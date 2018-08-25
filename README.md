@@ -8,7 +8,7 @@
 
 ## Getting Started
 
-```$
+```bash
 $ get-ipsws --help
 
 Usage: get-ipsws [OPTIONS] COMMAND [arg...]
@@ -30,6 +30,12 @@ Commands:
   help      Shows a list of commands or help for one command
 
 Run 'get-ipsws COMMAND --help' for more information on a command.
+```
+
+### Download an `ipsw`
+
+```bash
+$ get-ipsws --keys iPhone10,1 --build 16A5364a
 ```
 
 ## Issues
