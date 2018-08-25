@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -179,20 +180,22 @@ func processTr(tr *goquery.Selection) (IPSW, error) {
 		return IPSW{}, fmt.Errorf("this is the table header")
 	}
 
+	ipsw.Version = strings.TrimSpace(tableElements[0].Text())
+	ipsw.Build = strings.TrimSpace(tableElements[1].Text())
+	keys := []string{}
+	tableElements[2].Find("a").Each(func(_ int, alink *goquery.Selection) {
+		keys = append(keys, alink.Text())
+	})
+	ipsw.Keys = keys
+
 	if len(tableElements) == 8 {
-		ipsw.Version = strings.TrimSpace(tableElements[0].Text())
-		ipsw.Build = strings.TrimSpace(tableElements[1].Text())
-		keys := []string{}
-		tableElements[2].Find("a").Each(func(_ int, alink *goquery.Selection) {
-			keys = append(keys, alink.Text())
-		})
-		ipsw.Keys = keys
 		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
 		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[4].Text()))
 		// lastBaseBand = ipsw.Baseband
 		ipsw.ReleaseDate = strings.TrimSpace(tableElements[5].Text())
 		link, _ := tableElements[6].Find("a").Attr("href")
 		ipsw.DownloadURL = link
+		ipsw.FileName = path.Base(link)
 		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[7].Text()), ",", "", -1))
 		if err != nil {
 			err = errors.Wrap(err, "unable to convert str to int")
@@ -201,18 +204,12 @@ func processTr(tr *goquery.Selection) (IPSW, error) {
 	}
 
 	if len(tableElements) == 7 {
-		ipsw.Version = strings.TrimSpace(tableElements[0].Text())
-		ipsw.Build = strings.TrimSpace(tableElements[1].Text())
-		keys := []string{}
-		tableElements[2].Find("a").Each(func(_ int, alink *goquery.Selection) {
-			keys = append(keys, alink.Text())
-		})
-		ipsw.Keys = keys
 		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
 		// lastBaseBand = ipsw.Baseband
 		ipsw.ReleaseDate = strings.TrimSpace(tableElements[4].Text())
 		link, _ := tableElements[5].Find("a").Attr("href")
 		ipsw.DownloadURL = link
+		ipsw.FileName = path.Base(link)
 		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[6].Text()), ",", "", -1))
 		if err != nil {
 			err = errors.Wrap(err, "unable to convert str to int")
@@ -221,17 +218,11 @@ func processTr(tr *goquery.Selection) (IPSW, error) {
 	}
 
 	if len(tableElements) == 6 {
-		ipsw.Version = strings.TrimSpace(tableElements[0].Text())
-		ipsw.Build = strings.TrimSpace(tableElements[1].Text())
-		keys := []string{}
-		tableElements[2].Find("a").Each(func(_ int, alink *goquery.Selection) {
-			keys = append(keys, alink.Text())
-		})
-		ipsw.Keys = keys
 		// ipsw.Baseband = lastBaseBand
 		ipsw.ReleaseDate = strings.TrimSpace(tableElements[3].Text())
 		link, _ := tableElements[4].Find("a").Attr("href")
 		ipsw.DownloadURL = link
+		ipsw.FileName = path.Base(link)
 		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[5].Text()), ",", "", -1))
 		if err != nil {
 			err = errors.Wrap(err, "unable to convert str to int")
@@ -274,6 +265,7 @@ func getFirmwareLinks(url string) []string {
 func ScrapeIPhoneWiki() error {
 
 	links := []string{}
+
 	ipsws := []IPSW{}
 
 	firmwareLinks := getFirmwareLinks(iphoneWikiURL + firmwarePath)
@@ -284,6 +276,8 @@ func ScrapeIPhoneWiki() error {
 
 	// Request the HTML page.
 	for _, link := range links {
+		devices := []string{}
+
 		res, err := http.Get(iphoneWikiURL + link)
 		if err != nil {
 			log.Fatal(err.Error())
@@ -299,12 +293,17 @@ func ScrapeIPhoneWiki() error {
 			log.Fatal(err.Error())
 		}
 
-		// Find the review items
-		// doc.Find("#mw-content-text > div a").Each(func(i int, s *goquery.Selection) {
-		doc.Find("table").Each(func(_ int, table *goquery.Selection) {
+		// get device names
+		doc.Find("span.mw-headline").Each(func(_ int, span *goquery.Selection) {
+			devices = append(devices, span.Text())
+		})
 
+		// Find the review items
+		doc.Find("table").Each(func(i int, table *goquery.Selection) {
+			device := devices[i]
 			table.Find("tr").Each(func(_ int, tr *goquery.Selection) {
 				i, err := processTr(tr)
+				i.Device = device
 				if err != nil {
 					log.WithError(err).Error("parsing table row failed")
 				} else {
