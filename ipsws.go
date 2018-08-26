@@ -4,24 +4,14 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
 	"os"
-	"path"
 	"runtime"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
-	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
 	_ "github.com/blacktop/get-ipsws/statik"
-	"github.com/dustin/go-humanize"
-	"github.com/pkg/errors"
 	"github.com/rakyll/statik/fs"
 	"github.com/urfave/cli"
 )
@@ -30,6 +20,7 @@ const (
 	iphoneWikiURL    = "https://www.theiphonewiki.com"
 	firmwarePath     = "/wiki/Firmware"
 	betaFirmwarePath = "/wiki/Beta_Firmware"
+	ipswMeAPI        = "https://api.ipsw.me/v4"
 )
 
 var (
@@ -40,6 +31,7 @@ var (
 	// AppBuildTime stores the plugin's build time
 	AppBuildTime string
 	lastBaseBand []string
+	columnCount  int
 )
 
 // IPSW ipsw file
@@ -64,257 +56,6 @@ func getFmtStr() string {
 		return "%s"
 	}
 	return "\033[1m%s\033[0m"
-}
-
-// WriteCounter counts the number of bytes written to it. It implements to the io.Writer
-// interface and we can pass this into io.TeeReader() which will report progress on each
-// write cycle.
-type WriteCounter struct {
-	Total uint64
-}
-
-func (wc *WriteCounter) Write(p []byte) (int, error) {
-	n := len(p)
-	wc.Total += uint64(n)
-	wc.PrintProgress()
-	return n, nil
-}
-
-// PrintProgress prints download progress
-func (wc WriteCounter) PrintProgress() {
-	// Clear the line by using a character return to go back to the start and remove
-	// the remaining characters by filling it with spaces
-	fmt.Printf("\r%s", strings.Repeat(" ", 35))
-
-	// Return again and print current status of download
-	// We use the humanize package to print the bytes in a meaningful way (e.g. 10 MB)
-	fmt.Printf("\rDownloading... %s complete", humanize.Bytes(wc.Total))
-}
-
-// DownloadFile will download a url to a local file. It's efficient because it will
-// write as it downloads and not load the whole file into memory. We pass an io.TeeReader
-// into Copy() to report progress on the download.
-func DownloadFile(filepath string, url string) error {
-
-	// Create the file, but give it a tmp file extension, this means we won't overwrite a
-	// file until it's downloaded, but we'll remove the tmp extension once downloaded.
-	out, err := os.Create(filepath + ".tmp")
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// Get the data
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// Create our progress reporter and pass it to be used alongside our writer
-	counter := &WriteCounter{}
-	_, err = io.Copy(out, io.TeeReader(resp.Body, counter))
-	if err != nil {
-		return err
-	}
-
-	// The progress use the same line so print a new line once it's finished downloading
-	fmt.Print("\n")
-
-	err = os.Rename(filepath+".tmp", filepath)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func multiDownload() error {
-	// 	res, _ := http.Head("http://localhost/rand.txt") // 187 MB file of random numbers per line
-	// 	maps := res.Header
-	// 	length, _ := strconv.Atoi(maps["Content-Length"][0]) // Get the content length from the header request
-	// 	limit := 10                                          // 10 Go-routines for the process so each downloads 18.7MB
-	// 	len_sub := length / limit                            // Bytes for each Go-routine
-	// 	diff := length % limit                               // Get the remaining for the last request
-	// 	body := make([]string, 11)                           // Make up a temporary array to hold the data to be written to the file
-	// 	for i := 0; i < limit; i++ {
-	// 		wg.Add(1)
-
-	// 		min := len_sub * i       // Min range
-	// 		max := len_sub * (i + 1) // Max range
-
-	// 		if i == limit-1 {
-	// 			max += diff // Add the remaining bytes in the last request
-	// 		}
-
-	// 		go func(min int, max int, i int) {
-	// 			client := &http.Client{}
-	// 			req, _ := http.NewRequest("GET", "http://localhost/rand.txt", nil)
-	// 			range_header := "bytes=" + strconv.Itoa(min) + "-" + strconv.Itoa(max-1) // Add the data for the Range header of the form "bytes=0-100"
-	// 			req.Header.Add("Range", range_header)
-	// 			resp, _ := client.Do(req)
-	// 			defer resp.Body.Close()
-	// 			reader, _ := ioutil.ReadAll(resp.Body)
-	// 			body[i] = string(reader)
-	// 			ioutil.WriteFile(strconv.Itoa(i), []byte(string(body[i])), 0x777) // Write to the file i as a byte array
-	// 			wg.Done()
-	// 			//          ioutil.WriteFile("new_oct.png", []byte(string(body)), 0x777)
-	// 		}(min, max, i)
-	// 	}
-	// 	wg.Wait()
-	return nil
-}
-
-func processTr(tr *goquery.Selection) (IPSW, error) {
-
-	ipsw := IPSW{}
-	tableElements := []*goquery.Selection{}
-
-	// get table data
-	tr.Find("td").Each(func(_ int, td *goquery.Selection) {
-		tableElements = append(tableElements, td)
-	})
-
-	// skip header row
-	if len(tableElements) == 0 {
-		return IPSW{}, fmt.Errorf("this is the table header")
-	}
-
-	ipsw.Version = strings.TrimSpace(tableElements[0].Text())
-	ipsw.Build = strings.TrimSpace(tableElements[1].Text())
-	keys := []string{}
-	tableElements[2].Find("a").Each(func(_ int, alink *goquery.Selection) {
-		keys = append(keys, alink.Text())
-	})
-	ipsw.Keys = keys
-
-	if len(tableElements) == 8 {
-		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
-		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[4].Text()))
-		// lastBaseBand = ipsw.Baseband
-		ipsw.ReleaseDate = strings.TrimSpace(tableElements[5].Text())
-		link, _ := tableElements[6].Find("a").Attr("href")
-		ipsw.DownloadURL = link
-		ipsw.FileName = path.Base(link)
-		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[7].Text()), ",", "", -1))
-		if err != nil {
-			err = errors.Wrap(err, "unable to convert str to int")
-		}
-		ipsw.FileSize = fileSize
-	}
-
-	if len(tableElements) == 7 {
-		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
-		// lastBaseBand = ipsw.Baseband
-		ipsw.ReleaseDate = strings.TrimSpace(tableElements[4].Text())
-		link, _ := tableElements[5].Find("a").Attr("href")
-		ipsw.DownloadURL = link
-		ipsw.FileName = path.Base(link)
-		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[6].Text()), ",", "", -1))
-		if err != nil {
-			err = errors.Wrap(err, "unable to convert str to int")
-		}
-		ipsw.FileSize = fileSize
-	}
-
-	if len(tableElements) == 6 {
-		// ipsw.Baseband = lastBaseBand
-		ipsw.ReleaseDate = strings.TrimSpace(tableElements[3].Text())
-		link, _ := tableElements[4].Find("a").Attr("href")
-		ipsw.DownloadURL = link
-		ipsw.FileName = path.Base(link)
-		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[5].Text()), ",", "", -1))
-		if err != nil {
-			err = errors.Wrap(err, "unable to convert str to int")
-		}
-		ipsw.FileSize = fileSize
-	}
-
-	return ipsw, nil
-}
-
-func getFirmwareLinks(url string) []string {
-
-	links := []string{}
-
-	res, err := http.Get(url)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-	}
-
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	doc.Find("#mw-content-text > div a").Each(func(_ int, a *goquery.Selection) {
-		href, _ := a.Attr("href")
-		if strings.Contains(href, firmwarePath+"/") || strings.Contains(href, betaFirmwarePath+"/") {
-			links = append(links, href)
-		}
-	})
-	return links
-}
-
-// ScrapeIPhoneWiki scraps iPhoneWiki and extracts/filters download links
-func ScrapeIPhoneWiki() error {
-
-	links := []string{}
-
-	ipsws := []IPSW{}
-
-	firmwareLinks := getFirmwareLinks(iphoneWikiURL + firmwarePath)
-	betaFirmwareLinks := getFirmwareLinks(iphoneWikiURL + betaFirmwarePath)
-
-	links = append(links, firmwareLinks...)
-	links = append(links, betaFirmwareLinks...)
-
-	// Request the HTML page.
-	for _, link := range links {
-		devices := []string{}
-
-		res, err := http.Get(iphoneWikiURL + link)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-		}
-
-		// Load the HTML document
-		doc, err := goquery.NewDocumentFromReader(res.Body)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-
-		// get device names
-		doc.Find("span.mw-headline").Each(func(_ int, span *goquery.Selection) {
-			devices = append(devices, span.Text())
-		})
-
-		// Find the review items
-		doc.Find("table").Each(func(i int, table *goquery.Selection) {
-			device := devices[i]
-			table.Find("tr").Each(func(_ int, tr *goquery.Selection) {
-				i, err := processTr(tr)
-				i.Device = device
-				if err != nil {
-					log.WithError(err).Error("parsing table row failed")
-				} else {
-					ipsws = append(ipsws, i)
-				}
-			})
-		})
-	}
-
-	ipswJSON, _ := json.Marshal(ipsws)
-	return ioutil.WriteFile("database/ipsw.json", ipswJSON, 0644)
 }
 
 // QueryDB queries the IPSW json database
