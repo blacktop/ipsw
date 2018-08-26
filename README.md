@@ -38,6 +38,11 @@ Run 'get-ipsws COMMAND --help' for more information on a command.
 $ get-ipsws --keys iPhone10,1 --build 16A5364a
 ```
 
+## TODO
+
+- [ ] create offline copy of ipsw.me API
+- [ ] crawl ipsw.me for non-betas
+
 ## Issues
 
 Find a bug? Want more features? Find something missing in the documentation? Let me know! Please don't hesitate to [file an issue](https://github.com/blacktop/get-ipsws/issues/new)
