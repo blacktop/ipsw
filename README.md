@@ -40,6 +40,7 @@ $ get-ipsws --keys iPhone10,1 --build 16A5364a
 
 ## TODO
 
+- [ ] use https://github.com/gocolly/colly
 - [ ] create offline copy of ipsw.me API
 - [ ] crawl ipsw.me for non-betas
 
