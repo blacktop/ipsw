@@ -16,10 +16,8 @@ GIT_DESCRIBE=$(git describe --tags)
 setup: ## Install all the build and lint dependencies
 	@echo "===> Installing deps"
 	go get -u github.com/alecthomas/gometalinter
-	go get -u github.com/golang/dep/...
 	go get -u github.com/pierrre/gotestcover
 	go get -u golang.org/x/tools/cmd/cover
-	dep ensure
 	gometalinter --install
 
 test: ## Run all the tests
@@ -48,11 +46,28 @@ lint: ## Run all the linters
 		./...
 		markdownfmt -w README.md
 
+.PHONY: dry_release
+dry_release:
+	goreleaser --skip-publish --rm-dist --skip-validate
+
+.PHONY: bump
+bump: ## Incriment version patch number
+	@echo " > Bumping VERSION"
+	@hack/bump/version -p $(shell cat VERSION) > VERSION
+	@git commit -am "bumping version to $(VERSION)"
+	@git push
+
 .PHONY: release
-release: ## Create a new release from the VERSION
-	@echo "===> Creating Release"
-	@hack/make/release ${VERSION}
+release: bump ## Create a new release from the VERSION
+	@echo " > Creating Release"
+	@hack/make/release $(shell cat VERSION)
 	@goreleaser --rm-dist
+
+destroy: ## Remove release from the VERSION
+	@echo " > Deleting Release"
+	rm -rf dist
+	git tag -d ${VERSION}
+	git push origin :refs/tags/${VERSION}
 
 ci: lint test ## Run all the tests and code checks
 
