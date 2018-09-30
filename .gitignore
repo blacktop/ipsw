@@ -12,3 +12,6 @@
 *.out
 
 dist/
+*.ipsw
+get-ipsws
+caches/

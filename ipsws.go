@@ -4,13 +4,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
+	"path"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
+	"github.com/blacktop/get-ipsws/api"
 	_ "github.com/blacktop/get-ipsws/statik"
 	"github.com/rakyll/statik/fs"
 	"github.com/urfave/cli"
@@ -147,7 +150,11 @@ func main() {
 			Name:  "generate",
 			Usage: "crawl theiphonewiki.com and create JSON database",
 			Action: func(c *cli.Context) error {
-				ScrapeIPhoneWiki()
+				i := api.GetIPSW("iPhone11,2", "16A366")
+				fmt.Println(i)
+				// DownloadFile(path.Base(i.URL), i.URL)
+				Unzip(path.Base(i.URL), "caches")
+				// ScrapeIPhoneWiki()
 				return nil
 			},
 		},
