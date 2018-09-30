@@ -34,8 +34,8 @@ func Decompress(src []byte) []byte {
 				break
 			}
 			c = int(bite)
-			flags = uint(c | 0xFF00) /* uses higher byte cleverly */
-		} /* to count eight */
+			flags = uint(c | 0xFF00) /* uses higher byte cleverly to count eight*/
+		}
 
 		if flags&1 != 0 {
 			bite, err := srcBuf.ReadByte()
@@ -65,8 +65,8 @@ func Decompress(src []byte) []byte {
 			for k := 0; k <= j; k++ {
 				c = int(textBuf[(i+k)&(N-1)])
 				dst.WriteByte(byte(c))
-				r++
 				textBuf[r] = byte(c)
+				r++
 				r &= (N - 1)
 			}
 		}
