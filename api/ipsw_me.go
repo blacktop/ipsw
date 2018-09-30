@@ -18,6 +18,7 @@ type Device struct {
 	Platform    string `json:"platform,omitempty"`
 	CpID        int    `json:"cpid,omitempty"`
 	BdID        int    `json:"bdid,omitempty"`
+	Firmwares   []IPSW `json:"firmwares,omitempty"`
 }
 
 // IPSW struct
@@ -34,8 +35,8 @@ type IPSW struct {
 	Signed      bool      `json:"signed,omitempty"`
 }
 
-// GetDevices returns a list of all devices
-func GetDevices() []Device {
+// GetAllDevices returns a list of all devices
+func GetAllDevices() []Device {
 
 	res, err := http.Get(ipswMeURL + "devices")
 	if err != nil {
@@ -55,6 +56,29 @@ func GetDevices() []Device {
 	}
 
 	return devices
+}
+
+// GetDevice returns a device from it's identifier
+func GetDevice(identifier string) Device {
+
+	res, err := http.Get(ipswMeURL + "device" + "/" + identifier)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+	res.Body.Close()
+
+	d := Device{}
+	err = json.Unmarshal(body, &d)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return d
 }
 
 // GetAllIPSW finds all IPSW files for a given iOS version
@@ -100,3 +124,6 @@ func GetIPSW(identifier, buildID string) IPSW {
 
 	return i
 }
+
+// https://api.ipsw.me/v4/releases
+// func GetReleases() []Release {}
