@@ -53,7 +53,7 @@ Notice that the `kernelcache` was extracted from the IPSW and decompressed :smil
 ```bash
 $ file kernelcache.release.iphone11.decompressed
 
-kernelcache.release.iphone11.decompressed: Mach-O 64-bit executable arm64
+kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 ```
 
 ## TODO
