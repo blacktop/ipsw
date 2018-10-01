@@ -23,19 +23,23 @@ archive:
 
 brew:
   github:
-    owner: get-ipsws
+    owner: blacktop
     name: homebrew-tap
   folder: Formula
   homepage: "https://github.com/blacktop/get-ipsws"
-  description: "Download ipsw(s) from theiphonewiki.com"
+  description: "Download ipsw(s) from ipsw.me or theiphonewiki.com"
   test: |
     system "#{bin}/get-ipsws --version"
+
 checksum:
   name_template: "checksums.txt"
+
 sign:
   artifacts: checksum
+
 snapshot:
   name_template: "{{ .Tag }}-next"
+
 changelog:
   sort: asc
   filters:
