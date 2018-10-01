@@ -2,7 +2,7 @@
 
 [![Circle CI](https://circleci.com/gh/blacktop/get-ipsws.png?style=shield)](https://circleci.com/gh/blacktop/get-ipsws) [![Github All Releases](https://img.shields.io/github/downloads/blacktop/get-ipsws/total.svg)](https://github.com/blacktop/get-ipsws) [![GitHub release](https://img.shields.io/github/release/blacktop/get-ipsws.svg)](https://github.com/https://github.com/blacktop/get-ipsws/releases/releases) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 
-> Download ipsw(s) from ipsw.me or theiphonewiki.com
+> Download ipsw(s) from [ipsw.me](ipsw.me) or [theiphonewiki.com](theiphonewiki.com)
 
 ---
 
