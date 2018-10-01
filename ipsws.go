@@ -4,17 +4,14 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"path"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
-	"github.com/blacktop/get-ipsws/api"
 	"github.com/blacktop/get-ipsws/kernelcache"
 	"github.com/blacktop/get-ipsws/lzss"
 	_ "github.com/blacktop/get-ipsws/statik"
@@ -154,17 +151,17 @@ func main() {
 			Usage: "crawl theiphonewiki.com and create JSON database",
 			Action: func(c *cli.Context) error {
 				// i := api.GetDevice("iPhone10,1")
-				i := api.GetIPSW("iPhone11,2", "16A366")
-				fmt.Println(i)
-				DownloadFile(path.Base(i.URL), i.URL)
-				Unzip(path.Base(i.URL), "caches")
+				// i := api.GetIPSW("iPhone11,2", "16A366")
+				// fmt.Println(i)
+				// DownloadFile(path.Base(i.URL), i.URL)
+				// Unzip(path.Base(i.URL), "caches")
 				// ScrapeIPhoneWiki()
 				kc, err := kernelcache.Open("caches/kernelcache.release.iphone11")
 				if err != nil {
 					return err
 				}
 				dec := lzss.Decompress(kc.Data)
-				err = ioutil.WriteFile("caches/kernelcache.release.iphone11.decompressed", dec, 0644)
+				err = ioutil.WriteFile("caches/kernelcache.release.iphone11.decompressed", dec[:kc.Header.UncompressedSize], 0644)
 				if err != nil {
 					return err
 				}
