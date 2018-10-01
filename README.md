@@ -66,7 +66,6 @@ kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 
 - [ ] use https://github.com/gocolly/colly
 - [ ] create offline copy of ipsw.me API
-- [ ] crawl ipsw.me for non-betas
 
 ## Issues
 
