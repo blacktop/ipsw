@@ -6,15 +6,18 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"os"
+	"path"
 	"runtime"
 	"sync"
 	"time"
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
+	"github.com/blacktop/get-ipsws/api"
 	"github.com/blacktop/get-ipsws/kernelcache"
 	"github.com/blacktop/get-ipsws/lzss"
 	_ "github.com/blacktop/get-ipsws/statik"
+	"github.com/pkg/errors"
 	"github.com/rakyll/statik/fs"
 	"github.com/urfave/cli"
 )
@@ -90,9 +93,12 @@ func QueryDB(build string) []IPSW {
 }
 
 var appHelpTemplate = `Usage: {{.Name}} {{if .Flags}}[OPTIONS] {{end}}COMMAND [arg...]
+
 {{.Usage}}
+
 Version: {{.Version}}{{if or .Author .Email}}
-Author:{{if .Author}} {{.Author}}{{if .Email}} - <{{.Email}}>{{end}}{{else}}
+Author:{{if .Author}}
+  {{.Author}}{{if .Email}} - <{{.Email}}>{{end}}{{else}}
   {{.Email}}{{end}}{{end}}
 {{if .Flags}}
 Options:
@@ -120,6 +126,10 @@ func main() {
 			Name:  "verbose, V",
 			Usage: "verbose output",
 		},
+		cli.BoolFlag{
+			Name:  "dec",
+			Usage: "decompress the kernelcache",
+		},
 		cli.StringFlag{
 			Name:   "device, d",
 			Value:  "",
@@ -138,33 +148,19 @@ func main() {
 			Usage:  "iOS Build",
 			EnvVar: "IOS_BUILD",
 		},
-		cli.StringFlag{
-			Name:   "keys, k",
-			Value:  "",
-			Usage:  "iOS Keys",
-			EnvVar: "IOS_KEYS",
-		},
+		// cli.StringFlag{
+		// 	Name:   "keys, k",
+		// 	Value:  "",
+		// 	Usage:  "iOS Keys",
+		// 	EnvVar: "IOS_KEYS",
+		// },
 	}
 	app.Commands = []cli.Command{
 		{
 			Name:  "generate",
 			Usage: "crawl theiphonewiki.com and create JSON database",
 			Action: func(c *cli.Context) error {
-				// i := api.GetDevice("iPhone10,1")
-				// i := api.GetIPSW("iPhone11,2", "16A366")
-				// fmt.Println(i)
-				// DownloadFile(path.Base(i.URL), i.URL)
-				// Unzip(path.Base(i.URL), "caches")
-				// ScrapeIPhoneWiki()
-				kc, err := kernelcache.Open("caches/kernelcache.release.iphone11")
-				if err != nil {
-					return err
-				}
-				dec := lzss.Decompress(kc.Data)
-				err = ioutil.WriteFile("caches/kernelcache.release.iphone11.decompressed", dec[:kc.Header.UncompressedSize], 0644)
-				if err != nil {
-					return err
-				}
+				ScrapeIPhoneWiki()
 				return nil
 			},
 		},
@@ -175,13 +171,49 @@ func main() {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if len(c.String("build")) > 0 {
-
-			ipswList := QueryDB(c.String("build"))
-
-			for _, ipsw := range ipswList {
-				DownloadFile(ipsw.FileName, ipsw.DownloadURL)
+		if len(c.String("device")) > 0 && len(c.String("build")) > 0 {
+			// i := api.GetDevice("iPhone10,1")
+			i, err := api.GetIPSW(c.String("device"), c.String("build"))
+			if err != nil {
+				return errors.Wrap(err, "failed to query ipsw.me api")
 			}
+
+			if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
+				log.WithFields(log.Fields{
+					"device": c.String("device"),
+					"build":  c.String("build"),
+				}).Info("Getting IPSW")
+				err = DownloadFile(path.Base(i.URL), i.URL)
+				if err != nil {
+					return errors.Wrap(err, "failed to download file")
+				}
+			} else {
+				log.Warnf("ipsw already exits: %s", path.Base(i.URL))
+			}
+
+			if c.Bool("dec") {
+				log.Info("Extracting Kernelcache from IPSW")
+				kcache, err := Unzip(path.Base(i.URL), "")
+				if err != nil {
+					return errors.Wrap(err, "failed extract kernelcache from ipsw")
+				}
+				kc, err := kernelcache.Open(kcache)
+				if err != nil {
+					return errors.Wrap(err, "failed parse compressed kernelcache")
+				}
+				log.Info("Decompressing Kernelcache")
+				dec := lzss.Decompress(kc.Data)
+				err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
+				if err != nil {
+					return errors.Wrap(err, "failed to decompress kernelcache")
+				}
+			}
+
+			// ipswList := QueryDB(c.String("build"))
+
+			// for _, ipsw := range ipswList {
+			// 	DownloadFile(ipsw.FileName, ipsw.DownloadURL)
+			// }
 
 		} else {
 			cli.ShowAppHelp(c)

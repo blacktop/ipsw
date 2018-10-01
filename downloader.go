@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -76,10 +77,11 @@ func DownloadFile(filepath string, url string) error {
 }
 
 // Unzip - https://stackoverflow.com/a/24792688
-func Unzip(src, dest string) error {
+func Unzip(src, dest string) (string, error) {
+	var kcacheName string
 	r, err := zip.OpenReader(src)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer func() {
 		if err := r.Close(); err != nil {
@@ -127,15 +129,15 @@ func Unzip(src, dest string) error {
 
 	for _, f := range r.File {
 		if strings.Contains(f.Name, "kernelcache") {
+			kcacheName = path.Base(f.Name)
 			err := extractAndWriteFile(f)
 			if err != nil {
-				return err
+				return "", err
 			}
 		}
-
 	}
 
-	return nil
+	return kcacheName, nil
 }
 
 func multiDownload() error {

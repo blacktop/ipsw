@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/apex/log"
+	"github.com/blacktop/get-ipsws/utils"
 )
 
 // A LzssHeader represents the LZSS header
@@ -28,7 +29,7 @@ type CompressedCache struct {
 
 // Open opens the named file using os.Open and prepares it for use as a compressed kernelcache.
 func Open(name string) (*CompressedCache, error) {
-
+	log.Info("Parsing Compressed Kernelcache")
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
@@ -58,18 +59,19 @@ func Open(name string) (*CompressedCache, error) {
 	}
 
 	// Compressed Size: 17842843, Uncompressed: 35727352. Unknown (CRC?): 0x3f9543fd, Unknown 1: 0x1
-	log.Infof("Compressed Size: %d, Uncompressed: %d. Unknown: 0x%x, Unknown 1: 0x%x",
+	msg := fmt.Sprintf("compressed size: %d, uncompressed: %d. unknown: 0x%x, unknown 1: 0x%x",
 		cc.Header.CompressedSize,
 		cc.Header.UncompressedSize,
 		cc.Header.Unknown,
 		cc.Header.Unknown1,
 	)
+	utils.Indent(log.Info)(msg)
 
 	// find compressed kernel 0xfeedfa.. start address
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, 0xfeedfacf)
 	dStart := bytes.Index(dat, buf)
-	log.Infof("found compressed kernel at: %d", dStart)
+	log.Debugf("found compressed kernel at: %d", dStart)
 
 	if int64(cc.Header.CompressedSize) > cc.Size {
 		return nil, fmt.Errorf("compressed_size: %d is greater than file_size: %d", cc.Size, cc.Header.CompressedSize)
@@ -81,7 +83,7 @@ func Open(name string) (*CompressedCache, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("read %d bytes of data from file", n)
+	log.Debugf("read %d bytes of data from file", n)
 
 	return cc, nil
 }
