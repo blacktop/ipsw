@@ -14,21 +14,22 @@ const (
 // Decompress decompresses lzss data
 func Decompress(src []byte) []byte {
 
-	// ring buffer of size N, with extra F-1 bytes to aid string comparison
-	textBuf := make([]byte, N+F-1)
-	srcBuf := bytes.NewBuffer(src)
-	dst := bytes.Buffer{}
-
 	var i, j, r, c int
 	var flags uint
 
+	srcBuf := bytes.NewBuffer(src)
+	dst := bytes.Buffer{}
+
+	// ring buffer of size N, with extra F-1 bytes to aid string comparison
+	textBuf := make([]byte, N+F-1)
+	// for i := 0; i < N-F; i++ {
+	// 	textBuf[i] = byte(0x20)
+	// }
 	r = N - F
 	flags = 0
-
 	for {
-		flags >>= 1
-
-		if (flags & 0x100) == 0 {
+		flags = flags >> 1
+		if ((flags) & 0x100) == 0 {
 			bite, err := srcBuf.ReadByte()
 			if err != nil {
 				break
@@ -36,8 +37,7 @@ func Decompress(src []byte) []byte {
 			c = int(bite)
 			flags = uint(c | 0xFF00) /* uses higher byte cleverly to count eight*/
 		}
-
-		if flags&1 != 0 {
+		if flags&1 == 1 {
 			bite, err := srcBuf.ReadByte()
 			if err != nil {
 				break
