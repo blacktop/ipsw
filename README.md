@@ -6,6 +6,12 @@
 
 ---
 
+## Install
+
+```bash
+$ brew install blacktop/tap/get-ipsws
+```
+
 ## Getting Started
 
 ```bash
