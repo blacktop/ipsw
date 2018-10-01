@@ -3,12 +3,11 @@ package api
 import (
 	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"time"
 )
 
-const ipswMeURL = "https://api.ipsw.me/v4/"
+const ipswMeAPI = "https://api.ipsw.me/v4/"
 
 // Device struct
 type Device struct {
@@ -36,93 +35,95 @@ type IPSW struct {
 }
 
 // GetAllDevices returns a list of all devices
-func GetAllDevices() []Device {
+func GetAllDevices() ([]Device, error) {
+	devices := []Device{}
 
-	res, err := http.Get(ipswMeURL + "devices")
+	res, err := http.Get(ipswMeAPI + "devices")
 	if err != nil {
-		log.Fatal(err)
+		return devices, err
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		return devices, err
 	}
 	res.Body.Close()
 
-	devices := []Device{}
 	err = json.Unmarshal(body, &devices)
 	if err != nil {
-		log.Fatal(err)
+		return devices, err
 	}
 
-	return devices
+	return devices, nil
 }
 
 // GetDevice returns a device from it's identifier
-func GetDevice(identifier string) Device {
+func GetDevice(identifier string) (Device, error) {
+	d := Device{}
 
-	res, err := http.Get(ipswMeURL + "device" + "/" + identifier)
+	res, err := http.Get(ipswMeAPI + "device" + "/" + identifier)
 	if err != nil {
-		log.Fatal(err)
+		return d, err
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		return d, err
 	}
 	res.Body.Close()
 
-	d := Device{}
 	err = json.Unmarshal(body, &d)
 	if err != nil {
-		log.Fatal(err)
+		return d, err
 	}
 
-	return d
+	return d, nil
 }
 
 // GetAllIPSW finds all IPSW files for a given iOS version
-func GetAllIPSW(version string) []IPSW {
-	res, err := http.Get(ipswMeURL + "ipsw/" + version)
+func GetAllIPSW(version string) ([]IPSW, error) {
+	ipsws := []IPSW{}
+
+	res, err := http.Get(ipswMeAPI + "ipsw/" + version)
 	if err != nil {
-		log.Fatal(err)
+		return ipsws, err
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		return ipsws, err
 	}
 	res.Body.Close()
 
-	ipsws := []IPSW{}
 	err = json.Unmarshal(body, &ipsws)
 	if err != nil {
-		log.Fatal(err)
+		return ipsws, err
 	}
 
-	return ipsws
+	return ipsws, nil
 }
 
 // GetIPSW will get an IPSW when supplied an identifier and build ID
-func GetIPSW(identifier, buildID string) IPSW {
-	res, err := http.Get(ipswMeURL + "ipsw/" + identifier + "/" + buildID)
+func GetIPSW(identifier, buildID string) (IPSW, error) {
+	i := IPSW{}
+
+	res, err := http.Get(ipswMeAPI + "ipsw/" + identifier + "/" + buildID)
 	if err != nil {
-		log.Fatal(err)
+		return i, err
 	}
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		return i, err
 	}
 
-	i := IPSW{}
 	err = json.Unmarshal(body, &i)
 	if err != nil {
-		log.Fatal(err)
+		return i, err
 	}
 
-	return i
+	return i, nil
 }
 
 // https://api.ipsw.me/v4/releases
