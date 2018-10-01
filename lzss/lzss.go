@@ -22,11 +22,10 @@ func Decompress(src []byte) []byte {
 
 	// ring buffer of size N, with extra F-1 bytes to aid string comparison
 	textBuf := make([]byte, N+F-1)
-	// for i := 0; i < N-F; i++ {
-	// 	textBuf[i] = byte(0x20)
-	// }
+
 	r = N - F
 	flags = 0
+
 	for {
 		flags = flags >> 1
 		if ((flags) & 0x100) == 0 {
