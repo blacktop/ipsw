@@ -1,0 +1,32 @@
+# github.com/PuerkitoBio/goquery v1.4.1
+github.com/PuerkitoBio/goquery
+# github.com/VividCortex/ewma v1.1.1
+github.com/VividCortex/ewma
+# github.com/andybalholm/cascadia v1.0.0
+github.com/andybalholm/cascadia
+# github.com/apex/log v1.0.0
+github.com/apex/log
+github.com/apex/log/handlers/cli
+# github.com/dustin/go-humanize v0.0.0-20180713052910-9f541cc9db5d
+github.com/dustin/go-humanize
+# github.com/mattn/go-isatty v0.0.4
+github.com/mattn/go-isatty
+# github.com/pkg/errors v0.8.0
+github.com/pkg/errors
+# github.com/rakyll/statik v0.1.4
+github.com/rakyll/statik/fs
+# github.com/urfave/cli v1.20.0
+github.com/urfave/cli
+# github.com/vbauerster/mpb v3.3.2+incompatible
+github.com/vbauerster/mpb
+github.com/vbauerster/mpb/decor
+github.com/vbauerster/mpb/cwriter
+github.com/vbauerster/mpb/internal
+# golang.org/x/crypto v0.0.0-20181001203147-e3636079e1a4
+golang.org/x/crypto/ssh/terminal
+# golang.org/x/net v0.0.0-20180824152047-4bcd98cce591
+golang.org/x/net/html
+golang.org/x/net/html/atom
+# golang.org/x/sys v0.0.0-20180928133829-e4b3c5e90611
+golang.org/x/sys/unix
+golang.org/x/sys/windows
