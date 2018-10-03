@@ -183,7 +183,7 @@ func main() {
 					"device": c.String("device"),
 					"build":  c.String("build"),
 				}).Info("Getting IPSW")
-				err = DownloadFile(path.Base(i.URL), i.URL)
+				err = DownloadFile(i.URL)
 				if err != nil {
 					return errors.Wrap(err, "failed to download file")
 				}
