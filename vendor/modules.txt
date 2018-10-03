@@ -7,8 +7,6 @@ github.com/andybalholm/cascadia
 # github.com/apex/log v1.0.0
 github.com/apex/log
 github.com/apex/log/handlers/cli
-# github.com/dustin/go-humanize v0.0.0-20180713052910-9f541cc9db5d
-github.com/dustin/go-humanize
 # github.com/mattn/go-isatty v0.0.4
 github.com/mattn/go-isatty
 # github.com/pkg/errors v0.8.0
