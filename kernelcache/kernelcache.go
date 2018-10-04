@@ -1,14 +1,22 @@
 package kernelcache
 
 import (
+	"archive/zip"
 	"bytes"
 	"debug/macho"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/get-ipsws/lzss"
 	"github.com/blacktop/get-ipsws/utils"
+	"github.com/pkg/errors"
 )
 
 // A LzssHeader represents the LZSS header
@@ -86,6 +94,90 @@ func Open(name string) (*CompressedCache, error) {
 	log.Debugf("read %d bytes of data from file", n)
 
 	return cc, nil
+}
+
+// Extract extracts and decompresses a lernelcache from ipsw
+func Extract(ipsw string) error {
+	log.Info("Extracting Kernelcache from IPSW")
+	kcache, err := Unzip(ipsw, "")
+	if err != nil {
+		return errors.Wrap(err, "failed extract kernelcache from ipsw")
+	}
+	kc, err := Open(kcache)
+	if err != nil {
+		return errors.Wrap(err, "failed parse compressed kernelcache")
+	}
+	log.Info("Decompressing Kernelcache")
+	dec := lzss.Decompress(kc.Data)
+	err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to decompress kernelcache")
+	}
+	return nil
+}
+
+// Unzip - https://stackoverflow.com/a/24792688
+func Unzip(src, dest string) (string, error) {
+	var kcacheName string
+	r, err := zip.OpenReader(src)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err := r.Close(); err != nil {
+			panic(err)
+		}
+	}()
+
+	os.MkdirAll(dest, 0755)
+
+	// Closure to address file descriptors issue with all the deferred .Close() methods
+	extractAndWriteFile := func(f *zip.File) error {
+		rc, err := f.Open()
+		if err != nil {
+			return err
+		}
+		defer func() {
+			if err := rc.Close(); err != nil {
+				panic(err)
+			}
+		}()
+
+		path := filepath.Join(dest, f.Name)
+
+		if f.FileInfo().IsDir() {
+			os.MkdirAll(path, f.Mode())
+		} else {
+			os.MkdirAll(filepath.Dir(path), f.Mode())
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if err := f.Close(); err != nil {
+					panic(err)
+				}
+			}()
+
+			_, err = io.Copy(f, rc)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	for _, f := range r.File {
+		if strings.Contains(f.Name, "kernelcache") {
+			kcacheName = path.Base(f.Name)
+			err := extractAndWriteFile(f)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+
+	return kcacheName, nil
 }
 
 // ParseMachO parses the kernelcache as a mach-o
