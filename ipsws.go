@@ -4,7 +4,6 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path"
 	"runtime"
@@ -15,7 +14,6 @@ import (
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/get-ipsws/api"
 	"github.com/blacktop/get-ipsws/kernelcache"
-	"github.com/blacktop/get-ipsws/lzss"
 	_ "github.com/blacktop/get-ipsws/statik"
 	"github.com/pkg/errors"
 	"github.com/rakyll/statik/fs"
@@ -128,7 +126,7 @@ func main() {
 		},
 		cli.BoolFlag{
 			Name:  "dec",
-			Usage: "decompress the kernelcache",
+			Usage: "decompress kernelcache after downloading ipsw",
 		},
 		cli.StringFlag{
 			Name:   "device, d",
@@ -156,6 +154,25 @@ func main() {
 		// },
 	}
 	app.Commands = []cli.Command{
+		{
+			Name:  "extract",
+			Usage: "extract and decompress a kernelcache",
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				if c.Args().Present() {
+					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
+						kernelcache.Extract(c.Args().First())
+					} else {
+						return errors.New("file %s does not exist")
+					}
+				} else {
+					log.Fatal("Please supply a IPSW to extract from")
+				}
+				return nil
+			},
+		},
 		{
 			Name:  "generate",
 			Usage: "crawl theiphonewiki.com and create JSON database",
@@ -192,21 +209,7 @@ func main() {
 			}
 
 			if c.Bool("dec") {
-				log.Info("Extracting Kernelcache from IPSW")
-				kcache, err := Unzip(path.Base(i.URL), "")
-				if err != nil {
-					return errors.Wrap(err, "failed extract kernelcache from ipsw")
-				}
-				kc, err := kernelcache.Open(kcache)
-				if err != nil {
-					return errors.Wrap(err, "failed parse compressed kernelcache")
-				}
-				log.Info("Decompressing Kernelcache")
-				dec := lzss.Decompress(kc.Data)
-				err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
-				if err != nil {
-					return errors.Wrap(err, "failed to decompress kernelcache")
-				}
+				kernelcache.Extract(path.Base(i.URL))
 			}
 
 			// ipswList := QueryDB(c.String("build"))
