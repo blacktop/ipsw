@@ -240,7 +240,7 @@ func main() {
 
 				cont := false
 				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d ipsw files. Do you want to continue?", len(urls)),
+					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(urls)),
 				}
 				survey.AskOne(prompt, &cont, nil)
 
