@@ -16,5 +16,4 @@ dist/
 get-ipsws
 caches/
 *.BAK
-kernelcache.release.iphone11
-kernelcache.release.iphone11.decompressed
+kernelcache.release.*
