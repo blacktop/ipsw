@@ -8,9 +8,15 @@
 
 ## Install
 
+### macOS
+
 ```bash
 $ brew install blacktop/tap/get-ipsws
 ```
+
+### linux/windows
+
+Download from [releases](https://github.com/blacktop/get-ipsws/releases/latest)
 
 ## Getting Started
 
