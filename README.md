@@ -47,8 +47,9 @@ Run 'get-ipsws COMMAND --help' for more information on a command.
 ```bash
 $ get-ipsws --device iPhone11,2 --build 16A366 --dec
 
-   • Downloading IPSW
-      • Downloading... 3.6 GB complete
+   • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
+      3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
+      • verifying md5sum...
    • Extracting Kernelcache from IPSW
    • Parsing Compressed Kernelcache
       • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1

@@ -79,7 +79,8 @@ func Open(name string) (*CompressedCache, error) {
 	buf := make([]byte, 4)
 	binary.LittleEndian.PutUint32(buf, 0xfeedfacf)
 	dStart := bytes.Index(dat, buf)
-	log.Debugf("found compressed kernel at: %d", dStart)
+	msg = fmt.Sprintf("found compressed kernel at: %d", dStart)
+	utils.Indent(log.Debug)(msg)
 
 	if int64(cc.Header.CompressedSize) > cc.Size {
 		return nil, fmt.Errorf("compressed_size: %d is greater than file_size: %d", cc.Size, cc.Header.CompressedSize)
@@ -91,7 +92,8 @@ func Open(name string) (*CompressedCache, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("read %d bytes of data from file", n)
+	msg = fmt.Sprintf("read %d bytes of data from file", n)
+	utils.Indent(log.Debug)(msg)
 
 	return cc, nil
 }
