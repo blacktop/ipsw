@@ -74,6 +74,7 @@ $ get-ipsws extract iPhone11,2_12.0_16A366_Restore.ipsw
 
 - [ ] use https://github.com/gocolly/colly
 - [ ] create offline copy of ipsw.me API
+- [ ] download simultaniously to decrease total time _(need to limit concurrent downloads and 17+ at a time could be bad)_
 
 ## Issues
 
