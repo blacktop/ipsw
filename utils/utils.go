@@ -86,6 +86,6 @@ func Verify(md5sum, name string) (bool, error) {
 	Indent(log.WithFields(log.Fields{
 		"api":  md5sum,
 		"file": fmt.Sprintf("%x", h.Sum(nil)),
-	}).Debug)("MD5 hashes")
+	}).Debug)("md5 hashes")
 	return strings.EqualFold(md5sum, fmt.Sprintf("%x", h.Sum(nil))), nil
 }

@@ -76,7 +76,10 @@ build: ## Build a beta version of malice
 	go build
 
 clean: ## Clean up artifacts
-	rm *.tar
+	rm *.tar || true
+	rm *.ipsw || true
+	rm rm kernelcache.release.* || true
+	rm -rf dist
 
 # Absolutely awesome: http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 help:
