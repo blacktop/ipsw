@@ -4,17 +4,20 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path"
 	"runtime"
 	"sync"
 	"time"
 
+	"github.com/AlecAivazis/survey"
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/get-ipsws/api"
 	"github.com/blacktop/get-ipsws/kernelcache"
 	_ "github.com/blacktop/get-ipsws/statik"
+	"github.com/blacktop/get-ipsws/utils"
 	"github.com/pkg/errors"
 	"github.com/rakyll/statik/fs"
 	"github.com/urfave/cli"
@@ -60,6 +63,21 @@ func getFmtStr() string {
 		return "%s"
 	}
 	return "\033[1m%s\033[0m"
+}
+
+func unique(s []string) []string {
+	unique := make(map[string]bool, len(s))
+	us := make([]string, len(unique))
+	for _, elem := range s {
+		if len(elem) != 0 {
+			if !unique[elem] {
+				us = append(us, elem)
+				unique[elem] = true
+			}
+		}
+	}
+
+	return us
 }
 
 // QueryDB queries the IPSW json database
@@ -188,36 +206,57 @@ func main() {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if len(c.String("device")) > 0 && len(c.String("build")) > 0 {
-			// i := api.GetDevice("iPhone10,1")
-			i, err := api.GetIPSW(c.String("device"), c.String("build"))
-			if err != nil {
-				return errors.Wrap(err, "failed to query ipsw.me api")
-			}
-
-			if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
-				log.WithFields(log.Fields{
-					"device": c.String("device"),
-					"build":  c.String("build"),
-				}).Info("Getting IPSW")
-				err = DownloadFile(i.URL)
+		if len(c.String("build")) > 0 {
+			if len(c.String("device")) > 0 {
+				i, err := api.GetIPSW(c.String("device"), c.String("build"))
 				if err != nil {
-					return errors.Wrap(err, "failed to download file")
+					return errors.Wrap(err, "failed to query ipsw.me api")
+				}
+
+				if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
+					log.WithFields(log.Fields{
+						"device": c.String("device"),
+						"build":  c.String("build"),
+					}).Info("Getting IPSW")
+					err = DownloadFile(i.URL)
+					if err != nil {
+						return errors.Wrap(err, "failed to download file")
+					}
+				} else {
+					log.Warnf("ipsw already exits: %s", path.Base(i.URL))
+				}
+
+				if c.Bool("dec") {
+					kernelcache.Extract(path.Base(i.URL))
 				}
 			} else {
-				log.Warnf("ipsw already exits: %s", path.Base(i.URL))
+				urls := []string{}
+				ipsws, err := api.GetAllIPSW(c.String("build"))
+				if err != nil {
+					return errors.Wrap(err, "failed to query ipsw.me api")
+				}
+				for _, i := range ipsws {
+					urls = append(urls, i.URL)
+				}
+				urls = unique(urls)
+
+				log.Debug("URLS TO DOWNLOAD:")
+				for _, u := range urls {
+					utils.Indent(log.Debug)(u)
+				}
+
+				cont := false
+				prompt := &survey.Confirm{
+					Message: fmt.Sprintf("You are about to download %d ipsw files. Do you want to continue?", len(urls)),
+				}
+				survey.AskOne(prompt, &cont, nil)
+
+				if cont {
+					for _, url := range urls {
+						DownloadFile(url)
+					}
+				}
 			}
-
-			if c.Bool("dec") {
-				kernelcache.Extract(path.Base(i.URL))
-			}
-
-			// ipswList := QueryDB(c.String("build"))
-
-			// for _, ipsw := range ipswList {
-			// 	DownloadFile(ipsw.FileName, ipsw.DownloadURL)
-			// }
-
 		} else {
 			cli.ShowAppHelp(c)
 		}

@@ -27,7 +27,7 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["-V", "-b", "16A5364a"],
+      "args": ["-V", "-b", "12.0"],
       "showLog": false
     }
   ]

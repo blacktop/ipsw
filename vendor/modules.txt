@@ -1,3 +1,5 @@
+# github.com/AlecAivazis/survey v1.6.2
+github.com/AlecAivazis/survey
 # github.com/PuerkitoBio/goquery v1.4.1
 github.com/PuerkitoBio/goquery
 # github.com/VividCortex/ewma v1.1.1
@@ -7,8 +9,14 @@ github.com/andybalholm/cascadia
 # github.com/apex/log v1.0.0
 github.com/apex/log
 github.com/apex/log/handlers/cli
+# github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
+github.com/kballard/go-shellquote
+# github.com/mattn/go-colorable v0.0.9
+github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.4
 github.com/mattn/go-isatty
+# github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
+github.com/mgutz/ansi
 # github.com/pkg/errors v0.8.0
 github.com/pkg/errors
 # github.com/rakyll/statik v0.1.4
@@ -28,3 +36,6 @@ golang.org/x/net/html/atom
 # golang.org/x/sys v0.0.0-20180928133829-e4b3c5e90611
 golang.org/x/sys/unix
 golang.org/x/sys/windows
+# gopkg.in/AlecAivazis/survey.v1 v1.6.2
+gopkg.in/AlecAivazis/survey.v1/core
+gopkg.in/AlecAivazis/survey.v1/terminal

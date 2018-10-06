@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -42,6 +43,9 @@ func GetAllDevices() ([]Device, error) {
 	if err != nil {
 		return devices, err
 	}
+	if res.StatusCode != http.StatusOK {
+		return devices, fmt.Errorf("api returned status: %s", res.Status)
+	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -65,6 +69,9 @@ func GetDevice(identifier string) (Device, error) {
 	if err != nil {
 		return d, err
 	}
+	if res.StatusCode != http.StatusOK {
+		return d, fmt.Errorf("api returned status: %s", res.Status)
+	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -87,6 +94,9 @@ func GetAllIPSW(version string) ([]IPSW, error) {
 	res, err := http.Get(ipswMeAPI + "ipsw/" + version)
 	if err != nil {
 		return ipsws, err
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
 	body, err := ioutil.ReadAll(res.Body)
@@ -112,6 +122,10 @@ func GetIPSW(identifier, buildID string) (IPSW, error) {
 		return i, err
 	}
 	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return i, fmt.Errorf("api returned status: %s", res.Status)
+	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
