@@ -87,7 +87,7 @@ func Open(name string) (*CompressedCache, error) {
 	}
 
 	// Read entire file data.
-	cc.Data = make([]byte, cc.Size-int64(dStart), int64(cc.Header.CompressedSize))
+	cc.Data = make([]byte, cc.Size-int64(dStart-1), int64(cc.Header.UncompressedSize))
 	n, err := f.ReadAt(cc.Data, int64(dStart-1))
 	if err != nil {
 		return nil, err

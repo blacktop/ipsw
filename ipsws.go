@@ -149,9 +149,9 @@ func main() {
 				}
 				if c.Args().Present() {
 					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
-						kernelcache.Extract(c.Args().First())
+						return fmt.Errorf("file %s does not exist", c.Args().First())
 					} else {
-						return errors.New("file %s does not exist")
+						kernelcache.Extract(c.Args().First())
 					}
 				} else {
 					log.Fatal("Please supply a IPSW to extract from")
