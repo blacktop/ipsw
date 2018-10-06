@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -58,26 +58,14 @@ func init() {
 	log.SetHandler(clihander.Default)
 }
 
-func getFmtStr() string {
-	if runtime.GOOS == "windows" {
-		return "%s"
-	}
-	return "\033[1m%s\033[0m"
-}
-
-func unique(s []string) []string {
-	unique := make(map[string]bool, len(s))
-	us := make([]string, len(unique))
-	for _, elem := range s {
-		if len(elem) != 0 {
-			if !unique[elem] {
-				us = append(us, elem)
-				unique[elem] = true
-			}
+// LookupByRUL searchs for a ipsw in an array by a download URL
+func LookupByRUL(ipsws []api.IPSW, dlURL string) (api.IPSW, error) {
+	for _, i := range ipsws {
+		if strings.EqualFold(dlURL, i.URL) {
+			return i, nil
 		}
 	}
-
-	return us
+	return api.IPSW{}, fmt.Errorf("unable to find %s in ipsws", dlURL)
 }
 
 // QueryDB queries the IPSW json database
@@ -215,12 +203,17 @@ func main() {
 
 				if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
-						"device": c.String("device"),
-						"build":  c.String("build"),
+						"device":  i.Identifier,
+						"build":   i.BuildID,
+						"version": i.Version,
+						"signed":  i.Signed,
 					}).Info("Getting IPSW")
 					err = DownloadFile(i.URL)
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
+					}
+					if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
+						return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
 					}
 				} else {
 					log.Warnf("ipsw already exits: %s", path.Base(i.URL))
@@ -238,7 +231,7 @@ func main() {
 				for _, i := range ipsws {
 					urls = append(urls, i.URL)
 				}
-				urls = unique(urls)
+				urls = utils.Unique(urls)
 
 				log.Debug("URLS TO DOWNLOAD:")
 				for _, u := range urls {
@@ -253,7 +246,34 @@ func main() {
 
 				if cont {
 					for _, url := range urls {
-						DownloadFile(url)
+						if _, err := os.Stat(path.Base(url)); os.IsNotExist(err) {
+							// get a handle to ipsw object
+							i, err := LookupByRUL(ipsws, url)
+							if err != nil {
+								return errors.Wrap(err, "failed to get ipsw from download url")
+							}
+							log.WithFields(log.Fields{
+								"device":  i.Identifier,
+								"build":   i.BuildID,
+								"version": i.Version,
+								"signed":  i.Signed,
+							}).Info("Getting IPSW")
+							// download file
+							err = DownloadFile(url)
+							if err != nil {
+								return errors.Wrap(err, "failed to download file")
+							}
+							// verify download
+							if ok, _ := utils.Verify(i.MD5, path.Base(url)); !ok {
+								return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(url))
+							}
+						} else {
+							log.Warnf("ipsw already exits: %s", path.Base(url))
+						}
+
+						if c.Bool("dec") {
+							kernelcache.Extract(path.Base(url))
+						}
 					}
 				}
 			}
