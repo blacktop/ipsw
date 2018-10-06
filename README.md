@@ -50,7 +50,7 @@ Run 'ipsw COMMAND --help' for more information on a command.
 #### Download an `ipsw` and extract/decompress the `kernelcache`
 
 ```bash
-$ ipsw --device iPhone11,2 --build 16A366 --dec
+$ ipsw download --device iPhone11,2 --build 16A366 --dec
 
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s

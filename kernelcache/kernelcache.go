@@ -105,10 +105,13 @@ func Extract(ipsw string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
 	}
+	defer os.Remove(kcache)
+
 	kc, err := Open(kcache)
 	if err != nil {
 		return errors.Wrap(err, "failed parse compressed kernelcache")
 	}
+
 	log.Info("Decompressing Kernelcache")
 	dec := lzss.Decompress(kc.Data)
 	err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
