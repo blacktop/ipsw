@@ -48,7 +48,7 @@ func DownloadFile(url string) error {
 
 	bar := p.AddBar(size,
 		mpb.PrependDecorators(
-			decor.CountersKibiByte("% 6.1f / % 6.1f"),
+			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),
 		mpb.AppendDecorators(
 			decor.EwmaETA(decor.ET_STYLE_MMSS, float64(size)/2048),
