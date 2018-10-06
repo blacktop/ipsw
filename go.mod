@@ -1,4 +1,4 @@
-module github.com/blacktop/get-ipsws
+module github.com/blacktop/ipsw
 
 require (
 	github.com/AlecAivazis/survey v1.6.2

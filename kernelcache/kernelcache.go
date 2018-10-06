@@ -14,8 +14,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/get-ipsws/lzss"
-	"github.com/blacktop/get-ipsws/utils"
+	"github.com/blacktop/ipsw/lzss"
+	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 )
 

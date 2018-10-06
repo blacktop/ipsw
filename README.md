@@ -2,7 +2,7 @@
 
 [![Circle CI](https://circleci.com/gh/blacktop/ipsw.png?style=shield)](https://circleci.com/gh/blacktop/ipsw) [![Github All Releases](https://img.shields.io/github/downloads/blacktop/ipsw/total.svg)](https://github.com/blacktop/ipsw/releases/latest) [![GitHub release](https://img.shields.io/github/release/blacktop/ipsw.svg)](https://github.com/blacktop/ipsw/releases) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 
-> Download ipsw(s) from [ipsw.me](https://ipsw.me) or [theiphonewiki.com](https://theiphonewiki.com)
+> Download and parse ipsw(s) from [ipsw.me](https://ipsw.me) or [theiphonewiki.com](https://theiphonewiki.com)
 
 ---
 
@@ -27,28 +27,27 @@ Usage: ipsw [OPTIONS] COMMAND [arg...]
 
 IPSW Downloader
 
-Version: 18.09.5, BuildTime: 2018-10-04T02:27:30Z
+Version: 18.09.7, BuildTime: 2018-10-06T19:57:00Z
 Author:
   blacktop - <https://github.com/blacktop>
 
 Options:
-  --verbose, -V                    verbose output
-  --dec                            decompress kernelcache after downloading ipsw
-  --device value, -d value         iOS Device [$IOS_DEVICE]
-  --ios-version value, --iv value  iOS Version [$IOS_VERSION]
-  --build value, -b value          iOS Build [$IOS_BUILD]
-  --help, -h                       show help
-  --version, -v                    print the version
+  --verbose, -V  verbose output
+  --help, -h     show help
+  --version, -v  print the version
 
 Commands:
-  extract   extract and decompress a kernelcache
   generate  crawl theiphonewiki.com and create JSON database
+  extract   extract and decompress a kernelcache
+  download  download and parse ipsw from the internet
   help      Shows a list of commands or help for one command
 
 Run 'ipsw COMMAND --help' for more information on a command.
 ```
 
-### Download an `ipsw` and extract/decompress the `kernelcache`
+### `download`
+
+#### Download an `ipsw` and extract/decompress the `kernelcache`
 
 ```bash
 $ ipsw --device iPhone11,2 --build 16A366 --dec
@@ -70,7 +69,15 @@ $ file kernelcache.release.iphone11.decompressed
 kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 ```
 
-### Extract `kernelcache` from a previously downloaded `ipsw`
+#### Download all the iOS 12.0 `ipsws`
+
+```bash
+$ ipsw download --iversion 12.0
+```
+
+### `extract`
+
+Extract `kernelcache` from a previously downloaded `ipsw`
 
 ```bash
 $ ipsw extract iPhone11,2_12.0_16A366_Restore.ipsw

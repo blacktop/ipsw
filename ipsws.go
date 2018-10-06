@@ -14,10 +14,10 @@ import (
 	"github.com/AlecAivazis/survey"
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
-	"github.com/blacktop/get-ipsws/api"
-	"github.com/blacktop/get-ipsws/kernelcache"
-	_ "github.com/blacktop/get-ipsws/statik"
-	"github.com/blacktop/get-ipsws/utils"
+	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/kernelcache"
+	_ "github.com/blacktop/ipsw/statik"
+	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/rakyll/statik/fs"
 	"github.com/urfave/cli"
@@ -119,7 +119,7 @@ func main() {
 	cli.AppHelpTemplate = appHelpTemplate
 	app := cli.NewApp()
 
-	app.Name = "get-ipsws"
+	app.Name = "ipsw"
 	app.Author = "blacktop"
 	app.Email = "https://github.com/blacktop"
 	app.Version = AppVersion + ", BuildTime: " + AppBuildTime
@@ -130,36 +130,16 @@ func main() {
 			Name:  "verbose, V",
 			Usage: "verbose output",
 		},
-		cli.BoolFlag{
-			Name:  "dec",
-			Usage: "decompress kernelcache after downloading ipsw",
-		},
-		cli.StringFlag{
-			Name:   "device, d",
-			Value:  "",
-			Usage:  "iOS Device",
-			EnvVar: "IOS_DEVICE",
-		},
-		cli.StringFlag{
-			Name:   "iversion,iv",
-			Value:  "",
-			Usage:  "iOS Version",
-			EnvVar: "IOS_VERSION",
-		},
-		cli.StringFlag{
-			Name:   "build, b",
-			Value:  "",
-			Usage:  "iOS Build",
-			EnvVar: "IOS_BUILD",
-		},
-		// cli.StringFlag{
-		// 	Name:   "keys, k",
-		// 	Value:  "",
-		// 	Usage:  "iOS Keys",
-		// 	EnvVar: "IOS_KEYS",
-		// },
 	}
 	app.Commands = []cli.Command{
+		{
+			Name:  "generate",
+			Usage: "crawl theiphonewiki.com and create JSON database",
+			Action: func(c *cli.Context) error {
+				ScrapeIPhoneWiki()
+				return nil
+			},
+		},
 		{
 			Name:  "extract",
 			Usage: "extract and decompress a kernelcache",
@@ -180,108 +160,133 @@ func main() {
 			},
 		},
 		{
-			Name:  "generate",
-			Usage: "crawl theiphonewiki.com and create JSON database",
-			Action: func(c *cli.Context) error {
-				ScrapeIPhoneWiki()
-				return nil
+			Name:  "download",
+			Usage: "download and parse ipsw from the internet",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "dec",
+					Usage: "decompress kernelcache after downloading ipsw",
+				},
+				cli.StringFlag{
+					Name:   "device, d",
+					Value:  "",
+					Usage:  "iOS Device",
+					EnvVar: "IOS_DEVICE",
+				},
+				cli.StringFlag{
+					Name:   "iversion,iv",
+					Value:  "",
+					Usage:  "iOS Version",
+					EnvVar: "IOS_VERSION",
+				},
+				cli.StringFlag{
+					Name:   "build, b",
+					Value:  "",
+					Usage:  "iOS Build",
+					EnvVar: "IOS_BUILD",
+				},
+				// cli.StringFlag{
+				// 	Name:   "keys, k",
+				// 	Value:  "",
+				// 	Usage:  "iOS Keys",
+				// 	EnvVar: "IOS_KEYS",
+				// },
 			},
-		},
-	}
-	app.Action = func(c *cli.Context) error {
+			Action: func(c *cli.Context) error {
 
-		if c.Bool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		if len(c.String("build")) > 0 {
-			if len(c.String("device")) > 0 {
-				i, err := api.GetIPSW(c.String("device"), c.String("build"))
-				if err != nil {
-					return errors.Wrap(err, "failed to query ipsw.me api")
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
 				}
 
-				if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
-					log.WithFields(log.Fields{
-						"device":  i.Identifier,
-						"build":   i.BuildID,
-						"version": i.Version,
-						"signed":  i.Signed,
-					}).Info("Getting IPSW")
-					err = DownloadFile(i.URL)
-					if err != nil {
-						return errors.Wrap(err, "failed to download file")
-					}
-					if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
-						return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
-					}
-				} else {
-					log.Warnf("ipsw already exits: %s", path.Base(i.URL))
-				}
+				if len(c.String("device")) > 0 {
+					if len(c.String("build")) > 0 {
+						i, err := api.GetIPSW(c.String("device"), c.String("build"))
+						if err != nil {
+							return errors.Wrap(err, "failed to query ipsw.me api")
+						}
 
-				if c.Bool("dec") {
-					kernelcache.Extract(path.Base(i.URL))
-				}
-			}
-			} else if len(c.String("iversion")) > 0 {
-				urls := []string{}
-				ipsws, err := api.GetAllIPSW(c.String("build"))
-				if err != nil {
-					return errors.Wrap(err, "failed to query ipsw.me api")
-				}
-				for _, i := range ipsws {
-					urls = append(urls, i.URL)
-				}
-				urls = utils.Unique(urls)
-
-				log.Debug("URLS TO DOWNLOAD:")
-				for _, u := range urls {
-					utils.Indent(log.Debug)(u)
-				}
-
-				cont := false
-				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(urls)),
-				}
-				survey.AskOne(prompt, &cont, nil)
-
-				if cont {
-					for _, url := range urls {
-						if _, err := os.Stat(path.Base(url)); os.IsNotExist(err) {
-							// get a handle to ipsw object
-							i, err := LookupByRUL(ipsws, url)
-							if err != nil {
-								return errors.Wrap(err, "failed to get ipsw from download url")
-							}
+						if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
 							log.WithFields(log.Fields{
 								"device":  i.Identifier,
 								"build":   i.BuildID,
 								"version": i.Version,
 								"signed":  i.Signed,
 							}).Info("Getting IPSW")
-							// download file
-							err = DownloadFile(url)
+							err = DownloadFile(i.URL)
 							if err != nil {
 								return errors.Wrap(err, "failed to download file")
 							}
-							// verify download
-							if ok, _ := utils.Verify(i.MD5, path.Base(url)); !ok {
-								return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(url))
+							if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
+								return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
 							}
 						} else {
-							log.Warnf("ipsw already exits: %s", path.Base(url))
+							log.Warnf("ipsw already exits: %s", path.Base(i.URL))
 						}
 
 						if c.Bool("dec") {
-							kernelcache.Extract(path.Base(url))
+							kernelcache.Extract(path.Base(i.URL))
 						}
 					}
+				} else if len(c.String("iversion")) > 0 {
+					urls := []string{}
+					ipsws, err := api.GetAllIPSW(c.String("iversion"))
+					if err != nil {
+						return errors.Wrap(err, "failed to query ipsw.me api")
+					}
+					for _, i := range ipsws {
+						urls = append(urls, i.URL)
+					}
+					urls = utils.Unique(urls)
+
+					log.Debug("URLS TO DOWNLOAD:")
+					for _, u := range urls {
+						utils.Indent(log.Debug)(u)
+					}
+
+					cont := false
+					prompt := &survey.Confirm{
+						Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(urls)),
+					}
+					survey.AskOne(prompt, &cont, nil)
+
+					if cont {
+						for _, url := range urls {
+							if _, err := os.Stat(path.Base(url)); os.IsNotExist(err) {
+								// get a handle to ipsw object
+								i, err := LookupByRUL(ipsws, url)
+								if err != nil {
+									return errors.Wrap(err, "failed to get ipsw from download url")
+								}
+								log.WithFields(log.Fields{
+									"device":  i.Identifier,
+									"build":   i.BuildID,
+									"version": i.Version,
+									"signed":  i.Signed,
+								}).Info("Getting IPSW")
+								// download file
+								err = DownloadFile(url)
+								if err != nil {
+									return errors.Wrap(err, "failed to download file")
+								}
+								// verify download
+								if ok, _ := utils.Verify(i.MD5, path.Base(url)); !ok {
+									return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(url))
+								}
+							} else {
+								log.Warnf("ipsw already exits: %s", path.Base(url))
+							}
+
+							if c.Bool("dec") {
+								kernelcache.Extract(path.Base(url))
+							}
+						}
+					}
+				} else {
+					cli.ShowAppHelp(c)
 				}
-			}
-		} else {
-			cli.ShowAppHelp(c)
-		}
-		return nil
+				return nil
+			},
+		},
 	}
 
 	err := app.Run(os.Args)
