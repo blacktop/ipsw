@@ -42,7 +42,7 @@ Commands:
 Run 'get-ipsws COMMAND --help' for more information on a command.
 ```
 
-### Download an `ipsw` and extract/decompress the kernelcache
+### Download an `ipsw` and extract/decompress the `kernelcache`
 
 ```bash
 $ get-ipsws --device iPhone11,2 --build 16A366 --dec
@@ -55,7 +55,7 @@ $ get-ipsws --device iPhone11,2 --build 16A366 --dec
    • Decompressing Kernelcache
 ```
 
-Notice that the `kernelcache` was extracted from the IPSW and decompressed :smiling_imp:
+Notice that the `kernelcache` was extracted from the `ipsw` and decompressed :smiling_imp:
 
 ```bash
 $ file kernelcache.release.iphone11.decompressed
@@ -63,7 +63,7 @@ $ file kernelcache.release.iphone11.decompressed
 kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 ```
 
-### Extract kernelcache from a previously downloaded IPSW
+### Extract `kernelcache` from a previously downloaded `ipsw`
 
 ```bash
 $ get-ipsws extract iPhone11,2_12.0_16A366_Restore.ipsw
