@@ -76,14 +76,14 @@ $ ipsw download --iversion 12.0 --dec
 
 ? You are about to download 17 ipsw files. Continue? Yes
    • Getting IPSW              build=16A366 device=iPhone11,4 signed=true version=12.0
-	   3.3 GiB / 3.3 GiB [==========================================================| 00:00 ] 59.03 MiB/s
+    3.3 GiB / 3.3 GiB [==========================================================| 00:00 ] 59.03 MiB/s
       • verifying md5sum...
    • Extracting Kernelcache from IPSW
    • Parsing Compressed Kernelcache
       • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1
    • Decompressing Kernelcache
    • Getting IPSW              build=16A366 device=iPod7,1 signed=true version=12.0
-	   734.7 MiB / 2.6 GiB [===============>------------------------------------------| 00:57 ] 44.84 MiB/s
+    734.7 MiB / 2.6 GiB [===============>------------------------------------------| 00:57 ] 44.84 MiB/s
   ...
 ```
 
