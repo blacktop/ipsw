@@ -1,6 +1,6 @@
-# get-ipsws
+# ipsw
 
-[![Circle CI](https://circleci.com/gh/blacktop/get-ipsws.png?style=shield)](https://circleci.com/gh/blacktop/get-ipsws) [![Github All Releases](https://img.shields.io/github/downloads/blacktop/get-ipsws/total.svg)](https://github.com/blacktop/get-ipsws/releases/latest) [![GitHub release](https://img.shields.io/github/release/blacktop/get-ipsws.svg)](https://github.com/blacktop/get-ipsws/releases) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
+[![Circle CI](https://circleci.com/gh/blacktop/ipsw.png?style=shield)](https://circleci.com/gh/blacktop/ipsw) [![Github All Releases](https://img.shields.io/github/downloads/blacktop/ipsw/total.svg)](https://github.com/blacktop/ipsw/releases/latest) [![GitHub release](https://img.shields.io/github/release/blacktop/ipsw.svg)](https://github.com/blacktop/ipsw/releases) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 
 > Download ipsw(s) from [ipsw.me](https://ipsw.me) or [theiphonewiki.com](https://theiphonewiki.com)
 
@@ -11,19 +11,19 @@
 ### macOS
 
 ```bash
-$ brew install blacktop/tap/get-ipsws
+$ brew install blacktop/tap/ipsw
 ```
 
 ### linux/windows
 
-Download from [releases](https://github.com/blacktop/get-ipsws/releases/latest)
+Download from [releases](https://github.com/blacktop/ipsw/releases/latest)
 
 ## Getting Started
 
 ```bash
-$ get-ipsws --help
+$ ipsw --help
 
-Usage: get-ipsws [OPTIONS] COMMAND [arg...]
+Usage: ipsw [OPTIONS] COMMAND [arg...]
 
 IPSW Downloader
 
@@ -45,13 +45,13 @@ Commands:
   generate  crawl theiphonewiki.com and create JSON database
   help      Shows a list of commands or help for one command
 
-Run 'get-ipsws COMMAND --help' for more information on a command.
+Run 'ipsw COMMAND --help' for more information on a command.
 ```
 
 ### Download an `ipsw` and extract/decompress the `kernelcache`
 
 ```bash
-$ get-ipsws --device iPhone11,2 --build 16A366 --dec
+$ ipsw --device iPhone11,2 --build 16A366 --dec
 
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
@@ -73,7 +73,7 @@ kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 ### Extract `kernelcache` from a previously downloaded `ipsw`
 
 ```bash
-$ get-ipsws extract iPhone11,2_12.0_16A366_Restore.ipsw
+$ ipsw extract iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
 ## TODO
@@ -84,7 +84,7 @@ $ get-ipsws extract iPhone11,2_12.0_16A366_Restore.ipsw
 
 ## Issues
 
-Find a bug? Want more features? Find something missing in the documentation? Let me know! Please don't hesitate to [file an issue](https://github.com/blacktop/get-ipsws/issues/new)
+Find a bug? Want more features? Find something missing in the documentation? Let me know! Please don't hesitate to [file an issue](https://github.com/blacktop/ipsw/issues/new)
 
 ## License
 

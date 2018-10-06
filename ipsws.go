@@ -141,7 +141,7 @@ func main() {
 			EnvVar: "IOS_DEVICE",
 		},
 		cli.StringFlag{
-			Name:   "ios-version,iv",
+			Name:   "iversion,iv",
 			Value:  "",
 			Usage:  "iOS Version",
 			EnvVar: "IOS_VERSION",
@@ -222,7 +222,8 @@ func main() {
 				if c.Bool("dec") {
 					kernelcache.Extract(path.Base(i.URL))
 				}
-			} else {
+			}
+			} else if len(c.String("iversion")) > 0 {
 				urls := []string{}
 				ipsws, err := api.GetAllIPSW(c.String("build"))
 				if err != nil {
