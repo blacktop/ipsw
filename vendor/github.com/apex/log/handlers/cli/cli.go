@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/fatih/color"
+	colorable "github.com/mattn/go-colorable"
 )
 
 // Default handler outputting to stderr.
@@ -17,23 +19,15 @@ var Default = New(os.Stderr)
 // start time.
 var start = time.Now()
 
-// colors.
-const (
-	none   = 0
-	red    = 31
-	green  = 32
-	yellow = 33
-	blue   = 34
-	gray   = 37
-)
+var bold = color.New(color.Bold)
 
 // Colors mapping.
-var Colors = [...]int{
-	log.DebugLevel: gray,
-	log.InfoLevel:  blue,
-	log.WarnLevel:  yellow,
-	log.ErrorLevel: red,
-	log.FatalLevel: red,
+var Colors = [...]*color.Color{
+	log.DebugLevel: color.New(color.FgWhite),
+	log.InfoLevel:  color.New(color.FgBlue),
+	log.WarnLevel:  color.New(color.FgYellow),
+	log.ErrorLevel: color.New(color.FgRed),
+	log.FatalLevel: color.New(color.FgRed),
 }
 
 // Strings mapping.
@@ -54,6 +48,13 @@ type Handler struct {
 
 // New handler.
 func New(w io.Writer) *Handler {
+	if f, ok := w.(*os.File); ok {
+		return &Handler{
+			Writer:  colorable.NewColorable(f),
+			Padding: 3,
+		}
+	}
+
 	return &Handler{
 		Writer:  w,
 		Padding: 3,
@@ -69,14 +70,13 @@ func (h *Handler) HandleLog(e *log.Entry) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	fmt.Fprintf(h.Writer, "\033[%dm%*s\033[0m %-25s", color, h.Padding+1, level, e.Message)
+	color.Fprintf(h.Writer, "%s %-25s", bold.Sprintf("%*s", h.Padding+1, level), e.Message)
 
 	for _, name := range names {
 		if name == "source" {
 			continue
 		}
-
-		fmt.Fprintf(h.Writer, " \033[%dm%s\033[0m=%v", color, name, e.Fields.Get(name))
+		fmt.Fprintf(h.Writer, " %s=%v", color.Sprint(name), e.Fields.Get(name))
 	}
 
 	fmt.Fprintln(h.Writer)

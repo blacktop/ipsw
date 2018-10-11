@@ -6,9 +6,11 @@ github.com/PuerkitoBio/goquery
 github.com/VividCortex/ewma
 # github.com/andybalholm/cascadia v1.0.0
 github.com/andybalholm/cascadia
-# github.com/apex/log v1.0.0
+# github.com/apex/log v1.1.0
 github.com/apex/log
 github.com/apex/log/handlers/cli
+# github.com/fatih/color v1.7.0
+github.com/fatih/color
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 github.com/kballard/go-shellquote
 # github.com/mattn/go-colorable v0.0.9

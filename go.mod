@@ -6,8 +6,9 @@ require (
 	github.com/PuerkitoBio/goquery v1.4.1
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/andybalholm/cascadia v1.0.0 // indirect
-	github.com/apex/log v1.0.0
+	github.com/apex/log v1.1.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/fatih/color v1.7.0 // indirect
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kr/pty v1.1.3 // indirect
