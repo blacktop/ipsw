@@ -1,4 +1,0 @@
-
-// #cgo CFLAGS: -g -Wall
-// #include "lzss.h"
-import "C"
