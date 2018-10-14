@@ -7,6 +7,7 @@ require (
 	github.com/VividCortex/ewma v1.1.1 // indirect
 	github.com/andybalholm/cascadia v1.0.0 // indirect
 	github.com/apex/log v1.1.0
+	github.com/blacktop/lzss v0.1.0
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fatih/color v1.7.0 // indirect
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
