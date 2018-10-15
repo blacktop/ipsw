@@ -27,7 +27,7 @@ Usage: ipsw [OPTIONS] COMMAND [arg...]
 
 IPSW Downloader
 
-Version: 18.09.7, BuildTime: 2018-10-06T19:57:00Z
+Version: 18.10.1, BuildTime: 2018-10-15T01:56:00Z
 Author:
   blacktop - <https://github.com/blacktop>
 
@@ -37,10 +37,11 @@ Options:
   --version, -v  print the version
 
 Commands:
-  generate  crawl theiphonewiki.com and create JSON database
-  extract   extract and decompress a kernelcache
-  download  download and parse ipsw from the internet
-  help      Shows a list of commands or help for one command
+  generate    crawl theiphonewiki.com and create JSON database
+  extract     extract and decompress a kernelcache
+  decompress  decompress a kernelcache
+  download    download and parse ipsw from the internet
+  help        Shows a list of commands or help for one command
 
 Run 'ipsw COMMAND --help' for more information on a command.
 ```
@@ -122,6 +123,14 @@ Extract `kernelcache` from a previously downloaded `ipsw`
 
 ```bash
 $ ipsw extract iPhone11,2_12.0_16A366_Restore.ipsw
+```
+
+### `decompress`
+
+Decompress a previously extracted `kernelcache`
+
+```bash
+$ ipsw decompress kernelcache.release.iphone11
 ```
 
 ## TODO
