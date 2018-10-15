@@ -121,6 +121,23 @@ func Extract(ipsw string) error {
 	return nil
 }
 
+// Decompress decompresses a lernelcache
+func Decompress(kcache string) error {
+	kc, err := Open(kcache)
+	if err != nil {
+		return errors.Wrap(err, "failed parse compressed kernelcache")
+	}
+	defer os.Remove(kcache)
+
+	log.Info("Decompressing Kernelcache")
+	dec := lzss.Decompress(kc.Data)
+	err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to decompress kernelcache")
+	}
+	return nil
+}
+
 // Unzip - https://stackoverflow.com/a/24792688
 func Unzip(src, dest string) (string, error) {
 	var kcacheName string
