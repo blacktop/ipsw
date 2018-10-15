@@ -170,6 +170,25 @@ func main() {
 			},
 		},
 		{
+			Name:  "decompress",
+			Usage: "decompress a kernelcache",
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				if c.Args().Present() {
+					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
+						return fmt.Errorf("file %s does not exist", c.Args().First())
+					} else {
+						kernelcache.Decompress(c.Args().First())
+					}
+				} else {
+					log.Fatal("Please supply a kernelcache to decompress")
+				}
+				return nil
+			},
+		},
+		{
 			Name:  "download",
 			Usage: "download and parse ipsw from the internet",
 			Flags: []cli.Flag{
@@ -271,14 +290,14 @@ func main() {
 								if err != nil {
 									return errors.Wrap(err, "failed to get ipsw from download url")
 								}
-								log.WithFields(log.Fields{
-									"device":  i.Identifier,
-									"build":   i.BuildID,
-									"version": i.Version,
-									"signed":  i.Signed,
-								}).Info("Getting IPSW")
 
 								if c.Bool("kernel") {
+									log.WithFields(log.Fields{
+										"device":  i.Identifier,
+										"build":   i.BuildID,
+										"version": i.Version,
+										"signed":  i.Signed,
+									}).Info("Getting Kernelcache")
 									pzip, err := partialzip.New(url)
 									if err != nil {
 										return errors.Wrap(err, "failed to create partialzip instance")
@@ -290,8 +309,15 @@ func main() {
 											return errors.Wrap(err, "failed to download file")
 										}
 										kernelcache.Decompress(kpath)
+										continue
 									}
 								} else {
+									log.WithFields(log.Fields{
+										"device":  i.Identifier,
+										"build":   i.BuildID,
+										"version": i.Version,
+										"signed":  i.Signed,
+									}).Info("Getting IPSW")
 									// download file
 									err = DownloadFile(url)
 									if err != nil {
