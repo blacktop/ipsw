@@ -87,6 +87,35 @@ $ ipsw download --iversion 12.0 --dec
   ...
 ```
 
+#### Only download and decompress the kernelcaches _(which is CRAZY fast)_ :new:
+
+```bash
+$ time ipsw download --iversion 12.0.1 --kernel --dec
+
+"8.40s user 1.19s system 53% cpu 17.784 total"
+```
+
+That's **14** decompressed kernelcaches in under **9 seconds** :smirk:
+
+```bash
+$ ls -1
+
+kernelcache.release.ipad4b.decompressed
+kernelcache.release.ipad5b.decompressed
+kernelcache.release.ipad6b.decompressed
+kernelcache.release.ipad6d.decompressed
+kernelcache.release.ipad6f.decompressed
+kernelcache.release.ipad7.decompressed
+kernelcache.release.iphone10b.decompressed
+kernelcache.release.iphone11.decompressed
+kernelcache.release.iphone11b.decompressed
+kernelcache.release.iphone7.decompressed
+kernelcache.release.iphone8b.decompressed
+kernelcache.release.iphone9.decompressed
+kernelcache.release.j42d.decompressed
+kernelcache.release.n102.decompressed
+```
+
 ### `extract`
 
 Extract `kernelcache` from a previously downloaded `ipsw`
