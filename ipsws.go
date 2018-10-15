@@ -18,6 +18,7 @@ import (
 	"github.com/blacktop/ipsw/kernelcache"
 	_ "github.com/blacktop/ipsw/statik"
 	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/partialzip"
 	"github.com/pkg/errors"
 	"github.com/rakyll/statik/fs"
 	"github.com/urfave/cli"
@@ -96,6 +97,15 @@ func QueryDB(build string) []IPSW {
 	return ipsws
 }
 
+func findKernelInList(list []string) string {
+	for _, v := range list {
+		if strings.Contains(v, "kernel") {
+			return v
+		}
+	}
+	return ""
+}
+
 var appHelpTemplate = `Usage: {{.Name}} {{if .Flags}}[OPTIONS] {{end}}COMMAND [arg...]
 
 {{.Usage}}
@@ -166,6 +176,10 @@ func main() {
 				cli.BoolFlag{
 					Name:  "dec",
 					Usage: "decompress kernelcache after downloading ipsw",
+				},
+				cli.BoolFlag{
+					Name:  "kernel",
+					Usage: "only download the kernelcache from ipsw",
 				},
 				cli.StringFlag{
 					Name:   "device, d",
@@ -263,14 +277,30 @@ func main() {
 									"version": i.Version,
 									"signed":  i.Signed,
 								}).Info("Getting IPSW")
-								// download file
-								err = DownloadFile(url)
-								if err != nil {
-									return errors.Wrap(err, "failed to download file")
-								}
-								// verify download
-								if ok, _ := utils.Verify(i.MD5, path.Base(url)); !ok {
-									return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(url))
+
+								if c.Bool("kernel") {
+									pzip, err := partialzip.New(url)
+									if err != nil {
+										return errors.Wrap(err, "failed to create partialzip instance")
+									}
+									kpath := findKernelInList(pzip.List())
+									if len(kpath) > 0 {
+										_, err = pzip.Download(kpath)
+										if err != nil {
+											return errors.Wrap(err, "failed to download file")
+										}
+										kernelcache.Decompress(kpath)
+									}
+								} else {
+									// download file
+									err = DownloadFile(url)
+									if err != nil {
+										return errors.Wrap(err, "failed to download file")
+									}
+									// verify download
+									if ok, _ := utils.Verify(i.MD5, path.Base(url)); !ok {
+										return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(url))
+									}
 								}
 							} else {
 								log.Warnf("ipsw already exits: %s", path.Base(url))

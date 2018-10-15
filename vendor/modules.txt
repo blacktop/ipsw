@@ -11,6 +11,8 @@ github.com/apex/log
 github.com/apex/log/handlers/cli
 # github.com/blacktop/lzss v0.1.0
 github.com/blacktop/lzss
+# github.com/blacktop/partialzip v0.2.0
+github.com/blacktop/partialzip
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
@@ -43,3 +45,5 @@ golang.org/x/sys/windows
 # gopkg.in/AlecAivazis/survey.v1 v1.6.2
 gopkg.in/AlecAivazis/survey.v1/core
 gopkg.in/AlecAivazis/survey.v1/terminal
+# howett.net/plist v0.0.0-20180609054337-500bd5b9081b
+howett.net/plist
