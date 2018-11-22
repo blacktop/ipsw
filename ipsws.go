@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -169,6 +170,9 @@ func main() {
 						return fmt.Errorf("file %s does not exist", c.Args().First())
 					} else {
 						if c.Bool("dyld") {
+							if runtime.GOOS == "darwin" {
+								log.Fatal("dyld_shared_cache extraction only works on macOS :(")
+							}
 							dyld.Extract(c.Args().First())
 							return err
 						}
