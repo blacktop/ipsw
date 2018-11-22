@@ -125,6 +125,16 @@ Extract `kernelcache` from a previously downloaded `ipsw`
 $ ipsw extract iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
+Extract `dyld_shared_cache` from a previously downloaded `ipsw` _(only on macOS)_
+
+```bash
+$ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
+   • Extracting dyld_shared_cache from IPSW
+   • Mounting DMG
+   • Extracting /tmp/ios/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to ./dyld_shared_cache
+   • Unmounting DMG
+```
+
 ### `decompress`
 
 Decompress a previously extracted `kernelcache`

@@ -15,6 +15,7 @@ import (
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/dyld"
 	"github.com/blacktop/ipsw/kernelcache"
 	_ "github.com/blacktop/ipsw/statik"
 	"github.com/blacktop/ipsw/utils"
@@ -153,6 +154,12 @@ func main() {
 		{
 			Name:  "extract",
 			Usage: "extract and decompress a kernelcache",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "dyld, d",
+					Usage: "extract dyld_shared_cache",
+				},
+			},
 			Action: func(c *cli.Context) error {
 				if c.GlobalBool("verbose") {
 					log.SetLevel(log.DebugLevel)
@@ -161,6 +168,10 @@ func main() {
 					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
 						return fmt.Errorf("file %s does not exist", c.Args().First())
 					} else {
+						if c.Bool("dyld") {
+							dyld.Extract(c.Args().First())
+							return err
+						}
 						kernelcache.Extract(c.Args().First())
 					}
 				} else {

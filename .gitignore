@@ -17,3 +17,5 @@ get-ipsws
 caches/
 *.BAK
 kernelcache.release.*
+iPhone11,2_12.0_16A366_Restore
+dyld_shared_cache
