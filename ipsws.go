@@ -153,6 +153,24 @@ func main() {
 			},
 		},
 		{
+			Name:  "diff",
+			Usage: "diff kernelcache",
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				if c.Args().Present() {
+					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
+						return fmt.Errorf("file %s does not exist", c.Args().First())
+					}
+					kernelcache.ParseMachO(c.Args().First())
+				} else {
+					log.Fatal("Please supply a kernelcache to diff from")
+				}
+				return nil
+			},
+		},
+		{
 			Name:  "extract",
 			Usage: "extract and decompress a kernelcache",
 			Flags: []cli.Flag{
@@ -168,16 +186,15 @@ func main() {
 				if c.Args().Present() {
 					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
 						return fmt.Errorf("file %s does not exist", c.Args().First())
-					} else {
-						if c.Bool("dyld") {
-							if runtime.GOOS == "darwin" {
-								log.Fatal("dyld_shared_cache extraction only works on macOS :(")
-							}
-							dyld.Extract(c.Args().First())
-							return err
-						}
-						kernelcache.Extract(c.Args().First())
 					}
+					if c.Bool("dyld") {
+						if runtime.GOOS == "darwin" {
+							log.Fatal("dyld_shared_cache extraction only works on macOS :(")
+						}
+						return dyld.Extract(c.Args().First())
+					}
+					kernelcache.Extract(c.Args().First())
+
 				} else {
 					log.Fatal("Please supply a IPSW to extract from")
 				}
@@ -194,9 +211,8 @@ func main() {
 				if c.Args().Present() {
 					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
 						return fmt.Errorf("file %s does not exist", c.Args().First())
-					} else {
-						kernelcache.Decompress(c.Args().First())
 					}
+					kernelcache.Decompress(c.Args().First())
 				} else {
 					log.Fatal("Please supply a kernelcache to decompress")
 				}
