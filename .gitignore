@@ -14,7 +14,7 @@
 dist/
 *.ipsw
 get-ipsws
-caches/
+test-caches/
 *.BAK
 kernelcache.release.*
 iPhone11,2_12.0_16A366_Restore
