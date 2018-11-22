@@ -88,7 +88,7 @@ $ ipsw download --iversion 12.0 --dec
   ...
 ```
 
-#### Only download and decompress the kernelcaches _(which is CRAZY fast)_ :new:
+#### Only download and decompress the kernelcaches _(which is CRAZY fast)_
 
 ```bash
 $ time ipsw download --iversion 12.0.1 --kernel --dec
@@ -125,13 +125,13 @@ Extract `kernelcache` from a previously downloaded `ipsw`
 $ ipsw extract iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
-Extract `dyld_shared_cache` from a previously downloaded `ipsw` _(only on macOS)_
+Extract `dyld_shared_cache` from a previously downloaded `ipsw` _(only on macOS)_ :new:
 
 ```bash
 $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Extracting dyld_shared_cache from IPSW
    • Mounting DMG
-   • Extracting /tmp/ios/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to ./dyld_shared_cache
+   • Extracting /tmp/ios/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
    • Unmounting DMG
 ```
 
