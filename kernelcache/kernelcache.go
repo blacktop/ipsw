@@ -210,11 +210,14 @@ func ParseMachO(name string) error {
 	if err != nil {
 		return err
 	}
+
 	fmt.Println(f.FileHeader)
+
 	err = os.Mkdir("diff", os.ModePerm)
 	if err != nil {
 		return err
 	}
+
 	for _, sec := range f.Sections {
 		if strings.EqualFold(sec.Name, "__cstring") && strings.EqualFold(sec.Seg, "__TEXT") {
 			r := bufio.NewReader(sec.Open())
@@ -223,9 +226,11 @@ func ParseMachO(name string) error {
 				if err == io.EOF {
 					break
 				}
+
 				if err != nil && err != iotest.ErrTimeout {
 					panic("GetLines: " + err.Error())
 				}
+
 				if strings.Contains(s, "@/BuildRoot/") {
 					var assertStr string
 					parts := strings.Split(strings.TrimSpace(s), "@/BuildRoot/")
@@ -240,15 +245,16 @@ func ParseMachO(name string) error {
 						filePath := parts[0]
 						lineNum := parts[1]
 						fmt.Printf("%s on line %s ==> %s\n", filePath, lineNum, assertStr)
+
 						err = os.MkdirAll(filepath.Dir(filepath.Join("diff", filePath)), os.ModePerm)
 						if err != nil {
 							return err
 						}
+
 						f, err := os.Create(filepath.Join("diff", filePath))
 						if err != nil {
 							return err
 						}
-
 						f.Close()
 					} else {
 						fmt.Println("WHAT?? ", s)

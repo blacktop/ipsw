@@ -144,17 +144,17 @@ func main() {
 		},
 	}
 	app.Commands = []cli.Command{
-		{
-			Name:  "generate",
-			Usage: "crawl theiphonewiki.com and create JSON database",
-			Action: func(c *cli.Context) error {
-				ScrapeIPhoneWiki()
-				return nil
-			},
-		},
+		// {
+		// 	Name:  "generate",
+		// 	Usage: "crawl theiphonewiki.com and create JSON database",
+		// 	Action: func(c *cli.Context) error {
+		// 		ScrapeIPhoneWiki()
+		// 		return nil
+		// 	},
+		// },
 		{
 			Name:  "diff",
-			Usage: "diff kernelcache",
+			Usage: "diff kernelcache (using assert strings)",
 			Action: func(c *cli.Context) error {
 				if c.GlobalBool("verbose") {
 					log.SetLevel(log.DebugLevel)
@@ -223,6 +223,16 @@ func main() {
 			Name:  "download",
 			Usage: "download and parse ipsw from the internet",
 			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "proxy",
+					Value:  "",
+					Usage:  "HTTP/HTTPS proxy",
+					EnvVar: "HTTPS_PROXY",
+				},
+				cli.BoolFlag{
+					Name:  "insecure",
+					Usage: "do not verify ssl certs",
+				},
 				cli.BoolFlag{
 					Name:  "dec",
 					Usage: "decompress kernelcache after downloading ipsw",
@@ -276,7 +286,7 @@ func main() {
 								"version": i.Version,
 								"signed":  i.Signed,
 							}).Info("Getting IPSW")
-							err = DownloadFile(i.URL)
+							err = DownloadFile(i.URL, c.String("proxy"), c.Bool("insecure"))
 							if err != nil {
 								return errors.Wrap(err, "failed to download file")
 							}
@@ -350,7 +360,7 @@ func main() {
 										"signed":  i.Signed,
 									}).Info("Getting IPSW")
 									// download file
-									err = DownloadFile(url)
+									err = DownloadFile(url, c.String("proxy"), c.Bool("insecure"))
 									if err != nil {
 										return errors.Wrap(err, "failed to download file")
 									}
