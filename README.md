@@ -157,6 +157,10 @@ I am playing with the idea of `diffing` kernelcaches by creating directory struc
 
 Then you could use `git diff` or something to get a quick **high** level view of what Apple has changed by seeing new files being added or removed as well as seeing the line numbers of the assert strings move around.
 
+```bash
+$ ipsw diff kernelcache.release.iphone11
+```
+
 You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/diff/Library/Caches/com.apple.xbs/Sources)
 
 ## TODO
