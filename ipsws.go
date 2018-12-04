@@ -320,6 +320,8 @@ func main() {
 								kernelcache.Extract(path.Base(i.URL))
 							}
 						}
+					} else {
+						log.Fatal("you must also supply a --build")
 					}
 				} else if len(c.String("iversion")) > 0 {
 					urls := []string{}
