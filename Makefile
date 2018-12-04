@@ -54,7 +54,7 @@ dry_release:
 bump: ## Incriment version patch number
 	@echo " > Bumping VERSION"
 	@hack/bump/version -p $(shell cat VERSION) > VERSION
-	@git commit -am "bumping version to $(VERSION)"
+	@git commit -am "bumping version to $(shell cat VERSION)"
 	@git push
 
 .PHONY: release
