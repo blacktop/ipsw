@@ -135,6 +135,12 @@ This will download and decompress the `kernelcache` for an `iPhone XS` running `
 $ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92 --kernel --dec
 ```
 
+To disable cert verification
+
+```bash
+$ ipsw download --insecure --device iPhone11,2 --build 16B92 --kernel --dec
+```
+
 ### `extract`
 
 Extract `kernelcache` from a previously downloaded `ipsw`
