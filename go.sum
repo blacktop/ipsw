@@ -1,5 +1,5 @@
-github.com/AlecAivazis/survey v1.6.2 h1:3GI914VggzSChV48M9GyasD/z//+8sN7nt1V7M78NLs=
-github.com/AlecAivazis/survey v1.6.2/go.mod h1:MVECab6WqEH1aXhj8nKIwF7HEAJAj2bhhGiSjNy3wII=
+github.com/AlecAivazis/survey v1.7.0 h1:Hri7k8HCumnCO2ks0BjjYZdnLVL3b/nvfUjUUVJtHGs=
+github.com/AlecAivazis/survey v1.7.0/go.mod h1:MVECab6WqEH1aXhj8nKIwF7HEAJAj2bhhGiSjNy3wII=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b h1:sSQK05nvxs4UkgCJaxihteu+r+6ela3dNMm7NVmsS3c=
 github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b/go.mod h1:oX5x61PbNXchhh0oikYAH+4Pcfw5LKv21+Jnpr6r6Pc=

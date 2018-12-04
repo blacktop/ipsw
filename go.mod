@@ -1,7 +1,7 @@
 module github.com/blacktop/ipsw
 
 require (
-	github.com/AlecAivazis/survey v1.6.2
+	github.com/AlecAivazis/survey v1.7.0
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/PuerkitoBio/goquery v1.4.1
 	github.com/VividCortex/ewma v1.1.1 // indirect
