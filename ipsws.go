@@ -272,58 +272,7 @@ func main() {
 					log.SetLevel(log.DebugLevel)
 				}
 
-				if len(c.String("device")) > 0 {
-					if len(c.String("build")) > 0 {
-						i, err := api.GetIPSW(c.String("device"), c.String("build"))
-						if err != nil {
-							return errors.Wrap(err, "failed to query ipsw.me api")
-						}
-						if c.Bool("kernel") {
-							log.WithFields(log.Fields{
-								"device":  i.Identifier,
-								"build":   i.BuildID,
-								"version": i.Version,
-								"signed":  i.Signed,
-							}).Info("Getting Kernelcache")
-							pzip, err := partialzip.New(i.URL)
-							if err != nil {
-								return errors.Wrap(err, "failed to create partialzip instance")
-							}
-							kpath := findKernelInList(pzip.List())
-							if len(kpath) > 0 {
-								_, err = pzip.Download(kpath)
-								if err != nil {
-									return errors.Wrap(err, "failed to download file")
-								}
-								kernelcache.Decompress(kpath)
-							}
-						} else {
-							if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
-								log.WithFields(log.Fields{
-									"device":  i.Identifier,
-									"build":   i.BuildID,
-									"version": i.Version,
-									"signed":  i.Signed,
-								}).Info("Getting IPSW")
-								err = DownloadFile(i.URL, c.String("proxy"), c.Bool("insecure"))
-								if err != nil {
-									return errors.Wrap(err, "failed to download file")
-								}
-								if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
-									return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
-								}
-							} else {
-								log.Warnf("ipsw already exits: %s", path.Base(i.URL))
-							}
-
-							if c.Bool("dec") {
-								kernelcache.Extract(path.Base(i.URL))
-							}
-						}
-					} else {
-						log.Fatal("you must also supply a --build")
-					}
-				} else if len(c.String("iversion")) > 0 {
+				if len(c.String("iversion")) > 0 {
 					urls := []string{}
 					ipsws, err := api.GetAllIPSW(c.String("iversion"))
 					if err != nil {
@@ -399,6 +348,58 @@ func main() {
 								kernelcache.Extract(path.Base(url))
 							}
 						}
+					}
+
+				} else if len(c.String("device")) > 0 || len(c.String("build")) > 0 {
+					if len(c.String("device")) > 0 && len(c.String("build")) > 0 {
+						i, err := api.GetIPSW(c.String("device"), c.String("build"))
+						if err != nil {
+							return errors.Wrap(err, "failed to query ipsw.me api")
+						}
+						if c.Bool("kernel") {
+							log.WithFields(log.Fields{
+								"device":  i.Identifier,
+								"build":   i.BuildID,
+								"version": i.Version,
+								"signed":  i.Signed,
+							}).Info("Getting Kernelcache")
+							pzip, err := partialzip.New(i.URL)
+							if err != nil {
+								return errors.Wrap(err, "failed to create partialzip instance")
+							}
+							kpath := findKernelInList(pzip.List())
+							if len(kpath) > 0 {
+								_, err = pzip.Download(kpath)
+								if err != nil {
+									return errors.Wrap(err, "failed to download file")
+								}
+								kernelcache.Decompress(kpath)
+							}
+						} else {
+							if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
+								log.WithFields(log.Fields{
+									"device":  i.Identifier,
+									"build":   i.BuildID,
+									"version": i.Version,
+									"signed":  i.Signed,
+								}).Info("Getting IPSW")
+								err = DownloadFile(i.URL, c.String("proxy"), c.Bool("insecure"))
+								if err != nil {
+									return errors.Wrap(err, "failed to download file")
+								}
+								if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
+									return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
+								}
+							} else {
+								log.Warnf("ipsw already exits: %s", path.Base(i.URL))
+							}
+
+							if c.Bool("dec") {
+								kernelcache.Extract(path.Base(i.URL))
+							}
+						}
+					} else {
+						log.Fatal("you must also supply a --device AND a --build")
 					}
 				} else {
 					cli.ShowAppHelp(c)

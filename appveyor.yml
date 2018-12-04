@@ -1,0 +1,34 @@
+version: "{build}"
+
+# Source Config
+
+clone_folder: c:\gopath\src\github.com\blacktop\ipsw
+
+# Build host
+
+environment:
+  GOPATH: c:\gopath
+  DEPTESTBYPASS501: 1
+  GOVERSION: 1.11
+
+init:
+  - git config --global core.autocrlf input
+
+# Build
+
+install:
+  # Install the specific Go version.
+  - rmdir c:\go /s /q
+  - appveyor DownloadFile https://storage.googleapis.com/golang/go%GOVERSION%.windows-amd64.msi
+  - msiexec /i go%GOVERSION%.windows-amd64.msi /q
+  - choco install bzr
+  - set Path=c:\go\bin;c:\gopath\bin;C:\Program Files (x86)\Bazaar\;C:\Program Files\Mercurial\%Path%
+  - go version
+  - go env
+
+build: false
+deploy: false
+
+test_script:
+  - go build github.com/blacktop/ipsw
+  - ipsw.exe download --device iPhone11,2 --build 16B92 --kernel --dec
