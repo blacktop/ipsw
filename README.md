@@ -125,6 +125,10 @@ kernelcache.release.j42d.decompressed
 kernelcache.release.n102.decompressed
 ```
 
+But, how does it work?? 🤔
+
+With the POWER :muscle: of [partialzip](https://github.com/blacktop/partialzip) !!
+
 #### Download with a Proxy :new:
 
 This will download and decompress the `kernelcache` for an `iPhone XS` running `iOS 12.1` behind a corporate proxy
