@@ -27,7 +27,7 @@ Usage: ipsw [OPTIONS] COMMAND [arg...]
 
 IPSW Downloader
 
-Version: 18.10.1, BuildTime: 2018-10-15T01:56:00Z
+Version: 18.12.1, BuildTime: 2018-12-04T01:10:58Z
 Author:
   blacktop - <https://github.com/blacktop>
 
@@ -37,7 +37,7 @@ Options:
   --version, -v  print the version
 
 Commands:
-  generate    crawl theiphonewiki.com and create JSON database
+  diff        diff kernelcache (using assert strings)
   extract     extract and decompress a kernelcache
   decompress  decompress a kernelcache
   download    download and parse ipsw from the internet
@@ -117,6 +117,14 @@ kernelcache.release.j42d.decompressed
 kernelcache.release.n102.decompressed
 ```
 
+#### Download with a Proxy :new:
+
+This will download and decompress the `kernelcache` for an `iPhone XS` running `iOS 12.1` behind a corporate proxy
+
+```bash
+$ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92 --kernel --dec
+```
+
 ### `extract`
 
 Extract `kernelcache` from a previously downloaded `ipsw`
@@ -142,6 +150,14 @@ Decompress a previously extracted `kernelcache`
 ```bash
 $ ipsw decompress kernelcache.release.iphone11
 ```
+
+### `diff` [WIP] :construction:
+
+I am playing with the idea of `diffing` kernelcaches by creating directory structures of Apple's src from assert strings.
+
+Then you could use `git diff` or something to get a quick **high** level view of what Apple has changed by seeing new files being added or removed as well as seeing the line numbers of the assert strings move around.
+
+You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/diff/Library/Caches/com.apple.xbs/Sources)
 
 ## TODO
 

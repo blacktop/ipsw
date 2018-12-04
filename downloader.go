@@ -1,28 +1,54 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb"
 	"github.com/vbauerster/mpb/decor"
 )
 
+func getProxy(proxy string) func(*http.Request) (*url.URL, error) {
+	if len(proxy) > 0 {
+		proxyURL, err := url.Parse(proxy)
+		if err != nil {
+			log.WithError(err).Error("bad proxy url")
+		}
+		return http.ProxyURL(proxyURL)
+	}
+	return http.ProxyFromEnvironment
+}
+
 // DownloadFile will download a url to a local file. It's efficient because it will
 // write as it downloads and not load the whole file into memory. We pass an io.TeeReader
 // into Copy() to report progress on the download.
-func DownloadFile(url string) error {
+func DownloadFile(url, proxy string, insecure bool) error {
 
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           getProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		panic(err)
+		return errors.Wrap(err, "cannot create http request")
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
 	}
 	defer resp.Body.Close()
 
