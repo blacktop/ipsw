@@ -125,9 +125,7 @@ kernelcache.release.j42d.decompressed
 kernelcache.release.n102.decompressed
 ```
 
-But, how does it work?? 🤔
-
-With the POWER :muscle: of [partialzip](https://github.com/blacktop/partialzip) !!
+But, how does it work?? 🤔 With the POWER :muscle: of [partialzip](https://github.com/blacktop/partialzip) !!
 
 #### Download with a Proxy :new:
 
