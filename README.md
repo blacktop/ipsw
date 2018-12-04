@@ -90,6 +90,14 @@ $ ipsw download --iversion 12.0 --dec
 
 #### Only download and decompress the kernelcaches _(which is CRAZY fast)_
 
+Single `kernelcache`
+
+```bash
+ipsw download --device iPhone11,2 --build 16B92 --kernel --dec
+```
+
+All of dem!!!
+
 ```bash
 $ time ipsw download --iversion 12.0.1 --kernel --dec
 

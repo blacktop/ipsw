@@ -278,27 +278,47 @@ func main() {
 						if err != nil {
 							return errors.Wrap(err, "failed to query ipsw.me api")
 						}
-
-						if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
+						if c.Bool("kernel") {
 							log.WithFields(log.Fields{
 								"device":  i.Identifier,
 								"build":   i.BuildID,
 								"version": i.Version,
 								"signed":  i.Signed,
-							}).Info("Getting IPSW")
-							err = DownloadFile(i.URL, c.String("proxy"), c.Bool("insecure"))
+							}).Info("Getting Kernelcache")
+							pzip, err := partialzip.New(i.URL)
 							if err != nil {
-								return errors.Wrap(err, "failed to download file")
+								return errors.Wrap(err, "failed to create partialzip instance")
 							}
-							if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
-								return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
+							kpath := findKernelInList(pzip.List())
+							if len(kpath) > 0 {
+								_, err = pzip.Download(kpath)
+								if err != nil {
+									return errors.Wrap(err, "failed to download file")
+								}
+								kernelcache.Decompress(kpath)
 							}
 						} else {
-							log.Warnf("ipsw already exits: %s", path.Base(i.URL))
-						}
+							if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
+								log.WithFields(log.Fields{
+									"device":  i.Identifier,
+									"build":   i.BuildID,
+									"version": i.Version,
+									"signed":  i.Signed,
+								}).Info("Getting IPSW")
+								err = DownloadFile(i.URL, c.String("proxy"), c.Bool("insecure"))
+								if err != nil {
+									return errors.Wrap(err, "failed to download file")
+								}
+								if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
+									return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
+								}
+							} else {
+								log.Warnf("ipsw already exits: %s", path.Base(i.URL))
+							}
 
-						if c.Bool("dec") {
-							kernelcache.Extract(path.Base(i.URL))
+							if c.Bool("dec") {
+								kernelcache.Extract(path.Base(i.URL))
+							}
 						}
 					}
 				} else if len(c.String("iversion")) > 0 {
