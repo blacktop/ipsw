@@ -43,7 +43,7 @@
       "args": [
         "-V",
         "diff",
-        "caches/kernelcache.release.iphone11.decompressed"
+        "test-caches/kernelcache.release.iphone11.decompressed"
       ],
       "showLog": false
     },

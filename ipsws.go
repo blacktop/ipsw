@@ -163,10 +163,9 @@ func main() {
 					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
 						return fmt.Errorf("file %s does not exist", c.Args().First())
 					}
-					kernelcache.ParseMachO(c.Args().First())
-				} else {
-					log.Fatal("Please supply a kernelcache to diff from")
+					return kernelcache.ParseMachO(c.Args().First())
 				}
+				log.Fatal("Please supply a kernelcache to diff from")
 				return nil
 			},
 		},
@@ -188,7 +187,7 @@ func main() {
 						return fmt.Errorf("file %s does not exist", c.Args().First())
 					}
 					if c.Bool("dyld") {
-						if runtime.GOOS == "darwin" {
+						if runtime.GOOS != "darwin" {
 							log.Fatal("dyld_shared_cache extraction only works on macOS :(")
 						}
 						return dyld.Extract(c.Args().First())
