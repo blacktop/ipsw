@@ -16,6 +16,7 @@ import (
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/devicetree"
 	"github.com/blacktop/ipsw/dyld"
 	"github.com/blacktop/ipsw/kernelcache"
 	_ "github.com/blacktop/ipsw/statik"
@@ -219,6 +220,62 @@ func main() {
 			},
 		},
 		{
+			Name:  "dump",
+			Usage: "dump a DeviceTree",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "remote, r",
+					Usage: "dump DeviceTree from remote ipsw",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				if c.Args().Present() {
+					if c.Bool("remote") {
+						err := devicetree.RemoteParse(c.Args().First())
+						if err != nil {
+							return err
+						}
+					} else {
+						if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
+							return fmt.Errorf("file %s does not exist", c.Args().First())
+						}
+						err := devicetree.Parse(c.Args().First())
+						if err != nil {
+							return err
+						}
+					}
+				} else {
+					log.Fatal("Please supply a DeviceTree to dump or URL")
+				}
+				return nil
+			},
+		},
+		{
+			Name:  "itunes",
+			Usage: "get itunes plist",
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				itunes, err := api.NewiTunesVersionMaster()
+				if err != nil {
+					return err
+				}
+				urls, err := itunes.GetSoftwareURLsForBuildID("16F156")
+				if err != nil {
+					return err
+				}
+				fmt.Println("COUNT: ", len(urls))
+				for _, url := range urls {
+					fmt.Println(url)
+				}
+				return nil
+			},
+		},
+		{
 			Name:  "download",
 			Usage: "download and parse ipsw from the internet",
 			Flags: []cli.Flag{
@@ -386,8 +443,8 @@ func main() {
 								if err != nil {
 									return errors.Wrap(err, "failed to download file")
 								}
-								if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
-									return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
+								if ok, _ := utils.Verify(i.SHA1, path.Base(i.URL)); !ok {
+									return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(i.URL))
 								}
 							} else {
 								log.Warnf("ipsw already exits: %s", path.Base(i.URL))
