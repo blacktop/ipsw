@@ -16,9 +16,9 @@ import (
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/devicetree"
 	"github.com/blacktop/ipsw/dyld"
 	"github.com/blacktop/ipsw/kernelcache"
-	"github.com/blacktop/ipsw/devicetree"
 	_ "github.com/blacktop/ipsw/statik"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/partialzip"
@@ -230,7 +230,10 @@ func main() {
 					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
 						return fmt.Errorf("file %s does not exist", c.Args().First())
 					}
-					devicetree.Parse(c.Args().First())
+					err := devicetree.Parse(c.Args().First())
+					if err != nil {
+						return err
+					}
 				} else {
 					log.Fatal("Please supply a DeviceTree to dump")
 				}
