@@ -18,6 +18,7 @@ import (
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/dyld"
 	"github.com/blacktop/ipsw/kernelcache"
+	"github.com/blacktop/ipsw/devicetree"
 	_ "github.com/blacktop/ipsw/statik"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/partialzip"
@@ -214,6 +215,24 @@ func main() {
 					kernelcache.Decompress(c.Args().First())
 				} else {
 					log.Fatal("Please supply a kernelcache to decompress")
+				}
+				return nil
+			},
+		},
+		{
+			Name:  "dump",
+			Usage: "dump a DeviceTree",
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				if c.Args().Present() {
+					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
+						return fmt.Errorf("file %s does not exist", c.Args().First())
+					}
+					devicetree.Parse(c.Args().First())
+				} else {
+					log.Fatal("Please supply a DeviceTree to dump")
 				}
 				return nil
 			},
