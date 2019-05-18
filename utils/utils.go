@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"crypto/md5"
+	"crypto/sha1"
 	"fmt"
 	"io"
 	"os"
@@ -70,22 +70,22 @@ func Unique(s []string) []string {
 }
 
 // Verify verifies the downloaded against it's hash
-func Verify(md5sum, name string) (bool, error) {
-	Indent(log.Info)("verifying md5sum...")
+func Verify(sha1sum, name string) (bool, error) {
+	Indent(log.Info)("verifying sha1sum...")
 	f, err := os.Open(name)
 	if err != nil {
 		return false, err
 	}
 	defer f.Close()
 
-	h := md5.New()
+	h := sha1.New()
 	if _, err := io.Copy(h, f); err != nil {
 		return false, err
 	}
 
 	Indent(log.WithFields(log.Fields{
-		"api":  md5sum,
+		"api":  sha1sum,
 		"file": fmt.Sprintf("%x", h.Sum(nil)),
-	}).Debug)("md5 hashes")
-	return strings.EqualFold(md5sum, fmt.Sprintf("%x", h.Sum(nil))), nil
+	}).Debug)("sha1 hashes")
+	return strings.EqualFold(sha1sum, fmt.Sprintf("%x", h.Sum(nil))), nil
 }
