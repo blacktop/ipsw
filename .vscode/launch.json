@@ -32,6 +32,19 @@
       "showLog": false
     },
     {
+      "name": "iTunes",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "remotePath": "",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "program": "${workspaceRoot}/ipsws.go",
+      "env": {},
+      "args": ["-V", "itunes"],
+      "showLog": false
+    },
+    {
       "name": "Extract",
       "type": "go",
       "request": "launch",

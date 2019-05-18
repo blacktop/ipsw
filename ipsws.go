@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -107,6 +109,17 @@ func findKernelInList(list []string) string {
 		}
 	}
 	return ""
+}
+
+func findDeviceTreesInList(list []string) []string {
+	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
+	dTrees := []string{}
+	for _, v := range list {
+		if validDT.MatchString(v) {
+			dTrees = append(dTrees, v)
+		}
+	}
+	return dTrees
 }
 
 var appHelpTemplate = `Usage: {{.Name}} {{if .Flags}}[OPTIONS] {{end}}COMMAND [arg...]
@@ -236,6 +249,28 @@ func main() {
 					}
 				} else {
 					log.Fatal("Please supply a DeviceTree to dump")
+				}
+				return nil
+			},
+		},
+		{
+			Name:  "itunes",
+			Usage: "get itunes plist",
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				itunes, err := api.NewiTunesVersionMaster()
+				if err != nil {
+					return err
+				}
+				urls, err := itunes.GetSoftwareURLsForBuildID("16F156")
+				if err != nil {
+					return err
+				}
+				fmt.Println("COUNT: ", len(urls))
+				for _, url := range urls {
+					fmt.Println(url)
 				}
 				return nil
 			},
