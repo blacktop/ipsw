@@ -222,20 +222,33 @@ func main() {
 		{
 			Name:  "dump",
 			Usage: "dump a DeviceTree",
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name:  "remote, r",
+					Usage: "dump DeviceTree from remote ipsw",
+				},
+			},
 			Action: func(c *cli.Context) error {
 				if c.GlobalBool("verbose") {
 					log.SetLevel(log.DebugLevel)
 				}
 				if c.Args().Present() {
-					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
-						return fmt.Errorf("file %s does not exist", c.Args().First())
-					}
-					err := devicetree.Parse(c.Args().First())
-					if err != nil {
-						return err
+					if c.Bool("remote") {
+						err := devicetree.RemoteParse(c.Args().First())
+						if err != nil {
+							return err
+						}
+					} else {
+						if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
+							return fmt.Errorf("file %s does not exist", c.Args().First())
+						}
+						err := devicetree.Parse(c.Args().First())
+						if err != nil {
+							return err
+						}
 					}
 				} else {
-					log.Fatal("Please supply a DeviceTree to dump")
+					log.Fatal("Please supply a DeviceTree to dump or URL")
 				}
 				return nil
 			},
