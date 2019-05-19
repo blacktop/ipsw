@@ -8,10 +8,7 @@ import (
 	"time"
 )
 
-const (
-	ipswMeAPI        = "https://api.ipsw.me/v4/"
-	canijailbreakAPI = "https://canijailbreak.com/jailbreaks.json"
-)
+const ipswMeAPI = "https://api.ipsw.me/v4/"
 
 // Device struct
 type Device struct {
