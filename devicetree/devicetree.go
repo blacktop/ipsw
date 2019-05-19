@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -20,8 +20,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Asn1 DeviceTree object
-type Asn1 struct {
+// Img4 DeviceTree object
+type Img4 struct {
 	IM4P    string
 	Name    string
 	Version string
@@ -41,14 +41,7 @@ type NodeProperty struct {
 }
 
 // Properties object
-// type property map[string]interface{}
-
-// Properties object
 type Properties map[string]interface{}
-
-// 	property
-// 	Children []DeviceTree `json:"children,omitempty"`
-// }
 
 // DeviceTree object
 type DeviceTree map[string]Properties
@@ -204,30 +197,18 @@ func parseDeviceTree(buffer *bytes.Buffer) (*DeviceTree, error) {
 // Parse parses a DeviceTree img4 file
 func Parse(path string) error {
 	log.Info("Parsing DeviceTree")
-	f, err := os.Open(path)
+	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	fi, err := f.Stat()
-	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to read DeviceTree")
 	}
 
-	dat := make([]byte, fi.Size())
-	_, err = f.Read(dat)
-	if err != nil {
-		return err
-	}
-
-	var a Asn1
+	var i Img4
 	// NOTE: openssl asn1parse -i -inform DER -in DEVICETREE.im4p
-	if _, err := asn1.Unmarshal(dat, &a); err != nil {
+	if _, err := asn1.Unmarshal(content, &i); err != nil {
 		return err
 	}
 
-	dtree, err := parseDeviceTree(bytes.NewBuffer(a.Data))
+	dtree, err := parseDeviceTree(bytes.NewBuffer(i.Data))
 	if err != nil {
 		return err
 	}

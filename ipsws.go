@@ -62,8 +62,8 @@ func init() {
 	log.SetHandler(clihander.Default)
 }
 
-// LookupByRUL searchs for a ipsw in an array by a download URL
-func LookupByRUL(ipsws []api.IPSW, dlURL string) (api.IPSW, error) {
+// LookupByURL searchs for a ipsw in an array by a download URL
+func LookupByURL(ipsws []api.IPSW, dlURL string) (api.IPSW, error) {
 	for _, i := range ipsws {
 		if strings.EqualFold(dlURL, i.URL) {
 			return i, nil
@@ -354,7 +354,7 @@ func main() {
 						for _, url := range urls {
 							if _, err := os.Stat(path.Base(url)); os.IsNotExist(err) {
 								// get a handle to ipsw object
-								i, err := LookupByRUL(ipsws, url)
+								i, err := LookupByURL(ipsws, url)
 								if err != nil {
 									return errors.Wrap(err, "failed to get ipsw from download url")
 								}
