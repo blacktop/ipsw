@@ -244,7 +244,6 @@ func Parse(path string) error {
 
 // RemoteParse parses a DeviceTree img4 file in a remote ipsw file
 func RemoteParse(url string) error {
-	log.Info("Parsing Remote DeviceTree")
 
 	pzip, err := partialzip.New(url)
 	if err != nil {
