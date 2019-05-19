@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -109,17 +107,6 @@ func findKernelInList(list []string) string {
 		}
 	}
 	return ""
-}
-
-func findDeviceTreesInList(list []string) []string {
-	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
-	dTrees := []string{}
-	for _, v := range list {
-		if validDT.MatchString(v) {
-			dTrees = append(dTrees, v)
-		}
-	}
-	return dTrees
 }
 
 var appHelpTemplate = `Usage: {{.Name}} {{if .Flags}}[OPTIONS] {{end}}COMMAND [arg...]
@@ -443,8 +430,8 @@ func main() {
 								if err != nil {
 									return errors.Wrap(err, "failed to download file")
 								}
-								if ok, _ := utils.Verify(i.MD5, path.Base(i.URL)); !ok {
-									return fmt.Errorf("bad download: ipsw %s md5 hash is incorrect", path.Base(i.URL))
+								if ok, _ := utils.Verify(i.SHA1, path.Base(i.URL)); !ok {
+									return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(i.URL))
 								}
 							} else {
 								log.Warnf("ipsw already exits: %s", path.Base(i.URL))
