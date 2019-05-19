@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"debug/macho"
+	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -21,83 +22,70 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Img4 Kernelcache object
+type Img4 struct {
+	IM4P    string
+	Name    string
+	Version string
+	Data    []byte
+}
+
 // A LzssHeader represents the LZSS header
 type LzssHeader struct {
-	Signature        [8]byte // "complzss"
-	Unknown          uint32  // Likely CRC32. But who cares, anyway?
+	CompressionType  uint32 // 0x636f6d70 "comp"
+	Signature        uint32 // 0x6c7a7373 "lzss"
+	CheckSum         uint32 // Likely CRC32
 	UncompressedSize uint32
 	CompressedSize   uint32
-	Unknown1         uint32 // 1
+	Padding          [0x16c]byte
 }
 
 // A CompressedCache represents an open compressed kernelcache file.
 type CompressedCache struct {
 	Header LzssHeader
-	Size   int64
+	Size   int
 	Data   []byte
 }
 
 // Open opens the named file using os.Open and prepares it for use as a compressed kernelcache.
 func Open(name string) (*CompressedCache, error) {
 	log.Info("Parsing Compressed Kernelcache")
-	f, err := os.Open(name)
+
+	content, err := ioutil.ReadFile(name)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to read Kernelcache")
 	}
 
-	fi, err := f.Stat()
-	if err != nil {
-		return nil, err
+	var i Img4
+	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10
+	if _, err := asn1.Unmarshal(content, &i); err != nil {
+		return nil, errors.Wrap(err, "failed to ASN.1 parse Kernelcache")
 	}
 
-	cc := new(CompressedCache)
-	cc.Size = fi.Size()
+	buffer := bytes.NewBuffer(i.Data)
 
-	dat := make([]byte, 1000)
-	_, err = f.Read(dat)
-	if err != nil {
-		return nil, err
-	}
-
-	// find lzss magic
-	hStart := bytes.Index(dat, []byte("complzss"))
+	cc := CompressedCache{Size: buffer.Len()}
 
 	// Read entire file header.
-	f.Seek(int64(hStart), 0)
-	if err := binary.Read(f, binary.BigEndian, &cc.Header); err != nil {
+	if err := binary.Read(buffer, binary.BigEndian, &cc.Header); err != nil {
 		return nil, err
 	}
 
-	// Compressed Size: 17842843, Uncompressed: 35727352. Unknown (CRC?): 0x3f9543fd, Unknown 1: 0x1
-	msg := fmt.Sprintf("compressed size: %d, uncompressed: %d. unknown: 0x%x, unknown 1: 0x%x",
+	msg := fmt.Sprintf("compressed size: %d, uncompressed: %d. checkSum: 0x%x",
 		cc.Header.CompressedSize,
 		cc.Header.UncompressedSize,
-		cc.Header.Unknown,
-		cc.Header.Unknown1,
+		cc.Header.CheckSum,
 	)
 	utils.Indent(log.Info)(msg)
 
-	// find compressed kernel 0xfeedfa.. start address
-	buf := make([]byte, 4)
-	binary.LittleEndian.PutUint32(buf, 0xfeedfacf)
-	dStart := bytes.Index(dat, buf)
-	msg = fmt.Sprintf("found compressed kernel at: %d", dStart)
-	utils.Indent(log.Debug)(msg)
-
-	if int64(cc.Header.CompressedSize) > cc.Size {
+	if int(cc.Header.CompressedSize) > cc.Size {
 		return nil, fmt.Errorf("compressed_size: %d is greater than file_size: %d", cc.Size, cc.Header.CompressedSize)
 	}
 
-	// Read entire file data.
-	cc.Data = make([]byte, cc.Size-int64(dStart-1), int64(cc.Header.UncompressedSize))
-	n, err := f.ReadAt(cc.Data, int64(dStart-1))
-	if err != nil {
-		return nil, err
-	}
-	msg = fmt.Sprintf("read %d bytes of data from file", n)
-	utils.Indent(log.Debug)(msg)
+	// Read compressed file data.
+	cc.Data = buffer.Next(int(cc.Header.CompressedSize))
 
-	return cc, nil
+	return &cc, nil
 }
 
 // Extract extracts and decompresses a lernelcache from ipsw
@@ -107,7 +95,7 @@ func Extract(ipsw string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
 	}
-	defer os.Remove(kcache)
+	// defer os.Remove(kcache)
 
 	kc, err := Open(kcache)
 	if err != nil {
@@ -129,7 +117,7 @@ func Decompress(kcache string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed parse compressed kernelcache")
 	}
-	defer os.Remove(kcache)
+	// defer os.Remove(kcache)
 
 	log.Info("Decompressing Kernelcache")
 	dec := lzss.Decompress(kc.Data)
@@ -289,10 +277,8 @@ func LinesFromReader(r io.Reader) ([]string, error) {
 	return lines, nil
 }
 
-/**
- * Insert sting to n-th line of file.
- * If you want to insert a line, append newline '\n' to the end of the string.
- */
+// InsertStringToFile inserts sting to n-th line of file.
+// If you want to insert a line, append newline '\n' to the end of the string.
 func InsertStringToFile(path, str string, index int) error {
 	lines, err := File2lines(path)
 	if err != nil {
