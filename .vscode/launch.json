@@ -41,7 +41,7 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["-V", "itunes"],
+      "args": ["-V", "itunes", "--build", "16F156"],
       "showLog": false
     },
     {

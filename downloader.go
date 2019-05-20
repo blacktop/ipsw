@@ -94,7 +94,7 @@ func DownloadFile(url, proxy string, insecure bool) error {
 	return nil
 }
 
-func multiDownload() {
+func multiDownload(urls []string) {
 	doneWg := new(sync.WaitGroup)
 	p := mpb.New(mpb.WithWidth(64), mpb.WithWaitGroup(doneWg))
 	numBars := 4
