@@ -42,6 +42,7 @@ Commands:
   extract     extract and decompress a kernelcache
   decompress  decompress a kernelcache
   download    download and parse ipsw from the internet
+  itunes      download ipsws from the itunes plist
   help        Shows a list of commands or help for one command
 
 Run 'ipsw COMMAND --help' for more information on a command.

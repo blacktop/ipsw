@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"io/ioutil"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/blacktop/ipsw/utils"
+	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"howett.net/plist"
 )
@@ -119,6 +121,37 @@ func (vm *ITunesVersionMaster) GetBuildsForBuildID(buildID string) []Build {
 	return UniqueBuilds(builds)
 }
 
+// GetLatestBuilds gets all the latest IndividualBuilds that match supplied build ID
+func (vm *ITunesVersionMaster) GetLatestBuilds() ([]Build, error) {
+	var builds []Build
+	var versionsRaw []string
+
+	for _, build := range vm.GetBuilds() {
+		versionsRaw = append(versionsRaw, build.ProductVersion)
+	}
+
+	versions := make([]*version.Version, len(versionsRaw))
+
+	for i, raw := range versionsRaw {
+		v, err := version.NewVersion(raw)
+		if err != nil {
+			return nil, err
+		}
+
+		versions[i] = v
+	}
+
+	sort.Sort(version.Collection(versions))
+	newestVersion := versions[len(versions)-1]
+
+	for _, build := range vm.GetBuilds() {
+		if build.ProductVersion == newestVersion.String() {
+			builds = append(builds, build)
+		}
+	}
+	return UniqueBuilds(builds), nil
+}
+
 // GetSoftwareURLFor gets the latest ipsw download URL for a device. i.e. "iPhone11,2"
 func (vm *ITunesVersionMaster) GetSoftwareURLFor(device string) (string, error) {
 
@@ -169,6 +202,38 @@ func (vm *ITunesVersionMaster) GetSoftwareURLsForVersion(version string) ([]stri
 			urls = append(urls, build.FirmwareURL)
 		}
 	}
+	return utils.Unique(urls), nil
+}
+
+// GetLatestSoftwareURLs gets all the latests ipsw URLs
+func (vm *ITunesVersionMaster) GetLatestSoftwareURLs() ([]string, error) {
+	var urls []string
+	var versionsRaw []string
+
+	for _, build := range vm.GetBuilds() {
+		versionsRaw = append(versionsRaw, build.ProductVersion)
+	}
+
+	versions := make([]*version.Version, len(versionsRaw))
+
+	for i, raw := range versionsRaw {
+		v, err := version.NewVersion(raw)
+		if err != nil {
+			return nil, err
+		}
+
+		versions[i] = v
+	}
+
+	sort.Sort(version.Collection(versions))
+	newestVersion := versions[len(versions)-1]
+
+	for _, build := range vm.GetBuilds() {
+		if build.ProductVersion == newestVersion.String() {
+			urls = append(urls, build.FirmwareURL)
+		}
+	}
+
 	return utils.Unique(urls), nil
 }
 

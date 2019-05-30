@@ -255,7 +255,7 @@ func main() {
 		},
 		{
 			Name:  "itunes",
-			Usage: "get itunes plist",
+			Usage: "download ipsws from itunes plist",
 			Flags: []cli.Flag{
 				cli.StringFlag{
 					Name:   "proxy",
@@ -266,6 +266,10 @@ func main() {
 				cli.BoolFlag{
 					Name:  "insecure",
 					Usage: "do not verify ssl certs",
+				},
+				cli.BoolFlag{
+					Name:  "no-prompt, n",
+					Usage: "do not prompt user",
 				},
 				cli.StringFlag{
 					Name:   "iversion,iv",
@@ -284,59 +288,70 @@ func main() {
 				if c.GlobalBool("verbose") {
 					log.SetLevel(log.DebugLevel)
 				}
-				if len(c.String("iversion")) > 0 || len(c.String("build")) > 0 {
-					var err error
-					var builds []api.Build
+				// if len(c.String("iversion")) > 0 || len(c.String("build")) > 0 {
+				var err error
+				var builds []api.Build
 
-					itunes, err := api.NewiTunesVersionMaster()
+				itunes, err := api.NewiTunesVersionMaster()
+				if err != nil {
+					return err
+				}
+
+				if len(c.String("iversion")) > 0 {
+					builds = itunes.GetBuildsForVersion(c.String("iversion"))
+				} else if len(c.String("build")) > 0 {
+					builds = itunes.GetBuildsForBuildID(c.String("build"))
+				} else {
+					builds, err = itunes.GetLatestBuilds()
 					if err != nil {
-						return err
+						return errors.Wrap(err, "failed to get the latest builds")
 					}
+				}
 
-					if len(c.String("iversion")) > 0 {
-						builds = itunes.GetBuildsForVersion(c.String("iversion"))
-					} else {
-						builds = itunes.GetBuildsForBuildID(c.String("build"))
-					}
+				if len(builds) == 0 {
+					log.Fatal("your search criteria resulted in no matches")
+				}
 
-					if len(builds) == 0 {
-						log.Fatal("your search criteria resulted in no matches")
-					}
+				log.Debug("URLS TO DOWNLOAD:")
+				for _, b := range builds {
+					utils.Indent(log.Debug)(b.FirmwareURL)
+				}
 
-					log.Debug("URLS TO DOWNLOAD:")
-					for _, b := range builds {
-						utils.Indent(log.Debug)(b.FirmwareURL)
-					}
-
-					cont := false
+				cont := true
+				if !c.Bool("no-prompt") {
+					cont = false
 					prompt := &survey.Confirm{
 						Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(builds)),
 					}
 					survey.AskOne(prompt, &cont, nil)
-					if cont {
-						for _, build := range builds {
-							if _, err := os.Stat(path.Base(build.FirmwareURL)); os.IsNotExist(err) {
-								log.WithFields(log.Fields{
-									"device":  build.Identifier,
-									"build":   build.BuildVersion,
-									"version": build.ProductVersion,
-								}).Info("Getting IPSW")
-								// download file
-								err = DownloadFile(build.FirmwareURL, c.String("proxy"), c.Bool("insecure"))
-								if err != nil {
-									return errors.Wrap(err, "failed to download file")
-								}
-								// verify download
-								if ok, _ := utils.Verify(build.FirmwareSHA1, path.Base(build.FirmwareURL)); !ok {
-									return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(build.FirmwareURL))
-								}
-								// multiDownload(urls)
+				}
+
+				if cont {
+					for _, build := range builds {
+						if _, err := os.Stat(path.Base(build.FirmwareURL)); os.IsNotExist(err) {
+							log.WithFields(log.Fields{
+								"device":  build.Identifier,
+								"build":   build.BuildVersion,
+								"version": build.ProductVersion,
+							}).Info("Getting IPSW")
+							// download file
+							err = DownloadFile(build.FirmwareURL, c.String("proxy"), c.Bool("insecure"))
+							if err != nil {
+								return errors.Wrap(err, "failed to download file")
 							}
+							// verify download
+							if ok, _ := utils.Verify(build.FirmwareSHA1, path.Base(build.FirmwareURL)); !ok {
+								return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(build.FirmwareURL))
+							}
+							// multiDownload(urls)
+						} else {
+							log.Warnf("ipsw already exists: %s", path.Base(build.FirmwareURL))
 						}
 					}
-				} else {
-					log.Fatal("you must also supply a --iversion OR a --build")
 				}
+				// } else {
+				// 	log.Fatal("you must also supply a --iversion OR a --build")
+				// }
 				return nil
 			},
 		},
@@ -462,7 +477,7 @@ func main() {
 									}
 								}
 							} else {
-								log.Warnf("ipsw already exits: %s", path.Base(url))
+								log.Warnf("ipsw already exists: %s", path.Base(url))
 							}
 
 							if c.Bool("dec") {
@@ -512,7 +527,7 @@ func main() {
 									return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(i.URL))
 								}
 							} else {
-								log.Warnf("ipsw already exits: %s", path.Base(i.URL))
+								log.Warnf("ipsw already exists: %s", path.Base(i.URL))
 							}
 
 							if c.Bool("dec") {
