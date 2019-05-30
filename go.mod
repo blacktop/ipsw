@@ -25,6 +25,5 @@ require (
 	golang.org/x/net v0.0.0-20180824152047-4bcd98cce591 // indirect
 	golang.org/x/sys v0.0.0-20180928133829-e4b3c5e90611 // indirect
 	gopkg.in/AlecAivazis/survey.v1 v1.6.2 // indirect
-	gopkg.in/yaml.v2 v2.2.2 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )

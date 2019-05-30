@@ -1,4 +1,4 @@
-# github.com/AlecAivazis/survey v1.6.2
+# github.com/AlecAivazis/survey v1.7.0
 github.com/AlecAivazis/survey
 # github.com/PuerkitoBio/goquery v1.4.1
 github.com/PuerkitoBio/goquery
@@ -15,6 +15,8 @@ github.com/blacktop/lzss
 github.com/blacktop/partialzip
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
+# github.com/hashicorp/go-version v1.2.0
+github.com/hashicorp/go-version
 # github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 github.com/kballard/go-shellquote
 # github.com/mattn/go-colorable v0.0.9
@@ -23,7 +25,7 @@ github.com/mattn/go-colorable
 github.com/mattn/go-isatty
 # github.com/mgutz/ansi v0.0.0-20170206155736-9520e82c474b
 github.com/mgutz/ansi
-# github.com/pkg/errors v0.8.0
+# github.com/pkg/errors v0.8.1
 github.com/pkg/errors
 # github.com/rakyll/statik v0.1.4
 github.com/rakyll/statik/fs
@@ -45,5 +47,5 @@ golang.org/x/sys/windows
 # gopkg.in/AlecAivazis/survey.v1 v1.6.2
 gopkg.in/AlecAivazis/survey.v1/core
 gopkg.in/AlecAivazis/survey.v1/terminal
-# howett.net/plist v0.0.0-20180609054337-500bd5b9081b
+# howett.net/plist v0.0.0-20181124034731-591f970eefbb
 howett.net/plist
