@@ -10,6 +10,7 @@ require (
 	github.com/blacktop/lzss v0.1.0
 	github.com/blacktop/partialzip v0.2.0
 	github.com/fatih/color v1.7.0 // indirect
+	github.com/hashicorp/go-version v1.2.0
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kr/pty v1.1.4 // indirect
