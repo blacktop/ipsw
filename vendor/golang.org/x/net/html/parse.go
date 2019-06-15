@@ -255,7 +255,7 @@ func (p *parser) fosterParent(n *Node) {
 		}
 	}
 
-	if template != nil && (table == nil || j < i) {
+	if template != nil && (table == nil || j > i) {
 		template.AppendChild(n)
 		return
 	}
@@ -439,9 +439,6 @@ func (p *parser) resetInsertionMode() {
 		case a.Select:
 			if !last {
 				for ancestor, first := n, p.oe[0]; ancestor != first; {
-					if ancestor == first {
-						break
-					}
 					ancestor = p.oe[p.oe.index(ancestor)-1]
 					switch ancestor.DataAtom {
 					case a.Template:
@@ -470,6 +467,10 @@ func (p *parser) resetInsertionMode() {
 		case a.Table:
 			p.im = inTableIM
 		case a.Template:
+			// TODO: remove this divergence from the HTML5 spec.
+			if n.Namespace != "" {
+				continue
+			}
 			p.im = p.templateStack.top()
 		case a.Head:
 			// TODO: remove this divergence from the HTML5 spec.
@@ -900,7 +901,7 @@ func inBodyIM(p *parser) bool {
 		case a.A:
 			for i := len(p.afe) - 1; i >= 0 && p.afe[i].Type != scopeMarkerNode; i-- {
 				if n := p.afe[i]; n.Type == ElementNode && n.DataAtom == a.A {
-					p.inBodyEndTagFormatting(a.A)
+					p.inBodyEndTagFormatting(a.A, "a")
 					p.oe.remove(n)
 					p.afe.remove(n)
 					break
@@ -914,7 +915,7 @@ func inBodyIM(p *parser) bool {
 		case a.Nobr:
 			p.reconstructActiveFormattingElements()
 			if p.elementInScope(defaultScope, a.Nobr) {
-				p.inBodyEndTagFormatting(a.Nobr)
+				p.inBodyEndTagFormatting(a.Nobr, "nobr")
 				p.reconstructActiveFormattingElements()
 			}
 			p.addFormattingElement()
@@ -984,6 +985,14 @@ func inBodyIM(p *parser) bool {
 			p.acknowledgeSelfClosingTag()
 			p.popUntil(buttonScope, a.P)
 			p.parseImpliedToken(StartTagToken, a.Form, a.Form.String())
+			if p.form == nil {
+				// NOTE: The 'isindex' element has been removed,
+				// and the 'template' element has not been designed to be
+				// collaborative with the index element.
+				//
+				// Ignore the token.
+				return true
+			}
 			if action != "" {
 				p.form.Attr = []Attribute{{Key: "action", Val: action}}
 			}
@@ -1114,7 +1123,7 @@ func inBodyIM(p *parser) bool {
 		case a.H1, a.H2, a.H3, a.H4, a.H5, a.H6:
 			p.popUntil(defaultScope, a.H1, a.H2, a.H3, a.H4, a.H5, a.H6)
 		case a.A, a.B, a.Big, a.Code, a.Em, a.Font, a.I, a.Nobr, a.S, a.Small, a.Strike, a.Strong, a.Tt, a.U:
-			p.inBodyEndTagFormatting(p.tok.DataAtom)
+			p.inBodyEndTagFormatting(p.tok.DataAtom, p.tok.Data)
 		case a.Applet, a.Marquee, a.Object:
 			if p.popUntil(defaultScope, p.tok.DataAtom) {
 				p.clearActiveFormattingElements()
@@ -1125,7 +1134,7 @@ func inBodyIM(p *parser) bool {
 		case a.Template:
 			return inHeadIM(p)
 		default:
-			p.inBodyEndTagOther(p.tok.DataAtom)
+			p.inBodyEndTagOther(p.tok.DataAtom, p.tok.Data)
 		}
 	case CommentToken:
 		p.addChild(&Node{
@@ -1152,7 +1161,7 @@ func inBodyIM(p *parser) bool {
 	return true
 }
 
-func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
+func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom, tagName string) {
 	// This is the "adoption agency" algorithm, described at
 	// https://html.spec.whatwg.org/multipage/syntax.html#adoptionAgency
 
@@ -1174,7 +1183,7 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 			}
 		}
 		if formattingElement == nil {
-			p.inBodyEndTagOther(tagAtom)
+			p.inBodyEndTagOther(tagAtom, tagName)
 			return
 		}
 		feIndex := p.oe.index(formattingElement)
@@ -1252,12 +1261,6 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 		switch commonAncestor.DataAtom {
 		case a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr:
 			p.fosterParent(lastNode)
-		case a.Template:
-			// TODO: remove namespace checking
-			if commonAncestor.Namespace == "html" {
-				commonAncestor = commonAncestor.LastChild
-			}
-			fallthrough
 		default:
 			commonAncestor.AppendChild(lastNode)
 		}
@@ -1285,9 +1288,17 @@ func (p *parser) inBodyEndTagFormatting(tagAtom a.Atom) {
 // inBodyEndTagOther performs the "any other end tag" algorithm for inBodyIM.
 // "Any other end tag" handling from 12.2.6.5 The rules for parsing tokens in foreign content
 // https://html.spec.whatwg.org/multipage/syntax.html#parsing-main-inforeign
-func (p *parser) inBodyEndTagOther(tagAtom a.Atom) {
+func (p *parser) inBodyEndTagOther(tagAtom a.Atom, tagName string) {
 	for i := len(p.oe) - 1; i >= 0; i-- {
-		if p.oe[i].DataAtom == tagAtom {
+		// Two element nodes have the same tag if they have the same Data (a
+		// string-typed field). As an optimization, for common HTML tags, each
+		// Data string is assigned a unique, non-zero DataAtom (a uint32-typed
+		// field), since integer comparison is faster than string comparison.
+		// Uncommon (custom) tags get a zero DataAtom.
+		//
+		// The if condition here is equivalent to (p.oe[i].Data == tagName).
+		if (p.oe[i].DataAtom == tagAtom) &&
+			((tagAtom != 0) || (p.oe[i].Data == tagName)) {
 			p.oe = p.oe[:i]
 			break
 		}
@@ -1713,8 +1724,12 @@ func inSelectIM(p *parser) bool {
 			}
 			p.addElement()
 		case a.Select:
-			p.tok.Type = EndTagToken
-			return false
+			if p.popUntil(selectScope, a.Select) {
+				p.resetInsertionMode()
+			} else {
+				// Ignore the token.
+				return true
+			}
 		case a.Input, a.Keygen, a.Textarea:
 			if p.elementInScope(selectScope, a.Select) {
 				p.parseImpliedToken(EndTagToken, a.Select, a.Select.String())
@@ -1744,6 +1759,9 @@ func inSelectIM(p *parser) bool {
 		case a.Select:
 			if p.popUntil(selectScope, a.Select) {
 				p.resetInsertionMode()
+			} else {
+				// Ignore the token.
+				return true
 			}
 		case a.Template:
 			return inHeadIM(p)
@@ -1769,13 +1787,22 @@ func inSelectInTableIM(p *parser) bool {
 	case StartTagToken, EndTagToken:
 		switch p.tok.DataAtom {
 		case a.Caption, a.Table, a.Tbody, a.Tfoot, a.Thead, a.Tr, a.Td, a.Th:
-			if p.tok.Type == StartTagToken || p.elementInScope(tableScope, p.tok.DataAtom) {
-				p.parseImpliedToken(EndTagToken, a.Select, a.Select.String())
-				return false
-			} else {
+			if p.tok.Type == EndTagToken && !p.elementInScope(tableScope, p.tok.DataAtom) {
 				// Ignore the token.
 				return true
 			}
+			// This is like p.popUntil(selectScope, a.Select), but it also
+			// matches <math select>, not just <select>. Matching the MathML
+			// tag is arguably incorrect (conceptually), but it mimics what
+			// Chromium does.
+			for i := len(p.oe) - 1; i >= 0; i-- {
+				if n := p.oe[i]; n.DataAtom == a.Select {
+					p.oe = p.oe[:i]
+					break
+				}
+			}
+			p.resetInsertionMode()
+			return false
 		}
 	}
 	return inSelectIM(p)
@@ -2209,6 +2236,15 @@ func (p *parser) parse() error {
 }
 
 // Parse returns the parse tree for the HTML from the given Reader.
+//
+// It implements the HTML5 parsing algorithm
+// (https://html.spec.whatwg.org/multipage/syntax.html#tree-construction),
+// which is very complicated. The resultant tree can contain implicitly created
+// nodes that have no explicit <tag> listed in r's data, and nodes' parents can
+// differ from the nesting implied by a naive processing of start and end
+// <tag>s. Conversely, explicit <tag>s in r's data can be silently dropped,
+// with no corresponding node in the resulting tree.
+//
 // The input is assumed to be UTF-8 encoded.
 func Parse(r io.Reader) (*Node, error) {
 	p := &parser{
@@ -2230,6 +2266,8 @@ func Parse(r io.Reader) (*Node, error) {
 // ParseFragment parses a fragment of HTML and returns the nodes that were
 // found. If the fragment is the InnerHTML for an existing element, pass that
 // element in context.
+//
+// It has the same intricacies as Parse.
 func ParseFragment(r io.Reader, context *Node) ([]*Node, error) {
 	contextTag := ""
 	if context != nil {
