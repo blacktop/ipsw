@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/AlecAivazis/survey"
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/ipsw/api"
@@ -323,7 +323,7 @@ func main() {
 					prompt := &survey.Confirm{
 						Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(builds)),
 					}
-					survey.AskOne(prompt, &cont, nil)
+					survey.AskOne(prompt, &cont)
 				}
 
 				if cont {
@@ -428,7 +428,7 @@ func main() {
 					prompt := &survey.Confirm{
 						Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(urls)),
 					}
-					survey.AskOne(prompt, &cont, nil)
+					survey.AskOne(prompt, &cont)
 
 					if cont {
 						for _, url := range urls {
