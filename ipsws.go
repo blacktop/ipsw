@@ -202,6 +202,28 @@ func main() {
 			},
 		},
 		{
+			Name:  "webkit",
+			Usage: "get WebKit version from a dyld_shared_cache",
+			Action: func(c *cli.Context) error {
+				if c.GlobalBool("verbose") {
+					log.SetLevel(log.DebugLevel)
+				}
+				if c.Args().Present() {
+					if _, err := os.Stat(c.Args().First()); os.IsNotExist(err) {
+						return fmt.Errorf("file %s does not exist", c.Args().First())
+					}
+					version, err := dyld.GetWebKitVersion(c.Args().First())
+					if err != nil {
+						return err
+					}
+					fmt.Println("WebKit Version: ", version)
+				} else {
+					log.Fatal("Please supply a dyld_shared_cache to extract from")
+				}
+				return nil
+			},
+		},
+		{
 			Name:  "decompress",
 			Usage: "decompress a kernelcache",
 			Action: func(c *cli.Context) error {
