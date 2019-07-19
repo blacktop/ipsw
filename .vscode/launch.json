@@ -72,6 +72,19 @@
       "showLog": false
     },
     {
+      "name": "Extract - WebKit Version",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "remotePath": "",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "program": "${workspaceRoot}/ipsws.go",
+      "env": {},
+      "args": ["-V", "webkit", "${workspaceRoot}/dyld_shared_cache"],
+      "showLog": false
+    },
+    {
       "name": "Decompress",
       "type": "go",
       "request": "launch",
