@@ -1,17 +1,27 @@
-package main
+package api
 
 import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"path"
 	"strconv"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
 	"github.com/pkg/errors"
+)
+
+const (
+	iphoneWikiURL    = "https://www.theiphonewiki.com"
+	firmwarePath     = "/wiki/Firmware"
+	betaFirmwarePath = "/wiki/Beta_Firmware"
+)
+
+var (
+	lastBaseBand []string
+	columnCount  int
 )
 
 func processTr(tr *goquery.Selection, isHeader bool) (IPSW, error) {
@@ -33,21 +43,20 @@ func processTr(tr *goquery.Selection, isHeader bool) (IPSW, error) {
 	}
 
 	ipsw.Version = strings.TrimSpace(tableElements[0].Text())
-	ipsw.Build = strings.TrimSpace(tableElements[1].Text())
+	ipsw.BuildID = strings.TrimSpace(tableElements[1].Text())
 	keys := []string{}
 	tableElements[2].Find("a").Each(func(_ int, alink *goquery.Selection) {
 		keys = append(keys, alink.Text())
 	})
-	ipsw.Keys = keys
+	// ipsw.Keys = keys
 
 	if len(tableElements) == 8 {
 		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
 		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[4].Text()))
 		// lastBaseBand = ipsw.Baseband
-		ipsw.ReleaseDate = strings.TrimSpace(tableElements[5].Text())
+		// ipsw.ReleaseDate = strings.TrimSpace(tableElements[5].Text())
 		link, _ := tableElements[6].Find("a").Attr("href")
-		ipsw.DownloadURL = link
-		ipsw.FileName = path.Base(link)
+		ipsw.URL = link
 		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[7].Text()), ",", "", -1))
 		if err != nil {
 			err = errors.Wrap(err, "unable to convert str to int")
@@ -58,10 +67,9 @@ func processTr(tr *goquery.Selection, isHeader bool) (IPSW, error) {
 	if len(tableElements) == 7 {
 		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
 		// lastBaseBand = ipsw.Baseband
-		ipsw.ReleaseDate = strings.TrimSpace(tableElements[4].Text())
+		// ipsw.ReleaseDate = strings.TrimSpace(tableElements[4].Text())
 		link, _ := tableElements[5].Find("a").Attr("href")
-		ipsw.DownloadURL = link
-		ipsw.FileName = path.Base(link)
+		ipsw.URL = link
 		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[6].Text()), ",", "", -1))
 		if err != nil {
 			err = errors.Wrap(err, "unable to convert str to int")
@@ -71,10 +79,9 @@ func processTr(tr *goquery.Selection, isHeader bool) (IPSW, error) {
 
 	if len(tableElements) == 6 {
 		// ipsw.Baseband = lastBaseBand
-		ipsw.ReleaseDate = strings.TrimSpace(tableElements[3].Text())
+		// ipsw.ReleaseDate = strings.TrimSpace(tableElements[3].Text())
 		link, _ := tableElements[4].Find("a").Attr("href")
-		ipsw.DownloadURL = link
-		ipsw.FileName = path.Base(link)
+		ipsw.URL = link
 		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[5].Text()), ",", "", -1))
 		if err != nil {
 			err = errors.Wrap(err, "unable to convert str to int")
@@ -163,7 +170,7 @@ func ScrapeIPhoneWiki() error {
 				}
 
 				i, err := processTr(tr, isHeader)
-				i.Device = device
+				i.Identifier = device
 				if err != nil {
 					log.WithError(err).Error("parsing table row failed")
 				} else {

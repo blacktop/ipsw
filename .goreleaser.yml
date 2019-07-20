@@ -1,7 +1,8 @@
 # This is an example goreleaser.yaml file with some sane defaults.
 # Make sure to check the documentation at http://goreleaser.com
 builds:
-  - binary: ipsw
+  - main: ./cmd/ipsw
+    binary: ipsw
     goos:
       - windows
       - darwin
@@ -27,7 +28,7 @@ brew:
     name: homebrew-tap
   folder: Formula
   homepage: "https://github.com/blacktop/ipsw"
-  description: "Download ipsw(s) from ipsw.me or theiphonewiki.com"
+  description: "Download and parse ipsw(s)"
   test: |
     system "#{bin}/ipsw --version"
 

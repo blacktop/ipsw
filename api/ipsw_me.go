@@ -28,7 +28,7 @@ type IPSW struct {
 	BuildID     string    `json:"buildid,omitempty"`
 	SHA1        string    `json:"sha1sum,omitempty"`
 	MD5         string    `json:"md5sum,omitempty"`
-	Filesize    int       `json:"filesize,omitempty"`
+	FileSize    int       `json:"filesize,omitempty"`
 	URL         string    `json:"url,omitempty"`
 	ReleaseDate time.Time `json:"releasedate,omitempty"`
 	UploadDate  time.Time `json:"uploaddate,omitempty"`
