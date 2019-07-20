@@ -22,4 +22,4 @@ jobs:
       - checkout
       - setup_remote_docker
       # specify any bash command here prefixed with `run: `
-      - run: go run *.go --help
+      - run: go run cmd/ipsw/main.go --help
