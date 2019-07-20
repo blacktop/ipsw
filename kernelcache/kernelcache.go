@@ -82,7 +82,7 @@ func Open(name string) (*CompressedCache, error) {
 // Extract extracts and decompresses a lernelcache from ipsw
 func Extract(ipsw string) error {
 	log.Info("Extracting Kernelcache from IPSW")
-	kcache, err := utils.Unzip(ipsw, "", "kernelcache")
+	kcache, err := utils.Unzip(ipsw, "", "kernelcache", 20*1024*1024)
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
 	}
