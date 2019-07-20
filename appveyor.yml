@@ -30,5 +30,5 @@ build: false
 deploy: false
 
 test_script:
-  - go build github.com/blacktop/ipsw
-  - ipsw.exe download --device iPhone11,2 --build 16B92 --kernel --dec
+  - go build github.com/blacktop/ipsw/cmd/ipsw
+  - ipsw.exe download --device iPhone11,2 --build 16B92 kernel
