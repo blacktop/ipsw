@@ -9,7 +9,7 @@ clone_folder: c:\gopath\src\github.com\blacktop\ipsw
 environment:
   GOPATH: c:\gopath
   DEPTESTBYPASS501: 1
-  GOVERSION: 1.11
+  GOVERSION: 1.12
 
 init:
   - git config --global core.autocrlf input
