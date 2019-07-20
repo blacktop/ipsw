@@ -1,14 +1,14 @@
-# github.com/AlecAivazis/survey/v2 v2.0.0
+# github.com/AlecAivazis/survey/v2 v2.0.1
 github.com/AlecAivazis/survey/v2
 github.com/AlecAivazis/survey/v2/core
 github.com/AlecAivazis/survey/v2/terminal
-# github.com/PuerkitoBio/goquery v1.4.1
+# github.com/PuerkitoBio/goquery v1.5.0
 github.com/PuerkitoBio/goquery
 # github.com/VividCortex/ewma v1.1.1
 github.com/VividCortex/ewma
 # github.com/andybalholm/cascadia v1.0.0
 github.com/andybalholm/cascadia
-# github.com/apex/log v1.1.0
+# github.com/apex/log v1.1.1
 github.com/apex/log
 github.com/apex/log/handlers/cli
 # github.com/blacktop/lzss v0.1.0
@@ -52,7 +52,7 @@ github.com/mitchellh/mapstructure
 github.com/pelletier/go-toml
 # github.com/pkg/errors v0.8.1
 github.com/pkg/errors
-# github.com/rakyll/statik v0.1.4
+# github.com/rakyll/statik v0.1.6
 github.com/rakyll/statik/fs
 # github.com/spf13/afero v1.2.2
 github.com/spf13/afero
@@ -69,11 +69,11 @@ github.com/spf13/pflag
 github.com/spf13/viper
 # github.com/urfave/cli v1.20.0
 github.com/urfave/cli
-# github.com/vbauerster/mpb v3.3.2+incompatible
-github.com/vbauerster/mpb
-github.com/vbauerster/mpb/decor
-github.com/vbauerster/mpb/cwriter
-github.com/vbauerster/mpb/internal
+# github.com/vbauerster/mpb/v4 v4.8.4
+github.com/vbauerster/mpb/v4
+github.com/vbauerster/mpb/v4/decor
+github.com/vbauerster/mpb/v4/cwriter
+github.com/vbauerster/mpb/v4/internal
 # golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/net v0.0.0-20190628185345-da137c7871d7

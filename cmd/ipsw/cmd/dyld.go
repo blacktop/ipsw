@@ -22,30 +22,19 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	rootCmd.AddCommand(dyldCmd)
+}
 
 // dyldCmd represents the dyld command
 var dyldCmd = &cobra.Command{
 	Use:   "dyld",
 	Short: "Parse dyld_shared_cache",
+	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("dyld called")
+		cmd.Help()
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(dyldCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// dyldCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// dyldCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

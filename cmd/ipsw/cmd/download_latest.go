@@ -23,29 +23,90 @@ package cmd
 
 import (
 	"fmt"
-
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/utils"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"os"
+	"path"
 )
-
-// latestCmd represents the latest command
-var latestCmd = &cobra.Command{
-	Use:   "latest",
-	Short: "A brief description of your command",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("latest called")
-	},
-}
 
 func init() {
 	downloadCmd.AddCommand(latestCmd)
 
-	// Here you will define your flags and configuration settings.
+	latestCmd.Flags().BoolP("yes", "y", false, "do not prompt user")
+}
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// latestCmd.PersistentFlags().String("foo", "", "A help for foo")
+// latestCmd represents the latest command
+var latestCmd = &cobra.Command{
+	Use:   "latest",
+	Short: "Download latest release version",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var err error
+		var builds []api.Build
 
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// latestCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+		proxy, _ := cmd.Flags().GetString("proxy")
+		insecure, _ := cmd.Flags().GetBool("insecure")
+		skip, _ := cmd.Flags().GetBool("yes")
+
+		// filters
+		//version, _ := cmd.Flags().GetString("version")
+		//device, _ := cmd.Flags().GetString("device")
+		//build, _ := cmd.Flags().GetString("build")
+
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+
+		itunes, err := api.NewiTunesVersionMaster()
+		if err != nil {
+			return errors.Wrap(err, "failed to create itunes API")
+		}
+
+		builds, err = itunes.GetLatestBuilds()
+		if err != nil {
+			return errors.Wrap(err, "failed to get the latest builds")
+		}
+
+		log.Debug("URLS TO DOWNLOAD:")
+		for _, b := range builds {
+			utils.Indent(log.Debug)(b.FirmwareURL)
+		}
+
+		cont := true
+		if !skip {
+			cont = false
+			prompt := &survey.Confirm{
+				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(builds)),
+			}
+			survey.AskOne(prompt, &cont)
+		}
+
+		if cont {
+			for _, build := range builds {
+				if _, err := os.Stat(path.Base(build.FirmwareURL)); os.IsNotExist(err) {
+					log.WithFields(log.Fields{
+						"device":  build.Identifier,
+						"build":   build.BuildVersion,
+						"version": build.ProductVersion,
+					}).Info("Getting IPSW")
+					// download file
+					err = api.DownloadFile(build.FirmwareURL, proxy, insecure)
+					if err != nil {
+						return errors.Wrap(err, "failed to download file")
+					}
+					// verify download
+					if ok, _ := utils.Verify(build.FirmwareSHA1, path.Base(build.FirmwareURL)); !ok {
+						return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(build.FirmwareURL))
+					}
+				} else {
+					log.Warnf("ipsw already exists: %s", path.Base(build.FirmwareURL))
+				}
+			}
+		}
+
+		return nil
+	},
 }

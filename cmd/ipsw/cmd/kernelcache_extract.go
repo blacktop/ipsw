@@ -23,29 +23,28 @@ package cmd
 
 import (
 	"fmt"
-
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/kernelcache"
 	"github.com/spf13/cobra"
+	"os"
 )
-
-// kerExtractCmd represents the kerExtract command
-var kerExtractCmd = &cobra.Command{
-	Use:   "extract",
-	Short: "A brief description of your command",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("kerExtract called")
-	},
-}
 
 func init() {
 	kernelcacheCmd.AddCommand(kerExtractCmd)
+}
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// kerExtractCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// kerExtractCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+// kerExtractCmd represents the kerExtract command
+var kerExtractCmd = &cobra.Command{
+	Use:   "extract  [path to IPSW]",
+	Short: "Extract and decompress a kernelcache from IPSW",
+	Args:  cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exist", args[0])
+		}
+		return kernelcache.Extract(args[0])
+	},
 }
