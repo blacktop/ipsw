@@ -36,7 +36,7 @@ func init() {
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
 	Use:   "extract",
-	Short: "Extract kernelcache or dyld_shared_cache (macOS)",
+	Short: "Extract kernelcache or dyld_shared_cache (macOS) from IPSW",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("extract called")
 	},
