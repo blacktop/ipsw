@@ -1,18 +1,15 @@
 package dyld
 
 import (
-	"archive/zip"
 	"fmt"
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/utils"
+	"github.com/pkg/errors"
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"regexp"
-	"strings"
-	"github.com/blacktop/ipsw/utils"
-	"github.com/apex/log"
-	"github.com/pkg/errors"
 )
 
 const (

@@ -62,7 +62,7 @@ func LookupByURL(ipsws []api.IPSW, dlURL string) (api.IPSW, error) {
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
 	Use:   "download",
-	Short: "Download and parse ipsw from the internet",
+	Short: "Download and parse IPSW(s) from the internets",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
