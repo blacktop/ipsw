@@ -29,19 +29,21 @@ import (
 	clihander "github.com/apex/log/handlers/cli"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+	// "github.com/spf13/cobra/doc"
 	"github.com/spf13/viper"
 )
 
 var (
-	ctx *log.Entry
-  cfgFile string
-  // Verbose boolean flag for verbose logging
-  Verbose bool
+	ctx     *log.Entry
+	cfgFile string
+	// Verbose boolean flag for verbose logging
+	Verbose bool
 	// AppVersion stores the plugin's version
 	AppVersion string
 	// AppBuildTime stores the plugin's build time
 	AppBuildTime string
 )
+
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "ipsw",
@@ -55,6 +57,15 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+	// header := &doc.GenManHeader{
+	// 	Title:   "MINE",
+	// 	Section: "3",
+	// }
+	// err := doc.GenManTree(rootCmd, header, "./docs")
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	os.Exit(1)
+	// }
 }
 
 func init() {
@@ -67,7 +78,7 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
-  rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
+	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
 }
 
 // initConfig reads in config file and ENV variables if set.
