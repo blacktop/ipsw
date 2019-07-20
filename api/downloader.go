@@ -14,8 +14,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/pkg/errors"
-	"github.com/vbauerster/mpb"
-	"github.com/vbauerster/mpb/decor"
+    "github.com/vbauerster/mpb/v4"
+    "github.com/vbauerster/mpb/v4/decor"
 )
 
 func getProxy(proxy string) func(*http.Request) (*url.URL, error) {
@@ -68,11 +68,10 @@ func DownloadFile(url, proxy string, insecure bool) error {
 
 	p := mpb.New(
 		mpb.WithWidth(60),
-		mpb.WithFormat("[=>-|"),
 		mpb.WithRefreshRate(180*time.Millisecond),
 	)
 
-	bar := p.AddBar(size,
+	bar := p.AddBar(size, mpb.BarStyle("[=>-|"),
 		mpb.PrependDecorators(
 			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),

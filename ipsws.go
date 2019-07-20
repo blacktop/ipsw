@@ -357,7 +357,7 @@ func main() {
 								"version": build.ProductVersion,
 							}).Info("Getting IPSW")
 							// download file
-							err = DownloadFile(build.FirmwareURL, c.String("proxy"), c.Bool("insecure"))
+							err = api.DownloadFile(build.FirmwareURL, c.String("proxy"), c.Bool("insecure"))
 							if err != nil {
 								return errors.Wrap(err, "failed to download file")
 							}
@@ -489,7 +489,7 @@ func main() {
 										"signed":  i.Signed,
 									}).Info("Getting IPSW")
 									// download file
-									err = DownloadFile(url, c.String("proxy"), c.Bool("insecure"))
+									err = api.DownloadFile(url, c.String("proxy"), c.Bool("insecure"))
 									if err != nil {
 										return errors.Wrap(err, "failed to download file")
 									}
@@ -541,7 +541,7 @@ func main() {
 									"version": i.Version,
 									"signed":  i.Signed,
 								}).Info("Getting IPSW")
-								err = DownloadFile(i.URL, c.String("proxy"), c.Bool("insecure"))
+								err = api.DownloadFile(i.URL, c.String("proxy"), c.Bool("insecure"))
 								if err != nil {
 									return errors.Wrap(err, "failed to download file")
 								}
