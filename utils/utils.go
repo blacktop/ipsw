@@ -94,7 +94,7 @@ func Verify(sha1sum, name string) (bool, error) {
 }
 
 // Unzip - https://stackoverflow.com/a/24792688
-func Unzip(src, dest, searchTerm string) (string, error) {
+func Unzip(src, dest, searchTerm string, sizeFilter uint64) (string, error) {
 
 	var fName string
 
@@ -148,10 +148,12 @@ func Unzip(src, dest, searchTerm string) (string, error) {
 
 	for _, f := range r.File {
 		if strings.Contains(f.Name, searchTerm) {
-			fName = path.Base(f.Name)
-			err := extractAndWriteFile(f)
-			if err != nil {
-				return "", err
+			if f.UncompressedSize64 > sizeFilter {
+				fName = path.Base(f.Name)
+				err := extractAndWriteFile(f)
+				if err != nil {
+					return "", err
+				}
 			}
 		}
 	}
