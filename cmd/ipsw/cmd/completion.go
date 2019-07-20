@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -25,20 +26,43 @@ func init() {
 	rootCmd.AddCommand(completionCmd)
 }
 
+const (
+	longDescription = `
+	Outputs shell completion for the given shell (bash or zsh)
+	This depends on the bash-completion binary.  Example installation instructions:
+	OS X:
+		$ brew install bash-completion
+		$ source $(brew --prefix)/etc/bash_completion
+		$ ipsw completion bash > ~/.ipsw-completion  # for bash users
+		$ ipsw completion zsh > ~/.ipsw-completion   # for zsh users
+		$ source ~/.ipsw-completion
+	Ubuntu:
+		$ apt-get install bash-completion
+		$ source /etc/bash-completion
+		$ source <(ipsw completion bash) # for bash users
+		$ source <(ipsw completion zsh)  # for zsh users
+	Additionally, you may want to output the completion to a file and source in your .bashrc
+`
+)
+
 // completionCmd represents the completion command
 var completionCmd = &cobra.Command{
-	Use:   "completion",
+	Use:   "completion [bash|zsh]",
 	Short: "Generates bash completion scripts",
-	Long: `To load completion run
-
-. <(ipsw completion)
-
-To configure your bash shell to load completions for each session add to your bashrc
-
-# ~/.bashrc or ~/.profile
-. <(ipsw completion)
-`,
+	Long: longDescription,
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) != 1 {
+			return fmt.Errorf("requires 1 arg, found %d", len(args))
+		}
+		return cobra.OnlyValidArgs(cmd, args)
+	},
+	ValidArgs: []string{"bash", "zsh"},
 	Run: func(cmd *cobra.Command, args []string) {
-		rootCmd.GenBashCompletion(os.Stdout)
+		switch args[0] {
+		case "bash":
+			rootCmd.GenBashCompletion(os.Stdout)
+		case "zsh":
+			rootCmd.GenZshCompletion(os.Stdout)
+		}
 	},
 }
