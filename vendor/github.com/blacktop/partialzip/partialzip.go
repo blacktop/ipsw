@@ -9,7 +9,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -176,7 +175,7 @@ func (p *PartialZip) Download(path string) (int, error) {
 				return n, errors.Wrap(err, "failed to flate decompress data")
 			}
 
-			of, err := os.Create(filepath.Base(path))
+			of, err := os.Create(path)
 			defer of.Close()
 
 			n, err = of.Write(enflated)
