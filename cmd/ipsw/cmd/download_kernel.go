@@ -39,13 +39,14 @@ func init() {
 	downloadCmd.AddCommand(downloadKernelCmd)
 }
 
-func findKernelInList(list []string) string {
+func findKernelInList(list []string) []string {
+	var kernel []string
 	for _, v := range list {
 		if strings.Contains(v, "kernel") {
-			return v
+			kernel = append(kernel, v)
 		}
 	}
-	return ""
+	return kernel
 }
 
 // downloadKernelCmd represents the downloadKernel command
@@ -112,14 +113,14 @@ var downloadKernelCmd = &cobra.Command{
 					if err != nil {
 						return errors.Wrap(err, "failed to create partialzip instance")
 					}
-					kpath := findKernelInList(pzip.List())
-					if len(kpath) > 0 {
+					kpaths := findKernelInList(pzip.List())
+					for _, kpath := range kpaths {
 						_, err = pzip.Download(kpath)
 						if err != nil {
 							return errors.Wrap(err, "failed to download file")
 						}
 						kernelcache.Decompress(kpath)
-						continue
+						os.Remove(kpath)
 					}
 				}
 			}
@@ -141,13 +142,14 @@ var downloadKernelCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to create partialzip instance")
 				}
-				kpath := findKernelInList(pzip.List())
-				if len(kpath) > 0 {
+				kpaths := findKernelInList(pzip.List())
+				for _, kpath := range kpaths {
 					_, err = pzip.Download(kpath)
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}
 					kernelcache.Decompress(kpath)
+					os.Remove(kpath)
 				}
 			}
 		} else {
