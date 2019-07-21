@@ -24,11 +24,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/devicetree"
+	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"reflect"
+	"strings"
 )
 
 var (
@@ -43,8 +45,38 @@ func init() {
 	deviceCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
 }
 
-func printSummay() {
-	fmt.Println("TEWT")
+func printSummay(dtree *devicetree.DeviceTree) {
+
+	children := (*dtree)["device-tree"]["children"]
+
+	switch reflect.TypeOf(children).Kind() {
+	case reflect.Slice:
+		s := reflect.ValueOf(children)
+		for i := 0; i < s.Len(); i++ {
+			child := s.Index(i)
+			c := child.Interface().(devicetree.DeviceTree)
+			if _, ok := (c)["product"]; ok {
+				utils.Indent(log.Info)(fmt.Sprintf("Product Name: %s", (c)["product"]["product-name"]))
+			}
+		}
+	}
+
+	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
+		utils.Indent(log.Info)(fmt.Sprintf("Model: %s", model))
+		compatible := (*dtree)["device-tree"]["compatible"]
+		switch reflect.TypeOf(compatible).Kind() {
+		case reflect.Slice:
+			s := reflect.ValueOf(compatible)
+			for i := 0; i < s.Len(); i++ {
+				elem := s.Index(i).String()
+				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
+					utils.Indent(log.Info)(fmt.Sprintf("BoardConfig: %s", s.Index(i)))
+				}
+			}
+		}
+	} else {
+		log.Fatal("devicetree model is not a string")
+	}
 }
 
 // deviceCmd represents the device command
@@ -53,11 +85,13 @@ var deviceCmd = &cobra.Command{
 	Short: "Parse DeviceTree",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
 		if remoteFlag {
-			dtrees, err := devicetree.RemoteParse(args[0])
+			_, err := devicetree.RemoteParse(args[0])
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
@@ -67,15 +101,20 @@ var deviceCmd = &cobra.Command{
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
 			if jsonFlag {
+				// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
+				// jq '.[ "device-tree" ].compatible'
+				// jq '.[ "device-tree" ].model'
 				j, err := json.Marshal(dtree)
 				if err != nil {
 					return err
 				}
 
 				fmt.Println(string(j))
+			} else {
+				printSummay(dtree)
 			}
-
 		}
+
 		return nil
 	},
 }

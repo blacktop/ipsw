@@ -23,6 +23,10 @@ package cmd
 
 import (
 	"fmt"
+	"net/url"
+	"os"
+	"runtime"
+
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/devicetree"
 	"github.com/blacktop/ipsw/dyld"
@@ -30,8 +34,6 @@ import (
 	"github.com/blacktop/partialzip"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"os"
-	"runtime"
 )
 
 var (
@@ -50,24 +52,44 @@ func init() {
 	extractCmd.Flags().BoolVarP(&deviceTreeFlag, "device-tree", "t", false, "Extract DeviceTree")
 }
 
+func isURL(str string) bool {
+	u, err := url.Parse(str)
+	return err == nil && u.Scheme != "" && u.Host != ""
+}
+
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
 	Use:   "extract [path to IPSW | URL]",
 	Short: "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
 		if remote {
+			if !isURL(args[0]) {
+				log.Fatal("must supply valid URL when using the remote flag")
+			}
+
+			if deviceTreeFlag {
+				log.Error("unable to extract DeviceTree remotely (for now)")
+				// err := devicetree.RemoteParse(args[0])
+				// if err != nil {
+				// 	return errors.Wrap(err, "failed to extract DeviceTree")
+				// }
+			}
+			if dyldFlag {
+				log.Error("unable to extract dyld_shared_cache remotely")
+			}
 			if kernelFlag {
 				pzip, err := partialzip.New(args[0])
 				if err != nil {
 					return errors.Wrap(err, "failed to create partialzip instance")
 				}
-				kpath := findKernelInList(pzip.List())
-				if len(kpath) > 0 {
+				kpaths := findKernelInList(pzip.List())
+				for _,kpath := range kpaths {
 					_, err = pzip.Download(kpath)
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
@@ -76,13 +98,7 @@ var extractCmd = &cobra.Command{
 					if err != nil {
 						return errors.Wrap(err, "failed to extract kernelcache")
 					}
-				}
-			}
-
-			if deviceTreeFlag {
-				err := devicetree.RemoteParse(args[0])
-				if err != nil {
-					return errors.Wrap(err, "failed to extract DeviceTree")
+					os.Remove(kpath)
 				}
 			}
 		} else {
@@ -93,7 +109,7 @@ var extractCmd = &cobra.Command{
 			if kernelFlag {
 				err := kernelcache.Extract(args[0])
 				if err != nil {
-					return errors.Wrap(err, "failed to extract kernelcache")
+					return errors.Wrap(err, "failed to extract kernelcaches")
 				}
 			}
 
@@ -108,9 +124,9 @@ var extractCmd = &cobra.Command{
 			}
 
 			if deviceTreeFlag {
-				err := devicetree.Parse(args[0])
+				err := devicetree.Extract(args[0])
 				if err != nil {
-					return errors.Wrap(err, "failed to extract DeviceTree")
+					return errors.Wrap(err, "failed to extract DeviceTrees")
 				}
 			}
 		}

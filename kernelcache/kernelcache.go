@@ -1,11 +1,14 @@
 package kernelcache
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
@@ -82,23 +85,31 @@ func Open(name string) (*CompressedCache, error) {
 // Extract extracts and decompresses a lernelcache from ipsw
 func Extract(ipsw string) error {
 	log.Info("Extracting Kernelcache from IPSW")
-	kcache, err := utils.Unzip(ipsw, "", "kernelcache", 20*1024*1024)
+	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		if strings.Contains(f.Name, "kernelcache") {
+			return true
+		}
+		return false
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
 	}
-	// defer os.Remove(kcache)
 
-	kc, err := Open(kcache)
-	if err != nil {
-		return errors.Wrap(err, "failed parse compressed kernelcache")
+	for _, kcache := range kcaches {
+		kc, err := Open(kcache)
+		if err != nil {
+			return errors.Wrap(err, "failed parse compressed kernelcache")
+		}
+
+		log.Info("Decompressing Kernelcache")
+		dec := lzss.Decompress(kc.Data)
+		err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
+		if err != nil {
+			return errors.Wrap(err, "failed to decompress kernelcache")
+		}
+		os.Remove(kcache)
 	}
 
-	log.Info("Decompressing Kernelcache")
-	dec := lzss.Decompress(kc.Data)
-	err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
-	if err != nil {
-		return errors.Wrap(err, "failed to decompress kernelcache")
-	}
 	return nil
 }
 

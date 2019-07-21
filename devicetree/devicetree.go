@@ -1,6 +1,7 @@
 package devicetree
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/asn1"
 	"encoding/base64"
@@ -16,6 +17,7 @@ import (
 	"unicode"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/partialzip"
 	"github.com/pkg/errors"
 )
@@ -239,4 +241,30 @@ func RemoteParse(url string) ([]*DeviceTree, error) {
 	}
 
 	return dtreeArray, nil
+}
+
+// Extract extracts and decompresses a lernelcache from ipsw
+func Extract(ipsw string) error {
+	log.Info("Extracting DeviceTree from IPSW")
+	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
+		if validDT.MatchString(f.Name) {
+			return true
+		}
+		return false
+	})
+
+	if err != nil {
+		return errors.Wrap(err, "failed extract DeviceTree from ipsw")
+	}
+
+	// for _, dtree := range dtrees {
+	// 	d, err := Open(dtree)
+	// 	if err != nil {
+	// 		return errors.Wrap(err, "failed to open DeviceTree")
+	// 	}
+	// 	defer os.Remove(dtree)
+	// }
+
+	return nil
 }

@@ -19,16 +19,16 @@
       "showLog": false
     },
     {
-      "name": "Dump",
+      "name": "Device",
       "type": "go",
       "request": "launch",
       "mode": "auto",
       "remotePath": "",
       "port": 2345,
       "host": "127.0.0.1",
-      "program": "${workspaceRoot}/ipsws.go",
+      "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {},
-      "args": ["-V", "dump", "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore/Firmware/all_flash/DeviceTree.d321ap.im4p"],
+      "args": ["-V", "device", "${workspaceRoot}/Firmware/all_flash/DeviceTree.d321ap.im4p"],
       "showLog": false
     },
     {

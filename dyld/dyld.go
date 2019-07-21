@@ -1,15 +1,18 @@
 package dyld
 
 import (
+	"archive/zip"
 	"fmt"
-	"github.com/apex/log"
-	"github.com/blacktop/ipsw/utils"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strings"
+
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/utils"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -20,35 +23,48 @@ const (
 // Extract extracts dyld_shared_cache from ipsw
 func Extract(ipsw string) error {
 	log.Info("Extracting dyld_shared_cache from IPSW")
-	dmg, err := utils.Unzip(ipsw, "", ".dmg", 1024*1024*1024)
+	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		if strings.EqualFold(filepath.Ext(f.Name), ".dmg") {
+			if f.UncompressedSize64 > 1024*1024*1024 {
+				return true
+			}
+		}
+		return false
+	})
 	if err != nil {
 		return errors.Wrap(err, "failed extract dyld_shared_cache from ipsw")
 	}
-	defer os.Remove(dmg)
 
-	log.Info("Mounting DMG")
-	device, err := Mount(dmg)
-	if err != nil {
-		return errors.Wrapf(err, "failed to mount %s", dmg)
-	}
-	matches, err := filepath.Glob(filepath.Join(mountPoint, "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"))
-	if err != nil {
-		return err
-	}
-	if len(matches) == 0 {
-		return errors.Errorf("failed to find dyld_shared_cache in ipsw: %s", ipsw)
+	if len(dmgs) == 1 {
+		defer os.Remove(dmgs[0])
+
+		log.Info("Mounting DMG")
+		device, err := Mount(dmgs[0])
+		if err != nil {
+			return errors.Wrapf(err, "failed to mount %s", dmgs[0])
+		}
+		matches, err := filepath.Glob(filepath.Join(mountPoint, "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"))
+		if err != nil {
+			return err
+		}
+		if len(matches) == 0 {
+			return errors.Errorf("failed to find dyld_shared_cache in ipsw: %s", ipsw)
+		}
+
+		log.Infof("Extracting %s to ./dyld_shared_cache", matches[0])
+		err = Copy(matches[0], "dyld_shared_cache")
+		if err != nil {
+			return err
+		}
+		log.Info("Unmounting DMG")
+		err = Unmount(device)
+		if err != nil {
+			return errors.Wrapf(err, "failed to unmount %s", device)
+		}
+	} else {
+		return fmt.Errorf("dyld.Extract found more than one DMG (should only be one): %v", dmgs)
 	}
 
-	log.Infof("Extracting %s to ./dyld_shared_cache", matches[0])
-	err = Copy(matches[0], "dyld_shared_cache")
-	if err != nil {
-		return err
-	}
-	log.Info("Unmounting DMG")
-	err = Unmount(device)
-	if err != nil {
-		return errors.Wrapf(err, "failed to unmount %s", device)
-	}
 	return nil
 }
 
@@ -94,69 +110,3 @@ func Unmount(deviceNode string) error {
 
 	return nil
 }
-
-// Unzip - https://stackoverflow.com/a/24792688
-// func Unzip(src, dest string) (string, error) {
-// 	var dmgName string
-// 	r, err := zip.OpenReader(src)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	defer func() {
-// 		if err := r.Close(); err != nil {
-// 			panic(err)
-// 		}
-// 	}()
-
-// 	os.MkdirAll(dest, 0755)
-
-// 	// Closure to address file descriptors issue with all the deferred .Close() methods
-// 	extractAndWriteFile := func(f *zip.File) error {
-// 		rc, err := f.Open()
-// 		if err != nil {
-// 			return err
-// 		}
-// 		defer func() {
-// 			if err := rc.Close(); err != nil {
-// 				panic(err)
-// 			}
-// 		}()
-
-// 		path := filepath.Join(dest, path.Base(f.Name))
-
-// 		if f.FileInfo().IsDir() {
-// 			os.MkdirAll(path, f.Mode())
-// 		} else {
-// 			os.MkdirAll(filepath.Dir(path), f.Mode())
-// 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
-// 			if err != nil {
-// 				return err
-// 			}
-// 			defer func() {
-// 				if err := f.Close(); err != nil {
-// 					panic(err)
-// 				}
-// 			}()
-
-// 			_, err = io.Copy(f, rc)
-// 			if err != nil {
-// 				return err
-// 			}
-// 		}
-// 		return nil
-// 	}
-
-// 	for _, f := range r.File {
-// 		if strings.EqualFold(filepath.Ext(f.Name), ".dmg") {
-// 			if f.UncompressedSize64 > 1024*1024*1024 {
-// 				dmgName = path.Base(f.Name)
-// 				err := extractAndWriteFile(f)
-// 				if err != nil {
-// 					return "", err
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	return dmgName, nil
-// }
