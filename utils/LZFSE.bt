@@ -1,0 +1,207 @@
+//------------------------------------------------
+//--- 010 Editor v9.0.1 Binary Template
+//
+//      File: LZFSE.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: Parse LZFSE archive files.
+//  Category: Archive
+// File Mask:
+//  ID Bytes: 62 76 78 6E //bvxn
+//   History:
+//------------------------------------------------
+
+#define LZFSE_NO_BLOCK_MAGIC             0x00000000 // 0    (invalid)
+#define LZFSE_ENDOFSTREAM_BLOCK_MAGIC    0x24787662 // bvx$ (end of stream)
+#define LZFSE_UNCOMPRESSED_BLOCK_MAGIC   0x2d787662 // bvx- (raw data)
+#define LZFSE_COMPRESSEDV1_BLOCK_MAGIC   0x31787662 // bvx1 (lzfse compressed, uncompressed tables)
+#define LZFSE_COMPRESSEDV2_BLOCK_MAGIC   0x32787662 // bvx2 (lzfse compressed, compressed tables)
+#define LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC 0x6e787662 // bvxn (lzvn compressed)
+
+#define LZFSE_ENCODE_L_SYMBOLS 20
+#define LZFSE_ENCODE_M_SYMBOLS 20
+#define LZFSE_ENCODE_D_SYMBOLS 64
+#define LZFSE_ENCODE_LITERAL_SYMBOLS 256
+#define LZFSE_ENCODE_L_STATES 64
+#define LZFSE_ENCODE_M_STATES 64
+#define LZFSE_ENCODE_D_STATES 256
+#define LZFSE_ENCODE_LITERAL_STATES 1024
+#define LZFSE_MATCHES_PER_BLOCK 10000
+
+typedef struct {
+  //  Magic number, always LZFSE_COMPRESSEDV1_BLOCK_MAGIC.
+  char magic[4] <bgcolor=cBlue>;
+  //  Number of decoded (output) bytes in block.
+  uint n_raw_bytes;
+  //  Number of encoded (source) bytes in block.
+  uint n_payload_bytes;
+  //  Number of literal bytes output by block (*not* the number of literals).
+  uint n_literals;
+  //  Number of matches in block (which is also the number of literals).
+  uint n_matches;
+  //  Number of bytes used to encode literals.
+  uint n_literal_payload_bytes;
+  //  Number of bytes used to encode matches.
+  uint n_lmd_payload_bytes;
+
+  //  Final encoder states for the block, which will be the initial states for
+  //  the decoder:
+  //  Final accum_nbits for literals stream.
+  int literal_bits;
+  //  There are four interleaved streams of literals, so there are four final
+  //  states.
+  ushort literal_state[4];
+  //  accum_nbits for the l, m, d stream.
+  int lmd_bits;
+  //  Final L (literal length) state.
+  ushort l_state;
+  //  Final M (match length) state.
+  ushort m_state;
+  //  Final D (match distance) state.
+  ushort d_state;
+
+  //  Normalized frequency tables for each stream. Sum of values in each
+  //  array is the number of states.
+  ushort l_freq[LZFSE_ENCODE_L_SYMBOLS];
+  ushort m_freq[LZFSE_ENCODE_M_SYMBOLS];
+  ushort d_freq[LZFSE_ENCODE_D_SYMBOLS];
+  ushort literal_freq[LZFSE_ENCODE_LITERAL_SYMBOLS];
+} lzfse_compressed_block_header_v1;
+
+typedef struct {
+  BitfieldDisablePadding();
+  BitfieldLeftToRight();
+  //    0       20    n_literals
+  uint n_literals : 20;
+  //    20      20    n_literal_payload_bytes
+  uint n_literal_payload_bytes : 20;
+  //    40      20    n_matches
+  uint n_matches : 20;
+  //    60      3
+  int literal_bits : 3;
+  //    63      1     --- unused ---
+  uint : 1;
+} field1 <comment="uint64">;
+
+typedef struct {
+  //    0       10    literal_state[0]
+  ushort literal_state0 : 10;
+  //    10      10    literal_state[1]
+  ushort literal_state1 : 10;
+  //    20      10    literal_state[2]
+  ushort literal_state2 : 10;
+  //    30      10    literal_state[3]
+  ushort literal_state3 : 10;
+  //    40      20    n_lmd_payload_bytes
+  uint n_lmd_payload_bytes : 20;
+  //    60      3     lmd_bits
+  int lmd_bits : 3;
+  //    63      1     --- unused ---
+  uint : 1;
+} field2 <comment="uint64">;
+
+typedef struct {
+  BitfieldDisablePadding();
+  BitfieldLeftToRight();
+  //    0       32    header_size (total header size in bytes; this does not
+  //                  correspond to a field in the uncompressed header version,
+  //                  but is required; we wouldn't know the size of the
+  //                  compresssed header otherwise.
+  uint header_size : 32;
+  //    32      10    l_state
+  ushort l_state : 10;
+  //    42      10    m_state
+  ushort m_state : 10;
+  //    52      10    d_state
+  ushort d_state : 10;
+  //    62      2     --- unused ---
+  uint : 2;
+} field3 <comment="uint64">;
+
+typedef struct {
+  //  Magic number, always LZFSE_COMPRESSEDV2_BLOCK_MAGIC.
+  char magic[4] <bgcolor=cBlue>;
+  //  Number of decoded (output) bytes in block.
+  uint n_raw_bytes;
+  //  The fields n_payload_bytes ... d_state from the
+  //  lzfse_compressed_block_header_v1 object are packed into three 64-bit
+  //  fields in the compressed header, as follows:
+  //
+  //    offset  bits  value
+  //    0       20    n_literals
+  //    20      20    n_literal_payload_bytes
+  //    40      20    n_matches
+  //    60      3     literal_bits
+  //    63      1     --- unused ---
+  //
+  //    0       10    literal_state[0]
+  //    10      10    literal_state[1]
+  //    20      10    literal_state[2]
+  //    30      10    literal_state[3]
+  //    40      20    n_lmd_payload_bytes
+  //    60      3     lmd_bits
+  //    63      1     --- unused ---
+  //
+  //    0       32    header_size (total header size in bytes; this does not
+  //                  correspond to a field in the uncompressed header version,
+  //                  but is required; we wouldn't know the size of the
+  //                  compresssed header otherwise.
+  //    32      10    l_state
+  //    42      10    m_state
+  //    52      10    d_state
+  //    62      2     --- unused ---
+  field1 Characteristics <bgcolor=cLtGray>;
+  field2 Characteristics2 <bgcolor=cLtGray>;
+  field3 Characteristics3 <bgcolor=cLtGray>;
+  //  Variable size freq tables, using a Huffman-style fixed encoding.
+  //  Size allocated here is an upper bound (all values stored on 16 bits).
+  uchar freq[2 * (LZFSE_ENCODE_L_SYMBOLS + LZFSE_ENCODE_M_SYMBOLS +
+                    LZFSE_ENCODE_D_SYMBOLS + LZFSE_ENCODE_LITERAL_SYMBOLS)]  <bgcolor=cGray>;
+  //Printf( "Characteristics.n_literal_payload_bytes='%d'\n", Characteristics.n_literal_payload_bytes );
+  uchar payload[Characteristics.n_literal_payload_bytes + Characteristics2.n_lmd_payload_bytes] <bgcolor=cLtGray>;
+  char endMagic[4] <bgcolor=cLtBlue>;
+} lzfse_compressed_block_header_v2;
+
+typedef struct {
+  char magic[4] <bgcolor=cBlue>;
+  uint n_raw_bytes;
+  uint n_payload_bytes;
+  uchar payload[n_payload_bytes] <bgcolor=cLtGray>;
+  char endMagic[4] <bgcolor=cLtBlue>;
+} LZVN_COMPRESSED_BLOCK_HEADER;
+
+//--------------------------------------------
+
+// Define the file
+local uint magic;
+LittleEndian();
+while( !FEof() )
+{
+    // Read a magic
+    magic = ReadUInt( FTell() );
+
+    // Read data depending upon magic - should start with 'bvxn'.
+    // Note that when duplicate variables are defined, they
+    // are made into an array (see 'Using Templates and Structs'
+    // in the help file).
+    if( magic == LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC )
+    {
+        //SetBackColor( cLtGray );
+        LZVN_COMPRESSED_BLOCK_HEADER record;
+    }
+    else if( magic == LZFSE_COMPRESSEDV1_BLOCK_MAGIC )
+    {
+        SetBackColor( cLtGreen );
+        lzfse_compressed_block_header_v1 lzfse_c1;
+    }
+    else if( magic == LZFSE_COMPRESSEDV2_BLOCK_MAGIC )
+    {
+        SetBackColor( cLtGreen );
+        lzfse_compressed_block_header_v2 lzfse_c2;
+    }
+    else
+    {
+        Warning( "Unknown LZFSE magic encountered. Template stopped." );
+        return -1;
+    }
+}

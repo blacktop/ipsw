@@ -5,7 +5,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
+
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -195,54 +195,48 @@ func parseDeviceTree(buffer *bytes.Buffer) (*DeviceTree, error) {
 }
 
 // Parse parses a DeviceTree img4 file
-func Parse(path string) error {
+func Parse(path string) (*DeviceTree, error) {
 	log.Info("Parsing DeviceTree")
 	content, err := ioutil.ReadFile(path)
 	if err != nil {
-		return errors.Wrap(err, "failed to read DeviceTree")
+		return nil, errors.Wrap(err, "failed to read DeviceTree")
 	}
 
 	var i Img4
 	// NOTE: openssl asn1parse -i -inform DER -in DEVICETREE.im4p
 	if _, err := asn1.Unmarshal(content, &i); err != nil {
-		return err
+		return nil, err
 	}
 
 	dtree, err := parseDeviceTree(bytes.NewBuffer(i.Data))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	j, err := json.Marshal(dtree)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(string(j))
-
-	return nil
+	return dtree, nil
 }
 
 // RemoteParse parses a DeviceTree img4 file in a remote ipsw file
-func RemoteParse(url string) error {
-
+func RemoteParse(url string) ([]*DeviceTree, error) {
+	var dtreeArray []*DeviceTree
 	pzip, err := partialzip.New(url)
 	if err != nil {
-		return errors.Wrap(err, "failed to create partialzip instance")
+		return nil, errors.Wrap(err, "failed to create partialzip instance")
 	}
 	dtrees := findDeviceTreesInList(pzip.List())
 	if len(dtrees) > 0 {
 		for _, dtree := range dtrees {
 			_, err = pzip.Download(dtree)
 			if err != nil {
-				return errors.Wrap(err, "failed to download file")
+				return nil, errors.Wrap(err, "failed to download file")
 			}
-			err := Parse(filepath.Base(dtree))
+			dtree, err := Parse(filepath.Base(dtree))
 			if err != nil {
-				return err
+				return nil, err
 			}
+			dtreeArray = append(dtreeArray, dtree)
 		}
 	}
 
-	return nil
+	return dtreeArray, nil
 }
