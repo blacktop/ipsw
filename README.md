@@ -24,28 +24,27 @@ Download from [releases](https://github.com/blacktop/ipsw/releases/latest)
 ```bash
 $ ipsw --help
 
-Usage: ipsw [OPTIONS] COMMAND [arg...]
+Download and Parse IPSWs
 
-IPSW Downloader
+Usage:
+  ipsw [command]
 
-Version: 18.12.1, BuildTime: 2018-12-04T01:10:58Z
-Author:
-  blacktop - <https://github.com/blacktop>
+Available Commands:
+  completion  Generates bash completion scripts
+  device      Parse DeviceTree
+  download    Download and parse IPSW(s) from the internets
+  dyld        Parse dyld_shared_cache
+  extract     Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
+  help        Help about any command
+  kernel      Parse kernelcache
+  version     Print the version number of ipsw
 
-Options:
-  --verbose, -V  verbose output
-  --help, -h     show help
-  --version, -v  print the version
+Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -h, --help            help for ipsw
+  -V, --verbose         verbose output
 
-Commands:
-  diff        diff kernelcache (using assert strings)
-  extract     extract and decompress a kernelcache
-  decompress  decompress a kernelcache
-  download    download and parse ipsw from the internet
-  itunes      download ipsws from the itunes plist
-  help        Shows a list of commands or help for one command
-
-Run 'ipsw COMMAND --help' for more information on a command.
+Use "ipsw [command] --help" for more information about a command.
 ```
 
 ### `download`

@@ -22,18 +22,22 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"archive/zip"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"runtime"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/devicetree"
 	"github.com/blacktop/ipsw/dyld"
 	"github.com/blacktop/ipsw/kernelcache"
-	"github.com/blacktop/partialzip"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"howett.net/ranger"
 )
 
 var (
@@ -84,21 +88,39 @@ var extractCmd = &cobra.Command{
 				log.Error("unable to extract dyld_shared_cache remotely")
 			}
 			if kernelFlag {
-				pzip, err := partialzip.New(args[0])
+				log.Info("Extracting Kernelcache")
+				url, err := url.Parse(args[0])
 				if err != nil {
-					return errors.Wrap(err, "failed to create partialzip instance")
+					return errors.Wrap(err, "failed to parse url")
 				}
-				kpaths := findKernelInList(pzip.List())
-				for _,kpath := range kpaths {
-					_, err = pzip.Download(kpath)
-					if err != nil {
-						return errors.Wrap(err, "failed to download file")
+				reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+				if err != nil {
+					return errors.Wrap(err, "failed to create ranger reader")
+				}
+				length, err := reader.Length()
+				if err != nil {
+					return errors.Wrap(err, "failed to get reader length")
+				}
+				zr, err := zip.NewReader(reader, length)
+				if err != nil {
+					return errors.Wrap(err, "failed to create zip reader from ranger reader")
+				}
+
+				for _, f := range zr.File {
+					if strings.Contains(f.Name, "kernel") {
+						kdata := make([]byte, f.UncompressedSize64)
+						rc, _ := f.Open()
+						io.ReadFull(rc, kdata)
+						rc.Close()
+						kcomp, err := kernelcache.ParseImg4Data(kdata)
+						if err != nil {
+							return errors.Wrap(err, "failed parse compressed kernelcache")
+						}
+						err = ioutil.WriteFile(f.Name+".decompressed", kernelcache.DecompressData(kcomp), 0644)
+						if err != nil {
+							return errors.Wrap(err, "failed to decompress kernelcache")
+						}
 					}
-					err = kernelcache.Decompress(kpath)
-					if err != nil {
-						return errors.Wrap(err, "failed to extract kernelcache")
-					}
-					os.Remove(kpath)
 				}
 			}
 		} else {
@@ -107,6 +129,7 @@ var extractCmd = &cobra.Command{
 			}
 
 			if kernelFlag {
+				log.Info("Extracting kernelcaches")
 				err := kernelcache.Extract(args[0])
 				if err != nil {
 					return errors.Wrap(err, "failed to extract kernelcaches")
@@ -114,6 +137,7 @@ var extractCmd = &cobra.Command{
 			}
 
 			if dyldFlag {
+				log.Info("Extracting dyld_shared_cache")
 				if runtime.GOOS != "darwin" {
 					log.Fatal("dyld_shared_cache extraction only works on macOS :(")
 				}
@@ -124,6 +148,7 @@ var extractCmd = &cobra.Command{
 			}
 
 			if deviceTreeFlag {
+				log.Info("Extracting DeviceTrees")
 				err := devicetree.Extract(args[0])
 				if err != nil {
 					return errors.Wrap(err, "failed to extract DeviceTrees")

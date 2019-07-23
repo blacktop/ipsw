@@ -41,18 +41,13 @@ type CompressedCache struct {
 	Data   []byte
 }
 
-// Open opens the named file using os.Open and prepares it for use as a compressed kernelcache.
-func Open(name string) (*CompressedCache, error) {
-	log.Info("Parsing Compressed Kernelcache")
-
-	content, err := ioutil.ReadFile(name)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read Kernelcache")
-	}
+// ParseImg4Data parses a img4 data containing a compressed kernelcache.
+func ParseImg4Data(data []byte) (*CompressedCache, error) {
+	utils.Indent(log.Info)("Parsing Compressed Kernelcache")
 
 	var i Img4
 	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10
-	if _, err := asn1.Unmarshal(content, &i); err != nil {
+	if _, err := asn1.Unmarshal(data, &i); err != nil {
 		return nil, errors.Wrap(err, "failed to ASN.1 parse Kernelcache")
 	}
 
@@ -70,7 +65,7 @@ func Open(name string) (*CompressedCache, error) {
 		cc.Header.UncompressedSize,
 		cc.Header.CheckSum,
 	)
-	utils.Indent(log.Info)(msg)
+	utils.Indent(log.Debug)(msg)
 
 	if int(cc.Header.CompressedSize) > cc.Size {
 		return nil, fmt.Errorf("compressed_size: %d is greater than file_size: %d", cc.Size, cc.Header.CompressedSize)
@@ -96,12 +91,17 @@ func Extract(ipsw string) error {
 	}
 
 	for _, kcache := range kcaches {
-		kc, err := Open(kcache)
+		content, err := ioutil.ReadFile(kcache)
+		if err != nil {
+			return errors.Wrap(err, "failed to read Kernelcache")
+		}
+
+		kc, err := ParseImg4Data(content)
 		if err != nil {
 			return errors.Wrap(err, "failed parse compressed kernelcache")
 		}
 
-		log.Info("Decompressing Kernelcache")
+		utils.Indent(log.Info)("Decompressing Kernelcache")
 		dec := lzss.Decompress(kc.Data)
 		err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
 		if err != nil {
@@ -113,19 +113,31 @@ func Extract(ipsw string) error {
 	return nil
 }
 
-// Decompress decompresses a lernelcache
+// Decompress decompresses a compressed kernelcache
 func Decompress(kcache string) error {
-	kc, err := Open(kcache)
+	content, err := ioutil.ReadFile(kcache)
+	if err != nil {
+		return errors.Wrap(err, "failed to read Kernelcache")
+	}
+
+	kc, err := ParseImg4Data(content)
 	if err != nil {
 		return errors.Wrap(err, "failed parse compressed kernelcache")
 	}
 	// defer os.Remove(kcache)
 
-	log.Info("Decompressing Kernelcache")
+	utils.Indent(log.Info)("Decompressing Kernelcache")
 	dec := lzss.Decompress(kc.Data)
 	err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to decompress kernelcache")
 	}
 	return nil
+}
+
+// DecompressData decompresses compressed kernelcache []byte data
+func DecompressData(cc *CompressedCache) []byte {
+	utils.Indent(log.Info)("Decompressing Kernelcache")
+	dec := lzss.Decompress(cc.Data)
+	return dec[:cc.Header.UncompressedSize]
 }

@@ -2,11 +2,13 @@ package api
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sort"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
@@ -143,9 +145,10 @@ func (vm *ITunesVersionMaster) GetLatestBuilds() ([]Build, error) {
 
 	sort.Sort(version.Collection(versions))
 	newestVersion := versions[len(versions)-1]
+	utils.Indent(log.Debug)(fmt.Sprintf("Latest iOS release found is: %s", newestVersion.String()))
 
 	for _, build := range vm.GetBuilds() {
-		if build.ProductVersion == newestVersion.String() {
+		if strings.EqualFold(build.ProductVersion, newestVersion.Original()) {
 			builds = append(builds, build)
 		}
 	}

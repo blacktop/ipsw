@@ -22,6 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"archive/zip"
+	"io"
+	"io/ioutil"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -30,23 +34,13 @@ import (
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/kernelcache"
 	"github.com/blacktop/ipsw/utils"
-	"github.com/blacktop/partialzip"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"howett.net/ranger"
 )
 
 func init() {
 	downloadCmd.AddCommand(downloadKernelCmd)
-}
-
-func findKernelInList(list []string) []string {
-	var kernel []string
-	for _, v := range list {
-		if strings.Contains(v, "kernel") {
-			kernel = append(kernel, v)
-		}
-	}
-	return kernel
 }
 
 // downloadKernelCmd represents the downloadKernel command
@@ -90,15 +84,15 @@ var downloadKernelCmd = &cobra.Command{
 			}
 			urls = utils.Unique(urls)
 
-			log.Debug("URLS TO DOWNLOAD:")
+			log.Debug("URLs to Download:")
 			for _, u := range urls {
 				utils.Indent(log.Debug)(u)
 			}
 
-			for _, url := range urls {
-				if _, err := os.Stat(path.Base(url)); os.IsNotExist(err) {
+			for _, u := range urls {
+				if _, err := os.Stat(path.Base(u)); os.IsNotExist(err) {
 					// get a handle to ipsw object
-					i, err := LookupByURL(ipsws, url)
+					i, err := LookupByURL(ipsws, u)
 					if err != nil {
 						return errors.Wrap(err, "failed to get ipsw from download url")
 					}
@@ -109,18 +103,38 @@ var downloadKernelCmd = &cobra.Command{
 						"version": i.Version,
 						"signed":  i.Signed,
 					}).Info("Getting Kernelcache")
-					pzip, err := partialzip.New(url)
+					url, err := url.Parse(u)
 					if err != nil {
-						return errors.Wrap(err, "failed to create partialzip instance")
+						return errors.Wrap(err, "failed to parse url")
 					}
-					kpaths := findKernelInList(pzip.List())
-					for _, kpath := range kpaths {
-						_, err = pzip.Download(kpath)
-						if err != nil {
-							return errors.Wrap(err, "failed to download file")
+					reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+					if err != nil {
+						return errors.Wrap(err, "failed to create ranger reader")
+					}
+					length, err := reader.Length()
+					if err != nil {
+						return errors.Wrap(err, "failed to get reader length")
+					}
+					zr, err := zip.NewReader(reader, length)
+					if err != nil {
+						return errors.Wrap(err, "failed to create zip reader from ranger reader")
+					}
+
+					for _, f := range zr.File {
+						if strings.Contains(f.Name, "kernel") {
+							kdata := make([]byte, f.UncompressedSize64)
+							rc, _ := f.Open()
+							io.ReadFull(rc, kdata)
+							rc.Close()
+							kcomp, err := kernelcache.ParseImg4Data(kdata)
+							if err != nil {
+								return errors.Wrap(err, "failed parse compressed kernelcache")
+							}
+							err = ioutil.WriteFile(f.Name+".decompressed", kernelcache.DecompressData(kcomp), 0644)
+							if err != nil {
+								return errors.Wrap(err, "failed to decompress kernelcache")
+							}
 						}
-						kernelcache.Decompress(kpath)
-						os.Remove(kpath)
 					}
 				}
 			}
@@ -138,18 +152,38 @@ var downloadKernelCmd = &cobra.Command{
 					"version": i.Version,
 					"signed":  i.Signed,
 				}).Info("Getting Kernelcache")
-				pzip, err := partialzip.New(i.URL)
+				url, err := url.Parse(i.URL)
 				if err != nil {
-					return errors.Wrap(err, "failed to create partialzip instance")
+					return errors.Wrap(err, "failed to parse url")
 				}
-				kpaths := findKernelInList(pzip.List())
-				for _, kpath := range kpaths {
-					_, err = pzip.Download(kpath)
-					if err != nil {
-						return errors.Wrap(err, "failed to download file")
+				reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+				if err != nil {
+					return errors.Wrap(err, "failed to create ranger reader")
+				}
+				length, err := reader.Length()
+				if err != nil {
+					return errors.Wrap(err, "failed to get reader length")
+				}
+				zr, err := zip.NewReader(reader, length)
+				if err != nil {
+					return errors.Wrap(err, "failed to create zip reader from ranger reader")
+				}
+
+				for _, f := range zr.File {
+					if strings.Contains(f.Name, "kernel") {
+						kdata := make([]byte, f.UncompressedSize64)
+						rc, _ := f.Open()
+						io.ReadFull(rc, kdata)
+						rc.Close()
+						kcomp, err := kernelcache.ParseImg4Data(kdata)
+						if err != nil {
+							return errors.Wrap(err, "failed parse compressed kernelcache")
+						}
+						err = ioutil.WriteFile(f.Name+".decompressed", kernelcache.DecompressData(kcomp), 0644)
+						if err != nil {
+							return errors.Wrap(err, "failed to decompress kernelcache")
+						}
 					}
-					kernelcache.Decompress(kpath)
-					os.Remove(kpath)
 				}
 			}
 		} else {

@@ -49,6 +49,7 @@ var extractDyldCmd = &cobra.Command{
 		if runtime.GOOS != "darwin" {
 			log.Fatal("dyld_shared_cache extraction only works on macOS :(")
 		}
+		log.Info("Extracting dyld_shared_cache")
 		return dyld.Extract(args[0])
 	},
 }

@@ -31,6 +31,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"path"
+	"strings"
 )
 
 func init() {
@@ -54,6 +55,7 @@ var latestCmd = &cobra.Command{
 		// filters
 		//version, _ := cmd.Flags().GetString("version")
 		//device, _ := cmd.Flags().GetString("device")
+		doNotDownload, _ := cmd.Flags().GetString("black-list")
 		//build, _ := cmd.Flags().GetString("build")
 
 		if Verbose {
@@ -70,7 +72,16 @@ var latestCmd = &cobra.Command{
 			return errors.Wrap(err, "failed to get the latest builds")
 		}
 
-		log.Debug("URLS TO DOWNLOAD:")
+		if len(doNotDownload) > 0 {
+			for i, v := range builds {
+				if strings.Contains(v.Identifier, doNotDownload)  {
+					builds = append(builds[:i], builds[i+1:]...)
+					break
+				}
+			}
+		}
+
+		log.Debug("URLs to Download:")
 		for _, b := range builds {
 			utils.Indent(log.Debug)(b.FirmwareURL)
 		}
