@@ -127,8 +127,9 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(path, f.Mode())
 		} else {
-			os.MkdirAll(filepath.Dir(path), f.Mode())
-			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			// TODO: add the ability to preserve folder structure if user wants
+			// os.MkdirAll(filepath.Dir(path), f.Mode())
+			f, err := os.OpenFile(filepath.Base(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				return err
 			}

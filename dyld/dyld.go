@@ -62,7 +62,7 @@ func Extract(ipsw string) error {
 			return errors.Wrapf(err, "failed to unmount %s", device)
 		}
 	} else {
-		return fmt.Errorf("dyld.Extract found more than one DMG (should only be one): %v", dmgs)
+		return fmt.Errorf("dyld.Extract found more or less than one DMG (should only be one): %v", dmgs)
 	}
 
 	return nil

@@ -45,6 +45,7 @@ var kerExtractCmd = &cobra.Command{
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
+		log.Info("Extracting kernelcaches")
 		return kernelcache.Extract(args[0])
 	},
 }

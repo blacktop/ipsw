@@ -30,7 +30,6 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
-	"github.com/blacktop/ipsw/kernelcache"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -44,6 +43,7 @@ func init() {
 	downloadCmd.PersistentFlags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadCmd.PersistentFlags().Bool("insecure", false, "do not verify ssl certs")
 	// Filters
+	downloadCmd.PersistentFlags().StringP("black-list", "n", viper.GetString("IPSW_DEVICE_BLACKLIST"), "iOS device black list")
 	downloadCmd.PersistentFlags().StringP("version", "v", viper.GetString("IPSW_VERSION"), "iOS Version (i.e. 12.3.1)")
 	downloadCmd.PersistentFlags().StringP("device", "d", viper.GetString("IPSW_DEVICE"), "iOS Device (i.e. iPhone11,2)")
 	downloadCmd.PersistentFlags().StringP("build", "b", viper.GetString("IPSW_BUILD"), "iOS BuildID (i.e. 16F203)")
@@ -75,6 +75,7 @@ var downloadCmd = &cobra.Command{
 		// filters
 		version, _ := cmd.Flags().GetString("version")
 		device, _ := cmd.Flags().GetString("device")
+		doNotDownload, _ := cmd.Flags().GetString("black-list")
 		build, _ := cmd.Flags().GetString("build")
 
 		if len(version) > 0 && len(build) > 0 {
@@ -93,12 +94,18 @@ var downloadCmd = &cobra.Command{
 						urls = append(urls, i.URL)
 					}
 				} else {
-					urls = append(urls, i.URL)
+					if len(doNotDownload) > 0 {
+						if !strings.Contains(i.Identifier, doNotDownload) {
+							urls = append(urls, i.URL)
+						}
+					} else {
+						urls = append(urls, i.URL)
+					}
 				}
 			}
 			urls = utils.Unique(urls)
 
-			log.Debug("URLS TO DOWNLOAD:")
+			log.Debug("URLs to Download:")
 			for _, u := range urls {
 				utils.Indent(log.Debug)(u)
 			}
@@ -137,12 +144,9 @@ var downloadCmd = &cobra.Command{
 						if ok, _ := utils.Verify(i.SHA1, path.Base(i.URL)); !ok {
 							return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(url))
 						}
-
 					} else {
 						log.Warnf("ipsw already exists: %s", path.Base(url))
 					}
-
-					kernelcache.Extract(path.Base(url))
 				}
 			}
 
@@ -170,8 +174,6 @@ var downloadCmd = &cobra.Command{
 				} else {
 					log.Warnf("ipsw already exists: %s", path.Base(i.URL))
 				}
-
-				kernelcache.Extract(path.Base(i.URL))
 			}
 		} else {
 			log.Fatal("you must also supply a --device AND a --build")

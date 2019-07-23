@@ -243,7 +243,7 @@ func RemoteParse(url string) ([]*DeviceTree, error) {
 	return dtreeArray, nil
 }
 
-// Extract extracts and decompresses a lernelcache from ipsw
+// Extract extracts DeviceTree(s) from ipsw
 func Extract(ipsw string) error {
 	log.Info("Extracting DeviceTree from IPSW")
 	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
@@ -255,7 +255,7 @@ func Extract(ipsw string) error {
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "failed extract DeviceTree from ipsw")
+		return errors.Wrap(err, "failed to extract DeviceTree from ipsw")
 	}
 
 	// for _, dtree := range dtrees {
