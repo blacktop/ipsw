@@ -67,8 +67,6 @@ github.com/spf13/jwalterweatherman
 github.com/spf13/pflag
 # github.com/spf13/viper v1.4.0
 github.com/spf13/viper
-# github.com/urfave/cli v1.20.0
-github.com/urfave/cli
 # github.com/vbauerster/mpb/v4 v4.8.4
 github.com/vbauerster/mpb/v4
 github.com/vbauerster/mpb/v4/decor
@@ -89,3 +87,5 @@ golang.org/x/text/unicode/norm
 gopkg.in/yaml.v2
 # howett.net/plist v0.0.0-20181124034731-591f970eefbb
 howett.net/plist
+# howett.net/ranger v0.0.0-20171016084633-e2e137620847
+howett.net/ranger
