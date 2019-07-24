@@ -103,6 +103,7 @@ var downloadKernelCmd = &cobra.Command{
 			} else {
 				if iCan {
 					log.WithField("url", jbs.Jailbreaks[index].URL).Warnf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name)
+					utils.Indent(log.Warn, 2)(jbs.Jailbreaks[index].Caveats)
 				} else {
 					log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", api.GetRandomResearcher())
 				}
