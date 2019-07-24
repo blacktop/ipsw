@@ -3,6 +3,8 @@ build: off
 
 clone_folder: c:\gopath\src\github.com\blacktop\ipsw
 
+shallow_clone: true
+
 environment:
   GOPATH: c:\gopath
 
