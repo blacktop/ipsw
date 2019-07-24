@@ -110,6 +110,18 @@ var downloadCmd = &cobra.Command{
 				utils.Indent(log.Debug, 1)(u)
 			}
 
+			// check canijailbreak.com
+			jbs, _ := api.GetJailbreaks()
+			if iCan, index, err := jbs.CanIBreak(version); err != nil {
+				log.Error(err.Error())
+			} else {
+				if iCan {
+					log.WithField("url", jbs.Jailbreaks[index].URL).Warnf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name)
+				} else {
+					log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", api.GetRandomResearcher())
+				}
+			}
+
 			cont := true
 			// if filtered to a single device skip the prompt
 			if len(device) == 0 {
