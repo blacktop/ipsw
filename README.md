@@ -57,10 +57,13 @@ $ ipsw download --device iPhone11,2 --build 16A366 --dec
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
       • verifying md5sum...
+
+$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+
    • Extracting Kernelcache from IPSW
-   • Parsing Compressed Kernelcache
-      • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1
-   • Decompressing Kernelcache
+      • Parsing Compressed Kernelcache
+         • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1
+      • Decompressing Kernelcache
 ```
 
 Notice that the `kernelcache` was extracted from the `ipsw` and decompressed :smiling_imp:
@@ -74,16 +77,12 @@ kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 #### Download all the iOS 12.0 `ipsws`
 
 ```bash
-$ ipsw download --iversion 12.0 --dec
+$ ipsw download --version 12.0
 
 ? You are about to download 17 ipsw files. Continue? Yes
    • Getting IPSW              build=16A366 device=iPhone11,4 signed=true version=12.0
     3.3 GiB / 3.3 GiB [==========================================================| 00:00 ] 59.03 MiB/s
-      • verifying md5sum...
-   • Extracting Kernelcache from IPSW
-   • Parsing Compressed Kernelcache
-      • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1
-   • Decompressing Kernelcache
+      • verifying sha1sum...
    • Getting IPSW              build=16A366 device=iPod7,1 signed=true version=12.0
     734.7 MiB / 2.6 GiB [===============>------------------------------------------| 00:57 ] 44.84 MiB/s
   ...
@@ -94,13 +93,13 @@ $ ipsw download --iversion 12.0 --dec
 Single `kernelcache`
 
 ```bash
-ipsw download --device iPhone11,2 --build 16B92 --kernel --dec
+ipsw download kernel --device iPhone11,2 --build 16B92
 ```
 
 All of dem!!!
 
 ```bash
-$ time ipsw download --iversion 12.0.1 --kernel --dec
+$ time ipsw download kernel --version 12.0.1
 
 "8.40s user 1.19s system 53% cpu 17.784 total"
 ```
@@ -133,13 +132,13 @@ But, how does it work?? 🤔 With the POWER :muscle: of [partialzip](https://git
 This will download and decompress the `kernelcache` for an `iPhone XS` running `iOS 12.1` behind a corporate proxy
 
 ```bash
-$ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92 --kernel --dec
+$ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
 ```
 
 To disable cert verification
 
 ```bash
-$ ipsw download --insecure --device iPhone11,2 --build 16B92 --kernel --dec
+$ ipsw download --insecure --device iPhone11,2 --build 16B92
 ```
 
 ### `extract`
@@ -147,7 +146,7 @@ $ ipsw download --insecure --device iPhone11,2 --build 16B92 --kernel --dec
 Extract `kernelcache` from a previously downloaded `ipsw`
 
 ```bash
-$ ipsw extract iPhone11,2_12.0_16A366_Restore.ipsw
+$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
 Extract `dyld_shared_cache` from a previously downloaded `ipsw` _(only on macOS)_ :new:
@@ -160,12 +159,21 @@ $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Unmounting DMG
 ```
 
+### `webkit`
+
+Extract WebKit version from `dyld_shared_cache`
+
+```bash
+$ ipsw dyld webkit dyld_shared_cache
+   • WebKit Version: 607.2.6.0.1
+```
+
 ### `decompress`
 
 Decompress a previously extracted `kernelcache`
 
 ```bash
-$ ipsw decompress kernelcache.release.iphone11
+$ ipsw kernel decompress kernelcache.release.iphone11
 ```
 
 ### `diff` [WIP] :construction:
@@ -175,7 +183,7 @@ I am playing with the idea of `diffing` kernelcaches by creating directory struc
 Then you could use `git diff` or something to get a quick **high** level view of what Apple has changed by seeing new files being added or removed as well as seeing the line numbers of the assert strings move around.
 
 ```bash
-$ ipsw diff kernelcache.release.iphone11
+$ ipsw kernel diff kernelcache.release.iphone11
 ```
 
 You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/diff/Library/Caches/com.apple.xbs/Sources)
