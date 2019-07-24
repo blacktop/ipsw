@@ -15,35 +15,12 @@ import (
 	"github.com/apex/log/handlers/cli"
 )
 
-var (
-	normalPadding    = cli.Default.Padding
-	doublePadding    = normalPadding * 2
-	triplePadding    = normalPadding * 3
-	quadruplePadding = normalPadding * 4
-)
+var normalPadding = cli.Default.Padding
 
-// Indent indents apex log line
-func Indent(f func(s string)) func(string) {
+// Indent indents apex log line to supplied level
+func Indent(f func(s string), level int) func(string) {
 	return func(s string) {
-		cli.Default.Padding = doublePadding
-		f(s)
-		cli.Default.Padding = normalPadding
-	}
-}
-
-// DoubleIndent double indents apex log line
-func DoubleIndent(f func(s string)) func(string) {
-	return func(s string) {
-		cli.Default.Padding = triplePadding
-		f(s)
-		cli.Default.Padding = normalPadding
-	}
-}
-
-// TripleIndent triple indents apex log line
-func TripleIndent(f func(s string)) func(string) {
-	return func(s string) {
-		cli.Default.Padding = quadruplePadding
+		cli.Default.Padding = normalPadding * level
 		f(s)
 		cli.Default.Padding = normalPadding
 	}
@@ -74,7 +51,7 @@ func Unique(s []string) []string {
 
 // Verify verifies the downloaded against it's hash
 func Verify(sha1sum, name string) (bool, error) {
-	Indent(log.Info)("verifying sha1sum...")
+	Indent(log.Info, 1)("verifying sha1sum...")
 	f, err := os.Open(name)
 	if err != nil {
 		return false, err
@@ -89,7 +66,7 @@ func Verify(sha1sum, name string) (bool, error) {
 	Indent(log.WithFields(log.Fields{
 		"api":  sha1sum,
 		"file": fmt.Sprintf("%x", h.Sum(nil)),
-	}).Debug)("sha1 hashes")
+	}).Debug, 1)("sha1 hashes")
 	return strings.EqualFold(sha1sum, fmt.Sprintf("%x", h.Sum(nil))), nil
 }
 

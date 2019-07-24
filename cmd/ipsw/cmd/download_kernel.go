@@ -58,6 +58,7 @@ var downloadKernelCmd = &cobra.Command{
 		// insecure, _ := cmd.Flags().GetBool("insecure")
 
 		// filters
+		doNotDownload, _ := cmd.Flags().GetString("black-list")
 		version, _ := cmd.Flags().GetString("version")
 		device, _ := cmd.Flags().GetString("device")
 		build, _ := cmd.Flags().GetString("build")
@@ -79,49 +80,55 @@ var downloadKernelCmd = &cobra.Command{
 						urls = append(urls, i.URL)
 					}
 				} else {
-					urls = append(urls, i.URL)
+					if len(doNotDownload) > 0 {
+						if !strings.Contains(i.Identifier, doNotDownload) {
+							urls = append(urls, i.URL)
+						}
+					} else {
+						urls = append(urls, i.URL)
+					}
 				}
 			}
 			urls = utils.Unique(urls)
 
 			log.Debug("URLs to Download:")
 			for _, u := range urls {
-				utils.Indent(log.Debug)(u)
+				utils.Indent(log.Debug, 1)(u)
 			}
 
 			for _, u := range urls {
-				if _, err := os.Stat(path.Base(u)); os.IsNotExist(err) {
-					// get a handle to ipsw object
-					i, err := LookupByURL(ipsws, u)
-					if err != nil {
-						return errors.Wrap(err, "failed to get ipsw from download url")
-					}
+				// get a handle to ipsw object
+				i, err := LookupByURL(ipsws, u)
+				if err != nil {
+					return errors.Wrap(err, "failed to get ipsw from download url")
+				}
 
-					log.WithFields(log.Fields{
-						"device":  i.Identifier,
-						"build":   i.BuildID,
-						"version": i.Version,
-						"signed":  i.Signed,
-					}).Info("Getting Kernelcache")
-					url, err := url.Parse(u)
-					if err != nil {
-						return errors.Wrap(err, "failed to parse url")
-					}
-					reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
-					if err != nil {
-						return errors.Wrap(err, "failed to create ranger reader")
-					}
-					length, err := reader.Length()
-					if err != nil {
-						return errors.Wrap(err, "failed to get reader length")
-					}
-					zr, err := zip.NewReader(reader, length)
-					if err != nil {
-						return errors.Wrap(err, "failed to create zip reader from ranger reader")
-					}
+				log.WithFields(log.Fields{
+					"device":  i.Identifier,
+					"build":   i.BuildID,
+					"version": i.Version,
+					"signed":  i.Signed,
+				}).Info("Getting Kernelcache")
+				url, err := url.Parse(u)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse url")
+				}
+				reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+				if err != nil {
+					return errors.Wrap(err, "failed to create ranger reader")
+				}
+				length, err := reader.Length()
+				if err != nil {
+					return errors.Wrap(err, "failed to get reader length")
+				}
+				zr, err := zip.NewReader(reader, length)
+				if err != nil {
+					return errors.Wrap(err, "failed to create zip reader from ranger reader")
+				}
 
-					for _, f := range zr.File {
-						if strings.Contains(f.Name, "kernel") {
+				for _, f := range zr.File {
+					if strings.Contains(f.Name, "kernel") {
+						if _, err := os.Stat(path.Base(f.Name + ".decompressed")); os.IsNotExist(err) {
 							kdata := make([]byte, f.UncompressedSize64)
 							rc, _ := f.Open()
 							io.ReadFull(rc, kdata)
@@ -134,6 +141,8 @@ var downloadKernelCmd = &cobra.Command{
 							if err != nil {
 								return errors.Wrap(err, "failed to decompress kernelcache")
 							}
+						} else {
+							log.Warnf("kernelcache already exists: %s", path.Base(f.Name+".decompressed"))
 						}
 					}
 				}

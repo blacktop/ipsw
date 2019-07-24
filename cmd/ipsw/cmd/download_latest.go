@@ -74,7 +74,7 @@ var latestCmd = &cobra.Command{
 
 		if len(doNotDownload) > 0 {
 			for i, v := range builds {
-				if strings.Contains(v.Identifier, doNotDownload)  {
+				if strings.Contains(v.Identifier, doNotDownload) {
 					builds = append(builds[:i], builds[i+1:]...)
 					break
 				}
@@ -83,7 +83,7 @@ var latestCmd = &cobra.Command{
 
 		log.Debug("URLs to Download:")
 		for _, b := range builds {
-			utils.Indent(log.Debug)(b.FirmwareURL)
+			utils.Indent(log.Debug, 1)(b.FirmwareURL)
 		}
 
 		cont := true
