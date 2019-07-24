@@ -6,7 +6,7 @@ clone_folder: c:\gopath\src\github.com\blacktop\ipsw
 environment:
   GOPATH: c:\gopath
 
-stack: go 1.12
+stack: go 1.10
 
 before_test:
   - go vet ./...
