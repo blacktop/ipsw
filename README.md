@@ -88,6 +88,19 @@ $ ipsw download --version 12.0
   ...
 ```
 
+#### Download all the LATEST `ipsws`
+
+Queries iTunes XML for latest version _(maybe run this as a cron job)_ 😉
+
+```bash
+$ ipsw download -V latest --yes --black-list AppleTV
+   • Latest iOS release found is: "12.4"
+      • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
+   • Getting IPSW              build=16G77 device=iPhone6,2 version=12.4
+        363.0 MiB / 2.9 GiB [======>---------------------------------------------------| 18:52 ] 49.18 MiB/s
+  ...
+```
+
 #### Only download and decompress the kernelcaches _(which is CRAZY fast)_
 
 Single `kernelcache`
