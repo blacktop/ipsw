@@ -48,13 +48,24 @@ func (j *Jailbreaks) CanIBreak(iOSVersion string) (bool, int, error) {
 		return false, -1, errors.Wrap(err, "failed to create version")
 	}
 	for idx, jb := range j.Jailbreaks {
-		constraints, err := version.NewConstraint(fmt.Sprintf(">= %s, <= %s", jb.Firmwares.Start, jb.Firmwares.End))
-		if err != nil {
-			return false, -1, errors.Wrap(err, "failed to create new version constraint")
-		}
-		if constraints.Check(v) {
-			utils.Indent(log.Debug, 1)(fmt.Sprintf("%s satisfies constraints %s", v.Original(), constraints))
-			return jb.Jailbroken, idx, nil
+		if len(jb.Firmwares.Start) > 0 && len(jb.Firmwares.End) > 0 {
+			constraints, err := version.NewConstraint(fmt.Sprintf(">= %s, <= %s", jb.Firmwares.Start, jb.Firmwares.End))
+			if err != nil {
+				return false, -1, errors.Wrap(err, "failed to create new version constraint")
+			}
+			if constraints.Check(v) {
+				utils.Indent(log.Debug, 1)(fmt.Sprintf("%s satisfies constraints %s", v.Original(), constraints))
+				return jb.Jailbroken, idx, nil
+			}
+		} else if len(jb.Firmwares.Start) > 0 {
+			constraints, err := version.NewConstraint(fmt.Sprintf(">= %s", jb.Firmwares.Start))
+			if err != nil {
+				return false, -1, errors.Wrap(err, "failed to create new version constraint")
+			}
+			if constraints.Check(v) {
+				utils.Indent(log.Debug, 1)(fmt.Sprintf("%s satisfies constraints %s", v.Original(), constraints))
+				return jb.Jailbroken, idx, nil
+			}
 		}
 	}
 	return false, -1, nil

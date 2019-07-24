@@ -73,6 +73,25 @@
       "showLog": false
     },
     {
+      "name": "Download - Version",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "remotePath": "",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "program": "${workspaceRoot}/cmd/ipsw/main.go",
+      "env": {},
+      "args": [
+        "-V",
+        "download",
+        "--version",
+        "10.3.4"
+      ],
+      // "args": ["-V", "itunes", "--build", "16F156"],
+      "showLog": false
+    },
+    {
       "name": "Download - Kernel",
       "type": "go",
       "request": "launch",
