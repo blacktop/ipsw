@@ -145,7 +145,7 @@ func (vm *ITunesVersionMaster) GetLatestBuilds() ([]Build, error) {
 
 	sort.Sort(version.Collection(versions))
 	newestVersion := versions[len(versions)-1]
-	utils.Indent(log.Debug)(fmt.Sprintf("Latest iOS release found is: %s", newestVersion.String()))
+	utils.Indent(log.Debug, 1)(fmt.Sprintf("Latest iOS release found is: %s", newestVersion.String()))
 
 	for _, build := range vm.GetBuilds() {
 		if strings.EqualFold(build.ProductVersion, newestVersion.Original()) {

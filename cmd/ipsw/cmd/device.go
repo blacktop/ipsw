@@ -29,8 +29,7 @@ import (
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"reflect"
-	"strings"
+	"io/ioutil"
 )
 
 var (
@@ -45,40 +44,6 @@ func init() {
 	deviceCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
 }
 
-func printSummay(dtree *devicetree.DeviceTree) {
-
-	children := (*dtree)["device-tree"]["children"]
-
-	switch reflect.TypeOf(children).Kind() {
-	case reflect.Slice:
-		s := reflect.ValueOf(children)
-		for i := 0; i < s.Len(); i++ {
-			child := s.Index(i)
-			c := child.Interface().(devicetree.DeviceTree)
-			if _, ok := (c)["product"]; ok {
-				utils.Indent(log.Info)(fmt.Sprintf("Product Name: %s", (c)["product"]["product-name"]))
-			}
-		}
-	}
-
-	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
-		utils.Indent(log.Info)(fmt.Sprintf("Model: %s", model))
-		compatible := (*dtree)["device-tree"]["compatible"]
-		switch reflect.TypeOf(compatible).Kind() {
-		case reflect.Slice:
-			s := reflect.ValueOf(compatible)
-			for i := 0; i < s.Len(); i++ {
-				elem := s.Index(i).String()
-				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
-					utils.Indent(log.Info)(fmt.Sprintf("BoardConfig: %s", s.Index(i)))
-				}
-			}
-		}
-	} else {
-		log.Fatal("devicetree model is not a string")
-	}
-}
-
 // deviceCmd represents the device command
 var deviceCmd = &cobra.Command{
 	Use:   "device",
@@ -91,12 +56,20 @@ var deviceCmd = &cobra.Command{
 		}
 
 		if remoteFlag {
-			_, err := devicetree.RemoteParse(args[0])
+			dtrees, err := devicetree.RemoteParse(args[0])
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
+			for fileName, dtree := range dtrees {
+				utils.Indent(log.Info, 1)(fileName)
+				dtree.Summary()
+			}
 		} else {
-			dtree, err := devicetree.Parse(args[0])
+			content, err := ioutil.ReadFile(args[0])
+			if err != nil {
+				return errors.Wrap(err, "failed to read DeviceTree")
+			}
+			dtree, err := devicetree.ParseImg4Data(content)
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
@@ -111,7 +84,7 @@ var deviceCmd = &cobra.Command{
 
 				fmt.Println(string(j))
 			} else {
-				printSummay(dtree)
+				dtree.Summary()
 			}
 		}
 

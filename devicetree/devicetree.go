@@ -9,17 +9,18 @@ import (
 
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
+	"net/url"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"unicode"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
-	"github.com/blacktop/partialzip"
 	"github.com/pkg/errors"
+	"howett.net/ranger"
 )
 
 // Img4 DeviceTree object
@@ -47,6 +48,40 @@ type Properties map[string]interface{}
 
 // DeviceTree object
 type DeviceTree map[string]Properties
+
+// Summary prints out a summary of the DeviceTree
+func (dtree *DeviceTree) Summary() {
+	children := (*dtree)["device-tree"]["children"]
+
+	switch reflect.TypeOf(children).Kind() {
+	case reflect.Slice:
+		s := reflect.ValueOf(children)
+		for i := 0; i < s.Len(); i++ {
+			child := s.Index(i)
+			c := child.Interface().(DeviceTree)
+			if _, ok := (c)["product"]; ok {
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", (c)["product"]["product-name"]))
+			}
+		}
+	}
+
+	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", model))
+		compatible := (*dtree)["device-tree"]["compatible"]
+		switch reflect.TypeOf(compatible).Kind() {
+		case reflect.Slice:
+			s := reflect.ValueOf(compatible)
+			for i := 0; i < s.Len(); i++ {
+				elem := s.Index(i).String()
+				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
+					utils.Indent(log.Info, 2)(fmt.Sprintf("BoardConfig: %s", s.Index(i)))
+				}
+			}
+		}
+	} else {
+		log.Fatal("devicetree model is not a string")
+	}
+}
 
 func isASCIIPrintable(s string) bool {
 	for _, r := range s {
@@ -196,17 +231,12 @@ func parseDeviceTree(buffer *bytes.Buffer) (*DeviceTree, error) {
 	return &dtree, nil
 }
 
-// Parse parses a DeviceTree img4 file
-func Parse(path string) (*DeviceTree, error) {
-	log.Info("Parsing DeviceTree")
-	content, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read DeviceTree")
-	}
+// ParseImg4Data parses a img4 data containing a DeviceTree
+func ParseImg4Data(data []byte) (*DeviceTree, error) {
 
 	var i Img4
 	// NOTE: openssl asn1parse -i -inform DER -in DEVICETREE.im4p
-	if _, err := asn1.Unmarshal(content, &i); err != nil {
+	if _, err := asn1.Unmarshal(data, &i); err != nil {
 		return nil, err
 	}
 
@@ -219,28 +249,43 @@ func Parse(path string) (*DeviceTree, error) {
 }
 
 // RemoteParse parses a DeviceTree img4 file in a remote ipsw file
-func RemoteParse(url string) ([]*DeviceTree, error) {
-	var dtreeArray []*DeviceTree
-	pzip, err := partialzip.New(url)
+func RemoteParse(u string) (map[string]*DeviceTree, error) {
+
+	dt := make(map[string]*DeviceTree)
+	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
+
+	url, err := url.Parse(u)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create partialzip instance")
+		return nil, errors.Wrap(err, "failed to parse url")
 	}
-	dtrees := findDeviceTreesInList(pzip.List())
-	if len(dtrees) > 0 {
-		for _, dtree := range dtrees {
-			_, err = pzip.Download(dtree)
+	reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create ranger reader")
+	}
+	length, err := reader.Length()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get reader length")
+	}
+	zr, err := zip.NewReader(reader, length)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create zip reader from ranger reader")
+	}
+
+	for _, f := range zr.File {
+		if validDT.MatchString(f.Name) {
+			dtData := make([]byte, f.UncompressedSize64)
+			rc, _ := f.Open()
+			io.ReadFull(rc, dtData)
+			rc.Close()
+
+			dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to download file")
+				return nil, errors.Wrap(err, "failed to parse DeviceTree")
 			}
-			dtree, err := Parse(filepath.Base(dtree))
-			if err != nil {
-				return nil, err
-			}
-			dtreeArray = append(dtreeArray, dtree)
 		}
 	}
 
-	return dtreeArray, nil
+	return dt, nil
 }
 
 // Extract extracts DeviceTree(s) from ipsw

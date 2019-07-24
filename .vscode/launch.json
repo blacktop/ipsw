@@ -4,7 +4,6 @@
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
   "version": "0.2.0",
   "configurations": [
-
     {
       "name": "Generate",
       "type": "go",
@@ -15,7 +14,9 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["generate"],
+      "args": [
+        "generate"
+      ],
       "showLog": false
     },
     {
@@ -28,7 +29,29 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {},
-      "args": ["-V", "device", "${workspaceRoot}/Firmware/all_flash/DeviceTree.d321ap.im4p"],
+      "args": [
+        "-V",
+        "device",
+        "${workspaceRoot}/Firmware/all_flash/DeviceTree.d321ap.im4p"
+      ],
+      "showLog": false
+    },
+    {
+      "name": "Device - Remote",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "remotePath": "",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "program": "${workspaceRoot}/cmd/ipsw/main.go",
+      "env": {},
+      "args": [
+        "-V",
+        "device",
+        "-r",
+        "http://updates-http.cdn-apple.com/2019SpringFCS/fullrestores/041-68860/CC244E36-7C96-11E9-95EA-34F06256CCDB/iPhone_5.5_P3_12.3.1_16F203_Restore.ipsw"
+      ],
       "showLog": false
     },
     {
@@ -41,7 +64,11 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {},
-      "args": ["-V", "download", "latest"],
+      "args": [
+        "-V",
+        "download",
+        "latest"
+      ],
       // "args": ["-V", "itunes", "--build", "16F156"],
       "showLog": false
     },
@@ -55,7 +82,13 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {},
-      "args": ["-V", "download", "kernel", "--version", "12.4"],
+      "args": [
+        "-V",
+        "download",
+        "kernel",
+        "--version",
+        "12.4"
+      ],
       // "args": ["-V", "itunes", "--build", "16F156"],
       "showLog": false
     },
@@ -69,7 +102,11 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["-V", "extract", "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore.ipsw"],
+      "args": [
+        "-V",
+        "extract",
+        "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore.ipsw"
+      ],
       "showLog": false
     },
     {
@@ -82,7 +119,12 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["-V", "extract", "--dyld", "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore.ipsw"],
+      "args": [
+        "-V",
+        "extract",
+        "--dyld",
+        "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore.ipsw"
+      ],
       "showLog": false
     },
     {
@@ -95,7 +137,11 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["-V", "webkit", "${workspaceRoot}/dyld_shared_cache"],
+      "args": [
+        "-V",
+        "webkit",
+        "${workspaceRoot}/dyld_shared_cache"
+      ],
       "showLog": false
     },
     {
@@ -108,7 +154,11 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["-V", "decompress", "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore/kernelcache.release.iphone11"],
+      "args": [
+        "-V",
+        "decompress",
+        "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore/kernelcache.release.iphone11"
+      ],
       "showLog": false
     },
     {
@@ -156,7 +206,11 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/ipsws.go",
       "env": {},
-      "args": ["-V", "-b", "12.0"],
+      "args": [
+        "-V",
+        "-b",
+        "12.0"
+      ],
       "showLog": false
     }
   ]

@@ -1,3 +1,4 @@
 {
-    "go.formatTool": "goreturns"
+    "go.formatTool": "goreturns",
+    "editor.formatOnSave": true
 }
