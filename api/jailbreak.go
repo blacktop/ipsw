@@ -3,8 +3,14 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/utils"
+	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
+	"time"
 )
 
 // Jailbreak object
@@ -28,6 +34,36 @@ type Jailbreaks struct {
 }
 
 const canIJailbreakURL = "https://canijailbreak.com/jailbreaks.json"
+
+var researchers = []string{"Ian Beer", "Johnathan Levin", "Siguza", "Brandon Azad", "Luca Todesco"}
+
+func init() {
+	rand.Seed(time.Now().Unix())
+}
+
+// CanIBreak will check if an iOS version is jailbreakable
+func (j *Jailbreaks) CanIBreak(iOSVersion string) (bool, int, error) {
+	v, err := version.NewVersion(iOSVersion)
+	if err != nil {
+		return false, -1, errors.Wrap(err, "failed to create version")
+	}
+	for idx, jb := range j.Jailbreaks {
+		constraints, err := version.NewConstraint(fmt.Sprintf(">= %s, <= %s", jb.Firmwares.Start, jb.Firmwares.End))
+		if err != nil {
+			return false, -1, errors.Wrap(err, "failed to create new version constraint")
+		}
+		if constraints.Check(v) {
+			utils.Indent(log.Debug, 1)(fmt.Sprintf("%s satisfies constraints %s", v.Original(), constraints))
+			return jb.Jailbroken, idx, nil
+		}
+	}
+	return false, -1, nil
+}
+
+// GetRandomResearcher returns a random iOS Vulnerability Researcher
+func GetRandomResearcher() string {
+	return researchers[rand.Intn(len(researchers))]
+}
 
 // GetJailbreaks gets canijailbreak.com's JSON
 func GetJailbreaks() (Jailbreaks, error) {

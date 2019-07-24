@@ -147,6 +147,18 @@ func (vm *ITunesVersionMaster) GetLatestBuilds() ([]Build, error) {
 	newestVersion := versions[len(versions)-1]
 	utils.Indent(log.Debug, 1)(fmt.Sprintf("Latest iOS release found is: %s", newestVersion.String()))
 
+	// check canijailbreak.com
+	jbs, _ := GetJailbreaks()
+	if iCan, index, err := jbs.CanIBreak(newestVersion.Original()); err != nil {
+		log.Error(err.Error())
+	} else {
+		if iCan {
+			log.WithField("url", jbs.Jailbreaks[index].URL).Warnf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name)
+		} else {
+			log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", GetRandomResearcher())
+		}
+	}
+
 	for _, build := range vm.GetBuilds() {
 		if strings.EqualFold(build.ProductVersion, newestVersion.Original()) {
 			builds = append(builds, build)
