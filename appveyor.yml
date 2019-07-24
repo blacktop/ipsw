@@ -10,8 +10,8 @@ environment:
 
 stack: go 1.10
 
-before_test:
-  - go vet ./...
+# before_test:
+#   - go vet ./...
 
 test_script:
   - go build github.com/blacktop/ipsw/cmd/ipsw
