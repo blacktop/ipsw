@@ -199,7 +199,7 @@ Then you could use `git diff` or something to get a quick **high** level view of
 $ ipsw kernel diff kernelcache.release.iphone11
 ```
 
-You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/diff/Library/Caches/com.apple.xbs/Sources)
+You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/kernelcache/diff/Library/Caches/com.apple.xbs/Sources)
 
 ## TODO
 
