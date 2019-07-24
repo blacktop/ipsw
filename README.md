@@ -56,7 +56,7 @@ $ ipsw download --device iPhone11,2 --build 16A366 --dec
 
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
-      • verifying md5sum...
+      • verifying sha1sum...
 
 $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 
