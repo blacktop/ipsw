@@ -1,5 +1,5 @@
 REPO=blacktop
-NAME=graboid
+NAME=ipsw
 VERSION=$(shell cat VERSION)
 MESSAGE?="New release ${VERSION}"
 
@@ -74,6 +74,19 @@ ci: lint test ## Run all the tests and code checks
 build: ## Build a beta version of malice
 	@echo "===> Building Binaries"
 	go build
+
+.PHONY: docker
+docker: ## Build docker image
+	@echo "===> Building Docker Image"
+	docker build -t $(REPO)/$(NAME):$(VERSION) .
+
+.PHONY: ssh
+ssh:
+	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data --entrypoint=bash $(REPO)/$(NAME):$(VERSION)
+
+.PHONY: run
+run:
+	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data $(REPO)/$(NAME):$(VERSION)
 
 clean: ## Clean up artifacts
 	rm *.tar || true
