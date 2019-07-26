@@ -1,0 +1,12 @@
+# Ignore .git folder
+.git*
+.gitignore
+
+.devcontainer
+.idea
+.vscode
+
+dist
+test-caches
+
+dyld_shared_cache
