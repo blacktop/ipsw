@@ -87,6 +87,7 @@ ssh:
 .PHONY: run
 run:
 	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data $(REPO)/$(NAME):$(VERSION)
+	@go run cmd/ipsw/main.go dyld webkit `pwd`/test-caches/ipsws/dyld_shared_cache_*
 
 clean: ## Clean up artifacts
 	rm *.tar || true
