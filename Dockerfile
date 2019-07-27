@@ -34,7 +34,5 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
 
 COPY --from=go_builder /bin/ipsw /bin/ipsw
 
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-ENTRYPOINT [ "/entrypoint.sh" ]
+ENTRYPOINT [ "/bin/ipsw" ]
+CMD [ "--help" ]
