@@ -24,3 +24,4 @@ debug
 *.im4p
 .DS_Store
 .idea
+*.bu
