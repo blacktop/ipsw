@@ -43,7 +43,7 @@ type CompressedCache struct {
 
 // ParseImg4Data parses a img4 data containing a compressed kernelcache.
 func ParseImg4Data(data []byte) (*CompressedCache, error) {
-	utils.Indent(log.Info, 1)("Parsing Compressed Kernelcache")
+	utils.Indent(log.Info, 2)("Parsing Compressed Kernelcache")
 
 	var i Img4
 	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10
@@ -126,7 +126,7 @@ func Decompress(kcache string) error {
 	}
 	// defer os.Remove(kcache)
 
-	utils.Indent(log.Info, 1)("Decompressing Kernelcache")
+	utils.Indent(log.Info, 2)("Decompressing Kernelcache")
 	dec := lzss.Decompress(kc.Data)
 	err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
 	if err != nil {
@@ -137,7 +137,7 @@ func Decompress(kcache string) error {
 
 // DecompressData decompresses compressed kernelcache []byte data
 func DecompressData(cc *CompressedCache) []byte {
-	utils.Indent(log.Info, 1)("Decompressing Kernelcache")
+	utils.Indent(log.Info, 2)("Decompressing Kernelcache")
 	dec := lzss.Decompress(cc.Data)
 	return dec[:cc.Header.UncompressedSize]
 }
