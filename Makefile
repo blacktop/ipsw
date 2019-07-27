@@ -80,6 +80,10 @@ docker: ## Build docker image
 	@echo "===> Building Docker Image"
 	docker build -t $(REPO)/$(NAME):$(VERSION) .
 
+.PHONY: size
+size: ## Get built image size
+	sed -i.bu 's/docker%20image-.*-blue/docker%20image-$(shell docker images --format "{{.Size}}" $(REPO)/$(NAME):$(VERSION)| cut -d' ' -f1)-blue/' README.md
+
 .PHONY: ssh
 ssh:
 	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data --entrypoint=bash $(REPO)/$(NAME):$(VERSION)
