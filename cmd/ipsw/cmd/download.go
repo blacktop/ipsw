@@ -107,7 +107,7 @@ var downloadCmd = &cobra.Command{
 
 			log.Debug("URLs to Download:")
 			for _, u := range urls {
-				utils.Indent(log.Debug, 1)(u)
+				utils.Indent(log.Debug, 2)(u)
 			}
 
 			// check canijailbreak.com
