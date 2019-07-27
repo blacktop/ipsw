@@ -43,12 +43,15 @@ var extractDyldCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
-		if runtime.GOOS != "darwin" {
-			log.Fatal("dyld_shared_cache extraction only works on macOS :(")
+
+		if runtime.GOOS == "windows" {
+			log.Fatal("dyld_shared_cache extraction does not work on Windows :(")
 		}
+
 		log.Info("Extracting dyld_shared_cache")
 		return dyld.Extract(args[0])
 	},
