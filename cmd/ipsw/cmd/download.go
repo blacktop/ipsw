@@ -135,7 +135,8 @@ var downloadCmd = &cobra.Command{
 
 			if cont {
 				for _, url := range urls {
-					if _, err := os.Stat(path.Base(url)); os.IsNotExist(err) {
+					destName := strings.Replace(path.Base(url), ",", "_", -1)
+					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						// get a handle to ipsw object
 						i, err := LookupByURL(ipsws, url)
 						if err != nil {
@@ -154,11 +155,11 @@ var downloadCmd = &cobra.Command{
 							return errors.Wrap(err, "failed to download file")
 						}
 						// verify download
-						if ok, _ := utils.Verify(i.SHA1, path.Base(i.URL)); !ok {
-							return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(url))
+						if ok, _ := utils.Verify(i.SHA1, destName); !ok {
+							return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
 						}
 					} else {
-						log.Warnf("ipsw already exists: %s", path.Base(url))
+						log.Warnf("ipsw already exists: %s", destName)
 					}
 				}
 			}
@@ -169,8 +170,8 @@ var downloadCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to query ipsw.me api")
 				}
-
-				if _, err := os.Stat(path.Base(i.URL)); os.IsNotExist(err) {
+				destName := strings.Replace(path.Base(i.URL), ",", "_", -1)
+				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
 						"device":  i.Identifier,
 						"build":   i.BuildID,
@@ -181,11 +182,11 @@ var downloadCmd = &cobra.Command{
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}
-					if ok, _ := utils.Verify(i.SHA1, path.Base(i.URL)); !ok {
-						return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(i.URL))
+					if ok, _ := utils.Verify(i.SHA1, destName); !ok {
+						return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
 					}
 				} else {
-					log.Warnf("ipsw already exists: %s", path.Base(i.URL))
+					log.Warnf("ipsw already exists: %s", destName)
 				}
 			}
 		} else {

@@ -4,18 +4,17 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"sync"
+	"strings"
 	"time"
 
 	"github.com/apex/log"
 	"github.com/pkg/errors"
-    "github.com/vbauerster/mpb/v4"
-    "github.com/vbauerster/mpb/v4/decor"
+	"github.com/vbauerster/mpb/v4"
+	"github.com/vbauerster/mpb/v4/decor"
 )
 
 func getProxy(proxy string) func(*http.Request) (*url.URL, error) {
@@ -60,6 +59,8 @@ func DownloadFile(url, proxy string, insecure bool) error {
 
 	// create dest
 	destName := filepath.Base(url)
+	// remove commas
+	destName = strings.Replace(destName, ",", "_", -1)
 	dest, err := os.Create(destName)
 	if err != nil {
 		return errors.Wrapf(err, "cannot create %s", destName)
@@ -93,66 +94,77 @@ func DownloadFile(url, proxy string, insecure bool) error {
 	return nil
 }
 
-func multiDownload(urls []string) {
-	doneWg := new(sync.WaitGroup)
-	p := mpb.New(mpb.WithWidth(64), mpb.WithWaitGroup(doneWg))
-	numBars := 4
+// func multiDownload(urls []string, proxy string, insecure bool) {
+// 	var wg sync.WaitGroup
+// 	// pass &wg (optional), so p will wait for it eventually
+// 	p := mpb.New(mpb.WithWaitGroup(&wg))
+// 	total, numBars := 100, 3
+// 	wg.Add(numBars)
 
-	var bars []*mpb.Bar
-	var downloadWgg []*sync.WaitGroup
-	for i := 0; i < numBars; i++ {
-		wg := new(sync.WaitGroup)
-		wg.Add(1)
-		downloadWgg = append(downloadWgg, wg)
-		task := fmt.Sprintf("Task#%02d:", i)
-		job := "downloading"
-		b := p.AddBar(rand.Int63n(201)+100,
-			mpb.BarRemoveOnComplete(),
-			mpb.PrependDecorators(
-				decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
-				decor.Name(job, decor.WCSyncSpaceR),
-				decor.CountersNoUnit("%d / %d", decor.WCSyncWidth),
-			),
-			mpb.AppendDecorators(decor.Percentage(decor.WC{W: 5})),
-		)
-		go newTask(wg, b, i+1)
-		bars = append(bars, b)
-	}
+// 	for i := 0; i < numBars; i++ {
+// 		name := fmt.Sprintf("Bar#%d:", i)
+// 		bar := p.AddBar(int64(total),
+// 			mpb.PrependDecorators(
+// 				// simple name decorator
+// 				decor.Name(name),
+// 				// decor.DSyncWidth bit enables column width synchronization
+// 				decor.Percentage(decor.WCSyncSpace),
+// 			),
+// 			mpb.AppendDecorators(
+// 				// replace ETA decorator with "done" message, OnComplete event
+// 				decor.OnComplete(
+// 					// ETA decorator with ewma age of 60
+// 					decor.EwmaETA(decor.ET_STYLE_GO, 60), "done",
+// 				),
+// 			),
+// 		)
+// 		// download an ipsw
+// 		go func(url, proxy string, insecure bool) {
+// 			defer wg.Done()
+// 			client := &http.Client{
+// 				Transport: &http.Transport{
+// 					Proxy:           getProxy(proxy),
+// 					TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+// 				},
+// 			}
 
-	for i := 0; i < numBars; i++ {
-		doneWg.Add(1)
-		i := i
-		go func() {
-			task := fmt.Sprintf("Task#%02d:", i)
-			job := "installing"
-			// preparing delayed bars
-			b := p.AddBar(rand.Int63n(101)+100,
-				mpb.BarReplaceOnComplete(bars[i]),
-				mpb.BarClearOnComplete(),
-				mpb.PrependDecorators(
-					decor.Name(task, decor.WC{W: len(task) + 1, C: decor.DidentRight}),
-					decor.OnComplete(decor.Name(job, decor.WCSyncSpaceR), "done!"),
-					decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_MMSS, 60, decor.WCSyncWidth), "")),
-				mpb.AppendDecorators(
-					decor.OnComplete(decor.Percentage(decor.WC{W: 5}), ""),
-				),
-			)
-			// waiting for download to complete, before starting install job
-			downloadWgg[i].Wait()
-			go newTask(doneWg, b, numBars-i)
-		}()
-	}
+// 			req, err := http.NewRequest("GET", url, nil)
+// 			if err != nil {
+// 				return errors.Wrap(err, "cannot create http request")
+// 			}
 
-	p.Wait()
-}
+// 			resp, err := client.Do(req)
+// 			if err != nil {
+// 				return err
+// 			}
+// 			defer resp.Body.Close()
 
-func newTask(wg *sync.WaitGroup, b *mpb.Bar, incrBy int) {
-	defer wg.Done()
-	max := 100 * time.Millisecond
-	for !b.Completed() {
-		start := time.Now()
-		time.Sleep(time.Duration(rand.Intn(10)+1) * max / 10)
-		// ewma based decorators require work duration measurement
-		b.IncrBy(incrBy, time.Since(start))
-	}
-}
+// 			if resp.StatusCode != http.StatusOK {
+// 				return fmt.Errorf("server return status: %s", resp.Status)
+// 			}
+
+// 			size := resp.ContentLength
+
+// 			// create dest
+// 			destName := filepath.Base(url)
+// 			dest, err := os.Create(destName)
+// 			if err != nil {
+// 				return errors.Wrapf(err, "cannot create %s", destName)
+// 			}
+// 			defer dest.Close()
+// 		}(url, proxy, insecure)
+// 	}
+// 	// Waiting for passed &wg and for all bars to complete and flush
+// 	p.Wait()
+// }
+
+// func newTask(wg *sync.WaitGroup, b *mpb.Bar, incrBy int) {
+// 	defer wg.Done()
+// 	max := 100 * time.Millisecond
+// 	for !b.Completed() {
+// 		start := time.Now()
+// 		time.Sleep(time.Duration(rand.Intn(10)+1) * max / 10)
+// 		// ewma based decorators require work duration measurement
+// 		b.IncrBy(incrBy, time.Since(start))
+// 	}
+// }

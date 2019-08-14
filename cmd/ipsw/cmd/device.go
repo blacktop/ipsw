@@ -24,12 +24,15 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+
+	// "sort"
+	"io/ioutil"
+
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/devicetree"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"io/ioutil"
 )
 
 var (
@@ -60,6 +63,7 @@ var deviceCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
+			// sort.Sort(dtrees)
 			for fileName, dtree := range dtrees {
 				utils.Indent(log.Info, 1)(fileName)
 				dtree.Summary()

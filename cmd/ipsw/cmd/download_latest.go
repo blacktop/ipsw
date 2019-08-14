@@ -23,15 +23,16 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"os"
-	"path"
-	"strings"
 )
 
 func init() {
@@ -97,7 +98,8 @@ var latestCmd = &cobra.Command{
 
 		if cont {
 			for _, build := range builds {
-				if _, err := os.Stat(path.Base(build.FirmwareURL)); os.IsNotExist(err) {
+				destName := strings.Replace(path.Base(build.FirmwareURL), ",", "_", -1)
+				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
 						"device":  build.Identifier,
 						"build":   build.BuildVersion,
@@ -109,11 +111,11 @@ var latestCmd = &cobra.Command{
 						return errors.Wrap(err, "failed to download file")
 					}
 					// verify download
-					if ok, _ := utils.Verify(build.FirmwareSHA1, path.Base(build.FirmwareURL)); !ok {
-						return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", path.Base(build.FirmwareURL))
+					if ok, _ := utils.Verify(build.FirmwareSHA1, destName); !ok {
+						return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
 					}
 				} else {
-					log.Warnf("ipsw already exists: %s", path.Base(build.FirmwareURL))
+					log.Warnf("ipsw already exists: %s", destName)
 				}
 			}
 		}
