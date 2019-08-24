@@ -20,6 +20,14 @@ jobs:
     working_directory: /go/src/github.com/blacktop/ipsw
     steps:
       - checkout
-      - setup_remote_docker
+      - restore_cache:
+          keys:
+            - go-modules-v1-{{ checksum "go.sum" }}
+            - go-modules-v1
+      - run: go mod download
+      - save_cache:
+          key: go-modules-v1-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
       # specify any bash command here prefixed with `run: `
       - run: go run cmd/ipsw/main.go --help
