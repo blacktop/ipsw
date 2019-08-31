@@ -30,4 +30,4 @@ jobs:
           paths:
             - "/go/pkg/mod"
       # specify any bash command here prefixed with `run: `
-      - run: go run cmd/ipsw/main.go --help
+      - run: CGO_ENABLED=0 go run cmd/ipsw/main.go --help
