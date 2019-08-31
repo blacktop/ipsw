@@ -1,7 +1,9 @@
-package main
+// +build cgo
+
+package dyld
 
 /*
-#cgo CFLAGS: -I/Applications/Xcode-beta.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
+#cgo CFLAGS: -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
 #cgo LDFLAGS: -ldl
 #include <stdio.h>
 #include <string.h>
@@ -15,8 +17,8 @@ dsc_extract(void *f, const char* shared_cache_file_path, const char* extraction_
 	extractor_proc = (int (*)(const char *))f;
 	int result = (*extractor_proc)(shared_cache_file_path, extraction_root_path,
 							  ^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
-	fprintf(stderr, "dyld_shared_cache_extract_dylibs_progress() => %d\n", result);
-    return 0;
+	// fprintf(stderr, "dyld_shared_cache_extract_dylibs_progress() => %d\n", result);
+    return result;
 }
 */
 import "C"
@@ -29,7 +31,7 @@ import (
 	"unsafe"
 )
 
-var errSoNotFound = errors.New("unable to open a handle to the library")
+const bundle = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle"
 
 // LibHandle represents an open handle to a library
 type LibHandle struct {
@@ -51,7 +53,7 @@ func GetHandle(lib string) (*LibHandle, error) {
 		return h, nil
 	}
 	// }
-	return nil, errSoNotFound
+	return nil, errors.New("unable to open a handle to the library")
 }
 
 // GetSymbolPointer takes a symbol name and returns a pointer to the symbol.
@@ -81,14 +83,14 @@ func (l *LibHandle) Close() error {
 	return nil
 }
 
-func main() {
-	fmt.Println(os.Args)
+// Split extracts all the dyld_shared_cache libraries
+func Split(dyldSharedCachePath, destinationPath string) error {
 
-	if len(os.Args) != 3 {
-		log.Fatal("usage: dyld_shared_cache /path/to/extract/to")
+	if _, err := os.Stat(bundle); os.IsNotExist(err) {
+		return err
 	}
 
-	dscExtractor, err := GetHandle("/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
+	dscExtractor, err := GetHandle(bundle)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -98,11 +100,16 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dscPath := C.CString(os.Args[1])
+	dscPath := C.CString(dyldSharedCachePath)
 	defer C.free(unsafe.Pointer(dscPath))
 
-	destPath := C.CString(os.Args[2])
+	destPath := C.CString(destinationPath)
 	defer C.free(unsafe.Pointer(destPath))
 
-	C.dsc_extract(extractorProc, dscPath, destPath)
+	result := C.dsc_extract(extractorProc, dscPath, destPath)
+	if result != 0 {
+		return errors.New("something went wrong")
+	}
+
+	return nil
 }
