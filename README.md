@@ -189,6 +189,26 @@ $ ipsw dyld webkit dyld_shared_cache
    • WebKit Version: 607.2.6.0.1
 ```
 
+### `split` _(only on macOS)_ 🆕
+
+Split up a `dyld_shared_cache`
+
+```bash
+$ ipsw dyld split dyld_shared_cache
+   • Splitting dyld_shared_cache
+
+0/1445
+1/1445
+2/1445
+3/1445
+<SNIP>
+1440/1445
+1441/1445
+1442/1445
+1443/1445
+1444/1445
+```
+
 ### `decompress`
 
 Decompress a previously extracted `kernelcache`
