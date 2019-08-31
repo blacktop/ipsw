@@ -111,5 +111,9 @@ func Split(dyldSharedCachePath, destinationPath string) error {
 		return errors.New("something went wrong")
 	}
 
+	if err := dscExtractor.Close(); err != nil {
+		return err
+	}
+
 	return nil
 }
