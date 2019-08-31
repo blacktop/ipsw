@@ -49,7 +49,9 @@ var splitCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
+		dscPath := filepath.Clean(args[0])
+
+		if _, err := os.Stat(dscPath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
@@ -58,6 +60,6 @@ var splitCmd = &cobra.Command{
 		}
 
 		log.Info("Splitting dyld_shared_cache")
-		return dyld.Split(args[0], filepath.Dir(args[0]))
+		return dyld.Split(dscPath, filepath.Dir(dscPath))
 	},
 }
