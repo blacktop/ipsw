@@ -12,26 +12,26 @@ package dyld
 #include <dlfcn.h>
 int
 dsc_extract(void *f, const char* shared_cache_file_path, const char* extraction_root_path){
-	int (*extractor_proc)(const char* shared_cache_file_path, const char* extraction_root_path,
-                              void (^progress)(unsigned current, unsigned total));
+	int (*extractor_proc)(const char* shared_cache_file_path,
+		                  const char* extraction_root_path,
+                          void (^progress)(unsigned current, unsigned total));
 	extractor_proc = (int (*)(const char *))f;
-	int result = (*extractor_proc)(shared_cache_file_path, extraction_root_path,
-							  ^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
-	// fprintf(stderr, "dyld_shared_cache_extract_dylibs_progress() => %d\n", result);
+	int result = (*extractor_proc)(shared_cache_file_path,
+		                           extraction_root_path,
+							       ^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
     return result;
 }
 */
 import "C"
 
 import (
-	"errors"
 	"fmt"
-	"log"
-	"os"
 	"unsafe"
-)
 
-const bundle = "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle"
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/utils"
+	"github.com/pkg/errors"
+)
 
 // LibHandle represents an open handle to a library
 type LibHandle struct {
@@ -40,19 +40,20 @@ type LibHandle struct {
 }
 
 // GetHandle returns a handle to a library
-func GetHandle(lib string) (*LibHandle, error) {
-	// for _, name := range libs {
-	libname := C.CString(lib)
-	defer C.free(unsafe.Pointer(libname))
-	handle := C.dlopen(libname, C.RTLD_LAZY)
-	if handle != nil {
-		h := &LibHandle{
-			Handle:  handle,
-			Libname: lib,
+func GetHandle(libs []string) (*LibHandle, error) {
+	for _, name := range libs {
+		libname := C.CString(name)
+		defer C.free(unsafe.Pointer(libname))
+		handle := C.dlopen(libname, C.RTLD_LAZY)
+		if handle != nil {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("using bundle: %s", name))
+			h := &LibHandle{
+				Handle:  handle,
+				Libname: name,
+			}
+			return h, nil
 		}
-		return h, nil
 	}
-	// }
 	return nil, errors.New("unable to open a handle to the library")
 }
 
@@ -86,18 +87,23 @@ func (l *LibHandle) Close() error {
 // Split extracts all the dyld_shared_cache libraries
 func Split(dyldSharedCachePath, destinationPath string) error {
 
-	if _, err := os.Stat(bundle); os.IsNotExist(err) {
-		return err
+	var bundles = []string{
+		"/Applications/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
+		"/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
+		"/Applications/Xcode-beta.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
+		"/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
+		"/Applications/Xcode-beta.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
+		"/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
 	}
 
-	dscExtractor, err := GetHandle(bundle)
+	dscExtractor, err := GetHandle(bundles)
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrapf(err, "failed to split %s", dyldSharedCachePath)
 	}
 
 	extractorProc, err := dscExtractor.GetSymbolPointer("dyld_shared_cache_extract_dylibs_progress")
 	if err != nil {
-		log.Fatal(err)
+		return errors.Wrapf(err, "failed to split %s", dyldSharedCachePath)
 	}
 
 	dscPath := C.CString(dyldSharedCachePath)
@@ -108,11 +114,11 @@ func Split(dyldSharedCachePath, destinationPath string) error {
 
 	result := C.dsc_extract(extractorProc, dscPath, destPath)
 	if result != 0 {
-		return errors.New("something went wrong")
+		return errors.New("failed to run dsc_extract")
 	}
 
 	if err := dscExtractor.Close(); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to close dylib %s", dscExtractor.Libname)
 	}
 
 	return nil

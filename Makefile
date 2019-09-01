@@ -96,7 +96,7 @@ run:
 clean: ## Clean up artifacts
 	rm *.tar || true
 	rm *.ipsw || true
-	rm rm kernelcache.release.* || true
+	rm kernelcache.release.* || true
 	rm -rf dist
 
 # Absolutely awesome: http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
