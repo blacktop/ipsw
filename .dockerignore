@@ -8,5 +8,19 @@
 
 dist
 test-caches
+public
+resources
 
-dyld_shared_cache
+*.ipsw
+kernelcache.release.*
+dyld_shared_cache*
+
+debug
+*.im4p
+.DS_Store
+.idea
+*.bu
+public
+System
+usr
+*.bndb
