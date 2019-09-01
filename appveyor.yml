@@ -7,12 +7,12 @@ shallow_clone: true
 
 environment:
   GOPATH: c:\gopath
+  CGO_ENABLED: 0
 
 stack: go 1.10
 
-# before_test:
-#   - go vet ./...
+install:
+  - go build github.com/blacktop/ipsw/cmd/ipsw
 
 test_script:
-  - CGO_ENABLED=0 go build github.com/blacktop/ipsw/cmd/ipsw
   - ipsw.exe download --device iPhone11,2 --build 16B92 kernel
