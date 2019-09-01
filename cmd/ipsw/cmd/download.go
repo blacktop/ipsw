@@ -43,7 +43,8 @@ func init() {
 	downloadCmd.PersistentFlags().String("proxy", "", "HTTP/HTTPS proxy")
 	downloadCmd.PersistentFlags().Bool("insecure", false, "do not verify ssl certs")
 	// Filters
-	downloadCmd.PersistentFlags().StringP("black-list", "n", viper.GetString("IPSW_DEVICE_BLACKLIST"), "iOS device black list")
+	downloadCmd.PersistentFlags().StringArrayP("black-list", "", []string{viper.GetString("IPSW_DEVICE_BLACKLIST")}, "iOS device black list")
+	downloadCmd.PersistentFlags().StringArrayP("white-list", "", []string{viper.GetString("IPSW_DEVICE_WHITELIST")}, "iOS device white list")
 	downloadCmd.PersistentFlags().StringP("version", "v", viper.GetString("IPSW_VERSION"), "iOS Version (i.e. 12.3.1)")
 	downloadCmd.PersistentFlags().StringP("device", "d", viper.GetString("IPSW_DEVICE"), "iOS Device (i.e. iPhone11,2)")
 	downloadCmd.PersistentFlags().StringP("build", "b", viper.GetString("IPSW_BUILD"), "iOS BuildID (i.e. 16F203)")
@@ -75,7 +76,8 @@ var downloadCmd = &cobra.Command{
 		// filters
 		version, _ := cmd.Flags().GetString("version")
 		device, _ := cmd.Flags().GetString("device")
-		doNotDownload, _ := cmd.Flags().GetString("black-list")
+		doDownload, _ := cmd.Flags().GetStringSlice("white-list")
+		doNotDownload, _ := cmd.Flags().GetStringSlice("black-list")
 		build, _ := cmd.Flags().GetString("build")
 
 		if len(version) > 0 && len(build) > 0 {
@@ -94,8 +96,12 @@ var downloadCmd = &cobra.Command{
 						urls = append(urls, i.URL)
 					}
 				} else {
-					if len(doNotDownload) > 0 {
-						if !strings.Contains(i.Identifier, doNotDownload) {
+					if len(doDownload) > 0 {
+						if utils.StrSliceContains(doDownload, i.Identifier) {
+							urls = append(urls, i.URL)
+						}
+					} else if len(doNotDownload) > 0 {
+						if !utils.StrSliceContains(doNotDownload, i.Identifier) {
 							urls = append(urls, i.URL)
 						}
 					} else {

@@ -48,6 +48,7 @@ var latestCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		var builds []api.Build
+		var filteredBuilds []api.Build
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -55,8 +56,9 @@ var latestCmd = &cobra.Command{
 
 		// filters
 		//version, _ := cmd.Flags().GetString("version")
-		//device, _ := cmd.Flags().GetString("device")
-		doNotDownload, _ := cmd.Flags().GetString("black-list")
+		device, _ := cmd.Flags().GetString("device")
+		doDownload, _ := cmd.Flags().GetStringArray("white-list")
+		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 		//build, _ := cmd.Flags().GetString("build")
 
 		if Verbose {
@@ -73,17 +75,28 @@ var latestCmd = &cobra.Command{
 			return errors.Wrap(err, "failed to get the latest builds")
 		}
 
-		if len(doNotDownload) > 0 {
-			for i, v := range builds {
-				if strings.Contains(v.Identifier, doNotDownload) {
-					builds = append(builds[:i], builds[i+1:]...)
-					break
+		for _, v := range builds {
+			if len(device) > 0 {
+				if strings.EqualFold(device, v.Identifier) {
+					filteredBuilds = append(filteredBuilds, v)
+				}
+			} else {
+				if len(doDownload) > 0 {
+					if utils.StrSliceContains(doDownload, v.Identifier) {
+						filteredBuilds = append(filteredBuilds, v)
+					}
+				} else if len(doNotDownload) > 0 {
+					if !utils.StrSliceContains(doNotDownload, v.Identifier) {
+						filteredBuilds = append(filteredBuilds, v)
+					}
+				} else {
+					filteredBuilds = append(filteredBuilds, v)
 				}
 			}
 		}
 
 		log.Debug("URLs to Download:")
-		for _, b := range builds {
+		for _, b := range filteredBuilds {
 			utils.Indent(log.Debug, 1)(b.FirmwareURL)
 		}
 
@@ -91,13 +104,13 @@ var latestCmd = &cobra.Command{
 		if !skip {
 			cont = false
 			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(builds)),
+				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredBuilds)),
 			}
 			survey.AskOne(prompt, &cont)
 		}
 
 		if cont {
-			for _, build := range builds {
+			for _, build := range filteredBuilds {
 				destName := strings.Replace(path.Base(build.FirmwareURL), ",", "_", -1)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
