@@ -161,7 +161,7 @@ kernelcache.release.n102.decompressed
 
 But, how does it work?? 🤔 With the POWER :muscle: of [partialzip](https://github.com/blacktop/partialzip) !!
 
-#### Download with a Proxy :new:
+#### Download with a Proxy
 
 This will download and decompress the `kernelcache` for an `iPhone XS` running `iOS 12.1` behind a corporate proxy
 
