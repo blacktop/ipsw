@@ -198,7 +198,11 @@ $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
 `docker` 🆕
 
 ``` bash
-$ docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
+$ docker run --init -it --rm \
+             --device /dev/fuse \
+             --cap-add=SYS_ADMIN \
+             -v `pwd`:/data \
+             blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
 ```
 
 ### `webkit`
