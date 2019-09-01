@@ -185,7 +185,7 @@ $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 
 #### Extract `dyld_shared_cache` from a previously downloaded `ipsw`
 
-`macOS`
+- `macOS`
 
 ``` bash
 $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
@@ -195,7 +195,7 @@ $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Unmounting DMG
 ```
 
-`docker` 🆕
+- `docker` 🆕
 
 ``` bash
 $ docker run --init -it --rm \
@@ -227,7 +227,6 @@ $ ipsw dyld split dyld_shared_cache
 2/1445
 3/1445
 <SNIP>
-1440/1445
 1441/1445
 1442/1445
 1443/1445
