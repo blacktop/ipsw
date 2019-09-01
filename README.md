@@ -109,7 +109,7 @@ $ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
   ...
 ```
 
-> **NOTE:** We are filtering out the `AppleTVs` and the `iPod7,1` *(you must do one device type/family per --black-list flag)*
+> **NOTE:** you must do **one** device type/family per `--black-list` or `--white-list` flag
 
 To grab *only* the iPods
 
