@@ -13,12 +13,12 @@ package dyld
 int
 dsc_extract(void *f, const char* shared_cache_file_path, const char* extraction_root_path){
 	int (*extractor_proc)(const char* shared_cache_file_path,
-		                  const char* extraction_root_path,
-                          void (^progress)(unsigned current, unsigned total));
+							const char* extraction_root_path,
+							void (^progress)(unsigned current, unsigned total));
 	extractor_proc = (int (*)(const char *))f;
 	int result = (*extractor_proc)(shared_cache_file_path,
-		                           extraction_root_path,
-							       ^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
+									extraction_root_path,
+									^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
     return result;
 }
 */
