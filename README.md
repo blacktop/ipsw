@@ -105,7 +105,7 @@ $ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPhone6,2 version=12.4.1
-        363.0 MiB / 2.9 GiB [======>---------------------------------------------------| 18:52 ] 49.18 MiB/s
+        363.0 MiB / 2.9 GiB [======>-------------------------------------------------| 18:52 ] 49.18 MiB/s
   ...
 ```
 
@@ -118,7 +118,7 @@ $ ipsw download -V latest --yes --white-list ipod
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPod9,1 version=12.4.1
-        363.0 MiB / 2.9 GiB [======>---------------------------------------------------| 18:52 ] 49.18 MiB/s
+        363.0 MiB / 2.9 GiB [======>-------------------------------------------------| 18:52 ] 49.18 MiB/s
   ...
 ```
 
@@ -189,7 +189,7 @@ Extract `dyld_shared_cache` from a previously downloaded `ipsw` _(only on macOS)
 $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Extracting dyld_shared_cache from IPSW
    • Mounting DMG
-   • Extracting /tmp/ios/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
+   • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
    • Unmounting DMG
 ```
 
