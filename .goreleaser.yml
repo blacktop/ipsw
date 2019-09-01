@@ -48,3 +48,5 @@ changelog:
       - "^docs:"
       - "^test:"
       - "update README"
+      - "Update README.md"
+      - "fixes"
