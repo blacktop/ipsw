@@ -14,5 +14,5 @@ stack: go 1.10
 #   - go vet ./...
 
 test_script:
-  - go build github.com/blacktop/ipsw/cmd/ipsw
+  - CGO_ENABLED=0 go build github.com/blacktop/ipsw/cmd/ipsw
   - ipsw.exe download --device iPhone11,2 --build 16B92 kernel
