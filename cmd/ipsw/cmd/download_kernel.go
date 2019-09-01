@@ -58,7 +58,8 @@ var downloadKernelCmd = &cobra.Command{
 		// insecure, _ := cmd.Flags().GetBool("insecure")
 
 		// filters
-		doNotDownload, _ := cmd.Flags().GetString("black-list")
+		doDownload, _ := cmd.Flags().GetStringSlice("white-list")
+		doNotDownload, _ := cmd.Flags().GetStringSlice("black-list")
 		version, _ := cmd.Flags().GetString("version")
 		device, _ := cmd.Flags().GetString("device")
 		build, _ := cmd.Flags().GetString("build")
@@ -80,8 +81,12 @@ var downloadKernelCmd = &cobra.Command{
 						urls = append(urls, i.URL)
 					}
 				} else {
-					if len(doNotDownload) > 0 {
-						if !strings.Contains(i.Identifier, doNotDownload) {
+					if len(doDownload) > 0 {
+						if utils.StrSliceContains(doDownload, i.Identifier) {
+							urls = append(urls, i.URL)
+						}
+					} else if len(doNotDownload) > 0 {
+						if !utils.StrSliceContains(doNotDownload, i.Identifier) {
 							urls = append(urls, i.URL)
 						}
 					} else {

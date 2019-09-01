@@ -33,6 +33,16 @@ func getFmtStr() string {
 	return "\033[1m%s\033[0m"
 }
 
+// StrSliceContains returns true if string slice contains given string
+func StrSliceContains(slice []string, item string) bool {
+	for _, s := range slice {
+		if strings.Contains(item, s) {
+			return true
+		}
+	}
+	return false
+}
+
 // Unique returns a slice with only unique strings
 func Unique(s []string) []string {
 	unique := make(map[string]bool, len(s))
