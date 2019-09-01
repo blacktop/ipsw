@@ -85,15 +85,26 @@ func (l *LibHandle) Close() error {
 }
 
 // Split extracts all the dyld_shared_cache libraries
-func Split(dyldSharedCachePath, destinationPath string) error {
+func Split(dyldSharedCachePath, destinationPath, operatingSystem string) error {
 
-	var bundles = []string{
-		"/Applications/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
-		"/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
-		"/Applications/Xcode-beta.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
-		"/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
-		"/Applications/Xcode-beta.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
-		"/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
+	var bundles []string
+
+	switch operatingSystem {
+	case "iPhoneOS":
+		bundles = []string{
+			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
+			"/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
+		}
+	case "AppleTVOS":
+		bundles = []string{
+			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
+			"/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
+		}
+	case "WatchOS":
+		bundles = []string{
+			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
+			"/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
+		}
 	}
 
 	dscExtractor, err := GetHandle(bundles)
