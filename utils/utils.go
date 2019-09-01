@@ -36,7 +36,7 @@ func getFmtStr() string {
 // StrSliceContains returns true if string slice contains given string
 func StrSliceContains(slice []string, item string) bool {
 	for _, s := range slice {
-		if strings.Contains(item, s) {
+		if strings.Contains(strings.ToLower(item), strings.ToLower(s)) {
 			return true
 		}
 	}
