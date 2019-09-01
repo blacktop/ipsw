@@ -80,6 +80,11 @@ docker: ## Build docker image
 	@echo "===> Building Docker Image"
 	docker build -t $(REPO)/$(NAME):$(VERSION) .
 
+.PHONY: test-docker
+test-docker: ## Run docker test
+	@echo "===> Testing Docker Image"
+	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(VERSION) -V extract --dyld /data/iPhone11_2_12.4.1_16G102_Restore.ipsw
+
 .PHONY: size
 size: ## Get built image size
 	sed -i.bu 's/docker%20image-.*-blue/docker%20image-$(shell docker images --format "{{.Size}}" $(REPO)/$(NAME):$(VERSION)| cut -d' ' -f1)-blue/' README.md

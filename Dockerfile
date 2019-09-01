@@ -1,7 +1,7 @@
 ####################################################
 # GOLANG BUILDER
 ####################################################
-FROM golang:1 as go_builder
+FROM golang:1 as builder
 
 COPY . /go/src/github.com/blacktop/ipsw
 WORKDIR /go/src/github.com/blacktop/ipsw
@@ -32,7 +32,9 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY --from=go_builder /bin/ipsw /bin/ipsw
+COPY --from=builder /bin/ipsw /bin/ipsw
+
+WORKDIR /data
 
 ENTRYPOINT [ "/bin/ipsw" ]
 CMD [ "--help" ]

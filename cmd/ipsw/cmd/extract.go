@@ -28,7 +28,6 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
-	"runtime"
 	"strings"
 
 	"github.com/apex/log"
@@ -138,9 +137,6 @@ var extractCmd = &cobra.Command{
 
 			if dyldFlag {
 				log.Info("Extracting dyld_shared_cache")
-				if runtime.GOOS != "darwin" {
-					log.Fatal("dyld_shared_cache extraction only works on macOS :(")
-				}
 				err := dyld.Extract(args[0])
 				if err != nil {
 					return errors.Wrap(err, "failed to extract dyld_shared_cache")
