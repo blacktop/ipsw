@@ -27,3 +27,5 @@ require (
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 	howett.net/ranger v0.0.0-20171016084633-e2e137620847
 )
+
+go 1.13
