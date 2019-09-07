@@ -20,5 +20,5 @@ jobs:
       run: |
         go mod download
 
-    - name: Build
-      run: go build -v cmd/ipsw/
+    - name: Run
+      run: CGO_ENABLED=0 go run cmd/ipsw/main.go --help
