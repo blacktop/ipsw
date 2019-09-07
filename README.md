@@ -1,6 +1,6 @@
 # ipsw
 
-![actions](https://github.com/blacktop/ipsw/workflows/Go/badge.svg) [![Build status](https://ci.appveyor.com/api/projects/status/jcx0faojt820p5w4?svg=true)](https://ci.appveyor.com/project/blacktop/ipsw) [![Github All Releases](https://img.shields.io/github/downloads/blacktop/ipsw/total.svg)](https://github.com/blacktop/ipsw/releases/latest) [![GitHub release](https://img.shields.io/github/release/blacktop/ipsw.svg)](https://github.com/blacktop/ipsw/releases) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
+[![actions](https://github.com/blacktop/ipsw/workflows/Go/badge.svg)](https://github.com/blacktop/ipsw/blob/master/.github/workflows/go.yml) [![Build status](https://ci.appveyor.com/api/projects/status/jcx0faojt820p5w4?svg=true)](https://ci.appveyor.com/project/blacktop/ipsw) [![Github All Releases](https://img.shields.io/github/downloads/blacktop/ipsw/total.svg)](https://github.com/blacktop/ipsw/releases/latest) [![GitHub release](https://img.shields.io/github/release/blacktop/ipsw.svg)](https://github.com/blacktop/ipsw/releases) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 
 > Download and parse ipsw(s) from [ipsw.me](https://ipsw.me) or [theiphonewiki.com](https://theiphonewiki.com)
 
