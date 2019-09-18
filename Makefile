@@ -60,14 +60,14 @@ bump: ## Incriment version patch number
 .PHONY: release
 release: bump ## Create a new release from the VERSION
 	@echo " > Creating Release"
-	@hack/make/release $(shell cat VERSION)
+	@hack/make/release v$(shell cat VERSION)
 	@goreleaser --rm-dist
 
 destroy: ## Remove release from the VERSION
 	@echo " > Deleting Release"
 	rm -rf dist
-	git tag -d ${VERSION}
-	git push origin :refs/tags/${VERSION}
+	git tag -d v${VERSION}
+	git push origin :refs/tags/v${VERSION}
 
 ci: lint test ## Run all the tests and code checks
 
@@ -79,6 +79,12 @@ build: ## Build a beta version of malice
 docker: ## Build docker image
 	@echo "===> Building Docker Image"
 	docker build -t $(REPO)/$(NAME):$(VERSION) .
+
+docker-tag:
+	docker tag $(REPO)/$(NAME):$(VERSION) docker.pkg.github.com/blacktop/ipsw/$(NAME):$(VERSION)
+
+docker-push: docker-tag
+	docker push docker.pkg.github.com/blacktop/ipsw/$(NAME):$(VERSION)
 
 .PHONY: test-docker
 test-docker: ## Run docker test
