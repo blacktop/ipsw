@@ -19,7 +19,7 @@ jobs:
           go mod download
 
       - name: Run Help
-        run: CGO_ENABLED=1 go run cmd/ipsw/main.go --help
+        run: CGO_ENABLED=0 go run cmd/ipsw/main.go --help
 
       - name: Run Device List
-        run: CGO_ENABLED=1 go run cmd/ipsw/main.go device list
+        run: CGO_ENABLED=0 go run cmd/ipsw/main.go device list

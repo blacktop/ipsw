@@ -1,5 +1,5 @@
 //go:generate statik -src=./data
-// +build cgo darwin
+// +build linux,!cgo windows,!cgo darwin,cgo
 
 package xcode
 

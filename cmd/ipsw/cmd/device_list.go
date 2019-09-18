@@ -1,4 +1,4 @@
-// +build cgo darwin
+// +build linux,!cgo windows,!cgo darwin,cgo
 
 /*
 Copyright © 2019 blacktop
