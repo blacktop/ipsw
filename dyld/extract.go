@@ -1,4 +1,4 @@
-// +build cgo darwin
+// +build darwin,cgo
 
 package dyld
 
