@@ -26,3 +26,4 @@ System
 usr
 *.bndb
 .vscode/settings.json
+xcode/data
