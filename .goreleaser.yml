@@ -22,15 +22,15 @@ archive:
     linux: linux
     windows: win
 
-brew:
-  github:
-    owner: blacktop
-    name: homebrew-tap
-  folder: Formula
-  homepage: "https://github.com/blacktop/ipsw"
-  description: "Download and parse ipsw(s)"
-  test: |
-    system "#{bin}/ipsw --version"
+brews:
+  - github:
+      owner: blacktop
+      name: homebrew-tap
+    folder: Formula
+    homepage: "https://github.com/blacktop/ipsw"
+    description: "Download and parse ipsw(s)"
+    test: |
+      system "#{bin}/ipsw --version"
 
 checksum:
   name_template: "checksums.txt"
