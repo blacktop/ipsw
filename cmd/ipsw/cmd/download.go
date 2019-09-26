@@ -156,14 +156,14 @@ var downloadCmd = &cobra.Command{
 							"signed":  i.Signed,
 						}).Info("Getting IPSW")
 						// download file
-						err = api.DownloadFile(url, proxy, insecure)
+						err = api.DownloadFile(url, i.SHA1, proxy, insecure)
 						if err != nil {
 							return errors.Wrap(err, "failed to download file")
 						}
 						// verify download
-						if ok, _ := utils.Verify(i.SHA1, destName); !ok {
-							return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
-						}
+						// if ok, _ := utils.Verify(i.SHA1, destName); !ok {
+						// 	return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
+						// }
 					} else {
 						log.Warnf("ipsw already exists: %s", destName)
 					}
@@ -184,13 +184,13 @@ var downloadCmd = &cobra.Command{
 						"version": i.Version,
 						"signed":  i.Signed,
 					}).Info("Getting IPSW")
-					err = api.DownloadFile(i.URL, proxy, insecure)
+					err = api.DownloadFile(i.URL, i.SHA1, proxy, insecure)
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}
-					if ok, _ := utils.Verify(i.SHA1, destName); !ok {
-						return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
-					}
+					// if ok, _ := utils.Verify(i.SHA1, destName); !ok {
+					// 	return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
+					// }
 				} else {
 					log.Warnf("ipsw already exists: %s", destName)
 				}

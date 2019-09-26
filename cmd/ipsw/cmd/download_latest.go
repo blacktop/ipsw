@@ -119,14 +119,14 @@ var latestCmd = &cobra.Command{
 						"version": build.ProductVersion,
 					}).Info("Getting IPSW")
 					// download file
-					err = api.DownloadFile(build.FirmwareURL, proxy, insecure)
+					err = api.DownloadFile(build.FirmwareURL, build.FirmwareSHA1, proxy, insecure)
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}
 					// verify download
-					if ok, _ := utils.Verify(build.FirmwareSHA1, destName); !ok {
-						return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
-					}
+					// if ok, _ := utils.Verify(build.FirmwareSHA1, destName); !ok {
+					// 	return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
+					// }
 				} else {
 					log.Warnf("ipsw already exists: %s", destName)
 				}
