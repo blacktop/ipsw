@@ -25,6 +25,7 @@ package cmd
 
 import (
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -73,6 +74,8 @@ var listCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		sort.Sort(xcode.ByProductType{devices})
 
 		data := [][]string{}
 		for _, device := range devices {

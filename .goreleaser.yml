@@ -6,21 +6,21 @@ builds:
     goos:
       - windows
       - darwin
-      - linux
+      # - linux
     goarch:
       - amd64
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 
-archive:
-  format: tar.gz
-  format_overrides:
-    - goos: windows
-      format: zip
-  replacements:
-    amd64: amd64
-    darwin: macOS
-    linux: linux
-    windows: win
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    replacements:
+      amd64: amd64
+      darwin: macOS
+      linux: linux
+      windows: win
 
 brews:
   - github:
@@ -35,8 +35,8 @@ brews:
 checksum:
   name_template: "checksums.txt"
 
-sign:
-  artifacts: checksum
+signs:
+  - artifacts: checksum
 
 snapshot:
   name_template: "{{ .Tag }}-next"
