@@ -36,6 +36,15 @@ func (Device) TableName() string {
 	return "Devices"
 }
 
+type Devices []Device
+
+func (d Devices) Len() int      { return len(d) }
+func (d Devices) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
+
+type ByProductType struct{ Devices }
+
+func (s ByProductType) Less(i, j int) bool { return s.Devices[i].ProductType < s.Devices[j].ProductType }
+
 // DeviceTrait object
 type DeviceTrait struct {
 	DeviceTraitSetID             int    `gorm:"column:DeviceTraitSetID;primary_key" json:"-"`
