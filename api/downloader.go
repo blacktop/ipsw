@@ -89,6 +89,7 @@ func DownloadFile(url, sha1Hash, proxy string, insecure bool) error {
 
 	// create proxy reader
 	reader := bar.ProxyReader(resp.Body)
+	defer reader.Close()
 
 	tee := io.TeeReader(reader, dest)
 
