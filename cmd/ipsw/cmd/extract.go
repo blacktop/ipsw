@@ -31,9 +31,9 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/devicetree"
-	"github.com/blacktop/ipsw/dyld"
-	"github.com/blacktop/ipsw/kernelcache"
+	"github.com/blacktop/ipsw/pkg/devicetree"
+	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"howett.net/ranger"

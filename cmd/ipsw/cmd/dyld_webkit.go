@@ -28,7 +28,7 @@ import (
 	"github.com/apex/log"
 	"github.com/spf13/cobra"
 
-	"github.com/blacktop/ipsw/dyld"
+	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 // webkitCmd represents the webkit command

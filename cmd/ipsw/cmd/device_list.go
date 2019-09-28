@@ -29,7 +29,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/blacktop/ipsw/xcode"
+	"github.com/blacktop/ipsw/pkg/xcode"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
