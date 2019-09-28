@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/dyld"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

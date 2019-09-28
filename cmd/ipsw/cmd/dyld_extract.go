@@ -24,7 +24,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/dyld"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
 	"os"
 	"runtime"

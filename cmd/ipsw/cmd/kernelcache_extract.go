@@ -24,7 +24,7 @@ package cmd
 import (
 	"fmt"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/kernelcache"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 	"os"
 )

@@ -54,9 +54,9 @@ Flags:
 Use "ipsw [command] --help" for more information about a command.
 ```
 
-### `download` 
+### `download`
 
-#### Download an `ipsw` and extract/decompress the `kernelcache` 
+#### Download an `ipsw` and extract/decompress the `kernelcache`
 
 ``` bash
 $ ipsw download --device iPhone11,2 --build 16A366
@@ -64,7 +64,7 @@ $ ipsw download --device iPhone11,2 --build 16A366
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
       • verifying sha1sum...
-    
+
 $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 
    • Extracting Kernelcache from IPSW
@@ -81,7 +81,7 @@ $ file kernelcache.release.iphone11.decompressed
 kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 ```
 
-#### Download all the iOS 12.0 `ipsws` 
+#### Download all the iOS 12.0 `ipsws`
 
 ``` bash
 $ ipsw download --version 12.0
@@ -95,7 +95,7 @@ $ ipsw download --version 12.0
   ...
 ```
 
-#### Download all the LATEST `ipsws` 
+#### Download all the LATEST `ipsws`
 
 Queries iTunes XML for latest version _(maybe run this as a cron job)_ 😉
 
@@ -123,7 +123,7 @@ $ ipsw download -V latest --yes --white-list ipod
 
 #### Only download and decompress the kernelcaches _(which is CRAZY fast)_
 
-Single `kernelcache` 
+Single `kernelcache`
 
 ``` bash
 ipsw download kernel --device iPhone11,2 --build 16B92
@@ -174,17 +174,17 @@ To disable cert verification
 $ ipsw download --insecure --device iPhone11,2 --build 16B92
 ```
 
-### `extract` 
+### `extract`
 
-#### Extract `kernelcache` from a previously downloaded `ipsw` 
+#### Extract `kernelcache` from a previously downloaded `ipsw`
 
 ``` bash
 $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
-#### Extract `dyld_shared_cache` from a previously downloaded `ipsw` 
+#### Extract `dyld_shared_cache` from a previously downloaded `ipsw`
 
-* `macOS` 
+* `macOS`
 
 ``` bash
 $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
@@ -204,9 +204,9 @@ $ docker run --init -it --rm \
              blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
 ```
 
-### `webkit` 
+### `webkit`
 
-Extract WebKit version from `dyld_shared_cache` 
+Extract WebKit version from `dyld_shared_cache`
 
 ``` bash
 $ ipsw dyld webkit dyld_shared_cache
@@ -215,7 +215,7 @@ $ ipsw dyld webkit dyld_shared_cache
 
 ### `split` _(only on macOS)_ 🆕
 
-Split up a `dyld_shared_cache` 
+Split up a `dyld_shared_cache`
 
 ``` bash
 $ ipsw dyld split dyld_shared_cache
@@ -232,9 +232,9 @@ $ ipsw dyld split dyld_shared_cache
 1444/1445
 ```
 
-### `decompress` 
+### `decompress`
 
-Decompress a previously extracted `kernelcache` 
+Decompress a previously extracted `kernelcache`
 
 ``` bash
 $ ipsw kernel decompress kernelcache.release.iphone11
@@ -250,7 +250,7 @@ Then you could use `git diff` or something to get a quick **high** level view of
 $ ipsw kernel diff kernelcache.release.iphone11
 ```
 
-You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/kernelcache/diff/Library/Caches/com.apple.xbs/Sources)
+You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/pkg/kernelcache/diff/Library/Caches/com.apple.xbs/Sources)
 
 ## TODO
 

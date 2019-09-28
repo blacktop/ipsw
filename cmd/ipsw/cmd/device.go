@@ -29,7 +29,7 @@ import (
 	"io/ioutil"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/devicetree"
+	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
