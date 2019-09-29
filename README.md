@@ -14,11 +14,11 @@
 $ brew install blacktop/tap/ipsw
 ```
 
-### linux/windows
+### windows
 
 Download from [releases](https://github.com/blacktop/ipsw/releases/latest)
 
-### docker
+### linux/docker
 
 [![Docker Stars](https://img.shields.io/docker/stars/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Pulls](https://img.shields.io/docker/pulls/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Image](https://img.shields.io/badge/docker%20image-114MB-blue.svg)](https://hub.docker.com/r/blacktop/ipsw/)
 
