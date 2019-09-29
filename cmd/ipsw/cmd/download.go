@@ -1,24 +1,3 @@
-/*
-Copyright © 2019 blacktop
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-*/
 package cmd
 
 import (
@@ -156,14 +135,10 @@ var downloadCmd = &cobra.Command{
 							"signed":  i.Signed,
 						}).Info("Getting IPSW")
 						// download file
-						err = api.DownloadFile(url, i.SHA1, proxy, insecure)
+						err = api.NewDownload(url, i.SHA1, proxy, insecure).Do()
 						if err != nil {
 							return errors.Wrap(err, "failed to download file")
 						}
-						// verify download
-						// if ok, _ := utils.Verify(i.SHA1, destName); !ok {
-						// 	return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
-						// }
 					} else {
 						log.Warnf("ipsw already exists: %s", destName)
 					}
@@ -184,13 +159,10 @@ var downloadCmd = &cobra.Command{
 						"version": i.Version,
 						"signed":  i.Signed,
 					}).Info("Getting IPSW")
-					err = api.DownloadFile(i.URL, i.SHA1, proxy, insecure)
+					err = api.NewDownload(i.URL, i.SHA1, proxy, insecure).Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}
-					// if ok, _ := utils.Verify(i.SHA1, destName); !ok {
-					// 	return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName)
-					// }
 				} else {
 					log.Warnf("ipsw already exists: %s", destName)
 				}

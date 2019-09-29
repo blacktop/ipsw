@@ -6,6 +6,8 @@ require (
 	github.com/PuerkitoBio/goquery v1.5.0
 	github.com/apex/log v1.1.1
 	github.com/blacktop/lzss v0.1.0
+	github.com/blacktop/ranger v1.0.0
+	github.com/gofrs/flock v0.7.1
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
 	github.com/jinzhu/gorm v1.9.10
@@ -29,7 +31,6 @@ require (
 	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
-	howett.net/ranger v0.0.0-20171016084633-e2e137620847
 )
 
 go 1.13
