@@ -3,14 +3,15 @@ package api
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/apex/log"
-	"github.com/blacktop/ipsw/utils"
-	"github.com/hashicorp/go-version"
-	"github.com/pkg/errors"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"time"
+
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/utils"
+	"github.com/hashicorp/go-version"
+	"github.com/pkg/errors"
 )
 
 // Jailbreak object
@@ -35,7 +36,7 @@ type Jailbreaks struct {
 
 const canIJailbreakURL = "https://canijailbreak.com/jailbreaks.json"
 
-var researchers = []string{"Ian Beer", "Johnathan Levin", "Siguza", "Brandon Azad", "Luca Todesco"}
+var researchers = []string{"Ian Beer", "Johnathan Levin", "Siguza", "Brandon Azad", "Luca Todesco", "axi0mX", "xerub"}
 
 func init() {
 	rand.Seed(time.Now().Unix())
