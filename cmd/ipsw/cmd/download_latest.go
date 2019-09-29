@@ -38,7 +38,7 @@ import (
 func init() {
 	downloadCmd.AddCommand(latestCmd)
 
-	latestCmd.Flags().BoolP("yes", "y", false, "do not prompt user")
+	// latestCmd.Flags().BoolP("yes", "y", false, "do not prompt user")
 }
 
 // latestCmd represents the latest command

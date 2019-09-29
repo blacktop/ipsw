@@ -24,6 +24,7 @@ func init() {
 	// Filters
 	downloadCmd.PersistentFlags().StringArrayP("black-list", "", []string{viper.GetString("IPSW_DEVICE_BLACKLIST")}, "iOS device black list")
 	downloadCmd.PersistentFlags().StringArrayP("white-list", "", []string{viper.GetString("IPSW_DEVICE_WHITELIST")}, "iOS device white list")
+	downloadCmd.PersistentFlags().BoolP("yes", "y", false, "do not prompt user")
 	downloadCmd.PersistentFlags().StringP("version", "v", viper.GetString("IPSW_VERSION"), "iOS Version (i.e. 12.3.1)")
 	downloadCmd.PersistentFlags().StringP("device", "d", viper.GetString("IPSW_DEVICE"), "iOS Device (i.e. iPhone11,2)")
 	downloadCmd.PersistentFlags().StringP("build", "b", viper.GetString("IPSW_BUILD"), "iOS BuildID (i.e. 16F203)")
@@ -51,6 +52,7 @@ var downloadCmd = &cobra.Command{
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
+		skip, _ := cmd.Flags().GetBool("yes")
 
 		// filters
 		version, _ := cmd.Flags().GetString("version")
@@ -109,15 +111,16 @@ var downloadCmd = &cobra.Command{
 			}
 
 			cont := true
-			// if filtered to a single device skip the prompt
-			if len(device) == 0 {
-				cont = false
-				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(urls)),
+			if !skip {
+				// if filtered to a single device skip the prompt
+				if len(device) == 0 {
+					cont = false
+					prompt := &survey.Confirm{
+						Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(urls)),
+					}
+					survey.AskOne(prompt, &cont)
 				}
-				survey.AskOne(prompt, &cont)
 			}
-
 			if cont {
 				for _, url := range urls {
 					destName := strings.Replace(path.Base(url), ",", "_", -1)
