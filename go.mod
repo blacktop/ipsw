@@ -25,10 +25,10 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.3
 	github.com/spf13/viper v1.4.0
-	github.com/vbauerster/mpb/v4 v4.8.4
-	golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4 // indirect
+	github.com/vbauerster/mpb/v4 v4.9.4
+	golang.org/x/crypto v0.0.0-20190927123631-a832865fa7ad // indirect
 	golang.org/x/net v0.0.0-20190628185345-da137c7871d7 // indirect
-	golang.org/x/sys v0.0.0-20190712062909-fae7ac547cb7 // indirect
+	golang.org/x/sys v0.0.0-20190927073244-c990c680b611 // indirect
 	golang.org/x/text v0.3.2 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )
