@@ -174,7 +174,7 @@ func (d *Download) Do() error {
 		mpb.AppendDecorators(
 			decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048),
 			decor.Name(" ] "),
-			decor.OnComplete(decor.Spinner(nil), "✓"),
+			decor.OnComplete(decor.Spinner(nil), "✅"),
 			decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048), decor.WCSyncSpace),
 		),
 	)
@@ -221,7 +221,7 @@ func (d *Download) Do() error {
 			utils.Indent(log.WithFields(log.Fields{
 				"expected": d.Sha1,
 				"actual":   fmt.Sprintf("%x", h.Sum(nil)),
-			}).Error, 3)("BAD CHECKSUM")
+			}).Error, 3)("❌ BAD CHECKSUM")
 			if err := os.Remove(destName); err != nil {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 			}
