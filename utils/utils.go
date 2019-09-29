@@ -61,7 +61,6 @@ func Unique(s []string) []string {
 
 // Verify verifies the downloaded against it's hash
 func Verify(sha1sum, name string) (bool, error) {
-	Indent(log.Info, 1)("verifying sha1sum...")
 	f, err := os.Open(name)
 	if err != nil {
 		return false, err
@@ -73,11 +72,16 @@ func Verify(sha1sum, name string) (bool, error) {
 		return false, err
 	}
 
-	Indent(log.WithFields(log.Fields{
-		"api":  sha1sum,
-		"file": fmt.Sprintf("%x", h.Sum(nil)),
-	}).Debug, 1)("sha1 hashes")
-	return strings.EqualFold(sha1sum, fmt.Sprintf("%x", h.Sum(nil))), nil
+	match := strings.EqualFold(sha1sum, fmt.Sprintf("%x", h.Sum(nil)))
+
+	if !match {
+		Indent(log.WithFields(log.Fields{
+			"expected": sha1sum,
+			"actual":   fmt.Sprintf("%x", h.Sum(nil)),
+		}).Error, 3)("BAD CHECKSUM")
+	}
+
+	return match, nil
 }
 
 // Unzip - https://stackoverflow.com/a/24792688

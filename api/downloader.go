@@ -29,8 +29,10 @@ type Download struct {
 	URL  string
 	Sha1 string
 
-	size      int64
-	canResume bool
+	size         int64
+	bytesResumed int64
+	canResume    bool
+	resume       bool
 
 	client *http.Client
 }
@@ -99,23 +101,28 @@ func (d *Download) Do() error {
 	// check for a completed download
 	destName := strings.Replace(path.Base(d.URL), ",", "_", -1)
 	if _, err := os.Stat(destName); !os.IsNotExist(err) {
-		log.Warnf("ipsw already exists: %s", destName)
+		utils.Indent(log.Warn, 2)(fmt.Sprintf("ipsw already exists: %s", destName))
 		return nil
 	}
 
-	// check for a partial download
-	if _, err := os.Stat(destName); !os.IsNotExist(err) {
-		log.Warnf("ipsw already exists: %s", destName)
-		return nil
+	if d.canResume {
+		if f, err := os.Stat(destName + ".download"); !os.IsNotExist(err) {
+			d.resume = true
+			d.bytesResumed = f.Size()
+			rangeHeader := fmt.Sprintf("bytes=%d-", d.bytesResumed)
+			utils.Indent(log.WithField("range", rangeHeader).Debug, 2)("Setting Header")
+			req.Header.Add("Range", rangeHeader)
+		}
 	}
 
+	utils.Indent(log.WithField("file", destName).Debug, 2)("Downloading")
 	resp, err := d.client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusPartialContent {
 		return fmt.Errorf("server return status: %s", resp.Status)
 	}
 
@@ -132,18 +139,29 @@ func (d *Download) Do() error {
 		return nil
 	}
 
-	dest, err := os.Create(destName + ".download")
-	if err != nil {
-		return errors.Wrapf(err, "cannot create %s", destName)
+	var dest *os.File
+	if d.resume {
+		utils.Indent(log.WithField("file", destName).Warn, 2)("Resuming a previous download")
+		dest, err = os.OpenFile(destName+".download", os.O_APPEND|os.O_WRONLY, 0644)
+		if err != nil {
+			return errors.Wrapf(err, "cannot create %s", destName)
+		}
+		defer dest.Close()
+		dest.Seek(0, os.SEEK_END)
+	} else {
+		dest, err = os.Create(destName + ".download")
+		if err != nil {
+			return errors.Wrapf(err, "cannot create %s", destName)
+		}
+		defer dest.Close()
 	}
-	defer dest.Close()
 
 	p := mpb.New(
 		mpb.WithWidth(60),
 		mpb.WithRefreshRate(180*time.Millisecond),
 	)
 
-	bar := p.AddBar(d.size, mpb.BarStyle("[=>-|"),
+	bar := p.AddBar(d.size-d.bytesResumed, mpb.BarStyle("[=>-|"),
 		mpb.PrependDecorators(
 			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),
@@ -154,26 +172,49 @@ func (d *Download) Do() error {
 		),
 	)
 
+	// if d.resume {
+	// 	bar.SetCurrent(d.bytesResumed)
+	// }
+
 	// create proxy reader
 	reader := bar.ProxyReader(resp.Body)
 	defer reader.Close()
 
-	tee := io.TeeReader(reader, dest)
+	if d.resume {
+		if _, err := io.Copy(dest, reader); err != nil {
+			return err
+		}
 
-	h := sha1.New()
-	if _, err := io.Copy(h, tee); err != nil {
-		return err
-	}
+		p.Wait()
 
-	p.Wait()
+		if ok, _ := utils.Verify(d.Sha1, destName+".download"); !ok {
+			if err := os.Remove(destName + ".download"); err != nil {
+				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+			}
+			return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName+".download")
+		}
 
-	utils.Indent(log.Info, 1)("verifying sha1sum...")
-	checksum, _ := hex.DecodeString(d.Sha1)
+	} else {
+		tee := io.TeeReader(reader, dest)
 
-	if !bytes.Equal(h.Sum(nil), checksum) {
-		log.Error("BAD CHECKSUM")
-		if err := os.Remove(destName); err != nil {
-			return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+		h := sha1.New()
+		if _, err := io.Copy(h, tee); err != nil {
+			return err
+		}
+
+		p.Wait()
+
+		utils.Indent(log.Info, 2)("verifying sha1sum...")
+		checksum, _ := hex.DecodeString(d.Sha1)
+
+		if !bytes.Equal(h.Sum(nil), checksum) {
+			utils.Indent(log.WithFields(log.Fields{
+				"expected": d.Sha1,
+				"actual":   fmt.Sprintf("%x", h.Sum(nil)),
+			}).Error, 3)("BAD CHECKSUM")
+			if err := os.Remove(destName); err != nil {
+				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+			}
 		}
 	}
 

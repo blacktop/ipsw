@@ -92,7 +92,9 @@
         "-V",
         "download",
         "--version",
-        "10.3.4"
+        "13.1.1",
+        "--device",
+        "iPhone11,2"
       ],
       // "args": ["-V", "itunes", "--build", "16F156"],
       "showLog": false
