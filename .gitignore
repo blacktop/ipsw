@@ -27,3 +27,4 @@ usr
 *.bndb
 .vscode/settings.json
 xcode/data
+*.download
