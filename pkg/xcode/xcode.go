@@ -1,20 +1,13 @@
-//go:generate statik -src=./data
-// +build linux,!cgo windows,!cgo darwin,cgo
+//go:generate statik -src=./data -dest=../..
 
 package xcode
 
 import (
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 
 	// importing statik data
 	_ "github.com/blacktop/ipsw/statik"
-	"github.com/jinzhu/gorm"
-
-	// importing the sqlite dialects
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/pkg/errors"
 	"github.com/rakyll/statik/fs"
 )
 
@@ -63,27 +56,6 @@ type DeviceTrait struct {
 // TableName returns the table name for the DeviceTrait object
 func (DeviceTrait) TableName() string {
 	return "DeviceTraits"
-}
-
-// ReadDeviceTraitsDB parse the XCode device_traits.db
-func ReadDeviceTraitsDB() ([]Device, error) {
-	var allDevices []Device
-
-	for _, osType := range []string{"iPhoneOS", "AppleTVOS", "WatchOS"} {
-		dbFile := fmt.Sprintf("/Applications/Xcode.app/Contents/Developer/Platforms/%s.platform/usr/standalone/device_traits.db", osType)
-		db, err := gorm.Open("sqlite3", dbFile)
-		if err != nil {
-			return nil, errors.Wrapf(err, "unable to open database: %s", dbFile)
-		}
-		defer db.Close()
-
-		var devices []Device
-		db.Preload("DeviceTrait").Find(&devices)
-
-		allDevices = append(allDevices, devices...)
-	}
-
-	return allDevices, nil
 }
 
 // WriteToJSON writes the data to JSON

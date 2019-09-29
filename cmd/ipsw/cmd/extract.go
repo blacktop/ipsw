@@ -23,9 +23,11 @@ package cmd
 
 import (
 	"archive/zip"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -34,9 +36,9 @@ import (
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"howett.net/ranger"
 )
 
 var (
@@ -48,6 +50,9 @@ var (
 
 func init() {
 	rootCmd.AddCommand(extractCmd)
+
+	extractCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	extractCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 
 	extractCmd.Flags().BoolVarP(&remote, "remote", "r", false, "Extract from URL")
 	extractCmd.Flags().BoolVarP(&kernelFlag, "kernel", "k", false, "Extract kernelcache")
@@ -72,6 +77,9 @@ var extractCmd = &cobra.Command{
 		}
 
 		if remote {
+			proxy, _ := cmd.Flags().GetString("proxy")
+			insecure, _ := cmd.Flags().GetBool("insecure")
+
 			if !isURL(args[0]) {
 				log.Fatal("must supply valid URL when using the remote flag")
 			}
@@ -92,7 +100,15 @@ var extractCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to parse url")
 				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+				reader, err := ranger.NewReader(&ranger.HTTPRanger{
+					URL: url,
+					Client: &http.Client{
+						Transport: &http.Transport{
+							Proxy:           getProxy(proxy),
+							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+						},
+					},
+				})
 				if err != nil {
 					return errors.Wrap(err, "failed to create ranger reader")
 				}

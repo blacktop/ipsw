@@ -112,7 +112,9 @@
         "download",
         "kernel",
         "--version",
-        "12.4"
+        "13.1.1",
+        "--device",
+        "iPhone11,2"
       ],
       // "args": ["-V", "itunes", "--build", "16F156"],
       "showLog": false

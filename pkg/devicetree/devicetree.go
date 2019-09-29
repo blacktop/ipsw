@@ -19,8 +19,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
-	"howett.net/ranger"
 )
 
 // Img4 DeviceTree object
@@ -258,6 +258,15 @@ func RemoteParse(u string) (map[string]*DeviceTree, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse url")
 	}
+	// reader, err := ranger.NewReader(&ranger.HTTPRanger{
+	// 	URL: url,
+	// 	Client: &http.Client{
+	// 		Transport: &http.Transport{
+	// 			Proxy:           getProxy(proxy),
+	// 			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+	// 		},
+	// 	},
+	// })
 	reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ranger reader")

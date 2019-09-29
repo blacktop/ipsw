@@ -23,8 +23,10 @@ package cmd
 
 import (
 	"archive/zip"
+	"crypto/tls"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 	"path"
@@ -34,13 +36,24 @@ import (
 	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"howett.net/ranger"
 )
 
 func init() {
 	downloadCmd.AddCommand(downloadKernelCmd)
+}
+
+func getProxy(proxy string) func(*http.Request) (*url.URL, error) {
+	if len(proxy) > 0 {
+		proxyURL, err := url.Parse(proxy)
+		if err != nil {
+			log.WithError(err).Error("bad proxy url")
+		}
+		return http.ProxyURL(proxyURL)
+	}
+	return http.ProxyFromEnvironment
 }
 
 // downloadKernelCmd represents the downloadKernel command
@@ -53,9 +66,8 @@ var downloadKernelCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// TODO: add this back in
-		// proxy, _ := cmd.Flags().GetString("proxy")
-		// insecure, _ := cmd.Flags().GetBool("insecure")
+		proxy, _ := cmd.Flags().GetString("proxy")
+		insecure, _ := cmd.Flags().GetBool("insecure")
 
 		// filters
 		doDownload, _ := cmd.Flags().GetStringSlice("white-list")
@@ -131,7 +143,15 @@ var downloadKernelCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to parse url")
 				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+				reader, err := ranger.NewReader(&ranger.HTTPRanger{
+					URL: url,
+					Client: &http.Client{
+						Transport: &http.Transport{
+							Proxy:           getProxy(proxy),
+							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+						},
+					},
+				})
 				if err != nil {
 					return errors.Wrap(err, "failed to create ranger reader")
 				}
@@ -183,7 +203,15 @@ var downloadKernelCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to parse url")
 				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+				reader, err := ranger.NewReader(&ranger.HTTPRanger{
+					URL: url,
+					Client: &http.Client{
+						Transport: &http.Transport{
+							Proxy:           getProxy(proxy),
+							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+						},
+					},
+				})
 				if err != nil {
 					return errors.Wrap(err, "failed to create ranger reader")
 				}
