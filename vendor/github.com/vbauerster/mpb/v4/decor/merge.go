@@ -5,13 +5,14 @@ import (
 	"unicode/utf8"
 )
 
-// Merge helper func, provides a way to synchronize width of single
-// decorator with adjacent decorators of different bar, like so:
-//   +--------+---------+
-//   |     MERGE(D)     |
-//   +--------+---------+
-//   |   D1   |   D2    |
-//   +--------+---------+
+// Merge wraps its decorator argument with intention to sync width
+// with several decorators of another bar. Visual example:
+//
+//    +----+--------+---------+--------+
+//    | B1 |      MERGE(D, P1, Pn)     |
+//    +----+--------+---------+--------+
+//    | B2 |   D0   |   D1    |   Dn   |
+//    +----+--------+---------+--------+
 //
 func Merge(decorator Decorator, placeholders ...WC) Decorator {
 	if _, ok := decorator.Sync(); !ok || len(placeholders) == 0 {
@@ -38,7 +39,7 @@ type mergeDecorator struct {
 	placeHolders []*placeHolderDecorator
 }
 
-func (d *mergeDecorator) CompoundDecorators() []Decorator {
+func (d *mergeDecorator) MergeUnwrap() []Decorator {
 	decorators := make([]Decorator, len(d.placeHolders)+1)
 	decorators[0] = d.Decorator
 	for i, ph := range d.placeHolders {
@@ -47,8 +48,8 @@ func (d *mergeDecorator) CompoundDecorators() []Decorator {
 	return decorators
 }
 
-func (md *mergeDecorator) Sync() (chan int, bool) {
-	return md.wc.Sync()
+func (d *mergeDecorator) Sync() (chan int, bool) {
+	return d.wc.Sync()
 }
 
 func (d *mergeDecorator) Decor(st *Statistics) string {

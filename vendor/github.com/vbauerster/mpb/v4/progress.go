@@ -1,6 +1,7 @@
 package mpb
 
 import (
+	"bytes"
 	"container/heap"
 	"context"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/vbauerster/mpb/v4/cwriter"
+	"github.com/vbauerster/mpb/v4/decor"
 )
 
 const (
@@ -64,7 +66,6 @@ func New(options ...ContainerOption) *Progress {
 // context. It's not possible to reuse instance after *Progress.Wait()
 // method has been called.
 func NewWithContext(ctx context.Context, options ...ContainerOption) *Progress {
-
 	s := &pState{
 		bHeap:      priorityQueue{},
 		width:      pwidth,
@@ -90,6 +91,7 @@ func NewWithContext(ctx context.Context, options ...ContainerOption) *Progress {
 		done:         make(chan struct{}),
 		dlogger:      log.New(s.debugOut, "[mpb] ", log.Lshortfile),
 	}
+
 	p.cwg.Add(1)
 	go p.serve(s, cwriter.New(s.output))
 	return p
@@ -97,41 +99,25 @@ func NewWithContext(ctx context.Context, options ...ContainerOption) *Progress {
 
 // AddBar creates a new progress bar and adds to the container.
 func (p *Progress) AddBar(total int64, options ...BarOption) *Bar {
-	return p.Add(total, newDefaultBarFiller(), options...)
+	return p.Add(total, NewBarFiller(), options...)
 }
 
 // AddSpinner creates a new spinner bar and adds to the container.
 func (p *Progress) AddSpinner(total int64, alignment SpinnerAlignment, options ...BarOption) *Bar {
-	filler := &spinnerFiller{
-		frames:    defaultSpinnerStyle,
-		alignment: alignment,
-	}
-	return p.Add(total, filler, options...)
+	return p.Add(total, NewSpinnerFiller(alignment), options...)
 }
 
 // Add creates a bar which renders itself by provided filler.
 // Set total to 0, if you plan to update it later.
 func (p *Progress) Add(total int64, filler Filler, options ...BarOption) *Bar {
 	if filler == nil {
-		filler = newDefaultBarFiller()
+		filler = NewBarFiller()
 	}
 	p.bwg.Add(1)
 	result := make(chan *Bar)
 	select {
 	case p.operateState <- func(ps *pState) {
-		bs := &bState{
-			total:    total,
-			filler:   filler,
-			priority: ps.idCount,
-			id:       ps.idCount,
-			width:    ps.width,
-			debugOut: ps.debugOut,
-		}
-		for _, opt := range options {
-			if opt != nil {
-				opt(bs)
-			}
-		}
+		bs := ps.makeBarState(total, filler, options...)
 		bar := newBar(p, bs)
 		if bs.runningBar != nil {
 			bs.runningBar.noPop = true
@@ -143,7 +129,9 @@ func (p *Progress) Add(total int64, filler Filler, options ...BarOption) *Bar {
 		ps.idCount++
 		result <- bar
 	}:
-		return <-result
+		bar := <-result
+		bar.subscribeDecorators()
+		return bar
 	case <-p.done:
 		p.bwg.Done()
 		return nil
@@ -339,6 +327,32 @@ func (s *pState) updateSyncMatrix() {
 			s.aMatrix[i] = append(s.aMatrix[i], ch)
 		}
 	}
+}
+
+func (s *pState) makeBarState(total int64, filler Filler, options ...BarOption) *bState {
+	bs := &bState{
+		total:    total,
+		filler:   filler,
+		priority: s.idCount,
+		id:       s.idCount,
+		width:    s.width,
+		debugOut: s.debugOut,
+		extender: func(r io.Reader, _ int, _ *decor.Statistics) (io.Reader, int) {
+			return r, 0
+		},
+	}
+
+	for _, opt := range options {
+		if opt != nil {
+			opt(bs)
+		}
+	}
+
+	bs.bufP = bytes.NewBuffer(make([]byte, 0, bs.width))
+	bs.bufB = bytes.NewBuffer(make([]byte, 0, bs.width))
+	bs.bufA = bytes.NewBuffer(make([]byte, 0, bs.width))
+
+	return bs
 }
 
 func syncWidth(matrix map[int][]chan int) {

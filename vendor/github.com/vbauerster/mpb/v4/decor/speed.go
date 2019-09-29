@@ -4,137 +4,32 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/VividCortex/ewma"
 )
 
-type SpeedKiB float64
-
-func (s SpeedKiB) Format(st fmt.State, verb rune) {
-	prec, ok := st.Precision()
-
-	if verb == 'd' || !ok {
-		prec = 0
-	}
-	if verb == 'f' && !ok {
-		prec = 6
-	}
-	// retain old beahavior if s verb used
-	if verb == 's' {
-		prec = 1
-	}
-
-	var res, unit string
-	switch {
-	case s >= TiB:
-		unit = "TiB/s"
-		res = strconv.FormatFloat(float64(s)/TiB, 'f', prec, 64)
-	case s >= GiB:
-		unit = "GiB/s"
-		res = strconv.FormatFloat(float64(s)/GiB, 'f', prec, 64)
-	case s >= MiB:
-		unit = "MiB/s"
-		res = strconv.FormatFloat(float64(s)/MiB, 'f', prec, 64)
-	case s >= KiB:
-		unit = "KiB/s"
-		res = strconv.FormatFloat(float64(s)/KiB, 'f', prec, 64)
-	default:
-		unit = "b/s"
-		res = strconv.FormatInt(int64(s), 10)
-	}
-
-	if st.Flag(' ') {
-		res += " "
-	}
-	res += unit
-
-	if w, ok := st.Width(); ok {
-		if len(res) < w {
-			pad := strings.Repeat(" ", w-len(res))
-			if st.Flag(int('-')) {
-				res += pad
-			} else {
-				res = pad + res
-			}
-		}
-	}
-
-	io.WriteString(st, res)
+type speedType struct {
+	fmt.Formatter
 }
 
-type SpeedKB float64
-
-func (s SpeedKB) Format(st fmt.State, verb rune) {
-	prec, ok := st.Precision()
-
-	if verb == 'd' || !ok {
-		prec = 0
-	}
-	if verb == 'f' && !ok {
-		prec = 6
-	}
-	// retain old beahavior if s verb used
-	if verb == 's' {
-		prec = 1
-	}
-
-	var res, unit string
-	switch {
-	case s >= TB:
-		unit = "TB/s"
-		res = strconv.FormatFloat(float64(s)/TB, 'f', prec, 64)
-	case s >= GB:
-		unit = "GB/s"
-		res = strconv.FormatFloat(float64(s)/GB, 'f', prec, 64)
-	case s >= MB:
-		unit = "MB/s"
-		res = strconv.FormatFloat(float64(s)/MB, 'f', prec, 64)
-	case s >= KB:
-		unit = "kB/s"
-		res = strconv.FormatFloat(float64(s)/KB, 'f', prec, 64)
-	default:
-		unit = "b/s"
-		res = strconv.FormatInt(int64(s), 10)
-	}
-
-	if st.Flag(' ') {
-		res += " "
-	}
-	res += unit
-
-	if w, ok := st.Width(); ok {
-		if len(res) < w {
-			pad := strings.Repeat(" ", w-len(res))
-			if st.Flag(int('-')) {
-				res += pad
-			} else {
-				res = pad + res
-			}
-		}
-	}
-
-	io.WriteString(st, res)
+func (self *speedType) Format(st fmt.State, verb rune) {
+	self.Formatter.Format(st, verb)
+	io.WriteString(st, "/s")
 }
 
-// EwmaSpeed exponential-weighted-moving-average based speed decorator,
-// with dynamic unit measure adjustment.
-//
-//	`unit` one of [0|UnitKiB|UnitKB] zero for no unit
-//
-//	`unitFormat` printf compatible verb for value, like "%f" or "%d"
-//
-//	`age` ewma age
-//
-//	`wcc` optional WC config
-//
-// unitFormat example if UnitKiB is chosen:
-//
-//	"%.1f" = "1.0MiB/s" or "% .1f" = "1.0 MiB/s"
-func EwmaSpeed(unit int, unitFormat string, age float64, wcc ...WC) Decorator {
-	return MovingAverageSpeed(unit, unitFormat, ewma.NewMovingAverage(age), wcc...)
+// EwmaSpeed exponential-weighted-moving-average based speed decorator.
+// Note that it's necessary to supply bar.Incr* methods with incremental
+// work duration as second argument, in order for this decorator to
+// work correctly. This decorator is a wrapper of MovingAverageSpeed.
+func EwmaSpeed(unit int, format string, age float64, wcc ...WC) Decorator {
+	var average MovingAverage
+	if age == 0 {
+		average = ewma.NewMovingAverage()
+	} else {
+		average = ewma.NewMovingAverage(age)
+	}
+	return MovingAverageSpeed(unit, format, average, wcc...)
 }
 
 // MovingAverageSpeed decorator relies on MovingAverage implementation
@@ -142,30 +37,39 @@ func EwmaSpeed(unit int, unitFormat string, age float64, wcc ...WC) Decorator {
 //
 //	`unit` one of [0|UnitKiB|UnitKB] zero for no unit
 //
-//	`unitFormat` printf compatible verb for value, like "%f" or "%d"
+//	`format` printf compatible verb for value, like "%f" or "%d"
 //
 //	`average` MovingAverage implementation
 //
 //	`wcc` optional WC config
-func MovingAverageSpeed(unit int, unitFormat string, average MovingAverage, wcc ...WC) Decorator {
+//
+// format examples:
+//
+//	unit=UnitKiB, format="%.1f"  output: "1.0MiB/s"
+//	unit=UnitKiB, format="% .1f" output: "1.0 MiB/s"
+//	unit=UnitKB,  format="%.1f"  output: "1.0MB/s"
+//	unit=UnitKB,  format="% .1f" output: "1.0 MB/s"
+//
+func MovingAverageSpeed(unit int, format string, average MovingAverage, wcc ...WC) Decorator {
 	var wc WC
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
+	if format == "" {
+		format = "%.0f"
+	}
 	wc.Init()
 	d := &movingAverageSpeed{
-		WC:         wc,
-		unit:       unit,
-		unitFormat: unitFormat,
-		average:    average,
+		WC:       wc,
+		average:  average,
+		producer: chooseSpeedProducer(unit, format),
 	}
 	return d
 }
 
 type movingAverageSpeed struct {
 	WC
-	unit        int
-	unitFormat  string
+	producer    func(float64) string
 	average     ewma.MovingAverage
 	msg         string
 	completeMsg *string
@@ -179,16 +83,12 @@ func (d *movingAverageSpeed) Decor(st *Statistics) string {
 		return d.FormatMsg(d.msg)
 	}
 
-	speed := d.average.Value()
-	switch d.unit {
-	case UnitKiB:
-		d.msg = fmt.Sprintf(d.unitFormat, SpeedKiB(speed))
-	case UnitKB:
-		d.msg = fmt.Sprintf(d.unitFormat, SpeedKB(speed))
-	default:
-		d.msg = fmt.Sprintf(d.unitFormat, speed)
+	var speed float64
+	if v := math.Round(d.average.Value()); v != 0 {
+		speed = 1 / time.Duration(v).Seconds()
 	}
 
+	d.msg = d.producer(speed)
 	return d.FormatMsg(d.msg)
 }
 
@@ -197,48 +97,62 @@ func (d *movingAverageSpeed) NextAmount(n int64, wdd ...time.Duration) {
 	for _, wd := range wdd {
 		workDuration = wd
 	}
-	speed := float64(n) / workDuration.Seconds() / 1000
-	if math.IsInf(speed, 0) || math.IsNaN(speed) {
+	durPerByte := float64(workDuration) / float64(n)
+	if math.IsInf(durPerByte, 0) || math.IsNaN(durPerByte) {
 		return
 	}
-	d.average.Add(speed)
+	d.average.Add(durPerByte)
 }
 
 func (d *movingAverageSpeed) OnCompleteMessage(msg string) {
 	d.completeMsg = &msg
 }
 
-// AverageSpeed decorator with dynamic unit measure adjustment.
+// AverageSpeed decorator with dynamic unit measure adjustment. It's
+// a wrapper of NewAverageSpeed.
+func AverageSpeed(unit int, format string, wcc ...WC) Decorator {
+	return NewAverageSpeed(unit, format, time.Now(), wcc...)
+}
+
+// NewAverageSpeed decorator with dynamic unit measure adjustment and
+// user provided start time.
 //
 //	`unit` one of [0|UnitKiB|UnitKB] zero for no unit
 //
-//	`unitFormat` printf compatible verb for value, like "%f" or "%d"
+//	`format` printf compatible verb for value, like "%f" or "%d"
+//
+//	`startTime` start time
 //
 //	`wcc` optional WC config
 //
-// unitFormat example if UnitKiB is chosen:
+// format examples:
 //
-//	"%.1f" = "1.0MiB/s" or "% .1f" = "1.0 MiB/s"
-func AverageSpeed(unit int, unitFormat string, wcc ...WC) Decorator {
+//	unit=UnitKiB, format="%.1f"  output: "1.0MiB/s"
+//	unit=UnitKiB, format="% .1f" output: "1.0 MiB/s"
+//	unit=UnitKB,  format="%.1f"  output: "1.0MB/s"
+//	unit=UnitKB,  format="% .1f" output: "1.0 MB/s"
+//
+func NewAverageSpeed(unit int, format string, startTime time.Time, wcc ...WC) Decorator {
 	var wc WC
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
+	if format == "" {
+		format = "%.0f"
+	}
 	wc.Init()
 	d := &averageSpeed{
-		WC:         wc,
-		unit:       unit,
-		unitFormat: unitFormat,
-		startTime:  time.Now(),
+		WC:        wc,
+		startTime: startTime,
+		producer:  chooseSpeedProducer(unit, format),
 	}
 	return d
 }
 
 type averageSpeed struct {
 	WC
-	unit        int
-	unitFormat  string
 	startTime   time.Time
+	producer    func(float64) string
 	msg         string
 	completeMsg *string
 }
@@ -251,21 +165,33 @@ func (d *averageSpeed) Decor(st *Statistics) string {
 		return d.FormatMsg(d.msg)
 	}
 
-	timeElapsed := time.Since(d.startTime)
-	speed := float64(st.Current) / timeElapsed.Seconds()
-
-	switch d.unit {
-	case UnitKiB:
-		d.msg = fmt.Sprintf(d.unitFormat, SpeedKiB(speed))
-	case UnitKB:
-		d.msg = fmt.Sprintf(d.unitFormat, SpeedKB(speed))
-	default:
-		d.msg = fmt.Sprintf(d.unitFormat, speed)
-	}
+	speed := float64(st.Current) / time.Since(d.startTime).Seconds()
+	d.msg = d.producer(speed)
 
 	return d.FormatMsg(d.msg)
 }
 
 func (d *averageSpeed) OnCompleteMessage(msg string) {
 	d.completeMsg = &msg
+}
+
+func (d *averageSpeed) AverageAdjust(startTime time.Time) {
+	d.startTime = startTime
+}
+
+func chooseSpeedProducer(unit int, format string) func(float64) string {
+	switch unit {
+	case UnitKiB:
+		return func(speed float64) string {
+			return fmt.Sprintf(format, &speedType{SizeB1024(math.Round(speed))})
+		}
+	case UnitKB:
+		return func(speed float64) string {
+			return fmt.Sprintf(format, &speedType{SizeB1000(math.Round(speed))})
+		}
+	default:
+		return func(speed float64) string {
+			return fmt.Sprintf(format, speed)
+		}
+	}
 }

@@ -1,14 +1,5 @@
 package decor
 
-// StaticName returns name decorator.
-//
-//	`name` string to display
-//
-//	`wcc` optional WC config
-func StaticName(name string, wcc ...WC) Decorator {
-	return Name(name, wcc...)
-}
-
 // Name returns name decorator.
 //
 //	`name` string to display

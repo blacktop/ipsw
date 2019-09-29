@@ -8,8 +8,8 @@ import (
 	"github.com/VividCortex/ewma"
 )
 
-// TimeNormalizer interface
-// Implementors meant to normalize ETA.
+// TimeNormalizer interface. Implementors could be passed into
+// MovingAverageETA, in order to affect i.e. normalize its output.
 type TimeNormalizer interface {
 	Normalize(time.Duration) time.Duration
 }
@@ -23,21 +23,24 @@ func (f TimeNormalizerFunc) Normalize(src time.Duration) time.Duration {
 }
 
 // EwmaETA exponential-weighted-moving-average based ETA decorator.
-//
-//	`style` one of [ET_STYLE_GO|ET_STYLE_HHMMSS|ET_STYLE_HHMM|ET_STYLE_MMSS]
-//
-//	`age` ewma age
-//
-//	`wcc` optional WC config
+// Note that it's necessary to supply bar.Incr* methods with incremental
+// work duration as second argument, in order for this decorator to
+// work correctly. This decorator is a wrapper of MovingAverageETA.
 func EwmaETA(style TimeStyle, age float64, wcc ...WC) Decorator {
-	return MovingAverageETA(style, ewma.NewMovingAverage(age), nil, wcc...)
+	var average MovingAverage
+	if age == 0 {
+		average = ewma.NewMovingAverage()
+	} else {
+		average = ewma.NewMovingAverage(age)
+	}
+	return MovingAverageETA(style, average, nil, wcc...)
 }
 
 // MovingAverageETA decorator relies on MovingAverage implementation to calculate its average.
 //
 //	`style` one of [ET_STYLE_GO|ET_STYLE_HHMMSS|ET_STYLE_HHMM|ET_STYLE_MMSS]
 //
-//	`average` available implementations of MovingAverage [ewma.MovingAverage|NewMedian|NewMedianEwma]
+//	`average` implementation of MovingAverage interface
 //
 //	`normalizer` available implementations are [FixedIntervalTimeNormalizer|MaxTolerateTimeNormalizer]
 //
@@ -50,19 +53,19 @@ func MovingAverageETA(style TimeStyle, average MovingAverage, normalizer TimeNor
 	wc.Init()
 	d := &movingAverageETA{
 		WC:         wc,
-		style:      style,
 		average:    average,
 		normalizer: normalizer,
+		producer:   chooseTimeProducer(style),
 	}
 	return d
 }
 
 type movingAverageETA struct {
 	WC
-	style       TimeStyle
 	average     ewma.MovingAverage
-	completeMsg *string
 	normalizer  TimeNormalizer
+	producer    func(time.Duration) string
+	completeMsg *string
 }
 
 func (d *movingAverageETA) Decor(st *Statistics) string {
@@ -75,27 +78,7 @@ func (d *movingAverageETA) Decor(st *Statistics) string {
 	if d.normalizer != nil {
 		remaining = d.normalizer.Normalize(remaining)
 	}
-	hours := int64((remaining / time.Hour) % 60)
-	minutes := int64((remaining / time.Minute) % 60)
-	seconds := int64((remaining / time.Second) % 60)
-
-	var str string
-	switch d.style {
-	case ET_STYLE_GO:
-		str = fmt.Sprint(time.Duration(remaining.Seconds()) * time.Second)
-	case ET_STYLE_HHMMSS:
-		str = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-	case ET_STYLE_HHMM:
-		str = fmt.Sprintf("%02d:%02d", hours, minutes)
-	case ET_STYLE_MMSS:
-		if hours > 0 {
-			str = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-		} else {
-			str = fmt.Sprintf("%02d:%02d", minutes, seconds)
-		}
-	}
-
-	return d.FormatMsg(str)
+	return d.FormatMsg(d.producer(remaining))
 }
 
 func (d *movingAverageETA) NextAmount(n int64, wdd ...time.Duration) {
@@ -103,40 +86,55 @@ func (d *movingAverageETA) NextAmount(n int64, wdd ...time.Duration) {
 	for _, wd := range wdd {
 		workDuration = wd
 	}
-	lastItemEstimate := float64(workDuration) / float64(n)
-	if math.IsInf(lastItemEstimate, 0) || math.IsNaN(lastItemEstimate) {
+	durPerItem := float64(workDuration) / float64(n)
+	if math.IsInf(durPerItem, 0) || math.IsNaN(durPerItem) {
 		return
 	}
-	d.average.Add(lastItemEstimate)
+	d.average.Add(durPerItem)
 }
 
 func (d *movingAverageETA) OnCompleteMessage(msg string) {
 	d.completeMsg = &msg
 }
 
-// AverageETA decorator.
+// AverageETA decorator. It's wrapper of NewAverageETA.
 //
 //	`style` one of [ET_STYLE_GO|ET_STYLE_HHMMSS|ET_STYLE_HHMM|ET_STYLE_MMSS]
 //
 //	`wcc` optional WC config
 func AverageETA(style TimeStyle, wcc ...WC) Decorator {
+	return NewAverageETA(style, time.Now(), nil, wcc...)
+}
+
+// NewAverageETA decorator with user provided start time.
+//
+//	`style` one of [ET_STYLE_GO|ET_STYLE_HHMMSS|ET_STYLE_HHMM|ET_STYLE_MMSS]
+//
+//	`startTime` start time
+//
+//	`normalizer` available implementations are [FixedIntervalTimeNormalizer|MaxTolerateTimeNormalizer]
+//
+//	`wcc` optional WC config
+func NewAverageETA(style TimeStyle, startTime time.Time, normalizer TimeNormalizer, wcc ...WC) Decorator {
 	var wc WC
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
 	wc.Init()
 	d := &averageETA{
-		WC:        wc,
-		style:     style,
-		startTime: time.Now(),
+		WC:         wc,
+		startTime:  startTime,
+		normalizer: normalizer,
+		producer:   chooseTimeProducer(style),
 	}
 	return d
 }
 
 type averageETA struct {
 	WC
-	style       TimeStyle
 	startTime   time.Time
+	normalizer  TimeNormalizer
+	producer    func(time.Duration) string
 	completeMsg *string
 }
 
@@ -145,44 +143,32 @@ func (d *averageETA) Decor(st *Statistics) string {
 		return d.FormatMsg(*d.completeMsg)
 	}
 
-	var str string
-	timeElapsed := time.Since(d.startTime)
-	v := math.Round(float64(timeElapsed) / float64(st.Current))
-	if math.IsInf(v, 0) || math.IsNaN(v) {
-		v = 0
-	}
-	remaining := time.Duration((st.Total - st.Current) * int64(v))
-	hours := int64((remaining / time.Hour) % 60)
-	minutes := int64((remaining / time.Minute) % 60)
-	seconds := int64((remaining / time.Second) % 60)
-
-	switch d.style {
-	case ET_STYLE_GO:
-		str = fmt.Sprint(time.Duration(remaining.Seconds()) * time.Second)
-	case ET_STYLE_HHMMSS:
-		str = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-	case ET_STYLE_HHMM:
-		str = fmt.Sprintf("%02d:%02d", hours, minutes)
-	case ET_STYLE_MMSS:
-		if hours > 0 {
-			str = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
-		} else {
-			str = fmt.Sprintf("%02d:%02d", minutes, seconds)
+	var remaining time.Duration
+	if st.Current != 0 {
+		durPerItem := float64(time.Since(d.startTime)) / float64(st.Current)
+		durPerItem = math.Round(durPerItem)
+		remaining = time.Duration((st.Total - st.Current) * int64(durPerItem))
+		if d.normalizer != nil {
+			remaining = d.normalizer.Normalize(remaining)
 		}
 	}
-
-	return d.FormatMsg(str)
+	return d.FormatMsg(d.producer(remaining))
 }
 
 func (d *averageETA) OnCompleteMessage(msg string) {
 	d.completeMsg = &msg
 }
 
+func (d *averageETA) AverageAdjust(startTime time.Time) {
+	d.startTime = startTime
+}
+
+// MaxTolerateTimeNormalizer returns implementation of TimeNormalizer.
 func MaxTolerateTimeNormalizer(maxTolerate time.Duration) TimeNormalizer {
 	var normalized time.Duration
 	var lastCall time.Time
 	return TimeNormalizerFunc(func(remaining time.Duration) time.Duration {
-		if diff := normalized - remaining; diff <= 0 || diff > maxTolerate || remaining < maxTolerate/2 {
+		if diff := normalized - remaining; diff <= 0 || diff > maxTolerate || remaining < time.Minute {
 			normalized = remaining
 			lastCall = time.Now()
 			return remaining
@@ -193,12 +179,13 @@ func MaxTolerateTimeNormalizer(maxTolerate time.Duration) TimeNormalizer {
 	})
 }
 
+// FixedIntervalTimeNormalizer returns implementation of TimeNormalizer.
 func FixedIntervalTimeNormalizer(updInterval int) TimeNormalizer {
 	var normalized time.Duration
 	var lastCall time.Time
 	var count int
 	return TimeNormalizerFunc(func(remaining time.Duration) time.Duration {
-		if count == 0 || remaining <= time.Duration(15*time.Second) {
+		if count == 0 || remaining < time.Minute {
 			count = updInterval
 			normalized = remaining
 			lastCall = time.Now()
@@ -207,9 +194,39 @@ func FixedIntervalTimeNormalizer(updInterval int) TimeNormalizer {
 		count--
 		normalized -= time.Since(lastCall)
 		lastCall = time.Now()
-		if normalized > 0 {
-			return normalized
-		}
-		return remaining
+		return normalized
 	})
+}
+
+func chooseTimeProducer(style TimeStyle) func(time.Duration) string {
+	switch style {
+	case ET_STYLE_HHMMSS:
+		return func(remaining time.Duration) string {
+			hours := int64(remaining/time.Hour) % 60
+			minutes := int64(remaining/time.Minute) % 60
+			seconds := int64(remaining/time.Second) % 60
+			return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+		}
+	case ET_STYLE_HHMM:
+		return func(remaining time.Duration) string {
+			hours := int64(remaining/time.Hour) % 60
+			minutes := int64(remaining/time.Minute) % 60
+			return fmt.Sprintf("%02d:%02d", hours, minutes)
+		}
+	case ET_STYLE_MMSS:
+		return func(remaining time.Duration) string {
+			hours := int64(remaining/time.Hour) % 60
+			minutes := int64(remaining/time.Minute) % 60
+			seconds := int64(remaining/time.Second) % 60
+			if hours > 0 {
+				return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+			}
+			return fmt.Sprintf("%02d:%02d", minutes, seconds)
+		}
+	default:
+		return func(remaining time.Duration) string {
+			// strip off nanoseconds
+			return ((remaining / time.Second) * time.Second).String()
+		}
+	}
 }
