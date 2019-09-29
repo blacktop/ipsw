@@ -26,6 +26,15 @@ type spinnerFiller struct {
 	alignment SpinnerAlignment
 }
 
+// NewSpinnerFiller spinner Filler used with *Progress.AddSpinner
+func NewSpinnerFiller(alignment SpinnerAlignment) Filler {
+	filler := &spinnerFiller{
+		frames:    defaultSpinnerStyle,
+		alignment: alignment,
+	}
+	return filler
+}
+
 func (s *spinnerFiller) Fill(w io.Writer, width int, stat *decor.Statistics) {
 
 	frame := s.frames[s.count%uint(len(s.frames))]

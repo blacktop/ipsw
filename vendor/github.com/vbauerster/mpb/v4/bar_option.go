@@ -1,36 +1,24 @@
 package mpb
 
 import (
+	"bytes"
+	"io"
+
 	"github.com/vbauerster/mpb/v4/decor"
 )
 
 // BarOption is a function option which changes the default behavior of a bar.
 type BarOption func(*bState)
 
-type merger interface {
-	CompoundDecorators() []decor.Decorator
-}
-
-func (s *bState) appendAmountReceiver(d decor.Decorator) {
-	if ar, ok := d.(decor.AmountReceiver); ok {
-		s.amountReceivers = append(s.amountReceivers, ar)
-	}
-}
-
-func (s *bState) appendShutdownListener(d decor.Decorator) {
-	if sl, ok := d.(decor.ShutdownListener); ok {
-		s.shutdownListeners = append(s.shutdownListeners, sl)
-	}
+type mergeWrapper interface {
+	MergeUnwrap() []decor.Decorator
 }
 
 func (s *bState) addDecorators(dest *[]decor.Decorator, decorators ...decor.Decorator) {
 	for _, decorator := range decorators {
-		s.appendAmountReceiver(decorator)
-		s.appendShutdownListener(decorator)
-		if m, ok := decorator.(merger); ok {
-			dd := m.CompoundDecorators()
-			s.appendAmountReceiver(dd[0])
-			s.appendShutdownListener(dd[0])
+		if mw, ok := decorator.(mergeWrapper); ok {
+			dd := mw.MergeUnwrap()
+			s.mDecorators = append(s.mDecorators, dd[0])
 			*dest = append(*dest, dd[1:]...)
 		}
 		*dest = append(*dest, decorator)
@@ -65,9 +53,8 @@ func BarWidth(width int) BarOption {
 	}
 }
 
-// BarRemoveOnComplete removes whole bar line on complete event. Any
-// decorators attached to the bar, having OnComplete action will not
-// have a chance to run its OnComplete action, because of this option.
+// BarRemoveOnComplete removes bar filler and decorators if any, on
+// complete event.
 func BarRemoveOnComplete() BarOption {
 	return func(s *bState) {
 		s.dropOnComplete = true
@@ -90,10 +77,20 @@ func BarParkTo(runningBar *Bar) BarOption {
 	}
 }
 
-// BarClearOnComplete clears bar part of bar line on complete event.
+// BarClearOnComplete clears bar filler only, on complete event.
 func BarClearOnComplete() BarOption {
 	return func(s *bState) {
-		s.noBufBOnComplete = true
+		s.filler = makeClearOnCompleteFiller(s.filler)
+	}
+}
+
+func makeClearOnCompleteFiller(filler Filler) FillerFunc {
+	return func(w io.Writer, width int, st *decor.Statistics) {
+		if st.Completed {
+			w.Write([]byte{})
+		} else {
+			filler.Fill(w, width, st)
+		}
 	}
 }
 
@@ -109,8 +106,20 @@ func BarPriority(priority int) BarOption {
 // BarExtender is an option to extend bar to the next new line, with
 // arbitrary output.
 func BarExtender(extender Filler) BarOption {
+	if extender == nil {
+		return nil
+	}
 	return func(s *bState) {
-		s.extender = extender
+		s.extender = makeExtFunc(extender)
+	}
+}
+
+func makeExtFunc(extender Filler) extFunc {
+	buf := new(bytes.Buffer)
+	nl := []byte("\n")
+	return func(r io.Reader, tw int, st *decor.Statistics) (io.Reader, int) {
+		extender.Fill(buf, tw, st)
+		return io.MultiReader(r, buf), bytes.Count(buf.Bytes(), nl)
 	}
 }
 

@@ -9,11 +9,7 @@ import (
 // MovingAverage is the interface that computes a moving average over
 // a time-series stream of numbers. The average may be over a window
 // or exponentially decaying.
-type MovingAverage interface {
-	Add(float64)
-	Value() float64
-	Set(float64)
-}
+type MovingAverage = ewma.MovingAverage
 
 type medianWindow [3]float64
 
@@ -41,27 +37,4 @@ func (s *medianWindow) Set(value float64) {
 // NewMedian is fixed last 3 samples median MovingAverage.
 func NewMedian() MovingAverage {
 	return new(medianWindow)
-}
-
-type medianEwma struct {
-	count  uint
-	median MovingAverage
-	MovingAverage
-}
-
-func (s *medianEwma) Add(v float64) {
-	s.median.Add(v)
-	if s.count >= 2 {
-		s.MovingAverage.Add(s.median.Value())
-	}
-	s.count++
-}
-
-// NewMedianEwma is ewma based MovingAverage, which gets its values
-// from median MovingAverage.
-func NewMedianEwma(age ...float64) MovingAverage {
-	return &medianEwma{
-		MovingAverage: ewma.NewMovingAverage(age...),
-		median:        NewMedian(),
-	}
 }

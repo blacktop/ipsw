@@ -55,9 +55,9 @@ func WithShutdownNotifier(ch chan struct{}) ContainerOption {
 	}
 }
 
-// WithOutput overrides default os.Stdout output. Setting it to nil will
-// effectively disable auto refresh rate and discard any output, usefull
-// if you want to disable progress bars with little overhead.
+// WithOutput overrides default os.Stdout output. Setting it to nil
+// will effectively disable auto refresh rate and discard any output,
+// useful if you want to disable progress bars with little overhead.
 func WithOutput(w io.Writer) ContainerOption {
 	return func(s *pState) {
 		if w == nil {

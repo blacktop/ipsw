@@ -27,12 +27,13 @@ type barFiller struct {
 	noBrackets   bool
 }
 
-func newDefaultBarFiller() Filler {
-	bf := &barFiller{
+// NewBarFiller bar Filler used with *Progress.AddBar
+func NewBarFiller() Filler {
+	filler := &barFiller{
 		format: make([][]byte, utf8.RuneCountInString(defaultBarStyle)),
 	}
-	bf.setStyle(defaultBarStyle)
-	return bf
+	filler.setStyle(defaultBarStyle)
+	return filler
 }
 
 func (s *barFiller) setStyle(style string) {
@@ -64,7 +65,7 @@ func (s *barFiller) Fill(w io.Writer, width int, stat *decor.Statistics) {
 
 	bb := make([][]byte, width)
 
-	cwidth := int(internal.Percentage(stat.Total, stat.Current, int64(width)))
+	cwidth := int(internal.PercentageRound(stat.Total, stat.Current, width))
 
 	for i := 0; i < cwidth; i++ {
 		bb[i] = s.format[rFill]
@@ -75,7 +76,7 @@ func (s *barFiller) Fill(w io.Writer, width int, stat *decor.Statistics) {
 		if s.refillAmount > stat.Current {
 			rwidth = cwidth
 		} else {
-			rwidth = int(internal.Percentage(stat.Total, int64(s.refillAmount), int64(width)))
+			rwidth = int(internal.PercentageRound(stat.Total, int64(s.refillAmount), width))
 		}
 		for i := 0; i < rwidth; i++ {
 			bb[i] = s.format[rRefill]
