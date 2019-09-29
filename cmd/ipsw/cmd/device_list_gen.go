@@ -13,9 +13,9 @@ func init() {
 
 // genCmd represents the gen command
 var genCmd = &cobra.Command{
-	Use:   "gen",
+	Use:   "gen [output PATH]",
 	Short: "Generate iOS devices database",
-	Args:  cobra.NoArgs,
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		devices, err := xcode.ReadDeviceTraitsDB()
@@ -23,7 +23,7 @@ var genCmd = &cobra.Command{
 			return err
 		}
 
-		err = xcode.WriteToJSON(devices)
+		err = xcode.WriteToJSON(devices, args[0])
 		if err != nil {
 			return err
 		}

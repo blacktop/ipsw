@@ -52,6 +52,7 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+      - "^bumping"
       - "update README"
       - "Update README.md"
       - "fixes"
