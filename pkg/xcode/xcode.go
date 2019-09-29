@@ -5,6 +5,7 @@ package xcode
 import (
 	"encoding/json"
 	"io/ioutil"
+	"path/filepath"
 
 	// importing statik data
 	_ "github.com/blacktop/ipsw/statik"
@@ -59,12 +60,12 @@ func (DeviceTrait) TableName() string {
 }
 
 // WriteToJSON writes the data to JSON
-func WriteToJSON(devices []Device) error {
+func WriteToJSON(devices []Device, dest string) error {
 	dJSON, err := json.Marshal(devices)
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile("xcode/data/device_traits.json", dJSON, 0644)
+	return ioutil.WriteFile(filepath.Clean(dest), dJSON, 0644)
 }
 
 // GetDevices reads the devices from embedded JSON

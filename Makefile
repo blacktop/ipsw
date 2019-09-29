@@ -46,8 +46,12 @@ lint: ## Run all the linters
 		./...
 		markdownfmt -w README.md
 
+.PHONY: update_devs
+update_devs:
+	CGO_ENABLED=1 CC=gcc go run ./cmd/ipsw/main.go device list gen pkg/xcode/data/device_traits.json
+
 .PHONY: dry_release
-dry_release:
+dry_release: update_devs
 	goreleaser --skip-publish --rm-dist --skip-validate
 
 .PHONY: bump
@@ -58,7 +62,7 @@ bump: ## Incriment version patch number
 	@git push
 
 .PHONY: release
-release: bump ## Create a new release from the VERSION
+release: update_devs bump ## Create a new release from the VERSION
 	@echo " > Creating Release"
 	@hack/make/release v$(shell cat VERSION)
 	@goreleaser --rm-dist
