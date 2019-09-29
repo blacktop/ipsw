@@ -167,23 +167,23 @@ func (d *Download) Do() error {
 		mpb.WithRefreshRate(180*time.Millisecond),
 	)
 
-	bar := p.AddBar(d.size-d.bytesResumed, mpb.BarStyle("[=>-|"),
-		// bar := p.AddBar(d.size, mpb.BarStyle("[=>-|"),
+	bar := p.AddBar(d.size, mpb.BarStyle("[=>-|"),
 		mpb.PrependDecorators(
 			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),
 		mpb.AppendDecorators(
-			decor.EwmaETA(decor.ET_STYLE_MMSS, float64(d.size)/2048),
+			decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048),
 			decor.Name(" ] "),
-			decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+			decor.OnComplete(decor.Spinner(nil), "✓"),
+			decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048), decor.WCSyncSpace),
 		),
 	)
 
-	// if d.resume {
-	// 	bar.SetCurrent(d.bytesResumed)
-	// 	bar.SetRefill(d.bytesResumed)
-	// 	// bar.Increment()
-	// }
+	if d.resume {
+		// bar.SetCurrent(d.bytesResumed)
+		bar.SetRefill(d.bytesResumed)
+		bar.IncrInt64(d.bytesResumed)
+	}
 
 	// create proxy reader
 	reader := bar.ProxyReader(resp.Body)

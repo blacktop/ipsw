@@ -62,7 +62,7 @@ bump: ## Incriment version patch number
 	@git push
 
 .PHONY: release
-release: update_devs bump ## Create a new release from the VERSION
+release: bump ## Create a new release from the VERSION
 	@echo " > Creating Release"
 	@hack/make/release v$(shell cat VERSION)
 	@goreleaser --rm-dist
@@ -84,7 +84,7 @@ docker: ## Build docker image
 	@echo "===> Building Docker Image"
 	docker build -t $(REPO)/$(NAME):$(VERSION) .
 
-docker-tag:
+docker-tag: docker
 	docker tag $(REPO)/$(NAME):$(VERSION) docker.pkg.github.com/blacktop/ipsw/$(NAME):$(VERSION)
 
 docker-push: docker-tag
