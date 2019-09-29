@@ -155,6 +155,12 @@ func (d *Download) Do() error {
 		}
 		defer dest.Close()
 	}
+	defer func() {
+		err = os.Rename(destName+".download", destName)
+		if err != nil {
+			log.Error("failed to remove .download from completed download")
+		}
+	}()
 
 	p := mpb.New(
 		mpb.WithWidth(60),
@@ -162,6 +168,7 @@ func (d *Download) Do() error {
 	)
 
 	bar := p.AddBar(d.size-d.bytesResumed, mpb.BarStyle("[=>-|"),
+		// bar := p.AddBar(d.size, mpb.BarStyle("[=>-|"),
 		mpb.PrependDecorators(
 			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),
@@ -174,6 +181,8 @@ func (d *Download) Do() error {
 
 	// if d.resume {
 	// 	bar.SetCurrent(d.bytesResumed)
+	// 	bar.SetRefill(d.bytesResumed)
+	// 	// bar.Increment()
 	// }
 
 	// create proxy reader
@@ -187,6 +196,7 @@ func (d *Download) Do() error {
 
 		p.Wait()
 
+		utils.Indent(log.Info, 2)("verifying sha1sum...")
 		if ok, _ := utils.Verify(d.Sha1, destName+".download"); !ok {
 			if err := os.Remove(destName + ".download"); err != nil {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
@@ -216,11 +226,6 @@ func (d *Download) Do() error {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 			}
 		}
-	}
-
-	err = os.Rename(destName+".download", destName)
-	if err != nil {
-		return errors.Wrap(err, "failed to remove .download from completed download")
 	}
 
 	return nil

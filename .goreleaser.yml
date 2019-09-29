@@ -3,6 +3,11 @@
 builds:
   - main: ./cmd/ipsw
     binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=gcc
+    hooks:
+      pre: go generate ./...
     goos:
       - windows
       - darwin
