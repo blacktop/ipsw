@@ -13,10 +13,14 @@ github.com/apex/log
 github.com/apex/log/handlers/cli
 # github.com/blacktop/lzss v0.1.0
 github.com/blacktop/lzss
+# github.com/blacktop/ranger v1.0.0
+github.com/blacktop/ranger
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.4.7
 github.com/fsnotify/fsnotify
+# github.com/gofrs/flock v0.7.1
+github.com/gofrs/flock
 # github.com/hashicorp/go-version v1.2.0
 github.com/hashicorp/go-version
 # github.com/hashicorp/hcl v1.0.0
@@ -96,5 +100,3 @@ golang.org/x/text/unicode/norm
 gopkg.in/yaml.v2
 # howett.net/plist v0.0.0-20181124034731-591f970eefbb
 howett.net/plist
-# howett.net/ranger v0.0.0-20171016084633-e2e137620847
-howett.net/ranger
