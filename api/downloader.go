@@ -155,12 +155,6 @@ func (d *Download) Do() error {
 		}
 		defer dest.Close()
 	}
-	defer func() {
-		err = os.Rename(destName+".download", destName)
-		if err != nil {
-			log.Error("failed to remove .download from completed download")
-		}
-	}()
 
 	p := mpb.New(
 		mpb.WithWidth(60),
@@ -226,6 +220,11 @@ func (d *Download) Do() error {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 			}
 		}
+	}
+
+	err = os.Rename(destName+".download", destName)
+	if err != nil {
+		return errors.Wrap(err, "failed to remove .download from completed download")
 	}
 
 	return nil
