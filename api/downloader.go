@@ -146,14 +146,12 @@ func (d *Download) Do() error {
 		if err != nil {
 			return errors.Wrapf(err, "cannot create %s", destName)
 		}
-		defer dest.Close()
 		dest.Seek(0, os.SEEK_END)
 	} else {
 		dest, err = os.Create(destName + ".download")
 		if err != nil {
 			return errors.Wrapf(err, "cannot create %s", destName)
 		}
-		defer dest.Close()
 	}
 
 	p := mpb.New(
@@ -190,8 +188,13 @@ func (d *Download) Do() error {
 
 		p.Wait()
 
+		// close file
+		dest.Sync()
+		dest.Close()
+
 		utils.Indent(log.Info, 2)("verifying sha1sum...")
 		if ok, _ := utils.Verify(d.Sha1, destName+".download"); !ok {
+			fileLock.Unlock()
 			if err := os.Remove(destName + ".download"); err != nil {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 			}
@@ -208,6 +211,10 @@ func (d *Download) Do() error {
 
 		p.Wait()
 
+		// close file
+		dest.Sync()
+		dest.Close()
+
 		utils.Indent(log.Info, 2)("verifying sha1sum...")
 		checksum, _ := hex.DecodeString(d.Sha1)
 
@@ -216,6 +223,7 @@ func (d *Download) Do() error {
 				"expected": d.Sha1,
 				"actual":   fmt.Sprintf("%x", h.Sum(nil)),
 			}).Error, 3)("❌ BAD CHECKSUM")
+			fileLock.Unlock()
 			if err := os.Remove(destName); err != nil {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 			}
