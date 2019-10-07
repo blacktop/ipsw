@@ -11,6 +11,8 @@ github.com/andybalholm/cascadia
 # github.com/apex/log v1.1.1
 github.com/apex/log
 github.com/apex/log/handlers/cli
+# github.com/blacktop/go-lzfse v1.0.10
+github.com/blacktop/go-lzfse
 # github.com/blacktop/lzss v0.1.0
 github.com/blacktop/lzss
 # github.com/blacktop/ranger v1.0.0
