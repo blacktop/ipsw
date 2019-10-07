@@ -201,12 +201,17 @@
       "remotePath": "",
       "port": 2345,
       "host": "127.0.0.1",
-      "program": "${workspaceRoot}/ipsws.go",
-      "env": {},
+      "program": "${workspaceRoot}/cmd/ipsw/main.go",
+      "env": {
+        "CGO_ENABLED": 1,
+        "CC": "gcc",
+        "GODEBUG": "cgocheck=2"
+      },
       "args": [
         "-V",
-        "decompress",
-        "${workspaceRoot}/iPhone11,2_12.3_16F156_Restore/kernelcache.release.iphone11"
+        "kernel",
+        "dec",
+        "${workspaceRoot}/kernelcache.release.iphone12"
       ],
       "showLog": false
     },

@@ -11,9 +11,17 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/lzss"
 	"github.com/pkg/errors"
+)
+
+const (
+	lzfseEncodeLSymbols       = 20
+	lzfseEncodeMSymbols       = 20
+	lzfseEncodeDSymbols       = 64
+	lzfseEncodeLiteralSymbols = 256
 )
 
 // Img4 Kernelcache object
@@ -34,16 +42,25 @@ type LzssHeader struct {
 	Padding          [0x16c]byte
 }
 
+// LzfseCompressedBlockHeaderV2 represents the lzfse header
+type LzfseCompressedBlockHeaderV2 struct {
+	Magic        uint32 // "bvx2"
+	NumRawBytes  uint32
+	PackedFields [3]uint64
+	Freq         [2 * (lzfseEncodeLSymbols + lzfseEncodeMSymbols + lzfseEncodeDSymbols + lzfseEncodeLiteralSymbols)]uint8
+}
+
 // A CompressedCache represents an open compressed kernelcache file.
 type CompressedCache struct {
-	Header LzssHeader
+	Magic  []byte
+	Header interface{}
 	Size   int
 	Data   []byte
 }
 
 // ParseImg4Data parses a img4 data containing a compressed kernelcache.
 func ParseImg4Data(data []byte) (*CompressedCache, error) {
-	utils.Indent(log.Info, 2)("Parsing Compressed Kernelcache")
+	utils.Indent(log.Info, 2)("Parsing Kernelcache IMG4")
 
 	var i Img4
 	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10
@@ -51,28 +68,16 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 		return nil, errors.Wrap(err, "failed to ASN.1 parse Kernelcache")
 	}
 
-	buffer := bytes.NewBuffer(i.Data)
+	cc := CompressedCache{
+		Magic: make([]byte, 4),
+		Size:  len(i.Data),
+		Data: i.Data,
+	}
 
-	cc := CompressedCache{Size: buffer.Len()}
-
-	// Read entire file header.
-	if err := binary.Read(buffer, binary.BigEndian, &cc.Header); err != nil {
+	// Read file header magic.
+	if err := binary.Read(bytes.NewBuffer(i.Data[:4]), binary.BigEndian, &cc.Magic); err != nil {
 		return nil, err
 	}
-
-	msg := fmt.Sprintf("compressed size: %d, uncompressed: %d. checkSum: 0x%x",
-		cc.Header.CompressedSize,
-		cc.Header.UncompressedSize,
-		cc.Header.CheckSum,
-	)
-	utils.Indent(log.Debug, 1)(msg)
-
-	if int(cc.Header.CompressedSize) > cc.Size {
-		return nil, fmt.Errorf("compressed_size: %d is greater than file_size: %d", cc.Size, cc.Header.CompressedSize)
-	}
-
-	// Read compressed file data.
-	cc.Data = buffer.Next(int(cc.Header.CompressedSize))
 
 	return &cc, nil
 }
@@ -101,9 +106,12 @@ func Extract(ipsw string) error {
 			return errors.Wrap(err, "failed parse compressed kernelcache")
 		}
 
-		utils.Indent(log.Info, 1)("Decompressing Kernelcache")
-		dec := lzss.Decompress(kc.Data)
-		err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
+		dec, err := DecompressData(kc)
+		if err != nil {
+			return errors.Wrap(err, "failed to decompress kernelcache")
+		}
+
+		err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
 		if err != nil {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
@@ -127,17 +135,60 @@ func Decompress(kcache string) error {
 	// defer os.Remove(kcache)
 
 	utils.Indent(log.Info, 2)("Decompressing Kernelcache")
-	dec := lzss.Decompress(kc.Data)
-	err = ioutil.WriteFile(kcache+".decompressed", dec[:kc.Header.UncompressedSize], 0644)
+	dec, err := DecompressData(kc)
 	if err != nil {
 		return errors.Wrap(err, "failed to decompress kernelcache")
 	}
+
+	err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to decompress kernelcache")
+	}
+	utils.Indent(log.Info, 2)("Created " + kcache + ".decompressed")
 	return nil
 }
 
 // DecompressData decompresses compressed kernelcache []byte data
-func DecompressData(cc *CompressedCache) []byte {
+func DecompressData(cc *CompressedCache) ([]byte, error) {
 	utils.Indent(log.Info, 2)("Decompressing Kernelcache")
-	dec := lzss.Decompress(cc.Data)
-	return dec[:cc.Header.UncompressedSize]
+
+	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
+		utils.Indent(log.Info, 2)("Kernelcache is LZFSE compressed")
+		// lzfseHeader := LzfseCompressedBlockHeaderV2{}
+		// // Read entire file header.
+		// if err := binary.Read(bytes.NewBuffer(i.Data[:1000]), binary.BigEndian, &lzfseHeader); err != nil {
+		// 	return nil, err
+		// }
+		// cc.Header = lzfseHeader
+		return lzfse.DecodeBuffer(cc.Data), nil
+
+	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
+		utils.Indent(log.Debug, 1)("kernelcache is LZSS compressed")
+		buffer := bytes.NewBuffer(cc.Data)
+		lzssHeader := LzssHeader{}
+		// Read entire file header.
+		if err := binary.Read(buffer, binary.BigEndian, &lzssHeader); err != nil {
+			return nil, err
+		}
+
+		msg := fmt.Sprintf("compressed size: %d, uncompressed: %d. checkSum: 0x%x",
+			lzssHeader.CompressedSize,
+			lzssHeader.UncompressedSize,
+			lzssHeader.CheckSum,
+		)
+		utils.Indent(log.Debug, 1)(msg)
+
+		cc.Header = lzssHeader
+
+		if int(lzssHeader.CompressedSize) > cc.Size {
+			return nil, fmt.Errorf("compressed_size: %d is greater than file_size: %d", cc.Size, lzssHeader.CompressedSize)
+		}
+
+		// Read compressed file data.
+		cc.Data = buffer.Next(int(lzssHeader.CompressedSize))
+			dec := lzss.Decompress(cc.Data)
+			return dec[:lzssHeader.UncompressedSize], nil
+	}
+
+	return []byte{}, errors.New("unsupported compression")
 }
