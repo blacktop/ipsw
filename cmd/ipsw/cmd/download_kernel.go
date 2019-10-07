@@ -175,7 +175,11 @@ var downloadKernelCmd = &cobra.Command{
 							if err != nil {
 								return errors.Wrap(err, "failed parse compressed kernelcache")
 							}
-							err = ioutil.WriteFile(f.Name+".decompressed", kernelcache.DecompressData(kcomp), 0644)
+							dec, err := kernelcache.DecompressData(kcomp)
+							if err != nil {
+								return errors.Wrap(err, "failed to decompress kernelcache")
+							}
+							err = ioutil.WriteFile(f.Name+".decompressed", dec, 0644)
 							if err != nil {
 								return errors.Wrap(err, "failed to decompress kernelcache")
 							}
@@ -234,7 +238,11 @@ var downloadKernelCmd = &cobra.Command{
 						if err != nil {
 							return errors.Wrap(err, "failed parse compressed kernelcache")
 						}
-						err = ioutil.WriteFile(f.Name+".decompressed", kernelcache.DecompressData(kcomp), 0644)
+						dec, err := kernelcache.DecompressData(kcomp)
+						if err != nil {
+							return errors.Wrap(err, "failed to decompress kernelcache")
+						}
+						err = ioutil.WriteFile(f.Name+".decompressed", dec, 0644)
 						if err != nil {
 							return errors.Wrap(err, "failed to decompress kernelcache")
 						}
