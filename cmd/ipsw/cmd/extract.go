@@ -36,6 +36,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -139,6 +140,7 @@ var extractCmd = &cobra.Command{
 						if err != nil {
 							return errors.Wrap(err, "failed to decompress kernelcache")
 						}
+						utils.Indent(log.Info, 2)("Created " + f.Name + ".decompressed")
 					}
 				}
 			}
