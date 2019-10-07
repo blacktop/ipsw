@@ -115,6 +115,7 @@ func Extract(ipsw string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
+		utils.Indent(log.Info, 2)("Created " + kcache + ".decompressed")
 		os.Remove(kcache)
 	}
 
