@@ -14,12 +14,26 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v1
 
+      - name: Install lzfse
+        run: |
+          apt-get update && apt-get install -y cmake
+          cd /tmp
+          git clone https://github.com/lzfse/lzfse.git
+          cd lzfse
+          mkdir build
+          cd build
+          cmake ..
+          make install
+
       - name: Get dependencies
         run: |
           go mod download
 
       - name: Run Help
-        run: CGO_ENABLED=0 go run cmd/ipsw/main.go --help
+        run: CGO_ENABLED=1 go run cmd/ipsw/main.go --help
 
       - name: Run Device List
-        run: CGO_ENABLED=0 go run cmd/ipsw/main.go device list
+        run: CGO_ENABLED=1 go run cmd/ipsw/main.go device list
+
+      - name: Run Extract Remote Kernelcache
+        run: CGO_ENABLED=1 go run cmd/ipsw/main.go -V extract -r -k https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
