@@ -6,7 +6,19 @@ FROM golang:1 as builder
 COPY . /go/src/github.com/blacktop/ipsw
 WORKDIR /go/src/github.com/blacktop/ipsw
 
-RUN CGO_ENABLED=0 go build -o /bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+RUN \
+    apt-get update \
+    && apt-get install -y cmake\
+    && cd /tmp \
+    && echo "===> Installing lzfse..." \
+    && git clone https://github.com/lzfse/lzfse.git \
+    && cd lzfse \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make install
+
+RUN CGO_ENABLED=1 go build -o /bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
 
 ####################################################
 # APFS-FUSE BUILDER
@@ -19,6 +31,14 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && apt-get update \
     && apt-get install -y $buildDeps fuse3 unzip \
     && cd /tmp \
+    && echo "===> Installing lzfse..." \
+    && git clone https://github.com/lzfse/lzfse.git \
+    && cd lzfse \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make install \
+    && echo "===> Installing apfs-fuse..." \
     && git clone https://github.com/sgan81/apfs-fuse.git \
     && cd apfs-fuse \
     && git submodule init \

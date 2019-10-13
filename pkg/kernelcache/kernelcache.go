@@ -71,7 +71,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 	cc := CompressedCache{
 		Magic: make([]byte, 4),
 		Size:  len(i.Data),
-		Data: i.Data,
+		Data:  i.Data,
 	}
 
 	// Read file header magic.
@@ -155,12 +155,13 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 
 	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
 		utils.Indent(log.Info, 2)("Kernelcache is LZFSE compressed")
-		// lzfseHeader := LzfseCompressedBlockHeaderV2{}
-		// // Read entire file header.
-		// if err := binary.Read(bytes.NewBuffer(i.Data[:1000]), binary.BigEndian, &lzfseHeader); err != nil {
-		// 	return nil, err
-		// }
-		// cc.Header = lzfseHeader
+		lzfseHeader := LzfseCompressedBlockHeaderV2{}
+		// Read entire file header.
+		if err := binary.Read(bytes.NewBuffer(cc.Data[:1000]), binary.BigEndian, &lzfseHeader); err != nil {
+			return nil, err
+		}
+		cc.Header = lzfseHeader
+
 		return lzfse.DecodeBuffer(cc.Data), nil
 
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
@@ -187,8 +188,8 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 
 		// Read compressed file data.
 		cc.Data = buffer.Next(int(lzssHeader.CompressedSize))
-			dec := lzss.Decompress(cc.Data)
-			return dec[:lzssHeader.UncompressedSize], nil
+		dec := lzss.Decompress(cc.Data)
+		return dec[:lzssHeader.UncompressedSize], nil
 	}
 
 	return []byte{}, errors.New("unsupported compression")
