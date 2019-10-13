@@ -12,8 +12,12 @@ public
 resources
 
 *.ipsw
+*.ipsw.download
 kernelcache.release.*
 dyld_shared_cache*
+
+System*
+usr*
 
 debug
 *.im4p

@@ -30,8 +30,8 @@ github.com/aws/aws-sdk-go v1.20.6/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN
 github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59/go.mod h1:q/89r3U2H7sSsE2t6Kca0lfwTK8JdoNGS/yzM/4iH5I=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
-github.com/blacktop/go-lzfse v1.0.10 h1:YNqhkOzG3qFptIv7Mbec1NoUtZZF5ICm267z+EyrKJY=
-github.com/blacktop/go-lzfse v1.0.10/go.mod h1:b/0s26ecQ5SleO5NO41iY2Ie32rZxS5BKQstc5z2ia8=
+github.com/blacktop/go-lzfse v1.1.0 h1:GsiSW80RztVCVWO2O9WAwWkC2vLwzktiA9X2qMxdsZ8=
+github.com/blacktop/go-lzfse v1.1.0/go.mod h1:b/0s26ecQ5SleO5NO41iY2Ie32rZxS5BKQstc5z2ia8=
 github.com/blacktop/lzss v0.1.0 h1:o0S0ZiBX9tIPNNx4W+AUUbVhcwaVFoFrZa7Zbdo7xJU=
 github.com/blacktop/lzss v0.1.0/go.mod h1:v0Qp9FkNDSCRvsycRnyUojUBvbtaQBpjw/StLMzZ8Po=
 github.com/blacktop/ranger v1.0.0 h1:S3rSfzP11C1b0oxICT9+tVkZUSoAyIdY+KF5QX5enOQ=
