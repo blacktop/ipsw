@@ -34,6 +34,8 @@ brews:
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
+    dependencies:
+      - lzfse
     test: |
       system "#{bin}/ipsw --version"
 
