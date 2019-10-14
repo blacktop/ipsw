@@ -1,20 +1,70 @@
 # This is an example goreleaser.yaml file with some sane defaults.
 # Make sure to check the documentation at http://goreleaser.com
 builds:
-  - main: ./cmd/ipsw
+  # - main: ./cmd/ipsw
+  #   binary: ipsw
+  #   env:
+  #     - CGO_ENABLED=1
+  #     - CC=gcc
+  #   hooks:
+  #     pre: go generate ./...
+  #   goos:
+  #     # - windows
+  #     - darwin
+  #     # - linux
+  #   goarch:
+  #     - amd64
+  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+
+  - id: ipsw_extended_windows
+    main: ./cmd/ipsw
     binary: ipsw
+    ldflags:
+      - -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+      - "-extldflags '-static'"
+    env:
+      - CGO_ENABLED=1
+      - CC=x86_64-w64-mingw32-gcc
+      - CXX=x86_64-w64-mingw32-g++
+    flags:
+      - -tags
+      - extended
+    goos:
+      - windows
+    goarch:
+      - amd64
+
+  - id: ipsw_extended_darwin
+    main: ./cmd/ipsw
+    binary: ipsw
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
     env:
       - CGO_ENABLED=1
       - CC=gcc
-    hooks:
-      pre: go generate ./...
+      - CXX=gcc++
+      # - CC=o64-clang
+      # - CXX=o64-clang++
+    flags:
+      - -tags
+      - extended
     goos:
-      - windows
       - darwin
-      # - linux
     goarch:
       - amd64
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+
+  # - id: ipsw_extended_linux
+  #   main: ./cmd/ipsw
+  #   binary: ipsw
+  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  #   env:
+  #     - CGO_ENABLED=1
+  #   flags:
+  #     - -tags
+  #     - extended
+  #   goos:
+  #     - linux
+  #   goarch:
+  #     - amd64
 
 archives:
   - format: tar.gz
