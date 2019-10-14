@@ -16,4 +16,4 @@ install:
 
 test_script:
   - ipsw.exe device list
-  - ipsw.exe download --device iPhone11,2 --build 16B92 kernel
+  - ipsw.exe device -r https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
