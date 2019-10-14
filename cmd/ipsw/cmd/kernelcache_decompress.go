@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright © 2019 blacktop
 
@@ -23,10 +25,11 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func init() {
