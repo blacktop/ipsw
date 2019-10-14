@@ -121,7 +121,7 @@ $ ipsw download -V latest --yes --white-list ipod
   ...
 ```
 
-#### Only download and decompress the kernelcaches _(which is CRAZY fast)_
+#### Only download and decompress the kernelcaches _(not supported on Windows)_
 
 Single `kernelcache`
 
@@ -174,7 +174,7 @@ To disable cert verification
 $ ipsw download --insecure --device iPhone11,2 --build 16B92
 ```
 
-### `extract`
+### `extract` _(not supported on Windows)_
 
 #### Extract `kernelcache` from a previously downloaded `ipsw`
 
@@ -232,7 +232,7 @@ $ ipsw dyld split dyld_shared_cache
 1444/1445
 ```
 
-### `decompress`
+### `decompress` _(not supported on Windows)_
 
 Decompress a previously extracted `kernelcache`
 
