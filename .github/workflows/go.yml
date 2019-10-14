@@ -23,7 +23,7 @@ jobs:
           mkdir build
           cd build
           cmake ..
-          make install
+          sudo make install
 
       - name: Get dependencies
         run: |
