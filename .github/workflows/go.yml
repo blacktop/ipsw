@@ -30,13 +30,13 @@ jobs:
           go mod download
 
       - name: Build
-        run: CGO_ENABLED=1 go build -o /bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+        run: CGO_ENABLED=1 go build -o /usr/local/bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
 
       - name: Run Help
-        run: /bin/ipsw --help
+        run: ipsw --help
 
       - name: Run Device List
-        run: /bin/ipsw device list
+        run: ipsw device list
 
       - name: Run Extract Remote Kernelcache
-        run: /bin/ipsw -V extract -r -k https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
+        run: ipsw -V extract -r -k https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
