@@ -8,7 +8,6 @@ require (
 	github.com/blacktop/go-lzfse v1.1.0
 	github.com/blacktop/lzss v0.1.0
 	github.com/blacktop/ranger v1.0.0
-	github.com/gofrs/flock v0.7.1
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
 	github.com/jinzhu/gorm v1.9.10
