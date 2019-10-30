@@ -16,7 +16,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
-	"github.com/gofrs/flock"
+
+	// "github.com/gofrs/flock"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v4"
 	"github.com/vbauerster/mpb/v4/decor"
@@ -126,18 +127,18 @@ func (d *Download) Do() error {
 		return fmt.Errorf("server return status: %s", resp.Status)
 	}
 
-	fileLock := flock.New(destName + ".download")
-	defer fileLock.Unlock()
+	// fileLock := flock.New(destName + ".download")
+	// defer fileLock.Unlock()
 
-	locked, err := fileLock.TryLock()
-	if err != nil {
-		return errors.Wrapf(err, "unable to lock %s", destName+".download")
-	}
+	// locked, err := fileLock.TryLock()
+	// if err != nil {
+	// 	return errors.Wrapf(err, "unable to lock %s", destName+".download")
+	// }
 
-	if !locked {
-		log.Errorf("%s is being downloaded by another instance", destName+".download")
-		return nil
-	}
+	// if !locked {
+	// 	log.Errorf("%s is being downloaded by another instance", destName+".download")
+	// 	return nil
+	// }
 
 	var dest *os.File
 	if d.resume {
@@ -194,7 +195,7 @@ func (d *Download) Do() error {
 
 		utils.Indent(log.Info, 2)("verifying sha1sum...")
 		if ok, _ := utils.Verify(d.Sha1, destName+".download"); !ok {
-			fileLock.Unlock()
+			// fileLock.Unlock()
 			if err := os.Remove(destName + ".download"); err != nil {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 			}
@@ -223,7 +224,7 @@ func (d *Download) Do() error {
 				"expected": d.Sha1,
 				"actual":   fmt.Sprintf("%x", h.Sum(nil)),
 			}).Error, 3)("❌ BAD CHECKSUM")
-			fileLock.Unlock()
+			// fileLock.Unlock()
 			if err := os.Remove(destName); err != nil {
 				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 			}
