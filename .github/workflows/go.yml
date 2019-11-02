@@ -30,7 +30,7 @@ jobs:
           cmake ..
           sudo make install
       - name: Build Dependencies (macOS)
-        if: matrix.platform == 'ubuntu-latest'
+        if: matrix.platform == 'macos-latest'
         run: |
           brew install lzfse
       - name: Build Dependencies (Windows)
