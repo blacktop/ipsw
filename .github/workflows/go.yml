@@ -37,7 +37,6 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: |
           choco install cmake
-          cd /tmp
           git clone https://github.com/lzfse/lzfse.git
           cd lzfse
           mkdir build
