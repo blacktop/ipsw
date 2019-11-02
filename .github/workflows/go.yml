@@ -21,7 +21,7 @@ jobs:
       - name: Build Dependencies (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          sudo apt-get update && sudo apt-get install -y cmake
+          sudo apt-get update && sudo apt-get install -y cmake libtool
           cd /tmp
           git clone https://github.com/lzfse/lzfse.git
           cd lzfse
