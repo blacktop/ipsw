@@ -1,3 +1,5 @@
+// +build darwin,cgo
+
 package kernelcache
 
 import (
