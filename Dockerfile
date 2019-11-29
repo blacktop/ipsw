@@ -18,7 +18,15 @@ RUN \
     && cmake .. \
     && make install
 
-RUN CC=gcc CGO_ENABLED=1 go build -o /bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+
+RUN CGO_ENABLED=1 go build \
+    -o /bin/ipsw \
+    -a -tags netgo \
+    -ldflags '-s -w -extldflags "-static"' \
+    -ldflags "-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION)" \
+    -ldflags "-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" \
+    ./cmd/ipsw
 
 ####################################################
 # APFS-FUSE BUILDER
@@ -51,6 +59,8 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && apt-get purge -y --auto-remove $buildDeps \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
 COPY --from=builder /bin/ipsw /bin/ipsw
 

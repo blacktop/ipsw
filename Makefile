@@ -93,7 +93,7 @@ docker-push: docker-tag
 .PHONY: test-docker
 test-docker: ## Run docker test
 	@echo "===> Testing Docker Image"
-	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(VERSION) -V extract --dyld /data/iPhone11_2_12.4.1_16G102_Restore.ipsw
+	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(VERSION) -V extract --dyld /data/iPhone12_1_13.2.3_17B111_Restore.ipsw
 
 .PHONY: size
 size: ## Get built image size
