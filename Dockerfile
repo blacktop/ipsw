@@ -18,7 +18,7 @@ RUN \
     && cmake .. \
     && make install
 
-RUN CGO_ENABLED=1 go build -o /bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+RUN CC=gcc CGO_ENABLED=1 go build -o /bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
 
 ####################################################
 # APFS-FUSE BUILDER
