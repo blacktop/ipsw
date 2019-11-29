@@ -11,10 +11,12 @@ test-caches
 public
 resources
 
+*.zip
 *.ipsw
 *.ipsw.download
 kernelcache.release.*
 dyld_shared_cache*
+*_Restore
 
 System*
 usr*
