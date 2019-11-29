@@ -211,7 +211,7 @@
         "-V",
         "kernel",
         "dec",
-        "${workspaceRoot}/kernelcache.release.iphone12"
+        "${workspaceRoot}/iPhone12_1_13.2.3_17B111_Restore/kernelcache.release.iphone12b"
       ],
       "showLog": false
     },

@@ -13,6 +13,7 @@
 
 dist/
 *.ipsw
+*.zip
 kernelcache.release.*
 dyld_shared_cache*
 
@@ -28,3 +29,4 @@ usr
 .vscode/settings.json
 xcode/data
 *.download
+*_Restore

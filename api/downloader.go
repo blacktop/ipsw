@@ -167,7 +167,7 @@ func (d *Download) Do() error {
 		mpb.AppendDecorators(
 			decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048),
 			decor.Name(" ] "),
-			decor.OnComplete(decor.Spinner(nil), "✅"),
+			decor.OnComplete(decor.Spinner(nil), "✅ "),
 			decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048), decor.WCSyncSpace),
 		),
 	)

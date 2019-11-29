@@ -5,6 +5,7 @@ package kernelcache
 import (
 	"archive/zip"
 	"bytes"
+	"debug/macho"
 	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
@@ -164,7 +165,25 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		}
 		cc.Header = lzfseHeader
 
-		return lzfse.DecodeBuffer(cc.Data), nil
+		decData := lzfse.DecodeBuffer(cc.Data)
+
+		r := bytes.NewReader(decData)
+		fat, err := macho.NewFatFile(r)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to parse fat mach-o")
+		}
+		defer fat.Close()
+
+		// Sanity check
+		if fat.Magic != macho.MagicFat {
+			return nil, errors.New("did not find fat mach-o magic")
+		}
+		if len(fat.Arches) > 1 {
+			return nil, errors.New("found more than 1 fat mach-o")
+		}
+
+		// Essentially: lipo -thin arm64e
+		return decData[fat.Arches[0].Offset:], nil
 
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
 		utils.Indent(log.Debug, 1)("kernelcache is LZSS compressed")
