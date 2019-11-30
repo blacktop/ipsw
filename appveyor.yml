@@ -15,13 +15,12 @@ environment:
   stack: go 1.13
 
   before_build:
-    - ps: |
-        git clone https://github.com/lzfse/lzfse.git
-        cd lzfse
-        mkdir build
-        cd build
-        cmake --install .
-        # dlltool --def C:\gopath\src\github.com\blacktop\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
+    - git clone https://github.com/lzfse/lzfse.git
+    - cd lzfse
+    - mkdir build
+    - cd build
+    - cmake --install .
+    # - dlltool --def C:\gopath\src\github.com\blacktop\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
 
 install:
   - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
