@@ -67,7 +67,10 @@ jobs:
         run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw --help
       - name: Run Help (Windows)
         if: matrix.platform == 'windows-latest'
-        run: ipsw.exe --help
+        run: |
+          dir
+          dir D:\a\ipsw\ipsw
+          ipsw.exe --help
 
       - name: Run Device List
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
