@@ -42,6 +42,8 @@ jobs:
           cd build
           cmake -G "Visual Studio 16 2019" ..
           cmake --build . --config Debug
+          dlltool -dllname lzfse.dll --output-lib lzfse.a
+          # dlltool -dllname lzfse.dll --def cproj.def --output-lib lzfse.a
 
       - name: Get dependencies
         run: |
