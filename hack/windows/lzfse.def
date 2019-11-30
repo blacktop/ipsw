@@ -1,0 +1,5 @@
+EXPORTS
+lzfse_decode_buffer
+lzfse_decode_scratch_size
+lzfse_encode_buffer
+lzfse_encode_scratch_size
