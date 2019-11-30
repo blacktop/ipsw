@@ -7,7 +7,7 @@ shallow_clone: true
 
 environment:
   GOPATH: c:\gopath
-  CGO_ENABLED: 0
+  CGO_ENABLED: 1
   GO_LDFLAGS: -Lc:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug
 
 stack: go 1.13
