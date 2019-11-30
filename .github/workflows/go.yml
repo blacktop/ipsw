@@ -36,13 +36,12 @@ jobs:
       - name: Build Dependencies (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          choco install cmake.install --installargs '"ADD_CMAKE_TO_PATH=System"'
           git clone https://github.com/lzfse/lzfse.git
           cd lzfse
           mkdir build
           cd build
-          cmake ..
-          make install
+          cmake -G "$env:GENERATOR" ..
+          cmake --build . --config Debug
 
       - name: Get dependencies
         run: |
