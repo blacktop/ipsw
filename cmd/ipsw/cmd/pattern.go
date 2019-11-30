@@ -1,5 +1,3 @@
-// +build !windows
-
 /*
 Copyright © 2019 blacktop
 
@@ -36,7 +34,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
@@ -44,13 +41,14 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(downloadKernelCmd)
+	downloadCmd.AddCommand(patternCmd)
 }
 
-// downloadKernelCmd represents the downloadKernel command
-var downloadKernelCmd = &cobra.Command{
-	Use:   "kernel",
-	Short: "Download just the kernelcache",
+// patternCmd represents the pattern command
+var patternCmd = &cobra.Command{
+	Use:   "pattern",
+	Short: "Download files that contain pattern",
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -104,19 +102,6 @@ var downloadKernelCmd = &cobra.Command{
 				utils.Indent(log.Debug, 2)(u)
 			}
 
-			// check canijailbreak.com
-			jbs, _ := api.GetJailbreaks()
-			if iCan, index, err := jbs.CanIBreak(version); err != nil {
-				log.Error(err.Error())
-			} else {
-				if iCan {
-					log.WithField("url", jbs.Jailbreaks[index].URL).Warnf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name)
-					utils.Indent(log.Warn, 2)(jbs.Jailbreaks[index].Caveats)
-				} else {
-					log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", api.GetRandomResearcher())
-				}
-			}
-
 			for _, u := range urls {
 				// get a handle to ipsw object
 				i, err := LookupByURL(ipsws, u)
@@ -129,7 +114,7 @@ var downloadKernelCmd = &cobra.Command{
 					"build":   i.BuildID,
 					"version": i.Version,
 					"signed":  i.Signed,
-				}).Info("Getting Kernelcache")
+				}).Infof("Getting files that contain: %s", args[0])
 				url, err := url.Parse(u)
 				if err != nil {
 					return errors.Wrap(err, "failed to parse url")
@@ -156,26 +141,19 @@ var downloadKernelCmd = &cobra.Command{
 				}
 
 				for _, f := range zr.File {
-					if strings.Contains(f.Name, "kernel") {
-						if _, err := os.Stat(path.Base(f.Name + ".decompressed")); os.IsNotExist(err) {
-							kdata := make([]byte, f.UncompressedSize64)
+					if strings.Contains(f.Name, args[0]) {
+						if _, err := os.Stat(path.Base(f.Name)); os.IsNotExist(err) {
+							data := make([]byte, f.UncompressedSize64)
 							rc, _ := f.Open()
-							io.ReadFull(rc, kdata)
+							io.ReadFull(rc, data)
 							rc.Close()
-							kcomp, err := kernelcache.ParseImg4Data(kdata)
+
+							err = ioutil.WriteFile(path.Base(f.Name), data, 0644)
 							if err != nil {
-								return errors.Wrap(err, "failed parse compressed kernelcache")
-							}
-							dec, err := kernelcache.DecompressData(kcomp)
-							if err != nil {
-								return errors.Wrap(err, "failed to decompress kernelcache")
-							}
-							err = ioutil.WriteFile(f.Name+".decompressed", dec, 0644)
-							if err != nil {
-								return errors.Wrap(err, "failed to decompress kernelcache")
+								return errors.Wrapf(err, "failed to write %s", f.Name)
 							}
 						} else {
-							log.Warnf("kernelcache already exists: %s", path.Base(f.Name+".decompressed"))
+							log.Warnf("%s already exists", path.Base(f.Name))
 						}
 					}
 				}
@@ -193,7 +171,7 @@ var downloadKernelCmd = &cobra.Command{
 					"build":   i.BuildID,
 					"version": i.Version,
 					"signed":  i.Signed,
-				}).Info("Getting Kernelcache")
+				}).Infof("Getting files that contain: %s", args[0])
 				url, err := url.Parse(i.URL)
 				if err != nil {
 					return errors.Wrap(err, "failed to parse url")
@@ -220,23 +198,18 @@ var downloadKernelCmd = &cobra.Command{
 				}
 
 				for _, f := range zr.File {
-					if strings.Contains(f.Name, "kernel") {
-						kdata := make([]byte, f.UncompressedSize64)
+					if _, err := os.Stat(path.Base(f.Name)); os.IsNotExist(err) {
+						data := make([]byte, f.UncompressedSize64)
 						rc, _ := f.Open()
-						io.ReadFull(rc, kdata)
+						io.ReadFull(rc, data)
 						rc.Close()
-						kcomp, err := kernelcache.ParseImg4Data(kdata)
+
+						err = ioutil.WriteFile(path.Base(f.Name), data, 0644)
 						if err != nil {
-							return errors.Wrap(err, "failed parse compressed kernelcache")
+							return errors.Wrapf(err, "failed to write %s", f.Name)
 						}
-						dec, err := kernelcache.DecompressData(kcomp)
-						if err != nil {
-							return errors.Wrap(err, "failed to decompress kernelcache")
-						}
-						err = ioutil.WriteFile(f.Name+".decompressed", dec, 0644)
-						if err != nil {
-							return errors.Wrap(err, "failed to decompress kernelcache")
-						}
+					} else {
+						log.Warnf("%s already exists", path.Base(f.Name))
 					}
 				}
 			}
