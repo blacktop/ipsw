@@ -22,7 +22,7 @@ install:
   - cmake -G "Visual Studio 14 2015 Win64" ..
   - cmake --build . --config Debug
   - dir C:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug
-  - go build github.com/blacktop/ipsw/cmd/ipsw
+  - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
 
 test_script:
   - ipsw.exe device list
