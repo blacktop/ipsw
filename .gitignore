@@ -30,3 +30,4 @@ usr
 xcode/data
 *.download
 *_Restore
+*.plist

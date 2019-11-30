@@ -167,8 +167,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 
 		decData := lzfse.DecodeBuffer(cc.Data)
 
-		r := bytes.NewReader(decData)
-		fat, err := macho.NewFatFile(r)
+		fat, err := macho.NewFatFile(bytes.NewReader(decData))
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse fat mach-o")
 		}
@@ -179,7 +178,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 			return nil, errors.New("did not find fat mach-o magic")
 		}
 		if len(fat.Arches) > 1 {
-			return nil, errors.New("found more than 1 fat mach-o")
+			return nil, errors.New("found more than 1 mach-o fat file")
 		}
 
 		// Essentially: lipo -thin arm64e
