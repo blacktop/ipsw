@@ -9,7 +9,7 @@ environment:
   GOPATH: c:\gopath
   CGO_ENABLED: 1
   CC: gcc.exe
-  GO_LDFLAGS: -LC:\Program Files\lzfse\lib -llzfse
+  GO_LDFLAGS: -LC:/Program Files/lzfse/lib -llzfse
   PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
 
 stack: go 1.13
