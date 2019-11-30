@@ -36,7 +36,7 @@ jobs:
       - name: Build Dependencies (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          choco install mingw cmake
+          choco install cmake.install --installargs '"ADD_CMAKE_TO_PATH=System"'
           git clone https://github.com/lzfse/lzfse.git
           cd lzfse
           mkdir build
