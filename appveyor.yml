@@ -17,7 +17,7 @@ install:
   - cd lzfse
   - mkdir build
   - cd build
-  - cmake -G "Visual Studio 16 2019" ..
+  - cmake -G "Visual Studio 14 2015 Win64" ..
   - cmake --build . --config Debug
   - go build -ldflags '-s -w -extldflags "-static"' github.com/blacktop/ipsw/cmd/ipsw
 
