@@ -6,7 +6,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.5.0
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/apex/log v1.1.1
-	github.com/blacktop/go-lzfse v1.1.1
+	github.com/blacktop/go-lzfse v1.1.2
 	github.com/blacktop/lzss v0.1.0
 	github.com/blacktop/ranger v1.0.0
 	github.com/hashicorp/go-version v1.2.0
