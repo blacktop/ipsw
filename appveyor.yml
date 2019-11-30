@@ -9,7 +9,7 @@ environment:
   GOPATH: c:\gopath
   CGO_ENABLED: 1
   CC: gcc.exe
-  GO_LDFLAGS: -LC:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug -llzfse
+  GO_LDFLAGS: -LC:\Program Files\lzfse\lib -llzfse
   PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
 
 stack: go 1.13
@@ -26,11 +26,11 @@ install:
   # - cd Debug
   # - dlltool --def C:\gopath\src\github.com\blacktop\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
   # - dir C:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug
-  # - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
-# test_script:
-#   - ipsw.exe device list
-#   - ipsw.exe device -r https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
-#   - ipsw.exe -V download kernel -v 13.2.3 -d iPhone12,3
+  - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
 
+test_script:
+  - ipsw.exe device list
+  - ipsw.exe device -r https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
+  - ipsw.exe -V download kernel -v 13.2.3 -d iPhone12,3
 # artifacts:
 #   - path: lzfse\build\Debug
