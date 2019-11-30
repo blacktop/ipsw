@@ -59,7 +59,7 @@ jobs:
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          go build -ldflags "-s -w -extldflags '-static'" ./cmd/ipsw
+          CGO_LDFLAGS="-LD:\a\ipsw\ipsw\lzfse\build\Debug" go build -ldflags "-s -w -extldflags '-static'" ./cmd/ipsw
           dir
 
       - name: Run Help
