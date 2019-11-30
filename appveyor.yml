@@ -19,8 +19,12 @@ install:
   - cd lzfse
   - mkdir build
   - cd build
+  - cmake -G "Visual Studio 14 2015 Win64" ..
+  # - cmake --help
   - cmake --install .
+  # - cd Debug
   # - dlltool --def C:\gopath\src\github.com\blacktop\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
+  # - dir C:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug
   # - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
 # test_script:
 #   - ipsw.exe device list
