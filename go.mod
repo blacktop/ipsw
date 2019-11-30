@@ -15,7 +15,7 @@ require (
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
-	github.com/mattn/go-sqlite3 v2.0.0+incompatible // indirect
+	github.com/mattn/go-sqlite3 v1.12.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/olekukonko/tablewriter v0.0.3
 	github.com/pelletier/go-toml v1.6.0 // indirect
