@@ -59,7 +59,7 @@ jobs:
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          go build -o build/dist/ipsw -ldflags "-s -w -extldflags '-static'" ./cmd/ipsw
+          go build -ldflags "-s -w -extldflags '-static'" ./cmd/ipsw
           dir
 
       - name: Run Help
