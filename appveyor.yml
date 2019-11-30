@@ -21,8 +21,8 @@ install:
   - cd build
   - cmake -G "Visual Studio 14 2015 Win64" ..
   - cmake --build . --config Debug
-  - echo EXPORTS > foo.def
-  - nm foo.dll | grep ' T _' | sed 's/.* T _//' >> lzfse.def
+  - echo EXPORTS > lzfse.def
+  - nm Debug\lzfse.dll | grep ' T _' | sed 's/.* T _//' >> lzfse.def
   - dlltool --def lzfse.def --dllname Debug\lzfse.dll --output-lib lzfse.a
   # - dir C:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug
   # - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
