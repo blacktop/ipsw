@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
-
 	// "github.com/gofrs/flock"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v4"
@@ -108,11 +108,17 @@ func (d *Download) Do() error {
 
 	if d.canResume {
 		if f, err := os.Stat(destName + ".download"); !os.IsNotExist(err) {
-			d.resume = true
-			d.bytesResumed = f.Size()
-			rangeHeader := fmt.Sprintf("bytes=%d-", d.bytesResumed)
-			utils.Indent(log.WithField("range", rangeHeader).Debug, 2)("Setting Header")
-			req.Header.Add("Range", rangeHeader)
+			prompt := &survey.Confirm{
+				Message: fmt.Sprintf("Previous download of %s can be resumed. Resume?", destName),
+			}
+			survey.AskOne(prompt, &d.resume)
+
+			if d.resume {
+				d.bytesResumed = f.Size()
+				rangeHeader := fmt.Sprintf("bytes=%d-", d.bytesResumed)
+				utils.Indent(log.WithField("range", rangeHeader).Debug, 2)("Setting Header")
+				req.Header.Add("Range", rangeHeader)
+			}
 		}
 	}
 
