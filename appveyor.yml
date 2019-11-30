@@ -21,6 +21,7 @@ install:
   - cd build
   - cmake -G "Visual Studio 14 2015 Win64" ..
   # - cmake --help
+  - cmake --build .
   - cmake --install .
   # - cd Debug
   # - dlltool --def C:\gopath\src\github.com\blacktop\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
