@@ -58,7 +58,9 @@ jobs:
         run: sudo CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
-        run: go build -o build/dist/ipsw -ldflags "-s -w -extldflags '-static' -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+        run: |
+          go build -o build/dist/ipsw -ldflags "-s -w -extldflags '-static'" ./cmd/ipsw
+          dir
 
       - name: Run Help
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
