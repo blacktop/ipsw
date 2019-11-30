@@ -1,4 +1,4 @@
-// +build linux,cgo darwin,cgo
+// +build windows,cgo linux,cgo darwin,cgo
 
 package kernelcache
 
