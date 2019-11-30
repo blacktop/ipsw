@@ -12,18 +12,16 @@ environment:
   GO_LDFLAGS: -LC:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug -llzfse
   PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
 
-  stack: go 1.13
-
-  before_build:
-    - git clone https://github.com/lzfse/lzfse.git
-    - cd lzfse
-    - mkdir build
-    - cd build
-    - cmake --install .
-    # - dlltool --def C:\gopath\src\github.com\blacktop\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
+stack: go 1.13
 
 install:
-  - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
+  - git clone https://github.com/lzfse/lzfse.git
+  - cd lzfse
+  - mkdir build
+  - cd build
+  - cmake --install .
+  # - dlltool --def C:\gopath\src\github.com\blacktop\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
+  # - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
 # test_script:
 #   - ipsw.exe device list
 #   - ipsw.exe device -r https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
