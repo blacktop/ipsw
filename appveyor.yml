@@ -9,7 +9,7 @@ environment:
   GOPATH: c:\gopath
   CGO_ENABLED: 1
   CC: gcc.exe
-  GO_LDFLAGS: -Lc:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug
+  GO_LDFLAGS: -LC:\gopath\src\github.com\blacktop\ipsw\lzfse\build\Debug
   PATH: C:\msys64\mingw64\bin\;C:\Program Files (x86)\NSIS\;%PATH%
 
   stack: go 1.13
