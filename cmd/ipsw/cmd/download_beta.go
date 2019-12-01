@@ -59,6 +59,11 @@ var betaCmd = &cobra.Command{
 			return errors.Wrap(err, "failed to query ipsw.me api")
 		}
 
+		if len(ipsws) < 1 {
+			log.Errorf("no ipsws found for build %s", args[0])
+			return nil
+		}
+
 		log.Debug("URLs to Download:")
 		for _, i := range ipsws {
 			utils.Indent(log.Debug, 2)(i.URL)
