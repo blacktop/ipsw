@@ -199,13 +199,15 @@ func (d *Download) Do() error {
 		dest.Sync()
 		dest.Close()
 
-		utils.Indent(log.Info, 2)("verifying sha1sum...")
-		if ok, _ := utils.Verify(d.Sha1, destName+".download"); !ok {
-			// fileLock.Unlock()
-			if err := os.Remove(destName + ".download"); err != nil {
-				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+		if len(d.Sha1) > 0 {
+			utils.Indent(log.Info, 2)("verifying sha1sum...")
+			if ok, _ := utils.Verify(d.Sha1, destName+".download"); !ok {
+				// fileLock.Unlock()
+				if err := os.Remove(destName + ".download"); err != nil {
+					return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+				}
+				return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName+".download")
 			}
-			return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName+".download")
 		}
 
 	} else {
@@ -222,17 +224,19 @@ func (d *Download) Do() error {
 		dest.Sync()
 		dest.Close()
 
-		utils.Indent(log.Info, 2)("verifying sha1sum...")
-		checksum, _ := hex.DecodeString(d.Sha1)
+		if len(d.Sha1) > 0 {
+			utils.Indent(log.Info, 2)("verifying sha1sum...")
+			checksum, _ := hex.DecodeString(d.Sha1)
 
-		if !bytes.Equal(h.Sum(nil), checksum) {
-			utils.Indent(log.WithFields(log.Fields{
-				"expected": d.Sha1,
-				"actual":   fmt.Sprintf("%x", h.Sum(nil)),
-			}).Error, 3)("❌ BAD CHECKSUM")
-			// fileLock.Unlock()
-			if err := os.Remove(destName); err != nil {
-				return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+			if !bytes.Equal(h.Sum(nil), checksum) {
+				utils.Indent(log.WithFields(log.Fields{
+					"expected": d.Sha1,
+					"actual":   fmt.Sprintf("%x", h.Sum(nil)),
+				}).Error, 3)("❌ BAD CHECKSUM")
+				// fileLock.Unlock()
+				if err := os.Remove(destName); err != nil {
+					return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+				}
 			}
 		}
 	}

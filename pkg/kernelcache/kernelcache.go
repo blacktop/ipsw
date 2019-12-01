@@ -25,6 +25,7 @@ const (
 	lzfseEncodeMSymbols       = 20
 	lzfseEncodeDSymbols       = 64
 	lzfseEncodeLiteralSymbols = 256
+	lzssPadding               = 0x16c
 )
 
 // Img4 Kernelcache object
@@ -42,7 +43,7 @@ type LzssHeader struct {
 	CheckSum         uint32 // Likely CRC32
 	UncompressedSize uint32
 	CompressedSize   uint32
-	Padding          [0x16c]byte
+	Padding          [lzssPadding]byte
 }
 
 // LzfseCompressedBlockHeaderV2 represents the lzfse header
