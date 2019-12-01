@@ -1,15 +1,10 @@
 package api
 
 import (
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"strconv"
+	"regexp"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
-	"github.com/apex/log"
+	"github.com/gocolly/colly"
 	"github.com/pkg/errors"
 )
 
@@ -19,167 +14,86 @@ const (
 	betaFirmwarePath = "/wiki/Beta_Firmware"
 )
 
-var (
-	lastBaseBand []string
-	columnCount  int
-)
+var devices = []string{"iPad", "iPad_Air", "iPad_Pro", "iPad_mini", "iPhone", "iPod_touch"}
 
-func processTr(tr *goquery.Selection, isHeader bool) (IPSW, error) {
-
-	ipsw := IPSW{}
-	tableElements := []*goquery.Selection{}
-
-	// get table data
-	tr.Find("td").Each(func(_ int, td *goquery.Selection) {
-		tableElements = append(tableElements, td)
-		if isHeader {
-			columnCount++
-		}
-	})
-
-	// skip header row
-	if len(tableElements) == 0 {
-		return IPSW{}, fmt.Errorf("this is the table header")
-	}
-
-	ipsw.Version = strings.TrimSpace(tableElements[0].Text())
-	ipsw.BuildID = strings.TrimSpace(tableElements[1].Text())
-	keys := []string{}
-	tableElements[2].Find("a").Each(func(_ int, alink *goquery.Selection) {
-		keys = append(keys, alink.Text())
-	})
-	// ipsw.Keys = keys
-
-	if len(tableElements) == 8 {
-		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
-		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[4].Text()))
-		// lastBaseBand = ipsw.Baseband
-		// ipsw.ReleaseDate = strings.TrimSpace(tableElements[5].Text())
-		link, _ := tableElements[6].Find("a").Attr("href")
-		ipsw.URL = link
-		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[7].Text()), ",", "", -1))
-		if err != nil {
-			err = errors.Wrap(err, "unable to convert str to int")
-		}
-		ipsw.FileSize = fileSize
-	}
-
-	if len(tableElements) == 7 {
-		// ipsw.Baseband = append(ipsw.Baseband, strings.TrimSpace(tableElements[3].Text()))
-		// lastBaseBand = ipsw.Baseband
-		// ipsw.ReleaseDate = strings.TrimSpace(tableElements[4].Text())
-		link, _ := tableElements[5].Find("a").Attr("href")
-		ipsw.URL = link
-		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[6].Text()), ",", "", -1))
-		if err != nil {
-			err = errors.Wrap(err, "unable to convert str to int")
-		}
-		ipsw.FileSize = fileSize
-	}
-
-	if len(tableElements) == 6 {
-		// ipsw.Baseband = lastBaseBand
-		// ipsw.ReleaseDate = strings.TrimSpace(tableElements[3].Text())
-		link, _ := tableElements[4].Find("a").Attr("href")
-		ipsw.URL = link
-		fileSize, err := strconv.Atoi(strings.Replace(strings.TrimSpace(tableElements[5].Text()), ",", "", -1))
-		if err != nil {
-			err = errors.Wrap(err, "unable to convert str to int")
-		}
-		ipsw.FileSize = fileSize
-	}
-
-	return ipsw, nil
+// BetaIPSW object
+type BetaIPSW struct {
+	Device  string `json:"device,omitempty"`
+	Version string `json:"version,omitempty"`
+	BuildID string `json:"buildid,omitempty"`
+	URL     string `json:"url,omitempty"`
 }
 
-func getFirmwareLinks(url string) []string {
-
-	links := []string{}
-
-	res, err := http.Get(url)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-	}
-
-	// Load the HTML document
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	doc.Find("#mw-content-text > div a").Each(func(_ int, a *goquery.Selection) {
-		href, _ := a.Attr("href")
-		if strings.Contains(href, firmwarePath+"/") || strings.Contains(href, betaFirmwarePath+"/") {
-			links = append(links, href)
+func unique(ipsws []BetaIPSW) []BetaIPSW {
+	unique := make(map[string]bool, len(ipsws))
+	us := make([]BetaIPSW, len(unique))
+	for _, elem := range ipsws {
+		if len(elem.URL) != 0 {
+			if !unique[elem.URL] {
+				us = append(us, elem)
+				unique[elem.URL] = true
+			}
 		}
-	})
-	return links
+	}
+	return us
 }
 
-// ScrapeIPhoneWiki scraps iPhoneWiki and extracts/filters download links
-func ScrapeIPhoneWiki() error {
+// ScrapeURLs will scrape the iPhone Wiki for beta firmwares
+func ScrapeURLs(build string) ([]BetaIPSW, error) {
+	ipsws := []BetaIPSW{}
 
-	links := []string{}
+	c := colly.NewCollector(
+		colly.AllowedDomains("www.theiphonewiki.com"),
+		colly.URLFilters(
+			regexp.MustCompile("https://www.theiphonewiki.com/wiki/Beta_Firmware/(.+)$"),
+		),
+		colly.Async(true),
+	)
 
-	ipsws := []IPSW{}
+	// On every a element which has href attribute call callback
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		link := e.Attr("href")
 
-	firmwareLinks := getFirmwareLinks(iphoneWikiURL + firmwarePath)
-	betaFirmwareLinks := getFirmwareLinks(iphoneWikiURL + betaFirmwarePath)
+		if strings.Contains(link, "apple.com") {
+			// fmt.Printf("Link found: %q -> %s\n", e.Text, link)
 
-	links = append(links, firmwareLinks...)
-	links = append(links, betaFirmwareLinks...)
+			r := regexp.MustCompile(`\/(?P<device>i.+)_(?P<version>.+)_(?P<build>\w+)_Restore.ipsw$`)
+			names := r.SubexpNames()
 
-	// Request the HTML page.
-	for _, link := range links {
-		devices := []string{}
-
-		res, err := http.Get(iphoneWikiURL + link)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		defer res.Body.Close()
-		if res.StatusCode != 200 {
-			log.Fatalf("status code error: %d %s", res.StatusCode, res.Status)
-		}
-
-		// Load the HTML document
-		doc, err := goquery.NewDocumentFromReader(res.Body)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-
-		// get device names
-		doc.Find("span.mw-headline").Each(func(_ int, span *goquery.Selection) {
-			devices = append(devices, span.Text())
-		})
-
-		// Find the review items
-		doc.Find("table").Each(func(i int, table *goquery.Selection) {
-
-			var isHeader = true
-			columnCount = 0
-			device := devices[i]
-
-			table.Find("tr").Each(func(idx int, tr *goquery.Selection) {
-				if idx > 0 {
-					isHeader = false
+			result := r.FindAllStringSubmatch(link, -1)
+			if result != nil {
+				m := map[string]string{}
+				for i, n := range result[0] {
+					m[names[i]] = n
 				}
-
-				i, err := processTr(tr, isHeader)
-				i.Identifier = device
-				if err != nil {
-					log.WithError(err).Error("parsing table row failed")
-				} else {
-					ipsws = append(ipsws, i)
+				if strings.EqualFold(m["build"], build) {
+					ipsws = append(ipsws, BetaIPSW{
+						Device:  m["device"],
+						Version: m["version"],
+						BuildID: m["build"],
+						URL:     link,
+					})
+					// utils.Indent(log.WithFields(log.Fields{
+					// 	"link":    e.Text,
+					// 	"device":  m["device"],
+					// 	"version": m["version"],
+					// 	"build":   m["build"],
+					// }).Debug, 2)("Found Link")
 				}
-			})
-		})
+			}
+		}
+
+		c.Visit(e.Request.AbsoluteURL(link))
+	})
+
+	for _, device := range devices {
+		err := c.Visit("https://www.theiphonewiki.com/wiki/Beta_Firmware/" + device)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+		}
 	}
 
-	ipswJSON, _ := json.Marshal(ipsws)
-	return ioutil.WriteFile("database/ipsw.json", ipswJSON, 0644)
+	c.Wait()
+
+	return unique(ipsws), nil
 }
