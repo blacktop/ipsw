@@ -97,7 +97,7 @@ $ ipsw download --version 12.0
 
 #### Download all the LATEST `ipsws`
 
-Queries iTunes XML for latest version _(maybe run this as a cron job)_ 😉
+Queries the iTunes XML for latest version _(maybe run this as a cron job)_ 😉
 
 ``` bash
 $ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
@@ -121,7 +121,7 @@ $ ipsw download -V latest --yes --white-list ipod
   ...
 ```
 
-#### Only download and decompress the kernelcaches _(not supported on Windows)_
+#### Only download and `decompress` the kernelcaches _(not supported on Windows)_
 
 Single `kernelcache`
 
@@ -159,6 +159,20 @@ kernelcache.release.n102.decompressed
 ```
 
 But, how does it work?? 🤔 With the POWER :muscle: of [partialzip](https://github.com/blacktop/partialzip) !!
+
+#### Only download files that match a given name/path
+
+``` bash
+$ ipsw download -v 13.2.3 -d iPhone12,3 pattern Firmware/all_flash/iBoot
+```
+
+#### Download BETA `ipsws`
+
+This is done by scraping [theiphonewiki.com](https://theiphonewiki.com).
+
+``` bash
+$ ipsw download beta 17C5046a
+```
 
 #### Download with a Proxy
 
