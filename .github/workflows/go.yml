@@ -63,7 +63,7 @@ jobs:
         env:
           CGO_LDFLAGS: -LD:\a\ipsw\ipsw\lzfse\build\Debug
         run: |
-          go build -ldflags "-linkmode external -extldflags -static" ./cmd/ipsw
+          go build -o build/dist/ipsw -ldflags "-linkmode external -extldflags -static" ./cmd/ipsw
 
       - name: Run Help
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
