@@ -70,21 +70,21 @@ jobs:
         run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw --help
       - name: Run Help (Windows)
         if: matrix.platform == 'windows-latest'
-        run: D:\a\ipsw\ipsw\ipsw.exe --help
+        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe --help
 
       - name: Run Device List
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
         run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw device list
       - name: Run Device List (Windows)
         if: matrix.platform == 'windows-latest'
-        run: D:\a\ipsw\ipsw\ipsw.exe device list
+        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe device list
 
       - name: Run Extract Remote Kernelcache
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
         run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v 13.2.3 -d iPhone12,3
       # - name: Run Extract Remote Kernelcache (Windows)
       #   if: matrix.platform == 'windows-latest'
-      #   run: D:\a\ipsw\ipsw\ipsw.exe -V download kernel -v 13.2.3 -d iPhone12,3
+      #   run: D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 13.2.3 -d iPhone12,3
 
       - uses: actions/upload-artifact@master
         with:
