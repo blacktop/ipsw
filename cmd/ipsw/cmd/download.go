@@ -155,6 +155,15 @@ var downloadCmd = &cobra.Command{
 						if err != nil {
 							return errors.Wrap(err, "failed to download file")
 						}
+						// append sha1 and filename to checksums file
+						f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+						if err != nil {
+							return errors.Wrap(err, "failed to open checksums.txt.sha1")
+						}
+						defer f.Close()
+						if _, err = f.WriteString(i.SHA1 + "  " + destName + "\n"); err != nil {
+							return errors.Wrap(err, "failed to write to checksums.txt.sha1")
+						}
 					} else {
 						log.Warnf("ipsw already exists: %s", destName)
 					}
@@ -178,6 +187,15 @@ var downloadCmd = &cobra.Command{
 					err = api.NewDownload(i.URL, i.SHA1, proxy, insecure).Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
+					}
+					// append sha1 and filename to checksums file
+					f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+					if err != nil {
+						return errors.Wrap(err, "failed to open checksums.txt.sha1")
+					}
+					defer f.Close()
+					if _, err = f.WriteString(i.SHA1 + "  " + destName + "\n"); err != nil {
+						return errors.Wrap(err, "failed to write to checksums.txt.sha1")
 					}
 				} else {
 					log.Warnf("ipsw already exists: %s", destName)
