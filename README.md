@@ -121,6 +121,16 @@ $ ipsw download -V latest --yes --white-list ipod
   ...
 ```
 
+This will also generate a `checksums.txt.sha1` file that you can use to verify the downloads
+
+```bash
+$ sha1sum -c checksums.txt.sha1
+
+iPad_64bit_TouchID_13.2.3_17B111_Restore.ipsw: OK
+iPadPro_9.7_13.2.3_17B111_Restore.ipsw: OK
+iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
+```
+
 #### Only download and `decompress` the kernelcaches _(not supported on Windows)_
 
 Single `kernelcache`
