@@ -47,9 +47,9 @@ const (
 
 // completionCmd represents the completion command
 var completionCmd = &cobra.Command{
-	Use:   "completion [bash|zsh]",
+	Use:   "completion <bash|zsh>",
 	Short: "Generates bash completion scripts",
-	Long: longDescription,
+	Long:  longDescription,
 	Args: func(cmd *cobra.Command, args []string) error {
 		if len(args) != 1 {
 			return fmt.Errorf("requires 1 arg, found %d", len(args))

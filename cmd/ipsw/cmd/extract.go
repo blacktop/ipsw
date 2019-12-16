@@ -70,7 +70,7 @@ func isURL(str string) bool {
 
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
-	Use:   "extract [path to IPSW | URL]",
+	Use:   "extract <IPSW | URL>",
 	Short: "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

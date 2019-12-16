@@ -13,7 +13,7 @@ func init() {
 
 // genCmd represents the gen command
 var genCmd = &cobra.Command{
-	Use:   "gen [output PATH]",
+	Use:   "gen <PATH>",
 	Short: "Generate iOS devices database",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

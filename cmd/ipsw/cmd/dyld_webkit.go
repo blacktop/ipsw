@@ -33,7 +33,7 @@ import (
 
 // webkitCmd represents the webkit command
 var webkitCmd = &cobra.Command{
-	Use:   "webkit [path to dyld_shared_cache]",
+	Use:   "webkit <dyld_shared_cache>",
 	Short: "Get WebKit version from a dyld_shared_cache",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -69,7 +69,7 @@ func checkRequiredFlags(flags *pflag.FlagSet) error {
 
 // splitCmd represents the split command
 var splitCmd = &cobra.Command{
-	Use:   "split [path to dyld_shared_cache]",
+	Use:   "split <dyld_shared_cache>",
 	Short: "Extracts all the dyld_shared_cache libraries",
 	Args:  cobra.MinimumNArgs(1),
 	PreRunE: func(cmd *cobra.Command, args []string) error {

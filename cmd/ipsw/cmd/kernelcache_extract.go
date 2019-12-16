@@ -38,7 +38,7 @@ func init() {
 
 // kerExtractCmd represents the kerExtract command
 var kerExtractCmd = &cobra.Command{
-	Use:   "extract  [path to IPSW]",
+	Use:   "extract <IPSW>",
 	Short: "Extract and decompress a kernelcache from IPSW",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

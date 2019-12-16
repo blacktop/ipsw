@@ -45,6 +45,8 @@ func init() {
 
 	deviceCmd.Flags().BoolVarP(&jsonFlag, "json", "j", false, "Output to stdout as JSON")
 	deviceCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
+
+	deviceCmd.MarkZshCompPositionalArgumentFile(1, "DeviceTree*")
 }
 
 // deviceCmd represents the device command

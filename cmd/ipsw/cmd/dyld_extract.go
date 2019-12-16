@@ -36,7 +36,7 @@ func init() {
 
 // extractDyldCmd represents the extractDyld command
 var extractDyldCmd = &cobra.Command{
-	Use:   "extract [path to IPSW]",
+	Use:   "extract <IPSW>",
 	Short: "Extract dyld_shared_cache from DMG in IPSW",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
