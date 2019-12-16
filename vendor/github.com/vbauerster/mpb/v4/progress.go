@@ -30,7 +30,7 @@ type Progress struct {
 	bwg          *sync.WaitGroup
 	operateState chan func(*pState)
 	done         chan struct{}
-	forceRefresh chan time.Time
+	refreshCh    chan time.Time
 	once         sync.Once
 	dlogger      *log.Logger
 }
@@ -49,7 +49,8 @@ type pState struct {
 	popCompleted     bool
 	rr               time.Duration
 	uwg              *sync.WaitGroup
-	manualRefreshCh  <-chan time.Time
+	refreshSrc       <-chan time.Time
+	renderDelay      <-chan struct{}
 	shutdownNotifier chan struct{}
 	parkedBars       map[*Bar]*Bar
 	output           io.Writer
@@ -87,7 +88,6 @@ func NewWithContext(ctx context.Context, options ...ContainerOption) *Progress {
 		cwg:          new(sync.WaitGroup),
 		bwg:          new(sync.WaitGroup),
 		operateState: make(chan func(*pState)),
-		forceRefresh: make(chan time.Time),
 		done:         make(chan struct{}),
 		dlogger:      log.New(s.debugOut, "[mpb] ", log.Lshortfile),
 	}
@@ -99,19 +99,19 @@ func NewWithContext(ctx context.Context, options ...ContainerOption) *Progress {
 
 // AddBar creates a new progress bar and adds to the container.
 func (p *Progress) AddBar(total int64, options ...BarOption) *Bar {
-	return p.Add(total, NewBarFiller(), options...)
+	return p.Add(total, NewBarFiller(DefaultBarStyle, false), options...)
 }
 
 // AddSpinner creates a new spinner bar and adds to the container.
 func (p *Progress) AddSpinner(total int64, alignment SpinnerAlignment, options ...BarOption) *Bar {
-	return p.Add(total, NewSpinnerFiller(alignment), options...)
+	return p.Add(total, NewSpinnerFiller(DefaultSpinnerStyle, alignment), options...)
 }
 
 // Add creates a bar which renders itself by provided filler.
 // Set total to 0, if you plan to update it later.
 func (p *Progress) Add(total int64, filler Filler, options ...BarOption) *Bar {
 	if filler == nil {
-		filler = NewBarFiller()
+		filler = NewBarFiller(DefaultBarStyle, false)
 	}
 	p.bwg.Add(1)
 	result := make(chan *Bar)
@@ -205,25 +205,18 @@ func (p *Progress) shutdown() {
 func (p *Progress) serve(s *pState, cw *cwriter.Writer) {
 	defer p.cwg.Done()
 
-	manualOrTickCh, cleanUp := s.manualOrTick()
-	defer cleanUp()
-
-	refreshCh := fanInRefreshSrc(p.done, p.forceRefresh, manualOrTickCh)
+	p.refreshCh = s.newTicker(p.done)
 
 	for {
 		select {
 		case op := <-p.operateState:
 			op(s)
-		case _, ok := <-refreshCh:
-			if !ok {
-				if s.shutdownNotifier != nil {
-					close(s.shutdownNotifier)
-				}
-				return
-			}
+		case <-p.refreshCh:
 			if err := s.render(cw); err != nil {
-				p.dlogger.Println(err)
+				go p.dlogger.Println(err)
 			}
+		case <-s.shutdownNotifier:
+			return
 		}
 	}
 }
@@ -259,9 +252,6 @@ func (s *pState) flush(cw *cwriter.Writer) error {
 			// this ensures no bar ends up with less than 100% rendered
 			defer func() {
 				s.barShutdownQueue = append(s.barShutdownQueue, b)
-				if !b.noPop && s.popCompleted {
-					b.priority = -1
-				}
 			}()
 		}
 		lineCount += b.extendedLines + 1
@@ -303,12 +293,31 @@ func (s *pState) flush(cw *cwriter.Writer) error {
 	return cw.Flush(lineCount)
 }
 
-func (s *pState) manualOrTick() (<-chan time.Time, func()) {
-	if s.manualRefreshCh != nil {
-		return s.manualRefreshCh, func() {}
+func (s *pState) newTicker(done <-chan struct{}) chan time.Time {
+	ch := make(chan time.Time)
+	if s.shutdownNotifier == nil {
+		s.shutdownNotifier = make(chan struct{})
 	}
-	ticker := time.NewTicker(s.rr)
-	return ticker.C, ticker.Stop
+	go func() {
+		if s.renderDelay != nil {
+			<-s.renderDelay
+		}
+		if s.refreshSrc == nil {
+			ticker := time.NewTicker(s.rr)
+			defer ticker.Stop()
+			s.refreshSrc = ticker.C
+		}
+		for {
+			select {
+			case tick := <-s.refreshSrc:
+				ch <- tick
+			case <-done:
+				close(s.shutdownNotifier)
+				return
+			}
+		}
+	}()
+	return ch
 }
 
 func (s *pState) updateSyncMatrix() {
@@ -332,6 +341,7 @@ func (s *pState) updateSyncMatrix() {
 func (s *pState) makeBarState(total int64, filler Filler, options ...BarOption) *bState {
 	bs := &bState{
 		total:    total,
+		baseF:    extractBaseFiller(filler),
 		filler:   filler,
 		priority: s.idCount,
 		id:       s.idCount,
@@ -346,6 +356,10 @@ func (s *pState) makeBarState(total int64, filler Filler, options ...BarOption) 
 		if opt != nil {
 			opt(bs)
 		}
+	}
+
+	if s.popCompleted && !bs.noPop {
+		bs.priority = -1
 	}
 
 	bs.bufP = bytes.NewBuffer(make([]byte, 0, bs.width))
@@ -372,38 +386,9 @@ func syncWidth(matrix map[int][]chan int) {
 	}
 }
 
-func fanInRefreshSrc(done <-chan struct{}, channels ...<-chan time.Time) <-chan time.Time {
-	var wg sync.WaitGroup
-	multiplexedStream := make(chan time.Time)
-
-	multiplex := func(c <-chan time.Time) {
-		defer wg.Done()
-		// source channels are never closed (time.Ticker never closes associated
-		// channel), so we cannot simply range over a c, instead we use select
-		// inside infinite loop
-		for {
-			select {
-			case v := <-c:
-				select {
-				case multiplexedStream <- v:
-				case <-done:
-					return
-				}
-			case <-done:
-				return
-			}
-		}
+func extractBaseFiller(f Filler) Filler {
+	if f, ok := f.(Wrapper); ok {
+		return extractBaseFiller(f.Base())
 	}
-
-	wg.Add(len(channels))
-	for _, c := range channels {
-		go multiplex(c)
-	}
-
-	go func() {
-		wg.Wait()
-		close(multiplexedStream)
-	}()
-
-	return multiplexedStream
+	return f
 }

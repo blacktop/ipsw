@@ -10,9 +10,8 @@ func Name(name string, wcc ...WC) Decorator {
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
-	wc.Init()
 	d := &nameDecorator{
-		WC:  wc,
+		WC:  wc.Init(),
 		msg: name,
 	}
 	return d
@@ -20,17 +19,9 @@ func Name(name string, wcc ...WC) Decorator {
 
 type nameDecorator struct {
 	WC
-	msg      string
-	complete *string
+	msg string
 }
 
 func (d *nameDecorator) Decor(st *Statistics) string {
-	if st.Completed && d.complete != nil {
-		return d.FormatMsg(*d.complete)
-	}
 	return d.FormatMsg(d.msg)
-}
-
-func (d *nameDecorator) OnCompleteMessage(msg string) {
-	d.complete = &msg
 }

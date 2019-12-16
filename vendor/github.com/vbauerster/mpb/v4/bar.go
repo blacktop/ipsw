@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"strings"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -18,7 +17,7 @@ import (
 // Filler interface.
 // Bar renders by calling Filler's Fill method. You can literally have
 // any bar kind, by implementing this interface and passing it to the
-// mpb.Add function.
+// *Progress.Add method.
 type Filler interface {
 	Fill(w io.Writer, width int, stat *decor.Statistics)
 }
@@ -28,6 +27,14 @@ type FillerFunc func(w io.Writer, width int, stat *decor.Statistics)
 
 func (f FillerFunc) Fill(w io.Writer, width int, stat *decor.Statistics) {
 	f(w, width, stat)
+}
+
+// Wrapper interface.
+// If you're implementing custom Filler by wrapping a built-in one,
+// it is necessary to implement this interface to retain functionality
+// of built-in Filler.
+type Wrapper interface {
+	Base() Filler
 }
 
 // Bar represents a progress Bar.
@@ -44,17 +51,12 @@ type Bar struct {
 	syncTableCh   chan [][]chan int
 	completed     chan bool
 
-	// concel is called either by user or on complete event
+	// cancel is called either by user or on complete event
 	cancel func()
 	// done is closed after cacheState is assigned
 	done chan struct{}
 	// cacheState is populated, right after close(shutdown)
 	cacheState *bState
-
-	arbitraryCurrent struct {
-		sync.Mutex
-		current int64
-	}
 
 	container      *Progress
 	dlogger        *log.Logger
@@ -64,6 +66,7 @@ type Bar struct {
 type extFunc func(in io.Reader, tw int, st *decor.Statistics) (out io.Reader, lines int)
 
 type bState struct {
+	baseF             Filler
 	filler            Filler
 	id                int
 	width             int
@@ -75,7 +78,6 @@ type bState struct {
 	noPop             bool
 	aDecorators       []decor.Decorator
 	pDecorators       []decor.Decorator
-	mDecorators       []decor.Decorator
 	amountReceivers   []decor.AmountReceiver
 	shutdownListeners []decor.ShutdownListener
 	averageAdjusters  []decor.AverageAdjuster
@@ -139,7 +141,11 @@ func (b *Bar) ProxyReader(r io.Reader) io.ReadCloser {
 	if !ok {
 		rc = ioutil.NopCloser(r)
 	}
-	return &proxyReader{rc, b, time.Now()}
+	prox := &proxyReader{rc, b, time.Now()}
+	if wt, ok := r.(io.WriterTo); ok {
+		return &proxyWriterTo{prox, wt}
+	}
+	return prox
 }
 
 // ID returs id of the bar.
@@ -171,7 +177,7 @@ func (b *Bar) SetRefill(amount int64) {
 		SetRefill(int64)
 	}
 	b.operateState <- func(s *bState) {
-		if f, ok := s.filler.(refiller); ok {
+		if f, ok := s.baseF.(refiller); ok {
 			f.SetRefill(amount)
 		}
 	}
@@ -193,10 +199,9 @@ func (b *Bar) TraverseDecorators(cb decor.CBFunc) {
 		for _, decorators := range [...][]decor.Decorator{
 			s.pDecorators,
 			s.aDecorators,
-			s.mDecorators,
 		} {
 			for _, d := range decorators {
-				cb(d)
+				cb(extractBaseDecorator(d))
 			}
 		}
 	}
@@ -207,11 +212,15 @@ func (b *Bar) TraverseDecorators(cb decor.CBFunc) {
 func (b *Bar) SetTotal(total int64, complete bool) {
 	select {
 	case b.operateState <- func(s *bState) {
-		s.total = total
+		if total <= 0 {
+			s.total = s.current
+		} else {
+			s.total = total
+		}
 		if complete && !s.toComplete {
 			s.current = s.total
 			s.toComplete = true
-			go b.refreshNowTillShutdown()
+			go b.refreshTillShutdown()
 		}
 	}:
 	case <-b.done:
@@ -220,14 +229,20 @@ func (b *Bar) SetTotal(total int64, complete bool) {
 
 // SetCurrent sets progress' current to arbitrary amount.
 func (b *Bar) SetCurrent(current int64, wdd ...time.Duration) {
-	if current <= 0 {
-		return
+	select {
+	case b.operateState <- func(s *bState) {
+		for _, ar := range s.amountReceivers {
+			ar.NextAmount(current-s.current, wdd...)
+		}
+		s.current = current
+		if s.total > 0 && s.current >= s.total {
+			s.current = s.total
+			s.toComplete = true
+			go b.refreshTillShutdown()
+		}
+	}:
+	case <-b.done:
 	}
-	b.arbitraryCurrent.Lock()
-	last := b.arbitraryCurrent.current
-	b.IncrBy(int(current-last), wdd...)
-	b.arbitraryCurrent.current = current
-	b.arbitraryCurrent.Unlock()
 }
 
 // Increment is a shorthand for b.IncrInt64(1, wdd...).
@@ -246,14 +261,14 @@ func (b *Bar) IncrBy(n int, wdd ...time.Duration) {
 func (b *Bar) IncrInt64(n int64, wdd ...time.Duration) {
 	select {
 	case b.operateState <- func(s *bState) {
+		for _, ar := range s.amountReceivers {
+			ar.NextAmount(n, wdd...)
+		}
 		s.current += n
 		if s.total > 0 && s.current >= s.total {
 			s.current = s.total
 			s.toComplete = true
-			go b.refreshNowTillShutdown()
-		}
-		for _, ar := range s.amountReceivers {
-			ar.NextAmount(n, wdd...)
+			go b.refreshTillShutdown()
 		}
 	}:
 	case <-b.done:
@@ -374,10 +389,10 @@ func (b *Bar) subscribeDecorators() {
 	}
 }
 
-func (b *Bar) refreshNowTillShutdown() {
+func (b *Bar) refreshTillShutdown() {
 	for {
 		select {
-		case b.container.forceRefresh <- time.Now():
+		case b.container.refreshCh <- time.Now():
 		case <-b.done:
 			return
 		}
@@ -452,4 +467,11 @@ func newStatistics(s *bState) *decor.Statistics {
 		Total:     s.total,
 		Current:   s.current,
 	}
+}
+
+func extractBaseDecorator(d decor.Decorator) decor.Decorator {
+	if d, ok := d.(decor.Wrapper); ok {
+		return extractBaseDecorator(d.Base())
+	}
+	return d
 }

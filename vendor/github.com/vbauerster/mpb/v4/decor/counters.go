@@ -47,43 +47,38 @@ func Counters(unit int, pairFmt string, wcc ...WC) Decorator {
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
-	wc.Init()
-	if pairFmt == "" {
-		pairFmt = "%d / %d"
-	}
 	d := &countersDecorator{
-		WC:      wc,
-		unit:    unit,
-		pairFmt: pairFmt,
+		WC:       wc.Init(),
+		producer: chooseSizeProducer(unit, pairFmt),
 	}
 	return d
 }
 
 type countersDecorator struct {
 	WC
-	unit        int
-	pairFmt     string
-	completeMsg *string
+	producer func(*Statistics) string
 }
 
 func (d *countersDecorator) Decor(st *Statistics) string {
-	if st.Completed && d.completeMsg != nil {
-		return d.FormatMsg(*d.completeMsg)
-	}
-
-	var res string
-	switch d.unit {
-	case UnitKiB:
-		res = fmt.Sprintf(d.pairFmt, SizeB1024(st.Current), SizeB1024(st.Total))
-	case UnitKB:
-		res = fmt.Sprintf(d.pairFmt, SizeB1000(st.Current), SizeB1000(st.Total))
-	default:
-		res = fmt.Sprintf(d.pairFmt, st.Current, st.Total)
-	}
-
-	return d.FormatMsg(res)
+	return d.FormatMsg(d.producer(st))
 }
 
-func (d *countersDecorator) OnCompleteMessage(msg string) {
-	d.completeMsg = &msg
+func chooseSizeProducer(unit int, format string) func(*Statistics) string {
+	if format == "" {
+		format = "%d / %d"
+	}
+	switch unit {
+	case UnitKiB:
+		return func(st *Statistics) string {
+			return fmt.Sprintf(format, SizeB1024(st.Current), SizeB1024(st.Total))
+		}
+	case UnitKB:
+		return func(st *Statistics) string {
+			return fmt.Sprintf(format, SizeB1000(st.Current), SizeB1000(st.Total))
+		}
+	default:
+		return func(st *Statistics) string {
+			return fmt.Sprintf(format, st.Current, st.Total)
+		}
+	}
 }

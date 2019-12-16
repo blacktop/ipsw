@@ -1,9 +1,6 @@
 # go-lzfse
-Go bindings for lzfse compression
 
-# lzss
-
-[![GoDoc](https://godoc.org/github.com/blacktop/lzss?status.svg)](https://godoc.org/github.com/blacktop/lzss) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
+[![GoDoc](https://godoc.org/github.com/blacktop/go-lzfse?status.svg)](https://godoc.org/github.com/blacktop/go-lzfse) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
 
 > Go bindings for [lzfse](https://github.com/lzfse/lzfse) compression.
 
@@ -28,7 +25,6 @@ go get github.com/blacktop/go-lzfse
 ```golang
 import (
     "io/ioutil"
-    "unsafe"
     "log"
 
     lzfse "github.com/blacktop/go-lzfse"
@@ -36,19 +32,15 @@ import (
 )
 
 func main() {
-    dat, err := ioutil.ReadFile("kernelcache.release.iphone12.decompressed")
+
+    dat, err := ioutil.ReadFile("encoded.file")
     if err != nil {
         log.Fatal(errors.Wrap(err, "failed to read compressed file"))
     }
 
-    var decompressed bytes.Buffer
+    decompressed = lzfse.DecodeBuffer(dat)
 
-    scratch := make([]byte, lzfse.DecodeScratchSize())
-    p := unsafe.Pointer(&scratch[0])
-
-    lzfse.DecodeBuffer(decompressed.Bytes(), uint(len(decompressed)), string(dat), uint(len(dat)), p)
-
-    err = ioutil.WriteFile("kernelcache.release.iphone12.decompressed", decompressed, 0644)
+    err = ioutil.WriteFile("decoded.file", decompressed, 0644)
     if err != nil {
         log.Fatal(errors.Wrap(err, "failed to decompress file"))
     }

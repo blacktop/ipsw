@@ -50,9 +50,8 @@ func MovingAverageETA(style TimeStyle, average MovingAverage, normalizer TimeNor
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
-	wc.Init()
 	d := &movingAverageETA{
-		WC:         wc,
+		WC:         wc.Init(),
 		average:    average,
 		normalizer: normalizer,
 		producer:   chooseTimeProducer(style),
@@ -62,17 +61,12 @@ func MovingAverageETA(style TimeStyle, average MovingAverage, normalizer TimeNor
 
 type movingAverageETA struct {
 	WC
-	average     ewma.MovingAverage
-	normalizer  TimeNormalizer
-	producer    func(time.Duration) string
-	completeMsg *string
+	average    ewma.MovingAverage
+	normalizer TimeNormalizer
+	producer   func(time.Duration) string
 }
 
 func (d *movingAverageETA) Decor(st *Statistics) string {
-	if st.Completed && d.completeMsg != nil {
-		return d.FormatMsg(*d.completeMsg)
-	}
-
 	v := math.Round(d.average.Value())
 	remaining := time.Duration((st.Total - st.Current) * int64(v))
 	if d.normalizer != nil {
@@ -91,10 +85,6 @@ func (d *movingAverageETA) NextAmount(n int64, wdd ...time.Duration) {
 		return
 	}
 	d.average.Add(durPerItem)
-}
-
-func (d *movingAverageETA) OnCompleteMessage(msg string) {
-	d.completeMsg = &msg
 }
 
 // AverageETA decorator. It's wrapper of NewAverageETA.
@@ -120,9 +110,8 @@ func NewAverageETA(style TimeStyle, startTime time.Time, normalizer TimeNormaliz
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
-	wc.Init()
 	d := &averageETA{
-		WC:         wc,
+		WC:         wc.Init(),
 		startTime:  startTime,
 		normalizer: normalizer,
 		producer:   chooseTimeProducer(style),
@@ -132,17 +121,12 @@ func NewAverageETA(style TimeStyle, startTime time.Time, normalizer TimeNormaliz
 
 type averageETA struct {
 	WC
-	startTime   time.Time
-	normalizer  TimeNormalizer
-	producer    func(time.Duration) string
-	completeMsg *string
+	startTime  time.Time
+	normalizer TimeNormalizer
+	producer   func(time.Duration) string
 }
 
 func (d *averageETA) Decor(st *Statistics) string {
-	if st.Completed && d.completeMsg != nil {
-		return d.FormatMsg(*d.completeMsg)
-	}
-
 	var remaining time.Duration
 	if st.Current != 0 {
 		durPerItem := float64(time.Since(d.startTime)) / float64(st.Current)
@@ -153,10 +137,6 @@ func (d *averageETA) Decor(st *Statistics) string {
 		}
 	}
 	return d.FormatMsg(d.producer(remaining))
-}
-
-func (d *averageETA) OnCompleteMessage(msg string) {
-	d.completeMsg = &msg
 }
 
 func (d *averageETA) AverageAdjust(startTime time.Time) {

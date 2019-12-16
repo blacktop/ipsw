@@ -25,9 +25,8 @@ func NewElapsed(style TimeStyle, startTime time.Time, wcc ...WC) Decorator {
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
-	wc.Init()
 	d := &elapsedDecorator{
-		WC:        wc,
+		WC:        wc.Init(),
 		startTime: startTime,
 		producer:  chooseTimeProducer(style),
 	}
@@ -36,24 +35,14 @@ func NewElapsed(style TimeStyle, startTime time.Time, wcc ...WC) Decorator {
 
 type elapsedDecorator struct {
 	WC
-	startTime   time.Time
-	producer    func(time.Duration) string
-	msg         string
-	completeMsg *string
+	startTime time.Time
+	producer  func(time.Duration) string
+	msg       string
 }
 
 func (d *elapsedDecorator) Decor(st *Statistics) string {
-	if st.Completed {
-		if d.completeMsg != nil {
-			return d.FormatMsg(*d.completeMsg)
-		}
-		return d.FormatMsg(d.msg)
+	if !st.Completed {
+		d.msg = d.producer(time.Since(d.startTime))
 	}
-
-	d.msg = d.producer(time.Since(d.startTime))
 	return d.FormatMsg(d.msg)
-}
-
-func (d *elapsedDecorator) OnCompleteMessage(msg string) {
-	d.completeMsg = &msg
 }

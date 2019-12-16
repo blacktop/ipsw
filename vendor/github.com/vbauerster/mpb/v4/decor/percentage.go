@@ -51,12 +51,11 @@ func NewPercentage(fmt string, wcc ...WC) Decorator {
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
-	wc.Init()
 	if fmt == "" {
 		fmt = "% d"
 	}
 	d := &percentageDecorator{
-		WC:  wc,
+		WC:  wc.Init(),
 		fmt: fmt,
 	}
 	return d
@@ -64,18 +63,10 @@ func NewPercentage(fmt string, wcc ...WC) Decorator {
 
 type percentageDecorator struct {
 	WC
-	fmt         string
-	completeMsg *string
+	fmt string
 }
 
 func (d *percentageDecorator) Decor(st *Statistics) string {
-	if st.Completed && d.completeMsg != nil {
-		return d.FormatMsg(*d.completeMsg)
-	}
 	p := internal.Percentage(st.Total, st.Current, 100)
 	return d.FormatMsg(fmt.Sprintf(d.fmt, percentageType(p)))
-}
-
-func (d *percentageDecorator) OnCompleteMessage(msg string) {
-	d.completeMsg = &msg
 }
