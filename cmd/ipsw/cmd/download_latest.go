@@ -70,28 +70,22 @@ var latestCmd = &cobra.Command{
 			return errors.Wrap(err, "failed to create itunes API")
 		}
 
-		builds, err = itunes.GetLatestBuilds()
+		builds, err = itunes.GetLatestBuilds(device)
 		if err != nil {
 			return errors.Wrap(err, "failed to get the latest builds")
 		}
 
 		for _, v := range builds {
-			if len(device) > 0 {
-				if strings.EqualFold(device, v.Identifier) {
+			if len(doDownload) > 0 {
+				if utils.StrSliceContains(doDownload, v.Identifier) {
+					filteredBuilds = append(filteredBuilds, v)
+				}
+			} else if len(doNotDownload) > 0 {
+				if !utils.StrSliceContains(doNotDownload, v.Identifier) {
 					filteredBuilds = append(filteredBuilds, v)
 				}
 			} else {
-				if len(doDownload) > 0 {
-					if utils.StrSliceContains(doDownload, v.Identifier) {
-						filteredBuilds = append(filteredBuilds, v)
-					}
-				} else if len(doNotDownload) > 0 {
-					if !utils.StrSliceContains(doNotDownload, v.Identifier) {
-						filteredBuilds = append(filteredBuilds, v)
-					}
-				} else {
-					filteredBuilds = append(filteredBuilds, v)
-				}
+				filteredBuilds = append(filteredBuilds, v)
 			}
 		}
 

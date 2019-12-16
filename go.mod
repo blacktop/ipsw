@@ -1,7 +1,7 @@
 module github.com/blacktop/ipsw
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.0.4
+	github.com/AlecAivazis/survey/v2 v2.0.5
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/PuerkitoBio/goquery v1.5.0
 	github.com/andybalholm/cascadia v1.1.0 // indirect
@@ -40,7 +40,7 @@ require (
 	github.com/vbauerster/mpb/v4 v4.11.1
 	golang.org/x/crypto v0.0.0-20191128160524-b544559bb6d1 // indirect
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
-	golang.org/x/sys v0.0.0-20191128015809-6d18c012aee9 // indirect
+	golang.org/x/sys v0.0.0-20191206220618-eeba5f6aabab // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/yaml.v2 v2.2.7 // indirect
 	howett.net/plist v0.0.0-20181124034731-591f970eefbb
