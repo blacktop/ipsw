@@ -40,10 +40,10 @@ type Download struct {
 }
 
 // NewDownload creates a new downloader
-func NewDownload(url, sha1, proxy string, insecure bool) *Download {
+func NewDownload(proxy string, insecure bool) *Download {
 	return &Download{
-		URL:     url,
-		Sha1:    sha1,
+		// URL:     url,
+		// Sha1:    sha1,
 		resume:  false,
 		skipAll: false,
 		client: &http.Client{
@@ -127,18 +127,18 @@ func (d *Download) Do() error {
 			switch choice {
 			case "resume":
 				d.resume = true
+			case "restart":
+				log.Infof("Downloading %s - RESTARTED", destName+".download")
+				d.resume = false
 			case "skip":
 				log.Infof("%s - SKIPPED", destName+".download")
 				d.resume = false
 				return nil
 			case "skip all":
-				log.Info("Skipping ALL (you are performing a distributed download)")
+				log.Info("Skipping ALL active downloads (you are performing a distributed download)")
 				d.skipAll = true
 				d.resume = false
 				return nil
-			case "restart":
-				log.Infof("Downloading %s - RESTARTED", destName+".download")
-				d.resume = false
 			}
 
 			if d.resume {

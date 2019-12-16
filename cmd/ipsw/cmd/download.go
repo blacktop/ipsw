@@ -70,8 +70,8 @@ var downloadCmd = &cobra.Command{
 		// filters
 		version, _ := cmd.Flags().GetString("version")
 		device, _ := cmd.Flags().GetString("device")
-		doDownload, _ := cmd.Flags().GetStringSlice("white-list")
-		doNotDownload, _ := cmd.Flags().GetStringSlice("black-list")
+		doDownload, _ := cmd.Flags().GetStringArray("white-list")
+		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 		build, _ := cmd.Flags().GetString("build")
 
 		if len(version) > 0 && len(build) > 0 {
@@ -135,6 +135,7 @@ var downloadCmd = &cobra.Command{
 				}
 			}
 			if cont {
+				downloader := api.NewDownload(proxy, insecure)
 				for _, url := range urls {
 					destName := strings.Replace(path.Base(url), ",", "_", -1)
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
@@ -151,7 +152,9 @@ var downloadCmd = &cobra.Command{
 							"signed":  i.Signed,
 						}).Info("Getting IPSW")
 						// download file
-						err = api.NewDownload(url, i.SHA1, proxy, insecure).Do()
+						downloader.URL = url
+						downloader.Sha1 = i.SHA1
+						err = downloader.Do()
 						if err != nil {
 							return errors.Wrap(err, "failed to download file")
 						}
@@ -184,7 +187,10 @@ var downloadCmd = &cobra.Command{
 						"version": i.Version,
 						"signed":  i.Signed,
 					}).Info("Getting IPSW")
-					err = api.NewDownload(i.URL, i.SHA1, proxy, insecure).Do()
+					downloader := api.NewDownload(proxy, insecure)
+					downloader.URL = i.URL
+					downloader.Sha1 = i.SHA1
+					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}

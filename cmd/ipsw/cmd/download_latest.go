@@ -104,6 +104,7 @@ var latestCmd = &cobra.Command{
 		}
 
 		if cont {
+			downloader := api.NewDownload(proxy, insecure)
 			for _, build := range filteredBuilds {
 				destName := strings.Replace(path.Base(build.FirmwareURL), ",", "_", -1)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
@@ -113,7 +114,9 @@ var latestCmd = &cobra.Command{
 						"version": build.ProductVersion,
 					}).Info("Getting IPSW")
 					// download file
-					err = api.NewDownload(build.FirmwareURL, build.FirmwareSHA1, proxy, insecure).Do()
+					downloader.URL = build.FirmwareURL
+					downloader.Sha1 = build.FirmwareSHA1
+					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}
