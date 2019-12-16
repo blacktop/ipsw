@@ -38,7 +38,7 @@ func init() {
 
 // decCmd represents the dec command
 var decCmd = &cobra.Command{
-	Use:   "dec [path to kernelcache]",
+	Use:   "dec <kernelcache>",
 	Short: "Decompress a kernelcache",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
