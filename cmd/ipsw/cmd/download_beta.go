@@ -80,6 +80,7 @@ var betaCmd = &cobra.Command{
 		}
 
 		if cont {
+			downloader := api.NewDownload(proxy, insecure)
 			for _, i := range ipsws {
 				destName := strings.Replace(path.Base(i.URL), ",", "_", -1)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
@@ -90,7 +91,8 @@ var betaCmd = &cobra.Command{
 						"version": i.Version,
 					}).Info("Getting IPSW")
 					// download file
-					err = api.NewDownload(i.URL, "", proxy, insecure).Do()
+					downloader.URL = i.URL
+					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")
 					}

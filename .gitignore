@@ -32,3 +32,4 @@ xcode/data
 *.download
 *_Restore
 *.plist
+checksums.txt.sha1
