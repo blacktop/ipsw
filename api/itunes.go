@@ -124,12 +124,19 @@ func (vm *ITunesVersionMaster) GetBuildsForBuildID(buildID string) []Build {
 }
 
 // GetLatestBuilds gets all the latest IndividualBuilds that match supplied build ID
-func (vm *ITunesVersionMaster) GetLatestBuilds() ([]Build, error) {
+func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 	var builds []Build
 	var versionsRaw []string
 
 	for _, build := range vm.GetBuilds() {
-		versionsRaw = append(versionsRaw, build.ProductVersion)
+		if len(device) > 0 {
+			if strings.EqualFold(device, build.Identifier) {
+				versionsRaw = append(versionsRaw, build.ProductVersion)
+			}
+		} else {
+			versionsRaw = append(versionsRaw, build.ProductVersion)
+		}
+
 	}
 
 	versions := make([]*version.Version, len(versionsRaw))
@@ -162,7 +169,13 @@ func (vm *ITunesVersionMaster) GetLatestBuilds() ([]Build, error) {
 
 	for _, build := range vm.GetBuilds() {
 		if strings.EqualFold(build.ProductVersion, newestVersion.Original()) {
-			builds = append(builds, build)
+			if len(device) > 0 {
+				if strings.EqualFold(device, build.Identifier) {
+					builds = append(builds, build)
+				}
+			} else {
+				builds = append(builds, build)
+			}
 		}
 	}
 	return UniqueBuilds(builds), nil

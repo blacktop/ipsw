@@ -55,8 +55,6 @@ func ScrapeURLs(build string) ([]BetaIPSW, error) {
 		link := e.Attr("href")
 
 		if strings.Contains(link, "apple.com") {
-			// fmt.Printf("Link found: %q -> %s\n", e.Text, link)
-
 			r := regexp.MustCompile(`\/(?P<device>i.+)_(?P<version>.+)_(?P<build>\w+)_Restore.ipsw$`)
 			names := r.SubexpNames()
 
@@ -73,12 +71,6 @@ func ScrapeURLs(build string) ([]BetaIPSW, error) {
 						BuildID: m["build"],
 						URL:     link,
 					})
-					// utils.Indent(log.WithFields(log.Fields{
-					// 	"link":    e.Text,
-					// 	"device":  m["device"],
-					// 	"version": m["version"],
-					// 	"build":   m["build"],
-					// }).Debug, 2)("Found Link")
 				}
 			}
 		}

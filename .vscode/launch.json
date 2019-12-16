@@ -64,11 +64,13 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {
-        "CGO_ENABLED": 0
+        "CGO_ENABLED": 1
       },
       "args": [
         "-V",
         "download",
+        "--device",
+        "iPad4,1",
         "latest",
         "--black-list",
         "iPod7,1",

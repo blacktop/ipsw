@@ -12,6 +12,7 @@
 *.out
 
 dist/
+test-caches/
 *.ipsw
 *.zip
 kernelcache.release.*
