@@ -14,10 +14,10 @@ import (
 	"strings"
 	"time"
 
+	// "github.com/gofrs/flock"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
-	// "github.com/gofrs/flock"
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v4"
 	"github.com/vbauerster/mpb/v4/decor"
@@ -32,8 +32,9 @@ type Download struct {
 
 	size         int64
 	bytesResumed int64
-	canResume    bool
 	resume       bool
+	canResume    bool
+	skipAll      bool
 
 	client *http.Client
 }
@@ -41,8 +42,10 @@ type Download struct {
 // NewDownload creates a new downloader
 func NewDownload(url, sha1, proxy string, insecure bool) *Download {
 	return &Download{
-		URL:  url,
-		Sha1: sha1,
+		URL:     url,
+		Sha1:    sha1,
+		resume:  false,
+		skipAll: false,
 		client: &http.Client{
 			Transport: &http.Transport{
 				Proxy:           getProxy(proxy),
@@ -108,10 +111,35 @@ func (d *Download) Do() error {
 
 	if d.canResume {
 		if f, err := os.Stat(destName + ".download"); !os.IsNotExist(err) {
-			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("Previous download of %s can be resumed. Resume?", destName),
+
+			// don't try to download files being downloaded elsewhere
+			if d.skipAll {
+				return nil
 			}
-			survey.AskOne(prompt, &d.resume)
+
+			choice := ""
+			prompt := &survey.Select{
+				Message: fmt.Sprintf("Previous download of %s can be resumed:", destName),
+				Options: []string{"resume", "skip", "skip all", "restart"},
+			}
+			survey.AskOne(prompt, &choice)
+
+			switch choice {
+			case "resume":
+				d.resume = true
+			case "skip":
+				log.Infof("%s - SKIPPED", destName+".download")
+				d.resume = false
+				return nil
+			case "skip all":
+				log.Info("Skipping ALL (you are performing a distributed download)")
+				d.skipAll = true
+				d.resume = false
+				return nil
+			case "restart":
+				log.Infof("Downloading %s - RESTARTED", destName+".download")
+				d.resume = false
+			}
 
 			if d.resume {
 				d.bytesResumed = f.Size()
@@ -171,10 +199,10 @@ func (d *Download) Do() error {
 			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),
 		mpb.AppendDecorators(
-			decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048),
+			decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
 			decor.Name(" ] "),
-			decor.OnComplete(decor.Spinner(nil), "✅ "),
 			decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048), decor.WCSyncSpace),
+			// decor.AverageSpeed(decor.UnitKiB, "% .2f"),
 		),
 	)
 
