@@ -5,23 +5,40 @@ import (
 	"time"
 )
 
-// proxyReader is io.Reader wrapper, for proxy read bytes
 type proxyReader struct {
 	io.ReadCloser
 	bar *Bar
 	iT  time.Time
 }
 
-func (pr *proxyReader) Read(p []byte) (n int, err error) {
-	n, err = pr.ReadCloser.Read(p)
+func (prox *proxyReader) Read(p []byte) (n int, err error) {
+	n, err = prox.ReadCloser.Read(p)
 	if n > 0 {
-		pr.bar.IncrBy(n, time.Since(pr.iT))
-		pr.iT = time.Now()
+		prox.bar.IncrBy(n, time.Since(prox.iT))
+		prox.iT = time.Now()
 	}
 	if err == io.EOF {
 		go func() {
-			current := pr.bar.Current()
-			pr.bar.SetTotal(current, true)
+			prox.bar.SetTotal(0, true)
+		}()
+	}
+	return
+}
+
+type proxyWriterTo struct {
+	*proxyReader
+	wt io.WriterTo
+}
+
+func (prox *proxyWriterTo) WriteTo(w io.Writer) (n int64, err error) {
+	n, err = prox.wt.WriteTo(w)
+	if n > 0 {
+		prox.bar.IncrInt64(n, time.Since(prox.iT))
+		prox.iT = time.Now()
+	}
+	if err == io.EOF {
+		go func() {
+			prox.bar.SetTotal(0, true)
 		}()
 	}
 	return

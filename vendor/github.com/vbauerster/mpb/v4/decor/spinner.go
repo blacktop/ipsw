@@ -12,12 +12,11 @@ func Spinner(frames []string, wcc ...WC) Decorator {
 	for _, widthConf := range wcc {
 		wc = widthConf
 	}
-	wc.Init()
 	if len(frames) == 0 {
 		frames = defaultSpinnerStyle
 	}
 	d := &spinnerDecorator{
-		WC:     wc,
+		WC:     wc.Init(),
 		frames: frames,
 	}
 	return d
@@ -25,20 +24,12 @@ func Spinner(frames []string, wcc ...WC) Decorator {
 
 type spinnerDecorator struct {
 	WC
-	frames   []string
-	count    uint
-	complete *string
+	frames []string
+	count  uint
 }
 
 func (d *spinnerDecorator) Decor(st *Statistics) string {
-	if st.Completed && d.complete != nil {
-		return d.FormatMsg(*d.complete)
-	}
 	frame := d.frames[d.count%uint(len(d.frames))]
 	d.count++
 	return d.FormatMsg(frame)
-}
-
-func (d *spinnerDecorator) OnCompleteMessage(msg string) {
-	d.complete = &msg
 }

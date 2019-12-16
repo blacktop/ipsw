@@ -3,7 +3,7 @@ module github.com/blacktop/ipsw
 require (
 	github.com/AlecAivazis/survey/v2 v2.0.5
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
-	github.com/PuerkitoBio/goquery v1.5.0
+	github.com/PuerkitoBio/goquery v1.5.0 // indirect
 	github.com/andybalholm/cascadia v1.1.0 // indirect
 	github.com/antchfx/htmlquery v1.2.0 // indirect
 	github.com/antchfx/xmlquery v1.2.1 // indirect
@@ -18,7 +18,6 @@ require (
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/hashicorp/go-version v1.2.0
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
-	github.com/jawher/mow.cli v1.1.0 // indirect
 	github.com/jinzhu/gorm v1.9.11
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/kr/pty v1.1.8 // indirect

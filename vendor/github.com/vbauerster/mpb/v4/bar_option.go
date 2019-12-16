@@ -17,9 +17,7 @@ type mergeWrapper interface {
 func (s *bState) addDecorators(dest *[]decor.Decorator, decorators ...decor.Decorator) {
 	for _, decorator := range decorators {
 		if mw, ok := decorator.(mergeWrapper); ok {
-			dd := mw.MergeUnwrap()
-			s.mDecorators = append(s.mDecorators, dd[0])
-			*dest = append(*dest, dd[1:]...)
+			*dest = append(*dest, mw.MergeUnwrap()...)
 		}
 		*dest = append(*dest, decorator)
 	}
@@ -53,14 +51,6 @@ func BarWidth(width int) BarOption {
 	}
 }
 
-// BarRemoveOnComplete removes bar filler and decorators if any, on
-// complete event.
-func BarRemoveOnComplete() BarOption {
-	return func(s *bState) {
-		s.dropOnComplete = true
-	}
-}
-
 // BarReplaceOnComplete is deprecated. Use BarParkTo instead.
 func BarReplaceOnComplete(runningBar *Bar) BarOption {
 	return BarParkTo(runningBar)
@@ -77,21 +67,34 @@ func BarParkTo(runningBar *Bar) BarOption {
 	}
 }
 
-// BarClearOnComplete clears bar filler only, on complete event.
-func BarClearOnComplete() BarOption {
+// BarRemoveOnComplete removes bar filler and decorators if any, on
+// complete event.
+func BarRemoveOnComplete() BarOption {
 	return func(s *bState) {
-		s.filler = makeClearOnCompleteFiller(s.filler)
+		s.dropOnComplete = true
 	}
 }
 
-func makeClearOnCompleteFiller(filler Filler) FillerFunc {
-	return func(w io.Writer, width int, st *decor.Statistics) {
+// BarClearOnComplete clears bar filler only, on complete event.
+func BarClearOnComplete() BarOption {
+	return BarOnComplete("")
+}
+
+// BarOnComplete replaces bar filler with message, on complete event.
+func BarOnComplete(message string) BarOption {
+	return func(s *bState) {
+		s.filler = makeBarOnCompleteFiller(s.baseF, message)
+	}
+}
+
+func makeBarOnCompleteFiller(filler Filler, message string) Filler {
+	return FillerFunc(func(w io.Writer, width int, st *decor.Statistics) {
 		if st.Completed {
-			w.Write([]byte{})
+			io.WriteString(w, message)
 		} else {
 			filler.Fill(w, width, st)
 		}
-	}
+	})
 }
 
 // BarPriority sets bar's priority. Zero is highest priority, i.e. bar
@@ -130,50 +133,21 @@ func TrimSpace() BarOption {
 	}
 }
 
-// BarStyle sets custom bar style, default one is "[=>-]<+".
-//
-//	'[' left bracket rune
-//
-//	'=' fill rune
-//
-//	'>' tip rune
-//
-//	'-' empty rune
-//
-//	']' right bracket rune
-//
-//	'<' reverse tip rune, used when BarReverse option is set
-//
-//	'+' refill rune, used when *Bar.SetRefill(int64) is called
-//
-// It's ok to provide first five runes only, for example BarStyle("╢▌▌░╟").
-// To omit left and right bracket runes, either set style as " =>- "
-// or use BarNoBrackets option.
+// BarStyle overrides mpb.DefaultBarStyle, for example BarStyle("╢▌▌░╟").
+// If you need to override `reverse tip` and `refill rune` set 6th and
+// 7th rune respectively, for example BarStyle("[=>-]<+").
 func BarStyle(style string) BarOption {
-	chk := func(filler Filler) (interface{}, bool) {
-		if style == "" {
-			return nil, false
+	if style == "" {
+		return nil
+	}
+	type styleSetter interface {
+		SetStyle(string)
+	}
+	return func(s *bState) {
+		if t, ok := s.baseF.(styleSetter); ok {
+			t.SetStyle(style)
 		}
-		t, ok := filler.(*barFiller)
-		return t, ok
 	}
-	cb := func(t interface{}) {
-		t.(*barFiller).setStyle(style)
-	}
-	return MakeFillerTypeSpecificBarOption(chk, cb)
-}
-
-// BarNoBrackets omits left and right edge runes of the bar. Edges are
-// brackets in default bar style, hence the name of the option.
-func BarNoBrackets() BarOption {
-	chk := func(filler Filler) (interface{}, bool) {
-		t, ok := filler.(*barFiller)
-		return t, ok
-	}
-	cb := func(t interface{}) {
-		t.(*barFiller).noBrackets = true
-	}
-	return MakeFillerTypeSpecificBarOption(chk, cb)
 }
 
 // BarNoPop disables bar pop out of container. Effective when
@@ -186,23 +160,23 @@ func BarNoPop() BarOption {
 
 // BarReverse reverse mode, bar will progress from right to left.
 func BarReverse() BarOption {
-	chk := func(filler Filler) (interface{}, bool) {
-		t, ok := filler.(*barFiller)
-		return t, ok
+	type revSetter interface {
+		SetReverse(bool)
 	}
-	cb := func(t interface{}) {
-		t.(*barFiller).reverse = true
+	return func(s *bState) {
+		if t, ok := s.baseF.(revSetter); ok {
+			t.SetReverse(true)
+		}
 	}
-	return MakeFillerTypeSpecificBarOption(chk, cb)
 }
 
 // SpinnerStyle sets custom spinner style.
 // Effective when Filler type is spinner.
 func SpinnerStyle(frames []string) BarOption {
+	if len(frames) == 0 {
+		return nil
+	}
 	chk := func(filler Filler) (interface{}, bool) {
-		if len(frames) == 0 {
-			return nil, false
-		}
 		t, ok := filler.(*spinnerFiller)
 		return t, ok
 	}
@@ -220,7 +194,7 @@ func MakeFillerTypeSpecificBarOption(
 	cb func(interface{}),
 ) BarOption {
 	return func(s *bState) {
-		if t, ok := typeChecker(s.filler); ok {
+		if t, ok := typeChecker(s.baseF); ok {
 			cb(t)
 		}
 	}

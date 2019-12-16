@@ -1000,7 +1000,7 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 	deferForeignKeys := -1
 	foreignKeys := -1
 	ignoreCheckConstraints := -1
-	journalMode := "DELETE"
+	var journalMode string
 	lockingMode := "NORMAL"
 	queryOnly := -1
 	recursiveTriggers := -1
@@ -1232,7 +1232,7 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 		if _, ok := params["_locking"]; ok {
 			pkey = "_locking"
 		}
-		if val := params.Get("_locking"); val != "" {
+		if val := params.Get(pkey); val != "" {
 			switch strings.ToUpper(val) {
 			case "NORMAL", "EXCLUSIVE":
 				lockingMode = strings.ToUpper(val)
@@ -1522,10 +1522,10 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 		// Before going any further, we need to check that the user
 		// has provided an username and password within the DSN.
 		// We are not allowed to continue.
-		if len(authUser) < 0 {
+		if len(authUser) == 0 {
 			return nil, fmt.Errorf("Missing '_auth_user' while user authentication was requested with '_auth'")
 		}
-		if len(authPass) < 0 {
+		if len(authPass) == 0 {
 			return nil, fmt.Errorf("Missing '_auth_pass' while user authentication was requested with '_auth'")
 		}
 
@@ -1571,10 +1571,11 @@ func (d *SQLiteDriver) Open(dsn string) (driver.Conn, error) {
 	}
 
 	// Journal Mode
-	// Because default Journal Mode is DELETE this PRAGMA can always be executed.
-	if err := exec(fmt.Sprintf("PRAGMA journal_mode = %s;", journalMode)); err != nil {
-		C.sqlite3_close_v2(db)
-		return nil, err
+	if journalMode != "" {
+		if err := exec(fmt.Sprintf("PRAGMA journal_mode = %s;", journalMode)); err != nil {
+			C.sqlite3_close_v2(db)
+			return nil, err
+		}
 	}
 
 	// Locking Mode
@@ -1867,7 +1868,7 @@ func (s *SQLiteStmt) query(ctx context.Context, args []namedValue) (driver.Rows,
 	return rows, nil
 }
 
-// LastInsertId teturn last inserted ID.
+// LastInsertId return last inserted ID.
 func (r *SQLiteResult) LastInsertId() (int64, error) {
 	return r.id, nil
 }
