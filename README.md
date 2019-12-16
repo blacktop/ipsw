@@ -10,7 +10,7 @@
 
 ### macOS
 
-``` bash
+```bash
 $ brew install blacktop/tap/ipsw
 ```
 
@@ -22,13 +22,13 @@ Download from [releases](https://github.com/blacktop/ipsw/releases/latest)
 
 [![Docker Stars](https://img.shields.io/docker/stars/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Pulls](https://img.shields.io/docker/pulls/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Image](https://img.shields.io/badge/docker%20image-114MB-blue.svg)](https://hub.docker.com/r/blacktop/ipsw/)
 
-``` bash
+```bash
 $ docker pull blacktop/ipsw
 ```
 
 ## Getting Started
 
-``` bash
+```bash
 $ ipsw --help
 
 Download and Parse IPSWs
@@ -58,7 +58,7 @@ Use "ipsw [command] --help" for more information about a command.
 
 #### Download an `ipsw` and extract/decompress the `kernelcache`
 
-``` bash
+```bash
 $ ipsw download --device iPhone11,2 --build 16A366
 
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
@@ -75,7 +75,7 @@ $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 
 Notice that the `kernelcache` was extracted from the `ipsw` and decompressed :smiling_imp:
 
-``` bash
+```bash
 $ file kernelcache.release.iphone11.decompressed
 
 kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
@@ -83,7 +83,7 @@ kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 
 #### Download all the iOS 12.0 `ipsws`
 
-``` bash
+```bash
 $ ipsw download --version 12.0
 
 ? You are about to download 17 ipsw files. Continue? Yes
@@ -99,7 +99,7 @@ $ ipsw download --version 12.0
 
 Queries the iTunes XML for latest version _(maybe run this as a cron job)_ 😉
 
-``` bash
+```bash
 $ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
@@ -110,9 +110,9 @@ $ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
 
 > **NOTE:** you must do **one** device type/family per `--black-list` or `--white-list` flag
 
-To grab *only* the iPods
+To grab _only_ the iPods
 
-``` bash
+```bash
 $ ipsw download -V latest --yes --white-list ipod
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
@@ -135,13 +135,13 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 
 Single `kernelcache`
 
-``` bash
+```bash
 ipsw download kernel --device iPhone11,2 --build 16B92
 ```
 
 All of dem!!!
 
-``` bash
+```bash
 $ time ipsw download kernel --version 12.0.1
 
 "8.40s user 1.19s system 53% cpu 17.784 total"
@@ -149,7 +149,7 @@ $ time ipsw download kernel --version 12.0.1
 
 That's **14** decompressed kernelcaches in under **9 seconds** :smirk:
 
-``` bash
+```bash
 $ ls -1
 
 kernelcache.release.ipad4b.decompressed
@@ -172,7 +172,7 @@ But, how does it work?? 🤔 With the POWER :muscle: of [partialzip](https://git
 
 #### Only download files that match a given name/path
 
-``` bash
+```bash
 $ ipsw download -v 13.2.3 -d iPhone12,3 pattern Firmware/all_flash/iBoot
 ```
 
@@ -180,7 +180,7 @@ $ ipsw download -v 13.2.3 -d iPhone12,3 pattern Firmware/all_flash/iBoot
 
 This is done by scraping [theiphonewiki.com](https://theiphonewiki.com).
 
-``` bash
+```bash
 $ ipsw download beta 17C5046a
 ```
 
@@ -188,13 +188,13 @@ $ ipsw download beta 17C5046a
 
 This will download and decompress the `kernelcache` for an `iPhone XS` running `iOS 12.1` behind a corporate proxy
 
-``` bash
+```bash
 $ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
 ```
 
 To disable cert verification
 
-``` bash
+```bash
 $ ipsw download --insecure --device iPhone11,2 --build 16B92
 ```
 
@@ -202,15 +202,15 @@ $ ipsw download --insecure --device iPhone11,2 --build 16B92
 
 #### Extract `kernelcache` from a previously downloaded `ipsw`
 
-``` bash
+```bash
 $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
 #### Extract `dyld_shared_cache` from a previously downloaded `ipsw`
 
-* `macOS`
+- `macOS`
 
-``` bash
+```bash
 $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Extracting dyld_shared_cache from IPSW
    • Mounting DMG
@@ -218,9 +218,9 @@ $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Unmounting DMG
 ```
 
-* `docker` 🆕
+- `docker` 🆕
 
-``` bash
+```bash
 $ docker run --init -it --rm \
              --device /dev/fuse \
              --cap-add=SYS_ADMIN \
@@ -232,7 +232,7 @@ $ docker run --init -it --rm \
 
 Extract WebKit version from `dyld_shared_cache`
 
-``` bash
+```bash
 $ ipsw dyld webkit dyld_shared_cache
    • WebKit Version: 607.2.6.0.1
 ```
@@ -241,7 +241,7 @@ $ ipsw dyld webkit dyld_shared_cache
 
 Split up a `dyld_shared_cache`
 
-``` bash
+```bash
 $ ipsw dyld split dyld_shared_cache
    • Splitting dyld_shared_cache
 
@@ -260,7 +260,7 @@ $ ipsw dyld split dyld_shared_cache
 
 Decompress a previously extracted `kernelcache`
 
-``` bash
+```bash
 $ ipsw kernel decompress kernelcache.release.iphone11
 ```
 
@@ -270,17 +270,28 @@ I am playing with the idea of `diffing` kernelcaches by creating directory struc
 
 Then you could use `git diff` or something to get a quick **high** level view of what Apple has changed by seeing new files being added or removed as well as seeing the line numbers of the assert strings move around.
 
-``` bash
+```bash
 $ ipsw kernel diff kernelcache.release.iphone11
 ```
 
 You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/pkg/kernelcache/diff/Library/Caches/com.apple.xbs/Sources)
 
+### Add `zsh` completions
+
+Pick a folder in your \$fpath to write the completion to.
+
+> **NOTE:** I'm using `/usr/local/share/zsh-completions`
+
+```bash
+$ ipsw completion zsh > /usr/local/share/zsh-completions/_ipsw
+$ rm -f ~/.zcompdump; compinit
+```
+
 ## TODO
 
-* [x] use https://github.com/gocolly/colly
-* [ ] create offline copy of ipsw.me API
-* [ ] download simultaniously to decrease total time _(need to limit concurrent downloads and 17+ at a time could be bad)_
+- [x] use https://github.com/gocolly/colly
+- [ ] create offline copy of ipsw.me API
+- [ ] download simultaniously to decrease total time _(need to limit concurrent downloads and 17+ at a time could be bad)_
 
 ## Issues
 
@@ -289,4 +300,3 @@ Find a bug? Want more features? Find something missing in the documentation? Let
 ## License
 
 MIT Copyright (c) 2018 **blacktop**
-
