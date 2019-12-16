@@ -176,6 +176,15 @@ But, how does it work?? 🤔 With the POWER :muscle: of [partialzip](https://git
 $ ipsw download -v 13.2.3 -d iPhone12,3 pattern Firmware/all_flash/iBoot
 ```
 
+```bash
+$ ls iBoot*
+iBoot.d321.RELEASE.im4p        iBoot.d331p.RELEASE.im4p.plist
+iBoot.d321.RELEASE.im4p.plist  iBoot.d421.RELEASE.im4p
+iBoot.d331.RELEASE.im4p        iBoot.d421.RELEASE.im4p.plist
+iBoot.d331.RELEASE.im4p.plist  iBoot.d431.RELEASE.im4p
+iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
+```
+
 #### Download BETA `ipsws`
 
 This is done by scraping [theiphonewiki.com](https://theiphonewiki.com).
