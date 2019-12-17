@@ -31,6 +31,12 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
+func init() {
+	dyldCmd.AddCommand(webkitCmd)
+
+	webkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
 // webkitCmd represents the webkit command
 var webkitCmd = &cobra.Command{
 	Use:   "webkit <dyld_shared_cache>",
@@ -51,18 +57,4 @@ var webkitCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-func init() {
-	dyldCmd.AddCommand(webkitCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// webkitCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// webkitCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

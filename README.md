@@ -330,13 +330,23 @@ You can see an example of what this outputs [HERE](https://github.com/blacktop/i
 
 ### Add `zsh` completions
 
-Pick a folder in your \$fpath to write the completion to.
+Pick a folder in your `$fpath` to write the completion to.
 
 > **NOTE:** I'm using `/usr/local/share/zsh-completions`
 
 ```bash
 $ ipsw completion zsh > /usr/local/share/zsh-completions/_ipsw
 $ rm -f ~/.zcompdump; compinit
+```
+
+=OR=
+
+Add the following to your `~/.zshrc`
+
+```bash
+autoload -Uz compinit && compinit -C
+source <(ipsw completion zsh)
+compdef _ipsw ipsw
 ```
 
 ## TODO

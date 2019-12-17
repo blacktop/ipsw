@@ -34,6 +34,8 @@ import (
 
 func init() {
 	kernelcacheCmd.AddCommand(kerExtractCmd)
+
+	kerExtractCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
 }
 
 // kerExtractCmd represents the kerExtract command

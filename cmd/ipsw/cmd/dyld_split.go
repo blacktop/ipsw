@@ -24,6 +24,8 @@ func init() {
 	splitCmd.Flags().BoolP("iphone", "i", true, "Extract from iPhoneOS cache")
 	splitCmd.Flags().BoolP("appletv", "a", false, "Extract from AppleTVOS cache")
 	splitCmd.Flags().BoolP("watch", "w", false, "Extract from WatchOS cache")
+
+	splitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 func contains(slice []string, item string) bool {
