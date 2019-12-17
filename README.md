@@ -37,14 +37,14 @@ Usage:
   ipsw [command]
 
 Available Commands:
-  completion  Generates bash completion scripts
-  device      Parse DeviceTree
-  download    Download and parse IPSW(s) from the internets
-  dyld        Parse dyld_shared_cache
-  extract     Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
-  help        Help about any command
-  kernel      Parse kernelcache
-  version     Print the version number of ipsw
+  device-list     List all iOS devices
+  device-tree     Parse DeviceTree
+  download        Download and parse IPSW(s) from the internets
+  dyld            Parse dyld_shared_cache
+  extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
+  help            Help about any command
+  kernel          Parse kernelcache
+  version         Print the version number of ipsw
 
 Flags:
       --config string   config file (default is $HOME/.ipsw.yaml)
@@ -279,7 +279,7 @@ Print out SUMMARY
 
 ```bash
 $ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
-$ ipsw device DeviceTree.d431ap.im4p
+$ ipsw device-tree DeviceTree.d431ap.im4p
       • Product Name: iPhone 11 Pro Max
       • Model: iPhone12,5
       • BoardConfig: D431AP
@@ -288,7 +288,7 @@ $ ipsw device DeviceTree.d431ap.im4p
 Or print out JSON
 
 ```bash
-$ ipsw device --json DeviceTree.d431ap.im4p | jq .
+$ ipsw device-tree --json DeviceTree.d431ap.im4p | jq .
 ```
 
 ```json
@@ -308,7 +308,7 @@ $ ipsw device --json DeviceTree.d431ap.im4p | jq .
 Or remotely
 
 ```bash
-$ ipsw device --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
+$ ipsw device-tree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
 
    • DeviceTree.n112ap.im4p
       • Product Name: iPod touch

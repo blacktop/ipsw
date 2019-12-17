@@ -76,10 +76,10 @@ jobs:
 
       - name: Run Device List
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
-        run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw device list
+        run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw device-list
       - name: Run Device List (Windows)
         if: matrix.platform == 'windows-latest'
-        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe device list
+        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe device-list
 
       - name: Run Extract Remote Kernelcache
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
