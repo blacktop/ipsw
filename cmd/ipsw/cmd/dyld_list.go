@@ -54,4 +54,6 @@ var dyldListCmd = &cobra.Command{
 
 func init() {
 	dyldCmd.AddCommand(dyldListCmd)
+
+	dyldListCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }

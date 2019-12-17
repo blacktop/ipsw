@@ -245,6 +245,51 @@ $ ipsw dyld webkit dyld_shared_cache
    • WebKit Version: 607.2.6.0.1
 ```
 
+### `list`
+
+Similar to `otool -L dyld_shared_cache`
+
+```bash
+$ ipsw dyld list dyld_shared_cache
+
+Header
+======
+Magic               = dyld_v1  arm64e
+MappingOffset       = 00000138
+MappingCount        = 3
+ImagesOffset        = 00000198
+ImagesCount         = 1819
+DyldBaseAddress     = 00000000
+CodeSignatureOffset = 5F4B0000
+CodeSignatureSize   = 002FC000
+SlideInfoOffset     = 48108000
+SlideInfoSize       = 00018000
+LocalSymbolsOffset  = 4F714000
+LocalSymbolsSize    = 0FD9C000
+UUID                = 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
+Platform            = iOS
+Format              = 10
+
+Mappings
+========
+| INITPROT | MAXPROT |  SIZE  |     ADDRESS      | FILE OFFSET |
+|----------|---------|--------|------------------|-------------|
+| r-x      | r-x     | 968 MB | 0000000180000000 | 0           |
+| rw-      | rw-     | 184 MB | 00000001BE8FC000 | 3C8FC000    |
+| r--      | r--     | 118 MB | 00000001CC108000 | 48108000    |
+
+Images
+======
+1:      18003c000 /usr/lib/system/libsystem_trace.dylib
+2:      180053000 /usr/lib/system/libxpc.dylib
+3:      180087000 /usr/lib/system/libsystem_blocks.dylib
+4:      180088000 /usr/lib/system/libsystem_c.dylib
+5:      180107000 /usr/lib/system/libdispatch.dylib
+6:      180144000 /usr/lib/system/libsystem_malloc.dylib
+7:      180165000 /usr/lib/system/libsystem_platform.dylib
+<SNIP>
+```
+
 ### `split` _(only on macOS)_ 🆕
 
 Split up a `dyld_shared_cache`
