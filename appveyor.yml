@@ -29,8 +29,8 @@ install:
   - go build -ldflags "-linkmode external -extldflags -static" github.com/blacktop/ipsw/cmd/ipsw
 
 test_script:
-  - ipsw.exe device list
-  - ipsw.exe device -r https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
+  - ipsw.exe device-list
+  - ipsw.exe device-tree -r https://updates.cdn-apple.com/2019FallSeed/fullrestores/061-28687/1A71B3E2-EA30-11E9-B7D3-A61B17E817B4/iPhone12,3,iPhone12,5_13.2_17B5068e_Restore.ipsw
   # - ipsw.exe -V download kernel -v 13.2.3 -d iPhone12,3
 # artifacts:
 #   - path: lzfse\build\Debug
