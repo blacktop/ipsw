@@ -32,6 +32,8 @@ import (
 
 func init() {
 	dyldCmd.AddCommand(extractDyldCmd)
+
+	extractDyldCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
 }
 
 // extractDyldCmd represents the extractDyld command

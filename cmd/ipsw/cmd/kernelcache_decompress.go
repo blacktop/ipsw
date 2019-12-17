@@ -34,6 +34,8 @@ import (
 
 func init() {
 	kernelcacheCmd.AddCommand(decCmd)
+
+	decCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
 // decCmd represents the dec command

@@ -32,6 +32,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
+
 	"github.com/spf13/cobra"
 )
 
@@ -41,17 +42,17 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(deviceCmd)
+	rootCmd.AddCommand(deviceTreeCmd)
 
-	deviceCmd.Flags().BoolVarP(&jsonFlag, "json", "j", false, "Output to stdout as JSON")
-	deviceCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
+	deviceTreeCmd.Flags().BoolVarP(&jsonFlag, "json", "j", false, "Output to stdout as JSON")
+	deviceTreeCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
 
-	deviceCmd.MarkZshCompPositionalArgumentFile(1, "DeviceTree*")
+	deviceTreeCmd.MarkZshCompPositionalArgumentFile(1, "DeviceTree*")
 }
 
-// deviceCmd represents the device command
-var deviceCmd = &cobra.Command{
-	Use:   "device",
+// deviceTreeCmd represents the deviceTree command
+var deviceTreeCmd = &cobra.Command{
+	Use:   "device-tree <DeviceTree>",
 	Short: "Parse DeviceTree",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
