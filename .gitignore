@@ -33,3 +33,4 @@ xcode/data
 *_Restore
 *.plist
 checksums.txt.sha1
+cmd/ipsw/__debug_bin

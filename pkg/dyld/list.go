@@ -3,21 +3,32 @@ package dyld
 import (
 	"bufio"
 	"bytes"
+	"debug/macho"
 	"encoding/binary"
 	"fmt"
-	"log"
+	"io"
 	"os"
-	"unsafe"
+	"strings"
 
-	"github.com/dustin/go-humanize"
-	"github.com/olekukonko/tablewriter"
+	"github.com/apex/log"
 	"github.com/pkg/errors"
 )
 
 type DyldCache struct {
-	header   DyldCacheHeader
-	mappings []DyldCacheMappingInfo
-	images   []DyldCacheImageInfo
+	header        DyldCacheHeader
+	mappings      DyldCacheMappings
+	images        DyldCacheImages
+	codesignature []byte
+	slideInfo     DyldCacheSlideInfo
+	localSymInfo  DyldCacheLocalSymbolsInfo
+}
+
+type DyldCacheMappings []DyldCacheMappingInfo
+type DyldCacheImages []DyldCacheImage
+
+type DyldCacheImage struct {
+	Name string
+	Info DyldCacheImageInfo
 }
 
 type DyldCacheHeader struct {
@@ -33,7 +44,7 @@ type DyldCacheHeader struct {
 	SlideInfoSize        uint64   // size of kernel slid info
 	LocalSymbolsOffset   uint64   // file offset of where local symbols are stored
 	LocalSymbolsSize     uint64   // size of local symbols information
-	UUID                 UUID     // unique value for each shared cache file
+	UUID                 uuid     // unique value for each shared cache file
 	CacheType            uint64   // 0 for development, 1 for production
 	BranchPoolsOffset    uint32   // file offset to table of uint64_t pool addresses
 	BranchPoolsCount     uint32   // number of uint64_t entries
@@ -49,7 +60,7 @@ type DyldCacheHeader struct {
 	ProgClosuresSize     uint64   // size of list of program launch closures
 	ProgClosuresTrieAddr uint64   // (unslid) address of trie of indexes into program launch closures
 	ProgClosuresTrieSize uint64   // size of trie of indexes into program launch closures
-	Platform             Platform // platform number (macOS=1, etc)
+	Platform             platform // platform number (macOS=1, etc)
 	FormatVersion        uint8    // dyld3::closure::kFormatVersion
 	Padding8             uint8
 	Padding16            uint16
@@ -71,86 +82,43 @@ type DyldCacheHeader struct {
 	OtherTrieSize        uint64 // size of trie of dylibs and bundles with dlopen closures
 }
 
-type UUID [16]byte
+type uuid [16]byte
 
-func (self UUID) String() string {
-	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-		self[0], self[1], self[2], self[3],
-		self[4], self[5], self[6], self[7],
-		self[8], self[9], self[10], self[11],
-		self[12], self[13], self[14], self[15])
-}
-
-type Platform uint32
+type platform uint32
 
 const (
-	unknown          Platform = 0
-	macOS            Platform = 1 // PLATFORM_MACOS
-	iOS              Platform = 2 // PLATFORM_IOS
-	tvOS             Platform = 3 // PLATFORM_TVOS
-	watchOS          Platform = 4 // PLATFORM_WATCHOS
-	bridgeOS         Platform = 5 // PLATFORM_BRIDGEOS
-	iOSMac           Platform = 6 // PLATFORM_IOSMAC
-	iOSSimulator     Platform = 7 // PLATFORM_IOSSIMULATOR
-	tvOSSimulator    Platform = 8 // PLATFORM_TVOSSIMULATOR
-	watchOSSimulator Platform = 9 // PLATFORM_WATCHOSSIMULATOR
+	unknown          platform = 0
+	macOS            platform = 1 // PLATFORM_MACOS
+	iOS              platform = 2 // PLATFORM_IOS
+	tvOS             platform = 3 // PLATFORM_TVOS
+	watchOS          platform = 4 // PLATFORM_WATCHOS
+	bridgeOS         platform = 5 // PLATFORM_BRIDGEOS
+	iOSMac           platform = 6 // PLATFORM_IOSMAC
+	iOSSimulator     platform = 7 // PLATFORM_IOSSIMULATOR
+	tvOSSimulator    platform = 8 // PLATFORM_TVOSSIMULATOR
+	watchOSSimulator platform = 9 // PLATFORM_WATCHOSSIMULATOR
 )
 
-func (p Platform) String() string {
-	names := [...]string{
-		"unknown",
-		"macOS",
-		"iOS",
-		"tvOS",
-		"watchOS",
-		"bridgeOS",
-		"iOSMac",
-		"iOS Simulator",
-		"tvOS Simulator",
-		"watchOS Simulator"}
-	return names[p]
+type vmProtection int32
+
+func (v vmProtection) Read() bool {
+	return (v & 0x01) != 0
 }
 
-type VMProtection int32
-
-func (self VMProtection) Read() bool {
-	return (self & 0x01) != 0
+func (v vmProtection) Write() bool {
+	return (v & 0x02) != 0
 }
 
-func (self VMProtection) Write() bool {
-	return (self & 0x02) != 0
-}
-
-func (self VMProtection) Execute() bool {
-	return (self & 0x04) != 0
-}
-
-func (self VMProtection) String() string {
-	var protStr string
-	if self.Read() {
-		protStr += "r"
-	} else {
-		protStr += "-"
-	}
-	if self.Write() {
-		protStr += "w"
-	} else {
-		protStr += "-"
-	}
-	if self.Execute() {
-		protStr += "x"
-	} else {
-		protStr += "-"
-	}
-	return protStr
+func (v vmProtection) Execute() bool {
+	return (v & 0x04) != 0
 }
 
 type DyldCacheMappingInfo struct {
 	Address    uint64
 	Size       uint64
 	FileOffset uint64
-	MaxProt    VMProtection
-	InitProt   VMProtection
+	MaxProt    vmProtection
+	InitProt   vmProtection
 }
 
 type DyldCacheImageInfo struct {
@@ -187,6 +155,15 @@ type DyldCacheLocalSymbolsEntry struct {
 	DylibOffset     uint32 // offset in cache file of start of dylib
 	NlistStartIndex uint32 // start index of locals for this dylib
 	NlistCount      uint32 // number of local symbols for this dylib
+}
+
+// This is the symbol table entry structure for 64-bit architectures.
+type nlist64 struct {
+	nStrx  uint32 // index into the string table
+	nType  uint8  // type flag, see below
+	nSect  uint8  // section number or NO_SECT
+	nDesc  uint16 // see <mach-o/stab.h>
+	nValue uint64 // value of this symbol (or stab offset)
 }
 
 type DyldCacheImageInfoExtra struct {
@@ -236,86 +213,10 @@ type DyldCacheAcceleratorDof struct {
 }
 
 type DyldCacheImageTextInfo struct {
-	UUID            UUID
+	UUID            uuid
 	LoadAddress     uint64 // unslid address of start of __TEXT
 	TextSegmentSize uint32
 	PathOffset      uint32 // offset from start of cache file
-}
-
-func (self DyldCacheHeader) String() string {
-	var magicBytes []byte = self.Magic[:]
-
-	return fmt.Sprintf(
-		"Magic               = %s\n"+
-			"MappingOffset       = %08X\n"+
-			"MappingCount        = %d\n"+
-			"ImagesOffset        = %08X\n"+
-			"ImagesCount         = %d\n"+
-			"DyldBaseAddress     = %08X\n"+
-			"CodeSignatureOffset = %08X\n"+
-			"CodeSignatureSize   = %08X\n"+
-			"SlideInfoOffset     = %08X\n"+
-			"SlideInfoSize       = %08X\n"+
-			"LocalSymbolsOffset  = %08X\n"+
-			"LocalSymbolsSize    = %08X\n"+
-			"UUID                = %s\n"+
-			"Platform            = %s\n"+
-			"Format              = %d\n",
-		bytes.Trim(magicBytes, "\x00"),
-		self.MappingOffset,
-		self.MappingCount,
-		self.ImagesOffset,
-		self.ImagesCount,
-		self.DyldBaseAddress,
-		self.CodeSignatureOffset,
-		self.CodeSignatureSize,
-		self.SlideInfoOffset,
-		self.SlideInfoSize,
-		self.LocalSymbolsOffset,
-		self.LocalSymbolsSize,
-		self.UUID.String(),
-		self.Platform.String(),
-		self.FormatVersion,
-	)
-}
-
-func (self DyldCacheMappingInfo) String() string {
-	return fmt.Sprintf(
-		"Address    = %016X\n"+
-			"Size       = %s\n"+
-			"FileOffset = %X\n"+
-			"MaxProt    = %s\n"+
-			"InitProt   = %s\n",
-		self.Address,
-		humanize.Bytes(self.Size),
-		self.FileOffset,
-		self.MaxProt.String(),
-		self.InitProt.String(),
-	)
-}
-
-func (self DyldCacheImageInfo) String() string {
-	return fmt.Sprintf(
-		"Address        = %016X\n"+
-			"ModTime        = %016X\n"+
-			"Inode          = %d\n"+
-			"PathFileOffset = %08X\n",
-		self.Address,
-		self.ModTime,
-		self.Inode,
-		self.PathFileOffset,
-	)
-}
-
-func readNextBytes(file *os.File, number int) []byte {
-	bytes := make([]byte, number)
-
-	_, err := file.Read(bytes)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return bytes
 }
 
 // Parse parses a dyld_share_cache
@@ -329,72 +230,122 @@ func Parse(dsc string) error {
 	}
 	defer file.Close()
 
-	// fileInfo, err := file.Stat()
-	// if err != nil {
-	// 	return errors.Wrapf(err, "failed to stat file: %s", dsc)
-	// }
-
-	data := readNextBytes(file, int(unsafe.Sizeof(dCache.header)))
-
-	if err := binary.Read(bytes.NewBuffer(data), binary.LittleEndian, &dCache.header); err != nil {
+	if err := binary.Read(bufio.NewReader(file), binary.LittleEndian, &dCache.header); err != nil {
 		return err
 	}
-	fmt.Println("Header")
-	fmt.Println("======")
-	fmt.Println(dCache.header.String())
 
-	fmt.Println("Mappings")
-	fmt.Println("========")
 	file.Seek(int64(dCache.header.MappingOffset), os.SEEK_SET)
+	hr := bufio.NewReader(file)
+
 	for i := uint32(0); i != dCache.header.MappingCount; i++ {
 		mapping := DyldCacheMappingInfo{}
-		data = readNextBytes(file, int(unsafe.Sizeof(mapping)))
-
-		if err := binary.Read(bytes.NewBuffer(data), binary.LittleEndian, &mapping); err != nil {
+		if err := binary.Read(hr, binary.LittleEndian, &mapping); err != nil {
 			return err
 		}
 		dCache.mappings = append(dCache.mappings, mapping)
 	}
 
-	mdata := [][]string{}
-	for _, mapping := range dCache.mappings {
-		mdata = append(mdata, []string{
-			mapping.InitProt.String(),
-			mapping.MaxProt.String(),
-			fmt.Sprintf("%d MB", mapping.Size/(1024*1024)),
-			// humanize.Bytes(mapping.Size),
-			fmt.Sprintf("%016X", mapping.Address),
-			fmt.Sprintf("%X", mapping.FileOffset),
-		})
-	}
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"InitProt", "MaxProt", "Size", "Address", "File Offset"})
-	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
-	table.SetCenterSeparator("|")
-	table.AppendBulk(mdata)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.Render() // Send output
-
 	file.Seek(int64(dCache.header.ImagesOffset), os.SEEK_SET)
-	for i := uint32(0); i != dCache.header.ImagesCount; i++ {
-		image := DyldCacheImageInfo{}
-		data = readNextBytes(file, int(unsafe.Sizeof(image)))
+	ir := bufio.NewReader(file)
 
-		if err := binary.Read(bytes.NewBuffer(data), binary.LittleEndian, &image); err != nil {
+	for i := uint32(0); i != dCache.header.ImagesCount; i++ {
+		iinfo := DyldCacheImageInfo{}
+		if err := binary.Read(ir, binary.LittleEndian, &iinfo); err != nil {
 			return err
 		}
-		dCache.images = append(dCache.images, image)
+		dCache.images = append(dCache.images, DyldCacheImage{Info: iinfo})
 	}
-	fmt.Println()
-	fmt.Println("Images")
-	fmt.Println("======")
 	for idx, image := range dCache.images {
-		file.Seek(int64(image.PathFileOffset), os.SEEK_SET)
+		file.Seek(int64(image.Info.PathFileOffset), os.SEEK_SET)
 		r := bufio.NewReader(file)
 		if name, err := r.ReadString(byte(0)); err == nil {
-			fmt.Printf("%d:\t%08x %s\n", idx+1, image.Address, bytes.Trim([]byte(name), "\x00"))
+			dCache.images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
+		}
+		fmt.Printf("0x%08X\n", int64(image.Info.Address-dCache.mappings[0].Address))
+		// file.Seek(int64(image.Info.Address-dCache.mappings[0].Address), os.SEEK_SET)
+		sr := io.NewSectionReader(file, int64(image.Info.Address-dCache.mappings[0].Address), 1<<63-1)
+		mcho, err := macho.NewFile(sr)
+		if err != nil {
+			log.Error(errors.Wrap(err, "failed to create macho").Error())
+		}
+		for _, sec := range mcho.Sections {
+			if strings.EqualFold("__cstring", sec.Name) {
+				csr := bufio.NewReader(sec.Open())
+				for {
+					s, err := csr.ReadString('\x00')
+
+					if err == io.EOF {
+						break
+					}
+
+					if err != nil {
+						log.Fatal(err.Error())
+					}
+
+					fmt.Printf("%s: %s\n", dCache.images[idx].Name, s)
+				}
+
+			}
 		}
 	}
+
+	// file.Seek(int64(dCache.header.CodeSignatureOffset), os.SEEK_SET)
+
+	// data := make([]byte, dCache.header.CodeSignatureSize)
+	// if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
+	// 	return err
+	// }
+	// dCache.codesignature = data
+
+	// err = ioutil.WriteFile("dyld_codesignature.blob", data, 0644)
+	// if err != nil {
+	// 	return errors.Wrapf(err, "failed to open file: %s", dsc)
+	// }
+
+	// file.Seek(int64(dCache.header.SlideInfoOffset), os.SEEK_SET)
+	// slide := DyldCacheSlideInfo{}
+	// if err := binary.Read(bufio.NewReader(file), binary.LittleEndian, &slide); err != nil {
+	// 	return err
+	// }
+	// dCache.slideInfo = slide
+
+	file.Seek(int64(dCache.header.LocalSymbolsOffset), os.SEEK_SET)
+	lsInfo := DyldCacheLocalSymbolsInfo{}
+	if err := binary.Read(bufio.NewReader(file), binary.LittleEndian, &lsInfo); err != nil {
+		return err
+	}
+	dCache.localSymInfo = lsInfo
+
+	// nlistFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.NlistOffset
+	// nlistCount := dCache.localSymInfo.NlistCount
+	// // nlistByteSize = is64 ? nlistCount*16 : nlistCount*12;
+	// nlistByteSize := dCache.localSymInfo.NlistCount * 16
+	// stringsFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.StringsOffset
+	// stringsSize := dCache.localSymInfo.StringsSize
+	entriesCount := dCache.localSymInfo.EntriesCount
+
+	file.Seek(int64(uint32(dCache.header.LocalSymbolsOffset)+dCache.localSymInfo.EntriesOffset), os.SEEK_SET)
+	lsr := bufio.NewReader(file)
+	var entries []DyldCacheLocalSymbolsEntry
+	for i := uint32(0); i != entriesCount; i++ {
+		entry := DyldCacheLocalSymbolsEntry{}
+		if err := binary.Read(lsr, binary.LittleEndian, &entry); err != nil {
+			return err
+		}
+		entries = append(entries, entry)
+		fmt.Printf("   nlistStartIndex=%5d, nlistCount=%5d, image=%s\n", entry.NlistStartIndex, entry.NlistCount, dCache.images[i].Name)
+		//const char* stringPool = (char*)options.mappedCache + stringsFileOffset;
+		// const nlist_64* symTab = (nlist_64*)((char*)options.mappedCache + nlistFileOffset);
+		for e := uint32(0); i != entry.NlistCount; e++ {
+			// const nlist_64* entry = &symTab[entries[i].nlistStartIndex()+e];
+			// printf("     nlist[%d].str=%d, %s\n", e, entry->n_un.n_strx, &stringPool[entry->n_un.n_strx]);
+			// printf("     nlist[%d].value=0x%0llX\n", e, entry->n_value);
+		}
+	}
+
+	dCache.header.Print()
+	dCache.mappings.Print()
+	// dCache.images.Print()
 
 	return nil
 }
