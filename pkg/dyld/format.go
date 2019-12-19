@@ -17,20 +17,20 @@ func (u uuid) String() string {
 		u[12], u[13], u[14], u[15])
 }
 
-func (p platform) String() string {
-	names := [...]string{
-		"unknown",
-		"macOS",
-		"iOS",
-		"tvOS",
-		"watchOS",
-		"bridgeOS",
-		"iOSMac",
-		"iOS Simulator",
-		"tvOS Simulator",
-		"watchOS Simulator"}
-	return names[p]
-}
+// func (p platform) String() string {
+// 	names := [...]string{
+// 		"unknown",
+// 		"macOS",
+// 		"iOS",
+// 		"tvOS",
+// 		"watchOS",
+// 		"bridgeOS",
+// 		"iOSMac",
+// 		"iOS Simulator",
+// 		"tvOS Simulator",
+// 		"watchOS Simulator"}
+// 	return names[p]
+// }
 
 func (v vmProtection) String() string {
 	var protStr string

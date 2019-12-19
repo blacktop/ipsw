@@ -5,7 +5,6 @@ package dyld
 import (
 	"bufio"
 	"bytes"
-	"debug/macho"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/pkg/errors"
 )
 
@@ -304,6 +304,7 @@ func Parse(dsc string, verbose bool) error {
 	dCache.localSymInfo = lsInfo
 
 	if verbose {
+
 		nlistFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.NlistOffset
 		// nlistCount := dCache.localSymInfo.NlistCount
 		// nlistByteSize = is64 ? nlistCount*16 : nlistCount*12;
@@ -327,39 +328,40 @@ func Parse(dsc string, verbose bool) error {
 			entries = append(entries, entry)
 			fmt.Printf("   nlistStartIndex=%5d, nlistCount=%5d, image=%s\n", entry.NlistStartIndex, entry.NlistCount, dCache.images[i].Name)
 		}
+		if false {
+			stringPool := io.NewSectionReader(file, int64(stringsFileOffset), int64(stringsSize))
 
-		stringPool := io.NewSectionReader(file, int64(stringsFileOffset), int64(stringsSize))
+			file.Seek(int64(nlistFileOffset), os.SEEK_SET)
+			nlr := bufio.NewReader(file)
 
-		file.Seek(int64(nlistFileOffset), os.SEEK_SET)
-		nlr := bufio.NewReader(file)
+			for idx, entry := range entries {
+				for e := 0; e < int(entry.NlistCount); e++ {
+					nlist := nlist64{}
+					if err := binary.Read(nlr, binary.LittleEndian, &nlist); err != nil {
+						return err
+					}
 
-		for idx, entry := range entries {
-			for e := 0; e < int(entry.NlistCount); e++ {
-				nlist := nlist64{}
-				if err := binary.Read(nlr, binary.LittleEndian, &nlist); err != nil {
-					return err
+					stringPool.Seek(int64(nlist.Strx), os.SEEK_SET)
+					s, err := bufio.NewReader(stringPool).ReadString('\x00')
+					if err != nil {
+						log.Error(errors.Wrapf(err, "failed to read string at: %d", stringsFileOffset+nlist.Strx).Error())
+					}
+
+					fmt.Printf("%s,value=0x%016X %s\n", dCache.images[idx].Name, nlist.Value, strings.Trim(s, "\x00"))
 				}
-
-				stringPool.Seek(int64(nlist.Strx), os.SEEK_SET)
-				s, err := bufio.NewReader(stringPool).ReadString('\x00')
-				if err != nil {
-					log.Error(errors.Wrapf(err, "failed to read string at: %d", stringsFileOffset+nlist.Strx).Error())
-				}
-
-				fmt.Printf("%s,value=0x%016X %s\n", dCache.images[idx].Name, nlist.Value, strings.Trim(s, "\x00"))
 			}
 		}
-
-		if false {
+		if true {
 			for idx, entry := range entries {
 				file.Seek(int64(entry.DylibOffset), os.SEEK_SET)
 				fmt.Printf("%s @ 0x%08X\n", dCache.images[idx].Name, entry.DylibOffset)
-				mreader := bufio.NewReader(file)
-				mcho, err := macho.NewFile(mreader.rea)
-				if err != nil {
-					log.Error(errors.Wrap(err, "failed to parse macho").Error())
+				if strings.Contains(dCache.images[idx].Name, "JavaScriptCore") {
+					mcho, err := macho.NewFile(io.NewSectionReader(file, int64(entry.DylibOffset), 1<<63-1))
+					if err != nil {
+						log.Error(errors.Wrap(err, "failed to parse macho").Error())
+					}
+					fmt.Println(mcho.Symtab)
 				}
-				fmt.Println(mcho.Symtab)
 			}
 			// file.Seek(int64(image.Info.Address-dCache.mappings[0].Address), os.SEEK_SET)
 
