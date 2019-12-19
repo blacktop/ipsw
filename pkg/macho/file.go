@@ -439,6 +439,23 @@ func NewFile(r io.ReaderAt) (*File, error) {
 					return nil, err
 				}
 			}
+		case LoadCmdBuildVersion:
+			var build BuildVersionCmd
+			var buildTool buildToolVersion
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &build); err != nil {
+				return nil, err
+			}
+			// fmt.Println(build.Platform)
+			// fmt.Println(build.Sdk)
+			// fmt.Println(build.Sdk)
+			if build.Ntools > 0 {
+				if err := binary.Read(b, bo, &buildTool); err != nil {
+					return nil, err
+				}
+				// fmt.Println(buildTool.Tool)
+				// fmt.Println(buildTool.Version)
+			}
 		}
 		if s != nil {
 			s.sr = io.NewSectionReader(r, int64(s.Offset), int64(s.Filesz))
@@ -471,6 +488,7 @@ func (f *File) parseSymtab(symdat, strtab, cmddat []byte, hdr *SymtabCmd, offset
 		}
 		sym := &symtab[i]
 		if n.Name >= uint32(len(strtab)) {
+			continue
 			return nil, &FormatError{offset, "invalid name in symbol table", n.Name}
 		}
 		// We add "_" to Go symbols. Strip it here. See issue 33808.

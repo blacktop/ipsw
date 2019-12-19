@@ -12,7 +12,13 @@
 
 package macho
 
-import "strconv"
+//go:generate stringer -type=platform,tool
+
+import (
+	"encoding/binary"
+	"fmt"
+	"strconv"
+)
 
 // A FileHeader represents a Mach-O file header.
 type FileHeader struct {
@@ -40,10 +46,18 @@ const (
 type Type uint32
 
 const (
-	TypeObj    Type = 1
-	TypeExec   Type = 2
-	TypeDylib  Type = 6
-	TypeBundle Type = 8
+	TypeObj                        Type = 1
+	TypeExec                       Type = 2
+	TypeDylib                      Type = 6
+	TypeBundle                     Type = 8
+	TypeNlistOutofsyncWithDyldinfo Type = 0x04000000 /* The external symbols
+	   listed in the nlist symbol table do
+	   not include all the symbols listed in
+	   the dyld info. */
+	TypeDylibInCache Type = 0x80000000 /* Only for use on dylibs. When this bit
+	   is set, the dylib is part of the dyld
+	   shared cache, rather than loose in
+	   the filesystem. */
 )
 
 var typeStrings = []intName{
@@ -51,6 +65,8 @@ var typeStrings = []intName{
 	{uint32(TypeExec), "Exec"},
 	{uint32(TypeDylib), "Dylib"},
 	{uint32(TypeBundle), "Bundle"},
+	{uint32(TypeNlistOutofsyncWithDyldinfo), "Nlist Out of sync With Dyldinfo"},
+	{uint32(TypeDylibInCache), "Dylib in Cache"},
 }
 
 func (t Type) String() string   { return stringName(uint32(t), typeStrings, false) }
@@ -86,15 +102,16 @@ func (i Cpu) GoString() string { return stringName(uint32(i), cpuStrings, true) 
 type LoadCmd uint32
 
 const (
-	LoadCmdSegment    LoadCmd = 0x1
-	LoadCmdSymtab     LoadCmd = 0x2
-	LoadCmdThread     LoadCmd = 0x4
-	LoadCmdUnixThread LoadCmd = 0x5 // thread+stack
-	LoadCmdDysymtab   LoadCmd = 0xb
-	LoadCmdDylib      LoadCmd = 0xc // load dylib command
-	LoadCmdDylinker   LoadCmd = 0xf // id dylinker command (not load dylinker command)
-	LoadCmdSegment64  LoadCmd = 0x19
-	LoadCmdRpath      LoadCmd = 0x8000001c
+	LoadCmdSegment      LoadCmd = 0x1
+	LoadCmdSymtab       LoadCmd = 0x2
+	LoadCmdThread       LoadCmd = 0x4
+	LoadCmdUnixThread   LoadCmd = 0x5 // thread+stack
+	LoadCmdDysymtab     LoadCmd = 0xb
+	LoadCmdDylib        LoadCmd = 0xc // load dylib command
+	LoadCmdDylinker     LoadCmd = 0xf // id dylinker command (not load dylinker command)
+	LoadCmdSegment64    LoadCmd = 0x19
+	LoadCmdBuildVersion LoadCmd = 0x32
+	LoadCmdRpath        LoadCmd = 0x8000001c
 )
 
 var cmdStrings = []intName{
@@ -108,6 +125,67 @@ var cmdStrings = []intName{
 
 func (i LoadCmd) String() string   { return stringName(uint32(i), cmdStrings, false) }
 func (i LoadCmd) GoString() string { return stringName(uint32(i), cmdStrings, true) }
+
+type version uint32
+
+func (v version) String() string {
+	s := make([]byte, 4)
+	binary.BigEndian.PutUint32(s, uint32(v))
+	return fmt.Sprintf("%d.%d.%d", binary.BigEndian.Uint16(s[:2]), s[2], s[3])
+}
+
+type platform uint32
+
+const (
+	unknown          platform = 0
+	macOS            platform = 1  // PLATFORM_MACOS
+	iOS              platform = 2  // PLATFORM_IOS
+	tvOS             platform = 3  // PLATFORM_TVOS
+	watchOS          platform = 4  // PLATFORM_WATCHOS
+	bridgeOS         platform = 5  // PLATFORM_BRIDGEOS
+	macCatalyst      platform = 6  // PLATFORM_MACCATALYST
+	iOSSimulator     platform = 7  // PLATFORM_IOSSIMULATOR
+	tvOSSimulator    platform = 8  // PLATFORM_TVOSSIMULATOR
+	watchOSSimulator platform = 9  // PLATFORM_WATCHOSSIMULATOR
+	driverKit        platform = 10 // PLATFORM_DRIVERKIT
+)
+
+// func (p platform) String() string {
+// 	names := [...]string{
+// 		"unknown",
+// 		"macOS",
+// 		"iOS",
+// 		"tvOS",
+// 		"watchOS",
+// 		"bridgeOS",
+// 		"mac Catalyst",
+// 		"iOS Simulator",
+// 		"tvOS Simulator",
+// 		"watchOS Simulator",
+// 		"driver Kit"}
+// 	return names[p]
+// }
+
+type tool uint32
+
+const (
+	clang tool = 1 // TOOL_CLANG
+	swift tool = 2 // TOOL_SWIFT
+	ld    tool = 3 // TOOL_LD
+)
+
+// func (t tool) String() string {
+// 	names := [...]string{
+// 		"clang",
+// 		"swift",
+// 		"ld"}
+// 	return names[t]
+// }
+
+type buildToolVersion struct {
+	Tool    tool    /* enum for the tool */
+	Version version /* version number of the tool */
+}
 
 type (
 	// A Segment32 is a 32-bit Mach-O segment load command.
@@ -197,6 +275,21 @@ type (
 		Len  uint32
 		Type uint32
 		Data []uint32
+	}
+
+	/*
+	 * The build_version_command contains the min OS version on which this
+	 * binary was built to run for its platform.  The list of known platforms and
+	 * tool values following it.
+	 */
+	BuildVersionCmd struct {
+		Cmd LoadCmd /* LC_BUILD_VERSION */
+		Len uint32  /* sizeof(struct build_version_command) plus */
+		/* ntools * sizeof(struct build_tool_version) */
+		Platform platform /* platform */
+		Minos    version  /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+		Sdk      version  /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+		Ntools   uint32   /* number of tool entries following this */
 	}
 )
 
