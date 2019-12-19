@@ -43,7 +43,7 @@ var dyldListCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		err := dyld.Parse(args[0])
+		err := dyld.Parse(args[0], Verbose)
 		if err != nil {
 			return err
 		}
