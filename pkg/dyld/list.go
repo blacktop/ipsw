@@ -129,6 +129,7 @@ type DyldCacheImageInfo struct {
 	Pad            uint32
 }
 
+// DyldCacheSlideInfo is the dyld_cache_image_info struct
 // The rebasing info is to allow the kernel to lazily rebase DATA pages of the
 // dyld shared cache.  Rebasing is adding the slide to interior pointers.
 type DyldCacheSlideInfo struct {
@@ -157,13 +158,22 @@ type DyldCacheLocalSymbolsEntry struct {
 	NlistCount      uint32 // number of local symbols for this dylib
 }
 
-// This is the symbol table entry structure for 64-bit architectures.
-type nlist64 struct {
+// This is the symbol table entry structure for 32-bit architectures.
+type nlist32 struct {
 	nStrx  uint32 // index into the string table
 	nType  uint8  // type flag, see below
 	nSect  uint8  // section number or NO_SECT
 	nDesc  uint16 // see <mach-o/stab.h>
-	nValue uint64 // value of this symbol (or stab offset)
+	nValue uint32 // value of this symbol (or stab offset)
+}
+
+// This is the symbol table entry structure for 64-bit architectures.
+type nlist64 struct {
+	Strx  uint32 // index into the string table
+	Type  uint8  // type flag, see below
+	Sect  uint8  // section number or NO_SECT
+	Desc  uint16 // see <mach-o/stab.h>
+	Value uint64 // value of this symbol (or stab offset)
 }
 
 type DyldCacheImageInfoExtra struct {
@@ -257,34 +267,51 @@ func Parse(dsc string) error {
 	}
 	for idx, image := range dCache.images {
 		file.Seek(int64(image.Info.PathFileOffset), os.SEEK_SET)
+
 		r := bufio.NewReader(file)
 		if name, err := r.ReadString(byte(0)); err == nil {
 			dCache.images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
 		}
-		fmt.Printf("0x%08X\n", int64(image.Info.Address-dCache.mappings[0].Address))
-		// file.Seek(int64(image.Info.Address-dCache.mappings[0].Address), os.SEEK_SET)
-		sr := io.NewSectionReader(file, int64(image.Info.Address-dCache.mappings[0].Address), 1<<63-1)
-		mcho, err := macho.NewFile(sr)
-		if err != nil {
-			log.Error(errors.Wrap(err, "failed to create macho").Error())
-		}
-		for _, sec := range mcho.Sections {
-			if strings.EqualFold("__cstring", sec.Name) {
-				csr := bufio.NewReader(sec.Open())
-				for {
-					s, err := csr.ReadString('\x00')
+		if false {
+			file.Seek(int64(image.Info.Address-dCache.mappings[0].Address), os.SEEK_SET)
 
-					if err == io.EOF {
-						break
+			// if strings.Contains(dCache.images[idx].Name, "JavaScriptCore") {
+			fmt.Printf("%s @ 0x%08X\n", dCache.images[idx].Name, int64(image.Info.Address-dCache.mappings[0].Address))
+			sr := io.NewSectionReader(file, int64(image.Info.Address-dCache.mappings[0].Address), 1<<63-1)
+			mcho, err := macho.NewFile(sr)
+			if err != nil {
+				continue
+				// return errors.Wrap(err, "failed to create macho")
+			}
+
+			for _, sec := range mcho.Sections {
+				if strings.EqualFold("__cstring", sec.Name) {
+					fmt.Printf("%s %s\n", sec.Seg, sec.Name)
+					// csr := bufio.NewReader(sec.Open())
+					data := make([]byte, sec.Size)
+					// data, err := sec.Data()
+					// if err != nil {
+					// 	log.Fatal(err.Error())
+					// }
+					file.ReadAt(data, int64(sec.Offset))
+					csr := bytes.NewBuffer(data[:])
+
+					for {
+						s, err := csr.ReadString('\x00')
+
+						if err == io.EOF {
+							break
+						}
+
+						if err != nil {
+							log.Fatal(err.Error())
+						}
+
+						if len(s) > 0 {
+							fmt.Printf("%s: %#v\n", dCache.images[idx].Name, strings.Trim(s, "\x00"))
+						}
 					}
-
-					if err != nil {
-						log.Fatal(err.Error())
-					}
-
-					fmt.Printf("%s: %s\n", dCache.images[idx].Name, s)
 				}
-
 			}
 		}
 	}
@@ -316,36 +343,58 @@ func Parse(dsc string) error {
 	}
 	dCache.localSymInfo = lsInfo
 
-	// nlistFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.NlistOffset
-	// nlistCount := dCache.localSymInfo.NlistCount
-	// // nlistByteSize = is64 ? nlistCount*16 : nlistCount*12;
-	// nlistByteSize := dCache.localSymInfo.NlistCount * 16
-	// stringsFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.StringsOffset
-	// stringsSize := dCache.localSymInfo.StringsSize
-	entriesCount := dCache.localSymInfo.EntriesCount
+	if false {
+		nlistFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.NlistOffset
+		// nlistCount := dCache.localSymInfo.NlistCount
+		// // nlistByteSize = is64 ? nlistCount*16 : nlistCount*12;
+		nlistByteSize := dCache.localSymInfo.NlistCount * 16
+		stringsFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.StringsOffset
+		stringsSize := dCache.localSymInfo.StringsSize
+		entriesCount := dCache.localSymInfo.EntriesCount
+		fmt.Printf("local symbols nlist array:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", nlistByteSize/(1024*1024), nlistFileOffset, nlistFileOffset+nlistByteSize)
+		fmt.Printf("local symbols string pool:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", stringsSize/(1024*1024), stringsFileOffset, stringsFileOffset+stringsSize)
+		fmt.Printf("local symbols by dylib (count=%d):\n", entriesCount)
 
-	file.Seek(int64(uint32(dCache.header.LocalSymbolsOffset)+dCache.localSymInfo.EntriesOffset), os.SEEK_SET)
-	lsr := bufio.NewReader(file)
-	var entries []DyldCacheLocalSymbolsEntry
-	for i := uint32(0); i != entriesCount; i++ {
-		entry := DyldCacheLocalSymbolsEntry{}
-		if err := binary.Read(lsr, binary.LittleEndian, &entry); err != nil {
-			return err
-		}
-		entries = append(entries, entry)
-		fmt.Printf("   nlistStartIndex=%5d, nlistCount=%5d, image=%s\n", entry.NlistStartIndex, entry.NlistCount, dCache.images[i].Name)
-		//const char* stringPool = (char*)options.mappedCache + stringsFileOffset;
-		// const nlist_64* symTab = (nlist_64*)((char*)options.mappedCache + nlistFileOffset);
-		for e := uint32(0); i != entry.NlistCount; e++ {
-			// const nlist_64* entry = &symTab[entries[i].nlistStartIndex()+e];
-			// printf("     nlist[%d].str=%d, %s\n", e, entry->n_un.n_strx, &stringPool[entry->n_un.n_strx]);
-			// printf("     nlist[%d].value=0x%0llX\n", e, entry->n_value);
+		file.Seek(int64(uint32(dCache.header.LocalSymbolsOffset)+dCache.localSymInfo.EntriesOffset), os.SEEK_SET)
+		lsr := bufio.NewReader(file)
+
+		var entries []DyldCacheLocalSymbolsEntry
+		for i := uint32(0); i != entriesCount; i++ {
+			entry := DyldCacheLocalSymbolsEntry{}
+			if err := binary.Read(lsr, binary.LittleEndian, &entry); err != nil {
+				return err
+			}
+			entries = append(entries, entry)
+			fmt.Printf("   nlistStartIndex=%5d, nlistCount=%5d, image=%s\n", entry.NlistStartIndex, entry.NlistCount, dCache.images[i].Name)
+
+			// const char* stringPool = (char*)options.mappedCache + stringsFileOffset;
+			// const nlist_64* symTab = (nlist_64*)((char*)options.mappedCache + nlistFileOffset);
+
+			file.Seek(int64(nlistFileOffset+entries[i].NlistStartIndex), os.SEEK_SET)
+			fmt.Printf("Start of Entry Array: %d [0x%08X]\n", int64(nlistFileOffset+entries[i].NlistStartIndex), int64(nlistFileOffset+entries[i].NlistStartIndex))
+
+			for e := uint32(0); e != entry.NlistCount; e++ {
+				// fmt.Printf("entry: %d\n", nlistFileOffset+entries[i].NlistStartIndex+e)
+				nlist := nlist64{}
+				if err := binary.Read(lsr, binary.LittleEndian, &nlist); err != nil {
+					return err
+				}
+
+				file.Seek(int64(stringsFileOffset+nlist.Strx), os.SEEK_SET)
+				nlr := bufio.NewReader(file)
+				s, err := nlr.ReadString('\x00')
+				if err != nil {
+					log.Error(errors.Wrapf(err, "failed to read string at: %d", stringsFileOffset+nlist.Strx).Error())
+				}
+
+				fmt.Printf("     nlist[%d].value=0x%016X, str=%d, %#v\n", e, nlist.Value, nlist.Strx, strings.Trim(s, "\x00"))
+			}
 		}
 	}
 
 	dCache.header.Print()
 	dCache.mappings.Print()
-	// dCache.images.Print()
+	dCache.images.Print()
 
 	return nil
 }
