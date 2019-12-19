@@ -1,5 +1,7 @@
 package dyld
 
+//go:generate stringer -type=platform
+
 import (
 	"bufio"
 	"bytes"
