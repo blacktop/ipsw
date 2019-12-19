@@ -230,7 +230,7 @@ type DyldCacheImageTextInfo struct {
 }
 
 // Parse parses a dyld_share_cache
-func Parse(dsc string) error {
+func Parse(dsc string, verbose bool) error {
 
 	dCache := DyldCache{}
 
@@ -272,48 +272,6 @@ func Parse(dsc string) error {
 		if name, err := r.ReadString(byte(0)); err == nil {
 			dCache.images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
 		}
-		if false {
-			file.Seek(int64(image.Info.Address-dCache.mappings[0].Address), os.SEEK_SET)
-
-			// if strings.Contains(dCache.images[idx].Name, "JavaScriptCore") {
-			fmt.Printf("%s @ 0x%08X\n", dCache.images[idx].Name, int64(image.Info.Address-dCache.mappings[0].Address))
-			sr := io.NewSectionReader(file, int64(image.Info.Address-dCache.mappings[0].Address), 1<<63-1)
-			mcho, err := macho.NewFile(sr)
-			if err != nil {
-				continue
-				// return errors.Wrap(err, "failed to create macho")
-			}
-
-			for _, sec := range mcho.Sections {
-				if strings.EqualFold("__cstring", sec.Name) {
-					fmt.Printf("%s %s\n", sec.Seg, sec.Name)
-					// csr := bufio.NewReader(sec.Open())
-					data := make([]byte, sec.Size)
-					// data, err := sec.Data()
-					// if err != nil {
-					// 	log.Fatal(err.Error())
-					// }
-					file.ReadAt(data, int64(sec.Offset))
-					csr := bytes.NewBuffer(data[:])
-
-					for {
-						s, err := csr.ReadString('\x00')
-
-						if err == io.EOF {
-							break
-						}
-
-						if err != nil {
-							log.Fatal(err.Error())
-						}
-
-						if len(s) > 0 {
-							fmt.Printf("%s: %#v\n", dCache.images[idx].Name, strings.Trim(s, "\x00"))
-						}
-					}
-				}
-			}
-		}
 	}
 
 	// file.Seek(int64(dCache.header.CodeSignatureOffset), os.SEEK_SET)
@@ -343,10 +301,10 @@ func Parse(dsc string) error {
 	}
 	dCache.localSymInfo = lsInfo
 
-	if false {
+	if verbose {
 		nlistFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.NlistOffset
 		// nlistCount := dCache.localSymInfo.NlistCount
-		// // nlistByteSize = is64 ? nlistCount*16 : nlistCount*12;
+		// nlistByteSize = is64 ? nlistCount*16 : nlistCount*12;
 		nlistByteSize := dCache.localSymInfo.NlistCount * 16
 		stringsFileOffset := uint32(dCache.header.LocalSymbolsOffset) + dCache.localSymInfo.StringsOffset
 		stringsSize := dCache.localSymInfo.StringsSize
@@ -359,36 +317,88 @@ func Parse(dsc string) error {
 		lsr := bufio.NewReader(file)
 
 		var entries []DyldCacheLocalSymbolsEntry
-		for i := uint32(0); i != entriesCount; i++ {
+		for i := 0; i < int(entriesCount); i++ {
 			entry := DyldCacheLocalSymbolsEntry{}
 			if err := binary.Read(lsr, binary.LittleEndian, &entry); err != nil {
 				return err
 			}
 			entries = append(entries, entry)
 			fmt.Printf("   nlistStartIndex=%5d, nlistCount=%5d, image=%s\n", entry.NlistStartIndex, entry.NlistCount, dCache.images[i].Name)
+		}
 
-			// const char* stringPool = (char*)options.mappedCache + stringsFileOffset;
-			// const nlist_64* symTab = (nlist_64*)((char*)options.mappedCache + nlistFileOffset);
+		stringPool := io.NewSectionReader(file, int64(stringsFileOffset), int64(stringsSize))
 
-			file.Seek(int64(nlistFileOffset+entries[i].NlistStartIndex), os.SEEK_SET)
-			fmt.Printf("Start of Entry Array: %d [0x%08X]\n", int64(nlistFileOffset+entries[i].NlistStartIndex), int64(nlistFileOffset+entries[i].NlistStartIndex))
+		file.Seek(int64(nlistFileOffset), os.SEEK_SET)
+		nlr := bufio.NewReader(file)
 
-			for e := uint32(0); e != entry.NlistCount; e++ {
-				// fmt.Printf("entry: %d\n", nlistFileOffset+entries[i].NlistStartIndex+e)
+		for idx, entry := range entries {
+			for e := 0; e < int(entry.NlistCount); e++ {
 				nlist := nlist64{}
-				if err := binary.Read(lsr, binary.LittleEndian, &nlist); err != nil {
+				if err := binary.Read(nlr, binary.LittleEndian, &nlist); err != nil {
 					return err
 				}
 
-				file.Seek(int64(stringsFileOffset+nlist.Strx), os.SEEK_SET)
-				nlr := bufio.NewReader(file)
-				s, err := nlr.ReadString('\x00')
+				stringPool.Seek(int64(nlist.Strx), os.SEEK_SET)
+				s, err := bufio.NewReader(stringPool).ReadString('\x00')
 				if err != nil {
 					log.Error(errors.Wrapf(err, "failed to read string at: %d", stringsFileOffset+nlist.Strx).Error())
 				}
 
-				fmt.Printf("     nlist[%d].value=0x%016X, str=%d, %#v\n", e, nlist.Value, nlist.Strx, strings.Trim(s, "\x00"))
+				fmt.Printf("%s,value=0x%016X %s\n", dCache.images[idx].Name, nlist.Value, strings.Trim(s, "\x00"))
 			}
+		}
+
+		if false {
+			for idx, entry := range entries {
+				file.Seek(int64(entry.DylibOffset), os.SEEK_SET)
+				fmt.Printf("%s @ 0x%08X\n", dCache.images[idx].Name, entry.DylibOffset)
+				mreader := bufio.NewReader(file)
+				mcho, err := macho.NewFile(mreader.rea)
+				if err != nil {
+					log.Error(errors.Wrap(err, "failed to parse macho").Error())
+				}
+				fmt.Println(mcho.Symtab)
+			}
+			// file.Seek(int64(image.Info.Address-dCache.mappings[0].Address), os.SEEK_SET)
+
+			// // if strings.Contains(dCache.images[idx].Name, "JavaScriptCore") {
+			// fmt.Printf("%s @ 0x%08X\n", dCache.images[idx].Name, int64(image.Info.Address-dCache.mappings[0].Address))
+			// sr := io.NewSectionReader(file, int64(image.Info.Address-dCache.mappings[0].Address), 1<<63-1)
+			// mcho, err := macho.NewFile(sr)
+			// if err != nil {
+			// 	continue
+			// 	// return errors.Wrap(err, "failed to create macho")
+			// }
+
+			// for _, sec := range mcho.Sections {
+			// 	if strings.EqualFold("__cstring", sec.Name) {
+			// 		fmt.Printf("%s %s\n", sec.Seg, sec.Name)
+			// 		// csr := bufio.NewReader(sec.Open())
+			// 		data := make([]byte, sec.Size)
+			// 		// data, err := sec.Data()
+			// 		// if err != nil {
+			// 		// 	log.Fatal(err.Error())
+			// 		// }
+			// 		file.ReadAt(data, int64(sec.Offset))
+			// 		csr := bytes.NewBuffer(data[:])
+
+			// 		for {
+			// 			s, err := csr.ReadString('\x00')
+
+			// 			if err == io.EOF {
+			// 				break
+			// 			}
+
+			// 			if err != nil {
+			// 				log.Fatal(err.Error())
+			// 			}
+
+			// 			if len(s) > 0 {
+			// 				fmt.Printf("%s: %#v\n", dCache.images[idx].Name, strings.Trim(s, "\x00"))
+			// 			}
+			// 		}
+			// 	}
+			// }
 		}
 	}
 
