@@ -351,6 +351,7 @@ func Parse(dsc string, verbose bool) error {
 				}
 			}
 		}
+
 		if true {
 			for idx, entry := range entries {
 				file.Seek(int64(entry.DylibOffset), os.SEEK_SET)
@@ -411,7 +412,7 @@ func Parse(dsc string, verbose bool) error {
 
 	dCache.header.Print()
 	dCache.mappings.Print()
-	// dCache.images.Print()
+	dCache.images.Print()
 
 	return nil
 }
