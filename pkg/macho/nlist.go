@@ -1,9 +1,13 @@
 package macho
 
+import "strings"
+
+import "fmt"
+
 // An Nlist32 is a Mach-O 32-bit symbol table entry.
 type Nlist32 struct {
 	Name  uint32
-	Type  uint8
+	Type  nListType
 	Sect  uint8
 	Desc  uint16
 	Value uint32
@@ -12,13 +16,28 @@ type Nlist32 struct {
 // An Nlist64 is a Mach-O 64-bit symbol table entry.
 type Nlist64 struct {
 	Name  uint32
-	Type  uint8
+	Type  nListType
 	Sect  uint8
 	Desc  uint16
 	Value uint64
 }
 
 type nListType uint8
+
+/*
+ * The n_type field really contains four fields:
+ *	unsigned char N_STAB:3,
+ *		      N_PEXT:1,
+ *		      N_TYPE:3,
+ *		      N_EXT:1;
+ * which are used via the following masks.
+ */
+const (
+	N_STAB nListType = 0xe0 /* if any of these bits set, a symbolic debugging entry */
+	N_PEXT nListType = 0x10 /* private external symbol bit */
+	N_TYPE nListType = 0x0e /* mask for the type bits */
+	N_EXT  nListType = 0x01 /* external symbol bit, set for external symbols */
+)
 
 /*
  * Values for N_TYPE bits of the n_type field.
@@ -30,6 +49,63 @@ const (
 	N_PBUD nListType = 0xc /* prebound undefined (defined in a dylib) */
 	N_INDR nListType = 0xa /* indirect */
 )
+
+func (t nListType) IsDebugSym() bool {
+	return (t & N_STAB) != 0
+}
+
+func (t nListType) IsPrivateExternalSym() bool {
+	return (t & N_PEXT) != 0
+}
+
+func (t nListType) IsExternalSym() bool {
+	return (t & N_EXT) != 0
+}
+
+func (t nListType) IsUndefinedSym() bool {
+	return (t & N_TYPE) == N_UNDF
+}
+func (t nListType) IsAbsoluteSym() bool {
+	return (t & N_TYPE) == N_ABS
+}
+func (t nListType) IsDefinedInSection() bool {
+	return (t & N_TYPE) == N_SECT
+}
+func (t nListType) IsPreboundUndefinedSym() bool {
+	return (t & N_TYPE) == N_PBUD
+}
+func (t nListType) IsIndirectSym() bool {
+	return (t & N_TYPE) == N_INDR
+}
+
+func (t nListType) String(secName string) string {
+	var tStr string
+	if t.IsDebugSym() {
+		tStr += "debug|"
+	}
+	if t.IsPrivateExternalSym() {
+		tStr += "private_external|"
+	}
+	if t.IsExternalSym() {
+		tStr += "external|"
+	}
+	if t.IsUndefinedSym() {
+		tStr += "undefined|"
+	}
+	if t.IsAbsoluteSym() {
+		tStr += "absolute|"
+	}
+	if t.IsDefinedInSection() {
+		tStr += fmt.Sprintf("%s|", secName)
+	}
+	if t.IsPreboundUndefinedSym() {
+		tStr += "defined in a dylib|"
+	}
+	if t.IsIndirectSym() {
+		tStr += "indirect|"
+	}
+	return strings.TrimSuffix(tStr, "|")
+}
 
 type nListDesc uint16
 

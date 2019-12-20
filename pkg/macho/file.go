@@ -240,7 +240,7 @@ type BuildVersion struct {
 // A Symbol is a Mach-O 32-bit or 64-bit symbol table entry.
 type Symbol struct {
 	Name  string
-	Type  uint8
+	Type  nListType
 	Sect  uint8
 	Desc  uint16
 	Value uint64

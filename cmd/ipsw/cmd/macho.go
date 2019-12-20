@@ -26,6 +26,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/macho"
@@ -75,9 +76,16 @@ var machoCmd = &cobra.Command{
 		fmt.Println("Type:", m.Type.String())
 		fmt.Println("CPU:", m.Cpu.String())
 		fmt.Println("Flags:", m.FileHeader.Flags.String())
+		var sec string
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 		for _, sym := range m.Symtab.Syms {
-			fmt.Printf("0x%016X %s\n", sym.Value, sym.Name)
+			if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+				sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+			}
+			fmt.Fprintf(w, "0x%016X \t <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+			// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 		}
+		w.Flush()
 		fmt.Println("LOADS:", m.FileHeader.Ncmd)
 		fmt.Println("=====")
 		for idx, l := range m.Loads {
