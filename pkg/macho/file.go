@@ -146,6 +146,30 @@ type Dylib struct {
 	CompatVersion  uint32
 }
 
+// A DylibID represents a Mach-O id dynamic library command.
+type DylibID struct {
+	LoadBytes
+	Name           string
+	Time           uint32
+	CurrentVersion version
+	CompatVersion  version
+}
+
+// A DyldInfo represents a Mach-O id dyld info command.
+type DyldInfo struct {
+	LoadBytes
+	RebaseOff    uint32 // file offset to rebase info
+	RebaseSize   uint32 //  size of rebase info
+	BindOff      uint32 // file offset to binding info
+	BindSize     uint32 // size of binding info
+	WeakBindOff  uint32 // file offset to weak binding info
+	WeakBindSize uint32 //  size of weak binding info
+	LazyBindOff  uint32 // file offset to lazy binding info
+	LazyBindSize uint32 //  size of lazy binding info
+	ExportOff    uint32 // file offset to export info
+	ExportSize   uint32 //  size of export info
+}
+
 // A Symtab represents a Mach-O symbol table command.
 type Symtab struct {
 	LoadBytes
@@ -164,6 +188,31 @@ type Dysymtab struct {
 type Rpath struct {
 	LoadBytes
 	Path string
+}
+
+// A FunctionStarts represents a Mach-O function starts command.
+type FunctionStarts struct {
+	LoadBytes
+	Offset uint32
+	Size   uint32
+}
+
+// A DataInCode represents a Mach-O data in code command.
+type DataInCode struct {
+	LoadBytes
+	Entries []DataInCodeEntry
+}
+
+// A UUID represents a Mach-O uuid command.
+type UUID struct {
+	LoadBytes
+	ID string
+}
+
+// A SourceVersion represents a Mach-O source version.
+type SourceVersion struct {
+	LoadBytes
+	Version string
 }
 
 // A Symbol is a Mach-O 32-bit or 64-bit symbol table entry.
@@ -279,6 +328,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		var s *Segment
 		switch cmd {
 		default:
+			fmt.Println("GOT COMMAND:", cmd)
 			f.Loads[i] = LoadBytes(cmddat)
 
 		case LoadCmdRpath:
@@ -292,6 +342,36 @@ func NewFile(r io.ReaderAt) (*File, error) {
 				return nil, &FormatError{offset, "invalid path in rpath command", hdr.Path}
 			}
 			l.Path = cstring(cmddat[hdr.Path:])
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+
+		// case LoadCmdCodeSignature:
+		// case LoadCmdSegmentSplitInfo:
+		// case LoadCmdDylibCodeSignDrs:
+		// case LoadCmdLinkerOptimizationHint:
+		// case LoadCmdDyldExportsTrie:
+		// case LoadCmdDyldChainedFixups:
+		case LoadCmdFunctionStarts:
+			var led LinkEditDataCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &led); err != nil {
+				return nil, err
+			}
+			l := new(FunctionStarts)
+			l.Offset = led.Offset
+			l.Size = led.Size
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+
+		case LoadCmdDataInCode:
+			var led LinkEditDataCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &led); err != nil {
+				return nil, err
+			}
+			l := new(DataInCode)
+			// var e DataInCodeEntry
+
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
 
@@ -310,6 +390,42 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l.CurrentVersion = hdr.CurrentVersion
 			l.CompatVersion = hdr.CompatVersion
 			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case LoadCmdDylibID:
+			var hdr DylibIDCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(DylibID)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion
+			l.CompatVersion = hdr.CompatVersion
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+
+		case LoadCmdDyldInfo:
+		case LoadCmdDyldInfoOnly:
+			var info DyldInfoCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &info); err != nil {
+				return nil, err
+			}
+			l := new(DyldInfo)
+			l.RebaseOff = info.RebaseOff
+			l.RebaseSize = info.RebaseSize
+			l.BindOff = info.BindOff
+			l.BindSize = info.BindSize
+			l.WeakBindOff = info.WeakBindOff
+			l.WeakBindSize = info.WeakBindSize
+			l.LazyBindOff = info.LazyBindOff
+			l.LazyBindSize = info.LazyBindSize
+			l.ExportOff = info.ExportOff
+			l.ExportSize = info.ExportSize
 			f.Loads[i] = l
 
 		case LoadCmdSymtab:
@@ -439,6 +555,29 @@ func NewFile(r io.ReaderAt) (*File, error) {
 					return nil, err
 				}
 			}
+
+		case LoadCmdUUID:
+			var u UUIDCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &u); err != nil {
+				return nil, err
+			}
+			l := new(UUID)
+			l.ID = u.UUID.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+
+		case LoadCmdSourceVersion:
+			var sv SourceVersionCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &sv); err != nil {
+				return nil, err
+			}
+			l := new(SourceVersion)
+			l.Version = sv.Version.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+
 		case LoadCmdBuildVersion:
 			var build BuildVersionCmd
 			var buildTool buildToolVersion
