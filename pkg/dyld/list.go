@@ -360,7 +360,9 @@ func Parse(dsc string, verbose bool) error {
 					if err != nil {
 						log.Error(errors.Wrap(err, "failed to parse macho").Error())
 					}
-					fmt.Println(mcho.Symtab)
+					fmt.Println(mcho.Cpu.String())
+					fmt.Println(mcho.FileHeader.Flags.String())
+					break
 				}
 			}
 			// file.Seek(int64(image.Info.Address-dCache.mappings[0].Address), os.SEEK_SET)
@@ -408,7 +410,7 @@ func Parse(dsc string, verbose bool) error {
 
 	dCache.header.Print()
 	dCache.mappings.Print()
-	dCache.images.Print()
+	// dCache.images.Print()
 
 	return nil
 }
