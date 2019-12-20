@@ -55,16 +55,16 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[DiceKindData-1]
-	_ = x[DiceKindJumpTable8-2]
-	_ = x[DiceKindJumpTable16-3]
-	_ = x[DiceKindJumpTable32-4]
-	_ = x[DiceKindAbsJumpTable32-5]
+	_ = x[KindData-1]
+	_ = x[KindJumpTable8-2]
+	_ = x[KindJumpTable16-3]
+	_ = x[KindJumpTable32-4]
+	_ = x[KindAbsJumpTable32-5]
 }
 
-const _diceKind_name = "DiceKindDataDiceKindJumpTable8DiceKindJumpTable16DiceKindJumpTable32DiceKindAbsJumpTable32"
+const _diceKind_name = "KindDataKindJumpTable8KindJumpTable16KindJumpTable32KindAbsJumpTable32"
 
-var _diceKind_index = [...]uint8{0, 12, 30, 49, 68, 90}
+var _diceKind_index = [...]uint8{0, 8, 22, 37, 52, 70}
 
 func (i diceKind) String() string {
 	i -= 1

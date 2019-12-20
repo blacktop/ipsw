@@ -148,27 +148,15 @@ type Dylib struct {
 	LoadBytes
 	Name           string
 	Time           uint32
-	CurrentVersion version
-	CompatVersion  version
+	CurrentVersion string
+	CompatVersion  string
 }
 
 // A DylibID represents a Mach-O load dynamic library ident command.
-type DylibID struct {
-	LoadBytes
-	Name           string
-	Time           uint32
-	CurrentVersion version
-	CompatVersion  version
-}
+type DylibID Dylib
 
 // A WeakDylib represents a Mach-O load weak dynamic library command.
-type WeakDylib struct {
-	LoadBytes
-	Name           string
-	Time           uint32
-	CurrentVersion version
-	CompatVersion  version
-}
+type WeakDylib Dylib
 
 // A DyldInfo represents a Mach-O id dyld info command.
 type DyldInfo struct {
@@ -224,10 +212,29 @@ type UUID struct {
 	ID string
 }
 
+type Routines64 struct {
+	LoadBytes
+	InitAddress uint64
+	InitModule  uint64
+}
+
+type ReExportDylib Dylib
+
 // A SourceVersion represents a Mach-O source version.
 type SourceVersion struct {
 	LoadBytes
 	Version string
+}
+
+// A BuildVersion represents a Mach-O build for platform min OS version.
+type BuildVersion struct {
+	LoadBytes
+	Platform    string /* platform */
+	Minos       string /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+	Sdk         string /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+	NumTools    uint32 /* number of tool entries following this */
+	Tool        string
+	ToolVersion string
 }
 
 // A Symbol is a Mach-O 32-bit or 64-bit symbol table entry.
@@ -415,8 +422,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			}
 			l.Name = cstring(cmddat[hdr.Name:])
 			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion
-			l.CompatVersion = hdr.CompatVersion
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
 		case LoadCmdLoadWeakDylib:
@@ -431,8 +438,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			}
 			l.Name = cstring(cmddat[hdr.Name:])
 			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion
-			l.CompatVersion = hdr.CompatVersion
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
 		case LoadCmdDylibID:
@@ -447,8 +454,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			}
 			l.Name = cstring(cmddat[hdr.Name:])
 			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion
-			l.CompatVersion = hdr.CompatVersion
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
 
@@ -629,16 +636,47 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			if err := binary.Read(b, bo, &build); err != nil {
 				return nil, err
 			}
-			// fmt.Println(build.Platform)
-			// fmt.Println(build.Sdk)
-			// fmt.Println(build.Sdk)
-			if build.Ntools > 0 {
+			l := new(BuildVersion)
+			l.Platform = build.Platform.String()
+			l.Minos = build.Minos.String()
+			l.Sdk = build.Sdk.String()
+			l.NumTools = build.NumTools
+			if build.NumTools > 0 {
 				if err := binary.Read(b, bo, &buildTool); err != nil {
 					return nil, err
 				}
-				// fmt.Println(buildTool.Tool)
-				// fmt.Println(buildTool.Version)
+				l.Tool = buildTool.Tool.String()
+				l.ToolVersion = buildTool.Version.String()
 			}
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case LoadCmdRoutines64:
+			var r64 Routines64Cmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &r64); err != nil {
+				return nil, err
+			}
+			l := new(Routines64)
+			l.InitAddress = r64.InitAddress
+			l.InitModule = r64.InitModule
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case LoadCmdReexportDylib:
+			var hdr ReExportDylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(ReExportDylib)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
 		}
 		if s != nil {
 			s.sr = io.NewSectionReader(r, int64(s.Offset), int64(s.Filesz))
