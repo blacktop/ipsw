@@ -40,36 +40,6 @@ const (
 	MagicFat uint32 = 0xcafebabe
 )
 
-// A Type is the Mach-O file type, e.g. an object file, executable, or dynamic library.
-type Type uint32
-
-const (
-	TypeObj                        Type = 1
-	TypeExec                       Type = 2
-	TypeDylib                      Type = 6
-	TypeBundle                     Type = 8
-	TypeNlistOutofsyncWithDyldinfo Type = 0x04000000 /* The external symbols
-	   listed in the nlist symbol table do
-	   not include all the symbols listed in
-	   the dyld info. */
-	TypeDylibInCache Type = 0x80000000 /* Only for use on dylibs. When this bit
-	   is set, the dylib is part of the dyld
-	   shared cache, rather than loose in
-	   the filesystem. */
-)
-
-var typeStrings = []intName{
-	{uint32(TypeObj), "Obj"},
-	{uint32(TypeExec), "Exec"},
-	{uint32(TypeDylib), "Dylib"},
-	{uint32(TypeBundle), "Bundle"},
-	{uint32(TypeNlistOutofsyncWithDyldinfo), "Nlist Out of sync With Dyldinfo"},
-	{uint32(TypeDylibInCache), "Dylib in Cache"},
-}
-
-func (t Type) String() string   { return stringName(uint32(t), typeStrings, false) }
-func (t Type) GoString() string { return stringName(uint32(t), typeStrings, true) }
-
 // A Section32 is a 32-bit Mach-O section header.
 type Section32 struct {
 	Name     [16]byte
@@ -99,24 +69,6 @@ type Section64 struct {
 	Reserve1 uint32
 	Reserve2 uint32
 	Reserve3 uint32
-}
-
-// An Nlist32 is a Mach-O 32-bit symbol table entry.
-type Nlist32 struct {
-	Name  uint32
-	Type  uint8
-	Sect  uint8
-	Desc  uint16
-	Value uint32
-}
-
-// An Nlist64 is a Mach-O 64-bit symbol table entry.
-type Nlist64 struct {
-	Name  uint32
-	Type  uint8
-	Sect  uint8
-	Desc  uint16
-	Value uint64
 }
 
 // Regs386 is the Mach-O 386 register structure.

@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"reflect"
 	"strings"
 
 	"github.com/apex/log"
@@ -357,60 +356,13 @@ func Parse(dsc string, verbose bool) error {
 				file.Seek(int64(entry.DylibOffset), os.SEEK_SET)
 				fmt.Printf("%s @ 0x%08X\n", dCache.images[idx].Name, entry.DylibOffset)
 				// if strings.Contains(dCache.images[idx].Name, "JavaScriptCore") {
-				if strings.Contains(dCache.images[idx].Name, "WebCore") {
+				if strings.Contains(dCache.images[idx].Name, "Foundation") {
 					mcho, err := macho.NewFile(io.NewSectionReader(file, int64(entry.DylibOffset), 1<<63-1))
 					if err != nil {
 						log.Error(errors.Wrap(err, "failed to parse macho").Error())
 					}
 					fmt.Println("CPU:", mcho.Cpu.String())
 					fmt.Println("Flags:", mcho.FileHeader.Flags.String())
-					fmt.Println("LOADS")
-					fmt.Println("=====")
-					for _, l := range mcho.Loads {
-						rf := reflect.TypeOf(l)
-						if rf != nil {
-							if rf.Elem().Kind() != reflect.Struct {
-								log.Error("did not get expected type of struct")
-								examiner(rf, 0)
-							}
-							load := rf.Elem()
-							fmt.Println(load.Name())
-							switch load.Name() {
-							case "Dylib":
-								examiner(load, 1)
-							case "DylibID":
-								examiner(load, 1)
-							case "WeakDylib":
-								// examiner(load, 1)
-								// lVal := reflect.ValueOf(load)
-								for i := 0; i < load.NumField(); i++ {
-									f := load.Field(i)
-									if strings.EqualFold(f.Name, "Name") {
-										// fVal := reflect.ValueOf(&f)
-										fmt.Printf("%+v", load.(macho.WeakDylib))
-									}
-								}
-								// val := reflect.ValueOf(load).Elem()
-
-								// for i := 0; i < val.NumField(); i++ {
-								// 	valueField := val.Field(i)
-								// 	typeField := val.Type().Field(i)
-								// 	tag := typeField.Tag
-
-								// 	fmt.Printf("Field Name: %s,\t Field Value: %v,\t Tag Value: %s\n", typeField.Name, valueField.Interface(), tag.Get("tag_name"))
-								// }
-								// var dd macho.Dyl
-								// d := reflect.TypeOf(macho.DylibID)
-								// dd := load.(macho.DylibID)
-							}
-							// if strings.Contains(rf.Elem().Name(), "Dylib") {
-							// 	for i := 0; i < rf.Elem().NumField(); i++ {
-							// 		f := rf.Elem().Field(i)
-							// 		fmt.Println(f.Name)
-							// 	}
-							// }
-						}
-					}
 					break
 				}
 			}
@@ -462,22 +414,4 @@ func Parse(dsc string, verbose bool) error {
 	// dCache.images.Print()
 
 	return nil
-}
-
-func examiner(t reflect.Type, depth int) {
-	fmt.Println(strings.Repeat("\t", depth), "Type is", t.Name(), "and kind is", t.Kind())
-	switch t.Kind() {
-	case reflect.Array, reflect.Chan, reflect.Map, reflect.Ptr, reflect.Slice:
-		fmt.Println(strings.Repeat("\t", depth+1), "Contained type:")
-		examiner(t.Elem(), depth+1)
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			fmt.Println(strings.Repeat("\t", depth+1), "Field", i+1, "name is", f.Name, "type is", f.Type.Name(), "and kind is", f.Type.Kind())
-			if f.Tag != "" {
-				fmt.Println(strings.Repeat("\t", depth+2), "Tag is", f.Tag)
-				fmt.Println(strings.Repeat("\t", depth+2), "tag1 is", f.Tag.Get("tag1"), "tag2 is", f.Tag.Get("tag2"))
-			}
-		}
-	}
 }

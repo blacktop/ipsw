@@ -250,6 +250,35 @@ type (
 		Data []uint32
 	}
 
+	// A LoadFvmLibCmd is a Mach-O load a specified fixed VM shared library command.
+	LoadFvmLibCmd struct {
+		Cmd          LoadCmd // LC_IDFVMLIB or LC_LOADFVMLIB
+		Len          uint32
+		Name         uint32 // library's target pathname
+		MinorVersion uint32
+		HeaderAddr   uint32
+	}
+
+	// A IDFvmLibCmd is a Mach-O fixed VM shared library identification command.
+	IDFvmLibCmd LoadFvmLibCmd
+
+	// A IdentCmd is a Mach-O object identification info (obsolete)  command.
+	IdentCmd struct {
+		Cmd LoadCmd // LC_IDENT
+		Len uint32
+	}
+
+	// A FvmFileCmd is a Mach-O fixed VM file inclusion (internal use) command.
+	FvmFileCmd struct {
+		Cmd        LoadCmd // LC_FVMFILE
+		Len        uint32
+		Name       uint32 // files pathname
+		HeaderAddr uint32 // files virtual address
+	}
+
+	// A PrePageCmd is a Mach-O prepage command (internal use) command.
+	PrePageCmd interface{}
+
 	// A DysymtabCmd is a Mach-O dynamic symbol table command.
 	DysymtabCmd struct {
 		Cmd            LoadCmd
@@ -292,6 +321,32 @@ type (
 		Name uint32 // dynamic linker's path name
 	}
 
+	// A DylinkerIDCmd is a Mach-O dynamic linker identification command.
+	DylinkerIDCmd DylinkerCmd
+
+	// PreboundDylibCmd are modules prebound for a dynamically linked shared library
+	PreboundDylibCmd struct {
+		Cmd           LoadCmd // LC_PREBOUND_DYLIB
+		Len           uint32
+		Name          uint32 // library's path name
+		NumModules    uint32 // number of modules in library
+		LinkedModules uint32 // bit vector of linked modules
+	}
+
+	// A RoutinesCmd is a Mach-O image routines command.
+	RoutinesCmd struct {
+		Cmd         LoadCmd
+		Len         uint32
+		InitAddress uint32
+		InitModule  uint32
+		Reserved1   uint32
+		Reserved2   uint32
+		Reserved3   uint32
+		Reserved4   uint32
+		Reserved5   uint32
+		Reserved6   uint32
+	}
+
 	// A SubFrameworkCmd is a Mach-O dynamic sub_framework_command.
 	SubFrameworkCmd struct {
 		Cmd      LoadCmd
@@ -315,6 +370,39 @@ type (
 		Cmd     LoadCmd
 		Len     uint32
 		Library uint32
+	}
+
+	// A TwolevelHintsCmd is a Mach-O two-level namespace lookup hints command.
+	TwolevelHintsCmd struct {
+		Cmd      LoadCmd // LC_TWOLEVEL_HINTS
+		Len      uint32
+		Offset   uint32
+		NumHints uint32
+	}
+
+	// A PrebindCksumCmd is a Mach-O prebind checksum command.
+	PrebindCksumCmd struct {
+		Cmd      LoadCmd
+		Len      uint32
+		CheckSum uint32
+	}
+
+	// A WeakDylibCmd is a Mach-O load a dynamically linked shared library that is allowed to be missing
+	// (all symbols are weak imported) command.
+	WeakDylibCmd DylibCmd
+
+	// A Routines64Cmd is a Mach-O 64-bit image routines command.
+	Routines64Cmd struct {
+		Cmd         LoadCmd
+		Len         uint32
+		InitAddress uint64
+		InitModule  uint64
+		Reserved1   uint64
+		Reserved2   uint64
+		Reserved3   uint64
+		Reserved4   uint64
+		Reserved5   uint64
+		Reserved6   uint64
 	}
 
 	// A UUIDCmd is a Mach-O uuid load command contains a single
@@ -347,8 +435,8 @@ type (
 	// A SegmentSplitInfoCmd is a Mach-O code info to split segments command.
 	SegmentSplitInfoCmd LinkEditDataCmd
 
-	// A ReexportDylibCmd is a Mach-O load and re-export dylib command.
-	ReexportDylibCmd DylibCmd
+	// A ReExportDylibCmd is a Mach-O load and re-export dylib command.
+	ReExportDylibCmd DylibCmd
 
 	// A LazyLoadDylibCmd is a Mach-O delay load of dylib until first use command.
 	LazyLoadDylibCmd bool
@@ -459,7 +547,7 @@ type (
 		Platform platform /* platform */
 		Minos    version  /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
 		Sdk      version  /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
-		Ntools   uint32   /* number of tool entries following this */
+		NumTools uint32   /* number of tool entries following this */
 	}
 
 	// A DyldExportsTrieCmd is used with linkedit_data_command, payload is trie command.
