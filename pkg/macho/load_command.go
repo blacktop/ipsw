@@ -40,7 +40,7 @@ const (
 	LoadCmdSegment64              LoadCmd = 0x19                    // 64-bit segment of this file to be mapped
 	LoadCmdRoutines64             LoadCmd = 0x1a                    // 64-bit image routines
 	LoadCmdUUID                   LoadCmd = 0x1b                    // the uuid
-	LoadCmdRpath                  LoadCmd = 0x1c | LoadCmdReqDyld   // runpath additions
+	LoadCmdRpath                  LoadCmd = (0x1c | LoadCmdReqDyld) // runpath additions
 	LoadCmdCodeSignature          LoadCmd = 0x1d                    // local of code signature
 	LoadCmdSegmentSplitInfo       LoadCmd = 0x1e                    // local of info to split segments
 	LoadCmdReexportDylib          LoadCmd = (0x1f | LoadCmdReqDyld) // load and re-export dylib
@@ -178,10 +178,7 @@ type uuid [16]byte
 
 func (u uuid) String() string {
 	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-		u[0], u[1], u[2], u[3],
-		u[4], u[5], u[6], u[7],
-		u[8], u[9], u[10], u[11],
-		u[12], u[13], u[14], u[15])
+		u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8], u[9], u[10], u[11], u[12], u[13], u[14], u[15])
 }
 
 type DataInCodeEntry struct {
@@ -193,12 +190,16 @@ type DataInCodeEntry struct {
 type diceKind uint16
 
 const (
-	DiceKindData           diceKind = 0x0001
-	DiceKindJumpTable8     diceKind = 0x0002
-	DiceKindJumpTable16    diceKind = 0x0003
-	DiceKindJumpTable32    diceKind = 0x0004
-	DiceKindAbsJumpTable32 diceKind = 0x0005
+	KindData           diceKind = 0x0001
+	KindJumpTable8     diceKind = 0x0002
+	KindJumpTable16    diceKind = 0x0003
+	KindJumpTable32    diceKind = 0x0004
+	KindAbsJumpTable32 diceKind = 0x0005
 )
+
+/*****************
+ * LOAD COMMANDS *
+ *****************/
 
 type (
 	// A Segment32 is a 32-bit Mach-O segment load command.
@@ -241,6 +242,14 @@ type (
 		Strsize uint32
 	}
 
+	// A Thread is a Mach-O thread state command.
+	Thread struct {
+		Cmd  LoadCmd
+		Len  uint32
+		Type uint32
+		Data []uint32
+	}
+
 	// A DysymtabCmd is a Mach-O dynamic symbol table command.
 	DysymtabCmd struct {
 		Cmd            LoadCmd
@@ -265,12 +274,6 @@ type (
 		Nlocrel        uint32
 	}
 
-	// A SubClientCmd is a Mach-O dynamic sub client command.
-	SubClientCmd struct {
-		Cmd    LoadCmd
-		Len    uint32
-		Client uint32
-	}
 	// A DylibCmd is a Mach-O load dynamic library command.
 	// LC_ID_DYLIB, LC_LOAD_{,WEAK_}DYLIB,LC_REEXPORT_DYLIB
 	DylibCmd struct {
@@ -280,6 +283,83 @@ type (
 		Time           uint32
 		CurrentVersion version
 		CompatVersion  version
+	}
+
+	// A DylinkerCmd is a Mach-O dynamic load a dynamic linker command.
+	DylinkerCmd struct {
+		Cmd  LoadCmd
+		Len  uint32
+		Name uint32 // dynamic linker's path name
+	}
+
+	// A SubFrameworkCmd is a Mach-O dynamic sub_framework_command.
+	SubFrameworkCmd struct {
+		Cmd      LoadCmd
+		Len      uint32
+		Umbrella uint32
+	}
+	// A SubClientCmd is a Mach-O dynamic sub client command.
+	SubClientCmd struct {
+		Cmd    LoadCmd
+		Len    uint32
+		Client uint32
+	}
+	// A SubUmbrellaCmd is a Mach-O dynamic sub_umbrella_command.
+	SubUmbrellaCmd struct {
+		Cmd      LoadCmd
+		Len      uint32
+		Umbrella uint32
+	}
+	// A SubLibraryCmd is a Mach-O dynamic sub_library_command.
+	SubLibraryCmd struct {
+		Cmd     LoadCmd
+		Len     uint32
+		Library uint32
+	}
+
+	// A UUIDCmd is a Mach-O uuid load command contains a single
+	// 128-bit unique random number that identifies an object produced
+	// by the static link editor.
+	UUIDCmd struct {
+		Cmd  LoadCmd
+		Len  uint32
+		UUID uuid
+	}
+
+	// A RpathCmd is a Mach-O rpath command.
+	RpathCmd struct {
+		Cmd  LoadCmd
+		Len  uint32
+		Path uint32
+	}
+
+	// A LinkEditDataCmd is a Mach-O linkedit data command.
+	LinkEditDataCmd struct {
+		Cmd    LoadCmd
+		Len    uint32
+		Offset uint32
+		Size   uint32
+	}
+
+	// A CodeSignatureCmd is a Mach-O code signature command.
+	CodeSignatureCmd LinkEditDataCmd
+
+	// A SegmentSplitInfoCmd is a Mach-O code info to split segments command.
+	SegmentSplitInfoCmd LinkEditDataCmd
+
+	// A ReexportDylibCmd is a Mach-O load and re-export dylib command.
+	ReexportDylibCmd DylibCmd
+
+	// A LazyLoadDylibCmd is a Mach-O delay load of dylib until first use command.
+	LazyLoadDylibCmd bool
+
+	// A EncryptionInfoCmd is a Mach-O encrypted segment information command.
+	EncryptionInfoCmd struct {
+		Cmd     LoadCmd
+		Len     uint32
+		Offset  uint32 // file offset of encrypted range
+		Size    uint32 // file size of encrypted range
+		CryptID uint32 // which enryption system, 0 means not-encrypted yet
 	}
 
 	// A DyldInfoCmd is a Mach-O id dyld info command.
@@ -298,34 +378,73 @@ type (
 		ExportSize   uint32 //  size of export info
 	}
 
-	// A RpathCmd is a Mach-O rpath command.
-	RpathCmd struct {
-		Cmd  LoadCmd
-		Len  uint32
-		Path uint32
+	// A DyldInfoOnlyCmd is a Mach-O compressed dyld information only command.
+	DyldInfoOnlyCmd DyldInfoCmd
+
+	// A VersionMinCmd is a Mach-O version min command.
+	VersionMinCmd struct {
+		Cmd     LoadCmd
+		Len     uint32
+		Version version
+		Sdk     version
 	}
 
-	// A LinkEditDataCmd is a Mach-O linkedit data command.
-	LinkEditDataCmd struct {
-		Cmd    LoadCmd
-		Len    uint32
-		Offset uint32
-		Size   uint32
+	// A VersionMinMacOSCmd is a Mach-O build for macOS min OS version command.
+	VersionMinMacOSCmd VersionMinCmd
+
+	// A VersionMinIPhoneOSCmd is a Mach-O build for iPhoneOS min OS version command.
+	VersionMinIPhoneOSCmd VersionMinCmd
+
+	// A VersionMinTvOSCmd is a Mach-O build for tvOS min OS version command.
+	VersionMinTvOSCmd VersionMinCmd
+
+	// A VersionMinWatchOSCmd is a Mach-O build for watchOS min OS version command.
+	VersionMinWatchOSCmd VersionMinCmd
+
+	// A FunctionStartsCmd is a Mach-O compressed table of function start addresses command.
+	FunctionStartsCmd LinkEditDataCmd
+
+	// A DyldEnvironmentCmd is a Mach-O string for dyld to treat like environment variable command.
+	DyldEnvironmentCmd DylinkerCmd
+
+	// A EntryPointCmd is a Mach-O main command.
+	EntryPointCmd struct {
+		Cmd       LoadCmd // LC_MAIN only used in MH_EXECUTE filetypes
+		Len       uint32  // 24
+		Offset    uint64  // file (__TEXT) offset of main()
+		StackSize uint64  // if not zero, initial stack size
 	}
 
-	// A Thread is a Mach-O thread state command.
-	Thread struct {
-		Cmd  LoadCmd
-		Len  uint32
-		Type uint32
-		Data []uint32
-	}
+	// A DataInCodeCmd is a Mach-O data in code command.
+	DataInCodeCmd LinkEditDataCmd
 
 	// A SourceVersionCmd is a Mach-O source version command.
 	SourceVersionCmd struct {
 		Cmd     LoadCmd
 		Len     uint32
 		Version srcVersion // A.B.C.D.E packed as a24.b10.c10.d10.e10
+	}
+
+	// A DylibCodeSignDrsCmd is a Mach-O code signing DRs copied from linked dylibs command.
+	DylibCodeSignDrsCmd LinkEditDataCmd
+
+	// A LinkerOptionCmd is a Mach-O main command.
+	LinkerOptionCmd struct {
+		Cmd   LoadCmd // LC_LINKER_OPTION only used in MH_OBJECT filetypes
+		Len   uint32
+		Count uint32 // number of strings concatenation of zero terminated UTF8 strings. Zero filled at end to align
+	}
+
+	// A LinkerOptimizationHintCmd is a Mach-O optimization hints command.
+	LinkerOptimizationHintCmd LinkEditDataCmd
+
+	// A NoteCmd is a Mach-O note command.
+	NoteCmd struct {
+		Cmd       LoadCmd
+		Len       uint32
+		DataOwner [16]byte
+		Offset    uint64
+		Size      uint64
 	}
 
 	/*
@@ -343,12 +462,9 @@ type (
 		Ntools   uint32   /* number of tool entries following this */
 	}
 
-	// A UUIDCmd is a Mach-O uuid load command contains a single
-	// 128-bit unique random number that identifies an object produced
-	// by the static link editor.
-	UUIDCmd struct {
-		Cmd  LoadCmd
-		Len  uint32
-		UUID uuid
-	}
+	// A DyldExportsTrieCmd is used with linkedit_data_command, payload is trie command.
+	DyldExportsTrieCmd LinkEditDataCmd
+
+	// A DyldChainedFixupsCmd is used with linkedit_data_command command.
+	DyldChainedFixupsCmd LinkEditDataCmd
 )
