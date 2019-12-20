@@ -265,18 +265,15 @@ type (
 		Nlocrel        uint32
 	}
 
-	// A DylibCmd is a Mach-O load dynamic library command.
-	DylibCmd struct {
-		Cmd            LoadCmd
-		Len            uint32
-		Name           uint32
-		Time           uint32
-		CurrentVersion uint32
-		CompatVersion  uint32
+	// A SubClientCmd is a Mach-O dynamic sub client command.
+	SubClientCmd struct {
+		Cmd    LoadCmd
+		Len    uint32
+		Client uint32
 	}
-
-	// A DylibIDCmd is a Mach-O id dynamic library command.
-	DylibIDCmd struct {
+	// A DylibCmd is a Mach-O load dynamic library command.
+	// LC_ID_DYLIB, LC_LOAD_{,WEAK_}DYLIB,LC_REEXPORT_DYLIB
+	DylibCmd struct {
 		Cmd            LoadCmd
 		Len            uint32
 		Name           uint32
