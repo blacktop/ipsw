@@ -137,17 +137,32 @@ func (s *Section) Data() ([]byte, error) {
 // Open returns a new ReadSeeker reading the Mach-O section.
 func (s *Section) Open() io.ReadSeeker { return io.NewSectionReader(s.sr, 0, 1<<63-1) }
 
+// A SubClient is a Mach-O dynamic sub client command.
+type SubClient struct {
+	LoadBytes
+	Name string
+}
+
 // A Dylib represents a Mach-O load dynamic library command.
 type Dylib struct {
 	LoadBytes
 	Name           string
 	Time           uint32
-	CurrentVersion uint32
-	CompatVersion  uint32
+	CurrentVersion version
+	CompatVersion  version
 }
 
-// A DylibID represents a Mach-O id dynamic library command.
+// A DylibID represents a Mach-O load dynamic library ident command.
 type DylibID struct {
+	LoadBytes
+	Name           string
+	Time           uint32
+	CurrentVersion version
+	CompatVersion  version
+}
+
+// A WeakDylib represents a Mach-O load weak dynamic library command.
+type WeakDylib struct {
 	LoadBytes
 	Name           string
 	Time           uint32
@@ -345,6 +360,19 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
 
+		case LoadCmdSubClient:
+			var sc SubClientCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &sc); err != nil {
+				return nil, err
+			}
+			l := new(SubClient)
+			if sc.Client >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid path in sub client command", sc.Client}
+			}
+			l.Name = cstring(cmddat[sc.Client:])
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
 		// case LoadCmdCodeSignature:
 		// case LoadCmdSegmentSplitInfo:
 		// case LoadCmdDylibCodeSignDrs:
@@ -391,15 +419,31 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l.CompatVersion = hdr.CompatVersion
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
+		case LoadCmdLoadWeakDylib:
+			var hdr DylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(WeakDylib)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in weak dynamic library command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion
+			l.CompatVersion = hdr.CompatVersion
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
 		case LoadCmdDylibID:
-			var hdr DylibIDCmd
+			var hdr DylibCmd
 			b := bytes.NewReader(cmddat)
 			if err := binary.Read(b, bo, &hdr); err != nil {
 				return nil, err
 			}
 			l := new(DylibID)
 			if hdr.Name >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
+				return nil, &FormatError{offset, "invalid name in dynamic library ident command", hdr.Name}
 			}
 			l.Name = cstring(cmddat[hdr.Name:])
 			l.Time = hdr.Time
