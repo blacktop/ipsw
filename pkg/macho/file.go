@@ -709,7 +709,7 @@ func (f *File) parseSymtab(symdat, strtab, cmddat []byte, hdr *SymtabCmd, offset
 		}
 		sym := &symtab[i]
 		if n.Name >= uint32(len(strtab)) {
-			continue
+			continue // TODO: remove this
 			return nil, &FormatError{offset, "invalid name in symbol table", n.Name}
 		}
 		// We add "_" to Go symbols. Strip it here. See issue 33808.
