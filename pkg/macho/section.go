@@ -1,5 +1,9 @@
 package macho
 
+import "strings"
+
+import "fmt"
+
 // A Section32 is a 32-bit Mach-O section header.
 type Section32 struct {
 	Name     [16]byte
@@ -94,11 +98,11 @@ func (t SectionFlag) IsCstringLiterals() bool {
 	return (t & SECTION_TYPE) == S_CSTRING_LITERALS
 }
 
-func (t SectionFlag) Is_4ByteLiterals() bool {
+func (t SectionFlag) Is4ByteLiterals() bool {
 	return (t & SECTION_TYPE) == S_4BYTE_LITERALS
 }
 
-func (t SectionFlag) Is_8ByteLiterals() bool {
+func (t SectionFlag) Is8ByteLiterals() bool {
 	return (t & SECTION_TYPE) == S_8BYTE_LITERALS
 }
 
@@ -138,7 +142,7 @@ func (t SectionFlag) IsInterposing() bool {
 	return (t & SECTION_TYPE) == S_INTERPOSING
 }
 
-func (t SectionFlag) Is_16ByteLiterals() bool {
+func (t SectionFlag) Is16ByteLiterals() bool {
 	return (t & SECTION_TYPE) == S_16BYTE_LITERALS
 }
 
@@ -174,13 +178,89 @@ func (t SectionFlag) IsInitFuncOffsets() bool {
 	return (t & SECTION_TYPE) == S_INIT_FUNC_OFFSETS
 }
 
+func (f SectionFlag) String() string {
+	var fStr string
+	// if f.IsRegular() {
+	// 	fStr += "Regular, "
+	// }
+	if f.IsZerofill() {
+		fStr += "Zerofill, "
+	}
+	if f.IsCstringLiterals() {
+		fStr += "Cstring Literals, "
+	}
+	if f.Is4ByteLiterals() {
+		fStr += "4Byte Literals, "
+	}
+	if f.Is8ByteLiterals() {
+		fStr += "8Byte Literals, "
+	}
+	if f.IsLiteralPointers() {
+		fStr += "Literal Pointers, "
+	}
+	if f.IsNonLazySymbolPointers() {
+		fStr += "NonLazySymbolPointers, "
+	}
+	if f.IsLazySymbolPointers() {
+		fStr += "LazySymbolPointers, "
+	}
+	if f.IsSymbolStubs() {
+		fStr += "SymbolStubs, "
+	}
+	if f.IsModInitFuncPointers() {
+		fStr += "ModInitFuncPointers, "
+	}
+	if f.IsModTermFuncPointers() {
+		fStr += "ModTermFuncPointers, "
+	}
+	if f.IsCoalesced() {
+		fStr += "Coalesced, "
+	}
+	if f.IsGbZerofill() {
+		fStr += "GbZerofill, "
+	}
+	if f.IsInterposing() {
+		fStr += "Interposing, "
+	}
+	if f.Is16ByteLiterals() {
+		fStr += "16Byte Literals, "
+	}
+	if f.IsDtraceDof() {
+		fStr += "Dtrace DOF, "
+	}
+	if f.IsLazyDylibSymbolPointers() {
+		fStr += "LazyDylibSymbolPointers, "
+	}
+	if f.IsThreadLocalRegular() {
+		fStr += "ThreadLocalRegular, "
+	}
+	if f.IsThreadLocalZerofill() {
+		fStr += "ThreadLocalZerofill, "
+	}
+	if f.IsThreadLocalVariables() {
+		fStr += "ThreadLocalVariables, "
+	}
+	if f.IsThreadLocalVariablePointers() {
+		fStr += "ThreadLocalVariablePointers, "
+	}
+	if f.IsThreadLocalInitFunctionPointers() {
+		fStr += "ThreadLocalInitFunctionPointers, "
+	}
+	if f.IsInitFuncOffsets() {
+		fStr += "InitFuncOffsets, "
+	}
+	return strings.TrimSuffix(fStr, ", ")
+}
+
 const (
 	SECTION_ATTRIBUTES SectionFlag = 0xffffff00 /*  24 section attributes */
 	/*
 	 * Constants for the section attributes part of the flags field of a section
 	 * structure.
 	 */
-	SECTION_ATTRIBUTES_USR     SectionFlag = 0xff000000 /* User setable attributes */
+	SECTION_ATTRIBUTES_USR SectionFlag = 0xff000000 /* User setable attributes */
+	SECTION_ATTRIBUTES_SYS SectionFlag = 0x00ffff00 /* system setable attributes */
+
 	S_ATTR_PURE_INSTRUCTIONS   SectionFlag = 0x80000000 /* section contains only true machine instructions */
 	S_ATTR_NO_TOC              SectionFlag = 0x40000000 /* section contains coalesced symbols that are not to be in a ranlib table of contents */
 	S_ATTR_STRIP_STATIC_SYMS   SectionFlag = 0x20000000 /* ok to strip static symbols in this section in files with the MH_DYLDLINK flag */
@@ -197,8 +277,85 @@ const (
 	 * generally contain DWARF debugging info.
 	 */
 	S_ATTR_DEBUG             SectionFlag = 0x02000000 /* a debug section */
-	SECTION_ATTRIBUTES_SYS   SectionFlag = 0x00ffff00 /* system setable attributes */
 	S_ATTR_SOME_INSTRUCTIONS SectionFlag = 0x00000400 /* section contains some machine instructions */
 	S_ATTR_EXT_RELOC         SectionFlag = 0x00000200 /* section has external relocation entries */
 	S_ATTR_LOC_RELOC         SectionFlag = 0x00000100 /* section has local relocation entries */
 )
+
+func (t SectionFlag) GetAttributes() SectionFlag {
+	return (t & SECTION_ATTRIBUTES)
+}
+
+func (t SectionFlag) IsPureInstructions() bool {
+	return t.GetAttributes()&S_ATTR_PURE_INSTRUCTIONS != 0
+}
+func (t SectionFlag) IsNoToc() bool {
+	return t.GetAttributes()&S_ATTR_NO_TOC != 0
+}
+func (t SectionFlag) IsStripStaticSyms() bool {
+	return t.GetAttributes()&S_ATTR_STRIP_STATIC_SYMS != 0
+}
+func (t SectionFlag) IsNoDeadStrip() bool {
+	return t.GetAttributes()&S_ATTR_NO_DEAD_STRIP != 0
+}
+func (t SectionFlag) IsLiveSupport() bool {
+	return t.GetAttributes()&S_ATTR_LIVE_SUPPORT != 0
+}
+func (t SectionFlag) IsSelfModifyingCode() bool {
+	return t.GetAttributes()&S_ATTR_SELF_MODIFYING_CODE != 0
+}
+func (t SectionFlag) IsDebug() bool {
+	return t.GetAttributes()&S_ATTR_DEBUG != 0
+}
+func (t SectionFlag) IsSomeInstructions() bool {
+	return t.GetAttributes()&S_ATTR_SOME_INSTRUCTIONS != 0
+}
+func (t SectionFlag) IsExtReloc() bool {
+	return t.GetAttributes()&S_ATTR_EXT_RELOC != 0
+}
+func (t SectionFlag) IsLocReloc() bool {
+	return t.GetAttributes()&S_ATTR_LOC_RELOC != 0
+}
+
+func (f SectionFlag) AttributesList() []string {
+	var attrs []string
+	if f.IsPureInstructions() {
+		attrs = append(attrs, "PureInstructions")
+	}
+	if f.IsNoToc() {
+		attrs = append(attrs, "NoToc")
+	}
+	if f.IsStripStaticSyms() {
+		attrs = append(attrs, "StripStaticSyms")
+	}
+	if f.IsNoDeadStrip() {
+		attrs = append(attrs, "NoDeadStrip")
+	}
+	if f.IsLiveSupport() {
+		attrs = append(attrs, "LiveSupport")
+	}
+	if f.IsSelfModifyingCode() {
+		attrs = append(attrs, "SelfModifyingCode")
+	}
+	if f.IsDebug() {
+		attrs = append(attrs, "Debug")
+	}
+	if f.IsSomeInstructions() {
+		attrs = append(attrs, "SomeInstructions")
+	}
+	if f.IsExtReloc() {
+		attrs = append(attrs, "ExtReloc")
+	}
+	if f.IsLocReloc() {
+		attrs = append(attrs, "LocReloc")
+	}
+	return attrs
+}
+
+func (f SectionFlag) AttributesString() string {
+	var aStr string
+	for _, attr := range f.AttributesList() {
+		aStr += fmt.Sprintf("%s|", attr)
+	}
+	return strings.TrimSuffix(aStr, "|")
+}

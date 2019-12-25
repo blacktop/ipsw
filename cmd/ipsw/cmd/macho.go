@@ -84,10 +84,21 @@ var machoCmd = &cobra.Command{
 
 		fmt.Println("SECTIONS")
 		fmt.Println("========")
+		var secFlags string
+		var prevSeg string
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 		for _, sec := range m.Sections {
-			// "Mem: 0x1c75f63f0-0x1c75f6408		__DATA.__got_weak	(Non-Lazy Symbol Ptrs)"
-			fmt.Printf("Mem: 0x%x-0x%x          %s.%s\n", sec.Addr, sec.Addr+sec.Size, sec.Seg, sec.Name)
+			secFlags = ""
+			if !sec.Flags.IsRegular() {
+				secFlags = fmt.Sprintf("(%s)", sec.Flags)
+			}
+			if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
+				fmt.Fprintf(w, "\n")
+			}
+			fmt.Fprintf(w, "Mem: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
+			prevSeg = sec.Seg
 		}
+		w.Flush()
 
 		if symbols {
 			fmt.Println("SYMBOLS")

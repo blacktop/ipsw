@@ -197,6 +197,27 @@ const (
 	KindAbsJumpTable32 diceKind = 0x0005
 )
 
+type segFlag uint32
+
+const (
+	/* Constants for the flags field of the segment_command */
+	SG_HIGHVM segFlag = 0x1 /* the file contents for this segment is for
+	   the high part of the VM space, the low part
+	   is zero filled (for stacks in core files) */
+	SG_FVMLIB segFlag = 0x2 /* this segment is the VM that is allocated by
+	   a fixed VM library, for overlap checking in
+	   the link editor */
+	SG_NORELOC segFlag = 0x4 /* this segment has nothing that was relocated
+	   in it and nothing relocated to it, that is
+	   it maybe safely replaced without relocation*/
+	SG_PROTECTED_VERSION_1 segFlag = 0x8 /* This segment is protected.  If the
+	   segment starts at file offset 0, the
+	   first page of the segment is not
+	   protected.  All other pages of the
+	   segment are protected. */
+	SG_READ_ONLY segFlag = 0x10 /* This segment is made read-only after fixups */
+)
+
 /*****************
  * LOAD COMMANDS *
  *****************/
@@ -204,32 +225,32 @@ const (
 type (
 	// A Segment32 is a 32-bit Mach-O segment load command.
 	Segment32 struct {
-		Cmd     LoadCmd
-		Len     uint32
-		Name    [16]byte
-		Addr    uint32
-		Memsz   uint32
-		Offset  uint32
-		Filesz  uint32
-		Maxprot uint32
-		Prot    uint32
-		Nsect   uint32
-		Flag    uint32
+		Cmd     LoadCmd      /* LC_SEGMENT */
+		Len     uint32       /* includes sizeof section structs */
+		Name    [16]byte     /* segment name */
+		Addr    uint32       /* memory address of this segment */
+		Memsz   uint32       /* memory size of this segment */
+		Offset  uint32       /* file offset of this segment */
+		Filesz  uint32       /* amount to map from the file */
+		Maxprot vmProtection /* maximum VM protection */
+		Prot    vmProtection /* initial VM protection */
+		Nsect   uint32       /* number of sections in segment */
+		Flag    segFlag      /* flags */
 	}
 
 	// A Segment64 is a 64-bit Mach-O segment load command.
 	Segment64 struct {
-		Cmd     LoadCmd
-		Len     uint32
-		Name    [16]byte
-		Addr    uint64
-		Memsz   uint64
-		Offset  uint64
-		Filesz  uint64
-		Maxprot uint32
-		Prot    uint32
-		Nsect   uint32
-		Flag    uint32
+		Cmd     LoadCmd      /* LC_SEGMENT_64 */
+		Len     uint32       /* includes sizeof section_64 structs */
+		Name    [16]byte     /* segment name */
+		Addr    uint64       /* memory address of this segment */
+		Memsz   uint64       /* memory size of this segment */
+		Offset  uint64       /* file offset of this segment */
+		Filesz  uint64       /* amount to map from the file */
+		Maxprot vmProtection /* maximum VM protection */
+		Prot    vmProtection /* initial VM protection */
+		Nsect   uint32       /* number of sections in segment */
+		Flag    segFlag      /* flags */
 	}
 
 	// A SymtabCmd is a Mach-O symbol table command.
