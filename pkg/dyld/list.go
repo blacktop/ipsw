@@ -23,6 +23,7 @@ type DyldCache struct {
 	codesignature []byte
 	slideInfo     DyldCacheSlideInfo
 	localSymInfo  DyldCacheLocalSymbolsInfo
+	branchPools   []uint64
 }
 
 type DyldCacheMappings []DyldCacheMappingInfo
@@ -356,8 +357,8 @@ func Parse(dsc string, verbose bool) error {
 			for idx, entry := range entries {
 				file.Seek(int64(entry.DylibOffset), os.SEEK_SET)
 				fmt.Printf("%s @ 0x%08X\n", dCache.images[idx].Name, entry.DylibOffset)
-				// if strings.Contains(dCache.images[idx].Name, "JavaScriptCore") {
-				if strings.Contains(dCache.images[idx].Name, "Foundation") {
+				if strings.Contains(dCache.images[idx].Name, "JavaScriptCore") {
+					// if strings.Contains(dCache.images[idx].Name, "Foundation") {
 					mcho, err := macho.NewFile(io.NewSectionReader(file, int64(entry.DylibOffset), 1<<63-1))
 					if err != nil {
 						log.Error(errors.Wrap(err, "failed to parse macho").Error())

@@ -13,15 +13,15 @@ import (
 
 // A FatFile is a Mach-O universal binary that contains at least one architecture.
 type FatFile struct {
-	Magic  uint32
+	Magic  magic
 	Arches []FatArch
 	closer io.Closer
 }
 
 // A FatArchHeader represents a fat header for a specific image architecture.
 type FatArchHeader struct {
-	Cpu    Cpu
-	SubCpu uint32
+	Cpu    CPU
+	SubCpu CPUSubtype
 	Offset uint32
 	Size   uint32
 	Align  uint32
@@ -55,13 +55,13 @@ func NewFatFile(r io.ReaderAt) (*FatFile, error) {
 		// See if this is a Mach-O file via its magic number. The magic
 		// must be converted to little endian first though.
 		var buf [4]byte
-		binary.BigEndian.PutUint32(buf[:], ff.Magic)
+		binary.BigEndian.PutUint32(buf[:], ff.Magic.Int())
 		leMagic := binary.LittleEndian.Uint32(buf[:])
-		if leMagic == Magic32 || leMagic == Magic64 {
+		if leMagic == Magic32.Int() || leMagic == Magic64.Int() {
 			return nil, ErrNotFat
-		} else {
-			return nil, &FormatError{0, "invalid magic number", nil}
 		}
+		return nil, &FormatError{0, "invalid magic number", nil}
+
 	}
 	offset := int64(4)
 

@@ -35,6 +35,8 @@ import (
 
 func init() {
 	rootCmd.AddCommand(machoCmd)
+
+	machoCmd.Flags().BoolP("symbols", "n", false, "output symbols")
 }
 
 func examiner(t reflect.Type, depth int) {
@@ -61,9 +63,13 @@ var machoCmd = &cobra.Command{
 	Short: "Parse a MachO file",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		symbols, _ := cmd.Flags().GetBool("symbols")
+
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
@@ -72,20 +78,32 @@ var machoCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		fmt.Println("HEADER")
+		fmt.Println("======")
+		fmt.Println(m)
 
-		fmt.Println("Type:", m.Type.String())
-		fmt.Println("CPU:", m.Cpu.String())
-		fmt.Println("Flags:", m.FileHeader.Flags.String())
-		var sec string
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
-		for _, sym := range m.Symtab.Syms {
-			if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-				sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
-			}
-			fmt.Fprintf(w, "0x%016X \t <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
-			// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+		fmt.Println("SECTIONS")
+		fmt.Println("========")
+		for _, sec := range m.Sections {
+			// "Mem: 0x1c75f63f0-0x1c75f6408		__DATA.__got_weak	(Non-Lazy Symbol Ptrs)"
+			fmt.Printf("Mem: 0x%x-0x%x          %s.%s\n", sec.Addr, sec.Addr+sec.Size, sec.Seg, sec.Name)
 		}
-		w.Flush()
+
+		if symbols {
+			fmt.Println("SYMBOLS")
+			fmt.Println("=======")
+			var sec string
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+			for _, sym := range m.Symtab.Syms {
+				if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+					sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+				}
+				fmt.Fprintf(w, "0x%016X \t <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+				// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+			}
+			w.Flush()
+		}
+
 		fmt.Println("LOADS:", m.FileHeader.Ncmd)
 		fmt.Println("=====")
 		for idx, l := range m.Loads {

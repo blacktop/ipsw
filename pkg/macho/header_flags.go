@@ -127,91 +127,91 @@ func (f headerFlags) DylibInCache() bool {
 func (fs headerFlags) String() string {
 	var fStr string
 	if fs.NoUndefs() {
-		fStr += "NoUndefs "
+		fStr += "NoUndefs, "
 	}
 	if fs.IncrLink() {
-		fStr += "IncrLink "
+		fStr += "IncrLink, "
 	}
 	if fs.DyldLink() {
-		fStr += "DyldLink "
+		fStr += "DyldLink, "
 	}
 	if fs.BindAtLoad() {
-		fStr += "BindAtLoad "
+		fStr += "BindAtLoad, "
 	}
 	if fs.Prebound() {
-		fStr += "Prebound "
+		fStr += "Prebound, "
 	}
 	if fs.SplitSegs() {
-		fStr += "SplitSegs "
+		fStr += "SplitSegs, "
 	}
 	if fs.LazyInit() {
-		fStr += "LazyInit "
+		fStr += "LazyInit, "
 	}
 	if fs.TwoLevel() {
-		fStr += "TwoLevel "
+		fStr += "TwoLevel, "
 	}
 	if fs.ForceFlat() {
-		fStr += "ForceFlat "
+		fStr += "ForceFlat, "
 	}
 	if fs.NoMultiDefs() {
-		fStr += "NoMultiDefs "
+		fStr += "NoMultiDefs, "
 	}
 	if fs.NoFixPrebinding() {
-		fStr += "NoFixPrebinding "
+		fStr += "NoFixPrebinding, "
 	}
 	if fs.Prebindable() {
-		fStr += "Prebindable "
+		fStr += "Prebindable, "
 	}
 	if fs.AllModsBound() {
-		fStr += "AllModsBound "
+		fStr += "AllModsBound, "
 	}
 	if fs.SubsectionsViaSymbols() {
-		fStr += "SubsectionsViaSymbols "
+		fStr += "SubsectionsViaSymbols, "
 	}
 	if fs.Canonical() {
-		fStr += "Canonical "
+		fStr += "Canonical, "
 	}
 	if fs.WeakDefines() {
-		fStr += "WeakDefines "
+		fStr += "WeakDefines, "
 	}
 	if fs.BindsToWeak() {
-		fStr += "BindsToWeak "
+		fStr += "BindsToWeak, "
 	}
 	if fs.AllowStackExecution() {
-		fStr += "AllowStackExecution "
+		fStr += "AllowStackExecution, "
 	}
 	if fs.RootSafe() {
-		fStr += "RootSafe "
+		fStr += "RootSafe, "
 	}
 	if fs.SetuidSafe() {
-		fStr += "SetuidSafe "
+		fStr += "SetuidSafe, "
 	}
 	if fs.NoReexportedDylibs() {
-		fStr += "NoReexportedDylibs "
+		fStr += "NoReexportedDylibs, "
 	}
 	if fs.PIE() {
-		fStr += "PIE "
+		fStr += "PIE, "
 	}
 	if fs.DeadStrippableDylib() {
-		fStr += "DeadStrippableDylib "
+		fStr += "DeadStrippableDylib, "
 	}
 	if fs.HasTLVDescriptors() {
-		fStr += "HasTLVDescriptors "
+		fStr += "HasTLVDescriptors, "
 	}
 	if fs.NoHeapExecution() {
-		fStr += "NoHeapExecution "
+		fStr += "NoHeapExecution, "
 	}
 	if fs.AppExtensionSafe() {
-		fStr += "AppExtensionSafe "
+		fStr += "AppExtensionSafe, "
 	}
 	if fs.NlistOutofsyncWithDyldinfo() {
-		fStr += "NlistOutofsyncWithDyldinfo "
+		fStr += "NlistOutofsyncWithDyldinfo, "
 	}
 	if fs.SimSupport() {
-		fStr += "SimSupport "
+		fStr += "SimSupport, "
 	}
 	if fs.DylibInCache() {
-		fStr += "DylibInCache "
+		fStr += "DylibInCache, "
 	}
-	return strings.TrimSpace(fStr)
+	return strings.TrimSuffix(fStr, ", ")
 }
