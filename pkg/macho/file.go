@@ -93,7 +93,7 @@ type SectionHeader struct {
 	Align  uint32
 	Reloff uint32
 	Nreloc uint32
-	Flags  uint32
+	Flags  SectionFlag
 }
 
 // A Reloc represents a Mach-O relocation.
@@ -308,13 +308,13 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 	be := binary.BigEndian.Uint32(ident[0:])
 	le := binary.LittleEndian.Uint32(ident[0:])
-	switch Magic32 &^ 1 {
+	switch Magic32.Int() &^ 1 {
 	case be &^ 1:
 		f.ByteOrder = binary.BigEndian
-		f.Magic = be
+		f.Magic = magic(be)
 	case le &^ 1:
 		f.ByteOrder = binary.LittleEndian
-		f.Magic = le
+		f.Magic = magic(le)
 	default:
 		return nil, &FormatError{0, "invalid magic number", nil}
 	}
@@ -929,4 +929,21 @@ func (f *File) ImportedLibraries() ([]string, error) {
 		}
 	}
 	return all, nil
+}
+
+func (f File) String() string {
+
+	return fmt.Sprintf(
+		"Magic         = %s, (%s)\n"+
+			"Type          = %s\n"+
+			"CPU           = %s, %s\n"+
+			"Command(s)    = %d (Size: %d)\n"+
+			"Flags         = %s\n",
+		f.Magic, f.ByteOrder,
+		f.Type,
+		f.Cpu, f.SubCpu.String(f.Cpu),
+		f.FileHeader.Ncmd,
+		f.FileHeader.Cmdsz,
+		f.FileHeader.Flags,
+	)
 }

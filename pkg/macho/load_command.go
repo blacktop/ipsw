@@ -439,7 +439,7 @@ type (
 	ReExportDylibCmd DylibCmd
 
 	// A LazyLoadDylibCmd is a Mach-O delay load of dylib until first use command.
-	LazyLoadDylibCmd bool
+	LazyLoadDylibCmd DylibCmd
 
 	// A EncryptionInfoCmd is a Mach-O encrypted segment information command.
 	EncryptionInfoCmd struct {
@@ -468,6 +468,9 @@ type (
 
 	// A DyldInfoOnlyCmd is a Mach-O compressed dyld information only command.
 	DyldInfoOnlyCmd DyldInfoCmd
+
+	// A UpwardDylib is a Mach-O load upward dylibcommand.
+	UpwardDylib DylibCmd
 
 	// A VersionMinCmd is a Mach-O version min command.
 	VersionMinCmd struct {

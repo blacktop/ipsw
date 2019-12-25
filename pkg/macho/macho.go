@@ -20,9 +20,9 @@ import (
 
 // A FileHeader represents a Mach-O file header.
 type FileHeader struct {
-	Magic  uint32
-	Cpu    Cpu
-	SubCpu uint32
+	Magic  magic
+	Cpu    CPU
+	SubCpu CPUSubtype
 	Type   Type
 	Ncmd   uint32
 	Cmdsz  uint32
@@ -34,42 +34,23 @@ const (
 	fileHeaderSize64 = 8 * 4
 )
 
+type magic uint32
+
 const (
-	Magic32  uint32 = 0xfeedface
-	Magic64  uint32 = 0xfeedfacf
-	MagicFat uint32 = 0xcafebabe
+	Magic32  magic = 0xfeedface
+	Magic64  magic = 0xfeedfacf
+	MagicFat magic = 0xcafebabe
 )
 
-// A Section32 is a 32-bit Mach-O section header.
-type Section32 struct {
-	Name     [16]byte
-	Seg      [16]byte
-	Addr     uint32
-	Size     uint32
-	Offset   uint32
-	Align    uint32
-	Reloff   uint32
-	Nreloc   uint32
-	Flags    uint32
-	Reserve1 uint32
-	Reserve2 uint32
+var magicStrings = []intName{
+	{uint32(Magic32), "32-bit MachO"},
+	{uint32(Magic64), "64-bit MachO"},
+	{uint32(MagicFat), "Fat MachO"},
 }
 
-// A Section64 is a 64-bit Mach-O section header.
-type Section64 struct {
-	Name     [16]byte
-	Seg      [16]byte
-	Addr     uint64
-	Size     uint64
-	Offset   uint32
-	Align    uint32
-	Reloff   uint32
-	Nreloc   uint32
-	Flags    uint32
-	Reserve1 uint32
-	Reserve2 uint32
-	Reserve3 uint32
-}
+func (i magic) Int() uint32      { return uint32(i) }
+func (i magic) String() string   { return stringName(uint32(i), magicStrings, false) }
+func (i magic) GoString() string { return stringName(uint32(i), magicStrings, true) }
 
 // Regs386 is the Mach-O 386 register structure.
 type Regs386 struct {
@@ -114,6 +95,66 @@ type RegsAMD64 struct {
 	CS    uint64
 	FS    uint64
 	GS    uint64
+}
+
+// RegsARM is the Mach-O ARM register structure.
+type RegsARM struct {
+	R0   uint32
+	R1   uint32
+	R2   uint32
+	R3   uint32
+	R4   uint32
+	R5   uint32
+	R6   uint32
+	R7   uint32
+	R8   uint32
+	R9   uint32
+	R10  uint32
+	R11  uint32
+	R12  uint32
+	SP   uint32
+	LR   uint32
+	PC   uint32
+	CPSR uint32
+}
+
+// RegsARM64 is the Mach-O ARM 64 register structure.
+type RegsARM64 struct {
+	X0   uint64
+	X1   uint64
+	X2   uint64
+	X3   uint64
+	X4   uint64
+	X5   uint64
+	X6   uint64
+	X7   uint64
+	X8   uint64
+	X9   uint64
+	X10  uint64
+	X11  uint64
+	X12  uint64
+	X13  uint64
+	X14  uint64
+	X15  uint64
+	X16  uint64
+	X17  uint64
+	X18  uint64
+	X19  uint64
+	X20  uint64
+	X21  uint64
+	X22  uint64
+	X23  uint64
+	X24  uint64
+	X25  uint64
+	X26  uint64
+	X27  uint64
+	X28  uint64
+	FP   uint64
+	LR   uint64
+	SP   uint64
+	PC   uint64
+	CPSR uint32
+	PAD  uint32
 }
 
 type intName struct {

@@ -99,7 +99,7 @@ func (t nListType) String(secName string) string {
 		tStr += fmt.Sprintf("%s|", secName)
 	}
 	if t.IsPreboundUndefinedSym() {
-		tStr += "defined in a dylib|"
+		tStr += "prebound_undefined|"
 	}
 	if t.IsIndirectSym() {
 		tStr += "indirect|"
@@ -113,6 +113,8 @@ func (d nListDesc) GetCommAlign() nListDesc {
 	return (d >> 8) & 0x0f
 }
 
+const REFERENCE_TYPE nListDesc = 0x7
+
 const (
 	/* types of references */
 	REFERENCE_FLAG_UNDEFINED_NON_LAZY         nListDesc = 0
@@ -122,6 +124,25 @@ const (
 	REFERENCE_FLAG_PRIVATE_UNDEFINED_NON_LAZY nListDesc = 4
 	REFERENCE_FLAG_PRIVATE_UNDEFINED_LAZY     nListDesc = 5
 )
+
+func (d nListDesc) IsUndefinedNonLazy() bool {
+	return (d & REFERENCE_TYPE) == REFERENCE_FLAG_UNDEFINED_NON_LAZY
+}
+func (d nListDesc) IsUndefinedLazy() bool {
+	return (d & REFERENCE_TYPE) == REFERENCE_FLAG_UNDEFINED_LAZY
+}
+func (d nListDesc) IsDefined() bool {
+	return (d & REFERENCE_TYPE) == REFERENCE_FLAG_DEFINED
+}
+func (d nListDesc) IsPrivateDefined() bool {
+	return (d & REFERENCE_TYPE) == REFERENCE_FLAG_PRIVATE_DEFINED
+}
+func (d nListDesc) IsPrivateUndefinedNonLazy() bool {
+	return (d & REFERENCE_TYPE) == REFERENCE_FLAG_PRIVATE_UNDEFINED_NON_LAZY
+}
+func (d nListDesc) IsPrivateUndefinedLazy() bool {
+	return (d & REFERENCE_TYPE) == REFERENCE_FLAG_PRIVATE_UNDEFINED_LAZY
+}
 
 func (d nListDesc) GetLibraryOrdinal() nListDesc {
 	return (d >> 8) & 0xff
