@@ -12,7 +12,7 @@ import (
 	"github.com/blacktop/ipsw/utils"
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"howett.net/plist"
+	"github.com/blacktop/go-plist"
 )
 
 const iTunesVersionURL = "https://itunes.apple.com/WebObjects/MZStore.woa/wa/com.apple.jingle.appserver.client.MZITunesClientCheck/version/"

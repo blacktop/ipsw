@@ -10,6 +10,7 @@ require (
 	github.com/antchfx/xpath v1.1.2 // indirect
 	github.com/apex/log v1.1.1
 	github.com/blacktop/go-lzfse v1.1.10
+	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.0
 	github.com/blacktop/ranger v1.0.0
 	github.com/dustin/go-humanize v1.0.0
@@ -41,10 +42,8 @@ require (
 	golang.org/x/crypto v0.0.0-20191128160524-b544559bb6d1 // indirect
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933 // indirect
 	golang.org/x/sys v0.0.0-20191210023423-ac6580df4449 // indirect
-	golang.org/x/tools v0.0.0-20191219041853-979b82bfef62 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/yaml.v2 v2.2.7 // indirect
-	howett.net/plist v0.0.0-20181124034731-591f970eefbb
 )
 
 go 1.13

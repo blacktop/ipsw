@@ -19,10 +19,14 @@ github.com/apex/log
 github.com/apex/log/handlers/cli
 # github.com/blacktop/go-lzfse v1.1.10
 github.com/blacktop/go-lzfse
+# github.com/blacktop/go-plist v1.0.0
+github.com/blacktop/go-plist
 # github.com/blacktop/lzss v0.1.0
 github.com/blacktop/lzss
 # github.com/blacktop/ranger v1.0.0
 github.com/blacktop/ranger
+# github.com/dustin/go-humanize v1.0.0
+github.com/dustin/go-humanize
 # github.com/fatih/color v1.7.0
 github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.4.7
@@ -105,7 +109,7 @@ github.com/spf13/cobra
 github.com/spf13/jwalterweatherman
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# github.com/spf13/viper v1.5.0
+# github.com/spf13/viper v1.6.1
 github.com/spf13/viper
 # github.com/subosito/gotenv v1.2.0
 github.com/subosito/gotenv
@@ -123,7 +127,7 @@ golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
-# golang.org/x/sys v0.0.0-20191206220618-eeba5f6aabab
+# golang.org/x/sys v0.0.0-20191210023423-ac6580df4449
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 # golang.org/x/text v0.3.2
@@ -153,7 +157,7 @@ google.golang.org/appengine/internal/log
 google.golang.org/appengine/internal/remote_api
 google.golang.org/appengine/internal/urlfetch
 google.golang.org/appengine/urlfetch
+# gopkg.in/ini.v1 v1.51.0
+gopkg.in/ini.v1
 # gopkg.in/yaml.v2 v2.2.7
 gopkg.in/yaml.v2
-# howett.net/plist v0.0.0-20181124034731-591f970eefbb
-howett.net/plist
