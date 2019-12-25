@@ -85,18 +85,18 @@ var machoCmd = &cobra.Command{
 		fmt.Println("SECTIONS")
 		fmt.Println("========")
 		var secFlags string
-		var prevSeg string
+		// var prevSeg string
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 		for _, sec := range m.Sections {
 			secFlags = ""
 			if !sec.Flags.IsRegular() {
 				secFlags = fmt.Sprintf("(%s)", sec.Flags)
 			}
-			if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
-				fmt.Fprintf(w, "\n")
-			}
+			// if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
+			// 	fmt.Fprintf(w, "\n")
+			// }
 			fmt.Fprintf(w, "Mem: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
-			prevSeg = sec.Seg
+			// prevSeg = sec.Seg
 		}
 		w.Flush()
 

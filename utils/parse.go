@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 
-	"howett.net/plist"
+	"github.com/blacktop/go-plist"
 )
 
 type buildManifest struct {
