@@ -50,10 +50,10 @@ type SegmentHeader struct {
 	Memsz   uint64
 	Offset  uint64
 	Filesz  uint64
-	Maxprot uint32
-	Prot    uint32
+	Maxprot vmProtection
+	Prot    vmProtection
 	Nsect   uint32
-	Flag    uint32
+	Flag    segFlag
 }
 
 // A Segment represents a Mach-O 32-bit or 64-bit load segment command.
@@ -937,7 +937,7 @@ func (f File) String() string {
 		"Magic         = %s, (%s)\n"+
 			"Type          = %s\n"+
 			"CPU           = %s, %s\n"+
-			"Command(s)    = %d (Size: %d)\n"+
+			"Commands      = %d (Size: %d)\n"+
 			"Flags         = %s\n",
 		f.Magic, f.ByteOrder,
 		f.Type,

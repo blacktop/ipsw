@@ -12,7 +12,7 @@
 
 package macho
 
-//go:generate stringer -type=platform,tool,diceKind -output macho_string.go
+//go:generate stringer -type=platform,tool,diceKind,segFlag -output macho_string.go
 
 import (
 	"strconv"
@@ -51,6 +51,40 @@ var magicStrings = []intName{
 func (i magic) Int() uint32      { return uint32(i) }
 func (i magic) String() string   { return stringName(uint32(i), magicStrings, false) }
 func (i magic) GoString() string { return stringName(uint32(i), magicStrings, true) }
+
+type vmProtection int32
+
+func (v vmProtection) Read() bool {
+	return (v & 0x01) != 0
+}
+
+func (v vmProtection) Write() bool {
+	return (v & 0x02) != 0
+}
+
+func (v vmProtection) Execute() bool {
+	return (v & 0x04) != 0
+}
+
+func (v vmProtection) String() string {
+	var protStr string
+	if v.Read() {
+		protStr += "r"
+	} else {
+		protStr += "-"
+	}
+	if v.Write() {
+		protStr += "w"
+	} else {
+		protStr += "-"
+	}
+	if v.Execute() {
+		protStr += "x"
+	} else {
+		protStr += "-"
+	}
+	return protStr
+}
 
 // Regs386 is the Mach-O 386 register structure.
 type Regs386 struct {
