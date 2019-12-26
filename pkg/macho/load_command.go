@@ -263,6 +263,12 @@ type (
 		Strsize uint32
 	}
 
+	// A UnixThreadCmd is a Mach-O unix thread command.
+	UnixThreadCmd struct {
+		Cmd LoadCmd
+		Len uint32
+	}
+
 	// A Thread is a Mach-O thread state command.
 	Thread struct {
 		Cmd  LoadCmd
@@ -370,9 +376,9 @@ type (
 
 	// A SubFrameworkCmd is a Mach-O dynamic sub_framework_command.
 	SubFrameworkCmd struct {
-		Cmd      LoadCmd
-		Len      uint32
-		Umbrella uint32
+		Cmd       LoadCmd
+		Len       uint32
+		Framework uint32
 	}
 	// A SubClientCmd is a Mach-O dynamic sub client command.
 	SubClientCmd struct {
@@ -490,8 +496,8 @@ type (
 	// A DyldInfoOnlyCmd is a Mach-O compressed dyld information only command.
 	DyldInfoOnlyCmd DyldInfoCmd
 
-	// A UpwardDylib is a Mach-O load upward dylibcommand.
-	UpwardDylib DylibCmd
+	// A UpwardDylibCmd is a Mach-O load upward dylibcommand.
+	UpwardDylibCmd DylibCmd
 
 	// A VersionMinCmd is a Mach-O version min command.
 	VersionMinCmd struct {

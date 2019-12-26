@@ -158,6 +158,9 @@ type DylibID Dylib
 // A WeakDylib represents a Mach-O load weak dynamic library command.
 type WeakDylib Dylib
 
+// A UpwardDylib represents a Mach-O load upward dylib command.
+type UpwardDylib Dylib
+
 // A DyldInfo represents a Mach-O id dyld info command.
 type DyldInfo struct {
 	LoadBytes
@@ -185,6 +188,16 @@ type Dysymtab struct {
 	LoadBytes
 	DysymtabCmd
 	IndirectSyms []uint32 // indices into Symtab.Syms
+}
+
+// A UnixThread represents a Mach-O unix thread command.
+type UnixThread struct {
+	LoadBytes
+}
+
+type SubFramework struct {
+	LoadBytes
+	Framework string
 }
 
 // A Rpath represents a Mach-O rpath command.
@@ -670,6 +683,44 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l := new(ReExportDylib)
 			if hdr.Name >= uint32(len(cmddat)) {
 				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case LoadCmdUnixThread:
+			var ut UnixThreadCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &ut); err != nil {
+				return nil, err
+			}
+			l := new(UnixThread)
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case LoadCmdSubFramework:
+			var sf SubFrameworkCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &sf); err != nil {
+				return nil, err
+			}
+			l := new(SubFramework)
+			if sf.Framework >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid framework in subframework command", sf.Framework}
+			}
+			l.Framework = cstring(cmddat[sf.Framework:])
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case LoadCmdLoadUpwardDylib:
+			var hdr UpwardDylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(UpwardDylib)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in load upwardl dylib command", hdr.Name}
 			}
 			l.Name = cstring(cmddat[hdr.Name:])
 			l.Time = hdr.Time

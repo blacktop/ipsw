@@ -30,7 +30,8 @@ type CFBundle struct {
 	ShortVersionString    string `plist:"CFBundleShortVersionString,omitempty"`
 }
 
-func List(kernel string) error {
+// KextList lists all the kernel extensions in the kernelcache
+func KextList(kernel string) error {
 	m, err := macho.Open(kernel)
 	if err != nil {
 		return err
@@ -57,6 +58,7 @@ func List(kernel string) error {
 			if err != nil {
 				return err
 			}
+
 			fmt.Println("FOUND:", len(prelink.PrelinkInfoDictionary))
 			for _, bundle := range prelink.PrelinkInfoDictionary {
 				fmt.Printf("%s (%s)\n", bundle.ID, bundle.Version)
