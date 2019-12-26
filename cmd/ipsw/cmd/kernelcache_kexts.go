@@ -49,7 +49,7 @@ var kextsCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		err := kernelcache.List(args[0])
+		err := kernelcache.KextList(args[0])
 		if err != nil {
 			return err
 		}
