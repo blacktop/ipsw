@@ -12,9 +12,10 @@
 
 package macho
 
-//go:generate stringer -type=platform,tool,diceKind,segFlag -output macho_string.go
+//go:generate stringer -type=Platform,tool,diceKind,segFlag -output macho_string.go
 
 import (
+	"fmt"
 	"strconv"
 )
 
@@ -52,21 +53,21 @@ func (i magic) Int() uint32      { return uint32(i) }
 func (i magic) String() string   { return stringName(uint32(i), magicStrings, false) }
 func (i magic) GoString() string { return stringName(uint32(i), magicStrings, true) }
 
-type vmProtection int32
+type VmProtection int32
 
-func (v vmProtection) Read() bool {
+func (v VmProtection) Read() bool {
 	return (v & 0x01) != 0
 }
 
-func (v vmProtection) Write() bool {
+func (v VmProtection) Write() bool {
 	return (v & 0x02) != 0
 }
 
-func (v vmProtection) Execute() bool {
+func (v VmProtection) Execute() bool {
 	return (v & 0x04) != 0
 }
 
-func (v vmProtection) String() string {
+func (v VmProtection) String() string {
 	var protStr string
 	if v.Read() {
 		protStr += "r"
@@ -85,6 +86,31 @@ func (v vmProtection) String() string {
 	}
 	return protStr
 }
+
+// UUID is a macho uuid object
+type UUID [16]byte
+
+func (u UUID) String() string {
+	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+		u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8], u[9], u[10], u[11], u[12], u[13], u[14], u[15])
+}
+
+// Platform is a macho platform object
+type Platform uint32
+
+const (
+	unknown          Platform = 0
+	macOS            Platform = 1  // PLATFORM_MACOS
+	iOS              Platform = 2  // PLATFORM_IOS
+	tvOS             Platform = 3  // PLATFORM_TVOS
+	watchOS          Platform = 4  // PLATFORM_WATCHOS
+	bridgeOS         Platform = 5  // PLATFORM_BRIDGEOS
+	macCatalyst      Platform = 6  // PLATFORM_MACCATALYST
+	iOSSimulator     Platform = 7  // PLATFORM_IOSSIMULATOR
+	tvOSSimulator    Platform = 8  // PLATFORM_TVOSSIMULATOR
+	watchOSSimulator Platform = 9  // PLATFORM_WATCHOSSIMULATOR
+	driverKit        Platform = 10 // PLATFORM_DRIVERKIT
+)
 
 // Regs386 is the Mach-O 386 register structure.
 type Regs386 struct {
@@ -194,6 +220,23 @@ type RegsARM64 struct {
 type intName struct {
 	i uint32
 	s string
+}
+
+func (h FileHeader) String() string {
+
+	return fmt.Sprintf(
+		"Magic         = %s\n"+
+			"Type          = %s\n"+
+			"CPU           = %s, %s\n"+
+			"Commands      = %d (Size: %d)\n"+
+			"Flags         = %s\n",
+		h.Magic,
+		h.Type,
+		h.Cpu, h.SubCpu.String(h.Cpu),
+		h.Ncmd,
+		h.Cmdsz,
+		h.Flags,
+	)
 }
 
 func stringName(i uint32, names []intName, goSyntax bool) string {

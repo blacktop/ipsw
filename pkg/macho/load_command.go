@@ -145,22 +145,6 @@ func (sv srcVersion) String() string {
 	return fmt.Sprintf("%d.%d.%d.%d.%d", a, b, c, d, e)
 }
 
-type platform uint32
-
-const (
-	unknown          platform = 0
-	macOS            platform = 1  // PLATFORM_MACOS
-	iOS              platform = 2  // PLATFORM_IOS
-	tvOS             platform = 3  // PLATFORM_TVOS
-	watchOS          platform = 4  // PLATFORM_WATCHOS
-	bridgeOS         platform = 5  // PLATFORM_BRIDGEOS
-	macCatalyst      platform = 6  // PLATFORM_MACCATALYST
-	iOSSimulator     platform = 7  // PLATFORM_IOSSIMULATOR
-	tvOSSimulator    platform = 8  // PLATFORM_TVOSSIMULATOR
-	watchOSSimulator platform = 9  // PLATFORM_WATCHOSSIMULATOR
-	driverKit        platform = 10 // PLATFORM_DRIVERKIT
-)
-
 type tool uint32
 
 const (
@@ -172,13 +156,6 @@ const (
 type buildToolVersion struct {
 	Tool    tool    /* enum for the tool */
 	Version version /* version number of the tool */
-}
-
-type uuid [16]byte
-
-func (u uuid) String() string {
-	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-		u[0], u[1], u[2], u[3], u[4], u[5], u[6], u[7], u[8], u[9], u[10], u[11], u[12], u[13], u[14], u[15])
 }
 
 type DataInCodeEntry struct {
@@ -232,8 +209,8 @@ type (
 		Memsz   uint32       /* memory size of this segment */
 		Offset  uint32       /* file offset of this segment */
 		Filesz  uint32       /* amount to map from the file */
-		Maxprot vmProtection /* maximum VM protection */
-		Prot    vmProtection /* initial VM protection */
+		Maxprot VmProtection /* maximum VM protection */
+		Prot    VmProtection /* initial VM protection */
 		Nsect   uint32       /* number of sections in segment */
 		Flag    segFlag      /* flags */
 	}
@@ -247,8 +224,8 @@ type (
 		Memsz   uint64       /* memory size of this segment */
 		Offset  uint64       /* file offset of this segment */
 		Filesz  uint64       /* amount to map from the file */
-		Maxprot vmProtection /* maximum VM protection */
-		Prot    vmProtection /* initial VM protection */
+		Maxprot VmProtection /* maximum VM protection */
+		Prot    VmProtection /* initial VM protection */
 		Nsect   uint32       /* number of sections in segment */
 		Flag    segFlag      /* flags */
 	}
@@ -438,7 +415,7 @@ type (
 	UUIDCmd struct {
 		Cmd  LoadCmd
 		Len  uint32
-		UUID uuid
+		UUID UUID
 	}
 
 	// A RpathCmd is a Mach-O rpath command.
@@ -574,7 +551,7 @@ type (
 		Cmd LoadCmd /* LC_BUILD_VERSION */
 		Len uint32  /* sizeof(struct build_version_command) plus */
 		/* ntools * sizeof(struct build_tool_version) */
-		Platform platform /* platform */
+		Platform Platform /* platform */
 		Minos    version  /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
 		Sdk      version  /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
 		NumTools uint32   /* number of tool entries following this */

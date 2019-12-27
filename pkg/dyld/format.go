@@ -9,50 +9,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
-func (u uuid) String() string {
-	return fmt.Sprintf("%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-		u[0], u[1], u[2], u[3],
-		u[4], u[5], u[6], u[7],
-		u[8], u[9], u[10], u[11],
-		u[12], u[13], u[14], u[15])
-}
-
-// func (p platform) String() string {
-// 	names := [...]string{
-// 		"unknown",
-// 		"macOS",
-// 		"iOS",
-// 		"tvOS",
-// 		"watchOS",
-// 		"bridgeOS",
-// 		"iOSMac",
-// 		"iOS Simulator",
-// 		"tvOS Simulator",
-// 		"watchOS Simulator"}
-// 	return names[p]
-// }
-
-func (v vmProtection) String() string {
-	var protStr string
-	if v.Read() {
-		protStr += "r"
-	} else {
-		protStr += "-"
-	}
-	if v.Write() {
-		protStr += "w"
-	} else {
-		protStr += "-"
-	}
-	if v.Execute() {
-		protStr += "x"
-	} else {
-		protStr += "-"
-	}
-	return protStr
-}
-
-func (dch DyldCacheHeader) String() string {
+func (dch CacheHeader) String() string {
 	var magicBytes []byte = dch.Magic[:]
 
 	return fmt.Sprintf(
@@ -85,11 +42,11 @@ func (dch DyldCacheHeader) String() string {
 		dch.LocalSymbolsSize,
 		dch.UUID.String(),
 		dch.Platform.String(),
-		dch.FormatVersion,
+		dch.FormatVersion.Version(),
 	)
 }
 
-func (self DyldCacheMappingInfo) String() string {
+func (self CacheMappingInfo) String() string {
 	return fmt.Sprintf(
 		"Address    = %016X\n"+
 			"Size       = %s\n"+
@@ -104,7 +61,7 @@ func (self DyldCacheMappingInfo) String() string {
 	)
 }
 
-func (self DyldCacheImageInfo) String() string {
+func (self CacheImageInfo) String() string {
 	return fmt.Sprintf(
 		"Address        = %016X\n"+
 			"ModTime        = %016X\n"+
@@ -117,7 +74,7 @@ func (self DyldCacheImageInfo) String() string {
 	)
 }
 
-func (dch DyldCacheHeader) Print() {
+func (dch CacheHeader) Print() {
 	fmt.Println("Header")
 	fmt.Println("======")
 	fmt.Println(dch.String())
@@ -127,7 +84,7 @@ func (dch DyldCacheHeader) Print() {
 	fmt.Println()
 }
 
-func (mappings DyldCacheMappings) Print() {
+func (mappings CacheMappings) Print() {
 	fmt.Println("Mappings")
 	fmt.Println("========")
 	mdata := [][]string{}
@@ -151,7 +108,7 @@ func (mappings DyldCacheMappings) Print() {
 	fmt.Println()
 }
 
-func (images DyldCacheImages) Print() {
+func (images CacheImages) Print() {
 	fmt.Println("Images")
 	fmt.Println("======")
 	for idx, image := range images {
@@ -159,6 +116,6 @@ func (images DyldCacheImages) Print() {
 	}
 }
 
-func (info DyldCacheSlideInfo) Print() {
+func (info CacheSlideInfo) Print() {
 
 }

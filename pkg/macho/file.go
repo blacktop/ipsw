@@ -16,14 +16,18 @@ import (
 	"io"
 	"os"
 	"strings"
+	"text/tabwriter"
 )
+
+type sections []*Section
 
 // A File represents an open Mach-O file.
 type File struct {
 	FileHeader
 	ByteOrder binary.ByteOrder
 	Loads     []Load
-	Sections  []*Section
+	// Sections  []*Section
+	Sections sections
 
 	Symtab   *Symtab
 	Dysymtab *Dysymtab
@@ -50,8 +54,8 @@ type SegmentHeader struct {
 	Memsz   uint64
 	Offset  uint64
 	Filesz  uint64
-	Maxprot vmProtection
-	Prot    vmProtection
+	Maxprot VmProtection
+	Prot    VmProtection
 	Nsect   uint32
 	Flag    segFlag
 }
@@ -219,8 +223,8 @@ type DataInCode struct {
 	Entries []DataInCodeEntry
 }
 
-// A UUID represents a Mach-O uuid command.
-type UUID struct {
+// A uuid represents a Mach-O uuid command.
+type uuid struct {
 	LoadBytes
 	ID string
 }
@@ -626,7 +630,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			if err := binary.Read(b, bo, &u); err != nil {
 				return nil, err
 			}
-			l := new(UUID)
+			l := new(uuid)
 			l.ID = u.UUID.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
@@ -997,4 +1001,22 @@ func (f File) String() string {
 		f.FileHeader.Cmdsz,
 		f.FileHeader.Flags,
 	)
+}
+
+func (ss sections) Print() {
+	var secFlags string
+	// var prevSeg string
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+	for _, sec := range ss {
+		secFlags = ""
+		if !sec.Flags.IsRegular() {
+			secFlags = fmt.Sprintf("(%s)", sec.Flags)
+		}
+		// if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
+		// 	fmt.Fprintf(w, "\n")
+		// }
+		fmt.Fprintf(w, "Mem: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
+		// prevSeg = sec.Seg
+	}
+	w.Flush()
 }
