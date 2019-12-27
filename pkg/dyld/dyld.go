@@ -1,148 +1,308 @@
 package dyld
 
-import (
-	"archive/zip"
-	"fmt"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"regexp"
-	"runtime"
-	"strings"
+import "github.com/blacktop/ipsw/pkg/macho"
 
-	"github.com/apex/log"
-	"github.com/blacktop/ipsw/utils"
-	"github.com/pkg/errors"
+type Cache struct {
+	header        CacheHeader
+	mappings      CacheMappings
+	images        CacheImages
+	codesignature []byte
+	slideInfo     interface{}
+	localSymInfo  CacheLocalSymbolsInfo
+	branchPools   []uint64
+}
+
+type CacheMappings []CacheMappingInfo
+type CacheImages []CacheImage
+
+type CacheImage struct {
+	Name string
+	Info CacheImageInfo
+}
+
+type formatVersion uint32
+
+const (
+	IsSimulator          formatVersion = 0x100
+	DylibsExpectedOnDisk formatVersion = 0x200
+	LocallyBuiltCache    formatVersion = 0x400
 )
 
-// Extract extracts dyld_shared_cache from ipsw
-func Extract(ipsw string) error {
-
-	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		if strings.EqualFold(filepath.Ext(f.Name), ".dmg") {
-			if f.UncompressedSize64 > 1024*1024*1024 {
-				return true
-			}
-		}
-		return false
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed extract dyld_shared_cache from ipsw")
-	}
-
-	if len(dmgs) == 1 {
-		defer os.Remove(dmgs[0])
-
-		var searchStr, dyldDest, mountPoint string
-		if runtime.GOOS == "darwin" {
-			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
-			dyldDest = "dyld_shared_cache"
-			mountPoint = "/tmp/ios"
-		} else if runtime.GOOS == "linux" {
-			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
-			dyldDest = filepath.Join("/data", "dyld_shared_cache")
-			mountPoint = "/mnt"
-		}
-
-		utils.Indent(log.Info, 2)("Mounting DMG")
-		device, err := Mount(dmgs[0], mountPoint)
-		if err != nil {
-			return errors.Wrapf(err, "failed to mount %s", dmgs[0])
-		}
-
-		matches, err := filepath.Glob(filepath.Join(mountPoint, searchStr))
-		if err != nil {
-			return err
-		}
-
-		if len(matches) == 0 {
-			return errors.Errorf("failed to find dyld_shared_cache in ipsw: %s", ipsw)
-		}
-
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", matches[0], dyldDest))
-		err = Copy(matches[0], dyldDest)
-		if err != nil {
-			return err
-		}
-
-		utils.Indent(log.Info, 2)("Unmounting DMG")
-		err = Unmount(device)
-		if err != nil {
-			return errors.Wrapf(err, "failed to unmount %s", device)
-		}
-
-	} else {
-		return fmt.Errorf("dyld.Extract found more or less than one DMG (should only be one): %v", dmgs)
-	}
-
-	return nil
+func (f formatVersion) Version() uint8 {
+	return uint8(f & 0xff)
 }
 
-// Copy copies a file from mounted DMG to host
-func Copy(src, dst string) error {
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-	_, err = io.Copy(destination, source)
-
-	return nil
+func (f formatVersion) IsSimulator() bool {
+	return (f & IsSimulator) != 0
 }
 
-// Mount mounts a DMG with hdiutil
-func Mount(image, mountPoint string) (string, error) {
-	if runtime.GOOS == "darwin" {
-		var attachRe = regexp.MustCompile(`/dev/disk[\d]+`)
-		cmd := exec.Command("hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
-
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, out)
-		}
-
-		return string(attachRe.Find(out)), nil
-	} else if runtime.GOOS == "linux" {
-		cmd := exec.Command("apfs-fuse", image, mountPoint)
-
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, out)
-		}
-		return mountPoint, nil
-	}
-
-	return "", nil
+func (f formatVersion) IsDylibsExpectedOnDisk() bool {
+	return (f & DylibsExpectedOnDisk) != 0
 }
 
-// Unmount unmounts a DMG with hdiutil
-func Unmount(deviceNode string) error {
-	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("hdiutil", "detach", deviceNode)
+func (f formatVersion) IsLocallyBuiltCache() bool {
+	return (f & LocallyBuiltCache) != 0
+}
 
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
+type CacheHeader struct {
+	Magic                [16]byte       // e.g. "dyld_v0    i386"
+	MappingOffset        uint32         // file offset to first dyld_cache_mapping_info
+	MappingCount         uint32         // number of dyld_cache_mapping_info entries
+	ImagesOffset         uint32         // file offset to first dyld_cache_image_info
+	ImagesCount          uint32         // number of dyld_cache_image_info entries
+	DyldBaseAddress      uint64         // base address of dyld when cache was built
+	CodeSignatureOffset  uint64         // file offset of code signature blob
+	CodeSignatureSize    uint64         // size of code signature blob (zero means to end of file)
+	SlideInfoOffset      uint64         // file offset of kernel slid info
+	SlideInfoSize        uint64         // size of kernel slid info
+	LocalSymbolsOffset   uint64         // file offset of where local symbols are stored
+	LocalSymbolsSize     uint64         // size of local symbols information
+	UUID                 macho.UUID     // unique value for each shared cache file
+	CacheType            uint64         // 0 for development, 1 for production
+	BranchPoolsOffset    uint32         // file offset to table of uint64_t pool addresses
+	BranchPoolsCount     uint32         // number of uint64_t entries
+	AccelerateInfoAddr   uint64         // (unslid) address of optimization info
+	AccelerateInfoSize   uint64         // size of optimization info
+	ImagesTextOffset     uint64         // file offset to first dyld_cache_image_text_info
+	ImagesTextCount      uint64         // number of dyld_cache_image_text_info entries
+	DylibsImageGroupAddr uint64         // (unslid) address of ImageGroup for dylibs in this cache
+	DylibsImageGroupSize uint64         // size of ImageGroup for dylibs in this cache
+	OtherImageGroupAddr  uint64         // (unslid) address of ImageGroup for other OS dylibs
+	OtherImageGroupSize  uint64         // size of oImageGroup for other OS dylibs
+	ProgClosuresAddr     uint64         // (unslid) address of list of program launch closures
+	ProgClosuresSize     uint64         // size of list of program launch closures
+	ProgClosuresTrieAddr uint64         // (unslid) address of trie of indexes into program launch closures
+	ProgClosuresTrieSize uint64         // size of trie of indexes into program launch closures
+	Platform             macho.Platform // platform number (macOS=1, etc)
+	FormatVersion        formatVersion  /* formatVersion        : 8,  // dyld3::closure::kFormatVersion
+	   dylibsExpectedOnDisk : 1,  // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
+	   simulator            : 1,  // for simulator of specified platform
+	   locallyBuiltCache    : 1,  // 0 for B&I built cache, 1 for locally built cache
+	   TODO: I think there is a new flag here
+	   padding              : 21; // TBD */
+	SharedRegionStart    uint64 // base load address of cache if not slid
+	SharedRegionSize     uint64 // overall size of region cache can be mapped into
+	MaxSlide             uint64 // runtime slide of cache can be between zero and this value
+	DylibsImageArrayAddr uint64 // (unslid) address of ImageArray for dylibs in this cache
+	DylibsImageArraySize uint64 // size of ImageArray for dylibs in this cache
+	DylibsTrieAddr       uint64 // (unslid) address of trie of indexes of all cached dylibs
+	DylibsTrieSize       uint64 // size of trie of cached dylib paths
+	OtherImageArrayAddr  uint64 // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
+	OtherImageArraySize  uint64 // size of ImageArray for dylibs and bundles with dlopen closures
+	OtherTrieAddr        uint64 // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
+	OtherTrieSize        uint64 // size of trie of dylibs and bundles with dlopen closures
+}
 
-		return nil
+type CacheMappingInfo struct {
+	Address    uint64
+	Size       uint64
+	FileOffset uint64
+	MaxProt    macho.VmProtection
+	InitProt   macho.VmProtection
+}
 
-	} else if runtime.GOOS == "linux" {
-		cmd := exec.Command("umount", deviceNode)
+type CacheImageInfo struct {
+	Address        uint64
+	ModTime        uint64
+	Inode          uint64
+	PathFileOffset uint32
+	Pad            uint32
+}
 
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
+// CacheSlideInfo is the dyld_cache_image_info struct
+// The rebasing info is to allow the kernel to lazily rebase DATA pages of the
+// dyld shared cache.  Rebasing is adding the slide to interior pointers.
+type CacheSlideInfo struct {
+	Version       uint32 // currently 1
+	TocOffset     uint32
+	TocCount      uint32
+	EntriesOffset uint32
+	EntriesCount  uint32
+	EntriesSize   uint32 // currently 128
+	// uint16_t toc[toc_count];
+	// entrybitmap entries[entries_count];
+}
 
-		return nil
-	}
-	return nil
+const (
+	DYLD_CACHE_SLIDE_PAGE_ATTRS          = 0xC000 // high bits of uint16_t are flags
+	DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA     = 0x8000 // index is into extras array (not starts array)
+	DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE = 0x4000 // page has no rebasing
+	DYLD_CACHE_SLIDE_PAGE_ATTR_END       = 0x8000 // last chain entry for page
+)
+
+type CacheSlideInfo2 struct {
+	Version          uint32 // currently 2
+	PageSize         uint32 // currently 4096 (may also be 16384)
+	PageStartsOffset uint32
+	PageStartsCount  uint32
+	PageExtrasOffset uint32
+	PageExtrasCount  uint32
+	DeltaMask        uint64 // which (contiguous) set of bits contains the delta to the next rebase location
+	ValueAdd         uint64
+	//uint16_t    page_starts[page_starts_count];
+	//uint16_t    page_extras[page_extras_count];
+}
+
+const DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE = 0xFFFF // page has no rebasing
+
+type CacheSlideInfo3 struct {
+	Version         uint32 // currently 3
+	PageSize        uint32 // currently 4096 (may also be 16384)
+	PageStartsCount uint32
+	AuthValueAdd    uint64
+	// PageStarts      []uint16 /* len() = page_starts_count */
+}
+
+const (
+	DYLD_CACHE_SLIDE4_PAGE_NO_REBASE = 0xFFFF // page has no rebasing
+	DYLD_CACHE_SLIDE4_PAGE_INDEX     = 0x7FFF // mask of page_starts[] values
+	DYLD_CACHE_SLIDE4_PAGE_USE_EXTRA = 0x8000 // index is into extras array (not a chain start offset)
+	DYLD_CACHE_SLIDE4_PAGE_EXTRA_END = 0x8000 // last chain entry for page
+)
+
+type CacheSlideInfo4 struct {
+	Version          uint32 // currently 4
+	PageSize         uint32 // currently 4096 (may also be 16384)
+	PageStartsOffset uint32
+	PageStartsCount  uint32
+	PageExtrasOffset uint32
+	PageExtrasCount  uint32
+	DeltaMask        uint64 // which (contiguous) set of bits contains the delta to the next rebase location (0xC0000000)
+	ValueAdd         uint64 // base address of cache
+	//uint16_t    page_starts[page_starts_count];
+	//uint16_t    page_extras[page_extras_count];
+}
+
+// CacheSlidePointer3 struct
+// {
+//     uint64_t  raw;
+//     struct {
+//         uint64_t    pointerValue        : 51,
+//                     offsetToNextPointer : 11,
+//                     unused              :  2;
+//     }         plain;
+//     struct {
+//         uint64_t    offsetFromSharedCacheBase : 32,
+//                     diversityData             : 16,
+//                     hasAddressDiversity       :  1,
+//                     key                       :  2,
+//                     offsetToNextPointer       : 11,
+//                     unused                    :  1,
+//                     authenticated             :  1; // = 1;
+//     }         auth;
+// };
+type CacheSlidePointer3 uint64
+
+func (p CacheSlidePointer3) PointerValue() CacheSlidePointer3 {
+	return p & 0x7FFFFFFFFFFFF
+}
+
+func (p CacheSlidePointer3) OffsetToNextPointer() CacheSlidePointer3 {
+	return (p & 0x3FF8000000000000) >> 51
+}
+
+func (p CacheSlidePointer3) offsetFromSharedCacheBase() CacheSlidePointer3 {
+	return p & 0x7FFFFFFFFFFFF
+}
+func (p CacheSlidePointer3) diversityData() CacheSlidePointer3 {
+	return p & 0x7FFFFFFFFFFFF
+}
+func (p CacheSlidePointer3) hasAddressDiversity() bool {
+	return (p & 0x8000) != 0
+}
+func (p CacheSlidePointer3) key() CacheSlidePointer3 {
+	return p & 0x7FFFFFFFFFFFF
+}
+func (p CacheSlidePointer3) offsetToNextPointer() CacheSlidePointer3 {
+	return p & 0x7FFFFFFFFFFFF
+}
+
+func (p CacheSlidePointer3) authenticated() bool {
+	return (p & 0x1) != 0
+}
+
+type CacheLocalSymbolsInfo struct {
+	NlistOffset   uint32 // offset into this chunk of nlist entries
+	NlistCount    uint32 // count of nlist entries
+	StringsOffset uint32 // offset into this chunk of string pool
+	StringsSize   uint32 // byte count of string pool
+	EntriesOffset uint32 // offset into this chunk of array of dyld_cache_local_symbols_entry
+	EntriesCount  uint32 // number of elements in dyld_cache_local_symbols_entry array
+}
+
+type CacheLocalSymbolsEntry struct {
+	DylibOffset     uint32 // offset in cache file of start of dylib
+	NlistStartIndex uint32 // start index of locals for this dylib
+	NlistCount      uint32 // number of local symbols for this dylib
+}
+
+// This is the symbol table entry structure for 32-bit architectures.
+type nlist32 struct {
+	nStrx  uint32 // index into the string table
+	nType  uint8  // type flag, see below
+	nSect  uint8  // section number or NO_SECT
+	nDesc  uint16 // see <mach-o/stab.h>
+	nValue uint32 // value of this symbol (or stab offset)
+}
+
+// This is the symbol table entry structure for 64-bit architectures.
+type nlist64 struct {
+	Strx  uint32 // index into the string table
+	Type  uint8  // type flag, see below
+	Sect  uint8  // section number or NO_SECT
+	Desc  uint16 // see <mach-o/stab.h>
+	Value uint64 // value of this symbol (or stab offset)
+}
+
+type CacheImageInfoExtra struct {
+	ExportsTrieAddr           uint64 // address of trie in unslid cache
+	WeakBindingsAddr          uint64
+	ExportsTrieSize           uint32
+	WeakBindingsSize          uint32
+	DependentsStartArrayIndex uint32
+	ReExportsStartArrayIndex  uint32
+}
+
+type CacheAcceleratorInfo struct {
+	Version            uint32 // currently 1
+	ImageExtrasCount   uint32 // does not include aliases
+	ImagesExtrasOffset uint32 // offset into this chunk of first dyld_cache_image_info_extra
+	BottomUpListOffset uint32 // offset into this chunk to start of 16-bit array of sorted image indexes
+	DylibTrieOffset    uint32 // offset into this chunk to start of trie containing all dylib paths
+	DylibTrieSize      uint32 // size of trie containing all dylib paths
+	InitializersOffset uint32 // offset into this chunk to start of initializers list
+	InitializersCount  uint32 // size of initializers list
+	DofSectionsOffset  uint32 // offset into this chunk to start of DOF sections list
+	DofSectionsCount   uint32 // size of initializers list
+	ReExportListOffset uint32 // offset into this chunk to start of 16-bit array of re-exports
+	ReExportCount      uint32 // size of re-exports
+	DepListOffset      uint32 // offset into this chunk to start of 16-bit array of dependencies (0x8000 bit set if upward)
+	DepListCount       uint32 // size of dependencies
+	RangeTableOffset   uint32 // offset into this chunk to start of ss
+	RangeTableCount    uint32 // size of dependencies
+	DyldSectionAddr    uint64 // address of libdyld's __dyld section in unslid cache
+}
+
+type CacheAcceleratorInitializer struct {
+	FunctionOffset uint32 // address offset from start of cache mapping
+	ImageIndex     uint32
+}
+
+type CacheRangeEntry struct {
+	StartAddress uint64 // unslid address of start of region
+	Size         uint32
+	ImageIndex   uint32
+}
+
+type CacheAcceleratorDof struct {
+	SectionAddress uint64 // unslid address of start of region
+	SectionSize    uint32
+	ImageIndex     uint32
+}
+
+type CacheImageTextInfo struct {
+	UUID            macho.UUID
+	LoadAddress     uint64 // unslid address of start of __TEXT
+	TextSegmentSize uint32
+	PathOffset      uint32 // offset from start of cache file
 }

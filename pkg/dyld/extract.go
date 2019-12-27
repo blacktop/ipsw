@@ -1,134 +1,148 @@
-// +build darwin,cgo
-
 package dyld
 
-/*
-#cgo CFLAGS: -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
-#cgo LDFLAGS: -ldl
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stddef.h>
-#include <dlfcn.h>
-int
-dsc_extract(void *f, const char* shared_cache_file_path, const char* extraction_root_path){
-    int (*extractor_proc)(const char* shared_cache_file_path, const char* extraction_root_path,
-                          void (^progress)(unsigned current, unsigned total));
-    extractor_proc = (int (*)(const char *))f;
-    int result = (*extractor_proc)(shared_cache_file_path, extraction_root_path,
-                                   ^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
-    return result;
-}
-*/
-import "C"
-
 import (
+	"archive/zip"
 	"fmt"
-	"unsafe"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
+	"runtime"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 )
 
-// LibHandle represents an open handle to a library
-type LibHandle struct {
-	Handle  unsafe.Pointer
-	Libname string
-}
+// Extract extracts dyld_shared_cache from ipsw
+func Extract(ipsw string) error {
 
-// GetHandle returns a handle to a library
-func GetHandle(libs []string) (*LibHandle, error) {
-	for _, name := range libs {
-		libname := C.CString(name)
-		defer C.free(unsafe.Pointer(libname))
-		handle := C.dlopen(libname, C.RTLD_LAZY)
-		if handle != nil {
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("using bundle: %s", name))
-			h := &LibHandle{
-				Handle:  handle,
-				Libname: name,
+	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		if strings.EqualFold(filepath.Ext(f.Name), ".dmg") {
+			if f.UncompressedSize64 > 1024*1024*1024 {
+				return true
 			}
-			return h, nil
 		}
-	}
-	return nil, errors.New("unable to open a handle to the library")
-}
-
-// GetSymbolPointer takes a symbol name and returns a pointer to the symbol.
-func (l *LibHandle) GetSymbolPointer(symbol string) (unsafe.Pointer, error) {
-	sym := C.CString(symbol)
-	defer C.free(unsafe.Pointer(sym))
-
-	C.dlerror()
-	p := C.dlsym(l.Handle, sym)
-	e := C.dlerror()
-	if e != nil {
-		return nil, fmt.Errorf("error resolving symbol %q: %v", symbol, errors.New(C.GoString(e)))
+		return false
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed extract dyld_shared_cache from ipsw")
 	}
 
-	return p, nil
-}
+	if len(dmgs) == 1 {
+		defer os.Remove(dmgs[0])
 
-// Close closes a LibHandle.
-func (l *LibHandle) Close() error {
-	C.dlerror()
-	C.dlclose(l.Handle)
-	e := C.dlerror()
-	if e != nil {
-		return fmt.Errorf("error closing %v: %v", l.Libname, errors.New(C.GoString(e)))
+		var searchStr, dyldDest, mountPoint string
+		if runtime.GOOS == "darwin" {
+			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
+			dyldDest = "dyld_shared_cache"
+			mountPoint = "/tmp/ios"
+		} else if runtime.GOOS == "linux" {
+			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
+			dyldDest = filepath.Join("/data", "dyld_shared_cache")
+			mountPoint = "/mnt"
+		}
+
+		utils.Indent(log.Info, 2)("Mounting DMG")
+		device, err := Mount(dmgs[0], mountPoint)
+		if err != nil {
+			return errors.Wrapf(err, "failed to mount %s", dmgs[0])
+		}
+
+		matches, err := filepath.Glob(filepath.Join(mountPoint, searchStr))
+		if err != nil {
+			return err
+		}
+
+		if len(matches) == 0 {
+			return errors.Errorf("failed to find dyld_shared_cache in ipsw: %s", ipsw)
+		}
+
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", matches[0], dyldDest))
+		err = Copy(matches[0], dyldDest)
+		if err != nil {
+			return err
+		}
+
+		utils.Indent(log.Info, 2)("Unmounting DMG")
+		err = Unmount(device)
+		if err != nil {
+			return errors.Wrapf(err, "failed to unmount %s", device)
+		}
+
+	} else {
+		return fmt.Errorf("dyld.Extract found more or less than one DMG (should only be one): %v", dmgs)
 	}
 
 	return nil
 }
 
-// Split extracts all the dyld_shared_cache libraries
-func Split(dyldSharedCachePath, destinationPath, operatingSystem string) error {
-
-	var bundles []string
-
-	switch operatingSystem {
-	case "iPhoneOS":
-		bundles = []string{
-			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
-			"/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
-		}
-	case "AppleTVOS":
-		bundles = []string{
-			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
-			"/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
-		}
-	case "WatchOS":
-		bundles = []string{
-			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
-			"/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
-		}
-	}
-
-	dscExtractor, err := GetHandle(bundles)
+// Copy copies a file from mounted DMG to host
+func Copy(src, dst string) error {
+	source, err := os.Open(src)
 	if err != nil {
-		return errors.Wrapf(err, "failed to split %s", dyldSharedCachePath)
+		return err
 	}
+	defer source.Close()
 
-	extractorProc, err := dscExtractor.GetSymbolPointer("dyld_shared_cache_extract_dylibs_progress")
+	destination, err := os.Create(dst)
 	if err != nil {
-		return errors.Wrapf(err, "failed to split %s", dyldSharedCachePath)
+		return err
+	}
+	defer destination.Close()
+	_, err = io.Copy(destination, source)
+
+	return nil
+}
+
+// Mount mounts a DMG with hdiutil
+func Mount(image, mountPoint string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		var attachRe = regexp.MustCompile(`/dev/disk[\d]+`)
+		cmd := exec.Command("hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
+
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+
+		return string(attachRe.Find(out)), nil
+	} else if runtime.GOOS == "linux" {
+		cmd := exec.Command("apfs-fuse", image, mountPoint)
+
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return mountPoint, nil
 	}
 
-	dscPath := C.CString(dyldSharedCachePath)
-	defer C.free(unsafe.Pointer(dscPath))
+	return "", nil
+}
 
-	destPath := C.CString(destinationPath)
-	defer C.free(unsafe.Pointer(destPath))
+// Unmount unmounts a DMG with hdiutil
+func Unmount(deviceNode string) error {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("hdiutil", "detach", deviceNode)
 
-	result := C.dsc_extract(extractorProc, dscPath, destPath)
-	if result != 0 {
-		return errors.New("failed to run dsc_extract")
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
+
+		return nil
+
+	} else if runtime.GOOS == "linux" {
+		cmd := exec.Command("umount", deviceNode)
+
+		err := cmd.Run()
+		if err != nil {
+			return err
+		}
+
+		return nil
 	}
-
-	if err := dscExtractor.Close(); err != nil {
-		return errors.Wrapf(err, "failed to close dylib %s", dscExtractor.Libname)
-	}
-
 	return nil
 }
