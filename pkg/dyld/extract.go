@@ -35,13 +35,14 @@ func Extract(ipsw string) error {
 		defer os.Remove(dmgs[0])
 
 		var searchStr, dyldDest, mountPoint string
+		baseName := strings.TrimSuffix(ipsw, filepath.Ext(ipsw))
 		if runtime.GOOS == "darwin" {
 			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
-			dyldDest = "dyld_shared_cache"
+			dyldDest = "dyld_shared_cache_" + baseName
 			mountPoint = "/tmp/ios"
 		} else if runtime.GOOS == "linux" {
 			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
-			dyldDest = filepath.Join("/data", "dyld_shared_cache")
+			dyldDest = filepath.Join("/data", "dyld_shared_cache_"+baseName)
 			mountPoint = "/mnt"
 		}
 
