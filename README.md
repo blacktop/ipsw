@@ -1,10 +1,19 @@
-# ipsw
-
-[![actions](https://github.com/blacktop/ipsw/workflows/Go/badge.svg)](https://github.com/blacktop/ipsw/blob/master/.github/workflows/go.yml) [![Build status](https://ci.appveyor.com/api/projects/status/jcx0faojt820p5w4?svg=true)](https://ci.appveyor.com/project/blacktop/ipsw) [![Github All Releases](https://img.shields.io/github/downloads/blacktop/ipsw/total.svg)](https://github.com/blacktop/ipsw/releases/latest) [![GitHub release](https://img.shields.io/github/release/blacktop/ipsw.svg)](https://github.com/blacktop/ipsw/releases) [![License](http://img.shields.io/:license-mit-blue.svg)](http://doge.mit-license.org)
-
-> Download and parse ipsw(s) from [ipsw.me](https://ipsw.me) or [theiphonewiki.com](https://theiphonewiki.com)
-
----
+<p align="center">
+  <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://raw.githubusercontent.com/blacktop/ipsw/master/hack/ipsw.png" height="140" /></a>
+  <a href="https://github.com/blacktop/ipsw"><h3 align="center">ipsw</h3></a>
+  <p align="center">Download and parse ipsw(s) from <a href="https://github.com/blacktop/ipsw">ipsw.me</a> or <a>theiphonewiki.com</a></p>
+  <p align="center">
+    <a href="https://actions-badge.atrox.dev/blacktop/ipsw/got" alt="Actions">
+          <img src="https://github.com/blacktop/ipsw/workflows/Go/badge.svg" /></a>
+    <a href="https://github.com/blacktop/ipsw/releases/latest" alt="Downloads">
+          <img src="https://img.shields.io/github/downloads/blacktop/ipsw/total.svg" /></a>
+    <a href="https://github.com/blacktop/ipsw/releases/latest" alt="Downloads">
+          <img src="https://img.shields.io/github/downloads/blacktop/ipsw/total.svg" /></a>
+    <a href="https://github.com/blacktop/ipsw/releases" alt="GitHub Release">
+          <img src="https://img.shields.io/github/release/blacktop/ipsw.svg" /></a>
+    <a href="http://doge.mit-license.org" alt="LICENSE">
+          <img src="https://img.shields.io/:license-mit-blue.svg" /></a>
+</p>
 
 ## Install
 
@@ -397,7 +406,6 @@ compdef _ipsw ipsw
 
 - [x] use https://github.com/gocolly/colly
 - [ ] create offline copy of ipsw.me API
-- [ ] download simultaniously to decrease total time _(need to limit concurrent downloads and 17+ at a time could be bad)_
 
 ## Issues
 
