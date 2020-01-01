@@ -217,6 +217,13 @@ type FunctionStarts struct {
 	Size   uint32
 }
 
+// A LinkEditData represents a Mach-O linkedit data command.
+type LinkEditData struct {
+	LoadBytes
+	Offset uint32
+	Size   uint32
+}
+
 // A DataInCode represents a Mach-O data in code command.
 type DataInCode struct {
 	LoadBytes

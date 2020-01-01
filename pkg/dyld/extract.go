@@ -35,7 +35,7 @@ func Extract(ipsw string) error {
 		defer os.Remove(dmgs[0])
 
 		var searchStr, dyldDest, mountPoint string
-		baseName := strings.TrimSuffix(ipsw, filepath.Ext(ipsw))
+		baseName := strings.TrimSuffix(filepath.Base(ipsw), filepath.Ext(ipsw))
 		if runtime.GOOS == "darwin" {
 			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
 			dyldDest = "dyld_shared_cache_" + baseName

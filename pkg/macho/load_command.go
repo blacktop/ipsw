@@ -23,7 +23,8 @@ const (
 	LoadCmdDysymtab      LoadCmd = 0xb  // dynamic link-edit symbol table info
 	LoadCmdDylib         LoadCmd = 0xc  // load dylib command
 	LoadCmdDylibID       LoadCmd = 0xd  // id dylib command
-	LoadCmdDylinker      LoadCmd = 0xf  // id dylinker command (not load dylinker command)
+	LoadCmdDylinker      LoadCmd = 0xe  // load a dynamic linker
+	LoadCmdDylinkerID    LoadCmd = 0xf  // id dylinker command (not load dylinker command)
 	LoadCmdPreboundDylib LoadCmd = 0x10 // modules prebound for a dynamically linked shared library
 	LoadCmdRoutines      LoadCmd = 0x11 // image routines
 	LoadCmdSubFramework  LoadCmd = 0x12 // sub framework

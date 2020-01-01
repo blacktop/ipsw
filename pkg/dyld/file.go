@@ -110,10 +110,26 @@ func Parse(dsc string, verbose bool) error {
 		fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
 		fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
 		dataSegmentStart := dataMapping.FileOffset
+		var pointerBytes []byte
+		var value CacheSlidePointer3
 		for idx, start := range PageStarts {
 			pageStart := dataSegmentStart + uint64(uint32(idx)*slideInfo.PageSize)
+			pointerBytes = make([]byte, 8)
+			if start == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE {
+				fmt.Printf("page[% 5d]: no rebasing\n", idx)
+				continue
+			}
 			fmt.Printf("page[% 5d]: start=0x%04X, addr=0x%04X\n", idx, start, pageStart)
-			// var value CacheSlidePointer3
+			file.Seek(int64(pageStart), os.SEEK_SET)
+			if err := binary.Read(bufio.NewReader(file), binary.LittleEndian, &pointerBytes); err != nil {
+				return err
+			}
+			num := binary.LittleEndian.Uint64(pointerBytes)
+			value = CacheSlidePointer3(num)
+			fmt.Printf("PointerValue           = 0x%016X\n", value.PointerValue())
+			fmt.Printf("OffsetToNextPointer    = 0x%016X\n", value.OffsetToNextPointer())
+			fmt.Println("authenticated:      ", value.authenticated())
+			fmt.Println("hasAddressDiversity:", value.hasAddressDiversity())
 			// rebaseLocation := pageStart
 			// delta := uint64(start)
 			// for {
