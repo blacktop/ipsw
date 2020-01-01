@@ -34,7 +34,7 @@ type CPUSubtype uint32
 
 // X86 subtypes
 const (
-	CPUSubtypeX86All   CPUSubtype = 3
+	// CPUSubtypeX86All   CPUSubtype = 3
 	CPUSubtypeX8664All CPUSubtype = 3
 	CPUSubtypeX86Arch1 CPUSubtype = 4
 	CPUSubtypeX86_64H  CPUSubtype = 8
@@ -66,7 +66,7 @@ const (
 )
 
 var cpuSubtypeX86Strings = []intName{
-	{uint32(CPUSubtypeX86All), "x86"},
+	// {uint32(CPUSubtypeX86All), "x86"},
 	{uint32(CPUSubtypeX8664All), "x86_64"},
 	{uint32(CPUSubtypeX86Arch1), "x86 Arch1"},
 	{uint32(CPUSubtypeX86_64H), "x86_64 (Haswell)"},
@@ -97,7 +97,8 @@ func (st CPUSubtype) String(cpu CPU) string {
 	switch cpu {
 	case CPU386:
 	case CPUAmd64:
-		return stringName(uint32(st), cpuSubtypeX86Strings, false)
+		// TODO: this is a hack and this should be fully fleshed out
+		return stringName(uint32(st&0xFF), cpuSubtypeX86Strings, false)
 	case CPUArm:
 		return stringName(uint32(st), cpuSubtypeArmStrings, false)
 	case CPUArm64:

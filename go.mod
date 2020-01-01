@@ -22,6 +22,7 @@ require (
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
 	github.com/jinzhu/gorm v1.9.11
 	github.com/kennygrant/sanitize v1.2.4 // indirect
+	github.com/knightsc/gapstone v0.0.0-20191231144527-6fa5afaf11a9
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/mattn/go-colorable v0.1.4 // indirect
 	github.com/mattn/go-isatty v0.0.10 // indirect
