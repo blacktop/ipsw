@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://raw.githubusercontent.com/blacktop/ipsw/master/hack/ipsw.png" height="140" /></a>
-  <a href="https://github.com/blacktop/ipsw"><h3 align="center">ipsw</h3></a>
-  <p align="center">Download and parse ipsw(s) from <a href="https://github.com/blacktop/ipsw">ipsw.me</a> or <a>theiphonewiki.com</a></p>
+  <h2 align="center">ipsw</h2>
+  <h4><p align="center">Download and parse ipsw(s) from <a href="https://ipsw.me">ipsw.me</a> or <a href="https://www.theiphonewiki.com/wiki/Firmware">theiphonewiki.com</a></p></h4>
   <p align="center">
     <a href="https://actions-badge.atrox.dev/blacktop/ipsw/got" alt="Actions">
           <img src="https://github.com/blacktop/ipsw/workflows/Go/badge.svg" /></a>
