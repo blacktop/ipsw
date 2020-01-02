@@ -24,7 +24,7 @@ RUN \
     && git clone -b next https://github.com/aquynh/capstone.git \
     && cd capstone \
     && CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh \
-    && sudo ./make.sh install
+    && ./make.sh install
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
@@ -60,7 +60,7 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && git clone -b next https://github.com/aquynh/capstone.git \
     && cd capstone \
     && CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh \
-    && sudo ./make.sh install  \
+    && ./make.sh install  \
     && echo "===> Installing apfs-fuse..." \
     && cd /tmp \    
     && git clone https://github.com/sgan81/apfs-fuse.git \
