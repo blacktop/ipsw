@@ -29,10 +29,15 @@ jobs:
           cd build
           cmake ..
           sudo make install
+          cd /tmp
+          git clone -b next https://github.com/aquynh/capstone.git
+          cd capstone
+          CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh
+          sudo ./make.sh install
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew install lzfse
+          brew install lzfse capstone
       # - name: Build Dependencies (Windows)
       #   if: matrix.platform == 'windows-latest'
       #   run: |
