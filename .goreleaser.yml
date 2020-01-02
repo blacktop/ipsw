@@ -5,7 +5,9 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC=gcc
+      # - CC=gcc
+      - CGO_CFLAGS=-I/usr/local/include
+      - CGO_LDFLAGS=-L/usr/local/lib
     hooks:
       pre: go generate ./...
     goos:

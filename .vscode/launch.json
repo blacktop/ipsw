@@ -244,8 +244,8 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {},
-      "args": ["dyld", "list", "${workspaceRoot}/dyld_shared_cache"],
-      // "args": ["-V", "dyld", "list", "${workspaceRoot}/dyld_shared_cache"],
+      // "args": ["dyld", "list", "${workspaceRoot}/dyld_shared_cache"],
+      "args": ["-V", "dyld", "list", "${workspaceRoot}/dyld_shared_cache"],
       "showLog": false
     },
     {
@@ -258,8 +258,8 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {
-        "CGO_CFLAGS": "-I/usr/local/Cellar/capstone/HEAD-9fe1087/include",
-        "CGO_LDFLAGS": "-L/usr/local/Cellar/capstone/HEAD-9fe1087/lib"
+        "CGO_CFLAGS": "-I/usr/local/include",
+        "CGO_LDFLAGS": "-L/usr/local/lib"
       },
       "args": [
         "-V",
@@ -314,14 +314,16 @@
       "host": "127.0.0.1",
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {
-        "CGO_CFLAGS": "-I/usr/local/Cellar/capstone/HEAD-9fe1087/include",
-        "CGO_LDFLAGS": "-L/usr/local/Cellar/capstone/HEAD-9fe1087/lib"
+        "CGO_CFLAGS": "-I/usr/local/include",
+        "CGO_LDFLAGS": "-L/usr/local/lib"
       },
       "args": [
         "-V",
         "dis",
         "--vaddr",
-        "${workspaceRoot}/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore"
+        "0xfffffff007b7c05c",
+        "${workspaceRoot}/kernelcache.release.iphone12.decompressed"
+        // "${workspaceRoot}/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore"
       ],
       "showLog": false
     },

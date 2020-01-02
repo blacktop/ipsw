@@ -148,8 +148,6 @@ github.com/kisielk/errcheck v1.1.0/go.mod h1:EZBBE59ingxPouuu3KfxchcWSUPOHkagtvW
 github.com/kisielk/gotool v1.0.0/go.mod h1:XhKaO+MFFWcvkIS/tQcRk01m1F5IRFswLeQ+oQHNcck=
 github.com/knightsc/gapstone v0.0.0-20191231144527-6fa5afaf11a9 h1:1KszOoXSFt0aRQ6wxxcKm7QKgfLPI0TWO47UcY/f+vA=
 github.com/knightsc/gapstone v0.0.0-20191231144527-6fa5afaf11a9/go.mod h1:1K5hEzsMBLTPdRJKEHqBFJ8Zt2VRqDhomcQ11KH0WW4=
-github.com/knightsc/gapstone v4.0.1+incompatible h1:yROPRgpqBWgD/7fyH3+AJ2hQR4gYfKNFGnKcNY8HPIA=
-github.com/knightsc/gapstone v4.0.1+incompatible/go.mod h1:N9Q82fxOi8Fp9pHE2eflNZf5/FSg1815WZFhV8Gc2PE=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
 github.com/kr/pretty v0.1.0 h1:L/CwN0zerZDmRFUapSPitk6f+Q3+0za1rQkzVuMiMFI=

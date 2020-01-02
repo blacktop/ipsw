@@ -1,3 +1,5 @@
+// +build !windows
+
 /*
 Copyright © 2019 blacktop
 
@@ -61,26 +63,29 @@ var disCmd = &cobra.Command{
 		}
 
 		data = make([]byte, 4*instructions)
-
+		found := false
 		for _, sec := range m.Sections {
-			if sec.Seg == "__TEXT" && sec.Name == "__text" {
-				// validate start vaddr
-				if startAddr < sec.Addr {
-					return fmt.Errorf("supplied address flag is less that the start of the __TEXT.__text section which starts at 0x%08X", sec.Addr)
-				}
+			if sec.Name == "__text" {
+				if sec.Addr < startAddr && startAddr < (sec.Addr+sec.Size) {
+					found = true
 
-				memOffset := startAddr - sec.Addr
-				if instructions*4 > sec.Size-memOffset {
-					data = make([]byte, sec.Size-memOffset)
-				}
+					memOffset := startAddr - sec.Addr
+					if instructions*4 > sec.Size-memOffset {
+						data = make([]byte, sec.Size-memOffset)
+					}
 
-				_, err := sec.ReadAt(data, int64(memOffset))
-				if err != nil {
-					return err
-				}
+					_, err := sec.ReadAt(data, int64(memOffset))
+					if err != nil {
+						return err
+					}
 
-				break
+					break
+				}
 			}
+		}
+
+		if !found {
+			return fmt.Errorf("supplied vaddr not found in any __text section")
 		}
 
 		engine, err := gapstone.New(

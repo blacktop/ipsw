@@ -51,7 +51,7 @@ update_devs:
 	CGO_ENABLED=1 CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
 
 .PHONY: dry_release
-dry_release: update_devs
+dry_release:
 	goreleaser --skip-publish --rm-dist --skip-validate
 
 .PHONY: bump
