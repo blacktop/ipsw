@@ -8,7 +8,7 @@ WORKDIR /go/src/github.com/blacktop/ipsw
 
 RUN \
     apt-get update \
-    && apt-get install -y cmake\
+    && apt-get install -y cmake \
     && cd /tmp \
     && echo "===> Installing lzfse..." \
     && git clone https://github.com/lzfse/lzfse.git \
@@ -17,6 +17,14 @@ RUN \
     && cd build \
     && cmake .. \
     && make install
+
+RUN \
+    echo "===> Installing capstone..." \
+    && cd /tmp \    
+    && git clone -b next https://github.com/aquynh/capstone.git \
+    && cd capstone \
+    && CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh \
+    && sudo ./make.sh install
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
@@ -38,15 +46,23 @@ LABEL maintainer "https://github.com/blacktop"
 RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git libattr1-dev' \
     && apt-get update \
     && apt-get install -y $buildDeps fuse3 unzip \
-    && cd /tmp \
     && echo "===> Installing lzfse..." \
+    && cd /tmp \    
     && git clone https://github.com/lzfse/lzfse.git \
     && cd lzfse \
     && mkdir build \
     && cd build \
     && cmake .. \
     && make install \
+    && cd /tmp \
+    && echo "===> Installing capstone..." \
+    && cd /tmp \    
+    && git clone -b next https://github.com/aquynh/capstone.git \
+    && cd capstone \
+    && CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh \
+    && sudo ./make.sh install  \
     && echo "===> Installing apfs-fuse..." \
+    && cd /tmp \    
     && git clone https://github.com/sgan81/apfs-fuse.git \
     && cd apfs-fuse \
     && git submodule init \
