@@ -215,7 +215,7 @@ func Parse(dsc string, verbose bool) error {
 			}
 		}
 
-		if false {
+		if true {
 			for idx, entry := range entries {
 				file.Seek(int64(entry.DylibOffset), os.SEEK_SET)
 				fmt.Printf("%s @ 0x%08X\n", cache.images[idx].Name, entry.DylibOffset)
