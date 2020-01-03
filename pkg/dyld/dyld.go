@@ -1,24 +1,10 @@
 package dyld
 
-import "github.com/blacktop/ipsw/pkg/macho"
+import (
+	"fmt"
 
-type Cache struct {
-	header        CacheHeader
-	mappings      CacheMappings
-	images        CacheImages
-	codesignature []byte
-	slideInfo     interface{}
-	localSymInfo  CacheLocalSymbolsInfo
-	branchPools   []uint64
-}
-
-type CacheMappings []CacheMappingInfo
-type CacheImages []CacheImage
-
-type CacheImage struct {
-	Name string
-	Info CacheImageInfo
-}
+	"github.com/blacktop/ipsw/pkg/macho"
+)
 
 type formatVersion uint32
 
@@ -99,6 +85,11 @@ type CacheMappingInfo struct {
 	FileOffset uint64
 	MaxProt    macho.VmProtection
 	InitProt   macho.VmProtection
+}
+
+type CacheMapping struct {
+	Name string
+	CacheMappingInfo
 }
 
 type CacheImageInfo struct {
@@ -193,32 +184,56 @@ type CacheSlideInfo4 struct {
 // };
 type CacheSlidePointer3 uint64
 
-func (p CacheSlidePointer3) PointerValue() CacheSlidePointer3 {
-	return p & 0x7FFFFFFFFFFFF
+// Value returns the chained pointer's value
+func (p CacheSlidePointer3) Value() uint64 {
+	return uint64(p & 0x7FFFFFFFFFFFF)
 }
 
-func (p CacheSlidePointer3) OffsetToNextPointer() CacheSlidePointer3 {
-	return (p & 0x3FF8000000000000) >> 51
+// OffsetToNextPointer returns the offset to the next chained pointer
+func (p CacheSlidePointer3) OffsetToNextPointer() uint64 {
+	return uint64(p & 0x3FF8000000000000 >> 51)
 }
 
-func (p CacheSlidePointer3) offsetFromSharedCacheBase() CacheSlidePointer3 {
-	return p & 0x7FFFFFFFFFFFF
+// OffsetFromSharedCacheBase returns the chained pointer's offset from the base
+func (p CacheSlidePointer3) OffsetFromSharedCacheBase() uint64 {
+	return uint64(p & 0x7FFFFFFFFFFFF)
 }
-func (p CacheSlidePointer3) diversityData() CacheSlidePointer3 {
-	return p & 0x7FFFFFFFFFFFF
+
+// DiversityData returns the chained pointer's diversity data
+func (p CacheSlidePointer3) DiversityData() uint64 {
+	return uint64(p >> 32 & 0xFFFF)
 }
-func (p CacheSlidePointer3) hasAddressDiversity() bool {
+
+// HasAddressDiversity returns if the chained pointer has address diversity
+func (p CacheSlidePointer3) HasAddressDiversity() bool {
 	return (p & 0x8000) != 0
 }
-func (p CacheSlidePointer3) key() CacheSlidePointer3 {
-	return p & 0x7FFFFFFFFFFFF
-}
-func (p CacheSlidePointer3) offsetToNextPointer() CacheSlidePointer3 {
-	return p & 0x7FFFFFFFFFFFF
+
+// Key returns the chained pointer's key
+func (p CacheSlidePointer3) Key() uint64 {
+	return uint64(p >> 49 & 0x3)
 }
 
-func (p CacheSlidePointer3) authenticated() bool {
+// Authenticated returns if the chained pointer is authenticated
+func (p CacheSlidePointer3) Authenticated() bool {
 	return (p & 0x1) != 0
+}
+
+func (p CacheSlidePointer3) String() string {
+	var pStr string
+	if p.Authenticated() {
+		pStr = fmt.Sprintf("value: %x, offset: %x, has_diversity: %t, diversity: %x, key: %x, auth: %t",
+			p.Value(),
+			p.OffsetToNextPointer(),
+			p.HasAddressDiversity(),
+			p.DiversityData(),
+			p.Key(),
+			p.Authenticated(),
+		)
+	} else {
+		pStr = fmt.Sprintf("value: %x, offset: %x", p.Value(), p.OffsetToNextPointer())
+	}
+	return pStr
 }
 
 type CacheLocalSymbolsInfo struct {

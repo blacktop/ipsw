@@ -1,5 +1,5 @@
 /*
-Copyright © 2019 blacktop
+Copyright © 2020 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,14 +26,18 @@ import (
 	"os"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
 )
 
-// dyldListCmd represents the list command
-var dyldListCmd = &cobra.Command{
-	Use:   "list <dyld_shared_cache>",
-	Short: "List all dylibs in dyld_shared_cache",
+func init() {
+	dyldCmd.AddCommand(depsCmd)
+	depsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
+// depsCmd represents the deps command
+var depsCmd = &cobra.Command{
+	Use:   "deps",
+	Short: "List dependencies (same as otool -L)",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
@@ -43,24 +47,13 @@ var dyldListCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		// TODO: check for
-		// if ( dylibInfo->isAlias )
-		//   	printf("[alias] %s\n", dylibInfo->path);
+		// TODO: FINISH THIS
 
-		f, err := dyld.Open(args[0])
-		if err != nil {
-			return err
-		}
-
-		f.CacheHeader.Print()
-		f.Mappings.Print()
+		// err := dyld.Parse(args[0], Verbose)
+		// if err != nil {
+		// 	return err
+		// }
 
 		return nil
 	},
-}
-
-func init() {
-	dyldCmd.AddCommand(dyldListCmd)
-
-	dyldListCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
