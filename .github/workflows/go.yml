@@ -37,6 +37,7 @@ jobs:
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
+          brew update
           brew install lzfse
           brew install capstone --HEAD
       # - name: Build Dependencies (Windows)
