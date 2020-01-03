@@ -252,9 +252,13 @@ type CacheLocalSymbolsEntry struct {
 }
 
 type CacheLocalSymbol struct {
-	Name  string
-	Image string
-	CacheLocalSymbolsEntry
+	nlist32
+	Name string
+}
+
+type CacheLocalSymbol64 struct {
+	nlist64
+	Name string
 }
 
 // This is the symbol table entry structure for 32-bit architectures.
