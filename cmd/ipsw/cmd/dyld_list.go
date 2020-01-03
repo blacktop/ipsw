@@ -51,8 +51,11 @@ var dyldListCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		defer f.Close()
 
 		f.CacheHeader.Print()
+		f.LocalSymInfo.Print()
+
 		f.Mappings.Print()
 
 		return nil
