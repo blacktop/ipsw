@@ -80,8 +80,13 @@ func (dch CacheHeader) Print() {
 	fmt.Println(dch.String())
 	fmt.Printf("Slide Info:    %4dKB,  file offset: 0x%08X -> 0x%08X\n", dch.SlideInfoSize/1024, dch.SlideInfoOffset, dch.SlideInfoOffset+dch.SlideInfoSize)
 	fmt.Printf("Local Symbols:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", dch.LocalSymbolsSize/(1024*1024), dch.LocalSymbolsOffset, dch.LocalSymbolsOffset+dch.LocalSymbolsSize)
-	fmt.Printf("Accelerate Tab: %3dKB,                                          address: 0x%08X -> 0x%08X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
+	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%08X -> 0x%08X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
 	fmt.Println()
+}
+
+func (l *localSymbolInfo) Print() {
+	fmt.Printf("Local symbols nlist array:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", l.NListByteSize/(1024*1024), l.NListFileOffset, l.NListFileOffset+l.NListByteSize)
+	fmt.Printf("Local symbols string pool:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", l.StringsSize/(1024*1024), l.StringsFileOffset, l.StringsFileOffset+l.StringsSize)
 }
 
 func (mappings cacheMappings) Print() {

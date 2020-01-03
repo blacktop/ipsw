@@ -251,6 +251,12 @@ type CacheLocalSymbolsEntry struct {
 	NlistCount      uint32 // number of local symbols for this dylib
 }
 
+type CacheLocalSymbol struct {
+	Name  string
+	Image string
+	CacheLocalSymbolsEntry
+}
+
 // This is the symbol table entry structure for 32-bit architectures.
 type nlist32 struct {
 	nStrx  uint32 // index into the string table

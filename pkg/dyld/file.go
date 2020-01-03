@@ -7,10 +7,14 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
+	"github.com/pkg/errors"
 )
 
+// Known good magic
 var magic = []string{
 	"dyld_v1    i386",
 	"dyld_v1  x86_64",
@@ -25,12 +29,19 @@ var magic = []string{
 type cacheMappings []*CacheMapping
 type cacheImages []*CacheImage
 type cacheTextInfos []*CacheImageTextInfo
-type cacheLocalSymbols []*CacheLocalSymbolsEntry
+type cacheLocalSymbols []*CacheLocalSymbol
 
 // CacheImage represents a dyld dylib image.
 type CacheImage struct {
 	Name string
 	Info CacheImageInfo
+}
+
+type localSymbolInfo struct {
+	CacheLocalSymbolsInfo
+	NListFileOffset   uint32
+	NListByteSize     uint32
+	StringsFileOffset uint32
 }
 
 // A File represents an open dyld file.
@@ -42,7 +53,7 @@ type File struct {
 	Images        cacheImages
 	CodeSignature []byte
 	SlideInfo     interface{}
-	LocalSymInfo  CacheLocalSymbolsInfo
+	LocalSymInfo  localSymbolInfo
 	LocalSymbols  cacheLocalSymbols
 	BranchPools   []uint64
 	TextInfos     cacheTextInfos
@@ -166,11 +177,13 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	/*****************************
 	 * Read dyld kernel slid info
 	 *****************************/
-	f.parseSlideInfo()
+	log.Info("Parsing Slide Info...")
+	f.parseSlideInfo(r)
 
 	/**************************
 	 * Read dyld local symbols
 	 **************************/
+	log.Info("Parsing Local Symbols...")
 	f.parseLocalSyms(r)
 
 	// Read dyld branch pool.
@@ -201,77 +214,101 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	return f, nil
 }
 
+// TODO: IMPLIMENT THIS
+func (f *File) Is64bit() bool {
+	return true
+}
+
 func (f *File) parseLocalSyms(r io.ReaderAt) error {
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 
 	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
 
-	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo); err != nil {
+	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
 		return err
 	}
 
-	nlistFileOffset := uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
-	// nlistCount := f.LocalSymInfo.NlistCount
-	// nlistByteSize = is64 ? nlistCount*16 : nlistCount*12;
-	nlistByteSize := f.LocalSymInfo.NlistCount * 16
-	stringsFileOffset := uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
-	stringsSize := f.LocalSymInfo.StringsSize
-	entriesCount := f.LocalSymInfo.EntriesCount
-	fmt.Printf("local symbols nlist array:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", nlistByteSize/(1024*1024), nlistFileOffset, nlistFileOffset+nlistByteSize)
-	fmt.Printf("local symbols string pool:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", stringsSize/(1024*1024), stringsFileOffset, stringsFileOffset+stringsSize)
-	fmt.Printf("local symbols by dylib (count=%d):\n", entriesCount)
+	if f.Is64bit() {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
+	} else {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
+	}
+	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
+	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
 
 	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
-	for i := 0; i < int(entriesCount); i++ {
-		entry := CacheLocalSymbolsEntry{}
-		if err := binary.Read(sr, f.ByteOrder, &entry); err != nil {
+	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
+		lsym := CacheLocalSymbol{}
+		if err := binary.Read(sr, f.ByteOrder, &lsym.CacheLocalSymbolsEntry); err != nil {
 			return err
 		}
-		f.LocalSymbols = append(f.LocalSymbols, &entry)
-		// fmt.Printf("   nlistStartIndex=%5d, nlistCount=%5d, image=%s\n", entry.NlistStartIndex, entry.NlistCount, f.Images[i].Name)
+		f.LocalSymbols = append(f.LocalSymbols, &lsym)
+	}
+
+	stringPool := io.NewSectionReader(r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
+
+	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+
+	for idx, sym := range f.LocalSymbols {
+		for e := 0; e < int(sym.NlistCount); e++ {
+			nlist := nlist64{}
+			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
+				return err
+			}
+
+			stringPool.Seek(int64(nlist.Strx), os.SEEK_SET)
+			s, err := bufio.NewReader(stringPool).ReadString('\x00')
+			if err != nil {
+				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Strx).Error())
+			}
+			sym.Name = strings.Trim(s, "\x00")
+			sym.Image = f.Images[idx].Name
+		}
 	}
 
 	return nil
 }
 
-func (f *File) parseSlideInfo() error {
-	// // textMapping := cache.mappings[0]
-	// // dataMapping := cache.mappings[1]
-	// // linkEditMapping := cache.mappings[2]
-	// // file.Seek(int64((f.SlideInfoOffset-linkEditMapping.FileOffset)+(linkEditMapping.Address-textMapping.Address)), os.SEEK_SET)
-	// file.Seek(int64(f.SlideInfoOffset), os.SEEK_SET)
-	// slideInfoVersionData := make([]byte, 4)
-	// file.Read(slideInfoVersionData)
-	// slideInfoVersion := binary.LittleEndian.Uint32(slideInfoVersionData)
+func (f *File) parseSlideInfo(r io.ReaderAt) error {
+	sr := io.NewSectionReader(r, 0, 1<<63-1)
 
-	// file.Seek(int64(f.SlideInfoOffset), os.SEEK_SET)
+	// textMapping := cache.mappings[0]
+	// dataMapping := cache.mappings[1]
+	// linkEditMapping := cache.mappings[2]
 
-	// switch slideInfoVersion {
-	// case 1:
-	// 	slideInfo := CacheSlideInfo{}
-	// 	if err := binary.Read(bufio.NewReader(file), binary.LittleEndian, &slideInfo); err != nil {
-	// 		return err
-	// 	}
-	// 	cache.slideInfo = slideInfo
-	// case 2:
-	// 	slideInfo := CacheSlideInfo2{}
-	// 	if err := binary.Read(bufio.NewReader(file), binary.LittleEndian, &slideInfo); err != nil {
-	// 		return err
-	// 	}
-	// 	cache.slideInfo = slideInfo
-	// case 3:
-	// 	slideInfo := CacheSlideInfo3{}
+	// file.Seek(int64((f.SlideInfoOffset-linkEditMapping.FileOffset)+(linkEditMapping.Address-textMapping.Address)), os.SEEK_SET)
 
-	// 	sr := bufio.NewReader(file)
-	// 	if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
-	// 		return err
-	// 	}
+	sr.Seek(int64(f.SlideInfoOffset), os.SEEK_SET)
 
-	// 	cache.slideInfo = slideInfo
-	// 	fmt.Printf("page_size         =%d\n", slideInfo.PageSize)
-	// 	fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
-	// 	fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
+	slideInfoVersionData := make([]byte, 4)
+	sr.Read(slideInfoVersionData)
+	slideInfoVersion := binary.LittleEndian.Uint32(slideInfoVersionData)
+
+	sr.Seek(int64(f.SlideInfoOffset), os.SEEK_SET)
+
+	switch slideInfoVersion {
+	case 1:
+		slideInfo := CacheSlideInfo{}
+		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
+			return err
+		}
+		f.SlideInfo = slideInfo
+	case 2:
+		slideInfo := CacheSlideInfo2{}
+		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
+			return err
+		}
+		f.SlideInfo = slideInfo
+	case 3:
+		slideInfo := CacheSlideInfo3{}
+		if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
+			return err
+		}
+		f.SlideInfo = slideInfo
+		// fmt.Printf("page_size         =%d\n", slideInfo.PageSize)
+		// fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
+		// fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
 
 	// 	// var PageStarts []uint16
 	// 	// pStartBytes := make([]byte, 2)
@@ -324,15 +361,15 @@ func (f *File) parseSlideInfo() error {
 	// 	// 		// fmt.Println(pointer)
 	// 	// 	}
 	// 	// }
-	// case 4:
-	// 	slideInfo := CacheSlideInfo4{}
-	// 	if err := binary.Read(bufio.NewReader(file), binary.LittleEndian, &slideInfo); err != nil {
-	// 		return err
-	// 	}
-	// 	f.SlideInfo = slideInfo
-	// default:
-	// 	log.Fatalf("got unexpected dyld slide info version: %d", slideInfoVersion)
-	// }
+	case 4:
+		slideInfo := CacheSlideInfo4{}
+		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
+			return err
+		}
+		f.SlideInfo = slideInfo
+	default:
+		log.Fatalf("got unexpected dyld slide info version: %d", slideInfoVersion)
+	}
 	return nil
 }
 
