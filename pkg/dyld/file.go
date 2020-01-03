@@ -33,8 +33,10 @@ type cacheLocalSymbols []*CacheLocalSymbol
 
 // CacheImage represents a dyld dylib image.
 type CacheImage struct {
-	Name string
-	Info CacheImageInfo
+	Name         string
+	Index        uint32
+	Info         CacheImageInfo
+	LocalSymbols []*CacheLocalSymbol64
 }
 
 type localSymbolInfo struct {
@@ -54,9 +56,10 @@ type File struct {
 	CodeSignature []byte
 	SlideInfo     interface{}
 	LocalSymInfo  localSymbolInfo
-	LocalSymbols  cacheLocalSymbols
-	BranchPools   []uint64
-	TextInfos     cacheTextInfos
+	// LocalSymbols    cacheLocalSymbols
+	BranchPools     []uint64
+	AcceleratorInfo CacheAcceleratorInfo
+	TextInfos       cacheTextInfos
 
 	closer io.Closer
 }
@@ -155,7 +158,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		if err := binary.Read(sr, f.ByteOrder, &iinfo); err != nil {
 			return nil, err
 		}
-		f.Images = append(f.Images, &CacheImage{Info: iinfo})
+		f.Images = append(f.Images, &CacheImage{Index: i, Info: iinfo})
 	}
 	for idx, image := range f.Images {
 		sr.Seek(int64(image.Info.PathFileOffset), os.SEEK_SET)
@@ -201,6 +204,17 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		f.BranchPools = bPools
 	}
 
+	// Read dyld optimization info.
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= f.AccelerateInfoAddr && f.AccelerateInfoAddr < mapping.Address+mapping.Size {
+			sr.Seek(int64(f.AccelerateInfoAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
+			if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
+				return nil, err
+			}
+
+		}
+	}
+
 	// Read dyld text_info entries.
 	sr.Seek(int64(f.ImagesTextOffset), os.SEEK_SET)
 	for i := uint64(0); i != f.ImagesTextCount; i++ {
@@ -214,13 +228,17 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	return f, nil
 }
 
-// TODO: IMPLIMENT THIS
+// Is64bit returns if dyld is 64bit or not
 func (f *File) Is64bit() bool {
-	return true
+	return strings.Contains(string(f.Magic[:16]), "64")
 }
 
 func (f *File) parseLocalSyms(r io.ReaderAt) error {
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
+
+	if f.LocalSymbolsOffset == 0 {
+		return fmt.Errorf("dyld shared cache does not contain local symbols info")
+	}
 
 	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
 
@@ -238,20 +256,21 @@ func (f *File) parseLocalSyms(r io.ReaderAt) error {
 
 	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
+	var localSymEntries []*CacheLocalSymbolsEntry
 	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
-		lsym := CacheLocalSymbol{}
-		if err := binary.Read(sr, f.ByteOrder, &lsym.CacheLocalSymbolsEntry); err != nil {
+		lsymEntry := CacheLocalSymbolsEntry{}
+		if err := binary.Read(sr, f.ByteOrder, &lsymEntry); err != nil {
 			return err
 		}
-		f.LocalSymbols = append(f.LocalSymbols, &lsym)
+		localSymEntries = append(localSymEntries, &lsymEntry)
 	}
 
 	stringPool := io.NewSectionReader(r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
 
 	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
 
-	for idx, sym := range f.LocalSymbols {
-		for e := 0; e < int(sym.NlistCount); e++ {
+	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
+		for e := 0; e < int(localSymEntries[idx].NlistCount); e++ {
 			nlist := nlist64{}
 			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
 				return err
@@ -262,8 +281,10 @@ func (f *File) parseLocalSyms(r io.ReaderAt) error {
 			if err != nil {
 				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Strx).Error())
 			}
-			sym.Name = strings.Trim(s, "\x00")
-			sym.Image = f.Images[idx].Name
+			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
+				Name:    strings.Trim(s, "\x00"),
+				nlist64: nlist,
+			})
 		}
 	}
 
@@ -370,6 +391,22 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 	default:
 		log.Fatalf("got unexpected dyld slide info version: %d", slideInfoVersion)
 	}
+	return nil
+}
+
+func (f *File) parseAcceleratorInfo(r io.ReaderAt) error {
+	sr := io.NewSectionReader(r, 0, 1<<63-1)
+
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= f.AccelerateInfoAddr && f.AccelerateInfoAddr < mapping.Address+mapping.Size {
+			sr.Seek(int64(f.AccelerateInfoAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
+			if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
+				return err
+			}
+
+		}
+	}
+
 	return nil
 }
 
