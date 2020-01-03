@@ -84,12 +84,13 @@ func (dch CacheHeader) Print() {
 	fmt.Println()
 }
 
-func (mappings CacheMappings) Print() {
+func (mappings cacheMappings) Print() {
 	fmt.Println("Mappings")
 	fmt.Println("========")
 	mdata := [][]string{}
 	for _, mapping := range mappings {
 		mdata = append(mdata, []string{
+			mapping.Name,
 			mapping.InitProt.String(),
 			mapping.MaxProt.String(),
 			fmt.Sprintf("%d MB", mapping.Size/(1024*1024)),
@@ -99,7 +100,7 @@ func (mappings CacheMappings) Print() {
 		})
 	}
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"InitProt", "MaxProt", "Size", "Address", "File Offset"})
+	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset"})
 	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	table.SetCenterSeparator("|")
 	table.AppendBulk(mdata)
@@ -108,7 +109,7 @@ func (mappings CacheMappings) Print() {
 	fmt.Println()
 }
 
-func (images CacheImages) Print() {
+func (images cacheImages) Print() {
 	fmt.Println("Images")
 	fmt.Println("======")
 	for idx, image := range images {
