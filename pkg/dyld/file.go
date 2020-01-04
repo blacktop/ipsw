@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 )
@@ -19,11 +20,13 @@ var magic = []string{
 	"dyld_v1    i386",
 	"dyld_v1  x86_64",
 	"dyld_v1 x86_64h",
-	"dyld_v1   armv",
-	"dyld_v1  armv",
+	"dyld_v1   armv5",
+	"dyld_v1   armv6",
+	"dyld_v1   armv7",
+	"dyld_v1  armv7",
 	"dyld_v1   arm64",
-	"dyld_v1  arm64e",
 	"dyld_v1arm64_32",
+	"dyld_v1  arm64e",
 }
 
 type cacheMappings []*CacheMapping
@@ -37,7 +40,37 @@ type CacheImage struct {
 	Index        uint32
 	Info         CacheImageInfo
 	LocalSymbols []*CacheLocalSymbol64
+	CacheLocalSymbolsEntry
+	CacheImageInfoExtra
+	CacheImageTextInfo
+	Initializer    uint64
+	DOFSectionAddr uint64
+	DOFSectionSize uint32
+	RangeStartAddr uint64
+	RangeSize      uint32
+
+	// Embed ReaderAt for ReadAt method.
+	// Do not embed SectionReader directly
+	// to avoid having Read and Seek.
+	// If a client wants Read and Seek it must use
+	// Open() to avoid fighting over the seek offset
+	// with other clients.
+	io.ReaderAt
+	sr *io.SectionReader
 }
+
+// Data reads and returns the contents of the dylib's Mach-O.
+func (i *CacheImage) Data() ([]byte, error) {
+	dat := make([]byte, i.sr.Size())
+	n, err := i.sr.ReadAt(dat, 0)
+	if n == len(dat) {
+		err = nil
+	}
+	return dat[0:n], err
+}
+
+// Open returns a new ReadSeeker reading the dylib's Mach-O data.
+func (i *CacheImage) Open() io.ReadSeeker { return io.NewSectionReader(i.sr, 0, 1<<63-1) }
 
 type localSymbolInfo struct {
 	CacheLocalSymbolsInfo
@@ -59,7 +92,6 @@ type File struct {
 	// LocalSymbols    cacheLocalSymbols
 	BranchPools     []uint64
 	AcceleratorInfo CacheAcceleratorInfo
-	TextInfos       cacheTextInfos
 
 	closer io.Closer
 }
@@ -207,22 +239,85 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	// Read dyld optimization info.
 	for _, mapping := range f.Mappings {
 		if mapping.Address <= f.AccelerateInfoAddr && f.AccelerateInfoAddr < mapping.Address+mapping.Size {
-			sr.Seek(int64(f.AccelerateInfoAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
+			accelInfoPtr := int64(f.AccelerateInfoAddr - mapping.Address + mapping.FileOffset)
+			sr.Seek(accelInfoPtr, os.SEEK_SET)
 			if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
 				return nil, err
 			}
-
+			// Read dyld 16-bit array of sorted image indexes.
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.BottomUpListOffset), os.SEEK_SET)
+			bottomUpList := make([]uint16, f.AcceleratorInfo.ImageExtrasCount)
+			if err := binary.Read(sr, f.ByteOrder, &bottomUpList); err != nil {
+				return nil, err
+			}
+			// Read dyld 16-bit array of dependencies .
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), os.SEEK_SET)
+			depList := make([]uint16, f.AcceleratorInfo.DepListCount)
+			if err := binary.Read(sr, f.ByteOrder, &depList); err != nil {
+				return nil, err
+			}
+			// Read dyld 16-bit array of re-exports
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), os.SEEK_SET)
+			reExportList := make([]uint16, f.AcceleratorInfo.ReExportCount)
+			if err := binary.Read(sr, f.ByteOrder, &reExportList); err != nil {
+				return nil, err
+			}
+			// Read dyld image info extras.
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ImagesExtrasOffset), os.SEEK_SET)
+			for i := uint32(0); i != f.AcceleratorInfo.ImageExtrasCount; i++ {
+				imgXtrInfo := CacheImageInfoExtra{}
+				if err := binary.Read(sr, f.ByteOrder, &imgXtrInfo); err != nil {
+					return nil, err
+				}
+				f.Images[i].CacheImageInfoExtra = imgXtrInfo
+			}
+			// Read dyld initializers list.
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.InitializersOffset), os.SEEK_SET)
+			for i := uint32(0); i != f.AcceleratorInfo.InitializersCount; i++ {
+				accelInit := CacheAcceleratorInitializer{}
+				if err := binary.Read(sr, f.ByteOrder, &accelInit); err != nil {
+					return nil, err
+				}
+				// fmt.Printf("  image[%3d] 0x%X\n", accelInit.ImageIndex, f.Mappings[0].Address+uint64(accelInit.FunctionOffset))
+				f.Images[accelInit.ImageIndex].Initializer = f.Mappings[0].Address + uint64(accelInit.FunctionOffset)
+			}
+			// Read dyld DOF sections list.
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DofSectionsOffset), os.SEEK_SET)
+			for i := uint32(0); i != f.AcceleratorInfo.DofSectionsCount; i++ {
+				accelDOF := CacheAcceleratorDof{}
+				if err := binary.Read(sr, f.ByteOrder, &accelDOF); err != nil {
+					return nil, err
+				}
+				// fmt.Printf("  image[%3d] 0x%X -> 0x%X\n", accelDOF.ImageIndex, accelDOF.SectionAddress, accelDOF.SectionAddress+uint64(accelDOF.SectionSize))
+				f.Images[accelDOF.ImageIndex].DOFSectionAddr = accelDOF.SectionAddress
+				f.Images[accelDOF.ImageIndex].DOFSectionSize = accelDOF.SectionSize
+			}
+			// Read dyld offset to start of ss.
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), os.SEEK_SET)
+			for i := uint32(0); i != f.AcceleratorInfo.RangeTableCount; i++ {
+				rangeEntry := CacheRangeEntry{}
+				if err := binary.Read(sr, f.ByteOrder, &rangeEntry); err != nil {
+					return nil, err
+				}
+				// fmt.Printf("  0x%X -> 0x%X %s\n", rangeEntry.StartAddress, rangeEntry.StartAddress+uint64(rangeEntry.Size), f.Images[rangeEntry.ImageIndex].Name)
+				f.Images[rangeEntry.ImageIndex].RangeStartAddr = rangeEntry.StartAddress
+				f.Images[rangeEntry.ImageIndex].RangeSize = rangeEntry.Size
+			}
+			// Read dyld trie containing all dylib paths.
+			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), os.SEEK_SET)
+			dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
+			if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
+				return nil, err
+			}
 		}
 	}
 
 	// Read dyld text_info entries.
 	sr.Seek(int64(f.ImagesTextOffset), os.SEEK_SET)
 	for i := uint64(0); i != f.ImagesTextCount; i++ {
-		tinfo := CacheImageTextInfo{}
-		if err := binary.Read(sr, f.ByteOrder, &tinfo); err != nil {
+		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
 			return nil, err
 		}
-		f.TextInfos = append(f.TextInfos, &tinfo)
 	}
 
 	return f, nil
@@ -256,13 +351,10 @@ func (f *File) parseLocalSyms(r io.ReaderAt) error {
 
 	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
-	var localSymEntries []*CacheLocalSymbolsEntry
 	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
-		lsymEntry := CacheLocalSymbolsEntry{}
-		if err := binary.Read(sr, f.ByteOrder, &lsymEntry); err != nil {
+		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
 			return err
 		}
-		localSymEntries = append(localSymEntries, &lsymEntry)
 	}
 
 	stringPool := io.NewSectionReader(r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
@@ -270,7 +362,7 @@ func (f *File) parseLocalSyms(r io.ReaderAt) error {
 	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
 
 	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
-		for e := 0; e < int(localSymEntries[idx].NlistCount); e++ {
+		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
 			nlist := nlist64{}
 			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
 				return err
@@ -394,22 +486,6 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 	return nil
 }
 
-func (f *File) parseAcceleratorInfo(r io.ReaderAt) error {
-	sr := io.NewSectionReader(r, 0, 1<<63-1)
-
-	for _, mapping := range f.Mappings {
-		if mapping.Address <= f.AccelerateInfoAddr && f.AccelerateInfoAddr < mapping.Address+mapping.Size {
-			sr.Seek(int64(f.AccelerateInfoAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
-			if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
-				return err
-			}
-
-		}
-	}
-
-	return nil
-}
-
 // Image returns the first Image with the given name, or nil if no such image exists.
 func (f *File) Image(name string) *CacheImage {
 	for _, i := range f.Images {
@@ -418,6 +494,58 @@ func (f *File) Image(name string) *CacheImage {
 		}
 	}
 	return nil
+}
+
+// Strings returns all the dylib image's cstring literals
+func (i *CacheImage) Strings() []string {
+
+	var imgStrings []string
+
+	imgData, err := i.Data()
+	if err != nil {
+		return nil
+	}
+
+	m, err := macho.NewFile(bytes.NewReader(imgData))
+	if err != nil {
+		log.Error(errors.Wrap(err, "failed to parse macho").Error())
+	}
+	defer m.Close()
+
+	imgReader := i.Open()
+
+	for _, sec := range m.Sections {
+
+		if sec.Flags.IsCstringLiterals() {
+			fmt.Printf("%s %s\n", sec.Seg, sec.Name)
+			// csr := bufio.NewReader(sec.Open())
+			data := make([]byte, sec.Size)
+
+			imgReader.Seek(int64(sec.Offset), os.SEEK_SET)
+			imgReader.Read(data)
+
+			csr := bytes.NewBuffer(data[:])
+
+			for {
+				s, err := csr.ReadString('\x00')
+
+				if err == io.EOF {
+					break
+				}
+
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+
+				if len(s) > 0 {
+					imgStrings = append(imgStrings, strings.Trim(s, "\x00"))
+					// fmt.Printf("%s: %#v\n", i.Name, strings.Trim(s, "\x00"))
+				}
+			}
+		}
+	}
+
+	return imgStrings
 }
 
 func cstring(b []byte) string {
