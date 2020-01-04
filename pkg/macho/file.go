@@ -511,7 +511,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			}
 			strtab := make([]byte, hdr.Strsize)
 			if _, err := r.ReadAt(strtab, int64(hdr.Stroff)); err != nil {
-				return nil, err
+				return f, nil
+				// return nil, err
 			}
 			var symsz int
 			if f.Magic == Magic64 {
@@ -875,6 +876,16 @@ func (f *File) Segment(name string) *Segment {
 func (f *File) Section(name string) *Section {
 	for _, s := range f.Sections {
 		if s.Name == name {
+			return s
+		}
+	}
+	return nil
+}
+
+// SourceVersion returns the source version load command, or nil if no source version exists.
+func (f *File) SourceVersion() *SourceVersion {
+	for _, l := range f.Loads {
+		if s, ok := l.(*SourceVersion); ok {
 			return s
 		}
 	}

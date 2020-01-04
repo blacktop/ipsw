@@ -43,16 +43,20 @@ var webkitCmd = &cobra.Command{
 	Short: "Get WebKit version from a dyld_shared_cache",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
+
 		version, err := dyld.GetWebKitVersion(args[0])
 		if err != nil {
 			return err
 		}
+
 		log.Infof("WebKit Version: %s", version)
 
 		return nil
