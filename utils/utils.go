@@ -3,6 +3,7 @@ package utils
 import (
 	"archive/zip"
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -149,4 +150,69 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 	}
 
 	return fNames, nil
+}
+
+// WriteBuffer is a simple type that implements io.WriterAt on an in-memory buffer.
+// The zero value of this type is an empty buffer ready to use.
+// CREDIT: https://stackoverflow.com/a/46019585
+type WriteBuffer struct {
+	d []byte
+	m int
+}
+
+// NewWriteBuffer creates and returns a new WriteBuffer with the given initial size and
+// maximum. If maximum is <= 0 it is unlimited.
+func NewWriteBuffer(size, max int) *WriteBuffer {
+	if max < size && max >= 0 {
+		max = size
+	}
+	return &WriteBuffer{make([]byte, size), max}
+}
+
+// SetMax sets the maximum capacity of the WriteBuffer. If the provided maximum is lower
+// than the current capacity but greater than 0 it is set to the current capacity, if
+// less than or equal to zero it is unlimited..
+func (wb *WriteBuffer) SetMax(max int) {
+	if max < len(wb.d) && max >= 0 {
+		max = len(wb.d)
+	}
+	wb.m = max
+}
+
+// Bytes returns the WriteBuffer's underlying data. This value will remain valid so long
+// as no other methods are called on the WriteBuffer.
+func (wb *WriteBuffer) Bytes() []byte {
+	return wb.d
+}
+
+// Shape returns the current WriteBuffer size and its maximum if one was provided.
+func (wb *WriteBuffer) Shape() (int, int) {
+	return len(wb.d), wb.m
+}
+
+func (wb *WriteBuffer) WriteAt(dat []byte, off int64) (int, error) {
+	// Range/sanity checks.
+	if int(off) < 0 {
+		return 0, errors.New("Offset out of range (too small).")
+	}
+	if int(off)+len(dat) >= wb.m && wb.m > 0 {
+		return 0, errors.New("Offset+data length out of range (too large).")
+	}
+
+	// Check fast path extension
+	if int(off) == len(wb.d) {
+		wb.d = append(wb.d, dat...)
+		return len(dat), nil
+	}
+
+	// Check slower path extension
+	if int(off)+len(dat) >= len(wb.d) {
+		nd := make([]byte, int(off)+len(dat))
+		copy(nd, wb.d)
+		wb.d = nd
+	}
+
+	// Once no extension is needed just copy bytes into place.
+	copy(wb.d[int(off):], dat)
+	return len(dat), nil
 }

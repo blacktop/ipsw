@@ -34,6 +34,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(disCmd)
+
+	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
+	disCmd.PersistentFlags().Uint64P("instrs", "s", 20, "Number of instructions to disassemble")
+}
+
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
 	Use:   "dis",
@@ -111,11 +118,4 @@ var disCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(disCmd)
-
-	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
-	disCmd.PersistentFlags().Uint64P("instrs", "s", 20, "Number of instructions to disassemble")
 }

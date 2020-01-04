@@ -100,6 +100,8 @@ var machoCmd = &cobra.Command{
 		}
 		w.Flush()
 
+		fmt.Println("SourceVersion:", m.SourceVersion().Version)
+
 		if symbols {
 			fmt.Println("SYMBOLS")
 			fmt.Println("=======")

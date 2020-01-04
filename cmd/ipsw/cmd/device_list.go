@@ -32,6 +32,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	rootCmd.AddCommand(deviceListCmd)
+}
+
 // deviceListCmd represents the deviceList command
 var deviceListCmd = &cobra.Command{
 	Use:   "device-list",
@@ -79,8 +83,4 @@ var deviceListCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(deviceListCmd)
 }
