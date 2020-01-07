@@ -421,7 +421,7 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 
 	// textMapping := f.Mappings[0]
-	// dataMapping := f.Mappings[1]
+	dataMapping := f.Mappings[1]
 	// linkEditMapping := f.Mappings[2]
 
 	// file.Seek(int64((f.SlideInfoOffset-linkEditMapping.FileOffset)+(linkEditMapping.Address-textMapping.Address)), os.SEEK_SET)
@@ -458,50 +458,50 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 		fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
 		fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
 
-		// PageStarts := make([]uint16, slideInfo.PageStartsCount)
-		// if err := binary.Read(sr, binary.LittleEndian, &PageStarts); err != nil {
-		// 	return err
-		// }
+		PageStarts := make([]uint16, slideInfo.PageStartsCount)
+		if err := binary.Read(sr, binary.LittleEndian, &PageStarts); err != nil {
+			return err
+		}
 
-		// var pointer CacheSlidePointer3
+		var pointer CacheSlidePointer3
 
-		// for i, start := range PageStarts {
-		// 	pageOffset := dataMapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
-		// 	if start == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE {
-		// 		fmt.Printf("page[% 5d]: no rebasing\n", i)
-		// 		continue
-		// 	}
+		for i, start := range PageStarts {
+			pageOffset := dataMapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
+			if start == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE {
+				fmt.Printf("page[% 5d]: no rebasing\n", i)
+				continue
+			}
 
-		// 	// rebaseLocation := pageStart
-		// 	delta := uint64(start)
-		// 	var targetValue uint64
+			rebaseLocation := pageOffset
+			delta := uint64(start)
+			var targetValue uint64
 
-		// 	for {
-		// 		// rebaseLocation += delta
-		// 		sr.Seek(int64(pageOffset+delta), os.SEEK_SET)
-		// 		if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
-		// 			return err
-		// 		}
-		// 		fmt.Println(pointer)
+			for {
+				rebaseLocation += delta
+				sr.Seek(int64(rebaseLocation), os.SEEK_SET)
+				if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
+					return err
+				}
+				fmt.Println(pointer)
 
-		// 		if pointer.Authenticated() {
-		// 			targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
-		// 		} else {
-		// 			// Regular pointer which needs to fit in 51-bits of value.
-		// 			// C++ RTTI uses the top bit, so we'll allow the whole top-byte
-		// 			// and the signed-extended bottom 43-bits to be fit in to 51-bits.
-		// 			top8Bits := pointer.Value() & 0x007F80000000000
-		// 			bottom43Bits := pointer.Value() & 0x000007FFFFFFFFFF
-		// 			targetValue = (top8Bits << 13) | (((bottom43Bits << 21) >> 21) & 0x00FFFFFFFFFFFFFF)
-		// 		}
-		// 		fmt.Printf("    [% 5d + 0x%04X]: 0x%x\n", i, (uint64)(delta-pageOffset), targetValue)
+				if pointer.Authenticated() {
+					targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
+				} else {
+					// Regular pointer which needs to fit in 51-bits of value.
+					// C++ RTTI uses the top bit, so we'll allow the whole top-byte
+					// and the signed-extended bottom 43-bits to be fit in to 51-bits.
+					top8Bits := pointer.Value() & 0x007F80000000000
+					bottom43Bits := pointer.Value() & 0x000007FFFFFFFFFF
+					targetValue = (top8Bits << 13) | (((bottom43Bits << 21) >> 21) & 0x00FFFFFFFFFFFFFF)
+				}
+				fmt.Printf("    [% 5d + 0x%04X]: 0x%x\n", i, (uint64)(rebaseLocation-pageOffset), targetValue)
 
-		// 		if delta == 0 {
-		// 			break
-		// 		}
-		// 		delta = delta + pointer.OffsetToNextPointer()*8
-		// 	}
-		// }
+				if delta == 0 {
+					break
+				}
+				delta = pointer.OffsetToNextPointer() * 8
+			}
+		}
 	case 4:
 		slideInfo := CacheSlideInfo4{}
 		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
