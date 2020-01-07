@@ -34,3 +34,4 @@ xcode/data
 *.plist
 checksums.txt.sha1
 cmd/ipsw/__debug_bin
+pkg/dyld/slide_info.txt

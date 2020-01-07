@@ -16,14 +16,18 @@ import (
 	"io"
 	"os"
 	"strings"
-	"text/tabwriter"
+
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/macho/commands"
+	"github.com/blacktop/ipsw/pkg/macho/header"
+	"github.com/blacktop/ipsw/pkg/macho/types"
 )
 
 type sections []*Section
 
 // A File represents an open Mach-O file.
 type File struct {
-	FileHeader
+	header.FileHeader
 	ByteOrder binary.ByteOrder
 	Loads     []Load
 	// Sections  []*Section
@@ -47,17 +51,17 @@ func (b LoadBytes) Raw() []byte { return b }
 
 // A SegmentHeader is the header for a Mach-O 32-bit or 64-bit load segment command.
 type SegmentHeader struct {
-	Cmd     LoadCmd
+	Cmd     commands.LoadCmd
 	Len     uint32
 	Name    string
 	Addr    uint64
 	Memsz   uint64
 	Offset  uint64
 	Filesz  uint64
-	Maxprot VmProtection
-	Prot    VmProtection
+	Maxprot types.VmProtection
+	Prot    types.VmProtection
 	Nsect   uint32
-	Flag    segFlag
+	Flag    commands.SegFlag
 }
 
 // A Segment represents a Mach-O 32-bit or 64-bit load segment command.
@@ -97,7 +101,7 @@ type SectionHeader struct {
 	Align  uint32
 	Reloff uint32
 	Nreloc uint32
-	Flags  SectionFlag
+	Flags  commands.SectionFlag
 }
 
 // A Reloc represents a Mach-O relocation.
@@ -141,133 +145,165 @@ func (s *Section) Data() ([]byte, error) {
 // Open returns a new ReadSeeker reading the Mach-O section.
 func (s *Section) Open() io.ReadSeeker { return io.NewSectionReader(s.sr, 0, 1<<63-1) }
 
-// A SubClient is a Mach-O dynamic sub client command.
-type SubClient struct {
-	LoadBytes
-	Name string
-}
+type (
+	// A Symtab represents a Mach-O symbol table command.
+	Symtab struct {
+		LoadBytes
+		commands.SymtabCmd
+		Syms []Symbol
+	}
+	// A Symbol is a Mach-O 32-bit or 64-bit symbol table entry.
+	Symbol struct {
+		Name  string
+		Type  types.NLType
+		Sect  uint8
+		Desc  uint16
+		Value uint64
+	}
+	// #define	LC_SYMSEG	0x3	/* link-edit gdb symbol table info (obsolete) */
+	// #define	LC_THREAD	0x4	/* thread */
+	// A UnixThread represents a Mach-O unix thread command.
+	UnixThread struct {
+		LoadBytes
+	}
+	// #define	LC_LOADFVMLIB	0x6	/* load a specified fixed VM shared library */
+	// #define	LC_IDFVMLIB	0x7	/* fixed VM shared library identification */
+	// #define	LC_IDENT	0x8	/* object identification info (obsolete) */
+	// #define LC_FVMFILE	0x9	/* fixed VM file inclusion (internal use) */
+	// #define LC_PREPAGE      0xa     /* prepage command (internal use) */
+	// A Dysymtab represents a Mach-O dynamic symbol table command.
+	Dysymtab struct {
+		LoadBytes
+		commands.DysymtabCmd
+		IndirectSyms []uint32 // indices into Symtab.Syms
+	}
+	// A Dylib represents a Mach-O load dynamic library command.
+	Dylib struct {
+		LoadBytes
+		Name           string
+		Time           uint32
+		CurrentVersion string
+		CompatVersion  string
+	}
+	// A DylibID represents a Mach-O load dynamic library ident command.
+	DylibID Dylib
+	// #define LC_LOAD_DYLINKER 0xe	/* load a dynamic linker */
+	// #define LC_ID_DYLINKER	0xf	/* dynamic linker identification */
+	// #define	LC_PREBOUND_DYLIB 0x10	/* modules prebound for a dynamically */
+	// 				/*  linked shared library */
+	// #define	LC_ROUTINES	0x11	/* image routines */
 
-// A Dylib represents a Mach-O load dynamic library command.
-type Dylib struct {
-	LoadBytes
-	Name           string
-	Time           uint32
-	CurrentVersion string
-	CompatVersion  string
-}
+	SubFramework struct {
+		LoadBytes
+		Framework string
+	}
+	// #define	LC_SUB_UMBRELLA 0x13	/* sub umbrella */
+	// A SubClient is a Mach-O dynamic sub client command.
+	SubClient struct {
+		LoadBytes
+		Name string
+	}
 
-// A DylibID represents a Mach-O load dynamic library ident command.
-type DylibID Dylib
+	// #define	LC_SUB_LIBRARY  0x15	/* sub library */
+	// #define	LC_TWOLEVEL_HINTS 0x16	/* two-level namespace lookup hints */
+	// #define	LC_PREBIND_CKSUM  0x17	/* prebind checksum */
 
-// A WeakDylib represents a Mach-O load weak dynamic library command.
-type WeakDylib Dylib
+	// A WeakDylib represents a Mach-O load weak dynamic library command.
+	WeakDylib Dylib
 
-// A UpwardDylib represents a Mach-O load upward dylib command.
-type UpwardDylib Dylib
+	Routines64 struct {
+		LoadBytes
+		InitAddress uint64
+		InitModule  uint64
+	}
+	// A uuid represents a Mach-O uuid command.
+	UUID struct {
+		LoadBytes
+		ID string
+	}
+	// A Rpath represents a Mach-O rpath command.
+	Rpath struct {
+		LoadBytes
+		Path string
+	}
+	// #define LC_CODE_SIGNATURE 0x1d	/* local of code signature */
+	// #define LC_SEGMENT_SPLIT_INFO 0x1e /* local of info to split segments */
 
-// A DyldInfo represents a Mach-O id dyld info command.
-type DyldInfo struct {
-	LoadBytes
-	RebaseOff    uint32 // file offset to rebase info
-	RebaseSize   uint32 //  size of rebase info
-	BindOff      uint32 // file offset to binding info
-	BindSize     uint32 // size of binding info
-	WeakBindOff  uint32 // file offset to weak binding info
-	WeakBindSize uint32 //  size of weak binding info
-	LazyBindOff  uint32 // file offset to lazy binding info
-	LazyBindSize uint32 //  size of lazy binding info
-	ExportOff    uint32 // file offset to export info
-	ExportSize   uint32 //  size of export info
-}
+	ReExportDylib Dylib
+	// #define	LC_LAZY_LOAD_DYLIB 0x20	/* delay load of dylib until first use */
+	// #define	LC_ENCRYPTION_INFO 0x21	/* encrypted segment information */
 
-// A Symtab represents a Mach-O symbol table command.
-type Symtab struct {
-	LoadBytes
-	SymtabCmd
-	Syms []Symbol
-}
+	// A DyldInfo represents a Mach-O id dyld info command.
+	DyldInfo struct {
+		LoadBytes
+		RebaseOff    uint32 // file offset to rebase info
+		RebaseSize   uint32 //  size of rebase info
+		BindOff      uint32 // file offset to binding info
+		BindSize     uint32 // size of binding info
+		WeakBindOff  uint32 // file offset to weak binding info
+		WeakBindSize uint32 //  size of weak binding info
+		LazyBindOff  uint32 // file offset to lazy binding info
+		LazyBindSize uint32 //  size of lazy binding info
+		ExportOff    uint32 // file offset to export info
+		ExportSize   uint32 //  size of export info
+	}
 
-// A Dysymtab represents a Mach-O dynamic symbol table command.
-type Dysymtab struct {
-	LoadBytes
-	DysymtabCmd
-	IndirectSyms []uint32 // indices into Symtab.Syms
-}
+	// #define	LC_DYLD_INFO_ONLY (0x22|LC_REQ_DYLD)	/* compressed dyld information only */
 
-// A UnixThread represents a Mach-O unix thread command.
-type UnixThread struct {
-	LoadBytes
-}
+	// A UpwardDylib represents a Mach-O load upward dylib command.
+	UpwardDylib Dylib
+	// #define LC_VERSION_MIN_MACOSX 0x24   /* build for MacOSX min OS version */
+	// #define LC_VERSION_MIN_IPHONEOS 0x25 /* build for iPhoneOS min OS version */
 
-type SubFramework struct {
-	LoadBytes
-	Framework string
-}
+	// A FunctionStarts represents a Mach-O function starts command.
+	FunctionStarts struct {
+		LoadBytes
+		Offset uint32
+		Size   uint32
+	}
+	// #define LC_DYLD_ENVIRONMENT 0x27 /* string for dyld to treat
+	// 				    like environment variable */
+	// #define LC_MAIN (0x28|LC_REQ_DYLD) /* replacement for LC_UNIXTHREAD */
 
-// A Rpath represents a Mach-O rpath command.
-type Rpath struct {
-	LoadBytes
-	Path string
-}
+	// A DataInCode represents a Mach-O data in code command.
+	DataInCode struct {
+		LoadBytes
+		Entries []types.DataInCodeEntry
+	}
 
-// A FunctionStarts represents a Mach-O function starts command.
-type FunctionStarts struct {
-	LoadBytes
-	Offset uint32
-	Size   uint32
-}
+	// A SourceVersion represents a Mach-O source version.
+	SourceVersion struct {
+		LoadBytes
+		Version string
+	}
+	// #define LC_DYLIB_CODE_SIGN_DRS 0x2B /* Code signing DRs copied from linked dylibs */
+	// #define	LC_ENCRYPTION_INFO_64 0x2C /* 64-bit encrypted segment information */
+	// #define LC_LINKER_OPTION 0x2D /* linker options in MH_OBJECT files */
+	// #define LC_LINKER_OPTIMIZATION_HINT 0x2E /* optimization hints in MH_OBJECT files */
+	// #define LC_VERSION_MIN_TVOS 0x2F /* build for AppleTV min OS version */
+	// #define LC_VERSION_MIN_WATCHOS 0x30 /* build for Watch min OS version */
+	// #define LC_NOTE 0x31 /* arbitrary data included within a Mach-O file */
+
+	// A BuildVersion represents a Mach-O build for platform min OS version.
+	BuildVersion struct {
+		LoadBytes
+		Platform    string /* platform */
+		Minos       string /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+		Sdk         string /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
+		NumTools    uint32 /* number of tool entries following this */
+		Tool        string
+		ToolVersion string
+	}
+
+// #define LC_DYLD_EXPORTS_TRIE (0x33 | LC_REQ_DYLD) /* used with linkedit_data_command, payload is trie */
+// #define LC_DYLD_CHAINED_FIXUPS (0x34 | LC_REQ_DYLD) /* used with linkedit_data_command */
+)
 
 // A LinkEditData represents a Mach-O linkedit data command.
 type LinkEditData struct {
 	LoadBytes
 	Offset uint32
 	Size   uint32
-}
-
-// A DataInCode represents a Mach-O data in code command.
-type DataInCode struct {
-	LoadBytes
-	Entries []DataInCodeEntry
-}
-
-// A uuid represents a Mach-O uuid command.
-type uuid struct {
-	LoadBytes
-	ID string
-}
-
-type Routines64 struct {
-	LoadBytes
-	InitAddress uint64
-	InitModule  uint64
-}
-
-type ReExportDylib Dylib
-
-// A SourceVersion represents a Mach-O source version.
-type SourceVersion struct {
-	LoadBytes
-	Version string
-}
-
-// A BuildVersion represents a Mach-O build for platform min OS version.
-type BuildVersion struct {
-	LoadBytes
-	Platform    string /* platform */
-	Minos       string /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
-	Sdk         string /* X.Y.Z is encoded in nibbles xxxx.yy.zz */
-	NumTools    uint32 /* number of tool entries following this */
-	Tool        string
-	ToolVersion string
-}
-
-// A Symbol is a Mach-O 32-bit or 64-bit symbol table entry.
-type Symbol struct {
-	Name  string
-	Type  nListType
-	Sect  uint8
-	Desc  uint16
-	Value uint64
 }
 
 /*
@@ -332,13 +368,13 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 	be := binary.BigEndian.Uint32(ident[0:])
 	le := binary.LittleEndian.Uint32(ident[0:])
-	switch Magic32.Int() &^ 1 {
+	switch header.Magic32.Int() &^ 1 {
 	case be &^ 1:
 		f.ByteOrder = binary.BigEndian
-		f.Magic = magic(be)
+		f.Magic = header.Magic(be)
 	case le &^ 1:
 		f.ByteOrder = binary.LittleEndian
-		f.Magic = magic(le)
+		f.Magic = header.Magic(le)
 	default:
 		return nil, &FormatError{0, "invalid magic number", nil}
 	}
@@ -349,9 +385,9 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 
 	// Then load commands.
-	offset := int64(fileHeaderSize32)
-	if f.Magic == Magic64 {
-		offset = fileHeaderSize64
+	offset := int64(header.FileHeaderSize32)
+	if f.Magic == header.Magic64 {
+		offset = header.FileHeaderSize64
 	}
 	dat := make([]byte, f.Cmdsz)
 	if _, err := r.ReadAt(dat, offset); err != nil {
@@ -364,7 +400,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		if len(dat) < 8 {
 			return nil, &FormatError{offset, "command block too small", nil}
 		}
-		cmd, siz := LoadCmd(bo.Uint32(dat[0:4])), bo.Uint32(dat[4:8])
+		cmd, siz := commands.LoadCmd(bo.Uint32(dat[0:4])), bo.Uint32(dat[4:8])
 		if siz < 8 || siz > uint32(len(dat)) {
 			return nil, &FormatError{offset, "invalid command block size", nil}
 		}
@@ -374,186 +410,10 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		var s *Segment
 		switch cmd {
 		default:
-			fmt.Println("GOT COMMAND:", cmd)
+			log.Warnf("found NEW load command: %s", cmd)
 			f.Loads[i] = LoadBytes(cmddat)
-
-		case LoadCmdRpath:
-			var hdr RpathCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			l := new(Rpath)
-			if hdr.Path >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid path in rpath command", hdr.Path}
-			}
-			l.Path = cstring(cmddat[hdr.Path:])
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-
-		case LoadCmdSubClient:
-			var sc SubClientCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &sc); err != nil {
-				return nil, err
-			}
-			l := new(SubClient)
-			if sc.Client >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid path in sub client command", sc.Client}
-			}
-			l.Name = cstring(cmddat[sc.Client:])
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-		// case LoadCmdCodeSignature:
-		// case LoadCmdSegmentSplitInfo:
-		// case LoadCmdDylibCodeSignDrs:
-		// case LoadCmdLinkerOptimizationHint:
-		// case LoadCmdDyldExportsTrie:
-		// case LoadCmdDyldChainedFixups:
-		case LoadCmdFunctionStarts:
-			var led LinkEditDataCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &led); err != nil {
-				return nil, err
-			}
-			l := new(FunctionStarts)
-			l.Offset = led.Offset
-			l.Size = led.Size
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-
-		case LoadCmdDataInCode:
-			var led LinkEditDataCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &led); err != nil {
-				return nil, err
-			}
-			l := new(DataInCode)
-			// var e DataInCodeEntry
-
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-
-		case LoadCmdDylib:
-			var hdr DylibCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			l := new(Dylib)
-			if hdr.Name >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
-			}
-			l.Name = cstring(cmddat[hdr.Name:])
-			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion.String()
-			l.CompatVersion = hdr.CompatVersion.String()
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-		case LoadCmdLoadWeakDylib:
-			var hdr DylibCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			l := new(WeakDylib)
-			if hdr.Name >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid name in weak dynamic library command", hdr.Name}
-			}
-			l.Name = cstring(cmddat[hdr.Name:])
-			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion.String()
-			l.CompatVersion = hdr.CompatVersion.String()
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-		case LoadCmdDylibID:
-			var hdr DylibCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			l := new(DylibID)
-			if hdr.Name >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid name in dynamic library ident command", hdr.Name}
-			}
-			l.Name = cstring(cmddat[hdr.Name:])
-			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion.String()
-			l.CompatVersion = hdr.CompatVersion.String()
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-
-		case LoadCmdDyldInfo:
-		case LoadCmdDyldInfoOnly:
-			var info DyldInfoCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &info); err != nil {
-				return nil, err
-			}
-			l := new(DyldInfo)
-			l.RebaseOff = info.RebaseOff
-			l.RebaseSize = info.RebaseSize
-			l.BindOff = info.BindOff
-			l.BindSize = info.BindSize
-			l.WeakBindOff = info.WeakBindOff
-			l.WeakBindSize = info.WeakBindSize
-			l.LazyBindOff = info.LazyBindOff
-			l.LazyBindSize = info.LazyBindSize
-			l.ExportOff = info.ExportOff
-			l.ExportSize = info.ExportSize
-			f.Loads[i] = l
-
-		case LoadCmdSymtab:
-			var hdr SymtabCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			strtab := make([]byte, hdr.Strsize)
-			if _, err := r.ReadAt(strtab, int64(hdr.Stroff)); err != nil {
-				return f, nil
-				// return nil, err
-			}
-			var symsz int
-			if f.Magic == Magic64 {
-				symsz = 16
-			} else {
-				symsz = 12
-			}
-			symdat := make([]byte, int(hdr.Nsyms)*symsz)
-			if _, err := r.ReadAt(symdat, int64(hdr.Symoff)); err != nil {
-				return nil, err
-			}
-			st, err := f.parseSymtab(symdat, strtab, cmddat, &hdr, offset)
-			if err != nil {
-				return nil, err
-			}
-			f.Loads[i] = st
-			f.Symtab = st
-
-		case LoadCmdDysymtab:
-			var hdr DysymtabCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			dat := make([]byte, hdr.Nindirectsyms*4)
-			if _, err := r.ReadAt(dat, int64(hdr.Indirectsymoff)); err != nil {
-				return nil, err
-			}
-			x := make([]uint32, hdr.Nindirectsyms)
-			if err := binary.Read(bytes.NewReader(dat), bo, x); err != nil {
-				return nil, err
-			}
-			st := new(Dysymtab)
-			st.LoadBytes = LoadBytes(cmddat)
-			st.DysymtabCmd = hdr
-			st.IndirectSyms = x
-			f.Loads[i] = st
-			f.Dysymtab = st
-
-		case LoadCmdSegment:
-			var seg32 Segment32
+		case commands.LoadCmdSegment:
+			var seg32 commands.Segment32
 			b := bytes.NewReader(cmddat)
 			if err := binary.Read(b, bo, &seg32); err != nil {
 				return nil, err
@@ -573,7 +433,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			s.Flag = seg32.Flag
 			f.Loads[i] = s
 			for i := 0; i < int(s.Nsect); i++ {
-				var sh32 Section32
+				var sh32 commands.Section32
 				if err := binary.Read(b, bo, &sh32); err != nil {
 					return nil, err
 				}
@@ -591,9 +451,153 @@ func NewFile(r io.ReaderAt) (*File, error) {
 					return nil, err
 				}
 			}
-
-		case LoadCmdSegment64:
-			var seg64 Segment64
+		case commands.LoadCmdSymtab:
+			var hdr commands.SymtabCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			strtab := make([]byte, hdr.Strsize)
+			if _, err := r.ReadAt(strtab, int64(hdr.Stroff)); err != nil {
+				return f, nil
+				// return nil, err
+			}
+			var symsz int
+			if f.Magic == header.Magic64 {
+				symsz = 16
+			} else {
+				symsz = 12
+			}
+			symdat := make([]byte, int(hdr.Nsyms)*symsz)
+			if _, err := r.ReadAt(symdat, int64(hdr.Symoff)); err != nil {
+				return nil, err
+			}
+			st, err := f.parseSymtab(symdat, strtab, cmddat, &hdr, offset)
+			if err != nil {
+				return nil, err
+			}
+			f.Loads[i] = st
+			f.Symtab = st
+		// case commands.LoadCmdSymseg:
+		// case commands.LoadCmdThread:
+		case commands.LoadCmdUnixThread:
+			var ut commands.UnixThreadCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &ut); err != nil {
+				return nil, err
+			}
+			l := new(UnixThread)
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdLoadfvmlib:
+		// case commands.LoadCmdIdfvmlib:
+		// case commands.LoadCmdIdent:
+		// case commands.LoadCmdFvmfile:
+		// case commands.LoadCmdPrepage:
+		case commands.LoadCmdDysymtab:
+			var hdr commands.DysymtabCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			dat := make([]byte, hdr.Nindirectsyms*4)
+			if _, err := r.ReadAt(dat, int64(hdr.Indirectsymoff)); err != nil {
+				return nil, err
+			}
+			x := make([]uint32, hdr.Nindirectsyms)
+			if err := binary.Read(bytes.NewReader(dat), bo, x); err != nil {
+				return nil, err
+			}
+			st := new(Dysymtab)
+			st.LoadBytes = LoadBytes(cmddat)
+			st.DysymtabCmd = hdr
+			st.IndirectSyms = x
+			f.Loads[i] = st
+			f.Dysymtab = st
+		case commands.LoadCmdDylib:
+			var hdr commands.DylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(Dylib)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case commands.LoadCmdDylibID:
+			var hdr commands.DylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(DylibID)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in dynamic library ident command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdDylinker:
+		// case commands.LoadCmdDylinkerID:
+		// case commands.LoadCmdPreboundDylib:
+		// case commands.LoadCmdRoutines:
+		case commands.LoadCmdSubFramework:
+			var sf commands.SubFrameworkCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &sf); err != nil {
+				return nil, err
+			}
+			l := new(SubFramework)
+			if sf.Framework >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid framework in subframework command", sf.Framework}
+			}
+			l.Framework = cstring(cmddat[sf.Framework:])
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdSubUmbrella:
+		case commands.LoadCmdSubClient:
+			var sc commands.SubClientCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &sc); err != nil {
+				return nil, err
+			}
+			l := new(SubClient)
+			if sc.Client >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid path in sub client command", sc.Client}
+			}
+			l.Name = cstring(cmddat[sc.Client:])
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdSubLibrary:
+		// case commands.LoadCmdTwolevelHints:
+		// case commands.LoadCmdPrebindCksum:
+		case commands.LoadCmdLoadWeakDylib:
+			var hdr commands.DylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(WeakDylib)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in weak dynamic library command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case commands.LoadCmdSegment64:
+			var seg64 commands.Segment64
 			b := bytes.NewReader(cmddat)
 			if err := binary.Read(b, bo, &seg64); err != nil {
 				return nil, err
@@ -613,7 +617,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			s.Flag = seg64.Flag
 			f.Loads[i] = s
 			for i := 0; i < int(s.Nsect); i++ {
-				var sh64 Section64
+				var sh64 commands.Section64
 				if err := binary.Read(b, bo, &sh64); err != nil {
 					return nil, err
 				}
@@ -631,20 +635,123 @@ func NewFile(r io.ReaderAt) (*File, error) {
 					return nil, err
 				}
 			}
-
-		case LoadCmdUUID:
-			var u UUIDCmd
+		case commands.LoadCmdRoutines64:
+			var r64 commands.Routines64Cmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &r64); err != nil {
+				return nil, err
+			}
+			l := new(Routines64)
+			l.InitAddress = r64.InitAddress
+			l.InitModule = r64.InitModule
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case commands.LoadCmdUUID:
+			var u commands.UUIDCmd
 			b := bytes.NewReader(cmddat)
 			if err := binary.Read(b, bo, &u); err != nil {
 				return nil, err
 			}
-			l := new(uuid)
+			l := new(UUID)
 			l.ID = u.UUID.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
+		case commands.LoadCmdRpath:
+			var hdr commands.RpathCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(Rpath)
+			if hdr.Path >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid path in rpath command", hdr.Path}
+			}
+			l.Path = cstring(cmddat[hdr.Path:])
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdCodeSignature:
+		// case commands.LoadCmdSegmentSplitInfo:
+		case commands.LoadCmdReexportDylib:
+			var hdr commands.ReExportDylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(ReExportDylib)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdLazyLoadDylib:
+		// case commands.LoadCmdEncryptionInfo:
+		case commands.LoadCmdDyldInfo:
+		case commands.LoadCmdDyldInfoOnly:
+			var info commands.DyldInfoCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &info); err != nil {
+				return nil, err
+			}
+			l := new(DyldInfo)
+			l.RebaseOff = info.RebaseOff
+			l.RebaseSize = info.RebaseSize
+			l.BindOff = info.BindOff
+			l.BindSize = info.BindSize
+			l.WeakBindOff = info.WeakBindOff
+			l.WeakBindSize = info.WeakBindSize
+			l.LazyBindOff = info.LazyBindOff
+			l.LazyBindSize = info.LazyBindSize
+			l.ExportOff = info.ExportOff
+			l.ExportSize = info.ExportSize
+			f.Loads[i] = l
+		case commands.LoadCmdLoadUpwardDylib:
+			var hdr commands.UpwardDylibCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(UpwardDylib)
+			if hdr.Name >= uint32(len(cmddat)) {
+				return nil, &FormatError{offset, "invalid name in load upwardl dylib command", hdr.Name}
+			}
+			l.Name = cstring(cmddat[hdr.Name:])
+			l.Time = hdr.Time
+			l.CurrentVersion = hdr.CurrentVersion.String()
+			l.CompatVersion = hdr.CompatVersion.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdVersionMinMacosx:
+		// case commands.LoadCmdVersionMinIphoneos:
+		case commands.LoadCmdFunctionStarts:
+			var led commands.LinkEditDataCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &led); err != nil {
+				return nil, err
+			}
+			l := new(FunctionStarts)
+			l.Offset = led.Offset
+			l.Size = led.Size
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		// case commands.LoadCmdDyldEnvironment:
+		// case commands.LoadCmdMain:
+		case commands.LoadCmdDataInCode:
+			var led commands.LinkEditDataCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &led); err != nil {
+				return nil, err
+			}
+			l := new(DataInCode)
+			// var e DataInCodeEntry
 
-		case LoadCmdSourceVersion:
-			var sv SourceVersionCmd
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case commands.LoadCmdSourceVersion:
+			var sv commands.SourceVersionCmd
 			b := bytes.NewReader(cmddat)
 			if err := binary.Read(b, bo, &sv); err != nil {
 				return nil, err
@@ -653,10 +760,16 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l.Version = sv.Version.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
-
-		case LoadCmdBuildVersion:
-			var build BuildVersionCmd
-			var buildTool buildToolVersion
+		// case commands.LoadCmdDylibCodeSignDrs:
+		// case commands.LoadCmdEncryptionInfo64:
+		// case commands.LoadCmdLinkerOption:
+		// case commands.LoadCmdLinkerOptimizationHint:
+		// case commands.LoadCmdVersionMinTvos:
+		// case commands.LoadCmdVersionMinWatchos:
+		// case commands.LoadCmdNote:
+		case commands.LoadCmdBuildVersion:
+			var build commands.BuildVersionCmd
+			var buildTool types.BuildToolVersion
 			b := bytes.NewReader(cmddat)
 			if err := binary.Read(b, bo, &build); err != nil {
 				return nil, err
@@ -675,71 +788,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			}
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
-		case LoadCmdRoutines64:
-			var r64 Routines64Cmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &r64); err != nil {
-				return nil, err
-			}
-			l := new(Routines64)
-			l.InitAddress = r64.InitAddress
-			l.InitModule = r64.InitModule
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-		case LoadCmdReexportDylib:
-			var hdr ReExportDylibCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			l := new(ReExportDylib)
-			if hdr.Name >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid name in dynamic library command", hdr.Name}
-			}
-			l.Name = cstring(cmddat[hdr.Name:])
-			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion.String()
-			l.CompatVersion = hdr.CompatVersion.String()
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-		case LoadCmdUnixThread:
-			var ut UnixThreadCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &ut); err != nil {
-				return nil, err
-			}
-			l := new(UnixThread)
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-		case LoadCmdSubFramework:
-			var sf SubFrameworkCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &sf); err != nil {
-				return nil, err
-			}
-			l := new(SubFramework)
-			if sf.Framework >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid framework in subframework command", sf.Framework}
-			}
-			l.Framework = cstring(cmddat[sf.Framework:])
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
-		case LoadCmdLoadUpwardDylib:
-			var hdr UpwardDylibCmd
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &hdr); err != nil {
-				return nil, err
-			}
-			l := new(UpwardDylib)
-			if hdr.Name >= uint32(len(cmddat)) {
-				return nil, &FormatError{offset, "invalid name in load upwardl dylib command", hdr.Name}
-			}
-			l.Name = cstring(cmddat[hdr.Name:])
-			l.Time = hdr.Time
-			l.CurrentVersion = hdr.CurrentVersion.String()
-			l.CompatVersion = hdr.CompatVersion.String()
-			l.LoadBytes = LoadBytes(cmddat)
-			f.Loads[i] = l
+			// case commands.LoadCmdDyldExportsTrie:
+			// case commands.LoadCmdDyldChainedFixups:
 		}
 		if s != nil {
 			s.sr = io.NewSectionReader(r, int64(s.Offset), int64(s.Filesz))
@@ -749,18 +799,18 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	return f, nil
 }
 
-func (f *File) parseSymtab(symdat, strtab, cmddat []byte, hdr *SymtabCmd, offset int64) (*Symtab, error) {
+func (f *File) parseSymtab(symdat, strtab, cmddat []byte, hdr *commands.SymtabCmd, offset int64) (*Symtab, error) {
 	bo := f.ByteOrder
 	symtab := make([]Symbol, hdr.Nsyms)
 	b := bytes.NewReader(symdat)
 	for i := range symtab {
-		var n Nlist64
-		if f.Magic == Magic64 {
+		var n types.Nlist64
+		if f.Magic == header.Magic64 {
 			if err := binary.Read(b, bo, &n); err != nil {
 				return nil, err
 			}
 		} else {
-			var n32 Nlist32
+			var n32 types.Nlist32
 			if err := binary.Read(b, bo, &n32); err != nil {
 				return nil, err
 			}
@@ -1002,39 +1052,4 @@ func (f *File) ImportedLibraries() ([]string, error) {
 		}
 	}
 	return all, nil
-}
-
-func (f File) String() string {
-
-	return fmt.Sprintf(
-		"Magic         = %s, (%s)\n"+
-			"Type          = %s\n"+
-			"CPU           = %s, %s\n"+
-			"Commands      = %d (Size: %d)\n"+
-			"Flags         = %s\n",
-		f.Magic, f.ByteOrder,
-		f.Type,
-		f.Cpu, f.SubCpu.String(f.Cpu),
-		f.FileHeader.Ncmd,
-		f.FileHeader.Cmdsz,
-		f.FileHeader.Flags,
-	)
-}
-
-func (ss sections) Print() {
-	var secFlags string
-	// var prevSeg string
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-	for _, sec := range ss {
-		secFlags = ""
-		if !sec.Flags.IsRegular() {
-			secFlags = fmt.Sprintf("(%s)", sec.Flags)
-		}
-		// if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
-		// 	fmt.Fprintf(w, "\n")
-		// }
-		fmt.Fprintf(w, "Mem: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
-		// prevSeg = sec.Seg
-	}
-	w.Flush()
 }

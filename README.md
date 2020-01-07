@@ -447,7 +447,6 @@ compdef _ipsw ipsw
 - [ ] create offline copy of ipsw.me API
 - [ ] https://github.com/xerub/img4lib
 - [ ] devicetree read/write
-- [ ] Look at OTAs for beta files
 - [ ] parse plists for folder creation
 
 ## Issues

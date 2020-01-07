@@ -9,19 +9,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+
+	"github.com/blacktop/ipsw/pkg/macho/header"
 )
 
 // A FatFile is a Mach-O universal binary that contains at least one architecture.
 type FatFile struct {
-	Magic  magic
+	Magic  header.Magic
 	Arches []FatArch
 	closer io.Closer
 }
 
 // A FatArchHeader represents a fat header for a specific image architecture.
 type FatArchHeader struct {
-	Cpu    CPU
-	SubCpu CPUSubtype
+	CPU    header.CPU
+	SubCPU header.CPUSubtype
 	Offset uint32
 	Size   uint32
 	Align  uint32
@@ -51,13 +53,13 @@ func NewFatFile(r io.ReaderAt) (*FatFile, error) {
 	err := binary.Read(sr, binary.BigEndian, &ff.Magic)
 	if err != nil {
 		return nil, &FormatError{0, "error reading magic number", nil}
-	} else if ff.Magic != MagicFat {
+	} else if ff.Magic != header.MagicFat {
 		// See if this is a Mach-O file via its magic number. The magic
 		// must be converted to little endian first though.
 		var buf [4]byte
 		binary.BigEndian.PutUint32(buf[:], ff.Magic.Int())
 		leMagic := binary.LittleEndian.Uint32(buf[:])
-		if leMagic == Magic32.Int() || leMagic == Magic64.Int() {
+		if leMagic == header.Magic32.Int() || leMagic == header.Magic64.Int() {
 			return nil, ErrNotFat
 		}
 		return nil, &FormatError{0, "invalid magic number", nil}
@@ -81,7 +83,7 @@ func NewFatFile(r io.ReaderAt) (*FatFile, error) {
 	// there are not duplicate architectures.
 	seenArches := make(map[uint64]bool, narch)
 	// Make sure that all images are for the same MH_ type.
-	var machoType Type
+	var machoType header.Type
 
 	// Following the fat_header comes narch fat_arch structs that index
 	// Mach-O images further in the file.
@@ -101,9 +103,9 @@ func NewFatFile(r io.ReaderAt) (*FatFile, error) {
 		}
 
 		// Make sure the architecture for this image is not duplicate.
-		seenArch := (uint64(fa.Cpu) << 32) | uint64(fa.SubCpu)
+		seenArch := (uint64(fa.CPU) << 32) | uint64(fa.SubCPU)
 		if o, k := seenArches[seenArch]; o || k {
-			return nil, &FormatError{offset, fmt.Sprintf("duplicate architecture cpu=%v, subcpu=%#x", fa.Cpu, fa.SubCpu), nil}
+			return nil, &FormatError{offset, fmt.Sprintf("duplicate architecture cpu=%v, subcpu=%#x", fa.CPU, fa.SubCPU), nil}
 		}
 		seenArches[seenArch] = true
 
@@ -136,6 +138,7 @@ func OpenFat(name string) (*FatFile, error) {
 	return ff, nil
 }
 
+// Close with close the Mach-O Fat file.
 func (ff *FatFile) Close() error {
 	var err error
 	if ff.closer != nil {

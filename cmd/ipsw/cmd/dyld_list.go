@@ -30,15 +30,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	dyldCmd.AddCommand(dyldListCmd)
+
+	dyldListCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
 // dyldListCmd represents the list command
 var dyldListCmd = &cobra.Command{
 	Use:   "list <dyld_shared_cache>",
 	Short: "List all dylibs in dyld_shared_cache",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
@@ -55,15 +63,22 @@ var dyldListCmd = &cobra.Command{
 
 		f.CacheHeader.Print()
 		f.LocalSymInfo.Print()
-
 		f.Mappings.Print()
+
+		// for idx, img := range f.Images {
+		// 	fmt.Printf("%4d:\t0x%0X\t%s\n", idx+1, img.Info.Address, img.Name)
+		// }
+
+		image := f.Image("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
+		fmt.Println(image.Info.String())
+		fmt.Println(image.UUID)
+		fmt.Println("DylibOffset:", image.DylibOffset)
+		fmt.Println("Calc DylibOffset:", image.Info.Address-f.Mappings[0].Address)
+
+		for _, sym := range image.LocalSymbols {
+			fmt.Printf("0x%0X:\t%s\n", sym.Value, sym.Name)
+		}
 
 		return nil
 	},
-}
-
-func init() {
-	dyldCmd.AddCommand(dyldListCmd)
-
-	dyldListCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
