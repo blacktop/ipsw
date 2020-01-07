@@ -80,7 +80,7 @@ var machoCmd = &cobra.Command{
 		}
 		fmt.Println("HEADER")
 		fmt.Println("======")
-		fmt.Println(m)
+		fmt.Println(m.FileHeader)
 
 		fmt.Println("SECTIONS")
 		fmt.Println("========")

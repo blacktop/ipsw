@@ -3,7 +3,7 @@ package dyld
 import (
 	"fmt"
 
-	"github.com/blacktop/ipsw/pkg/macho"
+	"github.com/blacktop/ipsw/pkg/macho/types"
 )
 
 type formatVersion uint32
@@ -43,7 +43,7 @@ type CacheHeader struct {
 	SlideInfoSize        uint64         // size of kernel slid info
 	LocalSymbolsOffset   uint64         // file offset of where local symbols are stored
 	LocalSymbolsSize     uint64         // size of local symbols information
-	UUID                 macho.UUID     // unique value for each shared cache file
+	UUID                 types.UUID     // unique value for each shared cache file
 	CacheType            uint64         // 0 for development, 1 for production
 	BranchPoolsOffset    uint32         // file offset to table of uint64_t pool addresses
 	BranchPoolsCount     uint32         // number of uint64_t entries
@@ -59,7 +59,7 @@ type CacheHeader struct {
 	ProgClosuresSize     uint64         // size of list of program launch closures
 	ProgClosuresTrieAddr uint64         // (unslid) address of trie of indexes into program launch closures
 	ProgClosuresTrieSize uint64         // size of trie of indexes into program launch closures
-	Platform             macho.Platform // platform number (macOS=1, etc)
+	Platform             types.Platform // platform number (macOS=1, etc)
 	FormatVersion        formatVersion  /* formatVersion        : 8,  // dyld3::closure::kFormatVersion
 	   dylibsExpectedOnDisk : 1,  // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
 	   simulator            : 1,  // for simulator of specified platform
@@ -83,8 +83,8 @@ type CacheMappingInfo struct {
 	Address    uint64
 	Size       uint64
 	FileOffset uint64
-	MaxProt    macho.VmProtection
-	InitProt   macho.VmProtection
+	MaxProt    types.VmProtection
+	InitProt   types.VmProtection
 }
 
 type CacheMapping struct {
@@ -326,7 +326,7 @@ type CacheAcceleratorDof struct {
 }
 
 type CacheImageTextInfo struct {
-	UUID            macho.UUID
+	UUID            types.UUID
 	LoadAddress     uint64 // unslid address of start of __TEXT
 	TextSegmentSize uint32
 	PathOffset      uint32 // offset from start of cache file

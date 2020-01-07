@@ -1,4 +1,4 @@
-package macho
+package types
 
 import "strings"
 
@@ -7,7 +7,7 @@ import "fmt"
 // An Nlist32 is a Mach-O 32-bit symbol table entry.
 type Nlist32 struct {
 	Name  uint32
-	Type  nListType
+	Type  NLType
 	Sect  uint8
 	Desc  uint16
 	Value uint32
@@ -16,13 +16,13 @@ type Nlist32 struct {
 // An Nlist64 is a Mach-O 64-bit symbol table entry.
 type Nlist64 struct {
 	Name  uint32
-	Type  nListType
+	Type  NLType
 	Sect  uint8
 	Desc  uint16
 	Value uint64
 }
 
-type nListType uint8
+type NLType uint8
 
 /*
  * The n_type field really contains four fields:
@@ -33,52 +33,52 @@ type nListType uint8
  * which are used via the following masks.
  */
 const (
-	N_STAB nListType = 0xe0 /* if any of these bits set, a symbolic debugging entry */
-	N_PEXT nListType = 0x10 /* private external symbol bit */
-	N_TYPE nListType = 0x0e /* mask for the type bits */
-	N_EXT  nListType = 0x01 /* external symbol bit, set for external symbols */
+	N_STAB NLType = 0xe0 /* if any of these bits set, a symbolic debugging entry */
+	N_PEXT NLType = 0x10 /* private external symbol bit */
+	N_TYPE NLType = 0x0e /* mask for the type bits */
+	N_EXT  NLType = 0x01 /* external symbol bit, set for external symbols */
 )
 
 /*
  * Values for N_TYPE bits of the n_type field.
  */
 const (
-	N_UNDF nListType = 0x0 /* undefined, n_sect == NO_SECT */
-	N_ABS  nListType = 0x2 /* absolute, n_sect == NO_SECT */
-	N_SECT nListType = 0xe /* defined in section number n_sect */
-	N_PBUD nListType = 0xc /* prebound undefined (defined in a dylib) */
-	N_INDR nListType = 0xa /* indirect */
+	N_UNDF NLType = 0x0 /* undefined, n_sect == NO_SECT */
+	N_ABS  NLType = 0x2 /* absolute, n_sect == NO_SECT */
+	N_SECT NLType = 0xe /* defined in section number n_sect */
+	N_PBUD NLType = 0xc /* prebound undefined (defined in a dylib) */
+	N_INDR NLType = 0xa /* indirect */
 )
 
-func (t nListType) IsDebugSym() bool {
+func (t NLType) IsDebugSym() bool {
 	return (t & N_STAB) != 0
 }
 
-func (t nListType) IsPrivateExternalSym() bool {
+func (t NLType) IsPrivateExternalSym() bool {
 	return (t & N_PEXT) != 0
 }
 
-func (t nListType) IsExternalSym() bool {
+func (t NLType) IsExternalSym() bool {
 	return (t & N_EXT) != 0
 }
 
-func (t nListType) IsUndefinedSym() bool {
+func (t NLType) IsUndefinedSym() bool {
 	return (t & N_TYPE) == N_UNDF
 }
-func (t nListType) IsAbsoluteSym() bool {
+func (t NLType) IsAbsoluteSym() bool {
 	return (t & N_TYPE) == N_ABS
 }
-func (t nListType) IsDefinedInSection() bool {
+func (t NLType) IsDefinedInSection() bool {
 	return (t & N_TYPE) == N_SECT
 }
-func (t nListType) IsPreboundUndefinedSym() bool {
+func (t NLType) IsPreboundUndefinedSym() bool {
 	return (t & N_TYPE) == N_PBUD
 }
-func (t nListType) IsIndirectSym() bool {
+func (t NLType) IsIndirectSym() bool {
 	return (t & N_TYPE) == N_INDR
 }
 
-func (t nListType) String(secName string) string {
+func (t NLType) String(secName string) string {
 	var tStr string
 	if t.IsDebugSym() {
 		tStr += "debug|"
@@ -210,4 +210,53 @@ const (
 	 * symbol is pinned to the previous content.
 	 */
 	ALT_ENTRY nListDesc = 0x0200
+
+	/*
+	 * The N_COLD_FUNC bit of the n_desc field indicates that the symbol is used
+	 * infrequently and the linker should order it towards the end of the section.
+	 */
+	N_COLD_FUNC nListDesc = 0x0400
+)
+
+/*
+ * Symbolic debugger symbols.
+ */
+const (
+	N_GSYM  = 0x20 /* global symbol: name,,NO_SECT,type,0 */
+	N_FNAME = 0x22 /* procedure name (f77 kludge): name,,NO_SECT,0,0 */
+	N_FUN   = 0x24 /* procedure: name,,n_sect,linenumber,address */
+	N_STSYM = 0x26 /* static symbol: name,,n_sect,type,address */
+	N_LCSYM = 0x28 /* .lcomm symbol: name,,n_sect,type,address */
+	N_BNSYM = 0x2e /* begin nsect sym: 0,,n_sect,0,address */
+	N_AST   = 0x32 /* AST file path: name,,NO_SECT,0,0 */
+	N_OPT   = 0x3c /* emitted with gcc2_compiled and in gcc source */
+	N_RSYM  = 0x40 /* register sym: name,,NO_SECT,type,register */
+	N_SLINE = 0x44 /* src line: 0,,n_sect,linenumber,address */
+	N_ENSYM = 0x4e /* end nsect sym: 0,,n_sect,0,address */
+	N_SSYM  = 0x60 /* structure elt: name,,NO_SECT,type,struct_offset */
+	N_SO    = 0x64 /* source file name: name,,n_sect,0,address */
+	N_OSO   = 0x66 /* object file name: name,,(see below),0,st_mtime */
+	/*   historically N_OSO set n_sect to 0. The N_OSO
+	 *   n_sect may instead hold the low byte of the
+	 *   cpusubtype value from the Mach-O header. */
+	N_LSYM    = 0x80 /* local sym: name,,NO_SECT,type,offset */
+	N_BINCL   = 0x82 /* include file beginning: name,,NO_SECT,0,sum */
+	N_SOL     = 0x84 /* #included file name: name,,n_sect,0,address */
+	N_PARAMS  = 0x86 /* compiler parameters: name,,NO_SECT,0,0 */
+	N_VERSION = 0x88 /* compiler version: name,,NO_SECT,0,0 */
+	N_OLEVEL  = 0x8A /* compiler -O level: name,,NO_SECT,0,0 */
+	N_PSYM    = 0xa0 /* parameter: name,,NO_SECT,type,offset */
+	N_EINCL   = 0xa2 /* include file end: name,,NO_SECT,0,0 */
+	N_ENTRY   = 0xa4 /* alternate entry: name,,n_sect,linenumber,address */
+	N_LBRAC   = 0xc0 /* left bracket: 0,,NO_SECT,nesting level,address */
+	N_EXCL    = 0xc2 /* deleted include file: name,,NO_SECT,0,sum */
+	N_RBRAC   = 0xe0 /* right bracket: 0,,NO_SECT,nesting level,address */
+	N_BCOMM   = 0xe2 /* begin common: name,,NO_SECT,0,0 */
+	N_ECOMM   = 0xe4 /* end common: name,,n_sect,0,0 */
+	N_ECOML   = 0xe8 /* end common (local name): 0,,n_sect,0,address */
+	N_LENG    = 0xfe /* second stab entry with length information */
+	/*
+	 * for the berkeley pascal compiler, pc(1):
+	 */
+	N_PC = 0x30 /* global pascal symbol: name,,NO_SECT,subtype,line */
 )
