@@ -140,7 +140,7 @@ type CacheSlideInfo3 struct {
 	Version         uint32 // currently 3
 	PageSize        uint32 // currently 4096 (may also be 16384)
 	PageStartsCount uint32
-	Padding         uint32
+	_               uint32 // padding for 64bit alignment
 	AuthValueAdd    uint64
 	// PageStarts      []uint16 /* len() = page_starts_count */
 }
@@ -232,6 +232,11 @@ func (p CacheSlidePointer3) KeyName() string {
 		return "ERROR"
 	}
 	return name[key]
+}
+
+// IsBind returns if the chained pointer is bind
+func (p CacheSlidePointer3) IsBind() bool {
+	return (p & 0x4000000000000000) != 0
 }
 
 // Authenticated returns if the chained pointer is authenticated
