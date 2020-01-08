@@ -11,6 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/utils"
+	"github.com/pkg/errors"
 )
 
 // Known good magic
@@ -168,17 +169,17 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 	f.CodeSignature = cs
 
-	/*****************************
-	 * Read dyld kernel slid info
-	 *****************************/
-	log.Info("Parsing Slide Info...")
-	f.parseSlideInfo(r)
-
 	/**************************
 	 * Read dyld local symbols
 	 **************************/
 	log.Info("Parsing Local Symbols...")
 	f.parseLocalSyms(r)
+
+	/*****************************
+	 * Read dyld kernel slid info
+	 *****************************/
+	log.Info("Parsing Slide Info...")
+	f.parseSlideInfo(r)
 
 	// Read dyld branch pool.
 	if f.BranchPoolsOffset != 0 {
@@ -391,28 +392,28 @@ func (f *File) parseLocalSyms(r io.ReaderAt) error {
 		}
 	}
 
-	// stringPool := io.NewSectionReader(r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
+	stringPool := io.NewSectionReader(r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
 
-	// sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
 
-	// for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
-	// 	for e := 0; e < int(f.Images[idx].NlistCount); e++ {
-	// 		nlist := nlist64{}
-	// 		if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
-	// 			return err
-	// 		}
+	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
+		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
+			nlist := nlist64{}
+			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
+				return err
+			}
 
-	// 		stringPool.Seek(int64(nlist.Strx), os.SEEK_SET)
-	// 		s, err := bufio.NewReader(stringPool).ReadString('\x00')
-	// 		if err != nil {
-	// 			log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Strx).Error())
-	// 		}
-	// 		f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
-	// 			Name:    strings.Trim(s, "\x00"),
-	// 			nlist64: nlist,
-	// 		})
-	// 	}
-	// }
+			stringPool.Seek(int64(nlist.Strx), os.SEEK_SET)
+			s, err := bufio.NewReader(stringPool).ReadString('\x00')
+			if err != nil {
+				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Strx).Error())
+			}
+			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
+				Name:    strings.Trim(s, "\x00"),
+				nlist64: nlist,
+			})
+		}
+	}
 
 	return nil
 }
@@ -463,10 +464,13 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 			return err
 		}
 
+		var targetValue uint64
 		var pointer CacheSlidePointer3
 
 		for i, start := range PageStarts {
+			pageAddress := dataMapping.Address + uint64(uint32(i)*slideInfo.PageSize)
 			pageOffset := dataMapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
+
 			if start == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE {
 				fmt.Printf("page[% 5d]: no rebasing\n", i)
 				continue
@@ -474,10 +478,10 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 
 			rebaseLocation := pageOffset
 			delta := uint64(start)
-			var targetValue uint64
 
 			for {
 				rebaseLocation += delta
+
 				sr.Seek(int64(rebaseLocation), os.SEEK_SET)
 				if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
 					return err
@@ -485,16 +489,22 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 				fmt.Println(pointer)
 
 				if pointer.Authenticated() {
-					targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
+					// fmt.Printf("OffsetFromSharedCacheBase: 0x%x\n", pointer.OffsetFromSharedCacheBase())
+					// targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
+					targetValue = slideInfo.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
 				} else {
-					// Regular pointer which needs to fit in 51-bits of value.
-					// C++ RTTI uses the top bit, so we'll allow the whole top-byte
-					// and the signed-extended bottom 43-bits to be fit in to 51-bits.
-					top8Bits := pointer.Value() & 0x007F80000000000
-					bottom43Bits := pointer.Value() & 0x000007FFFFFFFFFF
-					targetValue = (top8Bits << 13) | (((bottom43Bits << 21) >> 21) & 0x00FFFFFFFFFFFFFF)
+					targetValue = pointer.SignExtend51()
 				}
-				fmt.Printf("    [% 5d + 0x%04X]: 0x%x\n", i, (uint64)(rebaseLocation-pageOffset), targetValue)
+
+				var symName string
+				sym := f.GetLocalSymAtAddress(targetValue)
+				if sym == nil {
+					symName = "?"
+				} else {
+					symName = sym.Name
+				}
+
+				fmt.Printf("    [% 5d + 0x%04X] @ 0x%x => 0x%x, %s\n", i, (uint64)(rebaseLocation-pageOffset), (uint64)(pageAddress+rebaseLocation), targetValue, symName)
 
 				if delta == 0 {
 					break
@@ -510,6 +520,18 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 		f.SlideInfo = slideInfo
 	default:
 		log.Fatalf("got unexpected dyld slide info version: %d", slideInfoVersion)
+	}
+	return nil
+}
+
+// GetLocalSymAtAddress returns the local symbol at a given address
+func (f *File) GetLocalSymAtAddress(addr uint64) *CacheLocalSymbol64 {
+	for _, image := range f.Images {
+		for _, sym := range image.LocalSymbols {
+			if sym.Value == addr {
+				return sym
+			}
+		}
 	}
 	return nil
 }
