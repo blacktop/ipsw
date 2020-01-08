@@ -1,0 +1,104 @@
+****************
+Platform: PPC-64
+Code:0x43 0x20 0x0c 0x07 0x41 0x56 0xff 0x17 0x80 0x20 0x00 0x00 0x80 0x3f 0x00 0x00 0x10 0x43 0x23 0x0e 0xd0 0x44 0x00 0x80 0x4c 0x43 0x22 0x02 0x2d 0x03 0x00 0x80 0x7c 0x43 0x20 0x14 0x7c 0x43 0x20 0x93 0x4f 0x20 0x00 0x21 0x4c 0xc8 0x00 0x21 0x40 0x82 0x00 0x14 
+Disasm:
+0x1000:	bdnzla+	0xc04
+	op_count: 1
+		operands[0].type: IMM = 0xc04
+	Branch hint: 1
+
+0x1004:	bdztla	4*cr5+eq, 0xffffffffffffff14
+	op_count: 2
+		operands[0].type: REG = cr5eq
+		operands[1].type: IMM = 0xffffffffffffff14
+	Branch code: 76
+	Branch hint: 1
+
+0x1008:	lwz	r1, 0(0)
+	op_count: 2
+		operands[0].type: REG = r1
+		operands[1].type: MEM
+
+0x100c:	lwz	r1, 0(r31)
+	op_count: 2
+		operands[0].type: REG = r1
+		operands[1].type: MEM
+			operands[1].mem.base: REG = r31
+
+0x1010:	vpkpx	v2, v3, v4
+	op_count: 3
+		operands[0].type: REG = v2
+		operands[1].type: REG = v3
+		operands[2].type: REG = v4
+
+0x1014:	stfs	f2, 0x80(r4)
+	op_count: 2
+		operands[0].type: REG = f2
+		operands[1].type: MEM
+			operands[1].mem.base: REG = r4
+			operands[1].mem.disp: 0x80
+
+0x1018:	crand	cr0eq, cr0un, cr1lt
+	op_count: 3
+		operands[0].type: REG = cr0eq
+		operands[1].type: REG = cr0un
+		operands[2].type: REG = cr1lt
+
+0x101c:	cmpwi	cr2, r3, 0x80
+	op_count: 3
+		operands[0].type: REG = cr2
+		operands[1].type: REG = r3
+		operands[2].type: IMM = 0x80
+
+0x1020:	addc	r2, r3, r4
+	op_count: 3
+		operands[0].type: REG = r2
+		operands[1].type: REG = r3
+		operands[2].type: REG = r4
+
+0x1024:	mulhd.	r2, r3, r4
+	op_count: 3
+		operands[0].type: REG = r2
+		operands[1].type: REG = r3
+		operands[2].type: REG = r4
+	Update-CR0: True
+
+0x1028:	bdnzlrl+	
+	Branch hint: 1
+
+0x102c:	bgelrl-	cr2
+	op_count: 1
+		operands[0].type: REG = cr2
+	Branch code: 4
+	Branch hint: 2
+
+0x1030:	bne	0x1044
+	op_count: 1
+		operands[0].type: IMM = 0x1044
+	Branch code: 68
+
+0x1034:
+
+****************
+Platform: PPC-64 + QPX
+Code:0x10 0x60 0x2a 0x10 0x10 0x64 0x28 0x88 0x7c 0x4a 0x5d 0x0f 
+Disasm:
+0x1000:	qvfabs	q3, q5
+	op_count: 2
+		operands[0].type: REG = q3
+		operands[1].type: REG = q5
+
+0x1004:	qvfand	q3, q4, q5
+	op_count: 3
+		operands[0].type: REG = q3
+		operands[1].type: REG = q4
+		operands[2].type: REG = q5
+
+0x1008:	qvstfsxa	q2, r10, r11
+	op_count: 3
+		operands[0].type: REG = q2
+		operands[1].type: REG = r10
+		operands[2].type: REG = r11
+
+0x100c:
+

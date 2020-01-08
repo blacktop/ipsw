@@ -140,6 +140,7 @@ type CacheSlideInfo3 struct {
 	Version         uint32 // currently 3
 	PageSize        uint32 // currently 4096 (may also be 16384)
 	PageStartsCount uint32
+	Padding         uint32
 	AuthValueAdd    uint64
 	// PageStarts      []uint16 /* len() = page_starts_count */
 }
@@ -184,6 +185,15 @@ type CacheSlideInfo4 struct {
 // };
 type CacheSlidePointer3 uint64
 
+// SignExtend51 returns a regular pointer which needs to fit in 51-bits of value.
+// C++ RTTI uses the top bit, so we'll allow the whole top-byte
+// and the signed-extended bottom 43-bits to be fit in to 51-bits.
+func (p CacheSlidePointer3) SignExtend51() uint64 {
+	top8Bits := uint64(p & 0x007F80000000000)
+	bottom43Bits := uint64(p & 0x000007FFFFFFFFFF)
+	return (top8Bits << 13) | (((uint64)(bottom43Bits<<21) >> 21) & 0x00FFFFFFFFFFFFFF)
+}
+
 // Value returns the chained pointer's value
 func (p CacheSlidePointer3) Value() uint64 {
 	return uint64(p & 0x7FFFFFFFFFFFF)
@@ -191,12 +201,12 @@ func (p CacheSlidePointer3) Value() uint64 {
 
 // OffsetToNextPointer returns the offset to the next chained pointer
 func (p CacheSlidePointer3) OffsetToNextPointer() uint64 {
-	return uint64(p & 0x3FF8000000000000 >> 51)
+	return uint64(p >> 51 & 0x7FF)
 }
 
 // OffsetFromSharedCacheBase returns the chained pointer's offset from the base
 func (p CacheSlidePointer3) OffsetFromSharedCacheBase() uint64 {
-	return uint64(p & 0x7FFFFFFFFFFFF)
+	return uint64(p & 0xFFFFFFFF)
 }
 
 // DiversityData returns the chained pointer's diversity data
@@ -206,7 +216,7 @@ func (p CacheSlidePointer3) DiversityData() uint64 {
 
 // HasAddressDiversity returns if the chained pointer has address diversity
 func (p CacheSlidePointer3) HasAddressDiversity() bool {
-	return (p & 0x8000) != 0
+	return (p & 0x800000000000) != 0
 }
 
 // Key returns the chained pointer's key
@@ -214,20 +224,30 @@ func (p CacheSlidePointer3) Key() uint64 {
 	return uint64(p >> 49 & 0x3)
 }
 
+// KeyName returns the chained pointer's key name
+func (p CacheSlidePointer3) KeyName() string {
+	name := []string{"IA", "IB", "DA", "DB"}
+	key := uint64(p >> 49 & 0x3)
+	if key >= 4 {
+		return "ERROR"
+	}
+	return name[key]
+}
+
 // Authenticated returns if the chained pointer is authenticated
 func (p CacheSlidePointer3) Authenticated() bool {
-	return (p & 0x1) != 0
+	return (p & 0x8000000000000000) != 0
 }
 
 func (p CacheSlidePointer3) String() string {
 	var pStr string
 	if p.Authenticated() {
-		pStr = fmt.Sprintf("value: %x, offset: %x, has_diversity: %t, diversity: %x, key: %x, auth: %t",
+		pStr = fmt.Sprintf("value: %x, offset: %x, has_diversity: %t, diversity: %x, key: %s, auth: %t",
 			p.Value(),
 			p.OffsetToNextPointer(),
 			p.HasAddressDiversity(),
 			p.DiversityData(),
-			p.Key(),
+			p.KeyName(),
 			p.Authenticated(),
 		)
 	} else {
