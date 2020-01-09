@@ -246,12 +246,19 @@ func (p CacheSlidePointer3) Authenticated() bool {
 
 func (p CacheSlidePointer3) String() string {
 	var pStr string
-	if p.Authenticated() {
-		pStr = fmt.Sprintf("value: %x, offset: %x, has_diversity: %t, diversity: %x, key: %s, auth: %t",
+	if p.Authenticated() && p.HasAddressDiversity() {
+		pStr = fmt.Sprintf("value: %x, next: %x, has_diversity: %t, diversity: %x, key: %s, auth: %t",
 			p.Value(),
 			p.OffsetToNextPointer(),
 			p.HasAddressDiversity(),
 			p.DiversityData(),
+			p.KeyName(),
+			p.Authenticated(),
+		)
+	} else if p.Authenticated() && !p.HasAddressDiversity() {
+		pStr = fmt.Sprintf("value: %x, next: %x, key: %s, auth: %t",
+			p.Value(),
+			p.OffsetToNextPointer(),
 			p.KeyName(),
 			p.Authenticated(),
 		)

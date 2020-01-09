@@ -482,11 +482,10 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 			for {
 				rebaseLocation += delta
 
-				sr.Seek(int64(rebaseLocation), os.SEEK_SET)
+				sr.Seek(int64(pageOffset+delta), os.SEEK_SET)
 				if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
 					return err
 				}
-				fmt.Println(pointer)
 
 				if pointer.Authenticated() {
 					// fmt.Printf("OffsetFromSharedCacheBase: 0x%x\n", pointer.OffsetFromSharedCacheBase())
@@ -504,12 +503,12 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 					symName = sym.Name
 				}
 
-				fmt.Printf("    [% 5d + 0x%04X] @ 0x%x => 0x%x, %s\n", i, (uint64)(rebaseLocation-pageOffset), (uint64)(pageAddress+rebaseLocation), targetValue, symName)
+				fmt.Printf("    [% 5d + 0x%04X] 0x%x @ offset: %x => 0x%x, %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), (uint64)(pageAddress+delta), (uint64)(pageOffset+delta), targetValue, pointer, symName)
 
-				if delta == 0 {
+				if pointer.OffsetToNextPointer() == 0 {
 					break
 				}
-				delta = pointer.OffsetToNextPointer() * 8
+				delta += pointer.OffsetToNextPointer() * 8
 			}
 		}
 	case 4:
