@@ -263,7 +263,8 @@
       "args": [
         "-V",
         "macho",
-        "${workspaceRoot}/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore"
+        "/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore"
+        // "${workspaceRoot}/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore"
         // "/bin/cat"
       ],
       "showLog": false

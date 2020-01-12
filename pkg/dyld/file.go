@@ -210,13 +210,13 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			if err := binary.Read(sr, f.ByteOrder, &bottomUpList); err != nil {
 				return nil, err
 			}
-			// Read dyld 16-bit array of dependencies .
+			// Read dyld 16-bit array of dependencies.
 			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), os.SEEK_SET)
 			depList := make([]uint16, f.AcceleratorInfo.DepListCount)
 			if err := binary.Read(sr, f.ByteOrder, &depList); err != nil {
 				return nil, err
 			}
-			// Read dyld 16-bit array of re-exports
+			// Read dyld 16-bit array of re-exports.
 			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), os.SEEK_SET)
 			reExportList := make([]uint16, f.AcceleratorInfo.ReExportCount)
 			if err := binary.Read(sr, f.ByteOrder, &reExportList); err != nil {
@@ -455,15 +455,15 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 		}
 		f.SlideInfo = slideInfo
 
-		fmt.Printf("page_size         =%d\n", slideInfo.PageSize)
-		fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
-		fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
+		// fmt.Printf("page_size         =%d\n", slideInfo.PageSize)
+		// fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
+		// fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
 
 		PageStarts := make([]uint16, slideInfo.PageStartsCount)
 		if err := binary.Read(sr, binary.LittleEndian, &PageStarts); err != nil {
 			return err
 		}
-
+		// if false {
 		var targetValue uint64
 		var pointer CacheSlidePointer3
 
@@ -488,7 +488,6 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 				}
 
 				if pointer.Authenticated() {
-					// fmt.Printf("OffsetFromSharedCacheBase: 0x%x\n", pointer.OffsetFromSharedCacheBase())
 					// targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
 					targetValue = slideInfo.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
 				} else {
@@ -511,6 +510,7 @@ func (f *File) parseSlideInfo(r io.ReaderAt) error {
 				delta += pointer.OffsetToNextPointer() * 8
 			}
 		}
+		// }
 	case 4:
 		slideInfo := CacheSlideInfo4{}
 		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
