@@ -534,6 +534,84 @@ func (f *File) Image(name string) *CacheImage {
 	return nil
 }
 
+func (f *File) HasImagePath(path string) (int, bool, error) {
+	var imageIndex uint64
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= f.AccelerateInfoAddr && f.AccelerateInfoAddr < mapping.Address+mapping.Size {
+			accelInfoPtr := int64(f.AccelerateInfoAddr - mapping.Address + mapping.FileOffset)
+			// Read dyld trie containing all dylib paths.
+			f.sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), os.SEEK_SET)
+			dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
+			if err := binary.Read(f.sr, f.ByteOrder, &dylibTrie); err != nil {
+				return 0, false, err
+			}
+			imageNode, err := Walk(dylibTrie, path)
+			if err != nil {
+				return 0, false, err
+			}
+			imageIndex, _, err = readUleb128(bytes.NewBuffer(dylibTrie[imageNode:]))
+			if err != nil {
+				return 0, false, err
+			}
+		}
+	}
+	return int(imageIndex), true, nil
+}
+
+func (f *File) FindDlopenOtherImage(path string) error {
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= f.OtherTrieAddr && f.OtherTrieAddr < mapping.Address+mapping.Size {
+			otherTriePtr := int64(f.OtherTrieAddr - mapping.Address + mapping.FileOffset)
+			// Read dyld trie containing TODO
+			f.sr.Seek(otherTriePtr, os.SEEK_SET)
+			otherTrie := make([]byte, f.OtherTrieSize)
+			if err := binary.Read(f.sr, f.ByteOrder, &otherTrie); err != nil {
+				return err
+			}
+			imageNode, err := Walk(otherTrie, path)
+			if err != nil {
+				return err
+			}
+			imageNum, _, err := readUleb128(bytes.NewBuffer(otherTrie[imageNode:]))
+			if err != nil {
+				return err
+			}
+			fmt.Println("imageNum:", imageNum)
+			arrayAddrOffset := f.OtherImageArrayAddr - f.Mappings[0].Address
+			fmt.Println("otherImageArray:", arrayAddrOffset)
+		}
+	}
+	return nil
+}
+
+func (f *File) FindClosure(executablePath string) error {
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= f.ProgClosuresTrieAddr && f.ProgClosuresTrieAddr < mapping.Address+mapping.Size {
+			progClosuresTriePtr := int64(f.ProgClosuresTrieAddr - mapping.Address + mapping.FileOffset)
+			// Read dyld trie containing TODO
+			f.sr.Seek(progClosuresTriePtr, os.SEEK_SET)
+			progClosuresTrie := make([]byte, f.ProgClosuresTrieSize)
+			if err := binary.Read(f.sr, f.ByteOrder, &progClosuresTrie); err != nil {
+				return err
+			}
+			imageNode, err := Walk(progClosuresTrie, executablePath)
+			if err != nil {
+				return err
+			}
+			closureOffset, _, err := readUleb128(bytes.NewBuffer(progClosuresTrie[imageNode:]))
+			if err != nil {
+				return err
+			}
+			if closureOffset < f.CacheHeader.ProgClosuresSize {
+				closurePtr := f.CacheHeader.ProgClosuresAddr + closureOffset
+				fmt.Println("closurePtr:", closurePtr)
+			}
+		}
+	}
+
+	return nil
+}
+
 // GetLocalSymAtAddress returns the local symbol at a given address
 func (f *File) GetLocalSymAtAddress(addr uint64) *CacheLocalSymbol64 {
 	for _, image := range f.Images {
@@ -655,7 +733,7 @@ func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*Cache
 	}
 
 	image := f.Image(imagePath)
-
+	// TODO: dry this up
 	for _, mapping := range f.Mappings {
 		start := image.CacheImageInfoExtra.ExportsTrieAddr
 		end := image.CacheImageInfoExtra.ExportsTrieAddr + uint64(image.CacheImageInfoExtra.ExportsTrieSize)
