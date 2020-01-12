@@ -142,6 +142,9 @@ func Walk(data []byte, symbol string) (int, error) {
 					return -1, fmt.Errorf("malformed trie child, nodeOffset=0x%lx out of range", nodeOffset)
 				}
 
+				if strIndex == searchStrIndex {
+					return -1, fmt.Errorf("symbol not in trie")
+				}
 				strIndex = searchStrIndex
 				log.Debugf("trieWalk: found matching edge advancing to node 0x%x", nodeOffset)
 				break
@@ -156,5 +159,5 @@ func Walk(data []byte, symbol string) (int, error) {
 
 	}
 
-	return offset, nil
+	return offset, fmt.Errorf("symbol not in trie")
 }

@@ -38,7 +38,7 @@ func init() {
 var symaddrCmd = &cobra.Command{
 	Use:   "symaddr",
 	Short: "Find exported symbol",
-	Args:  cobra.MinimumNArgs(3),
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -55,13 +55,26 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		sym, err := f.GetExportedSymbolAddress(args[1], args[2])
-		if err != nil {
-			return err
+		sym, err := f.GetExportedSymbolAddress(args[1])
+		// if err != nil {
+		// 	return err
+		// }
+		if sym != nil {
+			fmt.Println(sym)
+		} else {
+			log.Warn("symbol not found in exports (fast)")
+			log.Info("searching private symbols (slow)...")
+			err = f.ParseLocalSyms()
+			if err != nil {
+				return err
+			}
+
+			lSym := f.GetLocalSymbol(args[1])
+			if lSym != nil {
+				fmt.Println(lSym)
+			}
+			return fmt.Errorf("symbol not found in private symbols")
 		}
-
-		fmt.Println(sym)
-
 		return nil
 	},
 }
