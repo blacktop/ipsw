@@ -69,7 +69,7 @@ var dyldListCmd = &cobra.Command{
 		// 	fmt.Printf("%4d:\t0x%0X\t%s\n", idx+1, img.Info.Address, img.Name)
 		// }
 
-		image := f.Image("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
+		image := f.Image("/System/Library/Frameworks/WebKit.framework/WebKit")
 		fmt.Println(image.Info.String())
 		fmt.Println(image.UUID)
 		fmt.Println("DylibOffset:", image.DylibOffset)
