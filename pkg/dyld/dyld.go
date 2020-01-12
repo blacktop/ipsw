@@ -2,6 +2,7 @@ package dyld
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/blacktop/ipsw/pkg/macho/types"
 )
@@ -362,4 +363,72 @@ type CacheImageTextInfo struct {
 	LoadAddress     uint64 // unslid address of start of __TEXT
 	TextSegmentSize uint32
 	PathOffset      uint32 // offset from start of cache file
+}
+
+type CacheExportFlag int
+
+const (
+	exportSymbolFlagsKindMask        CacheExportFlag = 0x03
+	exportSymbolFlagsKindRegular     CacheExportFlag = 0x00
+	exportSymbolFlagsKindThreadLocal CacheExportFlag = 0x01
+	exportSymbolFlagsKindAbsolute    CacheExportFlag = 0x02
+	exportSymbolFlagsWeakDefinition  CacheExportFlag = 0x04
+	exportSymbolFlagsReexport        CacheExportFlag = 0x08
+	exportSymbolFlagsStubAndResolver CacheExportFlag = 0x10
+)
+
+func (f CacheExportFlag) Regular() bool {
+	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsKindRegular
+}
+func (f CacheExportFlag) ThreadLocal() bool {
+	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsKindThreadLocal
+}
+func (f CacheExportFlag) Absolute() bool {
+	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsKindAbsolute
+}
+func (f CacheExportFlag) WeakDefinition() bool {
+	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsWeakDefinition
+}
+func (f CacheExportFlag) ReExport() bool {
+	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsReexport
+}
+func (f CacheExportFlag) StubAndResolver() bool {
+	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsStubAndResolver
+}
+func (f CacheExportFlag) String() string {
+	var fStr string
+	if f.Regular() {
+		fStr += "Kind: Regular "
+		if f.StubAndResolver() {
+			fStr += "(Has Resolver Function)"
+		} else if f.WeakDefinition() {
+			fStr += "(Weak Definition)"
+		}
+	} else if f.ThreadLocal() {
+		fStr += "Kind: Thread Local"
+	} else if f.Absolute() {
+		fStr += "Kind: Absolute"
+	}
+	return strings.TrimSpace(fStr)
+}
+
+type CacheExportedSymbol struct {
+	IsHeaderOffset     bool
+	IsAbsolute         bool
+	HasResolverOffset  bool
+	IsThreadLocal      bool
+	IsWeakDef          bool
+	Flags              CacheExportFlag
+	FoundInDylib       string
+	Value              uint64
+	Address            uint64
+	ResolverFuncOffset uint32
+	Name               string
+}
+
+func (es CacheExportedSymbol) String() string {
+	if es.Flags.Regular() {
+		return fmt.Sprintf("0x%8x: %s [%s]", es.Address, es.Name, es.Flags)
+	}
+	return fmt.Sprintf("0x%8x: %s [%s]", es.Value, es.Name, es.Flags)
 }
