@@ -141,7 +141,7 @@ func Walk(data []byte, symbol string) (int, error) {
 				if (nodeOffset == 0) || (len(data) < int(nodeOffset)) {
 					return -1, fmt.Errorf("malformed trie child, nodeOffset=0x%lx out of range", nodeOffset)
 				}
-
+				// TODO: find out why we need this (we shouldn't)
 				if strIndex == searchStrIndex {
 					return -1, fmt.Errorf("symbol not in trie")
 				}
