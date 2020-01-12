@@ -291,7 +291,12 @@ type CacheLocalSymbol struct {
 
 type CacheLocalSymbol64 struct {
 	nlist64
-	Name string
+	Name         string
+	FoundInDylib string
+}
+
+func (ls CacheLocalSymbol64) String() string {
+	return fmt.Sprintf("0x%8x: %s, %s", ls.Value, ls.Name, ls.FoundInDylib)
 }
 
 // This is the symbol table entry structure for 32-bit architectures.
@@ -428,7 +433,7 @@ type CacheExportedSymbol struct {
 
 func (es CacheExportedSymbol) String() string {
 	if es.Flags.Regular() {
-		return fmt.Sprintf("0x%8x: %s [%s]", es.Address, es.Name, es.Flags)
+		return fmt.Sprintf("0x%8x: %s [%s], %s", es.Address, es.Name, es.Flags, es.FoundInDylib)
 	}
 	return fmt.Sprintf("0x%8x: %s [%s]", es.Value, es.Name, es.Flags)
 }
