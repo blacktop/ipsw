@@ -34,7 +34,6 @@ func readUleb128(buf *bytes.Buffer) (uint64, int, error) {
 		if err != nil {
 			return 0, 0, errors.Wrap(err, "could not parse ULEB128 value")
 		}
-
 		length++
 
 		result |= uint64((uint(b) & 0x7f) << shift)
@@ -81,7 +80,6 @@ func Walk(data []byte, symbol string) (int, error) {
 		}
 
 		if int(strIndex) >= len(symbol) && (terminalSize != 0) {
-			log.Infof("trieWalk: returning %d\n", data[offset])
 			return offset, nil
 		}
 
@@ -149,6 +147,7 @@ func Walk(data []byte, symbol string) (int, error) {
 				break
 			}
 		}
+
 		if nodeOffset != 0 {
 			offset = int(nodeOffset)
 		} else {

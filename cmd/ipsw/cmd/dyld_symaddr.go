@@ -1,5 +1,5 @@
 /*
-Copyright © 2019 blacktop
+Copyright © 2020 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -31,16 +31,14 @@ import (
 )
 
 func init() {
-	dyldCmd.AddCommand(dyldListCmd)
-
-	dyldListCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	dyldCmd.AddCommand(symaddrCmd)
 }
 
-// dyldListCmd represents the list command
-var dyldListCmd = &cobra.Command{
-	Use:   "list <dyld_shared_cache>",
-	Short: "List all dylibs in dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
+// symaddrCmd represents the symaddr command
+var symaddrCmd = &cobra.Command{
+	Use:   "symaddr",
+	Short: "Find exported symbol",
+	Args:  cobra.MinimumNArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -51,33 +49,18 @@ var dyldListCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		// TODO: check for
-		// if ( dylibInfo->isAlias )
-		//   	printf("[alias] %s\n", dylibInfo->path);
-
 		f, err := dyld.Open(args[0])
 		if err != nil {
 			return err
 		}
 		defer f.Close()
 
-		f.CacheHeader.Print()
-		f.LocalSymInfo.Print()
-		f.Mappings.Print()
+		sym, err := f.GetExportedSymbolAddress(args[1], args[2])
+		if err != nil {
+			return err
+		}
 
-		// for idx, img := range f.Images {
-		// 	fmt.Printf("%4d:\t0x%0X\t%s\n", idx+1, img.Info.Address, img.Name)
-		// }
-
-		image := f.Image("/System/Library/Frameworks/WebKit.framework/WebKit")
-		fmt.Println(image.Info.String())
-		fmt.Println(image.UUID)
-		fmt.Println("DylibOffset:", image.DylibOffset)
-		fmt.Println("Calc DylibOffset:", image.Info.Address-f.Mappings[0].Address)
-
-		// for _, sym := range image.LocalSymbols {
-		// 	fmt.Printf("0x%0X:\t%s\n", sym.Value, sym.Name)
-		// }
+		fmt.Println(sym)
 
 		return nil
 	},
