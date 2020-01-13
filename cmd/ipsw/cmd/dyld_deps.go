@@ -48,11 +48,7 @@ var depsCmd = &cobra.Command{
 		}
 
 		// TODO: FINISH THIS
-
-		// err := dyld.Parse(args[0], Verbose)
-		// if err != nil {
-		// 	return err
-		// }
+		fmt.Println("[place holder] this command has not been implimented yet")
 
 		return nil
 	},

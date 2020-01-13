@@ -62,22 +62,16 @@ var dyldListCmd = &cobra.Command{
 		defer f.Close()
 
 		f.CacheHeader.Print()
-		f.LocalSymInfo.Print()
+		// f.LocalSymInfo.Print()
+		fmt.Println()
 		f.Mappings.Print()
+		fmt.Println()
+		fmt.Println("Images")
+		fmt.Println("======")
 
-		// for idx, img := range f.Images {
-		// 	fmt.Printf("%4d:\t0x%0X\t%s\n", idx+1, img.Info.Address, img.Name)
-		// }
-
-		image := f.Image("/System/Library/Frameworks/WebKit.framework/WebKit")
-		fmt.Println(image.Info.String())
-		fmt.Println(image.UUID)
-		fmt.Println("DylibOffset:", image.DylibOffset)
-		fmt.Println("Calc DylibOffset:", image.Info.Address-f.Mappings[0].Address)
-
-		// for _, sym := range image.LocalSymbols {
-		// 	fmt.Printf("0x%0X:\t%s\n", sym.Value, sym.Name)
-		// }
+		for idx, img := range f.Images {
+			fmt.Printf("%4d:\t0x%0X\t%s\n", idx+1, img.Info.Address, img.Name)
+		}
 
 		return nil
 	},

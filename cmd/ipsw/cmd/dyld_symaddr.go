@@ -30,8 +30,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var imageName string
+
 func init() {
 	dyldCmd.AddCommand(symaddrCmd)
+
+	symaddrCmd.Flags().StringVarP(&imageName, "image", "i", "", "dylib image to search")
+	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // symaddrCmd represents the symaddr command
@@ -55,6 +60,45 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if len(imageName) > 0 {
+			sym, err := f.GetExportedSymbolAddressInImage(imageName, args[1])
+			// if err != nil {
+			// 	return err
+			// }
+			if sym != nil {
+				fmt.Println(sym)
+			} else {
+				err = f.GetLocalSymbolsForImage(imageName)
+				if err != nil {
+					return err
+				}
+				lSym := f.GetLocalSymbolInImage(imageName, args[1])
+				if lSym != nil {
+					fmt.Println(lSym)
+					return nil
+				}
+				return fmt.Errorf("symbol not found")
+			}
+		}
+
+		if false {
+			index, found, err := f.HasImagePath("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
+			if err != nil {
+				return err
+			}
+			if found {
+				fmt.Println("index:", index, "image:", f.Images[index].Name)
+			}
+			// err = f.FindClosure("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
+			// if err != nil {
+			// 	return err
+			// }
+			err = f.FindDlopenOtherImage("/Applications/FindMy.app/Frameworks/FMSiriIntents.framework/FMSiriIntents")
+			if err != nil {
+				return err
+			}
+		}
+
 		sym, err := f.GetExportedSymbolAddress(args[1])
 		// if err != nil {
 		// 	return err
@@ -70,10 +114,10 @@ var symaddrCmd = &cobra.Command{
 			}
 
 			lSym := f.GetLocalSymbol(args[1])
-			if lSym != nil {
-				fmt.Println(lSym)
+			if lSym == nil {
+				return fmt.Errorf("symbol not found in private symbols")
 			}
-			return fmt.Errorf("symbol not found in private symbols")
+			fmt.Println(lSym)
 		}
 		return nil
 	},
