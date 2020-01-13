@@ -279,7 +279,7 @@ type CacheLocalSymbolsInfo struct {
 }
 
 type CacheLocalSymbolsEntry struct {
-	DylibOffset     uint32 // offset in cache file of start of dylib
+	DylibOffset     uint64 // offset in cache file of start of dylib
 	NlistStartIndex uint32 // start index of locals for this dylib
 	NlistCount      uint32 // number of local symbols for this dylib
 }
@@ -296,7 +296,10 @@ type CacheLocalSymbol64 struct {
 }
 
 func (ls CacheLocalSymbol64) String() string {
-	return fmt.Sprintf("0x%8x: %s, %s", ls.Value, ls.Name, ls.FoundInDylib)
+	if len(ls.FoundInDylib) > 0 {
+		return fmt.Sprintf("0x%8x: %s, %s", ls.Value, ls.Name, ls.FoundInDylib)
+	}
+	return fmt.Sprintf("0x%8x: %s", ls.Value, ls.Name)
 }
 
 // This is the symbol table entry structure for 32-bit architectures.

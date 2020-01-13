@@ -4,17 +4,22 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"os"
 
 	"github.com/apex/log"
 	"github.com/pkg/errors"
 )
 
-type TrieEntry struct {
-	Name       uint64 // const char*
-	Address    uint64
-	Flags      uint64
-	Other      uint64
-	ImportName uint64 // const char*
+type trieEntry struct {
+	Offset uint64
+	Name   string
+}
+
+type trieEntrys struct {
+	Entries           []trieEntry
+	edgeStrings       [][]byte
+	cummulativeString []byte
+	r                 *bytes.Reader
 }
 
 func readUleb128(buf *bytes.Buffer) (uint64, int, error) {
@@ -49,8 +54,41 @@ func readUleb128(buf *bytes.Buffer) (uint64, int, error) {
 	return result, length, nil
 }
 
-// Walk walks a trie searching for a string
-func Walk(data []byte, symbol string) (int, error) {
+func readSleb128(buf *bytes.Buffer) (int64, int, error) {
+
+	var (
+		b      byte
+		err    error
+		result int64
+		shift  uint64
+		length int
+	)
+
+	if buf.Len() == 0 {
+		return 0, 0, nil
+	}
+
+	for {
+		b, err = buf.ReadByte()
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "could not parse SLEB128 value")
+		}
+		length++
+
+		result |= int64((int64(b) & 0x7f) << shift)
+		shift += 7
+		if b&0x80 == 0 {
+			break
+		}
+	}
+
+	if (shift < 8*uint64(length)) && (b&0x40 > 0) {
+		result |= -(1 << shift)
+	}
+	return result, length, nil
+}
+
+func walkTrie(data []byte, symbol string) (int, error) {
 
 	var offset int
 	var strIndex uint8
@@ -160,4 +198,98 @@ func Walk(data []byte, symbol string) (int, error) {
 	}
 
 	return offset, fmt.Errorf("symbol not in trie")
+}
+
+func parseTrie(trieData []byte) []trieEntry {
+
+	var entries trieEntrys
+
+	entries.r = bytes.NewReader(trieData)
+
+	entries.parseTrieNode()
+
+	return entries.Entries
+}
+
+func (t *trieEntrys) parseTrieNode() error {
+
+	// if int64(t.r.Len()) >= t.r.Size() {
+	// 	return nil
+	// }
+
+	currPos, _ := t.r.Seek(0, os.SEEK_CUR)
+	terminalSize, err := t.readUleb128()
+	if err != nil {
+		return err
+	}
+	// rewind
+	t.r.Seek(currPos, os.SEEK_SET)
+	// read children
+	_, _ = t.r.ReadByte()
+	t.r.UnreadByte()
+
+	if terminalSize != 0 {
+		off, err := t.readUleb128()
+		if err != nil {
+			return err
+		}
+		for _, es := range t.edgeStrings {
+			t.cummulativeString = append(t.cummulativeString, es...)
+		}
+		t.Entries = append(t.Entries, trieEntry{
+			Name:   string(t.cummulativeString),
+			Offset: off,
+		})
+		// pop last edge
+		// _, t.edgeStrings = t.edgeStrings[len(t.edgeStrings)-1], t.edgeStrings[:len(t.edgeStrings)-1]
+		fmt.Println(t.Entries)
+	}
+
+	t.r.Seek(int64(terminalSize+1), os.SEEK_CUR)
+
+	childrenRemaining, _ := t.r.ReadByte()
+
+	for i := 0; i < int(childrenRemaining); i++ {
+		var edgeString []byte
+		s, _ := t.r.ReadByte()
+		for s != '\x00' {
+			edgeString = append(edgeString, s)
+			s, _ = t.r.ReadByte()
+		}
+		// edgeString = append(edgeString, s)
+		t.edgeStrings = append(t.edgeStrings, edgeString)
+
+		childNodeOffset, err := t.readUleb128()
+		if err != nil {
+			return err
+		}
+		t.r.Seek(int64(childNodeOffset), os.SEEK_CUR)
+
+		t.parseTrieNode()
+	}
+
+	return nil
+}
+
+func (t *trieEntrys) readUleb128() (uint64, error) {
+	var result uint64
+	var shift uint64
+
+	for {
+		b, err := t.r.ReadByte()
+		if err != nil {
+			return 0, errors.Wrap(err, "could not parse ULEB128 value")
+		}
+
+		result |= uint64((uint(b) & 0x7f) << shift)
+
+		// If high order bit is 1.
+		if (b & 0x80) == 0 {
+			break
+		}
+
+		shift += 7
+	}
+
+	return result, nil
 }

@@ -245,7 +245,15 @@ $ docker run --init -it --rm \
              blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
 ```
 
-### `webkit`
+### `kernel kexts`
+
+List all the kernelcache's KEXTs
+
+```bash
+$ ipsw kernel kexts kernelcache.release.iphone12.decompressed
+```
+
+### `dyld webkit`
 
 Extract WebKit version from `dyld_shared_cache`
 
@@ -254,7 +262,7 @@ $ ipsw dyld webkit dyld_shared_cache
    • WebKit Version: 607.2.6.0.1
 ```
 
-### `list`
+### `dyld list`
 
 Similar to `otool -L dyld_shared_cache`
 
@@ -299,7 +307,23 @@ Images
 <SNIP>
 ```
 
-### `split` _(only on macOS)_ 🆕
+### `dyld symaddr`
+
+Find symbol (unslid) addresses in shared cache
+
+```bash
+$ ipsw dyld symaddr dyld_shared_cache <SYMBOL_NAME>
+```
+
+Speed it up by supplying the dylib name
+
+```bash
+$ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
+```
+
+> **NOTE:** you don't have to supply the full image path
+
+### `dyld split` _(only on macOS)_ 🆕
 
 Split up a `dyld_shared_cache`
 
@@ -367,6 +391,36 @@ $ ipsw device-tree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17
       • Product Name: iPod touch
       • Model: iPod9,1
       • BoardConfig: N112AP
+```
+
+### `macho` [WIP] :construction:
+
+Similar to `otool -h -l`
+
+```bash
+$ ipsw macho JavaScriptCore
+
+HEADER
+======
+Magic         = 64-bit MachO
+Type          = Dylib
+CPU           = AARCH64, ARM64e (ARMv8.3)
+Commands      = 22 (Size: 3800)
+Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
+
+SECTIONS
+========
+Mem: 0x18f5a1470-0x1902aa548   __TEXT.__text                                             PureInstructions|SomeInstructions
+Mem: 0x1902aa548-0x1902ac478   __TEXT.__auth_stubs             (SymbolStubs)             PureInstructions|SomeInstructions
+Mem: 0x1902ac480-0x19030e080   __TEXT.__const
+Mem: 0x19030e080-0x19039782a   __TEXT.__cstring                (Cstring Literals)
+Mem: 0x19039782a-0x190397d95   __TEXT.__oslogstring            (Cstring Literals)
+Mem: 0x190397d98-0x190399c04   __TEXT.__gcc_except_tab
+Mem: 0x190399c04-0x19039ab18   __TEXT.__unwind_info
+Mem: 0x19039b000-0x19039b000   __TEXT.__objc_classname         (Cstring Literals)
+Mem: 0x19039b000-0x19039b000   __TEXT.__objc_methname          (Cstring Literals)
+Mem: 0x19039b000-0x19039b000   __TEXT.__objc_methtype          (Cstring Literals)
+<SNIP>
 ```
 
 ### `dis` [WIP] :construction:

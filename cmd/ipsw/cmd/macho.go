@@ -117,53 +117,53 @@ var machoCmd = &cobra.Command{
 			w.Flush()
 		}
 
-		fmt.Println("LOADS:", m.FileHeader.Ncmd)
-		fmt.Println("=====")
-		for idx, l := range m.Loads {
-			rf := reflect.TypeOf(l)
-			if rf != nil {
-				if rf.Elem().Kind() != reflect.Struct {
-					log.Error("did not get expected type of struct")
-					examiner(rf, 0)
-				}
-				load := rf.Elem()
-				fmt.Println(idx+1, ")", load.Name())
-				switch load.Name() {
-				case "Dylib":
-					examiner(load, 1)
-				case "DylibID":
-					examiner(load, 1)
-				case "WeakDylib":
-					// examiner(load, 1)
-					// lVal := reflect.ValueOf(load)
-					for i := 0; i < load.NumField(); i++ {
-						f := load.Field(i)
-						if strings.EqualFold(f.Name, "Name") {
-							// fVal := reflect.ValueOf(&f)
-							fmt.Printf("%+v", load)
-						}
-					}
-					// val := reflect.ValueOf(load).Elem()
+		// fmt.Println("LOADS:", m.FileHeader.Ncmd)
+		// fmt.Println("=====")
+		// for idx, l := range m.Loads {
+		// 	rf := reflect.TypeOf(l)
+		// 	if rf != nil {
+		// 		if rf.Elem().Kind() != reflect.Struct {
+		// 			log.Error("did not get expected type of struct")
+		// 			examiner(rf, 0)
+		// 		}
+		// 		load := rf.Elem()
+		// 		fmt.Println(idx+1, ")", load.Name())
+		// 		switch load.Name() {
+		// 		case "Dylib":
+		// 			examiner(load, 1)
+		// 		case "DylibID":
+		// 			examiner(load, 1)
+		// 		case "WeakDylib":
+		// 			// examiner(load, 1)
+		// 			// lVal := reflect.ValueOf(load)
+		// 			for i := 0; i < load.NumField(); i++ {
+		// 				f := load.Field(i)
+		// 				if strings.EqualFold(f.Name, "Name") {
+		// 					// fVal := reflect.ValueOf(&f)
+		// 					fmt.Printf("%+v", load)
+		// 				}
+		// 			}
+		// 			// val := reflect.ValueOf(load).Elem()
 
-					// for i := 0; i < val.NumField(); i++ {
-					// 	valueField := val.Field(i)
-					// 	typeField := val.Type().Field(i)
-					// 	tag := typeField.Tag
+		// 			// for i := 0; i < val.NumField(); i++ {
+		// 			// 	valueField := val.Field(i)
+		// 			// 	typeField := val.Type().Field(i)
+		// 			// 	tag := typeField.Tag
 
-					// 	fmt.Printf("Field Name: %s,\t Field Value: %v,\t Tag Value: %s\n", typeField.Name, valueField.Interface(), tag.Get("tag_name"))
-					// }
-					// var dd macho.Dyl
-					// d := reflect.TypeOf(macho.DylibID)
-					// dd := load.(macho.DylibID)
-				}
-				// if strings.Contains(rf.Elem().Name(), "Dylib") {
-				// 	for i := 0; i < rf.Elem().NumField(); i++ {
-				// 		f := rf.Elem().Field(i)
-				// 		fmt.Println(f.Name)
-				// 	}
-				// }
-			}
-		}
+		// 			// 	fmt.Printf("Field Name: %s,\t Field Value: %v,\t Tag Value: %s\n", typeField.Name, valueField.Interface(), tag.Get("tag_name"))
+		// 			// }
+		// 			// var dd macho.Dyl
+		// 			// d := reflect.TypeOf(macho.DylibID)
+		// 			// dd := load.(macho.DylibID)
+		// 		}
+		// 		// if strings.Contains(rf.Elem().Name(), "Dylib") {
+		// 		// 	for i := 0; i < rf.Elem().NumField(); i++ {
+		// 		// 		f := rf.Elem().Field(i)
+		// 		// 		fmt.Println(f.Name)
+		// 		// 	}
+		// 		// }
+		// 	}
+		// }
 
 		return nil
 	},

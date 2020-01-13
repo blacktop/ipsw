@@ -160,6 +160,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		if name, err := r.ReadString(byte(0)); err == nil {
 			f.Images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
 		}
+		f.Images[idx].DylibOffset = image.Info.Address - f.Mappings[0].Address
 	}
 
 	// Read dyld code signature.
@@ -527,7 +528,7 @@ func (f *File) parseSlideInfo() error {
 // Image returns the first Image with the given name, or nil if no such image exists.
 func (f *File) Image(name string) *CacheImage {
 	for _, i := range f.Images {
-		if i.Name == name {
+		if strings.Contains(i.Name, name) {
 			return i
 		}
 	}
@@ -545,7 +546,7 @@ func (f *File) HasImagePath(path string) (int, bool, error) {
 			if err := binary.Read(f.sr, f.ByteOrder, &dylibTrie); err != nil {
 				return 0, false, err
 			}
-			imageNode, err := Walk(dylibTrie, path)
+			imageNode, err := walkTrie(dylibTrie, path)
 			if err != nil {
 				return 0, false, err
 			}
@@ -568,7 +569,7 @@ func (f *File) FindDlopenOtherImage(path string) error {
 			if err := binary.Read(f.sr, f.ByteOrder, &otherTrie); err != nil {
 				return err
 			}
-			imageNode, err := Walk(otherTrie, path)
+			imageNode, err := walkTrie(otherTrie, path)
 			if err != nil {
 				return err
 			}
@@ -594,7 +595,7 @@ func (f *File) FindClosure(executablePath string) error {
 			if err := binary.Read(f.sr, f.ByteOrder, &progClosuresTrie); err != nil {
 				return err
 			}
-			imageNode, err := Walk(progClosuresTrie, executablePath)
+			imageNode, err := walkTrie(progClosuresTrie, executablePath)
 			if err != nil {
 				return err
 			}
@@ -607,6 +608,72 @@ func (f *File) FindClosure(executablePath string) error {
 				fmt.Println("closurePtr:", closurePtr)
 			}
 		}
+	}
+
+	return nil
+}
+
+func (f *File) GetLocalSymbolsForImage(imagePath string) error {
+
+	if f.LocalSymbolsOffset == 0 {
+		return fmt.Errorf("dyld shared cache does not contain local symbols info")
+	}
+
+	image := f.Image(imagePath)
+	if image == nil {
+		return fmt.Errorf("image not found: %s", imagePath)
+	}
+
+	f.sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
+
+	if err := binary.Read(f.sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
+		return err
+	}
+
+	if f.Is64bit() {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
+	} else {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
+	}
+	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
+	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
+
+	f.sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+
+	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
+		if err := binary.Read(f.sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
+			return err
+		}
+	}
+
+	stringPool := io.NewSectionReader(f.sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
+
+	f.sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+
+	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
+		// skip over other images
+		if uint32(idx) != image.Index {
+			f.sr.Seek(int64(int(f.Images[idx].NlistCount)*binary.Size(nlist64{})), os.SEEK_CUR)
+			continue
+		}
+		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
+
+			nlist := nlist64{}
+			if err := binary.Read(f.sr, f.ByteOrder, &nlist); err != nil {
+				return err
+			}
+
+			stringPool.Seek(int64(nlist.Strx), os.SEEK_SET)
+			s, err := bufio.NewReader(stringPool).ReadString('\x00')
+			if err != nil {
+				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Strx).Error())
+			}
+			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
+				Name:    strings.Trim(s, "\x00"),
+				nlist64: nlist,
+			})
+		}
+		return nil
 	}
 
 	return nil
@@ -637,6 +704,17 @@ func (f *File) GetLocalSymbol(symbolName string) *CacheLocalSymbol64 {
 	return nil
 }
 
+// GetLocalSymbolInImage returns the local symbol that matches name in a given image
+func (f *File) GetLocalSymbolInImage(imageName, symbolName string) *CacheLocalSymbol64 {
+	image := f.Image(imageName)
+	for _, sym := range image.LocalSymbols {
+		if sym.Name == symbolName {
+			return sym
+		}
+	}
+	return nil
+}
+
 // GetExportedSymbolAddress returns the address of an images exported symbol
 func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, error) {
 
@@ -660,7 +738,7 @@ func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, er
 					return nil, err
 				}
 
-				symbolNode, err := Walk(exportTrie, symbol)
+				symbolNode, err := walkTrie(exportTrie, symbol)
 				if err != nil {
 					// skip image
 					continue
@@ -744,7 +822,7 @@ func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*Cache
 				return nil, err
 			}
 
-			symbolNode, err := Walk(exportTrie, symbol)
+			symbolNode, err := walkTrie(exportTrie, symbol)
 			if err != nil {
 				return nil, err
 			}
