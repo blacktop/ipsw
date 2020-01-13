@@ -442,6 +442,8 @@ Mem: 0x19039b000-0x19039b000   __TEXT.__objc_methtype          (Cstring Literals
 
 Working on getting a disassembler working
 
+> **NOTE:** requires **capstone** installed from the `next` branch _(brew install capstone --HEAD)_
+
 ```bash
 $ ipsw dis --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
 ```
