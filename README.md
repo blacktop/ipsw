@@ -251,6 +251,21 @@ List all the kernelcache's KEXTs
 
 ```bash
 $ ipsw kernel kexts kernelcache.release.iphone12.decompressed
+
+FOUND: 230
+com.apple.kpi.mach (19.2.0)
+com.apple.kpi.private (19.2.0)
+com.apple.kpi.unsupported (19.2.0)
+com.apple.kpi.iokit (19.2.0)
+com.apple.kpi.libkern (19.2.0)
+com.apple.kpi.bsd (19.2.0)
+com.apple.iokit.IONetworkingFamily (3.4)
+com.apple.iokit.IOTimeSyncFamily (810.1)
+com.apple.iokit.IOPCIFamily (2.9)
+com.apple.driver.IOACIPCFamily (1)
+com.apple.iokit.IOSkywalkFamily (1)
+com.apple.driver.AppleIPAppender (1.0)
+<SNIP>
 ```
 
 ### `dyld webkit`
