@@ -32,6 +32,7 @@ import (
 
 func init() {
 	kernelcacheCmd.AddCommand(kextsCmd)
+	kextsCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
 // kextsCmd represents the kexts command
