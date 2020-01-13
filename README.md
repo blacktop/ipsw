@@ -324,7 +324,7 @@ Images
 
 ### `dyld symaddr`
 
-Find symbol (unslid) addresses in shared cache
+Find symbol _(unslid)_ addresses in shared cache
 
 ```bash
 $ ipsw dyld symaddr dyld_shared_cache <SYMBOL_NAME>
