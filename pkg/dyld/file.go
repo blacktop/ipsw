@@ -715,6 +715,31 @@ func (f *File) GetLocalSymbolInImage(imageName, symbolName string) *CacheLocalSy
 	return nil
 }
 
+func (f *File) GetAllExportedSymbols() error {
+	for _, image := range f.Images {
+		log.Infof("Scanning Image: %s", image.Name)
+		for _, mapping := range f.Mappings {
+			start := image.CacheImageInfoExtra.ExportsTrieAddr
+			end := image.CacheImageInfoExtra.ExportsTrieAddr + uint64(image.CacheImageInfoExtra.ExportsTrieSize)
+			if mapping.Address <= start && end < mapping.Address+mapping.Size {
+				f.sr.Seek(int64(image.CacheImageInfoExtra.ExportsTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
+				exportTrie := make([]byte, image.CacheImageInfoExtra.ExportsTrieSize)
+				if err := binary.Read(f.sr, f.ByteOrder, &exportTrie); err != nil {
+					return err
+				}
+				syms, err := parseTrie(exportTrie)
+				if err != nil {
+					return err
+				}
+				for _, sym := range syms {
+					fmt.Println(sym.Name)
+				}
+			}
+		}
+	}
+	return nil
+}
+
 // GetExportedSymbolAddress returns the address of an images exported symbol
 func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, error) {
 

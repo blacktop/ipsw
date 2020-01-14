@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/apex/log"
@@ -11,8 +12,9 @@ import (
 )
 
 type trieEntry struct {
-	Offset uint64
 	Name   string
+	Flags  CacheExportFlag
+	Offset uint64
 }
 
 type trieEntrys struct {
@@ -200,83 +202,108 @@ func walkTrie(data []byte, symbol string) (int, error) {
 	return offset, fmt.Errorf("symbol not in trie")
 }
 
-func parseTrie(trieData []byte) []trieEntry {
-
-	var entries trieEntrys
-
-	entries.r = bytes.NewReader(trieData)
-
-	entries.parseTrieNode()
-
-	return entries.Entries
+type trieNode struct {
+	Offset   uint64
+	SymBytes []byte
 }
 
-func (t *trieEntrys) parseTrieNode() error {
+func parseTrie(trieData []byte) ([]trieEntry, error) {
 
-	// if int64(t.r.Len()) >= t.r.Size() {
-	// 	return nil
-	// }
+	var tNode trieNode
+	var entries []trieEntry
 
-	currPos, _ := t.r.Seek(0, os.SEEK_CUR)
-	terminalSize, err := t.readUleb128()
-	if err != nil {
-		return err
-	}
-	// rewind
-	t.r.Seek(currPos, os.SEEK_SET)
-	// read children
-	_, _ = t.r.ReadByte()
-	t.r.UnreadByte()
+	nodes := []trieNode{trieNode{
+		Offset:   0,
+		SymBytes: make([]byte, 0),
+	}}
 
-	if terminalSize != 0 {
-		off, err := t.readUleb128()
+	r := bytes.NewReader(trieData)
+
+	for {
+		if len(nodes) == 0 {
+			break
+		}
+		// pop last trieNode
+		tNode, nodes = nodes[len(nodes)-1], nodes[:len(nodes)-1]
+
+		terminalSize, err := ReadUleb128(r)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		for _, es := range t.edgeStrings {
-			t.cummulativeString = append(t.cummulativeString, es...)
+
+		if terminalSize != 0 {
+			for _, node := range nodes {
+				fmt.Println(string(node.SymBytes))
+			}
+			var symFlagInt, symValueInt, symOtherInt uint64
+			// WINNER WINNER
+			symFlagInt, err := ReadUleb128(r)
+			if err != nil {
+				return nil, err
+			}
+			symValueInt, err = ReadUleb128(r)
+			if err != nil {
+				return nil, err
+			}
+			if CacheExportFlag(symFlagInt).StubAndResolver() {
+				symOtherInt, err = ReadUleb128(r)
+				if err != nil {
+					return nil, err
+				}
+				fmt.Println(symOtherInt)
+			}
+			entries = append(entries, trieEntry{
+				Name:   string(tNode.SymBytes),
+				Flags:  CacheExportFlag(symFlagInt),
+				Offset: symValueInt,
+			})
 		}
-		t.Entries = append(t.Entries, trieEntry{
-			Name:   string(t.cummulativeString),
-			Offset: off,
-		})
-		// pop last edge
-		// _, t.edgeStrings = t.edgeStrings[len(t.edgeStrings)-1], t.edgeStrings[:len(t.edgeStrings)-1]
-		fmt.Println(t.Entries)
+
+		r.Seek(int64(tNode.Offset+terminalSize), os.SEEK_CUR)
+		childrenRemaining, err := r.ReadByte()
+		if err == io.EOF {
+			break
+		}
+
+		for i := 0; i < int(childrenRemaining); i++ {
+
+			tmp := make([]byte, len(tNode.SymBytes), 32000)
+			copy(tmp, tNode.SymBytes)
+
+			s, err := r.ReadByte()
+			if err == io.EOF {
+				break
+			}
+			for s != '\x00' {
+				tmp = append(tmp, s)
+				s, err = r.ReadByte()
+				if err == io.EOF {
+					break
+				}
+			}
+
+			childNodeOffset, err := ReadUleb128(r)
+			if err != nil {
+				return nil, err
+			}
+
+			nodes = append(nodes, trieNode{
+				Offset:   childNodeOffset,
+				SymBytes: tmp,
+			})
+		}
+
 	}
 
-	t.r.Seek(int64(terminalSize+1), os.SEEK_CUR)
-
-	childrenRemaining, _ := t.r.ReadByte()
-
-	for i := 0; i < int(childrenRemaining); i++ {
-		var edgeString []byte
-		s, _ := t.r.ReadByte()
-		for s != '\x00' {
-			edgeString = append(edgeString, s)
-			s, _ = t.r.ReadByte()
-		}
-		// edgeString = append(edgeString, s)
-		t.edgeStrings = append(t.edgeStrings, edgeString)
-
-		childNodeOffset, err := t.readUleb128()
-		if err != nil {
-			return err
-		}
-		t.r.Seek(int64(childNodeOffset), os.SEEK_CUR)
-
-		t.parseTrieNode()
-	}
-
-	return nil
+	return entries, nil
 }
 
-func (t *trieEntrys) readUleb128() (uint64, error) {
+func ReadUleb128(r *bytes.Reader) (uint64, error) {
 	var result uint64
 	var shift uint64
 
 	for {
-		b, err := t.r.ReadByte()
+		b, err := r.ReadByte()
 		if err != nil {
 			return 0, errors.Wrap(err, "could not parse ULEB128 value")
 		}
