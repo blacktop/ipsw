@@ -341,7 +341,8 @@
         "dyld",
         "symaddr",
         "${workspaceRoot}/dyld_shared_cache",
-        "__ZN3JSC14JSGlobalObject4initERNS_2VME"
+        "_fillandir_free_namelist"
+        // "__ZN3JSC14JSGlobalObject4initERNS_2VME"
       ],
       // "args": ["-V", "dyld", "list", "${workspaceRoot}/dyld_shared_cache"],
       "showLog": false

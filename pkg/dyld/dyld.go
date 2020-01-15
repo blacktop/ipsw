@@ -285,12 +285,12 @@ type CacheLocalSymbolsEntry struct {
 }
 
 type CacheLocalSymbol struct {
-	nlist32
+	types.Nlist32
 	Name string
 }
 
 type CacheLocalSymbol64 struct {
-	nlist64
+	types.Nlist64
 	Name         string
 	FoundInDylib string
 }
@@ -300,24 +300,6 @@ func (ls CacheLocalSymbol64) String() string {
 		return fmt.Sprintf("0x%8x: %s, %s", ls.Value, ls.Name, ls.FoundInDylib)
 	}
 	return fmt.Sprintf("0x%8x: %s", ls.Value, ls.Name)
-}
-
-// This is the symbol table entry structure for 32-bit architectures.
-type nlist32 struct {
-	nStrx  uint32 // index into the string table
-	nType  uint8  // type flag, see below
-	nSect  uint8  // section number or NO_SECT
-	nDesc  uint16 // see <mach-o/stab.h>
-	nValue uint32 // value of this symbol (or stab offset)
-}
-
-// This is the symbol table entry structure for 64-bit architectures.
-type nlist64 struct {
-	Strx  uint32 // index into the string table
-	Type  uint8  // type flag, see below
-	Sect  uint8  // section number or NO_SECT
-	Desc  uint16 // see <mach-o/stab.h>
-	Value uint64 // value of this symbol (or stab offset)
 }
 
 type CacheImageInfoExtra struct {
@@ -395,27 +377,27 @@ func (f CacheExportFlag) Absolute() bool {
 	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsKindAbsolute
 }
 func (f CacheExportFlag) WeakDefinition() bool {
-	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsWeakDefinition
+	return f == exportSymbolFlagsWeakDefinition
 }
 func (f CacheExportFlag) ReExport() bool {
-	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsReexport
+	return f == exportSymbolFlagsReexport
 }
 func (f CacheExportFlag) StubAndResolver() bool {
-	return (f & exportSymbolFlagsKindMask) == exportSymbolFlagsStubAndResolver
+	return f == exportSymbolFlagsStubAndResolver
 }
 func (f CacheExportFlag) String() string {
 	var fStr string
 	if f.Regular() {
-		fStr += "Kind: Regular "
+		fStr += "Regular "
 		if f.StubAndResolver() {
 			fStr += "(Has Resolver Function)"
 		} else if f.WeakDefinition() {
 			fStr += "(Weak Definition)"
 		}
 	} else if f.ThreadLocal() {
-		fStr += "Kind: Thread Local"
+		fStr += "Thread Local"
 	} else if f.Absolute() {
-		fStr += "Kind: Absolute"
+		fStr += "Absolute"
 	}
 	return strings.TrimSpace(fStr)
 }
