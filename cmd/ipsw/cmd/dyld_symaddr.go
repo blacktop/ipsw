@@ -60,11 +60,6 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		// err = f.GetAllExportedSymbols()
-		// if err != nil {
-		// 	return err
-		// }
-
 		if len(imageName) > 0 {
 			sym, err := f.GetExportedSymbolAddressInImage(imageName, args[1])
 			if err != nil {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
 
 	"github.com/apex/log"
@@ -12,10 +11,9 @@ import (
 )
 
 type trieEntry struct {
-	Name   string
-	Flags  CacheExportFlag
 	Offset uint64
 	Other  uint64
+	Name   string
 }
 
 type trieEntrys struct {
@@ -297,29 +295,23 @@ func readUleb128(buf *bytes.Buffer) (uint64, int, error) {
 		if (b & 0x80) == 0 {
 			break
 		}
-
-		shift += 7
+		t.Entries = append(t.Entries, trieEntry{
+			Name:   string(t.cummulativeString),
+			Offset: off,
+		})
+		// pop last edge
+		// _, t.edgeStrings = t.edgeStrings[len(t.edgeStrings)-1], t.edgeStrings[:len(t.edgeStrings)-1]
+		fmt.Println(t.Entries)
 	}
 
-	return result, length, nil
 }
 
-func readSleb128(buf *bytes.Buffer) (int64, int, error) {
-
-	var (
-		b      byte
-		err    error
-		result int64
-		shift  uint64
-		length int
-	)
-
-	if buf.Len() == 0 {
-		return 0, 0, nil
-	}
+func (t *trieEntrys) readUleb128() (uint64, error) {
+	var result uint64
+	var shift uint64
 
 	for {
-		b, err = buf.ReadByte()
+		b, err := t.r.ReadByte()
 		if err != nil {
 			return 0, 0, errors.Wrap(err, "could not parse SLEB128 value")
 		}
