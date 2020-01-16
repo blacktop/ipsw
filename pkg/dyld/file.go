@@ -107,7 +107,7 @@ func (f *File) Close() error {
 func NewFile(r io.ReaderAt) (*File, error) {
 	f := new(File)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
-	// f.r = r
+	f.r = r
 
 	// Read and decode dyld magic
 	var ident [16]byte
@@ -176,8 +176,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	/**************************
 	 * Read dyld local symbols
 	 **************************/
-	log.Info("Parsing Local Symbols...")
-	f.parseLocalSyms(r)
+	// log.Info("Parsing Local Symbols...")
+	// f.parseLocalSyms(r)
 
 	/*****************************
 	 * Read dyld kernel slid info
@@ -726,22 +726,24 @@ func (f *File) GetAllExportedSymbols() error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	for _, image := range f.Images {
-		log.Infof("Scanning Image: %s", image.Name)
-		for _, mapping := range f.Mappings {
-			start := image.CacheImageInfoExtra.ExportsTrieAddr
-			end := image.CacheImageInfoExtra.ExportsTrieAddr + uint64(image.CacheImageInfoExtra.ExportsTrieSize)
-			if mapping.Address <= start && end < mapping.Address+mapping.Size {
-				sr.Seek(int64(image.CacheImageInfoExtra.ExportsTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
-				exportTrie := make([]byte, image.CacheImageInfoExtra.ExportsTrieSize)
-				if err := binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
-					return err
-				}
-				syms, err := parseTrie(exportTrie)
-				if err != nil {
-					return err
-				}
-				for _, sym := range syms {
-					fmt.Println(sym.Name)
+		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
+			log.Infof("Scanning Image: %s", image.Name)
+			for _, mapping := range f.Mappings {
+				start := image.CacheImageInfoExtra.ExportsTrieAddr
+				end := image.CacheImageInfoExtra.ExportsTrieAddr + uint64(image.CacheImageInfoExtra.ExportsTrieSize)
+				if mapping.Address <= start && end < mapping.Address+mapping.Size {
+					sr.Seek(int64(image.CacheImageInfoExtra.ExportsTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
+					exportTrie := make([]byte, image.CacheImageInfoExtra.ExportsTrieSize)
+					if err := binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
+						return err
+					}
+					syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
+					if err != nil {
+						return err
+					}
+					for _, sym := range syms {
+						fmt.Println(sym.Name)
+					}
 				}
 			}
 		}
@@ -752,7 +754,6 @@ func (f *File) GetAllExportedSymbols() error {
 // GetExportedSymbolAddress returns the address of an images exported symbol
 func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, error) {
 
-	var offset int
 	var err error
 	var symFlagInt, symOrdinalInt, symValueInt, symResolverFuncOffsetInt uint64
 
@@ -780,21 +781,25 @@ func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, er
 					continue
 				}
 
-				symFlagInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode:]))
+				r := bytes.NewReader(exportTrie)
+
+				r.Seek(int64(symbolNode), io.SeekStart)
+				symFlagInt, err = ReadUleb128(r)
 				if err != nil {
 					return nil, err
 				}
+
 				exportedSymbol.Flags = CacheExportFlag(symFlagInt)
 
 				if exportedSymbol.Flags.ReExport() {
-					symOrdinalInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode+offset:]))
+					symOrdinalInt, err = ReadUleb128(r)
 					if err != nil {
 						return nil, err
 					}
 					fmt.Println("symOrdinal:", symOrdinalInt)
 				}
 
-				symValueInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode+offset:]))
+				symValueInt, err = ReadUleb128(r)
 				if err != nil {
 					return nil, err
 				}
@@ -806,7 +811,7 @@ func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, er
 					exportedSymbol.IsHeaderOffset = true
 					if exportedSymbol.Flags.StubAndResolver() {
 						exportedSymbol.IsHeaderOffset = true
-						symResolverFuncOffsetInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode+offset:]))
+						symResolverFuncOffsetInt, err = ReadUleb128(r)
 						if err != nil {
 							return nil, err
 						}
@@ -837,7 +842,6 @@ func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, er
 // GetExportedSymbolAddressInImage returns the address of an given image's exported symbol
 func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*CacheExportedSymbol, error) {
 
-	var offset int
 	var err error
 	var symFlagInt, symOrdinalInt, symValueInt, symResolverFuncOffsetInt uint64
 
@@ -866,21 +870,24 @@ func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*Cache
 				return nil, err
 			}
 
-			symFlagInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode:]))
+			r := bytes.NewReader(exportTrie)
+
+			r.Seek(int64(symbolNode), io.SeekStart)
+			symFlagInt, err = ReadUleb128(r)
 			if err != nil {
 				return nil, err
 			}
 			exportedSymbol.Flags = CacheExportFlag(symFlagInt)
 
 			if exportedSymbol.Flags.ReExport() {
-				symOrdinalInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode+offset:]))
+				symOrdinalInt, err = ReadUleb128(r)
 				if err != nil {
 					return nil, err
 				}
 				fmt.Println("symOrdinal:", symOrdinalInt)
 			}
 
-			symValueInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode+offset:]))
+			symValueInt, err = ReadUleb128(r)
 			if err != nil {
 				return nil, err
 			}
@@ -892,7 +899,7 @@ func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*Cache
 				exportedSymbol.IsHeaderOffset = true
 				if exportedSymbol.Flags.StubAndResolver() {
 					exportedSymbol.IsHeaderOffset = true
-					symResolverFuncOffsetInt, offset, err = readUleb128(bytes.NewBuffer(exportTrie[symbolNode+offset:]))
+					symResolverFuncOffsetInt, err = ReadUleb128(r)
 					if err != nil {
 						return nil, err
 					}
