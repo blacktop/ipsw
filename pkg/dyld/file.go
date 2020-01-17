@@ -796,7 +796,7 @@ func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, er
 					if err != nil {
 						return nil, err
 					}
-					fmt.Println("symOrdinal:", symOrdinalInt)
+					log.Debugf("ReExport symOrdinal: %d", symOrdinalInt)
 				}
 
 				symValueInt, err = ReadUleb128(r)
@@ -884,7 +884,7 @@ func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*Cache
 				if err != nil {
 					return nil, err
 				}
-				fmt.Println("symOrdinal:", symOrdinalInt)
+				log.Debugf("ReExport symOrdinal: %d", symOrdinalInt)
 			}
 
 			symValueInt, err = ReadUleb128(r)
