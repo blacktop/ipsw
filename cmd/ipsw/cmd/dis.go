@@ -41,16 +41,13 @@ var symbolName string
 func init() {
 	rootCmd.AddCommand(disCmd)
 
-	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	disCmd.Flags().StringVarP(&symbolName, "symbol", "s", "", "Function to disassemble")
+	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	disCmd.PersistentFlags().Uint64P("instrs", "i", 20, "Number of instructions to disassemble")
 }
 
 func hex2int(hexStr string) uint64 {
-	// remove 0x suffix if found in the input string
 	cleaned := strings.Replace(hexStr, "#0x", "", -1)
-
-	// base 16 for hexadecimal
 	result, _ := strconv.ParseUint(cleaned, 16, 64)
 	return uint64(result)
 }
@@ -134,24 +131,22 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to disassemble data")
 		}
 		if len(symbolName) > 0 {
-			fmt.Printf("%s:\n", symbolName)
+			fmt.Printf("%s:\n", strings.TrimPrefix(symbolName, "_"))
 		}
 		for i, insn := range insns {
 			// check for start of a new function
 			if i > 0 {
 				sym, err := m.FindAddressSymbol(uint64(insn.Address))
 				if err == nil {
-					fmt.Printf("%s:\n", sym)
+					fmt.Printf("%s:\n", strings.TrimPrefix(sym, "_"))
 				}
 			}
 			// check if branch location is a function
 			if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
-				// opStrParts := strings.Fields(insn.OpStr)
 				symAddr := hex2int(insn.OpStr)
 				sym, err := m.FindAddressSymbol(symAddr)
 				if err == nil {
 					fmt.Printf("#%s\n", strings.TrimPrefix(sym, "_"))
-					// return errors.Wrapf(err, "failed to map branch address to symbol")
 				}
 			}
 			fmt.Printf("0x%x:\t%s\t\t%s\n", insn.Address, insn.Mnemonic, insn.OpStr)
