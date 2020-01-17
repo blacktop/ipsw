@@ -303,14 +303,17 @@ LocalSymbolsSize    = 0FD9C000
 UUID                = 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
 Platform            = iOS
 Format              = 10
+Slide Info:      96KB,  file offset: 0x48108000 -> 0x48120000
+Local Symbols:  253MB,  file offset: 0x4F714000 -> 0x5F4B0000
+Accelerate Tab: 304KB,  address: 0x1D2F64000 -> 0x1D2FB0000
 
 Mappings
 ========
-| INITPROT | MAXPROT |  SIZE  |     ADDRESS      | FILE OFFSET |
-|----------|---------|--------|------------------|-------------|
-| r-x      | r-x     | 968 MB | 0000000180000000 | 0           |
-| rw-      | rw-     | 184 MB | 00000001BE8FC000 | 3C8FC000    |
-| r--      | r--     | 118 MB | 00000001CC108000 | 48108000    |
+|    SEG     | INITPROT | MAXPROT |  SIZE  |        ADDRESS         |     FILE OFFSET      |
+|------------|----------|---------|--------|------------------------|----------------------|
+| __TEXT     | r-x      | r-x     | 968 MB | 180000000 -> 1BC8FC000 | 00000000 -> 3C8FC000 |
+| __DATA     | rw-      | rw-     | 184 MB | 1BE8FC000 -> 1CA108000 | 3C8FC000 -> 48108000 |
+| __LINKEDIT | r--      | r--     | 118 MB | 1CC108000 -> 1D3714000 | 48108000 -> 4F714000 |
 
 Images
 ======
