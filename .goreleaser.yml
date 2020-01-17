@@ -86,6 +86,8 @@ brews:
   - github:
       owner: blacktop
       name: homebrew-tap
+    ids:
+      - darwin
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
