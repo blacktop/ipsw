@@ -58,7 +58,7 @@ func hex2int(hexStr string) uint64 {
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
 	Use:   "dis",
-	Short: "Disassemble at address",
+	Short: "Disassemble ARM binaries at address or symbol",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var data []byte
@@ -70,7 +70,7 @@ var disCmd = &cobra.Command{
 
 		m, err := macho.Open(args[0])
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "%s appears to not be a valid MachO", args[0])
 		}
 
 		if len(symbolName) > 0 {
