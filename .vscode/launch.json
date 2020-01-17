@@ -318,6 +318,10 @@
       "args": [
         "-V",
         "dis",
+        // "--symbol",
+        // "__ZN3JSC14JSGlobalObject4initERNS_2VME",
+        // "-i",
+        // "100",
         "--vaddr",
         "0xfffffff007b7c05c",
         "${workspaceRoot}/kernelcache.release.iphone12.decompressed"

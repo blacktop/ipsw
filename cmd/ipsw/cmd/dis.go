@@ -26,6 +26,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/macho"
@@ -34,11 +36,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var symbolName string
+
 func init() {
 	rootCmd.AddCommand(disCmd)
 
 	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
-	disCmd.PersistentFlags().Uint64P("instrs", "s", 20, "Number of instructions to disassemble")
+	disCmd.Flags().StringVarP(&symbolName, "symbol", "s", "", "Function to disassemble")
+	disCmd.PersistentFlags().Uint64P("instrs", "i", 20, "Number of instructions to disassemble")
+}
+
+func hex2int(hexStr string) uint64 {
+	// remove 0x suffix if found in the input string
+	cleaned := strings.Replace(hexStr, "#0x", "", -1)
+
+	// base 16 for hexadecimal
+	result, _ := strconv.ParseUint(cleaned, 16, 64)
+	return uint64(result)
 }
 
 // disCmd represents the dis command
@@ -48,25 +62,33 @@ var disCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var data []byte
+		var startAddr uint64
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		startAddr, _ := cmd.Flags().GetUint64("vaddr")
-		if startAddr == 0 {
-			return fmt.Errorf("you must supply a vaddr to disassemble at")
+		m, err := macho.Open(args[0])
+		if err != nil {
+			return err
+		}
+
+		if len(symbolName) > 0 {
+			startAddr, err = m.FindSymbolAddress(symbolName)
+			if err != nil {
+				return err
+			}
+		} else {
+			startAddr, _ = cmd.Flags().GetUint64("vaddr")
+			if startAddr == 0 {
+				return fmt.Errorf("you must supply a vaddr to disassemble at")
+			}
 		}
 
 		instructions, _ := cmd.Flags().GetUint64("instrs")
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
-		}
-
-		m, err := macho.Open(args[0])
-		if err != nil {
-			return err
 		}
 
 		data = make([]byte, 4*instructions)
@@ -111,8 +133,27 @@ var disCmd = &cobra.Command{
 		if err != nil {
 			return errors.Wrapf(err, "failed to disassemble data")
 		}
-
-		for _, insn := range insns {
+		if len(symbolName) > 0 {
+			fmt.Printf("%s:\n", symbolName)
+		}
+		for i, insn := range insns {
+			// check for start of a new function
+			if i > 0 {
+				sym, err := m.FindAddressSymbol(uint64(insn.Address))
+				if err == nil {
+					fmt.Printf("%s:\n", sym)
+				}
+			}
+			// check if branch location is a function
+			if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
+				// opStrParts := strings.Fields(insn.OpStr)
+				symAddr := hex2int(insn.OpStr)
+				sym, err := m.FindAddressSymbol(symAddr)
+				if err == nil {
+					fmt.Printf("#%s\n", strings.TrimPrefix(sym, "_"))
+					// return errors.Wrapf(err, "failed to map branch address to symbol")
+				}
+			}
 			fmt.Printf("0x%x:\t%s\t\t%s\n", insn.Address, insn.Mnemonic, insn.OpStr)
 		}
 
