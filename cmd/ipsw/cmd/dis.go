@@ -44,6 +44,7 @@ func init() {
 	disCmd.Flags().StringVarP(&symbolName, "symbol", "s", "", "Function to disassemble")
 	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	disCmd.PersistentFlags().Uint64P("instrs", "i", 20, "Number of instructions to disassemble")
+	symaddrCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 func hex2int(hexStr string) uint64 {
