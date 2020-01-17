@@ -1053,3 +1053,21 @@ func (f *File) ImportedLibraries() ([]string, error) {
 	}
 	return all, nil
 }
+
+func (f *File) FindSymbolAddress(symbol string) (uint64, error) {
+	for _, sym := range f.Symtab.Syms {
+		if strings.EqualFold(sym.Name, symbol) {
+			return sym.Value, nil
+		}
+	}
+	return 0, fmt.Errorf("symbol not found in macho symtab")
+}
+
+func (f *File) FindAddressSymbol(addr uint64) (string, error) {
+	for _, sym := range f.Symtab.Syms {
+		if sym.Value == addr {
+			return sym.Name, nil
+		}
+	}
+	return "", fmt.Errorf("symbol not found in macho symtab")
+}

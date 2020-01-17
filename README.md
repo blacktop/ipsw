@@ -472,11 +472,23 @@ $ ipsw dis --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
 ...
 ```
 
+You can also dissassemble a function by name
+
+```bash
+$ ipsw dis --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore
+```
+
 Make it pretty 💄🐷 using [bat](https://github.com/sharkdp/bat)
 
 ```bash
 $ ipsw dis --vaddr 0xfffffff007b7c05c --instrs 100 kernelcache.release.iphone12.decompressed \
    | bat -p --tabs 0 -l s
+```
+
+Demangle C++ names
+
+```bash
+$ ipsw dis --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore | c++filt | bat -p -l s --tabs 0
 ```
 
 ### `diff` [WIP] :construction:

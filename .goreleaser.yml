@@ -114,7 +114,6 @@ changelog:
       - "^test:"
       - "^bumping"
       - "^Update"
-      - "^fix"
       - "reorg"
       - "updates"
       - Merge pull request
