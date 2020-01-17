@@ -37,23 +37,16 @@ builds:
     goarch:
       - amd64
 
-  # - id: ipsw_extended_darwin
-  #   main: ./cmd/ipsw
-  #   binary: ipsw
-  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  #   env:
-  #     - CGO_ENABLED=1
-  #     - CC=gcc
-  #     - CXX=gcc++
-  #     # - CC=o64-clang
-  #     # - CXX=o64-clang++
-  #   flags:
-  #     - -tags
-  #     - extended
-  #   goos:
-  #     - darwin
-  #   goarch:
-  #     - amd64
+  - id: ipsw_extended_darwin
+    env:
+      - CGO_ENABLED=0
+    main: ./cmd/ipsw
+    binary: ipsw
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    goos:
+      - darwin
+    goarch:
+      - amd64
   # - id: ipsw_extended_linux
   #   main: ./cmd/ipsw
   #   binary: ipsw
@@ -69,15 +62,25 @@ builds:
   #     - amd64
 
 archives:
-  - format: tar.gz
-    format_overrides:
-      - goos: windows
-        format: zip
+  - id: darwin
+    builds:
+      - ipsw
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
+    format: tar.gz
     replacements:
-      amd64: amd64
       darwin: macOS
-      linux: linux
+  - id: windows
+    builds:
+      - ipsw_extended_windows
+    format: zip
+    replacements:
       windows: win
+  - id: extras
+    builds:
+      - ipsw_extended_darwin
+    format: tar.gz
+    replacements:
+      darwin: macOS
 
 brews:
   - github:
@@ -88,6 +91,7 @@ brews:
     description: "Download and parse ipsw(s)"
     dependencies:
       - lzfse
+      # - capstone
     test: |
       system "#{bin}/ipsw --version"
 
@@ -107,6 +111,9 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^bumping"
-      - "update README"
-      - "Update README.md"
-      - "fixes"
+      - "^Update"
+      - "^fix"
+      - "reorg"
+      - "updates"
+      - Merge pull request
+      - Merge branch

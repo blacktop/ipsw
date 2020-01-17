@@ -4,16 +4,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/apex/log"
 	"github.com/pkg/errors"
 )
 
 type trieEntry struct {
-	Offset uint64
-	Other  uint64
-	Name   string
+	Name    string
+	Flags   CacheExportFlag
+	Other   uint64
+	Address uint64
 }
 
 type trieEntrys struct {
@@ -28,7 +29,7 @@ type trieNode struct {
 	SymBytes []byte
 }
 
-func parseTrie(trieData []byte) ([]trieEntry, error) {
+func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 
 	var tNode trieNode
 	var entries []trieEntry
@@ -41,8 +42,9 @@ func parseTrie(trieData []byte) ([]trieEntry, error) {
 	r := bytes.NewReader(trieData)
 
 	for len(nodes) > 0 {
-		// pop last trieNode
 		tNode, nodes = nodes[len(nodes)-1], nodes[:len(nodes)-1]
+
+		r.Seek(int64(tNode.Offset), io.SeekStart)
 
 		terminalSize, err := ReadUleb128(r)
 		if err != nil {
@@ -51,15 +53,17 @@ func parseTrie(trieData []byte) ([]trieEntry, error) {
 
 		if terminalSize != 0 {
 			var symFlagInt, symValueInt, symOtherInt uint64
+			var reExportSymBytes []byte
+			var symName string
 
 			symFlagInt, err := ReadUleb128(r)
 			if err != nil {
 				return nil, err
 			}
+
 			flags := CacheExportFlag(symFlagInt)
-			fmt.Println(flags)
+
 			if flags.ReExport() {
-				var reExportSym []byte
 				symOtherInt, err = ReadUleb128(r)
 				if err != nil {
 					return nil, err
@@ -72,7 +76,7 @@ func parseTrie(trieData []byte) ([]trieEntry, error) {
 					if s == '\x00' {
 						break
 					}
-					reExportSym = append(reExportSym, s)
+					reExportSymBytes = append(reExportSymBytes, s)
 				}
 			}
 
@@ -89,15 +93,25 @@ func parseTrie(trieData []byte) ([]trieEntry, error) {
 				fmt.Println(symOtherInt)
 			}
 
+			if flags.Regular() || flags.ThreadLocal() {
+				symValueInt += loadAddress
+			}
+
+			if len(reExportSymBytes) > 0 {
+				symName = fmt.Sprintf("%s (%s)", string(tNode.SymBytes), string(reExportSymBytes))
+			} else {
+				symName = fmt.Sprintf("%s", string(tNode.SymBytes))
+			}
+
 			entries = append(entries, trieEntry{
-				Name:   string(tNode.SymBytes),
-				Flags:  flags,
-				Offset: symValueInt,
-				Other:  symOtherInt,
+				Name:    symName,
+				Flags:   flags,
+				Other:   symOtherInt,
+				Address: symValueInt,
 			})
 		}
 
-		r.Seek(int64(tNode.Offset+terminalSize), os.SEEK_CUR)
+		r.Seek(int64(tNode.Offset+terminalSize+1), io.SeekStart)
 		childrenRemaining, err := r.ReadByte()
 		if err == io.EOF {
 			break
@@ -124,6 +138,10 @@ func parseTrie(trieData []byte) ([]trieEntry, error) {
 				return nil, err
 			}
 
+			// log.WithFields(log.Fields{
+			// 	"name":   string(tmp),
+			// 	"offset": childNodeOffset,
+			// }).Infof("Node")
 			nodes = append(nodes, trieNode{
 				Offset:   childNodeOffset,
 				SymBytes: tmp,
@@ -295,37 +313,9 @@ func readUleb128(buf *bytes.Buffer) (uint64, int, error) {
 		if (b & 0x80) == 0 {
 			break
 		}
-		t.Entries = append(t.Entries, trieEntry{
-			Name:   string(t.cummulativeString),
-			Offset: off,
-		})
-		// pop last edge
-		// _, t.edgeStrings = t.edgeStrings[len(t.edgeStrings)-1], t.edgeStrings[:len(t.edgeStrings)-1]
-		fmt.Println(t.Entries)
-	}
 
-}
-
-func (t *trieEntrys) readUleb128() (uint64, error) {
-	var result uint64
-	var shift uint64
-
-	for {
-		b, err := t.r.ReadByte()
-		if err != nil {
-			return 0, 0, errors.Wrap(err, "could not parse SLEB128 value")
-		}
-		length++
-
-		result |= int64((int64(b) & 0x7f) << shift)
 		shift += 7
-		if b&0x80 == 0 {
-			break
-		}
 	}
 
-	if (shift < 8*uint64(length)) && (b&0x40 > 0) {
-		result |= -(1 << shift)
-	}
 	return result, length, nil
 }
