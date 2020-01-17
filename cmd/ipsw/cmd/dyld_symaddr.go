@@ -61,17 +61,17 @@ var symaddrCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(imageName) > 0 {
-			sym, err := f.GetExportedSymbolAddressInImage(imageName, args[1])
-			if err != nil {
-				return err
-			}
+			sym, err := f.FindExportedSymbolInImage(imageName, args[1])
+			// if err != nil {
+			// 	return err
+			// }
 			if sym != nil {
 				fmt.Println(sym)
 			} else {
-				// err = f.GetLocalSymbolsForImage(imageName)
-				// if err != nil {
-				// 	return err
-				// }
+				err = f.GetLocalSymbolsForImage(imageName)
+				if err != nil {
+					return err
+				}
 				lSym := f.GetLocalSymbolInImage(imageName, args[1])
 				if lSym != nil {
 					fmt.Println(lSym)
@@ -99,7 +99,7 @@ var symaddrCmd = &cobra.Command{
 			}
 		}
 
-		sym, err := f.GetExportedSymbolAddress(args[1])
+		sym, err := f.FindExportedSymbol(args[1])
 		// if err != nil {
 		// 	return err
 		// }
@@ -108,10 +108,10 @@ var symaddrCmd = &cobra.Command{
 		} else {
 			log.Warn("symbol not found in exports (fast)")
 			log.Info("searching private symbols (slow)...")
-			// err = f.ParseLocalSyms()
-			// if err != nil {
-			// 	return err
-			// }
+			err = f.ParseLocalSyms()
+			if err != nil {
+				return err
+			}
 
 			lSym := f.GetLocalSymbol(args[1])
 			if lSym == nil {
