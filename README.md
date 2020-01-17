@@ -48,11 +48,13 @@ Usage:
 Available Commands:
   device-list     List all iOS devices
   device-tree     Parse DeviceTree
+  dis             Disassemble ARM binaries at address or symbol
   download        Download and parse IPSW(s) from the internets
   dyld            Parse dyld_shared_cache
   extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
   help            Help about any command
   kernel          Parse kernelcache
+  macho           Parse a MachO file
   version         Print the version number of ipsw
 
 Flags:
@@ -235,7 +237,7 @@ $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Unmounting DMG
 ```
 
-- `docker` 🆕
+- `docker`
 
 ```bash
 $ docker run --init -it --rm \
@@ -245,7 +247,7 @@ $ docker run --init -it --rm \
              blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
 ```
 
-### `kernel kexts`
+### `kernel kexts` 🆕
 
 List all the kernelcache's KEXTs
 
@@ -277,7 +279,7 @@ $ ipsw dyld webkit dyld_shared_cache
    • WebKit Version: 607.2.6.0.1
 ```
 
-### `dyld list`
+### `dyld list` 🆕
 
 Similar to `otool -L dyld_shared_cache`
 
@@ -322,7 +324,7 @@ Images
 <SNIP>
 ```
 
-### `dyld symaddr`
+### `dyld symaddr` 🆕
 
 Find symbol _(unslid)_ addresses in shared cache
 
@@ -338,7 +340,7 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 
 > **NOTE:** you don't have to supply the full image path
 
-### `dyld split` _(only on macOS)_ 🆕
+### `dyld split` _(only on macOS)_
 
 Split up a `dyld_shared_cache`
 
