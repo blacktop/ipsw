@@ -12,7 +12,7 @@ require (
 	github.com/blacktop/go-lzfse v1.1.10
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.0
-	github.com/blacktop/ranger v1.0.0
+	github.com/blacktop/ranger v1.0.2
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gocolly/colly v1.2.0

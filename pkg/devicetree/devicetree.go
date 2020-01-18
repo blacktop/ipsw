@@ -49,8 +49,17 @@ type Properties map[string]interface{}
 // DeviceTree object
 type DeviceTree map[string]Properties
 
+// Summary object
+type Summary struct {
+	ProductName string
+	BoardConfig string
+	Model       string
+}
+
 // Summary prints out a summary of the DeviceTree
-func (dtree *DeviceTree) Summary() {
+func (dtree *DeviceTree) Summary() (*Summary, error) {
+	summary := &Summary{}
+
 	children := (*dtree)["device-tree"]["children"]
 
 	switch reflect.TypeOf(children).Kind() {
@@ -59,12 +68,52 @@ func (dtree *DeviceTree) Summary() {
 		for i := 0; i < s.Len(); i++ {
 			child := s.Index(i)
 			c := child.Interface().(DeviceTree)
-			if _, ok := (c)["product"]; ok {
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", (c)["product"]["product-name"]))
+			if product, ok := (c)["product"]["product-name"].(string); ok {
+				summary.ProductName = product
 			}
 		}
 	}
 
+	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
+		summary.Model = model
+		compatible := (*dtree)["device-tree"]["compatible"]
+		switch reflect.TypeOf(compatible).Kind() {
+		case reflect.Slice:
+			s := reflect.ValueOf(compatible)
+			for i := 0; i < s.Len(); i++ {
+				elem := s.Index(i).String()
+				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
+					summary.BoardConfig = elem
+				}
+			}
+		}
+	} else {
+		return nil, fmt.Errorf("devicetree model is not a string")
+	}
+
+	return summary, nil
+}
+
+// GetProductName returns the device-trees product names
+func (dtree *DeviceTree) GetProductName() (string, error) {
+	children := (*dtree)["device-tree"]["children"]
+
+	switch reflect.TypeOf(children).Kind() {
+	case reflect.Slice:
+		s := reflect.ValueOf(children)
+		for i := 0; i < s.Len(); i++ {
+			child := s.Index(i)
+			c := child.Interface().(DeviceTree)
+			if product, ok := (c)["product"]["product-name"].(string); ok {
+				return product, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("failed to get product-name")
+}
+
+// GetBoardConfig returns the device-trees board config
+func (dtree *DeviceTree) GetBoardConfig() (string, error) {
 	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", model))
 		compatible := (*dtree)["device-tree"]["compatible"]
@@ -74,13 +123,20 @@ func (dtree *DeviceTree) Summary() {
 			for i := 0; i < s.Len(); i++ {
 				elem := s.Index(i).String()
 				if !strings.Contains(elem, "Apple") && !strings.Contains(elem, model) {
-					utils.Indent(log.Info, 2)(fmt.Sprintf("BoardConfig: %s", s.Index(i)))
+					return elem, nil
 				}
 			}
 		}
-	} else {
-		log.Fatal("devicetree model is not a string")
 	}
+	return "", fmt.Errorf("failed to get board-config")
+}
+
+// GetModel returns the device-trees model
+func (dtree *DeviceTree) GetModel() (string, error) {
+	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
+		return model, nil
+	}
+	return "", fmt.Errorf("failed to get model")
 }
 
 func isASCIIPrintable(s string) bool {
@@ -267,7 +323,10 @@ func RemoteParse(u string) (map[string]*DeviceTree, error) {
 	// 		},
 	// 	},
 	// })
-	reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
+	reader, err := ranger.NewReader(&ranger.HTTPRanger{
+		URL:       url,
+		UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13 Safari/605.1.15",
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create ranger reader")
 	}
