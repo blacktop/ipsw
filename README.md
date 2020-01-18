@@ -580,7 +580,7 @@ compdef _ipsw ipsw
 - [ ] create offline copy of ipsw.me API
 - [ ] https://github.com/xerub/img4lib
 - [ ] devicetree read/write
-- [ ] parse plists for folder creation
+- [x] parse plists for folder creation
 
 ## Issues
 
