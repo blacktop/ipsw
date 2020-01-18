@@ -53,6 +53,7 @@ Available Commands:
   dyld            Parse dyld_shared_cache
   extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
   help            Help about any command
+  info            Display IPSW Info
   kernel          Parse kernelcache
   macho           Parse a MachO file
   version         Print the version number of ipsw
@@ -215,6 +216,50 @@ To disable cert verification
 
 ```bash
 $ ipsw download --insecure --device iPhone11,2 --build 16B92
+```
+
+### `info` 🆕
+
+Display `info` about IPSWs
+
+```bash
+$ ipsw info iPhone12,3_17C54_Restore.ipsw
+
+[IPSW Info]
+===========
+Version        = 13.3
+BuildVersion   = 17C54
+OS Type        = Production
+FileSystem     = 038-03630-068.dmg (Type: APFS)
+
+Supported Products:
+ - iPhone11,6
+ - iPhone11,4
+ - iPhone11,2
+ - iPhone12,5
+ - iPhone12,3
+
+DeviceMap:
+BDID 14)
+  - BoardConfig = d321ap
+  - CPID        = 32800
+  - Platform    = t8020
+  - SCEP        = 0
+  - SDOM        = 1
+<SNIP>
+
+KernelCaches:
+ - BoardConfig: d321ap => kernelcache.release.iphone11
+ - BoardConfig: d331ap => kernelcache.release.iphone11
+ - BoardConfig: d331pap => kernelcache.release.iphone11
+ - BoardConfig: d421ap => kernelcache.release.iphone12
+ - BoardConfig: d431ap => kernelcache.release.iphone12
+```
+
+Or remotely
+
+```bash
+$ ipsw info --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
 ```
 
 ### `extract` _(not supported on Windows)_
