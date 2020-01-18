@@ -356,6 +356,34 @@ func RemoteParse(u string) (map[string]*DeviceTree, error) {
 	return dt, nil
 }
 
+// Parse parses plist files in a local ipsw file
+func Parse(ipswPath string) (map[string]*DeviceTree, error) {
+	dt := make(map[string]*DeviceTree)
+	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
+
+	zr, err := zip.OpenReader(ipswPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open ipsw as zip")
+	}
+	defer zr.Close()
+
+	for _, f := range zr.File {
+		if validDT.MatchString(f.Name) {
+			dtData := make([]byte, f.UncompressedSize64)
+			rc, _ := f.Open()
+			io.ReadFull(rc, dtData)
+			rc.Close()
+
+			dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+			}
+		}
+	}
+
+	return dt, nil
+}
+
 // Extract extracts DeviceTree(s) from ipsw
 func Extract(ipsw string) error {
 	log.Info("Extracting DeviceTree from IPSW")
