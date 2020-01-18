@@ -37,6 +37,7 @@ func init() {
 	rootCmd.AddCommand(machoCmd)
 
 	machoCmd.Flags().BoolP("symbols", "n", false, "output symbols")
+	machoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 func examiner(t reflect.Type, depth int) {
