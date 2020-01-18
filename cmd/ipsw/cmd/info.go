@@ -26,9 +26,7 @@ import (
 	"os"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/devicetree"
-	"github.com/blacktop/ipsw/pkg/plist"
-	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +49,7 @@ var infoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 		if remoteFlag {
-			pIPSW, err := plist.RemoteParse(args[0])
+			pIPSW, err := info.RemoteParse(args[0])
 			if err != nil {
 				return errors.Wrap(err, "failed to extract remote plists")
 			}
@@ -60,23 +58,9 @@ var infoCmd = &cobra.Command{
 			if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 				return fmt.Errorf("file %s does not exist", args[0])
 			}
-			pIPSW, err := plist.Parse(args[0])
+			pIPSW, err := info.Parse(args[0])
 			if err != nil {
-				return errors.Wrap(err, "failed to parse plists")
-			}
-			dtrees, err := devicetree.Parse(args[0])
-			if err != nil {
-				return errors.Wrap(err, "failed to parse devicetree")
-			}
-			for fileName, dtree := range dtrees {
-				utils.Indent(log.Info, 1)(fileName)
-				s, err := dtree.Summary()
-				if err != nil {
-					return errors.Wrap(err, "failed to parse device-tree")
-				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
+				return errors.Wrap(err, "failed to extract and parse IPSW info")
 			}
 			fmt.Println(pIPSW)
 		}

@@ -24,9 +24,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -47,15 +50,29 @@ var dyldListCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
+		fileInfo, err := os.Lstat(args[0])
+		if err != nil {
 			return fmt.Errorf("file %s does not exist", args[0])
+		}
+
+		dyldFile := args[0]
+
+		// Check if file is a symlink
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			dyldFile, err = os.Readlink(args[0])
+			if err != nil {
+				return errors.Wrapf(err, "failed to read symlink %s", args[0])
+			}
+			fmt.Println(dyldFile)
+			dyldFile = strings.Replace(args[0], filepath.Base(args[0]), dyldFile, 1)
+			fmt.Println(dyldFile)
 		}
 
 		// TODO: check for
 		// if ( dylibInfo->isAlias )
 		//   	printf("[alias] %s\n", dylibInfo->path);
-
-		f, err := dyld.Open(args[0])
+		fmt.Println(dyldFile)
+		f, err := dyld.Open(dyldFile)
 		if err != nil {
 			return err
 		}

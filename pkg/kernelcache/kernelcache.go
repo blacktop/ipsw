@@ -11,10 +11,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
 	lzfse "github.com/blacktop/go-lzfse"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/lzss"
 	"github.com/pkg/errors"
@@ -98,7 +100,10 @@ func Extract(ipsw string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
 	}
-
+	i, err := info.Parse(ipsw)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse ipsw info")
+	}
 	for _, kcache := range kcaches {
 		content, err := ioutil.ReadFile(kcache)
 		if err != nil {
@@ -114,13 +119,16 @@ func Extract(ipsw string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
-
-		err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
-		if err != nil {
-			return errors.Wrap(err, "failed to decompress kernelcache")
+		for _, folder := range i.GetKernelCacheFolders(kcache) {
+			os.Mkdir(folder, os.ModePerm)
+			fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetOSType()))
+			err = ioutil.WriteFile(fname, dec, 0644)
+			if err != nil {
+				return errors.Wrap(err, "failed to decompress kernelcache")
+			}
+			utils.Indent(log.Info, 2)("Created " + fname)
+			os.Remove(kcache)
 		}
-		utils.Indent(log.Info, 2)("Created " + kcache + ".decompressed")
-		os.Remove(kcache)
 	}
 
 	return nil

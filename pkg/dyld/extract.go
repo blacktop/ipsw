@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 )
@@ -34,15 +35,23 @@ func Extract(ipsw string) error {
 	if len(dmgs) == 1 {
 		defer os.Remove(dmgs[0])
 
+		i, err := info.Parse(ipsw)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse ipsw info")
+		}
+		folders := i.GetFolders()
+		folder := folders[0]
+
 		var searchStr, dyldDest, mountPoint string
-		baseName := strings.TrimSuffix(filepath.Base(ipsw), filepath.Ext(ipsw))
 		if runtime.GOOS == "darwin" {
 			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
-			dyldDest = "dyld_shared_cache_" + baseName
+			os.MkdirAll(folder, os.ModePerm)
+			dyldDest = filepath.Join(folder, "dyld_shared_cache")
 			mountPoint = "/tmp/ios"
 		} else if runtime.GOOS == "linux" {
 			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
-			dyldDest = filepath.Join("/data", "dyld_shared_cache_"+baseName)
+			os.MkdirAll(filepath.Join("/data", folder), os.ModePerm)
+			dyldDest = filepath.Join("/data", folder, "dyld_shared_cache")
 			mountPoint = "/mnt"
 		}
 
@@ -67,6 +76,20 @@ func Extract(ipsw string) error {
 			return err
 		}
 
+		// Create symlinks for all the other folders to save space
+		for _, folder = range folders[1:] {
+			symlinkPath := filepath.Join(folder, "dyld_shared_cache")
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Creating symlink from %s to %s", dyldDest, symlinkPath))
+			os.MkdirAll(folder, os.ModePerm)
+			if _, err := os.Lstat(symlinkPath); err == nil {
+				os.Remove(symlinkPath)
+			}
+			err = os.Symlink(dyldDest, symlinkPath)
+			if err != nil {
+				return errors.Wrapf(err, "failed to symlink %s to %s", dyldDest, symlinkPath)
+			}
+		}
+
 		utils.Indent(log.Info, 2)("Unmounting DMG")
 		err = Unmount(device)
 		if err != nil {
@@ -82,20 +105,21 @@ func Extract(ipsw string) error {
 
 // Copy copies a file from mounted DMG to host
 func Copy(src, dst string) error {
-	source, err := os.Open(src)
+	from, err := os.Open(src)
 	if err != nil {
 		return err
 	}
-	defer source.Close()
+	defer from.Close()
 
-	destination, err := os.Create(dst)
+	to, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		return err
 	}
-	defer destination.Close()
-	_, err = io.Copy(destination, source)
+	defer to.Close()
 
-	return nil
+	_, err = io.Copy(to, from)
+
+	return err
 }
 
 // Mount mounts a DMG with hdiutil
