@@ -248,7 +248,11 @@
       "program": "${workspaceRoot}/cmd/ipsw/main.go",
       "env": {},
       "envFile": "${workspaceFolder}/.env",
-      "args": ["dyld", "list", "${workspaceRoot}/dyld_shared_cache"],
+      "args": [
+        "dyld",
+        "list",
+        "${workspaceRoot}/iPhone12,5_D431AP_17D5044a/dyld_shared_cache"
+      ],
       // "args": ["-V", "dyld", "list", "${workspaceRoot}/dyld_shared_cache"],
       "showLog": false
     },
