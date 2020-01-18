@@ -24,11 +24,12 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/spf13/cobra"
-
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 func init() {
@@ -48,11 +49,26 @@ var webkitCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
+		dscPath := filepath.Clean(args[0])
+
+		fileInfo, err := os.Lstat(dscPath)
+		if err != nil {
+			return fmt.Errorf("file %s does not exist", dscPath)
 		}
 
-		version, err := dyld.GetWebKitVersion(args[0])
+		// Check if file is a symlink
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			symlinkPath, err := os.Readlink(dscPath)
+			if err != nil {
+				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+			}
+			// TODO: this seems like it would break
+			linkParent := filepath.Dir(dscPath)
+			linkRoot := filepath.Dir(linkParent)
+
+			dscPath = filepath.Join(linkRoot, symlinkPath)
+		}
+		version, err := dyld.GetWebKitVersion(dscPath)
 		if err != nil {
 			return err
 		}

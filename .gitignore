@@ -15,7 +15,7 @@ dist/
 test-caches/
 *.ipsw
 *.zip
-kernelcache.release.*
+kernelcache.*
 dyld_shared_cache*
 
 debug

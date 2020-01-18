@@ -81,6 +81,10 @@ func Extract(ipsw string) error {
 			symlinkPath := filepath.Join(folder, "dyld_shared_cache")
 			utils.Indent(log.Info, 2)(fmt.Sprintf("Creating symlink from %s to %s", dyldDest, symlinkPath))
 			os.MkdirAll(folder, os.ModePerm)
+			symlinkPath, err = filepath.Abs(symlinkPath)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get abs path to %s", symlinkPath)
+			}
 			if _, err := os.Lstat(symlinkPath); err == nil {
 				os.Remove(symlinkPath)
 			}
