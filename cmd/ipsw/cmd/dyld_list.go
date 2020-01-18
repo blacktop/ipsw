@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -63,15 +62,17 @@ var dyldListCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrapf(err, "failed to read symlink %s", args[0])
 			}
-			fmt.Println(dyldFile)
-			dyldFile = strings.Replace(args[0], filepath.Base(args[0]), dyldFile, 1)
-			fmt.Println(dyldFile)
+			// TODO: this seems like it would break
+			linkParent := filepath.Dir(args[0])
+			linkRoot := filepath.Dir(linkParent)
+
+			dyldFile = filepath.Join(linkRoot, dyldFile)
 		}
 
 		// TODO: check for
 		// if ( dylibInfo->isAlias )
 		//   	printf("[alias] %s\n", dylibInfo->path);
-		fmt.Println(dyldFile)
+
 		f, err := dyld.Open(dyldFile)
 		if err != nil {
 			return err
