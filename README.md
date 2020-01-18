@@ -232,28 +232,33 @@ BuildVersion   = 17C54
 OS Type        = Production
 FileSystem     = 038-03630-068.dmg (Type: APFS)
 
-Supported Products:
- - iPhone11,6
- - iPhone11,4
- - iPhone11,2
- - iPhone12,5
- - iPhone12,3
+Devices
+-------
 
-DeviceMap:
-BDID 14)
-  - BoardConfig = d321ap
-  - CPID        = 32800
-  - Platform    = t8020
-  - SCEP        = 0
-  - SDOM        = 1
-<SNIP>
+iPhone XS Max)
+ - iPhone11,6_D331PAP_17C54
+   - KernelCache: kernelcache.release.iphone11
+   - CPU: t8020
 
-KernelCaches:
- - BoardConfig: d321ap => kernelcache.release.iphone11
- - BoardConfig: d331ap => kernelcache.release.iphone11
- - BoardConfig: d331pap => kernelcache.release.iphone11
- - BoardConfig: d421ap => kernelcache.release.iphone12
- - BoardConfig: d431ap => kernelcache.release.iphone12
+iPhone XS Max)
+ - iPhone11,4_D331AP_17C54
+   - KernelCache: kernelcache.release.iphone11
+   - CPU: t8020
+
+iPhone 11 Pro Max)
+ - iPhone12,5_D431AP_17C54
+   - KernelCache: kernelcache.release.iphone12
+   - CPU: t8030
+
+iPhone XS)
+ - iPhone11,2_D321AP_17C54
+   - KernelCache: kernelcache.release.iphone11
+   - CPU: t8020
+
+iPhone 11 Pro)
+ - iPhone12,3_D421AP_17C54
+   - KernelCache: kernelcache.release.iphone12
+   - CPU: t8030
 ```
 
 Or remotely
