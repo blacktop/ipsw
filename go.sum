@@ -43,8 +43,8 @@ github.com/blacktop/go-plist v1.0.0 h1:bBpFGaiCdJZbQgOKxjxAUdvugySX+C3RtGvZODcOO
 github.com/blacktop/go-plist v1.0.0/go.mod h1:niIOeDMEBISbJ9w0PPuc67iLvLh7Ve0N1gAfxIRWSk4=
 github.com/blacktop/lzss v0.1.0 h1:o0S0ZiBX9tIPNNx4W+AUUbVhcwaVFoFrZa7Zbdo7xJU=
 github.com/blacktop/lzss v0.1.0/go.mod h1:v0Qp9FkNDSCRvsycRnyUojUBvbtaQBpjw/StLMzZ8Po=
-github.com/blacktop/ranger v1.0.0 h1:S3rSfzP11C1b0oxICT9+tVkZUSoAyIdY+KF5QX5enOQ=
-github.com/blacktop/ranger v1.0.0/go.mod h1:2KXlAasHzrHMkXg1+/87hT5ISdQjxlcjbmZFZD69zas=
+github.com/blacktop/ranger v1.0.2 h1:yAGz/e8MiPsIul9vv8O4H80Mvjtng6eQ7YPUAy76vgU=
+github.com/blacktop/ranger v1.0.2/go.mod h1:2KXlAasHzrHMkXg1+/87hT5ISdQjxlcjbmZFZD69zas=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/coreos/bbolt v1.3.2/go.mod h1:iRUV2dpdMOn7Bo10OQBFzIJO9kkE559Wcmn+qkEiiKk=

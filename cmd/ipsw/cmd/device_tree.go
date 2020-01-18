@@ -24,6 +24,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+	"strings"
 
 	// "sort"
 	"io/ioutil"
@@ -66,10 +68,30 @@ var deviceTreeCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
-			// sort.Sort(dtrees)
-			for fileName, dtree := range dtrees {
-				utils.Indent(log.Info, 1)(fileName)
-				dtree.Summary()
+			if jsonFlag {
+				for fileName, dtree := range dtrees {
+					j, err := json.Marshal(dtree)
+					if err != nil {
+						return err
+					}
+					fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
+					err = ioutil.WriteFile(fileName+".json", j, 0644)
+					if err != nil {
+						return errors.Wrap(err, "failed to decompress kernelcache")
+					}
+				}
+			} else {
+				// sort.Sort(dtrees)
+				for fileName, dtree := range dtrees {
+					utils.Indent(log.Info, 1)(fileName)
+					s, err := dtree.Summary()
+					if err != nil {
+						return errors.Wrap(err, "failed to parse device-tree")
+					}
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
+				}
 			}
 		} else {
 			content, err := ioutil.ReadFile(args[0])
@@ -91,7 +113,13 @@ var deviceTreeCmd = &cobra.Command{
 
 				fmt.Println(string(j))
 			} else {
-				dtree.Summary()
+				s, err := dtree.Summary()
+				if err != nil {
+					return errors.Wrap(err, "failed to parse device-tree")
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
 			}
 		}
 
