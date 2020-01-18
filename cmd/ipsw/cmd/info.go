@@ -26,7 +26,9 @@ import (
 	"os"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/blacktop/ipsw/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -60,9 +62,22 @@ var infoCmd = &cobra.Command{
 			}
 			pIPSW, err := plist.Parse(args[0])
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to parse plists")
 			}
-
+			dtrees, err := devicetree.Parse(args[0])
+			if err != nil {
+				return errors.Wrap(err, "failed to parse devicetree")
+			}
+			for fileName, dtree := range dtrees {
+				utils.Indent(log.Info, 1)(fileName)
+				s, err := dtree.Summary()
+				if err != nil {
+					return errors.Wrap(err, "failed to parse device-tree")
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
+			}
 			fmt.Println(pIPSW)
 		}
 		return nil
