@@ -41,7 +41,7 @@ func init() {
 
 // betaCmd represents the beta command
 var betaCmd = &cobra.Command{
-	Use:   "beta",
+	Use:   "beta [build-id]",
 	Short: "Download beta IPSWs from the iphone wiki",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

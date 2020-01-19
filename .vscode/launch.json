@@ -118,6 +118,30 @@
       "showLog": false
     },
     {
+      "name": "Download - Pattern",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "remotePath": "",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "program": "${workspaceRoot}/cmd/ipsw/main.go",
+      "env": {},
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        // "-V",
+        "download",
+        "pattern",
+        "--version",
+        "13.3",
+        "--device",
+        "iPhone12,1",
+        "iBoot"
+      ],
+      // "args": ["-V", "itunes", "--build", "16F156"],
+      "showLog": false
+    },
+    {
       "name": "Extract",
       "type": "go",
       "request": "launch",

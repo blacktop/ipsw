@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"path/filepath"
 	"strings"
 
 	"github.com/blacktop/ipsw/pkg/devicetree"
@@ -102,6 +103,34 @@ func (i *IPSW) GetFolders() []string {
 
 	}
 	return folders
+}
+
+func (i *IPSW) GetFolderForFile(fileName string) string {
+	files := i.getManifestPaths()
+	for _, dtree := range i.DeviceTrees {
+		dt, _ := dtree.Summary()
+		for _, file := range files[strings.ToLower(dt.BoardConfig)] {
+			if strings.Contains(fileName, filepath.Base(file)) {
+				return fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.Restore.ProductBuildVersion)
+			}
+		}
+	}
+	return ""
+}
+
+func (i *IPSW) getManifestPaths() map[string][]string {
+
+	files := make(map[string][]string, len(i.Plists.BuildIdentities))
+
+	for _, bID := range i.Plists.BuildIdentities {
+		for _, manifest := range bID.Manifest {
+			if len(manifest.Info.Path) > 0 {
+				files[bID.Info.DeviceClass] = append(files[bID.Info.DeviceClass], manifest.Info.Path)
+			}
+		}
+	}
+
+	return files
 }
 
 // GetKernelCacheFolders returns the folders belonging to a KernelCache

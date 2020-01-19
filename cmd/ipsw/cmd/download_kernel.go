@@ -31,11 +31,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/ranger"
@@ -154,28 +155,35 @@ var downloadKernelCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to create zip reader from ranger reader")
 				}
-
+				iinfo, err := info.RemoteParse(u)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse ipsw info")
+				}
 				for _, f := range zr.File {
 					if strings.Contains(f.Name, "kernel") {
-						if _, err := os.Stat(path.Base(f.Name + ".decompressed")); os.IsNotExist(err) {
-							kdata := make([]byte, f.UncompressedSize64)
-							rc, _ := f.Open()
-							io.ReadFull(rc, kdata)
-							rc.Close()
-							kcomp, err := kernelcache.ParseImg4Data(kdata)
-							if err != nil {
-								return errors.Wrap(err, "failed parse compressed kernelcache")
+						for _, folder := range iinfo.GetKernelCacheFolders(f.Name) {
+							fname := filepath.Join(folder, "kernelcache."+strings.ToLower(iinfo.Plists.GetOSType()))
+							if _, err := os.Stat(fname); os.IsNotExist(err) {
+								kdata := make([]byte, f.UncompressedSize64)
+								rc, _ := f.Open()
+								io.ReadFull(rc, kdata)
+								rc.Close()
+								kcomp, err := kernelcache.ParseImg4Data(kdata)
+								if err != nil {
+									return errors.Wrap(err, "failed parse compressed kernelcache")
+								}
+								dec, err := kernelcache.DecompressData(kcomp)
+								if err != nil {
+									return errors.Wrap(err, "failed to decompress kernelcache")
+								}
+								os.Mkdir(folder, os.ModePerm)
+								err = ioutil.WriteFile(fname, dec, 0644)
+								if err != nil {
+									return errors.Wrap(err, "failed to decompress kernelcache")
+								}
+							} else {
+								log.Warnf("kernelcache already exists: %s", fname)
 							}
-							dec, err := kernelcache.DecompressData(kcomp)
-							if err != nil {
-								return errors.Wrap(err, "failed to decompress kernelcache")
-							}
-							err = ioutil.WriteFile(f.Name+".decompressed", dec, 0644)
-							if err != nil {
-								return errors.Wrap(err, "failed to decompress kernelcache")
-							}
-						} else {
-							log.Warnf("kernelcache already exists: %s", path.Base(f.Name+".decompressed"))
 						}
 					}
 				}
@@ -218,24 +226,35 @@ var downloadKernelCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to create zip reader from ranger reader")
 				}
-
+				iinfo, err := info.RemoteParse(i.URL)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse ipsw info")
+				}
 				for _, f := range zr.File {
 					if strings.Contains(f.Name, "kernel") {
-						kdata := make([]byte, f.UncompressedSize64)
-						rc, _ := f.Open()
-						io.ReadFull(rc, kdata)
-						rc.Close()
-						kcomp, err := kernelcache.ParseImg4Data(kdata)
-						if err != nil {
-							return errors.Wrap(err, "failed parse compressed kernelcache")
-						}
-						dec, err := kernelcache.DecompressData(kcomp)
-						if err != nil {
-							return errors.Wrap(err, "failed to decompress kernelcache")
-						}
-						err = ioutil.WriteFile(f.Name+".decompressed", dec, 0644)
-						if err != nil {
-							return errors.Wrap(err, "failed to decompress kernelcache")
+						for _, folder := range iinfo.GetKernelCacheFolders(f.Name) {
+							fname := filepath.Join(folder, "kernelcache."+strings.ToLower(iinfo.Plists.GetOSType()))
+							if _, err := os.Stat(fname); os.IsNotExist(err) {
+								kdata := make([]byte, f.UncompressedSize64)
+								rc, _ := f.Open()
+								io.ReadFull(rc, kdata)
+								rc.Close()
+								kcomp, err := kernelcache.ParseImg4Data(kdata)
+								if err != nil {
+									return errors.Wrap(err, "failed parse compressed kernelcache")
+								}
+								dec, err := kernelcache.DecompressData(kcomp)
+								if err != nil {
+									return errors.Wrap(err, "failed to decompress kernelcache")
+								}
+								os.Mkdir(folder, os.ModePerm)
+								err = ioutil.WriteFile(fname, dec, 0644)
+								if err != nil {
+									return errors.Wrap(err, "failed to decompress kernelcache")
+								}
+							} else {
+								log.Warnf("kernelcache already exists: %s", fname)
+							}
 						}
 					}
 				}

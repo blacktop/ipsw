@@ -34,7 +34,7 @@ type buildIdentity struct {
 	ApSecurityDomain        string
 	BbChipID                string
 	Info                    buildIdentityInfo
-	Manifest                buildIdentityManifest
+	Manifest                map[string]buildIdentityManifestType
 	ProductMarketingVersion string
 }
 
@@ -64,20 +64,20 @@ type variantContents struct {
 	VinylFirmware        string
 }
 
-type buildIdentityManifest struct {
-	DeviceTree         buildIdentityManifestType
-	KernelCache        buildIdentityManifestType
-	OS                 buildIdentityManifestType
-	RestoreDeviceTree  buildIdentityManifestType
-	RestoreKernelCache buildIdentityManifestType
-	RestoreSEP         buildIdentityManifestType
-	RestoreTrustCache  buildIdentityManifestType
-	SEP                buildIdentityManifestType
-	StaticTrustCache   buildIdentityManifestType
-	iBEC               buildIdentityManifestType
-	iBSS               buildIdentityManifestType
-	iBoot              buildIdentityManifestType
-}
+// type buildIdentityManifest struct {
+// 	DeviceTree         buildIdentityManifestType
+// 	KernelCache        buildIdentityManifestType
+// 	OS                 buildIdentityManifestType
+// 	RestoreDeviceTree  buildIdentityManifestType
+// 	RestoreKernelCache buildIdentityManifestType
+// 	RestoreSEP         buildIdentityManifestType
+// 	RestoreTrustCache  buildIdentityManifestType
+// 	SEP                buildIdentityManifestType
+// 	StaticTrustCache   buildIdentityManifestType
+// 	iBEC               buildIdentityManifestType
+// 	iBSS               buildIdentityManifestType
+// 	iBoot              buildIdentityManifestType
+// }
 
 type buildIdentityManifestType struct {
 	Digest  []byte
@@ -85,11 +85,12 @@ type buildIdentityManifestType struct {
 	Trusted bool
 }
 type buildIdentityManifestInfo struct {
-	IsFTAB          bool
-	IsFUDFirmware   bool
-	IsLoadedByiBoot bool
-	Path            string
-	Personalize     bool
+	IsFTAB            bool
+	IsFUDFirmware     bool `plist:"IsFUDFirmware,omitempty"`
+	IsFirmwarePayload bool `plist:"IsFirmwarePayload,omitempty"`
+	IsLoadedByiBoot   bool
+	Path              string `plist:"Path"`
+	Personalize       bool
 }
 
 type Restore struct {
@@ -117,7 +118,7 @@ func (b *BuildManifest) GetOSType() string {
 func (b *BuildManifest) GetKernelCaches() map[string]string {
 	kernelCaches := make(map[string]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		kernelCaches[bID.Info.DeviceClass] = bID.Manifest.KernelCache.Info.Path
+		kernelCaches[bID.Info.DeviceClass] = bID.Manifest["KernelCache"].Info.Path
 	}
 	return kernelCaches
 }
