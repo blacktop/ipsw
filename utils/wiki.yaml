@@ -1,0 +1,1269 @@
+HomePod:
+ - colors: Space Gray/White
+ - CPU Specs:
+    core_design: "[[Apple Typhoon]] x 2"
+    cpu: "[[T7000]]"
+    cpu_speed: Unknown
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Cinar 15C25 (AudioAccessory1,1)|11.0.2 (15C25)]], [[Fatsa 15F80 (AudioAccessory1,2)|11.4 (15F80)]]"
+    latest_firmware: "{{Latest firmware|AudioAccessory1,1}}, {{Latest firmware|AudioAccessory1,2}}"
+    latest_beta_firmware: "{{Latest beta firmware|AudioAccessory1,1}}, {{Latest beta firmware|AudioAccessory1,2}}"
+ - internal_name: AudioAccessory1,1, AudioAccessory1,2
+
+Apple Watch (1st generation):
+ - variations: Apple Watch/Apple Watch Sport/Apple Watch Edition
+ - Battery Specs:
+    current: 205 mA (38mm) / 246 mA (42mm)
+    power: 0.78 Wh (38mm) / 0.93 Wh (42mm)
+    voltage: 3.8 V (38mm) / 3.78 V (42mm)
+ - CPU Specs:
+    processor: "[[S7002]] S1"
+ - ram: 512 MB
+ - storage: 8 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4 GHz)"
+ - bluetooth: "[[BCM4334|4.0]]"
+ - Firmware:
+    initial_firmware: "[[SkiHill 12S507 (Watch1,1)|1.0 (12S507)]], [[SkiHill 12S507 (Watch1,2)|1.0 (12S507)]]"
+    latest_firmware: "[[Gull 15U70 (Watch1,1)|4.3.2 (15U70)]], [[Gull 15U70 (Watch1,2)|4.3.2 (15U70)]]"
+ - internal_name: Watch1,1, Watch1,2
+
+
+Apple Watch Series 1:
+ - variations: Apple Watch (Sport bands)
+ - Battery Specs:
+    current: 205 mA (38mm) / 246 mA (42mm)
+    power: 0.78 Wh (38mm) / 0.93 Wh (42mm)
+    voltage: 3.8 V (38mm) / 3.78 V (42mm)
+ - CPU Specs:
+    processor: "[[T8002]] S1P"
+ - ram: 512 MB
+ - storage: 8 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4 GHz)"
+ - bluetooth: 4.0
+ - Firmware:
+    initial_firmware: "[[Daytona 14S326 (Watch2,6)|3.0 (14S326)]], [[Daytona 14S326 (Watch2,7)|3.0 (14S326)]]"
+    latest_firmware: "{{Latest firmware|Watch2,6}}, {{Latest firmware|Watch2,7}}"
+    latest_beta_firmware: "{{Latest beta firmware|Watch2,6}}, {{Latest beta firmware|Watch2,7}}"
+ - internal_name: Watch2,6, Watch2,7
+
+
+Apple Watch Series 2:
+ - variations: Apple Watch/Apple Watch Sport/Apple Watch Edition/Apple Watch Hermes/Apple Watch Nike+
+ - Battery Specs:
+    current: 273 mA (38mm) / 334 mA (42mm)
+    power: 1.03 Wh (38mm) / 1.27 Wh (42mm)
+    voltage: 4.35 V (38mm) / 3.8 V (42mm)
+ - CPU Specs:
+    processor: "[[T8002]] "S2""
+ - ram: 512 MB
+ - storage: 8 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4 GHz)"
+ - bluetooth: 4.0
+ - Firmware:
+    initial_firmware: "[[Daytona 14S326 (Watch2,3)|3.0 (14S326)]], [[Daytona 14S326 (Watch2,4)|3.0 (14S326)]]"
+    latest_firmware: "{{Latest firmware|Watch2,3}}, {{Latest firmware|Watch2,4}}"
+    latest_beta_firmware: "{{Latest beta firmware|Watch2,3}}, {{Latest beta firmware|Watch2,4}}"
+ - internal_name: Watch2,3, Watch2,4
+
+
+Apple Watch Series 3:
+ - variations: Apple Watch / Apple Watch Edition / Apple Watch Hermes / Apple Watch Nike+
+ - Battery Specs:
+    current: 279 mA (38mm GPS/LTE) / 352 mA (42mm GPS/LTE) / 262 mA (38mm GPS) / ? mA (42mm GPS)
+    power: 1.07 Wh (38mm GPS/LTE) / ? Wh (42mm GPS/LTE) / 1.0 Wh (38mm GPS) / 1.34 Wh (42mm GPS)
+    voltage: 3.82 V (38mm GPS/LTE) / ? V (42mm GPS/LTE) / 3.81 V (38mm GPS) / ? V (42mm GPS)
+ - CPU Specs:
+    processor: "[[T8004]] "S3""
+ - ram: 768 MB
+ - storage: 8 (GPS) or 16 GB (GPS + LTE)
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4 GHz)"
+ - bluetooth: 4.2
+ - Firmware:
+    initial_firmware: "[[Fortune 15R372 (Watch3,1)|4.0 (15R372)]], [[Fortune 15R372 (Watch3,2)|4.0 (15R372)]], [[Fortune 15R372 (Watch3,3)|4.0 (15R372)]], [[Fortune 15R372 (Watch3,4)|4.0 (15R372)]]"
+    latest_firmware: "{{Latest firmware|Watch3,1}}, {{Latest firmware|Watch3,2}}, {{Latest firmware|Watch3,3}}, {{Latest firmware|Watch3,4}}"
+    latest_beta_firmware: "{{Latest beta firmware|Watch3,1}}, {{Latest beta firmware|Watch3,2}}, {{Latest beta firmware|Watch3,3}}, {{Latest beta firmware|Watch3,4}}"
+ - internal_name: Watch3,1, Watch3,2, Watch3,3, Watch3,4
+
+
+Apple Watch Series 4:
+ - variations: Apple Watch/Apple Watch Hermes/Apple Watch Nike+
+ - Battery Specs:
+    current:  ? mA (40mm) / ? mA (44mm) / ? mA (40mm LTE) / 291.8  mA (44mm LTE)
+    power:  0.86 Wh (40mm) / 1.113 Wh (44mm) / 0.86 Wh (40mm LTE) / 1.113 Wh (44mm LTE)
+    voltage:  ? V (40mm) / ? V (44mm) / ? V (40mm LTE) / 3.81 V (44mm LTE)
+ - CPU Specs:
+    processor: "[[T8006]] "S4""
+ - ram: ? MB
+ - storage: 16 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4 GHz)"
+ - bluetooth: 5.0
+ - Firmware:
+    initial_firmware: "[[Glory 16R364 (Watch4,1)|5.0 (16R364)]], [[Glory 16R364 (Watch4,2)|5.0 (16R364)]], [[Glory 16R364 (Watch4,3)|5.0 (16R364)]], [[Glory 16R364 (Watch4,4)|5.0 (16R364)]]"
+    latest_firmware: "{{Latest firmware|Watch4,1}}, {{Latest firmware|Watch4,2}}, {{Latest firmware|Watch4,3}}, {{Latest firmware|Watch4,4}}"
+    latest_beta_firmware: "{{Latest beta firmware|Watch4,1}}, {{Latest beta firmware|Watch4,2}}, {{Latest beta firmware|Watch4,3}}, {{Latest beta firmware|Watch4,4}}"
+ - internal_name: Watch4,1, Watch4,2, Watch4,3, Watch4,4
+
+
+Apple Watch Series 5:
+ - variations: ?
+ - Battery Specs:
+    current:  ? mA (40mm) / ? mA (44mm) / ? mA (40mm LTE) / ?  mA (44mm LTE)
+    power:  ? Wh (40mm) / ? Wh (44mm) / ? Wh (40mm LTE) / ? Wh (44mm LTE)
+    voltage:  ? V (40mm) / ? V (44mm) / ? V (40mm LTE) / ? (44mm LTE)
+ - CPU Specs:
+    processor: "S5"
+ - ram: 1 GB
+ - storage: 32 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4 GHz)"
+ - bluetooth: 5.0
+ - Firmware:
+    initial_firmware: "[[Grace 17R575 (Watch5,1)|6.0 (17R575)]], [[Grace 17R575 (Watch5,2)|6.0 (17R575)]], [[Grace 17R575 (Watch5,3)|6.0 (17R575)]], [[Grace 17R575 (Watch5,4)|6.0 (17R575)]]"
+    latest_firmware: "{{Latest firmware|Watch5,1}}, {{Latest firmware|Watch5,2}}, {{Latest firmware|Watch5,3}}, {{Latest firmware|Watch5,4}}"
+    latest_beta_firmware: "{{Latest beta firmware|Watch5,1}}, {{Latest beta firmware|Watch5,2}}, {{Latest beta firmware|Watch5,3}}, {{Latest beta firmware|Watch5,4}}"
+ - internal_name: Watch5,1, Watch5,2, Watch5,3, Watch5,4
+
+Apple TV (1st generation):
+# '''NOTE:''' The first generation Apple TV does not run on a variant of iOS.
+ - color: Silver/White
+ - Power Supply Specs:
+    current: 7.2 Amps
+    power: 48 Wh
+    voltage: 5 V
+ - CPU Specs:
+    core_design: Intel "Crofton" Pentium M x 1[http://www.appleinsider.com/articles/07/01/16/intel_confirms_low_voltage_small_form_factor_chip_in_apple_tv]
+    cpu_speed: 1 GHz
+ - ram: 256 MiB 400 MHz "[[wikipedia:DDR2 SDRAM|DDR2]] [[wikipedia:Synchronous dynamic random-access memory|SDRAM]]"
+ - storage: 40/160
+ - firmware: Modified build of "[[wikipedia:Mac OS X Tiger|Mac OS X 10.4 Tiger]]"
+    initial_firmware: 1.0
+    latest_firmware: 3.0.2
+ - internal_name: <code>AppleTV1,1</code>
+
+
+K66AP|Apple TV (2nd generation):
+ - color: Black
+ - Firmware:
+    initial_firmware: "[[Mojave 8M89 (AppleTV2,1)|4.0 / 4.1 (8M89)]]"
+    latest_firmware: "[[Sochi 11D258 (AppleTV2,1)|6.2.1 / 7.1.2 (11D258)]]"
+ - internal_name: <code>AppleTV2,1</code>
+ - Power Supply Specs:
+    current: 1.75 Amps
+    power: 5.95 Wh
+    voltage: 3.4 V
+    cpu: "[[S5L8930]]"
+    cpu_speed: 1 GHz
+    instruction_set: ARMv7
+ - ram: 256 MiB "[[wikipedia:Dynamic random-access memory|DRAM]] MB"
+ - storage: 8 GB
+
+Apple TV (3rd generation):
+ - color: Black
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM Cortex-A9|ARM Cortex-A9]] x 1 (another core is present on [[S5L8942]], but disabled)"
+    CPU:
+    - apple_tv3_1: "[[S5L8942]]"
+    - apple_tv3_2: "[[S5L8947]]"
+    cpu_speed: 1 GHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware: "[[Hoodoo 9B179b (AppleTV3,1)|5.0 / 5.1 (9B179b)]], [[Brighton 10B144b (AppleTV3,2)|5.2 / 6.1 (10B144b)]]"
+    latest_firmware: "{{Latest firmware|AppleTV3,1}}, {{Latest firmware|AppleTV3,2}}"
+ - internal_name: <code>AppleTV3,1</code>, <code>AppleTV3,2</code>
+ - Power Supply Specs:
+    current: 1.75 Amps
+    power: 5.95 Wh
+    voltage: 3.4 V
+ - ram: 512 MiB DRAM
+ - storage: 8 GB
+
+
+J42dAP|Apple TV (4th generation):
+ - color: Black
+ - CPU Specs:
+    core_design: "[[Apple Typhoon]] x 2"
+    cpu: "[[T7000]]"
+    cpu_speed: 1.5 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[MonarchTide 13T396 (AppleTV5,3)|9.0 (13T396)]]"
+    latest_firmware: "{{Latest firmware|AppleTV5,3}}"
+    latest_beta_firmware: "{{Latest beta firmware|AppleTV5,3}}"
+ - internal_name: <code>AppleTV5,3</code>
+ - Power Supply Specs:
+    current: 0.917 Amps
+    power: 410 Wh
+    voltage: 12 V
+ - ram: 2 GB
+ - storage: 32/64 GB
+
+
+J105aAP|Apple TV 4K:
+ - color: Black
+ - CPU Specs:
+    core_design: "[[Apple Hurricane]] & [[Apple Zephyr]]"
+    cpu: "[[T8011]]"
+    cpu_speed: 2.38 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Topaz 15J381 (AppleTV6,2)|11.0 (15J381)]]"
+    latest_firmware: "{{Latest firmware|AppleTV6,2}}"
+    latest_beta_firmware: "{{Latest beta firmware|AppleTV6,2}}"
+ - internal_name: <code>AppleTV6,2</code>
+ - Power Supply Specs:
+    current: 1.083 Amps
+    power: ? Wh
+    voltage: 12 V
+ - ram: 3 GB
+ - storage: 32/64 GB
+
+M68AP|iPhone:
+# This is the very first iPhone. It is sometimes referred to as the "iPhone 2G" due to its lack of support for 3G networks.
+ - Battery Specs:
+    current: 1400 mA
+    power: 5.18 Wh
+    voltage: 3.7 V
+ - Bluetooth 2.0 EDR
+ - Camera Specs:
+    rear: 1.9 megapixels<ref name="19mp"/>
+ - cellular_radio: Up to "[[wikipedia:Enhanced Data Rates for GSM Evolution|EDGE]] (2.5G)"
+ - colors: Aluminum (Gray)
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM11|ARM1176]] x 1"
+    cpu: "[[S5L8900]]"
+    cpu_speed: 400 MHz (412 MHz as of iPhone OS 1.1.2)
+    instruction_set: ARMv6
+ - Firmware:
+    initial_firmware:  "[[Heavenly 1A543a (iPhone1,1)|1.0 (1A543a)]]"
+    latest_firmware: "[[SUNorthstarTwo 7E18 (iPhone1,1)|3.1.3 (7E18)]]"
+ - internal_name: iPhone1,1
+ - ram: 128 MB
+ - storage: 4/8/16 GB
+ - wi_fi: 802.11b/g
+
+
+N82AP|iPhone 3G:
+ - Battery Specs:
+    current: 1150 mA
+    voltage: 3.7 V
+ - Bluetooth 2.0 EDR
+ - Camera Specs:
+    rear: 1.9 megapixels<ref name="19mp"/>
+ - cellular_radio: Up to "[[wikipedia:High-Speed Downlink Packet Access|HSDPA]] (3G)"
+ - colors: Black/White
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM11|ARM1176]] x 1"
+    cpu: "[[S5L8900]]"
+    cpu_speed: 412 MHz
+    instruction_set: ARMv6
+ - Firmware:
+    initial_firmware:  "[[Big Bear 5A345 (iPhone1,2)|2.0 (5A345)]]"
+    latest_firmware: "[[Jasper 8C148 (iPhone1,2)|4.2.1 (8C148)]]"
+ - internal_name: iPhone1,2
+ - ram: 128 MB
+ - storage: 8/16 GB
+ - wi_fi: 802.11b/g
+
+
+N88AP|iPhone 3GS:
+ - Battery Specs:
+    current: 1219 mA
+    power: 4.51 Whr
+    voltage: 3.7 V
+ - bluetooth: 2.1 EDR
+ - Camera Specs:
+    rear: 3.1 megapixels<ref name="31mp"/> / 480p30<ref name="480p"/> video
+ - cellular_radio: Up to "[[wikipedia:High-Speed Downlink Packet Access|HSDPA]] (3G)"
+ - colors: Black/White
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM Cortex-A8|ARM Cortex-A8]] x 1"
+    cpu: "[[S5L8920]]"
+    cpu_speed: 620 MHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware:  "[[Kirkwood 7A341 (iPhone2,1)|3.0 (7A341)]]"
+    latest_firmware: "[[BrightonMaps 10B500 (iPhone2,1)|6.1.6 (10B500)]]"
+ - internal_name: iPhone2,1
+ - ram: 256 MB
+ - storage: 8/16/32 GB
+ - wi_fi: 802.11b/g
+
+
+iPhone 4:
+# there_are_three_models_of_the_i_phone_4: the "[[N90AP|iPhone3,1]], [[N90BAP|iPhone3,2]], and [[N92AP|iPhone3,3]]."
+ - Battery Specs:
+    current: 1419 mA
+    power: 5.25 Whr
+    voltage: 3.7 V
+ - bluetooth: 2.1 EDR
+ - Camera Specs:
+    front: 0.3 megapixels<ref name="03mp"/> / 480p30<ref name="480p"/> video
+    rear: 5.0 megapixels<ref name="50mp"/> / 720p30<ref name="720p"/> video
+ - Cellular Radio:
+    i_phone3_1_and_i_phone3_2: Up to "[[wikipedia:High-Speed Downlink Packet Access|HSDPA]]+[[wikipedia:High-Speed Uplink Packet Access|HSUPA]] (3G)"
+    i_phone3_3: "[[wikipedia:Evolution-Data_Optimized#TIA-856 Rev. A|EV-DO Rev. A]] (3G)"
+ - colors: Black/White
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM Cortex-A8|ARM Cortex-A8]] x 1"
+    cpu: "[[S5L8930]] "A4""
+    cpu_speed: 800 MHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware:  "[[Apex 8A293 (iPhone3,1)|4.0 (8A293)]], [[Sundance 10A403 (iPhone3,2)|6.0 (10A403)]], [[Phoenix 8E128 (iPhone3,3)|4.2.5 (8E128)]], [[Phoenix 8E200 (iPhone3,3)|4.2.6 (8E200)]]"
+    latest_firmware: "[[Sochi 11D257 (iPhone3,1)|7.1.2 (11D257)]], [[Sochi 11D257 (iPhone3,2)|7.1.2 (11D257)]], [[Sochi 11D257 (iPhone3,3)|7.1.2 (11D257)]]"
+ - internal_name: iPhone3,1, iPhone3,2, iPhone3,3
+ - ram: 512 MB
+ - storage: 8/16/32 GB
+ - wi_fi: 802.11b/g/n (2.4 GHz only)
+
+
+N94AP|iPhone 4S:
+ - Battery Specs:
+    current: 1432 mA
+    power: 5.3 Whr
+    voltage: 3.7 V
+ - bluetooth: 4.0
+ - Camera Specs:
+    front: 0.3 MP VGA (480p) "[[FaceTime]] Camera."
+    rear: 8.0 MP ƒ/2.4 aperture, 5 element lens, back-side illuminated sensor, IR filter, HD Video (1080p) at 30fps.
+ - Cellular Radio:
+    Up to "[[wikipedia:High-Speed Downlink Packet Access|HSDPA]] (14.4 Mbps)+[[wikipedia:High-Speed Uplink Packet Access|HSUPA]] (3G), [[wikipedia:Evolution-Data_Optimized#TIA-856 Rev. A|EV-DO Rev. A]] (3G)"
+ - colors: Black/White
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM Cortex-A9|ARM Cortex-A9]] x 2"
+    cpu: "[[S5L8940]] "A5""
+    cpu_speed: 800 MHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware: "[[Telluride 9A334 (iPhone4,1)|5.0 (9A334)]]"
+    latest_firmware: "{{Latest firmware|iPhone4,1}}"
+ - internal_name: iPhone4,1
+ - ram: 512 MB
+ - storage: 8/16/32/64 GB
+ - wi_fi: 802.11b/g/n (2.4 GHz only)
+
+
+iPhone 5:
+# there_are_two_models_of_the_i_phone_5: "[[N41AP|iPhone5,1]] and [[N42AP|iPhone5,2]]."
+ - Battery Specs:
+    current: 1434 mA
+    power: 5.45 Whr
+    voltage: 3.8 V
+ - bluetooth: 4.0
+ - Camera Specs:
+    front: 1.2 megapixels<ref name="12mp"/> / 720p30<ref name="720p"/> video
+    rear: 8.0 megapixels<ref name="80mp"/> / 1080p30<ref name="1080p"/> video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Black/White
+ - CPU Specs:
+    core_design: Swift x 2
+    cpu: "[[S5L8950]] "A6""
+    cpu_speed: 1.2 GHz
+    instruction_set: ARMv7s
+ - Firmware:
+    initial_firmware:  "[[Sundance 10A405 (iPhone5,1)|6.0 (10A405)]], [[Sundance 10A405 (iPhone5,2)|6.0 (10A405)]]"
+    latest_firmware: "{{Latest firmware|iPhone5,1}}, {{Latest firmware|iPhone5,2}}"
+ - internal_name: iPhone5,1, iPhone5,2
+ - ram: 1 GB
+ - storage: 16/32/64 GB
+ - wi_fi: 802.11a/b/g/n
+
+
+iPhone 5c:
+# there_are_two_models_of_the_i_phone_5: "[[N48AP|iPhone5,3]] and [[N49AP|iPhone5,4]]."
+ - Battery Specs:
+    current: 1508 mA
+    power: 5.73 Whr
+    voltage: 3.8 V
+ - bluetooth: 4.0
+ - Camera Specs:
+    front: 1.2 megapixels<ref name="12mp"/> / 720p30<ref name="720p"/> video
+    rear: 8.0 megapixels<ref name="80mp"/> / 1080p30<ref name="1080p"/> video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Blue, Green, Pink, White, Yellow
+ - CPU Specs:
+    core_design: Swift x 2
+    cpu: "[[S5L8950]] "A6""
+    cpu_speed: 1.2 GHz
+    instruction_set: ARMv7s
+ - Firmware:
+    initial_firmware: "[[Innsbruck 11A466 (iPhone5,3)|7.0 (11A466)]], [[Innsbruck 11A466 (iPhone5,4)|7.0 (11A466)]]"
+    latest_firmware: "{{Latest firmware|iPhone5,3}}, {{Latest firmware|iPhone5,4}}"
+ - internal_name: iPhone5,3, iPhone5,4
+ - ram: 1 GB
+ - storage: 16/32/64 GB
+ - wi_fi: 802.11a/b/g/n
+
+
+iPhone 5s:
+# there_are_two_models_of_the_i_phone_5s: "[[N51AP|iPhone6,1]] and [[N53AP|iPhone6,2]]."
+ - Battery Specs:
+    current: 1508 mA
+    power: 5.73 Whr
+    voltage: 3.8 V
+ - bluetooth: 4.0
+ - Camera Specs:
+    front: 1.2 megapixels<ref name="12mp"/> / 720p30<ref name="720p"/> video
+    rear: 8.0 megapixels<ref name="80mp"/> / 1080p30<ref name="1080p"/> video / 720p120<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Cyclone]] x 2"
+    cpu: "[[S5L8960]] "A7""
+    cpu_speed: 1.3 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Innsbruck 11A466 (iPhone6,1)|7.0 (11A466)]], [[Innsbruck 11A466 (iPhone6,2)|7.0 (11A466)]]"
+    latest_firmware: "{{Latest firmware|iPhone6,1}}, {{Latest firmware|iPhone6,2}}"
+ - internal_name: iPhone6,1, iPhone6,2
+ - ram: 1 GB
+ - storage: 16/32/64 GB
+ - wi_fi: 802.11a/b/g/n
+
+
+N61AP|iPhone 6:
+ - Battery Specs:
+    current: 1809 mA
+    power: 6.91 Whr
+    voltage: 3.82 V
+ - bluetooth: 4.0
+ - Camera Specs:
+    front: 1.2 megapixels<ref name="12mp"/> / 720p30<ref name="720p"/> video
+    rear: 8.0 megapixels<ref name="80mp"/> / 1080p30, 1080p60<ref name="1080p"/> video / 720p120, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Typhoon]] x 2"
+    cpu: T7000 "A8”
+    cpu_speed: 1.38 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Okemo 12A365 (iPhone7,2)|8.0 (12A365)]]"
+    latest_firmware: "{{Latest firmware|iPhone7,2}}"
+ - internal_name: iPhone7,2
+ - ram: 1 GB
+ - storage: 16/64/128 GB
+ - wi_fi: 802.11a/b/g/n/ac
+
+N56AP|iPhone 6 Plus:
+ - Battery Specs:
+    current: 2906 mA
+    power: 11.1 Whr
+    voltage: 3.82 V
+ - bluetooth: 4.0
+ - Camera Specs:
+    front: 1.2 megapixels<ref name="12mp"/> / 720p30<ref name="720p"/> video
+    rear: 8.0 megapixels<ref name="80mp"/> / 1080p30, 1080p60<ref name="1080p"/> video / 720p120, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Typhoon]] x 2"
+    cpu: "[[T7000]] "A8""
+    cpu_speed: 1.38 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Okemo 12A366 (iPhone7,1)|8.0 (12A366)]]"
+    latest_firmware: "{{Latest firmware|iPhone7,1}}"
+ - internal_name: iPhone7,1
+ - ram: 1 GB
+ - storage: 16/64/128 GB
+ - wi_fi: 802.11a/b/g/n/ac
+
+
+iPhone 6s:
+
+ - Battery Specs:
+    current: 1715 mA
+    power: 6.55 Whr
+    voltage: 3.82 V
+ - bluetooth: 4.2
+ - Camera Specs:
+    front: 5 megapixels (?)
+    rear: 12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Rose Gold, Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Twister]] x 2"
+    cpu: "[[S8000]] and [[S8003]] "A9""
+    cpu_speed: 1.85 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Monarch 13A342 (iPhone8,1)|9.0 (13A342)]]"
+    latest_firmware: "{{Latest firmware|iPhone8,1}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone8,1}}"
+ - internal_name: iPhone8,1
+ - ram: 2 GB
+ - storage: 16/64/128 GB
+ - wi_fi: 802.11a/b/g/n/ac with MIMO
+
+
+iPhone 6s Plus:
+ - Battery Specs:
+    current: 2750 mA
+    power: 10.45 Whr
+    voltage: 3.8 V
+ - bluetooth: 4.2
+ - Camera Specs:
+    front: 5 megapixels (?)
+    rear: 12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Rose Gold, Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Twister]] x2"
+    cpu: "[[S8000]] and [[S8003]] "A9""
+    cpu_speed: 1.85 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Monarch 13A343 (iPhone8,2)|9.0 (13A343)]]"
+    latest_firmware: "{{Latest firmware|iPhone8,2}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone8,2}}"
+ - internal_name: iPhone8,2
+ - ram: 2 GB
+ - storage: 16/64/128 GB
+ - wi_fi: 802.11a/b/g/n/ac with MIMO
+
+
+iPhone SE:
+ - Battery Specs:
+    current: 1624 mA
+    power: 6.21 Whr
+    voltage: 3.82 V
+ - bluetooth: 4.2
+ - Camera Specs:
+    front: 1.2 megapixels<ref name="12mp"/> / 720p30<ref name="720p"/> video
+    rear: 12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Silver, Space Gray, Rose Gold
+ - CPU Specs:
+    core_design: "[[Apple Twister]] x 2"
+    cpu: "[[S8000]] & [[S8003]] "A9""
+    cpu_speed: 1.85 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Eagle 13E233 (iPhone8,4)|9.3 (13E233)]]"
+    latest_firmware: "{{Latest firmware|iPhone8,4}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone8,4}}"
+ - internal_name: iPhone8,4
+ - ram: 2 GB
+ - storage: 16/32/64/128 GB
+ - wi_fi: 802.11a/b/g/n/ac
+
+
+iPhone 7:
+ - Battery Specs:
+    current: 1960 mA
+    power: 7.45 Whr
+    voltage: 3.8 V
+ - bluetooth: 4.2
+ - Camera Specs:
+    front: 7 megapixels (?)
+    rear: 12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Rose Gold, Gold, Silver, Black, Jet Black or the Special Edition PRODUCT(RED)
+ - CPU Specs:
+    core_design: "[[Apple Fusion]] x 2"
+    cpu: "[[T8010]] "A10""
+    cpu_speed: 2.34 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: 10.0 (14A346)
+    latest_firmware: "{{Latest firmware|iPhone9,1}}, {{Latest firmware|iPhone9,3}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone9,1}}, {{Latest beta firmware|iPhone9,3}}"
+ - internal_name: iPhone9,1, iPhone9,3
+ - ram: 2 GB
+ - storage: 32/128/256 GB
+ - wi_fi: 802.11a/b/g/n/ac with MIMO
+
+
+iPhone 7 Plus:
+ - Battery Specs:
+    current: 2900 mA
+    power: 11.1 Whr
+    voltage: 3.82 V
+ - bluetooth: 4.2
+ - Camera Specs:
+    front: 7 megapixels
+    rear: 2&times;12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Rose Gold, Gold, Silver, Black, Jet Black or the Special Edition PRODUCT(RED)
+ - CPU Specs:
+    core_design: "[[Apple Fusion]] x 2"
+    cpu: "[[T8010]] "A10""
+    cpu_speed: 2.34 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: 10.0 (14A346)
+    latest_firmware: "{{Latest firmware|iPhone9,2}}, {{Latest firmware|iPhone9,4}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone9,2}}, {{Latest beta firmware|iPhone9,4}}"
+ - internal_name: iPhone9,2, iPhone9,4
+ - ram: 3 GB
+ - storage: 32/128/256 GB
+ - wi_fi: 802.11a/b/g/n/ac with MIMO
+
+
+iPhone 8:
+ - Battery Specs:
+    current: 1821 mA
+    power: 6.96 Whr
+    voltage: 3.82 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 7 megapixels
+    rear: 12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video 
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Red, Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Monsoon]] x 2 and [[Apple Mistral]] x 4"
+    cpu: "[[T8015]] "A11""
+    cpu_speed: 2.39 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Tigris 15A372 (iPhone10,1)|11.0 (15A372)]], [[Tigris 15A372 (iPhone10,4)|11.0 (15A372)]]"
+    latest_firmware: "{{Latest firmware|iPhone10,1}}, {{Latest firmware|iPhone10,4}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone10,1}}, {{Latest beta firmware|iPhone10,4}}"
+ - internal_name: iPhone10,1, iPhone10,4
+ - ram: 2 GB
+ - storage: 64/256 GB
+ - wi_fi: 802.11a/b/g/n/ac with MIMO
+
+
+iPhone 8 Plus:
+ - Battery Specs:
+    current: 2691 mA
+    power: 10.28 Whr
+    voltage: 3.82 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 7 megapixels
+    rear: 2&times;12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Red, Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Monsoon]] x 2 and [[Apple Mistral]] x 4"
+    cpu: "[[T8015]] "A11""
+    cpu_speed: 2.39 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Tigris 15A372 (iPhone10,2)|11.0 (15A372)]], [[Tigris 15A372 (iPhone10,5)|11.0 (15A372)]]"
+    latest_firmware: "{{Latest firmware|iPhone10,2}}, {{Latest firmware|iPhone10,5}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone10,2}}, {{Latest beta firmware|iPhone10,5}}"
+ - internal_name: iPhone10,2, iPhone10,5
+ - ram: 3 GB
+ - storage: 64/256 GB
+ - wi_fi: 802.11a/b/g/n/ac with MIMO
+
+
+iPhone X:
+ - Battery Specs:
+    current: 2716 mA
+    power: 10.35 Whr
+    voltage: 3.81 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 7 megapixels
+    rear: 2&times;12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Silver, Space Gray
+ - CPU Specs:
+    core_design: "[[Apple Monsoon]] x 2 and [[Apple Mistral]] x 4"
+    cpu: "[[T8015]] "A11""
+    cpu_speed: 2.39 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: 11.0.1 (15A8391)
+    latest_firmware: "{{Latest firmware|iPhone10,3}}, {{Latest firmware|iPhone10,6}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone10,3}}, {{Latest beta firmware|iPhone10,6}}"
+ - internal_name: iPhone10,3, iPhone10,6
+ - ram: 3 GB
+ - storage: 64/256 GB
+ - wi_fi: 802.11ac with MIMO
+
+
+N841AP|iPhone XR:
+ - Battery Specs:
+    current: 2942 mA
+    power: 11.16 Whr
+    voltage: 3.79 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 7 megapixels
+    rear: 12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: (PRODUCT)RED, Yellow, White, Coral, Black, Blue
+ - CPU Specs:
+    core_design: "[[Apple Vortex]] x 2 and [[Apple Tempest]] x 4"
+    cpu: "[[T8020]] "A12 Bionic""
+    cpu_speed: 2.49 GHz
+    instruction_set: ARMv8.3
+ - Firmware:
+    initial_firmware: "[[Peace 16A366 (iPhone11,8)|12.0 (16A366)]]"
+    latest_firmware: "{{Latest firmware|iPhone11,8}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone11,8}}"
+ - internal_name: iPhone11,8
+ - ram: 3 GB
+ - storage: 64/128/256 GB
+ - wi_fi: 802.11ac with MIMO
+
+
+D321AP|iPhone XS:
+ - Battery Specs:
+    current: 2658 mA
+    power: 10.13 Whr
+    voltage: 3.81 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 7 megapixels
+    rear: 2&times;12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Space Grey, Silver
+ - CPU Specs:
+    core_design: "[[Apple Vortex]] x 2 and [[Apple Tempest]] x 4"
+    cpu: "[[T8020]] "A12 Bionic""
+    cpu_speed: 2.49 GHz
+    instruction_set: ARMv8.3
+ - Firmware:
+    initial_firmware: "[[Peace 16A366 (iPhone11,2)|12.0 (16A366)]]"
+    latest_firmware: "{{Latest firmware|iPhone11,2}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone11,2}}"
+ - internal_name: iPhone11,2
+ - ram: 4 GB
+ - storage: 64/256/512 GB
+ - wi_fi: 802.11ac with MIMO
+
+
+iPhone XS Max:
+ - Battery Specs:
+    current: 3174 mA
+    power: 12.08 Whr
+    voltage: 3.80 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 7 megapixels
+    rear: 2&times;12.2 megapixels<ref name="122mp"/> / 4k-2160p30<ref name="2160p"/>, 1080p30, 1080p60<ref name="1080p"/> video / 1080p120<ref name="1080p"/>, 720p240<ref name="720p"/> slow-motion video
+ - Cellular Radio:
+    Up to "[[wikipedia:LTE (telecommunication)|LTE]] (4G)"
+ - colors: Gold, Space Grey, Silver
+ - CPU Specs:
+    core_design: "[[Apple Vortex]] x 2 and [[Apple Tempest]] x 4"
+    cpu: "[[T8020]] "A12 Bionic""
+    cpu_speed: 2.49 GHz
+    instruction_set: ARMv8.3
+ - Firmware:
+    initial_firmware: "[[Peace 16A366 (iPhone11,4)|12.0 (16A366)]], [[Peace 16A366 (iPhone11,6)|12.0 (16A366)]]"
+    latest_firmware: "{{Latest firmware|iPhone11,4}}, {{Latest firmware|iPhone11,6}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone11,6}}<br />'''Note:''' the iPhone11,4 model doesn't get beta firmwares."
+ - internal_name: iPhone11,4, iPhone11,6
+ - ram: 4 GB
+ - storage: 64/256/512 GB
+ - wi_fi: 802.11ac with MIMO
+
+
+iPhone 11:
+ - Battery Specs:
+    current: 3110 mAh
+    power: 11.91 Wh
+    voltage: 3.83 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 12 MP, f/2.2 aperture, burst mode, exposure control, face detection, auto-HDR, auto image stabilization, Retina flash, 4K video recording at 24, 30 or 60 FPS or 1080p HD at 30 or 60 FPS, Slow-motion video (1080p at 120 FPS) Portrait Mode, Portrait Lighting and Animoji
+    rear: 12 MP (1.4 μm) (1/2.55") Sony Exmor IMX333-Inspired, quad-LED flash, ƒ/1.8 aperture, Optical image stabilization (Wide-angle only) quad-LED flash, autofocus, IR filter, Burst mode, 6-element lens, 4K video recording at 24, 30 or 60 FPS or 1080p at 30 or 60 FPS, Slow-motion video (1080p at 120 FPS or 240 FPS), Time-lapse with stabilization, Panorama (up to 63 megapixels), Portrait Mode, Portrait Lighting, Facial recognition, Digital image stabilization, Optical image stabilization, Stereo audio recording, Night Mode
+ - cellular_radio: Gigabit-class LTE with 2x2 MIMO and LAA
+ - colors: Purple, Yellow, Green, Black, White, (PRODUCT)RED
+ - CPU Specs:
+    core_design: "[[Apple Lightning]] x 2 and [[Apple Thunder]] x 4"
+    cpu: "[[T8030]] "A13 Bionic""
+    cpu_speed: up to 2.65 GHz
+    instruction_set: ARMv8.3-A
+ - Firmware:
+    initial_firmware: "[[YukonPre 17A577 (iPhone12,1)|13.0 (17A577)]]"
+    latest_firmware: "{{Latest firmware|iPhone12,1}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone12,1}}"
+ - internal_name: iPhone12,1
+ - ram: 4 GB
+ - storage: 64, 128 or 256 GB
+ - wi_fi: 802.11ax (Wi-Fi 6) with 2x2 MIMO
+
+
+iPhone 11 Pro:
+ - Battery Specs:
+    current: 3046 mAh
+    power: 11.67 Wh
+    voltage: 3.83 V
+ - bluetooth: 5.0
+ - Camera Specs:
+    front: 12 MP, f/2.2 aperture, burst mode, exposure control, face detection, auto-HDR, auto image stabilization, Retina flash, 4K video recording at 24, 30 or 60 FPS or 1080p HD at 30 or 60 FPS, Slow-motion video (1080p at 120 FPS) Portrait Mode, Portrait Lighting and Animoji
+    rear: 12 MP (1.4 μm) (1/2.55") Sony Exmor IMX333-Inspired, ƒ/1.8 aperture, Optical image stabilization (Wide-angle & telephoto, not on ultrawide), brighter dual-LED flash, autofocus, IR filter, Burst mode, 6-element lens, 4K video recording at 24, 30 or 60 FPS or 1080p at 30 or 60 FPS, Slow-motion video (1080p at 120 FPS or 240 FPS), Time-lapse with stabilization, Panorama (up to 63 megapixels), Portrait Mode, Portrait Lighting, Facial recognition, Digital image stabilization, Stereo audio recording
+ - cellular_radio: Gigabit-class LTE with 4x4 MIMO and LAA
+ - colors:  Midnight Green, Space Grey, Silver, Gold
+ - CPU Specs:
+    core_design: "[[Apple Lightning]] x 2 and [[Apple Thunder]] x 4"
+    cpu: "[[T8030]] "A13 Bionic""
+    cpu_speed: up to 2.65 GHz
+    instruction_set: ARMv8.3-A
+ - Firmware:
+    initial_firmware: "[[YukonPre 17A577 (iPhone12,3)|13.0 (17A577)]]"
+    latest_firmware: "{{Latest firmware|iPhone12,3}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone12,3}}"
+ - internal_name: iPhone12,3
+ - ram: 4GB
+ - storage: 64, 256 or 512 GB
+ - wi_fi: 802.11ax (Wi-Fi 6) with 2x2 MIMO
+
+
+iPhone 11 Pro Max:
+ - Battery Specs:
+    current: 3969 mAh
+    power: 15.04 Wh
+    voltage: 3.79 V
+ - bluetooth: 5.0
+    front: 12 MP, f/2.2 aperture, burst mode, exposure control, face detection, auto-HDR, auto image stabilization, Retina flash, 4K video recording at 24, 30 or 60 FPS or 1080p HD at 30 or 60 FPS, Slow-motion video (1080p at 120 FPS) Portrait Mode, Portrait Lighting and Animoji
+    rear: 12 MP (1.4 μm) (1/2.55") Sony Exmor IMX333-Inspired, ƒ/1.8 aperture, Optical image stabilization (Wide-angle & telephoto, not on ultrawide), brighter dual-LED flash, autofocus, IR filter, Burst mode, 6-element lens, 4K video recording at 24, 30 or 60 FPS or 1080p at 30 or 60 FPS, Slow-motion video (1080p at 120 FPS or 240 FPS), Time-lapse with stabilization, Panorama (up to 63 megapixels), Portrait Mode, Portrait Lighting, Facial recognition, Digital image stabilization, Stereo audio recording
+ - cellular_radio: Gigabit-class LTE with 4x4 MIMO and LAA
+ - colors: Midnight Green, Space Grey, Silver, Gold
+ - CPU Specs:
+    core_design: "[[Apple Lightning]] x 2 and [[Apple Thunder]] x 4"
+    cpu: "[[T8030]] "A13 Bionic""
+    cpu_speed: up to 2.65 GHz
+    instruction_set: ARMv8.3-A
+ - Firmware:
+    initial_firmware: "[[YukonPre 17A577 (iPhone12,5)|13.0 (17A577)]]"
+    latest_firmware: "{{Latest firmware|iPhone12,5}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPhone12,5}}"
+ - internal_name: iPhone12,5
+ - ram: 4GB
+ - storage: 64, 256 or 512 GB
+ - wi_fi: 802.11ax (Wi-Fi 6) with 2x2 MIMO
+
+K48AP|iPad:
+ - colors: Black
+ - Battery Specs:
+    current: 6600 mA
+    power: 24.8 Wh
+    voltage: 3.76 V
+ - cellular_radio: Up to HSDPA (3.5G), Cellular model only
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM Cortex-A8|ARM Cortex-A8]] x 1"
+    cpu: "[[S5L8930]] "A4""
+    cpu_speed: 1 GHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware:  "[[Wildcat 7B367 (iPad1,1)|3.2 (7B367)]]"
+    latest_firmware: "[[Hoodoo 9B206 (iPad1,1)|5.1.1 (9B206)]]"
+ - internal_name: iPad1,1
+ - ram: 256 MB
+ - storage: 16/32/64 GB
+
+iPad 2:
+ - colors: Black/White
+ - Battery Specs:
+    current: 6930 mA
+    power: 25 Wh
+    voltage: 3.8 V
+ - Camera Specs:
+    rear: 0.75 megapixels
+ - Cellular Radio:
+    i_pad2_2: Up to HSDPA/HSUPA (3.5G)
+    i_pad2_3: Up to EV-DO Rev. A (3.5G)
+ - CPU Specs:
+    core_design: "[[wikipedia:ARM Cortex-A9 MPCore|ARM Cortex-A9]] x 2"
+    cpu: "[[S5L8940]] "A5""
+    cpu_speed: 1 GHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware: "[[Durango 8F191 (iPad2,1)|4.3 (8F191)]], [[Durango 8F191 (iPad2,2)|4.3 (8F191)]], [[Durango 8F191 (iPad2,3)|4.3 (8F191)]], [[Hoodoo 9B176 (iPad2,4)|5.1 (9B176)]]"
+    latest_firmware: "{{Latest firmware|iPad2,1}}, {{Latest firmware|iPad2,2}}, {{Latest firmware|iPad2,3}}, {{Latest firmware|iPad2,4}}"
+ - internal_name: iPad2,1, iPad2,2, iPad2,3, iPad2,4
+ - ram: 512 MB
+ - storage: 16/32/64 GB (Only 16GB for iPad2,4)
+
+iPad (3rd generation):
+ - colors: Black/White
+ - Battery Specs:
+    current: 11560 mA
+    power: 42.5 Wh
+    voltage: 3.78 V
+ - Camera Specs:
+    rear: 5 megapixels
+ - Cellular Radio:
+    i_pad3_2: Up to LTE (Band 13) (4G)
+    i_pad3_3: Up to LTE (Bands 4, 17) (4G)
+ - CPU Specs:
+    core_design: "[[Apple Swift]] x 2"
+    cpu: "[[S5L8945]] "A5X""
+    cpu_speed: 1 GHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware: "[[Hoodoo 9B176 (iPad3,1)|5.1 (9B176)]], [[Hoodoo 9B176 (iPad3,2)|5.1 (9B176)]], [[Hoodoo 9B176 (iPad3,3)|5.1 (9B176)]]"
+    latest_firmware: "{{Latest firmware|iPad3,1}}, {{Latest firmware|iPad3,2}}, {{Latest firmware|iPad3,3}}"
+ - internal_name: iPad3,1, iPad3,2, iPad3,3
+ - ram: 1 GB
+ - storage: 16/32/64 GB
+
+iPad (4th generation):
+ - colors: Black/White
+ - Battery Specs:
+    current: 11560 mA
+    power: 42.5 Wh
+    voltage: 3.78 V
+ - Camera Specs:
+    rear: 5 megapixels
+ - Cellular Radio:
+    i_pad3_5: Up to LTE (Bands 4, 17) (4G)
+    i_pad3_6: Up to LTE (Bands 1, 3, 5, 13, 25) (4G)
+ - CPU Specs:
+    core_design: "[[Apple Swift]] x 2"
+    cpu: "[[S5L8955]] "A6X""
+    cpu_speed: 1.4 GHz
+    instruction_set: ARMv7
+ - Firmware:
+    initial_firmware: "[[Sundance 10A407 (iPad3,4)|6.0 (10A407)]], [[SundanceTaos 10A8426 (iPad3,5)|6.0.1 (10A8426)]], [[SundanceTaos 10A8426 (iPad3,6)|6.0.1 (10A8426)]]"
+    latest_firmware: "{{Latest firmware|iPad3,4}}, {{Latest firmware|iPad3,5}}, {{Latest firmware|iPad3,6}}"
+ - internal_name: iPad3,4, iPad3,5, iPad3,6
+ - ram: 1 GB
+ - storage: 16/32/64/128 GB
+
+iPad (5th generation):
+ - colors: Gold/Silver/Space Gray
+ - Battery Specs:
+    current: 8820 mA
+    power: 32.9 Wh
+    voltage: 3.73 V
+ - Camera Specs:
+    rear: 8 megapixels
+ - Cellular Radio:
+    i_pad6_12: Up to LTE (Bands 1, 2, 3, 4, 5, 7, 8, 12, 13, 17, 18, 19, 20, 25, 26, 28, 29, 38, 39, 40, 41) (4G)
+ - CPU Specs:
+    core_design: "[[Apple Twister]] x 2"
+    cpu: "[[S8000]]"
+    cpu_speed: 1.85 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Erie 14E5277 (iPad6,11)|10.3 (14E277)]], [[Erie 14E5277 (iPad6,12)|10.3 (14E277)]]"
+    latest_firmware: "{{Latest firmware|iPad6,11}}, {{Latest firmware|iPad6,12}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPad6,11}}, {{Latest beta firmware|iPad6,12}}"
+ - internal_name: iPad6,11, iPad6,12
+ - ram: 2 GB
+ - storage: 32/128 GB
+
+
+iPad (6th generation):
+ - colors: Gold/Silver/Space Gray
+ - Battery Specs:
+    current: 8820 mA
+    power: 32.9 Wh
+    voltage: 3.73 V
+ - Camera Specs:
+    rear: 8 megapixels
+ - Cellular Radio:
+    i_pad7_6: Up to LTE (Bands 1, 2, 3, 4, 5, 7, 8, 12, 13, 17, 18, 19, 20, 25, 26, 28, 29, 38, 39, 40, 41) (4G)
+ - CPU Specs:
+    core_design: "[[Apple Fusion]] x 2"
+    cpu: "[[T8010]] "A10""
+    cpu_speed: 2.31 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Emet 15E216 (iPad7,5)|11.3 (15E216)]], [[Emet 15E218 (iPad7,6)|11.3 (15E218)]]"
+    latest_firmware: "{{Latest firmware|iPad7,5}}, {{Latest firmware|iPad7,6}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPad7,5}}, {{Latest beta firmware|iPad7,5}}"
+ - internal_name: iPad7,5, iPad7,6
+ - ram: 2 GB
+ - storage: 32/128 GB
+
+
+iPad (7th generation):
+ - colors: Silver, Space Gray, Gold.
+ - Battery Specs:
+    current: 8820 mA
+    power: 32.9 Wh
+    voltage: 3.73 V
+ - Camera Specs:
+    rear: 8.0 MP AF, iSight with Five Element Lens, Hybrid IR filter, video stabilization, face detection, HDR, ƒ/2.4 aperture.
+    front: 1.2 MP, 720p HD, ƒ/2.2 aperture ("[[FaceTime]] HD Camera)."
+ - Cellular Radio:
+    i_pad7_12: 
+ - CPU Specs:
+    core_design: "[[Apple Fusion]] x 2"
+    cpu: "[[T8010]] "A10""
+    cpu_speed: 2.31 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[Yukon 17A844 (iPad7,11)|13.1 (17A844)]], [[Yukon 17A844 (iPad7,12)|13.1 (17A844)]]"
+    latest_firmware: "{{Latest firmware|iPad7,11}}, {{Latest firmware|iPad7,12}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPad7,11}}, {{Latest beta firmware|iPad7,12}}"
+ - internal_name: iPad7,11, iPad7,12
+ - ram: 3 GB
+ - storage: 32 or 128 GB.
+
+iPad mini:
+ - color: Black & Slate/White & Silver/Space Gray
+ - Battery Specs:
+    current: 4440 mA
+    power: 16.5 Wh
+    voltage: 3.72 V
+ - Camera Specs:
+    rear: 5 megapixels
+ - Cellular Radio:
+    i_pad2_6: Up to LTE (Bands 4, 17) (4G)
+    i_pad2_7: Up to LTE (Bands 1, 3, 5, 13, 25) (4G)
+ - CPU Specs:
+    processor: "[[S5L8942]] "A5 Rev A""
+    processor_cores: 2
+    cpu_speed: 1 GHz
+ - Firmware:
+    initial_firmware: "[[Sundance 10A406 (iPad2,5)|6.0 (10A406)]], [[SundanceTaos 10A8426 (iPad2,6)|6.0.1 (10A8426)]], [[SundanceTaos 10A8426 (iPad2,7)|6.0.1 (10A8426)]]"
+    latest_firmware: "{{Latest firmware|iPad2,5}}, {{Latest firmware|iPad2,6}}, {{Latest firmware|iPad2,7}}"
+ - internal_name: iPad2,5, iPad2,6, iPad2,7
+ - ram: 512 MB
+ - storage: 16/32/64 GB
+
+
+iPad mini 2:
+ - color: Silver/Space Gray
+ - Battery Specs:
+    current: 6471 mA
+    power: 24.3 Wh
+    voltage: 3.75 V
+ - Camera Specs:
+    rear: 5 megapixels
+ - Cellular Radio:
+    i_pad4_5: Up to LTE (Bands 1, 2, 3, 4, 5, 7, 8, 13, 17, 18, 19, 20, 25, 26) (4G)
+    i_pad4_6: Up to LTE (Bands 1, 2, 3, 5, 7, 8, 18, 19, 20, 38, 39, 40) (4G)
+ - CPU Specs:
+    processor: "[[S5L8960]] "A7""
+    processor_cores: 2
+    cpu_speed: 1.3 GHz
+ - Firmware:
+    initial_firmware: "[[InnsbruckTaos 11B511 (iPad4,4)|7.0.3 (11B511)]], [[InnsbruckTaos 11B511 (iPad4,5)|7.0.3 (11B511)]], [[Sochi 11D167 (iPad4,6)|7.1 (11D167)]]"
+    latest_firmware: "{{Latest firmware|iPad4,4}}, {{Latest firmware|iPad4,5}}, {{Latest firmware|iPad4,6}}"
+ - internal_name: iPad4,4, iPad4,5, iPad4,6
+ - ram: 1 GB
+ - storage: 16/32/64/128 GB
+
+
+iPad mini 3:
+ - color: Gold/Silver/Space Gray
+ - Battery Specs:
+    current: 6471 mA
+    power: 24.3 Wh
+    voltage: 3.75 V
+ - Camera Specs:
+    rear: 5 megapixels
+ - Cellular Radio:
+    i_pad4_8: Up to LTE (Bands 1, 2, 3, 4, 5, 7, 8, 13, 17, 18, 19, 20, 25, 26) (4G)
+    i_pad4_9: Up to LTE (Bands 1, 2, 3, 5, 7, 8, 18, 19, 20, 38, 39, 40) (4G)
+ - CPU Specs:
+    processor: "[[S5L8960]] "A7""
+    processor_cores: 2
+    cpu_speed: 1.3 GHz
+ - Firmware:
+    initial_firmware: "[[Okemo 12A365 (iPad4,7)|8.0 (12A365)]], [[OkemoTaos 12B410 (iPad4,7)|8.1 (12B410)]], [[OkemoTaos 12B410 (iPad4,8)|8.1 (12B410)]], [[OkemoTaos 12B410 (iPad4,9)|8.1 (12B410)]]"
+    latest_firmware: "{{Latest firmware|iPad4,7}}, {{Latest firmware|iPad4,8}}, {{Latest firmware|iPad4,9}}"
+ - internal_name: iPad4,7, iPad4,8, iPad4,9
+ - ram: 1 GB
+ - storage: 16/64/128 GB
+
+
+iPad mini 4:
+ - color: Gold/Silver/Space Gray
+ - Battery Specs:
+    current: 5,124 mA
+    power: 19.32 Wh
+    voltage: 3.82 V
+ - Camera Specs:
+    rear: 8 megapixels
+ - Cellular Radio:
+    i_pad5_2: Up to LTE (Bands 1, 2, 3, 4, 5, 7, 8, 13, 17, 18, 19, 20, 25, 26, 28, 29, 38, 39, 40, 41) (4G)
+ - CPU Specs:
+    processor: "[[T7000]] "A8""
+    processor_cores: 2
+    cpu_speed: 1.49 GHz
+ - Firmware:
+    initial_firmware: "[[Monarch 13A340 (iPad5,1)|9.0 (13A340)]], [[Monarch 13A340 (iPad5,2)|9.0 (13A340)]]"
+    latest_firmware: "{{Latest firmware|iPad5,1}}, {{Latest firmware|iPad5,2}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPad5,1}}, {{Latest beta firmware|iPad5,2}}"
+ - internal_name: iPad5,1, iPad5,2
+ - ram: 2 GB
+ - storage: 16/64/128 GB
+
+
+iPad mini (5th generation):
+ - color: Gold/Silver/Space Gray
+ - Battery Specs:
+    current: 5124 mAH
+    power: 19.32 Wh
+    voltage: 3.82 V
+ - Camera Specs:
+    rear: 8 megapixels
+    front: 7 megapixels
+ - cellular_radio_i_pad11_2_only:
+    UMTS/HSPA/HSPA+/DC-HSDPA (850, 900, 1700/2100, 1900, 2100 MHz); GSM/EDGE (850, 900, 1800, 1900 MHz)
+    Gigabit-class LTE (Bands 1, 2, 3, 4, 5, 7, 8, 11, 12, 13, 14, 17, 18, 19, 20, 21, 25, 26, 29, 30, 34, 38, 39, 40, 41, 46, 66, 71)
+ - CPU Specs:
+    core_design: "[[Apple Vortex]] x 2 and [[Apple Tempest]] x 4"
+    cpu: "[[T8020]] "A12 Bionic""
+    cpu_speed: 2.48 GHz
+    instruction_set: ARMv8
+ - Firmware:
+    initial_firmware: "[[PeaceE 16E227 (iPad11,1)|12.2 (16E227)]], [[PeaceE 16E227 (iPad11,2)|12.2 (16E227)]]"
+    latest_firmware: "{{Latest firmware|iPad11,1}}, {{Latest firmware|iPad11,2}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPad11,1}}, {{Latest beta firmware|iPad11,2}}"
+ - internal_name: iPad11,1, iPad11,2
+ - ram: 3 GB
+ - storage: 64/256 GB
+
+N45AP|iPod touch:
+ - color: Black
+ - Battery Specs:
+    current: 580 mA
+    power: 2.15 Wh
+    voltage: 3.7 V
+ - CPU Specs:
+    processor: "[[S5L8900]]"
+    processor_cores: 1
+    cpu_speed: 400 MHz (412 MHz as of iPhone OS 1.1.2+)
+ - ram: 128 MB "[[wikipedia:Dynamic random-access memory|DRAM]]"
+ - storage: 8/16/32 GB
+ - wi_fi: 802.11 b/g
+ - Firmware:
+    initial_firmware:  "[[Snowbird 3A100a (iPod1,1)|1.1 (3A100a)]]"
+    latest_firmware: "[[SUNorthstarTwo 7E18 (iPod1,1)|3.1.3 (7E18)]]"
+ - internal_name: iPod1,1
+
+
+N72AP|iPod touch (2nd generation):
+ - color: Black
+ - Battery Specs:
+    current: 730 mA
+    power: 2.7 Wh
+    voltage: 3.7 V
+ - CPU Specs:
+    processor: "[[S5L8720]]"
+    processor_cores: 1
+    cpu_speed: 533 MHz
+ - ram: 128 MB "[[wikipedia:Dynamic random-access memory|DRAM]]"
+ - storage: 8/16/32 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]"
+ - Bluetooth: "[[BCM4325|2.1]] (iPhone OS 3.0 and later)"
+ - Firmware:
+    initial_firmware: "[[Sugar Bowl 5F138 (iPod2,1)|2.1.1 (5F138)]] (MB) and [[Northstar 7C145 (iPod2,1)|3.1.1 (7C145)]] (MC)"
+    latest_firmware: "[[Jasper 8C148 (iPod2,1)|4.2.1 (8C148)]]"
+ - internal_name: iPod2,1
+
+
+N18AP|iPod touch (3rd generation):
+ - color: Black
+ - Battery Specs:
+    current: 789 mA
+    power: 2.92 Wh
+    voltage: 3.7 V
+ - CPU Specs:
+    processor: "[[S5L8922]]"
+    processor_cores: 1
+    cpu_speed: 620 MHz
+ - ram: 256 MB "[[wikipedia:Dynamic random-access memory|DRAM]]"
+ - storage: 32/64 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]"
+ - Bluetooth: "[[BCM4329|2.1 EDR]]"
+ - Firmware:
+    initial_firmware: "[[Northstar 7C145 (iPod3,1)|3.1.1 (7C145)]]"
+    latest_firmware: "[[Hoodoo 9B176 (iPod3,1)|5.1.1 (9B206)]]"
+ - internal_name: iPod3,1
+
+
+N81AP|iPod touch (4th generation):
+ - color: Black/White
+ - Battery Specs:
+    current: 930 mA
+    power: 3.44 Wh
+    voltage: 3.7 V
+ - CPU Specs:
+    processor: "[[S5L8930]] "A4""
+    processor_cores: 1
+    cpu_speed: 1024 MHz 
+ - ram: 256 MB "[[wikipedia:Dynamic random-access memory|DRAM]]"
+ - storage: 8/16/32/64 GB
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4 GHz only)"
+ - Bluetooth: "[[BCM4329|2.1 EDR (2.4 GHz only)]]"
+ - Firmware:
+    initial_firmware: "[[Baker 8B117 (iPod4,1)|4.1 (8B117)]]"
+    latest_firmware: "[[BrightonMaps 10B500 (iPod4,1)|6.1.6 (10B500)]]"
+ - internal_name: iPod4,1
+
+
+iPod touch (5th generation):
+ - color: Black/Blue/Yellow/Pink/Red/White (Black and Silver for A1509)
+ - Battery Specs:
+    current: 1030 mA
+    power: 3.8 Wh
+    voltage: 3.7 V
+ - CPU Specs:
+    processor: "[[S5L8942]] "A5 Rev A""
+    processor_cores: 2
+    cpu_speed: 1024 MHz 
+ - ram: 512 MB
+ - storage: 16/32/64 GB (Only 16GB for A1509)
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11a-1999|a]]/[[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]] (2.4/5.0 GHz)"
+ - Bluetooth: "[[BCM4334|4.0]]"
+ - Firmware:
+    initial_firmware: "[[Sundance 10A406 (iPod5,1)|6.0 (10A406)]] and [[Sundance 10B329 (iPod5,1)|6.1.3 (10B329)]] (A1509)"
+    latest_firmware: "[[Genoa 13G36 (iPod5,1)|9.3.5 (13G36)]]"
+ - internal_name: iPod5,1
+
+
+N102AP|iPod touch (6th generation):
+ - color: Space Gray, Gold, Silver, Pink, Blue, PRODUCT(RED)
+ - Battery Specs:
+    current: 1043 mA
+    power: 3.99 Wh
+    voltage: 3.83 V
+ - CPU Specs:
+    processor: "[[T7000]] "A8""
+    processor_cores: 2
+    cpu_speed: 1.1 GHz 
+ - motion_coprocessor: "[[LPC18B1]] "M8""
+ - ram: 1 GB
+ - storage: 16/32/64/128
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11a-1999|a]]/[[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]]/[[wikipedia:IEEE 802.11ac|ac]] (2.4/5.0 GHz)"
+ - Bluetooth: "[[BCM4354|4.1]]"
+ - Firmware:
+    initial_firmware: "[[Copper 12H143 (iPod7,1)|8.4 (12H143)]]"
+    latest_firmware: "{{Latest firmware|iPod7,1}}"
+ - internal_name: iPod7,1
+
+
+N112AP|iPod touch (7th generation):
+ - color: Space Gray, Gold, Silver, Pink, Blue, PRODUCT(RED)
+ - Battery Specs:
+    current: 1043 mAh
+    power: 3.99 Wh
+    voltage: 3.83 V
+ - CPU Specs:
+    processor: "[[T8010]] "A10 Fusion""
+    processor_cores: 4 (2 used)
+    cpu_speed: 2.34 GHz (underclocked to 1.63 GHz)
+ - motion_coprocessor: "M10"
+ - ram: 2 GB
+ - storage: 32, 128, or 256 GB Flash memory
+ - wi_fi: "[[wikipedia:IEEE 802.11|802.11]] [[wikipedia:IEEE 802.11a-1999|a]]/[[wikipedia:IEEE 802.11b-1999|b]]/[[wikipedia:IEEE 802.11g-2003|g]]/[[wikipedia:IEEE 802.11n-2009|n]]/[[wikipedia:IEEE 802.11ac|ac]] (2.4/5.0 GHz)"
+ - Bluetooth: "[[BCM4354|4.1]]"
+ - Firmware:
+    initial_firmware: 12.3 (16F8155)
+    latest_firmware: "{{Latest firmware|iPod9,1}}"
+    latest_beta_firmware: "{{Latest beta firmware|iPod9,1}}"
+ - internal_name: iPod9,1
+

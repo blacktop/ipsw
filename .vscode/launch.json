@@ -359,6 +359,24 @@
       "showLog": false
     },
     {
+      "name": "Info",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "remotePath": "",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "program": "${workspaceRoot}/cmd/ipsw/main.go",
+      "env": {},
+      "envFile": "${workspaceFolder}/.env",
+      "args": [
+        // "-V",
+        "info",
+        "${workspaceRoot}/test-caches/ipsws/iPhone11_2_iPhone11_4_iPhone11_6_iPhone12_3_iPhone12_5_13.3_17C54_Restore.ipsw"
+      ],
+      "showLog": false
+    },
+    {
       "name": "Query",
       "type": "go",
       "request": "launch",

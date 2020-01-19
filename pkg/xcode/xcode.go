@@ -1,5 +1,3 @@
-//go:generate statik -src=./data -dest=../..
-
 package xcode
 
 import (
