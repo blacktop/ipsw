@@ -1,17 +1,44 @@
+//go:generate statik -src=./data -dest=../..
+
 package info
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"strings"
 
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/rakyll/statik/fs"
+
+	// importing statik data
+	_ "github.com/blacktop/ipsw/statik"
 	"github.com/pkg/errors"
 )
 
+// IPSW in the ipsw info object
 type IPSW struct {
 	Plists      *plist.IPSW
 	DeviceTrees map[string]*devicetree.DeviceTree
+}
+
+type processors struct {
+	Name          string
+	Model         string
+	Semiconductor string
+	DieSize       string
+	Transistors   string
+	CPUISA        string
+	CPU           string
+	CPUID         string
+	CPUCache      []string
+	GPU           string
+	AIAccelerator string
+	Memory        string
+	Introduced    string
+	Devices       []string
 }
 
 func (i *IPSW) String() string {
@@ -40,7 +67,8 @@ func (i *IPSW) String() string {
 		iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
 		for _, device := range i.Plists.Restore.DeviceMap {
 			if strings.ToLower(device.BoardConfig) == strings.ToLower(dt.BoardConfig) {
-				iStr += fmt.Sprintf("   - CPU: %s\n", device.Platform)
+				proc := getProcessor(device.Platform)
+				iStr += fmt.Sprintf("   - CPU: %s (%s), ID: %s\n", proc.Name, proc.CPUISA, device.Platform)
 			}
 		}
 	}
@@ -121,4 +149,36 @@ func RemoteParse(url string) (*IPSW, error) {
 	}
 
 	return ipsw, nil
+}
+
+// getProcessors reads the processors from embedded JSON
+func getProcessor(cpuid string) processors {
+	var ps []processors
+
+	statikFS, err := fs.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	procs, err := statikFS.Open("/procs.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data, err := ioutil.ReadAll(procs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(data, &ps)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, p := range ps {
+		if strings.ToLower(p.CPUID) == strings.ToLower(cpuid) {
+			return p
+		}
+	}
+
+	return processors{}
 }

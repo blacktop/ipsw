@@ -61,6 +61,8 @@ func init() {
 	extractCmd.Flags().BoolVarP(&kernelFlag, "kernel", "k", false, "Extract kernelcache")
 	extractCmd.Flags().BoolVarP(&dyldFlag, "dyld", "d", false, "Extract dyld_shared_cache")
 	extractCmd.Flags().BoolVarP(&deviceTreeFlag, "device-tree", "t", false, "Extract DeviceTree")
+
+	extractCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
 }
 
 func isURL(str string) bool {

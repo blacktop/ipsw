@@ -48,6 +48,7 @@ var infoCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
 		if remoteFlag {
 			pIPSW, err := info.RemoteParse(args[0])
 			if err != nil {
