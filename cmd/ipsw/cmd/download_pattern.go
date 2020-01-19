@@ -30,10 +30,12 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
@@ -140,20 +142,27 @@ var patternCmd = &cobra.Command{
 					return errors.Wrap(err, "failed to create zip reader from ranger reader")
 				}
 
+				ifo, err := info.RemoteParse(u)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse ipsw info")
+				}
+
 				for _, f := range zr.File {
 					if strings.Contains(f.Name, args[0]) {
-						if _, err := os.Stat(path.Base(f.Name)); os.IsNotExist(err) {
+						folder := ifo.GetFolderForFile(path.Base(f.Name))
+						os.Mkdir(folder, os.ModePerm)
+						if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
 							data := make([]byte, f.UncompressedSize64)
 							rc, _ := f.Open()
 							io.ReadFull(rc, data)
 							rc.Close()
 
-							err = ioutil.WriteFile(path.Base(f.Name), data, 0644)
+							err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
 							if err != nil {
 								return errors.Wrapf(err, "failed to write %s", f.Name)
 							}
 						} else {
-							log.Warnf("%s already exists", path.Base(f.Name))
+							log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
 						}
 					}
 				}
@@ -196,20 +205,25 @@ var patternCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to create zip reader from ranger reader")
 				}
-
+				ifo, err := info.RemoteParse(i.URL)
+				if err != nil {
+					return errors.Wrap(err, "failed to parse ipsw info")
+				}
 				for _, f := range zr.File {
-					if _, err := os.Stat(path.Base(f.Name)); os.IsNotExist(err) {
+					folder := ifo.GetFolderForFile(path.Base(f.Name))
+					os.Mkdir(folder, os.ModePerm)
+					if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
 						data := make([]byte, f.UncompressedSize64)
 						rc, _ := f.Open()
 						io.ReadFull(rc, data)
 						rc.Close()
 
-						err = ioutil.WriteFile(path.Base(f.Name), data, 0644)
+						err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
 						if err != nil {
 							return errors.Wrapf(err, "failed to write %s", f.Name)
 						}
 					} else {
-						log.Warnf("%s already exists", path.Base(f.Name))
+						log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
 					}
 				}
 			}
