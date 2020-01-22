@@ -132,14 +132,14 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to disassemble data")
 		}
 		if len(symbolName) > 0 {
-			fmt.Printf("%s:\n", strings.TrimPrefix(symbolName, "_"))
+			fmt.Printf("%s:\n", symbolName)
 		}
 		for i, insn := range insns {
 			// check for start of a new function
 			if i > 0 {
 				sym, err := m.FindAddressSymbol(uint64(insn.Address))
 				if err == nil {
-					fmt.Printf("%s:\n", strings.TrimPrefix(sym, "_"))
+					fmt.Printf("%s:\n", sym)
 				}
 			}
 			// check if branch location is a function
@@ -147,7 +147,7 @@ var disCmd = &cobra.Command{
 				symAddr := hex2int(insn.OpStr)
 				sym, err := m.FindAddressSymbol(symAddr)
 				if err == nil {
-					fmt.Printf("#%s\n", strings.TrimPrefix(sym, "_"))
+					fmt.Printf("#%s\n", sym)
 				}
 			}
 			fmt.Printf("0x%x:\t%s\t\t%s\n", insn.Address, insn.Mnemonic, insn.OpStr)
