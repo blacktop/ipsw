@@ -11,7 +11,7 @@ require (
 	github.com/blacktop/go-lzfse v1.1.10
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.0
-	github.com/blacktop/ranger v1.0.2
+	github.com/blacktop/ranger v1.0.3
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gocolly/colly/v2 v2.0.1
 	github.com/golang/groupcache v0.0.0-20191227052852-215e87163ea7 // indirect

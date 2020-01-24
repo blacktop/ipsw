@@ -21,7 +21,7 @@ import (
 
 // IPSW in the ipsw info object
 type IPSW struct {
-	Plists      *plist.IPSW
+	Plists      *plist.Plists
 	DeviceTrees map[string]*devicetree.DeviceTree
 }
 

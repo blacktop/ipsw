@@ -11,27 +11,32 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-dist/
-test-caches/
+# IDE
+.idea
+.vscode
+debug
+__debug_bin
+
+# ipsw files
 *.ipsw
 *.zip
+*.im4p
 kernelcache.*
 dyld_shared_cache*
-
-debug
-*.im4p
-.DS_Store
-.idea
-*.bu
+*_Restore
+*.plist
 public
 System
 usr
-*.bndb
-.vscode/settings.json
-xcode/data
-*.download
-*_Restore
-*.plist
-checksums.txt.sha1
-cmd/ipsw/__debug_bin
+
+.DS_Store
+
+# Repo
+*.bu
+dist/
+test-caches/
+pkg/info/data
 pkg/dyld/slide_info.txt
+
+*.download
+checksums.txt.sha1

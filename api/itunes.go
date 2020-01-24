@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/blacktop/go-plist"
