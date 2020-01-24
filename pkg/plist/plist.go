@@ -10,12 +10,13 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 )
 
-type IPSW struct {
+// Plists ipsw plists object
+type Plists struct {
 	*BuildManifest
 	*Restore
 }
@@ -123,10 +124,10 @@ func (b *BuildManifest) GetKernelCaches() map[string]string {
 	return kernelCaches
 }
 
-func (i *IPSW) String() string {
+func (i *Plists) String() string {
 	var iStr string
 	iStr += fmt.Sprintf(
-		"[IPSW Info]\n"+
+		"[Plists Info]\n"+
 			"===========\n"+
 			"Version        = %s\n"+
 			"BuildVersion   = %s\n"+
@@ -168,8 +169,8 @@ func (i *IPSW) String() string {
 	return iStr
 }
 
-// BoardConfig:
-func parseBuildManifest(data []byte) (*BuildManifest, error) {
+// ParseBuildManifest parses the BuildManifest.plist
+func ParseBuildManifest(data []byte) (*BuildManifest, error) {
 	bm := &BuildManifest{}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
@@ -181,7 +182,8 @@ func parseBuildManifest(data []byte) (*BuildManifest, error) {
 	return bm, nil
 }
 
-func parseRestore(data []byte) (*Restore, error) {
+// ParseRestore parses the Restore.plist
+func ParseRestore(data []byte) (*Restore, error) {
 	r := &Restore{}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
@@ -193,11 +195,47 @@ func parseRestore(data []byte) (*Restore, error) {
 	return r, nil
 }
 
-// RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(u string) (*IPSW, error) {
-	ipsw := &IPSW{}
+func ParseZipFiles(files []*zip.File) (*Plists, error) {
+	ipsw := &Plists{}
 
 	var validPlist = regexp.MustCompile(`.*plist$`)
+
+	for _, f := range files {
+		if validPlist.MatchString(f.Name) {
+			pData := make([]byte, f.UncompressedSize64)
+			switch f.Name {
+			case "Restore.plist":
+				rc, err := f.Open()
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+				}
+				io.ReadFull(rc, pData)
+				rc.Close()
+				ipsw.Restore, err = ParseRestore(pData)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				}
+			case "BuildManifest.plist":
+				rc, err := f.Open()
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+				}
+				io.ReadFull(rc, pData)
+				rc.Close()
+				ipsw.BuildManifest, err = ParseBuildManifest(pData)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				}
+			default:
+				log.Debugf("found unsupported plist %s", f.Name)
+			}
+		}
+	}
+	return ipsw, nil
+}
+
+// RemoteParse parses plist files in a remote ipsw file
+func RemoteParse(u string) (*Plists, error) {
 
 	url, err := url.Parse(u)
 	if err != nil {
@@ -219,38 +257,11 @@ func RemoteParse(u string) (*IPSW, error) {
 		return nil, errors.Wrap(err, "failed to create zip reader from ranger reader")
 	}
 
-	for _, f := range zr.File {
-		if validPlist.MatchString(f.Name) {
-			pData := make([]byte, f.UncompressedSize64)
-			rc, _ := f.Open()
-			io.ReadFull(rc, pData)
-			rc.Close()
-			switch f.Name {
-			case "Restore.plist":
-				// dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
-				ipsw.Restore, err = parseRestore(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
-				}
-			case "BuildManifest.plist":
-				ipsw.BuildManifest, err = parseBuildManifest(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
-				}
-			default:
-				log.Debugf("found unsupported plist %s", f.Name)
-			}
-		}
-	}
-
-	return ipsw, nil
+	return ParseZipFiles(zr.File)
 }
 
 // Parse parses plist files in a local ipsw file
-func Parse(ipswPath string) (*IPSW, error) {
-	ipsw := &IPSW{}
-
-	var validPlist = regexp.MustCompile(`.*plist$`)
+func Parse(ipswPath string) (*Plists, error) {
 
 	zr, err := zip.OpenReader(ipswPath)
 	if err != nil {
@@ -258,31 +269,7 @@ func Parse(ipswPath string) (*IPSW, error) {
 	}
 	defer zr.Close()
 
-	for _, f := range zr.File {
-		if validPlist.MatchString(f.Name) {
-			pData := make([]byte, f.UncompressedSize64)
-			rc, _ := f.Open()
-			io.ReadFull(rc, pData)
-			rc.Close()
-			switch f.Name {
-			case "Restore.plist":
-				// dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
-				ipsw.Restore, err = parseRestore(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
-				}
-			case "BuildManifest.plist":
-				ipsw.BuildManifest, err = parseBuildManifest(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
-				}
-			default:
-				log.Debugf("found unsupported plist %s", f.Name)
-			}
-		}
-	}
-
-	return ipsw, nil
+	return ParseZipFiles(zr.File)
 }
 
 // Extract extracts plists from ipsw

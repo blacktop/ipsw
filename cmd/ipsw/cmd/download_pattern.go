@@ -35,8 +35,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/utils"
 	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"

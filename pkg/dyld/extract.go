@@ -13,7 +13,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
 

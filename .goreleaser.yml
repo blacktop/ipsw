@@ -83,17 +83,20 @@ archives:
       darwin: macOS
 
 brews:
-  - github:
-      owner: blacktop
-      name: homebrew-tap
+  -
     ids:
       - darwin
+    github:
+      owner: blacktop
+      name: homebrew-tap
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
     dependencies:
       - lzfse
       # - capstone
+    install: |
+      bin.install "ipsw"
     test: |
       system "#{bin}/ipsw --version"
 

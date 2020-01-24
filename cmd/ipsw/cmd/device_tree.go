@@ -32,7 +32,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/devicetree"
-	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 
 	"github.com/spf13/cobra"

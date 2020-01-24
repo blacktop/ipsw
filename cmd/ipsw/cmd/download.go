@@ -11,7 +11,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api"
-	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"

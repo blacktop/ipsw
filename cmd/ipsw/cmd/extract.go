@@ -38,7 +38,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/blacktop/ipsw/utils"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
