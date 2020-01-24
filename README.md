@@ -23,6 +23,8 @@
 $ brew install blacktop/tap/ipsw
 ```
 
+> **NOTE:** for version that doesn't require `lzfse` or `capstone` use the one without **extras** in the [releases](https://github.com/blacktop/ipsw/releases/latest)
+
 ### windows
 
 Download from [releases](https://github.com/blacktop/ipsw/releases/latest)
@@ -538,7 +540,7 @@ $ ipsw dis --vaddr 0xfffffff007b7c05c --instrs 100 kernelcache.release.iphone12.
 Demangle C++ names
 
 ```bash
-$ ipsw dis --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore | c++filt | bat -p -l s --tabs 0
+$ ipsw dis --demangle --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore | bat -p -l s --tabs 0
 ```
 
 ### `diff` [WIP] :construction:
