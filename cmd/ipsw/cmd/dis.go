@@ -30,13 +30,17 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/demangle"
 	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/knightsc/gapstone"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
-var symbolName string
+var (
+	symbolName   string
+	demangleFlag bool
+)
 
 func init() {
 	rootCmd.AddCommand(disCmd)
@@ -44,6 +48,7 @@ func init() {
 	disCmd.Flags().StringVarP(&symbolName, "symbol", "s", "", "Function to disassemble")
 	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	disCmd.PersistentFlags().Uint64P("instrs", "i", 20, "Number of instructions to disassemble")
+	disCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -51,6 +56,29 @@ func hex2int(hexStr string) uint64 {
 	cleaned := strings.Replace(hexStr, "#0x", "", -1)
 	result, _ := strconv.ParseUint(cleaned, 16, 64)
 	return uint64(result)
+}
+
+// Demangle a string just as the GNU c++filt program does.
+func doDemangle(name string) string {
+	var deStr string
+
+	skip := 0
+	if name[0] == '.' || name[0] == '$' {
+		skip++
+	}
+	if name[skip] == '_' {
+		skip++
+	}
+	result := demangle.Filter(name[skip:])
+	if result == name[skip:] {
+		deStr += name
+	} else {
+		if name[0] == '.' {
+			deStr += "."
+		}
+		deStr += result
+	}
+	return deStr
 }
 
 // disCmd represents the dis command
@@ -132,6 +160,9 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to disassemble data")
 		}
 		if len(symbolName) > 0 {
+			if demangleFlag {
+				symbolName = doDemangle(symbolName)
+			}
 			fmt.Printf("%s:\n", symbolName)
 		}
 		for i, insn := range insns {
@@ -139,6 +170,9 @@ var disCmd = &cobra.Command{
 			if i > 0 {
 				sym, err := m.FindAddressSymbol(uint64(insn.Address))
 				if err == nil {
+					if demangleFlag {
+						sym = doDemangle(sym)
+					}
 					fmt.Printf("%s:\n", sym)
 				}
 			}
@@ -147,7 +181,12 @@ var disCmd = &cobra.Command{
 				symAddr := hex2int(insn.OpStr)
 				sym, err := m.FindAddressSymbol(symAddr)
 				if err == nil {
-					fmt.Printf("#%s\n", sym)
+					if demangleFlag {
+						sym = doDemangle(sym)
+					}
+					// fmt.Printf("#%s\n", sym)
+					// insn.OpStr += fmt.Sprintf(" # %s", sym)
+					insn.OpStr = fmt.Sprintf("# %s", sym)
 				}
 			}
 			fmt.Printf("0x%x:\t%s\t\t%s\n", insn.Address, insn.Mnemonic, insn.OpStr)
