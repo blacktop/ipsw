@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,9 +19,7 @@ import (
 	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/blacktop/lzss"
-	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 )
 
@@ -229,77 +226,36 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 }
 
 // RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(u string) error {
-	ipsw := &plist.IPSW{}
+func RemoteParse(zr *zip.Reader) error {
 
-	url, err := url.Parse(u)
+	ipsw, err := info.ParseZipFiles(zr.File)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse url")
-	}
-
-	reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create ranger reader")
-	}
-
-	length, err := reader.Length()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get reader length")
-	}
-
-	zr, err := zip.NewReader(reader, length)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create zip reader from ranger reader")
+		return err
 	}
 
 	for _, f := range zr.File {
-		if validPlist.MatchString(f.Name) {
-			pData := make([]byte, f.UncompressedSize64)
-			switch f.Name {
-			case "Restore.plist":
-				rc, err := f.Open()
-				if err != nil {
-					return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-				}
-				io.ReadFull(rc, pData)
-				rc.Close()
-				ipsw.Restore, err = plist.ParseRestore(pData)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse DeviceTree")
-				}
-			case "BuildManifest.plist":
-				rc, err := f.Open()
-				if err != nil {
-					return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-				}
-				io.ReadFull(rc, pData)
-				rc.Close()
-				ipsw.BuildManifest, err = plist.ParseBuildManifest(pData)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse DeviceTree")
-				}
-			default:
-				log.Debugf("found unsupported plist %s", f.Name)
-			}
-		}
-	}
-	for _, f := range zr.File {
-		if strings.Contains(f.Name, "kernel") {
+		if strings.Contains(f.Name, "kernelcache.") {
 			for _, folder := range ipsw.GetKernelCacheFolders(f.Name) {
 				fname := filepath.Join(folder, "kernelcache."+strings.ToLower(ipsw.Plists.GetOSType()))
 				if _, err := os.Stat(fname); os.IsNotExist(err) {
 					kdata := make([]byte, f.UncompressedSize64)
-					rc, _ := f.Open()
+					rc, err := f.Open()
+					if err != nil {
+						return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+					}
 					io.ReadFull(rc, kdata)
 					rc.Close()
+
 					kcomp, err := ParseImg4Data(kdata)
 					if err != nil {
 						return errors.Wrap(err, "failed parse compressed kernelcache")
 					}
+
 					dec, err := DecompressData(kcomp)
 					if err != nil {
 						return errors.Wrap(err, "failed to decompress kernelcache")
 					}
+
 					os.Mkdir(folder, os.ModePerm)
 					err = ioutil.WriteFile(fname, dec, 0644)
 					if err != nil {
@@ -311,5 +267,6 @@ func RemoteParse(u string) error {
 			}
 		}
 	}
+
 	return nil
 }

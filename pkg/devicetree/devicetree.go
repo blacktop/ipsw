@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"net/url"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 )
 
@@ -304,40 +302,16 @@ func ParseImg4Data(data []byte) (*DeviceTree, error) {
 	return dtree, nil
 }
 
-// RemoteParse parses a DeviceTree img4 file in a remote ipsw file
-func RemoteParse(u string) (map[string]*DeviceTree, error) {
-
+// Parse parses plist files in a local ipsw file
+func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 	dt := make(map[string]*DeviceTree)
 	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
 
-	url, err := url.Parse(u)
+	zr, err := zip.OpenReader(ipswPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse url")
+		return nil, errors.Wrap(err, "failed to open ipsw as zip")
 	}
-	// reader, err := ranger.NewReader(&ranger.HTTPRanger{
-	// 	URL: url,
-	// 	Client: &http.Client{
-	// 		Transport: &http.Transport{
-	// 			Proxy:           getProxy(proxy),
-	// 			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-	// 		},
-	// 	},
-	// })
-	reader, err := ranger.NewReader(&ranger.HTTPRanger{
-		URL:       url,
-		UserAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13 Safari/605.1.15",
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create ranger reader")
-	}
-	length, err := reader.Length()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get reader length")
-	}
-	zr, err := zip.NewReader(reader, length)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create zip reader from ranger reader")
-	}
+	defer zr.Close()
 
 	for _, f := range zr.File {
 		if validDT.MatchString(f.Name) {
@@ -356,19 +330,15 @@ func RemoteParse(u string) (map[string]*DeviceTree, error) {
 	return dt, nil
 }
 
-// Parse parses plist files in a local ipsw file
-func Parse(ipswPath string) (map[string]*DeviceTree, error) {
+// ParseZipFiles parses DeviceTree in remote ipsw zip
+func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
+
+	var err error
+
 	dt := make(map[string]*DeviceTree)
-	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
 
-	zr, err := zip.OpenReader(ipswPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open ipsw as zip")
-	}
-	defer zr.Close()
-
-	for _, f := range zr.File {
-		if validDT.MatchString(f.Name) {
+	for _, f := range files {
+		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
@@ -398,14 +368,6 @@ func Extract(ipsw string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to extract DeviceTree from ipsw")
 	}
-
-	// for _, dtree := range dtrees {
-	// 	d, err := Open(dtree)
-	// 	if err != nil {
-	// 		return errors.Wrap(err, "failed to open DeviceTree")
-	// 	}
-	// 	defer os.Remove(dtree)
-	// }
 
 	return nil
 }

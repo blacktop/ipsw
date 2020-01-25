@@ -2,15 +2,13 @@ package cmd
 
 import (
 	"fmt"
-	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -30,17 +28,6 @@ func init() {
 	downloadCmd.PersistentFlags().StringP("version", "v", viper.GetString("IPSW_VERSION"), "iOS Version (i.e. 12.3.1)")
 	downloadCmd.PersistentFlags().StringP("device", "d", viper.GetString("IPSW_DEVICE"), "iOS Device (i.e. iPhone11,2)")
 	downloadCmd.PersistentFlags().StringP("build", "b", viper.GetString("IPSW_BUILD"), "iOS BuildID (i.e. 16F203)")
-}
-
-func getProxy(proxy string) func(*http.Request) (*url.URL, error) {
-	if len(proxy) > 0 {
-		proxyURL, err := url.Parse(proxy)
-		if err != nil {
-			log.WithError(err).Error("bad proxy url")
-		}
-		return http.ProxyURL(proxyURL)
-	}
-	return http.ProxyFromEnvironment
 }
 
 // LookupByURL searchs for a ipsw in an array by a download URL

@@ -24,22 +24,12 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"archive/zip"
-	"crypto/tls"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/api"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ranger"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -131,61 +121,18 @@ var downloadKernelCmd = &cobra.Command{
 					"version": i.Version,
 					"signed":  i.Signed,
 				}).Info("Getting Kernelcache")
-				url, err := url.Parse(u)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse url")
-				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{
-					URL: url,
-					Client: &http.Client{
-						Transport: &http.Transport{
-							Proxy:           getProxy(proxy),
-							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-						},
-					},
+
+				zr, err := download.NewRemoteZipReader(u, &download.RemoteConfig{
+					Proxy:    proxy,
+					Insecure: insecure,
 				})
 				if err != nil {
-					return errors.Wrap(err, "failed to create ranger reader")
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
-				length, err := reader.Length()
+
+				err = kernelcache.RemoteParse(zr)
 				if err != nil {
-					return errors.Wrap(err, "failed to get reader length")
-				}
-				zr, err := zip.NewReader(reader, length)
-				if err != nil {
-					return errors.Wrap(err, "failed to create zip reader from ranger reader")
-				}
-				iinfo, err := info.RemoteParse(u)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse ipsw info")
-				}
-				for _, f := range zr.File {
-					if strings.Contains(f.Name, "kernel") {
-						for _, folder := range iinfo.GetKernelCacheFolders(f.Name) {
-							fname := filepath.Join(folder, "kernelcache."+strings.ToLower(iinfo.Plists.GetOSType()))
-							if _, err := os.Stat(fname); os.IsNotExist(err) {
-								kdata := make([]byte, f.UncompressedSize64)
-								rc, _ := f.Open()
-								io.ReadFull(rc, kdata)
-								rc.Close()
-								kcomp, err := kernelcache.ParseImg4Data(kdata)
-								if err != nil {
-									return errors.Wrap(err, "failed parse compressed kernelcache")
-								}
-								dec, err := kernelcache.DecompressData(kcomp)
-								if err != nil {
-									return errors.Wrap(err, "failed to decompress kernelcache")
-								}
-								os.Mkdir(folder, os.ModePerm)
-								err = ioutil.WriteFile(fname, dec, 0644)
-								if err != nil {
-									return errors.Wrap(err, "failed to decompress kernelcache")
-								}
-							} else {
-								log.Warnf("kernelcache already exists: %s", fname)
-							}
-						}
-					}
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
 			}
 
@@ -202,61 +149,14 @@ var downloadKernelCmd = &cobra.Command{
 					"version": i.Version,
 					"signed":  i.Signed,
 				}).Info("Getting Kernelcache")
-				url, err := url.Parse(i.URL)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse url")
-				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{
-					URL: url,
-					Client: &http.Client{
-						Transport: &http.Transport{
-							Proxy:           getProxy(proxy),
-							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-						},
-					},
+
+				zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+					Proxy:    proxy,
+					Insecure: insecure,
 				})
+				err = kernelcache.RemoteParse(zr)
 				if err != nil {
-					return errors.Wrap(err, "failed to create ranger reader")
-				}
-				length, err := reader.Length()
-				if err != nil {
-					return errors.Wrap(err, "failed to get reader length")
-				}
-				zr, err := zip.NewReader(reader, length)
-				if err != nil {
-					return errors.Wrap(err, "failed to create zip reader from ranger reader")
-				}
-				iinfo, err := info.RemoteParse(i.URL)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse ipsw info")
-				}
-				for _, f := range zr.File {
-					if strings.Contains(f.Name, "kernel") {
-						for _, folder := range iinfo.GetKernelCacheFolders(f.Name) {
-							fname := filepath.Join(folder, "kernelcache."+strings.ToLower(iinfo.Plists.GetOSType()))
-							if _, err := os.Stat(fname); os.IsNotExist(err) {
-								kdata := make([]byte, f.UncompressedSize64)
-								rc, _ := f.Open()
-								io.ReadFull(rc, kdata)
-								rc.Close()
-								kcomp, err := kernelcache.ParseImg4Data(kdata)
-								if err != nil {
-									return errors.Wrap(err, "failed parse compressed kernelcache")
-								}
-								dec, err := kernelcache.DecompressData(kcomp)
-								if err != nil {
-									return errors.Wrap(err, "failed to decompress kernelcache")
-								}
-								os.Mkdir(folder, os.ModePerm)
-								err = ioutil.WriteFile(fname, dec, 0644)
-								if err != nil {
-									return errors.Wrap(err, "failed to decompress kernelcache")
-								}
-							} else {
-								log.Warnf("kernelcache already exists: %s", fname)
-							}
-						}
-					}
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
 			}
 		} else {
