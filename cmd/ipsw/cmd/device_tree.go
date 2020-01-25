@@ -31,8 +31,9 @@ import (
 	"io/ioutil"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/devicetree"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/pkg/errors"
 
 	"github.com/spf13/cobra"
@@ -54,7 +55,7 @@ func init() {
 
 // deviceTreeCmd represents the deviceTree command
 var deviceTreeCmd = &cobra.Command{
-	Use:   "device-tree <DeviceTree>",
+	Use:   "dtree <DeviceTree>",
 	Short: "Parse DeviceTree",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -64,7 +65,11 @@ var deviceTreeCmd = &cobra.Command{
 		}
 
 		if remoteFlag {
-			dtrees, err := devicetree.RemoteParse(args[0])
+			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{})
+			if err != nil {
+				return errors.Wrap(err, "failed to create new remote zip reader")
+			}
+			dtrees, err := devicetree.ParseZipFiles(zr.File)
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
