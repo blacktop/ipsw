@@ -577,10 +577,12 @@ compdef _ipsw ipsw
 ## TODO
 
 - [x] use https://github.com/gocolly/colly
+- [x] parse plists for folder creation
 - [ ] create offline copy of ipsw.me API
 - [ ] https://github.com/xerub/img4lib
 - [ ] devicetree read/write
-- [x] parse plists for folder creation
+- [ ] add 💄https://github.com/muesli/termenv
+- [ ] maybe use https://github.com/AllenDang/giu for disassembler
 
 ## Issues
 
