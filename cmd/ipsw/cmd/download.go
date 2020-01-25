@@ -44,13 +44,13 @@ func getProxy(proxy string) func(*http.Request) (*url.URL, error) {
 }
 
 // LookupByURL searchs for a ipsw in an array by a download URL
-func LookupByURL(ipsws []api.IPSW, dlURL string) (api.IPSW, error) {
+func LookupByURL(ipsws []download.IPSW, dlURL string) (download.IPSW, error) {
 	for _, i := range ipsws {
 		if strings.EqualFold(dlURL, i.URL) {
 			return i, nil
 		}
 	}
-	return api.IPSW{}, fmt.Errorf("unable to find %s in ipsws", dlURL)
+	return download.IPSW{}, fmt.Errorf("unable to find %s in ipsws", dlURL)
 }
 
 // downloadCmd represents the download command
@@ -80,7 +80,7 @@ var downloadCmd = &cobra.Command{
 
 		if len(version) > 0 {
 			urls := []string{}
-			ipsws, err := api.GetAllIPSW(version)
+			ipsws, err := download.GetAllIPSW(version)
 			if err != nil {
 				return errors.Wrap(err, "failed to query ipsw.me api")
 			}
@@ -111,7 +111,7 @@ var downloadCmd = &cobra.Command{
 			}
 
 			// check canijailbreak.com
-			jbs, _ := api.GetJailbreaks()
+			jbs, _ := download.GetJailbreaks()
 			if iCan, index, err := jbs.CanIBreak(version); err != nil {
 				log.Error(err.Error())
 			} else {
@@ -119,7 +119,7 @@ var downloadCmd = &cobra.Command{
 					log.WithField("url", jbs.Jailbreaks[index].URL).Warnf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name)
 					utils.Indent(log.Warn, 2)(jbs.Jailbreaks[index].Caveats)
 				} else {
-					log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", api.GetRandomResearcher())
+					log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", download.GetRandomResearcher())
 				}
 			}
 
@@ -135,7 +135,7 @@ var downloadCmd = &cobra.Command{
 				}
 			}
 			if cont {
-				downloader := api.NewDownload(proxy, insecure)
+				downloader := download.NewDownload(proxy, insecure)
 				for _, url := range urls {
 					destName := strings.Replace(path.Base(url), ",", "_", -1)
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
@@ -175,7 +175,7 @@ var downloadCmd = &cobra.Command{
 
 		} else if len(device) > 0 || len(build) > 0 {
 			if len(device) > 0 && len(build) > 0 {
-				i, err := api.GetIPSW(device, build)
+				i, err := download.GetIPSW(device, build)
 				if err != nil {
 					return errors.Wrap(err, "failed to query ipsw.me api")
 				}
@@ -187,7 +187,7 @@ var downloadCmd = &cobra.Command{
 						"version": i.Version,
 						"signed":  i.Signed,
 					}).Info("Getting IPSW")
-					downloader := api.NewDownload(proxy, insecure)
+					downloader := download.NewDownload(proxy, insecure)
 					downloader.URL = i.URL
 					downloader.Sha1 = i.SHA1
 					err = downloader.Do()

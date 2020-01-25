@@ -73,7 +73,7 @@ var downloadKernelCmd = &cobra.Command{
 		}
 
 		if len(version) > 0 {
-			ipsws, err := api.GetAllIPSW(version)
+			ipsws, err := download.GetAllIPSW(version)
 			if err != nil {
 				return errors.Wrap(err, "failed to query ipsw.me api")
 			}
@@ -106,7 +106,7 @@ var downloadKernelCmd = &cobra.Command{
 			}
 
 			// check canijailbreak.com
-			jbs, _ := api.GetJailbreaks()
+			jbs, _ := download.GetJailbreaks()
 			if iCan, index, err := jbs.CanIBreak(version); err != nil {
 				log.Error(err.Error())
 			} else {
@@ -114,7 +114,7 @@ var downloadKernelCmd = &cobra.Command{
 					log.WithField("url", jbs.Jailbreaks[index].URL).Warnf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name)
 					utils.Indent(log.Warn, 2)(jbs.Jailbreaks[index].Caveats)
 				} else {
-					log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", api.GetRandomResearcher())
+					log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", download.GetRandomResearcher())
 				}
 			}
 
@@ -191,7 +191,7 @@ var downloadKernelCmd = &cobra.Command{
 
 		} else if len(device) > 0 || len(build) > 0 {
 			if len(device) > 0 && len(build) > 0 {
-				i, err := api.GetIPSW(device, build)
+				i, err := download.GetIPSW(device, build)
 				if err != nil {
 					return errors.Wrap(err, "failed to query ipsw.me api")
 				}

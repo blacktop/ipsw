@@ -54,7 +54,7 @@ var betaCmd = &cobra.Command{
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		skip, _ := cmd.Flags().GetBool("yes")
 
-		ipsws, err := api.ScrapeURLs(args[0])
+		ipsws, err := download.ScrapeURLs(args[0])
 		if err != nil {
 			return errors.Wrap(err, "failed to query ipsw.me api")
 		}
@@ -80,7 +80,7 @@ var betaCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := api.NewDownload(proxy, insecure)
+			downloader := download.NewDownload(proxy, insecure)
 			for _, i := range ipsws {
 				destName := strings.Replace(path.Base(i.URL), ",", "_", -1)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
