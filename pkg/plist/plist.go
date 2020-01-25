@@ -5,13 +5,11 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"net/url"
 	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 )
 
@@ -64,21 +62,6 @@ type variantContents struct {
 	SEP                  string
 	VinylFirmware        string
 }
-
-// type buildIdentityManifest struct {
-// 	DeviceTree         buildIdentityManifestType
-// 	KernelCache        buildIdentityManifestType
-// 	OS                 buildIdentityManifestType
-// 	RestoreDeviceTree  buildIdentityManifestType
-// 	RestoreKernelCache buildIdentityManifestType
-// 	RestoreSEP         buildIdentityManifestType
-// 	RestoreTrustCache  buildIdentityManifestType
-// 	SEP                buildIdentityManifestType
-// 	StaticTrustCache   buildIdentityManifestType
-// 	iBEC               buildIdentityManifestType
-// 	iBSS               buildIdentityManifestType
-// 	iBoot              buildIdentityManifestType
-// }
 
 type buildIdentityManifestType struct {
 	Digest  []byte
@@ -195,6 +178,18 @@ func ParseRestore(data []byte) (*Restore, error) {
 	return r, nil
 }
 
+// Parse parses plist files in a local ipsw file
+func Parse(ipswPath string) (*Plists, error) {
+
+	zr, err := zip.OpenReader(ipswPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open ipsw as zip")
+	}
+	defer zr.Close()
+
+	return ParseZipFiles(zr.File)
+}
+
 func ParseZipFiles(files []*zip.File) (*Plists, error) {
 	ipsw := &Plists{}
 
@@ -232,44 +227,6 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 		}
 	}
 	return ipsw, nil
-}
-
-// RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(u string) (*Plists, error) {
-
-	url, err := url.Parse(u)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse url")
-	}
-
-	reader, err := ranger.NewReader(&ranger.HTTPRanger{URL: url})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create ranger reader")
-	}
-
-	length, err := reader.Length()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get reader length")
-	}
-
-	zr, err := zip.NewReader(reader, length)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create zip reader from ranger reader")
-	}
-
-	return ParseZipFiles(zr.File)
-}
-
-// Parse parses plist files in a local ipsw file
-func Parse(ipswPath string) (*Plists, error) {
-
-	zr, err := zip.OpenReader(ipswPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open ipsw as zip")
-	}
-	defer zr.Close()
-
-	return ParseZipFiles(zr.File)
 }
 
 // Extract extracts plists from ipsw

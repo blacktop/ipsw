@@ -24,22 +24,15 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"archive/zip"
-	"crypto/tls"
 	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
 	"net/url"
 	"os"
-	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -101,51 +94,17 @@ var extractCmd = &cobra.Command{
 			}
 			if kernelFlag {
 				log.Info("Extracting Kernelcache")
-				url, err := url.Parse(args[0])
-				if err != nil {
-					return errors.Wrap(err, "failed to parse url")
-				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{
-					URL: url,
-					Client: &http.Client{
-						Transport: &http.Transport{
-							Proxy:           getProxy(proxy),
-							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-						},
-					},
+				zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
+					Proxy:    proxy,
+					Insecure: insecure,
 				})
 				if err != nil {
-					return errors.Wrap(err, "failed to create ranger reader")
-				}
-				length, err := reader.Length()
-				if err != nil {
-					return errors.Wrap(err, "failed to get reader length")
-				}
-				zr, err := zip.NewReader(reader, length)
-				if err != nil {
-					return errors.Wrap(err, "failed to create zip reader from ranger reader")
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
 
-				for _, f := range zr.File {
-					if strings.Contains(f.Name, "kernel") {
-						kdata := make([]byte, f.UncompressedSize64)
-						rc, _ := f.Open()
-						io.ReadFull(rc, kdata)
-						rc.Close()
-						kcomp, err := kernelcache.ParseImg4Data(kdata)
-						if err != nil {
-							return errors.Wrap(err, "failed parse compressed kernelcache")
-						}
-						dec, err := kernelcache.DecompressData(kcomp)
-						if err != nil {
-							return errors.Wrap(err, "failed to decompress kernelcache")
-						}
-						err = ioutil.WriteFile(f.Name+".decompressed", dec, 0644)
-						if err != nil {
-							return errors.Wrap(err, "failed to decompress kernelcache")
-						}
-						utils.Indent(log.Info, 2)("Created " + f.Name + ".decompressed")
-					}
+				err = kernelcache.RemoteParse(zr)
+				if err != nil {
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
 			}
 		} else {

@@ -3,6 +3,7 @@
 package info
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -162,19 +163,18 @@ func Parse(ipswPath string) (*IPSW, error) {
 	return ipsw, nil
 }
 
-// RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(url string) (*IPSW, error) {
+// ParseZipFiles parses plist files and devicetree in a remote zip file
+func ParseZipFiles(files []*zip.File) (*IPSW, error) {
 	var err error
-
 	ipsw := &IPSW{}
 
-	ipsw.Plists, err = plist.RemoteParse(url)
+	ipsw.Plists, err = plist.ParseZipFiles(files)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse plists")
+		return nil, errors.Wrap(err, "failed to parse remote plists")
 	}
-	ipsw.DeviceTrees, err = devicetree.RemoteParse(url)
+	ipsw.DeviceTrees, err = devicetree.ParseZipFiles(files)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse devicetree")
+		return nil, errors.Wrap(err, "failed to parse remote devicetree")
 	}
 
 	return ipsw, nil

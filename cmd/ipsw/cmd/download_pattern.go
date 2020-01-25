@@ -22,22 +22,17 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"archive/zip"
-	"crypto/tls"
 	"io"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/api"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ranger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -117,43 +112,29 @@ var patternCmd = &cobra.Command{
 					"version": i.Version,
 					"signed":  i.Signed,
 				}).Infof("Getting files that contain: %s", args[0])
-				url, err := url.Parse(u)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse url")
-				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{
-					URL: url,
-					Client: &http.Client{
-						Transport: &http.Transport{
-							Proxy:           getProxy(proxy),
-							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-						},
-					},
+
+				zr, err := download.NewRemoteZipReader(u, &download.RemoteConfig{
+					Proxy:    proxy,
+					Insecure: insecure,
 				})
 				if err != nil {
-					return errors.Wrap(err, "failed to create ranger reader")
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
-				length, err := reader.Length()
+				ipsw, err := info.ParseZipFiles(zr.File)
 				if err != nil {
-					return errors.Wrap(err, "failed to get reader length")
-				}
-				zr, err := zip.NewReader(reader, length)
-				if err != nil {
-					return errors.Wrap(err, "failed to create zip reader from ranger reader")
-				}
-
-				ifo, err := info.RemoteParse(u)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse ipsw info")
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
 
 				for _, f := range zr.File {
 					if strings.Contains(f.Name, args[0]) {
-						folder := ifo.GetFolderForFile(path.Base(f.Name))
+						folder := ipsw.GetFolderForFile(path.Base(f.Name))
 						os.Mkdir(folder, os.ModePerm)
 						if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
 							data := make([]byte, f.UncompressedSize64)
-							rc, _ := f.Open()
+							rc, err := f.Open()
+							if err != nil {
+								return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+							}
 							io.ReadFull(rc, data)
 							rc.Close()
 
@@ -181,36 +162,21 @@ var patternCmd = &cobra.Command{
 					"version": i.Version,
 					"signed":  i.Signed,
 				}).Infof("Getting files that contain: %s", args[0])
-				url, err := url.Parse(i.URL)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse url")
-				}
-				reader, err := ranger.NewReader(&ranger.HTTPRanger{
-					URL: url,
-					Client: &http.Client{
-						Transport: &http.Transport{
-							Proxy:           getProxy(proxy),
-							TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-						},
-					},
+
+				zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+					Proxy:    proxy,
+					Insecure: insecure,
 				})
 				if err != nil {
-					return errors.Wrap(err, "failed to create ranger reader")
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
-				length, err := reader.Length()
+				ipsw, err := info.ParseZipFiles(zr.File)
 				if err != nil {
-					return errors.Wrap(err, "failed to get reader length")
+					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
-				zr, err := zip.NewReader(reader, length)
-				if err != nil {
-					return errors.Wrap(err, "failed to create zip reader from ranger reader")
-				}
-				ifo, err := info.RemoteParse(i.URL)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse ipsw info")
-				}
+
 				for _, f := range zr.File {
-					folder := ifo.GetFolderForFile(path.Base(f.Name))
+					folder := ipsw.GetFolderForFile(path.Base(f.Name))
 					os.Mkdir(folder, os.ModePerm)
 					if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
 						data := make([]byte, f.UncompressedSize64)
