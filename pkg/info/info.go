@@ -1,4 +1,4 @@
-//go:generate statik -src=./data -dest=../..
+//go:generate statik -src=./data -dest=../../internal
 
 package info
 
@@ -15,7 +15,7 @@ import (
 	"github.com/rakyll/statik/fs"
 
 	// importing statik data
-	_ "github.com/blacktop/ipsw/statik"
+	_ "github.com/blacktop/ipsw/internal/statik"
 	"github.com/pkg/errors"
 )
 

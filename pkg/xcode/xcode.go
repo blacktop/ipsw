@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	// importing statik data
-	_ "github.com/blacktop/ipsw/statik"
+	_ "github.com/blacktop/ipsw/internal/statik"
 	"github.com/rakyll/statik/fs"
 )
 
