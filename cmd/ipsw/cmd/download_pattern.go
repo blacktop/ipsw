@@ -72,7 +72,7 @@ var patternCmd = &cobra.Command{
 		}
 
 		if len(version) > 0 {
-			ipsws, err := api.GetAllIPSW(version)
+			ipsws, err := download.GetAllIPSW(version)
 			if err != nil {
 				return errors.Wrap(err, "failed to query ipsw.me api")
 			}
@@ -170,7 +170,7 @@ var patternCmd = &cobra.Command{
 
 		} else if len(device) > 0 || len(build) > 0 {
 			if len(device) > 0 && len(build) > 0 {
-				i, err := api.GetIPSW(device, build)
+				i, err := download.GetIPSW(device, build)
 				if err != nil {
 					return errors.Wrap(err, "failed to query ipsw.me api")
 				}

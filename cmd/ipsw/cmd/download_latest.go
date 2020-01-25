@@ -47,8 +47,8 @@ var latestCmd = &cobra.Command{
 	Short: "Download latest release version",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
-		var builds []api.Build
-		var filteredBuilds []api.Build
+		var builds []download.Build
+		var filteredBuilds []download.Build
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
@@ -65,7 +65,7 @@ var latestCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		itunes, err := api.NewiTunesVersionMaster()
+		itunes, err := download.NewiTunesVersionMaster()
 		if err != nil {
 			return errors.Wrap(err, "failed to create itunes API")
 		}
@@ -104,7 +104,7 @@ var latestCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := api.NewDownload(proxy, insecure)
+			downloader := download.NewDownload(proxy, insecure)
 			for _, build := range filteredBuilds {
 				destName := strings.Replace(path.Base(build.FirmwareURL), ",", "_", -1)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
