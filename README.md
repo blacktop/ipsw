@@ -48,17 +48,15 @@ Usage:
   ipsw [command]
 
 Available Commands:
-  device-list     List all iOS devices
-  device-tree     Parse DeviceTree
-  dis             Disassemble ARM binaries at address or symbol
-  download        Download and parse IPSW(s) from the internets
-  dyld            Parse dyld_shared_cache
-  extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
-  help            Help about any command
-  info            Display IPSW Info
-  kernel          Parse kernelcache
-  macho           Parse a MachO file
-  version         Print the version number of ipsw
+  device-list List all iOS devices
+  download    Download and parse IPSW(s) from the internets
+  dtree       Parse DeviceTree
+  dyld        Parse dyld_shared_cache
+  help        Help about any command
+  info        Display IPSW Info
+  kernel      Parse kernelcache
+  macho       Parse a MachO file
+  version     Print the version number of ipsw
 
 Flags:
   -h, --help      help for ipsw
@@ -423,7 +421,7 @@ Print out SUMMARY
 
 ```bash
 $ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
-$ ipsw device-tree DeviceTree.d431ap.im4p
+$ ipsw dtree DeviceTree.d431ap.im4p
       • Product Name: iPhone 11 Pro Max
       • Model: iPhone12,5
       • BoardConfig: D431AP
@@ -452,7 +450,7 @@ $ ipsw device-tree --json DeviceTree.d431ap.im4p | jq .
 Or remotely
 
 ```bash
-$ ipsw device-tree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
+$ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
 
    • DeviceTree.n112ap.im4p
       • Product Name: iPod touch
