@@ -26,6 +26,7 @@ import (
 	"os"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -50,7 +51,11 @@ var infoCmd = &cobra.Command{
 		}
 
 		if remoteFlag {
-			pIPSW, err := info.RemoteParse(args[0])
+			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{})
+			if err != nil {
+				return errors.Wrap(err, "failed to create new remote zip reader")
+			}
+			pIPSW, err := info.ParseZipFiles(zr.File)
 			if err != nil {
 				return errors.Wrap(err, "failed to extract remote plists")
 			}
