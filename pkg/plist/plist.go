@@ -152,8 +152,8 @@ func (i *Plists) String() string {
 	return iStr
 }
 
-// ParseBuildManifest parses the BuildManifest.plist
-func ParseBuildManifest(data []byte) (*BuildManifest, error) {
+// parseBuildManifest parses the BuildManifest.plist
+func parseBuildManifest(data []byte) (*BuildManifest, error) {
 	bm := &BuildManifest{}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
@@ -165,8 +165,8 @@ func ParseBuildManifest(data []byte) (*BuildManifest, error) {
 	return bm, nil
 }
 
-// ParseRestore parses the Restore.plist
-func ParseRestore(data []byte) (*Restore, error) {
+// parseRestore parses the Restore.plist
+func parseRestore(data []byte) (*Restore, error) {
 	r := &Restore{}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
@@ -190,6 +190,7 @@ func Parse(ipswPath string) (*Plists, error) {
 	return ParseZipFiles(zr.File)
 }
 
+// ParseZipFiles parses plists in remote ipsw zip
 func ParseZipFiles(files []*zip.File) (*Plists, error) {
 	ipsw := &Plists{}
 
@@ -206,7 +207,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				}
 				io.ReadFull(rc, pData)
 				rc.Close()
-				ipsw.Restore, err = ParseRestore(pData)
+				ipsw.Restore, err = parseRestore(pData)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to parse DeviceTree")
 				}
@@ -217,7 +218,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				}
 				io.ReadFull(rc, pData)
 				rc.Close()
-				ipsw.BuildManifest, err = ParseBuildManifest(pData)
+				ipsw.BuildManifest, err = parseBuildManifest(pData)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to parse DeviceTree")
 				}

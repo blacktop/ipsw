@@ -43,6 +43,38 @@ type processors struct {
 	Devices       []string
 }
 
+// getProcessors reads the processors from embedded JSON
+func getProcessor(cpuid string) processors {
+	var ps []processors
+
+	statikFS, err := fs.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	procs, err := statikFS.Open("/procs.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data, err := ioutil.ReadAll(procs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(data, &ps)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, p := range ps {
+		if strings.ToLower(p.CPUID) == strings.ToLower(cpuid) {
+			return p
+		}
+	}
+
+	return processors{}
+}
+
 func (i *IPSW) String() string {
 	var iStr string
 	iStr += fmt.Sprintf(
@@ -77,24 +109,6 @@ func (i *IPSW) String() string {
 	return iStr
 }
 
-type folder struct {
-	Name        string
-	KernelCache string
-}
-
-func (i *IPSW) getFolders() []folder {
-	var fs []folder
-	kcs := i.Plists.BuildManifest.GetKernelCaches()
-	for _, dtree := range i.DeviceTrees {
-		dt, _ := dtree.Summary()
-		fs = append(fs, folder{
-			Name:        fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.Restore.ProductBuildVersion),
-			KernelCache: kcs[strings.ToLower(dt.BoardConfig)],
-		})
-	}
-	return fs
-}
-
 // GetFolders returns a list of the IPSW name folders
 func (i *IPSW) GetFolders() []string {
 	var folders []string
@@ -106,6 +120,7 @@ func (i *IPSW) GetFolders() []string {
 	return folders
 }
 
+// GetFolderForFile returns a list of the IPSW name folders for a given file
 func (i *IPSW) GetFolderForFile(fileName string) string {
 	files := i.getManifestPaths()
 	for _, dtree := range i.DeviceTrees {
@@ -132,6 +147,24 @@ func (i *IPSW) getManifestPaths() map[string][]string {
 	}
 
 	return files
+}
+
+type folder struct {
+	Name        string
+	KernelCache string
+}
+
+func (i *IPSW) getFolders() []folder {
+	var fs []folder
+	kcs := i.Plists.BuildManifest.GetKernelCaches()
+	for _, dtree := range i.DeviceTrees {
+		dt, _ := dtree.Summary()
+		fs = append(fs, folder{
+			Name:        fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.Restore.ProductBuildVersion),
+			KernelCache: kcs[strings.ToLower(dt.BoardConfig)],
+		})
+	}
+	return fs
 }
 
 // GetKernelCacheFolders returns the folders belonging to a KernelCache
@@ -178,36 +211,4 @@ func ParseZipFiles(files []*zip.File) (*IPSW, error) {
 	}
 
 	return ipsw, nil
-}
-
-// getProcessors reads the processors from embedded JSON
-func getProcessor(cpuid string) processors {
-	var ps []processors
-
-	statikFS, err := fs.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-	procs, err := statikFS.Open("/procs.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	data, err := ioutil.ReadAll(procs)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = json.Unmarshal(data, &ps)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, p := range ps {
-		if strings.ToLower(p.CPUID) == strings.ToLower(cpuid) {
-			return p
-		}
-	}
-
-	return processors{}
 }
