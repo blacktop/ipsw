@@ -25,7 +25,6 @@ kernelcache.*
 dyld_shared_cache*
 *_Restore
 *.plist
-public
 System
 usr
 
@@ -40,3 +39,6 @@ pkg/dyld/slide_info.txt
 
 *.download
 checksums.txt.sha1
+
+# Docs
+public
