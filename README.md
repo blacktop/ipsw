@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://raw.githubusercontent.com/blacktop/ipsw/master/hack/ipsw.png" height="140" /></a>
+  <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://raw.githubusercontent.com/blacktop/ipsw/master/docs/static/ipsw.png" height="140" /></a>
   <h1 align="center">ipsw</h1>
   <h4><p align="center">Download and parse ipsw(s) from <a href="https://ipsw.me">ipsw.me</a> or <a href="https://www.theiphonewiki.com/wiki/Firmware">theiphonewiki.com</a></p></h4>
   <p align="center">
