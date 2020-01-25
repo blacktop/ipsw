@@ -1,0 +1,4 @@
+baseURL = "https://blacktop.github.io/ipsw/"
+languageCode = "en-us"
+title = "ipsw - Docs"
+theme = "docsy"
