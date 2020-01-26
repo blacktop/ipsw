@@ -6,7 +6,7 @@ weight: 3
 summary: Build from source
 ---
 
-### Build with support for **lzfse** compression and **capstone** _ARM64_ disassembly
+## **WITH** support for **lzfse** compression and **capstone** disassembly
 
 #### Dependancies:
 
@@ -15,14 +15,14 @@ summary: Build from source
 
 ### Install the dependancies
 
-#### Via [homebrew](https://brew.sh)
+Via [homebrew](https://brew.sh)
 
 ```bash
 $ brew install lzfse
 $ brew install capstone --HEAD
 ```
 
-#### From source
+From source
 
 - [lzfse](https://github.com/lzfse/lzfse)
 
@@ -44,7 +44,7 @@ $ CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh
 $ sudo ./make.sh install
 ```
 
-## Install the Go binary
+#### Install the Go binary
 
 ```bash
 $ CGO_ENABLED=1 \
@@ -53,12 +53,18 @@ $ CGO_ENABLED=1 \
   go build ./cmd/ipsw
 ```
 
-### Build **WITHOUT** support for **lzfse** compression and **capstone** _ARM64_ disassembly
+## **WITHOUT** support for **lzfse** compression and **capstone** disassembly
 
-## Install the Go binary
+#### Install the Go binary
 
 ```bash
 $ CGO_ENABLED=0 go build ./cmd/ipsw
 ```
 
-#### Sooooo easy... man I hate cgo so much 🤬
+## **WITHOUT** internet
+
+Add `--mod=vendor` to use the Go deps in the vendor folder
+
+```bash
+$ go build --mod=vendor ./cmd/ipsw
+```
