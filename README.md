@@ -14,9 +14,9 @@
     <a href="http://doge.mit-license.org" alt="LICENSE">
           <img src="https://img.shields.io/:license-mit-blue.svg" /></a>
 </p>
-
+<br>
 <p align="center">
-  <img width="600" src="https://raw.githubusercontent.com/blacktop/ipsw/master/docs/static/images/terminal.svg">
+  <img width="600" src="https://blacktop.github.io/ipsw/images/terminal.svg">
 </p>
 
 ## Documentation
