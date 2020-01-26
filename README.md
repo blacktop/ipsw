@@ -21,12 +21,8 @@
 
 ## Documentation
 
-### See here [Docs](https://blacktop.github.io/ipsw/)
-
-## Issues
-
-Find a bug? Want more features? Find something missing in the documentation? Let me know! Please don't hesitate to [file an issue](https://github.com/blacktop/ipsw/issues/new)
+- [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/)
 
 ## License
 
-MIT Copyright (c) 2018 **blacktop**
+MIT Copyright (c) 2018-2020 **blacktop**
