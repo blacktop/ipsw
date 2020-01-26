@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>disass - ipsw</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
+
+  
+  
+  <link rel="stylesheet" href="/ipsw/css/style.min.ea6b48972da7f279ad582724dff6f5e2de2407599d9cb8f1739e9dacb2009522.css">
+  
+
+  
+
+</head>
+
+<body class='page page-default-single'>
+  <div id="main-menu-mobile" class="main-menu-mobile">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+  <div class="wrapper">
+    <div class='header'>
+  <div class="container">
+    <div class="logo">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div class="logo-mobile">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div id="main-menu" class="main-menu">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+    <button id="toggle-main-menu-mobile" class="hamburger hamburger--slider" type="button">
+  <span class="hamburger-box">
+    <span class="hamburger-inner"></span>
+  </span>
+</button>
+  </div>
+</div>
+
+
+    
+    
+    
+    
+    
+    
+
+    
+    <div class="container pt-2 pt-md-6 pb-3 pb-md-6">
+      <div class="row">
+        <div class="col-12 col-md-3 mb-3">
+          <div class="sidebar">
+            
+<div class="docs-menu">
+  <h4>Docs</h4>
+  <ul>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/install/">Install</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/build/">Build</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/getting-started/">Getting Started</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/download/">download</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/info/">info</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/extract/">extract</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/macho/">macho</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/dyld/">dyld</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-tree/">dtree</a>
+    </li>
+    
+    <li class="active ">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/disassemble/">disass</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-list/">device-list</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/completion/">completion</a>
+    </li>
+    
+  </ul>
+</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-md-9">
+          
+<h1 class="title">disass</h1>
+<div class="content ">
+  <h2 id="wip-">[WIP] 🚧</h2>
+<p>Working on getting a disassembler working</p>
+<p>⚠️ <strong>NOTE:</strong> requires <strong>capstone</strong> installed from the <code>next</code> branch <em>(brew install capstone &ndash;HEAD)</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-s" data-lang="s"><span class="mh">0xfffffff007b7c05c</span><span class="o">:</span>	<span class="n">pacibsp</span>
+<span class="mh">0xfffffff007b7c060</span><span class="o">:</span>	<span class="n">stp</span>		<span class="n">x24</span><span class="p">,</span> <span class="n">x23</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#-0x40]!</span>
+<span class="mh">0xfffffff007b7c064</span><span class="o">:</span>	<span class="n">stp</span>		<span class="n">x22</span><span class="p">,</span> <span class="n">x21</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x10]</span>
+<span class="mh">0xfffffff007b7c068</span><span class="o">:</span>	<span class="n">stp</span>		<span class="n">x20</span><span class="p">,</span> <span class="n">x19</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x20]</span>
+<span class="mh">0xfffffff007b7c06c</span><span class="o">:</span>	<span class="n">stp</span>		<span class="n">x29</span><span class="p">,</span> <span class="n">x30</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x30]</span>
+<span class="mh">0xfffffff007b7c070</span><span class="o">:</span>	<span class="n">mov</span>		<span class="n">x19</span><span class="p">,</span> <span class="n">x3</span>
+<span class="mh">0xfffffff007b7c074</span><span class="o">:</span>	<span class="n">mov</span>		<span class="n">x20</span><span class="p">,</span> <span class="n">x2</span>
+<span class="mh">0xfffffff007b7c078</span><span class="o">:</span>	<span class="n">mov</span>		<span class="n">x21</span><span class="p">,</span> <span class="n">x1</span>
+<span class="mh">0xfffffff007b7c07c</span><span class="o">:</span>	<span class="n">mov</span>		<span class="n">x22</span><span class="p">,</span> <span class="n">x0</span>
+<span class="mh">0xfffffff007b7c080</span><span class="o">:</span>	<span class="n">sub</span>		<span class="n">x23</span><span class="p">,</span> <span class="n">x5</span><span class="p">,</span> <span class="n">x4</span>
+<span class="mh">0xfffffff007b7c084</span><span class="o">:</span>	<span class="n">mov</span>		<span class="n">x0</span><span class="p">,</span> <span class="n">x23</span>
+<span class="mh">0xfffffff007b7c088</span><span class="o">:</span>	<span class="n">bl</span>		<span class="c1">#0xfffffff007b7c044</span>
+<span class="mh">0xfffffff007b7c08c</span><span class="o">:</span>	<span class="n">mov</span>		<span class="n">w8</span><span class="p">,</span> <span class="c1">#0x2f</span>
+<span class="mh">0xfffffff007b7c090</span><span class="o">:</span>	<span class="n">sub</span>		<span class="n">x8</span><span class="p">,</span> <span class="n">x8</span><span class="p">,</span> <span class="n">x22</span>
+<span class="mh">0xfffffff007b7c094</span><span class="o">:</span>	<span class="n">add</span>		<span class="n">x8</span><span class="p">,</span> <span class="n">x8</span><span class="p">,</span> <span class="n">x21</span>
+<span class="mh">0xfffffff007b7c098</span><span class="o">:</span>	<span class="n">orr</span>		<span class="n">x9</span><span class="p">,</span> <span class="n">xzr</span><span class="p">,</span> <span class="c1">#0xaaaaaaaaaaaaaaaa</span>
+<span class="mh">0xfffffff007b7c09c</span><span class="o">:</span>	<span class="n">movk</span>		<span class="n">x9</span><span class="p">,</span> <span class="c1">#0xaaab</span>
+<span class="mh">0xfffffff007b7c0a0</span><span class="o">:</span>	<span class="n">umulh</span>		<span class="n">x9</span><span class="p">,</span> <span class="n">x8</span><span class="p">,</span> <span class="n">x9</span>
+<span class="mh">0xfffffff007b7c0a4</span><span class="o">:</span>	<span class="n">lsr</span>		<span class="n">x9</span><span class="p">,</span> <span class="n">x9</span><span class="p">,</span> <span class="c1">#5</span>
+<span class="mh">0xfffffff007b7c0a8</span><span class="o">:</span>	<span class="n">orr</span>		<span class="n">w10</span><span class="p">,</span> <span class="n">wzr</span><span class="p">,</span> <span class="c1">#0x30</span>
+<span class="kc">...</span>
+</code></pre></div><p>You can also dissassemble a function by name</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --symbol &lt;SYMBOL_NAME&gt; --instrs <span class="m">200</span> JavaScriptCore
+</code></pre></div><p>Make it pretty 💄🐷 using <a href="https://github.com/sharkdp/bat">bat</a></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --vaddr 0xfffffff007b7c05c --instrs <span class="m">100</span> kernelcache.release.iphone12.decompressed <span class="se">\
+</span><span class="se"></span>   <span class="p">|</span> bat -p --tabs <span class="m">0</span> -l s
+</code></pre></div><p>Demangle C++ names</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --demangle --symbol &lt;SYMBOL_NAME&gt; --instrs <span class="m">200</span> JavaScriptCore <span class="p">|</span> bat -p -l s --tabs <span class="m">0</span>
+</code></pre></div>
+</div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="sub-footer">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <div class="sub-footer-inner">
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+  
+  
+
+  
+  <script type="text/javascript" src="/ipsw/js/scripts.min.1237ff71925bb8625c97a9af8db4c54525258bedfd7c47493daaff723bea755e.js"></script>
+  
+
+  
+  
+  
+    
+  
+
+
+</body>
+
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>download - ipsw</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
+
+  
+  
+  <link rel="stylesheet" href="/ipsw/css/style.min.ea6b48972da7f279ad582724dff6f5e2de2407599d9cb8f1739e9dacb2009522.css">
+  
+
+  
+
+</head>
+
+<body class='page page-default-single'>
+  <div id="main-menu-mobile" class="main-menu-mobile">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+  <div class="wrapper">
+    <div class='header'>
+  <div class="container">
+    <div class="logo">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div class="logo-mobile">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div id="main-menu" class="main-menu">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+    <button id="toggle-main-menu-mobile" class="hamburger hamburger--slider" type="button">
+  <span class="hamburger-box">
+    <span class="hamburger-inner"></span>
+  </span>
+</button>
+  </div>
+</div>
+
+
+    
+    
+    
+    
+    
+    
+
+    
+    <div class="container pt-2 pt-md-6 pb-3 pb-md-6">
+      <div class="row">
+        <div class="col-12 col-md-3 mb-3">
+          <div class="sidebar">
+            
+<div class="docs-menu">
+  <h4>Docs</h4>
+  <ul>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/install/">Install</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/build/">Build</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/getting-started/">Getting Started</a>
+    </li>
+    
+    <li class="active ">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/download/">download</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/info/">info</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/extract/">extract</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/macho/">macho</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/dyld/">dyld</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-tree/">dtree</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/disassemble/">disass</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-list/">device-list</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/completion/">completion</a>
+    </li>
+    
+  </ul>
+</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-md-9">
+          
+<h1 class="title">download</h1>
+<div class="content ">
+  <ul>
+<li><a href="#download"><strong>download</strong></a></li>
+<li><a href="#download-latest"><strong>download latest</strong></a></li>
+<li><a href="#download-kernel"><strong>download kernel</strong></a></li>
+<li><a href="#download-pattern"><strong>download pattern</strong></a></li>
+<li><a href="#download-beta"><strong>download beta</strong></a></li>
+</ul>
+<hr>
+<h2 id="download"><strong>download</strong></h2>
+<blockquote>
+<p>Queries the <a href="https://ipsw.me">ipsw.me</a> API</p>
+</blockquote>
+<ul>
+<li>Download an ipsw and extract/decompress the kernelcache</li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download --device iPhone11,2 --build 16A366
+
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16A366 <span class="nv">device</span><span class="o">=</span>iPhone11,2 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>12.0
+      3.4 GiB / 3.4 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="p">|</span> 00:00 <span class="o">]</span> 79.08 MiB/s
+      • verifying sha1sum...
+
+$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+
+   • Extracting Kernelcache from IPSW
+      • Parsing Compressed Kernelcache
+         • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1
+      • Decompressing Kernelcache
+</code></pre></div><p>⚠️ notice that the kernelcache was extracted from the ipsw and decompressed 😈</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ file kernelcache.release.iphone11.decompressed
+
+kernelcache.release.iphone11.decompressed: <span class="s2">&#34;Mach-O 64-bit executable arm64&#34;</span>
+</code></pre></div><ul>
+<li>Download all the iOS 12.0 ipsws</li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download --version 12.0
+
+? You are about to download <span class="m">17</span> ipsw files. Continue? Yes
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16A366 <span class="nv">device</span><span class="o">=</span>iPhone11,4 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>12.0
+    3.3 GiB / 3.3 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="p">|</span> 00:00 <span class="o">]</span> 59.03 MiB/s
+      • verifying sha1sum...
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16A366 <span class="nv">device</span><span class="o">=</span>iPod7,1 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>12.0
+    734.7 MiB / 2.6 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>&gt;------------------------------------------<span class="p">|</span> 00:57 <span class="o">]</span> 44.84 MiB/s
+  ...
+</code></pre></div><ul>
+<li>Download with a Proxy</li>
+</ul>
+<p>This will download and decompress the kernelcache for an <strong>iPhone XS</strong> running <strong>iOS 12.1</strong> behind a corporate proxy</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download --proxy http://proxy.org:<span class="o">[</span>PORT<span class="o">]</span> --device iPhone11,2 --build 16B92
+</code></pre></div><ul>
+<li>To disable cert verification</li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download --insecure --device iPhone11,2 --build 16B92
+</code></pre></div><h2 id="download-latest"><strong>download latest</strong></h2>
+<blockquote>
+<p>Queries the iTunes XML for latest version <em>(maybe run this as a cron job)</em> 😉</p>
+</blockquote>
+<ul>
+<li>Download all the latest ipsws</li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
+   • Latest iOS release found is: <span class="s2">&#34;12.4.1&#34;</span>
+      • <span class="s2">&#34;Yo, ain&#39;t no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏&#34;</span>
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16G77 <span class="nv">device</span><span class="o">=</span>iPhone6,2 <span class="nv">version</span><span class="o">=</span>12.4.1
+        363.0 MiB / 2.9 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>&gt;-----------------------------------------------<span class="p">|</span> 18:52 <span class="o">]</span> 49.18 MiB/s
+  ...
+</code></pre></div><p>This will also generate a <code>checksums.txt.sha1</code> file that you can use to verify the downloads</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ sha1sum -c checksums.txt.sha1
+
+iPad_64bit_TouchID_13.2.3_17B111_Restore.ipsw: OK
+iPadPro_9.7_13.2.3_17B111_Restore.ipsw: OK
+iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
+</code></pre></div><p>⚠️ <strong>NOTE:</strong> you must do <strong>one</strong> device type/family per <code>--black-list</code> or <code>--white-list</code> flag</p>
+<ul>
+<li>To grab <em>only</em> the iPods</li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download -V latest --yes --white-list ipod
+   • Latest iOS release found is: <span class="s2">&#34;12.4.1&#34;</span>
+      • <span class="s2">&#34;Yo, ain&#39;t no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏&#34;</span>
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16G77 <span class="nv">device</span><span class="o">=</span>iPod9,1 <span class="nv">version</span><span class="o">=</span>12.4.1
+        363.0 MiB / 2.9 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>&gt;-----------------------------------------------<span class="p">|</span> 18:52 <span class="o">]</span> 49.18 MiB/s
+  ...
+</code></pre></div><h2 id="download-kernel"><strong>download kernel</strong></h2>
+<blockquote>
+<p>Queries the <a href="https://ipsw.me">ipsw.me</a> API</p>
+</blockquote>
+<p>Only download and decompress the kernelcaches <em>(not supported on Windows)</em></p>
+<ul>
+<li>Single kernelcache</li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">ipsw download kernel --device iPhone11,2 --build 16B92
+</code></pre></div><ul>
+<li>All of dem!!!</li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> ipsw download kernel --version 12.0.1
+
+<span class="s2">&#34;8.40s user 1.19s system 53% cpu 17.784 total&#34;</span>
+</code></pre></div><p>That&rsquo;s <strong>14</strong> decompressed kernelcaches in under <strong>9 seconds</strong> 😏</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ls -1
+
+kernelcache.release.ipad4b.decompressed
+kernelcache.release.ipad5b.decompressed
+kernelcache.release.ipad6b.decompressed
+kernelcache.release.ipad6d.decompressed
+kernelcache.release.ipad6f.decompressed
+kernelcache.release.ipad7.decompressed
+kernelcache.release.iphone10b.decompressed
+kernelcache.release.iphone11.decompressed
+kernelcache.release.iphone11b.decompressed
+kernelcache.release.iphone7.decompressed
+kernelcache.release.iphone8b.decompressed
+kernelcache.release.iphone9.decompressed
+kernelcache.release.j42d.decompressed
+kernelcache.release.n102.decompressed
+</code></pre></div><h2 id="download-pattern"><strong>download pattern</strong></h2>
+<blockquote>
+<p>Queries the <a href="https://ipsw.me">ipsw.me</a> API</p>
+</blockquote>
+<p>Only download files that match a given name/path</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download -v 13.2.3 -d iPhone12,3 pattern Firmware/all_flash/iBoot
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ls iBoot*
+iBoot.d321.RELEASE.im4p        iBoot.d331p.RELEASE.im4p.plist
+iBoot.d321.RELEASE.im4p.plist  iBoot.d421.RELEASE.im4p
+iBoot.d331.RELEASE.im4p        iBoot.d421.RELEASE.im4p.plist
+iBoot.d331.RELEASE.im4p.plist  iBoot.d431.RELEASE.im4p
+iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
+</code></pre></div><h2 id="download-beta"><strong>download beta</strong></h2>
+<blockquote>
+<p>This is done by scraping <a href="https://theiphonewiki.com">theiphonewiki.com</a>.</p>
+</blockquote>
+<p>Download BETA ipsws</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download beta 17C5046a
+</code></pre></div>
+</div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="sub-footer">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <div class="sub-footer-inner">
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+  
+  
+
+  
+  <script type="text/javascript" src="/ipsw/js/scripts.min.1237ff71925bb8625c97a9af8db4c54525258bedfd7c47493daaff723bea755e.js"></script>
+  
+
+  
+  
+  
+    
+  
+
+
+</body>
+
+</html>

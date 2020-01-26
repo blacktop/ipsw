@@ -3,11 +3,87 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>https://blacktop.github.io/ipsw/categories/</loc>
+    <loc>https://blacktop.github.io/ipsw/docs/</loc>
+    <lastmod>2020-01-25T21:15:23-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/install/</loc>
+    <lastmod>2020-01-25T21:06:37-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/build/</loc>
+    <lastmod>2020-01-26T09:47:03-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/getting-started/</loc>
+    <lastmod>2020-01-26T09:35:23-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/</loc>
+    <lastmod>2020-01-25T21:55:52-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/download/</loc>
+    <lastmod>2020-01-25T21:55:35-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/info/</loc>
+    <lastmod>2020-01-26T09:17:25-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/extract/</loc>
+    <lastmod>2020-01-26T10:58:06-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/macho/</loc>
+    <lastmod>2020-01-26T09:17:20-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/kernel/</loc>
+    <lastmod>2020-01-26T09:17:30-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/dyld/</loc>
+    <lastmod>2020-01-26T09:17:35-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/device-tree/</loc>
+    <lastmod>2020-01-26T11:02:56-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/disassemble/</loc>
+    <lastmod>2020-01-26T09:15:48-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/device-list/</loc>
+    <lastmod>2020-01-26T11:31:22-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/docs/commands/completion/</loc>
+    <lastmod>2020-01-26T11:05:13-05:00</lastmod>
   </url>
   
   <url>
     <loc>https://blacktop.github.io/ipsw/</loc>
+    <lastmod>2020-01-25T21:02:49-05:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://blacktop.github.io/ipsw/categories/</loc>
   </url>
   
   <url>
