@@ -5,7 +5,7 @@ draft: false
 weight: 1
 ---
 
-## `ipsw` is a...
+## **ipsw** isa:
 
 - ipsw downloader/exploder
 - macho parser
@@ -17,3 +17,5 @@ weight: 1
 - otool wannabe
 - objdump wannabe
 - jtool wannabe
+
+---
