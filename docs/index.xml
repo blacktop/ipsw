@@ -38,5 +38,14 @@
       <description>Quickstart</description>
     </item>
     
+    <item>
+      <title>Roadmap</title>
+      <link>https://blacktop.github.io/ipsw/docs/roadmap/</link>
+      <pubDate>Sun, 26 Jan 2020 12:51:45 -0500</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/roadmap/</guid>
+      <description>Future features.</description>
+    </item>
+    
   </channel>
 </rss>
