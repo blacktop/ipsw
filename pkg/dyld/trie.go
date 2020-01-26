@@ -11,10 +11,11 @@ import (
 )
 
 type trieEntry struct {
-	Name    string
-	Flags   CacheExportFlag
-	Other   uint64
-	Address uint64
+	Name         string
+	Flags        CacheExportFlag
+	Other        uint64
+	Address      uint64
+	FoundInDylib string
 }
 
 type trieEntrys struct {
@@ -27,6 +28,13 @@ type trieEntrys struct {
 type trieNode struct {
 	Offset   uint64
 	SymBytes []byte
+}
+
+func (e trieEntry) String() string {
+	if len(e.FoundInDylib) > 0 {
+		return fmt.Sprintf("0x%8x: %s, %s", e.Address, e.Name, e.FoundInDylib)
+	}
+	return fmt.Sprintf("0x%8x: %s", e.Address, e.Name)
 }
 
 func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {

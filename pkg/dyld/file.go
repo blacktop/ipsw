@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/macho/types"
 	"github.com/pkg/errors"
 )
 
@@ -772,6 +772,7 @@ func (f *File) FindExportedSymbol(symbolName string) (*trieEntry, error) {
 					}
 					for _, sym := range syms {
 						if sym.Name == symbolName {
+							sym.FoundInDylib = image.Name
 							return &sym, nil
 						}
 						// fmt.Println(sym.Name)
