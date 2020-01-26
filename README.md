@@ -15,7 +15,9 @@
           <img src="https://img.shields.io/:license-mit-blue.svg" /></a>
 </p>
 
-![terminal](https://raw.githubusercontent.com/blacktop/ipsw/master/docs/static/images/terminal.svg)
+<p align="center">
+  <img width="600" src="https://raw.githubusercontent.com/blacktop/ipsw/master/docs/static/images/terminal.svg">
+</p>
 
 ## Documentation
 
