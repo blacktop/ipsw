@@ -16,7 +16,7 @@
 </p>
 <br>
 <p align="center">
-  <img width="600" src="https://blacktop.github.io/ipsw/images/terminal.svg">
+  <img src="https://blacktop.github.io/ipsw/images/terminal.svg">
 </p>
 
 ## Documentation
