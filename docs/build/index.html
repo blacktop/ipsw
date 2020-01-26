@@ -35,6 +35,12 @@
       </a>
     </li>
     
+    <li class="menu-item-github">
+      <a href="https://github.com/blacktop/ipsw">
+        <span>Github</span>
+      </a>
+    </li>
+    
   </ul>
 </div>
   <div class="wrapper">
@@ -59,6 +65,12 @@
     <li class="menu-item-docs">
       <a href="/ipsw/docs/">
         <span>Docs</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-github">
+      <a href="https://github.com/blacktop/ipsw">
+        <span>Github</span>
       </a>
     </li>
     
@@ -142,6 +154,10 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/completion/">completion</a>
     </li>
     
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/roadmap/">Roadmap</a>
+    </li>
+    
   </ul>
 </div>
 
@@ -151,17 +167,17 @@
           
 <h1 class="title">Build</h1>
 <div class="content ">
-  <h3 id="build-with-support-for-lzfse-compression-and-capstone-_arm64_-disassembly">Build with support for <strong>lzfse</strong> compression and <strong>capstone</strong> <em>ARM64</em> disassembly</h3>
+  <h2 id="with-support-for-lzfse-compression-and-capstone-disassembly"><strong>WITH</strong> support for <strong>lzfse</strong> compression and <strong>capstone</strong> disassembly</h2>
 <h4 id="dependancies">Dependancies:</h4>
 <ul>
 <li><a href="https://github.com/lzfse/lzfse">lzfse</a></li>
 <li><a href="https://github.com/aquynh/capstone/tree/next">capstone</a></li>
 </ul>
 <h3 id="install-the-dependancies">Install the dependancies</h3>
-<h4 id="via-homebrewhttpsbrewsh">Via <a href="https://brew.sh">homebrew</a></h4>
+<p>Via <a href="https://brew.sh">homebrew</a></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ brew install lzfse
 $ brew install capstone --HEAD
-</code></pre></div><h4 id="from-source">From source</h4>
+</code></pre></div><p>From source</p>
 <ul>
 <li><a href="https://github.com/lzfse/lzfse">lzfse</a></li>
 </ul>
@@ -178,16 +194,18 @@ $ make install
 $ <span class="nb">cd</span> capstone
 $ <span class="nv">CAPSTONE_ARCHS</span><span class="o">=</span><span class="s2">&#34;arm aarch64 x86&#34;</span> ./make.sh
 $ sudo ./make.sh install
-</code></pre></div><h2 id="install-the-go-binary">Install the Go binary</h2>
+</code></pre></div><h4 id="install-the-go-binary">Install the Go binary</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">1</span> <span class="se">\
 </span><span class="se"></span>  <span class="nv">CGO_CFLAGS</span><span class="o">=</span>-I/usr/local/include <span class="se">\ </span><span class="c1"># path to the lzfse and capstone includes</span>
   <span class="nv">CGO_LDFLAGS</span><span class="o">=</span>-L/usr/local/lib <span class="se">\ </span>   <span class="c1"># path to the lzfse and capstone libs</span>
   go build ./cmd/ipsw
-</code></pre></div><h3 id="build-without-support-for-lzfse-compression-and-capstone-_arm64_-disassembly">Build <strong>WITHOUT</strong> support for <strong>lzfse</strong> compression and <strong>capstone</strong> <em>ARM64</em> disassembly</h3>
-<h2 id="install-the-go-binary-1">Install the Go binary</h2>
+</code></pre></div><h2 id="without-support-for-lzfse-compression-and-capstone-disassembly"><strong>WITHOUT</strong> support for <strong>lzfse</strong> compression and <strong>capstone</strong> disassembly</h2>
+<h4 id="install-the-go-binary-1">Install the Go binary</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">0</span> go build ./cmd/ipsw
-</code></pre></div><h4 id="sooooo-easy-man-i-hate-cgo-so-much-">Sooooo easy&hellip; man I hate cgo so much 🤬</h4>
-
+</code></pre></div><h2 id="without-internet"><strong>WITHOUT</strong> internet</h2>
+<p>Add <code>--mod=vendor</code> to use the Go deps in the vendor folder</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ go build --mod<span class="o">=</span>vendor ./cmd/ipsw
+</code></pre></div>
 </div>
 </div>
 
