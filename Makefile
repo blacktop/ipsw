@@ -79,6 +79,11 @@ build: ## Build a beta version of malice
 	@echo "===> Building Binaries"
 	go build
 
+.PHONY: docs
+docs:
+	@echo "===> Building Docs"
+	hack/publish/gh-pages
+
 .PHONY: docker
 docker: ## Build docker image
 	@echo "===> Building Docker Image"
