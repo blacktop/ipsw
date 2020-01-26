@@ -83,7 +83,7 @@ func doDemangle(name string) string {
 
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
-	Use:   "dis",
+	Use:   "disass",
 	Short: "Disassemble ARM binaries at address or symbol",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
