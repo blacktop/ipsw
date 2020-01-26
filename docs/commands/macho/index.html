@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>macho - ipsw</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
+
+  
+  
+  <link rel="stylesheet" href="/ipsw/css/style.min.ea6b48972da7f279ad582724dff6f5e2de2407599d9cb8f1739e9dacb2009522.css">
+  
+
+  
+
+</head>
+
+<body class='page page-default-single'>
+  <div id="main-menu-mobile" class="main-menu-mobile">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+  <div class="wrapper">
+    <div class='header'>
+  <div class="container">
+    <div class="logo">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div class="logo-mobile">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div id="main-menu" class="main-menu">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+    <button id="toggle-main-menu-mobile" class="hamburger hamburger--slider" type="button">
+  <span class="hamburger-box">
+    <span class="hamburger-inner"></span>
+  </span>
+</button>
+  </div>
+</div>
+
+
+    
+    
+    
+    
+    
+    
+
+    
+    <div class="container pt-2 pt-md-6 pb-3 pb-md-6">
+      <div class="row">
+        <div class="col-12 col-md-3 mb-3">
+          <div class="sidebar">
+            
+<div class="docs-menu">
+  <h4>Docs</h4>
+  <ul>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/install/">Install</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/build/">Build</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/getting-started/">Getting Started</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/download/">download</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/info/">info</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/extract/">extract</a>
+    </li>
+    
+    <li class="active ">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/macho/">macho</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/dyld/">dyld</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-tree/">dtree</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/disassemble/">disass</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-list/">device-list</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/completion/">completion</a>
+    </li>
+    
+  </ul>
+</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-md-9">
+          
+<h1 class="title">macho</h1>
+<div class="content ">
+  <h2 id="wip-">[WIP] 🚧</h2>
+<h3 id="similar-to-otool--h--l">Similar to <code>otool -h -l</code></h3>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
+
+<span class="nv">HEADER</span>
+<span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
+<span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
+<span class="nv">Type</span>          <span class="o">=</span> Dylib
+<span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e <span class="o">(</span>ARMv8.3<span class="o">)</span>
+<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">22</span> <span class="o">(</span>Size: 3800<span class="o">)</span>
+<span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
+
+<span class="nv">SECTIONS</span>
+<span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
+Mem: 0x18f5a1470-0x1902aa548   __TEXT.__text                                             PureInstructions<span class="p">|</span>SomeInstructions
+Mem: 0x1902aa548-0x1902ac478   __TEXT.__auth_stubs             <span class="o">(</span>SymbolStubs<span class="o">)</span>             PureInstructions<span class="p">|</span>SomeInstructions
+Mem: 0x1902ac480-0x19030e080   __TEXT.__const
+Mem: 0x19030e080-0x19039782a   __TEXT.__cstring                <span class="o">(</span>Cstring Literals<span class="o">)</span>
+Mem: 0x19039782a-0x190397d95   __TEXT.__oslogstring            <span class="o">(</span>Cstring Literals<span class="o">)</span>
+Mem: 0x190397d98-0x190399c04   __TEXT.__gcc_except_tab
+Mem: 0x190399c04-0x19039ab18   __TEXT.__unwind_info
+Mem: 0x19039b000-0x19039b000   __TEXT.__objc_classname         <span class="o">(</span>Cstring Literals<span class="o">)</span>
+Mem: 0x19039b000-0x19039b000   __TEXT.__objc_methname          <span class="o">(</span>Cstring Literals<span class="o">)</span>
+Mem: 0x19039b000-0x19039b000   __TEXT.__objc_methtype          <span class="o">(</span>Cstring Literals<span class="o">)</span>
+&lt;SNIP&gt;
+</code></pre></div>
+</div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="sub-footer">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <div class="sub-footer-inner">
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+  
+  
+
+  
+  <script type="text/javascript" src="/ipsw/js/scripts.min.1237ff71925bb8625c97a9af8db4c54525258bedfd7c47493daaff723bea755e.js"></script>
+  
+
+  
+  
+  
+    
+  
+
+
+</body>
+
+</html>

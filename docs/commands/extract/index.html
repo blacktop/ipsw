@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>extract - ipsw</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
+
+  
+  
+  <link rel="stylesheet" href="/ipsw/css/style.min.ea6b48972da7f279ad582724dff6f5e2de2407599d9cb8f1739e9dacb2009522.css">
+  
+
+  
+
+</head>
+
+<body class='page page-default-single'>
+  <div id="main-menu-mobile" class="main-menu-mobile">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+  <div class="wrapper">
+    <div class='header'>
+  <div class="container">
+    <div class="logo">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div class="logo-mobile">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div id="main-menu" class="main-menu">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+    <button id="toggle-main-menu-mobile" class="hamburger hamburger--slider" type="button">
+  <span class="hamburger-box">
+    <span class="hamburger-inner"></span>
+  </span>
+</button>
+  </div>
+</div>
+
+
+    
+    
+    
+    
+    
+    
+
+    
+    <div class="container pt-2 pt-md-6 pb-3 pb-md-6">
+      <div class="row">
+        <div class="col-12 col-md-3 mb-3">
+          <div class="sidebar">
+            
+<div class="docs-menu">
+  <h4>Docs</h4>
+  <ul>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/install/">Install</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/build/">Build</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/getting-started/">Getting Started</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/download/">download</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/info/">info</a>
+    </li>
+    
+    <li class="active ">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/extract/">extract</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/macho/">macho</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/dyld/">dyld</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-tree/">dtree</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/disassemble/">disass</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-list/">device-list</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/completion/">completion</a>
+    </li>
+    
+  </ul>
+</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-md-9">
+          
+<h1 class="title">extract</h1>
+<div class="content ">
+  <h3 id="-_not-supported-on-windows_">⚠️ <em>(not supported on Windows)</em></h3>
+<h4 id="extract-kernelcache-from-a-previously-downloaded-8ipsw">Extract <em>kernelcache</em> from a previously downloaded 8ipsw*</h4>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+</code></pre></div><h4 id="extract-dyld_shared_cache-from-a-previously-downloaded-ipsw">Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></h4>
+<ul>
+<li><code>macOS</code></li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
+   • Extracting dyld_shared_cache from IPSW
+   • Mounting DMG
+   • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
+   • Unmounting DMG
+</code></pre></div><ul>
+<li><code>docker</code></li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ docker run --init -it --rm <span class="se">\
+</span><span class="se"></span>             --device /dev/fuse <span class="se">\
+</span><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
+</span><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
+</span><span class="se"></span>             blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
+</code></pre></div>
+</div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="sub-footer">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <div class="sub-footer-inner">
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+  
+  
+
+  
+  <script type="text/javascript" src="/ipsw/js/scripts.min.1237ff71925bb8625c97a9af8db4c54525258bedfd7c47493daaff723bea755e.js"></script>
+  
+
+  
+  
+  
+    
+  
+
+
+</body>
+
+</html>

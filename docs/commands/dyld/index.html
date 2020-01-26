@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <title>dyld - ipsw</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
+
+  
+  
+  <link rel="stylesheet" href="/ipsw/css/style.min.ea6b48972da7f279ad582724dff6f5e2de2407599d9cb8f1739e9dacb2009522.css">
+  
+
+  
+
+</head>
+
+<body class='page page-default-single'>
+  <div id="main-menu-mobile" class="main-menu-mobile">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+  <div class="wrapper">
+    <div class='header'>
+  <div class="container">
+    <div class="logo">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div class="logo-mobile">
+      <a href="https://blacktop.github.io/ipsw/"><img alt="Logo" src="/ipsw/images/ipsw.png" /></a>
+    </div>
+    <div id="main-menu" class="main-menu">
+  <ul>
+    
+    
+    <li class="menu-item-home">
+      <a href="/ipsw/">
+        <span>Home</span>
+      </a>
+    </li>
+    
+    <li class="menu-item-docs">
+      <a href="/ipsw/docs/">
+        <span>Docs</span>
+      </a>
+    </li>
+    
+  </ul>
+</div>
+    <button id="toggle-main-menu-mobile" class="hamburger hamburger--slider" type="button">
+  <span class="hamburger-box">
+    <span class="hamburger-inner"></span>
+  </span>
+</button>
+  </div>
+</div>
+
+
+    
+    
+    
+    
+    
+    
+
+    
+    <div class="container pt-2 pt-md-6 pb-3 pb-md-6">
+      <div class="row">
+        <div class="col-12 col-md-3 mb-3">
+          <div class="sidebar">
+            
+<div class="docs-menu">
+  <h4>Docs</h4>
+  <ul>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/install/">Install</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/build/">Build</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/getting-started/">Getting Started</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/download/">download</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/info/">info</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/extract/">extract</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/macho/">macho</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
+    </li>
+    
+    <li class="active ">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/dyld/">dyld</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-tree/">dtree</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/disassemble/">disass</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/device-list/">device-list</a>
+    </li>
+    
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/completion/">completion</a>
+    </li>
+    
+  </ul>
+</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-md-9">
+          
+<h1 class="title">dyld</h1>
+<div class="content ">
+  <ul>
+<li><a href="#dyld-extract"><strong>dyld extract</strong></a></li>
+<li><a href="#dyld-list"><strong>dyld list</strong></a></li>
+<li><a href="#dyld-symaddr"><strong>dyld symaddr</strong></a></li>
+<li><a href="#dyld-split"><strong>dyld split</strong></a></li>
+<li><a href="#dyld-webkit"><strong>dyld webkit</strong></a></li>
+</ul>
+<hr>
+<h3 id="dyld-extract"><strong>dyld extract</strong></h3>
+<p>Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></p>
+<ul>
+<li><code>macOS</code></li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld extract iPhone11,2_12.0_16A366_Restore.ipsw
+   • Extracting dyld_shared_cache from IPSW
+   • Mounting DMG
+   • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
+   • Unmounting DMG
+</code></pre></div><ul>
+<li><code>docker</code></li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ docker run --init -it --rm <span class="se">\
+</span><span class="se"></span>             --device /dev/fuse <span class="se">\
+</span><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
+</span><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
+</span><span class="se"></span>             blacktop/ipsw -V dyld extract iPhone11_2_12.4.1_16G102_Restore.ipsw
+</code></pre></div><h3 id="dyld-list"><strong>dyld list</strong></h3>
+<p>Similar to <code>otool -L dyld_shared_cache</code></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld list dyld_shared_cache
+
+<span class="nv">Header</span>
+<span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
+<span class="nv">Magic</span>               <span class="o">=</span> dyld_v1  arm64e
+<span class="nv">MappingOffset</span>       <span class="o">=</span> <span class="m">00000138</span>
+<span class="nv">MappingCount</span>        <span class="o">=</span> <span class="m">3</span>
+<span class="nv">ImagesOffset</span>        <span class="o">=</span> <span class="m">00000198</span>
+<span class="nv">ImagesCount</span>         <span class="o">=</span> <span class="m">1819</span>
+<span class="nv">DyldBaseAddress</span>     <span class="o">=</span> <span class="m">00000000</span>
+<span class="nv">CodeSignatureOffset</span> <span class="o">=</span> 5F4B0000
+<span class="nv">CodeSignatureSize</span>   <span class="o">=</span> 002FC000
+<span class="nv">SlideInfoOffset</span>     <span class="o">=</span> <span class="m">48108000</span>
+<span class="nv">SlideInfoSize</span>       <span class="o">=</span> <span class="m">00018000</span>
+<span class="nv">LocalSymbolsOffset</span>  <span class="o">=</span> 4F714000
+<span class="nv">LocalSymbolsSize</span>    <span class="o">=</span> 0FD9C000
+<span class="nv">UUID</span>                <span class="o">=</span> 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
+<span class="nv">Platform</span>            <span class="o">=</span> iOS
+<span class="nv">Format</span>              <span class="o">=</span> <span class="m">10</span>
+Slide Info:      96KB,  file offset: 0x48108000 -&gt; 0x48120000
+Local Symbols:  253MB,  file offset: 0x4F714000 -&gt; 0x5F4B0000
+Accelerate Tab: 304KB,  address: 0x1D2F64000 -&gt; 0x1D2FB0000
+
+<span class="nv">Mappings</span>
+<span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
+<span class="p">|</span>    SEG     <span class="p">|</span> INITPROT <span class="p">|</span> MAXPROT <span class="p">|</span>  SIZE  <span class="p">|</span>        ADDRESS         <span class="p">|</span>     FILE OFFSET      <span class="p">|</span>
+<span class="p">|</span>------------<span class="p">|</span>----------<span class="p">|</span>---------<span class="p">|</span>--------<span class="p">|</span>------------------------<span class="p">|</span>----------------------<span class="p">|</span>
+<span class="p">|</span> __TEXT     <span class="p">|</span> r-x      <span class="p">|</span> r-x     <span class="p">|</span> <span class="m">968</span> MB <span class="p">|</span> <span class="m">180000000</span> -&gt; 1BC8FC000 <span class="p">|</span> <span class="m">00000000</span> -&gt; 3C8FC000 <span class="p">|</span>
+<span class="p">|</span> __DATA     <span class="p">|</span> rw-      <span class="p">|</span> rw-     <span class="p">|</span> <span class="m">184</span> MB <span class="p">|</span> 1BE8FC000 -&gt; 1CA108000 <span class="p">|</span> 3C8FC000 -&gt; <span class="m">48108000</span> <span class="p">|</span>
+<span class="p">|</span> __LINKEDIT <span class="p">|</span> r--      <span class="p">|</span> r--     <span class="p">|</span> <span class="m">118</span> MB <span class="p">|</span> 1CC108000 -&gt; 1D3714000 <span class="p">|</span> <span class="m">48108000</span> -&gt; 4F714000 <span class="p">|</span>
+
+<span class="nv">Images</span>
+<span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
+1:      18003c000 /usr/lib/system/libsystem_trace.dylib
+2:      <span class="m">180053000</span> /usr/lib/system/libxpc.dylib
+3:      <span class="m">180087000</span> /usr/lib/system/libsystem_blocks.dylib
+4:      <span class="m">180088000</span> /usr/lib/system/libsystem_c.dylib
+5:      <span class="m">180107000</span> /usr/lib/system/libdispatch.dylib
+6:      <span class="m">180144000</span> /usr/lib/system/libsystem_malloc.dylib
+7:      <span class="m">180165000</span> /usr/lib/system/libsystem_platform.dylib
+&lt;SNIP&gt;
+</code></pre></div><h3 id="dyld-symaddr"><strong>dyld symaddr</strong></h3>
+<p>Find symbol <em>(unslid)</em> addresses in shared cache</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache &lt;SYMBOL_NAME&gt;
+</code></pre></div><p>Speed it up by supplying the dylib name</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache &lt;SYMBOL_NAME&gt;
+</code></pre></div><p>⚠️ <strong>NOTE:</strong> you don&rsquo;t have to supply the full image path</p>
+<h3 id="dyld-split"><strong>dyld split</strong></h3>
+<p><em>(only on macOS)</em></p>
+<p>Split up a <em>dyld_shared_cache</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld split dyld_shared_cache
+   • Splitting dyld_shared_cache
+
+0/1445
+1/1445
+2/1445
+3/1445
+&lt;SNIP&gt;
+1441/1445
+1442/1445
+1443/1445
+1444/1445
+</code></pre></div><h3 id="dyld-webkit"><strong>dyld webkit</strong></h3>
+<p>Extract WebKit version from <em>dyld_shared_cache</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld webkit dyld_shared_cache
+   • WebKit Version: 607.2.6.0.1
+</code></pre></div>
+</div>
+</div>
+
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="sub-footer">
+  <div class="container">
+    <div class="row">
+      <div class="col-12">
+        <div class="sub-footer-inner">
+          
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+  
+
+  
+  
+
+  
+  <script type="text/javascript" src="/ipsw/js/scripts.min.1237ff71925bb8625c97a9af8db4c54525258bedfd7c47493daaff723bea755e.js"></script>
+  
+
+  
+  
+  
+    
+  
+
+
+</body>
+
+</html>
