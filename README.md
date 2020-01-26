@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://raw.githubusercontent.com/blacktop/ipsw/master/docs/static/ipsw.png" height="140" /></a>
+  <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png" height="140" /></a>
   <h1 align="center">ipsw</h1>
   <h4><p align="center">Download and parse iOS ipsw(s)</p></h4>
   <p align="center">
