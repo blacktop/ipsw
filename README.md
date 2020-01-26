@@ -67,7 +67,7 @@ Use "ipsw [command] --help" for more information about a command.
 
 ## Documentation
 
-See here [docs](https://blacktop.github.io/ipsw/)
+### See here [Docs](https://blacktop.github.io/ipsw/)
 
 ## TODO
 
