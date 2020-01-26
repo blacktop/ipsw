@@ -243,6 +243,25 @@ func (b *builder) processFunctionNode(root *functionNode) (query, error) {
 			return nil, err
 		}
 		qyOutput = &functionQuery{Input: argQuery, Func: normalizespaceFunc}
+	case "replace":
+		//replace( string , string, string )
+		if len(root.Args) != 3 {
+			return nil, errors.New("xpath: replace function must have three parameters")
+		}
+		var (
+			arg1, arg2, arg3 query
+			err              error
+		)
+		if arg1, err = b.processNode(root.Args[0]); err != nil {
+			return nil, err
+		}
+		if arg2, err = b.processNode(root.Args[1]); err != nil {
+			return nil, err
+		}
+		if arg3, err = b.processNode(root.Args[2]); err != nil {
+			return nil, err
+		}
+		qyOutput = &functionQuery{Input: b.firstInput, Func: replaceFunc(arg1, arg2, arg3)}
 	case "translate":
 		//translate( string , string, string )
 		if len(root.Args) != 3 {
@@ -272,27 +291,27 @@ func (b *builder) processFunctionNode(root *functionNode) (query, error) {
 		}
 		qyOutput = &functionQuery{Input: argQuery, Func: notFunc}
 	case "name", "local-name", "namespace-uri":
-		inp := b.firstInput
 		if len(root.Args) > 1 {
 			return nil, fmt.Errorf("xpath: %s function must have at most one parameter", root.FuncName)
 		}
+		var (
+			arg query
+			err error
+		)
 		if len(root.Args) == 1 {
-			argQuery, err := b.processNode(root.Args[0])
+			arg, err = b.processNode(root.Args[0])
 			if err != nil {
 				return nil, err
 			}
-			inp = argQuery
 		}
-		f := &functionQuery{Input: inp}
 		switch root.FuncName {
 		case "name":
-			f.Func = nameFunc
+			qyOutput = &functionQuery{Input: b.firstInput, Func: nameFunc(arg)}
 		case "local-name":
-			f.Func = localNameFunc
+			qyOutput = &functionQuery{Input: b.firstInput, Func: localNameFunc(arg)}
 		case "namespace-uri":
-			f.Func = namespaceFunc
+			qyOutput = &functionQuery{Input: b.firstInput, Func: namespaceFunc(arg)}
 		}
-		qyOutput = f
 	case "true", "false":
 		val := root.FuncName == "true"
 		qyOutput = &functionQuery{
