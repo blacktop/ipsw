@@ -35,7 +35,7 @@ usr
 dist/
 test-caches/
 pkg/info/data
-pkg/dyld/slide_info.txt
+*.txt
 
 *.download
 checksums.txt.sha1
