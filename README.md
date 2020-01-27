@@ -19,6 +19,8 @@
   <img src="https://blacktop.github.io/ipsw/images/ipsw.gif">
 </p>
 
+> **NOTE:** better version of this animation [here](https://blacktop.github.io/ipsw/images/terminal.svg) _(2MB)_ 😬
+
 ## Documentation
 
 - [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/)
