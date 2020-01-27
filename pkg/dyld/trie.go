@@ -98,7 +98,8 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 				if err != nil {
 					return nil, err
 				}
-				fmt.Println(symOtherInt)
+				// TODO: handle stubs
+				log.Debugf("StubAndResolver: %d", symOtherInt)
 			}
 
 			if flags.Regular() || flags.ThreadLocal() {
