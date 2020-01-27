@@ -775,7 +775,6 @@ func (f *File) FindExportedSymbol(symbolName string) (*trieEntry, error) {
 							sym.FoundInDylib = image.Name
 							return &sym, nil
 						}
-						// fmt.Println(sym.Name)
 					}
 				}
 			}
