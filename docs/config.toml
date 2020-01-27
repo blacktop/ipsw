@@ -34,7 +34,8 @@ summaryLength = 30
   homepage_button_link = '/docs'
   homepage_button_text = 'Read The Docs'
   homepage_intro = 'Download and parse iOS ipsws.'
-  homepage_image = '/images/terminal.svg'
+  homepage_image = '/images/ipsw.gif'
+  #homepage_image = '/images/terminal.svg'
 
   ## You can enable to add anchor links to header elements
   # enable_anchor_link = true
