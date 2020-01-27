@@ -3,6 +3,7 @@
 .gitignore
 
 dist*
+docs*
 
 .devcontainer
 .github
