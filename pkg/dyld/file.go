@@ -552,7 +552,7 @@ func (f *File) HasImagePath(path string) (int, bool, error) {
 			if err != nil {
 				return 0, false, err
 			}
-			imageIndex, _, err = readUleb128(bytes.NewBuffer(dylibTrie[imageNode:]))
+			imageIndex, _, err = readUleb128FromBuffer(bytes.NewBuffer(dylibTrie[imageNode:]))
 			if err != nil {
 				return 0, false, err
 			}
@@ -577,7 +577,7 @@ func (f *File) FindDlopenOtherImage(path string) error {
 			if err != nil {
 				return err
 			}
-			imageNum, _, err := readUleb128(bytes.NewBuffer(otherTrie[imageNode:]))
+			imageNum, _, err := readUleb128FromBuffer(bytes.NewBuffer(otherTrie[imageNode:]))
 			if err != nil {
 				return err
 			}
@@ -605,7 +605,7 @@ func (f *File) FindClosure(executablePath string) error {
 			if err != nil {
 				return err
 			}
-			closureOffset, _, err := readUleb128(bytes.NewBuffer(progClosuresTrie[imageNode:]))
+			closureOffset, _, err := readUleb128FromBuffer(bytes.NewBuffer(progClosuresTrie[imageNode:]))
 			if err != nil {
 				return err
 			}
@@ -684,6 +684,122 @@ func (f *File) GetLocalSymbolsForImage(imagePath string) error {
 	}
 
 	return nil
+}
+
+func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	if f.LocalSymbolsOffset == 0 {
+		return nil, fmt.Errorf("dyld shared cache does not contain local symbols info")
+	}
+
+	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
+
+	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
+		return nil, err
+	}
+
+	if f.Is64bit() {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
+	} else {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
+	}
+	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
+	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
+	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+
+	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
+		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
+			return nil, err
+		}
+	}
+
+	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+	stringPool := make([]byte, f.LocalSymInfo.StringsSize)
+	sr.ReadAt(stringPool, int64(f.LocalSymInfo.StringsFileOffset))
+	nlistName := bytes.Index(stringPool, []byte(symbol))
+
+	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
+		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
+			nlist := types.Nlist64{}
+			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
+				return nil, err
+			}
+			if int(nlist.Name) == nlistName {
+				return &CacheLocalSymbol64{
+					Name:         symbol,
+					FoundInDylib: f.Images[idx].Name,
+					Nlist64:      nlist,
+				}, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("symbol not found in private symbols")
+}
+
+func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymbol64, error) {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	if f.LocalSymbolsOffset == 0 {
+		return nil, fmt.Errorf("dyld shared cache does not contain local symbols info")
+	}
+
+	image := f.Image(imageName)
+
+	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
+
+	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
+		return nil, err
+	}
+
+	if f.Is64bit() {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
+	} else {
+		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
+	}
+	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
+	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
+	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+
+	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
+		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
+			return nil, err
+		}
+	}
+
+	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+
+	stringPool := make([]byte, f.LocalSymInfo.StringsSize)
+	sr.ReadAt(stringPool, int64(f.LocalSymInfo.StringsFileOffset))
+
+	nlistName := bytes.Index(stringPool, []byte(symbol))
+
+	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+
+	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
+		// skip over other images
+		if uint32(idx) != image.Index {
+			sr.Seek(int64(int(f.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), os.SEEK_CUR)
+			continue
+		}
+		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
+			nlist := types.Nlist64{}
+			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
+				return nil, err
+			}
+			if int(nlist.Name) == nlistName {
+				return &CacheLocalSymbol64{
+					Name:         symbol,
+					FoundInDylib: f.Images[idx].Name,
+					Nlist64:      nlist,
+				}, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("symbol not found in private symbols")
 }
 
 // GetLocalSymAtAddress returns the local symbol at a given address
@@ -816,87 +932,9 @@ func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trieEnt
 
 // GetExportedSymbolAddress returns the address of an images exported symbol
 func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, error) {
-
-	var err error
-	var symFlagInt, symOrdinalInt, symValueInt, symResolverFuncOffsetInt uint64
-
-	exportedSymbol := &CacheExportedSymbol{
-		Name: symbol,
-	}
-
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
 	for _, image := range f.Images {
-		// log.Infof("Scanning Image: %s", image.Name)
-		for _, mapping := range f.Mappings {
-			start := image.CacheImageInfoExtra.ExportsTrieAddr
-			end := image.CacheImageInfoExtra.ExportsTrieAddr + uint64(image.CacheImageInfoExtra.ExportsTrieSize)
-			if mapping.Address <= start && end < mapping.Address+mapping.Size {
-				sr.Seek(int64(image.CacheImageInfoExtra.ExportsTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
-				exportTrie := make([]byte, image.CacheImageInfoExtra.ExportsTrieSize)
-				if err = binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
-					return nil, err
-				}
-
-				symbolNode, err := walkTrie(exportTrie, symbol)
-				if err != nil {
-					// skip image
-					continue
-				}
-
-				r := bytes.NewReader(exportTrie)
-
-				r.Seek(int64(symbolNode), io.SeekStart)
-				symFlagInt, err = ReadUleb128(r)
-				if err != nil {
-					return nil, err
-				}
-
-				exportedSymbol.Flags = CacheExportFlag(symFlagInt)
-
-				if exportedSymbol.Flags.ReExport() {
-					symOrdinalInt, err = ReadUleb128(r)
-					if err != nil {
-						return nil, err
-					}
-					log.Debugf("ReExport symOrdinal: %d", symOrdinalInt)
-				}
-
-				symValueInt, err = ReadUleb128(r)
-				if err != nil {
-					return nil, err
-				}
-				exportedSymbol.Value = symValueInt
-				exportedSymbol.Address = symValueInt + image.CacheImageTextInfo.LoadAddress
-
-				// parse flags
-				if exportedSymbol.Flags.Regular() {
-					exportedSymbol.IsHeaderOffset = true
-					if exportedSymbol.Flags.StubAndResolver() {
-						exportedSymbol.IsHeaderOffset = true
-						symResolverFuncOffsetInt, err = ReadUleb128(r)
-						if err != nil {
-							return nil, err
-						}
-						exportedSymbol.ResolverFuncOffset = uint32(symResolverFuncOffsetInt)
-					} else {
-						exportedSymbol.IsHeaderOffset = true
-					}
-					if exportedSymbol.Flags.WeakDefinition() {
-						exportedSymbol.IsWeakDef = true
-					}
-				}
-				if exportedSymbol.Flags.ThreadLocal() {
-					exportedSymbol.IsThreadLocal = true
-				}
-				if exportedSymbol.Flags.Absolute() {
-					exportedSymbol.IsAbsolute = true
-				}
-
-				exportedSymbol.FoundInDylib = image.Name
-
-				return exportedSymbol, nil
-			}
+		if exportSym, err := f.findSymbolInExportTrieForImage(symbol, image); err == nil {
+			return exportSym, nil
 		}
 	}
 	return nil, fmt.Errorf("symbol was not found in ExportsTrie")
@@ -904,81 +942,88 @@ func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, er
 
 // GetExportedSymbolAddressInImage returns the address of an given image's exported symbol
 func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*CacheExportedSymbol, error) {
+	return f.findSymbolInExportTrieForImage(symbol, f.Image(imagePath))
+}
 
-	var err error
-	var symFlagInt, symOrdinalInt, symValueInt, symResolverFuncOffsetInt uint64
+func (f *File) findSymbolInExportTrieForImage(symbol string, image *CacheImage) (*CacheExportedSymbol, error) {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	var reExportSymBytes []byte
 
 	exportedSymbol := &CacheExportedSymbol{
-		FoundInDylib: imagePath,
+		FoundInDylib: image.Name,
 		Name:         symbol,
 	}
 
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
-	image := f.Image(imagePath)
-
-	// TODO: dry this up
 	for _, mapping := range f.Mappings {
 		start := image.CacheImageInfoExtra.ExportsTrieAddr
 		end := image.CacheImageInfoExtra.ExportsTrieAddr + uint64(image.CacheImageInfoExtra.ExportsTrieSize)
 		if mapping.Address <= start && end < mapping.Address+mapping.Size {
 			sr.Seek(int64(image.CacheImageInfoExtra.ExportsTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
 			exportTrie := make([]byte, image.CacheImageInfoExtra.ExportsTrieSize)
-			if err = binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
+			if err := binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
 				return nil, err
 			}
 
 			symbolNode, err := walkTrie(exportTrie, symbol)
 			if err != nil {
-				return nil, err
+				// skip image
+				continue
 			}
 
 			r := bytes.NewReader(exportTrie)
 
 			r.Seek(int64(symbolNode), io.SeekStart)
-			symFlagInt, err = ReadUleb128(r)
+
+			// symFlagInt, _, err := readUleb128(bytes.NewBuffer(exportTrie[symbolNode:]))
+			symFlagInt, err := readUleb128(r)
 			if err != nil {
 				return nil, err
 			}
+
 			exportedSymbol.Flags = CacheExportFlag(symFlagInt)
 
 			if exportedSymbol.Flags.ReExport() {
-				symOrdinalInt, err = ReadUleb128(r)
+				symOrdinalInt, err := readUleb128(r)
 				if err != nil {
 					return nil, err
 				}
 				log.Debugf("ReExport symOrdinal: %d", symOrdinalInt)
+				for {
+					s, err := r.ReadByte()
+					if err == io.EOF {
+						break
+					}
+					if s == '\x00' {
+						break
+					}
+					reExportSymBytes = append(reExportSymBytes, s)
+				}
 			}
 
-			symValueInt, err = ReadUleb128(r)
+			symValueInt, err := readUleb128(r)
 			if err != nil {
 				return nil, err
 			}
 			exportedSymbol.Value = symValueInt
-			exportedSymbol.Address = symValueInt + image.CacheImageTextInfo.LoadAddress
 
-			// parse flags
-			if exportedSymbol.Flags.Regular() {
-				exportedSymbol.IsHeaderOffset = true
-				if exportedSymbol.Flags.StubAndResolver() {
-					exportedSymbol.IsHeaderOffset = true
-					symResolverFuncOffsetInt, err = ReadUleb128(r)
-					if err != nil {
-						return nil, err
-					}
-					exportedSymbol.ResolverFuncOffset = uint32(symResolverFuncOffsetInt)
-				} else {
-					exportedSymbol.IsHeaderOffset = true
+			if exportedSymbol.Flags.StubAndResolver() {
+				symOtherInt, err := readUleb128(r)
+				if err != nil {
+					return nil, err
 				}
-				if exportedSymbol.Flags.WeakDefinition() {
-					exportedSymbol.IsWeakDef = true
-				}
+				// TODO: handle stubs
+				log.Debugf("StubAndResolver: %d", symOtherInt)
 			}
-			if exportedSymbol.Flags.ThreadLocal() {
-				exportedSymbol.IsThreadLocal = true
-			}
+
 			if exportedSymbol.Flags.Absolute() {
-				exportedSymbol.IsAbsolute = true
+				exportedSymbol.Address = symValueInt
+			} else {
+				exportedSymbol.Address = symValueInt + image.CacheImageTextInfo.LoadAddress
+			}
+
+			if len(reExportSymBytes) > 0 {
+				exportedSymbol.Name = fmt.Sprintf("%s (%s)", exportedSymbol.Name, string(reExportSymBytes))
 			}
 
 			return exportedSymbol, nil
