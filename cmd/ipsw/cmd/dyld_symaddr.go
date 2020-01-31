@@ -79,64 +79,47 @@ var symaddrCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(imageName) > 0 {
-			sym, err := f.FindExportedSymbolInImage(imageName, args[1])
-			// if err != nil {
-			// 	return err
-			// }
-			if sym != nil {
+			if sym, _ := f.GetExportedSymbolAddressInImage(imageName, args[1]); sym != nil {
 				fmt.Println(sym)
-			} else {
-				err = f.GetLocalSymbolsForImage(imageName)
-				if err != nil {
-					return err
-				}
-				lSym := f.GetLocalSymbolInImage(imageName, args[1])
-				if lSym != nil {
-					fmt.Println(lSym)
-					return nil
-				}
-				return fmt.Errorf("symbol not found")
+				return nil
 			}
-		}
-
-		if false {
-			index, found, err := f.HasImagePath("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
+			lSym, err := f.FindLocalSymbolInImage(args[1], imageName)
 			if err != nil {
 				return err
 			}
-			if found {
-				fmt.Println("index:", index, "image:", f.Images[index].Name)
-			}
-			// err = f.FindClosure("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-			// if err != nil {
-			// 	return err
-			// }
-			err = f.FindDlopenOtherImage("/Applications/FindMy.app/Frameworks/FMSiriIntents.framework/FMSiriIntents")
-			if err != nil {
-				return err
-			}
+			fmt.Println(lSym)
+			return nil
 		}
 
-		sym, err := f.FindExportedSymbol(args[1])
-		// if err != nil {
-		// 	return err
+		// if false {
+		// 	index, found, err := f.HasImagePath("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	if found {
+		// 		fmt.Println("index:", index, "image:", f.Images[index].Name)
+		// 	}
+		// 	// err = f.FindClosure("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
+		// 	// if err != nil {
+		// 	// 	return err
+		// 	// }
+		// 	err = f.FindDlopenOtherImage("/Applications/FindMy.app/Frameworks/FMSiriIntents.framework/FMSiriIntents")
+		// 	if err != nil {
+		// 		return err
+		// 	}
 		// }
+
+		sym, _ := f.GetExportedSymbolAddress(args[1])
 		if sym != nil {
 			fmt.Println(sym)
 		} else {
-			log.Warn("symbol not found in exports (fast)")
-			log.Info("searching private symbols (slow)...")
-			err = f.ParseLocalSyms()
+			lSym, err := f.FindLocalSymbol(args[1])
 			if err != nil {
 				return err
 			}
-
-			lSym := f.GetLocalSymbol(args[1])
-			if lSym == nil {
-				return fmt.Errorf("symbol not found in private symbols")
-			}
 			fmt.Println(lSym)
 		}
+
 		return nil
 	},
 }

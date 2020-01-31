@@ -2,7 +2,6 @@ package dyld
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 
@@ -37,6 +36,61 @@ func (e trieEntry) String() string {
 	return fmt.Sprintf("0x%8x: %s", e.Address, e.Name)
 }
 
+func readUleb128(r *bytes.Reader) (uint64, error) {
+	var result uint64
+	var shift uint64
+
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			return 0, errors.Wrap(err, "could not parse ULEB128 value")
+		}
+
+		result |= uint64((uint(b) & 0x7f) << shift)
+
+		// If high order bit is 1.
+		if (b & 0x80) == 0 {
+			break
+		}
+
+		shift += 7
+	}
+
+	return result, nil
+}
+
+func readUleb128FromBuffer(buf *bytes.Buffer) (uint64, int, error) {
+
+	var (
+		result uint64
+		shift  uint64
+		length int
+	)
+
+	if buf.Len() == 0 {
+		return 0, 0, nil
+	}
+
+	for {
+		b, err := buf.ReadByte()
+		if err != nil {
+			return 0, 0, errors.Wrap(err, "could not parse ULEB128 value")
+		}
+		length++
+
+		result |= uint64((uint(b) & 0x7f) << shift)
+
+		// If high order bit is 1.
+		if (b & 0x80) == 0 {
+			break
+		}
+
+		shift += 7
+	}
+
+	return result, length, nil
+}
+
 func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 
 	var tNode trieNode
@@ -54,7 +108,7 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 
 		r.Seek(int64(tNode.Offset), io.SeekStart)
 
-		terminalSize, err := ReadUleb128(r)
+		terminalSize, err := readUleb128(r)
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +118,7 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 			var reExportSymBytes []byte
 			var symName string
 
-			symFlagInt, err := ReadUleb128(r)
+			symFlagInt, err := readUleb128(r)
 			if err != nil {
 				return nil, err
 			}
@@ -72,7 +126,7 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 			flags := CacheExportFlag(symFlagInt)
 
 			if flags.ReExport() {
-				symOtherInt, err = ReadUleb128(r)
+				symOtherInt, err = readUleb128(r)
 				if err != nil {
 					return nil, err
 				}
@@ -88,13 +142,13 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 				}
 			}
 
-			symValueInt, err = ReadUleb128(r)
+			symValueInt, err = readUleb128(r)
 			if err != nil {
 				return nil, err
 			}
 
 			if flags.StubAndResolver() {
-				symOtherInt, err = ReadUleb128(r)
+				symOtherInt, err = readUleb128(r)
 				if err != nil {
 					return nil, err
 				}
@@ -142,7 +196,7 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 				tmp = append(tmp, s)
 			}
 
-			childNodeOffset, err := ReadUleb128(r)
+			childNodeOffset, err := readUleb128(r)
 			if err != nil {
 				return nil, err
 			}
@@ -162,169 +216,83 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 	return entries, nil
 }
 
-func ReadUleb128(r *bytes.Reader) (uint64, error) {
-	var result uint64
-	var shift uint64
+func walkTrie(data []byte, symbol string) (uint64, error) {
+
+	var strIndex int
+	var offset, nodeOffset uint64
+
+	r := bytes.NewReader(data)
 
 	for {
-		b, err := r.ReadByte()
+		r.Seek(int64(offset), io.SeekStart)
+
+		terminalSize, err := readUleb128(r)
 		if err != nil {
-			return 0, errors.Wrap(err, "could not parse ULEB128 value")
+			return 0, err
 		}
 
-		result |= uint64((uint(b) & 0x7f) << shift)
+		if int(strIndex) == len(symbol) && (terminalSize != 0) {
+			// skip over zero terminator
+			return offset + 1, nil
+		}
 
-		// If high order bit is 1.
-		if (b & 0x80) == 0 {
+		r.Seek(int64(offset+terminalSize+1), io.SeekStart)
+
+		childrenRemaining, err := r.ReadByte()
+		if err == io.EOF {
 			break
 		}
 
-		shift += 7
-	}
-
-	return result, nil
-}
-
-func walkTrie(data []byte, symbol string) (int, error) {
-
-	var offset int
-	var strIndex uint8
-	var children, childrenRemaining uint8
-	var terminalSize, nodeOffset uint64
-
-	buff := bytes.NewReader(data)
-
-	for {
-		b := make([]byte, binary.Size(terminalSize))
-		_, err := buff.ReadAt(b, int64(offset))
-		if err != nil {
-			return -1, errors.Wrap(err, "failed to read trie terminalSize")
-		}
-		terminalSize := binary.LittleEndian.Uint64(b)
-		offset++
-
-		if terminalSize > 127 {
-			// except for re-export-with-rename, all terminal sizes fit in one byte
-			offset--
-			var n int
-			terminalSize, n, err = readUleb128(bytes.NewBuffer(data[offset:]))
-			if err != nil {
-				return -1, errors.Wrap(err, "failed to read terminalSize Uleb128")
-			}
-			offset += n
-		}
-
-		if int(strIndex) >= len(symbol) && (terminalSize != 0) {
-			return offset, nil
-		}
-
-		children = data[uint64(offset)+terminalSize]
-		if int(children) > len(data) {
-			return -1, fmt.Errorf("malformed trie node, terminalSize=0x%x extends past end of trie", terminalSize)
-		}
-
-		childrenRemaining = data[uint64(offset)+terminalSize+1]
-
-		offset = int(uint64(offset) + terminalSize + 1)
 		nodeOffset = 0
 
 		for i := childrenRemaining; i > 0; i-- {
 			searchStrIndex := strIndex
-			line, err := bytes.NewBuffer(data[offset:]).ReadString(byte(0))
-			if err != nil {
-				return -1, errors.Wrap(err, "failed to read child string")
-			}
-			log.Debugf("trieWalk: child str=%s", line)
-
 			wrongEdge := false
-			// scan whole edge to get to next edge
-			// if edge is longer than target symbol name, don't read past end of symbol name
-			c := data[offset]
-			for c != '\x00' {
+
+			for {
+				c, err := r.ReadByte()
+				if err == io.EOF {
+					break
+				}
+				if c == '\x00' {
+					break
+				}
 				if !wrongEdge {
 					if c != symbol[searchStrIndex] {
 						wrongEdge = true
 					}
 					searchStrIndex++
 				}
-				offset++
-				c = data[offset]
 			}
+
 			if wrongEdge {
 				// advance to next child
-				offset++ // skip over zero terminator
-				// skip over uleb128 until last byte is found
-				for (data[offset] & 0x80) != 0 {
-					offset++
-				}
-				offset++ // skip over last byte of uleb128
-
-				if offset > len(data) {
-					return -1, fmt.Errorf("malformed trie node, child node extends past end of trie")
+				r.Seek(1, io.SeekCurrent) // skip over zero terminator
+				// skip over last byte of uleb128
+				_, err = readUleb128(r)
+				if err != nil {
+					return 0, err
 				}
 			} else {
 				// the symbol so far matches this edge (child)
 				// so advance to the child's node
-				offset++
-				var n int
-				nodeOffset, n, err = readUleb128(bytes.NewBuffer(data[offset:]))
+				// r.Seek(1, io.SeekCurrent)
+				nodeOffset, err = readUleb128(r)
 				if err != nil {
-					return -1, errors.Wrap(err, "failed to read nodeOffset Uleb128")
+					return 0, err
 				}
-				offset += n
 
-				if (nodeOffset == 0) || (len(data) < int(nodeOffset)) {
-					return -1, fmt.Errorf("malformed trie child, nodeOffset=0x%lx out of range", nodeOffset)
-				}
-				// TODO: find out why we need this (we shouldn't)
-				if strIndex == searchStrIndex {
-					return -1, fmt.Errorf("symbol not in trie")
-				}
 				strIndex = searchStrIndex
-				log.Debugf("trieWalk: found matching edge advancing to node 0x%x", nodeOffset)
 				break
 			}
 		}
 
 		if nodeOffset != 0 {
-			offset = int(nodeOffset)
+			offset = nodeOffset
 		} else {
 			break
 		}
-
 	}
 
 	return offset, fmt.Errorf("symbol not in trie")
-}
-
-func readUleb128(buf *bytes.Buffer) (uint64, int, error) {
-
-	var (
-		result uint64
-		shift  uint64
-		length int
-	)
-
-	if buf.Len() == 0 {
-		return 0, 0, nil
-	}
-
-	for {
-		b, err := buf.ReadByte()
-		if err != nil {
-			return 0, 0, errors.Wrap(err, "could not parse ULEB128 value")
-		}
-		length++
-
-		result |= uint64((uint(b) & 0x7f) << shift)
-
-		// If high order bit is 1.
-		if (b & 0x80) == 0 {
-			break
-		}
-
-		shift += 7
-	}
-
-	return result, length, nil
 }
