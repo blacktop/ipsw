@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/macho"
@@ -167,10 +168,10 @@ func (f *File) Selectors(imageNames ...string) error {
 				}
 
 				objcRoSeg := libobjc.Segment("__OBJC_RO")
-				if objcRoSeg == nil {
-					fmt.Println("  - No selectors.")
-					return fmt.Errorf("segment __OBJC_RO does not exist")
-				}
+				// if objcRoSeg == nil {
+				// 	fmt.Println("  - No selectors.")
+				// 	return fmt.Errorf("segment __OBJC_RO does not exist")
+				// }
 				sr := objcRoSeg.Open()
 				for _, ptr := range selectorPtrs {
 					sr.Seek(int64(ptr-objcRoSeg.Addr), io.SeekStart)
@@ -178,11 +179,11 @@ func (f *File) Selectors(imageNames ...string) error {
 					if err != nil {
 						log.Error(errors.Wrapf(err, "failed to read selector name at: %d", ptr-objcRoSeg.Addr).Error())
 					}
-					fmt.Printf("    0x%x: %s\n", ptr, s)
-					// fmt.Printf("    0x%x: %s\n", ptr, strings.Trim(s, "\x00"))
+					fmt.Printf("    0x%x: %s\n", ptr, strings.Trim(s, "\x00"))
 				}
 			}
 		}
+		m.Close()
 	}
 	return nil
 }
