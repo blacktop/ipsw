@@ -79,6 +79,7 @@ var machoCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
 		fmt.Println("HEADER")
 		fmt.Println("======")
 		fmt.Println(m.FileHeader)
@@ -96,7 +97,7 @@ var machoCmd = &cobra.Command{
 			// if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
 			// 	fmt.Fprintf(w, "\n")
 			// }
-			fmt.Fprintf(w, "Mem: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
+			fmt.Fprintf(w, "Mem: 0x%x-0x%x \t Off: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Offset, uint64(sec.Offset)+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
 			// prevSeg = sec.Seg
 		}
 		w.Flush()

@@ -88,7 +88,11 @@ var dyldListCmd = &cobra.Command{
 		fmt.Println("======")
 
 		for idx, img := range f.Images {
-			fmt.Printf("%4d:\t0x%0X\t%s\n", idx+1, img.Info.Address, img.Name)
+			m, err := img.GetMacho()
+			if err != nil {
+				return errors.Wrap(err, "failed to create MachO")
+			}
+			fmt.Printf("%4d:\t0x%0X\t%s\t(%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
 		}
 
 		return nil
