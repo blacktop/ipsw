@@ -143,7 +143,7 @@ func (f *File) Selectors(imageNames ...string) error {
 		return err
 	}
 
-	if len(imageNames) > 0 {
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
 			images = append(images, f.Image(imageName))
 		}
