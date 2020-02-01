@@ -156,7 +156,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		f.Images = append(f.Images, &CacheImage{
 			Index: i,
 			Info:  iinfo,
-			sr:    sr})
+			sr:    sr,
+		})
 	}
 	for idx, image := range f.Images {
 		sr.Seek(int64(image.Info.PathFileOffset), os.SEEK_SET)
@@ -197,6 +198,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
 				return nil, err
 			}
+			// f.Images[i].ReaderAt = io.NewSectionReader(r, int64(f.Images[i].DylibOffset), 1<<63-1)
 		}
 	}
 
@@ -280,13 +282,20 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			// Read dyld offset to start of ss.
 			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), os.SEEK_SET)
 			for i := uint32(0); i != f.AcceleratorInfo.RangeTableCount; i++ {
-				rangeEntry := CacheRangeEntry{}
-				if err := binary.Read(sr, f.ByteOrder, &rangeEntry); err != nil {
+				rEntry := CacheRangeEntry{}
+				if err := binary.Read(sr, f.ByteOrder, &rEntry); err != nil {
 					return nil, err
 				}
 				// fmt.Printf("  0x%X -> 0x%X %s\n", rangeEntry.StartAddress, rangeEntry.StartAddress+uint64(rangeEntry.Size), f.Images[rangeEntry.ImageIndex].Name)
-				f.Images[rangeEntry.ImageIndex].RangeStartAddr = rangeEntry.StartAddress
-				f.Images[rangeEntry.ImageIndex].RangeSize = rangeEntry.Size
+				offset, err := f.getOffset(rEntry.StartAddress)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to get range entry's file offset")
+				}
+				f.Images[rEntry.ImageIndex].RangeEntries = append(f.Images[rEntry.ImageIndex].RangeEntries, rangeEntry{
+					StartAddr:  rEntry.StartAddress,
+					FileOffset: offset,
+					Size:       rEntry.Size,
+				})
 			}
 			// Read dyld trie containing all dylib paths.
 			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), os.SEEK_SET)
@@ -386,6 +395,15 @@ func NewFile(r io.ReaderAt) (*File, error) {
 // Is64bit returns if dyld is 64bit or not
 func (f *File) Is64bit() bool {
 	return strings.Contains(string(f.Magic[:16]), "64")
+}
+
+func (f *File) getOffset(address uint64) (uint64, error) {
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= address && address < mapping.Address+mapping.Size {
+			return (address - mapping.Address) + mapping.FileOffset, nil
+		}
+	}
+	return 0, fmt.Errorf("address not within any mappings adress range")
 }
 
 // ParseLocalSyms parses dyld's private symbols

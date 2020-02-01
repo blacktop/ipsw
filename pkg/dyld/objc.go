@@ -8,6 +8,7 @@ import (
 	"io"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/pkg/errors"
 )
 
@@ -44,74 +45,113 @@ type stringHash struct {
 	_        uint32 // alignment pad
 	Salt     uint64
 	Scramble [256]uint32
-	Tab      [0]uint8 /* tab[mask+1] (always power-of-2) */
 }
 
 // StringHash struct
 type StringHash struct {
 	stringHash
+	Tab        []byte  /* tab[mask+1] (always power-of-2) */
 	CheckBytes []byte  /* check byte for each string */
 	Offsets    []int32 /* offsets from &capacity to cstrings */
 }
 
-// Objc parses the Objective-C stuff
-func (f *File) Objc() error {
-
+func (f *File) getLibObjC() (*macho.File, error) {
 	image := f.Image("/usr/lib/libobjc.A.dylib")
 
-	m, err := image.GetMacho()
+	dat, err := image.Data()
 	if err != nil {
-		return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+		return nil, err
+	}
+	r := bytes.NewReader(dat)
+
+	return macho.NewFile(r)
+}
+
+// GetSelectorAddress returns a selector's pointer address
+func (f *File) GetSelectorAddress(selector string) (uint32, error) {
+
+	// m, err := f.getLibObjC()
+	image := f.Image("/usr/lib/libobjc.A.dylib")
+
+	dat, err := image.Data()
+	if err != nil {
+		return 0, err
+	}
+	r := bytes.NewReader(dat)
+
+	m, err := macho.NewFile(r)
+	if err != nil {
+		return 0, err
 	}
 
 	for _, s := range m.Sections {
 		if s.Seg == "__TEXT" && s.Name == "__objc_opt_ro" {
-			secData, err := s.Data()
+			dat, err := s.Data()
 			if err != nil {
-				return errors.Wrapf(err, "failed to read section %s data", s.Name)
+				return 0, err
 			}
-			r := bytes.NewReader(secData)
-			// r := s.Open()
+			secReader := bytes.NewReader(dat)
 			opt := Optimization{}
-			if err := binary.Read(r, f.ByteOrder, &opt); err != nil {
-				return err
+			if err := binary.Read(secReader, f.ByteOrder, &opt); err != nil {
+				return 0, err
 			}
 			if opt.Version != 15 {
-				return fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
+				return 0, fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
 			}
 			fmt.Println("Objective-C Optimization:", opt)
-
-			r.Seek(int64(opt.SelectorOptOffset), io.SeekStart)
+			// TODO: what is this offset from ???
+			r.Seek(int64(int32(s.Offset)+opt.SelectorOptOffset), io.SeekStart)
 
 			shash := StringHash{}
 			if err := binary.Read(r, f.ByteOrder, &shash.stringHash); err != nil {
-				return err
+				return 0, err
+			}
+			shash.Tab = make([]byte, shash.Mask+1)
+			if err := binary.Read(r, f.ByteOrder, &shash.Tab); err != nil {
+				return 0, err
 			}
 			shash.CheckBytes = make([]byte, shash.Capacity)
 			if err := binary.Read(r, f.ByteOrder, &shash.CheckBytes); err != nil {
-				return err
+				return 0, err
 			}
 			shash.Offsets = make([]int32, shash.Capacity)
 			if err := binary.Read(r, f.ByteOrder, &shash.Offsets); err != nil {
-				return err
+				return 0, err
 			}
 
-			ptr, err := shash.getIndex([]byte("release"))
+			ptr, err := shash.getIndex([]byte(selector))
 			if err != nil {
-				return errors.Wrapf(err, "failed get selector address for %s", "release")
+				return 0, errors.Wrapf(err, "failed get selector address for %s", selector)
 			}
 
-			fmt.Printf("    0x%x: %s\n", ptr, "release")
+			fmt.Printf("    0x%x: %s\n", ptr, selector)
+			return ptr, nil
 		}
 	}
-	return nil
+
+	return 0, fmt.Errorf("failed get selector address for %s", selector)
 }
 
 // Selectors returns all of the Objective-C selectors
-func (f *File) Selectors() error {
+func (f *File) Selectors(imageNames ...string) error {
 	var mask uint64 = 0x7FFFFFFFFFFFF
+	var images []*CacheImage
 
-	for _, image := range f.Images {
+	libobjc, err := f.getLibObjC()
+	if err != nil {
+		return err
+	}
+
+	if len(imageNames) > 0 {
+		for _, imageName := range imageNames {
+			images = append(images, f.Image(imageName))
+		}
+	} else {
+		images = f.Images
+	}
+	fmt.Println("Objective-C Selectors:")
+	for _, image := range images {
+		fmt.Println(image.Name)
 		m, err := image.GetMacho()
 		if err != nil {
 			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
@@ -125,8 +165,8 @@ func (f *File) Selectors() error {
 				for idx, ptr := range selectorPtrs {
 					selectorPtrs[idx] = ptr & mask
 				}
-				fmt.Println("Objective-C Selectors:")
-				objcRoSeg := m.Segment("__OBJC_RO")
+
+				objcRoSeg := libobjc.Segment("__OBJC_RO")
 				if objcRoSeg == nil {
 					fmt.Println("  - No selectors.")
 					return fmt.Errorf("segment __OBJC_RO does not exist")
@@ -141,47 +181,6 @@ func (f *File) Selectors() error {
 					fmt.Printf("    0x%x: %s\n", ptr, s)
 					// fmt.Printf("    0x%x: %s\n", ptr, strings.Trim(s, "\x00"))
 				}
-			}
-		}
-	}
-	return nil
-}
-
-// SelectorsForImage returns all of the Objective-C selectors
-func (f *File) SelectorsForImage(imageName string) error {
-	var mask uint64 = 0x7FFFFFFFFFFFF
-
-	image := f.Image(imageName)
-
-	m, err := image.GetMacho()
-	if err != nil {
-		return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
-	}
-
-	for _, s := range m.Sections {
-		if s.Seg == "__DATA" && s.Name == "__objc_selrefs" {
-			selectorPtrs := make([]uint64, s.Size/8)
-			if err := binary.Read(s.Open(), f.ByteOrder, &selectorPtrs); err != nil {
-				return err
-			}
-			for idx, ptr := range selectorPtrs {
-				selectorPtrs[idx] = ptr & mask
-			}
-			fmt.Println("Objective-C Selectors:")
-			objcRoSeg := m.Segment("__OBJC_RO")
-			if objcRoSeg == nil {
-				fmt.Println("  - No selectors.")
-				return fmt.Errorf("segment __OBJC_RO does not exist")
-			}
-			sr := objcRoSeg.Open()
-			for _, ptr := range selectorPtrs {
-				sr.Seek(int64(ptr-objcRoSeg.Addr), io.SeekStart)
-				s, err := bufio.NewReader(sr).ReadString('\x00')
-				if err != nil {
-					log.Error(errors.Wrapf(err, "failed to read selector name at: %d", ptr-objcRoSeg.Addr).Error())
-				}
-				fmt.Printf("    0x%x: %s\n", ptr, s)
-				// fmt.Printf("    0x%x: %s\n", ptr, strings.Trim(s, "\x00"))
 			}
 		}
 	}

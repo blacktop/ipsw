@@ -80,11 +80,12 @@ var selCmd = &cobra.Command{
 			return nil
 		}
 
-		err = f.Objc()
+		ptr, err := f.GetSelectorAddress(args[1])
 		if err != nil {
 			return err
 		}
 
+		fmt.Println(ptr)
 		return nil
 	},
 }

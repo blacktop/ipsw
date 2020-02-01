@@ -8,9 +8,16 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/pkg/errors"
 )
+
+type rangeEntry struct {
+	StartAddr  uint64
+	FileOffset uint64
+	Size       uint32
+}
 
 // CacheImage represents a dyld dylib image.
 type CacheImage struct {
@@ -24,8 +31,7 @@ type CacheImage struct {
 	Initializer    uint64
 	DOFSectionAddr uint64
 	DOFSectionSize uint32
-	RangeStartAddr uint64
-	RangeSize      uint32
+	RangeEntries   []rangeEntry
 
 	// Embed ReaderAt for ReadAt method.
 	// Do not embed SectionReader directly
@@ -33,18 +39,43 @@ type CacheImage struct {
 	// If a client wants Read and Seek it must use
 	// Open() to avoid fighting over the seek offset
 	// with other clients.
-	io.ReaderAt
+	// io.ReaderAt
 	sr *io.SectionReader
 }
 
 // Data reads and returns the contents of the dylib's Mach-O.
 func (i *CacheImage) Data() ([]byte, error) {
-	dat := make([]byte, i.TextSegmentSize)
-	n, err := i.sr.ReadAt(dat, int64(i.DylibOffset))
-	if n == len(dat) {
-		err = nil
+	// var buff bytes.Buffer
+	buff := utils.NewWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
+
+	i.sr.Seek(0, io.SeekStart)
+
+	for idx, rEntry := range i.RangeEntries {
+		dat := make([]byte, rEntry.Size)
+		n, err := i.sr.ReadAt(dat, int64(rEntry.FileOffset))
+		if err != nil {
+			return nil, err
+		}
+		if n != len(dat) {
+			return nil, fmt.Errorf("failed to read all the bytes")
+		}
+		if idx == 0 {
+			n, err = buff.WriteAt(dat, 0)
+			if err != nil {
+				return nil, err
+			}
+		}
+		n, err = buff.WriteAt(dat, int64(rEntry.FileOffset))
+		// n, err = buff.WriteAt(dat, int64(rEntry.StartAddr-i.Info.Address))
+		if err != nil {
+			return nil, err
+		}
+		if n != len(dat) {
+			return nil, fmt.Errorf("failed to write all the bytes")
+		}
 	}
-	return dat[0:n], err
+
+	return buff.Bytes(), nil
 }
 
 // Open returns a new ReadSeeker reading the dylib's Mach-O data.
@@ -54,13 +85,13 @@ func (i *CacheImage) Open() io.ReadSeeker {
 
 // GetMacho parses dyld image as a MachO
 func (i *CacheImage) GetMacho() (*macho.File, error) {
-	// dat, err := i.Data()
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// m, err := macho.NewFile(bytes.NewReader(dat))
-	r := io.NewSectionReader(i.sr, int64(i.DylibOffset), 1<<63-1)
-	m, err := macho.NewFile(r)
+	dat, err := i.Data()
+	if err != nil {
+		return nil, err
+	}
+	m, err := macho.NewFile(bytes.NewReader(dat))
+	// r := io.NewSectionReader(i.sr, int64(i.DylibOffset), 1<<63-1)
+	// m, err := macho.NewFile(i)
 	if err != nil {
 		return nil, err
 	}

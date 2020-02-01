@@ -451,6 +451,45 @@ func NewFile(r io.ReaderAt) (*File, error) {
 					return nil, err
 				}
 			}
+		case commands.LoadCmdSegment64:
+			var seg64 commands.Segment64
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &seg64); err != nil {
+				return nil, err
+			}
+			s = new(Segment)
+			s.LoadBytes = cmddat
+			s.Cmd = cmd
+			s.Len = siz
+			s.Name = cstring(seg64.Name[0:])
+			s.Addr = seg64.Addr
+			s.Memsz = seg64.Memsz
+			s.Offset = seg64.Offset
+			s.Filesz = seg64.Filesz
+			s.Maxprot = seg64.Maxprot
+			s.Prot = seg64.Prot
+			s.Nsect = seg64.Nsect
+			s.Flag = seg64.Flag
+			f.Loads[i] = s
+			for i := 0; i < int(s.Nsect); i++ {
+				var sh64 commands.Section64
+				if err := binary.Read(b, bo, &sh64); err != nil {
+					return nil, err
+				}
+				sh := new(Section)
+				sh.Name = cstring(sh64.Name[0:])
+				sh.Seg = cstring(sh64.Seg[0:])
+				sh.Addr = sh64.Addr
+				sh.Size = sh64.Size
+				sh.Offset = sh64.Offset
+				sh.Align = sh64.Align
+				sh.Reloff = sh64.Reloff
+				sh.Nreloc = sh64.Nreloc
+				sh.Flags = sh64.Flags
+				if err := f.pushSection(sh, r); err != nil {
+					return nil, err
+				}
+			}
 		case commands.LoadCmdSymtab:
 			var hdr commands.SymtabCmd
 			b := bytes.NewReader(cmddat)
@@ -596,45 +635,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l.CompatVersion = hdr.CompatVersion.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
-		case commands.LoadCmdSegment64:
-			var seg64 commands.Segment64
-			b := bytes.NewReader(cmddat)
-			if err := binary.Read(b, bo, &seg64); err != nil {
-				return nil, err
-			}
-			s = new(Segment)
-			s.LoadBytes = cmddat
-			s.Cmd = cmd
-			s.Len = siz
-			s.Name = cstring(seg64.Name[0:])
-			s.Addr = seg64.Addr
-			s.Memsz = seg64.Memsz
-			s.Offset = seg64.Offset
-			s.Filesz = seg64.Filesz
-			s.Maxprot = seg64.Maxprot
-			s.Prot = seg64.Prot
-			s.Nsect = seg64.Nsect
-			s.Flag = seg64.Flag
-			f.Loads[i] = s
-			for i := 0; i < int(s.Nsect); i++ {
-				var sh64 commands.Section64
-				if err := binary.Read(b, bo, &sh64); err != nil {
-					return nil, err
-				}
-				sh := new(Section)
-				sh.Name = cstring(sh64.Name[0:])
-				sh.Seg = cstring(sh64.Seg[0:])
-				sh.Addr = sh64.Addr
-				sh.Size = sh64.Size
-				sh.Offset = sh64.Offset
-				sh.Align = sh64.Align
-				sh.Reloff = sh64.Reloff
-				sh.Nreloc = sh64.Nreloc
-				sh.Flags = sh64.Flags
-				if err := f.pushSection(sh, r); err != nil {
-					return nil, err
-				}
-			}
 		case commands.LoadCmdRoutines64:
 			var r64 commands.Routines64Cmd
 			b := bytes.NewReader(cmddat)
