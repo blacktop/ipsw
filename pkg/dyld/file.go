@@ -153,7 +153,10 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		if err := binary.Read(sr, f.ByteOrder, &iinfo); err != nil {
 			return nil, err
 		}
-		f.Images = append(f.Images, &CacheImage{Index: i, Info: iinfo})
+		f.Images = append(f.Images, &CacheImage{
+			Index: i,
+			Info:  iinfo,
+			sr:    sr})
 	}
 	for idx, image := range f.Images {
 		sr.Seek(int64(image.Info.PathFileOffset), os.SEEK_SET)
@@ -161,7 +164,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		if name, err := r.ReadString(byte(0)); err == nil {
 			f.Images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
 		}
-		// f.Images[idx].DylibOffset = image.Info.Address - f.Mappings[0].Address
 	}
 
 	// Read dyld code signature.
@@ -173,11 +175,30 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 	f.CodeSignature = cs
 
-	/**************************
-	 * Read dyld local symbols
-	 **************************/
-	// log.Info("Parsing Local Symbols...")
-	// f.parseLocalSyms(r)
+	// Read dyld local symbol entries.
+	if f.LocalSymbolsOffset != 0 {
+		sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
+
+		if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
+			return nil, err
+		}
+
+		if f.Is64bit() {
+			f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
+		} else {
+			f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
+		}
+		f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
+		f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
+
+		sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+
+		for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
+			if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	/*****************************
 	 * Read dyld kernel slid info
@@ -373,28 +394,6 @@ func (f *File) ParseLocalSyms() error {
 
 	if f.LocalSymbolsOffset == 0 {
 		return fmt.Errorf("dyld shared cache does not contain local symbols info")
-	}
-
-	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
-
-	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
-		return err
-	}
-
-	if f.Is64bit() {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
-	} else {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
-	}
-	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
-	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
-
-	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
-
-	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
-		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
-			return err
-		}
 	}
 
 	stringPool := io.NewSectionReader(f.r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
@@ -693,27 +692,6 @@ func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
 		return nil, fmt.Errorf("dyld shared cache does not contain local symbols info")
 	}
 
-	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
-
-	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
-		return nil, err
-	}
-
-	if f.Is64bit() {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
-	} else {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
-	}
-	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
-	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
-	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
-
-	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
-		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
-			return nil, err
-		}
-	}
-
 	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 	stringPool := make([]byte, f.LocalSymInfo.StringsSize)
 	sr.ReadAt(stringPool, int64(f.LocalSymInfo.StringsFileOffset))
@@ -747,27 +725,6 @@ func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymb
 	}
 
 	image := f.Image(imageName)
-
-	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
-
-	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
-		return nil, err
-	}
-
-	if f.Is64bit() {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
-	} else {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
-	}
-	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
-	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
-	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
-
-	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
-		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
-			return nil, err
-		}
-	}
 
 	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
@@ -975,7 +932,6 @@ func (f *File) findSymbolInExportTrieForImage(symbol string, image *CacheImage) 
 
 			r.Seek(int64(symbolNode), io.SeekStart)
 
-			// symFlagInt, _, err := readUleb128(bytes.NewBuffer(exportTrie[symbolNode:]))
 			symFlagInt, err := readUleb128(r)
 			if err != nil {
 				return nil, err

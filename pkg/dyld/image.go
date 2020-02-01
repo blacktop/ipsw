@@ -39,8 +39,8 @@ type CacheImage struct {
 
 // Data reads and returns the contents of the dylib's Mach-O.
 func (i *CacheImage) Data() ([]byte, error) {
-	dat := make([]byte, i.sr.Size())
-	n, err := i.sr.ReadAt(dat, 0)
+	dat := make([]byte, i.TextSegmentSize)
+	n, err := i.sr.ReadAt(dat, int64(i.DylibOffset))
 	if n == len(dat) {
 		err = nil
 	}
@@ -48,7 +48,24 @@ func (i *CacheImage) Data() ([]byte, error) {
 }
 
 // Open returns a new ReadSeeker reading the dylib's Mach-O data.
-func (i *CacheImage) Open() io.ReadSeeker { return io.NewSectionReader(i.sr, 0, 1<<63-1) }
+func (i *CacheImage) Open() io.ReadSeeker {
+	return io.NewSectionReader(i.sr, int64(i.DylibOffset), 1<<63-1)
+}
+
+// GetMacho parses dyld image as a MachO
+func (i *CacheImage) GetMacho() (*macho.File, error) {
+	// dat, err := i.Data()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// m, err := macho.NewFile(bytes.NewReader(dat))
+	r := io.NewSectionReader(i.sr, int64(i.DylibOffset), 1<<63-1)
+	m, err := macho.NewFile(r)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
 
 // Strings returns all the dylib image's cstring literals
 func (i *CacheImage) Strings() []string {

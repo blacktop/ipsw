@@ -932,10 +932,30 @@ func (f *File) Section(name string) *Section {
 	return nil
 }
 
+// DylibID returns the dylib ID load command, or nil if no dylib ID exists.
+func (f *File) DylibID() *DylibID {
+	for _, l := range f.Loads {
+		if s, ok := l.(*DylibID); ok {
+			return s
+		}
+	}
+	return nil
+}
+
 // SourceVersion returns the source version load command, or nil if no source version exists.
 func (f *File) SourceVersion() *SourceVersion {
 	for _, l := range f.Loads {
 		if s, ok := l.(*SourceVersion); ok {
+			return s
+		}
+	}
+	return nil
+}
+
+// BuildVersion returns the build version load command, or nil if no build version exists.
+func (f *File) BuildVersion() *BuildVersion {
+	for _, l := range f.Loads {
+		if s, ok := l.(*BuildVersion); ok {
 			return s
 		}
 	}
