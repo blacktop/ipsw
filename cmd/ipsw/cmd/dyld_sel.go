@@ -42,8 +42,10 @@ func init() {
 // selCmd represents the sel command
 var selCmd = &cobra.Command{
 	Use:   "sel",
-	Short: "Find ObjC selector symbol",
-	Args:  cobra.MinimumNArgs(2),
+	Short: "Dump ObjC selector addresses",
+	// Short: "Find ObjC selector symbol",
+	Args: cobra.MinimumNArgs(1),
+	// Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -76,16 +78,16 @@ var selCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(imageName) > 0 {
-			return nil
-		}
-
-		ptr, err := f.GetSelectorAddress(args[1])
+		err = f.Selectors(imageName)
 		if err != nil {
 			return err
 		}
+		// ptr, err := f.GetSelectorAddress(args[1])
+		// if err != nil {
+		// 	return err
+		// }
 
-		fmt.Println(ptr)
+		// fmt.Println(ptr)
 		return nil
 	},
 }
