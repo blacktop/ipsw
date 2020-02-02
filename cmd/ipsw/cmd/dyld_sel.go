@@ -78,16 +78,27 @@ var selCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		err = f.Selectors(imageName)
+		// if len(imageName) > 0 {
+		// 	err = f.Selectors(imageName)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// } else {
+		// 	sels, err := f.AllSelectors()
+		// 	if err != nil {
+		// 		return err
+		// 	}
+
+		// 	fmt.Printf("0x%x: %s\n", sels[args[1]], args[1])
+		// }
+
+		ptr, err := f.GetSelectorAddress(args[1])
 		if err != nil {
 			return err
 		}
-		// ptr, err := f.GetSelectorAddress(args[1])
-		// if err != nil {
-		// 	return err
-		// }
 
-		// fmt.Println(ptr)
+		fmt.Println(ptr)
+
 		return nil
 	},
 }

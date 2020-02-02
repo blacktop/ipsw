@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"unicode"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/macho"
@@ -29,10 +30,31 @@ type Optimization struct {
 	ClassOptOffset    int32
 	ProtocolOptOffset int32
 	HeaderOptRwOffset int32
+	_                 uint32
 }
 
 func (o Optimization) isPointerAligned() bool {
 	return (binary.Size(o) % 8) == 0
+}
+
+func (o Optimization) String() string {
+	return fmt.Sprintf(
+		"Version           = %d\n"+
+			"Flags             = %d\n"+
+			"SelectorOptOffset = %016X\n"+
+			"HeaderOptRoOffset = %016X\n"+
+			"ClassOptOffset    = %016X\n"+
+			"ProtocolOptOffset = %016X\n"+
+			"HeaderOptRwOffset = %016X\n"+
+			"isPointerAligned  = %t\n",
+		o.Version,
+		o.Flags,
+		o.SelectorOptOffset,
+		o.HeaderOptRoOffset,
+		o.ClassOptOffset,
+		o.ProtocolOptOffset,
+		o.HeaderOptRwOffset,
+		o.isPointerAligned())
 }
 
 // Precomputed perfect hash table of strings.
@@ -50,10 +72,28 @@ type stringHash struct {
 
 // StringHash struct
 type StringHash struct {
+	FileOffset int32
 	stringHash
-	Tab        []byte  /* tab[mask+1] (always power-of-2) */
-	CheckBytes []byte  /* check byte for each string */
-	Offsets    []int32 /* offsets from &capacity to cstrings */
+	Tab        []byte /* tab[mask+1] (always power-of-2) */
+	CheckBytes []byte /* check byte for each string */
+	// Offsets    []uint32 /* offsets from &capacity to cstrings */
+	Offsets []int32 /* offsets from &capacity to cstrings */
+}
+
+func (s StringHash) String() string {
+	return fmt.Sprintf(
+		"FileOffset = %X\n"+
+			"Capacity   = %X\n"+
+			"Occupied   = %X\n"+
+			"Shift      = %X\n"+
+			"Mask       = %X\n"+
+			"Salt       = %016X\n",
+		s.FileOffset,
+		s.Capacity,
+		s.Occupied,
+		s.Shift,
+		s.Mask,
+		s.Salt)
 }
 
 func (f *File) getLibObjC() (*macho.File, error) {
@@ -99,34 +139,43 @@ func (f *File) GetSelectorAddress(selector string) (uint32, error) {
 			if opt.Version != 15 {
 				return 0, fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
 			}
-			fmt.Println("Objective-C Optimization:", opt)
-			// TODO: what is this offset from ???
-			r.Seek(int64(int32(s.Offset)+opt.SelectorOptOffset), io.SeekStart)
 
-			shash := StringHash{}
+			log.Debugf("Objective-C Optimization:\n%s", opt)
+
+			shash := StringHash{FileOffset: int32(s.Offset) + opt.SelectorOptOffset}
+
+			r.Seek(int64(shash.FileOffset), io.SeekStart)
 			if err := binary.Read(r, f.ByteOrder, &shash.stringHash); err != nil {
 				return 0, err
 			}
+
+			log.Debugf("Objective-C StringHash:\n%s", shash)
+
 			shash.Tab = make([]byte, shash.Mask+1)
 			if err := binary.Read(r, f.ByteOrder, &shash.Tab); err != nil {
 				return 0, err
 			}
+
 			shash.CheckBytes = make([]byte, shash.Capacity)
 			if err := binary.Read(r, f.ByteOrder, &shash.CheckBytes); err != nil {
 				return 0, err
 			}
+
 			shash.Offsets = make([]int32, shash.Capacity)
 			if err := binary.Read(r, f.ByteOrder, &shash.Offsets); err != nil {
 				return 0, err
 			}
 
-			ptr, err := shash.getIndex([]byte(selector))
+			selBytes := []byte(selector)
+			// selBytes = append(selBytes, byte(0))
+
+			selIndex, err := shash.getIndex(selBytes)
 			if err != nil {
 				return 0, errors.Wrapf(err, "failed get selector address for %s", selector)
 			}
-
-			fmt.Printf("    0x%x: %s\n", ptr, selector)
-			return ptr, nil
+			fmt.Printf("    0x%x: %s\n", shash.FileOffset+shash.Offsets[selIndex], selector)
+			// fmt.Printf("    0x%x: %s\n", 0x1b92c85a8, "release")
+			return selIndex, nil
 		}
 	}
 
@@ -188,6 +237,48 @@ func (f *File) Selectors(imageNames ...string) error {
 	return nil
 }
 
+func isASCII(s string) bool {
+	if len(s) < 1 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] > unicode.MaxASCII {
+			return false
+		}
+	}
+	return true
+}
+
+func (f *File) AllSelectors() (map[string]uint64, error) {
+
+	selectors := make(map[string]uint64)
+
+	libobjc, err := f.getLibObjC()
+	if err != nil {
+		return nil, err
+	}
+
+	objcRoSeg := libobjc.Segment("__OBJC_RO")
+	data, err := objcRoSeg.Data()
+	if err != nil {
+		return nil, err
+	}
+
+	var pos uint64
+
+	for i := uint64(0); i < uint64(len(data)); i++ {
+		if data[i] == '\x00' {
+			if isASCII(string(data[pos:i])) {
+				selectors[string(data[pos:i])] = pos + objcRoSeg.Addr
+				// fmt.Printf("0x%x: %s\n", uint64(pos+objcRoSeg.Addr), data[pos:i])
+			}
+			pos = i + 1
+		}
+	}
+
+	return selectors, nil
+}
+
 /*
 --------------------------------------------------------------------
 mix -- mix 3 64-bit values reversibly.
@@ -207,20 +298,60 @@ This implies that a hash using mix64 has no funnels.  There may be
   those.
 --------------------------------------------------------------------
 */
-func mix64(a, b, c *uint64) {
-	*a = (*a - *b - *c) ^ (*c >> 43)
-	*b = (*b - *c - *a) ^ (*a << 9)
-	*c = (*c - *a - *b) ^ (*b >> 8)
-	*a = (*a - *b - *c) ^ (*c >> 38)
-	*b = (*b - *c - *a) ^ (*a << 23)
-	*c = (*c - *a - *b) ^ (*b >> 5)
-	*a = (*a - *b - *c) ^ (*c >> 35)
-	*b = (*b - *c - *a) ^ (*a << 49)
-	*c = (*c - *a - *b) ^ (*b >> 11)
-	*a = (*a - *b - *c) ^ (*c >> 12)
-	*b = (*b - *c - *a) ^ (*a << 18)
-	*c = (*c - *a - *b) ^ (*b >> 22)
+func mix64(a, b, c uint64) (uint64, uint64, uint64) {
+	a -= b
+	a -= c
+	a ^= (c >> 43)
+	b -= c
+	b -= a
+	b ^= (a << 9)
+	c -= a
+	c -= b
+	c ^= (b >> 8)
+	a -= b
+	a -= c
+	a ^= (c >> 38)
+	b -= c
+	b -= a
+	b ^= (a << 23)
+	c -= a
+	c -= b
+	c ^= (b >> 5)
+	a -= b
+	a -= c
+	a ^= (c >> 35)
+	b -= c
+	b -= a
+	b ^= (a << 49)
+	c -= a
+	c -= b
+	c ^= (b >> 11)
+	a -= b
+	a -= c
+	a ^= (c >> 12)
+	b -= c
+	b -= a
+	b ^= (a << 18)
+	c -= a
+	c -= b
+	c ^= (b >> 22)
+	return a, b, c
 }
+
+// func mix64(a, b, c *uint64) {
+// 	*a = (*a - *b - *c) ^ (*c >> 43)
+// 	*b = (*b - *c - *a) ^ (*a << 9)
+// 	*c = (*c - *a - *b) ^ (*b >> 8)
+// 	*a = (*a - *b - *c) ^ (*c >> 38)
+// 	*b = (*b - *c - *a) ^ (*a << 23)
+// 	*c = (*c - *a - *b) ^ (*b >> 5)
+// 	*a = (*a - *b - *c) ^ (*c >> 35)
+// 	*b = (*b - *c - *a) ^ (*a << 49)
+// 	*c = (*c - *a - *b) ^ (*b >> 11)
+// 	*a = (*a - *b - *c) ^ (*c >> 12)
+// 	*b = (*b - *c - *a) ^ (*a << 18)
+// 	*c = (*c - *a - *b) ^ (*b >> 22)
+// }
 
 /*
 --------------------------------------------------------------------
@@ -256,10 +387,10 @@ func lookup8(k []byte, level uint64) uint64 {
 	// uint64_t  length;   /* the length of the key */
 	// uint64_t  level;    /* the previous hash, or an arbitrary value */
 	var a, b, c uint64
-	var length uint64
+	var length int
 
 	/* Set up the internal state */
-	length = uint64(len(k))
+	length = len(k)
 	a = level
 	b = level              /* the previous hash value */
 	c = 0x9e3779b97f4a7c13 /* the golden ratio; an arbitrary value */
@@ -269,7 +400,8 @@ func lookup8(k []byte, level uint64) uint64 {
 		a += uint64(k[p+0]) + (uint64(k[p+1]) << 8) + (uint64(k[p+2]) << 16) + (uint64(k[p+3]) << 24) + (uint64(k[p+4]) << 32) + (uint64(k[p+5]) << 40) + (uint64(k[p+6]) << 48) + (uint64(k[p+7]) << 56)
 		b += uint64(k[p+8]) + (uint64(k[p+9]) << 8) + (uint64(k[p+10]) << 16) + (uint64(k[p+11]) << 24) + (uint64(k[p+12]) << 32) + (uint64(k[p+13]) << 40) + (uint64(k[p+14]) << 48) + (uint64(k[p+15]) << 56)
 		c += uint64(k[p+16]) + (uint64(k[p+17]) << 8) + (uint64(k[p+18]) << 16) + (uint64(k[p+19]) << 24) + (uint64(k[p+20]) << 32) + (uint64(k[p+21]) << 40) + (uint64(k[p+22]) << 48) + (uint64(k[p+23]) << 56)
-		mix64(&a, &b, &c)
+		a, b, c = mix64(a, b, c)
+		// mix64(&a, &b, &c)
 		p += 24
 		length -= 24
 	}
@@ -326,14 +458,16 @@ func lookup8(k []byte, level uint64) uint64 {
 		a += uint64(k[p+0])
 		/* case 0: nothing left to add */
 	}
-	mix64(&a, &b, &c)
+	a, b, c = mix64(a, b, c)
+	// mix64(&a, &b, &c)
 	/*-------------------------------------------- report the result */
 	return c
 }
 
-func (sh StringHash) hash(key []byte) uint32 {
-	val := lookup8(key, sh.Salt)
-	return uint32((val >> uint64(sh.Shift)) ^ uint64(sh.Scramble[sh.Tab[val&uint64(sh.Mask)]]))
+func (s StringHash) hash(key []byte) uint32 {
+	val := lookup8(key, s.Salt)
+	index := (val >> uint64(s.Shift)) ^ uint64(s.Scramble[s.Tab[(val&uint64(s.Mask))]])
+	return uint32(index)
 }
 
 // The check bytes are used to reject strings that aren't in the table
@@ -344,24 +478,24 @@ func checkbyte(key []byte) uint8 {
 	return ((key[0] & 0x7) << 5) | (uint8(len(key)) & 0x1f)
 }
 
-func (sh StringHash) getIndex(key []byte) (uint32, error) {
-	h := sh.hash(key)
+func (s StringHash) getIndex(key []byte) (uint32, error) {
+	h := s.hash(key)
 	// Use check byte to reject without paging in the table's cstrings
-	hCheck := sh.CheckBytes[h]
+	hCheck := s.CheckBytes[h]
 	keyCheck := checkbyte(key)
 	if hCheck != keyCheck {
 		return 0, fmt.Errorf("INDEX_NOT_FOUND")
 	}
-	offset := sh.Offsets[h]
+	offset := s.Offsets[h]
 	if offset == 0 {
 		return 0, fmt.Errorf("INDEX_NOT_FOUND")
 	}
 	// result = (const char *)this + offset
 	// TODO: fix me
-	result := "FIX ME"
-	if result != string(key) {
-		return 0, fmt.Errorf("INDEX_NOT_FOUND")
-	}
+	// result := "FIX ME"
+	// if result != string(key) {
+	// 	return 0, fmt.Errorf("INDEX_NOT_FOUND")
+	// }
 
 	return h, nil
 }
