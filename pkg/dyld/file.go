@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
@@ -555,7 +556,12 @@ func (f *File) parseSlideInfo() error {
 // Image returns the first Image with the given name, or nil if no such image exists.
 func (f *File) Image(name string) *CacheImage {
 	for _, i := range f.Images {
-		if strings.Contains(i.Name, name) {
+		if strings.EqualFold(strings.ToLower(i.Name), strings.ToLower(name)) {
+			return i
+		}
+		base := filepath.Base(i.Name)
+		if strings.EqualFold(strings.ToLower(base), strings.ToLower(name)) {
+			fmt.Println(base)
 			return i
 		}
 	}
