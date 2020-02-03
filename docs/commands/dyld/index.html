@@ -171,6 +171,7 @@
 <li><a href="#dyld-extract"><strong>dyld extract</strong></a></li>
 <li><a href="#dyld-list"><strong>dyld list</strong></a></li>
 <li><a href="#dyld-symaddr"><strong>dyld symaddr</strong></a></li>
+<li><a href="#dyld-sel"><strong>dyld sel</strong></a></li>
 <li><a href="#dyld-split"><strong>dyld split</strong></a></li>
 <li><a href="#dyld-webkit"><strong>dyld webkit</strong></a></li>
 </ul>
@@ -242,6 +243,27 @@ Accelerate Tab: 304KB,  address: 0x1D2F64000 -&gt; 0x1D2FB0000
 </code></pre></div><p>Speed it up by supplying the dylib name</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache &lt;SYMBOL_NAME&gt;
 </code></pre></div><p>⚠️ <strong>NOTE:</strong> you don&rsquo;t have to supply the full image path</p>
+<h3 id="dyld-sel"><strong>dyld sel</strong></h3>
+<p>🚧 <strong>[WIP]</strong> 🚧</p>
+<p>Get ObjC selector address</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld dyld_shared_cache release
+
+0x1b92c85a8: release
+</code></pre></div><p>Or get all the selectors for an image</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld --image CoreFoundation dyld_shared_cache
+
+Objective-C Selectors:
+/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+    0x1b92c88c8: exceptionWithName:reason:userInfo:
+    0x1b92c878d: mutableCopyWithZone:
+    0x1b92c877f: copyWithZone:
+    0x1b92c88eb: initWithSet:copyItems:
+    0x1b92c8820: doesNotRecognizeSelector:
+    0x1b92c8902: initWithObjects:count:
+    0x1b92c8919: initWithCapacity:
+    0x1b92c8418: dealloc
+&lt;SNIP&gt;
+</code></pre></div><p><strong>NOTE:</strong> This doesn&rsquo;t include headers, class names or protocols <em>yet</em>.</p>
 <h3 id="dyld-split"><strong>dyld split</strong></h3>
 <p><em>(only on macOS)</em></p>
 <p>Split up a <em>dyld_shared_cache</em></p>
