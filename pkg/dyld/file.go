@@ -406,6 +406,15 @@ func (f *File) getOffset(address uint64) (uint64, error) {
 	return 0, fmt.Errorf("address not within any mappings adress range")
 }
 
+func (f *File) getVMAddress(offset uint64) (uint64, error) {
+	for _, mapping := range f.Mappings {
+		if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
+			return (offset - mapping.FileOffset) + mapping.Address, nil
+		}
+	}
+	return 0, fmt.Errorf("offset not within any mappings file offset range")
+}
+
 // ParseLocalSyms parses dyld's private symbols
 func (f *File) ParseLocalSyms() error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
