@@ -169,15 +169,15 @@
 <div class="content ">
   <h3 id="add-zsh-completions">Add <strong>zsh</strong> completions</h3>
 <h4 id="option-1">Option 1)</h4>
-<p>Pick a folder in your <code>$fpath</code> to write the completion to.</p>
-<p>⚠️ <strong>NOTE:</strong> I&rsquo;m using <code>/usr/local/share/zsh-completions</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw completion zsh &gt; /usr/local/share/zsh-completions/_ipsw
-$ rm -f ~/.zcompdump<span class="p">;</span> compinit
-</code></pre></div><h4 id="option-2">Option 2)</h4>
 <p>Add the following to your <code>~/.zshrc</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">autoload -Uz compinit <span class="o">&amp;&amp;</span> compinit -C
 <span class="nb">source</span> &lt;<span class="o">(</span>ipsw completion zsh<span class="o">)</span>
 compdef _ipsw ipsw
+</code></pre></div><h4 id="option-2">Option 2)</h4>
+<p>Pick a folder in your <code>$fpath</code> to write the completion to.</p>
+<p>⚠️ <strong>NOTE:</strong> I&rsquo;m using <code>/usr/local/share/zsh-completions</code></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw completion zsh &gt; /usr/local/share/zsh-completions/_ipsw
+$ rm -f ~/.zcompdump<span class="p">;</span> compinit
 </code></pre></div>
 </div>
 </div>
