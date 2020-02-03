@@ -18,7 +18,7 @@ summary: Parse kernelcache.
 Extract and decompress a kernelcache from IPSW
 
 ```bash
-$ ipsw extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
+$ ipsw kernel extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
    • Extracting kernelcaches
    • Extracting Kernelcache from IPSW
       • Parsing Kernelcache IMG4

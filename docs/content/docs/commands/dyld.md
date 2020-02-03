@@ -110,7 +110,7 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 Get ObjC selector address
 
 ```bash
-$ ipsw dyld dyld_shared_cache release
+$ ipsw dyld sel dyld_shared_cache release
 
 0x1b92c85a8: release
 ```
@@ -118,7 +118,7 @@ $ ipsw dyld dyld_shared_cache release
 Or get all the selectors for an image
 
 ```bash
-$ ipsw dyld --image CoreFoundation dyld_shared_cache
+$ ipsw dyld sel --image CoreFoundation dyld_shared_cache
 
 Objective-C Selectors:
 /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
@@ -133,7 +133,7 @@ Objective-C Selectors:
 <SNIP>
 ```
 
-**NOTE:** This doesn't include headers, class names or protocols _yet_.
+**NOTE:** This doesn't include `headers`, `class names` or `protocols` yetå.
 
 ### **dyld split**
 
