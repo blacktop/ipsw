@@ -8,13 +8,13 @@ summary: Combine extract commands together.
 
 ### ⚠️ _(not supported on Windows)_
 
-#### Extract *kernelcache* from a previously downloaded 8ipsw*
+#### Extract _kernelcache_ from a previously downloaded _ipsw_
 
 ```bash
 $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
-#### Extract *dyld_shared_cache* from a previously downloaded *ipsw*
+#### Extract _dyld_shared_cache_ from a previously downloaded _ipsw_
 
 - `macOS`
 
@@ -35,4 +35,3 @@ $ docker run --init -it --rm \
              -v `pwd` :/data \
              blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
 ```
-

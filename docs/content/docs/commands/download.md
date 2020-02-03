@@ -13,6 +13,8 @@ summary: Download and parse IPSW(s) from the internets.
 
 ---
 
+> ⚠️ **NOTICE:** Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why. ⚠️
+
 ## **download**
 
 > Queries the [ipsw.me](https://ipsw.me) API
@@ -114,13 +116,13 @@ $ ipsw download -V latest --yes --white-list ipod
 
 Only download and decompress the kernelcaches _(not supported on Windows)_
 
- - Single kernelcache
+- Single kernelcache
 
 ```bash
 ipsw download kernel --device iPhone11,2 --build 16B92
 ```
 
- - All of dem!!!
+- All of dem!!!
 
 ```bash
 $ time ipsw download kernel --version 12.0.1

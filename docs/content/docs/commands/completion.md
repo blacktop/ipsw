@@ -10,6 +10,16 @@ summary: Generate bash/zsh completions.
 
 #### Option 1)
 
+Add the following to your `~/.zshrc`
+
+```bash
+autoload -Uz compinit && compinit -C
+source <(ipsw completion zsh)
+compdef _ipsw ipsw
+```
+
+#### Option 2)
+
 Pick a folder in your `$fpath` to write the completion to.
 
 ⚠️ **NOTE:** I'm using `/usr/local/share/zsh-completions`
@@ -17,14 +27,4 @@ Pick a folder in your `$fpath` to write the completion to.
 ```bash
 $ ipsw completion zsh > /usr/local/share/zsh-completions/_ipsw
 $ rm -f ~/.zcompdump; compinit
-```
-
-#### Option 2)
-
-Add the following to your `~/.zshrc`
-
-```bash
-autoload -Uz compinit && compinit -C
-source <(ipsw completion zsh)
-compdef _ipsw ipsw
 ```
