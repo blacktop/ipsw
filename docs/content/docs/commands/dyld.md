@@ -9,6 +9,7 @@ summary: Parse dyld_shared_cache.
 - [**dyld extract**](#dyld-extract)
 - [**dyld list**](#dyld-list)
 - [**dyld symaddr**](#dyld-symaddr)
+- [**dyld sel**](#dyld-sel)
 - [**dyld split**](#dyld-split)
 - [**dyld webkit**](#dyld-webkit)
 
@@ -101,6 +102,38 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 ```
 
 ⚠️ **NOTE:** you don't have to supply the full image path
+
+### **dyld sel**
+
+🚧 **[WIP]** 🚧
+
+Get ObjC selector address
+
+```bash
+$ ipsw dyld dyld_shared_cache release
+
+0x1b92c85a8: release
+```
+
+Or get all the selectors for an image
+
+```bash
+$ ipsw dyld --image CoreFoundation dyld_shared_cache
+
+Objective-C Selectors:
+/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+    0x1b92c88c8: exceptionWithName:reason:userInfo:
+    0x1b92c878d: mutableCopyWithZone:
+    0x1b92c877f: copyWithZone:
+    0x1b92c88eb: initWithSet:copyItems:
+    0x1b92c8820: doesNotRecognizeSelector:
+    0x1b92c8902: initWithObjects:count:
+    0x1b92c8919: initWithCapacity:
+    0x1b92c8418: dealloc
+<SNIP>
+```
+
+**NOTE:** This doesn't include headers, class names or protocols _yet_.
 
 ### **dyld split**
 

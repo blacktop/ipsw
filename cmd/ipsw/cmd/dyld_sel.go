@@ -42,7 +42,7 @@ func init() {
 // selCmd represents the sel command
 var selCmd = &cobra.Command{
 	Use:   "sel",
-	Short: "Dump ObjC selector addresses",
+	Short: "Get ObjC selector addresses",
 	// Short: "Find ObjC selector symbol",
 	Args: cobra.MinimumNArgs(1),
 	// Args:  cobra.MinimumNArgs(2),
