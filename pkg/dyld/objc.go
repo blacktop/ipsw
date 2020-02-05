@@ -29,7 +29,7 @@ type Optimization struct {
 	SelectorOptOffset int32
 	HeaderOptRoOffset int32
 	ClassOptOffset    int32
-	_                 uint32
+	// _                 uint32
 	ProtocolOptOffset int32
 	HeaderOptRwOffset int32
 }
@@ -108,36 +108,36 @@ func (f *File) getLibObjC() (*macho.File, error) {
 	return macho.NewFile(r)
 }
 
-func (f *File) dumpOffsets(offsets []int32, fileOffset int32) {
+func (f *File) dumpOffsets(offsets []int32, fileOffset int64) {
 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 	for _, ptr := range offsets {
 		if ptr != 0 {
-			sr.Seek(int64(fileOffset+ptr), io.SeekStart)
+			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", fileOffset+ptr).Error())
+				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
 			}
-			addr, _ := f.getVMAddress(uint64(fileOffset + ptr))
+			addr, _ := f.getVMAddress(uint64(int32(fileOffset) + ptr))
 			fmt.Printf("    0x%x: %s\n", addr, strings.Trim(s, "\x00"))
 		}
 
 	}
 }
 
-func (f *File) offsetsToMap(offsets []int32, fileOffset int32) map[string]uint64 {
+func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64 {
 	objcMap := make(map[string]uint64)
 
 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 	for _, ptr := range offsets {
 		if ptr != 0 {
-			sr.Seek(int64(fileOffset+ptr), io.SeekStart)
+			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", fileOffset+ptr).Error())
+				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
 			}
-			addr, _ := f.getVMAddress(uint64(fileOffset + ptr))
+			addr, _ := f.getVMAddress(uint64(int32(fileOffset) + ptr))
 			objcMap[strings.Trim(s, "\x00")] = addr
 		}
 
@@ -145,10 +145,9 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int32) map[string]uint64
 	return objcMap
 }
 
-// GetSelectorAddress returns a selector's pointer address
+// GetSelectorAddress returns a selector name's address
 func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 
-	// m, err := f.getLibObjC()
 	image := f.Image("/usr/lib/libobjc.A.dylib")
 
 	dat, err := image.Data()
@@ -164,11 +163,7 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 
 	for _, s := range m.Sections {
 		if s.Seg == "__TEXT" && s.Name == "__objc_opt_ro" {
-			// dat, err := s.Data()
-			// if err != nil {
-			// 	return 0, err
-			// }
-			// secReader := bytes.NewReader(dat)
+
 			opt := Optimization{}
 			if err := binary.Read(s.Open(), f.ByteOrder, &opt); err != nil {
 				return 0, err
@@ -192,54 +187,27 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 
 			log.Debugf("Objective-C StringHash:\n%s", shash)
 
-			pos, _ := r.Seek(0, io.SeekCurrent)
-			log.Debugf("Tab: %d", pos)
-
 			shash.Tab = make([]byte, shash.Mask+1)
 			if err := binary.Read(r, f.ByteOrder, &shash.Tab); err != nil {
 				return 0, err
 			}
-
-			pos, _ = r.Seek(0, io.SeekCurrent)
-			log.Debugf("CheckBytes: %d", pos)
 
 			shash.CheckBytes = make([]byte, shash.Capacity)
 			if err := binary.Read(r, f.ByteOrder, &shash.CheckBytes); err != nil {
 				return 0, err
 			}
 
-			pos, _ = r.Seek(0, io.SeekCurrent)
-			log.Debugf("Offsets: %d", pos)
-
 			shash.Offsets = make([]int32, shash.Capacity)
 			if err := binary.Read(r, f.ByteOrder, &shash.Offsets); err != nil {
 				return 0, err
 			}
-
-			// selBytes := []byte(selector)
-			// selBytes = append(selBytes, byte(0))
-			// objcMap := f.offsetsToMap(shash.Offsets, shash.FileOffset)
-
-			// TODO: this is just me trying to understand why it's not working
-			// off, _ := f.getOffset(0x1b92c85a8)
-			// fmt.Println(off)
-			// for idx, of := range shash.Offsets {
-			// 	if of == -41097392 {
-			// 		fmt.Println("FOUND:", idx)
-			// 	}
-			// }
 
 			selIndex, err := shash.getIndex(selector)
 			if err != nil {
 				return 0, errors.Wrapf(err, "failed get selector address for %s", selector)
 			}
 
-			log.Debugf("FileOffset: %d", shash.FileOffset)
-			log.Debugf("Offsets[Index]: %d", shash.Offsets[selIndex])
-
 			ptr, _ := f.getVMAddress(uint64(shash.FileOffset + int64(shash.Offsets[selIndex])))
-			fmt.Printf("    0x%x: %s\n", ptr, selector)
-			// fmt.Printf("    0x%x: %s\n", 0x1b92c85a8, "release")
 
 			return ptr, nil
 		}
@@ -248,8 +216,8 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 	return 0, fmt.Errorf("failed get selector address for %s", selector)
 }
 
-// Selectors returns all of the Objective-C selectors
-func (f *File) Selectors(imageNames ...string) error {
+// SelectorsForImage returns all of the Objective-C selectors for a given image
+func (f *File) SelectorsForImage(imageNames ...string) error {
 	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
@@ -319,38 +287,70 @@ func isASCII(s string) bool {
 // AllSelectors is a dumb brute force way to get all the ObjC selector/class etc address
 // by just dumping all the strings in the __OBJC_RO segment
 // returns: map[sym]addr
-func (f *File) AllSelectors() (map[string]uint64, error) {
+func (f *File) AllSelectors(print bool) (map[string]uint64, error) {
 
-	selectorsMap := make(map[string]uint64)
+	image := f.Image("/usr/lib/libobjc.A.dylib")
 
-	libobjc, err := f.getLibObjC()
+	dat, err := image.Data()
+	if err != nil {
+		return nil, err
+	}
+	r := bytes.NewReader(dat)
+
+	m, err := macho.NewFile(r)
 	if err != nil {
 		return nil, err
 	}
 
-	objcRoSeg := libobjc.Segment("__OBJC_RO")
-	if objcRoSeg == nil {
-		return nil, fmt.Errorf("failed to find segment __OBJC_RO")
-	}
+	for _, s := range m.Sections {
+		if s.Seg == "__TEXT" && s.Name == "__objc_opt_ro" {
 
-	data, err := objcRoSeg.Data()
-	if err != nil {
-		return nil, err
-	}
-
-	var pos uint64
-
-	for i := uint64(0); i < uint64(len(data)); i++ {
-		if data[i] == '\x00' {
-			if isASCII(string(data[pos:i])) {
-				selectorsMap[string(data[pos:i])] = pos + objcRoSeg.Addr
-				// fmt.Printf("0x%x: %s\n", uint64(pos+objcRoSeg.Addr), data[pos:i])
+			opt := Optimization{}
+			if err := binary.Read(s.Open(), f.ByteOrder, &opt); err != nil {
+				return nil, err
 			}
-			pos = i + 1
+			if opt.Version != 15 {
+				return nil, fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
+			}
+
+			log.Debugf("Objective-C Optimization:\n%s", opt)
+
+			shash := StringHash{FileOffset: int64(s.Offset) + int64(opt.SelectorOptOffset)}
+			// shash := StringHash{FileOffset: int32(s.Offset) + opt.HeaderOptRoOffset}
+			// shash := StringHash{FileOffset: int32(s.Offset) + opt.ClassOptOffset}
+			// shash := StringHash{FileOffset: int32(s.Offset) + opt.ProtocolOptOffset}
+			// shash := StringHash{FileOffset: int32(s.Offset) + opt.HeaderOptRwOffset}
+
+			r.Seek(int64(shash.FileOffset), io.SeekStart)
+			if err := binary.Read(r, f.ByteOrder, &shash.stringHash); err != nil {
+				return nil, err
+			}
+
+			log.Debugf("Objective-C StringHash:\n%s", shash)
+
+			shash.Tab = make([]byte, shash.Mask+1)
+			if err := binary.Read(r, f.ByteOrder, &shash.Tab); err != nil {
+				return nil, err
+			}
+
+			shash.CheckBytes = make([]byte, shash.Capacity)
+			if err := binary.Read(r, f.ByteOrder, &shash.CheckBytes); err != nil {
+				return nil, err
+			}
+
+			shash.Offsets = make([]int32, shash.Capacity)
+			if err := binary.Read(r, f.ByteOrder, &shash.Offsets); err != nil {
+				return nil, err
+			}
+
+			if print {
+				f.dumpOffsets(shash.Offsets, shash.FileOffset)
+			}
+			return f.offsetsToMap(shash.Offsets, shash.FileOffset), nil
 		}
 	}
 
-	return selectorsMap, nil
+	return nil, fmt.Errorf("unable to find __TEXT.__objc_opt_ro")
 }
 
 /*
@@ -444,49 +444,71 @@ func lookup8(k []byte, level uint64) uint64 {
 	switch length { /* all the case statements fall through */
 	case 23:
 		c += (uint64(k[p+22]) << 56)
+		fallthrough
 	case 22:
 		c += (uint64(k[p+21]) << 48)
+		fallthrough
 	case 21:
 		c += (uint64(k[p+20]) << 40)
+		fallthrough
 	case 20:
 		c += (uint64(k[p+19]) << 32)
+		fallthrough
 	case 19:
 		c += (uint64(k[p+18]) << 24)
+		fallthrough
 	case 18:
 		c += (uint64(k[p+17]) << 16)
+		fallthrough
 	case 17:
 		c += (uint64(k[p+16]) << 8)
+		fallthrough
 	/* the first byte of c is reserved for the length */
 	case 16:
 		b += (uint64(k[p+15]) << 56)
+		fallthrough
 	case 15:
 		b += (uint64(k[p+14]) << 48)
+		fallthrough
 	case 14:
 		b += (uint64(k[p+13]) << 40)
+		fallthrough
 	case 13:
 		b += (uint64(k[p+12]) << 32)
+		fallthrough
 	case 12:
 		b += (uint64(k[p+11]) << 24)
+		fallthrough
 	case 11:
 		b += (uint64(k[p+10]) << 16)
+		fallthrough
 	case 10:
 		b += (uint64(k[p+9]) << 8)
+		fallthrough
 	case 9:
 		b += (uint64(k[p+8]))
+		fallthrough
 	case 8:
 		a += (uint64(k[p+7]) << 56)
+		fallthrough
 	case 7:
 		a += (uint64(k[p+6]) << 48)
+		fallthrough
 	case 6:
 		a += (uint64(k[p+5]) << 40)
+		fallthrough
 	case 5:
 		a += (uint64(k[p+4]) << 32)
+		fallthrough
 	case 4:
 		a += (uint64(k[p+3]) << 24)
+		fallthrough
 	case 3:
 		a += (uint64(k[p+2]) << 16)
+		fallthrough
 	case 2:
 		a += (uint64(k[p+1]) << 8)
+		fallthrough
 	case 1:
 		a += uint64(k[p+0])
 		/* case 0: nothing left to add */
@@ -496,10 +518,10 @@ func lookup8(k []byte, level uint64) uint64 {
 	return c
 }
 
-func (s StringHash) hash(key []byte) uint64 {
+func (s StringHash) hash(key []byte) uint32 {
 	val := lookup8(key, s.Salt)
 	index := (val >> uint64(s.Shift)) ^ uint64(s.Scramble[s.Tab[(val&uint64(s.Mask))]])
-	return index
+	return uint32(index)
 }
 
 // The check bytes are used to reject strings that aren't in the table
@@ -510,7 +532,7 @@ func checkbyte(key []byte) uint8 {
 	return ((key[0] & 0x7) << 5) | (uint8(len(key)) & 0x1f)
 }
 
-func (s StringHash) getIndex(keyStr string) (uint64, error) {
+func (s StringHash) getIndex(keyStr string) (uint32, error) {
 	key := []byte(keyStr)
 
 	h := s.hash(key)

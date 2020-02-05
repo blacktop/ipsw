@@ -133,7 +133,7 @@ Objective-C Selectors:
 <SNIP>
 ```
 
-**NOTE:** This doesn't include `headers`, `class names` or `protocols` yetå.
+**NOTE:** This doesn't include `headers`, `class names` or `protocols` yet.
 
 ### **dyld split**
 

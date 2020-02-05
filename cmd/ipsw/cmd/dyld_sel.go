@@ -78,27 +78,22 @@ var selCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(imageName) > 0 {
-			err = f.Selectors(imageName)
+		if len(args) > 1 {
+			ptr, err := f.GetSelectorAddress(args[1])
 			if err != nil {
 				return err
 			}
+			fmt.Printf("0x%x: %s\n", ptr, args[1])
 		} else {
-			sels, err := f.AllSelectors()
-			if err != nil {
-				return err
+			if len(imageName) > 0 {
+				err = f.SelectorsForImage(imageName)
+				if err != nil {
+					return err
+				}
+			} else {
+				f.AllSelectors(true)
 			}
-
-			fmt.Printf("0x%x: %s\n", sels[args[1]], args[1])
 		}
-
-		// TODO: figure out why we can't parse the perfect hash table
-		// ptr, err := f.GetSelectorAddress(args[1])
-		// if err != nil {
-		// 	return err
-		// }
-
-		// fmt.Printf("0x%x: %s\n", ptr, args[1])
 
 		return nil
 	},
