@@ -105,8 +105,6 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 
 ### **dyld sel**
 
-🚧 **[WIP]** 🚧
-
 Get ObjC selector address
 
 ```bash
@@ -131,6 +129,12 @@ Objective-C Selectors:
     0x1b92c8919: initWithCapacity:
     0x1b92c8418: dealloc
 <SNIP>
+```
+
+Get all teh selectors!!
+
+```bash
+$ ipsw dyld sel dyld_shared_cache
 ```
 
 **NOTE:** This doesn't include `headers`, `class names` or `protocols` yet.
