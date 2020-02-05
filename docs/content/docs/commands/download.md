@@ -13,7 +13,7 @@ summary: Download and parse IPSW(s) from the internets.
 
 ---
 
-> ⚠️ **NOTICE:** Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why. ⚠️
+> ⚠️ **NOTICE:** Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why.
 
 ## **download**
 
