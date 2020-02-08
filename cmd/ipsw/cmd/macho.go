@@ -102,6 +102,7 @@ var machoCmd = &cobra.Command{
 		}
 		w.Flush()
 
+		fmt.Printf("Dyld ID: %s (%s)\n", m.DylibID().Name, m.DylibID().CurrentVersion)
 		fmt.Println("SourceVersion:", m.SourceVersion().Version)
 
 		if symbols {
