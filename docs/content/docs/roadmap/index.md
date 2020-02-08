@@ -6,14 +6,19 @@ weight: 100
 summary: Future features.
 ---
 
-I'd eventually like to get to a 1-to-1 feature match with `jtool2`.  
+I'd eventually like to get to a 1-to-1 feature match with `jtool2`.
 
-My main goal is to create a mantainable *dyld_shared_cache* splitter
+My main goal is to create a mantainable _dyld_shared_cache_ splitter
 
 ### TODO
 
 - [x] use https://github.com/gocolly/colly
 - [x] parse plists for folder creation
+- [ ] MachO read/write
+- [ ] pure Go dyld splitter
+- [ ] pure Go lzfse
+- [ ] OTA support
+- [ ] APFS/HFS parsing to pull dyld without mounting
 - [ ] create offline copy of ipsw.me API
 - [ ] https://github.com/xerub/img4lib
 - [ ] devicetree read/write
