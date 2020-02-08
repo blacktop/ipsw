@@ -1,0 +1,1238 @@
+//------------------------------------------------
+//--- 010 Editor v10.0 Binary Template
+//
+//      File: Dyld.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose:
+//  Category: Executable
+// File Mask: dyld_shared_cache*
+//  ID Bytes: 64 79 6C 64
+//   History:
+//------------------------------------------------
+
+#define MH_MAGIC_64 0xfeedfacf /* the 64-bit mach magic number */
+#define MH_CIGAM_64 0xcffaedfe /* NXSwapInt(MH_MAGIC_64) */
+#define MH_MAGIC 0xfeedface    /* the mach magic number */
+#define MH_CIGAM 0xcefaedfe    /* NXSwapInt(MH_MAGIC) */
+
+typedef struct
+{
+    union {
+        char n_name[4]; /* for use when in-core */
+        uint32 n_strx;  /* index into the string table */
+    } n_un;
+    uchar n_type;   /* type flag, see below */
+    uchar n_sect;   /* section number or NO_SECT */
+    int16 n_desc;   /* see <mach-o/stab.h> */
+    uint32 n_value; /* value of this symbol (or stab offset) */
+} nlist;
+
+/*
+ * This is the symbol table entry structure for 64-bit architectures.
+ */
+typedef struct
+{
+    union {
+        uint32 n_strx; /* index into the string table */
+    } n_un;
+    uchar n_type;   /* type flag, see below */
+    uchar n_sect;   /* section number or NO_SECT */
+    uint16 n_desc;  /* see <mach-o/stab.h> */
+    uint64 n_value; /* value of this symbol (or stab offset) */
+} nlist_64;
+
+typedef struct
+{
+    char magic[16]<bgcolor = cLtBlue>; // e.g. "dyld_v0    i386"
+    uint mappingOffset;                // file offset to first dyld_cache_mapping_info
+    uint mappingCount;                 // number of dyld_cache_mapping_info entries
+    uint imagesOffset;                 // file offset to first dyld_cache_image_info
+    uint imagesCount;                  // number of dyld_cache_image_info entries
+    uint64 dyldBaseAddress;            // base address of dyld when cache was built
+    uint64 codeSignatureOffset;        // file offset of code signature blob
+    uint64 codeSignatureSize;          // size of code signature blob (zero means to end of file)
+    uint64 slideInfoOffset;            // file offset of kernel slid info
+    uint64 slideInfoSize;              // size of kernel slid info
+    uint64 localSymbolsOffset;         // file offset of where local symbols are stored
+    uint64 localSymbolsSize;           // size of local symbols information
+    ubyte uuid[16]<format = hex>;      // unique value for each shared cache file
+    uint64 cacheType;                  // 0 for development, 1 for production
+    uint branchPoolsOffset;            // file offset to table of uint64 pool addresses
+    uint branchPoolsCount;             // number of uint64 entries
+    uint64 accelerateInfoAddr;         // (unslid) address of optimization info
+    uint64 accelerateInfoSize;         // size of optimization info
+    uint64 imagesTextOffset;           // file offset to first dyld_cache_image_text_info
+    uint64 imagesTextCount;            // number of dyld_cache_image_text_info entries
+    uint64 dylibsImageGroupAddr;       // (unslid) address of ImageGroup for dylibs in this cache
+    uint64 dylibsImageGroupSize;       // size of ImageGroup for dylibs in this cache
+    uint64 otherImageGroupAddr;        // (unslid) address of ImageGroup for other OS dylibs
+    uint64 otherImageGroupSize;        // size of oImageGroup for other OS dylibs
+    uint64 progClosuresAddr;           // (unslid) address of list of program launch closures
+    uint64 progClosuresSize;           // size of list of program launch closures
+    uint64 progClosuresTrieAddr;       // (unslid) address of trie of indexes into program launch closures
+    uint64 progClosuresTrieSize;       // size of trie of indexes into program launch closures
+    uint platform;                     // platform number (macOS=1, etc)
+    uint formatVersion : 8;            // dyld3::closure::kFormatVersion
+    uint dylibsExpectedOnDisk : 1;     // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
+    uint simulator : 1;                // for simulator of specified platform
+    uint locallyBuiltCache : 1;        // 0 for B&I built cache, 1 for locally built cache
+    uint padding : 21;                 // TBD
+    uint64 sharedRegionStart;          // base load address of cache if not slid
+    uint64 sharedRegionSize;           // overall size of region cache can be mapped into
+    uint64 maxSlide<format = hex>;     // runtime slide of cache can be between zero and this value
+    uint64 dylibsImageArrayAddr;       // (unslid) address of ImageArray for dylibs in this cache
+    uint64 dylibsImageArraySize;       // size of ImageArray for dylibs in this cache
+    uint64 dylibsTrieAddr;             // (unslid) address of trie of indexes of all cached dylibs
+    uint64 dylibsTrieSize;             // size of trie of cached dylib paths
+    uint64 otherImageArrayAddr;        // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
+    uint64 otherImageArraySize;        // size of ImageArray for dylibs and bundles with dlopen closures
+    uint64 otherTrieAddr;              // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
+    uint64 otherTrieSize;
+} dyld_cache_header;
+
+typedef struct
+{
+    uint64 address;
+    uint64 size;
+    uint64 fileOffset;
+    uint32 maxProt;
+    uint32 initProt;
+} dyld_cache_mapping_info<bgcolor = cBlue>;
+
+typedef struct
+{
+    uint64 address;
+    uint64 modTime;
+    uint64 inode;
+    uint32 pathFileOffset;
+    uint32 pad;
+} dyld_cache_image_info<read = readimagename, bgcolor = cLtGreen>;
+
+string readimagename(dyld_cache_image_info &info)
+{
+    return ReadString(info.pathFileOffset);
+}
+
+typedef struct
+{
+    uint64 exportsTrieAddr; // address of trie in unslid cache
+    uint64 weakBindingsAddr;
+    uint32 exportsTrieSize;
+    uint32 weakBindingsSize;
+    uint32 dependentsStartArrayIndex;
+    uint32 reExportsStartArrayIndex;
+} dyld_cache_image_info_extra;
+
+typedef struct
+{
+    uint32 version;            // currently 1
+    uint32 imageExtrasCount;   // does not include aliases
+    uint32 imagesExtrasOffset; // offset into this chunk of first dyld_cache_image_info_extra
+    uint32 bottomUpListOffset; // offset into this chunk to start of 16-bit array of sorted image indexes
+    uint32 dylibTrieOffset;    // offset into this chunk to start of trie containing all dylib paths
+    uint32 dylibTrieSize;      // size of trie containing all dylib paths
+    uint32 initializersOffset; // offset into this chunk to start of initializers list
+    uint32 initializersCount;  // size of initializers list
+    uint32 dofSectionsOffset;  // offset into this chunk to start of DOF sections list
+    uint32 dofSectionsCount;   // size of initializers list
+    uint32 reExportListOffset; // offset into this chunk to start of 16-bit array of re-exports
+    uint32 reExportCount;      // size of re-exports
+    uint32 depListOffset;      // offset into this chunk to start of 16-bit array of dependencies (0x8000 bit set if upward)
+    uint32 depListCount;       // size of dependencies
+    uint32 rangeTableOffset;   // offset into this chunk to start of ss
+    uint32 rangeTableCount;    // size of dependencies
+    uint64 dyldSectionAddr;    // address of libdyld's __dyld section in unslid cache
+} dyld_cache_accelerator_info;
+
+typedef struct
+{
+    uint32 functionOffset; // address offset from start of cache mapping
+    uint32 imageIndex;
+} dyld_cache_accelerator_initializer;
+
+typedef struct
+{
+    uint64 startAddress; // unslid address of start of region
+    uint32 size;
+    uint32 imageIndex;
+} dyld_cache_range_entry;
+
+typedef struct
+{
+    uint64 sectionAddress; // unslid address of start of region
+    uint32 sectionSize;
+    uint32 imageIndex;
+} dyld_cache_accelerator_dof;
+
+typedef struct
+{
+    char uuid[16]<format = hex>;
+    uint64 loadAddress; // unslid address of start of __TEXT
+    uint32 textSegmentSize;
+    uint32 pathOffset; // offset from start of cache file
+} dyld_cache_image_text_info;
+
+// typedef struct
+// {
+//     local uint64 base = FTell();
+//     uint32 version; // currently 1
+//     uint32 toc_offset<format = hex>;
+//     uint32 toc_count;
+//     uint32 entries_offset<format = hex>;
+//     uint32 entries_count;
+//     uint32 entries_size; // currently 128
+//     FSeek(base + toc_offset);
+//     uint16 toc[toc_count];
+//     FSeek(base + entries_offset);
+//     uchar entries[entries_count * entries_size];
+// } dyld_cache_slide_info;
+
+// void get_dyld_cache_slide_info(uint64 totalsize)
+// {
+//     dyld_cache_slide_info slideinfo;
+// }
+
+char[] showstring64(nlist_64 &list)
+{
+    return ReadString(strtableoff + list.n_un.n_strx);
+}
+
+char[] showstring(nlist &list)
+{
+    return ReadString(strtableoff + list.n_un.n_strx);
+}
+
+void readliststring()
+{
+    if (isbit64)
+    {
+        nlist_64 nlists<read = showstring64>;
+    }
+    else
+    {
+        nlist nlists<read = showstring>;
+    }
+}
+
+typedef struct
+{
+    uint32 dylibOffset;     // offset in cache file of start of dylib
+    uint32 nlistStartIndex; // start index of locals for this dylib
+    uint32 nlistCount;      // number of local symbols for this dylib
+} dyld_cache_local_symbols_entry;
+
+typedef struct(uint count)
+{
+    for (i = 0; i < count; i++)
+    {
+        readliststring();
+    }
+}
+allnlist;
+
+struct dyld_cache_slide_info2
+{
+    uint32 version;   // currently 2
+    uint32 page_size; // currently 4096 (may also be 16384)
+    uint32 page_starts_offset;
+    uint32 page_starts_count;
+    uint32 page_extras_offset;
+    uint32 page_extras_count;
+    uint64 delta_mask; // which (contiguous) set of bits contains the delta to the next rebase location
+    uint64 value_add;
+    uint16 page_starts[page_starts_count];
+    uint16 page_extras[page_extras_count];
+};
+#define DYLD_CACHE_SLIDE_PAGE_ATTRS 0xC000          // high bits of uint16_t are flags
+#define DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA 0x8000     // index is into extras array (not starts array)
+#define DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE 0x4000 // page has no rebasing
+#define DYLD_CACHE_SLIDE_PAGE_ATTR_END 0x8000       // last chain entry for page
+
+typedef struct
+{
+    local uint64 base = FTell();
+    local uint i;
+    uint32 nlistOffset;   // offset into this chunk of nlist entries
+    uint32 nlistCount;    // count of nlist entries
+    uint32 stringsOffset; // offset into this chunk of string pool
+    uint32 stringsSize;   // byte count of string pool
+    uint32 entriesOffset; // offset into this chunk of array of dyld_cache_local_symbols_entry
+    uint32 entriesCount;  // number of elements in dyld_cache_local_symbols_entry array
+    FSeek(base + nlistOffset);
+    strtableoff = base + stringsOffset;
+    //allnlist lists(nlistCount);
+    FSeek(base + entriesOffset);
+    dyld_cache_local_symbols_entry nlistentry[entriesCount];
+} dyld_cache_local_symbols_info;
+
+void get_dyld_cache_local_symbols_info(uint64 totalsize)
+{
+    dyld_cache_local_symbols_info symbolinfo;
+}
+
+void get_dyld_cache_local_symbols_entry(uint64 totalsize)
+{
+}
+
+LittleEndian();
+
+local int isbit64 = 0;
+local uint32 i;
+local uint32 sig;
+local uint64 strtableoff;
+dyld_cache_header header;
+FSeek(header.mappingOffset);
+dyld_cache_mapping_info mapinfo[header.mappingCount];
+for (i = 0; i < header.mappingCount; i++)
+{
+    sig = ReadUInt(mapinfo[i].fileOffset);
+    if (sig == MH_MAGIC_64 || sig == MH_CIGAM_64)
+    {
+        isbit64 = 1;
+    }
+}
+FSeek(header.imagesOffset);
+dyld_cache_image_info imageinfo[header.imagesCount];
+// FSeek(header.codeSignatureOffset);
+// if (header.codeSignatureSize > 0)
+// {
+//     uchar sign[header.codeSignatureSize];
+// }
+// if (header.slideInfoOffset > 0)
+// {
+//     FSeek(header.slideInfoOffset);
+//     get_dyld_cache_slide_info(header.slideInfoSize);
+// }
+if (header.localSymbolsOffset > 0)
+{
+    FSeek(header.localSymbolsOffset);
+    get_dyld_cache_local_symbols_info(header.localSymbolsSize);
+}
+
+//  ----------------------------------    macho header  ---------------------------------------
+// Mach-o's should be Little Endian only -- except for the fat_header/fat_arch
+LittleEndian();
+
+typedef enum<uint>
+{
+    MACHO_32 = 0xFEEDFACE,  // 32-bit mach object file
+    MACHO_64 = 0xFEEDFACF,  // 64-bit mach object file
+    MACHO_FAT = 0xCAFEBABE, // Universal object file / FAT_MAGIC
+    MACHO_FAT_CIGAM = 0xBEBAFECA
+} Magic<format = hex>;
+
+#define CPU_ARCH_MASK 0xff000000
+#define CPU_ARCH_ABI64 0x01000000
+
+// Changed to enum, more info and handles constant | macro fine //
+//
+typedef enum<uint>
+{
+    CPU_TYPE_X86 = 0x07,
+    CPU_TYPE_X64 = 0x07 | CPU_ARCH_ABI64,
+    CPU_TYPE_ARM = 0x0C,
+    CPU_TYPE_ARM64 = 0x0C | CPU_ARCH_ABI64,
+    CPU_TYPE_PPC = 0x12,
+    CPU_TYPE_PPC64 = 0x12 | CPU_ARCH_ABI64,
+
+    CPU_TYPE_I386 = CPU_TYPE_X86,
+    CPU_TYPE_X86_64 = CPU_TYPE_X64,
+    CPU_TYPE_POWERPC = CPU_TYPE_PPC,
+    CPU_TYPE_POWERPC64 = CPU_TYPE_PPC64,
+} CpuType<format = hex>;
+
+typedef enum<uint>
+{
+    MACH_OBJECT = 0x1,
+    MACH_EXECUTE = 0x2,
+    MACH_FVMLIB = 0x3,
+    MACH_CORE = 0x4,
+    MACH_PRELOAD = 0x5,
+    MACH_DYLIB = 0x6,
+    MACH_DYLINKER = 0x7,
+    MACH_BUNDLE = 0x8,
+    MACH_DYLIB_STUB = 0x9,
+    MACH_DSYM = 0xA,
+    MACH_KEXT_BUNDLE = 0xB,
+} FileType;
+
+typedef enum<uint>
+{
+    i386_THREAD_STATE = 0x1,
+    i386_FLOAT_STATE = 0x2,
+    i386_EXCEPTION_STATE = 0x3
+} i386ThreadFlavor<format = hex>;
+
+typedef struct
+{
+    uint32 eax<format = hex>;
+    uint32 ebx<format = hex>;
+    uint32 ecx<format = hex>;
+    uint32 edx<format = hex>;
+    uint32 edi<format = hex>;
+    uint32 esi<format = hex>;
+    uint32 ebp<format = hex>;
+    uint32 esp<format = hex>;
+    uint32 ss<format = hex>;
+    uint32 eflags<format = hex>;
+    uint32 eip<format = hex>;
+    uint32 cs<format = hex>;
+    uint32 ds<format = hex>;
+    uint32 es<format = hex>;
+    uint32 fs<format = hex>;
+    uint32 gs<format = hex>;
+} i386ThreadState;
+
+typedef enum<uint>
+{
+    x86_THREAD_STATE32 = 0x1,
+    x86_FLOAT_STATE32 = 0x2,
+    x86_EXCEPTION_STATE32 = 0x3,
+    x86_THREAD_STATE64 = 0x4,
+    x86_FLOAT_STATE64 = 0x5,
+    x86_EXCEPTION_STATE64 = 0x6,
+    x86_THREAD_STATE = 0x7,
+    x86_FLOAT_STATE = 0x8,
+    x86_EXCEPTION_STATE = 0x9,
+    x86_DEBUG_STATE32 = 0xA,
+    x86_DEBUG_STATE64 = 0xB,
+    x86_DEBUG_STATE = 0xC,
+    THREAD_STATE_NONE = 0xD
+} x86ThreadFlavor<format = hex>;
+
+typedef struct
+{
+    uint64 rax<format = hex>;
+    uint64 rbx<format = hex>;
+    uint64 rcx<format = hex>;
+    uint64 rdx<format = hex>;
+    uint64 rdi<format = hex>;
+    uint64 rsi<format = hex>;
+    uint64 rbp<format = hex>;
+    uint64 rsp<format = hex>;
+    uint64 r8<format = hex>;
+    uint64 r9<format = hex>;
+    uint64 r10<format = hex>;
+    uint64 r11<format = hex>;
+    uint64 r12<format = hex>;
+    uint64 r13<format = hex>;
+    uint64 r14<format = hex>;
+    uint64 r15<format = hex>;
+    uint64 rip<format = hex>;
+    uint64 rflags<format = hex>;
+    uint64 cs<format = hex>;
+    uint64 fs<format = hex>;
+    uint64 gs<format = hex>;
+} x86ThreadState;
+
+typedef enum<uint>
+{
+    PPC_THREAD_STATE = 0x1,
+    PPC_FLOAT_STATE = 0x2,
+    PPC_EXCEPTION_STATE = 0x3,
+    PPC_VECTOR_STATE = 0x4,
+    PPC_THREAD_STATE64 = 0x5,
+    PPC_EXCEPTION_STATE64 = 0x6
+} PPCThreadFlavor<format = hex>;
+
+typedef struct
+{
+    uint32 r0<format = hex>;
+    uint32 r1<format = hex>;
+    uint32 r2<format = hex>;
+    uint32 r3<format = hex>;
+    uint32 r4<format = hex>;
+    uint32 r5<format = hex>;
+    uint32 r6<format = hex>;
+    uint32 r7<format = hex>;
+    uint32 r8<format = hex>;
+    uint32 r9<format = hex>;
+    uint32 r10<format = hex>;
+    uint32 r11<format = hex>;
+    uint32 r12<format = hex>;
+    uint32 r13<format = hex>;
+    uint32 r14<format = hex>;
+    uint32 r15<format = hex>;
+    uint32 r16<format = hex>;
+} ARMThreadState;
+
+typedef struct
+{
+    uint32 __srr0<comment = "Instruction address register (PC)">;
+    uint32 __srr1<comment = "Machine state register (supervisor)">;
+    uint32 __r0;
+    uint32 __r1;
+    uint32 __r2;
+    uint32 __r3;
+    uint32 __r4;
+    uint32 __r5;
+    uint32 __r6;
+    uint32 __r7;
+    uint32 __r8;
+    uint32 __r9;
+    uint32 __r10;
+    uint32 __r11;
+    uint32 __r12;
+    uint32 __r13;
+    uint32 __r14;
+    uint32 __r15;
+    uint32 __r16;
+    uint32 __r17;
+    uint32 __r18;
+    uint32 __r19;
+    uint32 __r20;
+    uint32 __r21;
+    uint32 __r22;
+    uint32 __r23;
+    uint32 __r24;
+    uint32 __r25;
+    uint32 __r26;
+    uint32 __r27;
+    uint32 __r28;
+    uint32 __r29;
+    uint32 __r30;
+    uint32 __r31;
+
+    uint32 __cr<comment = "Condition register">;
+    uint32 __xer<comment = "User's integer exception register">;
+    uint32 __lr<comment = "Link register">;
+    uint32 __ctr<comment = "Count register">;
+    uint32 __mq<comment = "MQ Register (601 only)">;
+
+    uint32 __vrsave<comment = "Vector save register">;
+} PPCThreadState;
+
+typedef enum<uint>
+{
+    MACH_NOUNDEFS = 0x1,
+    MACH_INCRLINK = 0x2,
+    MACH_DYLDLINK = 0x4,
+    MACH_BINDATLOAD = 0x8,
+    MACH_PREBOUND = 0x10,
+    MACH_SPLIT_SEGS = 0x20,
+    MACH_LAZY_INIT = 0x40,
+    MACH_TWOLEVEL = 0x80,
+    MACH_FORCE_FLAT = 0x100,
+    MACH_NOMULTIDEFS = 0x200,
+    MACH_NOFIXPREBINDING = 0x400,
+    MACH_PREBINDABLE = 0x800,
+    MACH_ALLMODSBOUND = 0x1000,
+    MACH_SUBSECTIONS_VIA_SYMBOLS = 0x2000,
+    MACH_CANONICAL = 0x4000,
+    MACH_WEAK_DEFINES = 0x8000,
+    MACH_BINDS_TO_WEAK = 0x10000,
+    MACH_ALLOW_STACK_EXECUTION = 0x20000,
+    MACH_ROOT_SAFE = 0x40000,
+    MACH_SETUID_SAFE = 0x80000,
+    MACH_NO_REEXPORTED_DYLIBS = 0x100000,
+    MACH_PIE = 0x200000,
+    MACH_DEAD_STRIPPABLE_DYLIB = 0x400000,
+    MACH_HAS_TLV_DESCRIPTORS = 0x800000,
+    MACH_NO_HEAP_EXECUTION = 0x1000000
+} Flags;
+
+typedef struct
+{
+
+    // TODO : Extract out capabilities here
+    CpuType cpu_type<comment = "CPU specifier", format = hex>;
+    uint32 cpu_sub_type<comment = "Machine specifier", format = hex>;
+    uint32 file_offset<comment = "Offset of header in file">;
+    uint32 size<comment = "Size of object file">;
+    uint32 align<comment = "alignment as a power of two">;
+} Fat_Arch;
+
+typedef struct
+{
+    Magic magic<comment = "Magic bytes for the file">;
+
+    if (magic == MACHO_FAT || magic == MACHO_FAT_CIGAM)
+    {
+        // Need to switch to BigEndian!
+        BigEndian();
+        uint32 fat_arch_size<comment = "Number of fat_arch structs">;
+        Fat_Arch fat_arch[fat_arch_size];
+        // Switch back to LittleEndian for rest of parsing
+        LittleEndian();
+    }
+    else
+    {
+        CpuType cpu_type<comment = "CPU specifier", format = hex>;
+        uint32 cpu_sub_type<comment = "Machine specifier", format = hex>;
+        FileType file_type;
+        uint32 num_load_commands;
+        uint32 size_of_load_commands;
+        Flags flags;
+    }
+    if (magic == MACHO_64)
+    {
+        uint32 reserved;
+    }
+} Header<read = HeaderRead>;
+
+string HeaderRead(Header &header)
+{
+    local string header_string;
+    switch (header.magic)
+    {
+    case MACHO_FAT:
+    case MACHO_FAT_CIGAM:
+        header_string = "FAT header";
+        break;
+    case MACHO_32:
+        header_string = "32bit Mach-O header";
+        break;
+    case MACHO_64:
+        header_string = "64bit Mach-O header";
+        break;
+    default:
+        header_string = "Unknown header!";
+    }
+    return header_string;
+}
+
+#define REQ_DYLD (0x80000000)
+
+typedef enum<uint>
+{
+    SEGMENT = 0x1,
+    SYM_TAB = 0x2,
+    SYM_SEG = 0x3,
+    THREAD = 0x4,
+    UNIX_THREAD = 0x5,
+    LOAD_FVM_LIB = 0x6,
+    ID_FVM_LIB = 0x7,
+    IDENT = 0x8,
+    FVM_FILE = 0x9,
+    PREPAGE = 0xA,
+    DY_SYM_TAB = 0xB,
+    LOAD_DYLIB = 0xC,
+    ID_DYLIB = 0xD,
+    LOAD_DYLINKER = 0xE,
+    ID_DYLINKER = 0xF,
+    PREBOUND_DYLIB = 0x10,
+    ROUTINES = 0x11,
+    SUB_FRAMEWORK = 0x12,
+    SUB_UMBRELLA = 0x13,
+    SUB_CLIENT = 0x14,
+    SUB_LIBRARY = 0x15,
+    TWOLEVEL_HINTS = 0x16,
+    PREBIND_CKSUM = 0x17,
+    LOAD_WEAK_DYLIB = 0x18 | REQ_DYLD,
+    SEGMENT_64 = 0x19,
+    ROUTINES_64 = 0x1A,
+    UUID = 0x1B,
+    RPATH = 0x1C | REQ_DYLD,
+    CODE_SIGNATURE = 0x1D,
+    SEGMENT_SPLIT_INFO = 0x1E,
+    REEXPORT_DYLIB = 0x1F | REQ_DYLD,
+    LAZY_LOAD_DYLIB = 0x20,
+    ENCRYPTION_INFO = 0x21,
+    DYLD_INFO = 0x22,
+    DYLD_INFO_ONLY = 0x22 | REQ_DYLD,
+    LOAD_UPWARD_DYLIB = 0x23 | REQ_DYLD,
+    VERSION_MIN_MAC_OSX = 0x24,
+    VERSION_MIN_IPHONE_OS = 0x25,
+    FUNCTION_STARTS = 0x26,
+    DYLD_ENVIRONMENT = 0x27,
+    MAIN = 0x28,
+    MAIN_DYLIB = 0x28 | REQ_DYLD, // Idk, ios app in arm64 uses
+    DATA_IN_CODE = 0x29,
+    SOURCE_VERSION = 0x2A,
+    DYLIB_CODE_SIGN_DRS = 0x2B,
+    ENCRYPTION_INFO_64 = 0x2c,
+    LC_BUILD_VERSION = 0x32,
+} LoadCommandType<read = LoadCommandTypeRead>;
+
+string LoadCommandTypeRead(LoadCommandType &loadCommandType)
+{
+    switch (loadCommandType)
+    {
+    case SEGMENT:
+        return "SEGMENT";
+    case SYM_TAB:
+        return "SYM_TAB";
+    case SYM_SEG:
+        return "SYM_SEG";
+    case THREAD:
+        return "THREAD";
+    case UNIX_THREAD:
+        return "UNIX_THREAD";
+    case LOAD_FVM_LIB:
+        return "LOAD_FVM_LIB";
+    case ID_FVM_LIB:
+        return "ID_FVM_LIB";
+    case IDENT:
+        return "IDENT";
+    case FVM_FILE:
+        return "FVM_FILE";
+    case PREPAGE:
+        return "PREPAGE";
+    case DY_SYM_TAB:
+        return "DY_SYM_TAB";
+    case LOAD_DYLIB:
+        return "LOAD_DYLIB";
+    case ID_DYLIB:
+        return "ID_DYLIB";
+    case LOAD_DYLINKER:
+        return "LOAD_DYLINKER";
+    case ID_DYLINKER:
+        return "ID_DYLINKER";
+    case PREBOUND_DYLIB:
+        return "PREBOUND_DYLIB";
+    case ROUTINES:
+        return "ROUTINES";
+    case SUB_FRAMEWORK:
+        return "SUB_FRAMEWORK";
+    case SUB_UMBRELLA:
+        return "SUB_UMBRELLA";
+    case SUB_CLIENT:
+        return "SUB_CLIENT";
+    case SUB_LIBRARY:
+        return "SUB_LIBRARY";
+    case TWOLEVEL_HINTS:
+        return "TWOLEVEL_HINTS";
+    case PREBIND_CKSUM:
+        return "PREBIND_CKSUM";
+    case LOAD_WEAK_DYLIB:
+        return "LOAD_WEAK_DYLIB";
+    case SEGMENT_64:
+        return "SEGMENT_64";
+    case ROUTINES_64:
+        return "ROUTINES_64";
+    case UUID:
+        return "UUID";
+    case RPATH:
+        return "RPATH";
+    case CODE_SIGNATURE:
+        return "CODE_SIGNATURE";
+    case SEGMENT_SPLIT_INFO:
+        return "SEGMENT_SPLIT_INFO";
+    case REEXPORT_DYLIB:
+        return "REEXPORT_DYLIB";
+    case LAZY_LOAD_DYLIB:
+        return "LAZY_LOAD_DYLIB";
+    case ENCRYPTION_INFO:
+        return "ENCRYPTION_INFO";
+    case DYLD_INFO:
+        return "DYLD_INFO";
+    case DYLD_INFO_ONLY:
+        return "DYLD_INFO_ONLY";
+    case LOAD_UPWARD_DYLIB:
+        return "LOAD_UPWARD_DYLIB";
+    case VERSION_MIN_MAC_OSX:
+        return "VERSION_MIN_MAC_OSX";
+    case VERSION_MIN_IPHONE_OS:
+        return "VERSION_MIN_IPHONE_OS";
+    case FUNCTION_STARTS:
+        return "FUNCTION_STARTS";
+    case DYLD_ENVIRONMENT:
+        return "DYLD_ENVIRONMENT";
+    case MAIN:
+        return "MAIN";
+    case MAIN_DYLIB:
+        return "MAIN_DYLIB";
+    case DATA_IN_CODE:
+        return "DATA_IN_CODE";
+    case SOURCE_VERSION:
+        return "SOURCE_VERSION";
+    case DYLIB_CODE_SIGN_DRS:
+        return "DYLIB_CODE_SIGN_DRS";
+    case ENCRYPTION_INFO_64:
+        return "ENCRYPTION_INFO_64";
+    case LC_BUILD_VERSION:
+        return "LC_BUILD_VERSION";
+    default:
+        return "Error";
+    }
+}
+
+typedef struct
+{
+    char section_name[16];
+    char segment_name[16];
+    uint32 address<format = hex>;
+    uint32 size<format = hex>;
+    uint32 offset;
+    uint32 section_alignment;
+    uint32 relocation_entry_offset;
+    uint32 number_of_relocation_entries;
+    uint32 flags<format = hex>;
+    uint32 reserved1;
+    uint32 reserved2;
+} Section<optimize = false>;
+
+typedef struct
+{
+    char section_name[16];
+    char segment_name[16];
+    uint64 address<format = hex>;
+    uint64 size<format = hex>;
+    uint32 offset;
+    uint32 section_alignment;
+    uint32 relocation_entry_offset;
+    uint32 number_of_relocation_entries;
+    uint32 flags<format = hex>;
+    uint32 reserved1;
+    uint32 reserved2;
+    uint32 reserved3;
+} Section64<optimize = false>;
+
+typedef uint vm_proc;
+
+typedef enum<uint>
+{
+    HIGH_VM = 0x1,
+    FVM_LIB = 0x2,
+    NO_RELOC = 0x4,
+    PROTECTION_VERSION_1 = 0x8
+} SegmentFlags<format = hex>;
+
+typedef struct
+{
+    uint32 load_command_string_offset<comment = "Offset in respect to the start of load command to string data">;
+
+    local int64 pos = FTell();
+    // We need to goto beginning of LoadCommand, then goto the offset
+    FSeek(FTell() - (sizeof(uint32) * 3) + load_command_string_offset);
+
+    string string_data<comment = "Load command string">;
+
+    FSeek(pos);
+} LoadCommandString<read = LoadCommandStringRead>;
+
+string LoadCommandStringRead(LoadCommandString &loadCommandString)
+{
+    return loadCommandString.string_data;
+};
+
+typedef ubyte Uuid[16]<read = readUUID, format = hex>;
+
+// TODO : Clean this ugly thing up
+string readUUID(Uuid uuid)
+{
+    local string ret, tmp;
+    local int i;
+
+    for (i = 0; i < 4; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 4]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 6]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 8]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 6; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 10]);
+        ret += tmp;
+    }
+    return ret;
+}
+
+string readUUID2(ubyte uuid[16])
+{
+    local string ret, tmp;
+    local int i;
+
+    for (i = 0; i < 4; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 4]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 6]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 8]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 6; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 10]);
+        ret += tmp;
+    }
+    return ret;
+}
+
+typedef struct
+{
+    uint32 version;
+} Version<read = VersionRead>;
+
+string VersionRead(Version &version)
+{
+    local string version_string;
+    if (version.version & 0xFF == 0)
+    {
+        SPrintf(version_string, "%u.%u", version.version >> 16, (version.version >> 8) & 0xFF);
+    }
+    else
+    {
+
+        SPrintf(version_string, "%u.%u.%u", version.version >> 16, (version.version >> 8) & 0xFF, version.version & 0xFF);
+    }
+    return version_string;
+}
+
+typedef struct
+{
+    uint32 tool;     // enum for the tool
+    Version version; // version of the tool
+} build_tool_version;
+
+typedef struct
+{
+    local uint64 o_pos = FTell();
+
+    //LoadCommandHead loadCommandHead <comment="Load command type and size">;
+    LoadCommandType command;
+    uint command_size;
+
+    // Process rest of load command based on command type
+    switch (command)
+    {
+    case ID_DYLIB:
+    case LOAD_DYLIB:
+    case LOAD_WEAK_DYLIB:
+    case REEXPORT_DYLIB:
+        LoadCommandString name;
+        // TODO : Pretty print this
+        uint32 timestamp;
+        // TODO : Pretty print this
+        uint32 current_version;
+        // TODO : Pretty print this
+        uint32 compatibility_version;
+        break;
+    case SYM_TAB:
+        uint32 symbol_table_offset<format = hex, comment = "Symbol table offsett address">;
+        uint32 number_of_symbol_table_entries<comment = "Number of symbol table entries">;
+        uint32 string_table_offset<format = hex, comment = "String table offset">;
+        uint32 string_table_size<comment = "String table size in bytes">;
+        break;
+    case DYLD_INFO:
+    case DYLD_INFO_ONLY:
+        uint32 rebase_offset;
+        uint32 rebase_size;
+        uint32 bind_offset;
+        uint32 bind_size;
+        uint32 weak_bind_offset;
+        uint32 weak_bind_size;
+        uint32 lazy_bind_offset;
+        uint32 lazy_bind_size;
+        uint32 export_offset;
+        uint32 export_size;
+        break;
+    case DY_SYM_TAB:
+        uint32 index_local_symbols;
+        uint32 local_symbols_size;
+        uint32 index_externally_defined_symbols;
+        uint32 externally_defined_symbols_size;
+        uint32 index_undefined_symbols;
+        uint32 undefined_symbols_size;
+        uint32 table_contents_offset;
+        uint32 enteries_toc_size;
+        uint32 file_offset_module_table;
+        uint32 module_table_entries_size;
+        uint32 external_references_symbol_table_offset;
+        uint32 external_references_symbol_table_size;
+        uint32 indirect_symbol_table_offset;
+        uint32 indirect_symbol_table_size;
+        uint32 external_relocation_entries_offset;
+        uint32 external_relocation_entries_size;
+        uint32 local_relocation_entries_offset;
+        uint32 local_relocation_entries_size;
+        break;
+    case UUID:
+        Uuid uuid;
+        break;
+    case VERSION_MIN_MAC_OSX:
+    case VERSION_MIN_IPHONE_OS:
+        // TODO : Pretty print this
+        Version version;
+        uint32 reserved<comment = "Should be zero">;
+        break;
+    case FUNCTION_STARTS:
+    case CODE_SIGNATURE:
+    case SEGMENT_SPLIT_INFO:
+    case DATA_IN_CODE:
+        uint32 data_offset;
+        uint32 data_size;
+        break;
+    case UNIX_THREAD:
+    case THREAD:
+        switch (cpu_typer)
+        {
+        case CPU_TYPE_X86:
+        case CPU_TYPE_I386:
+            i386ThreadFlavor flavor;
+            // TODO : Pretty print this
+            uint32 count;
+            switch (flavor)
+            {
+            case i386_THREAD_STATE:
+                i386ThreadState threadState;
+            // TODO : Flesh these guys out
+            case i386_FLOAT_STATE:
+            case i386_EXCEPTION_STATE:
+            }
+            break;
+        case CPU_TYPE_X86_64:
+            x86ThreadFlavor flavor;
+            // TODO : Pretty print this
+            uint32 count;
+            switch (flavor)
+            {
+            case x86_THREAD_STATE64:
+                x86ThreadState threadState;
+                break;
+            // TODO : Flesh these guys out
+            case x86_FLOAT_STATE64:
+            case x86_EXCEPTION_STATE64:
+            case x86_DEBUG_STATE64:
+            }
+            break;
+        case CPU_TYPE_POWERPC:
+        case CPU_TYPE_POWERPC64:
+            PPCThreadFlavor flavor;
+            // TODO : Pretty print this
+            uint32 count;
+            switch (flavor)
+            {
+            case PPC_THREAD_STATE:
+                PPCThreadState threadState;
+                break;
+            // TODO : Flesh these guys out
+            case PPC_FLOAT_STATE:
+            case PPC_EXCEPTION_STATE:
+            case PPC_VECTOR_STATE:
+            case PPC_THREAD_STATE64:
+            case PPC_EXCEPTION_STATE64:
+            }
+            break;
+        case CPU_TYPE_ARM:
+            // TODO: Unsure if this is correct ?
+            //                uint32 flavor;
+            //                uint32 count;
+            ARMThreadState threadState;
+            break;
+        }
+        break;
+    case FVM_LIB:
+    case ID_FVM_LIB:
+        LoadCommandString name<comment = "Fixed virtual memory library's target path name">;
+        uint32 minor_version<comment = "Library's minor version number">;
+        uint32 header_address<comment = "Library's header address">;
+        break;
+    case SUB_FRAMEWORK:
+        LoadCommandString umbrella<comment = "Umbrella framework name">;
+        break;
+    case SUB_CLIENT:
+        LoadCommandString client<comment = "Client name">;
+        break;
+    case SUB_UMBRELLA:
+        LoadCommandString sub_umbrella<comment = "Sub umbrella framework name">;
+        break;
+    case SUB_LIBRARY:
+        LoadCommandString sub_library<comment = "Sub library name">;
+        break;
+    case PREBOUND_DYLIB:
+        LoadCommandString name<comment = "Library's path name">;
+        uint32 modules_size<comment = "Number of modules inside library">;
+        LoadCommandString linked_modules<comment = "Bit vector of linked modules">;
+        break;
+    case ID_DYLINKER:
+    case LOAD_DYLINKER:
+        LoadCommandString name<comment = "Dynamic linker's path name">;
+        break;
+    case ROUTINES_64:
+        uint64 init_address<comment = "Address of initialization routine">;
+        uint64 init_module<comment = "Index into module table that init routine is defined">;
+        uint32 reversed_1;
+        uint32 reversed_2;
+        uint32 reversed_3;
+        uint32 reversed_4;
+        uint32 reversed_5;
+        uint32 reversed_6;
+        break;
+    case ROUTINES:
+        uint32 init_address<comment = "Address of initialization routine">;
+        uint32 init_module<comment = "Index into module table that init routine is defined">;
+        uint32 reversed_1;
+        uint32 reversed_2;
+        uint32 reversed_3;
+        uint32 reversed_4;
+        uint32 reversed_5;
+        uint32 reversed_6;
+        break;
+    case TWOLEVEL_HINTS:
+        uint32 offset<comment = "Offset into the hint table">;
+        uint32 hints_size<comment = "Number of hints inside the hints table">;
+        break;
+    case PREBIND_CKSUM:
+        uint32 cksum<comment = "Checksum or zero">;
+        break;
+    case RPATH:
+        LoadCommandString path<comment = "Path to add to run path">;
+        break;
+    case ENCRYPTION_INFO:
+        uint32 crypt_offset<comment = "File offset of encrypted range">;
+        uint32 crypt_size<comment = "File size of the encrypted range">;
+        uint32 crypt_id<comment = "Which encryption system, 0 means not-encrypted yet">;
+        break;
+    case IDENT:
+        break;
+    case FVM_FILE:
+        LoadCommandString name<comment = "File's pathname">;
+        uint32 header_address<comment = "File's virtual address">;
+        break;
+    case SEGMENT_64:
+        char segment_name[16];
+
+        uint64 vm_address<format = hex>;
+        uint64 vm_size<format = hex>;
+        uint64 file_off;
+        uint64 file_size;
+
+        vm_proc maximum_protection<format = hex>;
+        vm_proc initial_protection<format = hex>;
+        uint32 number_of_sections;
+        // TODO : Fix this enum
+        SegmentFlags flags;
+
+        // Having this if statement will prevent warnings in 010Editor
+        if (number_of_sections > 0)
+        {
+            Section64 section[number_of_sections];
+        }
+        break;
+    case SEGMENT:
+        char segment_name[16];
+
+        uint32 vm_address<format = hex>;
+        uint32 vm_size<format = hex>;
+        uint32 file_off;
+        uint32 file_size;
+
+        vm_proc maximum_protection<format = hex>;
+        vm_proc initial_protection<format = hex>;
+        uint32 number_of_sections;
+        // TODO : Fix this enum
+        SegmentFlags flags;
+
+        // Having this if statement will prevent warnings in 010Editor
+        if (number_of_sections > 0)
+        {
+            Section section[number_of_sections];
+        }
+        break;
+    case SOURCE_VERSION:
+        uint32 unka;
+        uint32 unkb;
+        break;
+    case ENCRYPTION_INFO_64:
+        uint32 cryptoff<format = hex>;  /* file offset of encrypted range */
+        uint32 cryptsize<format = hex>; /* file size of encrypted range */
+        uint32 cryptid;                 /* which enryption system, 0 means not-encrypted yet */
+        uint32 pad;                     /* padding to make this struct's size a multiple of 8 */
+        break;
+    case LC_BUILD_VERSION:
+        uint32 platform; // platform
+        Version minos;   // X.Y.Z is encoded in nibbles xxxx.yy.zz
+        Version sdk;     // X.Y.Z is encoded in nibbles xxxx.yy.zz
+        uint32 ntools;
+        if (ntools > 0)
+        {
+            build_tool_version tools[ntools];
+        }
+        break;
+    case MAIN:
+    case MAIN_DYLIB:
+        uint64 entryoff<format = hex>;
+        uint64 stacksize<format = hex>;
+        break;
+
+    default:
+        Warning("Hit an unknown or unsupported load command : [%d]", command);
+        break; //Exit(-1);
+    }
+
+    FSeek(o_pos + command_size); // AIO solution, fixes default case, need for unk/pad, and all of the LoadCommandString + Seeks all over //
+
+} LoadCommand<read = LoadCommandReader, optimize = false>;
+
+string LoadCommandReader(LoadCommand &loadCommand)
+{
+    return "load_command[" + LoadCommandTypeRead(loadCommand.command) + "]";
+}
+
+//parse each macho
+typedef struct(uint64 offset)
+{
+    local uint64 endpos = FTell();
+    FSeek(offset);
+    Header header<comment = "Mach-o header information">;
+    local uint32 cpu_typer;
+    if (header.magic == MACHO_32 || header.magic == MACHO_64)
+    {
+        cpu_typer = header.cpu_type;
+        // If we didn't find a FAT header, then just process the load commands
+        LoadCommand loadCommand[header.num_load_commands];
+    }
+    else
+    {
+        // Otherwise we need to grab the new headers again
+        local int i;
+        for (i = 0; i < header.fat_arch_size; i++)
+        {
+            FSeek(header.fat_arch[i].file_offset);
+            Header machHeader;
+            cpu_typer = machHeader.cpu_type;
+            LoadCommand loadCommand[machHeader.num_load_commands];
+        }
+    }
+    FSeek(endpos);
+}
+machoParser;
+
+for (i = 0; i < symbolinfo.entriesCount; i++)
+{
+    machoParser parser(symbolinfo.nlistentry[i].dylibOffset);
+}

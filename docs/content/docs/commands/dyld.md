@@ -105,7 +105,7 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 
 ### **dyld sel**
 
-Get ObjC selector address
+Get ObjC selector _(unslid)_ address
 
 ```bash
 $ ipsw dyld sel dyld_shared_cache release

@@ -45,13 +45,14 @@ var betaCmd = &cobra.Command{
 	Short: "Download beta IPSWs from the iphone wiki",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-
+		var filteredIPSWs []download.BetaIPSW
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
+		device, _ := cmd.Flags().GetString("device")
 		skip, _ := cmd.Flags().GetBool("yes")
 
 		ipsws, err := download.ScrapeURLs(args[0])
@@ -64,6 +65,16 @@ var betaCmd = &cobra.Command{
 			return nil
 		}
 
+		for _, i := range ipsws {
+			if len(device) > 0 {
+				if strings.EqualFold(device, i.Device) {
+					filteredIPSWs = append(filteredIPSWs, i)
+				}
+			} else {
+				filteredIPSWs = append(filteredIPSWs, i)
+			}
+		}
+
 		log.Debug("URLs to Download:")
 		for _, i := range ipsws {
 			utils.Indent(log.Debug, 2)(i.URL)
@@ -73,15 +84,14 @@ var betaCmd = &cobra.Command{
 		if !skip {
 			cont = false
 			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(ipsws)),
+				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredIPSWs)),
 			}
 			survey.AskOne(prompt, &cont)
-
 		}
 
 		if cont {
 			downloader := download.NewDownload(proxy, insecure)
-			for _, i := range ipsws {
+			for _, i := range filteredIPSWs {
 				destName := strings.Replace(path.Base(i.URL), ",", "_", -1)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
 

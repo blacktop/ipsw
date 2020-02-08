@@ -121,7 +121,7 @@ var disCmd = &cobra.Command{
 		found := false
 		for _, sec := range m.Sections {
 			if sec.Name == "__text" {
-				if sec.Addr < startAddr && startAddr < (sec.Addr+sec.Size) {
+				if sec.Addr <= startAddr && startAddr < (sec.Addr+sec.Size) {
 					found = true
 
 					memOffset := startAddr - sec.Addr
