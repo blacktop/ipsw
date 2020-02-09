@@ -10,6 +10,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/macho"
+	"github.com/blacktop/ipsw/pkg/macho/commands"
 	"github.com/pkg/errors"
 )
 
@@ -78,20 +79,67 @@ func (i *CacheImage) Data() ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
+// SegmentData reads the __TEXT header and returns the contents of the dylib's Mach-O.
+func (i *CacheImage) SegmentData() ([]byte, error) {
+	// var buff bytes.Buffer
+	buff := utils.NewWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
+
+	i.sr.Seek(0, io.SeekStart)
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return nil, err
+	}
+	for idx, seg := range m.Segments() {
+		dat := make([]byte, seg.Filesz)
+		n, err := i.sr.ReadAt(dat, int64(seg.Offset))
+		if err != nil {
+			return nil, err
+		}
+		if n != len(dat) {
+			return nil, fmt.Errorf("failed to read all the bytes")
+		}
+		if idx == 0 {
+			n, err = buff.WriteAt(dat, 0)
+			if err != nil {
+				return nil, err
+			}
+		}
+		n, err = buff.WriteAt(dat, int64(seg.Offset))
+		// n, err = buff.WriteAt(dat, int64(rEntry.StartAddr-i.Info.Address))
+		if err != nil {
+			return nil, err
+		}
+		if n != len(dat) {
+			return nil, fmt.Errorf("failed to write all the bytes")
+		}
+	}
+
+	return buff.Bytes(), nil
+}
+
 // Open returns a new ReadSeeker reading the dylib's Mach-O data.
 func (i *CacheImage) Open() io.ReadSeeker {
 	return io.NewSectionReader(i.sr, int64(i.DylibOffset), 1<<63-1)
 }
 
+// GetPartialMacho parses dyld image header as a partial MachO
+func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
+	r := io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize))
+	m, err := macho.NewFileFromDyld(r, commands.LoadCmdSegment64, commands.LoadCmdSegment, commands.LoadCmdDylibID)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // GetMacho parses dyld image as a MachO
 func (i *CacheImage) GetMacho() (*macho.File, error) {
-	dat, err := i.Data()
+	dat, err := i.SegmentData()
 	if err != nil {
 		return nil, err
 	}
 	m, err := macho.NewFile(bytes.NewReader(dat))
-	// r := io.NewSectionReader(i.sr, int64(i.DylibOffset), 1<<63-1)
-	// m, err := macho.NewFile(i)
 	if err != nil {
 		return nil, err
 	}
