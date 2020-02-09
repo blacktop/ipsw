@@ -40,7 +40,7 @@ $ make install
 ```bash
 $ git clone -b next https://github.com/aquynh/capstone.git
 $ cd capstone
-$ CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh
+$ CAPSTONE_ARCHS="arm aarch64" ./make.sh
 $ sudo ./make.sh install
 ```
 
