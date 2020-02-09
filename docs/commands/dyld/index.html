@@ -244,7 +244,7 @@ Accelerate Tab: 304KB,  address: 0x1D2F64000 -&gt; 0x1D2FB0000
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache &lt;SYMBOL_NAME&gt;
 </code></pre></div><p>⚠️ <strong>NOTE:</strong> you don&rsquo;t have to supply the full image path</p>
 <h3 id="dyld-sel"><strong>dyld sel</strong></h3>
-<p>Get ObjC selector address</p>
+<p>Get ObjC selector <em>(unslid)</em> address</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld sel dyld_shared_cache release
 
 0x1b92c85a8: release
