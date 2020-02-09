@@ -47,6 +47,8 @@ $ sudo ./make.sh install
 #### Install the Go binary
 
 ```bash
+$ git clone https://github.com/blacktop/ipsw.git
+$ cd ipsw
 $ CGO_ENABLED=1 \
   CGO_CFLAGS=-I/usr/local/include \ # path to the lzfse and capstone includes
   CGO_LDFLAGS=-L/usr/local/lib \    # path to the lzfse and capstone libs
@@ -58,6 +60,8 @@ $ CGO_ENABLED=1 \
 #### Install the Go binary
 
 ```bash
+$ git clone https://github.com/blacktop/ipsw.git
+$ cd ipsw
 $ CGO_ENABLED=0 go build ./cmd/ipsw
 ```
 
