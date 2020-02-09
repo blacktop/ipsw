@@ -88,7 +88,7 @@ var dyldListCmd = &cobra.Command{
 		fmt.Println("======")
 
 		for idx, img := range f.Images {
-			m, err := img.GetMacho()
+			m, err := img.GetPartialMacho()
 			if err != nil {
 				return errors.Wrap(err, "failed to create MachO")
 			}

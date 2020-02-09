@@ -921,6 +921,17 @@ func (f *File) Segment(name string) *Segment {
 	return nil
 }
 
+// Segments returns all Segments.
+func (f *File) Segments() []*Segment {
+	var segs []*Segment
+	for _, l := range f.Loads {
+		if s, ok := l.(*Segment); ok {
+			segs = append(segs, s)
+		}
+	}
+	return segs
+}
+
 // Section returns the first section with the given name, or nil if no such
 // section exists.
 func (f *File) Section(name string) *Section {

@@ -99,13 +99,12 @@ func (s StringHash) String() string {
 func (f *File) getLibObjC() (*macho.File, error) {
 	image := f.Image("/usr/lib/libobjc.A.dylib")
 
-	dat, err := image.Data()
+	m, err := image.GetMacho()
 	if err != nil {
 		return nil, err
 	}
-	r := bytes.NewReader(dat)
 
-	return macho.NewFile(r)
+	return m, nil
 }
 
 func (f *File) dumpOffsets(offsets []int32, fileOffset int64) {
