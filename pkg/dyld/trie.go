@@ -254,7 +254,7 @@ func walkTrie(data []byte, symbol string) (uint64, error) {
 				if err == io.EOF {
 					break
 				}
-				if c == '\x00' {
+				if c == '\x00' || searchStrIndex == len(symbol) {
 					break
 				}
 				if !wrongEdge {
