@@ -192,16 +192,20 @@ $ make install
 </ul>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone -b next https://github.com/aquynh/capstone.git
 $ <span class="nb">cd</span> capstone
-$ <span class="nv">CAPSTONE_ARCHS</span><span class="o">=</span><span class="s2">&#34;arm aarch64 x86&#34;</span> ./make.sh
+$ <span class="nv">CAPSTONE_ARCHS</span><span class="o">=</span><span class="s2">&#34;arm aarch64&#34;</span> ./make.sh
 $ sudo ./make.sh install
 </code></pre></div><h4 id="install-the-go-binary">Install the Go binary</h4>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">1</span> <span class="se">\
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/blacktop/ipsw.git
+$ <span class="nb">cd</span> ipsw
+$ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">1</span> <span class="se">\
 </span><span class="se"></span>  <span class="nv">CGO_CFLAGS</span><span class="o">=</span>-I/usr/local/include <span class="se">\ </span><span class="c1"># path to the lzfse and capstone includes</span>
   <span class="nv">CGO_LDFLAGS</span><span class="o">=</span>-L/usr/local/lib <span class="se">\ </span>   <span class="c1"># path to the lzfse and capstone libs</span>
   go build ./cmd/ipsw
 </code></pre></div><h2 id="without-support-for-lzfse-compression-and-capstone-disassembly"><strong>WITHOUT</strong> support for <strong>lzfse</strong> compression and <strong>capstone</strong> disassembly</h2>
 <h4 id="install-the-go-binary-1">Install the Go binary</h4>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">0</span> go build ./cmd/ipsw
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/blacktop/ipsw.git
+$ <span class="nb">cd</span> ipsw
+$ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">0</span> go build ./cmd/ipsw
 </code></pre></div><h2 id="without-internet"><strong>WITHOUT</strong> internet</h2>
 <p>Add <code>--mod=vendor</code> to use the Go deps in the vendor folder</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ go build --mod<span class="o">=</span>vendor ./cmd/ipsw
