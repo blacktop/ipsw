@@ -53,7 +53,7 @@ var latestCmd = &cobra.Command{
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		skip, _ := cmd.Flags().GetBool("yes")
-
+		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
 		// filters
 		//version, _ := cmd.Flags().GetString("version")
 		device, _ := cmd.Flags().GetString("device")
@@ -106,7 +106,12 @@ var latestCmd = &cobra.Command{
 		if cont {
 			downloader := download.NewDownload(proxy, insecure)
 			for _, build := range filteredBuilds {
-				destName := strings.Replace(path.Base(build.FirmwareURL), ",", "_", -1)
+				var destName string
+				if removeCommas {
+					destName = strings.Replace(path.Base(build.FirmwareURL), ",", "_", -1)
+				} else {
+					destName = path.Base(build.FirmwareURL)
+				}
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
 						"device":  build.Identifier,
@@ -116,6 +121,7 @@ var latestCmd = &cobra.Command{
 					// download file
 					downloader.URL = build.FirmwareURL
 					downloader.Sha1 = build.FirmwareSHA1
+					downloader.RemoveCommas = removeCommas
 					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")

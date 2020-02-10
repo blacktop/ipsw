@@ -953,6 +953,16 @@ func (f *File) DylibID() *DylibID {
 	return nil
 }
 
+// DyldInfo returns the dyld info load command, or nil if no dyld info exists.
+func (f *File) DyldInfo() *DyldInfo {
+	for _, l := range f.Loads {
+		if s, ok := l.(*DyldInfo); ok {
+			return s
+		}
+	}
+	return nil
+}
+
 // SourceVersion returns the source version load command, or nil if no source version exists.
 func (f *File) SourceVersion() *SourceVersion {
 	for _, l := range f.Loads {
