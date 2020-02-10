@@ -27,8 +27,9 @@ const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15
 
 // Download is a downloader object
 type Download struct {
-	URL  string
-	Sha1 string
+	URL          string
+	Sha1         string
+	RemoveCommas bool
 
 	size         int64
 	bytesResumed int64
@@ -103,7 +104,12 @@ func (d *Download) Do() error {
 	req.Header.Add("User-Agent", ua)
 
 	// check for a completed download
-	destName := strings.Replace(path.Base(d.URL), ",", "_", -1)
+	var destName string
+	if d.RemoveCommas {
+		destName = strings.Replace(path.Base(d.URL), ",", "_", -1)
+	} else {
+		destName = path.Base(d.URL)
+	}
 	if _, err := os.Stat(destName); !os.IsNotExist(err) {
 		utils.Indent(log.Warn, 2)(fmt.Sprintf("ipsw already exists: %s", destName))
 		return nil

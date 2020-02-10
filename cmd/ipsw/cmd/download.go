@@ -25,6 +25,7 @@ func init() {
 	downloadCmd.PersistentFlags().StringArrayP("black-list", "", []string{viper.GetString("IPSW_DEVICE_BLACKLIST")}, "iOS device black list")
 	downloadCmd.PersistentFlags().StringArrayP("white-list", "", []string{viper.GetString("IPSW_DEVICE_WHITELIST")}, "iOS device white list")
 	downloadCmd.PersistentFlags().BoolP("yes", "y", false, "do not prompt user")
+	downloadCmd.PersistentFlags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	downloadCmd.PersistentFlags().StringP("version", "v", viper.GetString("IPSW_VERSION"), "iOS Version (i.e. 12.3.1)")
 	downloadCmd.PersistentFlags().StringP("device", "d", viper.GetString("IPSW_DEVICE"), "iOS Device (i.e. iPhone11,2)")
 	downloadCmd.PersistentFlags().StringP("build", "b", viper.GetString("IPSW_BUILD"), "iOS BuildID (i.e. 16F203)")
@@ -53,6 +54,7 @@ var downloadCmd = &cobra.Command{
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		skip, _ := cmd.Flags().GetBool("yes")
+		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
 
 		// filters
 		version, _ := cmd.Flags().GetString("version")
@@ -124,7 +126,12 @@ var downloadCmd = &cobra.Command{
 			if cont {
 				downloader := download.NewDownload(proxy, insecure)
 				for _, url := range urls {
-					destName := strings.Replace(path.Base(url), ",", "_", -1)
+					var destName string
+					if removeCommas {
+						destName = strings.Replace(path.Base(url), ",", "_", -1)
+					} else {
+						destName = path.Base(url)
+					}
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						// get a handle to ipsw object
 						i, err := LookupByURL(ipsws, url)
@@ -141,6 +148,7 @@ var downloadCmd = &cobra.Command{
 						// download file
 						downloader.URL = url
 						downloader.Sha1 = i.SHA1
+						downloader.RemoveCommas = removeCommas
 						err = downloader.Do()
 						if err != nil {
 							return errors.Wrap(err, "failed to download file")
@@ -166,7 +174,12 @@ var downloadCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to query ipsw.me api")
 				}
-				destName := strings.Replace(path.Base(i.URL), ",", "_", -1)
+				var destName string
+				if removeCommas {
+					destName = strings.Replace(path.Base(i.URL), ",", "_", -1)
+				} else {
+					destName = path.Base(i.URL)
+				}
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
 						"device":  i.Identifier,
@@ -177,6 +190,7 @@ var downloadCmd = &cobra.Command{
 					downloader := download.NewDownload(proxy, insecure)
 					downloader.URL = i.URL
 					downloader.Sha1 = i.SHA1
+					downloader.RemoveCommas = removeCommas
 					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")

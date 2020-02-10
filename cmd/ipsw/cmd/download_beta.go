@@ -54,6 +54,7 @@ var betaCmd = &cobra.Command{
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		device, _ := cmd.Flags().GetString("device")
 		skip, _ := cmd.Flags().GetBool("yes")
+		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
 
 		ipsws, err := download.ScrapeURLs(args[0])
 		if err != nil {
@@ -92,9 +93,13 @@ var betaCmd = &cobra.Command{
 		if cont {
 			downloader := download.NewDownload(proxy, insecure)
 			for _, i := range filteredIPSWs {
-				destName := strings.Replace(path.Base(i.URL), ",", "_", -1)
+				var destName string
+				if removeCommas {
+					destName = strings.Replace(path.Base(i.URL), ",", "_", -1)
+				} else {
+					destName = path.Base(i.URL)
+				}
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
-
 					log.WithFields(log.Fields{
 						"device":  i.Device,
 						"build":   i.BuildID,
@@ -102,6 +107,7 @@ var betaCmd = &cobra.Command{
 					}).Info("Getting IPSW")
 					// download file
 					downloader.URL = i.URL
+					downloader.RemoveCommas = removeCommas
 					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")

@@ -941,18 +941,32 @@ func (f *File) findSymbolInExportTrieForImage(symbol string, image *CacheImage) 
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	var reExportSymBytes []byte
+	var eTrieAddr, eTrieSize uint64
 
 	exportedSymbol := &CacheExportedSymbol{
 		FoundInDylib: image.Name,
 		Name:         symbol,
 	}
 
+	if image.CacheImageInfoExtra.ExportsTrieAddr == 0 {
+		m, err := image.GetPartialMacho()
+		if err != nil {
+			return nil, err
+		}
+		if m.DyldInfo() != nil {
+			eTrieAddr, _ = f.getVMAddress(uint64(m.DyldInfo().ExportOff))
+			eTrieSize = uint64(m.DyldInfo().ExportSize)
+		}
+	} else {
+		eTrieAddr = image.CacheImageInfoExtra.ExportsTrieAddr
+		eTrieSize = uint64(image.CacheImageInfoExtra.ExportsTrieSize)
+	}
+
 	for _, mapping := range f.Mappings {
-		start := image.CacheImageInfoExtra.ExportsTrieAddr
-		end := image.CacheImageInfoExtra.ExportsTrieAddr + uint64(image.CacheImageInfoExtra.ExportsTrieSize)
-		if mapping.Address <= start && end < mapping.Address+mapping.Size {
-			sr.Seek(int64(image.CacheImageInfoExtra.ExportsTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
-			exportTrie := make([]byte, image.CacheImageInfoExtra.ExportsTrieSize)
+		if mapping.Address <= eTrieAddr && (eTrieAddr+eTrieSize) < mapping.Address+mapping.Size {
+			sr.Seek(int64(eTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
+
+			exportTrie := make([]byte, eTrieSize)
 			if err := binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
 				return nil, err
 			}
