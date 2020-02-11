@@ -130,6 +130,7 @@ func (f *File) String() string {
 	return fmt.Sprintf(
 		"Header\n"+
 			"======\n"+
+			"Magic            = \"%s\"\n"+
 			"UUID             = %s\n"+
 			"Platform         = %s\n"+
 			"Format           = %d\n"+
@@ -149,6 +150,7 @@ func (f *File) String() string {
 			"\nMappings\n"+
 			"========\n"+
 			"%s",
+		f.Magic,
 		f.UUID,
 		f.Platform,
 		f.FormatVersion.Version(),

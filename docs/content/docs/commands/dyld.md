@@ -48,6 +48,7 @@ $ ipsw dyld list dyld_shared_cache
 
 Header
 ======
+Magic            = "dyld_v1  arm64e"
 UUID             = 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
 Platform         = iOS
 Format           = 10
