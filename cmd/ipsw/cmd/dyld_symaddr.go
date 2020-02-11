@@ -109,10 +109,15 @@ var symaddrCmd = &cobra.Command{
 		// 	}
 		// }
 
-		sym, _ := f.GetExportedSymbolAddress(args[1])
-		if sym != nil {
-			fmt.Println(sym)
-		} else {
+		found := false
+		for _, image := range f.Images {
+			if sym, _ := f.GetExportedSymbolAddressInImage(image.Name, args[1]); sym != nil {
+				fmt.Println(sym)
+				found = true
+			}
+		}
+
+		if !found {
 			lSym, err := f.FindLocalSymbol(args[1])
 			if err != nil {
 				return err
