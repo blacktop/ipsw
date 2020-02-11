@@ -38,6 +38,7 @@ func init() {
 	dyldCmd.AddCommand(symaddrCmd)
 
 	symaddrCmd.Flags().StringVarP(&imageName, "image", "i", "", "dylib image to search")
+	symaddrCmd.PersistentFlags().BoolP("all", "a", false, "dump all exported symbols")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -45,7 +46,7 @@ func init() {
 var symaddrCmd = &cobra.Command{
 	Use:   "symaddr",
 	Short: "Find exported symbol",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -77,6 +78,16 @@ var symaddrCmd = &cobra.Command{
 			return err
 		}
 		defer f.Close()
+
+		dumpAll, _ := cmd.Flags().GetBool("all")
+
+		if dumpAll {
+			err := f.GetAllExportedSymbols()
+			if err != nil {
+				return errors.Wrap(err, "failed to get all exported symbols")
+			}
+			return nil
+		}
 
 		if len(imageName) > 0 {
 			if sym, _ := f.GetExportedSymbolAddressInImage(imageName, args[1]); sym != nil {
