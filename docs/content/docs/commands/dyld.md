@@ -48,24 +48,23 @@ $ ipsw dyld list dyld_shared_cache
 
 Header
 ======
-Magic               = dyld_v1  arm64e
-MappingOffset       = 00000138
-MappingCount        = 3
-ImagesOffset        = 00000198
-ImagesCount         = 1819
-DyldBaseAddress     = 00000000
-CodeSignatureOffset = 5F4B0000
-CodeSignatureSize   = 002FC000
-SlideInfoOffset     = 48108000
-SlideInfoSize       = 00018000
-LocalSymbolsOffset  = 4F714000
-LocalSymbolsSize    = 0FD9C000
-UUID                = 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
-Platform            = iOS
-Format              = 10
-Slide Info:      96KB,  file offset: 0x48108000 -> 0x48120000
-Local Symbols:  253MB,  file offset: 0x4F714000 -> 0x5F4B0000
-Accelerate Tab: 304KB,  address: 0x1D2F64000 -> 0x1D2FB0000
+UUID             = 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
+Platform         = iOS
+Format           = 10
+Max Slide        = 0x43704000
+
+Local Symbols (nlist array):     57MB,  offset:  0x4F71EAA0 -> 0x530FFCB0
+Local Symbols (string pool):    195MB,  offset:  0x530FFCB0 -> 0x5F4ACCED
+Code Signature:                   2MB,  offset:  0x5F4B0000 -> 0x5F7AC000
+ImagesText Info (1819 entries):  56KB,  offset:  0x00000198 -> 0x0000E4F8
+Slide Info (v3):                 96KB,  offset:  0x48108000 -> 0x48120000
+Branch Pool:                      0MB,  offset:  0x00000000 -> 0x00000000
+Accelerate Tab:                 304KB,  address: 0x1D2F64000 -> 0x1D2FB0000
+Dylib Image Groups:             271KB,  address: 0x1D304296C -> 0x1D30868A8
+Other Image Groups:               0KB,  address: 0x00000000 -> 0x00000000
+Closures:                         5MB,  address: 0x1D3148000 -> 0x1D37069F0
+Closures Trie:                   47KB,  address: 0x1D37069F0 -> 0x1D3712760
+Shared Region:                    4GB,  address: 0x180000000 -> 0x280000000
 
 Mappings
 ========
@@ -77,13 +76,12 @@ Mappings
 
 Images
 ======
-1:      18003c000 /usr/lib/system/libsystem_trace.dylib
-2:      180053000 /usr/lib/system/libxpc.dylib
-3:      180087000 /usr/lib/system/libsystem_blocks.dylib
-4:      180088000 /usr/lib/system/libsystem_c.dylib
-5:      180107000 /usr/lib/system/libdispatch.dylib
-6:      180144000 /usr/lib/system/libsystem_malloc.dylib
-7:      180165000 /usr/lib/system/libsystem_platform.dylib
+   1:	0x18003C000	/usr/lib/system/libsystem_trace.dylib	(1147.60.3)
+   2:	0x180053000	/usr/lib/system/libxpc.dylib	(1738.62.1)
+   3:	0x180087000	/usr/lib/system/libsystem_blocks.dylib	(73.0.0)
+   4:	0x180088000	/usr/lib/system/libsystem_c.dylib	(1353.60.8)
+   5:	0x180107000	/usr/lib/system/libdispatch.dylib	(1173.60.1)
+   6:	0x180144000	/usr/lib/system/libsystem_malloc.dylib	(283.60.1)
 <SNIP>
 ```
 

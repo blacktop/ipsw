@@ -2,8 +2,10 @@ package dyld
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
-	"os"
+	"reflect"
+	"strings"
 
 	"github.com/dustin/go-humanize"
 	"github.com/olekukonko/tablewriter"
@@ -78,7 +80,7 @@ func (dch CacheHeader) Print() {
 	fmt.Println("Header")
 	fmt.Println("======")
 	fmt.Println(dch.String())
-	fmt.Printf("Slide Info:    %4dKB,  file offset: 0x%08X -> 0x%08X\n", dch.SlideInfoSize/1024, dch.SlideInfoOffset, dch.SlideInfoOffset+dch.SlideInfoSize)
+	fmt.Printf("Slide Info:     %4dKB,  file offset: 0x%08X -> 0x%08X\n", dch.SlideInfoSize/1024, dch.SlideInfoOffset, dch.SlideInfoOffset+dch.SlideInfoSize)
 	fmt.Printf("Local Symbols:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", dch.LocalSymbolsSize/(1024*1024), dch.LocalSymbolsOffset, dch.LocalSymbolsOffset+dch.LocalSymbolsSize)
 	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%08X -> 0x%08X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
 	fmt.Println()
@@ -89,9 +91,9 @@ func (l *localSymbolInfo) Print() {
 	fmt.Printf("Local symbols string pool:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", l.StringsSize/(1024*1024), l.StringsFileOffset, l.StringsFileOffset+l.StringsSize)
 }
 
-func (mappings cacheMappings) Print() {
-	fmt.Println("Mappings")
-	fmt.Println("========")
+func (mappings cacheMappings) String() string {
+	tableString := &strings.Builder{}
+
 	mdata := [][]string{}
 	for _, mapping := range mappings {
 		mdata = append(mdata, []string{
@@ -104,14 +106,15 @@ func (mappings cacheMappings) Print() {
 			fmt.Sprintf("%08X -> %08X", mapping.FileOffset, mapping.FileOffset+mapping.Size),
 		})
 	}
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(tableString)
 	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset"})
 	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	table.SetCenterSeparator("|")
 	table.AppendBulk(mdata)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.Render() // Send output
-	fmt.Println()
+	table.Render()
+
+	return tableString.String()
 }
 
 func (images cacheImages) Print() {
@@ -122,6 +125,46 @@ func (images cacheImages) Print() {
 	}
 }
 
-func (info CacheSlideInfo) Print() {
-
+func (f *File) String() string {
+	slideVersion := reflect.ValueOf(f.SlideInfo).Field(0).Interface().(uint32)
+	return fmt.Sprintf(
+		"Header\n"+
+			"======\n"+
+			"UUID             = %s\n"+
+			"Platform         = %s\n"+
+			"Format           = %d\n"+
+			"Max Slide        = 0x%08X\n\n"+
+			"Local Symbols (nlist array):    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
+			"Local Symbols (string pool):    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
+			"Code Signature:                 %3dMB,  offset:  0x%08X -> 0x%08X\n"+
+			"ImagesText Info (%3d entries): %3dKB,  offset:  0x%08X -> 0x%08X\n"+
+			"Slide Info (v%d):               %4dKB,  offset:  0x%08X -> 0x%08X\n"+
+			"Branch Pool:                    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
+			"Accelerate Tab:                 %3dKB,  address: 0x%08X -> 0x%08X\n"+
+			"Dylib Image Groups:             %3dKB,  address: 0x%08X -> 0x%08X\n"+
+			"Other Image Groups:             %3dKB,  address: 0x%08X -> 0x%08X\n"+
+			"Closures:                       %3dMB,  address: 0x%08X -> 0x%08X\n"+
+			"Closures Trie:                  %3dKB,  address: 0x%08X -> 0x%08X\n"+
+			"Shared Region:                  %3dGB,  address: 0x%08X -> 0x%08X\n"+
+			"\nMappings\n"+
+			"========\n"+
+			"%s",
+		f.UUID,
+		f.Platform,
+		f.FormatVersion.Version(),
+		f.MaxSlide,
+		f.LocalSymInfo.NListByteSize/(1024*1024), f.LocalSymInfo.NListFileOffset, f.LocalSymInfo.NListFileOffset+f.LocalSymInfo.NListByteSize,
+		f.LocalSymInfo.StringsSize/(1024*1024), f.LocalSymInfo.StringsFileOffset, f.LocalSymInfo.StringsFileOffset+f.LocalSymInfo.StringsSize,
+		f.CodeSignatureSize/(1024*1024), f.CodeSignatureOffset, f.CodeSignatureOffset+f.CodeSignatureSize,
+		f.ImagesCount, int(f.ImagesCount)*binary.Size(CacheImageInfo{})/1024, f.ImagesOffset, int(f.ImagesOffset)+int(f.ImagesCount)*binary.Size(CacheImageInfo{}),
+		slideVersion, f.SlideInfoSize/1024, f.SlideInfoOffset, f.SlideInfoOffset+f.SlideInfoSize,
+		binary.Size(f.BranchPools), f.BranchPoolsOffset, int(f.BranchPoolsOffset)+binary.Size(f.BranchPools),
+		f.AccelerateInfoSize/1024, f.AccelerateInfoAddr, f.AccelerateInfoAddr+f.AccelerateInfoSize,
+		f.DylibsImageGroupSize/1024, f.DylibsImageGroupAddr, f.DylibsImageGroupAddr+f.DylibsImageGroupSize,
+		f.OtherImageGroupAddr/1024, f.OtherImageGroupAddr, f.OtherImageGroupAddr+f.OtherImageGroupSize,
+		f.ProgClosuresSize/(1024*1024), f.ProgClosuresAddr, f.ProgClosuresAddr+f.ProgClosuresSize,
+		f.ProgClosuresTrieSize/1024, f.ProgClosuresTrieAddr, f.ProgClosuresTrieAddr+f.ProgClosuresTrieSize,
+		f.SharedRegionSize/(1024*1024*1024), f.SharedRegionStart, f.SharedRegionStart+f.SharedRegionSize,
+		f.Mappings,
+	)
 }

@@ -207,7 +207,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	 * Read dyld kernel slid info
 	 *****************************/
 	// log.Info("Parsing Slide Info...")
-	// f.parseSlideInfo()
+	f.parseSlideInfo()
 
 	// Read dyld branch pool.
 	if f.BranchPoolsOffset != 0 {
@@ -316,81 +316,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			return nil, err
 		}
 	}
-
-	// javaScriptCore := f.Image("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-
-	// sr.Seek(int64(javaScriptCore.DylibOffset), os.SEEK_SET)
-
-	// textData := make([]byte, javaScriptCore.RangeSize)
-	// if err := binary.Read(sr, f.ByteOrder, &textData); err != nil {
-	// 	return nil, err
-	// }
-
-	// unoptMach, err := macho.NewFile(bytes.NewReader(textData))
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// buf := utils.NewWriteBuffer(int(javaScriptCore.RangeSize), 1<<63-1)
-
-	// if _, err := buf.WriteAt(textData, 0); err != nil {
-	// 	return nil, err
-	// }
-
-	// dataConst := unoptMach.Segment("__DATA_CONST")
-	// sr.Seek(int64(dataConst.SegmentHeader.Offset), os.SEEK_SET)
-
-	// dataConstData := make([]byte, dataConst.SegmentHeader.Memsz)
-	// if err := binary.Read(sr, f.ByteOrder, &dataConstData); err != nil {
-	// 	return nil, err
-	// }
-	// if _, err := buf.WriteAt(dataConstData, int64(dataConst.SegmentHeader.Offset)); err != nil {
-	// 	return nil, err
-	// }
-
-	// data := unoptMach.Segment("__DATA")
-	// sr.Seek(int64(data.SegmentHeader.Offset), os.SEEK_SET)
-
-	// dataData := make([]byte, data.SegmentHeader.Memsz)
-	// if err := binary.Read(sr, f.ByteOrder, &dataData); err != nil {
-	// 	return nil, err
-	// }
-	// if _, err := buf.WriteAt(dataData, int64(data.SegmentHeader.Offset)); err != nil {
-	// 	return nil, err
-	// }
-
-	// dataDirty := unoptMach.Segment("__DATA_DIRTY")
-	// sr.Seek(int64(dataDirty.SegmentHeader.Offset), os.SEEK_SET)
-
-	// dataDirtyData := make([]byte, dataDirty.SegmentHeader.Memsz)
-	// if err := binary.Read(sr, f.ByteOrder, &dataDirtyData); err != nil {
-	// 	return nil, err
-	// }
-	// if _, err := buf.WriteAt(dataDirtyData, int64(dataDirty.SegmentHeader.Offset)); err != nil {
-	// 	return nil, err
-	// }
-
-	// optMach, err := macho.NewFile(bytes.NewReader(buf.Bytes()))
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println(optMach.Symtab)
-	// // linkEdit := unoptMach.Segment("__LINKEDIT")
-
-	// if _, err := buf.WriteAt(textData, 0); err != nil {
-	// 	return nil, err
-	// }
-
-	// file.Seek(int64(image.Info.Address-cache.mappings[0].Address), os.SEEK_SET)
-
-	// // if strings.Contains(cache.images[idx].Name, "JavaScriptCore") {
-	// fmt.Printf("%s @ 0x%08X\n", cache.images[idx].Name, int64(image.Info.Address-cache.mappings[0].Address))
-	// sr := io.NewSectionReader(file, int64(image.Info.Address-cache.mappings[0].Address), 1<<63-1)
-	// mcho, err := macho.NewFile(sr)
-	// if err != nil {
-	// 	continue
-	// 	// return errors.Wrap(err, "failed to create macho")
-	// }
 
 	return f, nil
 }

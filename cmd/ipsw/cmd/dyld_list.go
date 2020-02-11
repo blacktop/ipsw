@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -79,22 +80,19 @@ var dyldListCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		f.CacheHeader.Print()
-		// f.LocalSymInfo.Print()
-		fmt.Println()
-		f.Mappings.Print()
-		fmt.Println()
+		fmt.Println(f)
+
 		fmt.Println("Images")
 		fmt.Println("======")
-
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 		for idx, img := range f.Images {
 			m, err := img.GetPartialMacho()
 			if err != nil {
 				return errors.Wrap(err, "failed to create MachO")
 			}
-			fmt.Printf("%4d:\t0x%0X\t%s\t(%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
+			fmt.Fprintf(w, "%4d:\t0x%0X\t%s\t(%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
 		}
-
+		w.Flush()
 		return nil
 	},
 }
