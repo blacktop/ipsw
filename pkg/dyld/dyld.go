@@ -417,8 +417,8 @@ type CacheExportedSymbol struct {
 }
 
 func (es CacheExportedSymbol) String() string {
-	if !es.Flags.Absolute() {
-		return fmt.Sprintf("0x%8x: %s [%s], %s", es.Address, es.Name, es.Flags, es.FoundInDylib)
-	}
-	return fmt.Sprintf("0x%8x: %s [%s]", es.Value, es.Name, es.Flags)
+	// if !es.Flags.Absolute() {
+	return fmt.Sprintf("0x%08x: %s [%s], %s", es.Address, es.Name, es.Flags, es.FoundInDylib)
+	// }
+	// return fmt.Sprintf("0x%8x: %s [%s]", es.Value, es.Name, es.Flags)
 }
