@@ -88,7 +88,7 @@ Images
 
 ### **dyld symaddr**
 
-Find symbol _(unslid)_ addresses in shared cache
+Find all instances of a symbol's _(unslid)_ addresses in shared cache
 
 ```bash
 $ ipsw dyld symaddr dyld_shared_cache <SYMBOL_NAME>
@@ -101,6 +101,12 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 ```
 
 ⚠️ **NOTE:** you don't have to supply the full image path
+
+Dump ALL teh symbolz!!!
+
+```bash
+$ ipsw dyld symaddr --all dyld_shared_cache
+```
 
 ### **dyld sel**
 
