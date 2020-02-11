@@ -200,24 +200,24 @@
 
 <span class="nv">Header</span>
 <span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
-<span class="nv">Magic</span>               <span class="o">=</span> dyld_v1  arm64e
-<span class="nv">MappingOffset</span>       <span class="o">=</span> <span class="m">00000138</span>
-<span class="nv">MappingCount</span>        <span class="o">=</span> <span class="m">3</span>
-<span class="nv">ImagesOffset</span>        <span class="o">=</span> <span class="m">00000198</span>
-<span class="nv">ImagesCount</span>         <span class="o">=</span> <span class="m">1819</span>
-<span class="nv">DyldBaseAddress</span>     <span class="o">=</span> <span class="m">00000000</span>
-<span class="nv">CodeSignatureOffset</span> <span class="o">=</span> 5F4B0000
-<span class="nv">CodeSignatureSize</span>   <span class="o">=</span> 002FC000
-<span class="nv">SlideInfoOffset</span>     <span class="o">=</span> <span class="m">48108000</span>
-<span class="nv">SlideInfoSize</span>       <span class="o">=</span> <span class="m">00018000</span>
-<span class="nv">LocalSymbolsOffset</span>  <span class="o">=</span> 4F714000
-<span class="nv">LocalSymbolsSize</span>    <span class="o">=</span> 0FD9C000
-<span class="nv">UUID</span>                <span class="o">=</span> 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
-<span class="nv">Platform</span>            <span class="o">=</span> iOS
-<span class="nv">Format</span>              <span class="o">=</span> <span class="m">10</span>
-Slide Info:      96KB,  file offset: 0x48108000 -&gt; 0x48120000
-Local Symbols:  253MB,  file offset: 0x4F714000 -&gt; 0x5F4B0000
-Accelerate Tab: 304KB,  address: 0x1D2F64000 -&gt; 0x1D2FB0000
+<span class="nv">Magic</span>            <span class="o">=</span> <span class="s2">&#34;dyld_v1  arm64e&#34;</span>
+<span class="nv">UUID</span>             <span class="o">=</span> 7659EEB7-96EB-38AB-A8B6-76367E2EC5E6
+<span class="nv">Platform</span>         <span class="o">=</span> iOS
+<span class="nv">Format</span>           <span class="o">=</span> <span class="m">10</span>
+Max <span class="nv">Slide</span>        <span class="o">=</span> 0x43704000
+
+Local Symbols <span class="o">(</span>nlist array<span class="o">)</span>:     57MB,  offset:  0x4F71EAA0 -&gt; 0x530FFCB0
+Local Symbols <span class="o">(</span>string pool<span class="o">)</span>:    195MB,  offset:  0x530FFCB0 -&gt; 0x5F4ACCED
+Code Signature:                   2MB,  offset:  0x5F4B0000 -&gt; 0x5F7AC000
+ImagesText Info <span class="o">(</span><span class="m">1819</span> entries<span class="o">)</span>:  56KB,  offset:  0x00000198 -&gt; 0x0000E4F8
+Slide Info <span class="o">(</span>v3<span class="o">)</span>:                 96KB,  offset:  0x48108000 -&gt; 0x48120000
+Branch Pool:                      0MB,  offset:  0x00000000 -&gt; 0x00000000
+Accelerate Tab:                 304KB,  address: 0x1D2F64000 -&gt; 0x1D2FB0000
+Dylib Image Groups:             271KB,  address: 0x1D304296C -&gt; 0x1D30868A8
+Other Image Groups:               0KB,  address: 0x00000000 -&gt; 0x00000000
+Closures:                         5MB,  address: 0x1D3148000 -&gt; 0x1D37069F0
+Closures Trie:                   47KB,  address: 0x1D37069F0 -&gt; 0x1D3712760
+Shared Region:                    4GB,  address: 0x180000000 -&gt; 0x280000000
 
 <span class="nv">Mappings</span>
 <span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
@@ -229,21 +229,22 @@ Accelerate Tab: 304KB,  address: 0x1D2F64000 -&gt; 0x1D2FB0000
 
 <span class="nv">Images</span>
 <span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>
-1:      18003c000 /usr/lib/system/libsystem_trace.dylib
-2:      <span class="m">180053000</span> /usr/lib/system/libxpc.dylib
-3:      <span class="m">180087000</span> /usr/lib/system/libsystem_blocks.dylib
-4:      <span class="m">180088000</span> /usr/lib/system/libsystem_c.dylib
-5:      <span class="m">180107000</span> /usr/lib/system/libdispatch.dylib
-6:      <span class="m">180144000</span> /usr/lib/system/libsystem_malloc.dylib
-7:      <span class="m">180165000</span> /usr/lib/system/libsystem_platform.dylib
+   1:	0x18003C000	/usr/lib/system/libsystem_trace.dylib	<span class="o">(</span>1147.60.3<span class="o">)</span>
+   2:	0x180053000	/usr/lib/system/libxpc.dylib	<span class="o">(</span>1738.62.1<span class="o">)</span>
+   3:	0x180087000	/usr/lib/system/libsystem_blocks.dylib	<span class="o">(</span>73.0.0<span class="o">)</span>
+   4:	0x180088000	/usr/lib/system/libsystem_c.dylib	<span class="o">(</span>1353.60.8<span class="o">)</span>
+   5:	0x180107000	/usr/lib/system/libdispatch.dylib	<span class="o">(</span>1173.60.1<span class="o">)</span>
+   6:	0x180144000	/usr/lib/system/libsystem_malloc.dylib	<span class="o">(</span>283.60.1<span class="o">)</span>
 &lt;SNIP&gt;
 </code></pre></div><h3 id="dyld-symaddr"><strong>dyld symaddr</strong></h3>
-<p>Find symbol <em>(unslid)</em> addresses in shared cache</p>
+<p>Find all instances of a symbol&rsquo;s <em>(unslid)</em> addresses in shared cache</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache &lt;SYMBOL_NAME&gt;
 </code></pre></div><p>Speed it up by supplying the dylib name</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache &lt;SYMBOL_NAME&gt;
 </code></pre></div><p>⚠️ <strong>NOTE:</strong> you don&rsquo;t have to supply the full image path</p>
-<h3 id="dyld-sel"><strong>dyld sel</strong></h3>
+<p>Dump ALL teh symbolz!!!</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr --all dyld_shared_cache
+</code></pre></div><h3 id="dyld-sel"><strong>dyld sel</strong></h3>
 <p>Get ObjC selector <em>(unslid)</em> address</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld sel dyld_shared_cache release
 
