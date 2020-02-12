@@ -793,7 +793,7 @@ func (f *File) GetAllExportedSymbols() error {
 
 	for _, image := range f.Images {
 		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
-			log.Infof("Image: %s", image.Name)
+			fmt.Printf("\n%s\n", image.Name)
 			exportTrie, err := f.getExportTrieData(image)
 			if err != nil {
 				return err
