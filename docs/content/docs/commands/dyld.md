@@ -105,7 +105,7 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 Dump ALL teh symbolz!!!
 
 ```bash
-$ ipsw dyld symaddr --all dyld_shared_cache
+$ ipsw dyld symaddr dyld_shared_cache
 ```
 
 ### **dyld sel**

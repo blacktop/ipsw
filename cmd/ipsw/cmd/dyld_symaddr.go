@@ -38,7 +38,6 @@ func init() {
 	dyldCmd.AddCommand(symaddrCmd)
 
 	symaddrCmd.Flags().StringVarP(&imageName, "image", "i", "", "dylib image to search")
-	symaddrCmd.PersistentFlags().BoolP("all", "a", false, "dump all exported symbols")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -79,27 +78,46 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		dumpAll, _ := cmd.Flags().GetBool("all")
-
-		if dumpAll {
+		if len(args) > 1 {
+			if len(imageName) > 0 { // Search for symbol inside dylib
+				if sym, _ := f.GetExportedSymbolAddressInImage(imageName, args[1]); sym != nil {
+					fmt.Println(sym)
+					// return nil
+				}
+				if lSym, _ := f.FindLocalSymbolInImage(args[1], imageName); lSym != nil {
+					fmt.Println(lSym)
+				}
+				return nil
+			}
+			// Search ALL dylibs for a symbol
+			found := false
+			for _, image := range f.Images {
+				if sym, _ := f.GetExportedSymbolAddressInImage(image.Name, args[1]); sym != nil {
+					fmt.Println(sym)
+					found = true
+				}
+			}
+			if !found {
+				if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
+					fmt.Println(lSym)
+				}
+			}
+		} else { // Dump ALL symbols
 			err := f.GetAllExportedSymbols()
 			if err != nil {
 				return errors.Wrap(err, "failed to get all exported symbols")
 			}
-			return nil
-		}
-
-		if len(imageName) > 0 {
-			if sym, _ := f.GetExportedSymbolAddressInImage(imageName, args[1]); sym != nil {
-				fmt.Println(sym)
-				return nil
-			}
-			lSym, err := f.FindLocalSymbolInImage(args[1], imageName)
+			log.Warn("parsing local symbols...")
+			err = f.ParseLocalSyms()
 			if err != nil {
-				return err
+				return errors.Wrap(err, "failed to parse private symbols")
 			}
-			fmt.Println(lSym)
-			return nil
+			for _, image := range f.Images {
+				fmt.Printf("\n%s\n", image.Name)
+				for _, sym := range image.LocalSymbols {
+					fmt.Printf("0x%8x: %s\n", sym.Value, sym.Name)
+				}
+			}
 		}
 
 		// if false {
@@ -119,22 +137,6 @@ var symaddrCmd = &cobra.Command{
 		// 		return err
 		// 	}
 		// }
-
-		found := false
-		for _, image := range f.Images {
-			if sym, _ := f.GetExportedSymbolAddressInImage(image.Name, args[1]); sym != nil {
-				fmt.Println(sym)
-				found = true
-			}
-		}
-
-		if !found {
-			lSym, err := f.FindLocalSymbol(args[1])
-			if err != nil {
-				return err
-			}
-			fmt.Println(lSym)
-		}
 
 		return nil
 	},

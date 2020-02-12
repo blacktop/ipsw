@@ -254,14 +254,17 @@ func walkTrie(data []byte, symbol string) (uint64, error) {
 				if err == io.EOF {
 					break
 				}
-				if c == '\x00' || searchStrIndex == len(symbol) {
+				if c == '\x00' {
 					break
 				}
 				if !wrongEdge {
-					if c != symbol[searchStrIndex] {
+					if searchStrIndex != len(symbol) && c != symbol[searchStrIndex] {
 						wrongEdge = true
 					}
 					searchStrIndex++
+					if searchStrIndex > len(symbol) {
+						return offset, fmt.Errorf("symbol not in trie")
+					}
 				}
 			}
 
