@@ -100,7 +100,7 @@ Speed it up by supplying the dylib name
 $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 ```
 
-⚠️ **NOTE:** you don't have to supply the full image path
+**NOTE:** you don't have to supply the full image path
 
 Dump ALL teh symbolz!!!
 
