@@ -256,10 +256,10 @@ Shared Region:                    4GB,  address: 0x180000000 -&gt; 0x280000000
    • parsing public symbols...
    • parsing private symbols...
 0x190a7221c: _xmlCtxtGetLastError
-ipsw dyld a2s dyld_shared_cache 0x190a7221c  61.59s user 9.80s system 233% cpu <span class="s2">&#34;30.545 total&#34;</span>
+61.59s user 9.80s system 233% cpu <span class="s2">&#34;30.545 total&#34;</span>
 </code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
 0x190a7221c: _xmlCtxtGetLastError
-dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c  2.12s user 0.51s system 109% cpu <span class="s2">&#34;2.407 total&#34;</span>
+2.12s user 0.51s system 109% cpu <span class="s2">&#34;2.407 total&#34;</span>
 </code></pre></div><h3 id="dyld-sel"><strong>dyld sel</strong></h3>
 <p>Get ObjC selector <em>(unslid)</em> address</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld sel dyld_shared_cache release
