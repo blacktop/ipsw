@@ -120,7 +120,7 @@ $ ipsw dyld a2s dyld_shared_cache 0x190a7221c
 0x190a7221c: _xmlCtxtGetLastError
 ```
 
-This is also create a cached version of the lookup hash table to the next time you lookup it will be much faster
+This will also create a cached version of the lookup hash table so the next time you lookup it will be much faster
 
 ```bash
 $ time dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c
