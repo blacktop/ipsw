@@ -171,6 +171,7 @@
 <li><a href="#dyld-extract"><strong>dyld extract</strong></a></li>
 <li><a href="#dyld-list"><strong>dyld list</strong></a></li>
 <li><a href="#dyld-symaddr"><strong>dyld symaddr</strong></a></li>
+<li><a href="#dyld-a2s"><strong>dyld a2s</strong></a></li>
 <li><a href="#dyld-sel"><strong>dyld sel</strong></a></li>
 <li><a href="#dyld-split"><strong>dyld split</strong></a></li>
 <li><a href="#dyld-webkit"><strong>dyld webkit</strong></a></li>
@@ -244,6 +245,21 @@ Shared Region:                    4GB,  address: 0x180000000 -&gt; 0x280000000
 </code></pre></div><p><strong>NOTE:</strong> you don&rsquo;t have to supply the full image path</p>
 <p>Dump ALL teh symbolz!!!</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache
+</code></pre></div><h3 id="dyld-a2s"><strong>dyld a2s</strong></h3>
+<p>Lookup what symbol is at a given <em>unslid</em> address <em>(in hex)</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld a2s dyld_shared_cache 0x190a7221c
+   • parsing public symbols...
+   • parsing private symbols...
+0x190a7221c: _xmlCtxtGetLastError
+</code></pre></div><p>This is also create a cached version of the lookup hash table to the next time you lookup it will be much faster</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c
+   • parsing public symbols...
+   • parsing private symbols...
+0x190a7221c: _xmlCtxtGetLastError
+ipsw dyld a2s dyld_shared_cache 0x190a7221c  61.59s user 9.80s system 233% cpu <span class="s2">&#34;30.545 total&#34;</span>
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
+0x190a7221c: _xmlCtxtGetLastError
+dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c  2.12s user 0.51s system 109% cpu <span class="s2">&#34;2.407 total&#34;</span>
 </code></pre></div><h3 id="dyld-sel"><strong>dyld sel</strong></h3>
 <p>Get ObjC selector <em>(unslid)</em> address</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld sel dyld_shared_cache release
