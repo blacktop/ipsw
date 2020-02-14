@@ -25,3 +25,4 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 - [ ] add 💄https://github.com/muesli/termenv
 - [ ] maybe use https://github.com/AllenDang/giu for disassembler
 - [ ] add https://github.com/mermaid-js/mermaid to docs
+- [ ] API maybe use (github.com/minio/simdjson-go)

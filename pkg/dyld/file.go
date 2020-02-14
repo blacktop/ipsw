@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -55,6 +57,8 @@ type File struct {
 
 	BranchPools   []uint64
 	CodeSignature []byte
+
+	AddressToSymbol map[uint64]string
 
 	r      io.ReaderAt
 	closer io.Closer
@@ -110,6 +114,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f := new(File)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 	f.r = r
+	f.AddressToSymbol = make(map[uint64]string)
 
 	// Read and decode dyld magic
 	var ident [16]byte
@@ -208,7 +213,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	 * Read dyld kernel slid info
 	 *****************************/
 	// log.Info("Parsing Slide Info...")
-	f.parseSlideInfo()
+	f.ParseSlideInfo(false)
 
 	// Read dyld branch pool.
 	if f.BranchPoolsOffset != 0 {
@@ -366,6 +371,7 @@ func (f *File) ParseLocalSyms() error {
 			if err != nil {
 				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
 			}
+			f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
 			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
 				Name:    strings.Trim(s, "\x00"),
 				Nlist64: nlist,
@@ -376,7 +382,8 @@ func (f *File) ParseLocalSyms() error {
 	return nil
 }
 
-func (f *File) parseSlideInfo() error {
+// ParseSlideInfo parses dyld slide info
+func (f *File) ParseSlideInfo(dump bool) error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	// textMapping := f.Mappings[0]
@@ -421,7 +428,7 @@ func (f *File) parseSlideInfo() error {
 		if err := binary.Read(sr, binary.LittleEndian, &PageStarts); err != nil {
 			return err
 		}
-		if false {
+		if dump {
 			var targetValue uint64
 			var pointer CacheSlidePointer3
 
@@ -453,11 +460,11 @@ func (f *File) parseSlideInfo() error {
 					}
 
 					var symName string
-					sym := f.GetLocalSymAtAddress(targetValue)
-					if sym == nil {
+					sym, ok := f.AddressToSymbol[targetValue]
+					if !ok {
 						symName = "?"
 					} else {
-						symName = sym.Name
+						symName = sym
 					}
 
 					fmt.Printf("    [% 5d + 0x%04X] 0x%x @ offset: %x => 0x%x, %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), (uint64)(pageAddress+delta), (uint64)(pageOffset+delta), targetValue, pointer, symName)
@@ -789,11 +796,10 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 }
 
 // GetAllExportedSymbols prints out all the exported symbols
-func (f *File) GetAllExportedSymbols() error {
+func (f *File) GetAllExportedSymbols(dump bool) error {
 
 	for _, image := range f.Images {
 		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
-			fmt.Printf("\n%s\n", image.Name)
 			exportTrie, err := f.getExportTrieData(image)
 			if err != nil {
 				return err
@@ -802,12 +808,39 @@ func (f *File) GetAllExportedSymbols() error {
 			if err != nil {
 				return err
 			}
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-			for _, sym := range syms {
-				fmt.Fprintf(w, "0x%8x:\t[%s]\t%s\n", sym.Address, sym.Flags, sym.Name)
+			if dump {
+				fmt.Printf("\n%s\n", image.Name)
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+				for _, sym := range syms {
+					fmt.Fprintf(w, "0x%8x:\t[%s]\t%s\n", sym.Address, sym.Flags, sym.Name)
+				}
+				w.Flush()
+			} else {
+				for _, sym := range syms {
+					f.AddressToSymbol[sym.Address] = sym.Name
+				}
 			}
-			w.Flush()
 		}
+	}
+
+	return nil
+}
+
+// SaveAddrToSymMap saves the dyld address-to-symbol map to disk
+func (f *File) SaveAddrToSymMap(dest string) error {
+	buff := new(bytes.Buffer)
+
+	e := gob.NewEncoder(buff)
+
+	// Encoding the map
+	err := e.Encode(f.AddressToSymbol)
+	if err != nil {
+		return err
+	}
+
+	err = ioutil.WriteFile(dest, buff.Bytes(), 0644)
+	if err != nil {
+		return err
 	}
 
 	return nil
