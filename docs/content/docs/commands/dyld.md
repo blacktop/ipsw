@@ -9,6 +9,7 @@ summary: Parse dyld_shared_cache.
 - [**dyld extract**](#dyld-extract)
 - [**dyld list**](#dyld-list)
 - [**dyld symaddr**](#dyld-symaddr)
+- [**dyld a2s**](#dyld-a2s)
 - [**dyld sel**](#dyld-sel)
 - [**dyld split**](#dyld-split)
 - [**dyld webkit**](#dyld-webkit)
@@ -106,6 +107,33 @@ Dump ALL teh symbolz!!!
 
 ```bash
 $ ipsw dyld symaddr dyld_shared_cache
+```
+
+### **dyld a2s**
+
+Lookup what symbol is at a given _unslid_ address _(in hex)_
+
+```bash
+$ ipsw dyld a2s dyld_shared_cache 0x190a7221c
+   • parsing public symbols...
+   • parsing private symbols...
+0x190a7221c: _xmlCtxtGetLastError
+```
+
+This is also create a cached version of the lookup hash table to the next time you lookup it will be much faster
+
+```bash
+$ time dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c
+   • parsing public symbols...
+   • parsing private symbols...
+0x190a7221c: _xmlCtxtGetLastError
+ipsw dyld a2s dyld_shared_cache 0x190a7221c  61.59s user 9.80s system 233% cpu "30.545 total"
+```
+
+```bash
+$ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
+0x190a7221c: _xmlCtxtGetLastError
+dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c  2.12s user 0.51s system 109% cpu "2.407 total"
 ```
 
 ### **dyld sel**

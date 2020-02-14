@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,19 +33,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var imageName string
-
 func init() {
-	dyldCmd.AddCommand(symaddrCmd)
-
-	symaddrCmd.Flags().StringVarP(&imageName, "image", "i", "", "dylib image to search")
-	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	dyldCmd.AddCommand(slideCmd)
+	slideCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
-// symaddrCmd represents the symaddr command
-var symaddrCmd = &cobra.Command{
-	Use:   "symaddr",
-	Short: "Lookup or dump symbol(s)",
+// slideCmd represents the slide command
+var slideCmd = &cobra.Command{
+	Use:   "slide",
+	Short: "Get slide info chained pointers",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -78,65 +75,32 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(args) > 1 {
-			if len(imageName) > 0 { // Search for symbol inside dylib
-				if sym, _ := f.GetExportedSymbolAddressInImage(imageName, args[1]); sym != nil {
-					fmt.Println(sym)
-					// return nil
-				}
-				if lSym, _ := f.FindLocalSymbolInImage(args[1], imageName); lSym != nil {
-					fmt.Println(lSym)
-				}
-				return nil
-			}
-			// Search ALL dylibs for a symbol
-			found := false
-			for _, image := range f.Images {
-				if sym, _ := f.GetExportedSymbolAddressInImage(image.Name, args[1]); sym != nil {
-					fmt.Println(sym)
-					found = true
-				}
-			}
-			if !found {
-				if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
-					fmt.Println(lSym)
-				}
-			}
-		} else { // Dump ALL symbols
-			err := f.GetAllExportedSymbols(true)
+		if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
+			log.Warn("parsing public symbols...")
+			err = f.GetAllExportedSymbols(false)
 			if err != nil {
-				return errors.Wrap(err, "failed to get all exported symbols")
+				return err
 			}
-			log.Warn("parsing local symbols...")
+			log.Warn("parsing private symbols...")
 			err = f.ParseLocalSyms()
 			if err != nil {
-				return errors.Wrap(err, "failed to parse private symbols")
+				return err
 			}
-			for _, image := range f.Images {
-				fmt.Printf("\n%s\n", image.Name)
-				for _, sym := range image.LocalSymbols {
-					fmt.Printf("0x%8x: %s\n", sym.Value, sym.Name)
-				}
+			f.SaveAddrToSymMap(dscPath + ".a2s")
+
+		} else {
+			a2sFile, err := os.Open(dscPath + ".a2s")
+			if err != nil {
+				return err
+			}
+			// Decoding the serialized data
+			err = gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol)
+			if err != nil {
+				return err
 			}
 		}
 
-		// if false {
-		// 	index, found, err := f.HasImagePath("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	if found {
-		// 		fmt.Println("index:", index, "image:", f.Images[index].Name)
-		// 	}
-		// 	// err = f.FindClosure("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-		// 	// if err != nil {
-		// 	// 	return err
-		// 	// }
-		// 	err = f.FindDlopenOtherImage("/Applications/FindMy.app/Frameworks/FMSiriIntents.framework/FMSiriIntents")
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
+		f.ParseSlideInfo(true)
 
 		return nil
 	},
