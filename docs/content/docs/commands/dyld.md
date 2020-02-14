@@ -127,13 +127,13 @@ $ time dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c
    • parsing public symbols...
    • parsing private symbols...
 0x190a7221c: _xmlCtxtGetLastError
-ipsw dyld a2s dyld_shared_cache 0x190a7221c  61.59s user 9.80s system 233% cpu "30.545 total"
+61.59s user 9.80s system 233% cpu "30.545 total"
 ```
 
 ```bash
 $ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
 0x190a7221c: _xmlCtxtGetLastError
-dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c  2.12s user 0.51s system 109% cpu "2.407 total"
+2.12s user 0.51s system 109% cpu "2.407 total"
 ```
 
 ### **dyld sel**
