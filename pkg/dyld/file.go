@@ -114,7 +114,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f := new(File)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 	f.r = r
-	f.AddressToSymbol = make(map[uint64]string)
+	f.AddressToSymbol = make(map[uint64]string, 4450000)
 
 	// Read and decode dyld magic
 	var ident [16]byte

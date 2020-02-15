@@ -13,8 +13,7 @@ _lzfse_decode_scratch_size:             ## @lzfse_decode_scratch_size
 	pop	rbp
 	ret
                                         ## -- End function
-	.private_extern	_lzfse_decode_buffer_with_scratch ## -- Begin function lzfse_decode_buffer_with_scratch
-	.globl	_lzfse_decode_buffer_with_scratch
+	.globl	_lzfse_decode_buffer_with_scratch ## -- Begin function lzfse_decode_buffer_with_scratch
 	.p2align	4, 0x90
 _lzfse_decode_buffer_with_scratch:      ## @lzfse_decode_buffer_with_scratch
 ## %bb.0:
