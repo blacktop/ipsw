@@ -170,7 +170,39 @@ func (s *Decoder) decodeLMD() error {
 	}
 
 	for symbols > 0 {
-		fmt.Println("test")
+		//  Decode the next L, M, D symbol from the input stream.
+		res := fseInCheckedFlush(&in, &src, src_start)
+		if res > 0 {
+			return fmt.Errorf("LZFSE_STATUS_ERROR")
+		}
+		l = fseValueDecode(&lState, s.CompressedLzfseBlockState.LDecoder[:], &in)
+		// assert(l_state < LZFSE_ENCODE_L_STATES)
+		// TODO
+		// if (lit + l) >= (s.CompressedLzfseBlockState.Literals + LZFSE_LITERALS_PER_BLOCK + 64) {
+		// 	return fmt.Errorf("LZFSE_STATUS_ERROR")
+		// }
+
+		// res = fse_in_flush2(&in, &src, src_start);
+		// if (res) {
+		//   return LZFSE_STATUS_ERROR;
+		// }
+
+		m = fseValueDecode(&mState, s.CompressedLzfseBlockState.MDecoder[:], &in)
+		// assert(m_state < LZFSE_ENCODE_M_STATES)
+
+		// res = fse_in_flush2(&in, &src, src_start);
+		// if (res) {
+		//   return LZFSE_STATUS_ERROR;
+		// }
+
+		newD := fseValueDecode(&dState, s.CompressedLzfseBlockState.DDecoder[:], &in)
+		// assert(d_state < LZFSE_ENCODE_D_STATES)
+
+		if newD > 0 {
+			d = newD
+		}
+
+		symbols--
 	ExecuteMatch:
 		fmt.Println("kill me")
 
@@ -211,13 +243,15 @@ func (s *Decoder) Decode() ([]byte, error) {
 				// Decode compressed headers
 				if s.blockMagic == LZFSE_COMPRESSEDV2_BLOCK_MAGIC {
 					log.Debug("LZFSE_COMPRESSEDV2_BLOCK_MAGIC")
-					if err := binary.Read(r, binary.LittleEndian, &header2); err != nil {
+					if err := binary.Read(s.src, binary.LittleEndian, &header2); err != nil {
 						return nil, err
 					}
 					err := decodeV1(&header1, header2)
 					if err != nil {
 						return nil, err
 					}
+					// Skip header
+					s.src.Seek(int64(binary.Size(compressedBlockHeaderV1{})), io.SeekCurrent)
 				} else {
 					// This should happen
 					log.Error("Not LZFSE_COMPRESSEDV2_BLOCK_MAGIC")
@@ -225,8 +259,7 @@ func (s *Decoder) Decode() ([]byte, error) {
 						return nil, err
 					}
 				}
-				// Skip header
-				s.src.Seek(int64(binary.Size(compressedBlockHeaderV1{})), io.SeekCurrent)
+
 				// Setup state for compressed V1 block from header
 				s.CompressedLzfseBlockState.NLmdPayloadBytes = header1.NLmdPayloadBytes
 				s.CompressedLzfseBlockState.NMatches = header1.NMatches
@@ -236,15 +269,15 @@ func (s *Decoder) Decode() ([]byte, error) {
 					header1.LiteralFreq,
 					s.CompressedLzfseBlockState.LiteralDecoder,
 				)
-				fseInitValueDecoderTable(
-					LZFSE_ENCODE_L_STATES, LZFSE_ENCODE_L_SYMBOLS, &header1.LFreq,
-					&lExtraBits, &lBaseValue, &s.CompressedLzfseBlockState.LDecoder)
-				fseInitValueDecoderTable(
-					LZFSE_ENCODE_M_STATES, LZFSE_ENCODE_M_SYMBOLS, &header1.MFreq,
-					&mExtraBits, &mBaseValue, &s.CompressedLzfseBlockState.MDecoder)
-				fseInitValueDecoderTable(
-					LZFSE_ENCODE_D_STATES, LZFSE_ENCODE_D_SYMBOLS, &header1.DFreq,
-					&dExtraBits, &dBaseValue, &s.CompressedLzfseBlockState.DDecoder)
+				s.CompressedLzfseBlockState.LDecoder = fseInitValueDecoderTable(
+					LZFSE_ENCODE_L_STATES, LZFSE_ENCODE_L_SYMBOLS, header1.LFreq[:],
+					lExtraBits[:], lBaseValue[:], s.CompressedLzfseBlockState.LDecoder[:])
+				s.CompressedLzfseBlockState.MDecoder = fseInitValueDecoderTable(
+					LZFSE_ENCODE_M_STATES, LZFSE_ENCODE_M_SYMBOLS, header1.MFreq[:],
+					mExtraBits[:], mBaseValue[:], s.CompressedLzfseBlockState.MDecoder[:])
+				s.CompressedLzfseBlockState.DDecoder = fseInitValueDecoderTable(
+					LZFSE_ENCODE_D_STATES, LZFSE_ENCODE_D_SYMBOLS, header1.DFreq[:],
+					dExtraBits[:], dBaseValue[:], s.CompressedLzfseBlockState.DDecoder[:])
 
 				// Decode literals
 				var in fseInStream
@@ -312,7 +345,7 @@ func (s *Decoder) Decode() ([]byte, error) {
 			log.Debug("LZFSE_COMPRESSEDV1_BLOCK_MAGIC || LZFSE_COMPRESSEDV2_BLOCK_MAGIC")
 			// Require the entire LMD payload to be in SRC
 			// if (s->src_end <= s->src ||
-			// 	bs->n_lmd_payload_bytes > (size_t)(s->src_end - s->src)) {
+			// 	s.CompressedLzfseBlockState.n_lmd_payload_bytes > (size_t)(s->src_end - s->src)) {
 			// 		return nil, fmt.Errorf("LZFSE_STATUS_SRC_EMPTY")
 			// 	}
 

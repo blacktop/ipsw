@@ -86,7 +86,7 @@ func fseInitDecoderTable(nstates, nsymbols int, freq [256]uint16, t [1024]int32)
 }
 
 func fseInitValueDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits []uint8,
-	symbolVbase []int32, t []fseValueDecoderEntry) {
+	symbolVbase []int32, t []fseValueDecoderEntry) []fseValueDecoderEntry {
 	var dDecoderIdx int
 
 	nClz := bits.LeadingZeros(uint(nstates))
@@ -117,6 +117,7 @@ func fseInitValueDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits 
 			dDecoderIdx++
 		}
 	}
+	return t
 }
 
 /* fseInCheckedInit initialize the fse input stream so that accum holds between 56
@@ -184,6 +185,16 @@ func fseDecode(pstate *uint16, decoderTable [1024]int32, in *fseInStream) uint8 
 	*pstate = uint16(e>>16) + uint16(fseInPull(in, fseBitCount(e&0xff)))
 	// Return the symbol for this state
 	return uint8(fseExtractBits(uint64(e), 8, 8)) // symbol
+}
+
+/* fseValueDecode - decode and return value using the decoder table, and update *pstate, in value_decoder_table[nstates]
+ * @note The caller must ensure we have enough bits available in the input
+ * stream accumulator. */
+func fseValueDecode(pstate *uint16, valueDecoderTable []fseValueDecoderEntry, in *fseInStream) int32 {
+	entry := valueDecoderTable[*pstate]
+	stateAndValueBits := uint32(fseInPull(in, fseBitCount(entry.TotalBits)))
+	*pstate = uint16(entry.Delta) + uint16(stateAndValueBits>>entry.ValueBits)
+	return entry.Vbase + int32(fseMaskLsb64(uint64(stateAndValueBits), fseBitCount(entry.ValueBits)))
 }
 
 // fseInPull - pull n bits out of the fse stream object.
