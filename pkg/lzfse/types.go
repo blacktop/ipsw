@@ -57,95 +57,53 @@ const (
 	LZFSE_LITERALS_PER_BLOCK    = (4 * LZFSE_MATCHES_PER_BLOCK)
 )
 
-type fseBitCount int32
+type lzfseCompressedBlockLiterals [LZFSE_LITERALS_PER_BLOCK + 64]uint8
 
-// FseInStream64 object representing an input stream.
-type FseInStream64 struct {
-	accum       uint64      // Input bits
-	accum_nbits fseBitCount // Number of valid bits in ACCUM, other bits are 0
-}
-
-// fse_value_decoder_entry entry for one state in the value decoder table (64b).
-type fse_value_decoder_entry struct {
-	total_bits uint8 // state bits + extra value bits = shift for next decode
-	value_bits uint8 // extra value bits
-	delta      int16 // state base (delta)
-	vbase      int32 // value base
-}
-
-type fse_in_stream FseInStream64
-
-// lzfse_compressed_block_decoder_state decoder state object for lzfse compressed blocks.
-type lzfse_compressed_block_decoder_state struct {
+// lzfseCompressedBlockDecoderState decoder state object for lzfse compressed blocks.
+type lzfseCompressedBlockDecoderState struct {
 	//  Number of matches remaining in the block.
-	n_matches uint32
+	NMatches uint32
 	//  Number of bytes used to encode L, M, D triplets for the block.
-	n_lmd_payload_bytes uint32
+	NLmdPayloadBytes uint32
 	//  Pointer to the next literal to emit.
-	current_literal *uint8
+	CurrentLiteral lzfseCompressedBlockLiterals
 	//  L, M, D triplet for the match currently being emitted. This is used only
 	//  if we need to restart after reaching the end of the destination buffer in
 	//  the middle of a literal or match.
-	l_value int32
-	m_value int32
-	d_value int32
+	LValue int32
+	MValue int32
+	DValue int32
 	//  FSE stream object.
-	lmd_in_stream fse_in_stream
+	LmdInStream fseInStream
 	//  Offset of L,M,D encoding in the input buffer. Because we read through an
 	//  FSE stream *backwards* while decoding, this is decremented as we move
 	//  through a block.
-	lmd_in_buf uint32
+	LmdInBuf uint32
 	//  The current state of the L, M, and D FSE decoders.
-	l_state uint16
-	m_state uint16
-	d_state uint16
+	LState uint16
+	MState uint16
+	DState uint16
 	//  Internal FSE decoder tables for the current block. These have
 	//  alignment forced to 8 bytes to guarantee that a single state's
 	//  entry cannot span two cachelines.
-	l_decoder       [LZFSE_ENCODE_L_STATES]fse_value_decoder_entry //__attribute__((__aligned__(8)))
-	m_decoder       [LZFSE_ENCODE_M_STATES]fse_value_decoder_entry //__attribute__((__aligned__(8)))
-	d_decoder       [LZFSE_ENCODE_D_STATES]fse_value_decoder_entry //__attribute__((__aligned__(8)))
-	literal_decoder [LZFSE_ENCODE_LITERAL_STATES]int32
-	//  The literal stream for the block, plus padding to allow for faster copy
-	//  operations.
-	literals [LZFSE_LITERALS_PER_BLOCK + 64]uint8
+	LDecoder       [LZFSE_ENCODE_L_STATES]fseValueDecoderEntry //__attribute__((__aligned__(8)))
+	MDecoder       [LZFSE_ENCODE_M_STATES]fseValueDecoderEntry //__attribute__((__aligned__(8)))
+	DDecoder       [LZFSE_ENCODE_D_STATES]fseValueDecoderEntry //__attribute__((__aligned__(8)))
+	LiteralDecoder [LZFSE_ENCODE_LITERAL_STATES]int32
+	//  The literal stream for the block, plus padding to allow for faster copy operations.
+	Literals lzfseCompressedBlockLiterals
 }
 
-//  Decoder state object for uncompressed blocks.
-type uncompressed_block_decoder_state struct {
-	n_raw_bytes uint32
+// decoder state object for uncompressed blocks.
+type uncompressedBlockDecoderState struct {
+	NRawBytes uint32
 }
 
-// lzvn_compressed_block_decoder_state decoder state object for lzvn-compressed blocks.
-type lzvn_compressed_block_decoder_state struct {
-	n_raw_bytes     uint32
-	n_payload_bytes uint32
-	d_prev          uint32
-}
-
-type lzfse_decoder_state struct {
-	//  Pointer to next byte to read from source buffer (this is advanced as we
-	//  decode src_begin describe the buffer and do not change).
-	src []byte
-	//  Pointer to first byte of source buffer.
-	src_begin int
-	//  Pointer to one byte past the end of the source buffer.
-	src_end int
-	//  Pointer to the next byte to write to destination buffer (this is advanced
-	//  as we decode dst_begin and dst_end describe the buffer and do not change).
-	dst []byte
-	//  Pointer to first byte of destination buffer.
-	dst_begin int
-	//  Pointer to one byte past the end of the destination buffer.
-	dst_end int
-	//  1 if we h ave reached the end of the stream, 0 otherwise.
-	end_of_stream int
-	//  magic number of the current block if we are within a block,
-	//  LZFSE_NO_BLOCK_MAGIC otherwise.
-	block_magic                  uint32
-	compressed_lzfse_block_state lzfse_compressed_block_decoder_state
-	compressed_lzvn_block_state  lzvn_compressed_block_decoder_state
-	uncompressed_block_state     uncompressed_block_decoder_state
+// lzvnCompressedBlockDecoderState decoder state object for lzvn-compressed blocks.
+type lzvnCompressedBlockDecoderState struct {
+	NRawBytes     uint32
+	NPayloadBytes uint32
+	DPrev         uint32
 }
 
 const (
