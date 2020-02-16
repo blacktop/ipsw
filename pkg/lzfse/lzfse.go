@@ -267,17 +267,17 @@ func (s *Decoder) Decode() ([]byte, error) {
 					LZFSE_ENCODE_LITERAL_STATES,
 					LZFSE_ENCODE_LITERAL_SYMBOLS,
 					header1.LiteralFreq,
-					s.CompressedLzfseBlockState.LiteralDecoder,
+					&s.CompressedLzfseBlockState.LiteralDecoder,
 				)
-				s.CompressedLzfseBlockState.LDecoder = fseInitValueDecoderTable(
+				fseInitValueLOrMDecoderTable(
 					LZFSE_ENCODE_L_STATES, LZFSE_ENCODE_L_SYMBOLS, header1.LFreq[:],
-					lExtraBits[:], lBaseValue[:], s.CompressedLzfseBlockState.LDecoder[:])
-				s.CompressedLzfseBlockState.MDecoder = fseInitValueDecoderTable(
+					lExtraBits[:], lBaseValue[:], &s.CompressedLzfseBlockState.LDecoder)
+				fseInitValueLOrMDecoderTable(
 					LZFSE_ENCODE_M_STATES, LZFSE_ENCODE_M_SYMBOLS, header1.MFreq[:],
-					mExtraBits[:], mBaseValue[:], s.CompressedLzfseBlockState.MDecoder[:])
-				s.CompressedLzfseBlockState.DDecoder = fseInitValueDecoderTable(
+					mExtraBits[:], mBaseValue[:], &s.CompressedLzfseBlockState.MDecoder)
+				fseInitValueDDecoderTable(
 					LZFSE_ENCODE_D_STATES, LZFSE_ENCODE_D_SYMBOLS, header1.DFreq[:],
-					dExtraBits[:], dBaseValue[:], s.CompressedLzfseBlockState.DDecoder[:])
+					dExtraBits[:], dBaseValue[:], &s.CompressedLzfseBlockState.DDecoder)
 
 				// Decode literals
 				var in fseInStream

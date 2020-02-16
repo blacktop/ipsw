@@ -46,7 +46,7 @@ func (f fseValueDecoderEntry) ToInt64() int64 {
 	return int64(binary.LittleEndian.Uint64(buf.Bytes()))
 }
 
-func fseInitDecoderTable(nstates, nsymbols int, freq [256]uint16, t [1024]int32) error {
+func fseInitDecoderTable(nstates, nsymbols int, freq [256]uint16, t *[1024]int32) error {
 	var sumOfFreq, lDecoderIdx int
 
 	nClz := bits.LeadingZeros(uint(nstates))
@@ -85,8 +85,8 @@ func fseInitDecoderTable(nstates, nsymbols int, freq [256]uint16, t [1024]int32)
 	return nil
 }
 
-func fseInitValueDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits []uint8,
-	symbolVbase []int32, t []fseValueDecoderEntry) []fseValueDecoderEntry {
+func fseInitValueLOrMDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits []uint8,
+	symbolVbase []int32, t *[64]fseValueDecoderEntry) {
 	var dDecoderIdx int
 
 	nClz := bits.LeadingZeros(uint(nstates))
@@ -117,7 +117,40 @@ func fseInitValueDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits 
 			dDecoderIdx++
 		}
 	}
-	return t
+}
+
+func fseInitValueDDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits []uint8,
+	symbolVbase []int32, t *[256]fseValueDecoderEntry) {
+	var dDecoderIdx int
+
+	nClz := bits.LeadingZeros(uint(nstates))
+	for i := 0; i < nsymbols; i++ {
+		f := int(freq[i])
+
+		if f == 0 {
+			continue // skip this symbol, no occurrences
+		}
+		k := bits.LeadingZeros(uint(f)) - nClz // shift needed to ensure N <= (F<<K) < 2*N
+		j0 := ((2 * nstates) >> k) - f
+
+		var ei fseValueDecoderEntry
+		ei.ValueBits = symbolVbits[i]
+		ei.Vbase = symbolVbase[i]
+
+		// Initialize all states S reached by this symbol: OFFSET <= S < OFFSET + F
+		for j := 0; j < f; j++ {
+			e := ei
+			if j < j0 {
+				e.TotalBits = uint8(k) + e.ValueBits
+				e.Delta = int16(((f + j) << k) - nstates)
+			} else {
+				e.TotalBits = uint8(k-1) + e.ValueBits
+				e.Delta = int16((j - j0) << (k - 1))
+			}
+			t[dDecoderIdx] = e
+			dDecoderIdx++
+		}
+	}
 }
 
 /* fseInCheckedInit initialize the fse input stream so that accum holds between 56
