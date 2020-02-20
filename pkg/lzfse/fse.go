@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math/bits"
 )
 
@@ -159,21 +160,26 @@ func fseInitValueDDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits
  *  unpredictable branch), while not requiring any additional fse_flush
  *  operations. This is why we have the special case for n == 0 (in which case
  *  we want to load only 7 bytes instead of 8). */
-func fseInCheckedInit(s fseInStream, n fseBitCount, pbuf []byte, buf_start int) error {
-	if n > 0 {
-		if *pbuf < buf_start+8 {
-			return fmt.Errorf("out of range")
+// func fseInCheckedInit(s *fseInStream, n fseBitCount, r *bytes.Reader, buffStart int64) error {
+// func fseInCheckedInit(s *fseInStream, n fseBitCount, r *bytes.Reader) error {
+func fseInCheckedInit(s *fseInStream, n fseBitCount, r *io.SectionReader) error {
+	// pbuf := io.NewSectionReader(r, 0, 1<<63-1)
+	if n != 0 {
+		_, err := r.Seek(-8, io.SeekCurrent)
+		if err != nil {
+			return err
 		}
-		*pbuf -= 8
-		// memcpy(&(s.Accum), *pbuf, 8)
+		if err := binary.Read(r, binary.LittleEndian, &s.Accum); err != nil {
+			return err
+		}
+		r.Seek(-8, io.SeekCurrent)
 		s.AccumNbits = n + 64
 	} else {
-		if *pbuf < buf_start+7 {
-			return fmt.Errorf("out of range")
+		r.Seek(-7, io.SeekCurrent)
+		if err := binary.Read(r, binary.LittleEndian, &s.Accum); err != nil {
+			return err
 		}
-
-		*pbuf -= 7
-		// memcpy(&(s.Accum), *pbuf, 7)
+		r.Seek(-8, io.SeekCurrent)
 		s.Accum &= 0xffffffffffffff
 		s.AccumNbits = n + 56
 	}
@@ -191,17 +197,21 @@ func fseInCheckedInit(s fseInStream, n fseBitCount, pbuf []byte, buf_start int) 
  * checking the new value of *pbuf remains >= buf_start.
  * @return 0 if OK.
  * @return -1 on failure. */
-func fseInCheckedFlush(s fseInStream, pbuf []byte, buf_start int) error {
+// func fseInCheckedFlush(s *fseInStream, r *bytes.Reader) error {
+func fseInCheckedFlush(s *fseInStream, r *io.SectionReader) error {
 	//  Get number of bits to add to bring us into the desired range.
 	nbits := (63 - s.AccumNbits) & -8
 	//  Convert bits to bytes and decrement buffer address, then load new data.
-	// const uint8_t *buf = (*pbuf) - (nbits >> 3)
-	// if buf < buf_start {
-	// 	return fmt.Errorf("out of range")
-	// }
-	// *pbuf = buf
+	_, err := r.Seek(int64(-(nbits >> 3)), io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+	// fmt.Println("delt:", delt)
 	var incoming uint64
-	//   memcpy(&incoming, buf, 8);
+	if err := binary.Read(r, binary.LittleEndian, &incoming); err != nil {
+		return err
+	}
+	r.Seek(-8, io.SeekCurrent)
 	// Update the state object and verify its validity (in DEBUG).
 	s.Accum = (s.Accum << nbits) | fseMaskLsb64(incoming, nbits)
 	s.AccumNbits += nbits

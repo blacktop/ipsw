@@ -52,6 +52,7 @@ type File struct {
 	Images   cacheImages
 
 	SlideInfo       interface{}
+	PatchInfo       CachePatchInfo
 	LocalSymInfo    localSymbolInfo
 	AcceleratorInfo CacheAcceleratorInfo
 
@@ -320,6 +321,69 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	for i := uint64(0); i != f.ImagesTextCount; i++ {
 		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
 			return nil, err
+		}
+	}
+
+	// Read dyld patch_info entries.
+	if patchInfoOffset, err := f.getOffset(f.PatchInfoAddr); err == nil {
+		sr.Seek(int64(patchInfoOffset), io.SeekStart)
+		if err := binary.Read(sr, f.ByteOrder, &f.PatchInfo); err != nil {
+			return nil, err
+		}
+		// Read all the other patch_info structs
+		if patchTableArrayOffset, err := f.getOffset(f.PatchInfo.PatchTableArrayAddr); err == nil {
+			sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
+			imagePatches := make([]CacheImagePatches, f.PatchInfo.PatchTableArrayCount)
+			if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
+				return nil, err
+			}
+			if patchExportNamesOffset, err := f.getOffset(f.PatchInfo.PatchExportNamesAddr); err == nil {
+				exportNames := io.NewSectionReader(f.r, int64(patchExportNamesOffset), int64(f.PatchInfo.PatchExportNamesSize))
+
+				if patchExportArrayOffset, err := f.getOffset(f.PatchInfo.PatchExportArrayAddr); err == nil {
+					sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
+					patchExports := make([]CachePatchableExport, f.PatchInfo.PatchExportArrayCount)
+					if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
+						return nil, err
+					}
+
+					if patchLocationArrayOffset, err := f.getOffset(f.PatchInfo.PatchLocationArrayAddr); err == nil {
+						sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
+						patchableLocations := make([]CachePatchableLocation, f.PatchInfo.PatchLocationArrayCount)
+						if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
+							return nil, err
+						}
+						// Add patchabled export info to images
+						for i, iPatch := range imagePatches {
+							if iPatch.PatchExportsCount > 0 {
+								for exportIndex := uint32(0); exportIndex != iPatch.PatchExportsCount; exportIndex++ {
+									patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
+									var exportName string
+									if uint64(patchExport.ExportNameOffset) < f.PatchInfo.PatchExportNamesSize {
+										exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
+										s, err := bufio.NewReader(exportNames).ReadString('\x00')
+										if err != nil {
+											return nil, errors.Wrapf(err, "failed to read string at: %x", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset)
+										}
+										exportName = strings.Trim(s, "\x00")
+									} else {
+										exportName = ""
+									}
+									plocs := make([]CachePatchableLocation, patchExport.PatchLocationsCount)
+									for locationIndex := uint32(0); locationIndex != patchExport.PatchLocationsCount; locationIndex++ {
+										plocs[locationIndex] = patchableLocations[patchExport.PatchLocationsStartIndex+locationIndex]
+									}
+									f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, patchableExport{
+										Name:           exportName,
+										OffsetOfImpl:   patchExport.CacheOffsetOfImpl,
+										PatchLocations: plocs,
+									})
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 

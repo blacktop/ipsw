@@ -136,12 +136,12 @@ type compressedBlockHeaderV1 struct {
 	//  Final encoder states for the block, which will be the initial states for
 	//  the decoder:
 	//  Final accum_nbits for literals stream.
-	LiteralBits int32
+	LiteralBits fseBitCount
 	//  There are four interleaved streams of literals, so there are four final
 	//  states.
 	LiteralState [4]uint16
 	//  accum_nbits for the l, m, d stream.
-	LmdBits int32
+	LmdBits fseBitCount
 	//  Final L (literal length) state.
 	LState uint16
 	//  Final M (match length) state.
@@ -231,6 +231,11 @@ var dBaseValue = [LZFSE_ENCODE_D_SYMBOLS]int32{
 	4092, 5116, 6140, 7164, 8188, 10236, 12284, 14332, 16380, 20476,
 	24572, 28668, 32764, 40956, 49148, 57340, 65532, 81916, 98300, 114684,
 	131068, 163836, 196604, 229372,
+}
+
+// decodeV2HeaderSize returns header_size field from a compressedBlockHeaderV2.
+func decodeV2HeaderSize(in compressedBlockHeaderV2) uint32 {
+	return getField(in.PackedFields[2], 0, 32)
 }
 
 func getField(v uint64, offset, nbits int) uint32 {
