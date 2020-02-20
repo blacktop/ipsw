@@ -133,8 +133,8 @@ func (f *File) String() string {
 			"Magic            = \"%s\"\n"+
 			"UUID             = %s\n"+
 			"Platform         = %s\n"+
-			"Format           = %d\n"+
-			"Max Slide        = 0x%08X\n\n"+
+			"Format           = %s\n"+
+			"Max Slide        = %s\n\n"+
 			"Local Symbols (nlist array):    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
 			"Local Symbols (string pool):    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
 			"Code Signature:                 %3dMB,  offset:  0x%08X -> 0x%08X\n"+
@@ -142,18 +142,17 @@ func (f *File) String() string {
 			"Slide Info (v%d):               %4dKB,  offset:  0x%08X -> 0x%08X\n"+
 			"Branch Pool:                    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
 			"Accelerate Tab:                 %3dKB,  address: 0x%08X -> 0x%08X\n"+
-			"Dylib Image Groups:             %3dKB,  address: 0x%08X -> 0x%08X\n"+
-			"Other Image Groups:             %3dKB,  address: 0x%08X -> 0x%08X\n"+
+			"Patch Info:                     %3dKB,  address: 0x%08X -> 0x%08X\n"+
 			"Closures:                       %3dMB,  address: 0x%08X -> 0x%08X\n"+
 			"Closures Trie:                  %3dKB,  address: 0x%08X -> 0x%08X\n"+
 			"Shared Region:                  %3dGB,  address: 0x%08X -> 0x%08X\n"+
 			"\nMappings\n"+
 			"========\n"+
 			"%s",
-		f.Magic,
+		bytes.Trim(f.Magic[:], "\x00"),
 		f.UUID,
 		f.Platform,
-		f.FormatVersion.Version(),
+		f.FormatVersion,
 		f.MaxSlide,
 		f.LocalSymInfo.NListByteSize/(1024*1024), f.LocalSymInfo.NListFileOffset, f.LocalSymInfo.NListFileOffset+f.LocalSymInfo.NListByteSize,
 		f.LocalSymInfo.StringsSize/(1024*1024), f.LocalSymInfo.StringsFileOffset, f.LocalSymInfo.StringsFileOffset+f.LocalSymInfo.StringsSize,
@@ -162,8 +161,7 @@ func (f *File) String() string {
 		slideVersion, f.SlideInfoSize/1024, f.SlideInfoOffset, f.SlideInfoOffset+f.SlideInfoSize,
 		binary.Size(f.BranchPools), f.BranchPoolsOffset, int(f.BranchPoolsOffset)+binary.Size(f.BranchPools),
 		f.AccelerateInfoSize/1024, f.AccelerateInfoAddr, f.AccelerateInfoAddr+f.AccelerateInfoSize,
-		f.DylibsImageGroupSize/1024, f.DylibsImageGroupAddr, f.DylibsImageGroupAddr+f.DylibsImageGroupSize,
-		f.OtherImageGroupAddr/1024, f.OtherImageGroupAddr, f.OtherImageGroupAddr+f.OtherImageGroupSize,
+		f.PatchInfoSize/1024, f.PatchInfoAddr, f.PatchInfoAddr+f.PatchInfoSize,
 		f.ProgClosuresSize/(1024*1024), f.ProgClosuresAddr, f.ProgClosuresAddr+f.ProgClosuresSize,
 		f.ProgClosuresTrieSize/1024, f.ProgClosuresTrieAddr, f.ProgClosuresTrieAddr+f.ProgClosuresTrieSize,
 		f.SharedRegionSize/(1024*1024*1024), f.SharedRegionStart, f.SharedRegionStart+f.SharedRegionSize,

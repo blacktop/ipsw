@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/internal/buffer"
 	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/blacktop/ipsw/pkg/macho/commands"
 	"github.com/pkg/errors"
@@ -20,6 +20,12 @@ type rangeEntry struct {
 	Size       uint32
 }
 
+type patchableExport struct {
+	Name           string
+	OffsetOfImpl   uint32
+	PatchLocations []CachePatchableLocation
+}
+
 // CacheImage represents a dyld dylib image.
 type CacheImage struct {
 	Name         string
@@ -29,11 +35,11 @@ type CacheImage struct {
 	CacheLocalSymbolsEntry
 	CacheImageInfoExtra
 	CacheImageTextInfo
-	Initializer    uint64
-	DOFSectionAddr uint64
-	DOFSectionSize uint32
-	RangeEntries   []rangeEntry
-
+	Initializer      uint64
+	DOFSectionAddr   uint64
+	DOFSectionSize   uint32
+	RangeEntries     []rangeEntry
+	PatchableExports []patchableExport
 	// Embed ReaderAt for ReadAt method.
 	// Do not embed SectionReader directly
 	// to avoid having Read and Seek.
@@ -47,7 +53,7 @@ type CacheImage struct {
 // Data reads and returns the contents of the dylib's Mach-O.
 func (i *CacheImage) Data() ([]byte, error) {
 	// var buff bytes.Buffer
-	buff := utils.NewWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
+	buff := buffer.NewReadWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
 
 	i.sr.Seek(0, io.SeekStart)
 
@@ -82,7 +88,7 @@ func (i *CacheImage) Data() ([]byte, error) {
 // SegmentData reads the __TEXT header and returns the contents of the dylib's Mach-O.
 func (i *CacheImage) SegmentData() ([]byte, error) {
 	// var buff bytes.Buffer
-	buff := utils.NewWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
+	buff := buffer.NewReadWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
 
 	i.sr.Seek(0, io.SeekStart)
 

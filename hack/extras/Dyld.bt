@@ -64,10 +64,10 @@ typedef struct
     uint64 accelerateInfoSize;         // size of optimization info
     uint64 imagesTextOffset;           // file offset to first dyld_cache_image_text_info
     uint64 imagesTextCount;            // number of dyld_cache_image_text_info entries
-    uint64 dylibsImageGroupAddr;       // (unslid) address of ImageGroup for dylibs in this cache
-    uint64 dylibsImageGroupSize;       // size of ImageGroup for dylibs in this cache
-    uint64 otherImageGroupAddr;        // (unslid) address of ImageGroup for other OS dylibs
-    uint64 otherImageGroupSize;        // size of oImageGroup for other OS dylibs
+    uint64 patchInfoAddr;              // (unslid) address of dyld_cache_patch_info
+    uint64 patchInfoSize;              // Size of all of the patch information pointed to via the dyld_cache_patch_info
+    uint64 otherImageGroupAddrUnused;  // unused
+    uint64 otherImageGroupSizeUnused;  // unused
     uint64 progClosuresAddr;           // (unslid) address of list of program launch closures
     uint64 progClosuresSize;           // size of list of program launch closures
     uint64 progClosuresTrieAddr;       // (unslid) address of trie of indexes into program launch closures
@@ -77,7 +77,8 @@ typedef struct
     uint dylibsExpectedOnDisk : 1;     // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
     uint simulator : 1;                // for simulator of specified platform
     uint locallyBuiltCache : 1;        // 0 for B&I built cache, 1 for locally built cache
-    uint padding : 21;                 // TBD
+    uint builtFromChainedFixups : 1;   // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
+    uint padding : 20;                 // TBD
     uint64 sharedRegionStart;          // base load address of cache if not slid
     uint64 sharedRegionSize;           // overall size of region cache can be mapped into
     uint64 maxSlide<format = hex>;     // runtime slide of cache can be between zero and this value
