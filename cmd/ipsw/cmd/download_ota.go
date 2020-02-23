@@ -23,43 +23,47 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	downloadCmd.AddCommand(otaCmd)
+	downloadCmd.AddCommand(otaDLCmd)
 }
 
-// otaCmd represents the ota command
-var otaCmd = &cobra.Command{
-	Use:   "ota",
-	Short: "Download OTA betas",
+// otaDLCmd represents the ota download command
+var otaDLCmd = &cobra.Command{
+	Use:    "ota",
+	Short:  "Download OTA betas",
+	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// proxy, _ := cmd.Flags().GetString("proxy")
-		// insecure, _ := cmd.Flags().GetBool("insecure")
+		proxy, _ := cmd.Flags().GetString("proxy")
+		insecure, _ := cmd.Flags().GetBool("insecure")
 		// skip, _ := cmd.Flags().GetBool("yes")
 
-		ota, err := download.NewOta()
+		ota, err := download.NewOTA(proxy, insecure)
 		if err != nil {
 			return errors.Wrap(err, "failed to create itunes API")
 		}
 
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, '_', tabwriter.DiscardEmptyColumns)
 		for _, asset := range ota.Assets {
-			fmt.Println(asset.Build)
-			fmt.Println(asset.OSVersion)
-			fmt.Println(asset.SupportedDevices)
-			fmt.Println(asset.BaseURL)
-			fmt.Println(asset.RelativePath)
+			if len(asset.ReleaseType) == 0 {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", asset.SupportedDevices[0], asset.OSVersion, asset.Build, humanize.Bytes(uint64(asset.DownloadSize)), asset.BaseURL+asset.RelativePath)
+			}
 		}
+		w.Flush()
 
 		// if len(ipsws) < 1 {
 		// 	log.Errorf("no ipsws found for build %s", args[0])

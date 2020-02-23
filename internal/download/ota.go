@@ -2,10 +2,12 @@ package download
 
 import (
 	"bytes"
+	"crypto/tls"
 	"io/ioutil"
 	"net/http"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -21,6 +23,8 @@ type otaAssetXML struct {
 	PrerequisiteOSVersion string   `plist:"PrerequisiteOSVersion,omitempty"`
 	SupportedDeviceModels []string `plist:"SupportedDeviceModels,omitempty"`
 	SupportedDevices      []string `plist:"SupportedDevices,omitempty"`
+	DocumentationID       string   `plist:"SUDocumentationID,omitempty"`
+	ReleaseType           string   `plist:"ReleaseType"`
 	CompressionAlgorithm  string   `plist:"_CompressionAlgorithm,omitempty"`
 	DownloadSize          int      `plist:"_DownloadSize,omitempty"`
 	IsZipStreamable       bool     `plist:"_IsZipStreamable,omitempty"`
@@ -37,13 +41,27 @@ type OtaXML struct {
 	SigningKey  string        `plist:"SigningKey,omitempty"`
 }
 
-// NewOta downloads and parses the itumes plist for iOS13 developer beta OTAs
-func NewOta() (*OtaXML, error) {
-	resp, err := http.Get(iOS13OtaDevBetaURL)
-	// resp, err := http.Get(iOS13OtaPublicBetaURL)
+// NewOTA downloads and parses the itumes plist for iOS13 developer beta OTAs
+func NewOTA(proxy string, insecure bool) (*OtaXML, error) {
+
+	req, err := http.NewRequest("GET", iOS13OtaDevBetaURL, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create http client")
+		return nil, errors.Wrap(err, "cannot create http request")
 	}
+	req.Header.Add("User-Agent", utils.RandomAgent())
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           getProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
 
 	document, err := ioutil.ReadAll(resp.Body)
 	if err != nil {

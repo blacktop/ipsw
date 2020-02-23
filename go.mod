@@ -12,6 +12,7 @@ require (
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.0
 	github.com/blacktop/ranger v1.0.3
+	github.com/blacktop/xz v0.5.7
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/gocolly/colly/v2 v2.0.1
