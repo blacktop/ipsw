@@ -23,8 +23,6 @@ import (
 	"github.com/vbauerster/mpb/v4/decor"
 )
 
-const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13 Safari/605.1.15"
-
 // Download is a downloader object
 type Download struct {
 	URL          string
@@ -73,7 +71,7 @@ func (d *Download) getHEAD() error {
 	if err != nil {
 		return errors.Wrap(err, "cannot create http request")
 	}
-	req.Header.Add("User-Agent", ua)
+	req.Header.Add("User-Agent", utils.RandomAgent())
 
 	resp, err := d.client.Do(req)
 	if err != nil {
@@ -101,7 +99,7 @@ func (d *Download) Do() error {
 	if err != nil {
 		return errors.Wrap(err, "cannot create http request")
 	}
-	req.Header.Add("User-Agent", ua)
+	req.Header.Add("User-Agent", utils.RandomAgent())
 
 	// check for a completed download
 	var destName string
