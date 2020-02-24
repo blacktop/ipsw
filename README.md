@@ -23,7 +23,7 @@
 
 ## Documentation
 
-- [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/)
+- [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/docs/)
 
 ## License
 
