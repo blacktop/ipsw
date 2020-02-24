@@ -1,3 +1,5 @@
+// +build !windows,cgo
+
 /*
 Copyright © 2020 blacktop
 
@@ -32,24 +34,33 @@ import (
 
 func init() {
 	rootCmd.AddCommand(otaCmd)
+
+	otaCmd.Flags().BoolP("list", "l", false, "list files")
+	otaCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // otaCmd represents the ota command
 var otaCmd = &cobra.Command{
-	Use:    "ota",
-	Short:  "Extract file(s) from OTA",
-	Hidden: true,
-	Args:   cobra.MinimumNArgs(1),
+	Use:   "ota",
+	Short: "Extract file(s) from OTA",
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var fileName string
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
+		}
+
+		listFiles, _ := cmd.Flags().GetBool("list")
+
+		if len(args) > 1 {
+			fileName = args[1]
 		}
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		return ota.Extract(args[0])
+		return ota.Extract(args[0], fileName, listFiles)
 	},
 }
