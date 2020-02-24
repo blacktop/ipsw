@@ -1,3 +1,5 @@
+// +build !windows,cgo
+
 /*
 Copyright © 2020 blacktop
 
@@ -24,24 +26,28 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"text/tabwriter"
+	"path"
+	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
-	"github.com/dustin/go-humanize"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
+
+	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote zip")
 }
 
 // otaDLCmd represents the ota download command
 var otaDLCmd = &cobra.Command{
-	Use:    "ota",
-	Short:  "Download OTA betas",
-	Hidden: true,
+	Use:   "ota",
+	Short: "Download OTA betas",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -50,63 +56,100 @@ var otaDLCmd = &cobra.Command{
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
-		// skip, _ := cmd.Flags().GetBool("yes")
+		skip, _ := cmd.Flags().GetBool("yes")
 
-		ota, err := download.NewOTA(proxy, insecure)
+		device, _ := cmd.Flags().GetString("device")
+		doDownload, _ := cmd.Flags().GetStringArray("white-list")
+		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
+
+		remote, _ := cmd.Flags().GetBool("dyld")
+
+		var otas []download.OtaAsset
+		var filteredOtas []download.OtaAsset
+
+		otaXML, err := download.NewOTA(proxy, insecure)
 		if err != nil {
 			return errors.Wrap(err, "failed to create itunes API")
 		}
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, '_', tabwriter.DiscardEmptyColumns)
-		for _, asset := range ota.Assets {
+		for _, asset := range otaXML.Assets {
 			if len(asset.ReleaseType) == 0 {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", asset.SupportedDevices[0], asset.OSVersion, asset.Build, humanize.Bytes(uint64(asset.DownloadSize)), asset.BaseURL+asset.RelativePath)
+				if len(device) > 0 {
+					if strings.EqualFold(device, asset.SupportedDevices[0]) {
+						otas = append(otas, asset)
+					}
+				} else {
+					otas = append(otas, asset)
+				}
+
 			}
 		}
-		w.Flush()
 
-		// if len(ipsws) < 1 {
-		// 	log.Errorf("no ipsws found for build %s", args[0])
-		// 	return nil
-		// }
+		for _, o := range otas {
+			if len(doDownload) > 0 {
+				if utils.StrSliceContains(doDownload, o.SupportedDevices[0]) {
+					filteredOtas = append(filteredOtas, o)
+				}
+			} else if len(doNotDownload) > 0 {
+				if !utils.StrSliceContains(doNotDownload, o.SupportedDevices[0]) {
+					filteredOtas = append(filteredOtas, o)
+				}
+			} else {
+				filteredOtas = append(filteredOtas, o)
+			}
+		}
 
-		// log.Debug("URLs to Download:")
-		// for _, i := range ipsws {
-		// 	utils.Indent(log.Debug, 2)(i.URL)
-		// }
+		log.Debug("URLs to Download:")
+		for _, o := range otas {
+			utils.Indent(log.Debug, 2)(o.BaseURL + o.RelativePath)
+		}
 
-		// cont := true
-		// if !skip {
-		// 	cont = false
-		// 	prompt := &survey.Confirm{
-		// 		Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(ipsws)),
-		// 	}
-		// 	survey.AskOne(prompt, &cont)
+		cont := true
+		if !skip {
+			cont = false
+			prompt := &survey.Confirm{
+				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(otas)),
+			}
+			survey.AskOne(prompt, &cont)
 
-		// }
+		}
 
-		// if cont {
-		// 	downloader := download.NewDownload(proxy, insecure)
-		// 	for _, i := range ipsws {
-		// 		destName := strings.Replace(path.Base(i.URL), ",", "_", -1)
-		// 		if _, err := os.Stat(destName); os.IsNotExist(err) {
+		if cont {
+			if remote {
+				for _, o := range otas {
+					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
+						Proxy:    proxy,
+						Insecure: insecure,
+					})
+					if err != nil {
+						return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
+					}
+					err = ota.RemoteParseOTA(zr)
+				}
+			} else {
+				downloader := download.NewDownload(proxy, insecure)
+				for _, o := range otas {
+					url := o.BaseURL + o.RelativePath
+					destName := strings.Replace(path.Base(url), ",", "_", -1)
+					if _, err := os.Stat(destName); os.IsNotExist(err) {
 
-		// 			log.WithFields(log.Fields{
-		// 				"device":  i.Device,
-		// 				"build":   i.BuildID,
-		// 				"version": i.Version,
-		// 			}).Info("Getting IPSW")
-		// 			// download file
-		// 			downloader.URL = i.URL
-		// 			err = downloader.Do()
-		// 			if err != nil {
-		// 				return errors.Wrap(err, "failed to download file")
-		// 			}
-		// 		} else {
-		// 			log.Warnf("ipsw already exists: %s", destName)
-		// 		}
-		// 	}
-		// }
+						log.WithFields(log.Fields{
+							"device":  o.SupportedDevices[0],
+							"build":   o.Build,
+							"version": o.OSVersion,
+						}).Info("Getting OTA")
+						// download file
+						downloader.URL = url
+						err = downloader.Do()
+						if err != nil {
+							return errors.Wrap(err, "failed to download file")
+						}
+					} else {
+						log.Warnf("ota already exists: %s", destName)
+					}
+				}
+			}
+		}
 
 		return nil
 	},

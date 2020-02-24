@@ -83,8 +83,7 @@ archives:
       darwin: macOS
 
 brews:
-  -
-    ids:
+  - ids:
       - darwin
     github:
       owner: blacktop
@@ -94,6 +93,7 @@ brews:
     description: "Download and parse ipsw(s)"
     dependencies:
       - lzfse
+      - xz
       # - capstone
     install: |
       bin.install "ipsw"
