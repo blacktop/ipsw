@@ -171,7 +171,8 @@
           
 <h1 class="title">ota</h1>
 <div class="content ">
-  <h3 id="list-files-in-ota">List files in OTA</h3>
+  <h3 id="-_not-supported-on-windows_">⚠️ <em>(not supported on Windows)</em></h3>
+<h4 id="list-files-in-ota">List files in OTA</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ota -l OTA.zip
 
 -rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">10</span> MB  System/Library/Frameworks/ARKit.framework/MLModels/H12/PersonSegmentation_H12.mlmodelc/model.espresso.hwx
@@ -185,7 +186,7 @@
 -rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">14</span> MB  System/Library/LinguisticData/RequiredAssets_en.bundle/AssetData/en.lm/montreal.dat
 -rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">17</span> MB  System/Library/LinguisticData/RequiredAssets_es.bundle/AssetData/es.lm/montreal.dat
 &lt;SNIP&gt;
-</code></pre></div><h3 id="extract-files">Extract file(s)</h3>
+</code></pre></div><h4 id="extract-files">Extract file(s)</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ota OTA.zip dyld_shared_cache
    • Extracting -rwxr-xr-x <span class="nv">uid</span><span class="o">=</span>0, <span class="nv">gid</span><span class="o">=</span>80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e
 </code></pre></div><p><strong>NOTE:</strong> you can supply a pattern/substring to match</p>
