@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <title>completion - ipsw</title>
+  <title>ota - ipsw</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   
   <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
@@ -150,11 +150,11 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/device-list/">device-list</a>
     </li>
     
-    <li class="active ">
+    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/completion/">completion</a>
     </li>
     
-    <li class="">
+    <li class="active ">
       <a href="https://blacktop.github.io/ipsw/docs/commands/ota/">ota</a>
     </li>
     
@@ -169,20 +169,27 @@
         </div>
         <div class="col-12 col-md-9">
           
-<h1 class="title">completion</h1>
+<h1 class="title">ota</h1>
 <div class="content ">
-  <h3 id="add-zsh-completions">Add <strong>zsh</strong> completions</h3>
-<h4 id="option-1">Option 1)</h4>
-<p>Add the following to your <code>~/.zshrc</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">autoload -Uz compinit <span class="o">&amp;&amp;</span> compinit -C
-<span class="nb">source</span> &lt;<span class="o">(</span>ipsw completion zsh<span class="o">)</span>
-compdef _ipsw ipsw
-</code></pre></div><h4 id="option-2">Option 2)</h4>
-<p>Pick a folder in your <code>$fpath</code> to write the completion to.</p>
-<p>⚠️ <strong>NOTE:</strong> I&rsquo;m using <code>/usr/local/share/zsh-completions</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw completion zsh &gt; /usr/local/share/zsh-completions/_ipsw
-$ rm -f ~/.zcompdump<span class="p">;</span> compinit
-</code></pre></div>
+  <h3 id="list-files-in-ota">List files in OTA</h3>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ota -l OTA.zip
+
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">10</span> MB  System/Library/Frameworks/ARKit.framework/MLModels/H12/PersonSegmentation_H12.mlmodelc/model.espresso.hwx
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">21</span> MB  System/Library/Frameworks/ARKit.framework/MLModels/H12/SemanticSegmentation_H12.mlmodelc/model.espresso.hwx
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">12</span> MB  System/Library/Frameworks/ARKit.framework/gan_model.mlmodelc/model.espresso.weights
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">17</span> MB  System/Library/Frameworks/MetalPerformanceShaders.framework/Frameworks/MPSNeuralNetwork.framework/default.metallib
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> 9.4 MB System/Library/Frameworks/Vision.framework/gazeflow-mcbdnde3m8_225900_opt_quantized_w_conv_u16_fc_fp16.espresso.weights
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> 9.4 MB System/Library/Frameworks/Vision.framework/pumtc2j5f7_wide_u8.espresso.weights
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">11</span> MB  System/Library/Frameworks/Vision.framework/scene-classifier.bin
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">16</span> MB  System/Library/LinguisticData/RequiredAssets_de.bundle/AssetData/de.lm/montreal.dat
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">14</span> MB  System/Library/LinguisticData/RequiredAssets_en.bundle/AssetData/en.lm/montreal.dat
+-rw-r--r-- <span class="nv">uid</span><span class="o">=</span><span class="m">0</span> <span class="nv">gid</span><span class="o">=</span><span class="m">0</span> <span class="m">17</span> MB  System/Library/LinguisticData/RequiredAssets_es.bundle/AssetData/es.lm/montreal.dat
+&lt;SNIP&gt;
+</code></pre></div><h3 id="extract-files">Extract file(s)</h3>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ota OTA.zip dyld_shared_cache
+   • Extracting -rwxr-xr-x <span class="nv">uid</span><span class="o">=</span>0, <span class="nv">gid</span><span class="o">=</span>80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e
+</code></pre></div><p><strong>NOTE:</strong> you can supply a pattern/substring to match</p>
+
 </div>
 </div>
 
