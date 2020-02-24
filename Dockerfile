@@ -8,7 +8,7 @@ WORKDIR /go/src/github.com/blacktop/ipsw
 
 RUN \
     apt-get update \
-    && apt-get install -y cmake \
+    && apt-get install -y cmake liblzma-dev \
     && cd /tmp \
     && echo "===> Installing lzfse..." \
     && git clone https://github.com/lzfse/lzfse.git \
@@ -45,7 +45,7 @@ LABEL maintainer "https://github.com/blacktop"
 
 RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git libattr1-dev' \
     && apt-get update \
-    && apt-get install -y $buildDeps fuse3 unzip \
+    && apt-get install -y $buildDeps fuse3 unzip lzma \
     && echo "===> Installing lzfse..." \
     && cd /tmp \    
     && git clone https://github.com/lzfse/lzfse.git \

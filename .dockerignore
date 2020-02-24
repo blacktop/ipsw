@@ -16,6 +16,7 @@ hack
 # ipsw files
 *.ipsw
 *.zip
+*.xz
 *.im4p
 kernelcache.*
 dyld_shared_cache*
