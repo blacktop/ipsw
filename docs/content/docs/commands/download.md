@@ -10,6 +10,7 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download kernel**](#download-kernel)
 - [**download pattern**](#download-pattern)
 - [**download beta**](#download-beta)
+- [**download ota**](#download-ota)
 
 ---
 
@@ -178,4 +179,20 @@ Download BETA ipsws
 
 ```bash
 $ ipsw download beta 17C5046a
+```
+
+## **download ota**
+
+⚠️ **NOTE:** _not supported on Windows_
+
+Download **beta** OTA _(over the air updates)_
+
+```bash
+$ ipsw download ota --device iPhone12,3
+```
+
+Just download the _dyld_shared_cache_
+
+```bash
+$ ipsw download ota --device iPhone12,3 --dyld
 ```

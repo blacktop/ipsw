@@ -16,7 +16,7 @@ const (
 	iOS13OtaPublicBetaURL = "https://mesu.apple.com/assets/iOS13PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 )
 
-type otaAssetXML struct {
+type OtaAsset struct {
 	Build                 string   `plist:"Build,omitempty"`
 	OSVersion             string   `plist:"OSVersion,omitempty"`
 	PrerequisiteBuild     string   `plist:"PrerequisiteBuild,omitempty"`
@@ -34,15 +34,15 @@ type otaAssetXML struct {
 	RelativePath          string   `plist:"__RelativePath,omitempty"`
 }
 
-type OtaXML struct {
-	Assets      []otaAssetXML `plist:"Assets,omitempty"`
-	Certificate []byte        `plist:"Certificate,omitempty"`
-	Signature   []byte        `plist:"Signature,omitempty"`
-	SigningKey  string        `plist:"SigningKey,omitempty"`
+type Ota struct {
+	Assets      []OtaAsset `plist:"Assets,omitempty"`
+	Certificate []byte     `plist:"Certificate,omitempty"`
+	Signature   []byte     `plist:"Signature,omitempty"`
+	SigningKey  string     `plist:"SigningKey,omitempty"`
 }
 
 // NewOTA downloads and parses the itumes plist for iOS13 developer beta OTAs
-func NewOTA(proxy string, insecure bool) (*OtaXML, error) {
+func NewOTA(proxy string, insecure bool) (*Ota, error) {
 
 	req, err := http.NewRequest("GET", iOS13OtaDevBetaURL, nil)
 	if err != nil {
@@ -68,7 +68,7 @@ func NewOTA(proxy string, insecure bool) (*OtaXML, error) {
 		return nil, errors.Wrap(err, "failed to read plist")
 	}
 
-	ota := OtaXML{}
+	ota := Ota{}
 
 	dec := plist.NewDecoder(bytes.NewReader(document))
 	dec.Decode(&ota)
