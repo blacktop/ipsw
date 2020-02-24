@@ -6,7 +6,9 @@ weight: 100
 summary: Parse OTA zip files.
 ---
 
-### List files in OTA
+### ⚠️ _(not supported on Windows)_
+
+#### List files in OTA
 
 ```bash
 $ ipsw ota -l OTA.zip
@@ -24,7 +26,7 @@ $ ipsw ota -l OTA.zip
 <SNIP>
 ```
 
-### Extract file(s)
+#### Extract file(s)
 
 ```bash
 $ ipsw ota OTA.zip dyld_shared_cache
