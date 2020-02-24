@@ -101,5 +101,14 @@
       <description>Generate bash/zsh completions.</description>
     </item>
     
+    <item>
+      <title>ota</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/ota/</link>
+      <pubDate>Sun, 23 Feb 2020 21:07:22 -0500</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/ota/</guid>
+      <description>Parse OTA zip files.</description>
+    </item>
+    
   </channel>
 </rss>

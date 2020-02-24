@@ -11,7 +11,7 @@
 
   
   
-  <link rel="stylesheet" href="/ipsw/css/style.min.c8fe18cdec0611ab723d4a1eba3ef6303d2b4ed8a30860a9a9fabf872f9eb9a0.css">
+  <link rel="stylesheet" href="/ipsw/css/style.min.283317b3b68727e38f0757ac07557dbd3980c78e15c2427b949d84af9955e8cd.css">
   
 
   
@@ -155,6 +155,10 @@
     </li>
     
     <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/ota/">ota</a>
+    </li>
+    
+    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/roadmap/">Roadmap</a>
     </li>
     
@@ -173,6 +177,7 @@
 <li><a href="#download-kernel"><strong>download kernel</strong></a></li>
 <li><a href="#download-pattern"><strong>download pattern</strong></a></li>
 <li><a href="#download-beta"><strong>download beta</strong></a></li>
+<li><a href="#download-ota"><strong>download ota</strong></a></li>
 </ul>
 <hr>
 <blockquote>
@@ -188,7 +193,7 @@
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download --device iPhone11,2 --build 16A366
 
    • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16A366 <span class="nv">device</span><span class="o">=</span>iPhone11,2 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>12.0
-      3.4 GiB / 3.4 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="p">|</span> 00:00 <span class="o">]</span> 79.08 MiB/s
+      3.4 GiB / 3.4 GiB <span class="o">[==========================================================</span><span class="p">|</span> 00:00 <span class="o">]</span> 79.08 MiB/s
       • verifying sha1sum...
 
 $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
@@ -208,10 +213,10 @@ kernelcache.release.iphone11.decompressed: <span class="s2">&#34;Mach-O 64-bit e
 
 ? You are about to download <span class="m">17</span> ipsw files. Continue? Yes
    • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16A366 <span class="nv">device</span><span class="o">=</span>iPhone11,4 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>12.0
-    3.3 GiB / 3.3 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="p">|</span> 00:00 <span class="o">]</span> 59.03 MiB/s
+    3.3 GiB / 3.3 GiB <span class="o">[==========================================================</span><span class="p">|</span> 00:00 <span class="o">]</span> 59.03 MiB/s
       • verifying sha1sum...
    • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16A366 <span class="nv">device</span><span class="o">=</span>iPod7,1 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>12.0
-    734.7 MiB / 2.6 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>&gt;------------------------------------------<span class="p">|</span> 00:57 <span class="o">]</span> 44.84 MiB/s
+    734.7 MiB / 2.6 GiB <span class="o">[===============</span>&gt;------------------------------------------<span class="p">|</span> 00:57 <span class="o">]</span> 44.84 MiB/s
   ...
 </code></pre></div><ul>
 <li>Download with a Proxy</li>
@@ -233,7 +238,7 @@ kernelcache.release.iphone11.decompressed: <span class="s2">&#34;Mach-O 64-bit e
    • Latest iOS release found is: <span class="s2">&#34;12.4.1&#34;</span>
       • <span class="s2">&#34;Yo, ain&#39;t no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏&#34;</span>
    • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16G77 <span class="nv">device</span><span class="o">=</span>iPhone6,2 <span class="nv">version</span><span class="o">=</span>12.4.1
-        363.0 MiB / 2.9 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>&gt;-----------------------------------------------<span class="p">|</span> 18:52 <span class="o">]</span> 49.18 MiB/s
+        363.0 MiB / 2.9 GiB <span class="o">[======</span>&gt;-----------------------------------------------<span class="p">|</span> 18:52 <span class="o">]</span> 49.18 MiB/s
   ...
 </code></pre></div><p>This will also generate a <code>checksums.txt.sha1</code> file that you can use to verify the downloads</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ sha1sum -c checksums.txt.sha1
@@ -249,7 +254,7 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
    • Latest iOS release found is: <span class="s2">&#34;12.4.1&#34;</span>
       • <span class="s2">&#34;Yo, ain&#39;t no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏&#34;</span>
    • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16G77 <span class="nv">device</span><span class="o">=</span>iPod9,1 <span class="nv">version</span><span class="o">=</span>12.4.1
-        363.0 MiB / 2.9 GiB <span class="o">[</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span><span class="o">=</span>&gt;-----------------------------------------------<span class="p">|</span> 18:52 <span class="o">]</span> 49.18 MiB/s
+        363.0 MiB / 2.9 GiB <span class="o">[======</span>&gt;-----------------------------------------------<span class="p">|</span> 18:52 <span class="o">]</span> 49.18 MiB/s
   ...
 </code></pre></div><h2 id="download-kernel"><strong>download kernel</strong></h2>
 <blockquote>
@@ -301,6 +306,12 @@ iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
 </blockquote>
 <p>Download BETA ipsws</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download beta 17C5046a
+</code></pre></div><h2 id="download-ota"><strong>download ota</strong></h2>
+<p>⚠️ <strong>NOTE:</strong> <em>not supported on Windows</em></p>
+<p>Download <strong>beta</strong> OTA <em>(over the air updates)</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download ota --device iPhone12,3
+</code></pre></div><p>Just download the <em>dyld_shared_cache</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download ota --device iPhone12,3 --dyld
 </code></pre></div>
 </div>
 </div>
