@@ -27,6 +27,7 @@ dyld_shared_cache*
 *.plist
 System
 usr
+*.xz
 
 .DS_Store
 
@@ -42,4 +43,4 @@ checksums.txt.sha1
 
 # Docs
 public
-*.xz
+
