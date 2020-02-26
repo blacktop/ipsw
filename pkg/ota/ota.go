@@ -253,7 +253,7 @@ func Parse(payload *zip.File, extractPattern string) (bool, error) {
 					}
 					return false, err
 				}
-				utils.Indent(log.Info, 1)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s\n", os.FileMode(e.Perms), e.Uid, e.Gid, humanize.Bytes(uint64(e.FileSize)), fileName))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s\n", os.FileMode(e.Perms), e.Uid, e.Gid, humanize.Bytes(uint64(e.FileSize)), fileName))
 				err = ioutil.WriteFile(filepath.Base(string(fileName)), fileBytes, 0644)
 				if err != nil {
 					return false, err

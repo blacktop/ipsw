@@ -183,8 +183,6 @@ $ ipsw download beta 17C5046a
 
 ## **download ota**
 
-⚠️ **NOTE:** _not supported on Windows_
-
 Download **beta** OTA _(over the air updates)_
 
 ```bash
