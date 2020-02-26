@@ -1,5 +1,3 @@
-// +build !windows,cgo
-
 /*
 Copyright © 2020 blacktop
 
@@ -124,7 +122,7 @@ var otaDLCmd = &cobra.Command{
 					if err != nil {
 						return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
 					}
-					err = ota.RemoteParseOTA(zr)
+					err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
 				}
 			} else {
 				downloader := download.NewDownload(proxy, insecure)

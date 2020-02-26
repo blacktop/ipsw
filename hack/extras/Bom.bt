@@ -1,0 +1,40 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: 
+//   Authors: 
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: 
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+typedef struct 
+{
+  char magic[8];            // Always "BOMStore"
+  uint version;         // Always 1
+  uint numberOfBlocks;  // Number of non-null entries in BOMBlockTable
+  uint indexOffset;     // Offset to index table
+  uint indexLength;     // Length of index table, indexOffset + indexLength = file_length
+  uint varsOffset;
+  uint varsLength;
+} BOMHeader;
+
+typedef struct 
+{
+  uint address;
+  uint length;
+} BOMPointer;
+
+typedef struct
+{
+  uint numberOfBlockTablePointers;  // Not all of them will be occupied. See header for number of non-null blocks
+  BOMPointer blockPointers[numberOfBlockTablePointers]; // First entry must always be a null entry
+} BOMBlockTable;
+
+BigEndian();
+
+BOMHeader header;
+FSeek(header.indexOffset);
+BOMBlockTable indexHeader;
