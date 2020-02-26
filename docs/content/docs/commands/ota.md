@@ -6,31 +6,38 @@ weight: 100
 summary: Parse OTA zip files.
 ---
 
-### ⚠️ _(not supported on Windows)_
-
 #### List files in OTA
 
 ```bash
-$ ipsw ota -l OTA.zip
+$ ipsw ota OTA.zip | head
+   • Listing files...
+-rw-r--r-- 2020-02-15T02:24:26-05:00 0 B    .Trashes
+---------- 2020-02-15T02:20:25-05:00 0 B    .file
+-rwxr-xr-x 2020-02-15T02:23:53-05:00 0 B    etc
+-rwxr-xr-x 2020-02-15T02:24:07-05:00 0 B    tmp
+-rwxr-xr-x 2020-02-15T02:24:11-05:00 0 B    var
+-rwxrwxr-x 2020-02-15T02:20:25-05:00 109 kB Applications/AXUIViewService.app/AXUIViewService
+-rw-rw-r-- 2020-02-15T02:20:25-05:00 621 B  Applications/AXUIViewService.app/AXUIViewService-Entitlements.plist
+-rw-rw-r-- 2020-02-15T02:20:26-05:00 22 kB  Applications/AXUIViewService.app/Assets.car
+-rw-rw-r-- 2020-02-15T02:20:26-05:00 1.5 kB Applications/AXUIViewService.app/Info.plist
+-rw-rw-r-- 2020-02-15T02:20:26-05:00 8 B    Applications/AXUIViewService.app/PkgInfo
+```
 
--rw-r--r-- uid=0 gid=0 10 MB  System/Library/Frameworks/ARKit.framework/MLModels/H12/PersonSegmentation_H12.mlmodelc/model.espresso.hwx
--rw-r--r-- uid=0 gid=0 21 MB  System/Library/Frameworks/ARKit.framework/MLModels/H12/SemanticSegmentation_H12.mlmodelc/model.espresso.hwx
--rw-r--r-- uid=0 gid=0 12 MB  System/Library/Frameworks/ARKit.framework/gan_model.mlmodelc/model.espresso.weights
--rw-r--r-- uid=0 gid=0 17 MB  System/Library/Frameworks/MetalPerformanceShaders.framework/Frameworks/MPSNeuralNetwork.framework/default.metallib
--rw-r--r-- uid=0 gid=0 9.4 MB System/Library/Frameworks/Vision.framework/gazeflow-mcbdnde3m8_225900_opt_quantized_w_conv_u16_fc_fp16.espresso.weights
--rw-r--r-- uid=0 gid=0 9.4 MB System/Library/Frameworks/Vision.framework/pumtc2j5f7_wide_u8.espresso.weights
--rw-r--r-- uid=0 gid=0 11 MB  System/Library/Frameworks/Vision.framework/scene-classifier.bin
--rw-r--r-- uid=0 gid=0 16 MB  System/Library/LinguisticData/RequiredAssets_de.bundle/AssetData/de.lm/montreal.dat
--rw-r--r-- uid=0 gid=0 14 MB  System/Library/LinguisticData/RequiredAssets_en.bundle/AssetData/en.lm/montreal.dat
--rw-r--r-- uid=0 gid=0 17 MB  System/Library/LinguisticData/RequiredAssets_es.bundle/AssetData/es.lm/montreal.dat
-<SNIP>
+See if `dyld` is in the OTA files
+
+```bash
+$ ipsw ota OTA.zip | grep dyld
+   • Listing files...
+-rwxr-xr-x 2020-02-15T02:22:01-05:00 1.7 GB System/Library/Caches/com.apple."dyld/dyld"_shared_cache_arm64e
+-rwxr-xr-x 2020-02-15T02:24:08-05:00 721 kB usr/lib/"dyld"
 ```
 
 #### Extract file(s)
 
 ```bash
 $ ipsw ota OTA.zip dyld_shared_cache
-   • Extracting -rwxr-xr-x uid=0, gid=80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e
+   • Extracting dyld_shared_cache...
+      • Extracting -rwxr-xr-x uid=0, gid=80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e
 ```
 
 **NOTE:** you can supply a pattern/substring to match
