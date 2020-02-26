@@ -1,5 +1,3 @@
-// +build !windows,cgo
-
 /*
 Copyright © 2020 blacktop
 
@@ -26,16 +24,18 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"text/tabwriter"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/ota"
+	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(otaCmd)
 
-	otaCmd.Flags().BoolP("list", "l", false, "list files")
 	otaCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -45,22 +45,33 @@ var otaCmd = &cobra.Command{
 	Short: "Extract file(s) from OTA",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var fileName string
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
-		}
-
-		listFiles, _ := cmd.Flags().GetBool("list")
-
-		if len(args) > 1 {
-			fileName = args[1]
 		}
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		return ota.Extract(args[0], fileName, listFiles)
+		if len(args) > 1 {
+			log.Infof("Extracting %s...", args[1])
+			return ota.Extract(args[0], args[1])
+		}
+
+		log.Info("Listing files...")
+		files, err := ota.List(args[0])
+		if err != nil {
+			return err
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+		for _, f := range files {
+			if !f.IsDir() {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+			}
+		}
+		w.Flush()
+
+		return nil
 	},
 }

@@ -12,8 +12,7 @@ require (
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.0
 	github.com/blacktop/ranger v1.0.3
-	github.com/blacktop/xz v0.5.7
-	github.com/danielrh/go-xz v0.0.0-20180613074948-15f6c3b7b11f
+	github.com/danielrh/go-xz v0.0.0-20180613074948-15f6c3b7b11f // indirect
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/gocolly/colly/v2 v2.0.1
@@ -35,6 +34,7 @@ require (
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.6.2
+	github.com/ulikunitz/xz v0.5.7
 	github.com/vbauerster/mpb/v4 v4.11.2
 	golang.org/x/crypto v0.0.0-20200204104054-c9f3fb736b72 // indirect
 	golang.org/x/net v0.0.0-20200114155413-6afb5195e5aa // indirect
