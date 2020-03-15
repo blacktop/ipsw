@@ -2,7 +2,7 @@
 title: "completion"
 date: 2020-01-26T11:05:13-05:00
 draft: false
-weight: 14
+weight: 15
 summary: Generate bash/zsh completions.
 ---
 

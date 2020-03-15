@@ -17,7 +17,7 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 - [ ] MachO read/write
 - [ ] pure Go dyld splitter
 - [ ] pure Go lzfse
-- [ ] OTA support
+- [x] OTA support
 - [ ] APFS/HFS parsing to pull dyld without mounting
 - [ ] create offline copy of ipsw.me API
 - [ ] https://github.com/xerub/img4lib

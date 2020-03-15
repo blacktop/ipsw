@@ -560,7 +560,6 @@ func (f *File) Image(name string) *CacheImage {
 		}
 		base := filepath.Base(i.Name)
 		if strings.EqualFold(strings.ToLower(base), strings.ToLower(name)) {
-			fmt.Println(base)
 			return i
 		}
 	}
