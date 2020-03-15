@@ -20,7 +20,7 @@ type SHSH struct {
 
 // ParseRAW parses a shsh blob out of a raw dump
 func ParseRAW(r io.Reader) error {
-	utils.Indent(log.Info, 2)("Parsing SHSH")
+	utils.Indent(log.Info, 2)("Parsing shsh")
 
 	img4, err := img4.Parse(r)
 	if err != nil {
