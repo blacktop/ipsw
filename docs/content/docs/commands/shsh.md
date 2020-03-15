@@ -19,4 +19,4 @@ $ ipsw shsh
          • Dumped SHSH blob to 1249767383957670.dumped.shsh
 ```
 
-> **NOTES:** This requires you have a jailbroken iDevice that you can ssh into.
+> **NOTE:** This requires you have a jailbroken iDevice that you can ssh into.
