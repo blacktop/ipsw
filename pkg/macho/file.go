@@ -227,7 +227,17 @@ type (
 		Path string
 	}
 	// #define LC_CODE_SIGNATURE 0x1d	/* local of code signature */
+	CodeSignature struct {
+		LoadBytes
+		Offset uint32
+		Size   uint32
+	}
 	// #define LC_SEGMENT_SPLIT_INFO 0x1e /* local of info to split segments */
+	SplitInfo struct {
+		LoadBytes
+		Offset uint32
+		Size   uint32
+	}
 
 	ReExportDylib Dylib
 	// #define	LC_LAZY_LOAD_DYLIB 0x20	/* delay load of dylib until first use */
@@ -253,8 +263,17 @@ type (
 	// A UpwardDylib represents a Mach-O load upward dylib command.
 	UpwardDylib Dylib
 	// #define LC_VERSION_MIN_MACOSX 0x24   /* build for MacOSX min OS version */
+	VersionMinMacosx struct {
+		LoadBytes
+		Version string
+		Sdk     string
+	}
 	// #define LC_VERSION_MIN_IPHONEOS 0x25 /* build for iPhoneOS min OS version */
-
+	VersionMinIphoneos struct {
+		LoadBytes
+		Version string
+		Sdk     string
+	}
 	// A FunctionStarts represents a Mach-O function starts command.
 	FunctionStarts struct {
 		LoadBytes
@@ -669,8 +688,28 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l.Path = cstring(cmddat[hdr.Path:])
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
-		// case commands.LoadCmdCodeSignature:
-		// case commands.LoadCmdSegmentSplitInfo:
+		case commands.LoadCmdCodeSignature:
+			var hdr commands.CodeSignatureCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(CodeSignature)
+			l.Offset = hdr.Offset
+			l.Size = hdr.Size
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case commands.LoadCmdSegmentSplitInfo:
+			var hdr commands.SegmentSplitInfoCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &hdr); err != nil {
+				return nil, err
+			}
+			l := new(SplitInfo)
+			l.Offset = hdr.Offset
+			l.Size = hdr.Size
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
 		case commands.LoadCmdReexportDylib:
 			var hdr commands.ReExportDylibCmd
 			b := bytes.NewReader(cmddat)
@@ -724,8 +763,28 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			l.CompatVersion = hdr.CompatVersion.String()
 			l.LoadBytes = LoadBytes(cmddat)
 			f.Loads[i] = l
-		// case commands.LoadCmdVersionMinMacosx:
-		// case commands.LoadCmdVersionMinIphoneos:
+		case commands.LoadCmdVersionMinMacosx:
+			var verMin commands.VersionMinMacOSCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &verMin); err != nil {
+				return nil, err
+			}
+			l := new(VersionMinMacosx)
+			l.Version = verMin.Version.String()
+			l.Sdk = verMin.Sdk.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
+		case commands.LoadCmdVersionMinIphoneos:
+			var verMin commands.VersionMinIPhoneOSCmd
+			b := bytes.NewReader(cmddat)
+			if err := binary.Read(b, bo, &verMin); err != nil {
+				return nil, err
+			}
+			l := new(VersionMinIphoneos)
+			l.Version = verMin.Version.String()
+			l.Sdk = verMin.Sdk.String()
+			l.LoadBytes = LoadBytes(cmddat)
+			f.Loads[i] = l
 		case commands.LoadCmdFunctionStarts:
 			var led commands.LinkEditDataCmd
 			b := bytes.NewReader(cmddat)
@@ -938,6 +997,16 @@ func (f *File) Section(name string) *Section {
 	for _, s := range f.Sections {
 		if s.Name == name {
 			return s
+		}
+	}
+	return nil
+}
+
+// UUID returns the UUID load command, or nil if no UUID exists.
+func (f *File) UUID() *UUID {
+	for _, l := range f.Loads {
+		if u, ok := l.(*UUID); ok {
+			return u
 		}
 	}
 	return nil

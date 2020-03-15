@@ -44,3 +44,4 @@ checksums.txt.sha1
 # Docs
 public
 
+*.unstripped

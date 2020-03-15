@@ -1,5 +1,5 @@
 /*
-Copyright © 2019 blacktop
+Copyright © 2020 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,28 +23,28 @@ package cmd
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/macho"
+	"github.com/blacktop/ipsw/pkg/tbd"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	dyldCmd.AddCommand(dyldListCmd)
+	dyldCmd.AddCommand(tbdCmd)
 
-	dyldListCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	tbdCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
-// dyldListCmd represents the list command
-var dyldListCmd = &cobra.Command{
-	Use:   "list <dyld_shared_cache>",
-	Short: "List all dylibs in dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
+// tbdCmd represents the tbd command
+var tbdCmd = &cobra.Command{
+	Use:    "tbd <dyld_shared_cache> <image>",
+	Short:  "Generate a .tbd file for a dylib",
+	Args:   cobra.MinimumNArgs(2),
+	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -71,49 +71,23 @@ var dyldListCmd = &cobra.Command{
 			dyldFile = filepath.Join(linkRoot, dyldFile)
 		}
 
-		// TODO: check for
-		// if ( dylibInfo->isAlias )
-		//   	printf("[alias] %s\n", dylibInfo->path);
-
-		f, err := dyld.Open(dyldFile)
+		t, err := tbd.NewTBD(args[0], args[1])
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to create tbd file for %s", args[1])
 		}
-		defer f.Close()
 
-		fmt.Println(f)
-
-		fmt.Println("Images")
-		fmt.Println("======")
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		for idx, img := range f.Images {
-			if f.FormatVersion.IsDylibsExpectedOnDisk() {
-				m, err := macho.Open(img.Name)
-				if err != nil {
-					if serr, ok := err.(*macho.FormatError); !ok {
-						return errors.Wrapf(serr, "failed to open MachO %s", img.Name)
-					}
-					fat, err := macho.OpenFat(img.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
-					}
-					fmt.Fprintf(w, "%4d:\t0x%0X\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
-					fat.Close()
-					continue
-				}
-				fmt.Fprintf(w, "%4d:\t0x%0X\t(%s)\t%s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
-				m.Close()
-			} else {
-				m, err := img.GetPartialMacho()
-				if err != nil {
-					return errors.Wrap(err, "failed to create MachO")
-				}
-				fmt.Fprintf(w, "%4d:\t0x%0X\t%s\t(%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
-				m.Close()
-			}
-			// w.Flush()
+		outTBD, err := t.Generate()
+		if err != nil {
+			return errors.Wrapf(err, "failed to create tbd file for %s", args[1])
 		}
-		w.Flush()
+
+		tbdFile := filepath.Base(t.Path)
+
+		err = ioutil.WriteFile(tbdFile+".tbd", []byte(outTBD), 0644)
+		if err != nil {
+			return errors.Wrapf(err, "failed to write tbd file %s", tbdFile+".tbd")
+		}
+
 		return nil
 	},
 }

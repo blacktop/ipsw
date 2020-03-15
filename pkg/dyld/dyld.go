@@ -11,8 +11,8 @@ import (
 type formatVersion uint32
 
 const (
-	IsSimulator            formatVersion = 0x100
-	DylibsExpectedOnDisk   formatVersion = 0x200
+	DylibsExpectedOnDisk   formatVersion = 0x100
+	IsSimulator            formatVersion = 0x200
 	LocallyBuiltCache      formatVersion = 0x400
 	BuiltFromChainedFixups formatVersion = 0x800
 )
@@ -21,12 +21,12 @@ func (f formatVersion) Version() uint8 {
 	return uint8(f & 0xff)
 }
 
-func (f formatVersion) IsSimulator() bool {
-	return (f & IsSimulator) != 0
-}
-
 func (f formatVersion) IsDylibsExpectedOnDisk() bool {
 	return (f & DylibsExpectedOnDisk) != 0
+}
+
+func (f formatVersion) IsSimulator() bool {
+	return (f & IsSimulator) != 0
 }
 
 func (f formatVersion) IsLocallyBuiltCache() bool {
@@ -99,12 +99,12 @@ type CacheHeader struct {
 	ProgClosuresTrieAddr      uint64         // (unslid) address of trie of indexes into program launch closures
 	ProgClosuresTrieSize      uint64         // size of trie of indexes into program launch closures
 	Platform                  types.Platform // platform number (macOS=1, etc)
-	FormatVersion             formatVersion  /* formatVersion        : 8,  // dyld3::closure::kFormatVersion
-	   dylibsExpectedOnDisk : 1,  // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
-	   simulator            : 1,  // for simulator of specified platform
-	   locallyBuiltCache    : 1,  // 0 for B&I built cache, 1 for locally built cache
-	   TODO: I think there is a new flag here
-	   padding              : 21; // TBD */
+	FormatVersion             formatVersion  /* : 8,  // dyld3::closure::kFormatVersion
+	   dylibsExpectedOnDisk   : 1,  // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
+	   simulator              : 1,  // for simulator of specified platform
+	   locallyBuiltCache      : 1,  // 0 for B&I built cache, 1 for locally built cache
+	   builtFromChainedFixups : 1,  // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
+	   padding                : 20; // TBD */
 	SharedRegionStart    uint64   // base load address of cache if not slid
 	SharedRegionSize     uint64   // overall size of region cache can be mapped into
 	MaxSlide             maxSlide // runtime slide of cache can be between zero and this value

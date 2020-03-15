@@ -109,7 +109,6 @@ var otaDLCmd = &cobra.Command{
 				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(otas)),
 			}
 			survey.AskOne(prompt, &cont)
-
 		}
 
 		if cont {
