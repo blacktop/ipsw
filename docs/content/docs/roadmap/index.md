@@ -20,7 +20,7 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 - [x] OTA support
 - [ ] APFS/HFS parsing to pull dyld without mounting
 - [ ] create offline copy of ipsw.me API
-- [ ] https://github.com/xerub/img4lib
+- [ ] https://github.com/xerub/img4lib and https://github.com/tihmstar/img4tool
 - [ ] devicetree read/write
 - [ ] add 💄https://github.com/muesli/termenv
 - [ ] maybe use https://github.com/AllenDang/giu for disassembler
