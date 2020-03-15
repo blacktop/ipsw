@@ -199,5 +199,5 @@ Extract WebKit version from _dyld_shared_cache_
 
 ```bash
 $ ipsw dyld webkit dyld_shared_cache
-   • WebKit Version: 607.2.6.0.1
+   • WebKit Version: 609.1.17.0.1 (svn rev 256416)
 ```
