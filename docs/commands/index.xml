@@ -93,21 +93,30 @@
     </item>
     
     <item>
-      <title>completion</title>
-      <link>https://blacktop.github.io/ipsw/docs/commands/completion/</link>
-      <pubDate>Sun, 26 Jan 2020 11:05:13 -0500</pubDate>
-      
-      <guid>https://blacktop.github.io/ipsw/docs/commands/completion/</guid>
-      <description>Generate bash/zsh completions.</description>
-    </item>
-    
-    <item>
       <title>ota</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/ota/</link>
       <pubDate>Sun, 23 Feb 2020 21:07:22 -0500</pubDate>
       
       <guid>https://blacktop.github.io/ipsw/docs/commands/ota/</guid>
       <description>Parse OTA zip files.</description>
+    </item>
+    
+    <item>
+      <title>shsh</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/shsh/</link>
+      <pubDate>Sun, 15 Mar 2020 01:32:35 -0400</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/shsh/</guid>
+      <description>Dump shsh blobs.</description>
+    </item>
+    
+    <item>
+      <title>completion</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/completion/</link>
+      <pubDate>Sun, 26 Jan 2020 11:05:13 -0500</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/completion/</guid>
+      <description>Generate bash/zsh completions.</description>
     </item>
     
   </channel>

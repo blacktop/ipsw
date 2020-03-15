@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <title>extract - ipsw</title>
+  <title>shsh - ipsw</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   
   <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
@@ -122,7 +122,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/info/">info</a>
     </li>
     
-    <li class="active ">
+    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/extract/">extract</a>
     </li>
     
@@ -154,7 +154,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/ota/">ota</a>
     </li>
     
-    <li class="">
+    <li class="active ">
       <a href="https://blacktop.github.io/ipsw/docs/commands/shsh/">shsh</a>
     </li>
     
@@ -173,29 +173,20 @@
         </div>
         <div class="col-12 col-md-9">
           
-<h1 class="title">extract</h1>
+<h1 class="title">shsh</h1>
 <div class="content ">
-  <h3 id="-_not-supported-on-windows_">⚠️ <em>(not supported on Windows)</em></h3>
-<h4 id="extract-_kernelcache_-from-a-previously-downloaded-_ipsw_">Extract <em>kernelcache</em> from a previously downloaded <em>ipsw</em></h4>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
-</code></pre></div><h4 id="extract-_dyld_shared_cache_-from-a-previously-downloaded-_ipsw_">Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></h4>
-<ul>
-<li><code>macOS</code></li>
-</ul>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
-   • Extracting dyld_shared_cache from IPSW
-   • Mounting DMG
-   • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
-   • Unmounting DMG
-</code></pre></div><ul>
-<li><code>docker</code></li>
-</ul>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ docker run --init -it --rm <span class="se">\
-</span><span class="se"></span>             --device /dev/fuse <span class="se">\
-</span><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
-</span><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
-</span><span class="se"></span>             blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
-</code></pre></div>
+  <h4 id="dump-shsh-blob">Dump shsh blob</h4>
+<p>Dumping shsh blobs allows you to downgrade iOS later.</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw shsh
+
+   • Connecting to root@localhost:2222
+      • Parsing shsh
+      • Parsing IMG4
+         • Dumped SHSH blob to 1249767383957670.dumped.shsh
+</code></pre></div><blockquote>
+<p><strong>NOTES:</strong> This requires you have a jailbroken iDevice that you can ssh into.</p>
+</blockquote>
+
 </div>
 </div>
 
