@@ -307,3 +307,19 @@ func Parse(r io.Reader) (*Img4, error) {
 		},
 	}, nil
 }
+
+func ParseIm4p(r io.Reader) (*im4p, error) {
+	utils.Indent(log.Info, 1)("Parsing Im4p")
+
+	data := new(bytes.Buffer)
+	data.ReadFrom(r)
+
+	var i im4p
+
+	_, err := asn1.Unmarshal(data.Bytes(), &i)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to ASN.1 parse Im4p")
+	}
+
+	return &i, nil
+}

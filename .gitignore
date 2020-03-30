@@ -28,7 +28,8 @@ dyld_shared_cache*
 System
 usr
 *.xz
-
+*.bin
+*.s
 .DS_Store
 
 # Repo
@@ -45,3 +46,4 @@ checksums.txt.sha1
 public
 
 *.unstripped
+*.bndb
