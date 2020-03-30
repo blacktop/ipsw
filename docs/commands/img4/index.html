@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <title>Getting Started - ipsw</title>
+  <title>Img4 - ipsw</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   
   <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
@@ -110,7 +110,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/build/">Build</a>
     </li>
     
-    <li class="active ">
+    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/getting-started/">Getting Started</a>
     </li>
     
@@ -158,7 +158,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/shsh/">shsh</a>
     </li>
     
-    <li class="">
+    <li class="active ">
       <a href="https://blacktop.github.io/ipsw/docs/commands/img4/">Img4</a>
     </li>
     
@@ -177,31 +177,24 @@
         </div>
         <div class="col-12 col-md-9">
           
-<h1 class="title">Getting Started</h1>
+<h1 class="title">Img4</h1>
 <div class="content ">
-  <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw --help
+  <h2 id="img4-dec"><strong>img4 dec</strong></h2>
+<h3 id="decrypt-an-im4p-file">Decrypt an <code>Im4p</code> file</h3>
+<p>Download <em>just</em> iBoot</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download pattern -v 13.4 -d iPhone12,3 iBoot
+</code></pre></div><p>Decrypt it with things from tweets 😏</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw img4 dec --iv-key &lt;IVKEY&gt; iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p
+   • Parsing Im4p
+      • Decrypting file to iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
+</code></pre></div><p>It&rsquo;s a thing of beauty 😍</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ hexdump -C -s <span class="m">512</span> -n <span class="m">80</span> iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
 
-Download and Parse IPSWs
-
-Usage:
-  ipsw <span class="o">[</span>command<span class="o">]</span>
-
-Available Commands:
-  device-list List all iOS devices
-  download    Download and parse IPSW<span class="o">(</span>s<span class="o">)</span> from the internets
-  dtree       Parse DeviceTree
-  dyld        Parse dyld_shared_cache
-  <span class="nb">help</span>        Help about any <span class="nb">command</span>
-  info        Display IPSW Info
-  kernel      Parse kernelcache
-  macho       Parse a MachO file
-  version     Print the version number of ipsw
-
-Flags:
-  -h, --help      <span class="nb">help</span> <span class="k">for</span> ipsw
-  -V, --verbose   verbose output
-
-Use <span class="s2">&#34;ipsw [command] --help&#34;</span> <span class="k">for</span> more information about a command.
+<span class="m">00000200</span>  <span class="m">69</span> <span class="m">42</span> 6f 6f <span class="m">74</span> <span class="m">20</span> <span class="m">66</span> 6f  <span class="m">72</span> <span class="m">20</span> <span class="m">64</span> <span class="m">34</span> <span class="m">32</span> <span class="m">31</span> 2c <span class="m">20</span>  <span class="p">|</span>iBoot <span class="k">for</span> d421, <span class="p">|</span>
+<span class="m">00000210</span>  <span class="m">43</span> 6f <span class="m">70</span> <span class="m">79</span> <span class="m">72</span> <span class="m">69</span> <span class="m">67</span> <span class="m">68</span>  <span class="m">74</span> <span class="m">20</span> <span class="m">32</span> <span class="m">30</span> <span class="m">30</span> <span class="m">37</span> 2d <span class="m">32</span>  <span class="p">|</span>Copyright 2007-2<span class="p">|</span>
+<span class="m">00000220</span>  <span class="m">30</span> <span class="m">31</span> <span class="m">39</span> 2c <span class="m">20</span> <span class="m">41</span> <span class="m">70</span> <span class="m">70</span>  6c <span class="m">65</span> <span class="m">20</span> <span class="m">49</span> 6e <span class="m">63</span> 2e <span class="m">00</span>  <span class="p">|</span>019, Apple Inc..<span class="p">|</span>
+<span class="m">00000230</span>  <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span>  <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000240</span>  <span class="m">52</span> <span class="m">45</span> 4c <span class="m">45</span> <span class="m">41</span> <span class="m">53</span> <span class="m">45</span> <span class="m">00</span>  <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span>  <span class="p">|</span>RELEASE.........<span class="p">|</span>
 </code></pre></div>
 </div>
 </div>
