@@ -19,7 +19,7 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 - [ ] pure Go lzfse
 - [x] OTA support
 - [ ] APFS/HFS parsing to pull dyld without mounting
-- [ ] create offline copy of ipsw.me API
+- [ ] watch for new IPSW files with https://github.com/radovskyb/watcher
 - [ ] https://github.com/xerub/img4lib and https://github.com/tihmstar/img4tool
 - [ ] devicetree read/write
 - [ ] add 💄https://github.com/muesli/termenv

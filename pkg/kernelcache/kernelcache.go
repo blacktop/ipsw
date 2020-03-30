@@ -69,8 +69,9 @@ type CompressedCache struct {
 func ParseImg4Data(data []byte) (*CompressedCache, error) {
 	utils.Indent(log.Info, 2)("Parsing Kernelcache IMG4")
 
+	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10 | less (to get offset)
+	//       openssl asn1parse -i -inform DER -in kernelcache.iphone10 -strparse OFFSET -noout -out lzfse.bin
 	var i Img4
-	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10
 	if _, err := asn1.Unmarshal(data, &i); err != nil {
 		return nil, errors.Wrap(err, "failed to ASN.1 parse Kernelcache")
 	}
