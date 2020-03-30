@@ -1,3 +1,5 @@
+// +build !windows,cgo
+
 /*
 Copyright © 2020 blacktop
 
