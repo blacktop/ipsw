@@ -111,6 +111,15 @@
     </item>
     
     <item>
+      <title>Img4</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/img4/</link>
+      <pubDate>Mon, 30 Mar 2020 17:48:08 -0400</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/img4/</guid>
+      <description>Parse Img4 files.</description>
+    </item>
+    
+    <item>
       <title>completion</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/completion/</link>
       <pubDate>Sun, 26 Jan 2020 11:05:13 -0500</pubDate>
