@@ -105,10 +105,10 @@
     "Model": "APL2498",
     "Semiconductor": "32 nm HKMG",
     "DieSize": "69.6 mm2",
-    "Transistors": "s5l8942x",
+    "Transistors": "",
     "CPUISA": "ARMv7",
     "CPU": "0.8–1.0 GHz dual-core Cortex-A9 (one core locked in Apple TV)",
-    "CPUID": "",
+    "CPUID": "s5l8942x",
     "CPUCache": ["L1i: 32 KB", "L1d: 32 KB", "L2: 1 MB"],
     "GPU": "PowerVR SGX543MP2 (dual-core) @ 200 MHz (12.8 GFLOPS)",
     "AIAccelerator": "",
@@ -407,7 +407,7 @@
     ]
   },
   {
-    "Name": "A12X Bionic",
+    "Name": "A12X/A12Z Bionic",
     "Model": "APL1083",
     "Semiconductor": "7 nm FinFET (TSMC N7)",
     "DieSize": "≈135 mm2",
@@ -416,11 +416,16 @@
     "CPU": "2.49 GHz octa-core (4× Vortex + 4× Tempest)",
     "CPUID": "T8027",
     "CPUCache": ["L1i: 128 KB", "L1d: 128 KB", "L2: 8 MB", "L3: none"],
-    "GPU": "Custom design (hepta-core)",
+    "GPU": "Custom design (hepta-core)/Custom design (octa-core)",
     "AIAccelerator": "Neural Engine (octa-core)",
     "Memory": "64-bit Dual-channel 2133 MHz LPDDR4X (68.2 GB/s)",
-    "Introduced": "October 2018",
-    "Devices": ["iPad Pro (11.0-inch)", "iPad Pro (12.9-inch) (3rd gen.)"]
+    "Introduced": "October 2018/March 2020",
+    "Devices": [
+      "iPad Pro (11.0-inch)",
+      "iPad Pro (12.9-inch) (3rd gen.)",
+      "iPad Pro (11.0-inch) (2020 4th gen.)",
+      "iPad Pro (12.9-inch) (2020 4th gen.)"
+    ]
   },
   {
     "Name": "A13 Bionic",
