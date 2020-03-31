@@ -10,6 +10,7 @@ summary: List all iOS devices.
 
 ```bash
 ❯ ipsw device-list
+
 +------------+--------------------------------+--------------+------------+
 |  PRODUCT   |          DESCRIPTION           | ARCHITECTURE | MEMORY(GB) |
 +------------+--------------------------------+--------------+------------+
@@ -86,6 +87,9 @@ summary: List all iOS devices.
 | iPad7,5    | iPad (6th gen)                 | arm64        | 2          |
 | iPad7,6    | iPad (6th gen)                 | arm64        | 2          |
 | iPad8,1    | iPad Pro (11-inch)             | arm64e       | 3          |
+| iPad8,10   | iPad Pro (11-inch) (2nd gen)   | arm64e       | 6          |
+| iPad8,11   | iPad Pro (12.9-inch) (4th gen) | arm64e       | 6          |
+| iPad8,12   | iPad Pro (12.9-inch) (4th gen) | arm64e       | 6          |
 | iPad8,2    | iPad Pro (11-inch)             | arm64e       | 6          |
 | iPad8,3    | iPad Pro (11-inch)             | arm64e       | 3          |
 | iPad8,4    | iPad Pro (11-inch)             | arm64e       | 6          |
@@ -93,6 +97,7 @@ summary: List all iOS devices.
 | iPad8,6    | iPad Pro (12.9-inch) (3rd gen) | arm64e       | 6          |
 | iPad8,7    | iPad Pro (12.9-inch) (3rd gen) | arm64e       | 3          |
 | iPad8,8    | iPad Pro (12.9-inch) (3rd gen) | arm64e       | 6          |
+| iPad8,9    | iPad Pro (11-inch) (2nd gen)   | arm64e       | 6          |
 | iPhone10,1 | iPhone 8                       | arm64        | 2          |
 | iPhone10,2 | iPhone 8 Plus                  | arm64        | 4          |
 | iPhone10,3 | iPhone X                       | arm64        | 4          |
