@@ -159,7 +159,7 @@ kernelcache.release.n102.decompressed
 Only download files that match a given name/path
 
 ```bash
-$ ipsw download -v 13.2.3 -d iPhone12,3 pattern Firmware/all_flash/iBoot
+$ ipsw download -v 13.4 -d iPhone12,3 pattern iBoot
 ```
 
 ```bash
