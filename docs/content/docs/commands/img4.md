@@ -8,6 +8,8 @@ summary: Parse Img4 files.
 
 ## **img4 dec**
 
+⚠️ **NOTE:** _not supported on Windows_
+
 ### Decrypt an `Im4p` file
 
 Download _just_ iBoot
