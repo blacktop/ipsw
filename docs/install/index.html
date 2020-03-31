@@ -181,7 +181,8 @@
 <div class="content ">
   <h2 id="macos">macOS</h2>
 <p>Via <a href="https://brew.sh">homebrew</a></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ brew install blacktop/tap/ipsw
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ brew install capstone --HEAD
+$ brew install blacktop/tap/ipsw
 </code></pre></div><blockquote>
 <p>For version that does <strong>NOT</strong> require <strong>lzfse</strong> or <strong>capstone</strong> use the <strong>macOS_amd64.tar.gz</strong> without <strong>extras</strong> in the <a href="https://github.com/blacktop/ipsw/releases/latest">releases</a></p>
 </blockquote>
@@ -191,7 +192,10 @@
 <hr>
 <h2 id="linuxdocker">linux/docker</h2>
 <p><a href="https://hub.docker.com/r/blacktop/ipsw/"><img src="https://img.shields.io/docker/stars/blacktop/ipsw.svg" alt="Docker Stars"></a> <a href="https://hub.docker.com/r/blacktop/ipsw/"><img src="https://img.shields.io/docker/pulls/blacktop/ipsw.svg" alt="Docker Pulls"></a> <a href="https://hub.docker.com/r/blacktop/ipsw/"><img src="https://img.shields.io/badge/docker%20image-114MB-blue.svg" alt="Docker Image"></a></p>
+<p>Download docker image</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ docker pull blacktop/ipsw
+</code></pre></div><p>Create <code>alias</code> to use like a binary</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">$ alias ipsw=&#39;docker run -it --rm -v $(pwd):/data blacktop/ipsw&#39;
 </code></pre></div>
 </div>
 </div>
