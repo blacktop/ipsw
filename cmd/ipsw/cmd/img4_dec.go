@@ -57,6 +57,10 @@ var decImg4Cmd = &cobra.Command{
 		}
 
 		ivkeyStr, _ := cmd.Flags().GetString("iv-key")
+		if len(ivkeyStr) == 0 {
+			return errors.New("you must supply an ivkey with the flag --iv-key")
+		}
+
 		ivkey, _ := hex.DecodeString(ivkeyStr)
 		iv := ivkey[:aes.BlockSize]
 		key := ivkey[aes.BlockSize:]
@@ -76,8 +80,6 @@ var decImg4Cmd = &cobra.Command{
 			return errors.Wrap(err, "failed to create new AES cipher")
 		}
 
-		// The IV needs to be unique, but not secure. Therefore it's common to
-		// include it at the beginning of the ciphertext.
 		if len(i.Data) < aes.BlockSize {
 			return errors.Errorf("Im4p data too short")
 		}
@@ -89,7 +91,6 @@ var decImg4Cmd = &cobra.Command{
 
 		mode := cipher.NewCBCDecrypter(block, iv)
 
-		// CryptBlocks can work in-place if the two arguments are the same.
 		mode.CryptBlocks(i.Data, i.Data)
 
 		decData := lzfse.DecodeBuffer(i.Data)
@@ -97,7 +98,7 @@ var decImg4Cmd = &cobra.Command{
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", args[0]+".dec"))
 		err = ioutil.WriteFile(args[0]+".dec", decData, 0644)
 		if err != nil {
-			return errors.Wrap(err, "unabled decrypt Img4")
+			return errors.Wrapf(err, "failed to write file: ", args[0]+".dec")
 		}
 
 		return nil
