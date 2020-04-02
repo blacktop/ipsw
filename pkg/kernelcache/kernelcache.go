@@ -18,6 +18,8 @@ import (
 
 	"github.com/apex/log"
 	lzfse "github.com/blacktop/go-lzfse"
+	"github.com/blacktop/go-plist"
+	bkmcho "github.com/blacktop/ipsw/pkg/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/lzss"
@@ -64,6 +66,255 @@ type CompressedCache struct {
 	Header interface{}
 	Size   int
 	Data   []byte
+}
+
+type PrelinkInfo struct {
+	PrelinkInfoDictionary []CFBundle `plist:"_PrelinkInfoDictionary,omitempty"`
+}
+
+type CFBundle struct {
+	Name                  string `plist:"CFBundleName,omitempty"`
+	ID                    string `plist:"CFBundleIdentifier,omitempty"`
+	InfoDictionaryVersion string `plist:"CFBundleInfoDictionaryVersion,omitempty"`
+	CompatibleVersion     string `plist:"OSBundleCompatibleVersion,omitempty"`
+	Version               string `plist:"CFBundleVersion,omitempty"`
+	Required              string `plist:"OSBundleRequired,omitempty"`
+	Executable            string `plist:"CFBundleExecutable,omitempty"`
+	OSKernelResource      bool   `plist:"OSKernelResource,omitempty"`
+	GetInfoString         string `plist:"CFBundleGetInfoString,omitempty"`
+	AllowUserLoad         bool   `plist:"OSBundleAllowUserLoad,omitempty"`
+	Signature             string `plist:"CFBundleSignature,omitempty"`
+	PackageType           string `plist:"CFBundlePackageType,omitempty"`
+	DevelopmentRegion     string `plist:"CFBundleDevelopmentRegion,omitempty"`
+	ShortVersionString    string `plist:"CFBundleShortVersionString,omitempty"`
+	ExecutableLoadAddr    uint64 `plist:"_PrelinkExecutableLoadAddr"`
+}
+
+func (pi *PrelinkInfo) ForeachBundle(visitor func(b * CFBundle) error) {
+	for _, bundle := range pi.PrelinkInfoDictionary {
+		bnd := bundle
+		if visitor(&bnd) != nil {
+			return
+		}
+	}
+}
+
+func (kc * KernelCache) KextWithName(name string) (*bkmcho.File, error) {
+	plkDict, err := kc.PrelinkInfoDict()
+	if err != nil {
+		return nil, err
+	}
+
+	var textBase uint64
+	plkDict.ForeachBundle(func(b * CFBundle) error {
+		if b.ID == name {
+			textBase = b.ExecutableLoadAddr
+			return io.EOF
+		}
+		return nil
+	})
+
+	if textBase == 0 {
+		return nil, fmt.Errorf("Couldn't find %s in LinkEdit Plist", name)
+	}
+
+	var kext *bkmcho.File
+	kc.ForeachMachO(func(m * bkmcho.File, offset int64) error {
+		textSegment, err := m.SegmentByName("__TEXT")
+		if err != nil {
+			return nil // continue
+		}
+
+		if textSegment.Addr != textBase {
+			return nil // continue
+		}
+
+		kext = m
+		return io.EOF
+	})
+
+	if kext == nil {
+		return nil, fmt.Errorf("Couldn't find %s")
+	}
+
+	return kext, nil
+}
+
+type addressOffsetPair struct {
+	address	uint64
+	offset	uint64
+}
+
+type prelinkOffsets struct {
+	prelinkText		addressOffsetPair
+	prelinkTextExec		addressOffsetPair
+	prelinkData		addressOffsetPair
+	prelinkDataConst	addressOffsetPair
+	prelinkLinkEdit		addressOffsetPair
+	prelinkInfo		addressOffsetPair
+}
+
+func addressOffsetPairForSegment(seg * bkmcho.Segment) addressOffsetPair {
+	return addressOffsetPair{
+		address: seg.Addr,
+		offset: seg.Offset,
+	}
+}
+
+type KernelCache struct {
+	r *os.File
+	plkOffsets * prelinkOffsets
+	plkDict * PrelinkInfo
+}
+
+func (k * KernelCache) Close() {
+	k.r.Close()
+}
+
+func (k * KernelCache) Reader() *os.File {
+	return k.r
+}
+
+func NewKernelCache(cache string) (*KernelCache, error) {
+	kc := &KernelCache{}
+	
+	f, err := os.Open(cache)
+	if err != nil {
+		return nil, err
+	}
+
+	kc.r = f
+
+	return kc, nil
+}
+
+func (kc * KernelCache) PrelinkOffsets() (*prelinkOffsets, error) {
+	if kc.plkOffsets != nil {
+		return kc.plkOffsets, nil
+	}
+
+	ra := io.NewSectionReader(kc.r, 0, 1<<63-1)
+	kernelMachO, err := bkmcho.NewFile(ra)
+	if err != nil {
+		return nil, err
+	}
+
+	var offsets prelinkOffsets
+
+	for _, seg := range kernelMachO.Segments() {
+		var pair *addressOffsetPair
+
+		switch seg.Name {
+		case "__PRELINK_TEXT":
+			pair = &offsets.prelinkText
+		case "__PRELINK_INFO":
+			pair = &offsets.prelinkInfo
+		case "__PLK_TEXT_EXEC":
+			pair = &offsets.prelinkTextExec
+		case "__PRELINK_DATA":
+			pair = &offsets.prelinkData
+		case "__PLK_DATA_CONST":
+			pair = &offsets.prelinkDataConst
+		case "__PLK_LINKEDIT":
+			pair = &offsets.prelinkLinkEdit
+		}
+
+		if nil != pair {
+			*pair = addressOffsetPairForSegment(seg)
+		}
+	}
+
+	kc.plkOffsets = &offsets
+
+	return &offsets, nil
+}
+
+func (kc * KernelCache) PrelinkInfoDict() (*PrelinkInfo, error) {
+	if kc.plkDict != nil {
+		return kc.plkDict, nil
+	}
+
+	ra := io.NewSectionReader(kc.r, 0, 1<<63-1)
+	kernelMachO, err := bkmcho.NewFile(ra)
+	if err != nil {
+		return nil, err
+	}
+
+	sect, err := kernelMachO.SectionByName("__PRELINK_INFO", "__info")
+	if err != nil {
+		return nil, err
+	}
+
+	f := sect.Open()
+
+	data := make([]byte, sect.Size)
+	_, err = f.Read(data)
+	if err != nil {
+		return nil, err
+	}
+
+	var prelink PrelinkInfo
+	decoder := plist.NewDecoder(bytes.NewReader(bytes.Trim([]byte(data), "\x00")))
+	err = decoder.Decode(&prelink)
+	if err != nil {
+		return nil, err
+	}
+
+	kc.plkDict = &prelink
+
+	return &prelink, nil
+}
+
+// SlideOffset slides an offset from a segment of the given its name and address.  Slide must be added
+// to each segment of a kext because without it, their offsets won't be accurate.
+func (offsets * prelinkOffsets) SlideOffset(segname string, addr uint64) uint64 {
+	pair := &addressOffsetPair{}
+
+	switch segname {
+	case "__TEXT":
+		pair = &offsets.prelinkText
+	case "__TEXT_EXEC":
+		pair = &offsets.prelinkTextExec
+	case "__DATA":
+		pair = &offsets.prelinkData
+	case "__DATA_CONST":
+		pair = &offsets.prelinkDataConst
+	}
+
+	return pair.offset - pair.address + addr
+}
+
+func (kc * KernelCache) ForeachMachO(visitor func(*bkmcho.File, int64) error) error {
+	for {
+		var magic uint32
+		err := binary.Read(kc.r, binary.LittleEndian, &magic)
+		if err != nil {
+			return err
+		}
+
+		if magic != 0xfeedfacf {
+			continue
+		}
+
+		seek, err := kc.r.Seek(0, io.SeekCurrent)
+		if err != nil {
+			return err
+		}
+
+		r2 := io.NewSectionReader(kc.r, seek - 4, 1<<63-1)
+		m, err := bkmcho.NewFile(r2)
+
+		if _, err2 := kc.r.Seek(seek + 32, io.SeekStart); err2 != nil {
+			return err2
+		}
+
+		if err == nil {
+			err = visitor(m, seek - 4)
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 // ParseImg4Data parses a img4 data containing a compressed kernelcache.
