@@ -19,7 +19,6 @@ import (
 	"github.com/apex/log"
 	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-plist"
-	bkmcho "github.com/blacktop/ipsw/pkg/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/lzss"
@@ -99,7 +98,7 @@ func (pi *PrelinkInfo) ForeachBundle(visitor func(b * CFBundle) error) {
 	}
 }
 
-func (kc * KernelCache) KextWithName(name string) (*bkmcho.File, error) {
+func (kc * KernelCache) KextWithName(name string) (*macho.File, error) {
 	plkDict, err := kc.PrelinkInfoDict()
 	if err != nil {
 		return nil, err
@@ -118,10 +117,10 @@ func (kc * KernelCache) KextWithName(name string) (*bkmcho.File, error) {
 		return nil, fmt.Errorf("Couldn't find %s in LinkEdit Plist", name)
 	}
 
-	var kext *bkmcho.File
-	kc.ForeachMachO(func(m * bkmcho.File, offset int64) error {
-		textSegment, err := m.SegmentByName("__TEXT")
-		if err != nil {
+	var kext *macho.File
+	kc.ForeachMachO(func(m * macho.File, offset int64) error {
+		textSegment := m.SegmentByName("__TEXT")
+		if textSegment == nil {
 			return nil // continue
 		}
 
@@ -154,7 +153,7 @@ type prelinkOffsets struct {
 	prelinkInfo		addressOffsetPair
 }
 
-func addressOffsetPairForSegment(seg * bkmcho.Segment) addressOffsetPair {
+func addressOffsetPairForSegment(seg * macho.Segment) addressOffsetPair {
 	return addressOffsetPair{
 		address: seg.Addr,
 		offset: seg.Offset,
@@ -194,7 +193,7 @@ func (kc * KernelCache) PrelinkOffsets() (*prelinkOffsets, error) {
 	}
 
 	ra := io.NewSectionReader(kc.r, 0, 1<<63-1)
-	kernelMachO, err := bkmcho.NewFile(ra)
+	kernelMachO, err := macho.NewFile(ra)
 	if err != nil {
 		return nil, err
 	}
@@ -235,14 +234,14 @@ func (kc * KernelCache) PrelinkInfoDict() (*PrelinkInfo, error) {
 	}
 
 	ra := io.NewSectionReader(kc.r, 0, 1<<63-1)
-	kernelMachO, err := bkmcho.NewFile(ra)
+	kernelMachO, err := macho.NewFile(ra)
 	if err != nil {
 		return nil, err
 	}
 
-	sect, err := kernelMachO.SectionByName("__PRELINK_INFO", "__info")
-	if err != nil {
-		return nil, err
+	sect := kernelMachO.SectionByName("__PRELINK_INFO", "__info")
+	if sect == nil {
+		return nil, fmt.Errorf("No prelink section")
 	}
 
 	f := sect.Open()
@@ -284,7 +283,7 @@ func (offsets * prelinkOffsets) SlideOffset(segname string, addr uint64) uint64 
 	return pair.offset - pair.address + addr
 }
 
-func (kc * KernelCache) ForeachMachO(visitor func(*bkmcho.File, int64) error) error {
+func (kc * KernelCache) ForeachMachO(visitor func(*macho.File, int64) error) error {
 	for {
 		var magic uint32
 		err := binary.Read(kc.r, binary.LittleEndian, &magic)
@@ -302,7 +301,7 @@ func (kc * KernelCache) ForeachMachO(visitor func(*bkmcho.File, int64) error) er
 		}
 
 		r2 := io.NewSectionReader(kc.r, seek - 4, 1<<63-1)
-		m, err := bkmcho.NewFile(r2)
+		m, err := macho.NewFile(r2)
 
 		if _, err2 := kc.r.Seek(seek + 32, io.SeekStart); err2 != nil {
 			return err2

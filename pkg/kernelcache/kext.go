@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/blacktop/go-macho"
 )
 
 // KextList lists all the kernel extensions in the kernelcache
@@ -49,6 +47,39 @@ func unSeek(fh * os.File, thingy func() error) error {
 	return err
 }
 
+type Segment64 struct {
+	LoadCmd	  uint32
+	Len       uint32
+	Name      [16]byte
+	Addr      uint64
+	Memsz     uint64
+	Offset    uint64
+	Filesz    uint64
+	Maxprot   uint32
+	Prot      uint32
+	Nsect     uint32
+	Flag      uint32
+}
+
+type Section64 struct {
+	Name      [16]byte
+	Seg       [16]byte
+	Addr      uint64
+	Size      uint64
+	Offset    uint32
+	Align     uint32
+	Reloff    uint32
+	Nreloc    uint32
+	Flags     uint32
+	Reserved1 uint32
+	Reserved2 uint32
+	Reserved3 uint32
+}
+
+func roundUp64(x, y uint64) uint64 {
+	return (x + y) & (^(y - 1))
+}
+
 // ExtractKext locates the specified kext and writes it to a file with the same name.
 func ExtractKext(kernel, kextName string) error {
 	fh, err := os.Create(kextName)
@@ -86,7 +117,7 @@ func ExtractKext(kernel, kextName string) error {
 	fmt.Println("Copying Segment data...")
 	fmt.Println()
 
-	segOffset := 0
+	var segOffset uint64
 	segOffsets := make([]uint64, 0)
 	for _, seg := range kext.Segments() {
 		fmt.Printf("%16s: Offset [0x%.16x -> ", seg.Name, seg.Offset)
@@ -94,9 +125,11 @@ func ExtractKext(kernel, kextName string) error {
 		seg.Offset = plkOffsets.SlideOffset(seg.Name, seg.Addr)
 		fmt.Printf("0x%.16x (0x%.16x)] %d bytes\n", seg.Offset, segOffset, seg.Filesz)
 
-		segDatum := make([]byte, seg.Filesz)
+		// round the segment's on-disk size up to 4096
+		segDiskSize := roundUp64(seg.Filesz, 0x1000)
+		segDatum := make([]byte, segDiskSize)
 		if seg.Name != "__LINKEDIT" {
-			if n, err := kc.Reader().ReadAt(segDatum, int64(seg.Offset)); n != int(seg.Filesz) {
+			if n, err := kc.Reader().ReadAt(segDatum[:seg.Filesz], int64(seg.Offset)); n != int(seg.Filesz) {
 				fmt.Printf("  Couldn't read segment data at %x: %v", seg.Offset, err)
 			}
 		}
@@ -107,7 +140,7 @@ func ExtractKext(kernel, kextName string) error {
 		}
 
 		segOffsets = append(segOffsets, uint64(segOffset))
-		segOffset += len(segDatum)
+		segOffset += segDiskSize
 	}
 
 	fmt.Println()
@@ -121,7 +154,7 @@ func ExtractKext(kernel, kextName string) error {
 	}
 
 	for i := 0; i < len(segOffsets); i++ {
-		var segHeader macho.Segment64
+		var segHeader Segment64
 		err := unSeek(fh, func() error {
 			if err2 := binary.Read(fh, binary.LittleEndian, &segHeader); err2 != nil {
 				fmt.Printf("Couldn't read segment header: %v\n", err2)
@@ -145,7 +178,7 @@ func ExtractKext(kernel, kextName string) error {
 		}
 
 		for i := 0; i < int(segHeader.Nsect); i++ {
-			var sectHeader macho.Section64
+			var sectHeader Section64
 
 			err = unSeek(fh, func() error {
 				if err2 := binary.Read(fh, binary.LittleEndian, &sectHeader); err2 != nil {
