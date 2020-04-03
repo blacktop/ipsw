@@ -1,4 +1,0 @@
-[submodule "vendor/lzfse"]
-	path = vendor/lzfse
-	url = https://github.com/lzfse/lzfse.git
-	branch = master
