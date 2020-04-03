@@ -30,8 +30,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/demangle"
-	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/knightsc/gapstone"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"

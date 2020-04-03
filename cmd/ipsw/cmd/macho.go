@@ -29,7 +29,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/macho"
+	"github.com/blacktop/go-macho"
 	"github.com/spf13/cobra"
 )
 
@@ -101,9 +101,13 @@ var machoCmd = &cobra.Command{
 			// prevSeg = sec.Seg
 		}
 		w.Flush()
-
-		fmt.Printf("Dyld ID: %s (%s)\n", m.DylibID().Name, m.DylibID().CurrentVersion)
-		fmt.Println("SourceVersion:", m.SourceVersion().Version)
+		
+		if m.DylibID() != nil {
+			fmt.Printf("Dyld ID: %s (%s)\n", m.DylibID().Name, m.DylibID().CurrentVersion)
+		}
+		if m.SourceVersion() != nil {
+			fmt.Println("SourceVersion:", m.SourceVersion().Version)
+		}
 
 		if symbols {
 			fmt.Println("SYMBOLS")

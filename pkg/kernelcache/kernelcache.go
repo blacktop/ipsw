@@ -5,7 +5,6 @@ package kernelcache
 import (
 	"archive/zip"
 	"bytes"
-	"debug/macho"
 	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
@@ -14,6 +13,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/blacktop/go-macho"
 
 	"github.com/apex/log"
 	lzfse "github.com/blacktop/go-lzfse"

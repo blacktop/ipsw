@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/pkg/macho"
 )
 
 type prelinkInfo struct {

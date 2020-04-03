@@ -5,7 +5,7 @@ import (
 	"math/bits"
 	"strings"
 
-	"github.com/blacktop/ipsw/pkg/macho/types"
+	"github.com/blacktop/go-macho/types"
 )
 
 type formatVersion uint32
