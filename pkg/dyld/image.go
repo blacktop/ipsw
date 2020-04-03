@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/buffer"
-	"github.com/blacktop/ipsw/pkg/macho"
-	"github.com/blacktop/ipsw/pkg/macho/commands"
 	"github.com/pkg/errors"
 )
 
@@ -132,7 +132,7 @@ func (i *CacheImage) Open() io.ReadSeeker {
 // GetPartialMacho parses dyld image header as a partial MachO
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	r := io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize))
-	m, err := macho.NewFileFromDyld(r, commands.LoadCmdSegment64, commands.LoadCmdDyldInfoOnly, commands.LoadCmdDylibID)
+	m, err := macho.NewFile(r, types.LcSegment64, types.LcDyldInfoOnly, types.LcDylibID)
 	if err != nil {
 		return nil, err
 	}

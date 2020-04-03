@@ -2,7 +2,6 @@ package kernelcache
 
 import (
 	"bufio"
-	"debug/macho"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -10,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing/iotest"
+
+	"github.com/blacktop/go-macho"
 )
 
 // ParseMachO parses the kernelcache as a mach-o

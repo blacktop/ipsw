@@ -28,8 +28,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/macho"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )

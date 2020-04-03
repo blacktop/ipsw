@@ -1,5 +1,7 @@
 module github.com/blacktop/ipsw
 
+go 1.14
+
 require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
@@ -9,6 +11,7 @@ require (
 	github.com/antchfx/xpath v1.1.4 // indirect
 	github.com/apex/log v1.1.2
 	github.com/blacktop/go-lzfse v1.1.10
+	github.com/blacktop/go-macho v1.0.3
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.0
 	github.com/blacktop/ranger v1.0.3
@@ -46,5 +49,3 @@ require (
 	gopkg.in/ini.v1 v1.54.0 // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )
-
-go 1.13
