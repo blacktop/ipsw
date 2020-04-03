@@ -46,6 +46,12 @@ lint: ## Run all the linters
 		./...
 		markdownfmt -w README.md
 
+.PHONY: update_mod
+update_mod:
+	rm go.sum
+	go mod download
+	go mod tidy
+
 .PHONY: update_devs
 update_devs:
 	CGO_ENABLED=1 CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
