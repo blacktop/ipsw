@@ -15,8 +15,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/macho/types"
 	"github.com/pkg/errors"
 )
 

@@ -11,7 +11,7 @@ import (
 	"unicode"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/macho"
+	"github.com/blacktop/go-macho"
 	"github.com/pkg/errors"
 )
 

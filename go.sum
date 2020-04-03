@@ -40,6 +40,8 @@ github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
 github.com/blacktop/go-lzfse v1.1.10 h1:dbKhrw3/Sv0yPPJdsYDeP05GnEb0P1z7lVT5VSsHoeE=
 github.com/blacktop/go-lzfse v1.1.10/go.mod h1:b/0s26ecQ5SleO5NO41iY2Ie32rZxS5BKQstc5z2ia8=
+github.com/blacktop/go-macho v1.0.1 h1:SMyWxg+U4oB0asphx+8uaNQJbJgo7Kzs4jJ0bKjvPrw=
+github.com/blacktop/go-macho v1.0.1/go.mod h1:Mj6ORK0tK9FOkvzUFX1q99/SC2dQT/d43gb9HFY/APM=
 github.com/blacktop/go-plist v1.0.0 h1:bBpFGaiCdJZbQgOKxjxAUdvugySX+C3RtGvZODcOOoI=
 github.com/blacktop/go-plist v1.0.0/go.mod h1:niIOeDMEBISbJ9w0PPuc67iLvLh7Ve0N1gAfxIRWSk4=
 github.com/blacktop/lzss v0.1.0 h1:o0S0ZiBX9tIPNNx4W+AUUbVhcwaVFoFrZa7Zbdo7xJU=
@@ -116,7 +118,6 @@ github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c/go.mod h1:DqJ97dSdRW
 github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
 github.com/inconshreveable/mousetrap v1.0.0 h1:Z8tu5sraLXCXIcARxBp/8cbvlwVa7Z1NHg9XEKhtSvM=
 github.com/inconshreveable/mousetrap v1.0.0/go.mod h1:PxqpIevigyE2G7u3NXJIT2ANytuPF1OarO4DADm73n8=
-github.com/jawher/mow.cli v1.1.0 h1:NdtHXRc0CwZQ507wMvQ/IS+Q3W3x2fycn973/b8Zuk8=
 github.com/jawher/mow.cli v1.1.0/go.mod h1:aNaQlc7ozF3vw6IJ2dHjp2ZFiA4ozMIYY6PyuRJwlUg=
 github.com/jessevdk/go-flags v1.4.0/go.mod h1:4FA24M0QyGHXBuZZK/XkWh8h0e1EYbRYJSGM75WSRxI=
 github.com/jinzhu/gorm v1.9.12 h1:Drgk1clyWT9t9ERbzHza6Mj/8FY/CqMyVzOiHviMo6Q=
