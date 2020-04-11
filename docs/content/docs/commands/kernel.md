@@ -29,8 +29,6 @@ $ ipsw kernel extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
 
 ### **kernel dec**
 
-⚠️ **NOTE:** _not supported on Windows_
-
 Decompress a previously extracted **kernelcache**
 
 ```bash

@@ -6,11 +6,10 @@ weight: 3
 summary: Build from source
 ---
 
-## **WITH** support for **lzfse** compression and **capstone** disassembly
+## **WITH** support for **capstone** disassembly
 
 #### Dependancies:
 
-- [lzfse](https://github.com/lzfse/lzfse)
 - [capstone](https://github.com/aquynh/capstone/tree/next)
 
 ### Install the dependancies
@@ -18,22 +17,10 @@ summary: Build from source
 Via [homebrew](https://brew.sh)
 
 ```bash
-$ brew install lzfse
 $ brew install capstone --HEAD
 ```
 
 From source
-
-- [lzfse](https://github.com/lzfse/lzfse)
-
-```bash
-$ git clone https://github.com/lzfse/lzfse.git
-$ cd lzfse
-$ mkdir build
-$ cd build
-$ cmake ..
-$ make install
-```
 
 - [capstone](https://github.com/aquynh/capstone/tree/next)
 
@@ -50,12 +37,12 @@ $ sudo ./make.sh install
 $ git clone https://github.com/blacktop/ipsw.git
 $ cd ipsw
 $ CGO_ENABLED=1 \
-  CGO_CFLAGS=-I/usr/local/include \ # path to the lzfse and capstone includes
-  CGO_LDFLAGS=-L/usr/local/lib \    # path to the lzfse and capstone libs
+  CGO_CFLAGS=-I/usr/local/include \ # path to the capstone includes
+  CGO_LDFLAGS=-L/usr/local/lib \    # path to the capstone libs
   go build ./cmd/ipsw
 ```
 
-## **WITHOUT** support for **lzfse** compression and **capstone** disassembly
+## **WITHOUT** support for **capstone** disassembly
 
 #### Install the Go binary
 
@@ -66,6 +53,14 @@ $ CGO_ENABLED=0 go build ./cmd/ipsw
 ```
 
 ## **WITHOUT** internet
+
+On internet connected machine with Go installed
+
+```bash
+$ go mod vendor
+```
+
+Now copy the project's directory to _no-net_ machine
 
 Add `--mod=vendor` to use the Go deps in the vendor folder
 

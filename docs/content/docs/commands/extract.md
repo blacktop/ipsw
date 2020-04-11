@@ -6,15 +6,13 @@ weight: 7
 summary: Combine extract commands together.
 ---
 
-### ⚠️ _(not supported on Windows)_
-
-#### Extract _kernelcache_ from a previously downloaded _ipsw_
+### Extract _kernelcache_ from a previously downloaded _ipsw_
 
 ```bash
 $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
-#### Extract _dyld_shared_cache_ from a previously downloaded _ipsw_
+### Extract _dyld_shared_cache_ from a previously downloaded _ipsw_
 
 - `macOS`
 
