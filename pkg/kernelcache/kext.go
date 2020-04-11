@@ -1,5 +1,3 @@
-// +build linux,cgo darwin,cgo
-
 package kernelcache
 
 import (
@@ -8,7 +6,7 @@ import (
 	"os"
 
 	"github.com/blacktop/go-macho"
-	"howett.net/plist"
+	"github.com/blacktop/go-plist"
 )
 
 // KextList lists all the kernel extensions in the kernelcache
@@ -33,7 +31,7 @@ func KextList(kernel string) error {
 				return err
 			}
 
-			var prelink prelinkInfo
+			var prelink PrelinkInfo
 			decoder := plist.NewDecoder(bytes.NewReader(bytes.Trim([]byte(data), "\x00")))
 			err = decoder.Decode(&prelink)
 			if err != nil {
