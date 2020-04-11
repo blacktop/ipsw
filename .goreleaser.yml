@@ -92,8 +92,6 @@ brews:
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
     dependencies:
-      - lzfse
-      - xz
       # - capstone
     install: |
       bin.install "ipsw"
