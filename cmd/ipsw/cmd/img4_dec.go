@@ -1,5 +1,3 @@
-// +build !windows,cgo
-
 /*
 Copyright © 2020 blacktop
 
@@ -24,15 +22,16 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 
+	"github.com/aixiansheng/lzfse"
 	"github.com/apex/log"
-	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/pkg/errors"
@@ -93,12 +92,17 @@ var decImg4Cmd = &cobra.Command{
 
 		mode.CryptBlocks(i.Data, i.Data)
 
-		decData := lzfse.DecodeBuffer(i.Data)
+		lr := lzfse.NewReader(bytes.NewReader(i.Data))
+
+		of, err := os.Create(args[0] + ".dec")
+		if err != nil {
+			return errors.Wrapf(err, "failed to create file: ", args[0]+".dec")
+		}
 
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", args[0]+".dec"))
-		err = ioutil.WriteFile(args[0]+".dec", decData, 0644)
+		_, err = io.Copy(of, lr)
 		if err != nil {
-			return errors.Wrapf(err, "failed to write file: ", args[0]+".dec")
+			return errors.Wrapf(err, "failed to decompress to file: ", args[0]+".dec")
 		}
 
 		return nil

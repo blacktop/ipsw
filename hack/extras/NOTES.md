@@ -15,3 +15,14 @@ $ echo "__TFCSo8NSStringCfMS_FT6stringSS_S_" | xcrun swift-demangle
 
 ___C.NSString.__allocating_init(__C.NSString.Type) -> (string: Swift.String) -> __C.NSString
 ```
+
+### lzfse
+
+#### src
+
+- https://github.com/lzfse/lzfse
+
+Ideas
+
+- https://github.com/minio/c2goasm
+- https://github.com/minio/asm2plan9s

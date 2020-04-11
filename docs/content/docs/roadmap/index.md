@@ -16,7 +16,7 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 - [x] parse plists for folder creation
 - [ ] MachO read/write
 - [ ] pure Go dyld splitter
-- [ ] pure Go lzfse
+- [x] pure Go lzfse _(thanks to [aixiansheng/lzfse](https://github.com/aixiansheng/lzfse))_
 - [x] OTA support
 - [ ] APFS/HFS parsing to pull dyld without mounting
 - [ ] watch for new IPSW files with https://github.com/radovskyb/watcher

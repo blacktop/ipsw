@@ -24,13 +24,12 @@ package cmd
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 
+	"github.com/aixiansheng/lzfse"
 	"github.com/apex/log"
-	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -78,13 +77,15 @@ var ibootCmd = &cobra.Command{
 		firstStartMatch := bytes.Index(dat, lzfseStart)
 		firstEndMatch := bytes.Index(dat, lzfseEnd)
 
-		decData := lzfse.DecodeBuffer(dat[firstStartMatch : firstEndMatch+4])
-		fmt.Println(hex.Dump(decData[:200]))
+		lr := lzfse.NewReader(bytes.NewReader(dat[firstStartMatch : firstEndMatch+4]))
+		// fmt.Println(hex.Dump(decData[:200]))
 
-		err = ioutil.WriteFile("firmware.bin", decData, 0644)
+		// err = ioutil.WriteFile("firmware.bin", decData, 0644)
+		outf, err := os.Create("firmware2.bin")
 		if err != nil {
 			return errors.Wrapf(err, "unabled to write file: %s", "firmware.bin")
 		}
+		io.Copy(outf, lr)
 		return nil
 	},
 }
