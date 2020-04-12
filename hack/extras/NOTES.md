@@ -26,3 +26,12 @@ Ideas
 
 - https://github.com/minio/c2goasm
 - https://github.com/minio/asm2plan9s
+
+### firmware
+
+- https://gist.github.com/mrmacete/42fc2371c3d8761ad7e8b607750ed153
+- https://github.com/mrmacete/sepsplit
+
+### JS/Web
+
+- https://github.com/indutny/macho
