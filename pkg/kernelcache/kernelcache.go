@@ -198,7 +198,6 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 
 		lr := lzfse.NewReader(bytes.NewReader(cc.Data))
 		buf := new(bytes.Buffer)
-		buf.Grow(4 * int(lzfseHeader.NumRawBytes))
 
 		_, err := buf.ReadFrom(lr)
 		if err != nil {
