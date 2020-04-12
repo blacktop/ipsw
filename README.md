@@ -3,7 +3,7 @@
   <h1 align="center">ipsw</h1>
   <h4><p align="center">Download and parse iOS ipsw(s)</p></h4>
   <p align="center">
-    <a href="https://actions-badge.atrox.dev/blacktop/ipsw/got" alt="Actions">
+    <a href="https://github.com/blacktop/ipsw/actions?query=workflow%3AGo" alt="Actions">
           <img src="https://github.com/blacktop/ipsw/workflows/Go/badge.svg" /></a>
     <a href="https://ci.appveyor.com/project/blacktop/ipsw" alt="AppVeyor">
           <img src="https://ci.appveyor.com/api/projects/status/jcx0faojt820p5w4?svg=true" /></a>
