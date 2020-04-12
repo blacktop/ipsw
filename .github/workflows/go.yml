@@ -23,13 +23,6 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y cmake libtool libc6-dev
           cd /tmp
-          git clone https://github.com/lzfse/lzfse.git
-          cd lzfse
-          mkdir build
-          cd build
-          cmake ..
-          sudo make install
-          cd /tmp
           git clone -b next https://github.com/aquynh/capstone.git
           cd capstone
           CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh
@@ -38,7 +31,6 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           brew update
-          brew install lzfse
           brew install capstone --HEAD
       # - name: Build Dependencies (Windows)
       #   if: matrix.platform == 'windows-latest'
@@ -60,7 +52,6 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-          ld -llzfse --verbose
           CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (macOS)
         if: matrix.platform == 'macos-latest'
@@ -88,12 +79,12 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: D:\a\ipsw\ipsw\build\dist\ipsw.exe device-list
 
-      # - name: Run Extract Remote Kernelcache
-      #   if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
-      #   run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V info --remote https://updates.cdn-apple.com/2019FallFCS/fullrestores/061-61311/1EF76538-179E-11EA-9FC5-AA4876E6C5EB/iPhone11,8,iPhone12,1_13.3_17C54_Restore.ipsw
-      # - name: Run Extract Remote Kernelcache (Windows)
-      #   if: matrix.platform == 'windows-latest'
-      #   run: D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 13.2.3 -d iPhone12,3
+      - name: Run Extract Remote Kernelcache
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
+        run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v 13.4.1 -d iPhone12,3
+      - name: Run Extract Remote Kernelcache (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 13.4.1 -d iPhone12,3
 
       - uses: actions/upload-artifact@master
         with:
