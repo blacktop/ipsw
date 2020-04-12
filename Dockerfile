@@ -46,15 +46,6 @@ LABEL maintainer "https://github.com/blacktop"
 RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git libattr1-dev' \
     && apt-get update \
     && apt-get install -y $buildDeps fuse3 unzip lzma \
-    && echo "===> Installing lzfse..." \
-    && cd /tmp \    
-    && git clone https://github.com/lzfse/lzfse.git \
-    && cd lzfse \
-    && mkdir build \
-    && cd build \
-    && cmake .. \
-    && make install \
-    && cd /tmp \
     && echo "===> Installing capstone..." \
     && cd /tmp \    
     && git clone -b next https://github.com/aquynh/capstone.git \
