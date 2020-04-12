@@ -138,6 +138,15 @@
     </item>
     
     <item>
+      <title>iboot</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/iboot/</link>
+      <pubDate>Sun, 12 Apr 2020 14:14:22 -0400</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/iboot/</guid>
+      <description>Parse iboot files.</description>
+    </item>
+    
+    <item>
       <title>img4</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/img4/</link>
       <pubDate>Mon, 30 Mar 2020 17:48:08 -0400</pubDate>
