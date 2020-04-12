@@ -5,8 +5,6 @@
   <p align="center">
     <a href="https://github.com/blacktop/ipsw/actions?query=workflow%3AGo" alt="Actions">
           <img src="https://github.com/blacktop/ipsw/workflows/Go/badge.svg" /></a>
-    <a href="https://ci.appveyor.com/project/blacktop/ipsw" alt="AppVeyor">
-          <img src="https://ci.appveyor.com/api/projects/status/jcx0faojt820p5w4?svg=true" /></a>
     <a href="https://github.com/blacktop/ipsw/releases/latest" alt="Downloads">
           <img src="https://img.shields.io/github/downloads/blacktop/ipsw/total.svg" /></a>
     <a href="https://github.com/blacktop/ipsw/releases" alt="GitHub Release">
