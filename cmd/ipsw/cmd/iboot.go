@@ -25,12 +25,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/aixiansheng/lzfse"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -51,11 +52,11 @@ func init() {
 
 // ibootCmd represents the iboot command
 var ibootCmd = &cobra.Command{
-	Use:    "iboot",
-	Short:  "Dump firmwares",
-	Hidden: true,
-	Args:   cobra.MinimumNArgs(1),
+	Use:   "iboot",
+	Short: "Dump firmwares",
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var name string
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -87,13 +88,32 @@ var ibootCmd = &cobra.Command{
 			}
 
 			lr := lzfse.NewReader(bytes.NewReader(dat[firstStartMatch : firstEndMatch+4]))
+			buf := new(bytes.Buffer)
 
-			outf, err := os.Create(fmt.Sprintf("firmware%d.bin", found))
+			_, err := buf.ReadFrom(lr)
+			if err != nil {
+				return errors.Wrap(err, "failed to lzfse decompress embedded firmware")
+			}
+
+			matches := utils.GrepStrings(buf.Bytes(), "AppleSMCFirmware")
+			if len(matches) > 0 {
+				name = strings.TrimPrefix(matches[0], "@@") + ".bin"
+			} else {
+				matches = utils.GrepStrings(buf.Bytes(), "AppleStorageProcessorANS2")
+				if len(matches) > 0 {
+					name = matches[0] + ".bin"
+				} else {
+					name = fmt.Sprintf("firmware%d.bin", found)
+				}
+			}
+
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", name))
+			ioutil.WriteFile(name, buf.Bytes(), 0644)
 			if err != nil {
 				return errors.Wrapf(err, "unabled to write file: %s", "firmware.bin")
 			}
 
-			io.Copy(outf, lr)
+			// io.Copy(outf, lr)
 
 			found++
 			dat = dat[firstEndMatch+4:]
