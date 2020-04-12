@@ -229,7 +229,7 @@ func getProperties(buffer io.Reader, node Node) (string, DeviceTree, error) {
 		if err != nil {
 			return "", DeviceTree{}, err
 		}
-		log.WithFields(log.Fields{"key": key, "value": value}).Debug("extracted property")
+		// log.WithFields(log.Fields{"key": key, "value": value}).Debug("extracted property")
 		if strings.EqualFold("name", key) {
 			if str, ok := value.(string); ok {
 				nodeName = str
