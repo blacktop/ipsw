@@ -24,6 +24,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -74,18 +75,30 @@ var ibootCmd = &cobra.Command{
 		lzfseEnd := make([]byte, 4)
 		binary.LittleEndian.PutUint32(lzfseStart, 0x32787662)
 		binary.LittleEndian.PutUint32(lzfseEnd, 0x24787662)
-		firstStartMatch := bytes.Index(dat, lzfseStart)
-		firstEndMatch := bytes.Index(dat, lzfseEnd)
 
-		lr := lzfse.NewReader(bytes.NewReader(dat[firstStartMatch : firstEndMatch+4]))
-		// fmt.Println(hex.Dump(decData[:200]))
+		found := 0
 
-		// err = ioutil.WriteFile("firmware.bin", decData, 0644)
-		outf, err := os.Create("firmware2.bin")
-		if err != nil {
-			return errors.Wrapf(err, "unabled to write file: %s", "firmware.bin")
+		for {
+			firstStartMatch := bytes.Index(dat, lzfseStart)
+			firstEndMatch := bytes.Index(dat, lzfseEnd)
+
+			if firstStartMatch < 0 || firstEndMatch < 0 {
+				break
+			}
+
+			lr := lzfse.NewReader(bytes.NewReader(dat[firstStartMatch : firstEndMatch+4]))
+
+			outf, err := os.Create(fmt.Sprintf("firmware%d.bin", found))
+			if err != nil {
+				return errors.Wrapf(err, "unabled to write file: %s", "firmware.bin")
+			}
+
+			io.Copy(outf, lr)
+
+			found++
+			dat = dat[firstEndMatch+4:]
 		}
-		io.Copy(outf, lr)
+
 		return nil
 	},
 }
