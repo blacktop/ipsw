@@ -2,6 +2,7 @@ package utils
 
 import (
 	"archive/zip"
+	"bytes"
 	"crypto/sha1"
 	"fmt"
 	"io"
@@ -167,4 +168,30 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 	}
 
 	return fNames, nil
+}
+
+// GrepStrings returns all matching strings in []byte
+func GrepStrings(data []byte, searchStr string) []string {
+
+	var matchStrings []string
+
+	r := bytes.NewBuffer(data[:])
+
+	for {
+		s, err := r.ReadString('\x00')
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		if len(s) > 0 && strings.Contains(s, searchStr) {
+			matchStrings = append(matchStrings, strings.Trim(s, "\x00"))
+		}
+	}
+
+	return matchStrings
 }
