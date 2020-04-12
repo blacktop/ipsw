@@ -91,8 +91,6 @@ brews:
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
-    dependencies:
-      # - capstone
     install: |
       bin.install "ipsw"
     test: |
