@@ -13,7 +13,7 @@ require (
 	github.com/apex/log v1.1.2
 	github.com/blacktop/go-macho v1.0.3
 	github.com/blacktop/go-plist v1.0.0
-	github.com/blacktop/lzss v0.1.0
+	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.9.0 // indirect
