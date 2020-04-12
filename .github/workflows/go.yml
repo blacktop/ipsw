@@ -88,7 +88,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: |
           D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 13.4.1 -d iPhone12,3
-          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V macho iPhone*/kernelcache*
+          dir
 
       - uses: actions/upload-artifact@master
         with:
