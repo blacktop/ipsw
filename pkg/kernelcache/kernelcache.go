@@ -21,38 +21,12 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	lzfseEncodeLSymbols       = 20
-	lzfseEncodeMSymbols       = 20
-	lzfseEncodeDSymbols       = 64
-	lzfseEncodeLiteralSymbols = 256
-	lzssPadding               = 0x16c
-)
-
 // Img4 Kernelcache object
 type Img4 struct {
 	IM4P    string
 	Name    string
 	Version string
 	Data    []byte
-}
-
-// A LzssHeader represents the LZSS header
-type LzssHeader struct {
-	CompressionType  uint32 // 0x636f6d70 "comp"
-	Signature        uint32 // 0x6c7a7373 "lzss"
-	CheckSum         uint32 // Likely CRC32
-	UncompressedSize uint32
-	CompressedSize   uint32
-	Padding          [lzssPadding]byte
-}
-
-// LzfseCompressedBlockHeaderV2 represents the lzfse header
-type LzfseCompressedBlockHeaderV2 struct {
-	Magic        uint32 // "bvx2"
-	NumRawBytes  uint32
-	PackedFields [3]uint64
-	Freq         [2 * (lzfseEncodeLSymbols + lzfseEncodeMSymbols + lzfseEncodeDSymbols + lzfseEncodeLiteralSymbols)]uint8
 }
 
 // A CompressedCache represents an open compressed kernelcache file.
@@ -189,12 +163,6 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 
 	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
 		utils.Indent(log.Info, 2)("Kernelcache is LZFSE compressed")
-		lzfseHeader := LzfseCompressedBlockHeaderV2{}
-		// Read entire file header.
-		if err := binary.Read(bytes.NewBuffer(cc.Data[:1000]), binary.BigEndian, &lzfseHeader); err != nil {
-			return nil, err
-		}
-		cc.Header = lzfseHeader
 
 		lr := lzfse.NewReader(bytes.NewReader(cc.Data))
 		buf := new(bytes.Buffer)
@@ -224,7 +192,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
 		utils.Indent(log.Debug, 1)("kernelcache is LZSS compressed")
 		buffer := bytes.NewBuffer(cc.Data)
-		lzssHeader := LzssHeader{}
+		lzssHeader := lzss.Header{}
 		// Read entire file header.
 		if err := binary.Read(buffer, binary.BigEndian, &lzssHeader); err != nil {
 			return nil, err
