@@ -25,7 +25,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -81,6 +81,14 @@ func doDemangle(name string) string {
 	return deStr
 }
 
+func isFunctionStart(starts []uint64, addr uint64) uint64 {
+	i := sort.Search(len(starts), func(i int) bool { return starts[i] >= addr })
+	if i < len(starts) && starts[i] == addr {
+		return starts[i+1] - addr
+	}
+	return 0
+}
+
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
 	Use:   "disass",
@@ -99,6 +107,10 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "%s appears to not be a valid MachO", args[0])
 		}
 
+		instructions, _ := cmd.Flags().GetUint64("instrs")
+
+		funcStarts := m.FunctionStarts()
+
 		if len(symbolName) > 0 {
 			startAddr, err = m.FindSymbolAddress(symbolName)
 			if err != nil {
@@ -111,13 +123,16 @@ var disCmd = &cobra.Command{
 			}
 		}
 
-		instructions, _ := cmd.Flags().GetUint64("instrs")
-
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
+		// Set number of bytes to disassemble either instrs or function size if supplied symbol
+		disassSize := 4 * instructions
+		if funcStarts != nil && startAddr > 0 {
+			funcSize := isFunctionStart(funcStarts, startAddr)
+			if funcSize != 0 && instructions < funcSize {
+				disassSize = funcSize
+			}
 		}
+		data = make([]byte, disassSize)
 
-		data = make([]byte, 4*instructions)
 		found := false
 		for _, sec := range m.Sections {
 			if sec.Name == "__text" {
@@ -151,6 +166,9 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to create capstone engine")
 		}
 
+		// turn on instruction details
+		engine.SetOption(gapstone.CS_OPT_DETAIL, gapstone.CS_OPT_ON)
+
 		insns, err := engine.Disasm(
 			data,
 			startAddr,
@@ -159,36 +177,60 @@ var disCmd = &cobra.Command{
 		if err != nil {
 			return errors.Wrapf(err, "failed to disassemble data")
 		}
-		if len(symbolName) > 0 {
-			if demangleFlag {
-				symbolName = doDemangle(symbolName)
-			}
-			fmt.Printf("%s:\n", symbolName)
-		}
+
 		for i, insn := range insns {
 			// check for start of a new function
-			if i > 0 {
+			if funcStarts != nil && isFunctionStart(funcStarts, uint64(insn.Address)) != 0 {
 				sym, err := m.FindAddressSymbol(uint64(insn.Address))
 				if err == nil {
 					if demangleFlag {
 						sym = doDemangle(sym)
 					}
-					fmt.Printf("%s:\n", sym)
+					fmt.Printf("\n%s:\n", sym)
 				}
 			}
+
+			// lookup adrp/ldr or add address as a cstring or symbol name
+			if Verbose && (insn.Mnemonic == "ldr" || insn.Mnemonic == "add") && insns[i-1].Mnemonic == "adrp" {
+				if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 1 {
+					if insns[i-1].Arm64.Operands != nil && len(insns[i-1].Arm64.Operands) > 1 {
+						adrpRegister := insns[i-1].Arm64.Operands[0].Reg
+						adrpImm := insns[i-1].Arm64.Operands[1].Imm
+						if insn.Mnemonic == "ldr" && adrpRegister == insn.Arm64.Operands[1].Mem.Base {
+							adrpImm += int64(insn.Arm64.Operands[1].Mem.Disp)
+						} else if insn.Mnemonic == "add" && adrpRegister == insn.Arm64.Operands[0].Reg {
+							adrpImm += insn.Arm64.Operands[2].Imm
+						}
+						// markup disassemble with label comment
+						sym, err := m.FindAddressSymbol(uint64(adrpImm))
+						if err == nil {
+							if demangleFlag {
+								sym = doDemangle(sym)
+							}
+							insn.OpStr += fmt.Sprintf(" // %s", sym)
+						} else {
+							cstr, err := m.GetCString(uint64(adrpImm))
+							if err == nil {
+								insn.OpStr += fmt.Sprintf(" // %s", cstr)
+							}
+						}
+					}
+				}
+			}
+
 			// check if branch location is a function
 			if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
-				symAddr := hex2int(insn.OpStr)
-				sym, err := m.FindAddressSymbol(symAddr)
-				if err == nil {
-					if demangleFlag {
-						sym = doDemangle(sym)
+				if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 1 {
+					sym, err := m.FindAddressSymbol(uint64(insn.Arm64.Operands[1].Imm))
+					if err == nil {
+						if demangleFlag {
+							sym = doDemangle(sym)
+						}
+						insn.OpStr = sym
 					}
-					// fmt.Printf("#%s\n", sym)
-					// insn.OpStr += fmt.Sprintf(" # %s", sym)
-					insn.OpStr = fmt.Sprintf("# %s", sym)
 				}
 			}
+
 			fmt.Printf("0x%x:\t%s\t\t%s\n", insn.Address, insn.Mnemonic, insn.OpStr)
 		}
 
