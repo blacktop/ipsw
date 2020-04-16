@@ -220,8 +220,8 @@ var disCmd = &cobra.Command{
 
 			// check if branch location is a function
 			if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
-				if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 1 {
-					sym, err := m.FindAddressSymbol(uint64(insn.Arm64.Operands[1].Imm))
+				if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 0 {
+					sym, err := m.FindAddressSymbol(uint64(insn.Arm64.Operands[0].Imm))
 					if err == nil {
 						if demangleFlag {
 							sym = doDemangle(sym)
