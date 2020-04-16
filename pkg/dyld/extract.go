@@ -3,17 +3,14 @@ package dyld
 import (
 	"archive/zip"
 	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/pkg/errors"
 )
 
@@ -56,7 +53,7 @@ func Extract(ipsw string) error {
 		}
 
 		utils.Indent(log.Info, 2)("Mounting DMG")
-		device, err := Mount(dmgs[0], mountPoint)
+		device, err := utils.Mount(dmgs[0], mountPoint)
 		if err != nil {
 			return errors.Wrapf(err, "failed to mount %s", dmgs[0])
 		}
@@ -71,7 +68,7 @@ func Extract(ipsw string) error {
 		}
 
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", matches[0], dyldDest))
-		err = Copy(matches[0], dyldDest)
+		err = utils.Cp(matches[0], dyldDest)
 		if err != nil {
 			return err
 		}
@@ -95,7 +92,7 @@ func Extract(ipsw string) error {
 		}
 
 		utils.Indent(log.Info, 2)("Unmounting DMG")
-		err = Unmount(device)
+		err = utils.Unmount(device)
 		if err != nil {
 			return errors.Wrapf(err, "failed to unmount %s", device)
 		}
@@ -104,74 +101,5 @@ func Extract(ipsw string) error {
 		return fmt.Errorf("dyld.Extract found more or less than one DMG (should only be one): %v", dmgs)
 	}
 
-	return nil
-}
-
-// Copy copies a file from mounted DMG to host
-func Copy(src, dst string) error {
-	from, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer from.Close()
-
-	to, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
-	if err != nil {
-		return err
-	}
-	defer to.Close()
-
-	_, err = io.Copy(to, from)
-
-	return err
-}
-
-// Mount mounts a DMG with hdiutil
-func Mount(image, mountPoint string) (string, error) {
-	if runtime.GOOS == "darwin" {
-		var attachRe = regexp.MustCompile(`/dev/disk[\d]+`)
-		cmd := exec.Command("hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
-
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, out)
-		}
-
-		return string(attachRe.Find(out)), nil
-	} else if runtime.GOOS == "linux" {
-		cmd := exec.Command("apfs-fuse", image, mountPoint)
-
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, out)
-		}
-		return mountPoint, nil
-	}
-
-	return "", nil
-}
-
-// Unmount unmounts a DMG with hdiutil
-func Unmount(deviceNode string) error {
-	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("hdiutil", "detach", deviceNode)
-
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
-
-		return nil
-
-	} else if runtime.GOOS == "linux" {
-		cmd := exec.Command("umount", deviceNode)
-
-		err := cmd.Run()
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}
 	return nil
 }
