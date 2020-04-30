@@ -183,7 +183,22 @@
           
 <h1 class="title">ota</h1>
 <div class="content ">
-  <h4 id="list-files-in-ota">List files in OTA</h4>
+  <h4 id="show-ota-info">Show OTA Info</h4>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ota --info OTA.zip
+
+<span class="o">[</span>OTA Info<span class="o">]</span>
+<span class="o">==========</span>
+<span class="nv">Version</span>        <span class="o">=</span> 13.5
+<span class="nv">BuildVersion</span>   <span class="o">=</span> 17F5054h
+OS <span class="nv">Type</span>        <span class="o">=</span> Beta
+
+Devices
+-------
+
+iPhone SE <span class="o">(</span>2nd generation<span class="o">))</span>
+ - iPhone12,8_D79AP_17F5054h
+   - KernelCache: kernelcache.release.iphone12c
+</code></pre></div><h4 id="list-files-in-ota">List files in OTA</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ota OTA.zip <span class="p">|</span> head
    • Listing files...
 -rw-r--r-- 2020-02-15T02:24:26-05:00 <span class="m">0</span> B    .Trashes
@@ -201,7 +216,7 @@
    • Listing files...
 -rwxr-xr-x 2020-02-15T02:22:01-05:00 1.7 GB System/Library/Caches/com.apple.<span class="s2">&#34;dyld/dyld&#34;</span>_shared_cache_arm64e
 -rwxr-xr-x 2020-02-15T02:24:08-05:00 <span class="m">721</span> kB usr/lib/<span class="s2">&#34;dyld&#34;</span>
-</code></pre></div><h4 id="extract-files">Extract file(s)</h4>
+</code></pre></div><h4 id="extract-files-from-ram-disk">Extract file(s) from RAM disk</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ota OTA.zip dyld_shared_cache
    • Extracting dyld_shared_cache...
       • Extracting -rwxr-xr-x <span class="nv">uid</span><span class="o">=</span>0, <span class="nv">gid</span><span class="o">=</span>80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e
