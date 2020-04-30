@@ -35,3 +35,10 @@ Ideas
 ### JS/Web
 
 - https://github.com/indutny/macho
+
+### Disass
+
+- https://github.com/decomp/decomp
+- https://blog.gopheracademy.com/advent-2018/llvm-ir-and-go/
+- https://blog.felixangell.com/an-introduction-to-llvm-in-go
+- https://ldhldh.myds.me:10081/docs/llvm342_docs/_mach_o_dump_8cpp.html

@@ -15,6 +15,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/bom"
 	"github.com/dustin/go-humanize"
 
@@ -112,17 +113,36 @@ func Extract(otaZIP, extractPattern string) error {
 	return parsePayload(&zr.Reader, extractPattern)
 }
 
+func getFolder(zr *zip.Reader) (string, error) {
+	i, err := info.ParseZipFiles(zr.File)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse plists in remote zip")
+	}
+
+	folders := i.GetFolders()
+	if len(folders) == 0 {
+		return "", fmt.Errorf("failed to get folder")
+	}
+
+	return folders[0], nil
+}
+
 // RemoteExtract extracts and decompresses remote OTA payload files
 func RemoteExtract(zr *zip.Reader, extractPattern string) error {
 
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
+
+	folder, err := getFolder(zr)
+	if err != nil {
+		return err
+	}
 
 	sortFileBySize(zr.File)
 
 	for _, f := range zr.File {
 		if validPayload.MatchString(f.Name) {
 			log.WithFields(log.Fields{"filename": f.Name, "size": humanize.Bytes(f.UncompressedSize64)}).Debug("Processing OTA file")
-			found, err := Parse(f, extractPattern)
+			found, err := Parse(f, folder, extractPattern)
 			if err != nil {
 				log.Error(err.Error())
 			}
@@ -138,12 +158,17 @@ func RemoteExtract(zr *zip.Reader, extractPattern string) error {
 func parsePayload(zr *zip.Reader, extractPattern string) error {
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
 
+	folder, err := getFolder(zr)
+	if err != nil {
+		return err
+	}
+
 	sortFileBySize(zr.File)
 
 	for _, f := range zr.File {
 		if validPayload.MatchString(f.Name) {
 			log.WithFields(log.Fields{"filename": f.Name, "size": humanize.Bytes(f.UncompressedSize64)}).Debug("Processing OTA file")
-			found, err := Parse(f, extractPattern)
+			found, err := Parse(f, folder, extractPattern)
 			if err != nil {
 				log.Error(err.Error())
 			}
@@ -157,7 +182,7 @@ func parsePayload(zr *zip.Reader, extractPattern string) error {
 }
 
 // Parse parses a ota payload file inside the zip
-func Parse(payload *zip.File, extractPattern string) (bool, error) {
+func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 
 	pData := make([]byte, payload.UncompressedSize64)
 
@@ -253,8 +278,11 @@ func Parse(payload *zip.File, extractPattern string) (bool, error) {
 					}
 					return false, err
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s\n", os.FileMode(e.Perms), e.Uid, e.Gid, humanize.Bytes(uint64(e.FileSize)), fileName))
-				err = ioutil.WriteFile(filepath.Base(string(fileName)), fileBytes, 0644)
+
+				os.Mkdir(folder, os.ModePerm)
+				fname := filepath.Join(folder, filepath.Base(string(fileName)))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s to %s\n", os.FileMode(e.Perms), e.Uid, e.Gid, humanize.Bytes(uint64(e.FileSize)), fileName, fname))
+				err = ioutil.WriteFile(fname, fileBytes, 0644)
 				if err != nil {
 					return false, err
 				}

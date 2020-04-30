@@ -223,15 +223,15 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 // RemoteParse parses plist files in a remote ipsw file
 func RemoteParse(zr *zip.Reader) error {
 
-	ipsw, err := info.ParseZipFiles(zr.File)
+	i, err := info.ParseZipFiles(zr.File)
 	if err != nil {
 		return err
 	}
 
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
-			for _, folder := range ipsw.GetKernelCacheFolders(f.Name) {
-				fname := filepath.Join(folder, "kernelcache."+strings.ToLower(ipsw.Plists.GetOSType()))
+			for _, folder := range i.GetKernelCacheFolders(f.Name) {
+				fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetOSType()))
 				if _, err := os.Stat(fname); os.IsNotExist(err) {
 					kdata := make([]byte, f.UncompressedSize64)
 					rc, err := f.Open()
@@ -256,6 +256,7 @@ func RemoteParse(zr *zip.Reader) error {
 					if err != nil {
 						return errors.Wrap(err, "failed to decompress kernelcache")
 					}
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
 				} else {
 					log.Warnf("kernelcache already exists: %s", fname)
 				}

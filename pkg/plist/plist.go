@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
@@ -17,6 +18,8 @@ import (
 type Plists struct {
 	*BuildManifest
 	*Restore
+	*OTAInfo
+	*Info
 }
 
 type BuildManifest struct {
@@ -77,6 +80,29 @@ type buildIdentityManifestInfo struct {
 	Personalize       bool
 }
 
+type OTAInfo struct {
+	CFBundleIdentifier    string                `plist:"CFBundleIdentifier,omitempty"`
+	MobileAssetProperties mobileAssetProperties `plist:"MobileAssetProperties,omitempty"`
+}
+
+type mobileAssetProperties struct {
+	Build                 string   `plist:"Build,omitempty"`
+	OSVersion             string   `plist:"OSVersion,omitempty"`
+	ReleaseType           string   `plist:"ReleaseType,omitempty"`
+	SupportedDeviceModels []string `plist:"SupportedDeviceModels,omitempty"`
+	SupportedDevices      []string `plist:"SupportedDevices,omitempty"`
+}
+
+// Info object found in OTAs
+type Info struct {
+	DeviceClass    string `plist:"DeviceClass,omitempty"`
+	HardwareModel  string `plist:"HardwareModel,omitempty"`
+	PackageVersion string `plist:"PackageVersion,omitempty"`
+	ProductType    string `plist:"ProductType,omitempty"`
+	ProductVersion string `plist:"ProductVersion,omitempty"`
+	Build          string `plist:"TargetUpdate,omitempty"`
+}
+
 type Restore struct {
 	DeviceMap                     []restoreDeviceMap `plist:"DeviceMap,omitempty"`
 	ProductBuildVersion           string             `plist:"ProductBuildVersion,omitempty"`
@@ -95,8 +121,11 @@ type restoreDeviceMap struct {
 	SDOM        int
 }
 
-func (b *BuildManifest) GetOSType() string {
-	return b.BuildIdentities[0].Info.VariantContents.OS
+func (p *Plists) GetOSType() string {
+	if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents.OS) > 0 {
+		return p.BuildManifest.BuildIdentities[0].Info.VariantContents.OS
+	}
+	return p.OTAInfo.MobileAssetProperties.ReleaseType
 }
 
 func (b *BuildManifest) GetKernelCaches() map[string]string {
@@ -117,7 +146,7 @@ func (i *Plists) String() string {
 			"OS Type        = %s\n",
 		i.BuildManifest.ProductVersion,
 		i.BuildManifest.ProductBuildVersion,
-		i.BuildManifest.GetOSType(),
+		i.GetOSType(),
 	)
 	iStr += fmt.Sprintf("FileSystem     = ")
 	for file, fsType := range i.Restore.SystemRestoreImageFileSystems {
@@ -178,6 +207,30 @@ func parseRestore(data []byte) (*Restore, error) {
 	return r, nil
 }
 
+func parseOTAInfo(data []byte) (*OTAInfo, error) {
+	o := &OTAInfo{}
+
+	decoder := plist.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(o)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse Info.plist")
+	}
+
+	return o, nil
+}
+
+func parseInfoPlist(data []byte) (*Info, error) {
+	i := &Info{}
+
+	decoder := plist.NewDecoder(bytes.NewReader(data))
+	err := decoder.Decode(i)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse AssetData/Info.plist")
+	}
+
+	return i, nil
+}
+
 // Parse parses plist files in a local ipsw file
 func Parse(ipswPath string) (*Plists, error) {
 
@@ -198,9 +251,9 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 
 	for _, f := range files {
 		if validPlist.MatchString(f.Name) {
-			pData := make([]byte, f.UncompressedSize64)
-			switch f.Name {
-			case "Restore.plist":
+			switch {
+			case strings.HasSuffix(f.Name, "Restore.plist"):
+				pData := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
 				if err != nil {
 					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
@@ -211,7 +264,8 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to parse DeviceTree")
 				}
-			case "BuildManifest.plist":
+			case strings.HasSuffix(f.Name, "BuildManifest.plist"):
+				pData := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
 				if err != nil {
 					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
@@ -219,6 +273,30 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				io.ReadFull(rc, pData)
 				rc.Close()
 				ipsw.BuildManifest, err = parseBuildManifest(pData)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				}
+			case strings.HasSuffix(f.Name, "AssetData/Info.plist"):
+				pData := make([]byte, f.UncompressedSize64)
+				rc, err := f.Open()
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+				}
+				io.ReadFull(rc, pData)
+				rc.Close()
+				ipsw.Info, err = parseInfoPlist(pData)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				}
+			case strings.EqualFold(f.Name, "Info.plist"):
+				pData := make([]byte, f.UncompressedSize64)
+				rc, err := f.Open()
+				if err != nil {
+					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+				}
+				io.ReadFull(rc, pData)
+				rc.Close()
+				ipsw.OTAInfo, err = parseOTAInfo(pData)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to parse DeviceTree")
 				}

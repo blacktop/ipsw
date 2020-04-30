@@ -50,26 +50,31 @@ var infoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		var err error
+		var pIPSW *info.Info
+
 		if remoteFlag {
 			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{})
 			if err != nil {
 				return errors.Wrap(err, "failed to create new remote zip reader")
 			}
-			pIPSW, err := info.ParseZipFiles(zr.File)
+			pIPSW, err = info.ParseZipFiles(zr.File)
 			if err != nil {
 				return errors.Wrap(err, "failed to extract remote plists")
 			}
-			fmt.Println(pIPSW)
 		} else {
-			if _, err := os.Stat(args[0]); os.IsNotExist(err) {
+			if _, err = os.Stat(args[0]); os.IsNotExist(err) {
 				return fmt.Errorf("file %s does not exist", args[0])
 			}
-			pIPSW, err := info.Parse(args[0])
+			pIPSW, err = info.Parse(args[0])
 			if err != nil {
 				return errors.Wrap(err, "failed to extract and parse IPSW info")
 			}
-			fmt.Println(pIPSW)
 		}
+
+		fmt.Println("\n[IPSW Info]")
+		fmt.Println("===========")
+		fmt.Println(pIPSW)
 		return nil
 	},
 }

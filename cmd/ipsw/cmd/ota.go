@@ -28,15 +28,18 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(otaCmd)
 
-	otaCmd.MarkZshCompPositionalArgumentFile(1)
+	otaCmd.Flags().BoolP("info", "i", false, "Display OTA Info")
+	otaCmd.MarkZshCompPositionalArgumentFile(1, "*.zip")
 }
 
 // otaCmd represents the ota command
@@ -52,6 +55,20 @@ var otaCmd = &cobra.Command{
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
+		}
+
+		showInfo, _ := cmd.Flags().GetBool("info")
+
+		if showInfo {
+			pIPSW, err := info.Parse(args[0])
+			if err != nil {
+				return errors.Wrap(err, "failed to extract and parse IPSW info")
+			}
+			fmt.Println("\n[OTA Info]")
+			fmt.Println("==========")
+			fmt.Println(pIPSW)
+
+			return nil
 		}
 
 		if len(args) > 1 {

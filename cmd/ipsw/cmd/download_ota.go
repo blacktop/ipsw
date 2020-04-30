@@ -31,6 +31,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -39,7 +40,8 @@ import (
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
-	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote zip")
+	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
+	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
 
 // otaDLCmd represents the ota download command
@@ -60,7 +62,8 @@ var otaDLCmd = &cobra.Command{
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
-		remote, _ := cmd.Flags().GetBool("dyld")
+		remoteDyld, _ := cmd.Flags().GetBool("dyld")
+		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
 		var otas []download.OtaAsset
 		var filteredOtas []download.OtaAsset
@@ -112,16 +115,27 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		if cont {
-			if remote {
+			if remoteDyld || remoteKernel {
 				for _, o := range otas {
 					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
 						Proxy:    proxy,
 						Insecure: insecure,
 					})
 					if err != nil {
-						return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
+						return errors.Wrap(err, "failed to open remote zip to OTA")
 					}
-					err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
+					if remoteDyld {
+						err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
+						if err != nil {
+							return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
+						}
+					}
+					if remoteKernel {
+						err = kernelcache.RemoteParse(zr)
+						if err != nil {
+							return errors.Wrap(err, "failed to download kernelcache from remote ota")
+						}
+					}
 				}
 			} else {
 				downloader := download.NewDownload(proxy, insecure)
@@ -133,7 +147,7 @@ var otaDLCmd = &cobra.Command{
 						log.WithFields(log.Fields{
 							"device":  o.SupportedDevices[0],
 							"build":   o.Build,
-							"version": o.OSVersion,
+							"version": o.DocumentationID,
 						}).Info("Getting OTA")
 						// download file
 						downloader.URL = url
