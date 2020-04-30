@@ -6,6 +6,25 @@ weight: 14
 summary: Parse OTA zip files.
 ---
 
+#### Show OTA Info
+
+```bash
+$ ipsw ota --info OTA.zip
+
+[OTA Info]
+==========
+Version        = 13.5
+BuildVersion   = 17F5054h
+OS Type        = Beta
+
+Devices
+-------
+
+iPhone SE (2nd generation))
+ - iPhone12,8_D79AP_17F5054h
+   - KernelCache: kernelcache.release.iphone12c
+```
+
 #### List files in OTA
 
 ```bash
@@ -32,7 +51,7 @@ $ ipsw ota OTA.zip | grep dyld
 -rwxr-xr-x 2020-02-15T02:24:08-05:00 721 kB usr/lib/"dyld"
 ```
 
-#### Extract file(s)
+#### Extract file(s) from RAM disk
 
 ```bash
 $ ipsw ota OTA.zip dyld_shared_cache

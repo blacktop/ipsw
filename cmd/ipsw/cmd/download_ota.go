@@ -117,6 +117,11 @@ var otaDLCmd = &cobra.Command{
 		if cont {
 			if remoteDyld || remoteKernel {
 				for _, o := range otas {
+					log.WithFields(log.Fields{
+						"device":  o.SupportedDevices[0],
+						"build":   o.Build,
+						"version": o.DocumentationID,
+					}).Info("Parsing remote OTA")
 					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
 						Proxy:    proxy,
 						Insecure: insecure,
@@ -125,12 +130,14 @@ var otaDLCmd = &cobra.Command{
 						return errors.Wrap(err, "failed to open remote zip to OTA")
 					}
 					if remoteDyld {
+						log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
 						err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
 						if err != nil {
 							return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
 						}
 					}
 					if remoteKernel {
+						log.Info("Extracting remote kernelcache")
 						err = kernelcache.RemoteParse(zr)
 						if err != nil {
 							return errors.Wrap(err, "failed to download kernelcache from remote ota")
