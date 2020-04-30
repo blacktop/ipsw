@@ -281,7 +281,7 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 
 				os.Mkdir(folder, os.ModePerm)
 				fname := filepath.Join(folder, filepath.Base(string(fileName)))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s to %s\n", os.FileMode(e.Perms), e.Uid, e.Gid, humanize.Bytes(uint64(e.FileSize)), fileName, fname))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s to %s", os.FileMode(e.Perms), e.Uid, e.Gid, humanize.Bytes(uint64(e.FileSize)), fileName, fname))
 				err = ioutil.WriteFile(fname, fileBytes, 0644)
 				if err != nil {
 					return false, err

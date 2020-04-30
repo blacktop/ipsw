@@ -189,8 +189,17 @@ Download **beta** OTA _(over the air updates)_
 $ ipsw download ota --device iPhone12,3
 ```
 
-Just download the _dyld_shared_cache_
+Just download the _kernelcache_ and _dyld_shared_cache_
 
 ```bash
-$ ipsw download ota --device iPhone12,3 --dyld
+$ ipsw download ota --device iPod9,1 --kernel --dyld
+? You are about to download 1 ipsw files. Continue? Yes
+   • Parsing remote OTA        build=17F5054h device=iPod9,1 version=iOS135DevBeta3
+   • Extracting remote dyld_shared_cache (can be a bit CPU intensive)
+      • Extracting -rwxr-xr-x uid=0, gid=80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64 to "iPod9,1_N112AP_17F5054h/dyld_shared_cache_arm64"
+   • Extracting remote kernelcache
+      • Parsing Kernelcache IMG4
+      • Decompressing Kernelcache
+      • Kernelcache is LZFSE compressed
+      • Writing "iPod9,1_N112AP_17F5054h/kernelcache.beta"
 ```
