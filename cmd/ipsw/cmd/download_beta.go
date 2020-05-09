@@ -45,7 +45,7 @@ var betaCmd = &cobra.Command{
 	Short: "Download beta IPSWs from the iphone wiki",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var filteredIPSWs []download.BetaIPSW
+		var filteredURLS []string
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -58,7 +58,7 @@ var betaCmd = &cobra.Command{
 
 		ipsws, err := download.ScrapeURLs(args[0])
 		if err != nil {
-			return errors.Wrap(err, "failed to query ipsw.me api")
+			return errors.Wrap(err, "failed to query www.theiphonewiki.com")
 		}
 
 		if len(ipsws) < 1 {
@@ -66,47 +66,52 @@ var betaCmd = &cobra.Command{
 			return nil
 		}
 
-		for _, i := range ipsws {
+		for url, ipsw := range ipsws {
 			if len(device) > 0 {
-				if strings.EqualFold(device, i.Device) {
-					filteredIPSWs = append(filteredIPSWs, i)
+				if utils.StrSliceContains(ipsw.Devices, device) {
+					filteredURLS = append(filteredURLS, url)
 				}
 			} else {
-				filteredIPSWs = append(filteredIPSWs, i)
+				filteredURLS = append(filteredURLS, url)
 			}
 		}
 
+		if len(filteredURLS) < 1 {
+			log.Errorf("no ipsws match device %s", device)
+			return nil
+		}
+
 		log.Debug("URLs to Download:")
-		for _, i := range ipsws {
-			utils.Indent(log.Debug, 2)(i.URL)
+		for _, url := range filteredURLS {
+			utils.Indent(log.Debug, 2)(url)
 		}
 
 		cont := true
 		if !skip {
 			cont = false
 			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredIPSWs)),
+				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredURLS)),
 			}
 			survey.AskOne(prompt, &cont)
 		}
 
 		if cont {
 			downloader := download.NewDownload(proxy, insecure)
-			for _, i := range filteredIPSWs {
+			for _, url := range filteredURLS {
 				var destName string
 				if removeCommas {
-					destName = strings.Replace(path.Base(i.URL), ",", "_", -1)
+					destName = strings.Replace(path.Base(url), ",", "_", -1)
 				} else {
-					destName = path.Base(i.URL)
+					destName = path.Base(url)
 				}
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
-						"device":  i.Device,
-						"build":   i.BuildID,
-						"version": i.Version,
+						"devices": ipsws[url].Devices,
+						"build":   ipsws[url].BuildID,
+						"version": ipsws[url].Version,
 					}).Info("Getting IPSW")
 					// download file
-					downloader.URL = i.URL
+					downloader.URL = url
 					downloader.RemoveCommas = removeCommas
 					err = downloader.Do()
 					if err != nil {
