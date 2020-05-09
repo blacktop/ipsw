@@ -10,7 +10,7 @@ require (
 	github.com/antchfx/htmlquery v1.2.2 // indirect
 	github.com/antchfx/xmlquery v1.2.3 // indirect
 	github.com/antchfx/xpath v1.1.5 // indirect
-	github.com/apex/log v1.1.2
+	github.com/apex/log v1.1.4
 	github.com/blacktop/go-macho v1.0.5
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
@@ -40,10 +40,10 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.6.3
+	github.com/spf13/viper v1.7.0
 	github.com/ulikunitz/xz v0.5.7
 	github.com/vbauerster/mpb/v4 v4.12.2
-	golang.org/x/crypto v0.0.0-20200414173820-0848c9571904
+	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79
 	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
 	golang.org/x/sys v0.0.0-20200413165638-669c56c373c4 // indirect
 	google.golang.org/appengine v1.6.5 // indirect
