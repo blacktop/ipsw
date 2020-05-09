@@ -54,7 +54,7 @@ update_mod:
 
 .PHONY: update_devs
 update_devs:
-	CGO_ENABLED=1 CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
+	CGO_ENABLED=1 CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/info/data/device_traits.json
 
 .PHONY: dry_release
 dry_release:
