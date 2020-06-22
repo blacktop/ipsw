@@ -14,6 +14,8 @@ import (
 const (
 	iOS13OtaDevBetaURL    = "https://mesu.apple.com/assets/iOS13DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 	iOS13OtaPublicBetaURL = "https://mesu.apple.com/assets/iOS13PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+	iOS14OtaDevBetaURL    = "https://mesu.apple.com/assets/iOS14DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+	iOS14OtaPublicBetaURL = "https://mesu.apple.com/assets/iOS14PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 )
 
 type OtaAsset struct {
@@ -44,7 +46,7 @@ type Ota struct {
 // NewOTA downloads and parses the itumes plist for iOS13 developer beta OTAs
 func NewOTA(proxy string, insecure bool) (*Ota, error) {
 
-	req, err := http.NewRequest("GET", iOS13OtaDevBetaURL, nil)
+	req, err := http.NewRequest("GET", iOS14OtaDevBetaURL, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create http request")
 	}
