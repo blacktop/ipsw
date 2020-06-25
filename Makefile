@@ -54,7 +54,7 @@ update_mod:
 
 .PHONY: update_devs
 update_devs:
-	CGO_ENABLED=1 CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/info/data/device_traits.json
+	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/info/data/device_traits.json
 
 .PHONY: dry_release
 dry_release:
