@@ -5,25 +5,19 @@ go 1.14
 require (
 	github.com/AlecAivazis/survey/v2 v2.0.7
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
-	github.com/PuerkitoBio/goquery v1.5.1 // indirect
 	github.com/aixiansheng/lzfse v0.2.2
-	github.com/antchfx/htmlquery v1.2.2 // indirect
-	github.com/antchfx/xmlquery v1.2.3 // indirect
-	github.com/antchfx/xpath v1.1.5 // indirect
-	github.com/apex/log v1.1.4
-	github.com/blacktop/go-macho v1.0.5
+	github.com/apex/log v1.4.0
+	github.com/blacktop/go-macho v1.0.6
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.9.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
-	github.com/gocolly/colly/v2 v2.0.1
-	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
-	github.com/golang/protobuf v1.4.0 // indirect
-	github.com/hashicorp/go-version v1.2.0
+	github.com/gocolly/colly/v2 v2.1.0
+	github.com/hashicorp/go-version v1.2.1
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
-	github.com/jinzhu/gorm v1.9.12
+	github.com/jinzhu/gorm v1.9.14
 	github.com/knightsc/gapstone v0.0.0-20191231144527-6fa5afaf11a9
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/mattn/go-colorable v0.1.6 // indirect
@@ -43,9 +37,7 @@ require (
 	github.com/spf13/viper v1.7.0
 	github.com/ulikunitz/xz v0.5.7
 	github.com/vbauerster/mpb/v4 v4.12.2
-	golang.org/x/crypto v0.0.0-20200429183012-4b2356b1ed79
-	golang.org/x/net v0.0.0-20200324143707-d3edc9973b7e // indirect
+	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
 	golang.org/x/sys v0.0.0-20200413165638-669c56c373c4 // indirect
-	google.golang.org/appengine v1.6.5 // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 )
