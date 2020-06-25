@@ -42,6 +42,7 @@ type localSymbolInfo struct {
 }
 
 type cacheMappings []*CacheMapping
+type cacheMappingsV2 []*CacheMappingV2
 type cacheImages []*CacheImage
 type codesignature struct {
 	ID            string
@@ -56,8 +57,9 @@ type File struct {
 	CacheHeader
 	ByteOrder binary.ByteOrder
 
-	Mappings cacheMappings
-	Images   cacheImages
+	Mappings   cacheMappings
+	MappingsV2 cacheMappingsV2
+	Images     cacheImages
 
 	SlideInfo       interface{}
 	PatchInfo       CachePatchInfo
@@ -161,6 +163,27 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		f.Mappings = append(f.Mappings, cm)
 	}
 
+	// Read NEW dyld mappings.
+	sr.Seek(int64(f.MappingV2Offset), os.SEEK_SET)
+
+	for i := uint32(0); i != f.MappingV2Count; i++ {
+		cmInfoV2 := CacheMappingInfoV2{}
+		if err := binary.Read(sr, f.ByteOrder, &cmInfoV2); err != nil {
+			return nil, err
+		}
+		cm := &CacheMappingV2{CacheMappingInfoV2: cmInfoV2}
+		if cmInfoV2.InitProt.Execute() {
+			cm.Name = "__TEXT"
+
+		} else if cmInfoV2.InitProt.Write() {
+			cm.Name = "__DATA"
+
+		} else if cmInfoV2.InitProt.Read() {
+			cm.Name = "__LINKEDIT"
+		}
+		f.MappingsV2 = append(f.MappingsV2, cm)
+	}
+
 	// Read dyld images.
 	sr.Seek(int64(f.ImagesOffset), os.SEEK_SET)
 
@@ -226,7 +249,9 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	 * Read dyld kernel slid info
 	 *****************************/
 	// log.Info("Parsing Slide Info...")
-	f.ParseSlideInfo(false)
+	if f.SlideInfoOffset > 0 {
+		f.ParseSlideInfo(false)
+	}
 
 	// Read dyld branch pool.
 	if f.BranchPoolsOffset != 0 {
@@ -465,7 +490,7 @@ func (f *File) ParseCodeSignature() error {
 			if err := binary.Read(csr, binary.BigEndian, &cmsData); err != nil {
 				return err
 			}
-			fmt.Println(hex.Dump(cmsData))
+			log.Debug(hex.Dump(cmsData))
 		}
 	}
 
@@ -606,7 +631,7 @@ func (f *File) ParseSlideInfo(dump bool) error {
 		}
 		f.SlideInfo = slideInfo
 	default:
-		log.Fatalf("got unexpected dyld slide info version: %d", slideInfoVersion)
+		log.Errorf("got unexpected dyld slide info version: %d", slideInfoVersion)
 	}
 	return nil
 }

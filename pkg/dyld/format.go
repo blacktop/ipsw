@@ -117,6 +117,35 @@ func (mappings cacheMappings) String() string {
 	return tableString.String()
 }
 
+func (mappings cacheMappingsV2) String() string {
+	tableString := &strings.Builder{}
+
+	mdata := [][]string{}
+	for _, mapping := range mappings {
+		mdata = append(mdata, []string{
+			mapping.Name,
+			mapping.InitProt.String(),
+			mapping.MaxProt.String(),
+			fmt.Sprintf("%d MB", mapping.Size/(1024*1024)),
+			// humanize.Bytes(mapping.Size),
+			fmt.Sprintf("%08X -> %08X", mapping.Address, mapping.Address+mapping.Size),
+			fmt.Sprintf("%08X -> %08X", mapping.FileOffset, mapping.FileOffset+mapping.Size),
+			fmt.Sprintf("%08X", mapping.Uknown1),
+			fmt.Sprintf("%X", mapping.Uknown2),
+			fmt.Sprintf("%d", mapping.Uknown3),
+		})
+	}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", "Offset?", "Size?", "Flag?"})
+	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+	table.SetCenterSeparator("|")
+	table.AppendBulk(mdata)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.Render()
+
+	return tableString.String()
+}
+
 func (images cacheImages) Print() {
 	fmt.Println("Images")
 	fmt.Println("======")
@@ -126,7 +155,18 @@ func (images cacheImages) Print() {
 }
 
 func (f *File) String() string {
-	slideVersion := reflect.ValueOf(f.SlideInfo).Field(0).Interface().(uint32)
+	var slideVersion uint32
+	var mappings string
+	if f.SlideInfo != nil {
+		slideVersion = reflect.ValueOf(f.SlideInfo).Field(0).Interface().(uint32)
+	} else {
+		slideVersion = 0
+	}
+	if f.MappingV2Offset > 0 {
+		mappings = f.MappingsV2.String()
+	} else {
+		mappings = f.Mappings.String()
+	}
 	return fmt.Sprintf(
 		"Header\n"+
 			"======\n"+
@@ -165,6 +205,6 @@ func (f *File) String() string {
 		f.ProgClosuresSize/(1024*1024), f.ProgClosuresAddr, f.ProgClosuresAddr+f.ProgClosuresSize,
 		f.ProgClosuresTrieSize/1024, f.ProgClosuresTrieAddr, f.ProgClosuresTrieAddr+f.ProgClosuresTrieSize,
 		f.SharedRegionSize/(1024*1024*1024), f.SharedRegionStart, f.SharedRegionStart+f.SharedRegionSize,
-		f.Mappings,
+		mappings,
 	)
 }
