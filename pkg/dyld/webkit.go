@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apex/log"
 	"github.com/gocolly/colly/v2"
 )
 
 const webkitURL = "https://trac.webkit.org/browser/webkit/tags/"
 
 // GetWebKitVersion greps the dyld_shared_cache for the WebKit version string
-func GetWebKitVersion(path string) (string, error) {
+func GetWebKitVersion(path string, getRev bool) (string, error) {
 
 	fd, err := os.Open(path)
 	if err != nil {
@@ -43,11 +44,15 @@ func GetWebKitVersion(path string) (string, error) {
 
 	if len(match) > 0 {
 		version := strings.TrimPrefix(match, "WebKit2-")[1:]
-		rev, err := scrapeWebKitTRAC(version)
-		if err != nil {
-			return "", err
+		if getRev {
+			log.Info("Querying https://trac.webkit.org...")
+			rev, err := scrapeWebKitTRAC(version)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("%s (svn rev %s)", version, rev), nil
 		}
-		return fmt.Sprintf("%s (svn rev %s)", version, rev), nil
+		return fmt.Sprintf("%s", version), nil
 	}
 
 	return "", fmt.Errorf("unable to find WebKit version in file: %s", path)

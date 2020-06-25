@@ -34,7 +34,7 @@ import (
 
 func init() {
 	dyldCmd.AddCommand(webkitCmd)
-
+	webkitCmd.Flags().BoolP("rev", "r", false, "Lookup svn rev on trac.webkit.org")
 	webkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -48,6 +48,8 @@ var webkitCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		getRev, _ := cmd.Flags().GetBool("rev")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -68,7 +70,7 @@ var webkitCmd = &cobra.Command{
 
 			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
-		version, err := dyld.GetWebKitVersion(dscPath)
+		version, err := dyld.GetWebKitVersion(dscPath, getRev)
 		if err != nil {
 			return err
 		}
