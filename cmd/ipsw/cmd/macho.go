@@ -80,34 +80,35 @@ var machoCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("HEADER")
-		fmt.Println("======")
-		fmt.Println(m.FileHeader)
+		fmt.Println(m.FileTOC.String())
+		// fmt.Println("HEADER")
+		// fmt.Println("======")
+		// fmt.Println(m.FileHeader)
 
-		fmt.Println("SECTIONS")
-		fmt.Println("========")
-		var secFlags string
-		// var prevSeg string
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-		for _, sec := range m.Sections {
-			secFlags = ""
-			if !sec.Flags.IsRegular() {
-				secFlags = fmt.Sprintf("(%s)", sec.Flags)
-			}
-			// if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
-			// 	fmt.Fprintf(w, "\n")
-			// }
-			fmt.Fprintf(w, "Mem: 0x%x-0x%x \t Off: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Offset, uint64(sec.Offset)+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
-			// prevSeg = sec.Seg
-		}
-		w.Flush()
-		
-		if m.DylibID() != nil {
-			fmt.Printf("Dyld ID: %s (%s)\n", m.DylibID().Name, m.DylibID().CurrentVersion)
-		}
-		if m.SourceVersion() != nil {
-			fmt.Println("SourceVersion:", m.SourceVersion().Version)
-		}
+		// fmt.Println("SECTIONS")
+		// fmt.Println("========")
+		// var secFlags string
+		// // var prevSeg string
+		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		// for _, sec := range m.Sections {
+		// 	secFlags = ""
+		// 	if !sec.Flags.IsRegular() {
+		// 		secFlags = fmt.Sprintf("(%s)", sec.Flags)
+		// 	}
+		// 	// if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
+		// 	// 	fmt.Fprintf(w, "\n")
+		// 	// }
+		// 	fmt.Fprintf(w, "Mem: 0x%x-0x%x \t Off: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Offset, uint64(sec.Offset)+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
+		// 	// prevSeg = sec.Seg
+		// }
+		// w.Flush()
+
+		// if m.DylibID() != nil {
+		// 	fmt.Printf("Dyld ID: %s (%s)\n", m.DylibID().Name, m.DylibID().CurrentVersion)
+		// }
+		// if m.SourceVersion() != nil {
+		// 	fmt.Println("SourceVersion:", m.SourceVersion().Version)
+		// }
 
 		if symbols {
 			fmt.Println("SYMBOLS")
