@@ -360,7 +360,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 			return nil, err
 		}
 	}
-
+	// TODO: de-waterfall this
 	// Read dyld patch_info entries.
 	if patchInfoOffset, err := f.getOffset(f.PatchInfoAddr); err == nil {
 		sr.Seek(int64(patchInfoOffset), io.SeekStart)
