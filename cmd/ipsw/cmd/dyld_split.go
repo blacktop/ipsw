@@ -71,7 +71,7 @@ func checkRequiredFlags(flags *pflag.FlagSet) error {
 
 // splitCmd represents the split command
 var splitCmd = &cobra.Command{
-	Use:   "split <dyld_shared_cache>",
+	Use:   "split <dyld_shared_cache> <optional_output_path>",
 	Short: "Extracts all the dyld_shared_cache libraries",
 	Args:  cobra.MinimumNArgs(1),
 	PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -83,7 +83,16 @@ var splitCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		var outputPath string
+
 		dscPath := filepath.Clean(args[0])
+
+		if len(args) > 1 {
+			outputPath = filepath.Clean(args[1])
+			if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+				return fmt.Errorf("path %s does not exist", dscPath)
+			}
+		}
 
 		fileInfo, err := os.Lstat(dscPath)
 		if err != nil {
@@ -107,6 +116,11 @@ var splitCmd = &cobra.Command{
 			log.Fatal("dyld_shared_cache splitting only works on macOS :(")
 		}
 
+		if len(outputPath) > 0 {
+			fullPath, _ := filepath.Abs(outputPath)
+			log.Infof("Splitting dyld_shared_cache to %s\n", fullPath)
+			return dyld.Split(dscPath, outputPath, deviceOsFlag)
+		}
 		log.Info("Splitting dyld_shared_cache")
 		return dyld.Split(dscPath, filepath.Dir(dscPath), deviceOsFlag)
 	},
