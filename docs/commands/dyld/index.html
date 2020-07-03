@@ -191,6 +191,7 @@
 <li><a href="#dyld-sel"><strong>dyld sel</strong></a></li>
 <li><a href="#dyld-split"><strong>dyld split</strong></a></li>
 <li><a href="#dyld-webkit"><strong>dyld webkit</strong></a></li>
+<li><a href="#dyld-patches-"><strong>dyld patches</strong> 🆕</a></li>
 </ul>
 <hr>
 <h3 id="dyld"><strong>dyld</strong></h3>
@@ -314,6 +315,33 @@ Objective-C Selectors:
 <p>Extract WebKit version from <em>dyld_shared_cache</em></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld webkit --rev dyld_shared_cache
    • WebKit Version: 609.1.17.0.1 <span class="o">(</span>svn rev 256416<span class="o">)</span>
+</code></pre></div><h3 id="dyld-patches-"><strong>dyld patches</strong> 🆕</h3>
+<p>List dyld patch info</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache <span class="p">|</span> grep entries
+   • <span class="o">[</span><span class="m">68</span> entries<span class="o">]</span> /usr/lib/system/libsystem_c.dylib
+   • <span class="o">[</span><span class="m">243</span> entries<span class="o">]</span> /usr/lib/system/libdispatch.dylib
+   • <span class="o">[</span><span class="m">13</span> entries<span class="o">]</span> /usr/lib/system/libsystem_malloc.dylib
+   • <span class="o">[</span><span class="m">3</span> entries<span class="o">]</span> /usr/lib/system/libsystem_platform.dylib
+   • <span class="o">[</span><span class="m">8</span> entries<span class="o">]</span> /usr/lib/system/libsystem_pthread.dylib
+   • <span class="o">[</span><span class="m">6</span> entries<span class="o">]</span> /usr/lib/libobjc.A.dylib
+   • <span class="o">[</span><span class="m">23</span> entries<span class="o">]</span> /usr/lib/libc++abi.dylib
+   • <span class="o">[</span><span class="m">45</span> entries<span class="o">]</span> /usr/lib/system/libsystem_kernel.dylib
+   • <span class="o">[</span><span class="m">2</span> entries<span class="o">]</span> /usr/lib/system/libdyld.dylib
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache -i libdyld.dylib
+0x0028074C <span class="o">(</span><span class="m">63</span> patches<span class="o">)</span>  _dlclose
+0x00280820 <span class="o">(</span><span class="m">399</span> patches<span class="o">)</span> _dlopen
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache -i libdyld.dylib -s _dlopen <span class="p">|</span> head
+   • _dlopen patch locations
+offset: 0x57b18898, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b19170, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b1ec20, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b345f8, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b38a50, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b3cd08, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b3db98, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b79850, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b88138, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57bb56a8, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
 </code></pre></div>
 </div>
 </div>
