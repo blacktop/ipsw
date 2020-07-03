@@ -6,6 +6,8 @@ weight: 14
 summary: Parse OTA zip files.
 ---
 
+### ⚠️ This broke in iOS 14
+
 #### Show OTA Info
 
 ```bash
