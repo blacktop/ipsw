@@ -13,6 +13,7 @@ summary: Parse dyld_shared_cache.
 - [**dyld sel**](#dyld-sel)
 - [**dyld split**](#dyld-split)
 - [**dyld webkit**](#dyld-webkit)
+- [**dyld patches** 🆕](#dyld-patches-)
 
 ---
 
@@ -197,4 +198,42 @@ Extract WebKit version from _dyld_shared_cache_
 ```bash
 $ ipsw dyld webkit --rev dyld_shared_cache
    • WebKit Version: 609.1.17.0.1 (svn rev 256416)
+```
+
+### **dyld patches** 🆕
+
+List dyld patch info
+
+```bash
+$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache | grep entries
+   • [68 entries] /usr/lib/system/libsystem_c.dylib
+   • [243 entries] /usr/lib/system/libdispatch.dylib
+   • [13 entries] /usr/lib/system/libsystem_malloc.dylib
+   • [3 entries] /usr/lib/system/libsystem_platform.dylib
+   • [8 entries] /usr/lib/system/libsystem_pthread.dylib
+   • [6 entries] /usr/lib/libobjc.A.dylib
+   • [23 entries] /usr/lib/libc++abi.dylib
+   • [45 entries] /usr/lib/system/libsystem_kernel.dylib
+   • [2 entries] /usr/lib/system/libdyld.dylib
+```
+
+```bash
+$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache -i libdyld.dylib
+0x0028074C (63 patches)  _dlclose
+0x00280820 (399 patches) _dlopen
+```
+
+```bash
+$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache -i libdyld.dylib -s _dlopen | head
+   • _dlopen patch locations
+offset: 0x57b18898, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b19170, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b1ec20, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b345f8, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b38a50, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b3cd08, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b3db98, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b79850, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b88138, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57bb56a8, addend: 0, has_diversity: true, key: 0, auth: true
 ```
