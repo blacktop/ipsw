@@ -117,7 +117,7 @@ func (mappings cacheMappings) String() string {
 	return tableString.String()
 }
 
-func (mappings cacheMappingsV2) String() string {
+func (mappings cacheExtMappings) String() string {
 	tableString := &strings.Builder{}
 
 	mdata := [][]string{}
@@ -130,13 +130,12 @@ func (mappings cacheMappingsV2) String() string {
 			// humanize.Bytes(mapping.Size),
 			fmt.Sprintf("%08X -> %08X", mapping.Address, mapping.Address+mapping.Size),
 			fmt.Sprintf("%08X -> %08X", mapping.FileOffset, mapping.FileOffset+mapping.Size),
-			fmt.Sprintf("%08X", mapping.Uknown1),
-			fmt.Sprintf("%X", mapping.Uknown2),
-			fmt.Sprintf("%d", mapping.Uknown3),
+			fmt.Sprintf("%08X -> %08X", mapping.SlideInfoOffset, mapping.SlideInfoOffset+mapping.SlideInfoSize),
+			fmt.Sprintf("%d", mapping.Flags),
 		})
 	}
 	table := tablewriter.NewWriter(tableString)
-	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", "Offset?", "Size?", "Flag?"})
+	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", "Slide Info Offset", "Flags"})
 	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
 	table.SetCenterSeparator("|")
 	table.AppendBulk(mdata)
@@ -162,10 +161,10 @@ func (f *File) String() string {
 	} else {
 		slideVersion = 0
 	}
-	if f.MappingV2Offset > 0 {
-		mappings = f.MappingsV2.String()
-	} else {
+	if f.CacheHeader.SlideInfoOffset > 0 {
 		mappings = f.Mappings.String()
+	} else {
+		mappings = f.ExtMappings.String()
 	}
 	return fmt.Sprintf(
 		"Header\n"+

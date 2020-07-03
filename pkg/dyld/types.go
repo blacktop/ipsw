@@ -116,8 +116,8 @@ type CacheHeader struct {
 	OtherImageArraySize  uint64   // size of ImageArray for dylibs and bundles with dlopen closures
 	OtherTrieAddr        uint64   // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
 	OtherTrieSize        uint64   // size of trie of dylibs and bundles with dlopen closures
-	MappingV2Offset      uint32   // file offset to first dyld_cache_mapping_info_v2
-	MappingV2Count       uint32   // number of dyld_cache_mapping_info entries_v2
+	ExtMappingOffset     uint32   // file offset to first dyld_cache_mapping_info
+	ExtMappingCount      uint32   // number of dyld_cache_mapping_info entries
 }
 
 type CacheMappingInfo struct {
@@ -128,15 +128,16 @@ type CacheMappingInfo struct {
 	InitProt   types.VmProtection
 }
 
-type CacheMappingInfoV2 struct {
-	Address    uint64
-	Size       uint64
-	FileOffset uint64
-	Uknown1    uint64
-	Uknown2    uint64
-	Uknown3    uint64
-	MaxProt    types.VmProtection
-	InitProt   types.VmProtection
+type CacheExtMappingInfo struct {
+	Address         uint64
+	Size            uint64
+	FileOffset      uint64
+	SlideInfoOffset uint64
+	SlideInfoSize   uint64
+	Flags           uint32
+	Reserved        uint32
+	MaxProt         types.VmProtection
+	InitProt        types.VmProtection
 }
 
 type CacheMapping struct {
@@ -144,9 +145,9 @@ type CacheMapping struct {
 	CacheMappingInfo
 }
 
-type CacheMappingV2 struct {
+type CacheExtMapping struct {
 	Name string
-	CacheMappingInfoV2
+	CacheExtMappingInfo
 }
 
 type CacheImageInfo struct {

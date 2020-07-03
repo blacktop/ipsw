@@ -100,7 +100,15 @@ var slideCmd = &cobra.Command{
 			}
 		}
 
-		f.ParseSlideInfo(true)
+		if f.SlideInfoOffset > 0 {
+			f.ParseSlideInfo(f.SlideInfoOffset, true)
+		} else {
+			for _, extMapping := range f.ExtMappings {
+				if extMapping.SlideInfoSize > 0 {
+					f.ParseSlideInfo(extMapping.SlideInfoOffset, true)
+				}
+			}
+		}
 
 		return nil
 	},
