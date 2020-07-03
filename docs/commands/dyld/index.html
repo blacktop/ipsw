@@ -192,6 +192,8 @@
 <li><a href="#dyld-split"><strong>dyld split</strong></a></li>
 <li><a href="#dyld-webkit"><strong>dyld webkit</strong></a></li>
 <li><a href="#dyld-patches-"><strong>dyld patches</strong> 🆕</a></li>
+<li><a href="#dyld-a2o"><strong>dyld a2o</strong></a></li>
+<li><a href="#dyld-o2a"><strong>dyld o2a</strong></a></li>
 </ul>
 <hr>
 <h3 id="dyld"><strong>dyld</strong></h3>
@@ -342,6 +344,16 @@ offset: 0x57b3db98, addend: 0, has_diversity: true, key: 0, auth: <span class="n
 offset: 0x57b79850, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
 offset: 0x57b88138, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
 offset: 0x57bb56a8, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+</code></pre></div><h3 id="dyld-a2o"><strong>dyld a2o</strong></h3>
+<p>Convert dyld_shared_cache address to offset</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld a2o dyld_shared_cache 1D7B18000
+
+0x053b18000
+</code></pre></div><h3 id="dyld-o2a"><strong>dyld o2a</strong></h3>
+<p>Convert dyld_shared_cache offset to address</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld a2o dyld_shared_cache 0x4C6C0000
+
+0x1ce6c0000
 </code></pre></div>
 </div>
 </div>
