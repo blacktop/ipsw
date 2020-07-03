@@ -205,7 +205,7 @@ $ ipsw dyld webkit --rev dyld_shared_cache
 List dyld patch info
 
 ```bash
-$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache | grep entries
+$ ipsw dyld patches dyld_shared_cache | grep entries
    • [68 entries] /usr/lib/system/libsystem_c.dylib
    • [243 entries] /usr/lib/system/libdispatch.dylib
    • [13 entries] /usr/lib/system/libsystem_malloc.dylib
@@ -218,13 +218,13 @@ $ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache | g
 ```
 
 ```bash
-$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache -i libdyld.dylib
+$ ipsw dyld patches dyld_shared_cache -i libdyld.dylib
 0x0028074C (63 patches)  _dlclose
 0x00280820 (399 patches) _dlopen
 ```
 
 ```bash
-$ ipsw dyld patches test-caches/iPhone11,2_D321AP_18A5301v/dyld_shared_cache -i libdyld.dylib -s _dlopen | head
+$ ipsw dyld patches dyld_shared_cache -i libdyld.dylib -s _dlopen | head
    • _dlopen patch locations
 offset: 0x57b18898, addend: 0, has_diversity: true, key: 0, auth: true
 offset: 0x57b19170, addend: 0, has_diversity: true, key: 0, auth: true
