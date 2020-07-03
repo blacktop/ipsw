@@ -117,7 +117,7 @@ func (f *File) dumpOffsets(offsets []int32, fileOffset int64) {
 			if err != nil {
 				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
 			}
-			addr, _ := f.getVMAddress(uint64(int32(fileOffset) + ptr))
+			addr, _ := f.GetVMAddress(uint64(int32(fileOffset) + ptr))
 			fmt.Printf("    0x%x: %s\n", addr, strings.Trim(s, "\x00"))
 		}
 
@@ -136,7 +136,7 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 			if err != nil {
 				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
 			}
-			addr, _ := f.getVMAddress(uint64(int32(fileOffset) + ptr))
+			addr, _ := f.GetVMAddress(uint64(int32(fileOffset) + ptr))
 			objcMap[strings.Trim(s, "\x00")] = addr
 		}
 
@@ -206,7 +206,7 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 				return 0, errors.Wrapf(err, "failed get selector address for %s", selector)
 			}
 
-			ptr, _ := f.getVMAddress(uint64(shash.FileOffset + int64(shash.Offsets[selIndex])))
+			ptr, _ := f.GetVMAddress(uint64(shash.FileOffset + int64(shash.Offsets[selIndex])))
 
 			return ptr, nil
 		}

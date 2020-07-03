@@ -336,7 +336,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 						return nil, err
 					}
 					// fmt.Printf("  0x%X -> 0x%X %s\n", rangeEntry.StartAddress, rangeEntry.StartAddress+uint64(rangeEntry.Size), f.Images[rangeEntry.ImageIndex].Name)
-					offset, err := f.getOffset(rEntry.StartAddress)
+					offset, err := f.GetOffset(rEntry.StartAddress)
 					if err != nil {
 						return nil, errors.Wrap(err, "failed to get range entry's file offset")
 					}
@@ -365,29 +365,29 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 	// TODO: de-waterfall this
 	// Read dyld patch_info entries.
-	if patchInfoOffset, err := f.getOffset(f.PatchInfoAddr); err == nil {
+	if patchInfoOffset, err := f.GetOffset(f.PatchInfoAddr); err == nil {
 		sr.Seek(int64(patchInfoOffset), io.SeekStart)
 		if err := binary.Read(sr, f.ByteOrder, &f.PatchInfo); err != nil {
 			return nil, err
 		}
 		// Read all the other patch_info structs
-		if patchTableArrayOffset, err := f.getOffset(f.PatchInfo.PatchTableArrayAddr); err == nil {
+		if patchTableArrayOffset, err := f.GetOffset(f.PatchInfo.PatchTableArrayAddr); err == nil {
 			sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
 			imagePatches := make([]CacheImagePatches, f.PatchInfo.PatchTableArrayCount)
 			if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
 				return nil, err
 			}
-			if patchExportNamesOffset, err := f.getOffset(f.PatchInfo.PatchExportNamesAddr); err == nil {
+			if patchExportNamesOffset, err := f.GetOffset(f.PatchInfo.PatchExportNamesAddr); err == nil {
 				exportNames := io.NewSectionReader(f.r, int64(patchExportNamesOffset), int64(f.PatchInfo.PatchExportNamesSize))
 
-				if patchExportArrayOffset, err := f.getOffset(f.PatchInfo.PatchExportArrayAddr); err == nil {
+				if patchExportArrayOffset, err := f.GetOffset(f.PatchInfo.PatchExportArrayAddr); err == nil {
 					sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
 					patchExports := make([]CachePatchableExport, f.PatchInfo.PatchExportArrayCount)
 					if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
 						return nil, err
 					}
 
-					if patchLocationArrayOffset, err := f.getOffset(f.PatchInfo.PatchLocationArrayAddr); err == nil {
+					if patchLocationArrayOffset, err := f.GetOffset(f.PatchInfo.PatchLocationArrayAddr); err == nil {
 						sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
 						patchableLocations := make([]CachePatchableLocation, f.PatchInfo.PatchLocationArrayCount)
 						if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
@@ -435,16 +435,16 @@ func (f *File) Is64bit() bool {
 	return strings.Contains(string(f.Magic[:16]), "64")
 }
 
-func (f *File) getOffset(address uint64) (uint64, error) {
+func (f *File) GetOffset(address uint64) (uint64, error) {
 	for _, mapping := range f.Mappings {
 		if mapping.Address <= address && address < mapping.Address+mapping.Size {
 			return (address - mapping.Address) + mapping.FileOffset, nil
 		}
 	}
-	return 0, fmt.Errorf("address not within any mappings adress range")
+	return 0, fmt.Errorf("address not within any mappings address range")
 }
 
-func (f *File) getVMAddress(offset uint64) (uint64, error) {
+func (f *File) GetVMAddress(offset uint64) (uint64, error) {
 	for _, mapping := range f.Mappings {
 		if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
 			return (offset - mapping.FileOffset) + mapping.Address, nil
@@ -922,7 +922,7 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 			return nil, err
 		}
 		if m.DyldInfo() != nil {
-			eTrieAddr, _ = f.getVMAddress(uint64(m.DyldInfo().ExportOff))
+			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldInfo().ExportOff))
 			eTrieSize = uint64(m.DyldInfo().ExportSize)
 		}
 	} else {
