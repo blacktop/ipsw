@@ -191,6 +191,8 @@ $ ipsw download ota --device iPhone12,3
 
 Just download the _kernelcache_ and _dyld_shared_cache_
 
+⚠️ **NOTE:** this broke in iOS 14 _(the format has changed again)_
+
 ```bash
 $ ipsw download ota --device iPod9,1 --kernel --dyld
 ? You are about to download 1 ipsw files. Continue? Yes
