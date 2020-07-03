@@ -14,6 +14,8 @@ summary: Parse dyld_shared_cache.
 - [**dyld split**](#dyld-split)
 - [**dyld webkit**](#dyld-webkit)
 - [**dyld patches** 🆕](#dyld-patches-)
+- [**dyld a2o**](#dyld-a2o)
+- [**dyld o2a**](#dyld-o2a)
 
 ---
 
@@ -236,4 +238,24 @@ offset: 0x57b3db98, addend: 0, has_diversity: true, key: 0, auth: true
 offset: 0x57b79850, addend: 0, has_diversity: true, key: 0, auth: true
 offset: 0x57b88138, addend: 0, has_diversity: true, key: 0, auth: true
 offset: 0x57bb56a8, addend: 0, has_diversity: true, key: 0, auth: true
+```
+
+### **dyld a2o**
+
+Convert dyld_shared_cache address to offset
+
+```bash
+ipsw dyld a2o dyld_shared_cache 1D7B18000
+
+0x053b18000
+```
+
+### **dyld o2a**
+
+Convert dyld_shared_cache offset to address
+
+```bash
+ipsw dyld a2o dyld_shared_cache 0x4C6C0000
+
+0x1ce6c0000
 ```
