@@ -25,6 +25,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -33,24 +35,25 @@ import (
 )
 
 func init() {
-	dyldCmd.AddCommand(symaddrCmd)
+	dyldCmd.AddCommand(patchesCmd)
 
-	symaddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	patchesCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	patchesCmd.Flags().StringP("sym", "s", "", "dylib image symbol to dump patches for")
+	patchesCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
-// symaddrCmd represents the symaddr command
-var symaddrCmd = &cobra.Command{
-	Use:   "symaddr",
-	Short: "Lookup or dump symbol(s)",
+// patchesCmd represents the patches command
+var patchesCmd = &cobra.Command{
+	Use:   "patches",
+	Short: "Dump dyld patch info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
 		imageName, _ := cmd.Flags().GetString("image")
+		symbolName, _ := cmd.Flags().GetString("sym")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -78,65 +81,42 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(args) > 1 {
-			if len(imageName) > 0 { // Search for symbol inside dylib
-				if sym, _ := f.GetExportedSymbolAddressInImage(imageName, args[1]); sym != nil {
-					fmt.Println(sym)
-					// return nil
+		if len(imageName) > 0 {
+			if img := f.Image(imageName); img != nil {
+				if img.PatchableExports != nil {
+					if len(symbolName) > 0 {
+						for _, patch := range img.PatchableExports {
+							if strings.EqualFold(strings.ToLower(patch.Name), strings.ToLower(symbolName)) {
+								log.Infof("%s patch locations", patch.Name)
+								for _, loc := range patch.PatchLocations {
+									fmt.Println(loc)
+								}
+							}
+						}
+					} else {
+						w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+						for _, patch := range img.PatchableExports {
+							fmt.Fprintf(w, "0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+						}
+						w.Flush()
+					}
+
+				} else {
+					log.Warn("Image had no patch entries")
 				}
-				if lSym, _ := f.FindLocalSymbolInImage(args[1], imageName); lSym != nil {
-					fmt.Println(lSym)
-				}
-				return nil
 			}
-			// Search ALL dylibs for a symbol
-			found := false
-			for _, image := range f.Images {
-				if sym, _ := f.GetExportedSymbolAddressInImage(image.Name, args[1]); sym != nil {
-					fmt.Println(sym)
-					found = true
-				}
-			}
-			if !found {
-				if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
-					fmt.Println(lSym)
-				}
-			}
-		} else { // Dump ALL symbols
-			err := f.GetAllExportedSymbols(true)
-			if err != nil {
-				return errors.Wrap(err, "failed to get all exported symbols")
-			}
-			log.Warn("parsing local symbols...")
-			err = f.ParseLocalSyms()
-			if err != nil {
-				return errors.Wrap(err, "failed to parse private symbols")
-			}
-			for _, image := range f.Images {
-				fmt.Printf("\n%s\n", image.Name)
-				for _, sym := range image.LocalSymbols {
-					fmt.Printf("0x%8x: %s\n", sym.Value, sym.Name)
+		} else {
+			for _, img := range f.Images {
+				if img.PatchableExports != nil {
+					log.Infof("[%d entries] %s", len(img.PatchableExports), img.Name)
+					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+					for _, patch := range img.PatchableExports {
+						fmt.Printf("0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+					}
+					w.Flush()
 				}
 			}
 		}
-
-		// if false {
-		// 	index, found, err := f.HasImagePath("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	if found {
-		// 		fmt.Println("index:", index, "image:", f.Images[index].Name)
-		// 	}
-		// 	// err = f.FindClosure("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-		// 	// if err != nil {
-		// 	// 	return err
-		// 	// }
-		// 	err = f.FindDlopenOtherImage("/Applications/FindMy.app/Frameworks/FMSiriIntents.framework/FMSiriIntents")
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
 
 		return nil
 	},

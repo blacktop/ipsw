@@ -460,6 +460,29 @@ func (p CachePatchableLocation) Discriminator() uint64 {
 	return uint64(p >> 48 & 0xFFFF)
 }
 
+func (p CachePatchableLocation) String() string {
+	var pStr string
+	if p.Authenticated() && p.UsesAddressDiversity() {
+		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, has_diversity: %t, key: %d, auth: %t",
+			p.CacheOffset(),
+			p.Addend(),
+			p.UsesAddressDiversity(),
+			p.Key(),
+			p.Authenticated(),
+		)
+	} else if p.Authenticated() && !p.UsesAddressDiversity() {
+		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, key: %d, auth: %t",
+			p.CacheOffset(),
+			p.Addend(),
+			p.Key(),
+			p.Authenticated(),
+		)
+	} else {
+		pStr = fmt.Sprintf("offset: 0x%08x", p.CacheOffset())
+	}
+	return pStr
+}
+
 type CacheExportFlag int
 
 const (
