@@ -35,7 +35,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(selCmd)
 
-	selCmd.Flags().StringVarP(&imageName, "image", "i", "", "dylib image to search")
+	selCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	selCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -51,6 +51,8 @@ var selCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		imageName, _ := cmd.Flags().GetString("image")
 
 		dscPath := filepath.Clean(args[0])
 
