@@ -111,6 +111,7 @@ summary: List all iOS devices.
 | iPhone12,1 | iPhone 11                      | arm64e       | 3          |
 | iPhone12,3 | iPhone 11 Pro                  | arm64e       | 3          |
 | iPhone12,5 | iPhone 11 Pro Max              | arm64e       | 3          |
+| iPhone12,8 | iPhone SE (2nd gen)            | arm64e       | 4          |
 | iPhone4,1  | iPhone 4S                      | armv7        | 0          |
 | iPhone5,1  | iPhone 5                       | armv7s       | 1          |
 | iPhone5,2  | iPhone 5                       | armv7s       | 1          |
@@ -124,8 +125,8 @@ summary: List all iOS devices.
 | iPhone8,1  | iPhone 6s                      | arm64        | 2          |
 | iPhone8,2  | iPhone 6s Plus                 | arm64        | 2          |
 | iPhone8,2  | iPhone 6s Plus                 | arm64        | 2          |
-| iPhone8,4  | iPhone SE                      | arm64        | 2          |
-| iPhone8,4  | iPhone SE                      | arm64        | 2          |
+| iPhone8,4  | iPhone SE (1st gen)            | arm64        | 2          |
+| iPhone8,4  | iPhone SE (1st gen)            | arm64        | 2          |
 | iPhone9,1  | iPhone 7                       | arm64        | 2          |
 | iPhone9,2  | iPhone 7 Plus                  | arm64        | 4          |
 | iPhone9,3  | iPhone 7                       | arm64        | 2          |
