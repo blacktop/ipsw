@@ -191,15 +191,20 @@ Usage:
   ipsw <span class="o">[</span>command<span class="o">]</span>
 
 Available Commands:
-  device-list List all iOS devices
-  download    Download and parse IPSW<span class="o">(</span>s<span class="o">)</span> from the internets
-  dtree       Parse DeviceTree
-  dyld        Parse dyld_shared_cache
-  <span class="nb">help</span>        Help about any <span class="nb">command</span>
-  info        Display IPSW Info
-  kernel      Parse kernelcache
-  macho       Parse a MachO file
-  version     Print the version number of ipsw
+  device-list     List all iOS devices
+  disass          Disassemble ARM binaries at address or symbol
+  download        Download and parse IPSW<span class="o">(</span>s<span class="o">)</span> from the internets
+  dtree           Parse DeviceTree
+  dyld            Parse dyld_shared_cache
+  extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
+  <span class="nb">help</span>            Help about any <span class="nb">command</span>
+  iboot           Dump firmwares
+  img4            Parse Img4
+  info            Display IPSW Info
+  kernel          Parse kernelcache
+  macho           Parse a MachO file
+  ota             Extract file<span class="o">(</span>s<span class="o">)</span> from OTA
+  version         Print the version number of ipsw
 
 Flags:
   -h, --help      <span class="nb">help</span> <span class="k">for</span> ipsw
