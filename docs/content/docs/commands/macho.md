@@ -6,8 +6,6 @@ weight: 8
 summary: Parse a MachO file
 ---
 
-## [WIP] 🚧
-
 ### Similar to `otool -h -l`
 
 ```bash
