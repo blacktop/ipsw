@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/gob"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -42,7 +41,7 @@ type localSymbolInfo struct {
 }
 
 type cacheMappings []*CacheMapping
-type cacheMappingsV2 []*CacheMappingV2
+type cacheExtMappings []*CacheExtMapping
 type cacheImages []*CacheImage
 type codesignature struct {
 	ID            string
@@ -57,9 +56,9 @@ type File struct {
 	CacheHeader
 	ByteOrder binary.ByteOrder
 
-	Mappings   cacheMappings
-	MappingsV2 cacheMappingsV2
-	Images     cacheImages
+	Mappings    cacheMappings
+	ExtMappings cacheExtMappings
+	Images      cacheImages
 
 	SlideInfo       interface{}
 	PatchInfo       CachePatchInfo
@@ -163,27 +162,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		f.Mappings = append(f.Mappings, cm)
 	}
 
-	// Read NEW dyld mappings.
-	sr.Seek(int64(f.MappingV2Offset), os.SEEK_SET)
-
-	for i := uint32(0); i != f.MappingV2Count; i++ {
-		cmInfoV2 := CacheMappingInfoV2{}
-		if err := binary.Read(sr, f.ByteOrder, &cmInfoV2); err != nil {
-			return nil, err
-		}
-		cm := &CacheMappingV2{CacheMappingInfoV2: cmInfoV2}
-		if cmInfoV2.InitProt.Execute() {
-			cm.Name = "__TEXT"
-
-		} else if cmInfoV2.InitProt.Write() {
-			cm.Name = "__DATA"
-
-		} else if cmInfoV2.InitProt.Read() {
-			cm.Name = "__LINKEDIT"
-		}
-		f.MappingsV2 = append(f.MappingsV2, cm)
-	}
-
 	// Read dyld images.
 	sr.Seek(int64(f.ImagesOffset), os.SEEK_SET)
 
@@ -248,9 +226,34 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	/*****************************
 	 * Read dyld kernel slid info
 	 *****************************/
-	// log.Info("Parsing Slide Info...")
+	log.Debug("Parsing Slide Info...")
 	if f.SlideInfoOffset > 0 {
-		f.ParseSlideInfo(false)
+		f.ParseSlideInfo(f.SlideInfoOffset, false)
+	} else {
+		// Read NEW (in iOS 14) dyld extended mappings.
+		sr.Seek(int64(f.ExtMappingOffset), os.SEEK_SET)
+		for i := uint32(0); i != f.ExtMappingCount; i++ {
+			cxmInfo := CacheExtMappingInfo{}
+			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
+				return nil, err
+			}
+			cm := &CacheExtMapping{CacheExtMappingInfo: cxmInfo}
+			if cxmInfo.InitProt.Execute() {
+				cm.Name = "__TEXT"
+			} else if cxmInfo.InitProt.Write() && cm.Flags != 1 {
+				cm.Name = "__DATA"
+			} else if cxmInfo.InitProt.Write() && cm.Flags == 1 {
+				cm.Name = "__AUTH"
+			} else if cxmInfo.InitProt.Read() {
+				cm.Name = "__LINKEDIT"
+			}
+
+			f.ExtMappings = append(f.ExtMappings, cm)
+
+			if cm.SlideInfoSize > 0 {
+				f.ParseSlideInfo(cm.SlideInfoOffset, false)
+			}
+		}
 	}
 
 	// Read dyld branch pool.
@@ -482,15 +485,14 @@ func (f *File) ParseCodeSignature() error {
 				return err
 			}
 		case types.CSSLOT_CMS_SIGNATURE:
-			cms := types.CsBlob{}
 			if err := binary.Read(csr, binary.BigEndian, &f.CodeSignature.CMSSignature); err != nil {
 				return err
 			}
-			cmsData := make([]byte, cms.Length)
+			cmsData := make([]byte, f.CodeSignature.CMSSignature.Length)
 			if err := binary.Read(csr, binary.BigEndian, &cmsData); err != nil {
 				return err
 			}
-			log.Debug(hex.Dump(cmsData))
+			// log.Debug(hex.Dump(cmsData))
 		}
 	}
 
@@ -531,7 +533,7 @@ func (f *File) ParseLocalSyms() error {
 }
 
 // ParseSlideInfo parses dyld slide info
-func (f *File) ParseSlideInfo(dump bool) error {
+func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	// textMapping := f.Mappings[0]
@@ -540,13 +542,13 @@ func (f *File) ParseSlideInfo(dump bool) error {
 
 	// file.Seek(int64((f.SlideInfoOffset-linkEditMapping.FileOffset)+(linkEditMapping.Address-textMapping.Address)), os.SEEK_SET)
 
-	sr.Seek(int64(f.SlideInfoOffset), os.SEEK_SET)
+	sr.Seek(int64(slideInfoOffset), os.SEEK_SET)
 
 	slideInfoVersionData := make([]byte, 4)
 	sr.Read(slideInfoVersionData)
 	slideInfoVersion := binary.LittleEndian.Uint32(slideInfoVersionData)
 
-	sr.Seek(int64(f.SlideInfoOffset), os.SEEK_SET)
+	sr.Seek(int64(slideInfoOffset), os.SEEK_SET)
 
 	switch slideInfoVersion {
 	case 1:
