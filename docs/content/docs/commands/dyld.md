@@ -228,21 +228,21 @@ $ ipsw dyld patches dyld_shared_cache -i libdyld.dylib
 ```bash
 $ ipsw dyld patches dyld_shared_cache -i libdyld.dylib -s _dlopen | head
    • _dlopen patch locations
-offset: 0x57b18898, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b19170, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b1ec20, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b345f8, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b38a50, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b3cd08, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b3db98, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b79850, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57b88138, addend: 0, has_diversity: true, key: 0, auth: true
-offset: 0x57bb56a8, addend: 0, has_diversity: true, key: 0, auth: true
+offset: 0x57b18898, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b19170, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b1ec20, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b345f8, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b38a50, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b3cd08, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b3db98, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b79850, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57b88138, addend: 0, diversity: 0x0000, key: IA, auth: true
+offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: true
 ```
 
 ### **dyld a2o**
 
-Convert dyld_shared_cache address to offset
+Convert _dyld_shared_cache_ address to offset
 
 ```bash
 ipsw dyld a2o dyld_shared_cache 1D7B18000
@@ -252,7 +252,7 @@ ipsw dyld a2o dyld_shared_cache 1D7B18000
 
 ### **dyld o2a**
 
-Convert dyld_shared_cache offset to address
+Convert _dyld_shared_cache_ offset to address
 
 ```bash
 ipsw dyld a2o dyld_shared_cache 0x4C6C0000
