@@ -287,9 +287,9 @@ func (p CacheSlidePointer3) Key() uint64 {
 }
 
 // KeyName returns the chained pointer's key name
-func (p CacheSlidePointer3) KeyName() string {
+func KeyName(keyVal uint64) string {
 	name := []string{"IA", "IB", "DA", "DB"}
-	key := uint64(p >> 49 & 0x3)
+	key := uint64(keyVal >> 49 & 0x3)
 	if key >= 4 {
 		return "ERROR"
 	}
@@ -309,19 +309,18 @@ func (p CacheSlidePointer3) Authenticated() bool {
 func (p CacheSlidePointer3) String() string {
 	var pStr string
 	if p.Authenticated() && p.HasAddressDiversity() {
-		pStr = fmt.Sprintf("value: %x, next: %x, has_diversity: %t, diversity: %x, key: %s, auth: %t",
+		pStr = fmt.Sprintf("value: %x, next: %x, diversity: %x, key: %s, auth: %t",
 			p.Value(),
 			p.OffsetToNextPointer(),
-			p.HasAddressDiversity(),
 			p.DiversityData(),
-			p.KeyName(),
+			KeyName(uint64(p)),
 			p.Authenticated(),
 		)
 	} else if p.Authenticated() && !p.HasAddressDiversity() {
 		pStr = fmt.Sprintf("value: %x, next: %x, key: %s, auth: %t",
 			p.Value(),
 			p.OffsetToNextPointer(),
-			p.KeyName(),
+			KeyName(uint64(p)),
 			p.Authenticated(),
 		)
 	} else {
@@ -442,39 +441,39 @@ type CachePatchableExport struct {
 type CachePatchableLocation uint64
 
 func (p CachePatchableLocation) CacheOffset() uint64 {
-	return uint64(p & 0xFFFFFFFF)
+	return types.ExtractBits(uint64(p), 0, 32)
 }
 func (p CachePatchableLocation) Addend() uint64 {
-	return uint64(p >> 32 & 0xFFF) // +/- 2048
+	return types.ExtractBits(uint64(p), 32, 12) // +/- 2048
 }
 func (p CachePatchableLocation) Authenticated() bool {
-	return (p & 0x100000000000) != 0
+	return types.ExtractBits(uint64(p), 44, 1) != 0
 }
 func (p CachePatchableLocation) UsesAddressDiversity() bool {
-	return (p & 0x100000000000) != 0
+	return types.ExtractBits(uint64(p), 45, 1) != 0
 }
 func (p CachePatchableLocation) Key() uint64 {
-	return uint64(p >> 46 & 0x2)
+	return types.ExtractBits(uint64(p), 46, 2)
 }
 func (p CachePatchableLocation) Discriminator() uint64 {
-	return uint64(p >> 48 & 0xFFFF)
+	return types.ExtractBits(uint64(p), 48, 16)
 }
 
 func (p CachePatchableLocation) String() string {
 	var pStr string
 	if p.Authenticated() && p.UsesAddressDiversity() {
-		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, has_diversity: %t, key: %d, auth: %t",
+		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, diversity: 0x%04x, key: %s, auth: %t",
 			p.CacheOffset(),
 			p.Addend(),
-			p.UsesAddressDiversity(),
-			p.Key(),
+			p.Discriminator(),
+			KeyName(uint64(p)),
 			p.Authenticated(),
 		)
 	} else if p.Authenticated() && !p.UsesAddressDiversity() {
-		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, key: %d, auth: %t",
+		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, key: %s, auth: %t",
 			p.CacheOffset(),
 			p.Addend(),
-			p.Key(),
+			KeyName(uint64(p)),
 			p.Authenticated(),
 		)
 	} else {

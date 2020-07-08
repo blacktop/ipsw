@@ -2,7 +2,6 @@ package dyld
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -99,7 +98,7 @@ func (s StringHash) String() string {
 func (f *File) getLibObjC() (*macho.File, error) {
 	image := f.Image("/usr/lib/libobjc.A.dylib")
 
-	m, err := image.GetMacho()
+	m, err := image.GetPartialMacho()
 	if err != nil {
 		return nil, err
 	}
@@ -146,16 +145,11 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 
 // GetSelectorAddress returns a selector name's address
 func (f *File) GetSelectorAddress(selector string) (uint64, error) {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	image := f.Image("/usr/lib/libobjc.A.dylib")
 
-	dat, err := image.Data()
-	if err != nil {
-		return 0, err
-	}
-	r := bytes.NewReader(dat)
-
-	m, err := macho.NewFile(r)
+	m, err := image.GetPartialMacho()
 	if err != nil {
 		return 0, err
 	}
@@ -163,8 +157,10 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 	for _, s := range m.Sections {
 		if s.Seg == "__TEXT" && s.Name == "__objc_opt_ro" {
 
+			secr := io.NewSectionReader(f.r, int64(s.Offset), int64(s.Size))
+
 			opt := Optimization{}
-			if err := binary.Read(s.Open(), f.ByteOrder, &opt); err != nil {
+			if err := binary.Read(secr, f.ByteOrder, &opt); err != nil {
 				return 0, err
 			}
 			if opt.Version != 15 {
@@ -179,25 +175,25 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 			// shash := StringHash{FileOffset: int32(s.Offset) + opt.ProtocolOptOffset}
 			// shash := StringHash{FileOffset: int32(s.Offset) + opt.HeaderOptRwOffset}
 
-			r.Seek(int64(shash.FileOffset), io.SeekStart)
-			if err := binary.Read(r, f.ByteOrder, &shash.stringHash); err != nil {
+			sr.Seek(int64(shash.FileOffset), io.SeekStart)
+			if err := binary.Read(sr, f.ByteOrder, &shash.stringHash); err != nil {
 				return 0, err
 			}
 
 			log.Debugf("Objective-C StringHash:\n%s", shash)
 
 			shash.Tab = make([]byte, shash.Mask+1)
-			if err := binary.Read(r, f.ByteOrder, &shash.Tab); err != nil {
+			if err := binary.Read(sr, f.ByteOrder, &shash.Tab); err != nil {
 				return 0, err
 			}
 
 			shash.CheckBytes = make([]byte, shash.Capacity)
-			if err := binary.Read(r, f.ByteOrder, &shash.CheckBytes); err != nil {
+			if err := binary.Read(sr, f.ByteOrder, &shash.CheckBytes); err != nil {
 				return 0, err
 			}
 
 			shash.Offsets = make([]int32, shash.Capacity)
-			if err := binary.Read(r, f.ByteOrder, &shash.Offsets); err != nil {
+			if err := binary.Read(sr, f.ByteOrder, &shash.Offsets); err != nil {
 				return 0, err
 			}
 
@@ -235,14 +231,15 @@ func (f *File) SelectorsForImage(imageNames ...string) error {
 	fmt.Println("Objective-C Selectors:")
 	for _, image := range images {
 		fmt.Println(image.Name)
-		m, err := image.GetMacho()
+		m, err := image.GetPartialMacho()
 		if err != nil {
 			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
 		}
 		for _, s := range m.Sections {
 			if s.Seg == "__DATA" && s.Name == "__objc_selrefs" {
+				r := io.NewSectionReader(f.r, int64(s.Offset), int64(s.Size))
 				selectorPtrs := make([]uint64, s.Size/8)
-				if err := binary.Read(s.Open(), f.ByteOrder, &selectorPtrs); err != nil {
+				if err := binary.Read(r, f.ByteOrder, &selectorPtrs); err != nil {
 					return err
 				}
 				for idx, ptr := range selectorPtrs {
@@ -255,7 +252,8 @@ func (f *File) SelectorsForImage(imageNames ...string) error {
 					return fmt.Errorf("segment __OBJC_RO does not exist")
 				}
 
-				sr := objcRoSeg.Open()
+				sr := io.NewSectionReader(f.r, int64(objcRoSeg.Offset), int64(objcRoSeg.Filesz))
+
 				for _, ptr := range selectorPtrs {
 					sr.Seek(int64(ptr-objcRoSeg.Addr), io.SeekStart)
 					s, err := bufio.NewReader(sr).ReadString('\x00')
@@ -287,16 +285,11 @@ func isASCII(s string) bool {
 // by just dumping all the strings in the __OBJC_RO segment
 // returns: map[sym]addr
 func (f *File) AllSelectors(print bool) (map[string]uint64, error) {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	image := f.Image("/usr/lib/libobjc.A.dylib")
 
-	dat, err := image.Data()
-	if err != nil {
-		return nil, err
-	}
-	r := bytes.NewReader(dat)
-
-	m, err := macho.NewFile(r)
+	m, err := image.GetPartialMacho()
 	if err != nil {
 		return nil, err
 	}
@@ -304,8 +297,10 @@ func (f *File) AllSelectors(print bool) (map[string]uint64, error) {
 	for _, s := range m.Sections {
 		if s.Seg == "__TEXT" && s.Name == "__objc_opt_ro" {
 
+			r := io.NewSectionReader(f.r, int64(s.Offset), int64(s.Size))
+
 			opt := Optimization{}
-			if err := binary.Read(s.Open(), f.ByteOrder, &opt); err != nil {
+			if err := binary.Read(r, f.ByteOrder, &opt); err != nil {
 				return nil, err
 			}
 			if opt.Version != 15 {
@@ -320,25 +315,25 @@ func (f *File) AllSelectors(print bool) (map[string]uint64, error) {
 			// shash := StringHash{FileOffset: int32(s.Offset) + opt.ProtocolOptOffset}
 			// shash := StringHash{FileOffset: int32(s.Offset) + opt.HeaderOptRwOffset}
 
-			r.Seek(int64(shash.FileOffset), io.SeekStart)
-			if err := binary.Read(r, f.ByteOrder, &shash.stringHash); err != nil {
+			sr.Seek(int64(shash.FileOffset), io.SeekStart)
+			if err := binary.Read(sr, f.ByteOrder, &shash.stringHash); err != nil {
 				return nil, err
 			}
 
 			log.Debugf("Objective-C StringHash:\n%s", shash)
 
 			shash.Tab = make([]byte, shash.Mask+1)
-			if err := binary.Read(r, f.ByteOrder, &shash.Tab); err != nil {
+			if err := binary.Read(sr, f.ByteOrder, &shash.Tab); err != nil {
 				return nil, err
 			}
 
 			shash.CheckBytes = make([]byte, shash.Capacity)
-			if err := binary.Read(r, f.ByteOrder, &shash.CheckBytes); err != nil {
+			if err := binary.Read(sr, f.ByteOrder, &shash.CheckBytes); err != nil {
 				return nil, err
 			}
 
 			shash.Offsets = make([]int32, shash.Capacity)
-			if err := binary.Read(r, f.ByteOrder, &shash.Offsets); err != nil {
+			if err := binary.Read(sr, f.ByteOrder, &shash.Offsets); err != nil {
 				return nil, err
 			}
 
