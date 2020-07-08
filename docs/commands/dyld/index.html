@@ -334,23 +334,23 @@ Objective-C Selectors:
 0x00280820 <span class="o">(</span><span class="m">399</span> patches<span class="o">)</span> _dlopen
 </code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld patches dyld_shared_cache -i libdyld.dylib -s _dlopen <span class="p">|</span> head
    • _dlopen patch locations
-offset: 0x57b18898, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b19170, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b1ec20, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b345f8, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b38a50, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b3cd08, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b3db98, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b79850, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57b88138, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
-offset: 0x57bb56a8, addend: 0, has_diversity: true, key: 0, auth: <span class="nb">true</span>
+offset: 0x57b18898, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b19170, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b1ec20, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b345f8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b38a50, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b3cd08, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b3db98, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b79850, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57b88138, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
 </code></pre></div><h3 id="dyld-a2o"><strong>dyld a2o</strong></h3>
-<p>Convert dyld_shared_cache address to offset</p>
+<p>Convert <em>dyld_shared_cache</em> address to offset</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld a2o dyld_shared_cache 1D7B18000
 
 0x053b18000
 </code></pre></div><h3 id="dyld-o2a"><strong>dyld o2a</strong></h3>
-<p>Convert dyld_shared_cache offset to address</p>
+<p>Convert <em>dyld_shared_cache</em> offset to address</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld a2o dyld_shared_cache 0x4C6C0000
 
 0x1ce6c0000
