@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"text/tabwriter"
 
@@ -79,22 +80,27 @@ var machoCmd = &cobra.Command{
 
 		if showSignature {
 			if m.CodeSignature() != nil {
+				cd := m.CodeSignature().CodeDirectory
 				fmt.Println("Code Signature")
 				fmt.Println("==============")
-				fmt.Printf("Code Directory (%d bytes)\n", m.CodeSignature().CodeDirectory.Length)
+				fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
 				fmt.Printf("\tVersion:     %x\n"+
 					"\tFlags:       0x%x\n"+
 					"\tCodeLimit:   0x%x\n"+
 					"\tIdentifier:  %s (@0x%x)\n"+
+					"\t# of hashes: %d code (%d pages) + %d special\n"+
 					"\tHashes @%d size: %d Type: %s\n",
-					m.CodeSignature().CodeDirectory.Version,
-					m.CodeSignature().CodeDirectory.Flags,
-					m.CodeSignature().CodeDirectory.CodeLimit,
+					cd.Version,
+					cd.Flags,
+					cd.CodeLimit,
 					m.CodeSignature().ID,
-					m.CodeSignature().CodeDirectory.IdentOffset,
-					m.CodeSignature().CodeDirectory.HashOffset,
-					m.CodeSignature().CodeDirectory.HashSize,
-					m.CodeSignature().CodeDirectory.HashType)
+					cd.IdentOffset,
+					cd.NCodeSlots,
+					int(math.Pow(2, float64(cd.PageSize))),
+					cd.NSpecialSlots,
+					cd.HashOffset,
+					cd.HashSize,
+					cd.HashType)
 				if len(m.CodeSignature().Requirements) > 0 {
 					fmt.Printf("Requirement Set (%d bytes) with %d requirement\n",
 						m.CodeSignature().Requirements[0].Length,
