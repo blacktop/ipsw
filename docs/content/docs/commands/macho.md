@@ -6,7 +6,29 @@ weight: 8
 summary: Parse a MachO file
 ---
 
-### Similar to `otool -h -l`
+- [**macho -d**](#macho--d)
+- [**macho -l**](#macho--l)
+- [**macho --sig**](#macho---sig)
+- [**macho --ent**](#macho---ent)
+- [**macho --objc**](#macho---objc)
+
+### **macho -d**
+
+Similar to `otool -h`
+
+```bash
+$ ipsw macho JavaScriptCore
+
+Magic         = 64-bit MachO
+Type          = Dylib
+CPU           = AARCH64, ARM64e (ARMv8.3) caps: PAC00
+Commands      = 25 (Size: 4384)
+Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
+```
+
+### **macho -l**
+
+Similar to `otool -h -l`
 
 ```bash
 $ ipsw macho JavaScriptCore
@@ -83,7 +105,9 @@ NOTE: recorded command size 4384, computed command size 4384
 NOTE: File size is 20287612
 ```
 
-### Similar to `jtool --sig`
+### **macho --sig**
+
+Similar to `jtool --sig`
 
 ```bash
 $ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig
@@ -100,7 +124,9 @@ Requirement Set (72 bytes) with 1 requirement
         Designated Requirement (@20, 72 bytes): identifier "com.apple.JavaScriptCore" AND anchor apple
 ```
 
-### Similar to `jtool --ent`
+### **macho --ent**
+
+Similar to `jtool --ent`
 
 ```bash
 $ ipsw macho /usr/libexec/amfid --ent
@@ -123,9 +149,11 @@ Entitlements
 </plist>
 ```
 
-### Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
+### **macho --objc**
 
-**NOTE:** I ran `lipo -thin x86_64 /usr/lib/libobjc.A.dylib -output ./libobjc.A.dylib` first
+Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
+
+**NOTE:** I first ran `lipo -thin x86_64 /usr/lib/libobjc.A.dylib -output ./libobjc.A.dylib`
 
 ```bash
 $ ipsw macho libobjc.A.dylib --objc
