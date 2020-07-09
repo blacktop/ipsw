@@ -22,19 +22,52 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
+	"io/ioutil"
+	"os"
+
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/img4"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	rootCmd.AddCommand(img4Cmd)
+	img4Cmd.AddCommand(img4ExtractCmd)
+
+	extractCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
-// img4Cmd represents the img4 command
-var img4Cmd = &cobra.Command{
-	Use:   "img4",
-	Short: "Parse Img4",
-	Args:  cobra.NoArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+// img4ExtractCmd represents the extract command
+var img4ExtractCmd = &cobra.Command{
+	Use:   "extract <img4>",
+	Short: "Extract img4 payloads",
+	Args:  cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+
+		f, err := os.Open(args[0])
+		if err != nil {
+			return errors.Wrapf(err, "unabled to open file: %s", args[0])
+		}
+
+		i, err := img4.ParseIm4p(f)
+		if err != nil {
+			return errors.Wrap(err, "unabled to parse Im4p")
+		}
+
+		outFile := args[0] + ".payload"
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Exracting payload to file %s", outFile))
+
+		err = ioutil.WriteFile(outFile, i.Data, 0644)
+		if err != nil {
+			return errors.Wrapf(err, "failed to write file: ", outFile)
+		}
+
+		return nil
 	},
 }
