@@ -24,8 +24,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"reflect"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
@@ -36,29 +34,13 @@ import (
 func init() {
 	rootCmd.AddCommand(machoCmd)
 
-	machoCmd.Flags().BoolP("sig", "s", false, "Show code signature in binary")
-	machoCmd.Flags().BoolP("ent", "e", false, "Show entitlements in binary")
-	machoCmd.Flags().BoolP("objc", "c", false, "Show ObjC info in binary")
-	machoCmd.Flags().BoolP("symbols", "n", false, "Output symbols")
+	machoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
+	machoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	machoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
+	machoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
+	machoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
+	machoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	machoCmd.MarkZshCompPositionalArgumentFile(1)
-}
-
-func examiner(t reflect.Type, depth int) {
-	fmt.Println(strings.Repeat("\t", depth), "Type is", t.Name(), "and kind is", t.Kind())
-	switch t.Kind() {
-	case reflect.Array, reflect.Chan, reflect.Map, reflect.Ptr, reflect.Slice:
-		fmt.Println(strings.Repeat("\t", depth+1), "Contained type:")
-		examiner(t.Elem(), depth+1)
-	case reflect.Struct:
-		for i := 0; i < t.NumField(); i++ {
-			f := t.Field(i)
-			fmt.Println(strings.Repeat("\t", depth+1), "Field", i+1, "name is", f.Name, "type is", f.Type.Name(), "and kind is", f.Type.Kind())
-			if f.Tag != "" {
-				fmt.Println(strings.Repeat("\t", depth+2), "Tag is", f.Tag)
-				fmt.Println(strings.Repeat("\t", depth+2), "tag1 is", f.Tag.Get("tag1"), "tag2 is", f.Tag.Get("tag2"))
-			}
-		}
-	}
 }
 
 // machoCmd represents the macho command
@@ -72,6 +54,8 @@ var machoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		showHeader, _ := cmd.Flags().GetBool("header")
+		showLoadCommands, _ := cmd.Flags().GetBool("loads")
 		showSignature, _ := cmd.Flags().GetBool("sig")
 		showEntitlements, _ := cmd.Flags().GetBool("ent")
 		showObjC, _ := cmd.Flags().GetBool("objc")
@@ -86,7 +70,12 @@ var machoCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println(m.FileTOC.String())
+		if showHeader && !showLoadCommands {
+			fmt.Println(m.FileHeader.String())
+		}
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC) {
+			fmt.Println(m.FileTOC.String())
+		}
 
 		if showSignature {
 			if m.CodeSignature() != nil {
