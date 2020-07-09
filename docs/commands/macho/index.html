@@ -183,7 +183,24 @@
           
 <h1 class="title">macho</h1>
 <div class="content ">
-  <h3 id="similar-to-otool--h--l">Similar to <code>otool -h -l</code></h3>
+  <ul>
+<li><a href="#macho--d"><strong>macho -d</strong></a></li>
+<li><a href="#macho--l"><strong>macho -l</strong></a></li>
+<li><a href="#macho---sig"><strong>macho &ndash;sig</strong></a></li>
+<li><a href="#macho---ent"><strong>macho &ndash;ent</strong></a></li>
+<li><a href="#macho---objc"><strong>macho &ndash;objc</strong></a></li>
+</ul>
+<h3 id="macho--d"><strong>macho -d</strong></h3>
+<p>Similar to <code>otool -h</code></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
+
+<span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
+<span class="nv">Type</span>          <span class="o">=</span> Dylib
+<span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e <span class="o">(</span>ARMv8.3<span class="o">)</span> caps: PAC00
+<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">25</span> <span class="o">(</span>Size: 4384<span class="o">)</span>
+<span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
+</code></pre></div><h3 id="macho--l"><strong>macho -l</strong></h3>
+<p>Similar to <code>otool -h -l</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
@@ -256,7 +273,8 @@
 
 NOTE: recorded <span class="nb">command</span> size 4384, computed <span class="nb">command</span> size <span class="m">4384</span>
 NOTE: File size is <span class="m">20287612</span>
-</code></pre></div><h3 id="similar-to-jtool---sig">Similar to <code>jtool --sig</code></h3>
+</code></pre></div><h3 id="macho---sig"><strong>macho &ndash;sig</strong></h3>
+<p>Similar to <code>jtool --sig</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig
 
 Code <span class="nv">Signature</span>
@@ -269,7 +287,8 @@ Code Directory <span class="o">(</span><span class="m">167849</span> bytes<span 
         Hashes @169 size: <span class="m">32</span> Type: Sha256
 Requirement Set <span class="o">(</span><span class="m">72</span> bytes<span class="o">)</span> with <span class="m">1</span> requirement
         Designated Requirement <span class="o">(</span>@20, <span class="m">72</span> bytes<span class="o">)</span>: identifier <span class="s2">&#34;com.apple.JavaScriptCore&#34;</span> AND anchor apple
-</code></pre></div><h3 id="similar-to-jtool---ent">Similar to <code>jtool --ent</code></h3>
+</code></pre></div><h3 id="macho---ent"><strong>macho &ndash;ent</strong></h3>
+<p>Similar to <code>jtool --ent</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/libexec/amfid --ent
 
 <span class="nv">Entitlements</span>
@@ -288,8 +307,9 @@ Requirement Set <span class="o">(</span><span class="m">72</span> bytes<span cla
         &lt;true/&gt;
 &lt;/dict&gt;
 &lt;/plist&gt;
-</code></pre></div><h3 id="similar-to-objdump---macho---objc-meta-data-or-dsdump---objc--vv">Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></h3>
-<p><strong>NOTE:</strong> I ran <code>lipo -thin x86_64 /usr/lib/libobjc.A.dylib -output ./libobjc.A.dylib</code> first</p>
+</code></pre></div><h3 id="macho---objc"><strong>macho &ndash;objc</strong></h3>
+<p>Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></p>
+<p><strong>NOTE:</strong> I first ran <code>lipo -thin x86_64 /usr/lib/libobjc.A.dylib -output ./libobjc.A.dylib</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho libobjc.A.dylib --objc
 
 Objective-C

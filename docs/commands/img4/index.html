@@ -202,6 +202,44 @@
 <span class="m">00000250</span>  <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span>  <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
 *
 <span class="m">00000280</span>  <span class="m">69</span> <span class="m">42</span> 6f 6f <span class="m">74</span> 2d <span class="m">35</span> <span class="m">35</span>  <span class="m">34</span> <span class="m">30</span> 2e <span class="m">31</span> <span class="m">30</span> <span class="m">32</span> 2e <span class="m">34</span>  <span class="p">|</span>iBoot-5540.102.4<span class="p">|</span>
+</code></pre></div><h2 id="img4-extract"><strong>img4 extract</strong></h2>
+<h3 id="ever-wonder-how-to-mount-the-ram-disks-in-the-_ipsw_-">Ever wonder how to mount the RAM disks in the <em>ipsw</em> ?</h3>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ unzip iPhone11,8,iPhone12,1_14.0_18A5319i_Restore.ipsw
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ls *.dmg
+
+-rw-r--r--@ <span class="m">1</span> blacktop  staff   102M Jan  <span class="m">9</span>  <span class="m">2007</span> 038-44087-104.dmg
+-rw-r--r--@ <span class="m">1</span> blacktop  staff    99M Jan  <span class="m">9</span>  <span class="m">2007</span> 038-44135-103.dmg
+-rw-r--r--@ <span class="m">1</span> blacktop  staff   4.7G Jan  <span class="m">9</span>  <span class="m">2007</span> 038-44337-066.dmg
+</code></pre></div><p>The <strong>BIG</strong> one <em>(4.7G)</em> is the <em>file system</em> (aka the one that has the <em>dyld_shared_cache</em>).</p>
+<p>The other two are the <code>arm64eCustomerRamDisk</code> and the <code>arm64eUpdateRamDisk</code>, however, you cannot mount them as they are actually <strong>Img4</strong> files. 😕</p>
+<p>You can now extract the Img4 payloads with the following command:</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw img4 extract 038-44087-104.dmg
+   • Parsing Im4p
+      • Exracting payload to file 038-44087-104.dmg.payload
+</code></pre></div><p>Rename the <code>payload</code> back to a <em>DMG</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ mv 038-44087-104.dmg.payload 038-44087-104.dmg.payload.dmg
+</code></pre></div><p>And now you can double click on the 🆕 <em>DMG</em> to mount the RAM disk image.</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">cd</span> /Volumes/AzulSeed18A5319i.arm64eUpdateRamDisk/
+$ ls -l
+total <span class="m">16</span>
+drwxrwxr-x  <span class="m">3</span> blacktop  staff  <span class="m">102</span> Jul  <span class="m">2</span> 02:15 Library
+drwxr-xr-x  <span class="m">4</span> blacktop  staff  <span class="m">136</span> Jul  <span class="m">2</span> 02:15 System
+drwxr-xr-x  <span class="m">2</span> blacktop  staff  <span class="m">272</span> Jul  <span class="m">2</span> 02:15 bin
+dr-xr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 dev
+lrwxr-xr-x  <span class="m">1</span> blacktop  staff   <span class="m">11</span> Jul  <span class="m">2</span> 02:15 etc -&gt; private/etc
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt1
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt2
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt3
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt4
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt5
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt6
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt7
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt8
+drwxr-xr-x  <span class="m">2</span> blacktop  staff   <span class="m">68</span> Jul  <span class="m">2</span> 02:15 mnt9
+drwxr-xr-x  <span class="m">4</span> blacktop  staff  <span class="m">136</span> Jul  <span class="m">2</span> 02:15 private
+drwxr-xr-x  <span class="m">2</span> blacktop  staff  <span class="m">544</span> Jul  <span class="m">2</span> 02:15 sbin
+drwxr-xr-x  <span class="m">9</span> blacktop  staff  <span class="m">306</span> Jul  <span class="m">2</span> 02:15 usr
+lrwxr-xr-x  <span class="m">1</span> blacktop  staff   <span class="m">11</span> Jul  <span class="m">2</span> 02:15 var -&gt; private/var
 </code></pre></div>
 </div>
 </div>
