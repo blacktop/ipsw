@@ -82,3 +82,287 @@ Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, A
 NOTE: recorded command size 4384, computed command size 4384
 NOTE: File size is 20287612
 ```
+
+### Similar to `jtool --sig`
+
+```bash
+$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig
+
+Code Signature
+==============
+Code Directory (167849 bytes)
+        Version:     20100
+        Flags:       0x0
+        CodeLimit:   0x14772b0
+        Identifier:  com.apple.JavaScriptCore (@0x30)
+        Hashes @169 size: 32 Type: Sha256
+Requirement Set (72 bytes) with 1 requirement
+        Designated Requirement (@20, 72 bytes): identifier "com.apple.JavaScriptCore" AND anchor apple
+```
+
+### Similar to `jtool --ent`
+
+```bash
+$ ipsw macho /usr/libexec/amfid --ent
+
+Entitlements
+============
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+        <key>com.apple.private.security.storage.SystemPolicyConfiguration</key>
+        <true/>
+        <key>com.apple.private.tcc.allow</key>
+        <array>
+                <string>kTCCServiceSystemPolicyAllFiles</string>
+        </array>
+        <key>com.apple.rootless.storage.SystemPolicyConfiguration</key>
+        <true/>
+</dict>
+</plist>
+```
+
+### Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
+
+**NOTE:** I ran `lipo -thin x86_64 /usr/lib/libobjc.A.dylib -output ./libobjc.A.dylib` first
+
+```bash
+$ ipsw macho libobjc.A.dylib --objc
+
+Objective-C
+===========
+@protocol NSObject
+ @property hash
+ @property superclass
+ @property description
+ @property debugDescription
+
+  // instance methods
+ -[NSObject isEqual:]
+ -[NSObject class]
+ -[NSObject self]
+ -[NSObject performSelector:]
+ -[NSObject performSelector:withObject:]
+ -[NSObject performSelector:withObject:withObject:]
+ -[NSObject isProxy]
+ -[NSObject isKindOfClass:]
+ -[NSObject isMemberOfClass:]
+ -[NSObject conformsToProtocol:]
+ -[NSObject respondsToSelector:]
+ -[NSObject retain]
+ -[NSObject release]
+ -[NSObject autorelease]
+ -[NSObject retainCount]
+ -[NSObject zone]
+ -[NSObject hash]
+ -[NSObject superclass]
+ -[NSObject description]
+
+@optional
+  // instance methods
+ -[NSObject debugDescription]
+@end
+
+0x00000035000 Object : <ROOT>
+  // instance methods
+  0x000000210b9 -[Object retain]
+  0x000000210be -[Object release]
+  0x000000210c3 -[Object autorelease]
+
+0x00000035078 __IncompleteProtocol : NSObject
+
+0x000000350c8 Protocol : NSObject
+  // instance methods
+  0x000000210d9 -[Protocol conformsTo:]
+  0x000000210e1 -[Protocol descriptionForInstanceMethod:]
+  0x00000021100 -[Protocol descriptionForClassMethod:]
+  0x0000002111c -[Protocol name]
+  0x0000002112d -[Protocol isEqual:]
+  0x000000211c2 -[Protocol hash]
+
+0x00000035168 __NSUnrecognizedTaggedPointer : NSObject
+  // instance methods
+  0x00000022d0e -[__NSUnrecognizedTaggedPointer retain]
+  0x00000022d12 -[__NSUnrecognizedTaggedPointer release]
+  0x00000022d13 -[__NSUnrecognizedTaggedPointer autorelease]
+
+0x00000035118 NSObject : <ROOT>
+  // instance methods
+  0x0000000ac6f -[NSObject self]
+  0x00000009d13 -[NSObject class]
+  0x00000011301 -[NSObject superclass]
+  0x0000000b258 -[NSObject isMemberOfClass:]
+  0x0000000a3df -[NSObject isKindOfClass:]
+  0x0000000ac75 -[NSObject respondsToSelector:]
+  0x0000000b2d1 -[NSObject conformsToProtocol:]
+  0x0000000a7bb -[NSObject hash]
+  0x00000009cef -[NSObject isEqual:]
+  0x00000012a68 -[NSObject isFault]
+  0x0000001131b -[NSObject isProxy]
+  0x0000000bc3e -[NSObject methodForSelector:]
+  0x00000022522 -[NSObject doesNotRecognizeSelector:]
+  0x0000000d6c9 -[NSObject performSelector:]
+  0x0000000da2d -[NSObject performSelector:withObject:]
+  0x0000000fd60 -[NSObject performSelector:withObject:withObject:]
+  0x00000022568 -[NSObject methodSignatureForSelector:]
+  0x0000002257a -[NSObject forwardInvocation:]
+  0x0000000c955 -[NSObject forwardingTargetForSelector:]
+  0x000000225b8 -[NSObject description]
+  0x000000225bb -[NSObject debugDescription]
+  0x00000007c98 -[NSObject retain]
+  0x00000010b7d -[NSObject _tryRetain]
+  0x0000000ec4b -[NSObject _isDeallocating]
+  0x0000000ec23 -[NSObject allowsWeakReference]
+  0x0000000ff3f -[NSObject retainWeakReference]
+  0x00000009b0c -[NSObject release]
+  0x00000009c61 -[NSObject autorelease]
+  0x00000010a96 -[NSObject retainCount]
+  0x000000095ab -[NSObject init]
+  0x00000007d3f -[NSObject dealloc]
+  0x000000225d4 -[NSObject finalize]
+  0x0000000b2c5 -[NSObject zone]
+  0x00000009cda -[NSObject copy]
+  0x00000009cf9 -[NSObject mutableCopy]
+
+0x00000035078 __IncompleteProtocol : NSObject
+
+0x000000350c8 Protocol : NSObject
+  // instance methods
+  0x000000210d9 -[Protocol conformsTo:]
+  0x000000210e1 -[Protocol descriptionForInstanceMethod:]
+  0x00000021100 -[Protocol descriptionForClassMethod:]
+  0x0000002111c -[Protocol name]
+  0x0000002112d -[Protocol isEqual:]
+  0x000000211c2 -[Protocol hash]
+
+0x00000035168 __NSUnrecognizedTaggedPointer : NSObject
+  // instance methods
+  0x00000022d0e -[__NSUnrecognizedTaggedPointer retain]
+  0x00000022d12 -[__NSUnrecognizedTaggedPointer release]
+  0x00000022d13 -[__NSUnrecognizedTaggedPointer autorelease]
+
+0x00000035118 NSObject : <ROOT>
+  // instance methods
+  0x0000000ac6f -[NSObject self]
+  0x00000009d13 -[NSObject class]
+  0x00000011301 -[NSObject superclass]
+  0x0000000b258 -[NSObject isMemberOfClass:]
+  0x0000000a3df -[NSObject isKindOfClass:]
+  0x0000000ac75 -[NSObject respondsToSelector:]
+  0x0000000b2d1 -[NSObject conformsToProtocol:]
+  0x0000000a7bb -[NSObject hash]
+  0x00000009cef -[NSObject isEqual:]
+  0x00000012a68 -[NSObject isFault]
+  0x0000001131b -[NSObject isProxy]
+  0x0000000bc3e -[NSObject methodForSelector:]
+  0x00000022522 -[NSObject doesNotRecognizeSelector:]
+  0x0000000d6c9 -[NSObject performSelector:]
+  0x0000000da2d -[NSObject performSelector:withObject:]
+  0x0000000fd60 -[NSObject performSelector:withObject:withObject:]
+  0x00000022568 -[NSObject methodSignatureForSelector:]
+  0x0000002257a -[NSObject forwardInvocation:]
+  0x0000000c955 -[NSObject forwardingTargetForSelector:]
+  0x000000225b8 -[NSObject description]
+  0x000000225bb -[NSObject debugDescription]
+  0x00000007c98 -[NSObject retain]
+  0x00000010b7d -[NSObject _tryRetain]
+  0x0000000ec4b -[NSObject _isDeallocating]
+  0x0000000ec23 -[NSObject allowsWeakReference]
+  0x0000000ff3f -[NSObject retainWeakReference]
+  0x00000009b0c -[NSObject release]
+  0x00000009c61 -[NSObject autorelease]
+  0x00000010a96 -[NSObject retainCount]
+  0x000000095ab -[NSObject init]
+  0x00000007d3f -[NSObject dealloc]
+  0x000000225d4 -[NSObject finalize]
+  0x0000000b2c5 -[NSObject zone]
+  0x00000009cda -[NSObject copy]
+  0x00000009cf9 -[NSObject mutableCopy]
+
+@selectors
+0x00000032c3a: _tryRetain
+0x00000032e96: init
+0x00000032c1f: allocWithZone:
+0x00000032ccb: mutableCopyWithZone:
+0x00000032b87: release
+0x00000032c55: retainCount
+0x00000032ba8: retainWeakReference
+0x00000032bbc: new
+0x00000032bc0: self
+0x00000032c19: alloc
+0x00000032c2e: autorelease
+0x00000032b8f: load
+0x00000032bee: resolveInstanceMethod:
+0x00000032d87: description
+0x00000032e9b: dealloc
+0x00000032e0c: doesNotRecognizeSelector:
+0x00000032b75: initialize
+0x00000032bc5: class
+0x00000032bcb: isKindOfClass:
+0x00000032bda: respondsToSelector:
+0x00000032b80: retain
+0x00000032ce0: copy
+0x00000032b94: allowsWeakReference
+0x00000032c05: resolveClassMethod:
+0x00000032c45: _isDeallocating
+0x00000032eaf: selector
+0x00000032cbd: copyWithZone:
+
+@methods
+0x00000032d87: description
+0x00000032b94: allowsWeakReference
+0x00000032bcb: isKindOfClass:
+0x00000032c1f: allocWithZone:
+0x00000032cb8: hash
+0x00000032ccb: mutableCopyWithZone:
+0x00000032b8f: load
+0x00000032bbc: new
+0x00000032e9b: dealloc
+0x00000032eaf: selector
+0x00000032eb8: finalize
+0x00000032b87: release
+0x00000032bee: resolveInstanceMethod:
+0x00000032c19: alloc
+0x00000032e0c: doesNotRecognizeSelector:
+0x00000032e26: instanceMethodSignatureForSelector:
+0x00000032d93: isSubclassOfClass:
+0x00000032e4a: methodSignatureForSelector:
+0x00000032b75: initialize
+0x00000032ba8: retainWeakReference
+0x00000032bc5: class
+0x00000032c71: descriptionForInstanceMethod:
+0x00000032d77: zone
+0x00000032d7c: superclass
+0x00000032df9: methodForSelector:
+0x00000032e96: init
+0x00000032c2e: autorelease
+0x00000032c55: retainCount
+0x00000032caf: isEqual:
+0x00000032d07: performSelector:withObject:
+0x00000032d23: performSelector:withObject:withObject:
+0x00000032dba: instancesRespondToSelector:
+0x00000032e66: forwardInvocation:
+0x00000032bda: respondsToSelector:
+0x00000032caa: name
+0x00000032d63: conformsToProtocol:
+0x00000032ea3: mutableCopy
+0x00000032b80: retain
+0x00000032c3a: _tryRetain
+0x00000032cbd: copyWithZone:
+0x00000032da6: isAncestorOfObject:
+0x00000032dde: instanceMethodForSelector:
+0x00000032bc0: self
+0x00000032c45: _isDeallocating
+0x00000032cf6: performSelector:
+0x00000032d4a: isProxy
+0x00000032dd6: isFault
+0x00000032c05: resolveClassMethod:
+0x00000032c65: conformsTo:
+0x00000032ce0: copy
+0x00000032c8f: descriptionForClassMethod:
+0x00000032d52: isMemberOfClass:
+0x00000032e79: forwardingTargetForSelector:
+0x00000032c61: isa
+0x00000032ce5: debugDescription
+```

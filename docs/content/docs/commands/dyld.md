@@ -149,18 +149,22 @@ $ ipsw dyld sel dyld_shared_cache release
 Or get all the selectors for an image
 
 ```bash
-$ ipsw dyld sel --image CoreFoundation dyld_shared_cache
+$ ipsw dyld sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
 
 Objective-C Selectors:
-/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
-    0x1b92c88c8: exceptionWithName:reason:userInfo:
-    0x1b92c878d: mutableCopyWithZone:
-    0x1b92c877f: copyWithZone:
-    0x1b92c88eb: initWithSet:copyItems:
-    0x1b92c8820: doesNotRecognizeSelector:
-    0x1b92c8902: initWithObjects:count:
-    0x1b92c8919: initWithCapacity:
-    0x1b92c8418: dealloc
+/usr/lib/libobjc.A.dylib
+    0x1c9dcc5fd: instanceMethodSignatureForSelector:
+    0x1c8f14de2: instanceMethodForSelector:
+    0x1c9d3be7d: instancesRespondToSelector:
+    0x1c8f113e9: isAncestorOfObject:
+    0x1c9e91b48: isSubclassOfClass:
+    0x1c90fe47d: name
+    0x1c9aa0937: descriptionForClassMethod:
+    0x1c9a01891: descriptionForInstanceMethod:
+    0x1c9aaf8c2: conformsTo:
+    0x1c8ef287d: 🤯 <========== WTF??
+    0x1c93562fd: release
+    0x1c9b2c9fd: initialize
 <SNIP>
 ```
 

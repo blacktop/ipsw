@@ -36,7 +36,10 @@ import (
 func init() {
 	rootCmd.AddCommand(machoCmd)
 
-	machoCmd.Flags().BoolP("symbols", "n", false, "output symbols")
+	machoCmd.Flags().BoolP("sig", "s", false, "Show code signature in binary")
+	machoCmd.Flags().BoolP("ent", "e", false, "Show entitlements in binary")
+	machoCmd.Flags().BoolP("objc", "c", false, "Show ObjC info in binary")
+	machoCmd.Flags().BoolP("symbols", "n", false, "Output symbols")
 	machoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -69,6 +72,9 @@ var machoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		showSignature, _ := cmd.Flags().GetBool("sig")
+		showEntitlements, _ := cmd.Flags().GetBool("ent")
+		showObjC, _ := cmd.Flags().GetBool("objc")
 		symbols, _ := cmd.Flags().GetBool("symbols")
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
@@ -81,6 +87,104 @@ var machoCmd = &cobra.Command{
 		}
 
 		fmt.Println(m.FileTOC.String())
+
+		if showSignature {
+			if m.CodeSignature() != nil {
+				fmt.Println("Code Signature")
+				fmt.Println("==============")
+				fmt.Printf("Code Directory (%d bytes)\n", m.CodeSignature().CodeDirectory.Length)
+				fmt.Printf("\tVersion:     %x\n"+
+					"\tFlags:       0x%x\n"+
+					"\tCodeLimit:   0x%x\n"+
+					"\tIdentifier:  %s (@0x%x)\n"+
+					"\tHashes @%d size: %d Type: %s\n",
+					m.CodeSignature().CodeDirectory.Version,
+					m.CodeSignature().CodeDirectory.Flags,
+					m.CodeSignature().CodeDirectory.CodeLimit,
+					m.CodeSignature().ID,
+					m.CodeSignature().CodeDirectory.IdentOffset,
+					m.CodeSignature().CodeDirectory.HashOffset,
+					m.CodeSignature().CodeDirectory.HashSize,
+					m.CodeSignature().CodeDirectory.HashType)
+				if len(m.CodeSignature().Requirements) > 0 {
+					fmt.Printf("Requirement Set (%d bytes) with %d requirement\n",
+						m.CodeSignature().Requirements[0].Length,
+						len(m.CodeSignature().Requirements))
+					for _, req := range m.CodeSignature().Requirements {
+						fmt.Printf("\t%s (@%d, %d bytes): %s\n",
+							req.Type,
+							req.Offset,
+							req.Length,
+							req.Detail)
+					}
+				}
+			} else {
+				fmt.Println("Code Signature")
+				fmt.Println("==============")
+				fmt.Println("  - no code signature data")
+			}
+		}
+
+		if showEntitlements {
+			if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
+				fmt.Println("Entitlements")
+				fmt.Println("============")
+				fmt.Println(m.CodeSignature().Entitlements)
+			} else {
+				fmt.Println("ENTITLEMENTS")
+				fmt.Println("============")
+				fmt.Println("  - no entitlements")
+			}
+		}
+
+		if showObjC {
+			if m.HasObjC() {
+				fmt.Println("Objective-C")
+				fmt.Println("===========")
+				// fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
+				// fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
+
+				// info, _ := m.GetObjCImageInfo()
+				// fmt.Println(info.Flags)
+				// fmt.Println(info.Flags.SwiftVersion())
+
+				if protos, err := m.GetObjCProtocols(); err == nil {
+					for _, proto := range protos {
+						fmt.Println(proto.String())
+					}
+				}
+				if classes, err := m.GetObjCClasses(); err == nil {
+					for _, class := range classes {
+						fmt.Println(class.String())
+					}
+				}
+				if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
+					for _, class := range nlclasses {
+						fmt.Println(class.String())
+					}
+				}
+				if cats, err := m.GetObjCCategories(); err == nil {
+					fmt.Printf("Categories: %#v\n", cats)
+				}
+				if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
+					fmt.Println("@selectors")
+					for vmaddr, name := range selRefs {
+						fmt.Printf("0x%011x: %s\n", vmaddr, name)
+					}
+				}
+				if methods, err := m.GetObjCMethodNames(); err == nil {
+					fmt.Printf("\n@methods\n")
+					for method, vmaddr := range methods {
+						fmt.Printf("0x%011x: %s\n", vmaddr, method)
+					}
+				}
+			} else {
+				fmt.Println("Objective-C")
+				fmt.Println("===========")
+				fmt.Println("  - no objc")
+			}
+		}
+
 		// fmt.Println("HEADER")
 		// fmt.Println("======")
 		// fmt.Println(m.FileHeader)
@@ -124,55 +228,6 @@ var machoCmd = &cobra.Command{
 			}
 			w.Flush()
 		}
-
-		// fmt.Println("LOADS:", m.FileHeader.Ncmd)
-		// fmt.Println("=====")
-		// for idx, l := range m.Loads {
-		// 	rf := reflect.TypeOf(l)
-		// 	if rf != nil {
-		// 		if rf.Elem().Kind() != reflect.Struct {
-		// 			log.Error("did not get expected type of struct")
-		// 			examiner(rf, 0)
-		// 		}
-		// 		load := rf.Elem()
-		// 		fmt.Println(idx+1, ")", load.Name())
-		// 		switch load.Name() {
-		// 		case "Dylib":
-		// 			examiner(load, 1)
-		// 		case "DylibID":
-		// 			examiner(load, 1)
-		// 		case "WeakDylib":
-		// 			// examiner(load, 1)
-		// 			// lVal := reflect.ValueOf(load)
-		// 			for i := 0; i < load.NumField(); i++ {
-		// 				f := load.Field(i)
-		// 				if strings.EqualFold(f.Name, "Name") {
-		// 					// fVal := reflect.ValueOf(&f)
-		// 					fmt.Printf("%+v", load)
-		// 				}
-		// 			}
-		// 			// val := reflect.ValueOf(load).Elem()
-
-		// 			// for i := 0; i < val.NumField(); i++ {
-		// 			// 	valueField := val.Field(i)
-		// 			// 	typeField := val.Type().Field(i)
-		// 			// 	tag := typeField.Tag
-
-		// 			// 	fmt.Printf("Field Name: %s,\t Field Value: %v,\t Tag Value: %s\n", typeField.Name, valueField.Interface(), tag.Get("tag_name"))
-		// 			// }
-		// 			// var dd macho.Dyl
-		// 			// d := reflect.TypeOf(macho.DylibID)
-		// 			// dd := load.(macho.DylibID)
-		// 		}
-		// 		// if strings.Contains(rf.Elem().Name(), "Dylib") {
-		// 		// 	for i := 0; i < rf.Elem().NumField(); i++ {
-		// 		// 		f := rf.Elem().Field(i)
-		// 		// 		fmt.Println(f.Name)
-		// 		// 	}
-		// 		// }
-		// 	}
-		// }
-
 		return nil
 	},
 }
