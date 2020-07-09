@@ -22,107 +22,19 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-	"text/tabwriter"
-
-	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(dyldCmd)
-
-	// dyldCmd.Flags().BoolP("header", "h", false, "Dump DYLD Shared Cache header")
-	dyldCmd.Flags().BoolP("dylibs", "L", false, "List dylibs and their versions")
-
-	dyldCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // dyldCmd represents the dyld command
 var dyldCmd = &cobra.Command{
 	Use:   "dyld",
 	Short: "Parse dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if Verbose {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		// showHeader, _ := cmd.Flags().GetBool("header")
-		showDylibs, _ := cmd.Flags().GetBool("dylibs")
-
-		fileInfo, err := os.Lstat(args[0])
-		if err != nil {
-			return fmt.Errorf("file %s does not exist", args[0])
-		}
-
-		dyldFile := args[0]
-
-		// Check if file is a symlink
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			dyldFile, err = os.Readlink(args[0])
-			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", args[0])
-			}
-			// TODO: this seems like it would break
-			linkParent := filepath.Dir(args[0])
-			linkRoot := filepath.Dir(linkParent)
-
-			dyldFile = filepath.Join(linkRoot, dyldFile)
-		}
-
-		// TODO: check for
-		// if ( dylibInfo->isAlias )
-		//   	printf("[alias] %s\n", dylibInfo->path);
-
-		f, err := dyld.Open(dyldFile)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-
-		// if showHeader {
-		fmt.Println(f)
-		// }
-
-		if showDylibs {
-			fmt.Println("Images")
-			fmt.Println("======")
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-			for idx, img := range f.Images {
-				if f.FormatVersion.IsDylibsExpectedOnDisk() {
-					m, err := macho.Open(img.Name)
-					if err != nil {
-						if serr, ok := err.(*macho.FormatError); !ok {
-							return errors.Wrapf(serr, "failed to open MachO %s", img.Name)
-						}
-						fat, err := macho.OpenFat(img.Name)
-						if err != nil {
-							return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
-						}
-						fmt.Fprintf(w, "%4d:\t0x%0X\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
-						fat.Close()
-						continue
-					}
-					fmt.Fprintf(w, "%4d:\t0x%0X\t(%s)\t%s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
-					m.Close()
-				} else {
-					m, err := img.GetPartialMacho()
-					if err != nil {
-						return errors.Wrap(err, "failed to create MachO")
-					}
-					fmt.Fprintf(w, "%4d:\t0x%0X\t%s\t(%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
-					m.Close()
-				}
-				// w.Flush()
-			}
-			w.Flush()
-		}
-		return nil
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
 	},
 }

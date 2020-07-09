@@ -85,7 +85,7 @@ archives:
 brews:
   - ids:
       - darwin
-    github:
+    tap:
       owner: blacktop
       name: homebrew-tap
     folder: Formula

@@ -6,7 +6,7 @@ weight: 10
 summary: Parse dyld_shared_cache.
 ---
 
-- [**dyld**](#dyld)
+- [**dyld info**](#dyld-info)
 - [**dyld extract**](#dyld-extract)
 - [**dyld symaddr**](#dyld-symaddr)
 - [**dyld a2s**](#dyld-a2s)
@@ -19,12 +19,12 @@ summary: Parse dyld_shared_cache.
 
 ---
 
-### **dyld**
+### **dyld info**
 
-Similar to `otool -h -L dyld_shared_cache`
+Similar to `jtool -h -l dyld_shared_cache`
 
 ```bash
-$ ipsw dyld -L dyld_shared_cache | head -n35
+$ ipsw dyld info -l dyld_shared_cache | head -n35
 
 Header
 ======
