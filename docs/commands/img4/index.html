@@ -205,23 +205,27 @@
 <span class="m">00000280</span>  <span class="m">69</span> <span class="m">42</span> 6f 6f <span class="m">74</span> 2d <span class="m">35</span> <span class="m">35</span>  <span class="m">34</span> <span class="m">30</span> 2e <span class="m">31</span> <span class="m">30</span> <span class="m">32</span> 2e <span class="m">34</span>  <span class="p">|</span>iBoot-5540.102.4<span class="p">|</span>
 </code></pre></div><h2 id="img4-extract"><strong>img4 extract</strong></h2>
 <h3 id="ever-wonder-how-to-mount-the-ram-disks-in-the-_ipsw_-">Ever wonder how to mount the RAM disks in the <em>ipsw</em> ?</h3>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ unzip iPhone11,8,iPhone12,1_14.0_18A5319i_Restore.ipsw
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ls *.dmg
-
--rw-r--r--@ <span class="m">1</span> blacktop  staff   102M Jan  <span class="m">9</span>  <span class="m">2007</span> 038-44087-104.dmg
--rw-r--r--@ <span class="m">1</span> blacktop  staff    99M Jan  <span class="m">9</span>  <span class="m">2007</span> 038-44135-103.dmg
--rw-r--r--@ <span class="m">1</span> blacktop  staff   4.7G Jan  <span class="m">9</span>  <span class="m">2007</span> 038-44337-066.dmg
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ unzip -l iPhone11,8,iPhone12,1_14.0_18A5319i_Restore.zip <span class="p">|</span> grep dmg
+<span class="m">107235355</span>  01-09-2007 09:41   038-44087-104.dmg
+<span class="m">104157211</span>  01-09-2007 09:41   038-44135-103.dmg
+<span class="m">5041226384</span>  01-09-2007 09:41   038-44337-066.dmg
+     <span class="m">5041</span>  01-09-2007 09:41   Firmware/038-44087-104.dmg.trustcache
+     <span class="m">4865</span>  01-09-2007 09:41   Firmware/038-44135-103.dmg.trustcache
+  <span class="m">8574971</span>  01-09-2007 09:41   Firmware/038-44337-066.dmg.mtree
+       <span class="m">99</span>  01-09-2007 09:41   Firmware/038-44337-066.dmg.root_hash
+    <span class="m">49173</span>  01-09-2007 09:41   Firmware/038-44337-066.dmg.trustcache
 </code></pre></div><p>The <strong>BIG</strong> one <em>(4.7G)</em> is the <em>file system</em> (aka the one that has the <em>dyld_shared_cache</em>).</p>
 <p>The other two are the <code>arm64eCustomerRamDisk</code> and the <code>arm64eUpdateRamDisk</code>, however, you cannot mount them as they are actually <strong>Img4</strong> files. 😕</p>
 <p>You can now extract the Img4 payloads with the following command:</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw img4 extract 038-44087-104.dmg
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ unzip -p iPhone_4.7_14.0_18A5319i_Restore.ipsw 038-44087-104.dmg &gt; 038-44087-104.dmg
+$ ipsw img4 extract 038-44087-104.dmg
    • Parsing Im4p
       • Exracting payload to file 038-44087-104.dmg.payload
 </code></pre></div><p>Rename the <code>payload</code> back to a <em>DMG</em></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ mv 038-44087-104.dmg.payload 038-44087-104.dmg.payload.dmg
-</code></pre></div><p>And now you can double click on the 🆕 <em>DMG</em> to mount the RAM disk image.</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">cd</span> /Volumes/AzulSeed18A5319i.arm64eUpdateRamDisk/
-$ ls -l
+</code></pre></div><p>And now you can open the 🆕 <em>DMG</em> to mount the RAM disk image.</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ open 038-44087-104.dmg.payload.dmg
+$ ls -l /Volumes/AzulSeed18A5319i.arm64eUpdateRamDisk/
 total <span class="m">16</span>
 drwxrwxr-x  <span class="m">3</span> blacktop  staff  <span class="m">102</span> Jul  <span class="m">2</span> 02:15 Library
 drwxr-xr-x  <span class="m">4</span> blacktop  staff  <span class="m">136</span> Jul  <span class="m">2</span> 02:15 System
