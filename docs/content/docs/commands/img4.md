@@ -45,15 +45,15 @@ $ hexdump -C -s 512 -n 144 iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
 ### Ever wonder how to mount the RAM disks in the _ipsw_ ?
 
 ```bash
-$ unzip iPhone11,8,iPhone12,1_14.0_18A5319i_Restore.ipsw
-```
-
-```bash
-$ ls *.dmg
-
--rw-r--r--@ 1 blacktop  staff   102M Jan  9  2007 038-44087-104.dmg
--rw-r--r--@ 1 blacktop  staff    99M Jan  9  2007 038-44135-103.dmg
--rw-r--r--@ 1 blacktop  staff   4.7G Jan  9  2007 038-44337-066.dmg
+$ unzip -l iPhone11,8,iPhone12,1_14.0_18A5319i_Restore.zip | grep dmg
+107235355  01-09-2007 09:41   038-44087-104.dmg
+104157211  01-09-2007 09:41   038-44135-103.dmg
+5041226384  01-09-2007 09:41   038-44337-066.dmg
+     5041  01-09-2007 09:41   Firmware/038-44087-104.dmg.trustcache
+     4865  01-09-2007 09:41   Firmware/038-44135-103.dmg.trustcache
+  8574971  01-09-2007 09:41   Firmware/038-44337-066.dmg.mtree
+       99  01-09-2007 09:41   Firmware/038-44337-066.dmg.root_hash
+    49173  01-09-2007 09:41   Firmware/038-44337-066.dmg.trustcache
 ```
 
 The **BIG** one _(4.7G)_ is the _file system_ (aka the one that has the _dyld_shared_cache_).
@@ -63,6 +63,7 @@ The other two are the `arm64eCustomerRamDisk` and the `arm64eUpdateRamDisk`, how
 You can now extract the Img4 payloads with the following command:
 
 ```bash
+$ unzip -p iPhone_4.7_14.0_18A5319i_Restore.ipsw 038-44087-104.dmg > 038-44087-104.dmg
 $ ipsw img4 extract 038-44087-104.dmg
    • Parsing Im4p
       • Exracting payload to file 038-44087-104.dmg.payload
@@ -74,11 +75,11 @@ Rename the `payload` back to a _DMG_
 $ mv 038-44087-104.dmg.payload 038-44087-104.dmg.payload.dmg
 ```
 
-And now you can double click on the 🆕 _DMG_ to mount the RAM disk image.
+And now you can open the 🆕 _DMG_ to mount the RAM disk image.
 
 ```bash
-$ cd /Volumes/AzulSeed18A5319i.arm64eUpdateRamDisk/
-$ ls -l
+$ open 038-44087-104.dmg.payload.dmg
+$ ls -l /Volumes/AzulSeed18A5319i.arm64eUpdateRamDisk/
 total 16
 drwxrwxr-x  3 blacktop  staff  102 Jul  2 02:15 Library
 drwxr-xr-x  4 blacktop  staff  136 Jul  2 02:15 System
