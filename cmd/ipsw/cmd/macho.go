@@ -84,8 +84,8 @@ var machoCmd = &cobra.Command{
 				fmt.Println("Code Signature")
 				fmt.Println("==============")
 				fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
-				fmt.Printf("\tVersion:     %x\n"+
-					"\tFlags:       0x%x\n"+
+				fmt.Printf("\tVersion:     %s\n"+
+					"\tFlags:       %s\n"+
 					"\tCodeLimit:   0x%x\n"+
 					"\tIdentifier:  %s (@0x%x)\n"+
 					"\t# of hashes: %d code (%d pages) + %d special\n"+

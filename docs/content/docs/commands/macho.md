@@ -115,10 +115,11 @@ $ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore 
 Code Signature
 ==============
 Code Directory (167849 bytes)
-        Version:     20100
-        Flags:       0x0
+        Version:     Scatter
+        Flags:       None
         CodeLimit:   0x14772b0
         Identifier:  com.apple.JavaScriptCore (@0x30)
+        # of hashes: 5240 code (4096 pages) + 3 special
         Hashes @169 size: 32 Type: Sha256
 Requirement Set (72 bytes) with 1 requirement
         Designated Requirement (@20, 72 bytes): identifier "com.apple.JavaScriptCore" AND anchor apple

@@ -42,12 +42,13 @@ func init() {
 	img4Cmd.AddCommand(decImg4Cmd)
 
 	decImg4Cmd.PersistentFlags().StringP("iv-key", "k", "", "AES key")
+	decImg4Cmd.PersistentFlags().StringP("output", "o", "", "Output file")
 }
 
 // decCmd represents the dec command
 var decImg4Cmd = &cobra.Command{
-	Use:   "dec",
-	Short: "List kernel extentions",
+	Use:   "dec <img4>",
+	Short: "Decrypt img4 payloads",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -55,7 +56,10 @@ var decImg4Cmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		var r io.Reader
+		outputFile, _ := cmd.Flags().GetString("output")
 		ivkeyStr, _ := cmd.Flags().GetString("iv-key")
+
 		if len(ivkeyStr) == 0 {
 			return errors.New("you must supply an ivkey with the flag --iv-key")
 		}
@@ -92,17 +96,26 @@ var decImg4Cmd = &cobra.Command{
 
 		mode.CryptBlocks(i.Data, i.Data)
 
-		lr := lzfse.NewReader(bytes.NewReader(i.Data))
-
-		of, err := os.Create(args[0] + ".dec")
-		if err != nil {
-			return errors.Wrapf(err, "failed to create file: ", args[0]+".dec")
+		if len(outputFile) == 0 {
+			outputFile = args[0] + ".dec"
 		}
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", args[0]+".dec"))
-		_, err = io.Copy(of, lr)
+		of, err := os.Create(outputFile)
 		if err != nil {
-			return errors.Wrapf(err, "failed to decompress to file: ", args[0]+".dec")
+			return errors.Wrapf(err, "failed to create file: ", outputFile)
+		}
+
+		if bytes.Contains(i.Data[:4], []byte("bvx2")) {
+			utils.Indent(log.Info, 2)("Detected LZFSE compression")
+			r = lzfse.NewReader(bytes.NewReader(i.Data))
+		} else {
+			r = bytes.NewReader(i.Data)
+		}
+
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", outputFile))
+		_, err = io.Copy(of, r)
+		if err != nil {
+			return errors.Wrapf(err, "failed to decompress to file: ", outputFile)
 		}
 
 		return nil

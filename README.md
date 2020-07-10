@@ -23,6 +23,10 @@
 
 - [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/docs/)
 
+## Credit
+
+Big shout out to Jonathan Levin's amazing books and his legendary `jtool`
+
 ## License
 
 MIT Copyright (c) 2018-2020 **blacktop**
