@@ -21,6 +21,7 @@ Decrypt it with things from tweets 😏
 ```bash
 $ ipsw img4 dec --iv-key <IVKEY> iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p
    • Parsing Im4p
+      • Detected LZFSE compression
       • Decrypting file to iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
 ```
 
