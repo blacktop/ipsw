@@ -206,79 +206,75 @@
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
 <span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e <span class="o">(</span>ARMv8.3<span class="o">)</span> caps: PAC00
-<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">25</span> <span class="o">(</span>Size: 4384<span class="o">)</span>
+<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">25</span> <span class="o">(</span>Size: 4464<span class="o">)</span>
 <span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
-00: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00faf000, <span class="nv">addr</span><span class="o">=</span>0x1913da000-0x192389000	__TEXT
-	<span class="nv">offset</span><span class="o">=</span>0x00001ae0-0x00ebb7f4, <span class="nv">addr</span><span class="o">=</span>0x1913dbae0-0x1922957f4		__TEXT.__text		PureInstructions<span class="p">|</span>SomeInstructions
-	<span class="nv">offset</span><span class="o">=</span>0x00ebb7f4-0x00ebd7e4, <span class="nv">addr</span><span class="o">=</span>0x1922957f4-0x1922977e4		__TEXT.__auth_stubs	<span class="o">(</span>SymbolStubs<span class="o">)</span>	PureInstructions<span class="p">|</span>SomeInstructions
-	<span class="nv">offset</span><span class="o">=</span>0x00ebd7e8-0x00ebe0dc, <span class="nv">addr</span><span class="o">=</span>0x1922977e8-0x1922980dc		__TEXT.__objc_methlist
-	<span class="nv">offset</span><span class="o">=</span>0x00ebe0e0-0x00f16000, <span class="nv">addr</span><span class="o">=</span>0x1922980e0-0x1922f0000		__TEXT.__const
-	<span class="nv">offset</span><span class="o">=</span>0x00f16000-0x00faba8b, <span class="nv">addr</span><span class="o">=</span>0x1922f0000-0x192385a8b		__TEXT.__cstring	<span class="o">(</span>Cstring Literals<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00faba8c-0x00fad904, <span class="nv">addr</span><span class="o">=</span>0x192385a8c-0x192387904		__TEXT.__gcc_except_tab
-	<span class="nv">offset</span><span class="o">=</span>0x00fad904-0x00fadf49, <span class="nv">addr</span><span class="o">=</span>0x192387904-0x192387f49		__TEXT.__oslogstring	<span class="o">(</span>Cstring Literals<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00fadf4c-0x00faee74, <span class="nv">addr</span><span class="o">=</span>0x192387f4c-0x192388e74		__TEXT.__unwind_info
-	<span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000000, <span class="nv">addr</span><span class="o">=</span>0x192389000-0x192389000		__TEXT.__objc_classname	<span class="o">(</span>Cstring Literals<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000000, <span class="nv">addr</span><span class="o">=</span>0x192389000-0x192389000		__TEXT.__objc_methname	<span class="o">(</span>Cstring Literals<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000000, <span class="nv">addr</span><span class="o">=</span>0x192389000-0x192389000		__TEXT.__objc_methtype	<span class="o">(</span>Cstring Literals<span class="o">)</span>
-01: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00faf000-0x00fba0c8, <span class="nv">addr</span><span class="o">=</span>0x1cf381a60-0x1cf38cb28	__DATA_CONST
-	<span class="nv">offset</span><span class="o">=</span>0x00faf000-0x00faf250, <span class="nv">addr</span><span class="o">=</span>0x1cf381a60-0x1cf381cb0		__DATA_CONST.__got	<span class="o">(</span>NonLazySymbolPointers<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00faf250-0x00fb9578, <span class="nv">addr</span><span class="o">=</span>0x1cf381cb0-0x1cf38bfd8		__DATA_CONST.__const
-	<span class="nv">offset</span><span class="o">=</span>0x00fb9578-0x00fb95d0, <span class="nv">addr</span><span class="o">=</span>0x1cf38bfd8-0x1cf38c030		__DATA_CONST.__objc_classlist		NoDeadStrip
-	<span class="nv">offset</span><span class="o">=</span>0x00fb95d0-0x00fb95d0, <span class="nv">addr</span><span class="o">=</span>0x1cf38c030-0x1cf38c030		__DATA_CONST.__objc_catlist		NoDeadStrip
-	<span class="nv">offset</span><span class="o">=</span>0x00fb95d0-0x00fb95e8, <span class="nv">addr</span><span class="o">=</span>0x1cf38c030-0x1cf38c048		__DATA_CONST.__objc_protolist
-	<span class="nv">offset</span><span class="o">=</span>0x00fb95e8-0x00fb95f0, <span class="nv">addr</span><span class="o">=</span>0x1cf38c048-0x1cf38c050		__DATA_CONST.__objc_imageinfo
-	<span class="nv">offset</span><span class="o">=</span>0x00fb95f0-0x00fba0c8, <span class="nv">addr</span><span class="o">=</span>0x1cf38c050-0x1cf38cb28		__DATA_CONST.__objc_const
-02: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00fba0c8-0x00fc6410, <span class="nv">addr</span><span class="o">=</span>0x1d29f4000-0x1d2a00348	__DATA
-	<span class="nv">offset</span><span class="o">=</span>0x00fba0c8-0x00fba910, <span class="nv">addr</span><span class="o">=</span>0x1d29f4000-0x1d29f4848		__DATA.__objc_selrefs	<span class="o">(</span>Literal Pointers<span class="o">)</span>	NoDeadStrip
-	<span class="nv">offset</span><span class="o">=</span>0x00fba910-0x00fbaa18, <span class="nv">addr</span><span class="o">=</span>0x1d29f4848-0x1d29f4950		__DATA.__objc_classrefs		NoDeadStrip
-	<span class="nv">offset</span><span class="o">=</span>0x00fbaa18-0x00fbaa50, <span class="nv">addr</span><span class="o">=</span>0x1d29f4950-0x1d29f4988		__DATA.__objc_superrefs		NoDeadStrip
-	<span class="nv">offset</span><span class="o">=</span>0x00fbaa50-0x00fbaad0, <span class="nv">addr</span><span class="o">=</span>0x1d29f4988-0x1d29f4a08		__DATA.__objc_ivar
-	<span class="nv">offset</span><span class="o">=</span>0x00fbaad0-0x00fbaf58, <span class="nv">addr</span><span class="o">=</span>0x1d29f4a08-0x1d29f4e90		__DATA.__data
-	<span class="nv">offset</span><span class="o">=</span>0x00000000-0x00008180, <span class="nv">addr</span><span class="o">=</span>0x1d29f8000-0x1d2a00180		__DATA.__common	<span class="o">(</span>Zerofill<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00000000-0x000001c8, <span class="nv">addr</span><span class="o">=</span>0x1d2a00180-0x1d2a00348		__DATA.__bss	<span class="o">(</span>Zerofill<span class="o">)</span>
-03: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00fc6410-0x00ff7dc8, <span class="nv">addr</span><span class="o">=</span>0x1d8a8d458-0x1d8abee10	__AUTH_CONST
-	<span class="nv">offset</span><span class="o">=</span>0x00fc6410-0x00ff5f88, <span class="nv">addr</span><span class="o">=</span>0x1d8a8d458-0x1d8abcfd0		__AUTH_CONST.__const
-	<span class="nv">offset</span><span class="o">=</span>0x00ff5f88-0x00ff6dc8, <span class="nv">addr</span><span class="o">=</span>0x1d8abcfd0-0x1d8abde10		__AUTH_CONST.__cfstring
-	<span class="nv">offset</span><span class="o">=</span>0x00ff6dc8-0x00ff6dc8, <span class="nv">addr</span><span class="o">=</span>0x1d8abde10-0x1d8abde10		__AUTH_CONST.__objc_const
-	<span class="nv">offset</span><span class="o">=</span>0x00ff6dc8-0x00ff7dc0, <span class="nv">addr</span><span class="o">=</span>0x1d8abde10-0x1d8abee08		__AUTH_CONST.__auth_got	<span class="o">(</span>NonLazySymbolPointers<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00ff7dc0-0x00ff7dc8, <span class="nv">addr</span><span class="o">=</span>0x1d8abee08-0x1d8abee10		__AUTH_CONST.__got	<span class="o">(</span>NonLazySymbolPointers<span class="o">)</span>
-04: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00ff7dc8-0x01000d78, <span class="nv">addr</span><span class="o">=</span>0x1db912c10-0x1db91bbc0	__DATA_DIRTY
-	<span class="nv">offset</span><span class="o">=</span>0x00ff7dc8-0x00ff8098, <span class="nv">addr</span><span class="o">=</span>0x1db912c10-0x1db912ee0		__DATA_DIRTY.__objc_data
-	<span class="nv">offset</span><span class="o">=</span>0x00ff8098-0x00ffbf80, <span class="nv">addr</span><span class="o">=</span>0x1db912ee0-0x1db916dc8		__DATA_DIRTY.__data
-	<span class="nv">offset</span><span class="o">=</span>0x00000000-0x00003e00, <span class="nv">addr</span><span class="o">=</span>0x1db916dc8-0x1db91abc8		__DATA_DIRTY.__common	<span class="o">(</span>Zerofill<span class="o">)</span>
-	<span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000ff8, <span class="nv">addr</span><span class="o">=</span>0x1db91abc8-0x1db91bbc0		__DATA_DIRTY.__bss	<span class="o">(</span>Zerofill<span class="o">)</span>
-05: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x01000d78-0x010013a8, <span class="nv">addr</span><span class="o">=</span>0x1d8abee10-0x1d8abf440	__OBJC_CONST
-	<span class="nv">offset</span><span class="o">=</span>0x01000d78-0x010013a8, <span class="nv">addr</span><span class="o">=</span>0x1d8abee10-0x1d8abf440		__OBJC_CONST.__objc_class_ro
-06: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x010013a8-0x01001450, <span class="nv">addr</span><span class="o">=</span>0x1dc210f58-0x1dc211000	__AUTH
-	<span class="nv">offset</span><span class="o">=</span>0x010013a8-0x01001448, <span class="nv">addr</span><span class="o">=</span>0x1dc210f58-0x1dc210ff8		__AUTH.__objc_data
-	<span class="nv">offset</span><span class="o">=</span>0x01001448-0x01001450, <span class="nv">addr</span><span class="o">=</span>0x1dc210ff8-0x1dc211000		__AUTH.__data
-07: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x01001450-0x0135907c, <span class="nv">addr</span><span class="o">=</span>0x1def74000-0x1df2cc000	__LINKEDIT
-08: LC_ID_DYLIB                 /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore <span class="o">(</span>610.1.15<span class="o">)</span>
+00: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00fcf000, <span class="nv">addr</span><span class="o">=</span>0x19152f000-0x1924fe000    __TEXT
+        <span class="nv">offset</span><span class="o">=</span>0x00001cd0-0x00ed548c, <span class="nv">addr</span><span class="o">=</span>0x191530cd0-0x19240448c              __TEXT.__text           PureInstructions<span class="p">|</span>SomeInstructions
+        <span class="nv">offset</span><span class="o">=</span>0x00ed548c-0x00ed743c, <span class="nv">addr</span><span class="o">=</span>0x19240448c-0x19240643c              __TEXT.__auth_stubs     <span class="o">(</span>SymbolStubs<span class="o">)</span>   PureInstructions<span class="p">|</span>SomeInstructions
+        <span class="nv">offset</span><span class="o">=</span>0x00ed7440-0x00ed7d44, <span class="nv">addr</span><span class="o">=</span>0x192406440-0x192406d44              __TEXT.__objc_methlist
+        <span class="nv">offset</span><span class="o">=</span>0x00ed7d50-0x00f2ffe0, <span class="nv">addr</span><span class="o">=</span>0x192406d50-0x19245efe0              __TEXT.__const
+        <span class="nv">offset</span><span class="o">=</span>0x00f2ffe0-0x00fcba71, <span class="nv">addr</span><span class="o">=</span>0x19245efe0-0x1924faa71              __TEXT.__cstring        <span class="o">(</span>Cstring Literals<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x00fcba74-0x00fcd920, <span class="nv">addr</span><span class="o">=</span>0x1924faa74-0x1924fc920              __TEXT.__gcc_except_tab
+        <span class="nv">offset</span><span class="o">=</span>0x00fcd920-0x00fcdf68, <span class="nv">addr</span><span class="o">=</span>0x1924fc920-0x1924fcf68              __TEXT.__oslogstring    <span class="o">(</span>Cstring Literals<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x00fcdf68-0x00fcee9c, <span class="nv">addr</span><span class="o">=</span>0x1924fcf68-0x1924fde9c              __TEXT.__unwind_info
+        <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000000, <span class="nv">addr</span><span class="o">=</span>0x1924fe000-0x1924fe000              __TEXT.__objc_classname <span class="o">(</span>Cstring Literals<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000000, <span class="nv">addr</span><span class="o">=</span>0x1924fe000-0x1924fe000              __TEXT.__objc_methname  <span class="o">(</span>Cstring Literals<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000000, <span class="nv">addr</span><span class="o">=</span>0x1924fe000-0x1924fe000              __TEXT.__objc_methtype  <span class="o">(</span>Cstring Literals<span class="o">)</span>
+01: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00fcf000-0x00fda058, <span class="nv">addr</span><span class="o">=</span>0x1cfda7780-0x1cfdb27d8    __DATA_CONST
+        <span class="nv">offset</span><span class="o">=</span>0x00fcf000-0x00fcf120, <span class="nv">addr</span><span class="o">=</span>0x1cfda7780-0x1cfda78a0              __DATA_CONST.__got      <span class="o">(</span>NonLazySymbolPointers<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x00fcf120-0x00fd9508, <span class="nv">addr</span><span class="o">=</span>0x1cfda78a0-0x1cfdb1c88              __DATA_CONST.__const
+        <span class="nv">offset</span><span class="o">=</span>0x00fd9508-0x00fd9560, <span class="nv">addr</span><span class="o">=</span>0x1cfdb1c88-0x1cfdb1ce0              __DATA_CONST.__objc_classlist           NoDeadStrip
+        <span class="nv">offset</span><span class="o">=</span>0x00fd9560-0x00fd9560, <span class="nv">addr</span><span class="o">=</span>0x1cfdb1ce0-0x1cfdb1ce0              __DATA_CONST.__objc_catlist             NoDeadStrip
+        <span class="nv">offset</span><span class="o">=</span>0x00fd9560-0x00fd9578, <span class="nv">addr</span><span class="o">=</span>0x1cfdb1ce0-0x1cfdb1cf8              __DATA_CONST.__objc_protolist
+        <span class="nv">offset</span><span class="o">=</span>0x00fd9578-0x00fd9580, <span class="nv">addr</span><span class="o">=</span>0x1cfdb1cf8-0x1cfdb1d00              __DATA_CONST.__objc_imageinfo
+        <span class="nv">offset</span><span class="o">=</span>0x00fd9580-0x00fda058, <span class="nv">addr</span><span class="o">=</span>0x1cfdb1d00-0x1cfdb27d8              __DATA_CONST.__objc_const
+02: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00fda058-0x00fdaf70, <span class="nv">addr</span><span class="o">=</span>0x1d3461278-0x1d3462190    __DATA
+        <span class="nv">offset</span><span class="o">=</span>0x00fda058-0x00fda898, <span class="nv">addr</span><span class="o">=</span>0x1d3461278-0x1d3461ab8              __DATA.__objc_selrefs   <span class="o">(</span>Literal Pointers<span class="o">)</span>      NoDeadStrip
+        <span class="nv">offset</span><span class="o">=</span>0x00fda898-0x00fda9a0, <span class="nv">addr</span><span class="o">=</span>0x1d3461ab8-0x1d3461bc0              __DATA.__objc_classrefs         NoDeadStrip
+        <span class="nv">offset</span><span class="o">=</span>0x00fda9a0-0x00fda9d8, <span class="nv">addr</span><span class="o">=</span>0x1d3461bc0-0x1d3461bf8              __DATA.__objc_superrefs         NoDeadStrip
+        <span class="nv">offset</span><span class="o">=</span>0x00fda9d8-0x00fdaa58, <span class="nv">addr</span><span class="o">=</span>0x1d3461bf8-0x1d3461c78              __DATA.__objc_ivar
+        <span class="nv">offset</span><span class="o">=</span>0x00fdaa58-0x00fdac70, <span class="nv">addr</span><span class="o">=</span>0x1d3461c78-0x1d3461e90              __DATA.__data
+        <span class="nv">offset</span><span class="o">=</span>0x00000000-0x000001f8, <span class="nv">addr</span><span class="o">=</span>0x1d3461e90-0x1d3462088              __DATA.__common <span class="o">(</span>Zerofill<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00000108, <span class="nv">addr</span><span class="o">=</span>0x1d3462088-0x1d3462190              __DATA.__bss    <span class="o">(</span>Zerofill<span class="o">)</span>
+03: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x00fdaf70-0x0100ed18, <span class="nv">addr</span><span class="o">=</span>0x1d82b6308-0x1d82ea0b0    __AUTH_CONST
+        <span class="nv">offset</span><span class="o">=</span>0x00fdaf70-0x0100bf40, <span class="nv">addr</span><span class="o">=</span>0x1d82b6308-0x1d82e72d8              __AUTH_CONST.__const
+        <span class="nv">offset</span><span class="o">=</span>0x0100bf40-0x0100ced8, <span class="nv">addr</span><span class="o">=</span>0x1d82e72d8-0x1d82e8270              __AUTH_CONST.__auth_ptr
+        <span class="nv">offset</span><span class="o">=</span>0x0100ced8-0x0100dd38, <span class="nv">addr</span><span class="o">=</span>0x1d82e8270-0x1d82e90d0              __AUTH_CONST.__cfstring
+        <span class="nv">offset</span><span class="o">=</span>0x0100dd38-0x0100dd38, <span class="nv">addr</span><span class="o">=</span>0x1d82e90d0-0x1d82e90d0              __AUTH_CONST.__objc_const
+        <span class="nv">offset</span><span class="o">=</span>0x0100dd38-0x0100ed10, <span class="nv">addr</span><span class="o">=</span>0x1d82e90d0-0x1d82ea0a8              __AUTH_CONST.__auth_got <span class="o">(</span>NonLazySymbolPointers<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x0100ed10-0x0100ed18, <span class="nv">addr</span><span class="o">=</span>0x1d82ea0a8-0x1d82ea0b0              __AUTH_CONST.__got      <span class="o">(</span>NonLazySymbolPointers<span class="o">)</span>
+04: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x0100ed18-0x01020388, <span class="nv">addr</span><span class="o">=</span>0x1db1e4000-0x1db1f5670    __DATA_DIRTY
+        <span class="nv">offset</span><span class="o">=</span>0x0100ed18-0x0100ef98, <span class="nv">addr</span><span class="o">=</span>0x1db1e4000-0x1db1e4280              __DATA_DIRTY.__objc_data
+        <span class="nv">offset</span><span class="o">=</span>0x0100ef98-0x01013130, <span class="nv">addr</span><span class="o">=</span>0x1db1e4280-0x1db1e8418              __DATA_DIRTY.__data
+        <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00008668, <span class="nv">addr</span><span class="o">=</span>0x1db1ec000-0x1db1f4668              __DATA_DIRTY.__common   <span class="o">(</span>Zerofill<span class="o">)</span>
+        <span class="nv">offset</span><span class="o">=</span>0x00000000-0x00001008, <span class="nv">addr</span><span class="o">=</span>0x1db1f4668-0x1db1f5670              __DATA_DIRTY.__bss      <span class="o">(</span>Zerofill<span class="o">)</span>
+05: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x01020388-0x01020480, <span class="nv">addr</span><span class="o">=</span>0x1dce25a40-0x1dce25b38    __AUTH
+        <span class="nv">offset</span><span class="o">=</span>0x01020388-0x01020478, <span class="nv">addr</span><span class="o">=</span>0x1dce25a40-0x1dce25b30              __AUTH.__objc_data
+        <span class="nv">offset</span><span class="o">=</span>0x01020478-0x01020480, <span class="nv">addr</span><span class="o">=</span>0x1dce25b30-0x1dce25b38              __AUTH.__data
+06: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x01020480-0x01020ab0, <span class="nv">addr</span><span class="o">=</span>0x1d82ea0b0-0x1d82ea6e0    __OBJC_CONST
+        <span class="nv">offset</span><span class="o">=</span>0x01020480-0x01020ab0, <span class="nv">addr</span><span class="o">=</span>0x1d82ea0b0-0x1d82ea6e0              __OBJC_CONST.__objc_class_ro
+07: LC_SEGMENT_64 <span class="nv">offset</span><span class="o">=</span>0x01020ab0-0x0138476c, <span class="nv">addr</span><span class="o">=</span>0x1dfb84000-0x1dfee8000    __LINKEDIT
+08: LC_ID_DYLIB                 /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore <span class="o">(</span>610.1.18<span class="o">)</span>
 09: LC_DYLD_EXPORTS_TRIE        Count: <span class="m">0</span>
-10: LC_SYMTAB                   Symbol <span class="nv">offset</span><span class="o">=</span>0x0100C258, Num Syms: 30219, String <span class="nv">offset</span><span class="o">=</span>0x0108342C-0x0135907C
-11: LC_DYSYMTAB                 <span class="m">1097</span> Indirect symbols at offset 0x01082308
-12: LC_UUID                     0284D7B5-51DF-34C8-807F-BA431EBCAE1D
-13: LC_BUILD_VERSION            Platform: iOS, SDK: 14.0.0, Tool: ld <span class="o">(</span>607.2.0<span class="o">)</span>
-14: LC_SOURCE_VERSION           7610.1.15.50.3
-15: LC_LOAD_DYLIB               /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation <span class="o">(</span>1740.0.0<span class="o">)</span>
-16: LC_LOAD_DYLIB               /System/Library/Frameworks/Foundation.framework/Foundation <span class="o">(</span>1740.0.0<span class="o">)</span>
+10: LC_SYMTAB                   Symbol <span class="nv">offset</span><span class="o">=</span>0x0102BA28, Num Syms: 30476, String <span class="nv">offset</span><span class="o">=</span>0x010A3B54-0x0138476C
+11: LC_DYSYMTAB                 <span class="m">1051</span> Indirect symbols at offset 0x010A2AE8
+12: LC_UUID                     DA451B8C-AD8B-3017-BC14-81D074636B66
+13: LC_BUILD_VERSION            Platform: iOS, SDK: 14.0.0, Tool: ld <span class="o">(</span>607.4.0<span class="o">)</span>
+14: LC_SOURCE_VERSION           7610.1.18.20.3
+15: LC_LOAD_DYLIB               /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation <span class="o">(</span>1742.102.0<span class="o">)</span>
+16: LC_LOAD_DYLIB               /System/Library/Frameworks/Foundation.framework/Foundation <span class="o">(</span>1742.102.0<span class="o">)</span>
 17: LC_LOAD_DYLIB               /usr/lib/libicucore.A.dylib <span class="o">(</span>66.0.0<span class="o">)</span>
 18: LC_LOAD_DYLIB               /usr/lib/libobjc.A.dylib <span class="o">(</span>228.0.0<span class="o">)</span>
 19: LC_LOAD_DYLIB               /usr/lib/libz.1.dylib <span class="o">(</span>1.2.11<span class="o">)</span>
-20: LC_LOAD_DYLIB               /System/Library/Frameworks/Security.framework/Security <span class="o">(</span>59711.0.0<span class="o">)</span>
+20: LC_LOAD_DYLIB               /System/Library/Frameworks/Security.framework/Security <span class="o">(</span>59731.0.0<span class="o">)</span>
 21: LC_LOAD_DYLIB               /usr/lib/libc++.1.dylib <span class="o">(</span>904.4.0<span class="o">)</span>
-22: LC_LOAD_DYLIB               /usr/lib/libSystem.B.dylib <span class="o">(</span>1291.0.0<span class="o">)</span>
-23: LC_FUNCTION_STARTS          <span class="nv">offset</span><span class="o">=</span>0x01001450-0x0100c258, <span class="nv">size</span><span class="o">=</span>44552, <span class="nv">count</span><span class="o">=</span><span class="m">25787</span>
-24: LC_DATA_IN_CODE             <span class="nv">offset</span><span class="o">=</span>0x0100c258-0x0100c258, <span class="nv">size</span><span class="o">=</span>    0, <span class="nv">entries</span><span class="o">=</span><span class="m">0</span>
-
-NOTE: recorded <span class="nb">command</span> size 4384, computed <span class="nb">command</span> size <span class="m">4384</span>
-NOTE: File size is <span class="m">20287612</span>
+22: LC_LOAD_DYLIB               /usr/lib/libSystem.B.dylib <span class="o">(</span>1292.0.0<span class="o">)</span>
+23: LC_FUNCTION_STARTS          <span class="nv">offset</span><span class="o">=</span>0x01020ab0-0x0102ba28, <span class="nv">size</span><span class="o">=</span>44920, <span class="nv">count</span><span class="o">=</span><span class="m">26030</span>
+24: LC_DATA_IN_CODE             <span class="nv">offset</span><span class="o">=</span>0x0102ba28-0x0102ba28, <span class="nv">size</span><span class="o">=</span>    0, <span class="nv">entries</span><span class="o">=</span><span class="m">0</span>
 </code></pre></div><h3 id="macho---sig"><strong>macho &ndash;sig</strong></h3>
 <p>Similar to <code>jtool --sig</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig
 
-Code <span class="nv">Signature</span>
-<span class="o">==============</span>
 Code Directory <span class="o">(</span><span class="m">167849</span> bytes<span class="o">)</span>
         Version:     Scatter
         Flags:       None
@@ -288,12 +284,13 @@ Code Directory <span class="o">(</span><span class="m">167849</span> bytes<span 
         Hashes @169 size: <span class="m">32</span> Type: Sha256
 Requirement Set <span class="o">(</span><span class="m">72</span> bytes<span class="o">)</span> with <span class="m">1</span> requirement
         Designated Requirement <span class="o">(</span>@20, <span class="m">72</span> bytes<span class="o">)</span>: identifier <span class="s2">&#34;com.apple.JavaScriptCore&#34;</span> AND anchor apple
+CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
+        OU: Apple Certification Authority CN: Apple Code Signing Certification Authority <span class="o">(</span>2011-10-24 thru 2026-10-24<span class="o">)</span>
+        OU: Apple Certification Authority CN: Apple Root CA                              <span class="o">(</span>2006-04-25 thru 2035-02-09<span class="o">)</span>
+        OU: Apple Certification Authority CN: Software Signing                           <span class="o">(</span>2013-04-12 thru 2021-04-12<span class="o">)</span>
 </code></pre></div><h3 id="macho---ent"><strong>macho &ndash;ent</strong></h3>
 <p>Similar to <code>jtool --ent</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/libexec/amfid --ent
-
-<span class="nv">Entitlements</span>
-<span class="o">============</span>
 &lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">&#34;UTF-8&#34;</span>?&gt;
 &lt;!DOCTYPE plist PUBLIC <span class="s2">&#34;-//Apple//DTD PLIST 1.0//EN&#34;</span> <span class="s2">&#34;http://www.apple.com/DTDs/PropertyList-1.0.dtd&#34;</span>&gt;
 &lt;plist <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span>&gt;
