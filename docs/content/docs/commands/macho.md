@@ -36,73 +36,71 @@ $ ipsw macho JavaScriptCore
 Magic         = 64-bit MachO
 Type          = Dylib
 CPU           = AARCH64, ARM64e (ARMv8.3) caps: PAC00
-Commands      = 25 (Size: 4384)
+Commands      = 25 (Size: 4464)
 Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
-00: LC_SEGMENT_64 offset=0x00000000-0x00faf000, addr=0x1913da000-0x192389000	__TEXT
-	offset=0x00001ae0-0x00ebb7f4, addr=0x1913dbae0-0x1922957f4		__TEXT.__text		PureInstructions|SomeInstructions
-	offset=0x00ebb7f4-0x00ebd7e4, addr=0x1922957f4-0x1922977e4		__TEXT.__auth_stubs	(SymbolStubs)	PureInstructions|SomeInstructions
-	offset=0x00ebd7e8-0x00ebe0dc, addr=0x1922977e8-0x1922980dc		__TEXT.__objc_methlist
-	offset=0x00ebe0e0-0x00f16000, addr=0x1922980e0-0x1922f0000		__TEXT.__const
-	offset=0x00f16000-0x00faba8b, addr=0x1922f0000-0x192385a8b		__TEXT.__cstring	(Cstring Literals)
-	offset=0x00faba8c-0x00fad904, addr=0x192385a8c-0x192387904		__TEXT.__gcc_except_tab
-	offset=0x00fad904-0x00fadf49, addr=0x192387904-0x192387f49		__TEXT.__oslogstring	(Cstring Literals)
-	offset=0x00fadf4c-0x00faee74, addr=0x192387f4c-0x192388e74		__TEXT.__unwind_info
-	offset=0x00000000-0x00000000, addr=0x192389000-0x192389000		__TEXT.__objc_classname	(Cstring Literals)
-	offset=0x00000000-0x00000000, addr=0x192389000-0x192389000		__TEXT.__objc_methname	(Cstring Literals)
-	offset=0x00000000-0x00000000, addr=0x192389000-0x192389000		__TEXT.__objc_methtype	(Cstring Literals)
-01: LC_SEGMENT_64 offset=0x00faf000-0x00fba0c8, addr=0x1cf381a60-0x1cf38cb28	__DATA_CONST
-	offset=0x00faf000-0x00faf250, addr=0x1cf381a60-0x1cf381cb0		__DATA_CONST.__got	(NonLazySymbolPointers)
-	offset=0x00faf250-0x00fb9578, addr=0x1cf381cb0-0x1cf38bfd8		__DATA_CONST.__const
-	offset=0x00fb9578-0x00fb95d0, addr=0x1cf38bfd8-0x1cf38c030		__DATA_CONST.__objc_classlist		NoDeadStrip
-	offset=0x00fb95d0-0x00fb95d0, addr=0x1cf38c030-0x1cf38c030		__DATA_CONST.__objc_catlist		NoDeadStrip
-	offset=0x00fb95d0-0x00fb95e8, addr=0x1cf38c030-0x1cf38c048		__DATA_CONST.__objc_protolist
-	offset=0x00fb95e8-0x00fb95f0, addr=0x1cf38c048-0x1cf38c050		__DATA_CONST.__objc_imageinfo
-	offset=0x00fb95f0-0x00fba0c8, addr=0x1cf38c050-0x1cf38cb28		__DATA_CONST.__objc_const
-02: LC_SEGMENT_64 offset=0x00fba0c8-0x00fc6410, addr=0x1d29f4000-0x1d2a00348	__DATA
-	offset=0x00fba0c8-0x00fba910, addr=0x1d29f4000-0x1d29f4848		__DATA.__objc_selrefs	(Literal Pointers)	NoDeadStrip
-	offset=0x00fba910-0x00fbaa18, addr=0x1d29f4848-0x1d29f4950		__DATA.__objc_classrefs		NoDeadStrip
-	offset=0x00fbaa18-0x00fbaa50, addr=0x1d29f4950-0x1d29f4988		__DATA.__objc_superrefs		NoDeadStrip
-	offset=0x00fbaa50-0x00fbaad0, addr=0x1d29f4988-0x1d29f4a08		__DATA.__objc_ivar
-	offset=0x00fbaad0-0x00fbaf58, addr=0x1d29f4a08-0x1d29f4e90		__DATA.__data
-	offset=0x00000000-0x00008180, addr=0x1d29f8000-0x1d2a00180		__DATA.__common	(Zerofill)
-	offset=0x00000000-0x000001c8, addr=0x1d2a00180-0x1d2a00348		__DATA.__bss	(Zerofill)
-03: LC_SEGMENT_64 offset=0x00fc6410-0x00ff7dc8, addr=0x1d8a8d458-0x1d8abee10	__AUTH_CONST
-	offset=0x00fc6410-0x00ff5f88, addr=0x1d8a8d458-0x1d8abcfd0		__AUTH_CONST.__const
-	offset=0x00ff5f88-0x00ff6dc8, addr=0x1d8abcfd0-0x1d8abde10		__AUTH_CONST.__cfstring
-	offset=0x00ff6dc8-0x00ff6dc8, addr=0x1d8abde10-0x1d8abde10		__AUTH_CONST.__objc_const
-	offset=0x00ff6dc8-0x00ff7dc0, addr=0x1d8abde10-0x1d8abee08		__AUTH_CONST.__auth_got	(NonLazySymbolPointers)
-	offset=0x00ff7dc0-0x00ff7dc8, addr=0x1d8abee08-0x1d8abee10		__AUTH_CONST.__got	(NonLazySymbolPointers)
-04: LC_SEGMENT_64 offset=0x00ff7dc8-0x01000d78, addr=0x1db912c10-0x1db91bbc0	__DATA_DIRTY
-	offset=0x00ff7dc8-0x00ff8098, addr=0x1db912c10-0x1db912ee0		__DATA_DIRTY.__objc_data
-	offset=0x00ff8098-0x00ffbf80, addr=0x1db912ee0-0x1db916dc8		__DATA_DIRTY.__data
-	offset=0x00000000-0x00003e00, addr=0x1db916dc8-0x1db91abc8		__DATA_DIRTY.__common	(Zerofill)
-	offset=0x00000000-0x00000ff8, addr=0x1db91abc8-0x1db91bbc0		__DATA_DIRTY.__bss	(Zerofill)
-05: LC_SEGMENT_64 offset=0x01000d78-0x010013a8, addr=0x1d8abee10-0x1d8abf440	__OBJC_CONST
-	offset=0x01000d78-0x010013a8, addr=0x1d8abee10-0x1d8abf440		__OBJC_CONST.__objc_class_ro
-06: LC_SEGMENT_64 offset=0x010013a8-0x01001450, addr=0x1dc210f58-0x1dc211000	__AUTH
-	offset=0x010013a8-0x01001448, addr=0x1dc210f58-0x1dc210ff8		__AUTH.__objc_data
-	offset=0x01001448-0x01001450, addr=0x1dc210ff8-0x1dc211000		__AUTH.__data
-07: LC_SEGMENT_64 offset=0x01001450-0x0135907c, addr=0x1def74000-0x1df2cc000	__LINKEDIT
-08: LC_ID_DYLIB                 /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore (610.1.15)
+00: LC_SEGMENT_64 offset=0x00000000-0x00fcf000, addr=0x19152f000-0x1924fe000    __TEXT
+        offset=0x00001cd0-0x00ed548c, addr=0x191530cd0-0x19240448c              __TEXT.__text           PureInstructions|SomeInstructions
+        offset=0x00ed548c-0x00ed743c, addr=0x19240448c-0x19240643c              __TEXT.__auth_stubs     (SymbolStubs)   PureInstructions|SomeInstructions
+        offset=0x00ed7440-0x00ed7d44, addr=0x192406440-0x192406d44              __TEXT.__objc_methlist
+        offset=0x00ed7d50-0x00f2ffe0, addr=0x192406d50-0x19245efe0              __TEXT.__const
+        offset=0x00f2ffe0-0x00fcba71, addr=0x19245efe0-0x1924faa71              __TEXT.__cstring        (Cstring Literals)
+        offset=0x00fcba74-0x00fcd920, addr=0x1924faa74-0x1924fc920              __TEXT.__gcc_except_tab
+        offset=0x00fcd920-0x00fcdf68, addr=0x1924fc920-0x1924fcf68              __TEXT.__oslogstring    (Cstring Literals)
+        offset=0x00fcdf68-0x00fcee9c, addr=0x1924fcf68-0x1924fde9c              __TEXT.__unwind_info
+        offset=0x00000000-0x00000000, addr=0x1924fe000-0x1924fe000              __TEXT.__objc_classname (Cstring Literals)
+        offset=0x00000000-0x00000000, addr=0x1924fe000-0x1924fe000              __TEXT.__objc_methname  (Cstring Literals)
+        offset=0x00000000-0x00000000, addr=0x1924fe000-0x1924fe000              __TEXT.__objc_methtype  (Cstring Literals)
+01: LC_SEGMENT_64 offset=0x00fcf000-0x00fda058, addr=0x1cfda7780-0x1cfdb27d8    __DATA_CONST
+        offset=0x00fcf000-0x00fcf120, addr=0x1cfda7780-0x1cfda78a0              __DATA_CONST.__got      (NonLazySymbolPointers)
+        offset=0x00fcf120-0x00fd9508, addr=0x1cfda78a0-0x1cfdb1c88              __DATA_CONST.__const
+        offset=0x00fd9508-0x00fd9560, addr=0x1cfdb1c88-0x1cfdb1ce0              __DATA_CONST.__objc_classlist           NoDeadStrip
+        offset=0x00fd9560-0x00fd9560, addr=0x1cfdb1ce0-0x1cfdb1ce0              __DATA_CONST.__objc_catlist             NoDeadStrip
+        offset=0x00fd9560-0x00fd9578, addr=0x1cfdb1ce0-0x1cfdb1cf8              __DATA_CONST.__objc_protolist
+        offset=0x00fd9578-0x00fd9580, addr=0x1cfdb1cf8-0x1cfdb1d00              __DATA_CONST.__objc_imageinfo
+        offset=0x00fd9580-0x00fda058, addr=0x1cfdb1d00-0x1cfdb27d8              __DATA_CONST.__objc_const
+02: LC_SEGMENT_64 offset=0x00fda058-0x00fdaf70, addr=0x1d3461278-0x1d3462190    __DATA
+        offset=0x00fda058-0x00fda898, addr=0x1d3461278-0x1d3461ab8              __DATA.__objc_selrefs   (Literal Pointers)      NoDeadStrip
+        offset=0x00fda898-0x00fda9a0, addr=0x1d3461ab8-0x1d3461bc0              __DATA.__objc_classrefs         NoDeadStrip
+        offset=0x00fda9a0-0x00fda9d8, addr=0x1d3461bc0-0x1d3461bf8              __DATA.__objc_superrefs         NoDeadStrip
+        offset=0x00fda9d8-0x00fdaa58, addr=0x1d3461bf8-0x1d3461c78              __DATA.__objc_ivar
+        offset=0x00fdaa58-0x00fdac70, addr=0x1d3461c78-0x1d3461e90              __DATA.__data
+        offset=0x00000000-0x000001f8, addr=0x1d3461e90-0x1d3462088              __DATA.__common (Zerofill)
+        offset=0x00000000-0x00000108, addr=0x1d3462088-0x1d3462190              __DATA.__bss    (Zerofill)
+03: LC_SEGMENT_64 offset=0x00fdaf70-0x0100ed18, addr=0x1d82b6308-0x1d82ea0b0    __AUTH_CONST
+        offset=0x00fdaf70-0x0100bf40, addr=0x1d82b6308-0x1d82e72d8              __AUTH_CONST.__const
+        offset=0x0100bf40-0x0100ced8, addr=0x1d82e72d8-0x1d82e8270              __AUTH_CONST.__auth_ptr
+        offset=0x0100ced8-0x0100dd38, addr=0x1d82e8270-0x1d82e90d0              __AUTH_CONST.__cfstring
+        offset=0x0100dd38-0x0100dd38, addr=0x1d82e90d0-0x1d82e90d0              __AUTH_CONST.__objc_const
+        offset=0x0100dd38-0x0100ed10, addr=0x1d82e90d0-0x1d82ea0a8              __AUTH_CONST.__auth_got (NonLazySymbolPointers)
+        offset=0x0100ed10-0x0100ed18, addr=0x1d82ea0a8-0x1d82ea0b0              __AUTH_CONST.__got      (NonLazySymbolPointers)
+04: LC_SEGMENT_64 offset=0x0100ed18-0x01020388, addr=0x1db1e4000-0x1db1f5670    __DATA_DIRTY
+        offset=0x0100ed18-0x0100ef98, addr=0x1db1e4000-0x1db1e4280              __DATA_DIRTY.__objc_data
+        offset=0x0100ef98-0x01013130, addr=0x1db1e4280-0x1db1e8418              __DATA_DIRTY.__data
+        offset=0x00000000-0x00008668, addr=0x1db1ec000-0x1db1f4668              __DATA_DIRTY.__common   (Zerofill)
+        offset=0x00000000-0x00001008, addr=0x1db1f4668-0x1db1f5670              __DATA_DIRTY.__bss      (Zerofill)
+05: LC_SEGMENT_64 offset=0x01020388-0x01020480, addr=0x1dce25a40-0x1dce25b38    __AUTH
+        offset=0x01020388-0x01020478, addr=0x1dce25a40-0x1dce25b30              __AUTH.__objc_data
+        offset=0x01020478-0x01020480, addr=0x1dce25b30-0x1dce25b38              __AUTH.__data
+06: LC_SEGMENT_64 offset=0x01020480-0x01020ab0, addr=0x1d82ea0b0-0x1d82ea6e0    __OBJC_CONST
+        offset=0x01020480-0x01020ab0, addr=0x1d82ea0b0-0x1d82ea6e0              __OBJC_CONST.__objc_class_ro
+07: LC_SEGMENT_64 offset=0x01020ab0-0x0138476c, addr=0x1dfb84000-0x1dfee8000    __LINKEDIT
+08: LC_ID_DYLIB                 /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore (610.1.18)
 09: LC_DYLD_EXPORTS_TRIE        Count: 0
-10: LC_SYMTAB                   Symbol offset=0x0100C258, Num Syms: 30219, String offset=0x0108342C-0x0135907C
-11: LC_DYSYMTAB                 1097 Indirect symbols at offset 0x01082308
-12: LC_UUID                     0284D7B5-51DF-34C8-807F-BA431EBCAE1D
-13: LC_BUILD_VERSION            Platform: iOS, SDK: 14.0.0, Tool: ld (607.2.0)
-14: LC_SOURCE_VERSION           7610.1.15.50.3
-15: LC_LOAD_DYLIB               /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation (1740.0.0)
-16: LC_LOAD_DYLIB               /System/Library/Frameworks/Foundation.framework/Foundation (1740.0.0)
+10: LC_SYMTAB                   Symbol offset=0x0102BA28, Num Syms: 30476, String offset=0x010A3B54-0x0138476C
+11: LC_DYSYMTAB                 1051 Indirect symbols at offset 0x010A2AE8
+12: LC_UUID                     DA451B8C-AD8B-3017-BC14-81D074636B66
+13: LC_BUILD_VERSION            Platform: iOS, SDK: 14.0.0, Tool: ld (607.4.0)
+14: LC_SOURCE_VERSION           7610.1.18.20.3
+15: LC_LOAD_DYLIB               /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation (1742.102.0)
+16: LC_LOAD_DYLIB               /System/Library/Frameworks/Foundation.framework/Foundation (1742.102.0)
 17: LC_LOAD_DYLIB               /usr/lib/libicucore.A.dylib (66.0.0)
 18: LC_LOAD_DYLIB               /usr/lib/libobjc.A.dylib (228.0.0)
 19: LC_LOAD_DYLIB               /usr/lib/libz.1.dylib (1.2.11)
-20: LC_LOAD_DYLIB               /System/Library/Frameworks/Security.framework/Security (59711.0.0)
+20: LC_LOAD_DYLIB               /System/Library/Frameworks/Security.framework/Security (59731.0.0)
 21: LC_LOAD_DYLIB               /usr/lib/libc++.1.dylib (904.4.0)
-22: LC_LOAD_DYLIB               /usr/lib/libSystem.B.dylib (1291.0.0)
-23: LC_FUNCTION_STARTS          offset=0x01001450-0x0100c258, size=44552, count=25787
-24: LC_DATA_IN_CODE             offset=0x0100c258-0x0100c258, size=    0, entries=0
-
-NOTE: recorded command size 4384, computed command size 4384
-NOTE: File size is 20287612
+22: LC_LOAD_DYLIB               /usr/lib/libSystem.B.dylib (1292.0.0)
+23: LC_FUNCTION_STARTS          offset=0x01020ab0-0x0102ba28, size=44920, count=26030
+24: LC_DATA_IN_CODE             offset=0x0102ba28-0x0102ba28, size=    0, entries=0
 ```
 
 ### **macho --sig**
@@ -112,8 +110,6 @@ Similar to `jtool --sig`
 ```bash
 $ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig
 
-Code Signature
-==============
 Code Directory (167849 bytes)
         Version:     Scatter
         Flags:       None
@@ -123,6 +119,10 @@ Code Directory (167849 bytes)
         Hashes @169 size: 32 Type: Sha256
 Requirement Set (72 bytes) with 1 requirement
         Designated Requirement (@20, 72 bytes): identifier "com.apple.JavaScriptCore" AND anchor apple
+CMS (RFC3852) signature:
+        OU: Apple Certification Authority CN: Apple Code Signing Certification Authority (2011-10-24 thru 2026-10-24)
+        OU: Apple Certification Authority CN: Apple Root CA                              (2006-04-25 thru 2035-02-09)
+        OU: Apple Certification Authority CN: Software Signing                           (2013-04-12 thru 2021-04-12)
 ```
 
 ### **macho --ent**
@@ -131,9 +131,6 @@ Similar to `jtool --ent`
 
 ```bash
 $ ipsw macho /usr/libexec/amfid --ent
-
-Entitlements
-============
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
