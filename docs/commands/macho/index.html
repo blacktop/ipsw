@@ -307,8 +307,8 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 &lt;/plist&gt;
 </code></pre></div><h3 id="macho---objc"><strong>macho &ndash;objc</strong></h3>
 <p>Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></p>
-<p><strong>NOTE:</strong> I first ran <code>lipo -thin x86_64 /usr/lib/libobjc.A.dylib -output ./libobjc.A.dylib</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho libobjc.A.dylib --objc
+<p><strong>NOTE:</strong> Currently only supports <em>64-bit</em> architechtures</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/lib/libobjc.A.dylib --objc
 
 Objective-C
 <span class="o">===========</span>
