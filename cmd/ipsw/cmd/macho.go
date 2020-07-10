@@ -27,8 +27,10 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/fullsailor/pkcs7"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +53,9 @@ var machoCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var m *macho.File
+		var err error
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -62,13 +67,37 @@ var machoCmd = &cobra.Command{
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		symbols, _ := cmd.Flags().GetBool("symbols")
 
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC
+
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		m, err := macho.Open(args[0])
-		if err != nil {
+		// first check for fat file
+		fat, err := macho.OpenFat(args[0])
+		if err != nil && err != macho.ErrNotFat {
 			return err
+		}
+		if err == macho.ErrNotFat {
+			m, err = macho.Open(args[0])
+			if err != nil {
+				return err
+			}
+		} else {
+			var options []string
+			for _, arch := range fat.Arches {
+				options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
+			}
+
+			choice := 0
+			prompt := &survey.Select{
+				Message: fmt.Sprintf("Detected a fat MachO file, please select an architecture to analyze:"),
+				Options: options,
+			}
+			survey.AskOne(prompt, &choice)
+
+			m = fat.Arches[choice].File
 		}
 
 		if showHeader && !showLoadCommands {
@@ -79,10 +108,12 @@ var machoCmd = &cobra.Command{
 		}
 
 		if showSignature {
-			if m.CodeSignature() != nil {
-				cd := m.CodeSignature().CodeDirectory
+			if !onlySig {
 				fmt.Println("Code Signature")
 				fmt.Println("==============")
+			}
+			if m.CodeSignature() != nil {
+				cd := m.CodeSignature().CodeDirectory
 				fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
 				fmt.Printf("\tVersion:     %s\n"+
 					"\tFlags:       %s\n"+
@@ -113,29 +144,51 @@ var machoCmd = &cobra.Command{
 							req.Detail)
 					}
 				}
+				if len(m.CodeSignature().CMSSignature) > 0 {
+					fmt.Println("CMS (RFC3852) signature:")
+					p7, err := pkcs7.Parse(m.CodeSignature().CMSSignature)
+					if err != nil {
+						return err
+					}
+					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+					for _, cert := range p7.Certificates {
+						var ou string
+						if cert.Issuer.Organization != nil {
+							ou = cert.Issuer.Organization[0]
+						}
+						if cert.Issuer.OrganizationalUnit != nil {
+							ou = cert.Issuer.OrganizationalUnit[0]
+						}
+						fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
+							ou,
+							cert.Subject.CommonName,
+							cert.NotBefore.Format("2006-01-02"),
+							cert.NotAfter.Format("2006-01-02"))
+					}
+					w.Flush()
+				}
 			} else {
-				fmt.Println("Code Signature")
-				fmt.Println("==============")
 				fmt.Println("  - no code signature data")
 			}
+			fmt.Println()
 		}
 
 		if showEntitlements {
-			if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
+			if !onlyEnt {
 				fmt.Println("Entitlements")
 				fmt.Println("============")
+			}
+			if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
 				fmt.Println(m.CodeSignature().Entitlements)
 			} else {
-				fmt.Println("ENTITLEMENTS")
-				fmt.Println("============")
 				fmt.Println("  - no entitlements")
 			}
 		}
 
 		if showObjC {
+			fmt.Println("Objective-C")
+			fmt.Println("===========")
 			if m.HasObjC() {
-				fmt.Println("Objective-C")
-				fmt.Println("===========")
 				// fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
 				// fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
 
@@ -174,10 +227,9 @@ var machoCmd = &cobra.Command{
 					}
 				}
 			} else {
-				fmt.Println("Objective-C")
-				fmt.Println("===========")
 				fmt.Println("  - no objc")
 			}
+			fmt.Println()
 		}
 
 		// fmt.Println("HEADER")
