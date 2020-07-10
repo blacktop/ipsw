@@ -151,10 +151,10 @@ $ ipsw macho /usr/libexec/amfid --ent
 
 Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
 
-**NOTE:** I first ran `lipo -thin x86_64 /usr/lib/libobjc.A.dylib -output ./libobjc.A.dylib`
+**NOTE:** Currently only supports _64-bit_ architechtures
 
 ```bash
-$ ipsw macho libobjc.A.dylib --objc
+$ ipsw macho /usr/lib/libobjc.A.dylib --objc
 
 Objective-C
 ===========
