@@ -190,6 +190,7 @@
 </code></pre></div><p>Decrypt it with things from tweets 😏</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw img4 dec --iv-key &lt;IVKEY&gt; iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p
    • Parsing Im4p
+      • Detected LZFSE compression
       • Decrypting file to iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
 </code></pre></div><p>It&rsquo;s a thing of beauty 😍</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ hexdump -C -s <span class="m">512</span> -n <span class="m">144</span> iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec

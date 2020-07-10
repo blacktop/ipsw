@@ -184,7 +184,7 @@
 <h1 class="title">dyld</h1>
 <div class="content ">
   <ul>
-<li><a href="#dyld"><strong>dyld</strong></a></li>
+<li><a href="#dyld-info"><strong>dyld info</strong></a></li>
 <li><a href="#dyld-extract"><strong>dyld extract</strong></a></li>
 <li><a href="#dyld-symaddr"><strong>dyld symaddr</strong></a></li>
 <li><a href="#dyld-a2s"><strong>dyld a2s</strong></a></li>
@@ -196,9 +196,9 @@
 <li><a href="#dyld-o2a"><strong>dyld o2a</strong></a></li>
 </ul>
 <hr>
-<h3 id="dyld"><strong>dyld</strong></h3>
-<p>Similar to <code>otool -h -L dyld_shared_cache</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld -L dyld_shared_cache <span class="p">|</span> head -n35
+<h3 id="dyld-info"><strong>dyld info</strong></h3>
+<p>Similar to <code>jtool -h -l dyld_shared_cache</code></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld info -l dyld_shared_cache <span class="p">|</span> head -n35
 
 <span class="nv">Header</span>
 <span class="o">======</span>
