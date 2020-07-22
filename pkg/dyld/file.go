@@ -14,6 +14,8 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho/pkg/codesign"
+	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
@@ -40,16 +42,10 @@ type localSymbolInfo struct {
 	StringsFileOffset uint32
 }
 
+type cacheImages []*CacheImage
 type cacheMappings []*CacheMapping
 type cacheExtMappings []*CacheExtMapping
-type cacheImages []*CacheImage
-type codesignature struct {
-	ID            string
-	Raw           []byte
-	CodeDirectory types.CsCodeDirectory
-	Requirements  types.CsRequirementsBlob
-	CMSSignature  types.CsBlob
-}
+type codesignature *ctypes.CodeSignature
 
 // A File represents an open dyld file.
 type File struct {
@@ -191,11 +187,12 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	if err := binary.Read(sr, f.ByteOrder, &cs); err != nil {
 		return nil, err
 	}
-	f.CodeSignature.Raw = cs
 
-	if err := f.ParseCodeSignature(); err != nil {
+	csig, err := codesign.ParseCodeSignature(cs)
+	if err != nil {
 		return nil, err
 	}
+	f.CodeSignature = csig
 
 	// Read dyld local symbol entries.
 	if f.LocalSymbolsOffset != 0 {
@@ -451,52 +448,6 @@ func (f *File) GetVMAddress(offset uint64) (uint64, error) {
 		}
 	}
 	return 0, fmt.Errorf("offset not within any mappings file offset range")
-}
-
-func (f *File) ParseCodeSignature() error {
-	// sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-	csr := bytes.NewReader(f.CodeSignature.Raw)
-
-	cs := types.CsSuperBlob{}
-	if err := binary.Read(csr, binary.BigEndian, &cs); err != nil {
-		return err
-	}
-
-	csIndex := make([]types.CsBlobIndex, cs.Count)
-	if err := binary.Read(csr, binary.BigEndian, &csIndex); err != nil {
-		return err
-	}
-
-	for _, index := range csIndex {
-		csr.Seek(int64(index.Offset), io.SeekStart)
-		switch index.Type {
-		case types.CSSLOT_CODEDIRECTORY:
-			if err := binary.Read(csr, binary.BigEndian, &f.CodeSignature.CodeDirectory); err != nil {
-				return err
-			}
-			csr.Seek(int64(index.Offset+f.CodeSignature.CodeDirectory.IdentOffset), io.SeekStart)
-			id, err := bufio.NewReader(csr).ReadString('\x00')
-			if err != nil {
-				return errors.Wrapf(err, "failed to read string at: %d", index.Offset+f.CodeSignature.CodeDirectory.IdentOffset)
-			}
-			f.CodeSignature.ID = id
-		case types.CSSLOT_REQUIREMENTS:
-			if err := binary.Read(csr, binary.BigEndian, &f.CodeSignature.Requirements); err != nil {
-				return err
-			}
-		case types.CSSLOT_CMS_SIGNATURE:
-			if err := binary.Read(csr, binary.BigEndian, &f.CodeSignature.CMSSignature); err != nil {
-				return err
-			}
-			cmsData := make([]byte, f.CodeSignature.CMSSignature.Length)
-			if err := binary.Read(csr, binary.BigEndian, &cmsData); err != nil {
-				return err
-			}
-			// log.Debug(hex.Dump(cmsData))
-		}
-	}
-
-	return nil
 }
 
 // ParseLocalSyms parses dyld's private symbols
