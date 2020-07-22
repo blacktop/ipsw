@@ -198,7 +198,7 @@
 <hr>
 <h3 id="dyld-info"><strong>dyld info</strong></h3>
 <p>Similar to <code>jtool -h -l dyld_shared_cache</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld info -l dyld_shared_cache <span class="p">|</span> head -n35
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld info -l -s dyld_shared_cache <span class="p">|</span> head -n35
 
 <span class="nv">Header</span>
 <span class="o">======</span>
@@ -229,13 +229,28 @@ Shared Region:                    4GB,  address: 0x180000000 -&gt; 0x280000000
 <span class="p">|</span> __AUTH     <span class="p">|</span> rw-      <span class="p">|</span> rw-     <span class="p">|</span> <span class="m">81</span> MB   <span class="p">|</span> 1D7B18000 -&gt; 1DCCA4000 <span class="p">|</span> 53B18000 -&gt; 58CA4000 <span class="p">|</span> 58CB8000 -&gt; 58CC4000 <span class="p">|</span> <span class="m">1</span>     <span class="p">|</span>
 <span class="p">|</span> __LINKEDIT <span class="p">|</span> r--      <span class="p">|</span> r--     <span class="p">|</span> <span class="m">148</span> MB  <span class="p">|</span> 1DECA4000 -&gt; 1E8138000 <span class="p">|</span> 58CA4000 -&gt; <span class="m">62138000</span> <span class="p">|</span> <span class="m">00000000</span> -&gt; <span class="m">00000000</span> <span class="p">|</span> <span class="m">0</span>     <span class="p">|</span>
 
+Code <span class="nv">Signature</span>
+<span class="o">==============</span>
+Code Directory <span class="o">(</span><span class="m">3963356</span> bytes<span class="o">)</span>
+	Version:     ExecSeg
+	Flags:       Adhoc
+	CodeLimit:   0x78f24000
+	Identifier:  com.apple.dyld.cache.arm64e.release <span class="o">(</span>@0x58<span class="o">)</span>
+	TeamID:
+	CDHash:      7d32d18703679ac152a74ff872e38dda69339eabe29a0a6837861cec3d05de87 <span class="o">(</span>computed<span class="o">)</span>
+	<span class="c1"># of hashes: 123849 code (16384 pages) + 2 special</span>
+	Hashes @188 size: <span class="m">32</span> Type: Sha256
+Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span class="o">)</span> with <span class="m">1</span> requirement
+	0: 0x0 <span class="o">(</span>@0, <span class="m">12</span> bytes<span class="o">)</span>: empty requirement <span class="nb">set</span>
+
 <span class="nv">Images</span>
 <span class="o">======</span>
    1: 0x180045000 /usr/lib/system/libsystem_trace.dylib                                                           <span class="o">(</span>1264.0.0<span class="o">)</span>
    2: 0x18005C000 /usr/lib/system/libxpc.dylib                                                                    <span class="o">(</span>2001.0.0<span class="o">)</span>
    3: 0x180091000 /usr/lib/system/libsystem_blocks.dylib                                                          <span class="o">(</span>76.0.0<span class="o">)</span>
    4: 0x180093000 /usr/lib/system/libsystem_c.dylib                                                               <span class="o">(</span>1431.0.0<span class="o">)</span>
-</code></pre></div><h3 id="dyld-extract"><strong>dyld extract</strong></h3>
+</code></pre></div><p><strong>NOTE:</strong> We added the <code>-s</code> or <code>--sig</code> flag to also parse the <em>CodeDirectory</em>.</p>
+<h3 id="dyld-extract"><strong>dyld extract</strong></h3>
 <p>Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></p>
 <ul>
 <li><code>macOS</code></li>

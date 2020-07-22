@@ -273,21 +273,36 @@
 24: LC_DATA_IN_CODE             <span class="nv">offset</span><span class="o">=</span>0x0102ba28-0x0102ba28, <span class="nv">size</span><span class="o">=</span>    0, <span class="nv">entries</span><span class="o">=</span><span class="m">0</span>
 </code></pre></div><h3 id="macho---sig"><strong>macho &ndash;sig</strong></h3>
 <p>Similar to <code>jtool --sig</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
 
 Code Directory <span class="o">(</span><span class="m">167849</span> bytes<span class="o">)</span>
-        Version:     Scatter
-        Flags:       None
-        CodeLimit:   0x14772b0
-        Identifier:  com.apple.JavaScriptCore <span class="o">(</span>@0x30<span class="o">)</span>
-        <span class="c1"># of hashes: 5240 code (4096 pages) + 3 special</span>
-        Hashes @169 size: <span class="m">32</span> Type: Sha256
+	Version:     Scatter
+	Flags:       None
+	CodeLimit:   0x1477320
+	Identifier:  com.apple.JavaScriptCore  <span class="o">(</span>@0x30<span class="o">)</span>
+	TeamID:
+	CDHash:      672d175a3045ec06f9c8e5d2ddc1ae04bf02f930d846ae820d3085bd884e24ac <span class="o">(</span>computed<span class="o">)</span>
+	<span class="c1"># of hashes: 5240 code (4096 pages) + 3 special</span>
+	Hashes @169 size: <span class="m">32</span> Type: Sha256
+		Special Slot   <span class="m">3</span> Resource Directory:	9c8adb9535f138fd28c8e42ecb03c25a98d81aeee8138a2a8f3588e5ace43dec
+		Special Slot   <span class="m">2</span> Requirements Blob:	c8b0d11b77cd4a60abdd93b6776cf691b1f584e8511c434a58747524e8c280f9
+		Special Slot   <span class="m">1</span> Bound Info.plist:	cf8085400b7145e1ae3d4b5eaf6037c3b6717bcab88570f5abc0b877961e5c30
+		Slot   <span class="m">0</span> <span class="o">(</span>File page @0x0000<span class="o">)</span>:	dfdea89e8455973ce1a138e53cc7859e33f8943448408831fedb1433953701ee
+		Slot   <span class="m">1</span> <span class="o">(</span>File page @0x1000<span class="o">)</span>:	24d72b5adb6f134eab447edb39566164855f03944a6135d7ee8295c18f041963
+		Slot   <span class="m">2</span> <span class="o">(</span>File page @0x2000<span class="o">)</span>:	8e42b49fb5dd11d989abdac71cfce2090c75524f0d66c3f6f060b6d8a85a307d
+		Slot   <span class="m">3</span> <span class="o">(</span>File page @0x3000<span class="o">)</span>:	3f856ada2dc70752622a75fbf773f77e25c2f67bfca97c1eaa6e859658642e41
+		Slot   <span class="m">4</span> <span class="o">(</span>File page @0x4000<span class="o">)</span>:	b507712eb7be07429fbb26151099ffc0b05ced7a752b0baf83e154f007d3b40a
+		Slot   <span class="m">5</span> <span class="o">(</span>File page @0x5000<span class="o">)</span>:	b07f51cc5ab8906003961fdce73df3fc85f4db6c6a7fcf49145cea2993a4b604
+                &lt;SNIP&gt;
+		Slot   <span class="m">5239</span> <span class="o">(</span>File page @0x1477000<span class="o">)</span>:	862946908462dd3ee7ae0e2879846e1dc10f21f7705bac09b2172d43d035f145
 Requirement Set <span class="o">(</span><span class="m">72</span> bytes<span class="o">)</span> with <span class="m">1</span> requirement
-        Designated Requirement <span class="o">(</span>@20, <span class="m">72</span> bytes<span class="o">)</span>: identifier <span class="s2">&#34;com.apple.JavaScriptCore&#34;</span> AND anchor apple
+	0: Designated Requirement <span class="o">(</span>@20, <span class="m">72</span> bytes<span class="o">)</span>: identifier <span class="s2">&#34;com.apple.JavaScriptCore&#34;</span> and anchor apple
 CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         OU: Apple Certification Authority CN: Apple Code Signing Certification Authority <span class="o">(</span>2011-10-24 thru 2026-10-24<span class="o">)</span>
         OU: Apple Certification Authority CN: Apple Root CA                              <span class="o">(</span>2006-04-25 thru 2035-02-09<span class="o">)</span>
         OU: Apple Certification Authority CN: Software Signing                           <span class="o">(</span>2013-04-12 thru 2021-04-12<span class="o">)</span>
+
+
 </code></pre></div><h3 id="macho---ent"><strong>macho &ndash;ent</strong></h3>
 <p>Similar to <code>jtool --ent</code></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/libexec/amfid --ent
