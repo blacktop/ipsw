@@ -24,7 +24,7 @@ summary: Parse dyld_shared_cache.
 Similar to `jtool -h -l dyld_shared_cache`
 
 ```bash
-$ ipsw dyld info -l dyld_shared_cache | head -n35
+$ ipsw dyld info -l -s dyld_shared_cache | head -n35
 
 Header
 ======
@@ -55,6 +55,20 @@ Mappings
 | __AUTH     | rw-      | rw-     | 81 MB   | 1D7B18000 -> 1DCCA4000 | 53B18000 -> 58CA4000 | 58CB8000 -> 58CC4000 | 1     |
 | __LINKEDIT | r--      | r--     | 148 MB  | 1DECA4000 -> 1E8138000 | 58CA4000 -> 62138000 | 00000000 -> 00000000 | 0     |
 
+Code Signature
+==============
+Code Directory (3963356 bytes)
+	Version:     ExecSeg
+	Flags:       Adhoc
+	CodeLimit:   0x78f24000
+	Identifier:  com.apple.dyld.cache.arm64e.release (@0x58)
+	TeamID:
+	CDHash:      7d32d18703679ac152a74ff872e38dda69339eabe29a0a6837861cec3d05de87 (computed)
+	# of hashes: 123849 code (16384 pages) + 2 special
+	Hashes @188 size: 32 Type: Sha256
+Requirement Set (12 bytes) with 1 requirement
+	0: 0x0 (@0, 12 bytes): empty requirement set
+
 Images
 ======
    1: 0x180045000 /usr/lib/system/libsystem_trace.dylib                                                           (1264.0.0)
@@ -62,6 +76,8 @@ Images
    3: 0x180091000 /usr/lib/system/libsystem_blocks.dylib                                                          (76.0.0)
    4: 0x180093000 /usr/lib/system/libsystem_c.dylib                                                               (1431.0.0)
 ```
+
+**NOTE:** We added the `-s` or `--sig` flag to also parse the _CodeDirectory_.
 
 ### **dyld extract**
 

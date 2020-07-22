@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
@@ -30,6 +31,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -38,6 +40,7 @@ func init() {
 	dyldCmd.AddCommand(dyldInfoCmd)
 
 	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
+	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	dyldInfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -53,6 +56,7 @@ var dyldInfoCmd = &cobra.Command{
 
 		// showHeader, _ := cmd.Flags().GetBool("header")
 		showDylibs, _ := cmd.Flags().GetBool("dylibs")
+		showSignature, _ := cmd.Flags().GetBool("sig")
 
 		fileInfo, err := os.Lstat(args[0])
 		if err != nil {
@@ -87,6 +91,88 @@ var dyldInfoCmd = &cobra.Command{
 		// if showHeader {
 		fmt.Println(f)
 		// }
+
+		if showSignature {
+			fmt.Println("Code Signature")
+			fmt.Println("==============")
+			if f.CodeSignature != nil {
+				cds := f.CodeSignature.CodeDirectories
+				if len(cds) > 0 {
+					for _, cd := range cds {
+						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
+						fmt.Printf("\tVersion:     %s\n"+
+							"\tFlags:       %s\n"+
+							"\tCodeLimit:   0x%x\n"+
+							"\tIdentifier:  %s (@0x%x)\n"+
+							"\tTeamID:      %s\n"+
+							"\tCDHash:      %s (computed)\n"+
+							"\t# of hashes: %d code (%d pages) + %d special\n"+
+							"\tHashes @%d size: %d Type: %s\n",
+							cd.Header.Version,
+							cd.Header.Flags,
+							cd.Header.CodeLimit,
+							cd.ID,
+							cd.Header.IdentOffset,
+							cd.TeamID,
+							cd.CDHash,
+							cd.Header.NCodeSlots,
+							int(math.Pow(2, float64(cd.Header.PageSize))),
+							cd.Header.NSpecialSlots,
+							cd.Header.HashOffset,
+							cd.Header.HashSize,
+							cd.Header.HashType)
+						if Verbose {
+							for _, sslot := range cd.SpecialSlots {
+								fmt.Printf("\t\t%s\n", sslot.Desc)
+							}
+							for _, cslot := range cd.CodeSlots {
+								fmt.Printf("\t\t%s\n", cslot.Desc)
+							}
+						}
+					}
+				}
+				reqs := f.CodeSignature.Requirements
+				if len(reqs) > 0 {
+					fmt.Printf("Requirement Set (%d bytes) with %d requirement\n",
+						reqs[0].Length, // TODO: fix this (needs to be length - sizeof(header))
+						len(reqs))
+					for idx, req := range reqs {
+						fmt.Printf("\t%d: %s (@%d, %d bytes): %s\n",
+							idx,
+							req.Type,
+							req.Offset,
+							req.Length,
+							req.Detail)
+					}
+				}
+				if len(f.CodeSignature.CMSSignature) > 0 {
+					fmt.Println("CMS (RFC3852) signature:")
+					p7, err := pkcs7.Parse(f.CodeSignature.CMSSignature)
+					if err != nil {
+						return err
+					}
+					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+					for _, cert := range p7.Certificates {
+						var ou string
+						if cert.Issuer.Organization != nil {
+							ou = cert.Issuer.Organization[0]
+						}
+						if cert.Issuer.OrganizationalUnit != nil {
+							ou = cert.Issuer.OrganizationalUnit[0]
+						}
+						fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
+							ou,
+							cert.Subject.CommonName,
+							cert.NotBefore.Format("2006-01-02"),
+							cert.NotAfter.Format("2006-01-02"))
+					}
+					w.Flush()
+				}
+			} else {
+				fmt.Println("  - no code signature data")
+			}
+			fmt.Println()
+		}
 
 		if showDylibs {
 			fmt.Println("Images")
