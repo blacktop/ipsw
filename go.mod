@@ -5,7 +5,7 @@ go 1.14
 require (
 	github.com/AlecAivazis/survey/v2 v2.0.8
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
-	github.com/aixiansheng/lzfse v0.2.2
+	github.com/aixiansheng/lzfse v0.2.4
 	github.com/apex/log v1.6.0
 	github.com/blacktop/go-macho v1.0.20
 	github.com/blacktop/go-plist v1.0.0
