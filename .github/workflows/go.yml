@@ -9,10 +9,10 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Set up Go 1.13
+      - name: Set up Go 1.14
         uses: actions/setup-go@v1
         with:
-          go-version: 1.13
+          go-version: 1.14.5
         id: go
 
       - name: Check out code into the Go module directory
@@ -82,12 +82,12 @@ jobs:
       - name: Run Extract Remote Kernelcache
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v 13.5.1 -d iPhone12,3
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v 13.6 -d iPhone12,3
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho iPhone*/kernelcache*
       - name: Run Extract Remote Kernelcache (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 13.5.1 -d iPhone12,3
+          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 13.6 -d iPhone12,3
           dir
 
       - uses: actions/upload-artifact@master
