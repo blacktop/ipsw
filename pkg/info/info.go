@@ -153,8 +153,8 @@ func (i *Info) getManifestPaths() map[string][]string {
 }
 
 type folder struct {
-	Name        string
-	KernelCache string
+	Name         string
+	KernelCaches []string
 }
 
 func (i *Info) getFolders() []folder {
@@ -163,8 +163,8 @@ func (i *Info) getFolders() []folder {
 	for _, dtree := range i.DeviceTrees {
 		dt, _ := dtree.Summary()
 		fs = append(fs, folder{
-			Name:        fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion),
-			KernelCache: kcs[strings.ToLower(dt.BoardConfig)],
+			Name:         fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion),
+			KernelCaches: kcs[strings.ToLower(dt.BoardConfig)],
 		})
 	}
 	return fs
@@ -174,8 +174,10 @@ func (i *Info) getFolders() []folder {
 func (i *Info) GetKernelCacheFolders(kc string) []string {
 	var folders []string
 	for _, folder := range i.getFolders() {
-		if strings.HasSuffix(kc, folder.KernelCache) {
-			folders = append(folders, folder.Name)
+		for _, kcache := range folder.KernelCaches {
+			if strings.HasSuffix(kc, kcache) {
+				folders = append(folders, folder.Name)
+			}
 		}
 	}
 	return folders

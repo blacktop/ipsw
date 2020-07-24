@@ -128,10 +128,21 @@ func (p *Plists) GetOSType() string {
 	return p.OTAInfo.MobileAssetProperties.ReleaseType
 }
 
-func (b *BuildManifest) GetKernelCaches() map[string]string {
-	kernelCaches := make(map[string]string, len(b.BuildIdentities))
+func (p *Plists) GetKernelType(name string) string {
+	for _, bID := range p.BuildManifest.BuildIdentities {
+		if strings.EqualFold(bID.Manifest["KernelCache"].Info.Path, name) {
+			return bID.Info.VariantContents.InstalledKernelCache
+		}
+	}
+	return p.OTAInfo.MobileAssetProperties.ReleaseType
+}
+
+func (b *BuildManifest) GetKernelCaches() map[string][]string {
+	kernelCaches := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		kernelCaches[bID.Info.DeviceClass] = bID.Manifest["KernelCache"].Info.Path
+		if !utils.StrSliceContains(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path) {
+			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path)
+		}
 	}
 	return kernelCaches
 }

@@ -117,7 +117,7 @@ func Extract(ipsw string) error {
 		}
 		for _, folder := range i.GetKernelCacheFolders(kcache) {
 			os.Mkdir(folder, os.ModePerm)
-			fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetOSType()))
+			fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(kcache)))
 			err = ioutil.WriteFile(fname, dec, 0644)
 			if err != nil {
 				return errors.Wrap(err, "failed to decompress kernelcache")
@@ -231,7 +231,7 @@ func RemoteParse(zr *zip.Reader) error {
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
 			for _, folder := range i.GetKernelCacheFolders(f.Name) {
-				fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetOSType()))
+				fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(f.Name)))
 				if _, err := os.Stat(fname); os.IsNotExist(err) {
 					kdata := make([]byte, f.UncompressedSize64)
 					rc, err := f.Open()
