@@ -110,7 +110,7 @@ var ibootCmd = &cobra.Command{
 			utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", name))
 			ioutil.WriteFile(name, buf.Bytes(), 0644)
 			if err != nil {
-				return errors.Wrapf(err, "unabled to write file: %s", "firmware.bin")
+				return errors.Wrapf(err, "unabled to write file: %s", name)
 			}
 
 			// io.Copy(outf, lr)
