@@ -110,9 +110,10 @@ func init() {
 
 // sepCmd represents the sep command
 var sepCmd = &cobra.Command{
-	Use:   "sep",
-	Short: "🚧 [WIP] Dump MachOs 🚧",
-	Args:  cobra.MinimumNArgs(1),
+	Use:    "sep",
+	Short:  "🚧 [WIP] Dump MachOs 🚧",
+	Args:   cobra.MinimumNArgs(1),
+	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
