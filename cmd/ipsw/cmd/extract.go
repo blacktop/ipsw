@@ -22,24 +22,25 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"archive/zip"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/url"
 	"os"
+	"path"
+	"path/filepath"
+	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-)
-
-var (
-	kernelFlag     bool
-	dyldFlag       bool
-	deviceTreeFlag bool
-	remote         bool
 )
 
 func init() {
@@ -48,10 +49,12 @@ func init() {
 	extractCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	extractCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 
-	extractCmd.Flags().BoolVarP(&remote, "remote", "r", false, "Extract from URL")
-	extractCmd.Flags().BoolVarP(&kernelFlag, "kernel", "k", false, "Extract kernelcache")
-	extractCmd.Flags().BoolVarP(&dyldFlag, "dyld", "d", false, "Extract dyld_shared_cache")
-	extractCmd.Flags().BoolVarP(&deviceTreeFlag, "dtree", "t", false, "Extract DeviceTree")
+	extractCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
+	extractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
+	extractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache")
+	extractCmd.Flags().BoolP("dtree", "t", false, "Extract DeviceTree")
+	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
+	extractCmd.Flags().BoolP("sep", "s", false, "Extract SEPROM")
 
 	extractCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
 }
@@ -72,6 +75,13 @@ var extractCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		kernelFlag, _ := cmd.Flags().GetBool("kernel")
+		dyldFlag, _ := cmd.Flags().GetBool("dyld")
+		deviceTreeFlag, _ := cmd.Flags().GetBool("dtree")
+		ibootFlag, _ := cmd.Flags().GetBool("iboot")
+		sepFlag, _ := cmd.Flags().GetBool("sep")
+		remote, _ := cmd.Flags().GetBool("remote")
+
 		if remote {
 			proxy, _ := cmd.Flags().GetString("proxy")
 			insecure, _ := cmd.Flags().GetBool("insecure")
@@ -90,21 +100,85 @@ var extractCmd = &cobra.Command{
 			if dyldFlag {
 				log.Error("unable to extract dyld_shared_cache remotely")
 			}
+			// Get handle to remote ipsw zip
+			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
+				Proxy:    proxy,
+				Insecure: insecure,
+			})
+			if err != nil {
+				return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
+			}
+
 			if kernelFlag {
 				log.Info("Extracting Kernelcache")
-				zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
-					Proxy:    proxy,
-					Insecure: insecure,
-				})
-				if err != nil {
-					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
-				}
-
 				err = kernelcache.RemoteParse(zr)
 				if err != nil {
 					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
 			}
+
+			if ibootFlag {
+				log.Info("Extracting Remote iBoot(s)")
+				ipsw, err := info.ParseZipFiles(zr.File)
+				if err != nil {
+					return errors.Wrap(err, "failed to download iBoot(s) from remote ipsw")
+				}
+				var validIBoot = regexp.MustCompile(`.*iBoot.*im4p$`)
+				for _, f := range zr.File {
+					if validIBoot.MatchString(f.Name) {
+						folder := ipsw.GetFolderForFile(path.Base(f.Name))
+						os.Mkdir(folder, os.ModePerm)
+						if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
+							data := make([]byte, f.UncompressedSize64)
+							rc, err := f.Open()
+							if err != nil {
+								return errors.Wrapf(err, "failed to open file in remote ipsw: %s", f.Name)
+							}
+							io.ReadFull(rc, data)
+							rc.Close()
+
+							err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
+							if err != nil {
+								return errors.Wrapf(err, "failed to write %s", f.Name)
+							}
+						} else {
+							log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
+						}
+					}
+				}
+			}
+
+			if sepFlag {
+				log.Info("Extracting sep-firmwares")
+				ipsw, err := info.ParseZipFiles(zr.File)
+				if err != nil {
+					return errors.Wrap(err, "failed to download sep-firmwares from remote ipsw")
+				}
+				var validSEP = regexp.MustCompile(`.*sep-firmware.*im4p$`)
+				for _, f := range zr.File {
+					if validSEP.MatchString(f.Name) {
+						folder := ipsw.GetFolderForFile(path.Base(f.Name))
+						os.Mkdir(folder, os.ModePerm)
+						if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
+							data := make([]byte, f.UncompressedSize64)
+							rc, err := f.Open()
+							if err != nil {
+								return errors.Wrapf(err, "failed to open file in remote ipsw: %s", f.Name)
+							}
+							io.ReadFull(rc, data)
+							rc.Close()
+
+							err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
+							if err != nil {
+								return errors.Wrapf(err, "failed to write %s", f.Name)
+							}
+						} else {
+							log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
+						}
+					}
+				}
+			}
+
 		} else {
 			if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 				return fmt.Errorf("file %s does not exist", args[0])
@@ -131,6 +205,36 @@ var extractCmd = &cobra.Command{
 				err := devicetree.Extract(args[0])
 				if err != nil {
 					return errors.Wrap(err, "failed to extract DeviceTrees")
+				}
+			}
+
+			if ibootFlag {
+				log.Info("Extracting iBoot")
+				_, err := utils.Unzip(args[0], "", func(f *zip.File) bool {
+					var validIBoot = regexp.MustCompile(`.*iBoot.*im4p$`)
+					if validIBoot.MatchString(f.Name) {
+						return true
+					}
+					return false
+				})
+
+				if err != nil {
+					return errors.Wrap(err, "failed to extract iBoot from ipsw")
+				}
+			}
+
+			if sepFlag {
+				log.Info("Extracting sep-firmwares")
+				_, err := utils.Unzip(args[0], "", func(f *zip.File) bool {
+					var validSEP = regexp.MustCompile(`.*sep-firmware.*im4p$`)
+					if validSEP.MatchString(f.Name) {
+						return true
+					}
+					return false
+				})
+
+				if err != nil {
+					return errors.Wrap(err, "failed to extract sep-firmware from ipsw")
 				}
 			}
 		}
