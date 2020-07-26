@@ -7,7 +7,7 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/aixiansheng/lzfse v0.2.4
 	github.com/apex/log v1.6.0
-	github.com/blacktop/go-macho v1.0.20
+	github.com/blacktop/go-macho v1.0.21
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
