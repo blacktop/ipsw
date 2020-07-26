@@ -54,7 +54,7 @@ func init() {
 	extractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache")
 	extractCmd.Flags().BoolP("dtree", "t", false, "Extract DeviceTree")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
-	extractCmd.Flags().BoolP("sep", "s", false, "Extract SEPROM")
+	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
 
 	extractCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
 }
