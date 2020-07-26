@@ -174,7 +174,7 @@ var sepCmd = &cobra.Command{
 				fmt.Println(m.FileTOC.LoadsString())
 			}
 			log.WithFields(log.Fields{
-				"uuid":  hdr.KernelUUID,
+				"uuid":  hdr.InitUUID,
 				"start": fmt.Sprintf("0x%x", hdr.InitBasePaddr),
 				"size":  fmt.Sprintf("0x%x", hdr.PaddrMax),
 			}).Info(strings.TrimSpace(string(hdr.InitName[:])))
@@ -188,7 +188,7 @@ var sepCmd = &cobra.Command{
 
 			for _, app := range appList {
 				log.WithFields(log.Fields{
-					"uuid":  hdr.KernelUUID,
+					"uuid":  app.UUID,
 					"start": fmt.Sprintf("0x%x", app.PhysText),
 					"size":  fmt.Sprintf("0x%x", app.SizeText),
 				}).Info(strings.TrimSpace(string(app.Name[:])))
