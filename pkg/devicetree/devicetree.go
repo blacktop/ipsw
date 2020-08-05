@@ -16,6 +16,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/aixiansheng/lzfse"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
@@ -244,21 +245,21 @@ func getProperties(buffer io.Reader, node Node) (string, DeviceTree, error) {
 	return nodeName, DeviceTree{nodeName: props}, nil
 }
 
-func parseProperties(buffer *bytes.Buffer, node Node, parent DeviceTree) (DeviceTree, error) {
+func parseProperties(r io.Reader, node Node, parent DeviceTree) (DeviceTree, error) {
 
-	name, parent, err := getProperties(buffer, node)
+	name, parent, err := getProperties(r, node)
 	if err != nil {
 		return DeviceTree{}, err
 	}
 
 	children := []DeviceTree{}
 	for index := 0; index < int(node.NumChildren); index++ {
-		cNode, err := parseNode(buffer)
+		cNode, err := parseNode(r)
 		if err != nil {
 			return DeviceTree{}, err
 		}
 
-		cProps, err := parseProperties(buffer, cNode, DeviceTree{})
+		cProps, err := parseProperties(r, cNode, DeviceTree{})
 		if err != nil {
 			return DeviceTree{}, err
 		}
@@ -269,15 +270,15 @@ func parseProperties(buffer *bytes.Buffer, node Node, parent DeviceTree) (Device
 	return parent, nil
 }
 
-func parseDeviceTree(buffer *bytes.Buffer) (*DeviceTree, error) {
+func parseDeviceTree(r io.Reader) (*DeviceTree, error) {
 
 	// Read a Node from the buffer
-	node, err := parseNode(buffer)
+	node, err := parseNode(r)
 	if err != nil {
 		return nil, err
 	}
 
-	dtree, err := parseProperties(buffer, node, DeviceTree{})
+	dtree, err := parseProperties(r, node, DeviceTree{})
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +295,15 @@ func ParseImg4Data(data []byte) (*DeviceTree, error) {
 		return nil, err
 	}
 
-	dtree, err := parseDeviceTree(bytes.NewBuffer(i.Data))
+	var r io.Reader
+	if bytes.Contains(i.Data[:4], []byte("bvx2")) {
+		utils.Indent(log.Info, 2)("DeviceTree is LZFSE compressed")
+		r = lzfse.NewReader(bytes.NewReader(i.Data))
+	} else {
+		r = bytes.NewReader(i.Data)
+	}
+
+	dtree, err := parseDeviceTree(r)
 	if err != nil {
 		return nil, err
 	}
