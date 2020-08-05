@@ -4,6 +4,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/gocolly/colly/v2"
 	"github.com/pkg/errors"
@@ -23,6 +24,10 @@ type BetaIPSW struct {
 	Version string   `json:"version,omitempty"`
 	BuildID string   `json:"buildid,omitempty"`
 }
+
+type Keys map[string]string
+type BuildKeys map[string]Keys
+type DeviceKeys map[string]BuildKeys
 
 func trimQuotes(s string) string {
 	if len(s) > 0 && s[0] == '"' {
@@ -125,4 +130,70 @@ func ScrapeURLs(build string) (map[string]BetaIPSW, error) {
 	c.Wait()
 
 	return ipsws, nil
+}
+
+// ScrapeKeys will scrape the iPhone Wiki for firmware keys
+func ScrapeKeys(version string) (map[string]map[string]map[string]string, error) {
+	keys := make(map[string]map[string]map[string]string, 1000)
+
+	c := colly.NewCollector(
+		colly.AllowedDomains("www.theiphonewiki.com"),
+		colly.URLFilters(
+			regexp.MustCompile("https://www.theiphonewiki.com/wiki/(.+)$"),
+		),
+		// colly.Async(true),
+		colly.MaxDepth(1),
+		colly.UserAgent("free0"),
+		colly.IgnoreRobotsTxt(),
+	)
+
+	// On every a element which has href attribute call callback
+	c.OnHTML("a[href]", func(e *colly.HTMLElement) {
+		if strings.Contains(e.Attr("href"), "/wiki/") && !strings.Contains(e.Attr("href"), "redlink=1") {
+			c.Visit(e.Request.AbsoluteURL(e.Attr("href")))
+		}
+	})
+
+	c.OnHTML("body", func(e *colly.HTMLElement) {
+		e.ForEach("code", func(_ int, code *colly.HTMLElement) {
+			if len(code.Attr("id")) > 0 {
+				if strings.Contains(code.Attr("id"), "-iv") || strings.Contains(code.Attr("id"), "-key") {
+					if code.Text != "Unknown" {
+						urlParts := strings.Split(code.Request.URL.Path, "_")
+						buildID := urlParts[1]
+						deviceID := strings.Trim(urlParts[2], "()")
+						if keys[deviceID] == nil {
+							keys[deviceID] = map[string]map[string]string{}
+						}
+						if keys[deviceID][buildID] == nil {
+							keys[deviceID][buildID] = map[string]string{}
+						}
+						keys[deviceID][buildID][strings.TrimPrefix(code.Attr("id"), "keypage-")] = code.Text
+						// fmt.Printf("%#v\n", keys[deviceID])
+					}
+
+				}
+			}
+		})
+	})
+
+	// Set error handler
+	// c.OnError(func(r *colly.Response, err error) {
+	// 	// fmt.Println("Request URL:", r.Request.URL, "failed with response:", r, "\nError:", err)
+	// 	fmt.Println("Error:", err)
+	// })
+
+	c.SetRequestTimeout(60 * time.Second)
+
+	// for _, v := range []string{"1.x", "2.x", "3.x", "4.x", "5.x", "6.x", "7.x", "8.x", "9.x", "10.x", "11.x", "12.x", "13.x", "14.x"} {
+	for _, v := range []string{"13.x", "14.x"} {
+		err := c.Visit("https://www.theiphonewiki.com/wiki/Firmware_Keys/" + v)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to scrape https://www.theiphonewiki.com/wiki/Firmware_Keys/"+v)
+		}
+	}
+
+	c.Wait()
+
+	return keys, nil
 }

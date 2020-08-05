@@ -75,6 +75,31 @@ func getProcessor(cpuid string) processors {
 	return processors{}
 }
 
+func getFirmwareKeys(device, build string) map[string]string {
+	var keys map[string]map[string]map[string]string
+
+	statikFS, err := fs.New()
+	if err != nil {
+		log.Fatal(err)
+	}
+	keysJSON, err := statikFS.Open("/firmware_keys.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	data, err := ioutil.ReadAll(keysJSON)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = json.Unmarshal(data, &keys)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return keys[device][build]
+}
+
 func (i *Info) String() string {
 	var iStr string
 	iStr += fmt.Sprintf(

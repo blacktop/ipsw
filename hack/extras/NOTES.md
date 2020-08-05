@@ -42,3 +42,8 @@ Ideas
 - https://blog.gopheracademy.com/advent-2018/llvm-ir-and-go/
 - https://blog.felixangell.com/an-introduction-to-llvm-in-go
 - https://ldhldh.myds.me:10081/docs/llvm342_docs/_mach_o_dump_8cpp.html
+
+### DWARF
+
+- https://github.com/volatilityfoundation/dwarf2json/blob/master/main.go
+- https://github.com/dutchcoders/disassembler/blob/master/disassembler.go

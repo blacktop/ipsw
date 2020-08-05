@@ -40,6 +40,7 @@ import (
 // NOTE: https://www.blackhat.com/docs/us-16/materials/us-16-Mandt-Demystifying-The-Secure-Enclave-Processor.pdf
 // NOTE: http://mista.nu/research/sep-paper.pdf
 // NOTE: https://gist.github.com/xerub/0161aacd7258d31c6a27584f90fa2e8c
+// NOTE: https://github.com/matteyeux/sepsplit/blob/master/sepsplit.c
 
 const legionStr = "Built by legion2"
 const appListOffsetFromSEPOS32bit = 0xec8

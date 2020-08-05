@@ -56,6 +56,10 @@ update_mod:
 update_devs:
 	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/info/data/device_traits.json
 
+.PHONY: update_keys
+update_keys:
+	CGO_ENABLED=0 go run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
+
 .PHONY: dry_release
 dry_release:
 	goreleaser --skip-publish --rm-dist --skip-validate
