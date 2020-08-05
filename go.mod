@@ -3,11 +3,11 @@ module github.com/blacktop/ipsw
 go 1.14
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.0.8
+	github.com/AlecAivazis/survey/v2 v2.1.0
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/aixiansheng/lzfse v0.2.4
-	github.com/apex/log v1.6.0
-	github.com/blacktop/go-macho v1.0.21
+	github.com/apex/log v1.7.0
+	github.com/blacktop/go-macho v1.0.22
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -35,10 +35,10 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
-	github.com/spf13/viper v1.7.0
+	github.com/spf13/viper v1.7.1
 	github.com/ulikunitz/xz v0.5.7
 	github.com/vbauerster/mpb/v4 v4.12.2
-	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899
+	golang.org/x/crypto v0.0.0-20200728195943-123391ffb6de
 	golang.org/x/sys v0.0.0-20200413165638-669c56c373c4 // indirect
 	gopkg.in/ini.v1 v1.55.0 // indirect
 )

@@ -74,6 +74,7 @@ typedef enum <uint> {
     MACH_DYLIB_STUB   = 0x9,
     MACH_DSYM         = 0xA,
     MACH_KEXT_BUNDLE  = 0xB,
+    MACH_FILESET      = 0xC,
 } FileType;
 
 typedef enum <uint> {
