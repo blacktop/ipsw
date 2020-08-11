@@ -80,9 +80,9 @@ var symaddrCmd = &cobra.Command{
 
 		if len(args) > 1 {
 			if len(imageName) > 0 { // Search for symbol inside dylib
-				if sym, _ := f.GetExportedSymbolAddressInImage(imageName, args[1]); sym != nil {
-					fmt.Println(sym)
-					// return nil
+				if sym, _ := f.FindExportedSymbolInImage(imageName, args[1]); sym != nil {
+					fmt.Printf("0x%8x: (%s) %s\t%s\n", sym.Address, sym.Flags, sym.Name, f.Image(imageName).Name)
+					return nil
 				}
 				if lSym, _ := f.FindLocalSymbolInImage(args[1], imageName); lSym != nil {
 					fmt.Println(lSym)
@@ -90,17 +90,15 @@ var symaddrCmd = &cobra.Command{
 				return nil
 			}
 			// Search ALL dylibs for a symbol
-			found := false
 			for _, image := range f.Images {
-				if sym, _ := f.GetExportedSymbolAddressInImage(image.Name, args[1]); sym != nil {
-					fmt.Println(sym)
-					found = true
+				if sym, _ := f.FindExportedSymbolInImage(image.Name, args[1]); sym != nil {
+					fmt.Printf("0x%8x: (%s) %s\t%s\n", sym.Address, sym.Flags, sym.Name, image.Name)
+					return nil
 				}
 			}
-			if !found {
-				if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
-					fmt.Println(lSym)
-				}
+			if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
+				fmt.Println(lSym)
+				return nil
 			}
 		} else { // Dump ALL symbols
 			err := f.GetAllExportedSymbols(true)
