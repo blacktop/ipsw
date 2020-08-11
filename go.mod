@@ -3,11 +3,11 @@ module github.com/blacktop/ipsw
 go 1.14
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.1.0
+	github.com/AlecAivazis/survey/v2 v2.1.1
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/aixiansheng/lzfse v0.2.4
-	github.com/apex/log v1.7.0
-	github.com/blacktop/go-macho v1.0.22
+	github.com/apex/log v1.8.0
+	github.com/blacktop/go-macho v1.0.23
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
