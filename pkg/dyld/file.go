@@ -872,7 +872,10 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		if m.DyldInfo() != nil {
+		if m.DyldExportsTrie() != nil {
+			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldExportsTrie().Offset))
+			eTrieSize = uint64(m.DyldExportsTrie().Size)
+		} else if m.DyldInfo() != nil {
 			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldInfo().ExportOff))
 			eTrieSize = uint64(m.DyldInfo().ExportSize)
 		}
@@ -899,28 +902,30 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 func (f *File) GetAllExportedSymbols(dump bool) error {
 
 	for _, image := range f.Images {
-		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
-			exportTrie, err := f.getExportTrieData(image)
-			if err != nil {
-				return err
+		// if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
+		exportTrie, err := f.getExportTrieData(image)
+		if err != nil {
+			return err
+		}
+		if len(exportTrie) == 0 {
+			continue
+		}
+		syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
+		if err != nil {
+			return err
+		}
+		if dump {
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+			for _, sym := range syms {
+				fmt.Fprintf(w, "0x%8x:\t[%s]\t%s\t%s\n", sym.Address, sym.Flags, sym.Name, image.Name)
 			}
-			syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
-			if err != nil {
-				return err
-			}
-			if dump {
-				fmt.Printf("\n%s\n", image.Name)
-				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-				for _, sym := range syms {
-					fmt.Fprintf(w, "0x%8x:\t[%s]\t%s\n", sym.Address, sym.Flags, sym.Name)
-				}
-				w.Flush()
-			} else {
-				for _, sym := range syms {
-					f.AddressToSymbol[sym.Address] = sym.Name
-				}
+			w.Flush()
+		} else {
+			for _, sym := range syms {
+				f.AddressToSymbol[sym.Address] = sym.Name
 			}
 		}
+		// }
 	}
 
 	return nil
