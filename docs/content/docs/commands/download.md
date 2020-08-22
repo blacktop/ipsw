@@ -115,7 +115,7 @@ $ ipsw download -V latest --yes --white-list ipod
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
-Only download and decompress the kernelcaches
+Only download and decompress the kernelcaches _(not supported on Windows)_
 
 - Single kernelcache
 

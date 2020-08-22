@@ -37,16 +37,16 @@ builds:
     goarch:
       - amd64
 
-  - id: ipsw_extended_darwin
-    env:
-      - CGO_ENABLED=0
-    main: ./cmd/ipsw
-    binary: ipsw
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-    goos:
-      - darwin
-    goarch:
-      - amd64
+  # - id: ipsw_extended_darwin
+  #   env:
+  #     - CGO_ENABLED=0
+  #   main: ./cmd/ipsw
+  #   binary: ipsw
+  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  #   goos:
+  #     - darwin
+  #   goarch:
+  #     - amd64
   # - id: ipsw_extended_linux
   #   main: ./cmd/ipsw
   #   binary: ipsw
@@ -91,6 +91,8 @@ brews:
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
+    dependencies:
+      - lzfse
     install: |
       bin.install "ipsw"
     test: |

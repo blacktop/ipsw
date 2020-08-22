@@ -9,6 +9,28 @@ import (
 	"github.com/blacktop/go-plist"
 )
 
+type PrelinkInfo struct {
+	PrelinkInfoDictionary []CFBundle `plist:"_PrelinkInfoDictionary,omitempty"`
+}
+
+type CFBundle struct {
+	Name                  string `plist:"CFBundleName,omitempty"`
+	ID                    string `plist:"CFBundleIdentifier,omitempty"`
+	InfoDictionaryVersion string `plist:"CFBundleInfoDictionaryVersion,omitempty"`
+	CompatibleVersion     string `plist:"OSBundleCompatibleVersion,omitempty"`
+	Version               string `plist:"CFBundleVersion,omitempty"`
+	Required              string `plist:"OSBundleRequired,omitempty"`
+	Executable            string `plist:"CFBundleExecutable,omitempty"`
+	OSKernelResource      bool   `plist:"OSKernelResource,omitempty"`
+	GetInfoString         string `plist:"CFBundleGetInfoString,omitempty"`
+	AllowUserLoad         bool   `plist:"OSBundleAllowUserLoad,omitempty"`
+	Signature             string `plist:"CFBundleSignature,omitempty"`
+	PackageType           string `plist:"CFBundlePackageType,omitempty"`
+	DevelopmentRegion     string `plist:"CFBundleDevelopmentRegion,omitempty"`
+	ShortVersionString    string `plist:"CFBundleShortVersionString,omitempty"`
+	ExecutableLoadAddr    uint64 `plist:"_PrelinkExecutableLoadAddr,omitempty"`
+}
+
 // KextList lists all the kernel extensions in the kernelcache
 func KextList(kernel string) error {
 	m, err := macho.Open(kernel)

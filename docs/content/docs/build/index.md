@@ -6,10 +6,11 @@ weight: 3
 summary: Build from source
 ---
 
-## **WITH** support for **capstone** disassembly
+## **WITH** support for **lzfse** compression and **capstone** disassembly
 
 #### Dependancies:
 
+- [lzfse](https://github.com/lzfse/lzfse)
 - [capstone](https://github.com/aquynh/capstone/tree/next)
 
 ### Install the dependancies
@@ -21,6 +22,17 @@ $ brew install capstone --HEAD
 ```
 
 From source
+
+- [lzfse](https://github.com/lzfse/lzfse)
+
+```bash
+$ git clone https://github.com/lzfse/lzfse.git
+$ cd lzfse
+$ mkdir build
+$ cd build
+$ cmake ..
+$ make install
+```
 
 - [capstone](https://github.com/aquynh/capstone/tree/next)
 

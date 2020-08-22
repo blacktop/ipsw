@@ -6,6 +6,8 @@ weight: 7
 summary: Combine extract commands together.
 ---
 
+## ⚠️ _(not supported on Windows)_
+
 ### Extract _kernelcache_ from a previously downloaded _ipsw_
 
 ```bash

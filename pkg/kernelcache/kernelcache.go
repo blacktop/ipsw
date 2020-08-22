@@ -1,3 +1,5 @@
+// +build !windows,cgo
+
 package kernelcache
 
 import (
@@ -12,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/aixiansheng/lzfse"
 	"github.com/apex/log"
+	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -37,34 +39,13 @@ type CompressedCache struct {
 	Data   []byte
 }
 
-type PrelinkInfo struct {
-	PrelinkInfoDictionary []CFBundle `plist:"_PrelinkInfoDictionary,omitempty"`
-}
-
-type CFBundle struct {
-	Name                  string `plist:"CFBundleName,omitempty"`
-	ID                    string `plist:"CFBundleIdentifier,omitempty"`
-	InfoDictionaryVersion string `plist:"CFBundleInfoDictionaryVersion,omitempty"`
-	CompatibleVersion     string `plist:"OSBundleCompatibleVersion,omitempty"`
-	Version               string `plist:"CFBundleVersion,omitempty"`
-	Required              string `plist:"OSBundleRequired,omitempty"`
-	Executable            string `plist:"CFBundleExecutable,omitempty"`
-	OSKernelResource      bool   `plist:"OSKernelResource,omitempty"`
-	GetInfoString         string `plist:"CFBundleGetInfoString,omitempty"`
-	AllowUserLoad         bool   `plist:"OSBundleAllowUserLoad,omitempty"`
-	Signature             string `plist:"CFBundleSignature,omitempty"`
-	PackageType           string `plist:"CFBundlePackageType,omitempty"`
-	DevelopmentRegion     string `plist:"CFBundleDevelopmentRegion,omitempty"`
-	ShortVersionString    string `plist:"CFBundleShortVersionString,omitempty"`
-	ExecutableLoadAddr    uint64 `plist:"_PrelinkExecutableLoadAddr,omitempty"`
-}
-
 // ParseImg4Data parses a img4 data containing a compressed kernelcache.
 func ParseImg4Data(data []byte) (*CompressedCache, error) {
 	utils.Indent(log.Info, 2)("Parsing Kernelcache IMG4")
 
 	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10 | less (to get offset)
 	//       openssl asn1parse -i -inform DER -in kernelcache.iphone10 -strparse OFFSET -noout -out lzfse.bin
+
 	var i Img4
 	if _, err := asn1.Unmarshal(data, &i); err != nil {
 		return nil, errors.Wrap(err, "failed to ASN.1 parse Kernelcache")
@@ -164,17 +145,17 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
 		utils.Indent(log.Info, 2)("Kernelcache is LZFSE compressed")
 
-		lr := lzfse.NewReader(bytes.NewReader(cc.Data))
-		buf := new(bytes.Buffer)
+		dat := lzfse.DecodeBuffer(cc.Data)
+		// buf := new(bytes.Buffer)
 
-		_, err := buf.ReadFrom(lr)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to lzfse decompress kernelcache")
-		}
+		// _, err := buf.ReadFrom(lr)
+		// if err != nil {
+		// 	return nil, errors.Wrap(err, "failed to lzfse decompress kernelcache")
+		// }
 
-		fat, err := macho.NewFatFile(bytes.NewReader(buf.Bytes()))
+		fat, err := macho.NewFatFile(bytes.NewReader(dat))
 		if errors.Is(err, macho.ErrNotFat) {
-			return buf.Bytes(), nil
+			return dat, nil
 		}
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to parse fat mach-o")
@@ -187,7 +168,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		}
 
 		// Essentially: lipo -thin arm64e
-		return buf.Bytes()[fat.Arches[0].Offset:], nil
+		return dat[fat.Arches[0].Offset:], nil
 
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
 		utils.Indent(log.Debug, 1)("kernelcache is LZSS compressed")

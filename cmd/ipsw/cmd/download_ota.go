@@ -31,7 +31,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -41,7 +40,7 @@ func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
 	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
-	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
+	// otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
 
 // otaDLCmd represents the ota download command
@@ -63,7 +62,7 @@ var otaDLCmd = &cobra.Command{
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
-		remoteKernel, _ := cmd.Flags().GetBool("kernel")
+		// remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
 		var otas []download.OtaAsset
 		var filteredOtas []download.OtaAsset
@@ -115,7 +114,8 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		if cont {
-			if remoteDyld || remoteKernel {
+			if remoteDyld {
+				// if remoteDyld || remoteKernel {
 				for _, o := range otas {
 					log.WithFields(log.Fields{
 						"device":  o.SupportedDevices[0],
@@ -136,13 +136,13 @@ var otaDLCmd = &cobra.Command{
 							return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
 						}
 					}
-					if remoteKernel {
-						log.Info("Extracting remote kernelcache")
-						err = kernelcache.RemoteParse(zr)
-						if err != nil {
-							return errors.Wrap(err, "failed to download kernelcache from remote ota")
-						}
-					}
+					// if remoteKernel {
+					// 	log.Info("Extracting remote kernelcache")
+					// 	err = kernelcache.RemoteParse(zr)
+					// 	if err != nil {
+					// 		return errors.Wrap(err, "failed to download kernelcache from remote ota")
+					// 	}
+					// }
 				}
 			} else {
 				downloader := download.NewDownload(proxy, insecure)
