@@ -1,3 +1,5 @@
+// +build !windows,cgo
+
 /*
 Copyright © 2020 blacktop
 
@@ -29,8 +31,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aixiansheng/lzfse"
 	"github.com/apex/log"
+	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -87,19 +89,20 @@ var ibootCmd = &cobra.Command{
 				break
 			}
 
-			lr := lzfse.NewReader(bytes.NewReader(dat[firstStartMatch : firstEndMatch+4]))
-			buf := new(bytes.Buffer)
+			decData := lzfse.DecodeBuffer(dat[firstStartMatch : firstEndMatch+4])
+			// lr := bytes.NewReader(dat[firstStartMatch : firstEndMatch+4])
+			// buf := new(bytes.Buffer)
 
-			_, err := buf.ReadFrom(lr)
-			if err != nil {
-				return errors.Wrap(err, "failed to lzfse decompress embedded firmware")
-			}
+			// _, err := buf.ReadFrom(lr)
+			// if err != nil {
+			// 	return errors.Wrap(err, "failed to lzfse decompress embedded firmware")
+			// }
 
-			matches := utils.GrepStrings(buf.Bytes(), "AppleSMCFirmware")
+			matches := utils.GrepStrings(decData, "AppleSMCFirmware")
 			if len(matches) > 0 {
 				name = strings.TrimPrefix(matches[0], "@@") + ".bin"
 			} else {
-				matches = utils.GrepStrings(buf.Bytes(), "AppleStorageProcessorANS2")
+				matches = utils.GrepStrings(decData, "AppleStorageProcessorANS2")
 				if len(matches) > 0 {
 					name = matches[0] + ".bin"
 				} else {
@@ -108,7 +111,7 @@ var ibootCmd = &cobra.Command{
 			}
 
 			utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", name))
-			ioutil.WriteFile(name, buf.Bytes(), 0644)
+			ioutil.WriteFile(name, decData, 0644)
 			if err != nil {
 				return errors.Wrapf(err, "unabled to write file: %s", name)
 			}

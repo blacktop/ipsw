@@ -36,7 +36,7 @@ import (
 func init() {
 	img4Cmd.AddCommand(img4ExtractCmd)
 
-	extractCmd.MarkZshCompPositionalArgumentFile(1)
+	img4ExtractCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // img4ExtractCmd represents the extract command
