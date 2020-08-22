@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
-	"github.com/blacktop/go-plist"
 )
 
 const iTunesVersionURL = "https://itunes.apple.com/WebObjects/MZStore.woa/wa/com.apple.jingle.appserver.client.MZITunesClientCheck/version/"
@@ -264,6 +264,31 @@ func (vm *ITunesVersionMaster) GetLatestSoftwareURLs() ([]string, error) {
 	}
 
 	return utils.Unique(urls), nil
+}
+
+// GetLatestVersion gets the latest iOS version
+func (vm *ITunesVersionMaster) GetLatestVersion() (string, error) {
+	var versionsRaw []string
+
+	for _, build := range vm.GetBuilds() {
+		versionsRaw = append(versionsRaw, build.ProductVersion)
+	}
+
+	versions := make([]*version.Version, len(versionsRaw))
+
+	for i, raw := range versionsRaw {
+		v, err := version.NewVersion(raw)
+		if err != nil {
+			return "", err
+		}
+
+		versions[i] = v
+	}
+
+	sort.Sort(version.Collection(versions))
+	newestVersion := versions[len(versions)-1]
+
+	return newestVersion.String(), nil
 }
 
 // GetSoftwareURLsForBuildID gets all the ipsw URLs for an iOS Build ID

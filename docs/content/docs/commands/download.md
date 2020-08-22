@@ -111,6 +111,14 @@ $ ipsw download -V latest --yes --white-list ipod
   ...
 ```
 
+- To just output the latest iOS version
+
+```bash
+$ ipsw download latest --info
+
+13.6.1
+```
+
 ## **download kernel**
 
 > Queries the [ipsw.me](https://ipsw.me) API
