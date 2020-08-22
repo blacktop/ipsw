@@ -183,9 +183,10 @@
           
 <h1 class="title">Build</h1>
 <div class="content ">
-  <h2 id="with-support-for-capstone-disassembly"><strong>WITH</strong> support for <strong>capstone</strong> disassembly</h2>
+  <h2 id="with-support-for-lzfse-compression-and-capstone-disassembly"><strong>WITH</strong> support for <strong>lzfse</strong> compression and <strong>capstone</strong> disassembly</h2>
 <h4 id="dependancies">Dependancies:</h4>
 <ul>
+<li><a href="https://github.com/lzfse/lzfse">lzfse</a></li>
 <li><a href="https://github.com/aquynh/capstone/tree/next">capstone</a></li>
 </ul>
 <h3 id="install-the-dependancies">Install the dependancies</h3>
@@ -193,6 +194,15 @@
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ brew install capstone --HEAD
 </code></pre></div><p>From source</p>
 <ul>
+<li><a href="https://github.com/lzfse/lzfse">lzfse</a></li>
+</ul>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/lzfse/lzfse.git
+$ <span class="nb">cd</span> lzfse
+$ mkdir build
+$ <span class="nb">cd</span> build
+$ cmake ..
+$ make install
+</code></pre></div><ul>
 <li><a href="https://github.com/aquynh/capstone/tree/next">capstone</a></li>
 </ul>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone -b next https://github.com/aquynh/capstone.git
