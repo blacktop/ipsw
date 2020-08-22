@@ -33,7 +33,7 @@ jobs:
           mkdir build
           cd build
           cmake ..
-          make install
+          sudo make install
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
