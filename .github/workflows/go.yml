@@ -89,7 +89,7 @@ jobs:
 
       - id: get-latest
         run: |
-          echo ::set-output name=version::$(build/dist/ipsw download latest --info)
+          echo ::set-output name=version::$(LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download latest --info)
 
       - name: Run Extract Remote Kernelcache
         if: matrix.platform == 'ubuntu-latest'
