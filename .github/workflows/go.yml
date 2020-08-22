@@ -27,6 +27,13 @@ jobs:
           cd capstone
           CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh
           sudo ./make.sh install
+          cd /tmp          
+          git clone https://github.com/lzfse/lzfse.git
+          cd lzfse
+          mkdir build
+          cd build
+          cmake ..
+          make install
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
