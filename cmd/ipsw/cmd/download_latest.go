@@ -38,7 +38,7 @@ import (
 func init() {
 	downloadCmd.AddCommand(latestCmd)
 
-	// latestCmd.Flags().BoolP("yes", "y", false, "do not prompt user")
+	latestCmd.Flags().BoolP("info", "i", false, "Show latest iOS version")
 }
 
 // latestCmd represents the latest command
@@ -60,6 +60,7 @@ var latestCmd = &cobra.Command{
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 		//build, _ := cmd.Flags().GetString("build")
+		iosInfo, _ := cmd.Flags().GetBool("info")
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -68,6 +69,15 @@ var latestCmd = &cobra.Command{
 		itunes, err := download.NewiTunesVersionMaster()
 		if err != nil {
 			return errors.Wrap(err, "failed to create itunes API")
+		}
+
+		if iosInfo {
+			latestVersion, err := itunes.GetLatestVersion()
+			if err != nil {
+				return errors.Wrap(err, "failed to get latest iOS version")
+			}
+			fmt.Print(latestVersion)
+			return nil
 		}
 
 		builds, err = itunes.GetLatestBuilds(device)
