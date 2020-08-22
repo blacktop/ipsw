@@ -88,6 +88,7 @@ jobs:
         run: D:\a\ipsw\ipsw\build\dist\ipsw.exe device-list
 
       - id: get-latest
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
         run: |
           echo ::set-output name=version::$(LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download latest --info)
 
