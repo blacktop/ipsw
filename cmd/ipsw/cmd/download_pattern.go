@@ -27,7 +27,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -55,147 +54,56 @@ var patternCmd = &cobra.Command{
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 
-		// filters
-		doDownload, _ := cmd.Flags().GetStringSlice("white-list")
-		doNotDownload, _ := cmd.Flags().GetStringSlice("black-list")
-		version, _ := cmd.Flags().GetString("version")
-		device, _ := cmd.Flags().GetString("device")
-		build, _ := cmd.Flags().GetString("build")
-
-		if len(version) > 0 && len(build) > 0 {
-			log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		ipsws, err := filterIPSWs(cmd)
+		if err != nil {
+			log.Fatal(err.Error())
 		}
 
-		if len(version) > 0 {
-			ipsws, err := download.GetAllIPSW(version)
+		log.Debug("URLs to Download:")
+		for _, i := range ipsws {
+			utils.Indent(log.Debug, 2)(i.URL)
+		}
+
+		for _, i := range ipsws {
+
+			log.WithFields(log.Fields{
+				"device":  i.Identifier,
+				"build":   i.BuildID,
+				"version": i.Version,
+				"signed":  i.Signed,
+			}).Infof("Getting files that contain: %s", args[0])
+
+			zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+				Proxy:    proxy,
+				Insecure: insecure,
+			})
 			if err != nil {
-				return errors.Wrap(err, "failed to query ipsw.me api")
+				return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
+			}
+			ipsw, err := info.ParseZipFiles(zr.File)
+			if err != nil {
+				return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 			}
 
-			urls := []string{}
-			for _, i := range ipsws {
-				if len(device) > 0 {
-					if strings.EqualFold(device, i.Identifier) {
-						urls = append(urls, i.URL)
+			for _, f := range zr.File {
+				folder := ipsw.GetFolderForFile(path.Base(f.Name))
+				os.Mkdir(folder, os.ModePerm)
+				if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
+					data := make([]byte, f.UncompressedSize64)
+					rc, _ := f.Open()
+					io.ReadFull(rc, data)
+					rc.Close()
+
+					err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
+					if err != nil {
+						return errors.Wrapf(err, "failed to write %s", f.Name)
 					}
 				} else {
-					if len(doDownload) > 0 {
-						if utils.StrSliceContains(doDownload, i.Identifier) {
-							urls = append(urls, i.URL)
-						}
-					} else if len(doNotDownload) > 0 {
-						if !utils.StrSliceContains(doNotDownload, i.Identifier) {
-							urls = append(urls, i.URL)
-						}
-					} else {
-						urls = append(urls, i.URL)
-					}
+					log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
 				}
 			}
-			urls = utils.Unique(urls)
-
-			log.Debug("URLs to Download:")
-			for _, u := range urls {
-				utils.Indent(log.Debug, 2)(u)
-			}
-
-			for _, u := range urls {
-				// get a handle to ipsw object
-				i, err := LookupByURL(ipsws, u)
-				if err != nil {
-					return errors.Wrap(err, "failed to get ipsw from download url")
-				}
-
-				log.WithFields(log.Fields{
-					"device":  i.Identifier,
-					"build":   i.BuildID,
-					"version": i.Version,
-					"signed":  i.Signed,
-				}).Infof("Getting files that contain: %s", args[0])
-
-				zr, err := download.NewRemoteZipReader(u, &download.RemoteConfig{
-					Proxy:    proxy,
-					Insecure: insecure,
-				})
-				if err != nil {
-					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
-				}
-				ipsw, err := info.ParseZipFiles(zr.File)
-				if err != nil {
-					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
-				}
-
-				for _, f := range zr.File {
-					if strings.Contains(f.Name, args[0]) {
-						folder := ipsw.GetFolderForFile(path.Base(f.Name))
-						os.Mkdir(folder, os.ModePerm)
-						if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
-							data := make([]byte, f.UncompressedSize64)
-							rc, err := f.Open()
-							if err != nil {
-								return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-							}
-							io.ReadFull(rc, data)
-							rc.Close()
-
-							err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
-							if err != nil {
-								return errors.Wrapf(err, "failed to write %s", f.Name)
-							}
-						} else {
-							log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
-						}
-					}
-				}
-			}
-
-		} else if len(device) > 0 || len(build) > 0 {
-			if len(device) > 0 && len(build) > 0 {
-				i, err := download.GetIPSW(device, build)
-				if err != nil {
-					return errors.Wrap(err, "failed to query ipsw.me api")
-				}
-
-				log.WithFields(log.Fields{
-					"device":  i.Identifier,
-					"build":   i.BuildID,
-					"version": i.Version,
-					"signed":  i.Signed,
-				}).Infof("Getting files that contain: %s", args[0])
-
-				zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
-					Proxy:    proxy,
-					Insecure: insecure,
-				})
-				if err != nil {
-					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
-				}
-				ipsw, err := info.ParseZipFiles(zr.File)
-				if err != nil {
-					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
-				}
-
-				for _, f := range zr.File {
-					folder := ipsw.GetFolderForFile(path.Base(f.Name))
-					os.Mkdir(folder, os.ModePerm)
-					if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
-						data := make([]byte, f.UncompressedSize64)
-						rc, _ := f.Open()
-						io.ReadFull(rc, data)
-						rc.Close()
-
-						err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
-						if err != nil {
-							return errors.Wrapf(err, "failed to write %s", f.Name)
-						}
-					} else {
-						log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
-					}
-				}
-			}
-		} else {
-			log.Fatal("you must supply a --device AND a --build")
 		}
+
 		return nil
 	},
 }

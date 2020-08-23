@@ -24,6 +24,9 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"math/rand"
+	"time"
+
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -36,19 +39,25 @@ func init() {
 	downloadCmd.AddCommand(downloadKernelCmd)
 }
 
-func downloadRemoteKernelcache(url, proxy string, insecure bool) error {
+type stop struct {
+	error
+}
 
-	zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
-		Proxy:    proxy,
-		Insecure: insecure,
-	})
-	if err != nil {
-		return errors.Wrap(err, "failed to create remote zip reader of ipsw")
-	}
+func retry(attempts int, sleep time.Duration, f func() error) error {
+	if err := f(); err != nil {
+		if s, ok := err.(stop); ok {
+			// Return the original error for later checking
+			return s.error
+		}
 
-	err = kernelcache.RemoteParse(zr)
-	if err != nil {
-		return errors.Wrap(err, "failed to download kernelcache from remote ipsw")
+		if attempts--; attempts > 0 {
+			jitter := time.Duration(rand.Int63n(int64(sleep)))
+			sleep = sleep + jitter/2
+
+			time.Sleep(sleep)
+			return retry(attempts, 2*sleep, f)
+		}
+		return err
 	}
 
 	return nil
@@ -86,7 +95,25 @@ var downloadKernelCmd = &cobra.Command{
 				"signed":  i.Signed,
 			}).Info("Getting Kernelcache")
 
-			err = downloadRemoteKernelcache(i.URL, proxy, insecure)
+			err = retry(3, 3*time.Second, func() error {
+				zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+					Proxy:    proxy,
+					Insecure: insecure,
+				})
+				if err != nil {
+					return errors.Wrap(err, "failed to create remote zip reader of ipsw")
+				}
+
+				err = kernelcache.RemoteParse(zr)
+				if err != nil {
+					return errors.Wrap(err, "failed to download kernelcache from remote ipsw")
+				}
+
+				return nil
+			})
+			if err != nil {
+				return err
+			}
 		}
 
 		return nil
