@@ -1,6 +1,7 @@
 package download
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -128,6 +129,10 @@ func ScrapeURLs(build string) (map[string]BetaIPSW, error) {
 	}
 
 	c.Wait()
+
+	if len(ipsws) == 0 {
+		return nil, fmt.Errorf("no ipsws found for build %s", build)
+	}
 
 	return ipsws, nil
 }

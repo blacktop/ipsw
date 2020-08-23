@@ -24,8 +24,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -116,12 +114,7 @@ var latestCmd = &cobra.Command{
 		if cont {
 			downloader := download.NewDownload(proxy, insecure)
 			for _, build := range filteredBuilds {
-				var destName string
-				if removeCommas {
-					destName = strings.Replace(path.Base(build.FirmwareURL), ",", "_", -1)
-				} else {
-					destName = path.Base(build.FirmwareURL)
-				}
+				destName := getDestName(build.FirmwareURL, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
 						"device":  build.Identifier,
@@ -131,7 +124,7 @@ var latestCmd = &cobra.Command{
 					// download file
 					downloader.URL = build.FirmwareURL
 					downloader.Sha1 = build.FirmwareSHA1
-					downloader.RemoveCommas = removeCommas
+					downloader.DestName = destName
 					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")

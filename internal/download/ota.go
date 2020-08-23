@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"io/ioutil"
 	"net/http"
+	"strings"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -43,10 +44,15 @@ type Ota struct {
 	SigningKey  string     `plist:"SigningKey,omitempty"`
 }
 
-// NewOTA downloads and parses the itumes plist for iOS13 developer beta OTAs
-func NewOTA(proxy string, insecure bool) (*Ota, error) {
+// NewOTA downloads and parses the itumes plist for iOS13 or iOS14 developer beta OTAs
+func NewOTA(proxy string, insecure, ios13 bool) (*Ota, error) {
 
-	req, err := http.NewRequest("GET", iOS14OtaDevBetaURL, nil)
+	url := iOS14OtaDevBetaURL
+	if ios13 {
+		url = iOS13OtaDevBetaURL
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot create http request")
 	}
@@ -76,4 +82,40 @@ func NewOTA(proxy string, insecure bool) (*Ota, error) {
 	dec.Decode(&ota)
 
 	return &ota, nil
+}
+
+// GetOTAs returns a filtered list of OTA assets
+func (o *Ota) GetOTAs(device string, doDownload, doNotDownload []string) []OtaAsset {
+
+	var otas []OtaAsset
+	var filteredOtas []OtaAsset
+
+	for _, asset := range o.Assets {
+		if len(asset.ReleaseType) == 0 {
+			if len(device) > 0 {
+				if strings.EqualFold(device, asset.SupportedDevices[0]) {
+					otas = append(otas, asset)
+				}
+			} else {
+				otas = append(otas, asset)
+			}
+
+		}
+	}
+
+	for _, o := range otas {
+		if len(doDownload) > 0 {
+			if utils.StrSliceContains(doDownload, o.SupportedDevices[0]) {
+				filteredOtas = append(filteredOtas, o)
+			}
+		} else if len(doNotDownload) > 0 {
+			if !utils.StrSliceContains(doNotDownload, o.SupportedDevices[0]) {
+				filteredOtas = append(filteredOtas, o)
+			}
+		} else {
+			filteredOtas = append(filteredOtas, o)
+		}
+	}
+
+	return filteredOtas
 }

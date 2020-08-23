@@ -41,7 +41,7 @@ type CompressedCache struct {
 
 // ParseImg4Data parses a img4 data containing a compressed kernelcache.
 func ParseImg4Data(data []byte) (*CompressedCache, error) {
-	utils.Indent(log.Info, 2)("Parsing Kernelcache IMG4")
+	utils.Indent(log.Debug, 2)("Parsing Kernelcache IMG4")
 
 	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10 | less (to get offset)
 	//       openssl asn1parse -i -inform DER -in kernelcache.iphone10 -strparse OFFSET -noout -out lzfse.bin
@@ -67,7 +67,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 
 // Extract extracts and decompresses a lernelcache from ipsw
 func Extract(ipsw string) error {
-	log.Info("Extracting Kernelcache from IPSW")
+	log.Debug("Extracting Kernelcache from IPSW")
 	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
 		if strings.Contains(f.Name, "kernelcache") {
 			return true
@@ -124,7 +124,7 @@ func Decompress(kcache string) error {
 	}
 	// defer os.Remove(kcache)
 
-	utils.Indent(log.Info, 2)("Decompressing Kernelcache")
+	utils.Indent(log.Debug, 2)("Decompressing Kernelcache")
 	dec, err := DecompressData(kc)
 	if err != nil {
 		return errors.Wrap(err, "failed to decompress kernelcache")
@@ -140,10 +140,10 @@ func Decompress(kcache string) error {
 
 // DecompressData decompresses compressed kernelcache []byte data
 func DecompressData(cc *CompressedCache) ([]byte, error) {
-	utils.Indent(log.Info, 2)("Decompressing Kernelcache")
+	utils.Indent(log.Debug, 2)("Decompressing Kernelcache")
 
 	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
-		utils.Indent(log.Info, 2)("Kernelcache is LZFSE compressed")
+		utils.Indent(log.Debug, 2)("Kernelcache is LZFSE compressed")
 
 		dat := lzfse.DecodeBuffer(cc.Data)
 		// buf := new(bytes.Buffer)

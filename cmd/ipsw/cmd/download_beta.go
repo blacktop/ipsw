@@ -24,8 +24,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -42,7 +40,7 @@ func init() {
 // betaCmd represents the beta command
 var betaCmd = &cobra.Command{
 	Use:   "beta [build-id]",
-	Short: "Download beta IPSWs from the iphone wiki",
+	Short: "Download beta IPSWs from theiphonewiki.com",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var filteredURLS []string
@@ -58,12 +56,7 @@ var betaCmd = &cobra.Command{
 
 		ipsws, err := download.ScrapeURLs(args[0])
 		if err != nil {
-			return errors.Wrap(err, "failed to query www.theiphonewiki.com")
-		}
-
-		if len(ipsws) < 1 {
-			log.Errorf("no ipsws found for build %s", args[0])
-			return nil
+			return errors.Wrap(err, "failed querying theiphonewiki.com")
 		}
 
 		for url, ipsw := range ipsws {
@@ -98,12 +91,7 @@ var betaCmd = &cobra.Command{
 		if cont {
 			downloader := download.NewDownload(proxy, insecure)
 			for _, url := range filteredURLS {
-				var destName string
-				if removeCommas {
-					destName = strings.Replace(path.Base(url), ",", "_", -1)
-				} else {
-					destName = path.Base(url)
-				}
+				destName := getDestName(url, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
 					log.WithFields(log.Fields{
 						"devices": ipsws[url].Devices,
@@ -112,7 +100,8 @@ var betaCmd = &cobra.Command{
 					}).Info("Getting IPSW")
 					// download file
 					downloader.URL = url
-					downloader.RemoveCommas = removeCommas
+					downloader.DestName = destName
+
 					err = downloader.Do()
 					if err != nil {
 						return errors.Wrap(err, "failed to download file")

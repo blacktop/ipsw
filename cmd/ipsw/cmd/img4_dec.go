@@ -108,7 +108,7 @@ var decImg4Cmd = &cobra.Command{
 		}
 
 		if bytes.Contains(i.Data[:4], []byte("bvx2")) {
-			utils.Indent(log.Info, 2)("Detected LZFSE compression")
+			utils.Indent(log.Debug, 2)("Detected LZFSE compression")
 			r = bytes.NewReader(lzfse.DecodeBuffer(i.Data))
 		} else {
 			r = bytes.NewReader(i.Data)

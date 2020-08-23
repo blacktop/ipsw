@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"path"
-	"strings"
 	"time"
 
 	// "github.com/gofrs/flock"
@@ -25,9 +23,9 @@ import (
 
 // Download is a downloader object
 type Download struct {
-	URL          string
-	Sha1         string
-	RemoveCommas bool
+	URL      string
+	Sha1     string
+	DestName string
 
 	size         int64
 	bytesResumed int64
@@ -101,20 +99,8 @@ func (d *Download) Do() error {
 	}
 	req.Header.Add("User-Agent", utils.RandomAgent())
 
-	// check for a completed download
-	var destName string
-	if d.RemoveCommas {
-		destName = strings.Replace(path.Base(d.URL), ",", "_", -1)
-	} else {
-		destName = path.Base(d.URL)
-	}
-	if _, err := os.Stat(destName); !os.IsNotExist(err) {
-		utils.Indent(log.Warn, 2)(fmt.Sprintf("ipsw already exists: %s", destName))
-		return nil
-	}
-
 	if d.canResume {
-		if f, err := os.Stat(destName + ".download"); !os.IsNotExist(err) {
+		if f, err := os.Stat(d.DestName + ".download"); !os.IsNotExist(err) {
 
 			// don't try to download files being downloaded elsewhere
 			if d.skipAll {
@@ -123,7 +109,7 @@ func (d *Download) Do() error {
 
 			choice := ""
 			prompt := &survey.Select{
-				Message: fmt.Sprintf("Previous download of %s can be resumed:", destName),
+				Message: fmt.Sprintf("Previous download of %s can be resumed:", d.DestName),
 				Options: []string{"resume", "skip", "skip all", "restart"},
 			}
 			survey.AskOne(prompt, &choice)
@@ -132,10 +118,10 @@ func (d *Download) Do() error {
 			case "resume":
 				d.resume = true
 			case "restart":
-				log.Infof("Downloading %s - RESTARTED", destName+".download")
+				log.Infof("Downloading %s - RESTARTED", d.DestName+".download")
 				d.resume = false
 			case "skip":
-				log.Infof("%s - SKIPPED", destName+".download")
+				log.Infof("%s - SKIPPED", d.DestName+".download")
 				d.resume = false
 				return nil
 			case "skip all":
@@ -154,7 +140,7 @@ func (d *Download) Do() error {
 		}
 	}
 
-	utils.Indent(log.WithField("file", destName).Debug, 2)("Downloading")
+	utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Downloading")
 	resp, err := d.client.Do(req)
 	if err != nil {
 		return err
@@ -165,31 +151,31 @@ func (d *Download) Do() error {
 		return fmt.Errorf("server return status: %s", resp.Status)
 	}
 
-	// fileLock := flock.New(destName + ".download")
+	// fileLock := flock.New(d.DestName + ".download")
 	// defer fileLock.Unlock()
 
 	// locked, err := fileLock.TryLock()
 	// if err != nil {
-	// 	return errors.Wrapf(err, "unable to lock %s", destName+".download")
+	// 	return errors.Wrapf(err, "unable to lock %s", d.DestName+".download")
 	// }
 
 	// if !locked {
-	// 	log.Errorf("%s is being downloaded by another instance", destName+".download")
+	// 	log.Errorf("%s is being downloaded by another instance", d.DestName+".download")
 	// 	return nil
 	// }
 
 	var dest *os.File
 	if d.resume {
-		utils.Indent(log.WithField("file", destName).Warn, 2)("Resuming a previous download")
-		dest, err = os.OpenFile(destName+".download", os.O_APPEND|os.O_WRONLY, 0644)
+		utils.Indent(log.WithField("file", d.DestName).Warn, 2)("Resuming a previous download")
+		dest, err = os.OpenFile(d.DestName+".download", os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
-			return errors.Wrapf(err, "cannot create %s", destName)
+			return errors.Wrapf(err, "cannot create %s", d.DestName)
 		}
 		dest.Seek(0, os.SEEK_END)
 	} else {
-		dest, err = os.Create(destName + ".download")
+		dest, err = os.Create(d.DestName + ".download")
 		if err != nil {
-			return errors.Wrapf(err, "cannot create %s", destName)
+			return errors.Wrapf(err, "cannot create %s", d.DestName)
 		}
 	}
 
@@ -233,12 +219,12 @@ func (d *Download) Do() error {
 
 		if len(d.Sha1) > 0 {
 			utils.Indent(log.Info, 2)("verifying sha1sum...")
-			if ok, _ := utils.Verify(d.Sha1, destName+".download"); !ok {
+			if ok, _ := utils.Verify(d.Sha1, d.DestName+".download"); !ok {
 				// fileLock.Unlock()
-				if err := os.Remove(destName + ".download"); err != nil {
+				if err := os.Remove(d.DestName + ".download"); err != nil {
 					return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 				}
-				return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", destName+".download")
+				return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", d.DestName+".download")
 			}
 		}
 
@@ -266,14 +252,14 @@ func (d *Download) Do() error {
 					"actual":   fmt.Sprintf("%x", h.Sum(nil)),
 				}).Error, 3)("❌ BAD CHECKSUM")
 				// fileLock.Unlock()
-				if err := os.Remove(destName); err != nil {
+				if err := os.Remove(d.DestName); err != nil {
 					return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
 				}
 			}
 		}
 	}
 
-	err = os.Rename(destName+".download", destName)
+	err = os.Rename(d.DestName+".download", d.DestName)
 	if err != nil {
 		return errors.Wrap(err, "failed to remove .download from completed download")
 	}
