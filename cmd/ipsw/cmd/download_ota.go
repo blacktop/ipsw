@@ -31,7 +31,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +38,8 @@ import (
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
-	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
+	otaDLCmd.Flags().BoolP("ios13", "", false, "Download iOS 13.x OTAs (defaults to iOS14)")
+	// otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
 	// otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
 
@@ -61,43 +61,17 @@ var otaDLCmd = &cobra.Command{
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
-		remoteDyld, _ := cmd.Flags().GetBool("dyld")
+		ios13, _ := cmd.Flags().GetBool("ios13")
+
+		// remoteDyld, _ := cmd.Flags().GetBool("dyld")
 		// remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
-		var otas []download.OtaAsset
-		var filteredOtas []download.OtaAsset
-
-		otaXML, err := download.NewOTA(proxy, insecure)
+		otaXML, err := download.NewOTA(proxy, insecure, ios13)
 		if err != nil {
 			return errors.Wrap(err, "failed to create itunes API")
 		}
 
-		for _, asset := range otaXML.Assets {
-			if len(asset.ReleaseType) == 0 {
-				if len(device) > 0 {
-					if strings.EqualFold(device, asset.SupportedDevices[0]) {
-						otas = append(otas, asset)
-					}
-				} else {
-					otas = append(otas, asset)
-				}
-
-			}
-		}
-
-		for _, o := range otas {
-			if len(doDownload) > 0 {
-				if utils.StrSliceContains(doDownload, o.SupportedDevices[0]) {
-					filteredOtas = append(filteredOtas, o)
-				}
-			} else if len(doNotDownload) > 0 {
-				if !utils.StrSliceContains(doNotDownload, o.SupportedDevices[0]) {
-					filteredOtas = append(filteredOtas, o)
-				}
-			} else {
-				filteredOtas = append(filteredOtas, o)
-			}
-		}
+		otas := otaXML.GetOTAs(device, doDownload, doNotDownload)
 
 		log.Debug("URLs to Download:")
 		for _, o := range otas {
@@ -108,65 +82,69 @@ var otaDLCmd = &cobra.Command{
 		if !skip {
 			cont = false
 			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(otas)),
+				Message: fmt.Sprintf("You are about to download %d OTA files. Continue?", len(otas)),
 			}
 			survey.AskOne(prompt, &cont)
 		}
 
 		if cont {
-			if remoteDyld {
-				// if remoteDyld || remoteKernel {
-				for _, o := range otas {
+			// TODO: Add this back in once you figure out the 🆕 OTA format
+
+			// if remoteDyld {
+			// 	// if remoteDyld || remoteKernel {
+			// 	for _, o := range otas {
+			// 		log.WithFields(log.Fields{
+			// 			"device":  o.SupportedDevices[0],
+			// 			"build":   o.Build,
+			// 			"version": o.DocumentationID,
+			// 		}).Info("Parsing remote OTA")
+			// 		zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
+			// 			Proxy:    proxy,
+			// 			Insecure: insecure,
+			// 		})
+			// 		if err != nil {
+			// 			return errors.Wrap(err, "failed to open remote zip to OTA")
+			// 		}
+			// 		if remoteDyld {
+			// 			log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
+			// 			err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
+			// 			if err != nil {
+			// 				return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
+			// 			}
+			// 		}
+			// 		// if remoteKernel {
+			// 		// 	log.Info("Extracting remote kernelcache")
+			// 		// 	err = kernelcache.RemoteParse(zr)
+			// 		// 	if err != nil {
+			// 		// 		return errors.Wrap(err, "failed to download kernelcache from remote ota")
+			// 		// 	}
+			// 		// }
+			// 	}
+			// } else {
+
+			downloader := download.NewDownload(proxy, insecure)
+			for _, o := range otas {
+				url := o.BaseURL + o.RelativePath
+				destName := strings.Replace(path.Base(url), ",", "_", -1)
+				if _, err := os.Stat(destName); os.IsNotExist(err) {
+
 					log.WithFields(log.Fields{
 						"device":  o.SupportedDevices[0],
 						"build":   o.Build,
 						"version": o.DocumentationID,
-					}).Info("Parsing remote OTA")
-					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
+					}).Info("Getting OTA")
+					// download file
+					downloader.URL = url
+					err = downloader.Do()
 					if err != nil {
-						return errors.Wrap(err, "failed to open remote zip to OTA")
+						return errors.Wrap(err, "failed to download file")
 					}
-					if remoteDyld {
-						log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
-						err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
-						if err != nil {
-							return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
-						}
-					}
-					// if remoteKernel {
-					// 	log.Info("Extracting remote kernelcache")
-					// 	err = kernelcache.RemoteParse(zr)
-					// 	if err != nil {
-					// 		return errors.Wrap(err, "failed to download kernelcache from remote ota")
-					// 	}
-					// }
-				}
-			} else {
-				downloader := download.NewDownload(proxy, insecure)
-				for _, o := range otas {
-					url := o.BaseURL + o.RelativePath
-					destName := strings.Replace(path.Base(url), ",", "_", -1)
-					if _, err := os.Stat(destName); os.IsNotExist(err) {
-
-						log.WithFields(log.Fields{
-							"device":  o.SupportedDevices[0],
-							"build":   o.Build,
-							"version": o.DocumentationID,
-						}).Info("Getting OTA")
-						// download file
-						downloader.URL = url
-						err = downloader.Do()
-						if err != nil {
-							return errors.Wrap(err, "failed to download file")
-						}
-					} else {
-						log.Warnf("ota already exists: %s", destName)
-					}
+				} else {
+					log.Warnf("ota already exists: %s", destName)
 				}
 			}
+
+			// }
 		}
 
 		return nil

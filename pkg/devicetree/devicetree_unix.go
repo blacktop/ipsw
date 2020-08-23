@@ -23,7 +23,7 @@ func ParseImg4Data(data []byte) (*DeviceTree, error) {
 
 	var r io.Reader
 	if bytes.Contains(i.Data[:4], []byte("bvx2")) {
-		utils.Indent(log.Info, 2)("DeviceTree is LZFSE compressed")
+		utils.Indent(log.Debug, 2)("DeviceTree is LZFSE compressed")
 		r = bytes.NewReader(lzfse.DecodeBuffer(i.Data))
 	} else {
 		r = bytes.NewReader(i.Data)

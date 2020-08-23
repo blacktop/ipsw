@@ -140,5 +140,44 @@ func GetIPSW(identifier, buildID string) (IPSW, error) {
 	return i, nil
 }
 
+// GetVersion returns the iOS version for a given build ID
+func GetVersion(buildID string) (string, error) {
+
+	devices, err := GetAllDevices()
+	if err != nil {
+		return "", fmt.Errorf("failed to get all devices from ipsw.me API: %v", err)
+	}
+
+	for i := len(devices) - 1; i >= 0; i-- {
+		var dev Device
+		res, err := http.Get(ipswMeAPI + "device/" + devices[i].Identifier)
+		if err != nil {
+			return "", err
+		}
+		if res.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("api returned status: %s", res.Status)
+		}
+
+		body, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return "", err
+		}
+		res.Body.Close()
+
+		err = json.Unmarshal(body, &dev)
+		if err != nil {
+			return "", err
+		}
+
+		for _, ipsw := range dev.Firmwares {
+			if ipsw.BuildID == buildID {
+				return ipsw.Version, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("build did not a version")
+}
+
 // https://api.ipsw.me/v4/releases
 // func GetReleases() []Release {}
