@@ -191,10 +191,16 @@ $ ipsw download beta 17C5046a
 
 ## **download ota**
 
-Download **beta** OTA _(over the air updates)_
+Download **iOS14.x beta** OTA _(over the air updates)_
 
 ```bash
 $ ipsw download ota --device iPhone12,3
+```
+
+Download **iOS13.x beta** OTA _(over the air updates)_
+
+```bash
+$ ipsw download ota --ios13 --device iPhone12,3
 ```
 
 Just download the _kernelcache_ and _dyld_shared_cache_
@@ -202,7 +208,7 @@ Just download the _kernelcache_ and _dyld_shared_cache_
 ⚠️ **NOTE:** this broke in iOS 14 _(the format has changed again)_
 
 ```bash
-$ ipsw download ota --device iPod9,1 --kernel --dyld
+$ ipsw download ota --ios13 --device iPod9,1 --kernel --dyld
 ? You are about to download 1 ipsw files. Continue? Yes
    • Parsing remote OTA        build=17F5054h device=iPod9,1 version=iOS135DevBeta3
    • Extracting remote dyld_shared_cache (can be a bit CPU intensive)
@@ -213,3 +219,5 @@ $ ipsw download ota --device iPod9,1 --kernel --dyld
       • Kernelcache is LZFSE compressed
       • Writing "iPod9,1_N112AP_17F5054h/kernelcache.beta"
 ```
+
+⚠️ **NOTE:** `--kernel` flag is temp removed until I get a working Go lzfse implimentation.

@@ -43,7 +43,7 @@ var betaCmd = &cobra.Command{
 	Short: "Download beta IPSWs from theiphonewiki.com",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var filteredURLS []string
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -59,6 +59,7 @@ var betaCmd = &cobra.Command{
 			return errors.Wrap(err, "failed querying theiphonewiki.com")
 		}
 
+		var filteredURLS []string
 		for url, ipsw := range ipsws {
 			if len(device) > 0 {
 				if utils.StrSliceContains(ipsw.Devices, device) {
