@@ -80,6 +80,7 @@ var patternCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 			}
+
 			ipsw, err := info.ParseZipFiles(zr.File)
 			if err != nil {
 				return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")

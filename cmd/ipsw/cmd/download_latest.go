@@ -44,6 +44,11 @@ var latestCmd = &cobra.Command{
 	Use:   "latest",
 	Short: "Download latest release version",
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+
 		var err error
 		var builds []download.Build
 		var filteredBuilds []download.Build
@@ -52,17 +57,13 @@ var latestCmd = &cobra.Command{
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		skip, _ := cmd.Flags().GetBool("yes")
 		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
+
 		// filters
-		//version, _ := cmd.Flags().GetString("version")
 		device, _ := cmd.Flags().GetString("device")
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
-		//build, _ := cmd.Flags().GetString("build")
-		iosInfo, _ := cmd.Flags().GetBool("info")
 
-		if Verbose {
-			log.SetLevel(log.DebugLevel)
-		}
+		iosInfo, _ := cmd.Flags().GetBool("info")
 
 		itunes, err := download.NewiTunesVersionMaster()
 		if err != nil {
