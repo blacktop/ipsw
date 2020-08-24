@@ -33,10 +33,13 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 func init() {
 	downloadCmd.AddCommand(downloadKernelCmd)
+
+	downloadKernelCmd.Flags().BoolP("spec", "", false, "Download kernels into spec folders")
 }
 
 type stop struct {
@@ -76,6 +79,8 @@ var downloadKernelCmd = &cobra.Command{
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 
+		specFolders, _ := cmd.Flags().GetBool("spec")
+
 		ipsws, err := filterIPSWs(cmd)
 		if err != nil {
 			log.Fatal(err.Error())
@@ -86,8 +91,9 @@ var downloadKernelCmd = &cobra.Command{
 			utils.Indent(log.Debug, 2)(i.URL)
 		}
 
-		for _, i := range ipsws {
+		g := new(errgroup.Group)
 
+		for _, i := range ipsws {
 			log.WithFields(log.Fields{
 				"device":  i.Identifier,
 				"build":   i.BuildID,
@@ -95,7 +101,7 @@ var downloadKernelCmd = &cobra.Command{
 				"signed":  i.Signed,
 			}).Info("Getting Kernelcache")
 
-			err = retry(3, time.Second, func() error {
+			g.Go(func() error {
 				zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
 					Proxy:    proxy,
 					Insecure: insecure,
@@ -103,17 +109,20 @@ var downloadKernelCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to create remote zip reader of ipsw")
 				}
-
-				err = kernelcache.RemoteParseV2(zr, i.BuildID)
+				if specFolders {
+					err = kernelcache.RemoteParse(zr)
+				} else {
+					err = kernelcache.RemoteParseV2(zr, i.BuildID)
+				}
 				if err != nil {
 					return errors.Wrap(err, "failed to download kernelcache from remote ipsw")
 				}
-
 				return nil
 			})
-			if err != nil {
-				return err
-			}
+		}
+
+		if err := g.Wait(); err != nil {
+			log.Error(err.Error())
 		}
 
 		return nil

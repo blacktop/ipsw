@@ -38,5 +38,6 @@ require (
 	github.com/ulikunitz/xz v0.5.8
 	github.com/vbauerster/mpb/v5 v5.3.0
 	golang.org/x/crypto v0.0.0-20200820211705-5c72a883971a
+	golang.org/x/sync v0.0.0-20190423024810-112230192c58
 	gopkg.in/ini.v1 v1.55.0 // indirect
 )
