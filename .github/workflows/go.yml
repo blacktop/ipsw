@@ -96,7 +96,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v ${{ steps.get-latest.outputs.version }} -d iPhone12,3
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho iPhone*/kernelcache*
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho kernelcache*
 
       - name: Run Extract Remote Kernelcache (Windows)
         if: matrix.platform == 'windows-latest'
@@ -108,7 +108,7 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v ${{ steps.get-latest.outputs.version }} --black-list appletv
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho iP*/kernelcache*
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho kernelcache*
 
       - uses: actions/upload-artifact@v2
         with:
