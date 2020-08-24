@@ -273,7 +273,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				rc.Close()
 				ipsw.Restore, err = parseRestore(pData)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+					return nil, errors.Wrap(err, "failed to parse Restore.plist")
 				}
 			case strings.HasSuffix(f.Name, "BuildManifest.plist"):
 				pData := make([]byte, f.UncompressedSize64)
@@ -285,7 +285,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				rc.Close()
 				ipsw.BuildManifest, err = parseBuildManifest(pData)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+					return nil, errors.Wrap(err, "failed to parse BuildManifest.plist")
 				}
 			case strings.HasSuffix(f.Name, "AssetData/Info.plist"):
 				pData := make([]byte, f.UncompressedSize64)
@@ -297,7 +297,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				rc.Close()
 				ipsw.Info, err = parseInfoPlist(pData)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+					return nil, errors.Wrap(err, "failed to parse AssetData/Info.plist")
 				}
 			case strings.EqualFold(f.Name, "Info.plist"):
 				pData := make([]byte, f.UncompressedSize64)
@@ -309,10 +309,8 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				rc.Close()
 				ipsw.OTAInfo, err = parseOTAInfo(pData)
 				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse DeviceTree")
+					return nil, errors.Wrap(err, "failed to parse Info.plist")
 				}
-			default:
-				log.Debugf("found unsupported plist %s", f.Name)
 			}
 		}
 	}

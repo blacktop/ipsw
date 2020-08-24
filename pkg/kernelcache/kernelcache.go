@@ -48,7 +48,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 
 	var i Img4
 	if _, err := asn1.Unmarshal(data, &i); err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Kernelcache")
+		return nil, errors.Wrap(err, "failed to ASN.1 parse kernelcache")
 	}
 
 	cc := CompressedCache{
@@ -89,7 +89,7 @@ func Extract(ipsw string) error {
 
 		kc, err := ParseImg4Data(content)
 		if err != nil {
-			return errors.Wrap(err, "failed parse compressed kernelcache")
+			return errors.Wrap(err, "failed parse compressed kernelcache Img4")
 		}
 
 		dec, err := DecompressData(kc)
@@ -101,7 +101,7 @@ func Extract(ipsw string) error {
 			fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(kcache)))
 			err = ioutil.WriteFile(fname, dec, 0644)
 			if err != nil {
-				return errors.Wrap(err, "failed to decompress kernelcache")
+				return errors.Wrap(err, "failed to write kernelcache")
 			}
 			utils.Indent(log.Info, 2)("Created " + fname)
 			os.Remove(kcache)
@@ -120,7 +120,7 @@ func Decompress(kcache string) error {
 
 	kc, err := ParseImg4Data(content)
 	if err != nil {
-		return errors.Wrap(err, "failed parse compressed kernelcache")
+		return errors.Wrap(err, "failed parse compressed kernelcache Img4")
 	}
 	// defer os.Remove(kcache)
 
@@ -132,7 +132,7 @@ func Decompress(kcache string) error {
 
 	err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
 	if err != nil {
-		return errors.Wrap(err, "failed to decompress kernelcache")
+		return errors.Wrap(err, "failed to write kernelcache")
 	}
 	utils.Indent(log.Info, 2)("Created " + kcache + ".decompressed")
 	return nil
@@ -143,7 +143,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 	utils.Indent(log.Debug, 2)("Decompressing Kernelcache")
 
 	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
-		utils.Indent(log.Debug, 2)("Kernelcache is LZFSE compressed")
+		utils.Indent(log.Debug, 3)("Kernelcache is LZFSE compressed")
 
 		dat := lzfse.DecodeBuffer(cc.Data)
 		// buf := new(bytes.Buffer)
@@ -171,7 +171,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		return dat[fat.Arches[0].Offset:], nil
 
 	} else if bytes.Contains(cc.Magic, []byte("comp")) { // LZSS
-		utils.Indent(log.Debug, 1)("kernelcache is LZSS compressed")
+		utils.Indent(log.Debug, 3)("kernelcache is LZSS compressed")
 		buffer := bytes.NewBuffer(cc.Data)
 		lzssHeader := lzss.Header{}
 		// Read entire file header.
@@ -179,12 +179,12 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 			return nil, err
 		}
 
-		msg := fmt.Sprintf("compressed size: %d, uncompressed: %d. checkSum: 0x%x",
+		msg := fmt.Sprintf("compressed size: %d, uncompressed: %d, checkSum: 0x%x",
 			lzssHeader.CompressedSize,
 			lzssHeader.UncompressedSize,
 			lzssHeader.CheckSum,
 		)
-		utils.Indent(log.Debug, 1)(msg)
+		utils.Indent(log.Debug, 3)(msg)
 
 		cc.Header = lzssHeader
 
@@ -195,7 +195,7 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		// Read compressed file data.
 		cc.Data = buffer.Next(int(lzssHeader.CompressedSize))
 		dec := lzss.Decompress(cc.Data)
-		return dec[:lzssHeader.UncompressedSize], nil
+		return dec[:], nil
 	}
 
 	return []byte{}, errors.New("unsupported compression")
@@ -224,7 +224,7 @@ func RemoteParse(zr *zip.Reader) error {
 
 					kcomp, err := ParseImg4Data(kdata)
 					if err != nil {
-						return errors.Wrap(err, "failed parse compressed kernelcache")
+						return errors.Wrap(err, "failed parse kernelcache img4")
 					}
 
 					dec, err := DecompressData(kcomp)
@@ -235,7 +235,7 @@ func RemoteParse(zr *zip.Reader) error {
 					os.Mkdir(folder, os.ModePerm)
 					err = ioutil.WriteFile(fname, dec, 0644)
 					if err != nil {
-						return errors.Wrap(err, "failed to decompress kernelcache")
+						return errors.Wrap(err, "failed to write kernelcache")
 					}
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
 				} else {
@@ -246,4 +246,67 @@ func RemoteParse(zr *zip.Reader) error {
 	}
 
 	return nil
+}
+
+// RemoteParseV2 parses the kernelcache in a remote IPSW file
+func RemoteParseV2(zr *zip.Reader, destFolder string) error {
+
+	for _, f := range zr.File {
+		if strings.Contains(f.Name, "kernelcache.") {
+			fname := filepath.Join(destFolder, f.Name)
+			if _, err := os.Stat(fname); os.IsNotExist(err) {
+				kdata := make([]byte, f.UncompressedSize64)
+				rc, err := f.Open()
+				if err != nil {
+					return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+				}
+				io.ReadFull(rc, kdata)
+				rc.Close()
+
+				kcomp, err := ParseImg4Data(kdata)
+				if err != nil {
+					return errors.Wrap(err, "failed parse kernelcache img4")
+				}
+
+				dec, err := DecompressData(kcomp)
+				if err != nil {
+					return errors.Wrap(err, "failed to decompress kernelcache")
+				}
+
+				os.Mkdir(destFolder, os.ModePerm)
+				err = ioutil.WriteFile(fname, dec, 0644)
+				if err != nil {
+					return errors.Wrap(err, "failed to write kernelcache")
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
+			} else {
+				log.Warnf("kernelcache already exists: %s", fname)
+			}
+		}
+	}
+
+	return nil
+}
+
+// Parse parses the compressed kernelcache Img4 data
+func Parse(r io.ReadCloser) ([]byte, error) {
+	var buf bytes.Buffer
+
+	_, err := r.Read(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read data")
+	}
+
+	kcomp, err := ParseImg4Data(buf.Bytes())
+	if err != nil {
+		return nil, errors.Wrap(err, "failed parse kernelcache img4")
+	}
+
+	dec, err := DecompressData(kcomp)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decompress kernelcache")
+	}
+	r.Close()
+
+	return dec, nil
 }

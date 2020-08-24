@@ -95,7 +95,7 @@ var downloadKernelCmd = &cobra.Command{
 				"signed":  i.Signed,
 			}).Info("Getting Kernelcache")
 
-			err = retry(3, 3*time.Second, func() error {
+			err = retry(3, time.Second, func() error {
 				zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
 					Proxy:    proxy,
 					Insecure: insecure,
@@ -104,7 +104,7 @@ var downloadKernelCmd = &cobra.Command{
 					return errors.Wrap(err, "failed to create remote zip reader of ipsw")
 				}
 
-				err = kernelcache.RemoteParse(zr)
+				err = kernelcache.RemoteParseV2(zr, i.BuildID)
 				if err != nil {
 					return errors.Wrap(err, "failed to download kernelcache from remote ipsw")
 				}
