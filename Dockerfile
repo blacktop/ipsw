@@ -39,9 +39,11 @@ RUN CGO_ENABLED=1 go build \
 ####################################################
 # APFS-FUSE BUILDER
 ####################################################
-FROM ubuntu:19.04
+FROM ubuntu:20.04
 
 LABEL maintainer "https://github.com/blacktop"
+
+ARG DEBIAN_FRONTEND=noninteractive
 
 RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git libattr1-dev' \
     && apt-get update \
