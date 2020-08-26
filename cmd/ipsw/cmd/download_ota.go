@@ -127,13 +127,11 @@ var otaDLCmd = &cobra.Command{
 					// }
 				}
 			} else {
-
 				downloader := download.NewDownload(proxy, insecure)
 				for _, o := range otas {
 					url := o.BaseURL + o.RelativePath
 					destName := strings.Replace(path.Base(url), ",", "_", -1)
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
-
 						log.WithFields(log.Fields{
 							"device":  o.SupportedDevices[0],
 							"build":   o.Build,
@@ -141,6 +139,7 @@ var otaDLCmd = &cobra.Command{
 						}).Info("Getting OTA")
 						// download file
 						downloader.URL = url
+						downloader.DestName = destName
 						err = downloader.Do()
 						if err != nil {
 							return errors.Wrap(err, "failed to download file")
@@ -149,7 +148,6 @@ var otaDLCmd = &cobra.Command{
 						log.Warnf("ota already exists: %s", destName)
 					}
 				}
-
 			}
 		}
 
