@@ -98,6 +98,10 @@ var latestCmd = &cobra.Command{
 			}
 		}
 
+		if len(filteredBuilds) == 0 {
+			log.Fatal(fmt.Sprintf("no IPSWs match device %s %s", device, doDownload))
+		}
+
 		log.Debug("URLs to Download:")
 		for _, b := range filteredBuilds {
 			utils.Indent(log.Debug, 1)(b.FirmwareURL)

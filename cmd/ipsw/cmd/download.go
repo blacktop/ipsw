@@ -123,6 +123,10 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 		}
 	}
 
+	if len(uniqueIPSWs) == 0 {
+		return nil, fmt.Errorf("filter flags matched 0 IPSWs")
+	}
+
 	return uniqueIPSWs, nil
 }
 

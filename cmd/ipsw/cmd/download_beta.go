@@ -70,7 +70,7 @@ var betaCmd = &cobra.Command{
 			}
 		}
 
-		if len(filteredURLS) < 1 {
+		if len(filteredURLS) == 0 {
 			log.Errorf("no ipsws match device %s", device)
 			return nil
 		}
