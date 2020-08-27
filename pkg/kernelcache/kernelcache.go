@@ -65,7 +65,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 	return &cc, nil
 }
 
-// Extract extracts and decompresses a lernelcache from ipsw
+// Extract extracts and decompresses a kernelcache from ipsw
 func Extract(ipsw string) error {
 	log.Debug("Extracting Kernelcache from IPSW")
 	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
