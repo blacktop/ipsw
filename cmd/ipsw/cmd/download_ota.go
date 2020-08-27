@@ -80,6 +80,9 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		otas := otaXML.GetOTAs(device, doDownload, doNotDownload)
+		if len(otas) == 0 {
+			log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
+		}
 
 		log.Debug("URLs to Download:")
 		for _, o := range otas {
