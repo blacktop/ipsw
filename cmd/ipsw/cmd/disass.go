@@ -181,12 +181,16 @@ var disCmd = &cobra.Command{
 		for i, insn := range insns {
 			// check for start of a new function
 			if funcStarts != nil && isFunctionStart(funcStarts, uint64(insn.Address)) != 0 {
-				sym, err := m.FindAddressSymbol(uint64(insn.Address))
+				syms, err := m.FindAddressSymbols(uint64(insn.Address))
+				if len(syms) > 1 {
+					log.Warnf("found more than one symbol at address 0x%x, %v", insn.Address, syms)
+				}
 				if err == nil {
+					var symName string
 					if demangleFlag {
-						sym = doDemangle(sym)
+						symName = doDemangle(syms[0].Name)
 					}
-					fmt.Printf("\n%s:\n", sym)
+					fmt.Printf("\n%s:\n", symName)
 				}
 			}
 
@@ -202,12 +206,16 @@ var disCmd = &cobra.Command{
 							adrpImm += insn.Arm64.Operands[2].Imm
 						}
 						// markup disassemble with label comment
-						sym, err := m.FindAddressSymbol(uint64(adrpImm))
+						syms, err := m.FindAddressSymbols(uint64(adrpImm))
+						if len(syms) > 1 {
+							log.Warnf("found more than one symbol at address 0x%x, %v", uint64(adrpImm), syms)
+						}
 						if err == nil {
+							var symName string
 							if demangleFlag {
-								sym = doDemangle(sym)
+								symName = doDemangle(syms[0].Name)
 							}
-							insn.OpStr += fmt.Sprintf(" // %s", sym)
+							insn.OpStr += fmt.Sprintf(" // %s", symName)
 						} else {
 							cstr, err := m.GetCString(uint64(adrpImm))
 							if err == nil {
@@ -221,12 +229,16 @@ var disCmd = &cobra.Command{
 			// check if branch location is a function
 			if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
 				if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 0 {
-					sym, err := m.FindAddressSymbol(uint64(insn.Arm64.Operands[0].Imm))
+					syms, err := m.FindAddressSymbols(uint64(insn.Arm64.Operands[0].Imm))
+					if len(syms) > 1 {
+						log.Warnf("found more than one symbol at address 0x%x, %v", uint64(insn.Arm64.Operands[0].Imm), syms)
+					}
 					if err == nil {
+						var symName string
 						if demangleFlag {
-							sym = doDemangle(sym)
+							symName = doDemangle(syms[0].Name)
 						}
-						insn.OpStr = sym
+						insn.OpStr = symName
 					}
 				}
 			}
