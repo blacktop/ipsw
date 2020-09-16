@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -43,6 +44,7 @@ func init() {
 	machoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	machoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	machoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
+	machoCmd.Flags().BoolP("fixups", "f", false, "Print fixup chains")
 	machoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -66,6 +68,7 @@ var machoCmd = &cobra.Command{
 		showEntitlements, _ := cmd.Flags().GetBool("ent")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		symbols, _ := cmd.Flags().GetBool("symbols")
+		fixups, _ := cmd.Flags().GetBool("fixups")
 
 		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC
 		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC
@@ -293,6 +296,53 @@ var machoCmd = &cobra.Command{
 			}
 			w.Flush()
 		}
+
+		if fixups {
+			fmt.Println("FIXUPS")
+			fmt.Println("======")
+			if m.HasFixups() {
+
+				dcf, err := m.DyldChainedFixups()
+				if err != nil {
+					return err
+				}
+
+				segs := m.Segments()
+
+				dylibs, err := m.ImportedLibraries()
+				if err != nil {
+					return err
+				}
+
+				for segIdx, start := range dcf.Starts {
+					if start.PageStarts != nil {
+						fmt.Printf("\n%s\n\n", segs[segIdx].Name)
+						fmt.Println("BINDS")
+						fmt.Println("-----")
+						for _, bind := range start.Binds {
+							var lib string
+							if dcf.Imports[bind.Ordinal()].LibOrdinal() > 0 {
+								parts := strings.Split(dylibs[dcf.Imports[bind.Ordinal()].LibOrdinal()-1], "/")
+								lib = parts[len(parts)-1]
+							}
+							fmt.Printf("%s\t%s/%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name)
+						}
+						fmt.Printf("\nREBASES\n")
+						fmt.Println("-------")
+						for _, rebase := range start.Rebases {
+							fmt.Println(rebase)
+							// if addr, err := m.GetVMAddress(uint64(rebase.Offset())); err == nil {
+							// 	// fmt.Printf("addr: 0x%016x\n", addr)
+							// 	if syms, err := m.FindAddressSymbols(addr); err == nil {
+							// 		fmt.Println(syms)
+							// 	}
+							// }
+						}
+					}
+				}
+			}
+		}
+
 		return nil
 	},
 }
