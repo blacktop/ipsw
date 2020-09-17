@@ -288,7 +288,7 @@ func (vm *ITunesVersionMaster) GetLatestVersion() (string, error) {
 	sort.Sort(version.Collection(versions))
 	newestVersion := versions[len(versions)-1]
 
-	return newestVersion.String(), nil
+	return newestVersion.Original(), nil
 }
 
 // GetSoftwareURLsForBuildID gets all the ipsw URLs for an iOS Build ID
