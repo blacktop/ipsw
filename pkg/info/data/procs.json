@@ -444,6 +444,22 @@
     "Devices": ["iPhone 11", "iPhone 11 Pro", "iPhone 11 Pro Max"]
   },
   {
+    "Name": "A14 Bionic",
+    "Model": "",
+    "Semiconductor": "5 nm FinFET",
+    "DieSize": "",
+    "Transistors": "",
+    "CPUISA": "ARMv8.3-A",
+    "CPU": "",
+    "CPUID": "T8101",
+    "CPUCache": [],
+    "GPU": "",
+    "AIAccelerator": "",
+    "Memory": "",
+    "Introduced": "October 2020",
+    "Devices": ["iPad Air (Fall 2020)"]
+  },
+  {
     "Name": "S1",
     "Model": "APL0778",
     "Semiconductor": "28 nm HKMG",
