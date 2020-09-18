@@ -310,14 +310,16 @@ var machoCmd = &cobra.Command{
 					if start.PageStarts != nil {
 						fmt.Println("BINDS")
 						fmt.Println("-----")
+						w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 						for _, bind := range start.Binds {
 							var addend string
 							if fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend(); fullAddend > 0 {
 								addend = fmt.Sprintf(" + 0x%x", fullAddend)
 							}
 							lib := m.LibraryOrdinalName(dcf.Imports[bind.Ordinal()].LibOrdinal())
-							fmt.Printf("%s\t%s/%s%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name, addend)
+							fmt.Fprintf(w, "%s\t%s/%s%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name, addend)
 						}
+						w.Flush()
 						fmt.Printf("\nREBASES\n")
 						fmt.Println("-------")
 						var lastSec *macho.Section
