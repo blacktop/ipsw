@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -307,36 +306,29 @@ var machoCmd = &cobra.Command{
 					return err
 				}
 
-				segs := m.Segments()
-
-				dylibs, err := m.ImportedLibraries()
-				if err != nil {
-					return err
-				}
-
-				for segIdx, start := range dcf.Starts {
+				for _, start := range dcf.Starts {
 					if start.PageStarts != nil {
-						fmt.Printf("\n%s\n\n", segs[segIdx].Name)
 						fmt.Println("BINDS")
 						fmt.Println("-----")
 						for _, bind := range start.Binds {
-							var lib string
-							if dcf.Imports[bind.Ordinal()].LibOrdinal() > 0 {
-								parts := strings.Split(dylibs[dcf.Imports[bind.Ordinal()].LibOrdinal()-1], "/")
-								lib = parts[len(parts)-1]
+							var addend string
+							if fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend(); fullAddend > 0 {
+								addend = fmt.Sprintf(" + 0x%x", fullAddend)
 							}
-							fmt.Printf("%s\t%s/%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name)
+							lib := m.LibraryOrdinalName(dcf.Imports[bind.Ordinal()].LibOrdinal())
+							fmt.Printf("%s\t%s/%s%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name, addend)
 						}
 						fmt.Printf("\nREBASES\n")
 						fmt.Println("-------")
+						var lastSec *macho.Section
 						for _, rebase := range start.Rebases {
+							addr := uint64(rebase.Offset()) + m.GetBaseAddress()
+							sec := m.FindSectionForVMAddr(addr)
+							if sec != lastSec {
+								fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
+							}
 							fmt.Println(rebase)
-							// if addr, err := m.GetVMAddress(uint64(rebase.Offset())); err == nil {
-							// 	// fmt.Printf("addr: 0x%016x\n", addr)
-							// 	if syms, err := m.FindAddressSymbols(addr); err == nil {
-							// 		fmt.Println(syms)
-							// 	}
-							// }
+							lastSec = sec
 						}
 					}
 				}
