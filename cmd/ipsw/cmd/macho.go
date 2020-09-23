@@ -67,10 +67,11 @@ var machoCmd = &cobra.Command{
 		showEntitlements, _ := cmd.Flags().GetBool("ent")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		symbols, _ := cmd.Flags().GetBool("symbols")
-		fixups, _ := cmd.Flags().GetBool("fixups")
+		showFixups, _ := cmd.Flags().GetBool("fixups")
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showFixups
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showFixups
+		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showFixups
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
@@ -105,7 +106,7 @@ var machoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC) {
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups) {
 			fmt.Println(m.FileTOC.String())
 		}
 
@@ -296,9 +297,11 @@ var machoCmd = &cobra.Command{
 			w.Flush()
 		}
 
-		if fixups {
-			fmt.Println("FIXUPS")
-			fmt.Println("======")
+		if showFixups {
+			if !onlyFixups {
+				fmt.Println("FIXUPS")
+				fmt.Println("======")
+			}
 			if m.HasFixups() {
 
 				dcf, err := m.DyldChainedFixups()
@@ -308,32 +311,38 @@ var machoCmd = &cobra.Command{
 
 				for _, start := range dcf.Starts {
 					if start.PageStarts != nil {
-						fmt.Println("BINDS")
-						fmt.Println("-----")
-						w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
-						for _, bind := range start.Binds {
-							var addend string
-							if fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend(); fullAddend > 0 {
-								addend = fmt.Sprintf(" + 0x%x", fullAddend)
+						if len(start.Binds) > 0 {
+							fmt.Printf("\nBINDS\n")
+							fmt.Println("-----")
+							w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+							for _, bind := range start.Binds {
+								var addend string
+								if fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend(); fullAddend > 0 {
+									addend = fmt.Sprintf(" + 0x%x", fullAddend)
+								}
+								lib := m.LibraryOrdinalName(dcf.Imports[bind.Ordinal()].LibOrdinal())
+								fmt.Fprintf(w, "%s\t%s/%s%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name, addend)
 							}
-							lib := m.LibraryOrdinalName(dcf.Imports[bind.Ordinal()].LibOrdinal())
-							fmt.Fprintf(w, "%s\t%s/%s%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name, addend)
+							w.Flush()
 						}
-						w.Flush()
-						fmt.Printf("\nREBASES\n")
-						fmt.Println("-------")
-						var lastSec *macho.Section
-						for _, rebase := range start.Rebases {
-							addr := uint64(rebase.Offset()) + m.GetBaseAddress()
-							sec := m.FindSectionForVMAddr(addr)
-							if sec != lastSec {
-								fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
+						if len(start.Rebases) > 0 {
+							fmt.Printf("\nREBASES\n")
+							fmt.Println("-------")
+							var lastSec *macho.Section
+							for _, rebase := range start.Rebases {
+								addr := uint64(rebase.Offset()) + m.GetBaseAddress()
+								sec := m.FindSectionForVMAddr(addr)
+								if sec != lastSec {
+									fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
+								}
+								fmt.Println(rebase)
+								lastSec = sec
 							}
-							fmt.Println(rebase)
-							lastSec = sec
 						}
 					}
 				}
+			} else {
+				fmt.Println("  - no fixups")
 			}
 		}
 
