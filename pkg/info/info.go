@@ -13,6 +13,7 @@ import (
 
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/blacktop/ipsw/pkg/xcode"
 	"github.com/rakyll/statik/fs"
 
 	// importing statik data
@@ -121,8 +122,22 @@ func (i *Info) String() string {
 	iStr += fmt.Sprintf("-------\n")
 	for _, dtree := range i.DeviceTrees {
 		dt, _ := dtree.Summary()
-		iStr += fmt.Sprintf("\n%s)\n", dt.ProductName)
-		iStr += fmt.Sprintf(" - %s_%s_%s\n", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+		prodName := dt.ProductName
+		if len(prodName) == 0 {
+			devices, err := xcode.GetDevices()
+			if err == nil {
+				for _, device := range devices {
+					if device.ProductType == dt.Model {
+						prodName = device.ProductDescription
+						break
+					}
+				}
+			} else {
+				prodName = dt.Model
+			}
+		}
+		iStr += fmt.Sprintf("\n%s\n", prodName)
+		iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
 		iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
 		if i.Plists.Restore != nil {
 			for _, device := range i.Plists.Restore.DeviceMap {

@@ -312,7 +312,6 @@ func parseDeviceTree(r io.Reader) (*DeviceTree, error) {
 // Parse parses plist files in a local ipsw file
 func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 	dt := make(map[string]*DeviceTree)
-	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
 
 	zr, err := zip.OpenReader(ipswPath)
 	if err != nil {
@@ -321,13 +320,23 @@ func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 	defer zr.Close()
 
 	for _, f := range zr.File {
-		if validDT.MatchString(f.Name) {
+		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
 			rc, _ := f.Open()
 			io.ReadFull(rc, dtData)
 			rc.Close()
 
 			dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+			}
+		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
+			dtData := make([]byte, f.UncompressedSize64)
+			rc, _ := f.Open()
+			io.ReadFull(rc, dtData)
+			rc.Close()
+
+			dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to parse DeviceTree")
 			}
@@ -355,6 +364,16 @@ func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to parse DeviceTree")
 			}
+		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
+			dtData := make([]byte, f.UncompressedSize64)
+			rc, _ := f.Open()
+			io.ReadFull(rc, dtData)
+			rc.Close()
+
+			dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+			}
 		}
 	}
 
@@ -366,6 +385,10 @@ func Extract(ipsw string) error {
 	log.Info("Extracting DeviceTree from IPSW")
 	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
 		var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
+		if validDT.MatchString(f.Name) {
+			return true
+		}
+		validDT = regexp.MustCompile(`.*DeviceTree.*img3$`)
 		if validDT.MatchString(f.Name) {
 			return true
 		}

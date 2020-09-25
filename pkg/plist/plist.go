@@ -125,7 +125,10 @@ func (p *Plists) GetOSType() string {
 	if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents.OS) > 0 {
 		return p.BuildManifest.BuildIdentities[0].Info.VariantContents.OS
 	}
-	return p.OTAInfo.MobileAssetProperties.ReleaseType
+	if p.OTAInfo != nil {
+		return p.OTAInfo.MobileAssetProperties.ReleaseType
+	}
+	return ""
 }
 
 func (p *Plists) GetKernelType(name string) string {

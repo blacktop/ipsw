@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -103,10 +104,20 @@ var deviceTreeCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrap(err, "failed to read DeviceTree")
 			}
-			dtree, err := devicetree.ParseImg4Data(content)
-			if err != nil {
-				return errors.Wrap(err, "failed to extract DeviceTree")
+
+			var dtree *devicetree.DeviceTree
+			if bytes.Contains(content[:4], []byte("3gmI")) {
+				dtree, err = devicetree.ParseImg3Data(content)
+				if err != nil {
+					return errors.Wrap(err, "failed to extract DeviceTree")
+				}
+			} else {
+				dtree, err = devicetree.ParseImg4Data(content)
+				if err != nil {
+					return errors.Wrap(err, "failed to extract DeviceTree")
+				}
 			}
+
 			if jsonFlag {
 				// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
 				// jq '.[ "device-tree" ].compatible'
