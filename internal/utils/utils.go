@@ -78,6 +78,15 @@ func Unique(s []string) []string {
 	return us
 }
 
+// ReverseBytes reverse byte array order
+func ReverseBytes(a []byte) []byte {
+	for i := len(a)/2 - 1; i >= 0; i-- {
+		opp := len(a) - 1 - i
+		a[i], a[opp] = a[opp], a[i]
+	}
+	return a
+}
+
 // Verify verifies the downloaded against it's hash
 func Verify(sha1sum, name string) (bool, error) {
 	f, err := os.Open(name)
