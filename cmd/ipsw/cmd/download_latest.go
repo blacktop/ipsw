@@ -55,7 +55,8 @@ var latestCmd = &cobra.Command{
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
-		skip, _ := cmd.Flags().GetBool("yes")
+		confirm, _ := cmd.Flags().GetBool("yes")
+		skipAll, _ := cmd.Flags().GetBool("skip-all")
 		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
 
 		// filters
@@ -108,7 +109,7 @@ var latestCmd = &cobra.Command{
 		}
 
 		cont := true
-		if !skip {
+		if !confirm {
 			cont = false
 			prompt := &survey.Confirm{
 				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredBuilds)),
@@ -117,7 +118,7 @@ var latestCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := download.NewDownload(proxy, insecure)
+			downloader := download.NewDownload(proxy, insecure, skipAll)
 			for _, build := range filteredBuilds {
 				destName := getDestName(build.FirmwareURL, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {

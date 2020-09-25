@@ -56,7 +56,9 @@ var otaDLCmd = &cobra.Command{
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
-		skip, _ := cmd.Flags().GetBool("yes")
+		confirm, _ := cmd.Flags().GetBool("yes")
+		skipAll, _ := cmd.Flags().GetBool("skip-all")
+
 		// filters
 		device, _ := cmd.Flags().GetString("device")
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
@@ -90,7 +92,7 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		cont := true
-		if !skip {
+		if !confirm {
 			cont = false
 			prompt := &survey.Confirm{
 				Message: fmt.Sprintf("You are about to download %d OTA files. Continue?", len(otas)),
@@ -130,7 +132,7 @@ var otaDLCmd = &cobra.Command{
 					// }
 				}
 			} else {
-				downloader := download.NewDownload(proxy, insecure)
+				downloader := download.NewDownload(proxy, insecure, skipAll)
 				for _, o := range otas {
 					url := o.BaseURL + o.RelativePath
 					destName := strings.Replace(path.Base(url), ",", "_", -1)

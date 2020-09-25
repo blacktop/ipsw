@@ -25,6 +25,7 @@ func init() {
 	downloadCmd.PersistentFlags().StringArrayP("black-list", "", []string{viper.GetString("IPSW_DEVICE_BLACKLIST")}, "iOS device black list")
 	downloadCmd.PersistentFlags().StringArrayP("white-list", "", []string{viper.GetString("IPSW_DEVICE_WHITELIST")}, "iOS device white list")
 	downloadCmd.PersistentFlags().BoolP("yes", "y", false, "do not prompt user")
+	downloadCmd.PersistentFlags().BoolP("skip-all", "s", false, "Always skip resumable IPSWs")
 	downloadCmd.PersistentFlags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	downloadCmd.PersistentFlags().StringP("version", "v", viper.GetString("IPSW_VERSION"), "iOS Version (i.e. 12.3.1)")
 	downloadCmd.PersistentFlags().StringP("device", "d", viper.GetString("IPSW_DEVICE"), "iOS Device (i.e. iPhone11,2)")
@@ -152,7 +153,8 @@ var downloadCmd = &cobra.Command{
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
-		skip, _ := cmd.Flags().GetBool("yes")
+		confirm, _ := cmd.Flags().GetBool("yes")
+		skipAll, _ := cmd.Flags().GetBool("skip-all")
 		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
 
 		ipsws, err := filterIPSWs(cmd)
@@ -166,7 +168,7 @@ var downloadCmd = &cobra.Command{
 		}
 
 		cont := true
-		if !skip {
+		if !confirm {
 			// if filtered to a single device skip the prompt
 			if len(ipsws) > 1 {
 				cont = false
@@ -188,7 +190,7 @@ var downloadCmd = &cobra.Command{
 						"signed":  i.Signed,
 					}).Info("Getting IPSW")
 
-					downloader := download.NewDownload(proxy, insecure)
+					downloader := download.NewDownload(proxy, insecure, skipAll)
 					downloader.URL = i.URL
 					downloader.Sha1 = i.SHA1
 					downloader.DestName = destName
