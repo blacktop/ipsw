@@ -37,12 +37,12 @@ type Download struct {
 }
 
 // NewDownload creates a new downloader
-func NewDownload(proxy string, insecure bool) *Download {
+func NewDownload(proxy string, insecure, skipAll bool) *Download {
 	return &Download{
 		// URL:     url,
 		// Sha1:    sha1,
 		resume:  false,
-		skipAll: false,
+		skipAll: skipAll,
 		client: &http.Client{
 			Transport: &http.Transport{
 				Proxy:           getProxy(proxy),
