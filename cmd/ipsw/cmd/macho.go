@@ -30,6 +30,7 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/fullsailor/pkcs7"
 	"github.com/spf13/cobra"
 )
@@ -295,6 +296,19 @@ var machoCmd = &cobra.Command{
 				// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 			}
 			w.Flush()
+			// Dedup these symbols (has repeats but also additional symbols??)
+			if m.DyldExportsTrie() != nil {
+				fmt.Println("DyldExport SYMBOLS")
+				fmt.Println("------------------")
+				exports, err := trie.ParseTrie(m.DyldExportsTrie().Data, m.GetBaseAddress())
+				if err != nil {
+					return err
+				}
+				for _, export := range exports {
+					fmt.Fprintf(w, "0x%016X \t <%s> \t %s\n", export.Address, export.Flags, export.Name)
+				}
+				w.Flush()
+			}
 		}
 
 		if showFixups {
