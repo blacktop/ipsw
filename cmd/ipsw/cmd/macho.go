@@ -44,7 +44,8 @@ func init() {
 	machoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	machoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	machoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
-	machoCmd.Flags().BoolP("fixups", "f", false, "Print fixup chains")
+	machoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
+	machoCmd.Flags().BoolP("fixups", "x", false, "Print fixup chains")
 	machoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -68,11 +69,13 @@ var machoCmd = &cobra.Command{
 		showEntitlements, _ := cmd.Flags().GetBool("ent")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		symbols, _ := cmd.Flags().GetBool("symbols")
+		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		showFixups, _ := cmd.Flags().GetBool("fixups")
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showFixups
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showFixups
-		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showFixups
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showFixups && !showFuncStarts
+		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showFixups && !showFuncStarts
+		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && showFuncStarts
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
@@ -107,7 +110,7 @@ var machoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups) {
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts) {
 			fmt.Println(m.FileTOC.String())
 		}
 
@@ -254,34 +257,17 @@ var machoCmd = &cobra.Command{
 			fmt.Println()
 		}
 
-		// fmt.Println("HEADER")
-		// fmt.Println("======")
-		// fmt.Println(m.FileHeader)
-
-		// fmt.Println("SECTIONS")
-		// fmt.Println("========")
-		// var secFlags string
-		// // var prevSeg string
-		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-		// for _, sec := range m.Sections {
-		// 	secFlags = ""
-		// 	if !sec.Flags.IsRegular() {
-		// 		secFlags = fmt.Sprintf("(%s)", sec.Flags)
-		// 	}
-		// 	// if !strings.EqualFold(sec.Seg, prevSeg) && len(prevSeg) > 0 {
-		// 	// 	fmt.Fprintf(w, "\n")
-		// 	// }
-		// 	fmt.Fprintf(w, "Mem: 0x%x-0x%x \t Off: 0x%x-0x%x \t %s.%s \t %s \t %s\n", sec.Addr, sec.Addr+sec.Size, sec.Offset, uint64(sec.Offset)+sec.Size, sec.Seg, sec.Name, secFlags, sec.Flags.AttributesString())
-		// 	// prevSeg = sec.Seg
-		// }
-		// w.Flush()
-
-		// if m.DylibID() != nil {
-		// 	fmt.Printf("Dyld ID: %s (%s)\n", m.DylibID().Name, m.DylibID().CurrentVersion)
-		// }
-		// if m.SourceVersion() != nil {
-		// 	fmt.Println("SourceVersion:", m.SourceVersion().Version)
-		// }
+		if showFuncStarts {
+			if !onlyFuncStarts {
+				fmt.Println("FUNCTION STARTS")
+				fmt.Println("===============")
+			}
+			if m.FunctionStarts() != nil {
+				for _, vaddr := range m.FunctionStarts() {
+					fmt.Printf("0x%016X\n", vaddr)
+				}
+			}
+		}
 
 		if symbols {
 			fmt.Println("SYMBOLS")
