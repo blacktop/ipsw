@@ -11,7 +11,7 @@
 
   
   
-  <link rel="stylesheet" href="/ipsw/css/style.min.283317b3b68727e38f0757ac07557dbd3980c78e15c2427b949d84af9955e8cd.css">
+  <link rel="stylesheet" href="/ipsw/css/style.min.aad43d4ecb69a264f2539b89d7f779d5f3cdff22e7585fe5fc3c77272f1c2696.css">
   
 
   
@@ -183,16 +183,13 @@
           
 <h1 class="title">Build</h1>
 <div class="content ">
-  <h2 id="with-support-for-lzfse-compression-and-capstone-disassembly"><strong>WITH</strong> support for <strong>lzfse</strong> compression and <strong>capstone</strong> disassembly</h2>
+  <h2 id="with-support-for-lzfse-decompression"><strong>WITH</strong> support for <strong>lzfse</strong> decompression</h2>
 <h4 id="dependancies">Dependancies:</h4>
 <ul>
 <li><a href="https://github.com/lzfse/lzfse">lzfse</a></li>
-<li><a href="https://github.com/aquynh/capstone/tree/next">capstone</a></li>
 </ul>
 <h3 id="install-the-dependancies">Install the dependancies</h3>
-<p>Via <a href="https://brew.sh">homebrew</a></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ brew install capstone --HEAD
-</code></pre></div><p>From source</p>
+<p>From source</p>
 <ul>
 <li><a href="https://github.com/lzfse/lzfse">lzfse</a></li>
 </ul>
@@ -202,21 +199,14 @@ $ mkdir build
 $ <span class="nb">cd</span> build
 $ cmake ..
 $ make install
-</code></pre></div><ul>
-<li><a href="https://github.com/aquynh/capstone/tree/next">capstone</a></li>
-</ul>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone -b next https://github.com/aquynh/capstone.git
-$ <span class="nb">cd</span> capstone
-$ <span class="nv">CAPSTONE_ARCHS</span><span class="o">=</span><span class="s2">&#34;arm aarch64&#34;</span> ./make.sh
-$ sudo ./make.sh install
 </code></pre></div><h4 id="install-the-go-binary">Install the Go binary</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/blacktop/ipsw.git
 $ <span class="nb">cd</span> ipsw
 $ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">1</span> <span class="se">\
-</span><span class="se"></span>  <span class="nv">CGO_CFLAGS</span><span class="o">=</span>-I/usr/local/include <span class="se">\ </span><span class="c1"># path to the capstone includes</span>
-  <span class="nv">CGO_LDFLAGS</span><span class="o">=</span>-L/usr/local/lib <span class="se">\ </span>   <span class="c1"># path to the capstone libs</span>
+</span><span class="se"></span>  <span class="nv">CGO_CFLAGS</span><span class="o">=</span>-I/usr/local/include <span class="se">\ </span><span class="c1"># path to the lzfse includes</span>
+  <span class="nv">CGO_LDFLAGS</span><span class="o">=</span>-L/usr/local/lib <span class="se">\ </span>   <span class="c1"># path to the lzfse libs</span>
   go build ./cmd/ipsw
-</code></pre></div><h2 id="without-support-for-capstone-disassembly"><strong>WITHOUT</strong> support for <strong>capstone</strong> disassembly</h2>
+</code></pre></div><h2 id="without-support-for-lzfse-decompression"><strong>WITHOUT</strong> support for <strong>lzfse</strong> decompression</h2>
 <h4 id="install-the-go-binary-1">Install the Go binary</h4>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/blacktop/ipsw.git
 $ <span class="nb">cd</span> ipsw
@@ -242,7 +232,9 @@ $ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">0</
     <div class="row">
       <div class="col-12">
         <div class="sub-footer-inner">
-          
+          <ul>
+            <li class="zerostatic"><a href="https://www.zerostatic.io">www.zerostatic.io</a></li>
+          </ul>
         </div>
       </div>
     </div>

@@ -6,11 +6,7 @@
     <description>Recent content on ipsw</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Sat, 25 Jan 2020 21:02:49 -0500</lastBuildDate>
-    
-	<atom:link href="https://blacktop.github.io/ipsw/index.xml" rel="self" type="application/rss+xml" />
-    
-    
+    <lastBuildDate>Sat, 25 Jan 2020 21:02:49 -0500</lastBuildDate><atom:link href="https://blacktop.github.io/ipsw/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>Install</title>
       <link>https://blacktop.github.io/ipsw/docs/install/</link>
@@ -107,7 +103,7 @@
       <pubDate>Sun, 26 Jan 2020 09:15:48 -0500</pubDate>
       
       <guid>https://blacktop.github.io/ipsw/docs/commands/disassemble/</guid>
-      <description>Disassemble ARMv8.3 binaries.</description>
+      <description>Disassemble ARMv8.5 binaries.</description>
     </item>
     
     <item>

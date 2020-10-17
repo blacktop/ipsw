@@ -11,7 +11,7 @@
 
   
   
-  <link rel="stylesheet" href="/ipsw/css/style.min.283317b3b68727e38f0757ac07557dbd3980c78e15c2427b949d84af9955e8cd.css">
+  <link rel="stylesheet" href="/ipsw/css/style.min.aad43d4ecb69a264f2539b89d7f779d5f3cdff22e7585fe5fc3c77272f1c2696.css">
   
 
   
@@ -185,7 +185,6 @@
 <div class="content ">
   <h2 id="wip-">[WIP] 🚧</h2>
 <p>Working on getting a disassembler working</p>
-<p>⚠️ <strong>NOTE:</strong> requires <strong>capstone</strong> installed from the <code>next</code> branch <em>(brew install capstone &ndash;HEAD)</em></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
 </code></pre></div><div class="highlight"><pre class="chroma"><code class="language-s" data-lang="s"><span class="mh">0xfffffff007b7c05c</span><span class="o">:</span>	<span class="n">pacibsp</span>
 <span class="mh">0xfffffff007b7c060</span><span class="o">:</span>	<span class="n">stp</span>		<span class="n">x24</span><span class="p">,</span> <span class="n">x23</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#-0x40]!</span>
@@ -211,8 +210,31 @@
 </code></pre></div><p>You can also dissassemble a function by name</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --symbol &lt;SYMBOL_NAME&gt; --instrs <span class="m">200</span> JavaScriptCore
 </code></pre></div><p>Make it pretty 💄🐷 using <a href="https://github.com/sharkdp/bat">bat</a></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --vaddr 0xfffffff007b7c05c --instrs <span class="m">100</span> kernelcache.release.iphone12.decompressed <span class="se">\
-</span><span class="se"></span>   <span class="p">|</span> bat -p --tabs <span class="m">0</span> -l s
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed <span class="se">\
+</span><span class="se"></span>   <span class="p">|</span> bat -l s --tabs <span class="m">0</span> -p --theme Nord
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-s" data-lang="s"><span class="n">func_fffffff007b44000</span><span class="o">:</span>
+<span class="mh">0xfffffff007b44000</span><span class="o">:</span>  <span class="m">5</span><span class="n">f</span> <span class="m">24</span> <span class="m">03</span> <span class="n">d5</span>        <span class="n">bti</span>             <span class="n">c</span>
+<span class="mh">0xfffffff007b44004</span><span class="o">:</span>  <span class="m">01</span> <span class="m">00</span> <span class="m">00</span> <span class="m">14</span>        <span class="n">b</span>               <span class="c1">#0xfffffff007b44008</span>
+
+<span class="n">func_fffffff007b44008</span><span class="o">:</span>
+<span class="mh">0xfffffff007b44008</span><span class="o">:</span>  <span class="m">3</span><span class="n">f</span> <span class="m">05</span> <span class="m">40</span> <span class="n">f1</span>        <span class="n">cmp</span>             <span class="n">x9</span><span class="p">,</span> <span class="c1">#0x1, lsl #0xc</span>
+<span class="mh">0xfffffff007b4400c</span><span class="o">:</span>  <span class="n">ea</span> <span class="m">03</span> <span class="m">00</span> <span class="m">91</span>        <span class="n">mov</span>             <span class="n">x10</span><span class="p">,</span> <span class="n">sp</span>
+<span class="mh">0xfffffff007b44010</span><span class="o">:</span>  <span class="n">c3</span> <span class="m">00</span> <span class="m">00</span> <span class="m">54</span>        <span class="n">b.cc</span>            <span class="c1">#0xfffffff007b44028</span>
+<span class="mh">0xfffffff007b44014</span><span class="o">:</span>  <span class="m">4</span><span class="n">a</span> <span class="m">05</span> <span class="m">40</span> <span class="n">d1</span>        <span class="n">sub</span>             <span class="n">x10</span><span class="p">,</span> <span class="n">x10</span><span class="p">,</span> <span class="c1">#0x1, lsl #0xc</span>
+<span class="mh">0xfffffff007b44018</span><span class="o">:</span>  <span class="m">5</span><span class="n">f</span> <span class="m">01</span> <span class="m">40</span> <span class="n">f9</span>        <span class="n">ldr</span>             <span class="n">xzr</span><span class="p">,</span> <span class="n">[x10]</span>
+<span class="mh">0xfffffff007b4401c</span><span class="o">:</span>  <span class="m">29</span> <span class="m">05</span> <span class="m">40</span> <span class="n">d1</span>        <span class="n">sub</span>             <span class="n">x9</span><span class="p">,</span> <span class="n">x9</span><span class="p">,</span> <span class="c1">#0x1, lsl #0xc</span>
+<span class="mh">0xfffffff007b44020</span><span class="o">:</span>  <span class="m">3</span><span class="n">f</span> <span class="m">05</span> <span class="m">40</span> <span class="n">f1</span>        <span class="n">cmp</span>             <span class="n">x9</span><span class="p">,</span> <span class="c1">#0x1, lsl #0xc</span>
+<span class="mh">0xfffffff007b44024</span><span class="o">:</span>  <span class="m">88</span> <span class="n">ff</span> <span class="n">ff</span> <span class="m">54</span>        <span class="n">b.hi</span>            <span class="c1">#0xfffffff007b44014</span>
+<span class="mh">0xfffffff007b44028</span><span class="o">:</span>  <span class="m">4</span><span class="n">a</span> <span class="m">01</span> <span class="m">09</span> <span class="n">cb</span>        <span class="n">sub</span>             <span class="n">x10</span><span class="p">,</span> <span class="n">x10</span><span class="p">,</span> <span class="n">x9</span>
+<span class="mh">0xfffffff007b4402c</span><span class="o">:</span>  <span class="m">5</span><span class="n">f</span> <span class="m">01</span> <span class="m">40</span> <span class="n">f9</span>        <span class="n">ldr</span>             <span class="n">xzr</span><span class="p">,</span> <span class="n">[x10]</span>
+<span class="mh">0xfffffff007b44030</span><span class="o">:</span>  <span class="n">c0</span> <span class="m">03</span> <span class="m">5</span><span class="n">f</span> <span class="n">d6</span>        <span class="n">ret</span>
+
+<span class="n">func_fffffff007b44034</span><span class="o">:</span>
+<span class="mh">0xfffffff007b44034</span><span class="o">:</span>  <span class="m">20</span> <span class="m">50</span> <span class="m">8</span><span class="n">e</span> <span class="n">d2</span>        <span class="n">mov</span>             <span class="n">x0</span><span class="p">,</span> <span class="c1">#0x7281</span>
+<span class="mh">0xfffffff007b44038</span><span class="o">:</span>  <span class="n">c0</span> <span class="n">ec</span> <span class="n">ad</span> <span class="n">f2</span>        <span class="n">movk</span>            <span class="n">x0</span><span class="p">,</span> <span class="c1">#0x6f66, lsl #0x10</span>
+<span class="mh">0xfffffff007b4403c</span><span class="o">:</span>  <span class="m">40</span> <span class="m">0</span><span class="n">e</span> <span class="n">ce</span> <span class="n">f2</span>        <span class="n">movk</span>            <span class="n">x0</span><span class="p">,</span> <span class="c1">#0x7072, lsl #0x20</span>
+<span class="mh">0xfffffff007b44040</span><span class="o">:</span>  <span class="m">80</span> <span class="n">ed</span> <span class="n">ff</span> <span class="n">f2</span>        <span class="n">movk</span>            <span class="n">x0</span><span class="p">,</span> <span class="c1">#0xff6c, lsl #0x30</span>
+<span class="mh">0xfffffff007b44044</span><span class="o">:</span>  <span class="n">c0</span> <span class="m">03</span> <span class="m">5</span><span class="n">f</span> <span class="n">d6</span>        <span class="n">ret</span>
 </code></pre></div><p>Demangle C++ names</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw disass --demangle --symbol &lt;SYMBOL_NAME&gt; --instrs <span class="m">200</span> JavaScriptCore <span class="p">|</span> bat -p -l s --tabs <span class="m">0</span>
 </code></pre></div>
@@ -230,7 +252,9 @@
     <div class="row">
       <div class="col-12">
         <div class="sub-footer-inner">
-          
+          <ul>
+            <li class="zerostatic"><a href="https://www.zerostatic.io">www.zerostatic.io</a></li>
+          </ul>
         </div>
       </div>
     </div>
