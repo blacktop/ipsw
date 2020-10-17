@@ -11,11 +11,8 @@ summary: How to install
 Via [homebrew](https://brew.sh)
 
 ```bash
-$ brew install capstone --HEAD
 $ brew install blacktop/tap/ipsw
 ```
-
-> For version that does **NOT** require **capstone** use the **macOS_amd64.tar.gz** without **extras** in the [releases](https://github.com/blacktop/ipsw/releases/latest)
 
 ---
 
