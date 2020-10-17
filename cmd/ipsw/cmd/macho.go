@@ -283,7 +283,7 @@ var machoCmd = &cobra.Command{
 			}
 			w.Flush()
 			// Dedup these symbols (has repeats but also additional symbols??)
-			if m.DyldExportsTrie() != nil {
+			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
 				fmt.Println("DyldExport SYMBOLS")
 				fmt.Println("------------------")
 				exports, err := trie.ParseTrie(m.DyldExportsTrie().Data, m.GetBaseAddress())
