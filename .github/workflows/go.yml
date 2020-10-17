@@ -22,11 +22,6 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update && sudo apt-get install -y cmake libtool libc6-dev
-          cd /tmp
-          git clone -b next https://github.com/aquynh/capstone.git
-          cd capstone
-          CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh
-          sudo ./make.sh install
           cd /tmp          
           git clone https://github.com/lzfse/lzfse.git
           cd lzfse
@@ -39,7 +34,6 @@ jobs:
         run: |
           brew update
           brew install lzfse
-          brew install capstone --HEAD
       # - name: Build Dependencies (Windows)
       #   if: matrix.platform == 'windows-latest'
       #   run: |
