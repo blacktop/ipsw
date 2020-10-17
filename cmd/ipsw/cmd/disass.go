@@ -1,5 +1,3 @@
-// +build !windows,cgo
-
 /*
 Copyright © 2019 blacktop
 
@@ -24,17 +22,19 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/demangle"
-	"github.com/knightsc/gapstone"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	// "github.com/knightsc/gapstone"
 )
 
 var (
@@ -89,6 +89,13 @@ func isFunctionStart(starts []uint64, addr uint64) uint64 {
 	return 0
 }
 
+func pad(length int) string {
+	if length > 0 {
+		return strings.Repeat(" ", length)
+	}
+	return " "
+}
+
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
 	Use:   "disass",
@@ -135,116 +142,192 @@ var disCmd = &cobra.Command{
 
 		found := false
 		for _, sec := range m.Sections {
-			if sec.Name == "__text" {
-				if sec.Addr <= startAddr && startAddr < (sec.Addr+sec.Size) {
-					found = true
+			// if sec.Name == "__text" {
+			if sec.Addr <= startAddr && startAddr < (sec.Addr+sec.Size) {
+				found = true
 
-					memOffset := startAddr - sec.Addr
-					if instructions*4 > sec.Size-memOffset {
-						data = make([]byte, sec.Size-memOffset)
-					}
-
-					_, err := sec.ReadAt(data, int64(memOffset))
-					if err != nil {
-						return err
-					}
-
-					break
+				memOffset := startAddr - sec.Addr
+				if instructions*4 > sec.Size-memOffset {
+					data = make([]byte, sec.Size-memOffset)
 				}
+
+				_, err := sec.ReadAt(data, int64(memOffset))
+				if err != nil {
+					return err
+				}
+
+				break
 			}
+			// }
 		}
 
 		if !found {
 			return fmt.Errorf("supplied vaddr not found in any __text section")
 		}
 
-		engine, err := gapstone.New(
-			gapstone.CS_ARCH_ARM64,
-			gapstone.CS_MODE_ARM,
-		)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create capstone engine")
-		}
-
-		// turn on instruction details
-		engine.SetOption(gapstone.CS_OPT_DETAIL, gapstone.CS_OPT_ON)
-
-		insns, err := engine.Disasm(
-			data,
-			startAddr,
-			0, // insns to disassemble, 0 for all
-		)
-		if err != nil {
-			return errors.Wrapf(err, "failed to disassemble data")
-		}
-
-		for i, insn := range insns {
+		for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}) {
 			// check for start of a new function
-			if funcStarts != nil && isFunctionStart(funcStarts, uint64(insn.Address)) != 0 {
-				syms, err := m.FindAddressSymbols(uint64(insn.Address))
+			if funcStarts != nil && isFunctionStart(funcStarts, i.Instruction.Address()) != 0 {
+				syms, err := m.FindAddressSymbols(i.Instruction.Address())
 				if len(syms) > 1 {
-					log.Warnf("found more than one symbol at address 0x%x, %v", insn.Address, syms)
+					log.Warnf("found more than one symbol at address 0x%x, %v", i.Instruction.Address(), syms)
 				}
 				if err == nil {
 					var symName string
 					if demangleFlag {
 						symName = doDemangle(syms[0].Name)
+					} else {
+						for _, sym := range syms {
+							if len(sym.Name) > 0 {
+								symName = sym.Name
+							}
+						}
 					}
 					fmt.Printf("\n%s:\n", symName)
+				} else {
+					fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
 				}
 			}
 
 			// lookup adrp/ldr or add address as a cstring or symbol name
-			if Verbose && (insn.Mnemonic == "ldr" || insn.Mnemonic == "add") && insns[i-1].Mnemonic == "adrp" {
-				if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 1 {
-					if insns[i-1].Arm64.Operands != nil && len(insns[i-1].Arm64.Operands) > 1 {
-						adrpRegister := insns[i-1].Arm64.Operands[0].Reg
-						adrpImm := insns[i-1].Arm64.Operands[1].Imm
-						if insn.Mnemonic == "ldr" && adrpRegister == insn.Arm64.Operands[1].Mem.Base {
-							adrpImm += int64(insn.Arm64.Operands[1].Mem.Disp)
-						} else if insn.Mnemonic == "add" && adrpRegister == insn.Arm64.Operands[0].Reg {
-							adrpImm += insn.Arm64.Operands[2].Imm
-						}
-						// markup disassemble with label comment
-						syms, err := m.FindAddressSymbols(uint64(adrpImm))
-						if len(syms) > 1 {
-							log.Warnf("found more than one symbol at address 0x%x, %v", uint64(adrpImm), syms)
-						}
-						if err == nil {
-							var symName string
-							if demangleFlag {
-								symName = doDemangle(syms[0].Name)
-							}
-							insn.OpStr += fmt.Sprintf(" // %s", symName)
-						} else {
-							cstr, err := m.GetCString(uint64(adrpImm))
-							if err == nil {
-								insn.OpStr += fmt.Sprintf(" // %s", cstr)
-							}
-						}
-					}
-				}
-			}
+			// if Verbose && (insn.Mnemonic == "ldr" || insn.Mnemonic == "add") && insns[i-1].Mnemonic == "adrp" {
+			// 	if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 1 {
+			// 		if insns[i-1].Arm64.Operands != nil && len(insns[i-1].Arm64.Operands) > 1 {
+			// 			adrpRegister := insns[i-1].Arm64.Operands[0].Reg
+			// 			adrpImm := insns[i-1].Arm64.Operands[1].Imm
+			// 			if insn.Mnemonic == "ldr" && adrpRegister == insn.Arm64.Operands[1].Mem.Base {
+			// 				adrpImm += int64(insn.Arm64.Operands[1].Mem.Disp)
+			// 			} else if insn.Mnemonic == "add" && adrpRegister == insn.Arm64.Operands[0].Reg {
+			// 				adrpImm += insn.Arm64.Operands[2].Imm
+			// 			}
+			// 			// markup disassemble with label comment
+			// 			syms, err := m.FindAddressSymbols(uint64(adrpImm))
+			// 			if len(syms) > 1 {
+			// 				log.Warnf("found more than one symbol at address 0x%x, %v", uint64(adrpImm), syms)
+			// 			}
+			// 			if err == nil {
+			// 				var symName string
+			// 				if demangleFlag {
+			// 					symName = doDemangle(syms[0].Name)
+			// 				}
+			// 				insn.OpStr += fmt.Sprintf(" // %s", symName)
+			// 			} else {
+			// 				cstr, err := m.GetCString(uint64(adrpImm))
+			// 				if err == nil {
+			// 					insn.OpStr += fmt.Sprintf(" // %s", cstr)
+			// 				}
+			// 			}
+			// 		}
+			// 	}
+			// }
 
-			// check if branch location is a function
-			if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
-				if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 0 {
-					syms, err := m.FindAddressSymbols(uint64(insn.Arm64.Operands[0].Imm))
-					if len(syms) > 1 {
-						log.Warnf("found more than one symbol at address 0x%x, %v", uint64(insn.Arm64.Operands[0].Imm), syms)
-					}
-					if err == nil {
-						var symName string
-						if demangleFlag {
-							symName = doDemangle(syms[0].Name)
-						}
-						insn.OpStr = symName
-					}
-				}
-			}
-
-			fmt.Printf("0x%x:\t%s\t\t%s\n", insn.Address, insn.Mnemonic, insn.OpStr)
+			// // check if branch location is a function
+			// if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
+			// 	if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 0 {
+			// 		syms, err := m.FindAddressSymbols(uint64(insn.Arm64.Operands[0].Imm))
+			// 		if len(syms) > 1 {
+			// 			log.Warnf("found more than one symbol at address 0x%x, %v", uint64(insn.Arm64.Operands[0].Imm), syms)
+			// 		}
+			// 		if err == nil {
+			// 			var symName string
+			// 			if demangleFlag {
+			// 				symName = doDemangle(syms[0].Name)
+			// 			}
+			// 			insn.OpStr = symName
+			// 		}
+			// 	}
+			// }
+			fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), i.Instruction.OpStr())
 		}
+
+		// fmt.Println("CAPSTONE====================================================")
+		// engine, err := gapstone.New(
+		// 	gapstone.CS_ARCH_ARM64,
+		// 	gapstone.CS_MODE_ARM,
+		// )
+		// if err != nil {
+		// 	return errors.Wrapf(err, "failed to create capstone engine")
+		// }
+
+		// // turn on instruction details
+		// engine.SetOption(gapstone.CS_OPT_DETAIL, gapstone.CS_OPT_ON)
+
+		// insns, err := engine.Disasm(
+		// 	data,
+		// 	startAddr,
+		// 	0, // insns to disassemble, 0 for all
+		// )
+		// if err != nil {
+		// 	return errors.Wrapf(err, "failed to disassemble data")
+		// }
+
+		// for i, insn := range insns {
+		// 	// check for start of a new function
+		// 	if funcStarts != nil && isFunctionStart(funcStarts, uint64(insn.Address)) != 0 {
+		// 		syms, err := m.FindAddressSymbols(uint64(insn.Address))
+		// 		if len(syms) > 1 {
+		// 			log.Warnf("found more than one symbol at address 0x%x, %v", insn.Address, syms)
+		// 		}
+		// 		if err == nil {
+		// 			var symName string
+		// 			if demangleFlag {
+		// 				symName = doDemangle(syms[0].Name)
+		// 			}
+		// 			fmt.Printf("\n%s:\n", symName)
+		// 		}
+		// 	}
+
+		// 	// lookup adrp/ldr or add address as a cstring or symbol name
+		// 	if Verbose && (insn.Mnemonic == "ldr" || insn.Mnemonic == "add") && insns[i-1].Mnemonic == "adrp" {
+		// 		if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 1 {
+		// 			if insns[i-1].Arm64.Operands != nil && len(insns[i-1].Arm64.Operands) > 1 {
+		// 				adrpRegister := insns[i-1].Arm64.Operands[0].Reg
+		// 				adrpImm := insns[i-1].Arm64.Operands[1].Imm
+		// 				if insn.Mnemonic == "ldr" && adrpRegister == insn.Arm64.Operands[1].Mem.Base {
+		// 					adrpImm += int64(insn.Arm64.Operands[1].Mem.Disp)
+		// 				} else if insn.Mnemonic == "add" && adrpRegister == insn.Arm64.Operands[0].Reg {
+		// 					adrpImm += insn.Arm64.Operands[2].Imm
+		// 				}
+		// 				// markup disassemble with label comment
+		// 				syms, err := m.FindAddressSymbols(uint64(adrpImm))
+		// 				if len(syms) > 1 {
+		// 					log.Warnf("found more than one symbol at address 0x%x, %v", uint64(adrpImm), syms)
+		// 				}
+		// 				if err == nil {
+		// 					var symName string
+		// 					if demangleFlag {
+		// 						symName = doDemangle(syms[0].Name)
+		// 					}
+		// 					insn.OpStr += fmt.Sprintf(" // %s", symName)
+		// 				} else {
+		// 					cstr, err := m.GetCString(uint64(adrpImm))
+		// 					if err == nil {
+		// 						insn.OpStr += fmt.Sprintf(" // %s", cstr)
+		// 					}
+		// 				}
+		// 			}
+		// 		}
+		// 	}
+
+		// 	// check if branch location is a function
+		// 	if strings.HasPrefix(insn.Mnemonic, "b") && strings.HasPrefix(insn.OpStr, "#0x") {
+		// 		if insn.Arm64.Operands != nil && len(insn.Arm64.Operands) > 0 {
+		// 			syms, err := m.FindAddressSymbols(uint64(insn.Arm64.Operands[0].Imm))
+		// 			if len(syms) > 1 {
+		// 				log.Warnf("found more than one symbol at address 0x%x, %v", uint64(insn.Arm64.Operands[0].Imm), syms)
+		// 			}
+		// 			if err == nil {
+		// 				var symName string
+		// 				if demangleFlag {
+		// 					symName = doDemangle(syms[0].Name)
+		// 				}
+		// 				insn.OpStr = symName
+		// 			}
+		// 		}
+		// 	}
+
+		// 	fmt.Printf("0x%x:\t%s\t\t%s\n", insn.Address, insn.Mnemonic, insn.OpStr)
+		// }
 
 		return nil
 	},

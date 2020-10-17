@@ -18,14 +18,6 @@ RUN \
     && cmake .. \
     && make install
 
-RUN \
-    echo "===> Installing capstone..." \
-    && cd /tmp \    
-    && git clone -b next https://github.com/aquynh/capstone.git \
-    && cd capstone \
-    && CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh \
-    && ./make.sh install
-
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
 RUN CGO_ENABLED=1 go build \
@@ -57,12 +49,6 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && cmake .. \
     && make install \
     && cd /tmp \    
-    && echo "===> Installing capstone..." \
-    && cd /tmp \    
-    && git clone -b next https://github.com/aquynh/capstone.git \
-    && cd capstone \
-    && CAPSTONE_ARCHS="arm aarch64 x86" ./make.sh \
-    && ./make.sh install  \
     && echo "===> Installing apfs-fuse..." \
     && cd /tmp \    
     && git clone https://github.com/sgan81/apfs-fuse.git \
