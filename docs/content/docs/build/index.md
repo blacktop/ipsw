@@ -6,20 +6,13 @@ weight: 3
 summary: Build from source
 ---
 
-## **WITH** support for **lzfse** compression and **capstone** disassembly
+## **WITH** support for **lzfse** decompression
 
 #### Dependancies:
 
 - [lzfse](https://github.com/lzfse/lzfse)
-- [capstone](https://github.com/aquynh/capstone/tree/next)
 
 ### Install the dependancies
-
-Via [homebrew](https://brew.sh)
-
-```bash
-$ brew install capstone --HEAD
-```
 
 From source
 
@@ -34,27 +27,18 @@ $ cmake ..
 $ make install
 ```
 
-- [capstone](https://github.com/aquynh/capstone/tree/next)
-
-```bash
-$ git clone -b next https://github.com/aquynh/capstone.git
-$ cd capstone
-$ CAPSTONE_ARCHS="arm aarch64" ./make.sh
-$ sudo ./make.sh install
-```
-
 #### Install the Go binary
 
 ```bash
 $ git clone https://github.com/blacktop/ipsw.git
 $ cd ipsw
 $ CGO_ENABLED=1 \
-  CGO_CFLAGS=-I/usr/local/include \ # path to the capstone includes
-  CGO_LDFLAGS=-L/usr/local/lib \    # path to the capstone libs
+  CGO_CFLAGS=-I/usr/local/include \ # path to the lzfse includes
+  CGO_LDFLAGS=-L/usr/local/lib \    # path to the lzfse libs
   go build ./cmd/ipsw
 ```
 
-## **WITHOUT** support for **capstone** disassembly
+## **WITHOUT** support for **lzfse** decompression
 
 #### Install the Go binary
 
