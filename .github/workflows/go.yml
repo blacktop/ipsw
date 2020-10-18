@@ -101,7 +101,7 @@ jobs:
       - name: Run Extract ALL Remote Kernelcaches
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v ${{ steps.get-latest.outputs.version }} --black-list appletv
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v 14.0.1 --black-list appletv
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
 
       - uses: actions/upload-artifact@v2
