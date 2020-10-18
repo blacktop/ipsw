@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png" height="140" /></a>
   <h1 align="center">ipsw</h1>
-  <h4><p align="center">Download and parse iOS ipsw(s)</p></h4>
+  <h4><p align="center">🇨🇭 iOS/macOS swiss army knife 🇨🇭</p></h4>
   <p align="center">
     <a href="https://github.com/blacktop/ipsw/actions?query=workflow%3AGo" alt="Actions">
           <img src="https://github.com/blacktop/ipsw/workflows/Go/badge.svg" /></a>
@@ -16,12 +16,16 @@
 
 ## What is `ipsw` 🤔
 
-- ipsw downloader/exploder
+- IPSW downloader/exploder
+- OTA downloader/exploder
 - macho parser
-- dyld parser
+- ObjC class-dump
+- Swift class-dump 🚧
+- dyld_shared_cache parser
 - kernelcache parser
+- img4 parser/decrypter
 - device-tree parser
-- ARM disassember
+- ARM v8.5-a disassember
 - research tool
 - otool wannabe
 - objdump wannabe
