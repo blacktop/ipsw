@@ -1,7 +1,7 @@
 <p align="center">
   <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png" height="140" /></a>
   <h1 align="center">ipsw</h1>
-  <h4><p align="center">🇨🇭 iOS/macOS swiss army knife 🇨🇭</p></h4>
+  <h4><p align="center">📱iOS/💻macOS swiss army knife 🇨🇭</p></h4>
   <p align="center">
     <a href="https://github.com/blacktop/ipsw/actions?query=workflow%3AGo" alt="Actions">
           <img src="https://github.com/blacktop/ipsw/workflows/Go/badge.svg" /></a>
