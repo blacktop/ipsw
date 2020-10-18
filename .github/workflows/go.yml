@@ -67,12 +67,12 @@ jobs:
           dir build/dist
           dir
 
-      - name: Run Help
-        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
-        run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw --help
-      - name: Run Help (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe --help
+      # - name: Run Help
+      #   if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
+      #   run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw --help
+      # - name: Run Help (Windows)
+      #   if: matrix.platform == 'windows-latest'
+      #   run: D:\a\ipsw\ipsw\build\dist\ipsw.exe --help
 
       - name: Run Device List
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
