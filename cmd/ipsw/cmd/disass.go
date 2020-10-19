@@ -23,7 +23,10 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/binary"
+	"encoding/gob"
 	"fmt"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -32,15 +35,17 @@ import (
 	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	// "github.com/knightsc/gapstone"
 )
 
 var (
-	symbolName   string
-	demangleFlag bool
-	symbolMap    map[uint64]string
+	symbolName    string
+	demangleFlag  bool
+	symbolMapFile string
+	symbolMap     map[uint64]string
 )
 
 func init() {
@@ -50,6 +55,7 @@ func init() {
 	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	disCmd.PersistentFlags().Uint64P("instrs", "i", 0, "Number of instructions to disassemble")
 	disCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
+	disCmd.Flags().StringVarP(&symbolMapFile, "companion", "c", "", "Companion symbol map file")
 	disCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -151,6 +157,9 @@ func getData(m *macho.File, startAddress, instructionCount uint64) ([]byte, erro
 func lookupSymbol(m *macho.File, addr uint64) string {
 
 	if symName, ok := symbolMap[addr]; ok {
+		if demangleFlag {
+			return doDemangle(symName)
+		}
 		return symName
 	}
 
@@ -248,6 +257,93 @@ func parseSymbolStubs(m *macho.File) error {
 	return nil
 }
 
+// func convertToVMAddr(f *macho.File, value uint64) uint64 {
+// 	if fixupchains.DcpArm64eIsRebase(value) {
+// 		if fixupchains.DcpArm64eIsAuth(value) {
+// 			dcp := fixupchains.DyldChainedPtrArm64eAuthRebase{Pointer: value}
+// 			// return dcp.Target()
+// 			return dcp.Target() + f.GetBaseAddress()
+// 		}
+// 		dcp := fixupchains.DyldChainedPtrArm64eRebase{Pointer: value}
+// 		return dcp.UnpackTarget()
+// 	} else {
+// 		if fixupchains.DcpArm64eIsAuth(value) {
+// 			dcp := fixupchains.DyldChainedPtrArm64eAuthBind{Pointer: value}
+// 			return dcp.Offset() + f.GetBaseAddress()
+// 		}
+// 		dcp := fixupchains.DyldChainedPtrArm64eBind{Pointer: value}
+// 		return dcp.Offset() + f.GetBaseAddress()
+// 	}
+
+// 	// return value
+// }
+
+func parseGOT(m *macho.File) error {
+
+	// authPtr := m.Section("__AUTH_CONST", "__auth_ptr")
+	// data, err := authPtr.Data()
+	// if err != nil {
+	// 	return err
+	// }
+	// ptrs := make([]uint64, authPtr.Size/8)
+	// if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &ptrs); err != nil {
+	// 	return err
+	// }
+	// for _, ptr := range ptrs {
+	// 	newPtr := convertToVMAddr(m, ptr)
+	// 	fmt.Printf("ptr: %#x\n", ptr)
+	// 	fmt.Printf("newPtr: %#x, %s\n", newPtr, symbolMap[newPtr])
+	// }
+	for _, sec := range m.Sections {
+		if sec.Flags.IsNonLazySymbolPointers() {
+
+			data, err := sec.Data()
+			if err != nil {
+				return err
+			}
+
+			ptrs := make([]uint64, sec.Size/8)
+
+			if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &ptrs); err != nil {
+				return err
+			}
+			// imports, err := m.ImportedSymbolNames()
+			// if err != nil {
+			// 	return err
+			// }
+			// for name := range imports {
+			// 	fmt.Println(name)
+			// }
+			for idx, ptr := range ptrs {
+				gotPtr := sec.Addr + uint64(idx*8)
+				// fmt.Printf("gotPtr: %#x\n", gotPtr)
+				var targetValue uint64
+				pointer := dyld.CacheSlidePointer3(ptr)
+				if pointer.Authenticated() {
+					targetValue = 0x180000000 + pointer.OffsetFromSharedCacheBase()
+				} else {
+					targetValue = pointer.SignExtend51()
+				}
+				// fmt.Printf("ptr: %#x\n", ptr)
+				// fmt.Printf("newPtr: %#x, %s\n", targetValue, symbolMap[targetValue])
+				// fmt.Println(lookupSymbol(m, targetValue))
+				if _, ok := symbolMap[gotPtr]; ok {
+					// continue
+					symbolMap[gotPtr] = "__got." + symbolMap[gotPtr]
+				} else {
+					if _, ok := symbolMap[targetValue]; ok {
+						symbolMap[gotPtr] = "__got." + symbolMap[targetValue]
+					} else {
+						symbolMap[gotPtr] = fmt.Sprintf("__got_ptr_%#x", targetValue)
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 func pad(length int) string {
 	if length > 0 {
 		return strings.Repeat(" ", length)
@@ -292,7 +388,19 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to get data to disassemble")
 		}
 
-		symbolMap = make(map[uint64]string)
+		if len(symbolMapFile) > 0 {
+			a2sFile, err := os.Open(symbolMapFile)
+			if err != nil {
+				return errors.Wrapf(err, "failed to open companion file")
+			}
+			// Decoding the serialized data
+			err = gob.NewDecoder(a2sFile).Decode(&symbolMap)
+			if err != nil {
+				return err
+			}
+		} else {
+			symbolMap = make(map[uint64]string)
+		}
 
 		err = parseImports(m)
 		if err != nil {
@@ -302,6 +410,11 @@ var disCmd = &cobra.Command{
 		err = parseSymbolStubs(m)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse symbol stubs")
+		}
+
+		err = parseGOT(m)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse got(s)")
 		}
 
 		var prevInstruction arm64.Instruction

@@ -554,8 +554,8 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 					}
 
 					if pointer.Authenticated() {
-						// targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
-						targetValue = slideInfo.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
+						targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
+						// targetValue = slideInfo.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
 					} else {
 						targetValue = pointer.SignExtend51()
 					}
