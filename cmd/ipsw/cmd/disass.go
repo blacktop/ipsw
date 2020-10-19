@@ -40,6 +40,7 @@ import (
 var (
 	symbolName   string
 	demangleFlag bool
+	symbolMap    map[uint64]string
 )
 
 func init() {
@@ -148,6 +149,11 @@ func getData(m *macho.File, startAddress, instructionCount uint64) ([]byte, erro
 }
 
 func lookupSymbol(m *macho.File, addr uint64) string {
+
+	if symName, ok := symbolMap[addr]; ok {
+		return symName
+	}
+
 	syms, err := m.FindAddressSymbols(addr)
 	if err != nil {
 		return ""
@@ -164,6 +170,8 @@ func lookupSymbol(m *macho.File, addr uint64) string {
 		}
 	}
 
+	symbolMap[addr] = symName
+
 	return symName
 }
 
@@ -178,6 +186,66 @@ func isFunctionStart(m *macho.File, addr uint64) {
 			}
 		}
 	}
+}
+
+func parseImports(m *macho.File) error {
+	if m.HasFixups() {
+		var addr uint64
+
+		dcf, err := m.DyldChainedFixups()
+		if err != nil {
+			return err
+		}
+
+		for _, start := range dcf.Starts {
+			if start.PageStarts != nil {
+				if len(start.Binds) > 0 {
+					for _, bind := range start.Binds {
+						fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend()
+						addr = m.GetBaseAddress() + bind.Offset() + fullAddend
+						symbolMap[addr] = dcf.Imports[bind.Ordinal()].Name
+					}
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func parseSymbolStubs(m *macho.File) error {
+	for _, sec := range m.Sections {
+		if sec.Flags.IsSymbolStubs() {
+
+			data, err := sec.Data()
+			if err != nil {
+				return err
+			}
+
+			var prevInstruction arm64.Instruction
+			for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(sec.Addr)}) {
+				// TODO: remove duplicate code (refactor into IL)
+				operation := i.Instruction.Operation().String()
+				if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
+					operands := i.Instruction.Operands()
+					if operands != nil && prevInstruction.Operands() != nil {
+						adrpRegister := prevInstruction.Operands()[0].Reg[0]
+						adrpImm := prevInstruction.Operands()[1].Immediate
+						if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
+							adrpImm += operands[1].Immediate
+						} else if operation == "add" && adrpRegister == operands[0].Reg[0] {
+							adrpImm += operands[2].Immediate
+						}
+						symbolMap[prevInstruction.Address()] = symbolMap[adrpImm]
+					}
+				}
+				// fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), i.Instruction.OpStr())
+				prevInstruction = *i.Instruction
+			}
+		}
+	}
+
+	return nil
 }
 
 func pad(length int) string {
@@ -224,6 +292,18 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to get data to disassemble")
 		}
 
+		symbolMap = make(map[uint64]string)
+
+		err = parseImports(m)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse imports")
+		}
+
+		err = parseSymbolStubs(m)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse symbol stubs")
+		}
+
 		var prevInstruction arm64.Instruction
 
 		for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}) {
@@ -247,11 +327,11 @@ var disCmd = &cobra.Command{
 					// markup disassemble with label comment
 					symName := lookupSymbol(m, adrpImm)
 					if len(symName) > 0 {
-						opStr += fmt.Sprintf(" // %s", symName)
+						opStr += fmt.Sprintf(" ; %s", symName)
 					} else {
 						cstr, err := m.GetCString(adrpImm)
 						if err == nil {
-							opStr += fmt.Sprintf(" // %s", cstr)
+							opStr += fmt.Sprintf(" ; %#v", cstr)
 						}
 					}
 				}
