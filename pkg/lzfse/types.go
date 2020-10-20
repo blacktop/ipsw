@@ -232,15 +232,3 @@ var dBaseValue = [LZFSE_ENCODE_D_SYMBOLS]int32{
 	24572, 28668, 32764, 40956, 49148, 57340, 65532, 81916, 98300, 114684,
 	131068, 163836, 196604, 229372,
 }
-
-// decodeV2HeaderSize returns header_size field from a compressedBlockHeaderV2.
-func decodeV2HeaderSize(in compressedBlockHeaderV2) uint32 {
-	return getField(in.PackedFields[2], 0, 32)
-}
-
-func getField(v uint64, offset, nbits int) uint32 {
-	if nbits == 32 {
-		return uint32(v >> offset)
-	}
-	return uint32((v >> offset) & ((1 << nbits) - 1))
-}

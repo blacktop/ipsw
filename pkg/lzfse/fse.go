@@ -165,8 +165,7 @@ func fseInitValueDDecoderTable(nstates, nsymbols int, freq []uint16, symbolVbits
 func fseInCheckedInit(s *fseInStream, n fseBitCount, r *io.SectionReader) error {
 	// pbuf := io.NewSectionReader(r, 0, 1<<63-1)
 	if n != 0 {
-		_, err := r.Seek(-8, io.SeekCurrent)
-		if err != nil {
+		if _, err := r.Seek(-8, io.SeekCurrent); err != nil {
 			return err
 		}
 		if err := binary.Read(r, binary.LittleEndian, &s.Accum); err != nil {
@@ -184,8 +183,7 @@ func fseInCheckedInit(s *fseInStream, n fseBitCount, r *io.SectionReader) error 
 		s.AccumNbits = n + 56
 	}
 
-	if (s.AccumNbits < 56 || s.AccumNbits >= 64) ||
-		((s.Accum >> s.AccumNbits) != 0) {
+	if (s.AccumNbits < 56 || s.AccumNbits >= 64) || ((s.Accum >> s.AccumNbits) != 0) {
 		return fmt.Errorf("the incoming input is wrong (encoder should have zeroed the upper bits)")
 	}
 
