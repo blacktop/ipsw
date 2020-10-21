@@ -420,6 +420,12 @@ var disCmd = &cobra.Command{
 		var prevInstruction arm64.Instruction
 
 		for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}) {
+
+			if i.Error != nil {
+				fmt.Println(i.StrRepr)
+				continue
+			}
+
 			opStr := i.Instruction.OpStr()
 
 			// check for start of a new function
@@ -444,7 +450,11 @@ var disCmd = &cobra.Command{
 					} else {
 						cstr, err := m.GetCString(adrpImm)
 						if err == nil {
-							opStr += fmt.Sprintf(" ; %#v", cstr)
+							if len(cstr) > 200 {
+								opStr += fmt.Sprintf(" ; %#v...", cstr[:200])
+							} else {
+								opStr += fmt.Sprintf(" ; %#v", cstr)
+							}
 						}
 					}
 				}
