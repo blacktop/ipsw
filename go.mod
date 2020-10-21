@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.1.1
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/apex/log v1.9.0
-	github.com/blacktop/go-arm64 v0.6.0
+	github.com/blacktop/go-arm64 v0.6.2
 	github.com/blacktop/go-lzfse v1.1.12
 	github.com/blacktop/go-macho v1.1.1
 	github.com/blacktop/go-plist v1.0.0
@@ -31,13 +31,14 @@ require (
 	github.com/rakyll/statik v0.1.7
 	github.com/spf13/afero v1.2.2 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
-	github.com/spf13/cobra v1.1.0
+	github.com/spf13/cobra v1.1.1
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.1
 	github.com/ulikunitz/xz v0.5.8
 	github.com/vbauerster/mpb/v5 v5.3.0
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897
-	golang.org/x/sync v0.0.0-20201008141435-b3e1573b7520
+	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
 	gopkg.in/ini.v1 v1.55.0 // indirect
+	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
