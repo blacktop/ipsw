@@ -205,14 +205,15 @@ func parseImports(m *macho.File) error {
 		if err != nil {
 			return err
 		}
-
-		for _, start := range dcf.Starts {
-			if start.PageStarts != nil {
-				if len(start.Binds) > 0 {
-					for _, bind := range start.Binds {
-						fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend()
-						addr = m.GetBaseAddress() + bind.Offset() + fullAddend
-						symbolMap[addr] = dcf.Imports[bind.Ordinal()].Name
+		if dcf.Imports != nil {
+			for _, start := range dcf.Starts {
+				if start.PageStarts != nil {
+					if len(start.Binds) > 0 {
+						for _, bind := range start.Binds {
+							fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend()
+							addr = m.GetBaseAddress() + bind.Offset() + fullAddend
+							symbolMap[addr] = dcf.Imports[bind.Ordinal()].Name
+						}
 					}
 				}
 			}
