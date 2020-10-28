@@ -32,7 +32,6 @@ jobs:
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
-          brew update
           brew install lzfse
       # - name: Build Dependencies (Windows)
       #   if: matrix.platform == 'windows-latest'
@@ -89,19 +88,19 @@ jobs:
       - name: Run Extract Remote Kernelcache
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v 14.0.1 -d iPhone12,1
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v 14.1 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
 
       - name: Run Extract Remote Kernelcache (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 14.0.1 -d iPhone12,1
+          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 14.1 -d iPhone12,1
           dir
 
       - name: Run Extract ALL Remote Kernelcaches
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v 14.0.1 -d iPhone12,1
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v 14.1 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
 
       - uses: actions/upload-artifact@v2
