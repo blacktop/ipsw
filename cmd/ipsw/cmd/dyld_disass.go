@@ -40,9 +40,9 @@ func init() {
 
 	// dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	// dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
-	dyldDisassCmd.Flags().Uint64P("instrs", "c", 30, "Number of instructions to disassemble")
-	dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demandle symbol names")
-	dyldDisassCmd.Flags().StringP("companion", "c", "", "Companion symbol map file")
+	dyldDisassCmd.Flags().Uint64P("count", "c", 30, "Number of instructions to disassemble")
+	// dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demandle symbol names")
+	dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
@@ -69,7 +69,7 @@ var dyldDisassCmd = &cobra.Command{
 	Use:    "disass",
 	Short:  "🚧 [WIP] Disassemble dyld_shared_cache symbol in an image",
 	Hidden: true,
-	Args:   cobra.MinimumNArgs(1),
+	Args:   cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var image *dyld.CacheImage
@@ -80,7 +80,7 @@ var dyldDisassCmd = &cobra.Command{
 		}
 
 		imageName, _ := cmd.Flags().GetString("image")
-		instructions, _ := cmd.Flags().GetUint64("instrs")
+		instructions, _ := cmd.Flags().GetUint64("count")
 		// symbolName, _ := cmd.Flags().GetString("symbol")
 		// doDemangle, _ := cmd.Flags().GetBool("demangle")
 
@@ -168,6 +168,7 @@ var dyldDisassCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+
 				for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(symAddr)}) {
 
 					if i.Error != nil {
