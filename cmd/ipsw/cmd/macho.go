@@ -25,19 +25,23 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/fullsailor/pkcs7"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	rootCmd.AddCommand(machoCmd)
 
+	machoCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
 	machoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
 	machoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
 	machoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
@@ -63,6 +67,7 @@ var machoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		selectedArch, _ := cmd.Flags().GetString("arch")
 		showHeader, _ := cmd.Flags().GetBool("header")
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
 		showSignature, _ := cmd.Flags().GetBool("sig")
@@ -93,18 +98,33 @@ var machoCmd = &cobra.Command{
 			}
 		} else {
 			var options []string
+			var shortOptions []string
 			for _, arch := range fat.Arches {
 				options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
+				shortOptions = append(shortOptions, strings.ToLower(arch.CPU.String()))
 			}
 
-			choice := 0
-			prompt := &survey.Select{
-				Message: fmt.Sprintf("Detected a fat MachO file, please select an architecture to analyze:"),
-				Options: options,
+			if len(selectedArch) > 0 {
+				found := false
+				for i, opt := range shortOptions {
+					if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
+						m = fat.Arches[i].File
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
+				}
+			} else {
+				choice := 0
+				prompt := &survey.Select{
+					Message: fmt.Sprintf("Detected a fat MachO file, please select an architecture to analyze:"),
+					Options: options,
+				}
+				survey.AskOne(prompt, &choice)
+				m = fat.Arches[choice].File
 			}
-			survey.AskOne(prompt, &choice)
-
-			m = fat.Arches[choice].File
 		}
 
 		if showHeader && !showLoadCommands {
@@ -237,12 +257,14 @@ var machoCmd = &cobra.Command{
 					}
 				}
 				if cats, err := m.GetObjCCategories(); err == nil {
-					fmt.Printf("Categories: %#v\n", cats)
+					for _, cat := range cats {
+						fmt.Println(cat.String())
+					}
 				}
 				if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
-					fmt.Println("@selectors")
-					for vmaddr, name := range selRefs {
-						fmt.Printf("0x%011x: %s\n", vmaddr, name)
+					fmt.Println("@selectors refs")
+					for off, sel := range selRefs {
+						fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
 					}
 				}
 				if methods, err := m.GetObjCMethodNames(); err == nil {
@@ -318,33 +340,32 @@ var machoCmd = &cobra.Command{
 
 				for _, start := range dcf.Starts {
 					if start.PageStarts != nil {
-						if len(start.Binds) > 0 {
-							fmt.Printf("\nBINDS\n")
-							fmt.Println("-----")
-							w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
-							for _, bind := range start.Binds {
+						var sec *macho.Section
+						var lastSec *macho.Section
+						for _, fixup := range start.Fixups {
+							switch f := fixup.(type) {
+							case fixupchains.Bind:
 								var addend string
-								if fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend(); fullAddend > 0 {
+								addr := uint64(f.Offset()) + m.GetBaseAddress()
+								if fullAddend := dcf.Imports[f.Ordinal()].Addend() + f.Addend(); fullAddend > 0 {
 									addend = fmt.Sprintf(" + 0x%x", fullAddend)
+									addr += fullAddend
 								}
-								lib := m.LibraryOrdinalName(dcf.Imports[bind.Ordinal()].LibOrdinal())
-								fmt.Fprintf(w, "%s\t%s/%s%s\n", bind, lib, dcf.Imports[bind.Ordinal()].Name, addend)
-							}
-							w.Flush()
-						}
-						if len(start.Rebases) > 0 {
-							fmt.Printf("\nREBASES\n")
-							fmt.Println("-------")
-							var lastSec *macho.Section
-							for _, rebase := range start.Rebases {
-								addr := uint64(rebase.Offset()) + m.GetBaseAddress()
-								sec := m.FindSectionForVMAddr(addr)
+								sec = m.FindSectionForVMAddr(addr)
+								lib := m.LibraryOrdinalName(dcf.Imports[f.Ordinal()].LibOrdinal())
 								if sec != lastSec {
 									fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
 								}
-								fmt.Println(rebase)
-								lastSec = sec
+								fmt.Printf("%s\t%s/%s%s\n", fixupchains.Bind(f).String(m.GetBaseAddress()), lib, f.Name(), addend)
+							case fixupchains.Rebase:
+								addr := uint64(f.Offset()) + m.GetBaseAddress()
+								sec = m.FindSectionForVMAddr(addr)
+								if sec != lastSec {
+									fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
+								}
+								fmt.Println(f.String(m.GetBaseAddress()))
 							}
+							lastSec = sec
 						}
 					}
 				}
