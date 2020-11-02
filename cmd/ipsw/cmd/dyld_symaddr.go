@@ -35,6 +35,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(symaddrCmd)
 
+	symaddrCmd.Flags().BoolP("all", "a", false, "Find all symbol matches")
 	symaddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -51,6 +52,7 @@ var symaddrCmd = &cobra.Command{
 		}
 
 		imageName, _ := cmd.Flags().GetString("image")
+		allMatches, _ := cmd.Flags().GetBool("all")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -82,59 +84,48 @@ var symaddrCmd = &cobra.Command{
 			if len(imageName) > 0 { // Search for symbol inside dylib
 				if sym, _ := f.FindExportedSymbolInImage(imageName, args[1]); sym != nil {
 					fmt.Printf("0x%8x: (%s) %s\t%s\n", sym.Address, sym.Flags, sym.Name, f.Image(imageName).Name)
-					return nil
+					if !allMatches {
+						return nil
+					}
 				}
 				if lSym, _ := f.FindLocalSymbolInImage(args[1], imageName); lSym != nil {
 					fmt.Println(lSym)
 				}
 				return nil
 			}
+
 			// Search ALL dylibs for a symbol
 			for _, image := range f.Images {
 				if sym, _ := f.FindExportedSymbolInImage(image.Name, args[1]); sym != nil {
 					fmt.Printf("0x%8x: (%s) %s\t%s\n", sym.Address, sym.Flags, sym.Name, image.Name)
-					return nil
+					if !allMatches {
+						return nil
+					}
 				}
 			}
 			if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
 				fmt.Println(lSym)
-				return nil
 			}
-		} else { // Dump ALL symbols
-			err := f.GetAllExportedSymbols(true)
-			if err != nil {
-				return errors.Wrap(err, "failed to get all exported symbols")
-			}
-			log.Warn("parsing local symbols...")
-			err = f.ParseLocalSyms()
-			if err != nil {
-				return errors.Wrap(err, "failed to parse private symbols")
-			}
-			for _, image := range f.Images {
-				fmt.Printf("\n%s\n", image.Name)
-				for _, sym := range image.LocalSymbols {
-					fmt.Printf("0x%8x: %s\n", sym.Value, sym.Name)
-				}
-			}
+			return nil
+		}
+		/*
+		 * Dump ALL symbols
+		 */
+		if err = f.GetAllExportedSymbols(true); err != nil {
+			return errors.Wrap(err, "failed to get all exported symbols")
 		}
 
-		// if false {
-		// 	index, found, err := f.HasImagePath("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	if found {
-		// 		fmt.Println("index:", index, "image:", f.Images[index].Name)
-		// 	}
-		// 	// err = f.FindClosure("/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore")
-		// 	// if err != nil {
-		// 	// 	return err
-		// 	// }
-		// 	err = f.FindDlopenOtherImage("/Applications/FindMy.app/Frameworks/FMSiriIntents.framework/FMSiriIntents")
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
+		log.Warn("parsing local symbols (slow)...")
+		if err = f.ParseLocalSyms(); err != nil {
+			return errors.Wrap(err, "failed to parse private symbols")
+		}
+
+		for _, image := range f.Images {
+			fmt.Printf("\n%s\n", image.Name)
+			for _, sym := range image.LocalSymbols {
+				fmt.Printf("0x%8x: %s\n", sym.Value, sym.Name)
+			}
+		}
 
 		return nil
 	},
