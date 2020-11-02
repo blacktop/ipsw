@@ -32,7 +32,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
-	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/fullsailor/pkcs7"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -285,7 +284,7 @@ var machoCmd = &cobra.Command{
 				fmt.Println("===============")
 			}
 			if m.FunctionStarts() != nil {
-				for _, vaddr := range m.FunctionStarts() {
+				for _, vaddr := range m.FunctionStartAddrs() {
 					fmt.Printf("0x%016X\n", vaddr)
 				}
 			}
@@ -308,7 +307,7 @@ var machoCmd = &cobra.Command{
 			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
 				fmt.Println("DyldExport SYMBOLS")
 				fmt.Println("------------------")
-				exports, err := trie.ParseTrie(m.DyldExportsTrie().Data, m.GetBaseAddress())
+				exports, err := m.DyldExports()
 				if err != nil {
 					return err
 				}

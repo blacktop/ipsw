@@ -56,8 +56,8 @@ github.com/blacktop/go-arm64 v0.6.9 h1:GVZ9LTXyBgcEJ2KREs/f5X3lq9uozr7KVlLsCdcOD
 github.com/blacktop/go-arm64 v0.6.9/go.mod h1:MadXPi/vTAx0FYNcQllHRMZrRRuwPfjzhr7d1UUWQc0=
 github.com/blacktop/go-lzfse v1.1.12 h1:UsEwnUUaukWzSTXMK3cRwztCxtP5NK+HnqGVJO7dQow=
 github.com/blacktop/go-lzfse v1.1.12/go.mod h1:b/0s26ecQ5SleO5NO41iY2Ie32rZxS5BKQstc5z2ia8=
-github.com/blacktop/go-macho v1.1.6 h1:hRxmvjP9vxBKsEXnlh7FFSAQ9rwAp9BdzXXOaV1SnHs=
-github.com/blacktop/go-macho v1.1.6/go.mod h1:RFM+BXgCwyvOW0IMF4IFXKQxDbw8URyGrp38uDKGxkQ=
+github.com/blacktop/go-macho v1.1.8 h1:9VvOXIu30GWQz5c7jdrH4kkjqAqMQ9mbjfsIQ5Wugz4=
+github.com/blacktop/go-macho v1.1.8/go.mod h1:RFM+BXgCwyvOW0IMF4IFXKQxDbw8URyGrp38uDKGxkQ=
 github.com/blacktop/go-plist v1.0.0 h1:bBpFGaiCdJZbQgOKxjxAUdvugySX+C3RtGvZODcOOoI=
 github.com/blacktop/go-plist v1.0.0/go.mod h1:niIOeDMEBISbJ9w0PPuc67iLvLh7Ve0N1gAfxIRWSk4=
 github.com/blacktop/lzss v0.1.1 h1:ADOUgVH3hq2miBfaxhV1GgY97wNSv5fBiXRnUVe8QSg=
