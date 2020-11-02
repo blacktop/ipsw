@@ -321,243 +321,375 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 </code></pre></div><h3 id="macho---objc"><strong>macho &ndash;objc</strong></h3>
 <p>Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></p>
 <p><strong>NOTE:</strong> Currently only supports <em>64-bit</em> architechtures</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/lib/libobjc.A.dylib --objc
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">Objective-C
+===========
 
-Objective-C
-<span class="o">===========</span>
 @protocol NSObject
- @property <span class="nb">hash</span>
- @property superclass
- @property description
- @property debugDescription
+ @property (TQ,R) hash
+ @property (T#,R) superclass
+ @property (T@&#34;NSString&#34;,R,C) description
+ @property (T@&#34;NSString&#34;,R,C) debugDescription
 
   // instance methods
- -<span class="o">[</span>NSObject isEqual:<span class="o">]</span>
- -<span class="o">[</span>NSObject class<span class="o">]</span>
- -<span class="o">[</span>NSObject self<span class="o">]</span>
- -<span class="o">[</span>NSObject performSelector:<span class="o">]</span>
- -<span class="o">[</span>NSObject performSelector:withObject:<span class="o">]</span>
- -<span class="o">[</span>NSObject performSelector:withObject:withObject:<span class="o">]</span>
- -<span class="o">[</span>NSObject isProxy<span class="o">]</span>
- -<span class="o">[</span>NSObject isKindOfClass:<span class="o">]</span>
- -<span class="o">[</span>NSObject isMemberOfClass:<span class="o">]</span>
- -<span class="o">[</span>NSObject conformsToProtocol:<span class="o">]</span>
- -<span class="o">[</span>NSObject respondsToSelector:<span class="o">]</span>
- -<span class="o">[</span>NSObject retain<span class="o">]</span>
- -<span class="o">[</span>NSObject release<span class="o">]</span>
- -<span class="o">[</span>NSObject autorelease<span class="o">]</span>
- -<span class="o">[</span>NSObject retainCount<span class="o">]</span>
- -<span class="o">[</span>NSObject zone<span class="o">]</span>
- -<span class="o">[</span>NSObject hash<span class="o">]</span>
- -<span class="o">[</span>NSObject superclass<span class="o">]</span>
- -<span class="o">[</span>NSObject description<span class="o">]</span>
+ -[NSObject isEqual:]
+ -[NSObject class]
+ -[NSObject self]
+ -[NSObject performSelector:]
+ -[NSObject performSelector:withObject:]
+ -[NSObject performSelector:withObject:withObject:]
+ -[NSObject isProxy]
+ -[NSObject isKindOfClass:]
+ -[NSObject isMemberOfClass:]
+ -[NSObject conformsToProtocol:]
+ -[NSObject respondsToSelector:]
+ -[NSObject retain]
+ -[NSObject release]
+ -[NSObject autorelease]
+ -[NSObject retainCount]
+ -[NSObject zone]
+ -[NSObject hash]
+ -[NSObject superclass]
+ -[NSObject description]
 
 @optional
   // instance methods
- -<span class="o">[</span>NSObject debugDescription<span class="o">]</span>
+ -[NSObject debugDescription]
+
 @end
 
 0x00000035000 Object : &lt;ROOT&gt;
+  // instance variables
+  +0x00 # isa (0x8)
+
+  // class methods
+  0x000000210c8 +[Object initialize]
+  0x000000210cc +[Object class]
+  0x000000210d0 +[Object retain]
+  0x000000210d4 +[Object release]
+  0x000000210d5 +[Object autorelease]
+
   // instance methods
-  0x000000210b9 -<span class="o">[</span>Object retain<span class="o">]</span>
-  0x000000210be -<span class="o">[</span>Object release<span class="o">]</span>
-  0x000000210c3 -<span class="o">[</span>Object autorelease<span class="o">]</span>
+  0x000000210b9 -[Object retain]
+  0x000000210be -[Object release]
+  0x000000210c3 -[Object autorelease]
+
 
 0x00000035078 __IncompleteProtocol : NSObject
 
 0x000000350c8 Protocol : NSObject
   // instance methods
-  0x000000210d9 -<span class="o">[</span>Protocol conformsTo:<span class="o">]</span>
-  0x000000210e1 -<span class="o">[</span>Protocol descriptionForInstanceMethod:<span class="o">]</span>
-  0x00000021100 -<span class="o">[</span>Protocol descriptionForClassMethod:<span class="o">]</span>
-  0x0000002111c -<span class="o">[</span>Protocol name<span class="o">]</span>
-  0x0000002112d -<span class="o">[</span>Protocol isEqual:<span class="o">]</span>
-  0x000000211c2 -<span class="o">[</span>Protocol hash<span class="o">]</span>
+  0x000000210d9 -[Protocol conformsTo:]
+  0x000000210e1 -[Protocol descriptionForInstanceMethod:]
+  0x00000021100 -[Protocol descriptionForClassMethod:]
+  0x0000002111c -[Protocol name]
+  0x0000002112d -[Protocol isEqual:]
+  0x000000211c2 -[Protocol hash]
+
 
 0x00000035168 __NSUnrecognizedTaggedPointer : NSObject
   // instance methods
-  0x00000022d0e -<span class="o">[</span>__NSUnrecognizedTaggedPointer retain<span class="o">]</span>
-  0x00000022d12 -<span class="o">[</span>__NSUnrecognizedTaggedPointer release<span class="o">]</span>
-  0x00000022d13 -<span class="o">[</span>__NSUnrecognizedTaggedPointer autorelease<span class="o">]</span>
+  0x00000022d0e -[__NSUnrecognizedTaggedPointer retain]
+  0x00000022d12 -[__NSUnrecognizedTaggedPointer release]
+  0x00000022d13 -[__NSUnrecognizedTaggedPointer autorelease]
 
-0x00000035118 NSObject : &lt;ROOT&gt;
+
+0x00000035118 NSObject : &lt;ROOT&gt; &lt;NSObject&gt;
+  // instance variables
+  +0x00 # isa (0x8)
+
+ @property (TQ,R) hash
+ @property (T#,R) superclass
+ @property (T@&#34;NSString&#34;,R,C) description
+ @property (T@&#34;NSString&#34;,R,C) debugDescription
+
+  // class methods
+  0x00000007743 +[NSObject initialize]
+  0x00000008d94 +[NSObject self]
+  0x00000009b98 +[NSObject class]
+  0x0000000d4fc +[NSObject superclass]
+  0x00000013741 +[NSObject isMemberOfClass:]
+  0x0000000c967 +[NSObject isKindOfClass:]
+  0x0000000bd4e +[NSObject isSubclassOfClass:]
+  0x00000011328 +[NSObject isAncestorOfObject:]
+  0x00000010ca1 +[NSObject instancesRespondToSelector:]
+  0x0000000bbd1 +[NSObject respondsToSelector:]
+  0x0000000c999 +[NSObject conformsToProtocol:]
+  0x0000000c6b8 +[NSObject hash]
+  0x0000000c6bc +[NSObject isEqual:]
+  0x000000223d5 +[NSObject isFault]
+  0x000000223d8 +[NSObject isProxy]
+  0x0000000bceb +[NSObject instanceMethodForSelector:]
+  0x0000000f280 +[NSObject methodForSelector:]
+  0x0000000b284 +[NSObject resolveClassMethod:]
+  0x0000000acd7 +[NSObject resolveInstanceMethod:]
+  0x000000223ea +[NSObject doesNotRecognizeSelector:]
+  0x0000000e541 +[NSObject performSelector:]
+  0x00000012a15 +[NSObject performSelector:withObject:]
+  0x00000022428 +[NSObject performSelector:withObject:withObject:]
+  0x00000022470 +[NSObject instanceMethodSignatureForSelector:]
+  0x00000022482 +[NSObject methodSignatureForSelector:]
+  0x00000022494 +[NSObject forwardInvocation:]
+  0x000000224cf +[NSObject forwardingTargetForSelector:]
+  0x000000224d2 +[NSObject description]
+  0x000000224d5 +[NSObject debugDescription]
+  0x00000009802 +[NSObject new]
+  0x00000009c4e +[NSObject retain]
+  0x000000224e2 +[NSObject _tryRetain]
+  0x000000224e8 +[NSObject _isDeallocating]
+  0x0000001163b +[NSObject allowsWeakReference]
+  0x00000012761 +[NSObject retainWeakReference]
+  0x0000000bbf7 +[NSObject release]
+  0x0000000dd48 +[NSObject autorelease]
+  0x000000224ec +[NSObject retainCount]
+  0x00000008d54 +[NSObject alloc]
+  0x00000009599 +[NSObject allocWithZone:]
+  0x000000224fe +[NSObject init]
+  0x00000022502 +[NSObject dealloc]
+  0x0000000ff33 +[NSObject zone]
+  0x00000022508 +[NSObject copy]
+  0x0000000ff4c +[NSObject copyWithZone:]
+  0x00000022510 +[NSObject mutableCopy]
+  0x00000022514 +[NSObject mutableCopyWithZone:]
+
   // instance methods
-  0x0000000ac6f -<span class="o">[</span>NSObject self<span class="o">]</span>
-  0x00000009d13 -<span class="o">[</span>NSObject class<span class="o">]</span>
-  0x00000011301 -<span class="o">[</span>NSObject superclass<span class="o">]</span>
-  0x0000000b258 -<span class="o">[</span>NSObject isMemberOfClass:<span class="o">]</span>
-  0x0000000a3df -<span class="o">[</span>NSObject isKindOfClass:<span class="o">]</span>
-  0x0000000ac75 -<span class="o">[</span>NSObject respondsToSelector:<span class="o">]</span>
-  0x0000000b2d1 -<span class="o">[</span>NSObject conformsToProtocol:<span class="o">]</span>
-  0x0000000a7bb -<span class="o">[</span>NSObject hash<span class="o">]</span>
-  0x00000009cef -<span class="o">[</span>NSObject isEqual:<span class="o">]</span>
-  0x00000012a68 -<span class="o">[</span>NSObject isFault<span class="o">]</span>
-  0x0000001131b -<span class="o">[</span>NSObject isProxy<span class="o">]</span>
-  0x0000000bc3e -<span class="o">[</span>NSObject methodForSelector:<span class="o">]</span>
-  0x00000022522 -<span class="o">[</span>NSObject doesNotRecognizeSelector:<span class="o">]</span>
-  0x0000000d6c9 -<span class="o">[</span>NSObject performSelector:<span class="o">]</span>
-  0x0000000da2d -<span class="o">[</span>NSObject performSelector:withObject:<span class="o">]</span>
-  0x0000000fd60 -<span class="o">[</span>NSObject performSelector:withObject:withObject:<span class="o">]</span>
-  0x00000022568 -<span class="o">[</span>NSObject methodSignatureForSelector:<span class="o">]</span>
-  0x0000002257a -<span class="o">[</span>NSObject forwardInvocation:<span class="o">]</span>
-  0x0000000c955 -<span class="o">[</span>NSObject forwardingTargetForSelector:<span class="o">]</span>
-  0x000000225b8 -<span class="o">[</span>NSObject description<span class="o">]</span>
-  0x000000225bb -<span class="o">[</span>NSObject debugDescription<span class="o">]</span>
-  0x00000007c98 -<span class="o">[</span>NSObject retain<span class="o">]</span>
-  0x00000010b7d -<span class="o">[</span>NSObject _tryRetain<span class="o">]</span>
-  0x0000000ec4b -<span class="o">[</span>NSObject _isDeallocating<span class="o">]</span>
-  0x0000000ec23 -<span class="o">[</span>NSObject allowsWeakReference<span class="o">]</span>
-  0x0000000ff3f -<span class="o">[</span>NSObject retainWeakReference<span class="o">]</span>
-  0x00000009b0c -<span class="o">[</span>NSObject release<span class="o">]</span>
-  0x00000009c61 -<span class="o">[</span>NSObject autorelease<span class="o">]</span>
-  0x00000010a96 -<span class="o">[</span>NSObject retainCount<span class="o">]</span>
-  0x000000095ab -<span class="o">[</span>NSObject init<span class="o">]</span>
-  0x00000007d3f -<span class="o">[</span>NSObject dealloc<span class="o">]</span>
-  0x000000225d4 -<span class="o">[</span>NSObject finalize<span class="o">]</span>
-  0x0000000b2c5 -<span class="o">[</span>NSObject zone<span class="o">]</span>
-  0x00000009cda -<span class="o">[</span>NSObject copy<span class="o">]</span>
-  0x00000009cf9 -<span class="o">[</span>NSObject mutableCopy<span class="o">]</span>
+  0x0000000ac6f -[NSObject self]
+  0x00000009d13 -[NSObject class]
+  0x00000011301 -[NSObject superclass]
+  0x0000000b258 -[NSObject isMemberOfClass:]
+  0x0000000a3df -[NSObject isKindOfClass:]
+  0x0000000ac75 -[NSObject respondsToSelector:]
+  0x0000000b2d1 -[NSObject conformsToProtocol:]
+  0x0000000a7bb -[NSObject hash]
+  0x00000009cef -[NSObject isEqual:]
+  0x00000012a68 -[NSObject isFault]
+  0x0000001131b -[NSObject isProxy]
+  0x0000000bc3e -[NSObject methodForSelector:]
+  0x00000022522 -[NSObject doesNotRecognizeSelector:]
+  0x0000000d6c9 -[NSObject performSelector:]
+  0x0000000da2d -[NSObject performSelector:withObject:]
+  0x0000000fd60 -[NSObject performSelector:withObject:withObject:]
+  0x00000022568 -[NSObject methodSignatureForSelector:]
+  0x0000002257a -[NSObject forwardInvocation:]
+  0x0000000c955 -[NSObject forwardingTargetForSelector:]
+  0x000000225b8 -[NSObject description]
+  0x000000225bb -[NSObject debugDescription]
+  0x00000007c98 -[NSObject retain]
+  0x00000010b7d -[NSObject _tryRetain]
+  0x0000000ec4b -[NSObject _isDeallocating]
+  0x0000000ec23 -[NSObject allowsWeakReference]
+  0x0000000ff3f -[NSObject retainWeakReference]
+  0x00000009b0c -[NSObject release]
+  0x00000009c61 -[NSObject autorelease]
+  0x00000010a96 -[NSObject retainCount]
+  0x000000095ab -[NSObject init]
+  0x00000007d3f -[NSObject dealloc]
+  0x000000225d4 -[NSObject finalize]
+  0x0000000b2c5 -[NSObject zone]
+  0x00000009cda -[NSObject copy]
+  0x00000009cf9 -[NSObject mutableCopy]
+
 
 0x00000035078 __IncompleteProtocol : NSObject
 
 0x000000350c8 Protocol : NSObject
   // instance methods
-  0x000000210d9 -<span class="o">[</span>Protocol conformsTo:<span class="o">]</span>
-  0x000000210e1 -<span class="o">[</span>Protocol descriptionForInstanceMethod:<span class="o">]</span>
-  0x00000021100 -<span class="o">[</span>Protocol descriptionForClassMethod:<span class="o">]</span>
-  0x0000002111c -<span class="o">[</span>Protocol name<span class="o">]</span>
-  0x0000002112d -<span class="o">[</span>Protocol isEqual:<span class="o">]</span>
-  0x000000211c2 -<span class="o">[</span>Protocol hash<span class="o">]</span>
+  0x000000210d9 -[Protocol conformsTo:]
+  0x000000210e1 -[Protocol descriptionForInstanceMethod:]
+  0x00000021100 -[Protocol descriptionForClassMethod:]
+  0x0000002111c -[Protocol name]
+  0x0000002112d -[Protocol isEqual:]
+  0x000000211c2 -[Protocol hash]
+
 
 0x00000035168 __NSUnrecognizedTaggedPointer : NSObject
   // instance methods
-  0x00000022d0e -<span class="o">[</span>__NSUnrecognizedTaggedPointer retain<span class="o">]</span>
-  0x00000022d12 -<span class="o">[</span>__NSUnrecognizedTaggedPointer release<span class="o">]</span>
-  0x00000022d13 -<span class="o">[</span>__NSUnrecognizedTaggedPointer autorelease<span class="o">]</span>
+  0x00000022d0e -[__NSUnrecognizedTaggedPointer retain]
+  0x00000022d12 -[__NSUnrecognizedTaggedPointer release]
+  0x00000022d13 -[__NSUnrecognizedTaggedPointer autorelease]
 
-0x00000035118 NSObject : &lt;ROOT&gt;
+
+0x00000035118 NSObject : &lt;ROOT&gt; &lt;NSObject&gt;
+  // instance variables
+  +0x00 # isa (0x8)
+
+ @property (TQ,R) hash
+ @property (T#,R) superclass
+ @property (T@&#34;NSString&#34;,R,C) description
+ @property (T@&#34;NSString&#34;,R,C) debugDescription
+
+  // class methods
+  0x00000007743 +[NSObject initialize]
+  0x00000008d94 +[NSObject self]
+  0x00000009b98 +[NSObject class]
+  0x0000000d4fc +[NSObject superclass]
+  0x00000013741 +[NSObject isMemberOfClass:]
+  0x0000000c967 +[NSObject isKindOfClass:]
+  0x0000000bd4e +[NSObject isSubclassOfClass:]
+  0x00000011328 +[NSObject isAncestorOfObject:]
+  0x00000010ca1 +[NSObject instancesRespondToSelector:]
+  0x0000000bbd1 +[NSObject respondsToSelector:]
+  0x0000000c999 +[NSObject conformsToProtocol:]
+  0x0000000c6b8 +[NSObject hash]
+  0x0000000c6bc +[NSObject isEqual:]
+  0x000000223d5 +[NSObject isFault]
+  0x000000223d8 +[NSObject isProxy]
+  0x0000000bceb +[NSObject instanceMethodForSelector:]
+  0x0000000f280 +[NSObject methodForSelector:]
+  0x0000000b284 +[NSObject resolveClassMethod:]
+  0x0000000acd7 +[NSObject resolveInstanceMethod:]
+  0x000000223ea +[NSObject doesNotRecognizeSelector:]
+  0x0000000e541 +[NSObject performSelector:]
+  0x00000012a15 +[NSObject performSelector:withObject:]
+  0x00000022428 +[NSObject performSelector:withObject:withObject:]
+  0x00000022470 +[NSObject instanceMethodSignatureForSelector:]
+  0x00000022482 +[NSObject methodSignatureForSelector:]
+  0x00000022494 +[NSObject forwardInvocation:]
+  0x000000224cf +[NSObject forwardingTargetForSelector:]
+  0x000000224d2 +[NSObject description]
+  0x000000224d5 +[NSObject debugDescription]
+  0x00000009802 +[NSObject new]
+  0x00000009c4e +[NSObject retain]
+  0x000000224e2 +[NSObject _tryRetain]
+  0x000000224e8 +[NSObject _isDeallocating]
+  0x0000001163b +[NSObject allowsWeakReference]
+  0x00000012761 +[NSObject retainWeakReference]
+  0x0000000bbf7 +[NSObject release]
+  0x0000000dd48 +[NSObject autorelease]
+  0x000000224ec +[NSObject retainCount]
+  0x00000008d54 +[NSObject alloc]
+  0x00000009599 +[NSObject allocWithZone:]
+  0x000000224fe +[NSObject init]
+  0x00000022502 +[NSObject dealloc]
+  0x0000000ff33 +[NSObject zone]
+  0x00000022508 +[NSObject copy]
+  0x0000000ff4c +[NSObject copyWithZone:]
+  0x00000022510 +[NSObject mutableCopy]
+  0x00000022514 +[NSObject mutableCopyWithZone:]
+
   // instance methods
-  0x0000000ac6f -<span class="o">[</span>NSObject self<span class="o">]</span>
-  0x00000009d13 -<span class="o">[</span>NSObject class<span class="o">]</span>
-  0x00000011301 -<span class="o">[</span>NSObject superclass<span class="o">]</span>
-  0x0000000b258 -<span class="o">[</span>NSObject isMemberOfClass:<span class="o">]</span>
-  0x0000000a3df -<span class="o">[</span>NSObject isKindOfClass:<span class="o">]</span>
-  0x0000000ac75 -<span class="o">[</span>NSObject respondsToSelector:<span class="o">]</span>
-  0x0000000b2d1 -<span class="o">[</span>NSObject conformsToProtocol:<span class="o">]</span>
-  0x0000000a7bb -<span class="o">[</span>NSObject hash<span class="o">]</span>
-  0x00000009cef -<span class="o">[</span>NSObject isEqual:<span class="o">]</span>
-  0x00000012a68 -<span class="o">[</span>NSObject isFault<span class="o">]</span>
-  0x0000001131b -<span class="o">[</span>NSObject isProxy<span class="o">]</span>
-  0x0000000bc3e -<span class="o">[</span>NSObject methodForSelector:<span class="o">]</span>
-  0x00000022522 -<span class="o">[</span>NSObject doesNotRecognizeSelector:<span class="o">]</span>
-  0x0000000d6c9 -<span class="o">[</span>NSObject performSelector:<span class="o">]</span>
-  0x0000000da2d -<span class="o">[</span>NSObject performSelector:withObject:<span class="o">]</span>
-  0x0000000fd60 -<span class="o">[</span>NSObject performSelector:withObject:withObject:<span class="o">]</span>
-  0x00000022568 -<span class="o">[</span>NSObject methodSignatureForSelector:<span class="o">]</span>
-  0x0000002257a -<span class="o">[</span>NSObject forwardInvocation:<span class="o">]</span>
-  0x0000000c955 -<span class="o">[</span>NSObject forwardingTargetForSelector:<span class="o">]</span>
-  0x000000225b8 -<span class="o">[</span>NSObject description<span class="o">]</span>
-  0x000000225bb -<span class="o">[</span>NSObject debugDescription<span class="o">]</span>
-  0x00000007c98 -<span class="o">[</span>NSObject retain<span class="o">]</span>
-  0x00000010b7d -<span class="o">[</span>NSObject _tryRetain<span class="o">]</span>
-  0x0000000ec4b -<span class="o">[</span>NSObject _isDeallocating<span class="o">]</span>
-  0x0000000ec23 -<span class="o">[</span>NSObject allowsWeakReference<span class="o">]</span>
-  0x0000000ff3f -<span class="o">[</span>NSObject retainWeakReference<span class="o">]</span>
-  0x00000009b0c -<span class="o">[</span>NSObject release<span class="o">]</span>
-  0x00000009c61 -<span class="o">[</span>NSObject autorelease<span class="o">]</span>
-  0x00000010a96 -<span class="o">[</span>NSObject retainCount<span class="o">]</span>
-  0x000000095ab -<span class="o">[</span>NSObject init<span class="o">]</span>
-  0x00000007d3f -<span class="o">[</span>NSObject dealloc<span class="o">]</span>
-  0x000000225d4 -<span class="o">[</span>NSObject finalize<span class="o">]</span>
-  0x0000000b2c5 -<span class="o">[</span>NSObject zone<span class="o">]</span>
-  0x00000009cda -<span class="o">[</span>NSObject copy<span class="o">]</span>
-  0x00000009cf9 -<span class="o">[</span>NSObject mutableCopy<span class="o">]</span>
+  0x0000000ac6f -[NSObject self]
+  0x00000009d13 -[NSObject class]
+  0x00000011301 -[NSObject superclass]
+  0x0000000b258 -[NSObject isMemberOfClass:]
+  0x0000000a3df -[NSObject isKindOfClass:]
+  0x0000000ac75 -[NSObject respondsToSelector:]
+  0x0000000b2d1 -[NSObject conformsToProtocol:]
+  0x0000000a7bb -[NSObject hash]
+  0x00000009cef -[NSObject isEqual:]
+  0x00000012a68 -[NSObject isFault]
+  0x0000001131b -[NSObject isProxy]
+  0x0000000bc3e -[NSObject methodForSelector:]
+  0x00000022522 -[NSObject doesNotRecognizeSelector:]
+  0x0000000d6c9 -[NSObject performSelector:]
+  0x0000000da2d -[NSObject performSelector:withObject:]
+  0x0000000fd60 -[NSObject performSelector:withObject:withObject:]
+  0x00000022568 -[NSObject methodSignatureForSelector:]
+  0x0000002257a -[NSObject forwardInvocation:]
+  0x0000000c955 -[NSObject forwardingTargetForSelector:]
+  0x000000225b8 -[NSObject description]
+  0x000000225bb -[NSObject debugDescription]
+  0x00000007c98 -[NSObject retain]
+  0x00000010b7d -[NSObject _tryRetain]
+  0x0000000ec4b -[NSObject _isDeallocating]
+  0x0000000ec23 -[NSObject allowsWeakReference]
+  0x0000000ff3f -[NSObject retainWeakReference]
+  0x00000009b0c -[NSObject release]
+  0x00000009c61 -[NSObject autorelease]
+  0x00000010a96 -[NSObject retainCount]
+  0x000000095ab -[NSObject init]
+  0x00000007d3f -[NSObject dealloc]
+  0x000000225d4 -[NSObject finalize]
+  0x0000000b2c5 -[NSObject zone]
+  0x00000009cda -[NSObject copy]
+  0x00000009cf9 -[NSObject mutableCopy]
 
-@selectors
-0x00000032c3a: _tryRetain
-0x00000032e96: init
-0x00000032c1f: allocWithZone:
-0x00000032ccb: mutableCopyWithZone:
-0x00000032b87: release
-0x00000032c55: retainCount
-0x00000032ba8: retainWeakReference
-0x00000032bbc: new
-0x00000032bc0: self
-0x00000032c19: alloc
-0x00000032c2e: autorelease
-0x00000032b8f: load
-0x00000032bee: resolveInstanceMethod:
-0x00000032d87: description
-0x00000032e9b: dealloc
-0x00000032e0c: doesNotRecognizeSelector:
-0x00000032b75: initialize
-0x00000032bc5: class
-0x00000032bcb: isKindOfClass:
-0x00000032bda: respondsToSelector:
-0x00000032b80: retain
-0x00000032ce0: copy
-0x00000032b94: allowsWeakReference
-0x00000032c05: resolveClassMethod:
-0x00000032c45: _isDeallocating
-0x00000032eaf: selector
-0x00000032cbd: copyWithZone:
+
+@selectors refs
+0x00000034e30 =&gt; 0x00000032b8f: load
+0x00000034eb0 =&gt; 0x00000032c55: retainCount
+0x00000034ef0 =&gt; 0x00000032e9b: dealloc
+0x00000034e80 =&gt; 0x00000032c19: alloc
+0x00000034ee0 =&gt; 0x00000032ccb: mutableCopyWithZone:
+0x00000034e28 =&gt; 0x00000032b75: initialize
+0x00000034e48 =&gt; 0x00000032bbc: new
+0x00000034e58 =&gt; 0x00000032bc5: class
+0x00000034ea0 =&gt; 0x00000032c3a: _tryRetain
+0x00000034ec8 =&gt; 0x00000032d87: description
+0x00000034ed0 =&gt; 0x00000032eaf: selector
+0x00000034e50 =&gt; 0x00000032bc0: self
+0x00000034e88 =&gt; 0x00000032c1f: allocWithZone:
+0x00000034e98 =&gt; 0x00000032c2e: autorelease
+0x00000034e68 =&gt; 0x00000032bda: respondsToSelector:
+0x00000034ec0 =&gt; 0x00000032e96: init
+0x00000034e38 =&gt; 0x00000032b94: allowsWeakReference
+0x00000034e70 =&gt; 0x00000032bee: resolveInstanceMethod:
+0x00000034ea8 =&gt; 0x00000032c45: _isDeallocating
+0x00000034e20 =&gt; 0x00000032b87: release
+0x00000034e78 =&gt; 0x00000032c05: resolveClassMethod:
+0x00000034eb8 =&gt; 0x00000032ce0: copy
+0x00000034ed8 =&gt; 0x00000032e0c: doesNotRecognizeSelector:
+0x00000034ee8 =&gt; 0x00000032cbd: copyWithZone:
+0x00000034e90 =&gt; 0x00000032b80: retain
+0x00000034e40 =&gt; 0x00000032ba8: retainWeakReference
+0x00000034e60 =&gt; 0x00000032bcb: isKindOfClass:
 
 @methods
-0x00000032d87: description
-0x00000032b94: allowsWeakReference
+0x00000032d4a: isProxy
+0x00000032e4a: methodSignatureForSelector:
+0x00000032b80: retain
 0x00000032bcb: isKindOfClass:
-0x00000032c1f: allocWithZone:
-0x00000032cb8: <span class="nb">hash</span>
+0x00000032c19: alloc
+0x00000032c2e: autorelease
+0x00000032caa: name
+0x00000032cb8: hash
+0x00000032c05: resolveClassMethod:
+0x00000032c3a: _tryRetain
 0x00000032ccb: mutableCopyWithZone:
-0x00000032b8f: load
-0x00000032bbc: new
+0x00000032da6: isAncestorOfObject:
+0x00000032dba: instancesRespondToSelector:
+0x00000032cbd: copyWithZone:
+0x00000032ce0: copy
 0x00000032e9b: dealloc
+0x00000032e26: instanceMethodSignatureForSelector:
+0x00000032e96: init
+0x00000032b75: initialize
+0x00000032b87: release
+0x00000032d23: performSelector:withObject:withObject:
+0x00000032cf6: performSelector:
+0x00000032dde: instanceMethodForSelector:
+0x00000032e66: forwardInvocation:
+0x00000032ba8: retainWeakReference
+0x00000032d77: zone
+0x00000032e0c: doesNotRecognizeSelector:
+0x00000032bc5: class
+0x00000032bda: respondsToSelector:
+0x00000032c61: isa
+0x00000032d63: conformsToProtocol:
+0x00000032c71: descriptionForInstanceMethod:
+0x00000032d7c: superclass
 0x00000032eaf: selector
 0x00000032eb8: finalize
-0x00000032b87: release
-0x00000032bee: resolveInstanceMethod:
-0x00000032c19: alloc
-0x00000032e0c: doesNotRecognizeSelector:
-0x00000032e26: instanceMethodSignatureForSelector:
-0x00000032d93: isSubclassOfClass:
-0x00000032e4a: methodSignatureForSelector:
-0x00000032b75: initialize
-0x00000032ba8: retainWeakReference
-0x00000032bc5: class
-0x00000032c71: descriptionForInstanceMethod:
-0x00000032d77: zone
-0x00000032d7c: superclass
-0x00000032df9: methodForSelector:
-0x00000032e96: init
-0x00000032c2e: autorelease
-0x00000032c55: retainCount
-0x00000032caf: isEqual:
-0x00000032d07: performSelector:withObject:
-0x00000032d23: performSelector:withObject:withObject:
-0x00000032dba: instancesRespondToSelector:
-0x00000032e66: forwardInvocation:
-0x00000032bda: respondsToSelector:
-0x00000032caa: name
-0x00000032d63: conformsToProtocol:
-0x00000032ea3: mutableCopy
-0x00000032b80: retain
-0x00000032c3a: _tryRetain
-0x00000032cbd: copyWithZone:
-0x00000032da6: isAncestorOfObject:
-0x00000032dde: instanceMethodForSelector:
-0x00000032bc0: self
-0x00000032c45: _isDeallocating
-0x00000032cf6: performSelector:
-0x00000032d4a: isProxy
-0x00000032dd6: isFault
-0x00000032c05: resolveClassMethod:
-0x00000032c65: conformsTo:
-0x00000032ce0: copy
-0x00000032c8f: descriptionForClassMethod:
-0x00000032d52: isMemberOfClass:
 0x00000032e79: forwardingTargetForSelector:
-0x00000032c61: isa
+0x00000032b8f: load
+0x00000032c8f: descriptionForClassMethod:
+0x00000032d07: performSelector:withObject:
+0x00000032d87: description
+0x00000032dd6: isFault
+0x00000032c55: retainCount
+0x00000032bc0: self
+0x00000032c65: conformsTo:
 0x00000032ce5: debugDescription
+0x00000032c1f: allocWithZone:
+0x00000032d93: isSubclassOfClass:
+0x00000032b94: allowsWeakReference
+0x00000032bbc: new
+0x00000032c45: _isDeallocating
+0x00000032d52: isMemberOfClass:
+0x00000032df9: methodForSelector:
+0x00000032ea3: mutableCopy
+0x00000032bee: resolveInstanceMethod:
+0x00000032caf: isEqual:
 </code></pre></div>
 </div>
 </div>
