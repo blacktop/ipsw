@@ -75,7 +75,7 @@ var patchesCmd = &cobra.Command{
 			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
 
-		f, err := dyld.Open(dscPath)
+		f, err := dyld.Open(dscPath, &dyld.Config{ParsePatchInfo: true})
 		if err != nil {
 			return err
 		}
