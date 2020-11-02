@@ -93,6 +93,7 @@ brews:
     description: "Download and parse ipsw(s)"
     dependencies:
       - lzfse
+      - bat
     install: |
       bin.install "ipsw"
     test: |
