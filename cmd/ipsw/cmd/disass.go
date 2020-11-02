@@ -90,7 +90,7 @@ func doDemangle(name string) string {
 
 func getFunctionSize(m *macho.File, addr uint64) int64 {
 	if m.FunctionStarts() != nil {
-		starts := m.FunctionStarts()
+		starts := m.FunctionStartAddrs()
 		i := sort.Search(len(starts), func(i int) bool { return starts[i] >= addr })
 		if i+1 == len(starts) && starts[i] == addr {
 			return -1
