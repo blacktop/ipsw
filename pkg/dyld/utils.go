@@ -31,7 +31,7 @@ func (f *File) GetVMAddress(offset uint64) (uint64, error) {
 }
 
 // ReadBytes returns bytes at a given offset
-func (f *File) ReadBytes(offset int64, size uint32) ([]byte, error) {
+func (f *File) ReadBytes(offset int64, size uint64) ([]byte, error) {
 	data := make([]byte, size)
 	_, err := f.r.ReadAt(data, offset)
 	if err != nil {
