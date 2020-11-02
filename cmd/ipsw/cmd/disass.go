@@ -197,6 +197,28 @@ func isFunctionStart(m *macho.File, addr uint64) {
 	}
 }
 
+func parseObjC(m *macho.File) error {
+	if m.HasObjC() {
+		if cfstrs, err := m.GetCFStrings(); err == nil {
+			for _, cfstr := range cfstrs {
+				symbolMap[cfstr.Address] = fmt.Sprintf("%#v", cfstr.Name)
+			}
+		}
+		if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
+			for off, sel := range selRefs {
+				symbolMap[off] = fmt.Sprintf("sel_%s", sel.Name)
+				symbolMap[sel.VMAddr] = sel.Name
+			}
+		}
+		if methods, err := m.GetObjCMethodNames(); err == nil {
+			for method, vmaddr := range methods {
+				symbolMap[vmaddr] = method
+			}
+		}
+	}
+	return nil
+}
+
 func parseImports(m *macho.File) error {
 	if m.HasFixups() {
 		var addr uint64
@@ -208,11 +230,12 @@ func parseImports(m *macho.File) error {
 		if dcf.Imports != nil {
 			for _, start := range dcf.Starts {
 				if start.PageStarts != nil {
-					if len(start.Binds) > 0 {
-						for _, bind := range start.Binds {
+					binds := start.Binds()
+					if len(binds) > 0 {
+						for _, bind := range binds {
 							fullAddend := dcf.Imports[bind.Ordinal()].Addend() + bind.Addend()
 							addr = m.GetBaseAddress() + bind.Offset() + fullAddend
-							symbolMap[addr] = dcf.Imports[bind.Ordinal()].Name
+							symbolMap[addr] = bind.Name()
 						}
 					}
 				}
@@ -408,6 +431,11 @@ var disCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to parse imports")
 		}
 
+		err = parseObjC(m)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse objc runtime")
+		}
+
 		err = parseSymbolStubs(m)
 		if err != nil {
 			return errors.Wrapf(err, "failed to parse symbol stubs")
@@ -466,6 +494,17 @@ var disCmd = &cobra.Command{
 					symName := lookupSymbol(m, operands[0].Immediate)
 					if len(symName) > 0 {
 						opStr = fmt.Sprintf("\t%s", symName)
+					}
+				}
+			} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
+				operation := i.Instruction.Operation()
+				if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
+					operands := i.Instruction.Operands()
+					if operands[1].OpClass == arm64.LABEL {
+						symName := lookupSymbol(m, operands[1].Immediate)
+						if len(symName) > 0 {
+							opStr += fmt.Sprintf(" ; %s", symName)
+						}
 					}
 				}
 			}
