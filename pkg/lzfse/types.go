@@ -106,20 +106,22 @@ type lzvnCompressedBlockDecoderState struct {
 	DPrev         uint32
 }
 
+type magic uint32
+
 const (
 	// Block header objects
-	LZFSE_NO_BLOCK_MAGIC             = 0x00000000 // 0    (invalid)
-	LZFSE_ENDOFSTREAM_BLOCK_MAGIC    = 0x24787662 // bvx$ (end of stream)
-	LZFSE_UNCOMPRESSED_BLOCK_MAGIC   = 0x2d787662 // bvx- (raw data)
-	LZFSE_COMPRESSEDV1_BLOCK_MAGIC   = 0x31787662 // bvx1 (lzfse compressed, uncompressed tables)
-	LZFSE_COMPRESSEDV2_BLOCK_MAGIC   = 0x32787662 // bvx2 (lzfse compressed, compressed tables)
-	LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC = 0x6e787662 // bvxn (lzvn compressed)
+	LZFSE_NO_BLOCK_MAGIC             magic = 0x00000000 // 0    (invalid)
+	LZFSE_ENDOFSTREAM_BLOCK_MAGIC    magic = 0x24787662 // bvx$ (end of stream)
+	LZFSE_UNCOMPRESSED_BLOCK_MAGIC   magic = 0x2d787662 // bvx- (raw data)
+	LZFSE_COMPRESSEDV1_BLOCK_MAGIC   magic = 0x31787662 // bvx1 (lzfse compressed, uncompressed tables)
+	LZFSE_COMPRESSEDV2_BLOCK_MAGIC   magic = 0x32787662 // bvx2 (lzfse compressed, compressed tables)
+	LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC magic = 0x6e787662 // bvxn (lzvn compressed)
 )
 
 // compressedBlockHeaderV1 block header with uncompressed tables.
 type compressedBlockHeaderV1 struct {
 	//  Magic number, always LZFSE_COMPRESSEDV1_BLOCK_MAGIC.
-	Magic uint32
+	Magic magic
 	//  Number of decoded (output) bytes in block.
 	NRawBytes uint32
 	//  Number of encoded (source) bytes in block.
@@ -163,7 +165,7 @@ type compressedBlockHeaderV1 struct {
  *  be taken when reading one of these headers from the stream. */
 type compressedBlockHeaderV2 struct {
 	//  Magic number, always LZFSE_COMPRESSEDV2_BLOCK_MAGIC.
-	Magic uint32
+	Magic magic
 	//  Number of decoded (output) bytes in block.
 	NRawBytes uint32
 	//  The fields n_payload_bytes ... d_state from the
