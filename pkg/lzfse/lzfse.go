@@ -168,35 +168,45 @@ func decodeV1(out *compressedBlockHeaderV1, in compressedBlockHeaderV2) error {
 func (s *Decoder) decodeLmdExecuteMatch(bs *lzfseCompressedBlockDecoderState) error {
 
 	var litIdx int32
-
+	reader := bytes.NewReader(make([]byte, 1))
 	//  Error if D is out of range, so that we avoid passing through
 	//  uninitialized data or accesssing memory out of the destination
 	//  buffer.
-	if uint32(bs.DValue) > dst+bs.LValue {
+	if bs.DValue > s.dstIdx+bs.LValue {
 		return fmt.Errorf("LZFSE_STATUS_ERROR")
 	}
 
-	if bs.LValue+bs.MValue <= remainingBytes {
+	if bs.LValue+bs.MValue <= int32(s.dst.Cap()) {
 		//  If we have plenty of space remaining, we can copy the literal
 		//  and match with 16- and 32-byte operations, without worrying
 		//  about writing off the end of the buffer.
-		remainingBytes -= bs.LValue + bs.MValue
-		copy(dst, lit, bs.LValue)
-		dst += bs.LValue
-		lit += bs.LValue
+		_, err := s.dst.Write(bs.CurrentLiteral[:bs.LValue])
+		if err != nil {
+			return err
+		}
+		litIdx += bs.LValue
+		s.dstIdx += bs.LValue
 		//  For the match, we have two paths; a fast copy by 16-bytes if
 		//  the match distance is large enough to allow it, and a more
 		//  careful path that applies a permutation to account for the
 		//  possible overlap between source and destination if the distance
 		//  is small.
-		if bs.DValue >= 8 || bs.DValue >= bs.MValue {
-			copy(dst, dst-bs.DValue, bs.MValue)
-		} else {
-			for i := int32(0); i < bs.MValue; i++ {
-				dst[i] = dst[i-bs.DValue]
-			}
+		// if bs.DValue >= 8 || bs.DValue >= bs.MValue {
+		buff := make([]byte, bs.MValue)
+		reader.Reset(s.dst.Bytes())
+		_, err = reader.ReadAt(buff, int64(s.dstIdx-bs.DValue))
+		if err != nil {
+			return err
 		}
-		dst += bs.MValue
+		_, err = s.dst.Write(buff)
+		if err != nil {
+			return err
+		}
+		s.dstIdx += bs.MValue
+		// } else {
+		// 	return fmt.Errorf("failed to decodeLmdExecuteMatch")
+		// }
+
 	} else {
 		//  Otherwise, we are very close to the end of the destination
 		//  buffer, so we cannot use wide copies that slop off the end
@@ -207,52 +217,40 @@ func (s *Decoder) decodeLmdExecuteMatch(bs *lzfseCompressedBlockDecoderState) er
 		//  Now, we process the literal. Either there's space for it
 		//  or there isn't; if there is, we copy the whole thing and
 		//  update all the pointers and lengths to reflect the copy.
-		if bs.LValue <= remainingBytes {
-			for i := int32(0); i < bs.LValue; i++ {
-				dst[i] = lit[i]
+		if bs.LValue <= int32(s.dst.Cap()) {
+			_, err := s.dst.Write(bs.CurrentLiteral[litIdx:bs.LValue])
+			if err != nil {
+				return err
 			}
-			dst += bs.LValue
-			lit += bs.LValue
-			remainingBytes -= bs.LValue
+			litIdx += bs.LValue
+			s.dstIdx += bs.LValue
 			bs.LValue = 0
 		} else {
 			//  There isn't enough space to fit the whole literal. Copy as
 			//  much of it as we can, update the pointers and the value of
 			//  L, and report that the destination buffer is full. Note that
 			//  we always write right up to the end of the destination buffer.
-			for i := 0; i < remainingBytes; i++ {
-				dst[i] = lit[i]
+			_, err := s.dst.Write(bs.CurrentLiteral[litIdx:])
+			if err != nil {
+				return err
 			}
-			dst += remainingBytes
-			lit += remainingBytes
-			bs.LValue -= remainingBytes
-			// goto DestinationBufferIsFull;
-			s.CompressedLzfseBlockState.LValue = bs.LValue
-			s.CompressedLzfseBlockState.MValue = bs.MValue
-			s.CompressedLzfseBlockState.DValue = bs.DValue
-			s.CompressedLzfseBlockState.LState = bs.LState
-			s.CompressedLzfseBlockState.MState = bs.MState
-			s.CompressedLzfseBlockState.DState = bs.DState
-			s.CompressedLzfseBlockState.LmdInStream = bs.LmdInStream
-			s.CompressedLzfseBlockState.NMatches = bs.NMatches
-			s.CompressedLzfseBlockState.LmdInBuf = bs.LmdInBuf
-			// bs->lmd_in_buf = (uint32_t)(src - s->src);
-			s.CompressedLzfseBlockState.CurrentLiteral = bs.CurrentLiteral
-			// bs->current_literal = lit;
-			// s.dst = dst
-			// s->dst = dst;
-			return fmt.Errorf("LZFSE_STATUS_DST_FULL")
+			s.dstIdx = int32(len(bs.CurrentLiteral))
+			litIdx = int32(len(bs.CurrentLiteral))
+			bs.LValue -= int32(s.dst.Len())
 		}
 		//  The match goes just like the literal does. We copy as much as
 		//  we can byte-by-byte, and if we reach the end of the buffer
 		//  before finishing, we return to the caller indicating that
 		//  the buffer is full.
-		if bs.MValue <= remainingBytes {
-			for i := int32(0); i < bs.MValue; i++ {
-				dst[i] = dst[i-bs.DValue]
+		if bs.MValue <= int32(s.dst.Len()) {
+			buff := make([]byte, bs.MValue)
+			reader.Reset(s.dst.Bytes())
+			_, err := reader.ReadAt(buff, int64(s.dstIdx-bs.DValue))
+			if err != nil {
+				return err
 			}
-			dst += bs.MValue
-			remainingBytes -= bs.MValue
+			s.dst.Write(buff)
+			s.dstIdx += bs.MValue
 			bs.MValue = 0
 			// (void)M; // no dead store warning
 			//  We don't need to update M = 0, because there's no partial
@@ -263,32 +261,18 @@ func (s *Decoder) decodeLmdExecuteMatch(bs *lzfseCompressedBlockDecoderState) er
 			//
 			// But we still set M = 0, to maintain the post-condition.
 		} else {
-			for i := 0; i < remainingBytes; i++ {
-				dst[i] = dst[i-bs.DValue]
+			buff := make([]byte, s.dst.Len())
+			reader.Reset(s.dst.Bytes())
+			_, err := reader.ReadAt(buff, int64(s.dstIdx-bs.DValue))
+			if err != nil {
+				return err
 			}
-			dst += remainingBytes
-			bs.MValue -= remainingBytes
-			// GOTO DestinationBufferIsFull:
-			//  Because we want to be able to resume decoding where we've left
-			//  off (even in the middle of a literal or match), we need to
-			//  update all of the block state fields with the current values
-			//  so that we can resume execution from this point once the
-			//  caller has given us more space to write into.
-			s.CompressedLzfseBlockState.LValue = bs.LValue
-			s.CompressedLzfseBlockState.MValue = bs.MValue
-			s.CompressedLzfseBlockState.DValue = bs.DValue
-			s.CompressedLzfseBlockState.LState = bs.LState
-			s.CompressedLzfseBlockState.MState = bs.MState
-			s.CompressedLzfseBlockState.DState = bs.DState
-			s.CompressedLzfseBlockState.LmdInStream = bs.LmdInStream
-			s.CompressedLzfseBlockState.NMatches = bs.NMatches
-			s.CompressedLzfseBlockState.LmdInBuf = bs.LmdInBuf
-			// bs->lmd_in_buf = (uint32_t)(src - s->src);
-			s.CompressedLzfseBlockState.CurrentLiteral = bs.CurrentLiteral
-			// bs->current_literal = lit;
-			// s.dst = dst
-			// s->dst = dst;
-			return fmt.Errorf("LZFSE_STATUS_DST_FULL")
+			_, err = s.dst.Write(buff)
+			if err != nil {
+				return err
+			}
+			s.dstIdx += int32(s.dst.Len())
+			bs.MValue -= int32(s.dst.Len())
 		}
 		//  Restore the "sham" decremented value of remainingBytes and
 		//  continue to the next L, M, D triple. We'll just be back in
@@ -377,6 +361,16 @@ func (s *Decoder) decodeLMD() error {
 	return nil
 }
 
+func (s *Decoder) printOffsets() {
+	srcOffset, _ := s.src.Seek(0, io.SeekCurrent)
+	rOffset, _ := s.r.Seek(0, io.SeekCurrent)
+	dstOffset := len(s.dst.Bytes())
+	log.WithFields(log.Fields{
+		"src": srcOffset,
+		"r":   rOffset,
+		"dst": dstOffset,
+	}).Debug("Offsets")
+}
 
 func (s *Decoder) syncReaders() {
 	offset, _ := s.src.Seek(0, io.SeekCurrent)
@@ -453,38 +447,38 @@ func (s *Decoder) decode() error {
 
 				// Decode literals
 				{
-				var in fseInStream
+					var in fseInStream
 
 					s.src.Seek(int64(header1.NLiteralPayloadBytes), io.SeekCurrent) // skip literal payload
 					s.syncReaders()
 
-				//   const uint8_t *buf = s->src; // read bits backwards from the end
+					//   const uint8_t *buf = s->src; // read bits backwards from the end
 					if err := fseInCheckedInit(&in, header1.LiteralBits, s.r); err != nil {
-					return fmt.Errorf("LZFSE_STATUS_ERROR")
-				}
-
-				state0 := header1.LiteralState[0]
-				state1 := header1.LiteralState[1]
-				state2 := header1.LiteralState[2]
-				state3 := header1.LiteralState[3]
-
-				for i := uint32(0); i < header1.NLiterals; i += 4 { // n_literals is multiple of 4
-
-						if err := fseInCheckedFlush(&in, s.r); err != nil {
-						return fmt.Errorf("LZFSE_STATUS_ERROR: [57, 64] bits")
+						return fmt.Errorf("LZFSE_STATUS_ERROR")
 					}
 
-					s.CompressedLzfseBlockState.Literals[i+0] =
-						fseDecode(&state0, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
-					s.CompressedLzfseBlockState.Literals[i+1] =
-						fseDecode(&state1, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
-					s.CompressedLzfseBlockState.Literals[i+2] =
-						fseDecode(&state2, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
-					s.CompressedLzfseBlockState.Literals[i+3] =
-						fseDecode(&state3, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
-				}
+					state0 := header1.LiteralState[0]
+					state1 := header1.LiteralState[1]
+					state2 := header1.LiteralState[2]
+					state3 := header1.LiteralState[3]
 
-				s.CompressedLzfseBlockState.CurrentLiteral = s.CompressedLzfseBlockState.Literals
+					for i := uint32(0); i < header1.NLiterals; i += 4 { // n_literals is multiple of 4
+
+						if err := fseInCheckedFlush(&in, s.r); err != nil {
+							return fmt.Errorf("LZFSE_STATUS_ERROR: [57, 64] bits")
+						}
+
+						s.CompressedLzfseBlockState.Literals[i+0] =
+							fseDecode(&state0, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
+						s.CompressedLzfseBlockState.Literals[i+1] =
+							fseDecode(&state1, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
+						s.CompressedLzfseBlockState.Literals[i+2] =
+							fseDecode(&state2, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
+						s.CompressedLzfseBlockState.Literals[i+3] =
+							fseDecode(&state3, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
+					}
+
+					s.CompressedLzfseBlockState.CurrentLiteral = s.CompressedLzfseBlockState.Literals
 				} // literals
 
 				// SRC is not incremented to skip the LMD payload, since we need it
