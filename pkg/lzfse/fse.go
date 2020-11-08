@@ -204,7 +204,6 @@ func fseInCheckedFlush(s *fseInStream, r *io.SectionReader) error {
 	if err != nil {
 		return err
 	}
-	// fmt.Println("delt:", delt)
 	var incoming uint64
 	if err := binary.Read(r, binary.LittleEndian, &incoming); err != nil {
 		return err
@@ -213,7 +212,12 @@ func fseInCheckedFlush(s *fseInStream, r *io.SectionReader) error {
 	// Update the state object and verify its validity (in DEBUG).
 	s.Accum = (s.Accum << nbits) | fseMaskLsb64(incoming, nbits)
 	s.AccumNbits += nbits
-	//   DEBUG_CHECK_INPUT_STREAM_PARAMETERS
+	if s.AccumNbits < 56 || s.AccumNbits >= 64 {
+		return fmt.Errorf("failed to fseInCheckedFlush - s.AccumNbits < 56 || s.AccumNbits >= 64")
+	}
+	if (s.Accum >> s.AccumNbits) != 0 {
+		return fmt.Errorf("failed to fseInCheckedFlush - (s.Accum >> s.AccumNbits) == 0")
+	}
 	return nil // OK
 }
 
