@@ -372,6 +372,12 @@ func (s *Decoder) decodeLMD() error {
 	return nil
 }
 
+
+func (s *Decoder) syncReaders(r *io.SectionReader) {
+	offset, _ := s.src.Seek(0, io.SeekCurrent)
+	r.Seek(offset, io.SeekStart)
+}
+
 // Decode decodes an encoded lzfse buffer
 func (s *Decoder) decode() error {
 
@@ -380,7 +386,6 @@ func (s *Decoder) decode() error {
 	for {
 		switch s.blockMagic {
 		case LZFSE_NO_BLOCK_MAGIC:
-			log.Debug("LZFSE_NO_BLOCK_MAGIC")
 			if err := binary.Read(s.src, binary.LittleEndian, &s.blockMagic); err != nil {
 				return err
 			}
@@ -399,7 +404,6 @@ func (s *Decoder) decode() error {
 				return fmt.Errorf("not implimented")
 			}
 			if s.blockMagic == LZFSE_COMPRESSEDV1_BLOCK_MAGIC || s.blockMagic == LZFSE_COMPRESSEDV2_BLOCK_MAGIC {
-				log.Debug("LZFSE_COMPRESSEDV1_BLOCK_MAGIC || LZFSE_COMPRESSEDV2_BLOCK_MAGIC")
 				var header1 compressedBlockHeaderV1
 				var header2 compressedBlockHeaderV2
 				// Decode compressed headers
@@ -444,10 +448,11 @@ func (s *Decoder) decode() error {
 					dExtraBits[:], dBaseValue[:], &s.CompressedLzfseBlockState.DDecoder)
 
 				// Decode literals
+				{
 				var in fseInStream
 
-				offset, _ := s.src.Seek(int64(header1.NLiteralPayloadBytes), io.SeekCurrent) // skip literal payload
-				r.Seek(offset, io.SeekStart)
+					s.src.Seek(int64(header1.NLiteralPayloadBytes), io.SeekCurrent) // skip literal payload
+					s.syncReaders(r)
 
 				//   const uint8_t *buf = s->src; // read bits backwards from the end
 				if err := fseInCheckedInit(&in, header1.LiteralBits, r); err != nil {
@@ -460,13 +465,11 @@ func (s *Decoder) decode() error {
 				state3 := header1.LiteralState[3]
 
 				for i := uint32(0); i < header1.NLiterals; i += 4 { // n_literals is multiple of 4
-					pos, _ := r.Seek(0, io.SeekCurrent)
-					fmt.Println("pos1:", pos)
+
 					if err := fseInCheckedFlush(&in, r); err != nil {
 						return fmt.Errorf("LZFSE_STATUS_ERROR: [57, 64] bits")
 					}
-					pos, _ = r.Seek(0, io.SeekCurrent)
-					fmt.Println("pos2:", pos)
+
 					s.CompressedLzfseBlockState.Literals[i+0] =
 						fseDecode(&state0, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
 					s.CompressedLzfseBlockState.Literals[i+1] =
@@ -476,7 +479,9 @@ func (s *Decoder) decode() error {
 					s.CompressedLzfseBlockState.Literals[i+3] =
 						fseDecode(&state3, s.CompressedLzfseBlockState.LiteralDecoder, &in) // 10b max
 				}
+
 				s.CompressedLzfseBlockState.CurrentLiteral = s.CompressedLzfseBlockState.Literals
+				} // literals
 
 				// SRC is not incremented to skip the LMD payload, since we need it
 				// during block decode.
@@ -487,24 +492,26 @@ func (s *Decoder) decode() error {
 				{
 					var in fseInStream
 					// read bits backwards from the end
-					offset, _ = s.src.Seek(0, io.SeekCurrent)
-					r.Seek(offset+int64(header1.NLmdPayloadBytes), io.SeekStart)
-					// TODO: here the C passes in s.src as last arg (instead of buff_start)
+					s.syncReaders(r)
+					r.Seek(int64(header1.NLmdPayloadBytes), io.SeekCurrent)
+
 					if err := fseInCheckedInit(&in, header1.LmdBits, r); err != nil {
 						return fmt.Errorf("LZFSE_STATUS_ERROR - fseInCheckedInit: %v", err)
 					}
+
 					s.CompressedLzfseBlockState.LState = header1.LState
 					s.CompressedLzfseBlockState.MState = header1.MState
 					s.CompressedLzfseBlockState.DState = header1.DState
 					bufOffset, _ := r.Seek(0, io.SeekCurrent)
-					offset, _ = s.src.Seek(0, io.SeekCurrent)
+					offset, _ := s.src.Seek(0, io.SeekCurrent)
 					s.CompressedLzfseBlockState.LmdInBuf = uint32(bufOffset - offset)
 					s.CompressedLzfseBlockState.LValue = 0
 					s.CompressedLzfseBlockState.MValue = 0
-					//  Initialize D to an illegal value so we can't erroneously use
-					//  an uninitialized "previous" value.
+					//  Initialize D to an illegal value so we can't erroneously use an uninitialized "previous" value.
 					s.CompressedLzfseBlockState.DValue = -1
 					s.CompressedLzfseBlockState.LmdInStream = in
+
+					s.syncReaders(r)
 				}
 
 				break
@@ -532,6 +539,7 @@ func (s *Decoder) decode() error {
 
 			s.blockMagic = LZFSE_NO_BLOCK_MAGIC
 			s.src.Seek(int64(s.CompressedLzfseBlockState.NLmdPayloadBytes), io.SeekCurrent) // to next block
+			s.syncReaders(r)
 			break
 		case LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC:
 			log.Debug("LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC")
