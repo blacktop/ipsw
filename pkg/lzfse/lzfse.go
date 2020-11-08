@@ -7,16 +7,16 @@ import (
 	"io"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/buffer"
 	"github.com/pkg/errors"
 )
 
 // Decoder lzfse_decoder_state object
 type Decoder struct {
-	blockMagic uint32
+	blockMagic magic
 
-	src *bytes.Reader
-	dst *buffer.ReadWriteBuffer
+	src    *bytes.Reader
+	dst    bytes.Buffer
+	dstIdx int32
 
 	CompressedLzfseBlockState lzfseCompressedBlockDecoderState
 	CompressedLzvnBlockState  lzvnCompressedBlockDecoderState
@@ -25,10 +25,21 @@ type Decoder struct {
 
 // NewDecoder creates a new lzfse decoder
 func NewDecoder(data []byte) *Decoder {
+	var dst bytes.Buffer
+	dst.Grow(4 * len(data))
 	return &Decoder{
 		src: bytes.NewReader(data),
-		dst: buffer.NewReadWriteBuffer(4*len(data), 4*len(data)),
+		dst: dst,
 	}
+}
+
+// DecodeBuffer decompresses a buffer using LZFSE.
+func (s *Decoder) DecodeBuffer() ([]byte, error) {
+	err := s.decode()
+	if err != nil {
+		return nil, err
+	}
+	return s.dst.Bytes(), nil
 }
 
 // decodeV1FreqValue decode an entry value from next bits of stream.
@@ -294,14 +305,14 @@ func (s *Decoder) decodeLMD() error {
 	r := io.NewSectionReader(s.src, 0, 1<<63-1)
 	bs := s.CompressedLzfseBlockState
 
-	if bs.LState < LZFSE_ENCODE_L_STATES {
-		return fmt.Errorf("failed bs.LState < LZFSE_ENCODE_L_STATES assertion")
+	if s.CompressedLzfseBlockState.LState >= LZFSE_ENCODE_L_STATES {
+		return fmt.Errorf("failed s.CompressedLzfseBlockState.LState < LZFSE_ENCODE_L_STATES assertion")
 	}
-	if bs.MState < LZFSE_ENCODE_M_STATES {
-		return fmt.Errorf("failed bs.MState < LZFSE_ENCODE_M_STATES assertion")
+	if s.CompressedLzfseBlockState.MState >= LZFSE_ENCODE_M_STATES {
+		return fmt.Errorf("failed s.CompressedLzfseBlockState.MState < LZFSE_ENCODE_M_STATES assertion")
 	}
-	if bs.DState < LZFSE_ENCODE_D_STATES {
-		return fmt.Errorf("failed bs.DState < LZFSE_ENCODE_D_STATES assertion")
+	if s.CompressedLzfseBlockState.DState >= LZFSE_ENCODE_D_STATES {
+		return fmt.Errorf("failed s.CompressedLzfseBlockState.DState < LZFSE_ENCODE_D_STATES assertion")
 	}
 
 	//  Number of bytes remaining in the destination buffer, minus 32 to
@@ -317,55 +328,52 @@ func (s *Decoder) decodeLMD() error {
 	//  from the caller.  There's a pending L, M, D triplet that we weren't
 	//  able to completely process.  Jump ahead to finish executing that symbol
 	//  before decoding new values.
-	if bs.LValue > 0 || bs.MValue > 0 {
+	if s.CompressedLzfseBlockState.LValue != 0 || s.CompressedLzfseBlockState.MValue != 0 {
 		// goto ExecuteMatch
-		s.decodeLmdExecuteMatch(&bs)
+		s.decodeLmdExecuteMatch(&s.CompressedLzfseBlockState)
 	}
 
-	for ; bs.NMatches > 0; bs.NMatches-- {
+	for s.CompressedLzfseBlockState.NMatches > 0 {
 		//  Decode the next L, M, D symbol from the input stream.
-		err := fseInCheckedFlush(&bs.LmdInStream, r)
-		if err != nil {
+		if err := fseInCheckedFlush2(&s.CompressedLzfseBlockState.LmdInStream, s.src); err != nil {
 			return errors.Wrap(err, "LZFSE_STATUS_ERROR - fseInCheckedFlush")
 		}
 
-		bs.LValue = fseValueDecode(&bs.LState, s.CompressedLzfseBlockState.LDecoder[:], &bs.LmdInStream)
-		if bs.LState < LZFSE_ENCODE_L_STATES {
-			return fmt.Errorf("failed bs.LState < LZFSE_ENCODE_L_STATES assertion")
+		s.CompressedLzfseBlockState.LValue = fseValueDecode(&s.CompressedLzfseBlockState.LState, s.CompressedLzfseBlockState.LDecoder[:], &s.CompressedLzfseBlockState.LmdInStream)
+		if s.CompressedLzfseBlockState.LState >= LZFSE_ENCODE_L_STATES {
+			return fmt.Errorf("failed s.CompressedLzfseBlockState.LState < LZFSE_ENCODE_L_STATES assertion")
 		}
 
 		// TODO
-		// if (int32(bs.CurrentLiteral) + bs.LValue) >= (bs.Literals + (LZFSE_LITERALS_PER_BLOCK + 64)) {
+		// if (int32(s.CompressedLzfseBlockState.CurrentLiteral) + s.CompressedLzfseBlockState.LValue) >= (s.CompressedLzfseBlockState.Literals + (LZFSE_LITERALS_PER_BLOCK + 64)) {
 		// 	return fmt.Errorf("LZFSE_STATUS_ERROR")
 		// }
 
-		// err = fseInCheckedFlush(&bs.LmdInStream, r)
-		// if err != nil {
-		// 	return errors.Wrap(err, "LZFSE_STATUS_ERROR - fseInCheckedFlush")
-		// }
-
-		bs.MValue = fseValueDecode(&bs.MState, s.CompressedLzfseBlockState.MDecoder[:], &bs.LmdInStream)
-
-		// err = fseInCheckedFlush(&bs.LmdInStream, r)
-		// if err != nil {
-		// 	return errors.Wrap(err, "LZFSE_STATUS_ERROR - fseInCheckedFlush")
-		// }
-
-		newD := fseValueDecode(&bs.DState, s.CompressedLzfseBlockState.DDecoder[:], &bs.LmdInStream)
-
-		if newD > 0 {
-			bs.DValue = newD
+		s.CompressedLzfseBlockState.MValue = fseValueDecode(&s.CompressedLzfseBlockState.MState, s.CompressedLzfseBlockState.MDecoder[:], &s.CompressedLzfseBlockState.LmdInStream)
+		if s.CompressedLzfseBlockState.MState >= LZFSE_ENCODE_M_STATES {
+			return fmt.Errorf("failed s.CompressedLzfseBlockState.MState < LZFSE_ENCODE_M_STATES assertion")
 		}
 
+		newD := fseValueDecode(&s.CompressedLzfseBlockState.DState, s.CompressedLzfseBlockState.DDecoder[:], &s.CompressedLzfseBlockState.LmdInStream)
+		if s.CompressedLzfseBlockState.DState >= LZFSE_ENCODE_D_STATES {
+			return fmt.Errorf("failed s.CompressedLzfseBlockState.DState < LZFSE_ENCODE_D_STATES assertion")
+		}
+
+		if newD > 0 {
+			s.CompressedLzfseBlockState.DValue = newD
+		}
+
+		s.CompressedLzfseBlockState.NMatches--
+
 		// ExecuteMatch:
-		s.decodeLmdExecuteMatch(&bs)
+		s.decodeLmdExecuteMatch(&s.CompressedLzfseBlockState)
 	}
 
 	return nil
 }
 
 // Decode decodes an encoded lzfse buffer
-func (s *Decoder) Decode() error {
+func (s *Decoder) decode() error {
 
 	r := io.NewSectionReader(s.src, 0, 1<<63-1)
 
@@ -535,6 +543,4 @@ func (s *Decoder) Decode() error {
 			return fmt.Errorf("LZFSE_STATUS_ERROR: invalid magic")
 		}
 	}
-
-	return nil
 }
