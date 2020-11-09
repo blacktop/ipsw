@@ -1,5 +1,3 @@
-// +build windows
-
 package devicetree
 
 import (
@@ -10,8 +8,10 @@ import (
 	"io"
 
 	"github.com/apex/log"
+	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img3"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 )
 
 // ParseImg3Data parses a img4 data containing a DeviceTree
@@ -55,8 +55,13 @@ func ParseImg3Data(data []byte) (*DeviceTree, error) {
 
 	var dr io.Reader
 	if bytes.Contains(i.Tags[1].Data[:4], []byte("bvx2")) {
-		utils.Indent(log.Info, 2)("DeviceTree is LZFSE compressed")
-		return nil, fmt.Errorf("LZFSE decompression not supported on windows")
+		utils.Indent(log.Debug, 2)("DeviceTree is LZFSE compressed")
+		dat, err := lzfse.NewDecoder(i.Tags[1].Data).DecodeBuffer()
+		if err != nil {
+			return nil, fmt.Errorf("failed to lzfse decompress DeviceTree: %v", err)
+		}
+		// dr = bytes.NewReader(lzfse.DecodeBuffer(i.Tags[1].Data))
+		dr = bytes.NewReader(dat)
 	} else {
 		dr = bytes.NewReader(i.Tags[1].Data)
 	}
@@ -80,8 +85,13 @@ func ParseImg4Data(data []byte) (*DeviceTree, error) {
 
 	var r io.Reader
 	if bytes.Contains(i.Data[:4], []byte("bvx2")) {
-		utils.Indent(log.Info, 2)("DeviceTree is LZFSE compressed")
-		return nil, fmt.Errorf("LZFSE decompression not supported on windows")
+		utils.Indent(log.Debug, 2)("DeviceTree is LZFSE compressed")
+		dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
+		if err != nil {
+			return nil, fmt.Errorf("failed to lzfse decompress DeviceTree: %v", err)
+		}
+		// r = bytes.NewReader(lzfse.DecodeBuffer(i.Data))
+		r = bytes.NewReader(dat)
 	} else {
 		r = bytes.NewReader(i.Data)
 	}

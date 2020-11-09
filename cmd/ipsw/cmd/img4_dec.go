@@ -1,5 +1,3 @@
-// +build !windows,cgo
-
 /*
 Copyright © 2020 blacktop
 
@@ -33,9 +31,10 @@ import (
 	"os"
 
 	"github.com/apex/log"
-	lzfse "github.com/blacktop/go-lzfse"
+	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -109,7 +108,11 @@ var decImg4Cmd = &cobra.Command{
 
 		if bytes.Contains(i.Data[:4], []byte("bvx2")) {
 			utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-			r = bytes.NewReader(lzfse.DecodeBuffer(i.Data))
+			dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
+			if err != nil {
+				return fmt.Errorf("failed to lzfse decompress %s: %v", args[0], err)
+			}
+			r = bytes.NewReader(dat)
 		} else {
 			r = bytes.NewReader(i.Data)
 		}

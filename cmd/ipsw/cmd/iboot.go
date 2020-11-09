@@ -1,5 +1,3 @@
-// +build !windows,cgo
-
 /*
 Copyright © 2020 blacktop
 
@@ -32,8 +30,9 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	lzfse "github.com/blacktop/go-lzfse"
+	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -89,7 +88,12 @@ var ibootCmd = &cobra.Command{
 				break
 			}
 
-			decData := lzfse.DecodeBuffer(dat[firstStartMatch : firstEndMatch+4])
+			decData, err := lzfse.NewDecoder(dat[firstStartMatch : firstEndMatch+4]).DecodeBuffer()
+			if err != nil {
+				return fmt.Errorf("failed to lzfse decompress embedded firmware: %v", err)
+			}
+
+			// decData := lzfse.DecodeBuffer(dat[firstStartMatch : firstEndMatch+4])
 			// lr := bytes.NewReader(dat[firstStartMatch : firstEndMatch+4])
 			// buf := new(bytes.Buffer)
 
