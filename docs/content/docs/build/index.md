@@ -6,40 +6,6 @@ weight: 3
 summary: Build from source
 ---
 
-## **WITH** support for **lzfse** decompression
-
-#### Dependancies:
-
-- [lzfse](https://github.com/lzfse/lzfse)
-
-### Install the dependancies
-
-From source
-
-- [lzfse](https://github.com/lzfse/lzfse)
-
-```bash
-$ git clone https://github.com/lzfse/lzfse.git
-$ cd lzfse
-$ mkdir build
-$ cd build
-$ cmake ..
-$ make install
-```
-
-#### Install the Go binary
-
-```bash
-$ git clone https://github.com/blacktop/ipsw.git
-$ cd ipsw
-$ CGO_ENABLED=1 \
-  CGO_CFLAGS=-I/usr/local/include \ # path to the lzfse includes
-  CGO_LDFLAGS=-L/usr/local/lib \    # path to the lzfse libs
-  go build ./cmd/ipsw
-```
-
-## **WITHOUT** support for **lzfse** decompression
-
 #### Install the Go binary
 
 ```bash

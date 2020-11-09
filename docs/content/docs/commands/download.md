@@ -123,7 +123,7 @@ $ ipsw download latest --info
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
-Only download and decompress the kernelcaches _(not supported on Windows)_
+Only download and decompress the kernelcaches
 
 - Single kernelcache
 
@@ -219,5 +219,3 @@ $ ipsw download ota --ios13 --device iPod9,1 --kernel --dyld
       • Kernelcache is LZFSE compressed
       • Writing "iPod9,1_N112AP_17F5054h/kernelcache.beta"
 ```
-
-⚠️ **NOTE:** `--kernel` flag is temp removed until I get a working Go lzfse implimentation.

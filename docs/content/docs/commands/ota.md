@@ -6,8 +6,6 @@ weight: 14
 summary: Parse OTA zip files.
 ---
 
-### ⚠️ This broke in iOS 14
-
 #### Show OTA Info
 
 ```bash
@@ -45,6 +43,8 @@ $ ipsw ota OTA.zip | head
 ```
 
 See if `dyld` is in the OTA files
+
+### ⚠️ This broke in iOS 14
 
 ```bash
 $ ipsw ota OTA.zip | grep dyld

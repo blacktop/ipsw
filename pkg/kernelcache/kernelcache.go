@@ -1,5 +1,3 @@
-// +build !windows,cgo
-
 package kernelcache
 
 import (
@@ -15,10 +13,11 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	lzfse "github.com/blacktop/go-lzfse"
+	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/blacktop/lzss"
 	"github.com/pkg/errors"
 )
@@ -127,7 +126,7 @@ func Decompress(kcache string) error {
 	utils.Indent(log.Debug, 2)("Decompressing Kernelcache")
 	dec, err := DecompressData(kc)
 	if err != nil {
-		return errors.Wrap(err, "failed to decompress kernelcache")
+		return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 	}
 
 	err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
@@ -145,13 +144,18 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 	if bytes.Contains(cc.Magic, []byte("bvx2")) { // LZFSE
 		utils.Indent(log.Debug, 3)("Kernelcache is LZFSE compressed")
 
-		dat := lzfse.DecodeBuffer(cc.Data)
+		// dat := lzfse.DecodeBuffer(cc.Data)
 		// buf := new(bytes.Buffer)
 
 		// _, err := buf.ReadFrom(lr)
 		// if err != nil {
 		// 	return nil, errors.Wrap(err, "failed to lzfse decompress kernelcache")
 		// }
+
+		dat, err := lzfse.NewDecoder(cc.Data).DecodeBuffer()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to lzfse decompress kernelcache")
+		}
 
 		fat, err := macho.NewFatFile(bytes.NewReader(dat))
 		if errors.Is(err, macho.ErrNotFat) {
@@ -229,7 +233,7 @@ func RemoteParse(zr *zip.Reader) error {
 
 					dec, err := DecompressData(kcomp)
 					if err != nil {
-						return errors.Wrap(err, "failed to decompress kernelcache")
+						return errors.Wrapf(err, "failed to decompress kernelcache %s", fname)
 					}
 
 					os.Mkdir(folder, os.ModePerm)
@@ -270,7 +274,7 @@ func RemoteParseV2(zr *zip.Reader, destFolder string) error {
 
 				dec, err := DecompressData(kcomp)
 				if err != nil {
-					return errors.Wrap(err, "failed to decompress kernelcache")
+					return errors.Wrapf(err, "failed to decompress kernelcache %s", f.Name)
 				}
 
 				os.Mkdir(destFolder, os.ModePerm)

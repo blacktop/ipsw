@@ -31,6 +31,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -41,7 +42,7 @@ func init() {
 
 	otaDLCmd.Flags().BoolP("ios13", "", false, "Download iOS 13.x OTAs (defaults to iOS14)")
 	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
-	// otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
+	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
 
 // otaDLCmd represents the ota download command
@@ -67,8 +68,7 @@ var otaDLCmd = &cobra.Command{
 		ios13, _ := cmd.Flags().GetBool("ios13")
 
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
-		// TODO: add kernel back in once we have a pure Go lzfse
-		// remoteKernel, _ := cmd.Flags().GetBool("kernel")
+		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
 		if remoteDyld && !ios13 {
 			// if (remoteDyld || remoteKernel) && !ios13 {
@@ -101,8 +101,7 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		if cont {
-			if remoteDyld && ios13 {
-				// if (remoteDyld || remoteKernel) && ios13 {
+			if (remoteDyld || remoteKernel) && ios13 {
 				for _, o := range otas {
 					log.WithFields(log.Fields{
 						"device":  o.SupportedDevices[0],
@@ -123,13 +122,35 @@ var otaDLCmd = &cobra.Command{
 							return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
 						}
 					}
-					// if remoteKernel {
-					// 	log.Info("Extracting remote kernelcache")
-					// 	err = kernelcache.RemoteParse(zr)
-					// 	if err != nil {
-					// 		return errors.Wrap(err, "failed to download kernelcache from remote ota")
-					// 	}
-					// }
+					if remoteKernel {
+						log.Info("Extracting remote kernelcache")
+						err = kernelcache.RemoteParse(zr)
+						if err != nil {
+							return errors.Wrap(err, "failed to download kernelcache from remote ota")
+						}
+					}
+				}
+			} else if remoteKernel && !ios13 {
+				for _, o := range otas {
+					log.WithFields(log.Fields{
+						"device":  o.SupportedDevices[0],
+						"build":   o.Build,
+						"version": o.DocumentationID,
+					}).Info("Parsing remote OTA")
+					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
+						Proxy:    proxy,
+						Insecure: insecure,
+					})
+					if err != nil {
+						return errors.Wrap(err, "failed to open remote zip to OTA")
+					}
+					if remoteKernel {
+						log.Info("Extracting remote kernelcache")
+						err = kernelcache.RemoteParse(zr)
+						if err != nil {
+							return errors.Wrap(err, "failed to download kernelcache from remote ota")
+						}
+					}
 				}
 			} else {
 				downloader := download.NewDownload(proxy, insecure, skipAll)
