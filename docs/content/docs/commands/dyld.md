@@ -194,7 +194,7 @@ $ ipsw dyld sel dyld_shared_cache
 
 ### **dyld split**
 
-_(only on macOS)_
+_(only on macOS and requires XCode to be installed)_
 
 Split up a _dyld_shared_cache_
 
