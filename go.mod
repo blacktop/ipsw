@@ -6,8 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.2.2
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/apex/log v1.9.0
-	github.com/blacktop/go-arm64 v0.6.9
-	github.com/blacktop/go-lzfse v1.1.12
+	github.com/blacktop/go-arm64 v0.6.12
 	github.com/blacktop/go-macho v1.1.8
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
