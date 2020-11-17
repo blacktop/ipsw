@@ -38,20 +38,23 @@ func (f formatVersion) IsBuiltFromChainedFixups() bool {
 }
 
 func (f formatVersion) String() string {
-	var fStr string
+	var fStr []string
 	if f.IsSimulator() {
-		fStr += "Simulator|"
+		fStr = append(fStr, "Simulator")
 	}
 	if f.IsDylibsExpectedOnDisk() {
-		fStr += "DylibsExpectedOnDisk|"
+		fStr = append(fStr, "DylibsExpectedOnDisk")
 	}
 	if f.IsLocallyBuiltCache() {
-		fStr += "LocallyBuiltCache|"
+		fStr = append(fStr, "LocallyBuiltCache")
 	}
 	if f.IsBuiltFromChainedFixups() {
-		fStr += "BuiltFromChainedFixups|"
+		fStr = append(fStr, "BuiltFromChainedFixups")
 	}
-	return fmt.Sprintf("%d (%s)", f.Version(), strings.TrimSuffix(fStr, "|"))
+	if len(fStr) > 0 {
+		return fmt.Sprintf("%d (%s)", f.Version(), strings.Join(fStr, "|"))
+	}
+	return fmt.Sprintf("%d", f.Version())
 }
 
 type maxSlide uint64

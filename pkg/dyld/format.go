@@ -80,15 +80,15 @@ func (dch CacheHeader) Print() {
 	fmt.Println("Header")
 	fmt.Println("======")
 	fmt.Println(dch.String())
-	fmt.Printf("Slide Info:     %4dKB,  file offset: 0x%08X -> 0x%08X\n", dch.SlideInfoSize/1024, dch.SlideInfoOffset, dch.SlideInfoOffset+dch.SlideInfoSize)
-	fmt.Printf("Local Symbols:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", dch.LocalSymbolsSize/(1024*1024), dch.LocalSymbolsOffset, dch.LocalSymbolsOffset+dch.LocalSymbolsSize)
-	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%08X -> 0x%08X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
+	fmt.Printf("Slide Info:     %4dKB,  file offset: 0x%09X -> 0x%09X\n", dch.SlideInfoSize/1024, dch.SlideInfoOffset, dch.SlideInfoOffset+dch.SlideInfoSize)
+	fmt.Printf("Local Symbols:  %3dMB,  file offset: 0x%09X -> 0x%09X\n", dch.LocalSymbolsSize/(1024*1024), dch.LocalSymbolsOffset, dch.LocalSymbolsOffset+dch.LocalSymbolsSize)
+	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%09X -> 0x%09X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
 	fmt.Println()
 }
 
 func (l *localSymbolInfo) Print() {
-	fmt.Printf("Local symbols nlist array:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", l.NListByteSize/(1024*1024), l.NListFileOffset, l.NListFileOffset+l.NListByteSize)
-	fmt.Printf("Local symbols string pool:  %3dMB,  file offset: 0x%08X -> 0x%08X\n", l.StringsSize/(1024*1024), l.StringsFileOffset, l.StringsFileOffset+l.StringsSize)
+	fmt.Printf("Local symbols nlist array:  %3dMB,  file offset: 0x%09X -> 0x%09X\n", l.NListByteSize/(1024*1024), l.NListFileOffset, l.NListFileOffset+l.NListByteSize)
+	fmt.Printf("Local symbols string pool:  %3dMB,  file offset: 0x%09X -> 0x%09X\n", l.StringsSize/(1024*1024), l.StringsFileOffset, l.StringsFileOffset+l.StringsSize)
 }
 
 func (mappings cacheMappings) String() string {
@@ -128,9 +128,9 @@ func (mappings cacheExtMappings) String() string {
 			mapping.MaxProt.String(),
 			fmt.Sprintf("%d MB", mapping.Size/(1024*1024)),
 			// humanize.Bytes(mapping.Size),
-			fmt.Sprintf("%08X -> %08X", mapping.Address, mapping.Address+mapping.Size),
-			fmt.Sprintf("%08X -> %08X", mapping.FileOffset, mapping.FileOffset+mapping.Size),
-			fmt.Sprintf("%08X -> %08X", mapping.SlideInfoOffset, mapping.SlideInfoOffset+mapping.SlideInfoSize),
+			fmt.Sprintf("%#08x -> %#08x", mapping.Address, mapping.Address+mapping.Size),
+			fmt.Sprintf("%#08x -> %#08x", mapping.FileOffset, mapping.FileOffset+mapping.Size),
+			fmt.Sprintf("%#08x -> %#08x", mapping.SlideInfoOffset, mapping.SlideInfoOffset+mapping.SlideInfoSize),
 			fmt.Sprintf("%d", mapping.Flags),
 		})
 	}
@@ -174,17 +174,17 @@ func (f *File) String() string {
 			"Platform         = %s\n"+
 			"Format           = %s\n"+
 			"Max Slide        = %s\n\n"+
-			"Local Symbols (nlist array):    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
-			"Local Symbols (string pool):    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
-			"Code Signature:                 %3dMB,  offset:  0x%08X -> 0x%08X\n"+
-			"ImagesText Info (%3d entries): %3dKB,  offset:  0x%08X -> 0x%08X\n"+
-			"Slide Info (v%d):               %4dKB,  offset:  0x%08X -> 0x%08X\n"+
-			"Branch Pool:                    %3dMB,  offset:  0x%08X -> 0x%08X\n"+
-			"Accelerate Tab:                 %3dKB,  address: 0x%08X -> 0x%08X\n"+
-			"Patch Info:                     %3dKB,  address: 0x%08X -> 0x%08X\n"+
-			"Closures:                       %3dMB,  address: 0x%08X -> 0x%08X\n"+
-			"Closures Trie:                  %3dKB,  address: 0x%08X -> 0x%08X\n"+
-			"Shared Region:                  %3dGB,  address: 0x%08X -> 0x%08X\n"+
+			"Local Symbols (nlist array):    %3dMB,  offset:  0x%09X -> 0x%09X\n"+
+			"Local Symbols (string pool):    %3dMB,  offset:  0x%09X -> 0x%09X\n"+
+			"Code Signature:                 %3dMB,  offset:  0x%09X -> 0x%09X\n"+
+			"ImagesText Info (%3d entries): %3dKB,  offset:  0x%09X -> 0x%09X\n"+
+			"Slide Info (v%d):               %4dKB,  offset:  0x%09X -> 0x%09X\n"+
+			"Branch Pool:                    %3dMB,  offset:  0x%09X -> 0x%09X\n"+
+			"Accelerate Tab:                 %3dKB,  address: 0x%09X -> 0x%09X\n"+
+			"Patch Info:                     %3dKB,  address: 0x%09X -> 0x%09X\n"+
+			"Closures:                       %3dMB,  address: 0x%09X -> 0x%09X\n"+
+			"Closures Trie:                  %3dKB,  address: 0x%09X -> 0x%09X\n"+
+			"Shared Region:                  %3dGB,  address: 0x%09X -> 0x%09X\n"+
 			"\nMappings\n"+
 			"========\n"+
 			"%s",

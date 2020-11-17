@@ -229,32 +229,34 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	/**********************
 	 * Read dyld slid info
 	 **********************/
-	if config.ParseSlideInfo {
-		log.Debug("Parsing Slide Info...")
-		if f.SlideInfoOffset > 0 {
+	if f.SlideInfoOffset > 0 {
+		if config.ParseSlideInfo {
+			log.Debug("Parsing Slide Info...")
 			f.ParseSlideInfo(f.SlideInfoOffset, false)
-		} else {
-			// Read NEW (in iOS 14) dyld extended mappings.
-			sr.Seek(int64(f.ExtMappingOffset), os.SEEK_SET)
-			for i := uint32(0); i != f.ExtMappingCount; i++ {
-				cxmInfo := CacheExtMappingInfo{}
-				if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
-					return nil, err
-				}
-				cm := &CacheExtMapping{CacheExtMappingInfo: cxmInfo}
-				if cxmInfo.InitProt.Execute() {
-					cm.Name = "__TEXT"
-				} else if cxmInfo.InitProt.Write() && cm.Flags != 1 {
-					cm.Name = "__DATA"
-				} else if cxmInfo.InitProt.Write() && cm.Flags == 1 {
-					cm.Name = "__AUTH"
-				} else if cxmInfo.InitProt.Read() {
-					cm.Name = "__LINKEDIT"
-				}
+		}
+	} else {
+		// Read NEW (in iOS 14) dyld extended mappings.
+		sr.Seek(int64(f.ExtMappingOffset), os.SEEK_SET)
+		for i := uint32(0); i != f.ExtMappingCount; i++ {
+			cxmInfo := CacheExtMappingInfo{}
+			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
+				return nil, err
+			}
+			cm := &CacheExtMapping{CacheExtMappingInfo: cxmInfo}
+			if cxmInfo.InitProt.Execute() {
+				cm.Name = "__TEXT"
+			} else if cxmInfo.InitProt.Write() && cm.Flags != 1 {
+				cm.Name = "__DATA"
+			} else if cxmInfo.InitProt.Write() && cm.Flags == 1 {
+				cm.Name = "__AUTH"
+			} else if cxmInfo.InitProt.Read() {
+				cm.Name = "__LINKEDIT"
+			}
 
-				f.ExtMappings = append(f.ExtMappings, cm)
-
+			f.ExtMappings = append(f.ExtMappings, cm)
+			if config.ParseSlideInfo {
 				if cm.SlideInfoSize > 0 {
+					log.Debug("Parsing Slide Info...")
 					f.ParseSlideInfo(cm.SlideInfoOffset, false)
 				}
 			}
