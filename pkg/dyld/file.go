@@ -226,9 +226,9 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		}
 	}
 
-	/**********************
-	 * Read dyld slid info
-	 **********************/
+	/***********************
+	 * Read dyld slide info
+	 ***********************/
 	if f.SlideInfoOffset > 0 {
 		if config.ParseSlideInfo {
 			log.Debug("Parsing Slide Info...")
