@@ -227,6 +227,31 @@ func (f *File) GetLocalSymbolInImage(imageName, symbolName string) *CacheLocalSy
 	return nil
 }
 
+func (f *File) GetCString(strVMAdr uint64) (string, error) {
+
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	strOffset, err := f.GetOffset(strVMAdr)
+	if err != nil {
+		return "", err
+	}
+
+	if _, err := sr.Seek(int64(strOffset), io.SeekStart); err != nil {
+		return "", fmt.Errorf("failed to Seek to offset 0x%x: %v", strOffset, err)
+	}
+
+	s, err := bufio.NewReader(sr).ReadString('\x00')
+	if err != nil {
+		return "", fmt.Errorf("failed to ReadString as offset 0x%x, %v", strOffset, err)
+	}
+
+	if len(s) > 0 {
+		return strings.Trim(s, "\x00"), nil
+	}
+
+	return "", fmt.Errorf("string not found at offset 0x%x", strOffset)
+}
+
 func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 	var eTrieAddr, eTrieSize uint64
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)

@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,8 +41,8 @@ func init() {
 
 	// dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	// dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
-	dyldDisassCmd.Flags().Uint64P("count", "c", 30, "Number of instructions to disassemble")
-	// dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demandle symbol names")
+	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
+	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
 	dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
@@ -60,8 +61,24 @@ func functionSize(starts []uint64, addr uint64) int64 {
 
 func functionStart(starts []uint64, addr uint64) {
 	if functionSize(starts, addr) != 0 {
-		fmt.Printf("\nfunc_%x:\n", addr)
+		if symName, ok := symbolMap[addr]; ok {
+			fmt.Printf("\n%s:\n", symName)
+		} else {
+			fmt.Printf("\nfunc_%x:\n", addr)
+		}
 	}
+}
+
+func findSymbol(addr uint64) string {
+
+	if symName, ok := symbolMap[addr]; ok {
+		if demangleFlag {
+			return doDemangle(symName)
+		}
+		return symName
+	}
+
+	return ""
 }
 
 // disassCmd represents the disass command
@@ -81,6 +98,7 @@ var dyldDisassCmd = &cobra.Command{
 
 		imageName, _ := cmd.Flags().GetString("image")
 		instructions, _ := cmd.Flags().GetUint64("count")
+
 		// symbolName, _ := cmd.Flags().GetString("symbol")
 		// doDemangle, _ := cmd.Flags().GetBool("demangle")
 
@@ -109,6 +127,34 @@ var dyldDisassCmd = &cobra.Command{
 			return err
 		}
 		defer f.Close()
+
+		if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
+			log.Warn("parsing public symbols...")
+			err = f.GetAllExportedSymbols(false)
+			if err != nil {
+				return err
+			}
+			log.Warn("parsing private symbols...")
+			err = f.ParseLocalSyms()
+			if err != nil {
+				return err
+			}
+
+			// save lookup map to disk to speed up subsequent requests
+			f.SaveAddrToSymMap(dscPath + ".a2s")
+
+			return nil
+		}
+
+		a2sFile, err := os.Open(dscPath + ".a2s")
+		if err != nil {
+			return err
+		}
+		// Decoding the serialized data
+		err = gob.NewDecoder(a2sFile).Decode(&symbolMap)
+		if err != nil {
+			return err
+		}
 
 		if len(args) > 1 {
 			found := false
@@ -155,19 +201,50 @@ var dyldDisassCmd = &cobra.Command{
 
 				// fmt.Println(m.FileTOC.String())
 
-				if image != nil {
-					fmt.Println(image.Name)
+				fmt.Println(image.Name)
+				// if image != nil {
+				// 	fmt.Println(image.Name)
+				// } else {
+				// 	if image, err := f.GetImageContainingTextAddr(symAddr); err == nil {
+				// 		fmt.Println(image.Name)
+				// 	}
+				// }
+
+				off, _ := f.GetOffset(symAddr)
+				var data []byte
+				if instructions > 0 {
+					data, err = f.ReadBytes(int64(off), instructions*4)
+					if err != nil {
+						return err
+					}
 				} else {
-					if image, err := f.GetImageContainingTextAddr(symAddr); err == nil {
-						fmt.Println(image.Name)
+					data, err = f.ReadBytes(int64(off), uint64(functionSize(starts, symAddr)))
+					if err != nil {
+						return err
 					}
 				}
 
-				off, _ := f.GetOffset(symAddr)
-				data, err := f.ReadBytes(int64(off), instructions*4)
-				if err != nil {
-					return err
-				}
+				// err = parseImports(m)
+				// if err != nil {
+				// 	return errors.Wrapf(err, "failed to parse imports")
+				// }
+
+				// err = parseObjC(m)
+				// if err != nil {
+				// 	return errors.Wrapf(err, "failed to parse objc runtime")
+				// }
+
+				// err = parseSymbolStubs(m)
+				// if err != nil {
+				// 	return errors.Wrapf(err, "failed to parse symbol stubs")
+				// }
+
+				// err = parseGOT(m)
+				// if err != nil {
+				// 	return errors.Wrapf(err, "failed to parse got(s)")
+				// }
+
+				var prevInstruction arm64.Instruction
 
 				for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(symAddr)}) {
 
@@ -176,10 +253,63 @@ var dyldDisassCmd = &cobra.Command{
 						continue
 					}
 
+					opStr := i.Instruction.OpStr()
+
 					// check for start of a new function
 					functionStart(starts, i.Instruction.Address())
 
-					fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), i.Instruction.OpStr())
+					// lookup adrp/ldr or add address as a cstring or symbol name
+					operation := i.Instruction.Operation().String()
+					if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
+						operands := i.Instruction.Operands()
+						if operands != nil && prevInstruction.Operands() != nil {
+							adrpRegister := prevInstruction.Operands()[0].Reg[0]
+							adrpImm := prevInstruction.Operands()[1].Immediate
+							if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
+								adrpImm += operands[1].Immediate
+							} else if operation == "add" && adrpRegister == operands[0].Reg[0] {
+								adrpImm += operands[2].Immediate
+							}
+							// markup disassemble with label comment
+							symName := findSymbol(adrpImm)
+							if len(symName) > 0 {
+								opStr += fmt.Sprintf(" ; %s", symName)
+							} else {
+								cstr, err := f.GetCString(adrpImm)
+								if err == nil {
+									if len(cstr) > 200 {
+										opStr += fmt.Sprintf(" ; %#v...", cstr[:200])
+									} else {
+										opStr += fmt.Sprintf(" ; %#v", cstr)
+									}
+								}
+							}
+						}
+
+					} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
+						operands := i.Instruction.Operands()
+						if operands != nil && operands[0].OpClass == arm64.LABEL {
+							symName := findSymbol(operands[0].Immediate)
+							if len(symName) > 0 {
+								opStr = fmt.Sprintf("\t%s", symName)
+							}
+						}
+					} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
+						operation := i.Instruction.Operation()
+						if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
+							operands := i.Instruction.Operands()
+							if operands[1].OpClass == arm64.LABEL {
+								symName := findSymbol(operands[1].Immediate)
+								if len(symName) > 0 {
+									opStr += fmt.Sprintf(" ; %s", symName)
+								}
+							}
+						}
+					}
+
+					fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
+
+					prevInstruction = *i.Instruction
 				}
 			}
 		} else {
