@@ -11,6 +11,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/go-macho/types/objc"
 	"github.com/pkg/errors"
 )
 
@@ -20,6 +22,14 @@ const (
 	isProduction              optFlags = (1 << 0) // never set in development cache
 	noMissingWeakSuperclasses optFlags = (1 << 1) // never set in development cache
 )
+
+// objcInfo is the dyld_shared_cache dylib objc object
+type objcInfo struct {
+	Classes   []objc.Class
+	Methods   []objc.Method
+	SelRefs   map[uint64]*objc.Selector
+	CFStrings []objc.CFString
+}
 
 // Optimization structure
 type Optimization struct {
@@ -137,6 +147,8 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 			}
 			addr, _ := f.GetVMAddress(uint64(int32(fileOffset) + ptr))
 			objcMap[strings.Trim(s, "\x00")] = addr
+
+			f.AddressToSymbol[addr] = strings.Trim(s, "\x00")
 		}
 
 	}
@@ -228,44 +240,58 @@ func (f *File) SelectorsForImage(imageNames ...string) error {
 	} else {
 		images = f.Images
 	}
-	fmt.Println("Objective-C Selectors:")
+	// fmt.Println("Objective-C Selectors:")
 	for _, image := range images {
-		fmt.Println(image.Name)
+		// fmt.Println(image.Name)
 		m, err := image.GetPartialMacho()
 		if err != nil {
 			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
 		}
-		for _, s := range m.Sections {
-			if s.Seg == "__DATA" && s.Name == "__objc_selrefs" {
-				r := io.NewSectionReader(f.r, int64(s.Offset), int64(s.Size))
-				selectorPtrs := make([]uint64, s.Size/8)
-				if err := binary.Read(r, f.ByteOrder, &selectorPtrs); err != nil {
-					return err
-				}
-				for idx, ptr := range selectorPtrs {
-					selectorPtrs[idx] = ptr & mask
+
+		image.ObjC.SelRefs = make(map[uint64]*objc.Selector)
+
+		sec := m.Section("__DATA", "__objc_selrefs")
+		if sec != nil {
+			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+			selectorPtrs := make([]uint64, sec.Size/8)
+			if err := binary.Read(r, f.ByteOrder, &selectorPtrs); err != nil {
+				return err
+			}
+			for idx, ptr := range selectorPtrs {
+				selectorPtrs[idx] = ptr & mask // TODO use chain fixups
+			}
+
+			objcRoSeg := libobjc.Segment("__OBJC_RO")
+			if objcRoSeg == nil {
+				fmt.Println("  - No selectors.")
+				return fmt.Errorf("segment __OBJC_RO does not exist")
+			}
+
+			sr := io.NewSectionReader(f.r, int64(objcRoSeg.Offset), int64(objcRoSeg.Filesz))
+
+			for idx, ptr := range selectorPtrs {
+				sr.Seek(int64(ptr-objcRoSeg.Addr), io.SeekStart)
+
+				s, err := bufio.NewReader(sr).ReadString('\x00')
+				if err != nil {
+					log.Error(errors.Wrapf(err, "failed to read selector name at: %d", ptr-objcRoSeg.Addr).Error())
 				}
 
-				objcRoSeg := libobjc.Segment("__OBJC_RO")
-				if objcRoSeg == nil {
-					fmt.Println("  - No selectors.")
-					return fmt.Errorf("segment __OBJC_RO does not exist")
+				image.ObjC.SelRefs[ptr] = &objc.Selector{
+					VMAddr: ptr - objcRoSeg.Addr,
+					Name:   strings.Trim(s, "\x00"),
 				}
 
-				sr := io.NewSectionReader(f.r, int64(objcRoSeg.Offset), int64(objcRoSeg.Filesz))
-
-				for _, ptr := range selectorPtrs {
-					sr.Seek(int64(ptr-objcRoSeg.Addr), io.SeekStart)
-					s, err := bufio.NewReader(sr).ReadString('\x00')
-					if err != nil {
-						log.Error(errors.Wrapf(err, "failed to read selector name at: %d", ptr-objcRoSeg.Addr).Error())
-					}
-					fmt.Printf("    0x%x: %s\n", ptr, strings.Trim(s, "\x00"))
+				if len(image.ObjC.SelRefs[ptr].Name) > 0 {
+					f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("sel_%s", image.ObjC.SelRefs[ptr].Name)
+					f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
 				}
 			}
 		}
+
 		m.Close()
 	}
+
 	return nil
 }
 
@@ -345,6 +371,157 @@ func (f *File) AllSelectors(print bool) (map[string]uint64, error) {
 	}
 
 	return nil, fmt.Errorf("unable to find __TEXT.__objc_opt_ro")
+}
+
+// MethodsForImage returns all of the Objective-C methods for a given image
+func (f *File) MethodsForImage(imageNames ...string) error {
+
+	var images []*CacheImage
+	var methodList objc.MethodList
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			images = append(images, f.Image(imageName))
+		}
+	} else {
+		images = f.Images
+	}
+
+	// fmt.Println("Objective-C Methods:")
+
+	for _, image := range images {
+		// fmt.Println(image.Name)
+		m, err := image.GetPartialMacho()
+		if err != nil {
+			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+		}
+
+		if sec := m.Section("__TEXT", "__objc_methlist"); sec != nil {
+			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+			for {
+				err := binary.Read(r, f.ByteOrder, &methodList)
+
+				currOffset, _ := r.Seek(0, io.SeekCurrent)
+				currOffset += int64(sec.Offset)
+				// currOffset += int64(sec.Offset) + int64(binary.Size(objc.MethodList{}))
+
+				if err == io.EOF {
+					break
+				}
+
+				if err != nil {
+					return fmt.Errorf("failed to read method_list_t: %v", err)
+				}
+
+				methods := make([]objc.MethodSmallT, methodList.Count)
+				if err := binary.Read(r, f.ByteOrder, &methods); err != nil {
+					return fmt.Errorf("failed to read method_t(s) (small): %v", err)
+				}
+
+				for _, method := range methods {
+					n, err := f.GetCStringAtOffset(uint64(method.NameOffset) + uint64(currOffset))
+					if err != nil {
+						return fmt.Errorf("failed to read cstring: %v", err)
+					}
+
+					t, err := f.GetCStringAtOffset(uint64(method.TypesOffset) + uint64(currOffset+4))
+					if err != nil {
+						return fmt.Errorf("failed to read cstring: %v", err)
+					}
+
+					impVMAddr, err := f.GetVMAddress(uint64(method.ImpOffset) + uint64(currOffset+8))
+					if err != nil {
+						return fmt.Errorf("failed to convert offset 0x%x to vmaddr; %v", method.ImpOffset, err)
+					}
+
+					currOffset += int64(methodList.EntSize())
+					// fmt.Printf("    %#x: %s %s\n", impVMAddr, t, n)
+					image.ObjC.Methods = append(image.ObjC.Methods, objc.Method{
+						ImpVMAddr: impVMAddr,
+						Name:      n,
+						Types:     t,
+						Pointer: types.FilePointer{
+							VMAdder: impVMAddr,
+							Offset:  int64(method.ImpOffset),
+						},
+					})
+					if len(n) > 0 {
+						f.AddressToSymbol[impVMAddr] = n
+					}
+				}
+
+				curr, _ := r.Seek(0, io.SeekCurrent)
+				align := types.RoundUp(uint64(curr), 8)
+				r.Seek(int64(align), io.SeekStart)
+			}
+		}
+
+		m.Close()
+	}
+
+	return nil
+}
+
+// CFStringsForImage returns all of the Objective-C cfstrings for a given image
+func (f *File) CFStringsForImage(imageNames ...string) error {
+	var mask uint64 = (1 << 40) - 1 // 40bit mask
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			images = append(images, f.Image(imageName))
+		}
+	} else {
+		images = f.Images
+	}
+
+	// fmt.Println("Objective-C CFStrings:")
+
+	for _, image := range images {
+		// fmt.Println(image.Name)
+		m, err := image.GetPartialMacho()
+		if err != nil {
+			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+		}
+
+		for _, s := range m.Segments() {
+			if sec := m.Section(s.Name, "__cfstring"); sec != nil {
+				r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+				image.ObjC.CFStrings = make([]objc.CFString, int(sec.Size)/binary.Size(objc.CFString64T{}))
+				cfStrTypes := make([]objc.CFString64T, int(sec.Size)/binary.Size(objc.CFString64T{}))
+
+				if err := binary.Read(r, f.ByteOrder, &cfStrTypes); err != nil {
+					return fmt.Errorf("failed to read cfstring64_t structs: %v", err)
+				}
+
+				for idx, cfstr := range cfStrTypes {
+					image.ObjC.CFStrings[idx].CFString64T = &cfstr
+					if cfstr.Data == 0 {
+						return fmt.Errorf("unhandled cstring parse case where data is 0")
+					}
+
+					image.ObjC.CFStrings[idx].Name, err = f.GetCString(cfstr.Data & mask) // TODO use chain fixups
+					if err != nil {
+						return fmt.Errorf("failed to read cstring: %v", err)
+					}
+
+					image.ObjC.CFStrings[idx].Address = sec.Addr + uint64(idx*binary.Size(objc.CFString64T{}))
+					if err != nil {
+						return fmt.Errorf("failed to calulate cfstring vmaddr: %v", err)
+					}
+
+					if len(image.ObjC.CFStrings[idx].Name) > 0 {
+						f.AddressToSymbol[image.ObjC.CFStrings[idx].Address] = image.ObjC.CFStrings[idx].Name // TODO: check the mem consumption
+						// fmt.Printf("    %#x: %#v\n", cfstrings[idx].Address, cfstrings[idx].Name)
+					}
+				}
+			}
+		}
+
+		m.Close()
+	}
+
+	return nil
 }
 
 /*

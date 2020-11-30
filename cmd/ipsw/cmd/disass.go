@@ -469,7 +469,7 @@ var disCmd = &cobra.Command{
 					adrpImm := prevInstruction.Operands()[1].Immediate
 					if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
 						adrpImm += operands[1].Immediate
-					} else if operation == "add" && adrpRegister == operands[0].Reg[0] {
+					} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
 						adrpImm += operands[2].Immediate
 					}
 					// markup disassemble with label comment
