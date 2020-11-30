@@ -114,6 +114,8 @@ func (f *File) IsCString(m *macho.File, addr uint64) (string, error) {
 
 // ParseSymbolStubs parse symbol stubs in MachO
 func (f *File) ParseSymbolStubs(m *macho.File) error {
+	var targetValue uint64
+
 	for _, sec := range m.Sections {
 		if sec.Flags.IsSymbolStubs() {
 
@@ -134,8 +136,16 @@ func (f *File) ParseSymbolStubs(m *macho.File) error {
 							adrpImm += operands[2].Immediate
 						}
 
-						if len(f.AddressToSymbol[adrpImm]) > 0 {
-							f.AddressToSymbol[prevInstruction.Address()] = f.AddressToSymbol[adrpImm]
+						addr, err := f.ReadPointerAtAddress(adrpImm)
+						if err != nil {
+							return err
+						}
+
+						targetValue = convertToVMAddr(addr)
+
+						// fmt.Printf("%#x: %#x => %s\n", adrpImm, targetValue, f.AddressToSymbol[targetValue])
+						if symName, ok := f.AddressToSymbol[targetValue]; ok {
+							f.AddressToSymbol[prevInstruction.Address()] = symName
 						}
 					}
 				}
@@ -161,12 +171,7 @@ func (f *File) ParseGOT(m *macho.File) error {
 
 		var targetValue uint64
 		for idx, ptr := range ptrs {
-			pointer := CacheSlidePointer3(ptr)
-			if pointer.Authenticated() {
-				targetValue = 0x180000000 + pointer.OffsetFromSharedCacheBase()
-			} else {
-				targetValue = pointer.SignExtend51()
-			}
+			targetValue = convertToVMAddr(ptr)
 			// fmt.Printf("%#x: %#x => %s\n", authPtr.Addr+uint64(idx*8), targetValue, f.AddressToSymbol[targetValue])
 			if symName, ok := f.AddressToSymbol[targetValue]; ok {
 				f.AddressToSymbol[authPtr.Addr+uint64(idx*8)] = symName
@@ -194,13 +199,7 @@ func (f *File) ParseGOT(m *macho.File) error {
 			for idx, ptr := range ptrs {
 				gotPtr := sec.Addr + uint64(idx*8)
 				// fmt.Printf("gotPtr: %#x\n", gotPtr)
-				var targetValue uint64
-				pointer := CacheSlidePointer3(ptr)
-				if pointer.Authenticated() {
-					targetValue = 0x180000000 + pointer.OffsetFromSharedCacheBase()
-				} else {
-					targetValue = pointer.SignExtend51()
-				}
+				targetValue := convertToVMAddr(ptr)
 				// fmt.Printf("ptr: %#x\n", ptr)
 				// fmt.Printf("newPtr: %#x, %s\n", targetValue, symbolMap[targetValue])
 				// fmt.Println(lookupSymbol(m, targetValue))

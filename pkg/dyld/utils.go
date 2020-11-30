@@ -1,6 +1,7 @@
 package dyld
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 )
@@ -38,4 +39,31 @@ func (f *File) ReadBytes(offset int64, size uint64) ([]byte, error) {
 		return nil, err
 	}
 	return data, nil
+}
+
+// ReadPointer returns bytes at a given offset
+func (f *File) ReadPointer(offset uint64) (uint64, error) {
+	u64 := make([]byte, 8)
+	_, err := f.r.ReadAt(u64, int64(offset))
+	if err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(u64), nil
+}
+
+// ReadPointerAtAddress returns bytes at a given offset
+func (f *File) ReadPointerAtAddress(addr uint64) (uint64, error) {
+	offset, err := f.GetOffset(addr)
+	if err != nil {
+		return 0, err
+	}
+	return f.ReadPointer(offset)
+}
+
+func convertToVMAddr(addr uint64) uint64 {
+	pointer := CacheSlidePointer3(addr)
+	if pointer.Authenticated() {
+		return 0x180000000 + pointer.OffsetFromSharedCacheBase()
+	}
+	return pointer.SignExtend51()
 }
