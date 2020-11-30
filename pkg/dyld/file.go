@@ -123,7 +123,7 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	f := new(File)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 	f.r = r
-	f.AddressToSymbol = make(map[uint64]string, 4450000)
+	f.AddressToSymbol = make(map[uint64]string, 7000000)
 
 	if len(userConfig) > 0 {
 		config = *userConfig[0]
