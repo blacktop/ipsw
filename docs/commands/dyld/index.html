@@ -376,7 +376,7 @@ offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
 0x1ce6c0000
 </code></pre></div><h3 id="dyld-disass"><strong>dyld disass</strong></h3>
 <p>Disassemble a function in the <em>dyld_shared_cache</em></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld disass dyld_shared_cache _NSLog
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld disass --image Foundation dyld_shared_cache _NSLog
 
    • Found dyld_shared_cache companion symbol map file...
    • Locating symbol: _NSLog
@@ -384,7 +384,10 @@ offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
    • Parsing ObjC runtime structures...
    • Parsing MachO symbol stubs...
    • Parsing MachO global offset table...
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-nasm" data-lang="nasm"><span class="nl">_NSLog:</span>
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> You can speed up symbol lookups by supplying the <code>--image</code> flag</p>
+</blockquote>
+<div class="highlight"><pre class="chroma"><code class="language-nasm" data-lang="nasm"><span class="nl">_NSLog:</span>
 <span class="err">0</span><span class="nl">x1808b9930:</span>  <span class="err">7</span><span class="nf">f</span> <span class="mi">23</span> <span class="mi">03</span> <span class="nv">d5</span>       <span class="nv">pacibsp</span>
 <span class="err">0</span><span class="nl">x1808b9934:</span>  <span class="nf">ff</span> <span class="mi">83</span> <span class="mi">00</span> <span class="nv">d1</span>       <span class="nv">sub</span>             <span class="nb">sp</span><span class="p">,</span> <span class="nb">sp</span><span class="p">,</span> <span class="err">#</span><span class="mh">0x20</span>
 <span class="err">0</span><span class="nl">x1808b9938:</span>  <span class="nf">fd</span> <span class="mi">7</span><span class="nv">b</span> <span class="mi">01</span> <span class="nv">a9</span>       <span class="nv">stp</span>             <span class="nv">x29</span><span class="p">,</span> <span class="nv">x30</span><span class="p">,</span> <span class="p">[</span><span class="nb">sp</span><span class="p">,</span> <span class="err">#</span><span class="mh">0x10</span><span class="p">]</span>
