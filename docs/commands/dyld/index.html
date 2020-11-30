@@ -194,6 +194,7 @@
 <li><a href="#dyld-patches-"><strong>dyld patches</strong> 🆕</a></li>
 <li><a href="#dyld-a2o"><strong>dyld a2o</strong></a></li>
 <li><a href="#dyld-o2a"><strong>dyld o2a</strong></a></li>
+<li><a href="#dyld-disass"><strong>dyld disass</strong></a></li>
 </ul>
 <hr>
 <h3 id="dyld-info"><strong>dyld info</strong></h3>
@@ -374,7 +375,7 @@ offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
 
 0x1ce6c0000
 </code></pre></div><h3 id="dyld-disass"><strong>dyld disass</strong></h3>
-<p>Disassemble a function in the shared cache</p>
+<p>Disassemble a function in the <em>dyld_shared_cache</em></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld disass dyld_shared_cache _NSLog
 
    • Found dyld_shared_cache companion symbol map file...
