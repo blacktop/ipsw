@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/gob"
 	"fmt"
 	"os"
@@ -114,7 +115,10 @@ var dyldDisassCmd = &cobra.Command{
 			}
 
 			// save lookup map to disk to speed up subsequent requests
-			f.SaveAddrToSymMap(dscPath + ".a2s")
+			err = f.SaveAddrToSymMap(dscPath + ".a2s")
+			if err != nil {
+				return err
+			}
 
 		} else {
 			log.Info("Found dyld_shared_cache companion symbol map file...")
@@ -122,8 +126,15 @@ var dyldDisassCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+
+			gzr, err := gzip.NewReader(a2sFile)
+			if err != nil {
+				return err
+			}
+			defer gzr.Close()
+
 			// Decoding the serialized data
-			err = gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol)
+			err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
 			if err != nil {
 				return err
 			}

@@ -3,11 +3,11 @@ package dyld
 import (
 	"bufio"
 	"bytes"
+	"compress/gzip"
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"text/tabwriter"
@@ -350,12 +350,23 @@ func (f *File) SaveAddrToSymMap(dest string) error {
 	// Encoding the map
 	err := e.Encode(f.AddressToSymbol)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
 
-	err = ioutil.WriteFile(dest, buff.Bytes(), 0644)
+	of, err := os.Create(dest)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create file %s: %v", dest, err)
+	}
+	defer of.Close()
+
+	w := bufio.NewWriter(of)
+
+	gzw := gzip.NewWriter(w)
+	defer gzw.Close()
+
+	_, err = buff.WriteTo(gzw)
+	if err != nil {
+		return fmt.Errorf("failed to write addr2sym map to gzip file: %v", err)
 	}
 
 	return nil
