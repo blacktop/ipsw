@@ -199,6 +199,10 @@ var dyldDisassCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrapf(err, "failed to parse objc selectors")
 				}
+				err = f.ClassesForImage(image.Name)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse objc classes")
+				}
 			}
 
 			log.Info("Parsing MachO symbol stubs...")

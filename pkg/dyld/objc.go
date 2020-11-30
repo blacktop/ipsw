@@ -25,8 +25,8 @@ const (
 
 // objcInfo is the dyld_shared_cache dylib objc object
 type objcInfo struct {
-	Classes   []objc.Class
 	Methods   []objc.Method
+	ClassRefs map[uint64]*objc.Class
 	SelRefs   map[uint64]*objc.Selector
 	CFStrings []objc.CFString
 }
@@ -522,6 +522,189 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 	}
 
 	return nil
+}
+
+// ClassesForImage returns all of the Objective-C classes for a given image
+func (f *File) ClassesForImage(imageNames ...string) error {
+	var mask uint64 = (1 << 40) - 1 // 40bit mask
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			images = append(images, f.Image(imageName))
+		}
+	} else {
+		images = f.Images
+	}
+	// fmt.Println("Objective-C Classes:")
+	for _, image := range images {
+		// fmt.Println(image.Name)
+		m, err := image.GetPartialMacho()
+		if err != nil {
+			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+		}
+
+		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
+
+		sec := m.Section("__DATA", "__objc_classrefs")
+		if sec != nil {
+			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+			classPtrs := make([]uint64, sec.Size/8)
+			if err := binary.Read(r, f.ByteOrder, &classPtrs); err != nil {
+				return err
+			}
+			for idx, ptr := range classPtrs {
+				classPtrs[idx] = ptr & mask // TODO use chain fixups
+			}
+
+			for idx, ptr := range classPtrs {
+				c, err := f.GetObjCClass(ptr)
+				if err != nil {
+					return err
+				}
+
+				image.ObjC.ClassRefs[ptr] = c
+
+				if len(image.ObjC.ClassRefs[ptr].Name) > 0 {
+					f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("class_%s", image.ObjC.ClassRefs[ptr].Name)
+					f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
+				}
+			}
+		}
+
+		m.Close()
+	}
+
+	return nil
+}
+
+// GetObjCClass parses an ObjC class at a given virtual memory address
+func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
+	var classPtr objc.SwiftClassMetadata64
+
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	off, err := f.GetOffset(vmaddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
+	}
+
+	sr.Seek(int64(off), io.SeekStart)
+	if err := binary.Read(sr, f.ByteOrder, &classPtr); err != nil {
+		return nil, fmt.Errorf("failed to read swift_class_metadata_t: %v", err)
+	}
+
+	// info, err := f.GetObjCClassInfo(convertToVMAddr(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get class info at vmaddr: 0x%x; %v", classPtr.DataVMAddrAndFastFlags&objc.FAST_DATA_MASK64, err)
+	// }
+
+	var info objc.ClassRO64
+
+	off, err = f.GetOffset(convertToVMAddr(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
+	}
+
+	sr.Seek(int64(off), io.SeekStart)
+	if err := binary.Read(sr, f.ByteOrder, &info); err != nil {
+		return nil, fmt.Errorf("failed to read class_ro_t: %v", err)
+	}
+
+	name, err := f.GetCString(convertToVMAddr(info.NameVMAddr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cstring: %v", err)
+	}
+
+	// var methods []objc.Method
+	// if info.BaseMethodsVMAddr > 0 {
+	// 	methods, err = f.GetObjCMethods(convertToVMAddr(info.BaseMethodsVMAddr))
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to get methods at vmaddr: 0x%x; %v", info.BaseMethodsVMAddr, err)
+	// 	}
+	// }
+
+	// var prots []objc.Protocol
+	// if info.BaseProtocolsVMAddr > 0 {
+	// 	prots, err = f.parseObjcProtocolList(info.BaseProtocolsVMAddr)
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to read protocols vmaddr: %v", err)
+	// 	}
+	// }
+
+	// var ivars []objc.Ivar
+	// if info.IvarsVMAddr > 0 {
+	// 	ivars, err = f.GetObjCIvars(convertToVMAddr(info.IvarsVMAddr))
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to get ivars at vmaddr: 0x%x; %v", info.IvarsVMAddr, err)
+	// 	}
+	// }
+
+	// var props []objc.Property
+	// if info.BasePropertiesVMAddr > 0 {
+	// 	props, err = f.GetObjCProperties(convertToVMAddr(info.BasePropertiesVMAddr))
+	// 	if err != nil {
+	// 		return nil, fmt.Errorf("failed to get props at vmaddr: 0x%x; %v", info.BasePropertiesVMAddr, err)
+	// 	}
+	// }
+
+	// superClass := &objc.Class{Name: "<ROOT>"}
+	// if classPtr.SuperclassVMAddr > 0 {
+	// 	if !info.Flags.IsRoot() {
+	// 		superClass, err = f.GetObjCClass(convertToVMAddr(classPtr.SuperclassVMAddr))
+	// 		if err != nil {
+	// 			bindName, err := f.GetBindName(classPtr.SuperclassVMAddr)
+	// 			if err == nil {
+	// 				superClass = &objc.Class{Name: strings.TrimPrefix(bindName, "_OBJC_CLASS_$_")}
+	// 			} else {
+	// 				return nil, fmt.Errorf("failed to read super class objc_class_t at vmaddr: 0x%x; %v", vmaddr, err)
+	// 			}
+	// 		}
+	// 	}
+	// }
+
+	isaClass := &objc.Class{}
+	var cMethods []objc.Method
+	if classPtr.IsaVMAddr > 0 {
+		if !info.Flags.IsMeta() {
+			isaClass, err = f.GetObjCClass(convertToVMAddr(classPtr.IsaVMAddr))
+			if err != nil {
+				// bindName, err := f.GetBindName(classPtr.IsaVMAddr)
+				// if err == nil {
+				// 	isaClass = &objc.Class{Name: strings.TrimPrefix(bindName, "_OBJC_CLASS_$_")}
+				// } else {
+				// 	return nil, fmt.Errorf("failed to read super class objc_class_t at vmaddr: 0x%x; %v", vmaddr, err)
+				// }
+			} else {
+				if isaClass.ReadOnlyData.Flags.IsMeta() {
+					cMethods = isaClass.InstanceMethods
+				}
+			}
+		}
+	}
+
+	return &objc.Class{
+		Name: name,
+		// SuperClass:      superClass.Name,
+		Isa: isaClass.Name,
+		// InstanceMethods: methods,
+		ClassMethods: cMethods,
+		// Ivars:           ivars,
+		// Props:           props,
+		// Prots:           prots,
+		ClassPtr: types.FilePointer{
+			VMAdder: vmaddr,
+			Offset:  int64(off),
+		},
+		IsaVMAddr:             convertToVMAddr(classPtr.IsaVMAddr),
+		SuperclassVMAddr:      convertToVMAddr(classPtr.SuperclassVMAddr),
+		MethodCacheBuckets:    classPtr.MethodCacheBuckets,
+		MethodCacheProperties: classPtr.MethodCacheProperties,
+		DataVMAddr:            convertToVMAddr(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64,
+		IsSwiftLegacy:         (classPtr.DataVMAddrAndFastFlags&objc.FAST_IS_SWIFT_LEGACY == 1),
+		IsSwiftStable:         (classPtr.DataVMAddrAndFastFlags&objc.FAST_IS_SWIFT_STABLE == 1),
+		ReadOnlyData:          info,
+	}, nil
 }
 
 /*
