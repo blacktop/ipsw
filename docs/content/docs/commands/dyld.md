@@ -16,6 +16,7 @@ summary: Parse dyld_shared_cache.
 - [**dyld patches** 🆕](#dyld-patches-)
 - [**dyld a2o**](#dyld-a2o)
 - [**dyld o2a**](#dyld-o2a)
+- [**dyld disass**](#dyld-disass)
 
 ---
 
@@ -282,7 +283,7 @@ ipsw dyld a2o dyld_shared_cache 0x4C6C0000
 
 ### **dyld disass**
 
-Disassemble a function in the shared cache
+Disassemble a function in the _dyld_shared_cache_
 
 ```bash
 $ ipsw dyld disass dyld_shared_cache _NSLog
