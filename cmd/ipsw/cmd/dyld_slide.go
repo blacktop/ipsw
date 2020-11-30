@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"compress/gzip"
 	"encoding/gob"
 	"fmt"
 	"os"
@@ -86,18 +87,26 @@ var slideCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			f.SaveAddrToSymMap(dscPath + ".a2s")
-
+			err = f.SaveAddrToSymMap(dscPath + ".a2s")
+			if err != nil {
+				return err
+			}
 		} else {
 			a2sFile, err := os.Open(dscPath + ".a2s")
 			if err != nil {
 				return err
 			}
+			gzr, err := gzip.NewReader(a2sFile)
+			if err != nil {
+				return fmt.Errorf("failed to create gzip reader: %v", err)
+			}
 			// Decoding the serialized data
-			err = gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol)
+			err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
 			if err != nil {
 				return err
 			}
+			gzr.Close()
+			a2sFile.Close()
 		}
 
 		if f.SlideInfoOffset > 0 {

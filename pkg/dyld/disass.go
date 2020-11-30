@@ -100,6 +100,18 @@ func (f *File) FindSymbol(addr uint64, demangle bool) string {
 	return ""
 }
 
+// IsCString returns cstring at given virtual address if is in a CstringLiterals section
+func (f *File) IsCString(m *macho.File, addr uint64) (string, error) {
+	for _, sec := range m.Sections {
+		if sec.Flags.IsCstringLiterals() {
+			if sec.Addr <= addr && addr < sec.Addr+sec.Size {
+				return f.GetCString(addr)
+			}
+		}
+	}
+	return "", fmt.Errorf("not a cstring address")
+}
+
 // ParseSymbolStubs parse symbol stubs in MachO
 func (f *File) ParseSymbolStubs(m *macho.File) error {
 	for _, sec := range m.Sections {

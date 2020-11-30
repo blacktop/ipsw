@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"compress/gzip"
 	"encoding/gob"
 	"fmt"
 	"os"
@@ -47,16 +48,25 @@ var a2sCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var addr uint64
+		var numberStr string
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		numberStr := strings.Replace(args[1], "0x", "", -1)
-		numberStr = strings.Replace(numberStr, "0X", "", -1)
+		if strings.HasPrefix(strings.ToLower(args[1]), "0x") {
+			numberStr = strings.Replace(args[1], "0x", "", -1)
+			numberStr = strings.Replace(numberStr, "0X", "", -1)
+		}
 
 		addr, err := strconv.ParseUint(numberStr, 16, 64)
 		if err != nil {
-			return err
+			log.Warn("assuming given address is in decimal")
+			addr, err = strconv.ParseUint(args[1], 10, 64)
+			if err != nil {
+				return errors.Wrapf(err, "failed to convert given address to int: %s", args[1])
+			}
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -96,26 +106,34 @@ var a2sCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			fmt.Printf("0x%8x: %s\n", addr, f.AddressToSymbol[addr])
+			fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
 			// save lookup map to disk to speed up subsequent requests
-			f.SaveAddrToSymMap(dscPath + ".a2s")
-
-			return nil
+			return f.SaveAddrToSymMap(dscPath + ".a2s")
 		}
-
-		var addr2Sym map[uint64]string
 
 		a2sFile, err := os.Open(dscPath + ".a2s")
 		if err != nil {
 			return err
 		}
+		defer a2sFile.Close()
+
+		gzr, err := gzip.NewReader(a2sFile)
+		if err != nil {
+			return fmt.Errorf("failed to create gzip reader: %v", err)
+		}
+		defer gzr.Close()
+
 		// Decoding the serialized data
-		err = gob.NewDecoder(a2sFile).Decode(&addr2Sym)
+		err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("0x%8x: %s\n", addr, addr2Sym[addr])
+		if symName, ok := f.AddressToSymbol[addr]; ok {
+			fmt.Printf("%#x: %s\n", addr, symName)
+		} else {
+			log.Error("no symbol found")
+		}
 
 		return nil
 	},
