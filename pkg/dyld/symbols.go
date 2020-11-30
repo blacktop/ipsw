@@ -359,9 +359,7 @@ func (f *File) SaveAddrToSymMap(dest string) error {
 	}
 	defer of.Close()
 
-	w := bufio.NewWriter(of)
-
-	gzw := gzip.NewWriter(w)
+	gzw := gzip.NewWriter(of)
 	defer gzw.Close()
 
 	_, err = buff.WriteTo(gzw)

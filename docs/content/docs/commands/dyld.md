@@ -286,7 +286,7 @@ ipsw dyld a2o dyld_shared_cache 0x4C6C0000
 Disassemble a function in the _dyld_shared_cache_
 
 ```bash
-$ ipsw dyld disass dyld_shared_cache _NSLog
+$ ipsw dyld disass --image Foundation dyld_shared_cache _NSLog
 
    • Found dyld_shared_cache companion symbol map file...
    • Locating symbol: _NSLog
@@ -295,6 +295,8 @@ $ ipsw dyld disass dyld_shared_cache _NSLog
    • Parsing MachO symbol stubs...
    • Parsing MachO global offset table...
 ```
+
+> **NOTE:** You can speed up symbol lookups by supplying the `--image` flag
 
 ```nasm
 _NSLog:

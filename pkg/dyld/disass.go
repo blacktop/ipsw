@@ -5,11 +5,37 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strings"
 
 	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 )
+
+// GetSymbolAddress returns the virtual address and possibly the dylib containing a given symbol
+func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, error) {
+	if len(imageName) > 0 {
+		if sym, _ := f.FindExportedSymbolInImage(imageName, symbol); sym != nil {
+			return sym.Address, f.Image(imageName), nil
+		}
+	} else {
+		// Search ALL dylibs for the symbol
+		for _, image := range f.Images {
+			if sym, _ := f.FindExportedSymbolInImage(image.Name, symbol); sym != nil {
+				return sym.Address, image, nil
+			}
+		}
+	}
+
+	// Search addr2sym map
+	for addr, sym := range f.AddressToSymbol {
+		if strings.EqualFold(sym, symbol) {
+			return addr, nil, nil
+		}
+	}
+
+	return 0, nil, fmt.Errorf("failed to find symbol %s", symbol)
+}
 
 // Demangle a string just as the GNU c++filt program does.
 func doDemangle(name string) string {

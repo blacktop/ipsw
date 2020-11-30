@@ -44,7 +44,7 @@ func init() {
 	// dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
-	dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
+	// dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
@@ -57,8 +57,6 @@ var dyldDisassCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var image *dyld.CacheImage
-		var symAddr uint64
 		var data []byte
 		var starts []uint64
 
@@ -124,192 +122,169 @@ var dyldDisassCmd = &cobra.Command{
 			log.Info("Found dyld_shared_cache companion symbol map file...")
 			a2sFile, err := os.Open(dscPath + ".a2s")
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
 			}
 
 			gzr, err := gzip.NewReader(a2sFile)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to create gzip reader: %v", err)
 			}
-			defer gzr.Close()
 
 			// Decoding the serialized data
 			err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to decode addr2sym map; %v", err)
 			}
+			gzr.Close()
+			a2sFile.Close()
 		}
 
 		if len(args) > 1 {
-			found := false
 			log.Info("Locating symbol: " + args[1])
-			if len(imageName) > 0 { // Search for symbol inside dylib
-				image = f.Image(imageName)
-				if sym, _ := f.FindExportedSymbolInImage(imageName, args[1]); sym != nil {
-					symAddr = sym.Address
-					found = true
-				} else if lSym, _ := f.FindLocalSymbolInImage(args[1], imageName); lSym != nil {
-					symAddr = lSym.Value
-					found = true
-				}
-			} else {
-				// Search ALL dylibs for a symbol
-				for _, img := range f.Images {
-					if sym, _ := f.FindExportedSymbolInImage(img.Name, args[1]); sym != nil {
-						image = img
-						symAddr = sym.Address
-						found = true
-						break
-					}
-				}
-				if !found {
-					if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
-						symAddr = lSym.Value
-					} else {
-						return fmt.Errorf("symbol %s not found", args[1])
-					}
-				}
+			symAddr, image, err := f.GetSymbolAddress(args[1], imageName)
+			if err != nil {
+				return err
+			}
 
-				off, _ := f.GetOffset(symAddr)
+			off, _ := f.GetOffset(symAddr)
 
-				if image == nil {
-					image, err = f.GetImageContainingTextAddr(symAddr)
-					if err != nil {
-						return err
-					}
-				}
-
-				log.WithFields(log.Fields{"dylib": image.Name}).Info("Found symbol")
-
-				m, err := image.GetPartialMacho()
+			if image == nil {
+				image, err = f.GetImageContainingTextAddr(symAddr)
 				if err != nil {
 					return err
 				}
+			}
 
-				// fmt.Println(m.FileTOC.String())
+			log.WithFields(log.Fields{"dylib": image.Name}).Info("Found symbol")
 
-				if fs := m.FunctionStarts(); fs != nil {
-					data, err := f.ReadBytes(int64(fs.Offset), uint64(fs.Size))
-					if err != nil {
-						return err
-					}
-					starts = m.FunctionStartAddrs(data...)
-				}
+			m, err := image.GetPartialMacho()
+			if err != nil {
+				return err
+			}
 
-				if instructions > 0 {
-					data, err = f.ReadBytes(int64(off), instructions*4)
-					if err != nil {
-						return err
-					}
-				} else {
-					data, err = f.ReadBytes(int64(off), uint64(f.FunctionSize(starts, symAddr)))
-					if err != nil {
-						return err
-					}
-				}
+			// fmt.Println(m.FileTOC.String())
 
-				if m.HasObjC() {
-					log.Info("Parsing ObjC runtime structures...")
-					err = f.CFStringsForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc runtime")
-					}
-					err = f.MethodsForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc runtime")
-					}
-					err = f.SelectorsForImage(image.Name)
-					// _, err = f.AllSelectors(false)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc runtime")
-					}
-				}
-
-				log.Info("Parsing MachO symbol stubs...")
-				err = f.ParseSymbolStubs(m)
+			if fs := m.FunctionStarts(); fs != nil {
+				data, err := f.ReadBytes(int64(fs.Offset), uint64(fs.Size))
 				if err != nil {
-					return errors.Wrapf(err, "failed to parse symbol stubs")
+					return err
 				}
+				starts = m.FunctionStartAddrs(data...)
+			}
 
-				log.Info("Parsing MachO global offset table...")
-				err = f.ParseGOT(m)
+			if instructions > 0 {
+				data, err = f.ReadBytes(int64(off), instructions*4)
 				if err != nil {
-					return errors.Wrapf(err, "failed to parse got(s)")
+					return err
+				}
+			} else {
+				data, err = f.ReadBytes(int64(off), uint64(f.FunctionSize(starts, symAddr)))
+				if err != nil {
+					return err
+				}
+			}
+
+			if m.HasObjC() {
+				log.Info("Parsing ObjC runtime structures...")
+				err = f.CFStringsForImage(image.Name)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse objc runtime")
+				}
+				err = f.MethodsForImage(image.Name)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse objc runtime")
+				}
+				err = f.SelectorsForImage(image.Name)
+				// _, err = f.AllSelectors(false)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse objc runtime")
+				}
+			}
+
+			log.Info("Parsing MachO symbol stubs...")
+			err = f.ParseSymbolStubs(m)
+			if err != nil {
+				return errors.Wrapf(err, "failed to parse symbol stubs")
+			}
+
+			log.Info("Parsing MachO global offset table...")
+			err = f.ParseGOT(m)
+			if err != nil {
+				return errors.Wrapf(err, "failed to parse got(s)")
+			}
+
+			var prevInstruction arm64.Instruction
+
+			for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(symAddr)}) {
+
+				if i.Error != nil {
+					fmt.Println(i.StrRepr)
+					continue
 				}
 
-				var prevInstruction arm64.Instruction
+				opStr := i.Instruction.OpStr()
 
-				for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(symAddr)}) {
-
-					if i.Error != nil {
-						fmt.Println(i.StrRepr)
-						continue
+				// check for start of a new function
+				if yes, fname := f.IsFunctionStart(starts, i.Instruction.Address(), demangleFlag); yes {
+					if len(fname) > 0 {
+						fmt.Printf("\n%s:\n", fname)
+					} else {
+						fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
 					}
+				}
 
-					opStr := i.Instruction.OpStr()
-
-					// check for start of a new function
-					if yes, fname := f.IsFunctionStart(starts, i.Instruction.Address(), demangleFlag); yes {
-						if len(fname) > 0 {
-							fmt.Printf("\n%s:\n", fname)
+				// lookup adrp/ldr or add address as a cstring or symbol name
+				operation := i.Instruction.Operation().String()
+				if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
+					operands := i.Instruction.Operands()
+					if operands != nil && prevInstruction.Operands() != nil {
+						adrpRegister := prevInstruction.Operands()[0].Reg[0]
+						adrpImm := prevInstruction.Operands()[1].Immediate
+						if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
+							adrpImm += operands[1].Immediate
+						} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
+							adrpImm += operands[2].Immediate
+						}
+						// markup disassemble with label comment
+						symName := f.FindSymbol(adrpImm, demangleFlag)
+						if len(symName) > 0 {
+							opStr += fmt.Sprintf(" ; %s", symName)
 						} else {
-							fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
+							cstr, err := f.GetCString(adrpImm)
+							if err == nil {
+								if len(cstr) > 200 {
+									opStr += fmt.Sprintf(" ; %#v...", cstr[:200])
+								} else {
+									opStr += fmt.Sprintf(" ; %#v", cstr)
+								}
+							}
 						}
 					}
 
-					// lookup adrp/ldr or add address as a cstring or symbol name
-					operation := i.Instruction.Operation().String()
-					if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
+				} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
+					operands := i.Instruction.Operands()
+					if operands != nil && operands[0].OpClass == arm64.LABEL {
+						symName := f.FindSymbol(operands[0].Immediate, demangleFlag)
+						if len(symName) > 0 {
+							opStr = fmt.Sprintf("\t%s", symName)
+						}
+					}
+				} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
+					operation := i.Instruction.Operation()
+					if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
 						operands := i.Instruction.Operands()
-						if operands != nil && prevInstruction.Operands() != nil {
-							adrpRegister := prevInstruction.Operands()[0].Reg[0]
-							adrpImm := prevInstruction.Operands()[1].Immediate
-							if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
-								adrpImm += operands[1].Immediate
-							} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
-								adrpImm += operands[2].Immediate
-							}
-							// markup disassemble with label comment
-							symName := f.FindSymbol(adrpImm, demangleFlag)
+						if operands[1].OpClass == arm64.LABEL {
+							symName := f.FindSymbol(operands[1].Immediate, demangleFlag)
 							if len(symName) > 0 {
 								opStr += fmt.Sprintf(" ; %s", symName)
-							} else {
-								cstr, err := f.GetCString(adrpImm)
-								if err == nil {
-									if len(cstr) > 200 {
-										opStr += fmt.Sprintf(" ; %#v...", cstr[:200])
-									} else {
-										opStr += fmt.Sprintf(" ; %#v", cstr)
-									}
-								}
-							}
-						}
-
-					} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
-						operands := i.Instruction.Operands()
-						if operands != nil && operands[0].OpClass == arm64.LABEL {
-							symName := f.FindSymbol(operands[0].Immediate, demangleFlag)
-							if len(symName) > 0 {
-								opStr = fmt.Sprintf("\t%s", symName)
-							}
-						}
-					} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
-						operation := i.Instruction.Operation()
-						if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
-							operands := i.Instruction.Operands()
-							if operands[1].OpClass == arm64.LABEL {
-								symName := f.FindSymbol(operands[1].Immediate, demangleFlag)
-								if len(symName) > 0 {
-									opStr += fmt.Sprintf(" ; %s", symName)
-								}
 							}
 						}
 					}
-
-					fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
-
-					prevInstruction = *i.Instruction
 				}
+
+				fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
+
+				prevInstruction = *i.Instruction
 			}
 		} else {
 			return fmt.Errorf("you must supply a cache and a symbol to disassemble")
