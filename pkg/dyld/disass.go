@@ -113,20 +113,29 @@ func (f *File) ParseSymbolStubs(m *macho.File) error {
 // ParseGOT parse global offset table in MachO
 func (f *File) ParseGOT(m *macho.File) error {
 
-	// authPtr := m.Section("__AUTH_CONST", "__auth_ptr")
-	// data, err := authPtr.Data()
-	// if err != nil {
-	// 	return err
-	// }
-	// ptrs := make([]uint64, authPtr.Size/8)
-	// if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &ptrs); err != nil {
-	// 	return err
-	// }
-	// for _, ptr := range ptrs {
-	// 	newPtr := convertToVMAddr(m, ptr)
-	// 	fmt.Printf("ptr: %#x\n", ptr)
-	// 	fmt.Printf("newPtr: %#x, %s\n", newPtr, symbolMap[newPtr])
-	// }
+	authPtr := m.Section("__AUTH_CONST", "__auth_ptr")
+	if authPtr != nil {
+		r := io.NewSectionReader(f.r, int64(authPtr.Offset), int64(authPtr.Size))
+		ptrs := make([]uint64, authPtr.Size/8)
+		if err := binary.Read(r, binary.LittleEndian, &ptrs); err != nil {
+			return err
+		}
+
+		var targetValue uint64
+		for idx, ptr := range ptrs {
+			pointer := CacheSlidePointer3(ptr)
+			if pointer.Authenticated() {
+				targetValue = 0x180000000 + pointer.OffsetFromSharedCacheBase()
+			} else {
+				targetValue = pointer.SignExtend51()
+			}
+			// fmt.Printf("%#x: %#x => %s\n", authPtr.Addr+uint64(idx*8), targetValue, f.AddressToSymbol[targetValue])
+			if symName, ok := f.AddressToSymbol[targetValue]; ok {
+				f.AddressToSymbol[authPtr.Addr+uint64(idx*8)] = symName
+			}
+		}
+	}
+
 	for _, sec := range m.Sections {
 		if sec.Flags.IsNonLazySymbolPointers() {
 
