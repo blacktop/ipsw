@@ -40,7 +40,7 @@ type CacheImage struct {
 	DOFSectionSize   uint32
 	RangeEntries     []rangeEntry
 	PatchableExports []patchableExport
-
+	ObjC             objcInfo
 	// Embed ReaderAt for ReadAt method.
 	// Do not embed SectionReader directly
 	// to avoid having Read and Seek.

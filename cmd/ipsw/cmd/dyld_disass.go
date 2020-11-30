@@ -27,10 +27,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -49,48 +49,17 @@ func init() {
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
-func functionSize(starts []uint64, addr uint64) int64 {
-	i := sort.Search(len(starts), func(i int) bool { return starts[i] >= addr })
-	if i+1 == len(starts) && starts[i] == addr {
-		return -1
-	} else if i < len(starts) && starts[i] == addr {
-		return int64(starts[i+1] - addr)
-	}
-	return 0
-}
-
-func functionStart(starts []uint64, addr uint64) {
-	if functionSize(starts, addr) != 0 {
-		if symName, ok := symbolMap[addr]; ok {
-			fmt.Printf("\n%s:\n", symName)
-		} else {
-			fmt.Printf("\nfunc_%x:\n", addr)
-		}
-	}
-}
-
-func findSymbol(addr uint64) string {
-
-	if symName, ok := symbolMap[addr]; ok {
-		if demangleFlag {
-			return doDemangle(symName)
-		}
-		return symName
-	}
-
-	return ""
-}
-
 // disassCmd represents the disass command
 var dyldDisassCmd = &cobra.Command{
-	Use:    "disass",
-	Short:  "🚧 [WIP] Disassemble dyld_shared_cache symbol in an image",
-	Hidden: true,
-	Args:   cobra.MinimumNArgs(2),
+	Use:   "disass",
+	Short: "🚧 [WIP] Disassemble dyld_shared_cache symbol in an image",
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var image *dyld.CacheImage
 		var symAddr uint64
+		var data []byte
+		var starts []uint64
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -128,13 +97,17 @@ var dyldDisassCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		// Load all symbols
 		if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-			log.Warn("parsing public symbols...")
+			log.Info("Generating dyld_shared_cache companion symbol map file...")
+
+			utils.Indent(log.Warn, 2)("parsing public symbols...")
 			err = f.GetAllExportedSymbols(false)
 			if err != nil {
 				return err
 			}
-			log.Warn("parsing private symbols...")
+
+			utils.Indent(log.Warn, 2)("parsing private symbols...")
 			err = f.ParseLocalSyms()
 			if err != nil {
 				return err
@@ -143,21 +116,22 @@ var dyldDisassCmd = &cobra.Command{
 			// save lookup map to disk to speed up subsequent requests
 			f.SaveAddrToSymMap(dscPath + ".a2s")
 
-			return nil
-		}
-
-		a2sFile, err := os.Open(dscPath + ".a2s")
-		if err != nil {
-			return err
-		}
-		// Decoding the serialized data
-		err = gob.NewDecoder(a2sFile).Decode(&symbolMap)
-		if err != nil {
-			return err
+		} else {
+			log.Info("Found dyld_shared_cache companion symbol map file...")
+			a2sFile, err := os.Open(dscPath + ".a2s")
+			if err != nil {
+				return err
+			}
+			// Decoding the serialized data
+			err = gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol)
+			if err != nil {
+				return err
+			}
 		}
 
 		if len(args) > 1 {
 			found := false
+			log.Info("Locating symbol: " + args[1])
 			if len(imageName) > 0 { // Search for symbol inside dylib
 				image = f.Image(imageName)
 				if sym, _ := f.FindExportedSymbolInImage(imageName, args[1]); sym != nil {
@@ -185,12 +159,24 @@ var dyldDisassCmd = &cobra.Command{
 					}
 				}
 
+				off, _ := f.GetOffset(symAddr)
+
+				if image == nil {
+					image, err = f.GetImageContainingTextAddr(symAddr)
+					if err != nil {
+						return err
+					}
+				}
+
+				log.WithFields(log.Fields{"dylib": image.Name}).Info("Found symbol")
+
 				m, err := image.GetPartialMacho()
 				if err != nil {
 					return err
 				}
 
-				var starts []uint64
+				// fmt.Println(m.FileTOC.String())
+
 				if fs := m.FunctionStarts(); fs != nil {
 					data, err := f.ReadBytes(int64(fs.Offset), uint64(fs.Size))
 					if err != nil {
@@ -199,50 +185,46 @@ var dyldDisassCmd = &cobra.Command{
 					starts = m.FunctionStartAddrs(data...)
 				}
 
-				// fmt.Println(m.FileTOC.String())
-
-				fmt.Println(image.Name)
-				// if image != nil {
-				// 	fmt.Println(image.Name)
-				// } else {
-				// 	if image, err := f.GetImageContainingTextAddr(symAddr); err == nil {
-				// 		fmt.Println(image.Name)
-				// 	}
-				// }
-
-				off, _ := f.GetOffset(symAddr)
-				var data []byte
 				if instructions > 0 {
 					data, err = f.ReadBytes(int64(off), instructions*4)
 					if err != nil {
 						return err
 					}
 				} else {
-					data, err = f.ReadBytes(int64(off), uint64(functionSize(starts, symAddr)))
+					data, err = f.ReadBytes(int64(off), uint64(f.FunctionSize(starts, symAddr)))
 					if err != nil {
 						return err
 					}
 				}
 
-				// err = parseImports(m)
-				// if err != nil {
-				// 	return errors.Wrapf(err, "failed to parse imports")
-				// }
+				if m.HasObjC() {
+					log.Info("Parsing ObjC runtime structures...")
+					err = f.CFStringsForImage(image.Name)
+					if err != nil {
+						return errors.Wrapf(err, "failed to parse objc runtime")
+					}
+					err = f.MethodsForImage(image.Name)
+					if err != nil {
+						return errors.Wrapf(err, "failed to parse objc runtime")
+					}
+					err = f.SelectorsForImage(image.Name)
+					// _, err = f.AllSelectors(false)
+					if err != nil {
+						return errors.Wrapf(err, "failed to parse objc runtime")
+					}
+				}
 
-				// err = parseObjC(m)
-				// if err != nil {
-				// 	return errors.Wrapf(err, "failed to parse objc runtime")
-				// }
+				log.Info("Parsing MachO symbol stubs...")
+				err = f.ParseSymbolStubs(m)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse symbol stubs")
+				}
 
-				// err = parseSymbolStubs(m)
-				// if err != nil {
-				// 	return errors.Wrapf(err, "failed to parse symbol stubs")
-				// }
-
-				// err = parseGOT(m)
-				// if err != nil {
-				// 	return errors.Wrapf(err, "failed to parse got(s)")
-				// }
+				log.Info("Parsing MachO global offset table...")
+				err = f.ParseGOT(m)
+				if err != nil {
+					return errors.Wrapf(err, "failed to parse got(s)")
+				}
 
 				var prevInstruction arm64.Instruction
 
@@ -256,7 +238,13 @@ var dyldDisassCmd = &cobra.Command{
 					opStr := i.Instruction.OpStr()
 
 					// check for start of a new function
-					functionStart(starts, i.Instruction.Address())
+					if yes, fname := f.IsFunctionStart(starts, i.Instruction.Address(), demangleFlag); yes {
+						if len(fname) > 0 {
+							fmt.Printf("\n%s:\n", fname)
+						} else {
+							fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
+						}
+					}
 
 					// lookup adrp/ldr or add address as a cstring or symbol name
 					operation := i.Instruction.Operation().String()
@@ -267,11 +255,11 @@ var dyldDisassCmd = &cobra.Command{
 							adrpImm := prevInstruction.Operands()[1].Immediate
 							if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
 								adrpImm += operands[1].Immediate
-							} else if operation == "add" && adrpRegister == operands[0].Reg[0] {
+							} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
 								adrpImm += operands[2].Immediate
 							}
 							// markup disassemble with label comment
-							symName := findSymbol(adrpImm)
+							symName := f.FindSymbol(adrpImm, demangleFlag)
 							if len(symName) > 0 {
 								opStr += fmt.Sprintf(" ; %s", symName)
 							} else {
@@ -289,7 +277,7 @@ var dyldDisassCmd = &cobra.Command{
 					} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
 						operands := i.Instruction.Operands()
 						if operands != nil && operands[0].OpClass == arm64.LABEL {
-							symName := findSymbol(operands[0].Immediate)
+							symName := f.FindSymbol(operands[0].Immediate, demangleFlag)
 							if len(symName) > 0 {
 								opStr = fmt.Sprintf("\t%s", symName)
 							}
@@ -299,7 +287,7 @@ var dyldDisassCmd = &cobra.Command{
 						if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
 							operands := i.Instruction.Operands()
 							if operands[1].OpClass == arm64.LABEL {
-								symName := findSymbol(operands[1].Immediate)
+								symName := f.FindSymbol(operands[1].Immediate, demangleFlag)
 								if len(symName) > 0 {
 									opStr += fmt.Sprintf(" ; %s", symName)
 								}
