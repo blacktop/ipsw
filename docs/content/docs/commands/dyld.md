@@ -298,7 +298,7 @@ $ ipsw dyld disass --image Foundation dyld_shared_cache _NSLog
 
 > **NOTE:** You can speed up symbol lookups by supplying the `--image` flag
 
-```nasm
+```s
 _NSLog:
 0x1808b9930:  7f 23 03 d5       pacibsp
 0x1808b9934:  ff 83 00 d1       sub             sp, sp, #0x20
