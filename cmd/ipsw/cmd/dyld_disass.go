@@ -188,16 +188,16 @@ var dyldDisassCmd = &cobra.Command{
 				log.Info("Parsing ObjC runtime structures...")
 				err = f.CFStringsForImage(image.Name)
 				if err != nil {
-					return errors.Wrapf(err, "failed to parse objc runtime")
+					return errors.Wrapf(err, "failed to parse objc cfstrings")
 				}
 				err = f.MethodsForImage(image.Name)
 				if err != nil {
-					return errors.Wrapf(err, "failed to parse objc runtime")
+					return errors.Wrapf(err, "failed to parse objc methods")
 				}
 				err = f.SelectorsForImage(image.Name)
 				// _, err = f.AllSelectors(false)
 				if err != nil {
-					return errors.Wrapf(err, "failed to parse objc runtime")
+					return errors.Wrapf(err, "failed to parse objc selectors")
 				}
 			}
 
@@ -210,7 +210,7 @@ var dyldDisassCmd = &cobra.Command{
 			log.Info("Parsing MachO global offset table...")
 			err = f.ParseGOT(m)
 			if err != nil {
-				return errors.Wrapf(err, "failed to parse got(s)")
+				return errors.Wrapf(err, "failed to parse GOT")
 			}
 
 			var prevInstruction arm64.Instruction
@@ -250,7 +250,7 @@ var dyldDisassCmd = &cobra.Command{
 						if len(symName) > 0 {
 							opStr += fmt.Sprintf(" ; %s", symName)
 						} else {
-							cstr, err := f.GetCString(adrpImm)
+							cstr, err := f.IsCString(m, adrpImm)
 							if err == nil {
 								if len(cstr) > 200 {
 									opStr += fmt.Sprintf(" ; %#v...", cstr[:200])
@@ -286,10 +286,10 @@ var dyldDisassCmd = &cobra.Command{
 
 				prevInstruction = *i.Instruction
 			}
-		} else {
-			return fmt.Errorf("you must supply a cache and a symbol to disassemble")
+
+			return nil
 		}
 
-		return nil
+		return fmt.Errorf("you must supply a cache and a symbol to disassemble")
 	},
 }

@@ -37,6 +37,9 @@ import (
 func init() {
 	dyldCmd.AddCommand(o2aCmd)
 
+	o2aCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
+	o2aCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
+
 	o2aCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -46,16 +49,33 @@ var o2aCmd = &cobra.Command{
 	Short: "Convert dyld_shared_cache offset to address",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		var offset uint64
+		var numberStr string
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		numberStr := strings.Replace(args[1], "0x", "", -1)
-		numberStr = strings.Replace(numberStr, "0X", "", -1)
+		inDec, _ := cmd.Flags().GetBool("dec")
+		inHex, _ := cmd.Flags().GetBool("hex")
+
+		if inDec && inHex {
+			return fmt.Errorf("you can only use --dec OR --hex")
+		}
+
+		if strings.HasPrefix(strings.ToLower(args[1]), "0x") {
+			numberStr = strings.Replace(args[1], "0x", "", -1)
+			numberStr = strings.Replace(numberStr, "0X", "", -1)
+		}
 
 		offset, err := strconv.ParseUint(numberStr, 16, 64)
 		if err != nil {
-			return err
+			log.Warn("assuming given offset is in decimal")
+			offset, err = strconv.ParseUint(args[1], 10, 64)
+			if err != nil {
+				return errors.Wrapf(err, "failed to convert given offset to int: %s", args[1])
+			}
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -88,7 +108,16 @@ var o2aCmd = &cobra.Command{
 		if err != nil {
 			log.Error(err.Error())
 		} else {
-			fmt.Printf("0x%09x\n", address)
+			if inDec {
+				fmt.Printf("%d\n", address)
+			} else if inHex {
+				fmt.Printf("%#x\n", address)
+			} else {
+				log.WithFields(log.Fields{
+					"hex": fmt.Sprintf("%#x", address),
+					"dec": fmt.Sprintf("%d", address),
+				}).Info("Address")
+			}
 		}
 
 		return nil
