@@ -29,6 +29,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/alecthomas/chroma"
+	"github.com/alecthomas/chroma/lexers"
+	"github.com/alecthomas/chroma/quick"
+	"github.com/alecthomas/chroma/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -48,6 +52,99 @@ func init() {
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+
+	styles.Register(chroma.MustNewStyle("nord", chroma.StyleEntries{
+		chroma.TextWhitespace:        "#d8dee9",
+		chroma.Comment:               "italic #616e87",
+		chroma.CommentPreproc:        "#5e81ac",
+		chroma.Keyword:               "bold #81a1c1",
+		chroma.KeywordPseudo:         "nobold #81a1c1",
+		chroma.KeywordType:           "nobold #81a1c1",
+		chroma.Operator:              "#81a1c1",
+		chroma.OperatorWord:          "bold #81a1c1",
+		chroma.Name:                  "#d8dee9",
+		chroma.NameBuiltin:           "#81a1c1",
+		chroma.NameFunction:          "#88c0d0",
+		chroma.NameClass:             "#8fbcbb",
+		chroma.NameNamespace:         "#8fbcbb",
+		chroma.NameException:         "#bf616a",
+		chroma.NameVariable:          "#d8dee9",
+		chroma.NameConstant:          "#8fbcbb",
+		chroma.NameLabel:             "#8fbcbb",
+		chroma.NameEntity:            "#d08770",
+		chroma.NameAttribute:         "#8fbcbb",
+		chroma.NameTag:               "#81a1c1",
+		chroma.NameDecorator:         "#d08770",
+		chroma.Punctuation:           "#eceff4",
+		chroma.LiteralString:         "#a3be8c",
+		chroma.LiteralStringDoc:      "#616e87",
+		chroma.LiteralStringInterpol: "#a3be8c",
+		chroma.LiteralStringEscape:   "#ebcb8b",
+		chroma.LiteralStringRegex:    "#ebcb8b",
+		chroma.LiteralStringSymbol:   "#a3be8c",
+		chroma.LiteralStringOther:    "#a3be8c",
+		chroma.LiteralNumber:         "#b48ead",
+		chroma.GenericHeading:        "bold #88c0d0",
+		chroma.GenericSubheading:     "bold #88c0d0",
+		chroma.GenericDeleted:        "#bf616a",
+		chroma.GenericInserted:       "#a3be8c",
+		chroma.GenericError:          "#bf616a",
+		chroma.GenericEmph:           "italic",
+		chroma.GenericStrong:         "bold",
+		chroma.GenericPrompt:         "bold #4c566a",
+		chroma.GenericOutput:         "#d8dee9",
+		chroma.GenericTraceback:      "#bf616a",
+		chroma.Error:                 "#bf616a",
+		chroma.Background:            " bg:#2e3440",
+	}))
+
+	lexers.Register(chroma.MustNewLexer(
+		&chroma.Config{
+			Name:      "ARM",
+			Aliases:   []string{"arm"},
+			Filenames: []string{"*.S"},
+			MimeTypes: []string{},
+		},
+		chroma.Rules{
+			"root": {
+				chroma.Include("whitespace"),
+				{`(?:[a-zA-Z$_][\w$.@-]*|\.[\w$.@-]+):`, chroma.NameLabel, nil},
+				{`(?:0[xX][a-zA-Z0-9]+|\d+):`, chroma.NameLabel, nil},
+				{`\.(?:[a-zA-Z$_][\w$.@-]*|\.[\w$.@-]+)`, chroma.NameAttribute, chroma.Push("directive-args")},
+				{`(?:[a-zA-Z$_][\w$.@-]*|\.[\w$.@-]+)`, chroma.NameFunction, chroma.Push("instruction-args")},
+				{`[\r\n]+`, chroma.Text, nil},
+			},
+			"directive-args": {
+				{`(?:[a-zA-Z$_][\w$.@-]*|\.[\w$.@-]+)`, chroma.NameConstant, nil},
+				{`"(\\"|[^"])*"`, chroma.LiteralString, nil},
+				{`(?:0[xX][a-zA-Z0-9]+|\d+)`, chroma.LiteralNumberInteger, nil},
+				{`[\r\n]+`, chroma.Text, chroma.Pop(1)},
+				chroma.Include("punctuation"),
+				chroma.Include("whitespace"),
+			},
+			"instruction-args": {
+				{`(?:[a-zA-Z$_][\w$.@-]*|\.[\w$.@-]+)`, chroma.NameConstant, nil},
+				{`(?:0[xX][a-zA-Z0-9]+|\d+)`, chroma.LiteralNumberInteger, nil},
+				{`r[rR]\d+`, chroma.NameVariable, nil},
+				{`'(.|\\')'?`, chroma.LiteralStringChar, nil},
+				{`[\r\n]+`, chroma.Text, chroma.Pop(1)},
+				chroma.Include("punctuation"),
+				chroma.Include("whitespace"),
+			},
+			"whitespace": {
+				{`[ \t]`, chroma.Text, nil},
+				{`//[\w\W]*?(?=\n)`, chroma.CommentSingle, nil},
+				{`/[*][\w\W]*?[*]/`, chroma.CommentMultiline, nil},
+				{`[;@].*?(?=\n)`, chroma.CommentSingle, nil},
+			},
+			"punctuation": {
+				{`[-*,.()\[\]!:{}^=#\+\\]+`, chroma.Punctuation, nil},
+			},
+			"eol": {
+				{`[\r\n]+`, chroma.Text, nil},
+			},
+		},
+	))
 }
 
 // disassCmd represents the disass command
@@ -217,6 +314,7 @@ var dyldDisassCmd = &cobra.Command{
 				return errors.Wrapf(err, "failed to parse GOT")
 			}
 
+			var funcASM string
 			var prevInstruction arm64.Instruction
 
 			for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(symAddr)}) {
@@ -231,9 +329,11 @@ var dyldDisassCmd = &cobra.Command{
 				// check for start of a new function
 				if yes, fname := f.IsFunctionStart(starts, i.Instruction.Address(), demangleFlag); yes {
 					if len(fname) > 0 {
-						fmt.Printf("\n%s:\n", fname)
+						funcASM += fmt.Sprintf("\n%s:\n", fname)
+						// fmt.Printf("\n%s:\n", fname)
 					} else {
-						fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
+						// fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
+						funcASM += fmt.Sprintf("\nfunc_%x:\n", i.Instruction.Address())
 					}
 				}
 
@@ -286,9 +386,15 @@ var dyldDisassCmd = &cobra.Command{
 					}
 				}
 
-				fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
-
+				// fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
+				funcASM += fmt.Sprintf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
 				prevInstruction = *i.Instruction
+			}
+
+			err = quick.Highlight(os.Stdout, funcASM, "asm", "terminal256", "nord")
+			// err = quick.Highlight(os.Stdout, funcASM, "s", "html", "paraiso-dark")
+			if err != nil {
+				return err
 			}
 
 			return nil
