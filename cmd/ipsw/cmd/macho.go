@@ -29,6 +29,9 @@ import (
 	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/alecthomas/chroma"
+	"github.com/alecthomas/chroma/quick"
+	"github.com/alecthomas/chroma/styles"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
@@ -50,6 +53,51 @@ func init() {
 	machoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	machoCmd.Flags().BoolP("fixups", "x", false, "Print fixup chains")
 	machoCmd.MarkZshCompPositionalArgumentFile(1)
+
+	styles.Register(chroma.MustNewStyle("nord", chroma.StyleEntries{
+		chroma.TextWhitespace:        "#d8dee9",
+		chroma.Comment:               "italic #616e87",
+		chroma.CommentPreproc:        "#5e81ac",
+		chroma.Keyword:               "bold #81a1c1",
+		chroma.KeywordPseudo:         "nobold #81a1c1",
+		chroma.KeywordType:           "nobold #81a1c1",
+		chroma.Operator:              "#81a1c1",
+		chroma.OperatorWord:          "bold #81a1c1",
+		chroma.Name:                  "#d8dee9",
+		chroma.NameBuiltin:           "#81a1c1",
+		chroma.NameFunction:          "#88c0d0",
+		chroma.NameClass:             "#8fbcbb",
+		chroma.NameNamespace:         "#8fbcbb",
+		chroma.NameException:         "#bf616a",
+		chroma.NameVariable:          "#d8dee9",
+		chroma.NameConstant:          "#8fbcbb",
+		chroma.NameLabel:             "#8fbcbb",
+		chroma.NameEntity:            "#d08770",
+		chroma.NameAttribute:         "#8fbcbb",
+		chroma.NameTag:               "#81a1c1",
+		chroma.NameDecorator:         "#d08770",
+		chroma.Punctuation:           "#eceff4",
+		chroma.LiteralString:         "#a3be8c",
+		chroma.LiteralStringDoc:      "#616e87",
+		chroma.LiteralStringInterpol: "#a3be8c",
+		chroma.LiteralStringEscape:   "#ebcb8b",
+		chroma.LiteralStringRegex:    "#ebcb8b",
+		chroma.LiteralStringSymbol:   "#a3be8c",
+		chroma.LiteralStringOther:    "#a3be8c",
+		chroma.LiteralNumber:         "#b48ead",
+		chroma.GenericHeading:        "bold #88c0d0",
+		chroma.GenericSubheading:     "bold #88c0d0",
+		chroma.GenericDeleted:        "#bf616a",
+		chroma.GenericInserted:       "#a3be8c",
+		chroma.GenericError:          "#bf616a",
+		chroma.GenericEmph:           "italic",
+		chroma.GenericStrong:         "bold",
+		chroma.GenericPrompt:         "bold #4c566a",
+		chroma.GenericOutput:         "#d8dee9",
+		chroma.GenericTraceback:      "#bf616a",
+		chroma.Error:                 "#bf616a",
+		chroma.Background:            " bg:#2e3440",
+	}))
 }
 
 // machoCmd represents the macho command
@@ -233,6 +281,7 @@ var machoCmd = &cobra.Command{
 			fmt.Println("Objective-C")
 			fmt.Println("===========")
 			if m.HasObjC() {
+				var objcOut string
 				// fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
 				// fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
 
@@ -242,35 +291,48 @@ var machoCmd = &cobra.Command{
 
 				if protos, err := m.GetObjCProtocols(); err == nil {
 					for _, proto := range protos {
-						fmt.Println(proto.String())
+						// fmt.Println(proto.String())
+						objcOut += fmt.Sprintln(proto.String())
 					}
 				}
 				if classes, err := m.GetObjCClasses(); err == nil {
 					for _, class := range classes {
-						fmt.Println(class.String())
+						// fmt.Println(class.String())
+						objcOut += fmt.Sprintln(class.String())
 					}
 				}
 				if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
 					for _, class := range nlclasses {
-						fmt.Println(class.String())
+						// fmt.Println(class.String())
+						objcOut += fmt.Sprintln(class.String())
 					}
 				}
 				if cats, err := m.GetObjCCategories(); err == nil {
 					for _, cat := range cats {
-						fmt.Println(cat.String())
+						// fmt.Println(cat.String())
+						objcOut += fmt.Sprintln(cat.String())
 					}
 				}
 				if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
-					fmt.Println("@selectors refs")
+					// fmt.Println("@selectors refs")
+					objcOut += fmt.Sprintln("@selectors refs")
 					for off, sel := range selRefs {
-						fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
+						// fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
+						objcOut += fmt.Sprintf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
 					}
 				}
 				if methods, err := m.GetObjCMethodNames(); err == nil {
-					fmt.Printf("\n@methods\n")
+					// fmt.Printf("\n@methods\n")
+					objcOut += fmt.Sprintf("\n@methods\n")
 					for method, vmaddr := range methods {
-						fmt.Printf("0x%011x: %s\n", vmaddr, method)
+						// fmt.Printf("0x%011x: %s\n", vmaddr, method)
+						objcOut += fmt.Sprintf("0x%011x: %s\n", vmaddr, method)
 					}
+				}
+				err = quick.Highlight(os.Stdout, objcOut, "m", "terminal256", "nord")
+				// err = quick.Highlight(os.Stdout, funcASM, "s", "html", "paraiso-dark")
+				if err != nil {
+					return err
 				}
 			} else {
 				fmt.Println("  - no objc")
