@@ -445,17 +445,17 @@
   },
   {
     "Name": "A14 Bionic",
-    "Model": "APL1W87",
+    "Model": "APL1W01",
     "Semiconductor": "5 nm FinFET (TSMC N5)",
-    "DieSize": "",
+    "DieSize": "88 mm2",
     "Transistors": "11.8 billion",
-    "CPUISA": "ARMv8.5-A",
+    "CPUISA": "ARMv8.4-A",
     "CPU": "hexa-core (2× Firestorm + 4× Icestorm)",
     "CPUID": "T8101",
-    "CPUCache": [],
+    "CPUCache": ["L1i: 192 KB", "L1d: 128 KB", "L2: 8 MB", "L3: none"],
     "GPU": "Custom design (quad-core)",
     "AIAccelerator": "Neural Engine (16-core) 11 TOPS",
-    "Memory": "LPDDR5 (Samsung)",
+    "Memory": "LPDDR4X (Samsung)",
     "Introduced": "October 2020",
     "Devices": ["iPad Air (Fall 2020)", "iPhone 12 Mini", "iPhone 12", "iPhone 12 Pro", "iPhone 12 Pro Max"]
   },
@@ -601,6 +601,26 @@
       "MacBook Air (2019)",
       "MacBook Pro (16-inch, 2019)",
       "Mac Pro (2019)"
+    ]
+  },
+  {
+    "Name": "M1",
+    "Model": "APL1102",
+    "Semiconductor": "5 nm (TSMC)",
+    "DieSize": "",
+    "Transistors": "16 billion",
+    "CPUISA": "ARMv8.4-A",
+    "CPU": "3.2 GHz 8-core (4× Firestorm + 4× Icestorm)",
+    "CPUID": "T8103",
+    "CPUCache": ["L1i: 192 KB", "L1d: 128 KB", "L2: 8 MB"],
+    "GPU": "7- or 8-core (up to 2.6 TFLOPs)",
+    "AIAccelerator": "",
+    "Memory": "LPDDR4X",
+    "Introduced": "November 2020",
+    "Devices": [
+      "MacBook Pro (13-inch, M1, 2020)",
+      "MacBook Air (M1, 2020)",
+      "Mac mini (M1, 2020)"
     ]
   },
   {
