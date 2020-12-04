@@ -14,6 +14,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+func unmount(device string) error {
+	utils.Indent(log.Info, 2)("Unmounting DMG")
+	err := utils.Unmount(device)
+	if err != nil {
+		return errors.Wrapf(err, "failed to unmount %s", device)
+	}
+	return nil
+}
+
 // Extract extracts dyld_shared_cache from ipsw
 func Extract(ipsw string) error {
 
@@ -39,9 +48,10 @@ func Extract(ipsw string) error {
 		folders := i.GetFolders()
 		folder := folders[0]
 
-		var searchStr, dyldDest, mountPoint string
+		var searchStr, searchStrMacOS, dyldDest, mountPoint string
 		if runtime.GOOS == "darwin" {
 			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
+			searchStrMacOS = "System/Library/dyld/dyld_shared_cache_*"
 			os.MkdirAll(folder, os.ModePerm)
 			dyldDest = filepath.Join(folder, "dyld_shared_cache")
 			mountPoint = "/tmp/ios"
@@ -57,6 +67,7 @@ func Extract(ipsw string) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to mount %s", dmgs[0])
 		}
+		defer unmount(device)
 
 		matches, err := filepath.Glob(filepath.Join(mountPoint, searchStr))
 		if err != nil {
@@ -64,7 +75,13 @@ func Extract(ipsw string) error {
 		}
 
 		if len(matches) == 0 {
-			return errors.Errorf("failed to find dyld_shared_cache in ipsw: %s", ipsw)
+			matches, err = filepath.Glob(filepath.Join(mountPoint, searchStrMacOS))
+			if err != nil {
+				return err
+			}
+			if len(matches) == 0 {
+				return errors.Errorf("failed to find dyld_shared_cache in ipsw: %s", ipsw)
+			}
 		}
 
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", matches[0], dyldDest))
@@ -89,12 +106,6 @@ func Extract(ipsw string) error {
 			if err != nil {
 				return errors.Wrapf(err, "failed to symlink %s to %s", dyldDest, symlinkPath)
 			}
-		}
-
-		utils.Indent(log.Info, 2)("Unmounting DMG")
-		err = utils.Unmount(device)
-		if err != nil {
-			return errors.Wrapf(err, "failed to unmount %s", device)
 		}
 
 	} else {

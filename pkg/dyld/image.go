@@ -132,8 +132,7 @@ func (i *CacheImage) Open() io.ReadSeeker {
 
 // GetPartialMacho parses dyld image header as a partial MachO
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
-	r := io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize))
-	m, err := macho.NewFile(r,
+	return macho.NewFile(io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize)),
 		types.LC_SEGMENT_64,
 		types.LC_DYLD_INFO,
 		types.LC_DYLD_INFO_ONLY,
@@ -146,10 +145,6 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 		types.LC_LOAD_DYLIB,
 		types.LC_FUNCTION_STARTS,
 		types.LC_DYLD_EXPORTS_TRIE)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 // GetMacho parses dyld image as a MachO
