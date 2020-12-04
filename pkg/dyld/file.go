@@ -184,6 +184,9 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		if name, err := r.ReadString(byte(0)); err == nil {
 			f.Images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
 		}
+		if offset, err := f.GetOffset(image.Info.Address); err == nil {
+			f.Images[idx].CacheLocalSymbolsEntry.DylibOffset = uint32(offset)
+		}
 	}
 
 	// Read dyld code signature.

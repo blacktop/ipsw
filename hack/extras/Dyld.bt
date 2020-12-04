@@ -18,7 +18,8 @@
 
 typedef struct
 {
-    union {
+    union
+    {
         char n_name[4]; /* for use when in-core */
         uint32 n_strx;  /* index into the string table */
     } n_un;
@@ -33,7 +34,8 @@ typedef struct
  */
 typedef struct
 {
-    union {
+    union
+    {
         uint32 n_strx; /* index into the string table */
     } n_un;
     uchar n_type;   /* type flag, see below */
@@ -1233,7 +1235,10 @@ typedef struct(uint64 offset)
 }
 machoParser;
 
-for (i = 0; i < symbolinfo.entriesCount; i++)
+if (header.localSymbolsOffset > 0)
 {
-    machoParser parser(symbolinfo.nlistentry[i].dylibOffset);
+    for (i = 0; i < symbolinfo.entriesCount; i++)
+    {
+        machoParser parser(symbolinfo.nlistentry[i].dylibOffset);
+    }
 }
