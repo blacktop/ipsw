@@ -101,19 +101,45 @@ func getFunctionSize(m *macho.File, addr uint64) int64 {
 	return 0
 }
 
-func getData(m *macho.File, startAddress, instructionCount uint64) ([]byte, error) {
+func getData(m *macho.File, startAddress *uint64, instructionCount uint64) ([]byte, error) {
 	var data []byte
 	var dataSize uint64
+	// var fileEntry *macho.File
+
+	// if m.FileTOC.FileHeader.Type == types.FileSet {
+	// 	fileEntry, err := m.GetFileSetFileByName("kernel")
+	// 	if err != nil {
+	// 		return nil, errors.Wrapf(err, "macho fileset does NOT contain kernel")
+	// 	}
+	// 	// log.Debug(fileEntry.FileTOC.String())
+	// 	if *startAddress == 0 {
+	// 		for _, sec := range fileEntry.Sections {
+	// 			if sec.Name == "__text" {
+	// 				*startAddress = sec.Addr
+	// 				return sec.Data()
+	// 			}
+	// 		}
+	// 		return nil, fmt.Errorf("you must supply a vaddr to disassemble at")
+	// 	}
+	// }
+
+	if *startAddress == 0 {
+		for _, sec := range m.Sections {
+			if sec.Name == "__text" {
+				*startAddress = sec.Addr
+				return sec.Data()
+			}
+		}
+		return nil, fmt.Errorf("you must supply a vaddr to disassemble at")
+	}
 
 	found := false
 	for _, sec := range m.Sections {
 		attrs := sec.Flags.GetAttributes()
 		if attrs.IsPureInstructions() || attrs.IsSomeInstructions() {
-			if sec.Addr <= startAddress && startAddress < (sec.Addr+sec.Size) {
+			if sec.Addr <= *startAddress && *startAddress < (sec.Addr+sec.Size) {
 				found = true
-
-				fileOffset := startAddress - sec.Addr
-
+				fileOffset := *startAddress - sec.Addr
 				// Set number of bytes to disassemble either instrs or function size if supplied symbol
 				if instructionCount > 0 {
 					dataSize = 4 * instructionCount
@@ -121,8 +147,8 @@ func getData(m *macho.File, startAddress, instructionCount uint64) ([]byte, erro
 						dataSize = sec.Size - fileOffset
 					}
 				} else {
-					if m.FunctionStarts() != nil && startAddress > 0 {
-						funcSize := getFunctionSize(m, startAddress)
+					if m.FunctionStarts() != nil && *startAddress > 0 {
+						funcSize := getFunctionSize(m, *startAddress)
 						if funcSize != 0 {
 							if funcSize == -1 { // last function in starts, size is start to end of section
 								dataSize = sec.Size - fileOffset
@@ -161,6 +187,10 @@ func lookupSymbol(m *macho.File, addr uint64) string {
 			return doDemangle(symName)
 		}
 		return symName
+	}
+
+	if m.Symtab == nil {
+		return ""
 	}
 
 	syms, err := m.FindAddressSymbols(addr)
@@ -281,27 +311,6 @@ func parseSymbolStubs(m *macho.File) error {
 	return nil
 }
 
-// func convertToVMAddr(f *macho.File, value uint64) uint64 {
-// 	if fixupchains.DcpArm64eIsRebase(value) {
-// 		if fixupchains.DcpArm64eIsAuth(value) {
-// 			dcp := fixupchains.DyldChainedPtrArm64eAuthRebase{Pointer: value}
-// 			// return dcp.Target()
-// 			return dcp.Target() + f.GetBaseAddress()
-// 		}
-// 		dcp := fixupchains.DyldChainedPtrArm64eRebase{Pointer: value}
-// 		return dcp.UnpackTarget()
-// 	} else {
-// 		if fixupchains.DcpArm64eIsAuth(value) {
-// 			dcp := fixupchains.DyldChainedPtrArm64eAuthBind{Pointer: value}
-// 			return dcp.Offset() + f.GetBaseAddress()
-// 		}
-// 		dcp := fixupchains.DyldChainedPtrArm64eBind{Pointer: value}
-// 		return dcp.Offset() + f.GetBaseAddress()
-// 	}
-
-// 	// return value
-// }
-
 func parseGOT(m *macho.File) error {
 
 	// authPtr := m.Section("__AUTH_CONST", "__auth_ptr")
@@ -400,14 +409,11 @@ var disCmd = &cobra.Command{
 			}
 		} else {
 			startAddr, _ = cmd.Flags().GetUint64("vaddr")
-			if startAddr == 0 {
-				return fmt.Errorf("you must supply a vaddr to disassemble at")
-			}
 		}
 
 		instructions, _ := cmd.Flags().GetUint64("instrs")
 
-		data, err := getData(m, startAddr, instructions)
+		data, err := getData(m, &startAddr, instructions)
 		if err != nil {
 			return errors.Wrapf(err, "failed to get data to disassemble")
 		}
