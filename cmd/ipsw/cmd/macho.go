@@ -129,13 +129,16 @@ var machoCmd = &cobra.Command{
 			}
 		}
 
-		// Fileset MachO typr
-		if m.FileTOC.FileHeader.Type == types.FileSet {
-			if len(filesetEntry) > 0 {
+		// Fileset MachO type
+		if len(filesetEntry) > 0 {
+			if m.FileTOC.FileHeader.Type == types.FileSet {
 				m, err = m.GetFileSetFileByName(filesetEntry)
 				if err != nil {
 					return fmt.Errorf("failed to parse entry %s; %#v", filesetEntry, err)
 				}
+			} else {
+				log.Error("MachO type is not FileSet")
+				return nil
 			}
 		}
 
