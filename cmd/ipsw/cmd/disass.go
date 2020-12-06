@@ -387,7 +387,7 @@ func pad(length int) string {
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
 	Use:   "disass",
-	Short: "Disassemble ARM binaries at address or symbol",
+	Short: "🚧 [WIP] Disassemble ARM binaries at address or symbol",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
