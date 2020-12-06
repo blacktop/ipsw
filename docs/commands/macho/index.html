@@ -189,6 +189,7 @@
 <li><a href="#macho---sig"><strong>macho &ndash;sig</strong></a></li>
 <li><a href="#macho---ent"><strong>macho &ndash;ent</strong></a></li>
 <li><a href="#macho---objc"><strong>macho &ndash;objc</strong></a></li>
+<li><a href="#macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></a></li>
 </ul>
 <h3 id="macho--d"><strong>macho -d</strong></h3>
 <p>Similar to <code>otool -h</code></p>
@@ -690,6 +691,22 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 0x00000032ea3: mutableCopy
 0x00000032bee: resolveInstanceMethod:
 0x00000032caf: isEqual:
+</code></pre></div><h3 id="macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></h3>
+<p>Analyze FileSet entry MachO</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho MacBookAir10,1_J313AP_20B29/kernelcache.production --fileset-entry kernel
+
+<span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
+<span class="nv">Type</span>          <span class="o">=</span> Exec
+<span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e caps: PAK00
+<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">29</span> <span class="o">(</span>Size: 5992<span class="o">)</span>
+<span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, PIE, DylibInCache
+000: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x000c7ff0 <span class="nv">off</span><span class="o">=</span>0x00c6c000-0x00d33ff0 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c70000-0xfffffe0007d38000 r-x/r-x   __TEXT
+        <span class="nv">sz</span><span class="o">=</span>0x000340e0 <span class="nv">off</span><span class="o">=</span>0x00c70120-0x00ca4200 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c74120-0xfffffe0007ca8200              __TEXT.__const
+        <span class="nv">sz</span><span class="o">=</span>0x0007bd97 <span class="nv">off</span><span class="o">=</span>0x00ca4200-0x00d1ff97 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007ca8200-0xfffffe0007d23f97              __TEXT.__cstring                 <span class="o">(</span>CstringLiterals<span class="o">)</span>
+        <span class="nv">sz</span><span class="o">=</span>0x00013f60 <span class="nv">off</span><span class="o">=</span>0x00d1ff97-0x00d33ef7 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d23f97-0xfffffe0007d37ef7              __TEXT.__os_log
+        <span class="nv">sz</span><span class="o">=</span>0x00000000 <span class="nv">off</span><span class="o">=</span>0x00d33ef7-0x00d33ef7 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d37ef7-0xfffffe0007d37ef7              __TEXT.__thread_starts
+        <span class="nv">sz</span><span class="o">=</span>0x000000f8 <span class="nv">off</span><span class="o">=</span>0x00d33ef8-0x00d33ff0 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d37ef8-0xfffffe0007d37ff0              __TEXT.__eh_frame
+&lt;SNIP&gt;
 </code></pre></div>
 </div>
 </div>
