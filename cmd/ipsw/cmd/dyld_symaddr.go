@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -93,7 +94,6 @@ var symaddrCmd = &cobra.Command{
 				}
 				return nil
 			}
-
 			// Search ALL dylibs for a symbol
 			for _, image := range f.Images {
 				if sym, _ := f.FindExportedSymbolInImage(image.Name, args[1]); sym != nil {
@@ -107,7 +107,36 @@ var symaddrCmd = &cobra.Command{
 				fmt.Println(lSym)
 			}
 			return nil
+
+		} else if len(imageName) > 0 {
+			// Dump ALL symbols for a dylib
+			if err := f.GetLocalSymbolsForImage(imageName); err != nil {
+				log.Error(err.Error())
+				m, err := f.Image(imageName).GetPartialMacho()
+				if err != nil {
+					return err
+				}
+				var sec string
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+				for _, sym := range m.Symtab.Syms {
+					if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+						sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+					}
+					fmt.Fprintf(w, "%#x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+					// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+				}
+				w.Flush()
+			} else {
+				for _, sym := range f.Image(imageName).LocalSymbols {
+					fmt.Printf("0x%8x: %s\n", sym.Value, sym.Name)
+				}
+				if err := f.GetAllExportedSymbolsForImage(imageName, true); err != nil {
+					log.Error(err.Error())
+				}
+			}
+			return nil
 		}
+
 		/*
 		 * Dump ALL symbols
 		 */
