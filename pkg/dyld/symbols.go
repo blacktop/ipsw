@@ -341,6 +341,40 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 	return nil
 }
 
+// GetAllExportedSymbolsForImage prints out all the exported symbols for a given image
+func (f *File) GetAllExportedSymbolsForImage(imageName string, dump bool) error {
+
+	image := f.Image(imageName)
+	if image == nil {
+		return fmt.Errorf("image %s not found", imageName)
+	}
+
+	exportTrie, err := f.getExportTrieData(image)
+	if err != nil {
+		return err
+	}
+	if len(exportTrie) == 0 {
+		return fmt.Errorf("image does NOT have an export trie")
+	}
+
+	syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
+	if err != nil {
+		return err
+	}
+
+	if dump {
+		for _, sym := range syms {
+			fmt.Printf("%#8x:\t%s\n", sym.Address, sym.Name)
+		}
+	} else {
+		for _, sym := range syms {
+			f.AddressToSymbol[sym.Address] = sym.Name
+		}
+	}
+
+	return nil
+}
+
 // SaveAddrToSymMap saves the dyld address-to-symbol map to disk
 func (f *File) SaveAddrToSymMap(dest string) error {
 	buff := new(bytes.Buffer)
