@@ -58,7 +58,6 @@ var dyldDisassCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var data []byte
-		var starts []uint64
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -90,7 +89,7 @@ var dyldDisassCmd = &cobra.Command{
 			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
 
-		f, err := dyld.Open(dscPath)
+		f, err := dyld.Open(dscPath, &dyld.Config{ParsePatchInfo: true})
 		if err != nil {
 			return err
 		}
@@ -105,11 +104,20 @@ var dyldDisassCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-
 			utils.Indent(log.Warn, 2)("parsing private symbols...")
 			err = f.ParseLocalSyms()
 			if err != nil {
-				return err
+				utils.Indent(log.Warn, 2)(err.Error())
+				utils.Indent(log.Warn, 2)("parsing patch exports...")
+				for _, img := range f.Images {
+					for _, patch := range img.PatchableExports {
+						addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+						if err != nil {
+							return err
+						}
+						f.AddressToSymbol[addr] = patch.Name
+					}
+				}
 			}
 
 			// save lookup map to disk to speed up subsequent requests
@@ -162,15 +170,17 @@ var dyldDisassCmd = &cobra.Command{
 				return err
 			}
 
+			if f.LocalSymbolsOffset == 0 {
+				utils.Indent(log.Warn, 2)("parsing symbol table...")
+				for _, sym := range m.Symtab.Syms {
+					if sym.Value != 0 {
+						f.AddressToSymbol[sym.Value] = sym.Name
+					}
+				}
+			}
 			// fmt.Println(m.FileTOC.String())
 
-			if fs := m.FunctionStarts(); fs != nil {
-				data, err := f.ReadBytes(int64(fs.Offset), uint64(fs.Size))
-				if err != nil {
-					return err
-				}
-				starts = m.FunctionStartAddrs(data...)
-			}
+			starts := m.FunctionStartAddrs()
 
 			if instructions > 0 {
 				data, err = f.ReadBytes(int64(off), instructions*4)
