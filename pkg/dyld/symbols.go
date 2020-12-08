@@ -19,6 +19,7 @@ import (
 
 // ParseLocalSyms parses dyld's private symbols
 func (f *File) ParseLocalSyms() error {
+
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
@@ -34,12 +35,19 @@ func (f *File) ParseLocalSyms() error {
 			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
 				return err
 			}
+
 			stringPool.Seek(int64(nlist.Name), io.SeekStart)
+
 			s, err := bufio.NewReader(stringPool).ReadString('\x00')
 			if err != nil {
 				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
 			}
+
 			f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
+			f.SymbolToAddress.Add(strings.Trim(s, "\x00"), CacheSymbolMetadata{
+				Address:    nlist.Value,
+				ImageIndex: idx,
+			})
 			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
 				Name:    strings.Trim(s, "\x00"),
 				Nlist64: nlist,
@@ -118,6 +126,16 @@ func (f *File) GetLocalSymbolsForImage(imagePath string) error {
 }
 
 func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
+
+	// if node, found := f.SymbolToAddress.Find(symbol); found {
+	// 	return &CacheLocalSymbol64{
+	// 		Name:         symbol,
+	// 		FoundInDylib: f.Images[idx].Name,
+	// 		Nlist64:      nlist,
+	// 	}, nil
+	// 	return node.Meta().(CacheSymbolMetadata)
+	// }
+
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
@@ -311,7 +329,7 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 // GetAllExportedSymbols prints out all the exported symbols
 func (f *File) GetAllExportedSymbols(dump bool) error {
 
-	for _, image := range f.Images {
+	for idx, image := range f.Images {
 		// if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
 		exportTrie, err := f.getExportTrieData(image)
 		if err != nil {
@@ -333,6 +351,10 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 		} else {
 			for _, sym := range syms {
 				f.AddressToSymbol[sym.Address] = sym.Name
+				f.SymbolToAddress.Add(sym.Name, CacheSymbolMetadata{
+					Address:    sym.Address,
+					ImageIndex: idx,
+				})
 			}
 		}
 		// }
@@ -369,6 +391,10 @@ func (f *File) GetAllExportedSymbolsForImage(imageName string, dump bool) error 
 	} else {
 		for _, sym := range syms {
 			f.AddressToSymbol[sym.Address] = sym.Name
+			f.SymbolToAddress.Add(sym.Name, CacheSymbolMetadata{
+				Address:    sym.Address,
+				ImageIndex: int(image.Index),
+			})
 		}
 	}
 

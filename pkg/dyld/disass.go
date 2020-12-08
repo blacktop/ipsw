@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"sort"
-	"strings"
 
 	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/go-macho"
@@ -24,13 +23,6 @@ func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, 
 			if sym, _ := f.FindExportedSymbolInImage(image.Name, symbol); sym != nil {
 				return sym.Address, image, nil
 			}
-		}
-	}
-
-	// Search addr2sym map
-	for addr, sym := range f.AddressToSymbol {
-		if strings.EqualFold(sym, symbol) {
-			return addr, nil, nil
 		}
 	}
 
