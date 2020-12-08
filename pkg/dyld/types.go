@@ -552,3 +552,8 @@ func (es CacheExportedSymbol) String() string {
 	// }
 	// return fmt.Sprintf("0x%8x: %s [%s]", es.Value, es.Name, es.Flags)
 }
+
+type CacheSymbolMetadata struct {
+	Address    uint64
+	ImageIndex int
+}

@@ -31,6 +31,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -58,6 +59,8 @@ var dyldDisassCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var data []byte
+		var image *dyld.CacheImage
+		var m *macho.File
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -95,6 +98,17 @@ var dyldDisassCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if len(imageName) > 0 {
+			image = f.Image(imageName)
+			if image == nil {
+				return fmt.Errorf("image %s not found in dyld_shared_cache", imageName)
+			}
+			m, err = image.GetPartialMacho()
+			if err != nil {
+				return err
+			}
+		}
+
 		// Load all symbols
 		if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
 			log.Info("Generating dyld_shared_cache companion symbol map file...")
@@ -109,13 +123,27 @@ var dyldDisassCmd = &cobra.Command{
 			if err != nil {
 				utils.Indent(log.Warn, 2)(err.Error())
 				utils.Indent(log.Warn, 2)("parsing patch exports...")
-				for _, img := range f.Images {
+				for idx, img := range f.Images {
 					for _, patch := range img.PatchableExports {
 						addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
 						if err != nil {
 							return err
 						}
 						f.AddressToSymbol[addr] = patch.Name
+					}
+					// utils.Indent(log.Warn, 2)(fmt.Sprintf("parsing %s symbol table...", img.Name))
+					m, err = img.GetPartialMacho()
+					if err != nil {
+						return err
+					}
+					for _, sym := range m.Symtab.Syms {
+						if sym.Value != 0 {
+							f.AddressToSymbol[sym.Value] = sym.Name
+							f.SymbolToAddress.Add(sym.Name, dyld.CacheSymbolMetadata{
+								Address:    sym.Value,
+								ImageIndex: idx,
+							})
+						}
 					}
 				}
 			}
@@ -149,10 +177,16 @@ var dyldDisassCmd = &cobra.Command{
 
 		if len(args) > 1 {
 			log.Info("Locating symbol: " + args[1])
-			symAddr, image, err := f.GetSymbolAddress(args[1], imageName)
-			if err != nil {
-				return err
+			// symAddr, image, err := f.GetSymbolAddress(args[1], imageName)
+			// if err != nil {
+			// 	return err
+			// }
+
+			n, found := f.SymbolToAddress.Find(args[1])
+			if !found {
+				return fmt.Errorf("not found")
 			}
+			symAddr := n.Meta().(dyld.CacheSymbolMetadata).Address
 
 			off, _ := f.GetOffset(symAddr)
 
@@ -165,7 +199,7 @@ var dyldDisassCmd = &cobra.Command{
 
 			log.WithFields(log.Fields{"dylib": image.Name}).Info("Found symbol")
 
-			m, err := image.GetPartialMacho()
+			m, err = image.GetPartialMacho()
 			if err != nil {
 				return err
 			}

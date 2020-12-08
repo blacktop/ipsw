@@ -14,6 +14,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/codesign"
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/derekparker/trie"
 	"github.com/pkg/errors"
 )
 
@@ -61,6 +62,7 @@ type File struct {
 	CodeSignature codesignature
 
 	AddressToSymbol map[uint64]string
+	SymbolToAddress *trie.Trie
 
 	r      io.ReaderAt
 	closer io.Closer
@@ -124,6 +126,7 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 	f.r = r
 	f.AddressToSymbol = make(map[uint64]string, 7000000)
+	f.SymbolToAddress = trie.New()
 
 	if len(userConfig) > 0 {
 		config = *userConfig[0]
