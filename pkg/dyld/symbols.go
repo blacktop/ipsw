@@ -44,10 +44,7 @@ func (f *File) ParseLocalSyms() error {
 			}
 
 			f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
-			f.SymbolToAddress.Add(strings.Trim(s, "\x00"), CacheSymbolMetadata{
-				Address:    nlist.Value,
-				ImageIndex: idx,
-			})
+			f.SymbolToAddress.Insert(strings.Trim(s, "\x00"), nlist.Value)
 			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
 				Name:    strings.Trim(s, "\x00"),
 				Nlist64: nlist,
@@ -329,7 +326,7 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 // GetAllExportedSymbols prints out all the exported symbols
 func (f *File) GetAllExportedSymbols(dump bool) error {
 
-	for idx, image := range f.Images {
+	for _, image := range f.Images {
 		// if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
 		exportTrie, err := f.getExportTrieData(image)
 		if err != nil {
@@ -351,10 +348,7 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 		} else {
 			for _, sym := range syms {
 				f.AddressToSymbol[sym.Address] = sym.Name
-				f.SymbolToAddress.Add(sym.Name, CacheSymbolMetadata{
-					Address:    sym.Address,
-					ImageIndex: idx,
-				})
+				f.SymbolToAddress.Insert(sym.Name, sym.Address)
 			}
 		}
 		// }
@@ -391,10 +385,7 @@ func (f *File) GetAllExportedSymbolsForImage(imageName string, dump bool) error 
 	} else {
 		for _, sym := range syms {
 			f.AddressToSymbol[sym.Address] = sym.Name
-			f.SymbolToAddress.Add(sym.Name, CacheSymbolMetadata{
-				Address:    sym.Address,
-				ImageIndex: int(image.Index),
-			})
+			f.SymbolToAddress.Insert(sym.Name, sym.Address)
 		}
 	}
 
@@ -425,6 +416,33 @@ func (f *File) SaveAddrToSymMap(dest string) error {
 	_, err = buff.WriteTo(gzw)
 	if err != nil {
 		return fmt.Errorf("failed to write addr2sym map to gzip file: %v", err)
+	}
+
+	return nil
+}
+func (f *File) SaveSymToAddrTrie(dest string) error {
+	buff := new(bytes.Buffer)
+
+	e := gob.NewEncoder(buff)
+
+	// Encoding the map
+	err := e.Encode(*f.SymbolToAddress)
+	if err != nil {
+		return fmt.Errorf("failed to encode sym2addr trie to binary: %v", err)
+	}
+
+	of, err := os.Create(dest)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %v", dest, err)
+	}
+	defer of.Close()
+
+	gzw := gzip.NewWriter(of)
+	defer gzw.Close()
+
+	_, err = buff.WriteTo(gzw)
+	if err != nil {
+		return fmt.Errorf("failed to write sym2addr trie to gzip file: %v", err)
 	}
 
 	return nil

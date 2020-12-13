@@ -26,6 +26,7 @@ import (
 	"compress/gzip"
 	"encoding/gob"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -34,6 +35,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/dgraph-io/badger"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -61,6 +63,7 @@ var dyldDisassCmd = &cobra.Command{
 		var data []byte
 		var image *dyld.CacheImage
 		var m *macho.File
+		var db *badger.DB
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -110,42 +113,56 @@ var dyldDisassCmd = &cobra.Command{
 		}
 
 		// Load all symbols
-		if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-			log.Info("Generating dyld_shared_cache companion symbol map file...")
-
-			utils.Indent(log.Warn, 2)("parsing public symbols...")
-			err = f.GetAllExportedSymbols(false)
+		if _, err := os.Stat(dscPath + ".s2a"); os.IsNotExist(err) {
+			log.Info("Generating dyld_shared_cache ipsw database...")
+			db, err = badger.Open(badger.DefaultOptions(dscPath + ".idb"))
 			if err != nil {
 				return err
 			}
+			defer db.Close()
+
+			// utils.Indent(log.Warn, 2)("parsing public symbols...")
+			// err = f.GetAllExportedSymbols(false)
+			// if err != nil {
+			// 	return err
+			// }
 			utils.Indent(log.Warn, 2)("parsing private symbols...")
 			err = f.ParseLocalSyms()
 			if err != nil {
 				utils.Indent(log.Warn, 2)(err.Error())
 				utils.Indent(log.Warn, 2)("parsing patch exports...")
-				for idx, img := range f.Images {
-					for _, patch := range img.PatchableExports {
-						addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
-						if err != nil {
-							return err
-						}
-						f.AddressToSymbol[addr] = patch.Name
-					}
+				// img := f.Image("Foundation")
+				for _, img := range f.Images {
+					// for _, patch := range img.PatchableExports {
+					// 	addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+					// 	if err != nil {
+					// 		return err
+					// 	}
+					// 	f.AddressToSymbol[addr] = patch.Name
+					// }
 					// utils.Indent(log.Warn, 2)(fmt.Sprintf("parsing %s symbol table...", img.Name))
 					m, err = img.GetPartialMacho()
 					if err != nil {
 						return err
 					}
 					for _, sym := range m.Symtab.Syms {
+						// if n, found := f.SymbolToAddress.Get(sym.Name); found {
+						// 	fmt.Printf("found symbol - %#x: %s; expected addr: %#x\n", n.(uint64), sym.Name, sym.Value)
+						// }
 						if sym.Value != 0 {
 							f.AddressToSymbol[sym.Value] = sym.Name
-							f.SymbolToAddress.Add(sym.Name, dyld.CacheSymbolMetadata{
-								Address:    sym.Value,
-								ImageIndex: idx,
-							})
+							f.SymbolToAddress.Insert(sym.Name, sym.Value)
 						}
 					}
 				}
+			}
+
+			if s2a, err := f.SymbolToAddress.Marshal(); err == nil {
+				if err = ioutil.WriteFile(dscPath+".s2a", s2a, 0644); err != nil {
+					return err
+				}
+			} else {
+				return err
 			}
 
 			// save lookup map to disk to speed up subsequent requests
@@ -153,9 +170,19 @@ var dyldDisassCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+			// err = f.SaveSymToAddrTrie(dscPath + ".s2a")
+			// if err != nil {
+			// 	return err
+			// }
 
 		} else {
 			log.Info("Found dyld_shared_cache companion symbol map file...")
+			db, err = badger.Open(badger.DefaultOptions(dscPath + ".idb"))
+			if err != nil {
+				return err
+			}
+			defer db.Close()
+
 			a2sFile, err := os.Open(dscPath + ".a2s")
 			if err != nil {
 				return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
@@ -173,6 +200,24 @@ var dyldDisassCmd = &cobra.Command{
 			}
 			gzr.Close()
 			a2sFile.Close()
+
+			s2aFile, err := os.Open(dscPath + ".s2a")
+			if err != nil {
+				return fmt.Errorf("failed to open companion file %s; %v", dscPath+".s2a", err)
+			}
+
+			// gzr, err := gzip.NewReader(s2aFile)
+			// if err != nil {
+			// 	return fmt.Errorf("failed to create gzip reader: %v", err)
+			// }
+
+			// Decoding the serialized data
+			err = gob.NewDecoder(s2aFile).Decode(&f.SymbolToAddress)
+			if err != nil {
+				return fmt.Errorf("failed to decode sym2addr trie; %v", err)
+			}
+			// gzr.Close()
+			s2aFile.Close()
 		}
 
 		if len(args) > 1 {
@@ -182,11 +227,75 @@ var dyldDisassCmd = &cobra.Command{
 			// 	return err
 			// }
 
-			n, found := f.SymbolToAddress.Find(args[1])
+			n, found := f.SymbolToAddress.Get(args[1])
 			if !found {
 				return fmt.Errorf("not found")
 			}
-			symAddr := n.Meta().(dyld.CacheSymbolMetadata).Address
+			var symAddr uint64
+			symAddr = n.(uint64)
+
+			// err = db.View(func(txn *badger.Txn) error {
+			// 	opts := badger.DefaultIteratorOptions
+			// 	opts.PrefetchSize = 10
+			// 	it := txn.NewIterator(opts)
+			// 	defer it.Close()
+			// 	for it.Rewind(); it.Valid(); it.Next() {
+			// 		item := it.Item()
+			// 		k := item.Key()
+			// 		err := item.Value(func(v []byte) error {
+			// 			// fmt.Printf("key=%s, value=%s\n", k, v)
+			// 			if string(v) == args[1] {
+			// 				symAddr = binary.LittleEndian.Uint64(k)
+			// 				return fmt.Errorf("FOOUND")
+			// 			}
+			// 			return nil
+			// 		})
+			// 		if err != nil {
+			// 			return err
+			// 		}
+			// 	}
+			// 	return nil
+			// })
+
+			// err = db.View(func(txn *badger.Txn) error {
+			// 	item, err := txn.Get([]byte(args[1]))
+			// 	if err != nil {
+			// 		return err
+			// 	}
+
+			// 	var valNot, valCopy []byte
+			// 	err = item.Value(func(val []byte) error {
+			// 		// This func with val would only be called if item.Value encounters no error.
+
+			// 		// Accessing val here is valid.
+			// 		fmt.Printf("The answer is: %s\n", val)
+
+			// 		// Copying or parsing val is valid.
+			// 		valCopy = append([]byte{}, val...)
+
+			// 		// Assigning val slice to another variable is NOT OK.
+			// 		valNot = val // Do not do this.
+			// 		return nil
+			// 	})
+			// 	if err != nil {
+			// 		return err
+			// 	}
+
+			// 	// DO NOT access val here. It is the most common cause of bugs.
+			// 	fmt.Printf("NEVER do this. %s\n", valNot)
+
+			// 	// You must copy it to use it outside item.Value(...).
+			// 	fmt.Printf("The answer is: %s\n", valCopy)
+
+			// 	// Alternatively, you could also use item.ValueCopy().
+			// 	valCopy, err = item.ValueCopy(nil)
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// 	fmt.Printf("The answer is: %s\n", valCopy)
+
+			// 	return nil
+			// })
 
 			off, _ := f.GetOffset(symAddr)
 
