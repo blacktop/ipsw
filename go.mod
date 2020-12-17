@@ -3,7 +3,7 @@ module github.com/blacktop/ipsw
 go 1.15
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.2.3
+	github.com/AlecAivazis/survey/v2 v2.2.5
 	github.com/Netflix/go-expect v0.0.0-20180928190340-9d1f4485533b // indirect
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
@@ -36,8 +36,8 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/ulikunitz/xz v0.5.8
 	github.com/vbauerster/mpb/v5 v5.3.0
-	golang.org/x/crypto v0.0.0-20201124201722-c8d3bf9c5392
-	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9
+	golang.org/x/crypto v0.0.0-20201208171446-5f87f3452ae9
+	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	gopkg.in/ini.v1 v1.55.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	howett.net/plist v0.0.0-20201203080718-1454fab16a06

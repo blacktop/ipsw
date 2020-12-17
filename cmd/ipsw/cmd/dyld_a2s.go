@@ -27,10 +27,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -48,25 +47,13 @@ var a2sCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var addr uint64
-		var numberStr string
-
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if strings.HasPrefix(strings.ToLower(args[1]), "0x") {
-			numberStr = strings.Replace(args[1], "0x", "", -1)
-			numberStr = strings.Replace(numberStr, "0X", "", -1)
-		}
-
-		addr, err := strconv.ParseUint(numberStr, 16, 64)
+		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
-			log.Warn("assuming given address is in decimal")
-			addr, err = strconv.ParseUint(args[1], 10, 64)
-			if err != nil {
-				return errors.Wrapf(err, "failed to convert given address to int: %s", args[1])
-			}
+			return err
 		}
 
 		dscPath := filepath.Clean(args[0])

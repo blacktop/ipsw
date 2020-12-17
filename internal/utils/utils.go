@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +23,21 @@ var normalPadding = cli.Default.Padding
 
 func init() {
 	rand.Seed(time.Now().Unix())
+}
+
+// ConvertStrToInt converts an input string to uint64
+func ConvertStrToInt(intStr string) (uint64, error) {
+	intStr = strings.ToLower(intStr)
+
+	if strings.ContainsAny(strings.ToLower(intStr), "xabcdef") {
+		intStr = strings.Replace(intStr, "0x", "", -1)
+		intStr = strings.Replace(intStr, "x", "", -1)
+		if out, err := strconv.ParseUint(intStr, 16, 64); err == nil {
+			return out, err
+		}
+		log.Warn("assuming given integer is in decimal")
+	}
+	return strconv.ParseUint(intStr, 10, 64)
 }
 
 func RandomAgent() string {

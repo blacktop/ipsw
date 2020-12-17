@@ -37,33 +37,6 @@ func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, 
 	return 0, nil, fmt.Errorf("failed to find symbol %s", symbol)
 }
 
-// Demangle a string just as the GNU c++filt program does.
-func doDemangle(name string) string {
-	var deStr string
-
-	if len(name) == 0 {
-		return name
-	}
-
-	skip := 0
-	if name[0] == '.' || name[0] == '$' {
-		skip++
-	}
-	if name[skip] == '_' {
-		skip++
-	}
-	result := demangle.Filter(name[skip:])
-	if result == name[skip:] {
-		deStr += name
-	} else {
-		if name[0] == '.' {
-			deStr += "."
-		}
-		deStr += result
-	}
-	return deStr
-}
-
 func (f *File) FunctionSize(starts []uint64, addr uint64) int64 {
 	i := sort.Search(len(starts), func(i int) bool { return starts[i] >= addr })
 	if i+1 == len(starts) && starts[i] == addr {
@@ -75,11 +48,11 @@ func (f *File) FunctionSize(starts []uint64, addr uint64) int64 {
 }
 
 // IsFunctionStart checks if address is at a function start and returns symbol name
-func (f *File) IsFunctionStart(starts []uint64, addr uint64, demangle bool) (bool, string) {
+func (f *File) IsFunctionStart(starts []uint64, addr uint64, shoudDemangle bool) (bool, string) {
 	if f.FunctionSize(starts, addr) != 0 {
 		if symName, ok := f.AddressToSymbol[addr]; ok {
-			if demangle {
-				return ok, doDemangle(symName)
+			if shoudDemangle {
+				return ok, demangle.Do(symName)
 			}
 			return ok, symName
 		}
@@ -89,10 +62,10 @@ func (f *File) IsFunctionStart(starts []uint64, addr uint64, demangle bool) (boo
 }
 
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
-func (f *File) FindSymbol(addr uint64, demangle bool) string {
+func (f *File) FindSymbol(addr uint64, shoudDemangle bool) string {
 	if symName, ok := f.AddressToSymbol[addr]; ok {
-		if demangle {
-			return doDemangle(symName)
+		if shoudDemangle {
+			return demangle.Do(symName)
 		}
 		return symName
 	}
