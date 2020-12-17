@@ -28,7 +28,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/apex/log"
@@ -57,35 +56,6 @@ func init() {
 	disCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
 	disCmd.Flags().StringVarP(&symbolMapFile, "companion", "c", "", "Companion symbol map file")
 	disCmd.MarkZshCompPositionalArgumentFile(1)
-}
-
-func hex2int(hexStr string) uint64 {
-	cleaned := strings.Replace(hexStr, "#0x", "", -1)
-	result, _ := strconv.ParseUint(cleaned, 16, 64)
-	return uint64(result)
-}
-
-// Demangle a string just as the GNU c++filt program does.
-func doDemangle(name string) string {
-	var deStr string
-
-	skip := 0
-	if name[0] == '.' || name[0] == '$' {
-		skip++
-	}
-	if name[skip] == '_' {
-		skip++
-	}
-	result := demangle.Filter(name[skip:])
-	if result == name[skip:] {
-		deStr += name
-	} else {
-		if name[0] == '.' {
-			deStr += "."
-		}
-		deStr += result
-	}
-	return deStr
 }
 
 func getFunctionSize(m *macho.File, addr uint64) int64 {
@@ -184,7 +154,7 @@ func lookupSymbol(m *macho.File, addr uint64) string {
 
 	if symName, ok := symbolMap[addr]; ok {
 		if demangleFlag {
-			return doDemangle(symName)
+			return demangle.Do(symName)
 		}
 		return symName
 	}
@@ -200,7 +170,7 @@ func lookupSymbol(m *macho.File, addr uint64) string {
 
 	var symName string
 	if demangleFlag {
-		symName = doDemangle(syms[0].Name)
+		symName = demangle.Do(syms[0].Name)
 	} else {
 		for _, sym := range syms {
 			if len(sym.Name) > 0 {

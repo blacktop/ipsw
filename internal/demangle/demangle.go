@@ -35,6 +35,33 @@ const (
 	Verbose
 )
 
+// Do demangle a string just as the GNU c++filt program does.
+func Do(name string) string {
+	var deStr string
+
+	if len(name) == 0 {
+		return name
+	}
+
+	skip := 0
+	if name[0] == '.' || name[0] == '$' {
+		skip++
+	}
+	if name[skip] == '_' {
+		skip++
+	}
+	result := Filter(name[skip:])
+	if result == name[skip:] {
+		deStr += name
+	} else {
+		if name[0] == '.' {
+			deStr += "."
+		}
+		deStr += result
+	}
+	return deStr
+}
+
 // Filter demangles a C++ symbol name, returning the human-readable C++ name.
 // If any error occurs during demangling, the input string is returned.
 func Filter(name string, options ...Option) string {
@@ -250,6 +277,7 @@ func adjustErr(err error, adj int) error {
 }
 
 type forLocalNameType int
+
 const (
 	forLocalName forLocalNameType = iota
 	notForLocalName

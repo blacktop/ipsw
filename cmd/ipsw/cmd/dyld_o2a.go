@@ -25,10 +25,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -50,9 +49,6 @@ var o2aCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var offset uint64
-		var numberStr string
-
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -64,18 +60,9 @@ var o2aCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --dec OR --hex")
 		}
 
-		if strings.HasPrefix(strings.ToLower(args[1]), "0x") {
-			numberStr = strings.Replace(args[1], "0x", "", -1)
-			numberStr = strings.Replace(numberStr, "0X", "", -1)
-		}
-
-		offset, err := strconv.ParseUint(numberStr, 16, 64)
+		offset, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
-			log.Warn("assuming given offset is in decimal")
-			offset, err = strconv.ParseUint(args[1], 10, 64)
-			if err != nil {
-				return errors.Wrapf(err, "failed to convert given offset to int: %s", args[1])
-			}
+			return err
 		}
 
 		dscPath := filepath.Clean(args[0])
