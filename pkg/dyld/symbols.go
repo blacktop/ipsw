@@ -273,6 +273,7 @@ func (f *File) GetCStringAtOffset(offset uint64) (string, error) {
 
 	return "", fmt.Errorf("string not found at offset 0x%x", offset)
 }
+
 func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 	var eTrieAddr, eTrieSize uint64
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)

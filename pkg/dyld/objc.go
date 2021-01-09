@@ -373,6 +373,115 @@ func (f *File) AllSelectors(print bool) (map[string]uint64, error) {
 	return nil, fmt.Errorf("unable to find __TEXT.__objc_opt_ro")
 }
 
+// ImpCachesForImage dumps all of the Objective-C imp caches for a given image
+func (f *File) ImpCachesForImage(imageNames ...string) error {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	var selectorStringVMAddrStart uint64
+	var selectorStringVMAddrEnd uint64
+
+	libobjc := f.Image("/usr/lib/libobjc.A.dylib")
+
+	m, err := libobjc.GetPartialMacho()
+	if err != nil {
+		return err
+	}
+
+	if sec := m.Section("__DATA_CONST", "__objc_scoffs"); sec != nil {
+
+		r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+
+		scoffs := make([]uint64, int(sec.Size/8))
+		if err := binary.Read(r, f.ByteOrder, &scoffs); err != nil {
+			return err
+		}
+		selectorStringVMAddrStart = convertToVMAddr(scoffs[0])
+		selectorStringVMAddrEnd = convertToVMAddr(scoffs[1])
+		// inlinedSelectorsVMAddrStart = scoffs[2]
+		// inlinedSelectorsVMAddrEnd = scoffs[3]
+	} else {
+		return fmt.Errorf("unable to find __DATA_CONST.__objc_scoffs")
+	}
+
+	var mask uint64 = (1 << 40) - 1 // 40bit mask
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			images = append(images, f.Image(imageName))
+		}
+	} else {
+		images = f.Images
+	}
+
+	for _, image := range images {
+		m, err := image.GetPartialMacho()
+		if err != nil {
+			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+		}
+
+		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
+
+		sec := m.Section("__DATA", "__objc_classrefs")
+		if sec != nil {
+			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+			classPtrs := make([]uint64, sec.Size/8)
+			if err := binary.Read(r, f.ByteOrder, &classPtrs); err != nil {
+				return err
+			}
+			for idx, ptr := range classPtrs {
+				classPtrs[idx] = ptr & mask // TODO use chain fixups
+			}
+
+			for _, ptr := range classPtrs {
+				c, err := f.GetObjCClass(ptr)
+				if err != nil {
+					return err
+				}
+
+				if convertToVMAddr(c.MethodCacheProperties) > 0 {
+					off, err := f.GetOffset(convertToVMAddr(c.MethodCacheProperties))
+					if err != nil {
+						return fmt.Errorf("failed to convert vmaddr: %v", err)
+					}
+
+					sr.Seek(int64(off), io.SeekStart)
+
+					var impCache objc.ImpCache
+					if err := binary.Read(sr, f.ByteOrder, &impCache.PreoptCacheT); err != nil {
+						return fmt.Errorf("failed to read preopt_cache_t: %v", err)
+					}
+
+					impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.CacheMask()+1)
+					if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
+						return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
+					}
+
+					fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.CacheMask()+1)
+
+					for _, bucket := range impCache.Entries {
+						if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
+							sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
+							if err != nil {
+								return err
+							}
+							fmt.Printf("  - %#09x: %s\n", c.ClassPtr.VMAdder-uint64(bucket.ImpOffset), sel)
+						} else {
+							fmt.Printf("  - %#09x:\n", 0)
+						}
+					}
+				} else {
+					fmt.Printf("%s: empty\n", c.Name)
+				}
+			}
+		}
+
+		m.Close()
+	}
+
+	return nil
+}
+
 // MethodsForImage returns all of the Objective-C methods for a given image
 func (f *File) MethodsForImage(imageNames ...string) error {
 
