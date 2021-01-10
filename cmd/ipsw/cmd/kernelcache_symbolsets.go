@@ -25,17 +25,35 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/go-plist"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"howett.net/plist"
 )
 
 func init() {
 	kernelcacheCmd.AddCommand(symbolsetsCmd)
 	kextsCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+}
+
+type symbolsSets struct {
+	SymbolsSetsDictionary []cFBundle `plist:"SymbolsSets,omitempty"`
+}
+
+type cFBundle struct {
+	ID                string   `plist:"CFBundleIdentifier,omitempty"`
+	CompatibleVersion string   `plist:"OSBundleCompatibleVersion,omitempty"`
+	Version           string   `plist:"CFBundleVersion,omitempty"`
+	Symbols           []symbol `plist:"Symbols,omitempty"`
+}
+
+type symbol struct {
+	Name   string `plist:"SymbolName,omitempty"`
+	Prefix string `plist:"SymbolPrefix,omitempty"`
 }
 
 // symbolsetsCmd represents the symbolsets command
@@ -58,18 +76,23 @@ var symbolsetsCmd = &cobra.Command{
 			return errors.Wrapf(err, "%s appears to not be a valid MachO", args[0])
 		}
 
+		if m.FileTOC.FileHeader.Type == types.FileSet {
+			m, err = m.GetFileSetFileByName("com.apple.kernel")
+			if err != nil {
+				return fmt.Errorf("failed to parse entry com.apple.kernel; %#v", err)
+			}
+		}
+
 		symbolsets := m.Section("__LINKINFO", "__symbolsets")
 		if symbolsets == nil {
 			log.Error("kernelcache does NOT contain __LINKINFO.__symbolsets")
 			return nil
 		}
 
-		dat, err := symbolsets.Data()
-		if err != nil {
-			return errors.Wrapf(err, "failed to read section __LINKINFO.__symbolsets data")
-		}
+		dat := make([]byte, symbolsets.Size)
+		m.ReadAt(dat, int64(symbolsets.Offset))
 
-		var blist interface{} // TODO: flesh out this struct
+		var blist symbolsSets
 
 		dec := plist.NewDecoder(bytes.NewReader(dat))
 
@@ -78,7 +101,16 @@ var symbolsetsCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to parse __symbolsets bplist data")
 		}
 
-		fmt.Printf("%#v\n", blist)
+		fmt.Println("Symbol Sets")
+		fmt.Println("===========")
+		for _, sset := range blist.SymbolsSetsDictionary {
+			head := fmt.Sprintf("%s: (%s)", sset.ID, sset.Version)
+			fmt.Printf("\n%s\n", head)
+			fmt.Println(strings.Repeat("-", len(head)))
+			for _, sym := range sset.Symbols {
+				fmt.Printf("%s%s\n", sym.Prefix, sym.Name)
+			}
+		}
 
 		return nil
 	},
