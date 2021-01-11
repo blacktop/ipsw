@@ -10,7 +10,10 @@ summary: Parse dyld_shared_cache.
 - [**dyld extract**](#dyld-extract)
 - [**dyld symaddr**](#dyld-symaddr)
 - [**dyld a2s**](#dyld-a2s)
-- [**dyld sel**](#dyld-sel)
+- [**dyld objc**](#dyld-objc)
+  - [**dyld objc class**](#dyld-objc-class)
+  - [**dyld objc proto**](#dyld-objc-proto)
+  - [**dyld objc sel**](#dyld-objc-sel)
 - [**dyld split**](#dyld-split)
 - [**dyld webkit**](#dyld-webkit)
 - [**dyld patches** 🆕](#dyld-patches-)
@@ -153,12 +156,72 @@ $ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
 2.12s user 0.51s system 109% cpu "2.407 total"
 ```
 
-### **dyld sel**
+### **dyld objc**
 
-Get ObjC selector _(unslid)_ address
+#### Dump ObjC addresses
+
+Dump all the classes
 
 ```bash
-$ ipsw dyld sel dyld_shared_cache release
+$ ipsw dyld objc --class dyld_shared_cache
+```
+
+Dump all the protocols
+
+```bash
+$ ipsw dyld objc --proto dyld_shared_cache
+```
+
+Dump all the selectors
+
+```bash
+$ ipsw dyld objc --sel dyld_shared_cache
+```
+
+Dump all the imp-caches
+
+```bash
+$ ipsw dyld objc --imp-cache dyld_shared_cache
+```
+
+### **dyld objc class**
+
+Lookup a class's address
+
+```bash
+$ ipsw dyld objc class dyld_shared_cache release
+
+0x1b92c85a8: release
+```
+
+Or get all the classes for an image
+
+```bash
+$ ipsw dyld objc class --image libobjc.A.dylib dyld_shared_cache
+```
+
+### **dyld objc proto**
+
+Lookup a protocol's address
+
+```bash
+$ ipsw dyld objc proto dyld_shared_cache release
+
+0x1b92c85a8: release
+```
+
+Or get all the protocols for an image
+
+```bash
+$ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
+```
+
+### **dyld objc sel**
+
+Lookup a selector's address
+
+```bash
+$ ipsw dyld objc sel dyld_shared_cache release
 
 0x1b92c85a8: release
 ```
@@ -166,7 +229,7 @@ $ ipsw dyld sel dyld_shared_cache release
 Or get all the selectors for an image
 
 ```bash
-$ ipsw dyld sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
+$ ipsw dyld objc sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
 
 Objective-C Selectors:
 /usr/lib/libobjc.A.dylib
@@ -184,14 +247,6 @@ Objective-C Selectors:
     0x1c9b2c9fd: initialize
 <SNIP>
 ```
-
-Get all teh selectors!!
-
-```bash
-$ ipsw dyld sel dyld_shared_cache
-```
-
-**NOTE:** This doesn't include `headers`, `class names` or `protocols` yet.
 
 ### **dyld split**
 
