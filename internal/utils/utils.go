@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
@@ -219,4 +220,17 @@ func GrepStrings(data []byte, searchStr string) []string {
 	}
 
 	return matchStrings
+}
+
+// IsASCII checks if given string is ascii
+func IsASCII(s string) bool {
+	if len(s) < 1 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] > unicode.MaxASCII {
+			return false
+		}
+	}
+	return true
 }
