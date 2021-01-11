@@ -205,7 +205,7 @@ var dyldDisassCmd = &cobra.Command{
 					return errors.Wrapf(err, "failed to parse objc methods")
 				}
 				err = f.SelectorsForImage(image.Name)
-				// _, err = f.AllSelectors(false)
+				// _, err = f.GetAllSelectors(false)
 				if err != nil {
 					return errors.Wrapf(err, "failed to parse objc selectors")
 				}
