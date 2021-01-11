@@ -71,62 +71,68 @@ var dyldMachoCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if i := f.Image(args[1]); i != nil {
-			m, err := i.GetPartialMacho()
-			if err != nil {
-				return err
+		if len(args) > 1 {
+			if i := f.Image(args[1]); i != nil {
+				m, err := i.GetPartialMacho()
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(m.FileTOC.String())
+
+				// if showObjC {
+				// 	fmt.Println("Objective-C")
+				// 	fmt.Println("===========")
+				// 	if m.HasObjC() {
+				// 		// fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
+				// 		// fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
+
+				// 		// info, _ := m.GetObjCImageInfo()
+				// 		// fmt.Println(info.Flags)
+				// 		// fmt.Println(info.Flags.SwiftVersion())
+
+				// 		if protos, err := m.GetObjCProtocols(); err == nil {
+				// 			for _, proto := range protos {
+				// 				fmt.Println(proto.String())
+				// 			}
+				// 		}
+				// 		if classes, err := m.GetObjCClasses(); err == nil {
+				// 			for _, class := range classes {
+				// 				fmt.Println(class.String())
+				// 			}
+				// 		}
+				// 		if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
+				// 			for _, class := range nlclasses {
+				// 				fmt.Println(class.String())
+				// 			}
+				// 		}
+				// 		if cats, err := m.GetObjCCategories(); err == nil {
+				// 			for _, cat := range cats {
+				// 				fmt.Println(cat.String())
+				// 			}
+				// 		}
+				// 		if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
+				// 			fmt.Println("@selectors refs")
+				// 			for off, sel := range selRefs {
+				// 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
+				// 			}
+				// 		}
+				// 		if methods, err := m.GetObjCMethodNames(); err == nil {
+				// 			fmt.Printf("\n@methods\n")
+				// 			for method, vmaddr := range methods {
+				// 				fmt.Printf("0x%011x: %s\n", vmaddr, method)
+				// 			}
+				// 		}
+				// 	} else {
+				// 		fmt.Println("  - no objc")
+				// 	}
+				// 	fmt.Println()
+				// }
+			} else {
+				log.Errorf("dylib %s not found in %s", args[1], dscPath)
 			}
-
-			fmt.Println(m.FileTOC.String())
-
-			// if showObjC {
-			// 	fmt.Println("Objective-C")
-			// 	fmt.Println("===========")
-			// 	if m.HasObjC() {
-			// 		// fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
-			// 		// fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
-
-			// 		// info, _ := m.GetObjCImageInfo()
-			// 		// fmt.Println(info.Flags)
-			// 		// fmt.Println(info.Flags.SwiftVersion())
-
-			// 		if protos, err := m.GetObjCProtocols(); err == nil {
-			// 			for _, proto := range protos {
-			// 				fmt.Println(proto.String())
-			// 			}
-			// 		}
-			// 		if classes, err := m.GetObjCClasses(); err == nil {
-			// 			for _, class := range classes {
-			// 				fmt.Println(class.String())
-			// 			}
-			// 		}
-			// 		if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
-			// 			for _, class := range nlclasses {
-			// 				fmt.Println(class.String())
-			// 			}
-			// 		}
-			// 		if cats, err := m.GetObjCCategories(); err == nil {
-			// 			for _, cat := range cats {
-			// 				fmt.Println(cat.String())
-			// 			}
-			// 		}
-			// 		if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
-			// 			fmt.Println("@selectors refs")
-			// 			for off, sel := range selRefs {
-			// 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
-			// 			}
-			// 		}
-			// 		if methods, err := m.GetObjCMethodNames(); err == nil {
-			// 			fmt.Printf("\n@methods\n")
-			// 			for method, vmaddr := range methods {
-			// 				fmt.Printf("0x%011x: %s\n", vmaddr, method)
-			// 			}
-			// 		}
-			// 	} else {
-			// 		fmt.Println("  - no objc")
-			// 	}
-			// 	fmt.Println()
-			// }
+		} else {
+			log.Error("you must supply a dylib MachO to parse")
 		}
 
 		return nil
