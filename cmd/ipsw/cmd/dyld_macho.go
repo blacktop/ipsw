@@ -34,7 +34,7 @@ import (
 
 // dyldMachoCmd represents the macho command
 var dyldMachoCmd = &cobra.Command{
-	Use:   "macho <dyld_shared_cache>",
+	Use:   "macho <dyld_shared_cache> <dylib>",
 	Short: "Parse a dylib file",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

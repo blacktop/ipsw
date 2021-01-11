@@ -8,6 +8,7 @@ summary: Parse dyld_shared_cache.
 
 - [**dyld info**](#dyld-info)
 - [**dyld extract**](#dyld-extract)
+- [**dyld macho**](#dyld-macho)
 - [**dyld symaddr**](#dyld-symaddr)
 - [**dyld a2s**](#dyld-a2s)
 - [**dyld objc**](#dyld-objc)
@@ -105,6 +106,24 @@ $ docker run --init -it --rm \
              --cap-add=SYS_ADMIN \
              -v `pwd` :/data \
              blacktop/ipsw -V dyld extract iPhone11_2_12.4.1_16G102_Restore.ipsw
+```
+
+### **dyld macho**
+
+Parse a dyld*shared_cache dylib *(same as ipsw macho cmd)\_
+
+```bash
+$ ipsw dyld macho dyld_shared_cache JavaScriptCore
+
+Magic         = 64-bit MachO
+Type          = Dylib
+CPU           = AARCH64, ARM64e caps: PAC00
+Commands      = 25 (Size: 4464)
+Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe, DylibInCache
+000: LC_SEGMENT_64 sz=0x01131000 off=0x09e18000-0x0af49000 addr=0x189e18000-0x18af49000 r-x/r-x   __TEXT
+        sz=0x00ed4e18 off=0x09e19290-0x0acee0a8 addr=0x189e19290-0x18acee0a8            __TEXT.__text                   PureInstructions|SomeInstructions
+        sz=0x00002000 off=0x0acee0a8-0x0acf00a8 addr=0x18acee0a8-0x18acf00a8            __TEXT.__auth_stubs             PureInstructions|SomeInstructions (SymbolStubs)
+<SNIP>
 ```
 
 ### **dyld symaddr**
