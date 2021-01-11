@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -32,21 +33,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	dyldCmd.AddCommand(dyldObjcCmd)
-
-	dyldObjcCmd.Flags().BoolP("class", "c", false, "Print the classes")
-	dyldObjcCmd.Flags().BoolP("sel", "s", false, "Print the selectors")
-	dyldObjcCmd.Flags().BoolP("proto", "p", false, "Print the protocols")
-	dyldObjcCmd.Flags().BoolP("imp-cache", "i", false, "Print the imp-caches")
-
-	dyldObjcCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
-}
-
-// dyldObjcCmd represents the objc command
-var dyldObjcCmd = &cobra.Command{
-	Use:   "objc",
-	Short: "Dump Objective-C Optimization Info",
+// objcSelCmd represents the sel command
+var objcSelCmd = &cobra.Command{
+	Use:   "sel",
+	Short: "Get ObjC selector info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -54,10 +44,7 @@ var dyldObjcCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		printClasses, _ := cmd.Flags().GetBool("class")
-		printSelectors, _ := cmd.Flags().GetBool("sel")
-		printProtocols, _ := cmd.Flags().GetBool("proto")
-		printImpCaches, _ := cmd.Flags().GetBool("imp-cache")
+		imageName, _ := cmd.Flags().GetString("image")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -85,34 +72,45 @@ var dyldObjcCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if printClasses {
-			_, err := f.GetAllClasses(true)
+		if len(args) > 1 {
+			ptr, err := f.GetSelectorAddress(args[1])
 			if err != nil {
 				return err
 			}
-		}
+			fmt.Printf("0x%x: %s\n", ptr, args[1])
+		} else {
+			if len(imageName) > 0 {
+				err = f.SelectorsForImage(imageName)
+				if err != nil {
+					return err
+				}
 
-		if printSelectors {
-			_, err := f.GetAllSelectors(true)
-			if err != nil {
-				return err
-			}
-		}
+				// sort by address
+				addrs := make([]uint64, 0, len(f.AddressToSymbol))
+				for a := range f.AddressToSymbol {
+					addrs = append(addrs, a)
+				}
+				sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
 
-		if printProtocols {
-			_, err := f.GetAllProtocols(true)
-			if err != nil {
-				return err
-			}
-		}
+				for _, addr := range addrs {
+					fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
+				}
 
-		if printImpCaches {
-			err = f.ImpCachesForImage()
-			if err != nil {
-				return err
+			} else {
+				_, err := f.GetAllSelectors(true)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
 		return nil
 	},
+}
+
+func init() {
+	dyldObjcCmd.AddCommand(objcSelCmd)
+
+	objcSelCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	objcSelCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
