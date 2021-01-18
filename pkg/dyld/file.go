@@ -40,7 +40,7 @@ type localSymbolInfo struct {
 
 type cacheImages []*CacheImage
 type cacheMappings []*CacheMapping
-type cacheExtMappings []*CacheExtMapping
+type cacheMappingsWithSlideInfo []*CacheMappingWithSlideInfo
 type codesignature *ctypes.CodeSignature
 
 // A File represents an open dyld file.
@@ -48,9 +48,10 @@ type File struct {
 	CacheHeader
 	ByteOrder binary.ByteOrder
 
-	Mappings    cacheMappings
-	ExtMappings cacheExtMappings
-	Images      cacheImages
+	Mappings              cacheMappings
+	MappingsWithSlideInfo cacheMappingsWithSlideInfo
+
+	Images cacheImages
 
 	SlideInfo       interface{}
 	PatchInfo       CachePatchInfo
@@ -173,9 +174,10 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 			return nil, err
 		}
 		f.Images = append(f.Images, &CacheImage{
-			Index: i,
-			Info:  iinfo,
-			sr:    sr,
+			Index:    i,
+			Info:     iinfo,
+			Mappings: f.Mappings,
+			sr:       sr,
 		})
 	}
 	for idx, image := range f.Images {
@@ -232,20 +234,20 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	/***********************
 	 * Read dyld slide info
 	 ***********************/
-	if f.SlideInfoOffset > 0 {
+	if f.SlideInfoOffsetUnused > 0 {
 		if config.ParseSlideInfo {
 			log.Debug("Parsing Slide Info...")
-			f.ParseSlideInfo(f.SlideInfoOffset, false)
+			f.ParseSlideInfo(f.SlideInfoOffsetUnused, false)
 		}
 	} else {
 		// Read NEW (in iOS 14) dyld extended mappings.
-		sr.Seek(int64(f.ExtMappingOffset), os.SEEK_SET)
-		for i := uint32(0); i != f.ExtMappingCount; i++ {
-			cxmInfo := CacheExtMappingInfo{}
+		sr.Seek(int64(f.MappingWithSlideOffset), os.SEEK_SET)
+		for i := uint32(0); i != f.MappingWithSlideCount; i++ {
+			cxmInfo := CacheMappingAndSlideInfo{}
 			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
 				return nil, err
 			}
-			cm := &CacheExtMapping{CacheExtMappingInfo: cxmInfo}
+			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: cxmInfo}
 			if cxmInfo.InitProt.Execute() {
 				cm.Name = "__TEXT"
 			} else if cxmInfo.InitProt.Write() && cm.Flags != 1 {
@@ -256,7 +258,7 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 				cm.Name = "__LINKEDIT"
 			}
 
-			f.ExtMappings = append(f.ExtMappings, cm)
+			f.MappingsWithSlideInfo = append(f.MappingsWithSlideInfo, cm)
 			if config.ParseSlideInfo {
 				if cm.SlideInfoSize > 0 {
 					log.Debug("Parsing Slide Info...")

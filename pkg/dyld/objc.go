@@ -674,7 +674,7 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 						Types:     t,
 						Pointer: types.FilePointer{
 							VMAdder: impVMAddr,
-							Offset:  int64(method.ImpOffset),
+							Offset:  uint64(method.ImpOffset),
 						},
 					})
 					if len(n) > 0 {
@@ -976,7 +976,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 		// Prots:           prots,
 		ClassPtr: types.FilePointer{
 			VMAdder: vmaddr,
-			Offset:  int64(off),
+			Offset:  uint64(off),
 		},
 		IsaVMAddr:             convertToVMAddr(classPtr.IsaVMAddr),
 		SuperclassVMAddr:      convertToVMAddr(classPtr.SuperclassVMAddr),

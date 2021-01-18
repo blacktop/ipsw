@@ -32,6 +32,7 @@ type CacheImage struct {
 	Index        uint32
 	Info         CacheImageInfo
 	LocalSymbols []*CacheLocalSymbol64
+	Mappings     cacheMappings
 	CacheLocalSymbolsEntry
 	CacheImageInfoExtra
 	CacheImageTextInfo
@@ -148,6 +149,31 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			types.LC_DYLD_EXPORTS_TRIE},
 		Offset:    int64(i.DylibOffset),
 		SrcReader: i.sr,
+		VMAddrConverter: types.VMAddrConverter{
+			Converter: func(addr uint64) uint64 {
+				pointer := CacheSlidePointer3(addr)
+				if pointer.Authenticated() {
+					return 0x180000000 + pointer.OffsetFromSharedCacheBase()
+				}
+				return pointer.SignExtend51()
+			},
+			VMAddr2Offet: func(address uint64) (uint64, error) {
+				for _, mapping := range i.Mappings {
+					if mapping.Address <= address && address < mapping.Address+mapping.Size {
+						return (address - mapping.Address) + mapping.FileOffset, nil
+					}
+				}
+				return 0, fmt.Errorf("address not within any mappings address range")
+			},
+			Offet2VMAddr: func(offset uint64) (uint64, error) {
+				for _, mapping := range i.Mappings {
+					if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
+						return (offset - mapping.FileOffset) + mapping.Address, nil
+					}
+				}
+				return 0, fmt.Errorf("offset not within any mappings file offset range")
+			},
+		},
 	})
 }
 
