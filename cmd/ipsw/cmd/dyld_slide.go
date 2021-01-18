@@ -109,10 +109,10 @@ var slideCmd = &cobra.Command{
 			a2sFile.Close()
 		}
 
-		if f.SlideInfoOffset > 0 {
-			f.ParseSlideInfo(f.SlideInfoOffset, true)
+		if f.SlideInfoOffsetUnused > 0 {
+			f.ParseSlideInfo(f.SlideInfoOffsetUnused, true)
 		} else {
-			for _, extMapping := range f.ExtMappings {
+			for _, extMapping := range f.MappingsWithSlideInfo {
 				if extMapping.SlideInfoSize > 0 {
 					f.ParseSlideInfo(extMapping.SlideInfoOffset, true)
 				}

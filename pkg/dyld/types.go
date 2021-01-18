@@ -81,8 +81,8 @@ type CacheHeader struct {
 	DyldBaseAddress           uint64         // base address of dyld when cache was built
 	CodeSignatureOffset       uint64         // file offset of code signature blob
 	CodeSignatureSize         uint64         // size of code signature blob (zero means to end of file)
-	SlideInfoOffset           uint64         // file offset of kernel slid info
-	SlideInfoSize             uint64         // size of kernel slid info
+	SlideInfoOffsetUnused     uint64         // unused.  Used to be file offset of kernel slid info
+	SlideInfoSizeUnused       uint64         // unused.  Used to be size of kernel slid info
 	LocalSymbolsOffset        uint64         // file offset of where local symbols are stored
 	LocalSymbolsSize          uint64         // size of local symbols information
 	UUID                      types.UUID     // unique value for each shared cache file
@@ -108,19 +108,19 @@ type CacheHeader struct {
 	   locallyBuiltCache      : 1,  // 0 for B&I built cache, 1 for locally built cache
 	   builtFromChainedFixups : 1,  // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
 	   padding                : 20; // TBD */
-	SharedRegionStart    uint64   // base load address of cache if not slid
-	SharedRegionSize     uint64   // overall size of region cache can be mapped into
-	MaxSlide             maxSlide // runtime slide of cache can be between zero and this value
-	DylibsImageArrayAddr uint64   // (unslid) address of ImageArray for dylibs in this cache
-	DylibsImageArraySize uint64   // size of ImageArray for dylibs in this cache
-	DylibsTrieAddr       uint64   // (unslid) address of trie of indexes of all cached dylibs
-	DylibsTrieSize       uint64   // size of trie of cached dylib paths
-	OtherImageArrayAddr  uint64   // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
-	OtherImageArraySize  uint64   // size of ImageArray for dylibs and bundles with dlopen closures
-	OtherTrieAddr        uint64   // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
-	OtherTrieSize        uint64   // size of trie of dylibs and bundles with dlopen closures
-	ExtMappingOffset     uint32   // file offset to first dyld_cache_mapping_info
-	ExtMappingCount      uint32   // number of dyld_cache_mapping_info entries
+	SharedRegionStart      uint64   // base load address of cache if not slid
+	SharedRegionSize       uint64   // overall size of region cache can be mapped into
+	MaxSlide               maxSlide // runtime slide of cache can be between zero and this value
+	DylibsImageArrayAddr   uint64   // (unslid) address of ImageArray for dylibs in this cache
+	DylibsImageArraySize   uint64   // size of ImageArray for dylibs in this cache
+	DylibsTrieAddr         uint64   // (unslid) address of trie of indexes of all cached dylibs
+	DylibsTrieSize         uint64   // size of trie of cached dylib paths
+	OtherImageArrayAddr    uint64   // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
+	OtherImageArraySize    uint64   // size of ImageArray for dylibs and bundles with dlopen closures
+	OtherTrieAddr          uint64   // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
+	OtherTrieSize          uint64   // size of trie of dylibs and bundles with dlopen closures
+	MappingWithSlideOffset uint32   // file offset to first dyld_cache_mapping_and_slide_info
+	MappingWithSlideCount  uint32   // number of dyld_cache_mapping_and_slide_info entries
 }
 
 type CacheMappingInfo struct {
@@ -131,14 +131,21 @@ type CacheMappingInfo struct {
 	InitProt   types.VmProtection
 }
 
-type CacheExtMappingInfo struct {
+type CacheMappingFlag uint64
+
+const (
+	DYLD_CACHE_MAPPING_AUTH_DATA  CacheMappingFlag = 1
+	DYLD_CACHE_MAPPING_DIRTY_DATA CacheMappingFlag = 2
+	DYLD_CACHE_MAPPING_CONST_DATA CacheMappingFlag = 4
+)
+
+type CacheMappingAndSlideInfo struct {
 	Address         uint64
 	Size            uint64
 	FileOffset      uint64
 	SlideInfoOffset uint64
 	SlideInfoSize   uint64
-	Flags           uint32
-	Reserved        uint32
+	Flags           CacheMappingFlag
 	MaxProt         types.VmProtection
 	InitProt        types.VmProtection
 }
@@ -148,9 +155,9 @@ type CacheMapping struct {
 	CacheMappingInfo
 }
 
-type CacheExtMapping struct {
+type CacheMappingWithSlideInfo struct {
 	Name string
-	CacheExtMappingInfo
+	CacheMappingAndSlideInfo
 }
 
 type CacheImageInfo struct {
@@ -446,8 +453,11 @@ type CachePatchableLocation uint64
 func (p CachePatchableLocation) CacheOffset() uint64 {
 	return types.ExtractBits(uint64(p), 0, 32)
 }
+func (p CachePatchableLocation) High7() uint64 {
+	return types.ExtractBits(uint64(p), 32, 7)
+}
 func (p CachePatchableLocation) Addend() uint64 {
-	return types.ExtractBits(uint64(p), 32, 12) // +/- 2048
+	return types.ExtractBits(uint64(p), 39, 5) // 0..31
 }
 func (p CachePatchableLocation) Authenticated() bool {
 	return types.ExtractBits(uint64(p), 44, 1) != 0

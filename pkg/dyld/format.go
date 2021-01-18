@@ -38,8 +38,8 @@ func (dch CacheHeader) String() string {
 		dch.DyldBaseAddress,
 		dch.CodeSignatureOffset,
 		dch.CodeSignatureSize,
-		dch.SlideInfoOffset,
-		dch.SlideInfoSize,
+		dch.SlideInfoOffsetUnused,
+		dch.SlideInfoSizeUnused,
 		dch.LocalSymbolsOffset,
 		dch.LocalSymbolsSize,
 		dch.UUID.String(),
@@ -80,7 +80,7 @@ func (dch CacheHeader) Print() {
 	fmt.Println("Header")
 	fmt.Println("======")
 	fmt.Println(dch.String())
-	fmt.Printf("Slide Info:     %4dKB,  file offset: 0x%09X -> 0x%09X\n", dch.SlideInfoSize/1024, dch.SlideInfoOffset, dch.SlideInfoOffset+dch.SlideInfoSize)
+	fmt.Printf("Slide Info:     %4dKB,  file offset: 0x%09X -> 0x%09X\n", dch.SlideInfoSizeUnused/1024, dch.SlideInfoOffsetUnused, dch.SlideInfoOffsetUnused+dch.SlideInfoSizeUnused)
 	fmt.Printf("Local Symbols:  %3dMB,  file offset: 0x%09X -> 0x%09X\n", dch.LocalSymbolsSize/(1024*1024), dch.LocalSymbolsOffset, dch.LocalSymbolsOffset+dch.LocalSymbolsSize)
 	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%09X -> 0x%09X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
 	fmt.Println()
@@ -117,7 +117,7 @@ func (mappings cacheMappings) String() string {
 	return tableString.String()
 }
 
-func (mappings cacheExtMappings) String() string {
+func (mappings cacheMappingsWithSlideInfo) String() string {
 	tableString := &strings.Builder{}
 
 	mdata := [][]string{}
@@ -161,10 +161,10 @@ func (f *File) String() string {
 	} else {
 		slideVersion = 0
 	}
-	if f.CacheHeader.SlideInfoOffset > 0 {
+	if f.CacheHeader.SlideInfoOffsetUnused > 0 {
 		mappings = f.Mappings.String()
 	} else {
-		mappings = f.ExtMappings.String()
+		mappings = f.MappingsWithSlideInfo.String()
 	}
 	return fmt.Sprintf(
 		"Header\n"+
@@ -197,7 +197,7 @@ func (f *File) String() string {
 		f.LocalSymInfo.StringsSize/(1024*1024), f.LocalSymInfo.StringsFileOffset, f.LocalSymInfo.StringsFileOffset+f.LocalSymInfo.StringsSize,
 		f.CodeSignatureSize/(1024*1024), f.CodeSignatureOffset, f.CodeSignatureOffset+f.CodeSignatureSize,
 		f.ImagesCount, int(f.ImagesCount)*binary.Size(CacheImageInfo{})/1024, f.ImagesOffset, int(f.ImagesOffset)+int(f.ImagesCount)*binary.Size(CacheImageInfo{}),
-		slideVersion, f.SlideInfoSize/1024, f.SlideInfoOffset, f.SlideInfoOffset+f.SlideInfoSize,
+		slideVersion, f.SlideInfoSizeUnused/1024, f.SlideInfoOffsetUnused, f.SlideInfoOffsetUnused+f.SlideInfoSizeUnused,
 		binary.Size(f.BranchPools), f.BranchPoolsOffset, int(f.BranchPoolsOffset)+binary.Size(f.BranchPools),
 		f.AccelerateInfoSize/1024, f.AccelerateInfoAddr, f.AccelerateInfoAddr+f.AccelerateInfoSize,
 		f.PatchInfoSize/1024, f.PatchInfoAddr, f.PatchInfoAddr+f.PatchInfoSize,
