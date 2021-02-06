@@ -43,7 +43,7 @@ var dyldMachoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// showObjC, _ := cmd.Flags().GetBool("objc")
+		showObjC, _ := cmd.Flags().GetBool("objc")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -80,54 +80,56 @@ var dyldMachoCmd = &cobra.Command{
 
 				fmt.Println(m.FileTOC.String())
 
-				// if showObjC {
-				// 	fmt.Println("Objective-C")
-				// 	fmt.Println("===========")
-				// 	if m.HasObjC() {
-				// 		// fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
-				// 		// fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
+				if showObjC {
+					fmt.Println("Objective-C")
+					fmt.Println("===========")
+					if m.HasObjC() {
+						fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
+						fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
 
-				// 		// info, _ := m.GetObjCImageInfo()
-				// 		// fmt.Println(info.Flags)
-				// 		// fmt.Println(info.Flags.SwiftVersion())
+						info, _ := m.GetObjCImageInfo()
+						fmt.Println(info.Flags)
+						fmt.Println(info.Flags.SwiftVersion())
 
-				// 		if protos, err := m.GetObjCProtocols(); err == nil {
-				// 			for _, proto := range protos {
-				// 				fmt.Println(proto.String())
-				// 			}
-				// 		}
-				// 		if classes, err := m.GetObjCClasses(); err == nil {
-				// 			for _, class := range classes {
-				// 				fmt.Println(class.String())
-				// 			}
-				// 		}
-				// 		if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
-				// 			for _, class := range nlclasses {
-				// 				fmt.Println(class.String())
-				// 			}
-				// 		}
-				// 		if cats, err := m.GetObjCCategories(); err == nil {
-				// 			for _, cat := range cats {
-				// 				fmt.Println(cat.String())
-				// 			}
-				// 		}
-				// 		if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
-				// 			fmt.Println("@selectors refs")
-				// 			for off, sel := range selRefs {
-				// 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
-				// 			}
-				// 		}
-				// 		if methods, err := m.GetObjCMethodNames(); err == nil {
-				// 			fmt.Printf("\n@methods\n")
-				// 			for method, vmaddr := range methods {
-				// 				fmt.Printf("0x%011x: %s\n", vmaddr, method)
-				// 			}
-				// 		}
-				// 	} else {
-				// 		fmt.Println("  - no objc")
-				// 	}
-				// 	fmt.Println()
-				// }
+						if protos, err := m.GetObjCProtocols(); err == nil {
+							for _, proto := range protos {
+								fmt.Println(proto.String())
+							}
+						}
+						if classes, err := m.GetObjCClasses(); err == nil {
+							for _, class := range classes {
+								fmt.Println(class.String())
+							}
+						} else {
+							log.Error(err.Error())
+						}
+						if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
+							for _, class := range nlclasses {
+								fmt.Println(class.String())
+							}
+						}
+						if cats, err := m.GetObjCCategories(); err == nil {
+							for _, cat := range cats {
+								fmt.Println(cat.String())
+							}
+						}
+						if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
+							fmt.Println("@selectors refs")
+							for off, sel := range selRefs {
+								fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
+							}
+						}
+						if methods, err := m.GetObjCMethodNames(); err == nil {
+							fmt.Printf("\n@methods\n")
+							for method, vmaddr := range methods {
+								fmt.Printf("0x%011x: %s\n", vmaddr, method)
+							}
+						}
+					} else {
+						fmt.Println("  - no objc")
+					}
+					fmt.Println()
+				}
 			} else {
 				log.Errorf("dylib %s not found in %s", args[1], dscPath)
 			}
@@ -147,8 +149,8 @@ func init() {
 	// dyldMachoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	// dyldMachoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	dyldMachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
-	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
-	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
+	// dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
+	// dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 
 	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
