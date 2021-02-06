@@ -110,19 +110,87 @@ $ docker run --init -it --rm \
 
 ### **dyld macho**
 
-Parse a dyld*shared_cache dylib *(same as ipsw macho cmd)\_
+Parse a dyld_shared_cache dylib _(same as ipsw macho cmd)_
 
 ```bash
-$ ipsw dyld macho dyld_shared_cache JavaScriptCore
+$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc | bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
 
 Magic         = 64-bit MachO
 Type          = Dylib
 CPU           = AARCH64, ARM64e caps: PAC00
-Commands      = 25 (Size: 4464)
-Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe, DylibInCache
-000: LC_SEGMENT_64 sz=0x01131000 off=0x09e18000-0x0af49000 addr=0x189e18000-0x18af49000 r-x/r-x   __TEXT
-        sz=0x00ed4e18 off=0x09e19290-0x0acee0a8 addr=0x189e19290-0x18acee0a8            __TEXT.__text                   PureInstructions|SomeInstructions
-        sz=0x00002000 off=0x0acee0a8-0x0acf00a8 addr=0x18acee0a8-0x18acf00a8            __TEXT.__auth_stubs             PureInstructions|SomeInstructions (SymbolStubs)
+Commands      = 49 (Size: 6680)
+Flags         = NoUndefs, DyldLink, TwoLevel, NoReexportedDylibs, AppExtensionSafe, NlistOutofsyncWithDyldinfo, DylibInCache
+000: LC_SEGMENT_64 sz=0x0027d000 off=0x390d8000-0x39355000 addr=0x1b90d8000-0x1b9355000 r-x/r-x   __TEXT
+        sz=0x0022e8f4 off=0x390da674-0x39308f68 addr=0x1b90da674-0x1b9308f68            __TEXT.__text                   PureInstructions|SomeInstructions
+        sz=0x00001af0 off=0x39308f68-0x3930aa58 addr=0x1b9308f68-0x1b930aa58            __TEXT.__auth_stubs             PureInstructions|SomeInstructions (SymbolStubs)
+        sz=0x00004524 off=0x3930aa58-0x3930ef7c addr=0x1b930aa58-0x1b930ef7c            __TEXT.__objc_methlist
+<SNIP>
+```
+
+```mm
+<SNIP>
+0x001e39fc000 JSContext : NSObject {
+  // instance variables
+  +0x08 @"JSVirtualMachine" m_virtualMachine (0x8)
+  +0x10 ^{OpaqueJSContext=} m_context (0x8)
+  +0x18 {Strong<JSC::JSObject, JSC::ShouldStrongDestructorGrabLock::No>="m_slot"^{JSValue}} m_exception (0x8)
+  +0x20 {WeakObjCPtr<id<JSModuleLoaderDelegate> >="m_weakReference"@} m_moduleLoaderDelegate (0x8)
+  +0x28 @? _exceptionHandler (0x8)
+}
+
+ @property (T@"JSValue",R) globalObject
+ @property (T@"JSValue",&) exception
+ @property (T@?,C,V_exceptionHandler) exceptionHandler
+ @property (T@"JSVirtualMachine",R) virtualMachine
+ @property (T@"NSString",C) name
+
+  // class methods
+  0x0018a04680c +[JSContext currentContext]
+  0x0018a046854 +[JSContext currentThis]
+  0x0018a0468e8 +[JSContext currentCallee]
+  0x00189e1b8d4 +[JSContext currentArguments]
+  0x00189e1b4f8 +[JSContext contextWithJSGlobalContextRef:]
+
+  // instance methods
+  0x0018a046afc -[JSContext _setRemoteInspectionEnabled:]
+  0x0018a046b1c -[JSContext _debuggerRunLoop]
+  0x00189e19ce4 -[JSContext wrapperForJSObject:]
+  0x0018a046b08 -[JSContext _includesNativeCallStackWhenReportingExceptions]
+  0x00189e1c908 -[JSContext exception]
+  0x00189e1ba58 -[JSContext objectForKeyedSubscript:]
+  0x00189e19294 -[JSContext evaluateScript:withSourceURL:]
+  0x00189e1b588 -[JSContext globalObject]
+  0x0018a046b44 -[JSContext exceptionHandler]
+  0x0018a0469dc -[JSContext setName:]
+  0x00189e1bb28 -[JSContext setException:]
+  0x00189e19eb4 -[JSContext wrapperForObjCObject:]
+  0x0018a046984 -[JSContext virtualMachine]
+  0x0018a046470 -[JSContext dependencyIdentifiersForModuleJSScript:]
+  0x0018a046b30 -[JSContext moduleLoaderDelegate]
+  0x0018a046b50 -[JSContext setExceptionHandler:]
+  0x0018a046cf4 -[JSContext valueFromNotifyException:]
+  0x00189e1c940 -[JSContext setObject:forKeyedSubscript:]
+  0x00189e19b48 -[JSContext dealloc]
+  0x0018a046b10 -[JSContext _setIncludesNativeCallStackWhenReportingExceptions:]
+  0x0018a046b38 -[JSContext setModuleLoaderDelegate:]
+  0x00189e19a98 -[JSContext initWithVirtualMachine:]
+  0x0018a046d44 -[JSContext boolFromNotifyException:]
+  0x0018a046bb0 -[JSContext initWithGlobalContextRef:]
+  0x0018a04698c -[JSContext name]
+  0x0018a046d68 -[JSContext wrapperMap]
+  0x00189e1c298 -[JSContext beginCallbackWithData:calleeValue:thisValue:argumentCount:arguments:]
+  0x00189e1c208 -[JSContext ensureWrapperMap]
+  0x0018a046c78 -[JSContext notifyException:]
+  0x00189e1ba44 -[JSContext evaluateScript:]
+  0x00189e19c88 -[JSContext init]
+  0x00189e1c900 -[JSContext .cxx_construct]
+  0x0018a0461e8 -[JSContext evaluateJSScript:]
+  0x0018a046b24 -[JSContext _setDebuggerRunLoop:]
+  0x0018a046b58 -[JSContext .cxx_destruct]
+  0x0018a04679c -[JSContext _setITMLDebuggableType]
+  0x00189e1ba30 -[JSContext JSGlobalContextRef]
+  0x00189e1baa0 -[JSContext endCallbackWithData:]
+  0x0018a046af4 -[JSContext _remoteInspectionEnabled]
 <SNIP>
 ```
 
