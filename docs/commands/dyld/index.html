@@ -186,9 +186,16 @@
   <ul>
 <li><a href="#dyld-info"><strong>dyld info</strong></a></li>
 <li><a href="#dyld-extract"><strong>dyld extract</strong></a></li>
+<li><a href="#dyld-macho"><strong>dyld macho</strong></a></li>
 <li><a href="#dyld-symaddr"><strong>dyld symaddr</strong></a></li>
 <li><a href="#dyld-a2s"><strong>dyld a2s</strong></a></li>
-<li><a href="#dyld-sel"><strong>dyld sel</strong></a></li>
+<li><a href="#dyld-objc"><strong>dyld objc</strong></a>
+<ul>
+<li><a href="#dyld-objc-class"><strong>dyld objc class</strong></a></li>
+<li><a href="#dyld-objc-proto"><strong>dyld objc proto</strong></a></li>
+<li><a href="#dyld-objc-sel"><strong>dyld objc sel</strong></a></li>
+</ul>
+</li>
 <li><a href="#dyld-split"><strong>dyld split</strong></a></li>
 <li><a href="#dyld-webkit"><strong>dyld webkit</strong></a></li>
 <li><a href="#dyld-patches-"><strong>dyld patches</strong> 🆕</a></li>
@@ -269,6 +276,84 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 </span><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
 </span><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
 </span><span class="se"></span>             blacktop/ipsw -V dyld extract iPhone11_2_12.4.1_16G102_Restore.ipsw
+</code></pre></div><h3 id="dyld-macho"><strong>dyld macho</strong></h3>
+<p>Parse a dyld_shared_cache dylib <em>(same as ipsw macho cmd)</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc <span class="p">|</span> bat -l m --tabs <span class="m">0</span> -p --theme Nord --wrap<span class="o">=</span>never --pager <span class="s2">&#34;less -S&#34;</span>
+
+<span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
+<span class="nv">Type</span>          <span class="o">=</span> Dylib
+<span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e caps: PAC00
+<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">49</span> <span class="o">(</span>Size: 6680<span class="o">)</span>
+<span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, NoReexportedDylibs, AppExtensionSafe, NlistOutofsyncWithDyldinfo, DylibInCache
+000: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x0027d000 <span class="nv">off</span><span class="o">=</span>0x390d8000-0x39355000 <span class="nv">addr</span><span class="o">=</span>0x1b90d8000-0x1b9355000 r-x/r-x   __TEXT
+        <span class="nv">sz</span><span class="o">=</span>0x0022e8f4 <span class="nv">off</span><span class="o">=</span>0x390da674-0x39308f68 <span class="nv">addr</span><span class="o">=</span>0x1b90da674-0x1b9308f68            __TEXT.__text                   PureInstructions<span class="p">|</span>SomeInstructions
+        <span class="nv">sz</span><span class="o">=</span>0x00001af0 <span class="nv">off</span><span class="o">=</span>0x39308f68-0x3930aa58 <span class="nv">addr</span><span class="o">=</span>0x1b9308f68-0x1b930aa58            __TEXT.__auth_stubs             PureInstructions<span class="p">|</span>SomeInstructions <span class="o">(</span>SymbolStubs<span class="o">)</span>
+        <span class="nv">sz</span><span class="o">=</span>0x00004524 <span class="nv">off</span><span class="o">=</span>0x3930aa58-0x3930ef7c <span class="nv">addr</span><span class="o">=</span>0x1b930aa58-0x1b930ef7c            __TEXT.__objc_methlist
+&lt;SNIP&gt;
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">&lt;SNIP&gt;
+0x001e39fc000 JSContext : NSObject {
+  // instance variables
+  +0x08 @&#34;JSVirtualMachine&#34; m_virtualMachine (0x8)
+  +0x10 ^{OpaqueJSContext=} m_context (0x8)
+  +0x18 {Strong&lt;JSC::JSObject, JSC::ShouldStrongDestructorGrabLock::No&gt;=&#34;m_slot&#34;^{JSValue}} m_exception (0x8)
+  +0x20 {WeakObjCPtr&lt;id&lt;JSModuleLoaderDelegate&gt; &gt;=&#34;m_weakReference&#34;@} m_moduleLoaderDelegate (0x8)
+  +0x28 @? _exceptionHandler (0x8)
+}
+
+ @property (T@&#34;JSValue&#34;,R) globalObject
+ @property (T@&#34;JSValue&#34;,&amp;) exception
+ @property (T@?,C,V_exceptionHandler) exceptionHandler
+ @property (T@&#34;JSVirtualMachine&#34;,R) virtualMachine
+ @property (T@&#34;NSString&#34;,C) name
+
+  // class methods
+  0x0018a04680c +[JSContext currentContext]
+  0x0018a046854 +[JSContext currentThis]
+  0x0018a0468e8 +[JSContext currentCallee]
+  0x00189e1b8d4 +[JSContext currentArguments]
+  0x00189e1b4f8 +[JSContext contextWithJSGlobalContextRef:]
+
+  // instance methods
+  0x0018a046afc -[JSContext _setRemoteInspectionEnabled:]
+  0x0018a046b1c -[JSContext _debuggerRunLoop]
+  0x00189e19ce4 -[JSContext wrapperForJSObject:]
+  0x0018a046b08 -[JSContext _includesNativeCallStackWhenReportingExceptions]
+  0x00189e1c908 -[JSContext exception]
+  0x00189e1ba58 -[JSContext objectForKeyedSubscript:]
+  0x00189e19294 -[JSContext evaluateScript:withSourceURL:]
+  0x00189e1b588 -[JSContext globalObject]
+  0x0018a046b44 -[JSContext exceptionHandler]
+  0x0018a0469dc -[JSContext setName:]
+  0x00189e1bb28 -[JSContext setException:]
+  0x00189e19eb4 -[JSContext wrapperForObjCObject:]
+  0x0018a046984 -[JSContext virtualMachine]
+  0x0018a046470 -[JSContext dependencyIdentifiersForModuleJSScript:]
+  0x0018a046b30 -[JSContext moduleLoaderDelegate]
+  0x0018a046b50 -[JSContext setExceptionHandler:]
+  0x0018a046cf4 -[JSContext valueFromNotifyException:]
+  0x00189e1c940 -[JSContext setObject:forKeyedSubscript:]
+  0x00189e19b48 -[JSContext dealloc]
+  0x0018a046b10 -[JSContext _setIncludesNativeCallStackWhenReportingExceptions:]
+  0x0018a046b38 -[JSContext setModuleLoaderDelegate:]
+  0x00189e19a98 -[JSContext initWithVirtualMachine:]
+  0x0018a046d44 -[JSContext boolFromNotifyException:]
+  0x0018a046bb0 -[JSContext initWithGlobalContextRef:]
+  0x0018a04698c -[JSContext name]
+  0x0018a046d68 -[JSContext wrapperMap]
+  0x00189e1c298 -[JSContext beginCallbackWithData:calleeValue:thisValue:argumentCount:arguments:]
+  0x00189e1c208 -[JSContext ensureWrapperMap]
+  0x0018a046c78 -[JSContext notifyException:]
+  0x00189e1ba44 -[JSContext evaluateScript:]
+  0x00189e19c88 -[JSContext init]
+  0x00189e1c900 -[JSContext .cxx_construct]
+  0x0018a0461e8 -[JSContext evaluateJSScript:]
+  0x0018a046b24 -[JSContext _setDebuggerRunLoop:]
+  0x0018a046b58 -[JSContext .cxx_destruct]
+  0x0018a04679c -[JSContext _setITMLDebuggableType]
+  0x00189e1ba30 -[JSContext JSGlobalContextRef]
+  0x00189e1baa0 -[JSContext endCallbackWithData:]
+  0x0018a046af4 -[JSContext _remoteInspectionEnabled]
+&lt;SNIP&gt;
 </code></pre></div><h3 id="dyld-symaddr"><strong>dyld symaddr</strong></h3>
 <p>Find all instances of a symbol&rsquo;s <em>(unslid)</em> addresses in shared cache</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache &lt;SYMBOL_NAME&gt;
@@ -292,13 +377,37 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 </code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
 0x190a7221c: _xmlCtxtGetLastError
 2.12s user 0.51s system 109% cpu <span class="s2">&#34;2.407 total&#34;</span>
-</code></pre></div><h3 id="dyld-sel"><strong>dyld sel</strong></h3>
-<p>Get ObjC selector <em>(unslid)</em> address</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld sel dyld_shared_cache release
+</code></pre></div><h3 id="dyld-objc"><strong>dyld objc</strong></h3>
+<h4 id="dump-objc-addresses">Dump ObjC addresses</h4>
+<p>Dump all the classes</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --class dyld_shared_cache
+</code></pre></div><p>Dump all the protocols</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --proto dyld_shared_cache
+</code></pre></div><p>Dump all the selectors</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --sel dyld_shared_cache
+</code></pre></div><p>Dump all the imp-caches</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --imp-cache dyld_shared_cache
+</code></pre></div><h3 id="dyld-objc-class"><strong>dyld objc class</strong></h3>
+<p>Lookup a class&rsquo;s address</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc class dyld_shared_cache release
+
+0x1b92c85a8: release
+</code></pre></div><p>Or get all the classes for an image</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc class --image libobjc.A.dylib dyld_shared_cache
+</code></pre></div><h3 id="dyld-objc-proto"><strong>dyld objc proto</strong></h3>
+<p>Lookup a protocol&rsquo;s address</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc proto dyld_shared_cache release
+
+0x1b92c85a8: release
+</code></pre></div><p>Or get all the protocols for an image</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
+</code></pre></div><h3 id="dyld-objc-sel"><strong>dyld objc sel</strong></h3>
+<p>Lookup a selector&rsquo;s address</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc sel dyld_shared_cache release
 
 0x1b92c85a8: release
 </code></pre></div><p>Or get all the selectors for an image</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
 
 Objective-C Selectors:
 /usr/lib/libobjc.A.dylib
@@ -315,10 +424,7 @@ Objective-C Selectors:
     0x1c93562fd: release
     0x1c9b2c9fd: initialize
 &lt;SNIP&gt;
-</code></pre></div><p>Get all teh selectors!!</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld sel dyld_shared_cache
-</code></pre></div><p><strong>NOTE:</strong> This doesn&rsquo;t include <code>headers</code>, <code>class names</code> or <code>protocols</code> yet.</p>
-<h3 id="dyld-split"><strong>dyld split</strong></h3>
+</code></pre></div><h3 id="dyld-split"><strong>dyld split</strong></h3>
 <p><em>(only on macOS and requires XCode to be installed)</em></p>
 <p>Split up a <em>dyld_shared_cache</em></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld split dyld_shared_cache .
