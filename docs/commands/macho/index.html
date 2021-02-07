@@ -323,374 +323,374 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 <p>Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></p>
 <p><strong>NOTE:</strong> Currently only supports <em>64-bit</em> architechtures</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">Objective-C
-===========
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-m" data-lang="m"><span class="n">Objective</span><span class="o">-</span><span class="n">C</span>
+<span class="o">==========</span><span class="p">=</span>
 
-@protocol NSObject
- @property (TQ,R) hash
- @property (T#,R) superclass
- @property (T@&#34;NSString&#34;,R,C) description
- @property (T@&#34;NSString&#34;,R,C) debugDescription
+<span class="p">@</span><span class="n">protocol</span> <span class="n">NSObject</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">TQ</span><span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">hash</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span>#<span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">superclass</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">NSString</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">C</span><span class="p">)</span> <span class="n">description</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">NSString</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">C</span><span class="p">)</span> <span class="n">debugDescription</span>
 
-  // instance methods
- -[NSObject isEqual:]
- -[NSObject class]
- -[NSObject self]
- -[NSObject performSelector:]
- -[NSObject performSelector:withObject:]
- -[NSObject performSelector:withObject:withObject:]
- -[NSObject isProxy]
- -[NSObject isKindOfClass:]
- -[NSObject isMemberOfClass:]
- -[NSObject conformsToProtocol:]
- -[NSObject respondsToSelector:]
- -[NSObject retain]
- -[NSObject release]
- -[NSObject autorelease]
- -[NSObject retainCount]
- -[NSObject zone]
- -[NSObject hash]
- -[NSObject superclass]
- -[NSObject description]
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isEqual</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">class</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">self</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isProxy</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isKindOfClass</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isMemberOfClass</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">conformsToProtocol</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">respondsToSelector</span><span class="p">:]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retain</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">release</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">autorelease</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainCount</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">zone</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">hash</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">superclass</span><span class="p">]</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">description</span><span class="p">]</span>
 
-@optional
-  // instance methods
- -[NSObject debugDescription]
+<span class="p">@</span><span class="n">optional</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+ <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">debugDescription</span><span class="p">]</span>
 
-@end
+<span class="p">@</span><span class="k">end</span>
 
-0x00000035000 Object : &lt;ROOT&gt;
-  // instance variables
-  +0x00 # isa (0x8)
+<span class="mi">0</span><span class="n">x00000035000</span> <span class="n">Object</span> <span class="p">:</span> <span class="o">&lt;</span><span class="n">ROOT</span><span class="o">&gt;</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="n">variables</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x00</span> # <span class="n">isa</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
 
-  // class methods
-  0x000000210c8 +[Object initialize]
-  0x000000210cc +[Object class]
-  0x000000210d0 +[Object retain]
-  0x000000210d4 +[Object release]
-  0x000000210d5 +[Object autorelease]
+  <span class="o">//</span> <span class="n">class</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x000000210c8</span> <span class="o">+</span><span class="p">[</span><span class="n">Object</span> <span class="n">initialize</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000210cc</span> <span class="o">+</span><span class="p">[</span><span class="n">Object</span> <span class="n">class</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000210d0</span> <span class="o">+</span><span class="p">[</span><span class="n">Object</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000210d4</span> <span class="o">+</span><span class="p">[</span><span class="n">Object</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000210d5</span> <span class="o">+</span><span class="p">[</span><span class="n">Object</span> <span class="n">autorelease</span><span class="p">]</span>
 
-  // instance methods
-  0x000000210b9 -[Object retain]
-  0x000000210be -[Object release]
-  0x000000210c3 -[Object autorelease]
-
-
-0x00000035078 __IncompleteProtocol : NSObject
-
-0x000000350c8 Protocol : NSObject
-  // instance methods
-  0x000000210d9 -[Protocol conformsTo:]
-  0x000000210e1 -[Protocol descriptionForInstanceMethod:]
-  0x00000021100 -[Protocol descriptionForClassMethod:]
-  0x0000002111c -[Protocol name]
-  0x0000002112d -[Protocol isEqual:]
-  0x000000211c2 -[Protocol hash]
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x000000210b9</span> <span class="o">-</span><span class="p">[</span><span class="n">Object</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000210be</span> <span class="o">-</span><span class="p">[</span><span class="n">Object</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000210c3</span> <span class="o">-</span><span class="p">[</span><span class="n">Object</span> <span class="n">autorelease</span><span class="p">]</span>
 
 
-0x00000035168 __NSUnrecognizedTaggedPointer : NSObject
-  // instance methods
-  0x00000022d0e -[__NSUnrecognizedTaggedPointer retain]
-  0x00000022d12 -[__NSUnrecognizedTaggedPointer release]
-  0x00000022d13 -[__NSUnrecognizedTaggedPointer autorelease]
+<span class="mi">0</span><span class="n">x00000035078</span> <span class="n">__IncompleteProtocol</span> <span class="p">:</span> <span class="n">NSObject</span>
+
+<span class="mi">0</span><span class="n">x000000350c8</span> <span class="n">Protocol</span> <span class="p">:</span> <span class="n">NSObject</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x000000210d9</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">conformsTo</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000210e1</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">descriptionForInstanceMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000021100</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">descriptionForClassMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000002111c</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">name</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000002112d</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">isEqual</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000211c2</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">hash</span><span class="p">]</span>
 
 
-0x00000035118 NSObject : &lt;ROOT&gt; &lt;NSObject&gt;
-  // instance variables
-  +0x00 # isa (0x8)
-
- @property (TQ,R) hash
- @property (T#,R) superclass
- @property (T@&#34;NSString&#34;,R,C) description
- @property (T@&#34;NSString&#34;,R,C) debugDescription
-
-  // class methods
-  0x00000007743 +[NSObject initialize]
-  0x00000008d94 +[NSObject self]
-  0x00000009b98 +[NSObject class]
-  0x0000000d4fc +[NSObject superclass]
-  0x00000013741 +[NSObject isMemberOfClass:]
-  0x0000000c967 +[NSObject isKindOfClass:]
-  0x0000000bd4e +[NSObject isSubclassOfClass:]
-  0x00000011328 +[NSObject isAncestorOfObject:]
-  0x00000010ca1 +[NSObject instancesRespondToSelector:]
-  0x0000000bbd1 +[NSObject respondsToSelector:]
-  0x0000000c999 +[NSObject conformsToProtocol:]
-  0x0000000c6b8 +[NSObject hash]
-  0x0000000c6bc +[NSObject isEqual:]
-  0x000000223d5 +[NSObject isFault]
-  0x000000223d8 +[NSObject isProxy]
-  0x0000000bceb +[NSObject instanceMethodForSelector:]
-  0x0000000f280 +[NSObject methodForSelector:]
-  0x0000000b284 +[NSObject resolveClassMethod:]
-  0x0000000acd7 +[NSObject resolveInstanceMethod:]
-  0x000000223ea +[NSObject doesNotRecognizeSelector:]
-  0x0000000e541 +[NSObject performSelector:]
-  0x00000012a15 +[NSObject performSelector:withObject:]
-  0x00000022428 +[NSObject performSelector:withObject:withObject:]
-  0x00000022470 +[NSObject instanceMethodSignatureForSelector:]
-  0x00000022482 +[NSObject methodSignatureForSelector:]
-  0x00000022494 +[NSObject forwardInvocation:]
-  0x000000224cf +[NSObject forwardingTargetForSelector:]
-  0x000000224d2 +[NSObject description]
-  0x000000224d5 +[NSObject debugDescription]
-  0x00000009802 +[NSObject new]
-  0x00000009c4e +[NSObject retain]
-  0x000000224e2 +[NSObject _tryRetain]
-  0x000000224e8 +[NSObject _isDeallocating]
-  0x0000001163b +[NSObject allowsWeakReference]
-  0x00000012761 +[NSObject retainWeakReference]
-  0x0000000bbf7 +[NSObject release]
-  0x0000000dd48 +[NSObject autorelease]
-  0x000000224ec +[NSObject retainCount]
-  0x00000008d54 +[NSObject alloc]
-  0x00000009599 +[NSObject allocWithZone:]
-  0x000000224fe +[NSObject init]
-  0x00000022502 +[NSObject dealloc]
-  0x0000000ff33 +[NSObject zone]
-  0x00000022508 +[NSObject copy]
-  0x0000000ff4c +[NSObject copyWithZone:]
-  0x00000022510 +[NSObject mutableCopy]
-  0x00000022514 +[NSObject mutableCopyWithZone:]
-
-  // instance methods
-  0x0000000ac6f -[NSObject self]
-  0x00000009d13 -[NSObject class]
-  0x00000011301 -[NSObject superclass]
-  0x0000000b258 -[NSObject isMemberOfClass:]
-  0x0000000a3df -[NSObject isKindOfClass:]
-  0x0000000ac75 -[NSObject respondsToSelector:]
-  0x0000000b2d1 -[NSObject conformsToProtocol:]
-  0x0000000a7bb -[NSObject hash]
-  0x00000009cef -[NSObject isEqual:]
-  0x00000012a68 -[NSObject isFault]
-  0x0000001131b -[NSObject isProxy]
-  0x0000000bc3e -[NSObject methodForSelector:]
-  0x00000022522 -[NSObject doesNotRecognizeSelector:]
-  0x0000000d6c9 -[NSObject performSelector:]
-  0x0000000da2d -[NSObject performSelector:withObject:]
-  0x0000000fd60 -[NSObject performSelector:withObject:withObject:]
-  0x00000022568 -[NSObject methodSignatureForSelector:]
-  0x0000002257a -[NSObject forwardInvocation:]
-  0x0000000c955 -[NSObject forwardingTargetForSelector:]
-  0x000000225b8 -[NSObject description]
-  0x000000225bb -[NSObject debugDescription]
-  0x00000007c98 -[NSObject retain]
-  0x00000010b7d -[NSObject _tryRetain]
-  0x0000000ec4b -[NSObject _isDeallocating]
-  0x0000000ec23 -[NSObject allowsWeakReference]
-  0x0000000ff3f -[NSObject retainWeakReference]
-  0x00000009b0c -[NSObject release]
-  0x00000009c61 -[NSObject autorelease]
-  0x00000010a96 -[NSObject retainCount]
-  0x000000095ab -[NSObject init]
-  0x00000007d3f -[NSObject dealloc]
-  0x000000225d4 -[NSObject finalize]
-  0x0000000b2c5 -[NSObject zone]
-  0x00000009cda -[NSObject copy]
-  0x00000009cf9 -[NSObject mutableCopy]
+<span class="mi">0</span><span class="n">x00000035168</span> <span class="n">__NSUnrecognizedTaggedPointer</span> <span class="p">:</span> <span class="n">NSObject</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x00000022d0e</span> <span class="o">-</span><span class="p">[</span><span class="n">__NSUnrecognizedTaggedPointer</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022d12</span> <span class="o">-</span><span class="p">[</span><span class="n">__NSUnrecognizedTaggedPointer</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022d13</span> <span class="o">-</span><span class="p">[</span><span class="n">__NSUnrecognizedTaggedPointer</span> <span class="n">autorelease</span><span class="p">]</span>
 
 
-0x00000035078 __IncompleteProtocol : NSObject
+<span class="mi">0</span><span class="n">x00000035118</span> <span class="n">NSObject</span> <span class="p">:</span> <span class="o">&lt;</span><span class="n">ROOT</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">NSObject</span><span class="o">&gt;</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="n">variables</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x00</span> # <span class="n">isa</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
 
-0x000000350c8 Protocol : NSObject
-  // instance methods
-  0x000000210d9 -[Protocol conformsTo:]
-  0x000000210e1 -[Protocol descriptionForInstanceMethod:]
-  0x00000021100 -[Protocol descriptionForClassMethod:]
-  0x0000002111c -[Protocol name]
-  0x0000002112d -[Protocol isEqual:]
-  0x000000211c2 -[Protocol hash]
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">TQ</span><span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">hash</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span>#<span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">superclass</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">NSString</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">C</span><span class="p">)</span> <span class="n">description</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">NSString</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">C</span><span class="p">)</span> <span class="n">debugDescription</span>
 
+  <span class="o">//</span> <span class="n">class</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x00000007743</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">initialize</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000008d94</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">self</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009b98</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">class</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000d4fc</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">superclass</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000013741</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isMemberOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c967</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isKindOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000bd4e</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isSubclassOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000011328</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isAncestorOfObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000010ca1</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">instancesRespondToSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000bbd1</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">respondsToSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c999</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">conformsToProtocol</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c6b8</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">hash</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000c6bc</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isEqual</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000223d5</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isFault</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000223d8</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isProxy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000bceb</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">instanceMethodForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000f280</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000b284</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">resolveClassMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000acd7</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">resolveInstanceMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000223ea</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">doesNotRecognizeSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000e541</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000012a15</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022428</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022470</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">instanceMethodSignatureForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022482</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodSignatureForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022494</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardInvocation</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000224cf</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardingTargetForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000224d2</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">description</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224d5</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">debugDescription</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009802</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">new</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009c4e</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224e2</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_tryRetain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224e8</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_isDeallocating</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000001163b</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">allowsWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000012761</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000bbf7</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000dd48</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">autorelease</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224ec</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainCount</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000008d54</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">alloc</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009599</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">allocWithZone</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000224fe</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">init</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022502</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">dealloc</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ff33</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">zone</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022508</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">copy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ff4c</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">copyWithZone</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022510</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">mutableCopy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022514</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">mutableCopyWithZone</span><span class="p">:]</span>
 
-0x00000035168 __NSUnrecognizedTaggedPointer : NSObject
-  // instance methods
-  0x00000022d0e -[__NSUnrecognizedTaggedPointer retain]
-  0x00000022d12 -[__NSUnrecognizedTaggedPointer release]
-  0x00000022d13 -[__NSUnrecognizedTaggedPointer autorelease]
-
-
-0x00000035118 NSObject : &lt;ROOT&gt; &lt;NSObject&gt;
-  // instance variables
-  +0x00 # isa (0x8)
-
- @property (TQ,R) hash
- @property (T#,R) superclass
- @property (T@&#34;NSString&#34;,R,C) description
- @property (T@&#34;NSString&#34;,R,C) debugDescription
-
-  // class methods
-  0x00000007743 +[NSObject initialize]
-  0x00000008d94 +[NSObject self]
-  0x00000009b98 +[NSObject class]
-  0x0000000d4fc +[NSObject superclass]
-  0x00000013741 +[NSObject isMemberOfClass:]
-  0x0000000c967 +[NSObject isKindOfClass:]
-  0x0000000bd4e +[NSObject isSubclassOfClass:]
-  0x00000011328 +[NSObject isAncestorOfObject:]
-  0x00000010ca1 +[NSObject instancesRespondToSelector:]
-  0x0000000bbd1 +[NSObject respondsToSelector:]
-  0x0000000c999 +[NSObject conformsToProtocol:]
-  0x0000000c6b8 +[NSObject hash]
-  0x0000000c6bc +[NSObject isEqual:]
-  0x000000223d5 +[NSObject isFault]
-  0x000000223d8 +[NSObject isProxy]
-  0x0000000bceb +[NSObject instanceMethodForSelector:]
-  0x0000000f280 +[NSObject methodForSelector:]
-  0x0000000b284 +[NSObject resolveClassMethod:]
-  0x0000000acd7 +[NSObject resolveInstanceMethod:]
-  0x000000223ea +[NSObject doesNotRecognizeSelector:]
-  0x0000000e541 +[NSObject performSelector:]
-  0x00000012a15 +[NSObject performSelector:withObject:]
-  0x00000022428 +[NSObject performSelector:withObject:withObject:]
-  0x00000022470 +[NSObject instanceMethodSignatureForSelector:]
-  0x00000022482 +[NSObject methodSignatureForSelector:]
-  0x00000022494 +[NSObject forwardInvocation:]
-  0x000000224cf +[NSObject forwardingTargetForSelector:]
-  0x000000224d2 +[NSObject description]
-  0x000000224d5 +[NSObject debugDescription]
-  0x00000009802 +[NSObject new]
-  0x00000009c4e +[NSObject retain]
-  0x000000224e2 +[NSObject _tryRetain]
-  0x000000224e8 +[NSObject _isDeallocating]
-  0x0000001163b +[NSObject allowsWeakReference]
-  0x00000012761 +[NSObject retainWeakReference]
-  0x0000000bbf7 +[NSObject release]
-  0x0000000dd48 +[NSObject autorelease]
-  0x000000224ec +[NSObject retainCount]
-  0x00000008d54 +[NSObject alloc]
-  0x00000009599 +[NSObject allocWithZone:]
-  0x000000224fe +[NSObject init]
-  0x00000022502 +[NSObject dealloc]
-  0x0000000ff33 +[NSObject zone]
-  0x00000022508 +[NSObject copy]
-  0x0000000ff4c +[NSObject copyWithZone:]
-  0x00000022510 +[NSObject mutableCopy]
-  0x00000022514 +[NSObject mutableCopyWithZone:]
-
-  // instance methods
-  0x0000000ac6f -[NSObject self]
-  0x00000009d13 -[NSObject class]
-  0x00000011301 -[NSObject superclass]
-  0x0000000b258 -[NSObject isMemberOfClass:]
-  0x0000000a3df -[NSObject isKindOfClass:]
-  0x0000000ac75 -[NSObject respondsToSelector:]
-  0x0000000b2d1 -[NSObject conformsToProtocol:]
-  0x0000000a7bb -[NSObject hash]
-  0x00000009cef -[NSObject isEqual:]
-  0x00000012a68 -[NSObject isFault]
-  0x0000001131b -[NSObject isProxy]
-  0x0000000bc3e -[NSObject methodForSelector:]
-  0x00000022522 -[NSObject doesNotRecognizeSelector:]
-  0x0000000d6c9 -[NSObject performSelector:]
-  0x0000000da2d -[NSObject performSelector:withObject:]
-  0x0000000fd60 -[NSObject performSelector:withObject:withObject:]
-  0x00000022568 -[NSObject methodSignatureForSelector:]
-  0x0000002257a -[NSObject forwardInvocation:]
-  0x0000000c955 -[NSObject forwardingTargetForSelector:]
-  0x000000225b8 -[NSObject description]
-  0x000000225bb -[NSObject debugDescription]
-  0x00000007c98 -[NSObject retain]
-  0x00000010b7d -[NSObject _tryRetain]
-  0x0000000ec4b -[NSObject _isDeallocating]
-  0x0000000ec23 -[NSObject allowsWeakReference]
-  0x0000000ff3f -[NSObject retainWeakReference]
-  0x00000009b0c -[NSObject release]
-  0x00000009c61 -[NSObject autorelease]
-  0x00000010a96 -[NSObject retainCount]
-  0x000000095ab -[NSObject init]
-  0x00000007d3f -[NSObject dealloc]
-  0x000000225d4 -[NSObject finalize]
-  0x0000000b2c5 -[NSObject zone]
-  0x00000009cda -[NSObject copy]
-  0x00000009cf9 -[NSObject mutableCopy]
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x0000000ac6f</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">self</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009d13</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">class</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000011301</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">superclass</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000b258</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isMemberOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000a3df</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isKindOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000ac75</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">respondsToSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000b2d1</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">conformsToProtocol</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000a7bb</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">hash</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009cef</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isEqual</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000012a68</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isFault</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000001131b</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isProxy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000bc3e</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022522</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">doesNotRecognizeSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000d6c9</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000da2d</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000fd60</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022568</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodSignatureForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000002257a</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardInvocation</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c955</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardingTargetForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000225b8</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">description</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000225bb</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">debugDescription</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000007c98</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000010b7d</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_tryRetain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ec4b</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_isDeallocating</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ec23</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">allowsWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ff3f</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009b0c</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009c61</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">autorelease</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000010a96</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainCount</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000095ab</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">init</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000007d3f</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">dealloc</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000225d4</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">finalize</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000b2c5</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">zone</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009cda</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">copy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009cf9</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">mutableCopy</span><span class="p">]</span>
 
 
-@selectors refs
-0x00000034e30 =&gt; 0x00000032b8f: load
-0x00000034eb0 =&gt; 0x00000032c55: retainCount
-0x00000034ef0 =&gt; 0x00000032e9b: dealloc
-0x00000034e80 =&gt; 0x00000032c19: alloc
-0x00000034ee0 =&gt; 0x00000032ccb: mutableCopyWithZone:
-0x00000034e28 =&gt; 0x00000032b75: initialize
-0x00000034e48 =&gt; 0x00000032bbc: new
-0x00000034e58 =&gt; 0x00000032bc5: class
-0x00000034ea0 =&gt; 0x00000032c3a: _tryRetain
-0x00000034ec8 =&gt; 0x00000032d87: description
-0x00000034ed0 =&gt; 0x00000032eaf: selector
-0x00000034e50 =&gt; 0x00000032bc0: self
-0x00000034e88 =&gt; 0x00000032c1f: allocWithZone:
-0x00000034e98 =&gt; 0x00000032c2e: autorelease
-0x00000034e68 =&gt; 0x00000032bda: respondsToSelector:
-0x00000034ec0 =&gt; 0x00000032e96: init
-0x00000034e38 =&gt; 0x00000032b94: allowsWeakReference
-0x00000034e70 =&gt; 0x00000032bee: resolveInstanceMethod:
-0x00000034ea8 =&gt; 0x00000032c45: _isDeallocating
-0x00000034e20 =&gt; 0x00000032b87: release
-0x00000034e78 =&gt; 0x00000032c05: resolveClassMethod:
-0x00000034eb8 =&gt; 0x00000032ce0: copy
-0x00000034ed8 =&gt; 0x00000032e0c: doesNotRecognizeSelector:
-0x00000034ee8 =&gt; 0x00000032cbd: copyWithZone:
-0x00000034e90 =&gt; 0x00000032b80: retain
-0x00000034e40 =&gt; 0x00000032ba8: retainWeakReference
-0x00000034e60 =&gt; 0x00000032bcb: isKindOfClass:
+<span class="mi">0</span><span class="n">x00000035078</span> <span class="n">__IncompleteProtocol</span> <span class="p">:</span> <span class="n">NSObject</span>
 
-@methods
-0x00000032d4a: isProxy
-0x00000032e4a: methodSignatureForSelector:
-0x00000032b80: retain
-0x00000032bcb: isKindOfClass:
-0x00000032c19: alloc
-0x00000032c2e: autorelease
-0x00000032caa: name
-0x00000032cb8: hash
-0x00000032c05: resolveClassMethod:
-0x00000032c3a: _tryRetain
-0x00000032ccb: mutableCopyWithZone:
-0x00000032da6: isAncestorOfObject:
-0x00000032dba: instancesRespondToSelector:
-0x00000032cbd: copyWithZone:
-0x00000032ce0: copy
-0x00000032e9b: dealloc
-0x00000032e26: instanceMethodSignatureForSelector:
-0x00000032e96: init
-0x00000032b75: initialize
-0x00000032b87: release
-0x00000032d23: performSelector:withObject:withObject:
-0x00000032cf6: performSelector:
-0x00000032dde: instanceMethodForSelector:
-0x00000032e66: forwardInvocation:
-0x00000032ba8: retainWeakReference
-0x00000032d77: zone
-0x00000032e0c: doesNotRecognizeSelector:
-0x00000032bc5: class
-0x00000032bda: respondsToSelector:
-0x00000032c61: isa
-0x00000032d63: conformsToProtocol:
-0x00000032c71: descriptionForInstanceMethod:
-0x00000032d7c: superclass
-0x00000032eaf: selector
-0x00000032eb8: finalize
-0x00000032e79: forwardingTargetForSelector:
-0x00000032b8f: load
-0x00000032c8f: descriptionForClassMethod:
-0x00000032d07: performSelector:withObject:
-0x00000032d87: description
-0x00000032dd6: isFault
-0x00000032c55: retainCount
-0x00000032bc0: self
-0x00000032c65: conformsTo:
-0x00000032ce5: debugDescription
-0x00000032c1f: allocWithZone:
-0x00000032d93: isSubclassOfClass:
-0x00000032b94: allowsWeakReference
-0x00000032bbc: new
-0x00000032c45: _isDeallocating
-0x00000032d52: isMemberOfClass:
-0x00000032df9: methodForSelector:
-0x00000032ea3: mutableCopy
-0x00000032bee: resolveInstanceMethod:
-0x00000032caf: isEqual:
+<span class="mi">0</span><span class="n">x000000350c8</span> <span class="n">Protocol</span> <span class="p">:</span> <span class="n">NSObject</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x000000210d9</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">conformsTo</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000210e1</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">descriptionForInstanceMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000021100</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">descriptionForClassMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000002111c</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">name</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000002112d</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">isEqual</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000211c2</span> <span class="o">-</span><span class="p">[</span><span class="n">Protocol</span> <span class="n">hash</span><span class="p">]</span>
+
+
+<span class="mi">0</span><span class="n">x00000035168</span> <span class="n">__NSUnrecognizedTaggedPointer</span> <span class="p">:</span> <span class="n">NSObject</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x00000022d0e</span> <span class="o">-</span><span class="p">[</span><span class="n">__NSUnrecognizedTaggedPointer</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022d12</span> <span class="o">-</span><span class="p">[</span><span class="n">__NSUnrecognizedTaggedPointer</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022d13</span> <span class="o">-</span><span class="p">[</span><span class="n">__NSUnrecognizedTaggedPointer</span> <span class="n">autorelease</span><span class="p">]</span>
+
+
+<span class="mi">0</span><span class="n">x00000035118</span> <span class="n">NSObject</span> <span class="p">:</span> <span class="o">&lt;</span><span class="n">ROOT</span><span class="o">&gt;</span> <span class="o">&lt;</span><span class="n">NSObject</span><span class="o">&gt;</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="n">variables</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x00</span> # <span class="n">isa</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
+
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">TQ</span><span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">hash</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span>#<span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">superclass</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">NSString</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">C</span><span class="p">)</span> <span class="n">description</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">NSString</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">,</span><span class="n">C</span><span class="p">)</span> <span class="n">debugDescription</span>
+
+  <span class="o">//</span> <span class="n">class</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x00000007743</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">initialize</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000008d94</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">self</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009b98</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">class</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000d4fc</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">superclass</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000013741</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isMemberOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c967</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isKindOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000bd4e</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isSubclassOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000011328</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isAncestorOfObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000010ca1</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">instancesRespondToSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000bbd1</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">respondsToSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c999</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">conformsToProtocol</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c6b8</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">hash</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000c6bc</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isEqual</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000223d5</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isFault</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000223d8</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isProxy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000bceb</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">instanceMethodForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000f280</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000b284</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">resolveClassMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000acd7</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">resolveInstanceMethod</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000223ea</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">doesNotRecognizeSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000e541</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000012a15</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022428</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022470</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">instanceMethodSignatureForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022482</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodSignatureForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022494</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardInvocation</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000224cf</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardingTargetForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000224d2</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">description</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224d5</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">debugDescription</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009802</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">new</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009c4e</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224e2</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_tryRetain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224e8</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_isDeallocating</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000001163b</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">allowsWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000012761</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000bbf7</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000dd48</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">autorelease</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000224ec</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainCount</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000008d54</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">alloc</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009599</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">allocWithZone</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000224fe</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">init</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022502</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">dealloc</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ff33</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">zone</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022508</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">copy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ff4c</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">copyWithZone</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022510</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">mutableCopy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000022514</span> <span class="o">+</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">mutableCopyWithZone</span><span class="p">:]</span>
+
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x0000000ac6f</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">self</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009d13</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">class</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000011301</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">superclass</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000b258</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isMemberOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000a3df</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isKindOfClass</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000ac75</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">respondsToSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000b2d1</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">conformsToProtocol</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000a7bb</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">hash</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009cef</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isEqual</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000012a68</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isFault</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000001131b</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">isProxy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000bc3e</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022522</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">doesNotRecognizeSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000d6c9</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000da2d</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000fd60</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span><span class="n">withObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00000022568</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">methodSignatureForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000002257a</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardInvocation</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0000000c955</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">forwardingTargetForSelector</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x000000225b8</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">description</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000225bb</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">debugDescription</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000007c98</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000010b7d</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_tryRetain</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ec4b</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">_isDeallocating</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ec23</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">allowsWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000ff3f</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainWeakReference</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009b0c</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">release</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009c61</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">autorelease</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000010a96</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">retainCount</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000095ab</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">init</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000007d3f</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">dealloc</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x000000225d4</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">finalize</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0000000b2c5</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">zone</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009cda</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">copy</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00000009cf9</span> <span class="o">-</span><span class="p">[</span><span class="n">NSObject</span> <span class="n">mutableCopy</span><span class="p">]</span>
+
+
+<span class="p">@</span><span class="n">selectors</span> <span class="n">refs</span>
+<span class="mi">0</span><span class="n">x00000034e30</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032b8f</span><span class="p">:</span> <span class="n">load</span>
+<span class="mi">0</span><span class="n">x00000034eb0</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032c55</span><span class="p">:</span> <span class="n">retainCount</span>
+<span class="mi">0</span><span class="n">x00000034ef0</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032e9b</span><span class="p">:</span> <span class="n">dealloc</span>
+<span class="mi">0</span><span class="n">x00000034e80</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032c19</span><span class="p">:</span> <span class="n">alloc</span>
+<span class="mi">0</span><span class="n">x00000034ee0</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032ccb</span><span class="p">:</span> <span class="n">mutableCopyWithZone</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000034e28</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032b75</span><span class="p">:</span> <span class="n">initialize</span>
+<span class="mi">0</span><span class="n">x00000034e48</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032bbc</span><span class="p">:</span> <span class="n">new</span>
+<span class="mi">0</span><span class="n">x00000034e58</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032bc5</span><span class="p">:</span> <span class="n">class</span>
+<span class="mi">0</span><span class="n">x00000034ea0</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032c3a</span><span class="p">:</span> <span class="n">_tryRetain</span>
+<span class="mi">0</span><span class="n">x00000034ec8</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032d87</span><span class="p">:</span> <span class="n">description</span>
+<span class="mi">0</span><span class="n">x00000034ed0</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032eaf</span><span class="p">:</span> <span class="n">selector</span>
+<span class="mi">0</span><span class="n">x00000034e50</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032bc0</span><span class="p">:</span> <span class="n">self</span>
+<span class="mi">0</span><span class="n">x00000034e88</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032c1f</span><span class="p">:</span> <span class="n">allocWithZone</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000034e98</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032c2e</span><span class="p">:</span> <span class="n">autorelease</span>
+<span class="mi">0</span><span class="n">x00000034e68</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032bda</span><span class="p">:</span> <span class="n">respondsToSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000034ec0</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032e96</span><span class="p">:</span> <span class="n">init</span>
+<span class="mi">0</span><span class="n">x00000034e38</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032b94</span><span class="p">:</span> <span class="n">allowsWeakReference</span>
+<span class="mi">0</span><span class="n">x00000034e70</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032bee</span><span class="p">:</span> <span class="n">resolveInstanceMethod</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000034ea8</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032c45</span><span class="p">:</span> <span class="n">_isDeallocating</span>
+<span class="mi">0</span><span class="n">x00000034e20</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032b87</span><span class="p">:</span> <span class="n">release</span>
+<span class="mi">0</span><span class="n">x00000034e78</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032c05</span><span class="p">:</span> <span class="n">resolveClassMethod</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000034eb8</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032ce0</span><span class="p">:</span> <span class="n">copy</span>
+<span class="mi">0</span><span class="n">x00000034ed8</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032e0c</span><span class="p">:</span> <span class="n">doesNotRecognizeSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000034ee8</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032cbd</span><span class="p">:</span> <span class="n">copyWithZone</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000034e90</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032b80</span><span class="p">:</span> <span class="n">retain</span>
+<span class="mi">0</span><span class="n">x00000034e40</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032ba8</span><span class="p">:</span> <span class="n">retainWeakReference</span>
+<span class="mi">0</span><span class="n">x00000034e60</span> <span class="p">=</span><span class="o">&gt;</span> <span class="mi">0</span><span class="n">x00000032bcb</span><span class="p">:</span> <span class="n">isKindOfClass</span><span class="p">:</span>
+
+<span class="p">@</span><span class="k">methods</span>
+<span class="mi">0</span><span class="n">x00000032d4a</span><span class="p">:</span> <span class="n">isProxy</span>
+<span class="mi">0</span><span class="n">x00000032e4a</span><span class="p">:</span> <span class="n">methodSignatureForSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032b80</span><span class="p">:</span> <span class="n">retain</span>
+<span class="mi">0</span><span class="n">x00000032bcb</span><span class="p">:</span> <span class="n">isKindOfClass</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032c19</span><span class="p">:</span> <span class="n">alloc</span>
+<span class="mi">0</span><span class="n">x00000032c2e</span><span class="p">:</span> <span class="n">autorelease</span>
+<span class="mi">0</span><span class="n">x00000032caa</span><span class="p">:</span> <span class="n">name</span>
+<span class="mi">0</span><span class="n">x00000032cb8</span><span class="p">:</span> <span class="n">hash</span>
+<span class="mi">0</span><span class="n">x00000032c05</span><span class="p">:</span> <span class="n">resolveClassMethod</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032c3a</span><span class="p">:</span> <span class="n">_tryRetain</span>
+<span class="mi">0</span><span class="n">x00000032ccb</span><span class="p">:</span> <span class="n">mutableCopyWithZone</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032da6</span><span class="p">:</span> <span class="n">isAncestorOfObject</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032dba</span><span class="p">:</span> <span class="n">instancesRespondToSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032cbd</span><span class="p">:</span> <span class="n">copyWithZone</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032ce0</span><span class="p">:</span> <span class="n">copy</span>
+<span class="mi">0</span><span class="n">x00000032e9b</span><span class="p">:</span> <span class="n">dealloc</span>
+<span class="mi">0</span><span class="n">x00000032e26</span><span class="p">:</span> <span class="n">instanceMethodSignatureForSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032e96</span><span class="p">:</span> <span class="n">init</span>
+<span class="mi">0</span><span class="n">x00000032b75</span><span class="p">:</span> <span class="n">initialize</span>
+<span class="mi">0</span><span class="n">x00000032b87</span><span class="p">:</span> <span class="n">release</span>
+<span class="mi">0</span><span class="n">x00000032d23</span><span class="p">:</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032cf6</span><span class="p">:</span> <span class="n">performSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032dde</span><span class="p">:</span> <span class="n">instanceMethodForSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032e66</span><span class="p">:</span> <span class="n">forwardInvocation</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032ba8</span><span class="p">:</span> <span class="n">retainWeakReference</span>
+<span class="mi">0</span><span class="n">x00000032d77</span><span class="p">:</span> <span class="n">zone</span>
+<span class="mi">0</span><span class="n">x00000032e0c</span><span class="p">:</span> <span class="n">doesNotRecognizeSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032bc5</span><span class="p">:</span> <span class="n">class</span>
+<span class="mi">0</span><span class="n">x00000032bda</span><span class="p">:</span> <span class="n">respondsToSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032c61</span><span class="p">:</span> <span class="n">isa</span>
+<span class="mi">0</span><span class="n">x00000032d63</span><span class="p">:</span> <span class="n">conformsToProtocol</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032c71</span><span class="p">:</span> <span class="n">descriptionForInstanceMethod</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032d7c</span><span class="p">:</span> <span class="n">superclass</span>
+<span class="mi">0</span><span class="n">x00000032eaf</span><span class="p">:</span> <span class="n">selector</span>
+<span class="mi">0</span><span class="n">x00000032eb8</span><span class="p">:</span> <span class="n">finalize</span>
+<span class="mi">0</span><span class="n">x00000032e79</span><span class="p">:</span> <span class="n">forwardingTargetForSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032b8f</span><span class="p">:</span> <span class="n">load</span>
+<span class="mi">0</span><span class="n">x00000032c8f</span><span class="p">:</span> <span class="n">descriptionForClassMethod</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032d07</span><span class="p">:</span> <span class="n">performSelector</span><span class="p">:</span><span class="n">withObject</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032d87</span><span class="p">:</span> <span class="n">description</span>
+<span class="mi">0</span><span class="n">x00000032dd6</span><span class="p">:</span> <span class="n">isFault</span>
+<span class="mi">0</span><span class="n">x00000032c55</span><span class="p">:</span> <span class="n">retainCount</span>
+<span class="mi">0</span><span class="n">x00000032bc0</span><span class="p">:</span> <span class="n">self</span>
+<span class="mi">0</span><span class="n">x00000032c65</span><span class="p">:</span> <span class="n">conformsTo</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032ce5</span><span class="p">:</span> <span class="n">debugDescription</span>
+<span class="mi">0</span><span class="n">x00000032c1f</span><span class="p">:</span> <span class="n">allocWithZone</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032d93</span><span class="p">:</span> <span class="n">isSubclassOfClass</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032b94</span><span class="p">:</span> <span class="n">allowsWeakReference</span>
+<span class="mi">0</span><span class="n">x00000032bbc</span><span class="p">:</span> <span class="n">new</span>
+<span class="mi">0</span><span class="n">x00000032c45</span><span class="p">:</span> <span class="n">_isDeallocating</span>
+<span class="mi">0</span><span class="n">x00000032d52</span><span class="p">:</span> <span class="n">isMemberOfClass</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032df9</span><span class="p">:</span> <span class="n">methodForSelector</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032ea3</span><span class="p">:</span> <span class="n">mutableCopy</span>
+<span class="mi">0</span><span class="n">x00000032bee</span><span class="p">:</span> <span class="n">resolveInstanceMethod</span><span class="p">:</span>
+<span class="mi">0</span><span class="n">x00000032caf</span><span class="p">:</span> <span class="n">isEqual</span><span class="p">:</span>
 </code></pre></div><h3 id="macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></h3>
 <p>Analyze FileSet entry MachO</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho MacBookAir10,1_J313AP_20B29/kernelcache.production --fileset-entry kernel
