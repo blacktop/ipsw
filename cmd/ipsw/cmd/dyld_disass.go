@@ -41,7 +41,7 @@ func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
 
 	// dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
-	// dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
+	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
 	// dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
@@ -54,7 +54,7 @@ func init() {
 var dyldDisassCmd = &cobra.Command{
 	Use:   "disass",
 	Short: "🚧 [WIP] Disassemble dyld_shared_cache symbol in an image",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var data []byte
@@ -65,7 +65,7 @@ var dyldDisassCmd = &cobra.Command{
 
 		imageName, _ := cmd.Flags().GetString("image")
 		instructions, _ := cmd.Flags().GetUint64("count")
-
+		startVMAddr, _ := cmd.Flags().GetUint64("vaddr")
 		// symbolName, _ := cmd.Flags().GetString("symbol")
 		// doDemangle, _ := cmd.Flags().GetBool("demangle")
 
@@ -147,11 +147,17 @@ var dyldDisassCmd = &cobra.Command{
 			a2sFile.Close()
 		}
 
-		if len(args) > 1 {
-			log.Info("Locating symbol: " + args[1])
-			symAddr, image, err := f.GetSymbolAddress(args[1], imageName)
-			if err != nil {
-				return err
+		if len(args) > 1 || startVMAddr > 0 {
+			var symAddr uint64
+			var image *dyld.CacheImage
+			if len(args) > 1 {
+				log.Info("Locating symbol: " + args[1])
+				symAddr, image, err = f.GetSymbolAddress(args[1], imageName)
+				if err != nil {
+					return err
+				}
+			} else {
+				symAddr = startVMAddr
 			}
 
 			off, _ := f.GetOffset(symAddr)
