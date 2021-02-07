@@ -438,7 +438,7 @@ $ ipsw dyld disass --image Foundation dyld_shared_cache _NSLog
    • Parsing MachO global offset table...
 ```
 
-> **NOTE:** You can speed up symbol lookups by supplying the `--image` flag
+> **NOTE:** You can speed up symbol lookups by supplying the `--image` flag or you can use the `--vaddr` flag
 
 ```s
 _NSLog:

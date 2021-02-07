@@ -48,7 +48,7 @@ Make it pretty 💄🐷 using [bat](https://github.com/sharkdp/bat)
 
 ```bash
 $ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed \
-   | bat -l s --tabs 0 -p --theme Nord
+   | bat -l s --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
 ```
 
 ```s
