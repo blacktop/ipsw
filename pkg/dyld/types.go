@@ -134,10 +134,24 @@ type CacheMappingInfo struct {
 type CacheMappingFlag uint64
 
 const (
+	DYLD_CACHE_MAPPING_NONE       CacheMappingFlag = 0
 	DYLD_CACHE_MAPPING_AUTH_DATA  CacheMappingFlag = 1
 	DYLD_CACHE_MAPPING_DIRTY_DATA CacheMappingFlag = 2
 	DYLD_CACHE_MAPPING_CONST_DATA CacheMappingFlag = 4
 )
+
+func (f CacheMappingFlag) IsNone() bool {
+	return f == DYLD_CACHE_MAPPING_NONE
+}
+func (f CacheMappingFlag) IsAuthData() bool {
+	return (f & DYLD_CACHE_MAPPING_AUTH_DATA) != 0
+}
+func (f CacheMappingFlag) IsDirtyData() bool {
+	return (f & DYLD_CACHE_MAPPING_DIRTY_DATA) != 0
+}
+func (f CacheMappingFlag) IsConstData() bool {
+	return (f & DYLD_CACHE_MAPPING_CONST_DATA) != 0
+}
 
 type CacheMappingAndSlideInfo struct {
 	Address         uint64

@@ -177,7 +177,6 @@ var dyldInfoCmd = &cobra.Command{
 		if showDylibs {
 			fmt.Println("Images")
 			fmt.Println("======")
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 			for idx, img := range f.Images {
 				if f.FormatVersion.IsDylibsExpectedOnDisk() {
 					m, err := macho.Open(img.Name)
@@ -189,23 +188,25 @@ var dyldInfoCmd = &cobra.Command{
 						if err != nil {
 							return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
 						}
-						fmt.Fprintf(w, "%4d:\t0x%0X\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
+						fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
 						fat.Close()
 						continue
 					}
-					fmt.Fprintf(w, "%4d:\t0x%0X\t(%s)\t%s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
+					fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
 					m.Close()
 				} else {
 					m, err := img.GetPartialMacho()
 					if err != nil {
 						return errors.Wrap(err, "failed to create MachO")
 					}
-					fmt.Fprintf(w, "%4d:\t0x%0X\t%s\t(%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
+					if Verbose {
+						fmt.Printf("%4d:  %#0X  %s  (%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
+					} else {
+						fmt.Printf("%4d:  %s  (%s)\n", idx+1, img.Name, m.DylibID().CurrentVersion)
+					}
 					m.Close()
 				}
-				// w.Flush()
 			}
-			w.Flush()
 		}
 		return nil
 	},

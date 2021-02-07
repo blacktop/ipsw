@@ -248,12 +248,19 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 				return nil, err
 			}
 			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: cxmInfo}
-			if cxmInfo.InitProt.Execute() {
+			if cxmInfo.MaxProt.Execute() {
 				cm.Name = "__TEXT"
-			} else if cxmInfo.InitProt.Write() && cm.Flags != 1 {
-				cm.Name = "__DATA"
-			} else if cxmInfo.InitProt.Write() && cm.Flags == 1 {
-				cm.Name = "__AUTH"
+			} else if cxmInfo.MaxProt.Write() {
+				if cm.Flags.IsAuthData() {
+					cm.Name = "__AUTH"
+				} else {
+					cm.Name = "__DATA"
+				}
+				if cm.Flags.IsDirtyData() {
+					cm.Name += "_DIRTY"
+				} else if cm.Flags.IsConstData() {
+					cm.Name += "_CONST"
+				}
 			} else if cxmInfo.InitProt.Read() {
 				cm.Name = "__LINKEDIT"
 			}
