@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -43,7 +44,12 @@ var dyldMachoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		showLoadCommands, _ := cmd.Flags().GetBool("loads")
 		showObjC, _ := cmd.Flags().GetBool("objc")
+		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
+		showFuncStarts, _ := cmd.Flags().GetBool("starts")
+
+		onlyFuncStarts := !showLoadCommands && !showObjC && showFuncStarts
 
 		dscPath := filepath.Clean(args[0])
 
@@ -78,18 +84,17 @@ var dyldMachoCmd = &cobra.Command{
 					return err
 				}
 
-				fmt.Println(m.FileTOC.String())
+				if showLoadCommands || !showObjC && !dumpSymbols {
+					fmt.Println(m.FileTOC.String())
+				}
 
 				if showObjC {
 					fmt.Println("Objective-C")
 					fmt.Println("===========")
 					if m.HasObjC() {
-						fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
-						fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
-
-						info, _ := m.GetObjCImageInfo()
-						fmt.Println(info.Flags)
-						fmt.Println(info.Flags.SwiftVersion())
+						if info, err := m.GetObjCImageInfo(); err == nil {
+							fmt.Println(info.Flags)
+						}
 
 						if protos, err := m.GetObjCProtocols(); err == nil {
 							for _, proto := range protos {
@@ -130,6 +135,54 @@ var dyldMachoCmd = &cobra.Command{
 					}
 					fmt.Println()
 				}
+
+				if showFuncStarts {
+					if !onlyFuncStarts {
+						fmt.Println("FUNCTION STARTS")
+						fmt.Println("===============")
+					}
+					if m.FunctionStarts() != nil {
+						for _, vaddr := range m.FunctionStartAddrs() {
+							fmt.Printf("0x%016X\n", vaddr)
+						}
+					}
+				}
+
+				if dumpSymbols {
+					fmt.Println("SYMBOLS")
+					fmt.Println("=======")
+					var sec string
+					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+					for _, sym := range m.Symtab.Syms {
+						if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+							sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+						}
+						fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+						// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+					}
+					w.Flush()
+					// Dedup these symbols (has repeats but also additional symbols??)
+					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
+						fmt.Printf("\nDyldExport SYMBOLS\n")
+						fmt.Println("------------------")
+						exports, err := m.DyldExports()
+						if err != nil {
+							return err
+						}
+						for _, export := range exports {
+							fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
+						}
+						w.Flush()
+					}
+					if cfstrs, err := m.GetCFStrings(); err == nil {
+						fmt.Printf("\nCFStrings\n")
+						fmt.Println("---------")
+						for _, cfstr := range cfstrs {
+							fmt.Printf("%#016x:  %#v\n", cfstr.Address, cfstr.Name)
+						}
+					}
+				}
+
 			} else {
 				log.Errorf("dylib %s not found in %s", args[1], dscPath)
 			}
@@ -145,12 +198,12 @@ func init() {
 	dyldCmd.AddCommand(dyldMachoCmd)
 
 	// dyldMachoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
-	// dyldMachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	dyldMachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
 	// dyldMachoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	// dyldMachoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	dyldMachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
-	// dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
-	// dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
+	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
+	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 
 	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
