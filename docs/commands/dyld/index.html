@@ -278,7 +278,7 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 </span><span class="se"></span>             blacktop/ipsw -V dyld extract iPhone11_2_12.4.1_16G102_Restore.ipsw
 </code></pre></div><h3 id="dyld-macho"><strong>dyld macho</strong></h3>
 <p>Parse a dyld_shared_cache dylib <em>(same as ipsw macho cmd)</em></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc <span class="p">|</span> bat -l m --tabs <span class="m">0</span> -p --theme Nord --wrap<span class="o">=</span>never --pager <span class="s2">&#34;less -S&#34;</span>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads <span class="p">|</span> bat -l m --tabs <span class="m">0</span> -p --theme Nord --wrap<span class="o">=</span>never --pager <span class="s2">&#34;less -S&#34;</span>
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
@@ -290,70 +290,70 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
         <span class="nv">sz</span><span class="o">=</span>0x00001af0 <span class="nv">off</span><span class="o">=</span>0x39308f68-0x3930aa58 <span class="nv">addr</span><span class="o">=</span>0x1b9308f68-0x1b930aa58            __TEXT.__auth_stubs             PureInstructions<span class="p">|</span>SomeInstructions <span class="o">(</span>SymbolStubs<span class="o">)</span>
         <span class="nv">sz</span><span class="o">=</span>0x00004524 <span class="nv">off</span><span class="o">=</span>0x3930aa58-0x3930ef7c <span class="nv">addr</span><span class="o">=</span>0x1b930aa58-0x1b930ef7c            __TEXT.__objc_methlist
 &lt;SNIP&gt;
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">&lt;SNIP&gt;
-0x001e39fc000 JSContext : NSObject {
-  // instance variables
-  +0x08 @&#34;JSVirtualMachine&#34; m_virtualMachine (0x8)
-  +0x10 ^{OpaqueJSContext=} m_context (0x8)
-  +0x18 {Strong&lt;JSC::JSObject, JSC::ShouldStrongDestructorGrabLock::No&gt;=&#34;m_slot&#34;^{JSValue}} m_exception (0x8)
-  +0x20 {WeakObjCPtr&lt;id&lt;JSModuleLoaderDelegate&gt; &gt;=&#34;m_weakReference&#34;@} m_moduleLoaderDelegate (0x8)
-  +0x28 @? _exceptionHandler (0x8)
-}
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-m" data-lang="m"><span class="o">&lt;</span><span class="n">SNIP</span><span class="o">&gt;</span>
+<span class="mi">0</span><span class="n">x001e39fc000</span> <span class="n">JSContext</span> <span class="p">:</span> <span class="n">NSObject</span> <span class="p">{</span>
+  <span class="o">//</span> <span class="n">instance</span> <span class="n">variables</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x08</span> <span class="p">@</span>&#34;<span class="n">JSVirtualMachine</span>&#34; <span class="n">m_virtualMachine</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x10</span> ^<span class="p">{</span><span class="n">OpaqueJSContext</span><span class="p">=}</span> <span class="n">m_context</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x18</span> <span class="p">{</span><span class="n">Strong</span><span class="o">&lt;</span><span class="n">JSC</span><span class="p">::</span><span class="n">JSObject</span><span class="p">,</span> <span class="n">JSC</span><span class="p">::</span><span class="n">ShouldStrongDestructorGrabLock</span><span class="p">::</span><span class="n">No</span><span class="o">&gt;</span><span class="p">=</span>&#34;<span class="n">m_slot</span>&#34;^<span class="p">{</span><span class="n">JSValue</span><span class="p">}}</span> <span class="n">m_exception</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x20</span> <span class="p">{</span><span class="n">WeakObjCPtr</span><span class="o">&lt;</span><span class="n">id</span><span class="o">&lt;</span><span class="n">JSModuleLoaderDelegate</span><span class="o">&gt;</span> <span class="o">&gt;</span><span class="p">=</span>&#34;<span class="n">m_weakReference</span>&#34;<span class="p">@}</span> <span class="n">m_moduleLoaderDelegate</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
+  <span class="o">+</span><span class="mi">0</span><span class="n">x28</span> <span class="p">@</span>? <span class="n">_exceptionHandler</span> <span class="p">(</span><span class="mi">0</span><span class="n">x8</span><span class="p">)</span>
+<span class="p">}</span>
 
- @property (T@&#34;JSValue&#34;,R) globalObject
- @property (T@&#34;JSValue&#34;,&amp;) exception
- @property (T@?,C,V_exceptionHandler) exceptionHandler
- @property (T@&#34;JSVirtualMachine&#34;,R) virtualMachine
- @property (T@&#34;NSString&#34;,C) name
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">JSValue</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">globalObject</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">JSValue</span>&#34;<span class="p">,</span><span class="o">&amp;</span><span class="p">)</span> <span class="n">exception</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>?<span class="p">,</span><span class="n">C</span><span class="p">,</span><span class="n">V_exceptionHandler</span><span class="p">)</span> <span class="n">exceptionHandler</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">JSVirtualMachine</span>&#34;<span class="p">,</span><span class="n">R</span><span class="p">)</span> <span class="n">virtualMachine</span>
+ <span class="p">@</span><span class="n">property</span> <span class="p">(</span><span class="n">T</span><span class="p">@</span>&#34;<span class="n">NSString</span>&#34;<span class="p">,</span><span class="n">C</span><span class="p">)</span> <span class="n">name</span>
 
-  // class methods
-  0x0018a04680c +[JSContext currentContext]
-  0x0018a046854 +[JSContext currentThis]
-  0x0018a0468e8 +[JSContext currentCallee]
-  0x00189e1b8d4 +[JSContext currentArguments]
-  0x00189e1b4f8 +[JSContext contextWithJSGlobalContextRef:]
+  <span class="o">//</span> <span class="n">class</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x0018a04680c</span> <span class="o">+</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">currentContext</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a046854</span> <span class="o">+</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">currentThis</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a0468e8</span> <span class="o">+</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">currentCallee</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1b8d4</span> <span class="o">+</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">currentArguments</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1b4f8</span> <span class="o">+</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">contextWithJSGlobalContextRef</span><span class="p">:]</span>
 
-  // instance methods
-  0x0018a046afc -[JSContext _setRemoteInspectionEnabled:]
-  0x0018a046b1c -[JSContext _debuggerRunLoop]
-  0x00189e19ce4 -[JSContext wrapperForJSObject:]
-  0x0018a046b08 -[JSContext _includesNativeCallStackWhenReportingExceptions]
-  0x00189e1c908 -[JSContext exception]
-  0x00189e1ba58 -[JSContext objectForKeyedSubscript:]
-  0x00189e19294 -[JSContext evaluateScript:withSourceURL:]
-  0x00189e1b588 -[JSContext globalObject]
-  0x0018a046b44 -[JSContext exceptionHandler]
-  0x0018a0469dc -[JSContext setName:]
-  0x00189e1bb28 -[JSContext setException:]
-  0x00189e19eb4 -[JSContext wrapperForObjCObject:]
-  0x0018a046984 -[JSContext virtualMachine]
-  0x0018a046470 -[JSContext dependencyIdentifiersForModuleJSScript:]
-  0x0018a046b30 -[JSContext moduleLoaderDelegate]
-  0x0018a046b50 -[JSContext setExceptionHandler:]
-  0x0018a046cf4 -[JSContext valueFromNotifyException:]
-  0x00189e1c940 -[JSContext setObject:forKeyedSubscript:]
-  0x00189e19b48 -[JSContext dealloc]
-  0x0018a046b10 -[JSContext _setIncludesNativeCallStackWhenReportingExceptions:]
-  0x0018a046b38 -[JSContext setModuleLoaderDelegate:]
-  0x00189e19a98 -[JSContext initWithVirtualMachine:]
-  0x0018a046d44 -[JSContext boolFromNotifyException:]
-  0x0018a046bb0 -[JSContext initWithGlobalContextRef:]
-  0x0018a04698c -[JSContext name]
-  0x0018a046d68 -[JSContext wrapperMap]
-  0x00189e1c298 -[JSContext beginCallbackWithData:calleeValue:thisValue:argumentCount:arguments:]
-  0x00189e1c208 -[JSContext ensureWrapperMap]
-  0x0018a046c78 -[JSContext notifyException:]
-  0x00189e1ba44 -[JSContext evaluateScript:]
-  0x00189e19c88 -[JSContext init]
-  0x00189e1c900 -[JSContext .cxx_construct]
-  0x0018a0461e8 -[JSContext evaluateJSScript:]
-  0x0018a046b24 -[JSContext _setDebuggerRunLoop:]
-  0x0018a046b58 -[JSContext .cxx_destruct]
-  0x0018a04679c -[JSContext _setITMLDebuggableType]
-  0x00189e1ba30 -[JSContext JSGlobalContextRef]
-  0x00189e1baa0 -[JSContext endCallbackWithData:]
-  0x0018a046af4 -[JSContext _remoteInspectionEnabled]
-&lt;SNIP&gt;
+  <span class="o">//</span> <span class="n">instance</span> <span class="k">methods</span>
+  <span class="mi">0</span><span class="n">x0018a046afc</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">_setRemoteInspectionEnabled</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046b1c</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">_debuggerRunLoop</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e19ce4</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">wrapperForJSObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046b08</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">_includesNativeCallStackWhenReportingExceptions</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1c908</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">exception</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1ba58</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">objectForKeyedSubscript</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e19294</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">evaluateScript</span><span class="p">:</span><span class="n">withSourceURL</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e1b588</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">globalObject</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a046b44</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">exceptionHandler</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a0469dc</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">setName</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e1bb28</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">setException</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e19eb4</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">wrapperForObjCObject</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046984</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">virtualMachine</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a046470</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">dependencyIdentifiersForModuleJSScript</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046b30</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">moduleLoaderDelegate</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a046b50</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">setExceptionHandler</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046cf4</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">valueFromNotifyException</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e1c940</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">setObject</span><span class="p">:</span><span class="n">forKeyedSubscript</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e19b48</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">dealloc</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a046b10</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">_setIncludesNativeCallStackWhenReportingExceptions</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046b38</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">setModuleLoaderDelegate</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e19a98</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">initWithVirtualMachine</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046d44</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">boolFromNotifyException</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046bb0</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">initWithGlobalContextRef</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a04698c</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">name</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a046d68</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">wrapperMap</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1c298</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">beginCallbackWithData</span><span class="p">:</span><span class="n">calleeValue</span><span class="p">:</span><span class="n">thisValue</span><span class="p">:</span><span class="n">argumentCount</span><span class="p">:</span><span class="n">arguments</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e1c208</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">ensureWrapperMap</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a046c78</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">notifyException</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e1ba44</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">evaluateScript</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x00189e19c88</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">init</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1c900</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="p">.</span><span class="n">cxx_construct</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a0461e8</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">evaluateJSScript</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046b24</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">_setDebuggerRunLoop</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046b58</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="p">.</span><span class="n">cxx_destruct</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x0018a04679c</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">_setITMLDebuggableType</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1ba30</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">JSGlobalContextRef</span><span class="p">]</span>
+  <span class="mi">0</span><span class="n">x00189e1baa0</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">endCallbackWithData</span><span class="p">:]</span>
+  <span class="mi">0</span><span class="n">x0018a046af4</span> <span class="o">-</span><span class="p">[</span><span class="n">JSContext</span> <span class="n">_remoteInspectionEnabled</span><span class="p">]</span>
+<span class="o">&lt;</span><span class="n">SNIP</span><span class="o">&gt;</span>
 </code></pre></div><h3 id="dyld-symaddr"><strong>dyld symaddr</strong></h3>
 <p>Find all instances of a symbol&rsquo;s <em>(unslid)</em> addresses in shared cache</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache &lt;SYMBOL_NAME&gt;
