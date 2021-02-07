@@ -113,7 +113,7 @@ $ docker run --init -it --rm \
 Parse a dyld_shared_cache dylib _(same as ipsw macho cmd)_
 
 ```bash
-$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc | bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
+$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads | bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -127,7 +127,7 @@ Flags         = NoUndefs, DyldLink, TwoLevel, NoReexportedDylibs, AppExtensionSa
 <SNIP>
 ```
 
-```mm
+```m
 <SNIP>
 0x001e39fc000 JSContext : NSObject {
   // instance variables
