@@ -12,12 +12,10 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 
 ### TODO
 
-- [x] use https://github.com/gocolly/colly
-- [x] parse plists for folder creation
+- [ ] Impliment a symbolicate for crashlogs by implimenting (`/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash`)
 - [ ] MachO read/write
 - [ ] pure Go dyld splitter
-- [x] pure Go lzfse
-- [x] OTA support
+- [ ] fix OTA support for iOS 14.x (dyld_shared_cache extraction broke)
 - [ ] APFS/HFS parsing to pull dyld without mounting
 - [ ] watch for new IPSW files with https://github.com/radovskyb/watcher
 - [ ] https://github.com/xerub/img4lib and https://github.com/tihmstar/img4tool
