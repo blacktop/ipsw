@@ -249,31 +249,46 @@ var machoCmd = &cobra.Command{
 			fmt.Println("Objective-C")
 			fmt.Println("===========")
 			if m.HasObjC() {
-				// fmt.Println("HasPlusLoadMethod: ", m.HasPlusLoadMethod())
-				// fmt.Printf("GetObjCInfo: %#v\n", m.GetObjCInfo())
-
-				// info, _ := m.GetObjCImageInfo()
-				// fmt.Println(info.Flags)
-				// fmt.Println(info.Flags.SwiftVersion())
+				if info, err := m.GetObjCImageInfo(); err == nil {
+					fmt.Println(info.Flags)
+				}
 
 				if protos, err := m.GetObjCProtocols(); err == nil {
 					for _, proto := range protos {
-						fmt.Println(proto.String())
+						if Verbose {
+							fmt.Println(proto.Verbose())
+						} else {
+							fmt.Println(proto.String())
+						}
 					}
 				}
 				if classes, err := m.GetObjCClasses(); err == nil {
 					for _, class := range classes {
-						fmt.Println(class.String())
+						if Verbose {
+							fmt.Println(class.Verbose())
+						} else {
+							fmt.Println(class.String())
+						}
 					}
+				} else {
+					log.Error(err.Error())
 				}
 				if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
 					for _, class := range nlclasses {
-						fmt.Println(class.String())
+						if Verbose {
+							fmt.Println(class.Verbose())
+						} else {
+							fmt.Println(class.String())
+						}
 					}
 				}
 				if cats, err := m.GetObjCCategories(); err == nil {
 					for _, cat := range cats {
-						fmt.Println(cat.String())
+						if Verbose {
+							fmt.Println(cat.Verbose())
+						} else {
+							fmt.Println(cat.String())
+						}
 					}
 				}
 				if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
