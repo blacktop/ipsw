@@ -182,6 +182,11 @@ type CacheImageInfo struct {
 	Pad            uint32
 }
 
+type slideInfo interface {
+	GetVersion() uint32
+	SlidePointer(uint64) uint64
+}
+
 // CacheSlideInfo is the dyld_cache_image_info struct
 // The rebasing info is to allow the kernel to lazily rebase DATA pages of the
 // dyld shared cache.  Rebasing is adding the slide to interior pointers.
@@ -196,16 +201,16 @@ type CacheSlideInfo struct {
 	// entrybitmap entries[entries_count];
 }
 
+func (i CacheSlideInfo) GetVersion() uint32 {
+	return i.Version
+}
+func (i CacheSlideInfo) SlidePointer(ptr uint64) uint64 {
+	return ptr // TODO: finish this
+}
+
 type CacheSlideInfoEntry struct {
 	bits [4096 / (8 * 4)]uint8 // 128-byte bitmap
 }
-
-const (
-	DYLD_CACHE_SLIDE_PAGE_ATTRS          = 0xC000 // high bits of uint16_t are flags
-	DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA     = 0x8000 // index is into extras array (not starts array)
-	DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE = 0x4000 // page has no rebasing
-	DYLD_CACHE_SLIDE_PAGE_ATTR_END       = 0x8000 // last chain entry for page
-)
 
 type CacheSlideInfo2 struct {
 	Version          uint32 // currently 2
@@ -220,7 +225,22 @@ type CacheSlideInfo2 struct {
 	//uint16_t    page_extras[page_extras_count];
 }
 
-const DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE = 0xFFFF // page has no rebasing
+func (i CacheSlideInfo2) GetVersion() uint32 {
+	return i.Version
+}
+func (i CacheSlideInfo2) SlidePointer(ptr uint64) uint64 {
+	if (ptr & ^i.DeltaMask) != 0 {
+		return (ptr & ^i.DeltaMask) + i.ValueAdd
+	}
+	return 0
+}
+
+const (
+	DYLD_CACHE_SLIDE_PAGE_ATTRS          = 0xC000 // high bits of uint16_t are flags
+	DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA     = 0x8000 // index is into extras array (not starts array)
+	DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE = 0x4000 // page has no rebasing
+	DYLD_CACHE_SLIDE_PAGE_ATTR_END       = 0x8000 // last chain entry for page
+)
 
 type CacheSlideInfo3 struct {
 	Version         uint32 // currently 3
@@ -231,25 +251,18 @@ type CacheSlideInfo3 struct {
 	// PageStarts      []uint16 /* len() = page_starts_count */
 }
 
-const (
-	DYLD_CACHE_SLIDE4_PAGE_NO_REBASE = 0xFFFF // page has no rebasing
-	DYLD_CACHE_SLIDE4_PAGE_INDEX     = 0x7FFF // mask of page_starts[] values
-	DYLD_CACHE_SLIDE4_PAGE_USE_EXTRA = 0x8000 // index is into extras array (not a chain start offset)
-	DYLD_CACHE_SLIDE4_PAGE_EXTRA_END = 0x8000 // last chain entry for page
-)
-
-type CacheSlideInfo4 struct {
-	Version          uint32 // currently 4
-	PageSize         uint32 // currently 4096 (may also be 16384)
-	PageStartsOffset uint32
-	PageStartsCount  uint32
-	PageExtrasOffset uint32
-	PageExtrasCount  uint32
-	DeltaMask        uint64 // which (contiguous) set of bits contains the delta to the next rebase location (0xC0000000)
-	ValueAdd         uint64 // base address of cache
-	//uint16_t    page_starts[page_starts_count];
-	//uint16_t    page_extras[page_extras_count];
+func (i CacheSlideInfo3) GetVersion() uint32 {
+	return i.Version
 }
+func (i CacheSlideInfo3) SlidePointer(ptr uint64) uint64 {
+	pointer := CacheSlidePointer3(ptr)
+	if pointer.Authenticated() {
+		return 0x180000000 + pointer.OffsetFromSharedCacheBase()
+	}
+	return pointer.SignExtend51()
+}
+
+const DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE = 0xFFFF // page has no rebasing
 
 // CacheSlidePointer3 struct
 // {
@@ -352,6 +365,43 @@ func (p CacheSlidePointer3) String() string {
 	}
 	return pStr
 }
+
+type CacheSlideInfo4 struct {
+	Version          uint32 // currently 4
+	PageSize         uint32 // currently 4096 (may also be 16384)
+	PageStartsOffset uint32
+	PageStartsCount  uint32
+	PageExtrasOffset uint32
+	PageExtrasCount  uint32
+	DeltaMask        uint64 // which (contiguous) set of bits contains the delta to the next rebase location (0xC0000000)
+	ValueAdd         uint64 // base address of cache
+	//uint16_t    page_starts[page_starts_count];
+	//uint16_t    page_extras[page_extras_count];
+}
+
+func (i CacheSlideInfo4) GetVersion() uint32 {
+	return i.Version
+}
+func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
+	value := ptr & ^i.DeltaMask
+
+	if (value & 0xFFFF8000) == 0 {
+		// small positive non-pointer, use as-is
+	} else if (value & 0x3FFF8000) == 0x3FFF8000 {
+		// small negative non-pointer
+		value |= 0xC0000000
+	} else {
+		value += i.ValueAdd
+	}
+	return value
+}
+
+const (
+	DYLD_CACHE_SLIDE4_PAGE_NO_REBASE = 0xFFFF // page has no rebasing
+	DYLD_CACHE_SLIDE4_PAGE_INDEX     = 0x7FFF // mask of page_starts[] values
+	DYLD_CACHE_SLIDE4_PAGE_USE_EXTRA = 0x8000 // index is into extras array (not a chain start offset)
+	DYLD_CACHE_SLIDE4_PAGE_EXTRA_END = 0x8000 // last chain entry for page
+)
 
 type CacheLocalSymbolsInfo struct {
 	NlistOffset   uint32 // offset into this chunk of nlist entries

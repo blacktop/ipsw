@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/dustin/go-humanize"
@@ -157,7 +156,7 @@ func (f *File) String() string {
 	var slideVersion uint32
 	var mappings string
 	if f.SlideInfo != nil {
-		slideVersion = reflect.ValueOf(f.SlideInfo).Field(0).Interface().(uint32)
+		slideVersion = f.SlideInfo.GetVersion()
 	} else {
 		slideVersion = 0
 	}
