@@ -53,7 +53,7 @@ type File struct {
 
 	Images cacheImages
 
-	SlideInfo       interface{}
+	SlideInfo       slideInfo
 	PatchInfo       CachePatchInfo
 	LocalSymInfo    localSymbolInfo
 	AcceleratorInfo CacheAcceleratorInfo
@@ -165,6 +165,50 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		f.Mappings = append(f.Mappings, cm)
 	}
 
+	/***********************
+	 * Read dyld slide info
+	 ***********************/
+	if f.SlideInfoOffsetUnused > 0 {
+		// if config.ParseSlideInfo {
+		// 	log.Debug("Parsing Slide Info...")
+		f.ParseSlideInfo(f.SlideInfoOffsetUnused, false)
+		// }
+	} else {
+		// Read NEW (in iOS 14) dyld mappings with slide info.
+		sr.Seek(int64(f.MappingWithSlideOffset), os.SEEK_SET)
+		for i := uint32(0); i != f.MappingWithSlideCount; i++ {
+			cxmInfo := CacheMappingAndSlideInfo{}
+			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
+				return nil, err
+			}
+			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: cxmInfo}
+			if cxmInfo.MaxProt.Execute() {
+				cm.Name = "__TEXT"
+			} else if cxmInfo.MaxProt.Write() {
+				if cm.Flags.IsAuthData() {
+					cm.Name = "__AUTH"
+				} else {
+					cm.Name = "__DATA"
+				}
+				if cm.Flags.IsDirtyData() {
+					cm.Name += "_DIRTY"
+				} else if cm.Flags.IsConstData() {
+					cm.Name += "_CONST"
+				}
+			} else if cxmInfo.InitProt.Read() {
+				cm.Name = "__LINKEDIT"
+			}
+
+			f.MappingsWithSlideInfo = append(f.MappingsWithSlideInfo, cm)
+			if cm.SlideInfoSize > 0 {
+				// if config.ParseSlideInfo {
+				// log.Debug("Parsing Slide Info...")
+				f.ParseSlideInfo(cm.SlideInfoOffset, false)
+				// }
+			}
+		}
+	}
+
 	// Read dyld images.
 	sr.Seek(int64(f.ImagesOffset), os.SEEK_SET)
 
@@ -174,10 +218,11 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 			return nil, err
 		}
 		f.Images = append(f.Images, &CacheImage{
-			Index:    i,
-			Info:     iinfo,
-			Mappings: f.Mappings,
-			sr:       sr,
+			Index:     i,
+			Info:      iinfo,
+			Mappings:  f.Mappings,
+			sr:        sr,
+			SlideInfo: f.SlideInfo,
 		})
 	}
 	for idx, image := range f.Images {
@@ -228,50 +273,6 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 				return nil, err
 			}
 			// f.Images[i].ReaderAt = io.NewSectionReader(r, int64(f.Images[i].DylibOffset), 1<<63-1)
-		}
-	}
-
-	/***********************
-	 * Read dyld slide info
-	 ***********************/
-	if f.SlideInfoOffsetUnused > 0 {
-		if config.ParseSlideInfo {
-			log.Debug("Parsing Slide Info...")
-			f.ParseSlideInfo(f.SlideInfoOffsetUnused, false)
-		}
-	} else {
-		// Read NEW (in iOS 14) dyld extended mappings.
-		sr.Seek(int64(f.MappingWithSlideOffset), os.SEEK_SET)
-		for i := uint32(0); i != f.MappingWithSlideCount; i++ {
-			cxmInfo := CacheMappingAndSlideInfo{}
-			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
-				return nil, err
-			}
-			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: cxmInfo}
-			if cxmInfo.MaxProt.Execute() {
-				cm.Name = "__TEXT"
-			} else if cxmInfo.MaxProt.Write() {
-				if cm.Flags.IsAuthData() {
-					cm.Name = "__AUTH"
-				} else {
-					cm.Name = "__DATA"
-				}
-				if cm.Flags.IsDirtyData() {
-					cm.Name += "_DIRTY"
-				} else if cm.Flags.IsConstData() {
-					cm.Name += "_CONST"
-				}
-			} else if cxmInfo.InitProt.Read() {
-				cm.Name = "__LINKEDIT"
-			}
-
-			f.MappingsWithSlideInfo = append(f.MappingsWithSlideInfo, cm)
-			if config.ParseSlideInfo {
-				if cm.SlideInfoSize > 0 {
-					log.Debug("Parsing Slide Info...")
-					f.ParseSlideInfo(cm.SlideInfoOffset, false)
-				}
-			}
 		}
 	}
 
@@ -513,13 +514,14 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 		// fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
 		// fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
 
-		PageStarts := make([]uint16, slideInfo.PageStartsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &PageStarts); err != nil {
-			return err
-		}
 		if dump {
 			var targetValue uint64
 			var pointer CacheSlidePointer3
+
+			PageStarts := make([]uint16, slideInfo.PageStartsCount)
+			if err := binary.Read(sr, binary.LittleEndian, &PageStarts); err != nil {
+				return err
+			}
 
 			for i, start := range PageStarts {
 				pageAddress := dataMapping.Address + uint64(uint32(i)*slideInfo.PageSize)

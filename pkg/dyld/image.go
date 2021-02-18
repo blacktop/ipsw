@@ -39,6 +39,7 @@ type CacheImage struct {
 	Initializer      uint64
 	DOFSectionAddr   uint64
 	DOFSectionSize   uint32
+	SlideInfo        slideInfo
 	RangeEntries     []rangeEntry
 	PatchableExports []patchableExport
 	ObjC             objcInfo
@@ -134,28 +135,29 @@ func (i *CacheImage) Open() io.ReadSeeker {
 // GetPartialMacho parses dyld image header as a partial MachO
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	return macho.NewFile(io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize)), macho.FileConfig{
-		LoadFilter: []types.LoadCmd{
-			types.LC_SEGMENT_64,
-			types.LC_DYLD_INFO,
-			types.LC_DYLD_INFO_ONLY,
-			types.LC_ID_DYLIB,
-			types.LC_SYMTAB,
-			types.LC_DYSYMTAB,
-			types.LC_UUID,
-			types.LC_BUILD_VERSION,
-			types.LC_SOURCE_VERSION,
-			types.LC_LOAD_DYLIB,
-			types.LC_FUNCTION_STARTS,
-			types.LC_DYLD_EXPORTS_TRIE},
+		// LoadFilter: []types.LoadCmd{
+		// 	types.LC_SEGMENT_64,
+		// 	types.LC_DYLD_INFO,
+		// 	types.LC_DYLD_INFO_ONLY,
+		// 	types.LC_ID_DYLIB,
+		// 	types.LC_SYMTAB,
+		// 	types.LC_DYSYMTAB,
+		// 	types.LC_UUID,
+		// 	types.LC_BUILD_VERSION,
+		// 	types.LC_SOURCE_VERSION,
+		// 	types.LC_SUB_FRAMEWORK,
+		// 	types.LC_SUB_CLIENT,
+		// 	types.LC_REEXPORT_DYLIB,
+		// 	types.LC_LOAD_DYLIB,
+		// 	types.LC_LOAD_WEAK_DYLIB,
+		// 	types.LC_LOAD_UPWARD_DYLIB,
+		// 	types.LC_FUNCTION_STARTS,
+		// 	types.LC_DYLD_EXPORTS_TRIE},
 		Offset:    int64(i.DylibOffset),
 		SrcReader: i.sr,
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
-				pointer := CacheSlidePointer3(addr)
-				if pointer.Authenticated() {
-					return 0x180000000 + pointer.OffsetFromSharedCacheBase()
-				}
-				return pointer.SignExtend51()
+				return i.SlideInfo.SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
 				for _, mapping := range i.Mappings {
