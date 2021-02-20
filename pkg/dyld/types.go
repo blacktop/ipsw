@@ -293,34 +293,39 @@ func (p CacheSlidePointer3) SignExtend51() uint64 {
 	return (top8Bits << 13) | (((uint64)(bottom43Bits<<21) >> 21) & 0x00FFFFFFFFFFFFFF)
 }
 
+// Raw returns the chained pointer's raw uint64 value
+func (p CacheSlidePointer3) Raw() uint64 {
+	return uint64(p)
+}
+
 // Value returns the chained pointer's value
 func (p CacheSlidePointer3) Value() uint64 {
-	return uint64(p & 0x7FFFFFFFFFFFF)
+	return types.ExtractBits(uint64(p), 0, 51)
 }
 
 // OffsetToNextPointer returns the offset to the next chained pointer
 func (p CacheSlidePointer3) OffsetToNextPointer() uint64 {
-	return uint64(p >> 51 & 0x7FF)
+	return types.ExtractBits(uint64(p), 51, 11)
 }
 
 // OffsetFromSharedCacheBase returns the chained pointer's offset from the base
 func (p CacheSlidePointer3) OffsetFromSharedCacheBase() uint64 {
-	return uint64(p & 0xFFFFFFFF)
+	return types.ExtractBits(uint64(p), 0, 32)
 }
 
 // DiversityData returns the chained pointer's diversity data
 func (p CacheSlidePointer3) DiversityData() uint64 {
-	return uint64(p >> 32 & 0xFFFF)
+	return types.ExtractBits(uint64(p), 32, 16)
 }
 
 // HasAddressDiversity returns if the chained pointer has address diversity
 func (p CacheSlidePointer3) HasAddressDiversity() bool {
-	return (p & 0x800000000000) != 0
+	return types.ExtractBits(uint64(p), 48, 1) != 0
 }
 
 // Key returns the chained pointer's key
 func (p CacheSlidePointer3) Key() uint64 {
-	return uint64(p >> 49 & 0x3)
+	return types.ExtractBits(uint64(p), 49, 2)
 }
 
 // KeyName returns the chained pointer's key name
@@ -333,14 +338,9 @@ func KeyName(keyVal uint64) string {
 	return name[key]
 }
 
-// IsBind returns if the chained pointer is bind
-func (p CacheSlidePointer3) IsBind() bool {
-	return (p & 0x4000000000000000) != 0
-}
-
 // Authenticated returns if the chained pointer is authenticated
 func (p CacheSlidePointer3) Authenticated() bool {
-	return (p & 0x8000000000000000) != 0
+	return types.ExtractBits(uint64(p), 63, 1) != 0
 }
 
 func (p CacheSlidePointer3) String() string {
