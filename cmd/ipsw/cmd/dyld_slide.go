@@ -36,6 +36,7 @@ import (
 
 func init() {
 	dyldCmd.AddCommand(slideCmd)
+	slideCmd.Flags().BoolP("auth", "a", false, "Print only slide info for mappings with auth flags")
 	slideCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -49,6 +50,8 @@ var slideCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		printAuthSlideInfo, _ := cmd.Flags().GetBool("auth")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -110,11 +113,20 @@ var slideCmd = &cobra.Command{
 		}
 
 		if f.SlideInfoOffsetUnused > 0 {
-			f.ParseSlideInfo(f.SlideInfoOffsetUnused, true)
+			f.ParseSlideInfo(dyld.CacheMappingAndSlideInfo{
+				Address:         f.Mappings[1].Address,
+				Size:            f.Mappings[1].Size,
+				FileOffset:      f.Mappings[1].FileOffset,
+				SlideInfoOffset: f.SlideInfoOffsetUnused,
+				SlideInfoSize:   f.SlideInfoSizeUnused,
+			}, false)
 		} else {
 			for _, extMapping := range f.MappingsWithSlideInfo {
+				if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
+					continue
+				}
 				if extMapping.SlideInfoSize > 0 {
-					f.ParseSlideInfo(extMapping.SlideInfoOffset, true)
+					f.ParseSlideInfo(extMapping.CacheMappingAndSlideInfo, true)
 				}
 			}
 		}

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/bits"
 	"os"
 	"path/filepath"
 	"strings"
@@ -169,10 +170,13 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	 * Read dyld slide info
 	 ***********************/
 	if f.SlideInfoOffsetUnused > 0 {
-		// if config.ParseSlideInfo {
-		// 	log.Debug("Parsing Slide Info...")
-		f.ParseSlideInfo(f.SlideInfoOffsetUnused, false)
-		// }
+		f.ParseSlideInfo(CacheMappingAndSlideInfo{
+			Address:         f.Mappings[1].Address,
+			Size:            f.Mappings[1].Size,
+			FileOffset:      f.Mappings[1].FileOffset,
+			SlideInfoOffset: f.SlideInfoOffsetUnused,
+			SlideInfoSize:   f.SlideInfoSizeUnused,
+		}, false)
 	} else {
 		// Read NEW (in iOS 14) dyld mappings with slide info.
 		sr.Seek(int64(f.MappingWithSlideOffset), os.SEEK_SET)
@@ -181,7 +185,9 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
 				return nil, err
 			}
-			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: cxmInfo}
+
+			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: cxmInfo, Name: "UNKNOWN"}
+
 			if cxmInfo.MaxProt.Execute() {
 				cm.Name = "__TEXT"
 			} else if cxmInfo.MaxProt.Write() {
@@ -199,13 +205,11 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 				cm.Name = "__LINKEDIT"
 			}
 
-			f.MappingsWithSlideInfo = append(f.MappingsWithSlideInfo, cm)
 			if cm.SlideInfoSize > 0 {
-				// if config.ParseSlideInfo {
-				// log.Debug("Parsing Slide Info...")
-				f.ParseSlideInfo(cm.SlideInfoOffset, false)
-				// }
+				f.ParseSlideInfo(cm.CacheMappingAndSlideInfo, false)
 			}
+
+			f.MappingsWithSlideInfo = append(f.MappingsWithSlideInfo, cm)
 		}
 	}
 
@@ -473,22 +477,16 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 }
 
 // ParseSlideInfo parses dyld slide info
-func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
+func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	// textMapping := f.Mappings[0]
-	dataMapping := f.Mappings[1]
-	// linkEditMapping := f.Mappings[2]
-
-	// file.Seek(int64((f.SlideInfoOffset-linkEditMapping.FileOffset)+(linkEditMapping.Address-textMapping.Address)), os.SEEK_SET)
-
-	sr.Seek(int64(slideInfoOffset), os.SEEK_SET)
+	sr.Seek(int64(mapping.SlideInfoOffset), os.SEEK_SET)
 
 	slideInfoVersionData := make([]byte, 4)
 	sr.Read(slideInfoVersionData)
 	slideInfoVersion := binary.LittleEndian.Uint32(slideInfoVersionData)
 
-	sr.Seek(int64(slideInfoOffset), os.SEEK_SET)
+	sr.Seek(int64(mapping.SlideInfoOffset), os.SEEK_SET)
 
 	switch slideInfoVersion {
 	case 1:
@@ -496,13 +494,116 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
 			return err
 		}
+
 		f.SlideInfo = slideInfo
+
+		if dump {
+			fmt.Printf("slide info version = %d\n", slideInfo.Version)
+			fmt.Printf("toc_count          = %d\n", slideInfo.TocCount)
+			fmt.Printf("data page count    = %d\n", mapping.Size/4096)
+
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.EntriesOffset)), os.SEEK_SET)
+			entries := make([]CacheSlideInfoEntry, int(slideInfo.EntriesCount))
+			if err := binary.Read(sr, binary.LittleEndian, &entries); err != nil {
+				return err
+			}
+
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.TocOffset)), os.SEEK_SET)
+			tocs := make([]uint16, int(slideInfo.TocCount))
+			if err := binary.Read(sr, binary.LittleEndian, &tocs); err != nil {
+				return err
+			}
+
+			for i, toc := range tocs {
+				fmt.Printf("%#08x: [% 5d,% 5d] ", int(mapping.Address)+i*4096, i, tocs[i])
+				for j := 0; i < int(slideInfo.EntriesSize); i++ {
+					fmt.Printf("%02x", entries[toc].bits[j])
+				}
+				fmt.Printf("\n")
+			}
+		}
 	case 2:
 		slideInfo := CacheSlideInfo2{}
 		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
 			return err
 		}
+
 		f.SlideInfo = slideInfo
+
+		if dump {
+			fmt.Printf("slide info version = %d\n", slideInfo.Version)
+			fmt.Printf("page_size          = %d\n", slideInfo.PageSize)
+			fmt.Printf("delta_mask         = %#016x\n", slideInfo.DeltaMask)
+			fmt.Printf("value_add          = %#016x\n", slideInfo.ValueAdd)
+			fmt.Printf("page_starts_count  = %d\n", slideInfo.PageStartsCount)
+			fmt.Printf("page_extras_count  = %d\n", slideInfo.PageExtrasCount)
+
+			var targetValue uint64
+			var pointer uint64
+
+			starts := make([]uint16, slideInfo.PageStartsCount)
+			if err := binary.Read(sr, binary.LittleEndian, &starts); err != nil {
+				return err
+			}
+
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), os.SEEK_SET)
+			extras := make([]uint16, int(slideInfo.PageExtrasCount))
+			if err := binary.Read(sr, binary.LittleEndian, &extras); err != nil {
+				return err
+			}
+
+			for i, start := range starts {
+				// pageAddress := mapping.Address + uint64(uint32(i)*slideInfo.PageSize)
+				pageOffset := mapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
+				rebaseChain := func(pageContent uint64, startOffset uint16) error {
+					deltaShift := uint64(bits.TrailingZeros64(slideInfo.DeltaMask) - 2)
+					pageOffset := uint32(startOffset)
+					delta := uint32(1)
+					for delta != 0 {
+						sr.Seek(int64(pageContent+uint64(pageOffset)), os.SEEK_SET)
+						if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
+							return err
+						}
+
+						delta = uint32(pointer & slideInfo.DeltaMask >> deltaShift)
+						targetValue = slideInfo.SlidePointer(pointer)
+
+						var symName string
+						sym, ok := f.AddressToSymbol[targetValue]
+						if !ok {
+							symName = "?"
+						} else {
+							symName = sym
+						}
+
+						fmt.Printf("    [% 5d + %#04x]: %#016x = %#016x, sym: %s\n", i, pageOffset, pointer, targetValue, symName)
+						pageOffset += delta
+					}
+
+					return nil
+				}
+
+				if start == DYLD_CACHE_SLIDE_PAGE_ATTR_NO_REBASE {
+					fmt.Printf("page[% 5d]: no rebasing\n", i)
+				} else if start&DYLD_CACHE_SLIDE_PAGE_ATTR_EXTRA != 0 {
+					fmt.Printf("page[% 5d]: ", i)
+					j := start & 0x3FFF
+					done := false
+					for !done {
+						aStart := extras[j]
+						fmt.Printf("start=%#04x ", aStart&0x3FFF)
+						pageStartOffset := (aStart & 0x3FFF) * 4
+						rebaseChain(pageOffset, pageStartOffset)
+						done = (extras[j] & DYLD_CACHE_SLIDE_PAGE_ATTR_END) != 0
+						j++
+					}
+					fmt.Printf("\n")
+				} else {
+					fmt.Printf("page[% 5d]: start=0x%04X\n", i, starts[i])
+					rebaseChain(pageOffset, start*4)
+				}
+			}
+		}
 	case 3:
 		slideInfo := CacheSlideInfo3{}
 		if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
@@ -510,11 +611,12 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 		}
 		f.SlideInfo = slideInfo
 
-		// fmt.Printf("page_size         =%d\n", slideInfo.PageSize)
-		// fmt.Printf("page_starts_count =%d\n", slideInfo.PageStartsCount)
-		// fmt.Printf("auth_value_add    =0x%016X\n", slideInfo.AuthValueAdd)
-
 		if dump {
+			fmt.Printf("slide info version = %d\n", slideInfo.Version)
+			fmt.Printf("page_size          = %d\n", slideInfo.PageSize)
+			fmt.Printf("page_starts_count  = %d\n", slideInfo.PageStartsCount)
+			fmt.Printf("auth_value_add     = %#016x\n", slideInfo.AuthValueAdd)
+
 			var targetValue uint64
 			var pointer CacheSlidePointer3
 
@@ -524,16 +626,19 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 			}
 
 			for i, start := range PageStarts {
-				pageAddress := dataMapping.Address + uint64(uint32(i)*slideInfo.PageSize)
-				pageOffset := dataMapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
+				pageAddress := mapping.Address + uint64(uint32(i)*slideInfo.PageSize)
+				pageOffset := mapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
 
-				if start == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE {
+				delta := uint64(start)
+
+				if delta == DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE {
 					fmt.Printf("page[% 5d]: no rebasing\n", i)
 					continue
 				}
 
+				fmt.Printf("page[% 5d]: start=0x%04X\n", i, delta)
+
 				rebaseLocation := pageOffset
-				delta := uint64(start)
 
 				for {
 					rebaseLocation += delta
@@ -544,9 +649,10 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 					}
 
 					if pointer.Authenticated() {
-						targetValue = f.CacheHeader.SharedRegionStart + pointer.OffsetFromSharedCacheBase()
-						// targetValue = slideInfo.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
+						// fmt.Println(fixupchains.DyldChainedPtrArm64eAuthBind{Pointer: pointer.Raw()}.String())
+						targetValue = slideInfo.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
 					} else {
+						// fmt.Println(fixupchains.DyldChainedPtrArm64eRebase{Pointer: pointer.Raw()}.String())
 						targetValue = pointer.SignExtend51()
 					}
 
@@ -563,6 +669,7 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 					if pointer.OffsetToNextPointer() == 0 {
 						break
 					}
+
 					delta += pointer.OffsetToNextPointer() * 8
 				}
 			}
@@ -572,7 +679,82 @@ func (f *File) ParseSlideInfo(slideInfoOffset uint64, dump bool) error {
 		if err := binary.Read(sr, f.ByteOrder, &slideInfo); err != nil {
 			return err
 		}
+
 		f.SlideInfo = slideInfo
+
+		if dump {
+			fmt.Printf("slide info version = %d\n", slideInfo.Version)
+			fmt.Printf("page_size          = %d\n", slideInfo.PageSize)
+			fmt.Printf("delta_mask         = %#016x\n", slideInfo.DeltaMask)
+			fmt.Printf("value_add          = %#016x\n", slideInfo.ValueAdd)
+			fmt.Printf("page_starts_count  = %d\n", slideInfo.PageStartsCount)
+			fmt.Printf("page_extras_count  = %d\n", slideInfo.PageExtrasCount)
+
+			var targetValue uint64
+			var pointer uint32
+
+			starts := make([]uint16, slideInfo.PageStartsCount)
+			if err := binary.Read(sr, binary.LittleEndian, &starts); err != nil {
+				return err
+			}
+
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), os.SEEK_SET)
+			extras := make([]uint16, int(slideInfo.PageExtrasCount))
+			if err := binary.Read(sr, binary.LittleEndian, &extras); err != nil {
+				return err
+			}
+
+			for i, start := range starts {
+				pageOffset := mapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
+				rebaseChainV4 := func(pageContent uint64, startOffset uint16) error {
+					deltaShift := uint64(bits.TrailingZeros64(slideInfo.DeltaMask) - 2)
+					pageOffset := uint32(startOffset)
+					delta := uint32(1)
+					for delta != 0 {
+						sr.Seek(int64(pageContent+uint64(pageOffset)), os.SEEK_SET)
+						if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
+							return err
+						}
+
+						delta = uint32(uint64(pointer) & slideInfo.DeltaMask >> deltaShift)
+						targetValue = slideInfo.SlidePointer(uint64(pointer))
+
+						var symName string
+						sym, ok := f.AddressToSymbol[targetValue]
+						if !ok {
+							symName = "?"
+						} else {
+							symName = sym
+						}
+
+						fmt.Printf("    [% 5d + %#04x]: %#08x = %#08x, sym: %s\n", i, pageOffset, pointer, targetValue, symName)
+						pageOffset += delta
+					}
+
+					return nil
+				}
+				if start == DYLD_CACHE_SLIDE4_PAGE_NO_REBASE {
+					fmt.Printf("page[% 5d]: no rebasing\n", i)
+				} else if start&DYLD_CACHE_SLIDE4_PAGE_USE_EXTRA != 0 {
+					fmt.Printf("page[% 5d]: ", i)
+					j := (start & DYLD_CACHE_SLIDE4_PAGE_INDEX)
+					done := false
+					for !done {
+						aStart := extras[j]
+						fmt.Printf("start=0x%04X ", aStart&DYLD_CACHE_SLIDE4_PAGE_INDEX)
+						pageStartOffset := (aStart & DYLD_CACHE_SLIDE4_PAGE_INDEX) * 4
+						rebaseChainV4(pageOffset, pageStartOffset)
+						done = (extras[j] & DYLD_CACHE_SLIDE4_PAGE_EXTRA_END) != 0
+						j++
+					}
+					fmt.Printf("\n")
+				} else {
+					fmt.Printf("page[% 5d]: start=0x%04X\n", i, starts[i])
+					rebaseChainV4(pageOffset, start*4)
+				}
+			}
+		}
+
 	default:
 		log.Errorf("got unexpected dyld slide info version: %d", slideInfoVersion)
 	}
