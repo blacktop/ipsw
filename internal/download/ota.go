@@ -13,10 +13,10 @@ import (
 )
 
 const (
-	iOS13OtaDevBetaURL    = "https://mesu.apple.com/assets/iOS13DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
-	iOS13OtaPublicBetaURL = "https://mesu.apple.com/assets/iOS13PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
-	iOS14OtaDevBetaURL    = "https://mesu.apple.com/assets/iOS14DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
-	iOS14OtaPublicBetaURL = "https://mesu.apple.com/assets/iOS14PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+	iOS13OtaDevBetaURL = "https://mesu.apple.com/assets/iOS13DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+	iOS13OtaPublicURL  = "https://mesu.apple.com/assets/iOS13PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+	iOS14OtaDevBetaURL = "https://mesu.apple.com/assets/iOS14DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+	iOS14OtaPublicURL  = "https://mesu.apple.com/assets/iOS14PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 )
 
 type OtaAsset struct {
@@ -45,11 +45,20 @@ type Ota struct {
 }
 
 // NewOTA downloads and parses the itumes plist for iOS13 or iOS14 developer beta OTAs
-func NewOTA(proxy string, insecure, ios13 bool) (*Ota, error) {
+func NewOTA(proxy string, insecure, ios13, public bool) (*Ota, error) {
 
-	url := iOS14OtaDevBetaURL
-	if ios13 {
-		url = iOS13OtaDevBetaURL
+	var url string
+
+	if public {
+		url = iOS14OtaPublicURL
+		if ios13 {
+			url = iOS13OtaPublicURL
+		}
+	} else {
+		url = iOS14OtaDevBetaURL
+		if ios13 {
+			url = iOS13OtaDevBetaURL
+		}
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
