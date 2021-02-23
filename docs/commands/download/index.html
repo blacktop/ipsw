@@ -330,8 +330,7 @@ iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
 </code></pre></div><p>Download <strong>iOS13.x beta</strong> OTA <em>(over the air updates)</em></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download ota --ios13 --device iPhone12,3
 </code></pre></div><p>Just download the <em>kernelcache</em> and <em>dyld_shared_cache</em></p>
-<p>⚠️ <strong>NOTE:</strong> this broke in iOS 14 <em>(the format has changed again)</em></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download ota --ios13 --device iPod9,1 --kernel --dyld
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download ota --device iPod9,1 --kernel --dyld
 ? You are about to download <span class="m">1</span> ipsw files. Continue? Yes
    • Parsing remote OTA        <span class="nv">build</span><span class="o">=</span>17F5054h <span class="nv">device</span><span class="o">=</span>iPod9,1 <span class="nv">version</span><span class="o">=</span>iOS135DevBeta3
    • Extracting remote dyld_shared_cache <span class="o">(</span>can be a bit CPU intensive<span class="o">)</span>
