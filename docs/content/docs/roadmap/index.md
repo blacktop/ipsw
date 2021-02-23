@@ -6,17 +6,18 @@ weight: 200
 summary: Future features.
 ---
 
-I'd eventually like to get to a 1-to-1 feature match with `jtool2`.
+I'd like to get to a 1-to-1 feature match with `jtool2` _(VERY close now)_
 
 My main goal is to create a mantainable _dyld_shared_cache_ splitter
 
 ### TODO
 
+- [ ] Add vaddr lookup to dyld cmd _(just add more detail to a2s)_
 - [ ] Impliment a symbolicate for crashlogs by implimenting (`/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash`)
 - [ ] MachO read/write
 - [ ] pure Go dyld splitter
-- [ ] fix OTA support for iOS 14.x (dyld_shared_cache extraction broke)
 - [ ] APFS/HFS parsing to pull dyld without mounting
+- [ ] (jtool) -K Kextract™ a kernel extension by its bundle ID
 - [ ] watch for new IPSW files with https://github.com/radovskyb/watcher
 - [ ] https://github.com/xerub/img4lib and https://github.com/tihmstar/img4tool
 - [ ] devicetree read/write
