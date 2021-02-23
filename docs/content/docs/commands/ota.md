@@ -44,8 +44,6 @@ $ ipsw ota OTA.zip | head
 
 See if `dyld` is in the OTA files
 
-### ⚠️ This broke in iOS 14
-
 ```bash
 $ ipsw ota OTA.zip | grep dyld
    • Listing files...
@@ -53,7 +51,7 @@ $ ipsw ota OTA.zip | grep dyld
 -rwxr-xr-x 2020-02-15T02:24:08-05:00 721 kB usr/lib/"dyld"
 ```
 
-#### Extract file(s) from RAM disk
+#### Extract file(s) from OTA payloads
 
 ```bash
 $ ipsw ota OTA.zip dyld_shared_cache

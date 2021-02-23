@@ -205,10 +205,8 @@ $ ipsw download ota --ios13 --device iPhone12,3
 
 Just download the _kernelcache_ and _dyld_shared_cache_
 
-⚠️ **NOTE:** this broke in iOS 14 _(the format has changed again)_
-
 ```bash
-$ ipsw download ota --ios13 --device iPod9,1 --kernel --dyld
+$ ipsw download ota --device iPod9,1 --kernel --dyld
 ? You are about to download 1 ipsw files. Continue? Yes
    • Parsing remote OTA        build=17F5054h device=iPod9,1 version=iOS135DevBeta3
    • Extracting remote dyld_shared_cache (can be a bit CPU intensive)

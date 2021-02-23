@@ -41,6 +41,7 @@ func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
 	otaDLCmd.Flags().BoolP("ios13", "", false, "Download iOS 13.x OTAs (defaults to iOS14)")
+	otaDLCmd.Flags().BoolP("isBeta", "", false, "Download Public (non-beta) OTAs")
 	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
@@ -66,17 +67,12 @@ var otaDLCmd = &cobra.Command{
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
 		ios13, _ := cmd.Flags().GetBool("ios13")
+		public, _ := cmd.Flags().GetBool("isBeta")
 
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
-		if remoteDyld && !ios13 {
-			// if (remoteDyld || remoteKernel) && !ios13 {
-			log.Fatal("--dyld currently not supported on iOS14.x")
-			// log.Fatal("--kernel OR --dyld currently not supported on iOS14.x")
-		}
-
-		otaXML, err := download.NewOTA(proxy, insecure, ios13)
+		otaXML, err := download.NewOTA(proxy, insecure, ios13, public)
 		if err != nil {
 			return errors.Wrap(err, "failed to create itunes API")
 		}
@@ -101,7 +97,7 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		if cont {
-			if (remoteDyld || remoteKernel) && ios13 {
+			if remoteDyld || remoteKernel {
 				for _, o := range otas {
 					log.WithFields(log.Fields{
 						"device":  o.SupportedDevices[0],
@@ -121,28 +117,6 @@ var otaDLCmd = &cobra.Command{
 						if err != nil {
 							return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
 						}
-					}
-					if remoteKernel {
-						log.Info("Extracting remote kernelcache")
-						err = kernelcache.RemoteParse(zr)
-						if err != nil {
-							return errors.Wrap(err, "failed to download kernelcache from remote ota")
-						}
-					}
-				}
-			} else if remoteKernel && !ios13 {
-				for _, o := range otas {
-					log.WithFields(log.Fields{
-						"device":  o.SupportedDevices[0],
-						"build":   o.Build,
-						"version": o.DocumentationID,
-					}).Info("Parsing remote OTA")
-					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
-					if err != nil {
-						return errors.Wrap(err, "failed to open remote zip to OTA")
 					}
 					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
