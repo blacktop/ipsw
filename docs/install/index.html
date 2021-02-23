@@ -191,10 +191,16 @@
 <p>Download from <a href="https://github.com/blacktop/ipsw/releases/latest">releases</a></p>
 <hr>
 <h2 id="linuxdocker">linux/docker</h2>
+<h3 id="via-linux-homebrewhttpsbrewsh">Via Linux <a href="https://brew.sh">homebrew</a></h3>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ brew install blacktop/tap/ipsw
+</code></pre></div><h3 id="via-dockerhttpswwwdockercom">Via <a href="https://www.docker.com">docker</a></h3>
 <p><a href="https://hub.docker.com/r/blacktop/ipsw/"><img src="https://img.shields.io/docker/stars/blacktop/ipsw.svg" alt="Docker Stars"></a> <a href="https://hub.docker.com/r/blacktop/ipsw/"><img src="https://img.shields.io/docker/pulls/blacktop/ipsw.svg" alt="Docker Pulls"></a> <a href="https://hub.docker.com/r/blacktop/ipsw/"><img src="https://img.shields.io/badge/docker%20image-114MB-blue.svg" alt="Docker Image"></a></p>
 <p>Download docker image</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ docker pull blacktop/ipsw
-</code></pre></div><p>Create <code>alias</code> to use like a binary</p>
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> the docker image also includes <a href="https://github.com/sgan81/apfs-fuse">apfs-fuse</a> which allows you to extract <code>dyld_shared_caches</code> from the APFS dmgs in the ipsw(s).</p>
+</blockquote>
+<p>Create <code>alias</code> to use like a binary</p>
 <div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">$ alias ipsw=&#39;docker run -it --rm -v $(pwd):/data blacktop/ipsw&#39;
 </code></pre></div>
 </div>
