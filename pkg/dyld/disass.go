@@ -52,7 +52,7 @@ func (f *File) FunctionSize(funcs []types.Function, addr uint64) int64 {
 func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shoudDemangle bool) (bool, string) {
 	if f.FunctionSize(funcs, addr) != 0 {
 		if symName, ok := f.AddressToSymbol[addr]; ok {
-			if shoudDemangle {
+			if shouldDemangle {
 				return ok, demangle.Do(symName)
 			}
 			return ok, symName
@@ -63,9 +63,9 @@ func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shoudDemangl
 }
 
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
-func (f *File) FindSymbol(addr uint64, shoudDemangle bool) string {
+func (f *File) FindSymbol(addr uint64, shouldDemangle bool) string {
 	if symName, ok := f.AddressToSymbol[addr]; ok {
-		if shoudDemangle {
+		if shouldDemangle {
 			return demangle.Do(symName)
 		}
 		return symName
