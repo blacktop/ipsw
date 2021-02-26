@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"io/ioutil"
 	"net/http"
-	"strings"
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -93,22 +92,62 @@ func NewOTA(proxy string, insecure, ios13, public bool) (*Ota, error) {
 	return &ota, nil
 }
 
+func uniqueOTAs(otas []OtaAsset) []OtaAsset {
+	unique := make(map[string]bool, len(otas))
+	os := make([]OtaAsset, len(unique))
+	for _, elem := range otas {
+		if len(elem.BaseURL) != 0 {
+			if !unique[elem.BaseURL] {
+				os = append(os, elem)
+				unique[elem.BaseURL] = true
+			}
+		}
+	}
+
+	return os
+}
+
+func filterOTADevices(otas []OtaAsset) []OtaAsset {
+	var devices []string
+	var filteredOtas []OtaAsset
+
+	for _, ota := range otas {
+		devices = append(devices, ota.SupportedDevices...)
+	}
+	devices = utils.Unique(devices)
+
+	for _, device := range devices {
+		var devOTA OtaAsset
+		for _, ota := range otas {
+			if utils.StrSliceContains(ota.SupportedDevices, device) {
+				if devOTA.SupportedDevices == nil {
+					devOTA = ota
+				} else {
+					if ota.DownloadSize > devOTA.DownloadSize {
+						devOTA = ota
+					}
+				}
+			}
+		}
+		filteredOtas = append(filteredOtas, devOTA)
+	}
+
+	return uniqueOTAs(filteredOtas)
+}
+
 // GetOTAs returns a filtered list of OTA assets
 func (o *Ota) GetOTAs(device string, doDownload, doNotDownload []string) []OtaAsset {
 
 	var otas []OtaAsset
 	var filteredOtas []OtaAsset
 
-	for _, asset := range o.Assets {
-		if len(asset.ReleaseType) == 0 {
-			if len(device) > 0 {
-				if strings.EqualFold(device, asset.SupportedDevices[0]) {
-					otas = append(otas, asset)
-				}
-			} else {
-				otas = append(otas, asset)
+	for _, ota := range uniqueOTAs(o.Assets) {
+		if len(device) > 0 {
+			if utils.StrSliceContains(ota.SupportedDevices, device) {
+				otas = append(otas, ota)
 			}
-
+		} else {
+			otas = append(otas, ota)
 		}
 	}
 
@@ -125,6 +164,8 @@ func (o *Ota) GetOTAs(device string, doDownload, doNotDownload []string) []OtaAs
 			filteredOtas = append(filteredOtas, o)
 		}
 	}
+
+	filteredOtas = filterOTADevices(filteredOtas)
 
 	return filteredOtas
 }

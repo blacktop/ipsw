@@ -41,8 +41,8 @@ func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
 	otaDLCmd.Flags().BoolP("ios13", "", false, "Download iOS 13.x OTAs (defaults to iOS14)")
-	otaDLCmd.Flags().BoolP("isBeta", "", false, "Download Public (non-beta) OTAs")
-	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
+	otaDLCmd.Flags().BoolP("public", "p", false, "Download Public (non-beta) OTAs")
+	otaDLCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache from remote OTA zip")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
 
@@ -67,7 +67,7 @@ var otaDLCmd = &cobra.Command{
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
 		ios13, _ := cmd.Flags().GetBool("ios13")
-		public, _ := cmd.Flags().GetBool("isBeta")
+		public, _ := cmd.Flags().GetBool("public")
 
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
@@ -100,7 +100,7 @@ var otaDLCmd = &cobra.Command{
 			if remoteDyld || remoteKernel {
 				for _, o := range otas {
 					log.WithFields(log.Fields{
-						"device":  o.SupportedDevices[0],
+						"device":  strings.Join(o.SupportedDevices, " "),
 						"build":   o.Build,
 						"version": o.DocumentationID,
 					}).Info("Parsing remote OTA")
@@ -133,7 +133,7 @@ var otaDLCmd = &cobra.Command{
 					destName := strings.Replace(path.Base(url), ",", "_", -1)
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						log.WithFields(log.Fields{
-							"device":  o.SupportedDevices[0],
+							"device":  strings.Join(o.SupportedDevices, " "),
 							"build":   o.Build,
 							"version": o.DocumentationID,
 						}).Info("Getting OTA")
