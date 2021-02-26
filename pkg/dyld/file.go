@@ -785,6 +785,23 @@ func (f *File) GetImageContainingTextAddr(addr uint64) (*CacheImage, error) {
 	return nil, fmt.Errorf("address not in any dylib __TEXT")
 }
 
+// GetImageContainingVMAddr returns a dylib whose segment contains a given virtual address
+func (f *File) GetImageContainingVMAddr(addr uint64) (*CacheImage, error) {
+	for _, img := range f.Images {
+		m, err := img.GetPartialMacho()
+		if err != nil {
+			return nil, err
+		}
+		for _, seg := range m.Segments() {
+			if seg.Addr <= addr && addr < seg.Addr+seg.Memsz {
+				return img, nil
+			}
+		}
+		m.Close()
+	}
+	return nil, fmt.Errorf("address not in any dylib __TEXT")
+}
+
 // HasImagePath returns the index of a given image path
 func (f *File) HasImagePath(path string) (int, bool, error) {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)

@@ -116,6 +116,34 @@ func (mappings cacheMappings) String() string {
 	return tableString.String()
 }
 
+func (mapping CacheMappingWithSlideInfo) String() string {
+	tableString := &strings.Builder{}
+
+	mdata := [][]string{}
+
+	mdata = append(mdata, []string{
+		mapping.Name,
+		mapping.InitProt.String(),
+		mapping.MaxProt.String(),
+		fmt.Sprintf("%d MB", mapping.Size/(1024*1024)),
+		// humanize.Bytes(mapping.Size),
+		fmt.Sprintf("%#08x -> %#08x", mapping.Address, mapping.Address+mapping.Size),
+		fmt.Sprintf("%#08x -> %#08x", mapping.FileOffset, mapping.FileOffset+mapping.Size),
+		fmt.Sprintf("%#08x -> %#08x", mapping.SlideInfoOffset, mapping.SlideInfoOffset+mapping.SlideInfoSize),
+		fmt.Sprintf("%d", mapping.Flags),
+	})
+
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Seg", "InitProt", "MaxProt", "Size", "Address", "File Offset", "Slide Info Offset", "Flags"})
+	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+	table.SetCenterSeparator("|")
+	table.AppendBulk(mdata)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.Render()
+
+	return tableString.String()
+}
+
 func (mappings cacheMappingsWithSlideInfo) String() string {
 	tableString := &strings.Builder{}
 
