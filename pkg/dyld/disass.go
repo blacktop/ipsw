@@ -49,7 +49,7 @@ func (f *File) FunctionSize(funcs []types.Function, addr uint64) int64 {
 }
 
 // IsFunctionStart checks if address is at a function start and returns symbol name
-func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shoudDemangle bool) (bool, string) {
+func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shouldDemangle bool) (bool, string) {
 	if f.FunctionSize(funcs, addr) != 0 {
 		if symName, ok := f.AddressToSymbol[addr]; ok {
 			if shouldDemangle {
