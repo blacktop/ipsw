@@ -63,9 +63,12 @@ var a2sCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		var unslidAddr uint64 = addr
 		if slide > 0 {
-			addr = addr - slide
+			unslidAddr = addr - slide
 		}
+
 		dscPath := filepath.Clean(args[0])
 
 		fileInfo, err := os.Lstat(dscPath)
@@ -94,7 +97,7 @@ var a2sCmd = &cobra.Command{
 
 		if showMapping {
 			for _, mapping := range f.MappingsWithSlideInfo {
-				if mapping.Address <= addr && addr < mapping.Address+mapping.Size {
+				if mapping.Address <= unslidAddr && unslidAddr < mapping.Address+mapping.Size {
 					fmt.Printf("\nMAPPING")
 					fmt.Println("=======")
 					fmt.Println(mapping.String())
@@ -103,7 +106,7 @@ var a2sCmd = &cobra.Command{
 			}
 		}
 
-		image, err := f.GetImageContainingVMAddr(addr)
+		image, err := f.GetImageContainingVMAddr(unslidAddr)
 		if err != nil {
 			return err
 		}
@@ -118,10 +121,10 @@ var a2sCmd = &cobra.Command{
 			fmt.Println("IMAGE")
 			fmt.Println("-----")
 			fmt.Printf(" > %s\n\n", image.Name)
-			if s := m.FindSegmentForVMAddr(addr); s != nil {
+			if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
 				fmt.Println(s)
 				if s.Nsect > 0 {
-					if c := m.FindSectionForVMAddr(addr); c != nil {
+					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
 						secFlags := ""
 						if !c.Flags.IsRegular() {
 							secFlags = fmt.Sprintf("(%s)", c.Flags)
@@ -132,9 +135,9 @@ var a2sCmd = &cobra.Command{
 			}
 			fmt.Println()
 		} else {
-			if s := m.FindSegmentForVMAddr(addr); s != nil {
+			if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
 				if s.Nsect > 0 {
-					if c := m.FindSectionForVMAddr(addr); c != nil {
+					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
 						log.WithFields(log.Fields{
 							"dylib":   image.Name,
 							"section": fmt.Sprintf("%s.%s", s.Name, c.Name),
@@ -207,6 +210,7 @@ var a2sCmd = &cobra.Command{
 		// 	a2sFile.Close()
 		// }
 
+		// TODO: add objc methods in the -[Class sel:] form
 		if m.HasObjC() {
 			log.Debug("Parsing ObjC runtime structures...")
 			err = f.CFStringsForImage(image.Name)
@@ -243,14 +247,14 @@ var a2sCmd = &cobra.Command{
 			return errors.Wrapf(err, "failed to parse GOT")
 		}
 
-		if symName, ok := f.AddressToSymbol[addr]; ok {
+		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 			fmt.Printf("\n%#x: %s\n", addr, symName)
 			return nil
 		}
 
-		if fn, err := m.GetFunctionForVMAddr(addr); err == nil {
+		if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
 			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-				fmt.Printf("\n%#x: %s + %d\n", addr, symName, addr-fn.StartAddr)
+				fmt.Printf("\n%#x: %s + %d\n", addr, symName, unslidAddr-fn.StartAddr)
 				return nil
 			}
 		}
