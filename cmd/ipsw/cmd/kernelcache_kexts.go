@@ -37,7 +37,7 @@ func init() {
 
 // kextsCmd represents the kexts command
 var kextsCmd = &cobra.Command{
-	Use:   "kexts",
+	Use:   "kexts <kernelcache>",
 	Short: "List kernel extentions",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

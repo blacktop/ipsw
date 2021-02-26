@@ -27,7 +27,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
-	"sort"
 	"strings"
 
 	"github.com/apex/log"
@@ -56,19 +55,6 @@ func init() {
 	disCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
 	disCmd.Flags().StringVarP(&symbolMapFile, "companion", "c", "", "Companion symbol map file")
 	disCmd.MarkZshCompPositionalArgumentFile(1)
-}
-
-func getFunctionSize(m *macho.File, addr uint64) int64 {
-	if m.FunctionStarts() != nil {
-		starts := m.FunctionStartAddrs()
-		i := sort.Search(len(starts), func(i int) bool { return starts[i] >= addr })
-		if i+1 == len(starts) && starts[i] == addr {
-			return -1
-		} else if i < len(starts) && starts[i] == addr {
-			return int64(starts[i+1] - addr)
-		}
-	}
-	return 0
 }
 
 func getData(m *macho.File, startAddress *uint64, instructionCount uint64) ([]byte, error) {
@@ -118,12 +104,11 @@ func getData(m *macho.File, startAddress *uint64, instructionCount uint64) ([]by
 					}
 				} else {
 					if m.FunctionStarts() != nil && *startAddress > 0 {
-						funcSize := getFunctionSize(m, *startAddress)
-						if funcSize != 0 {
-							if funcSize == -1 { // last function in starts, size is start to end of section
+						if fn, err := m.GetFunctionForVMAddr(*startAddress); err != nil {
+							if fn.EndAddr == 0 {
 								dataSize = sec.Size - fileOffset
 							} else {
-								dataSize = uint64(funcSize)
+								dataSize = uint64(fn.EndAddr - fn.StartAddr)
 							}
 						} else {
 							dataSize = sec.Size - fileOffset // not a function start (disassemble from start address to end of section)
@@ -186,12 +171,14 @@ func lookupSymbol(m *macho.File, addr uint64) string {
 
 func isFunctionStart(m *macho.File, addr uint64) {
 	if m.FunctionStarts() != nil {
-		if getFunctionSize(m, addr) != 0 {
-			symName := lookupSymbol(m, addr)
-			if len(symName) > 0 {
-				fmt.Printf("\n%s:\n", symName)
-			} else {
-				fmt.Printf("\nfunc_%x:\n", addr)
+		if fn, err := m.GetFunctionForVMAddr(addr); err != nil {
+			if addr == fn.StartAddr {
+				symName := lookupSymbol(m, addr)
+				if len(symName) > 0 {
+					fmt.Printf("\n%s:\n", symName)
+				} else {
+					fmt.Printf("\nfunc_%x:\n", addr)
+				}
 			}
 		}
 	}
@@ -356,7 +343,7 @@ func pad(length int) string {
 
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
-	Use:   "disass",
+	Use:   "disass [options] <MACHO>",
 	Short: "🚧 [WIP] Disassemble ARM binaries at address or symbol",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

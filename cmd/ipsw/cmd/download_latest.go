@@ -41,7 +41,7 @@ func init() {
 
 // latestCmd represents the latest command
 var latestCmd = &cobra.Command{
-	Use:   "latest",
+	Use:   "latest [options]",
 	Short: "Download latest release version",
 	RunE: func(cmd *cobra.Command, args []string) error {
 

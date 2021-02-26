@@ -42,8 +42,8 @@ func init() {
 
 // patternCmd represents the pattern command
 var patternCmd = &cobra.Command{
-	Use:   "pattern",
-	Short: "Download files that contain pattern",
+	Use:   "pattern <PATTERN>",
+	Short: "Download files that contain file name part",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/demangle"
 )
 
@@ -37,19 +38,19 @@ func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, 
 	return 0, nil, fmt.Errorf("failed to find symbol %s", symbol)
 }
 
-func (f *File) FunctionSize(starts []uint64, addr uint64) int64 {
-	i := sort.Search(len(starts), func(i int) bool { return starts[i] >= addr })
-	if i+1 == len(starts) && starts[i] == addr {
+func (f *File) FunctionSize(funcs []types.Function, addr uint64) int64 {
+	i := sort.Search(len(funcs), func(i int) bool { return funcs[i].StartAddr >= addr })
+	if i+1 == len(funcs) && funcs[i].StartAddr == addr {
 		return -1
-	} else if i < len(starts) && starts[i] == addr {
-		return int64(starts[i+1] - addr)
+	} else if i < len(funcs) && funcs[i].StartAddr == addr {
+		return int64(funcs[i+1].StartAddr - addr)
 	}
 	return 0
 }
 
 // IsFunctionStart checks if address is at a function start and returns symbol name
-func (f *File) IsFunctionStart(starts []uint64, addr uint64, shoudDemangle bool) (bool, string) {
-	if f.FunctionSize(starts, addr) != 0 {
+func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shoudDemangle bool) (bool, string) {
+	if f.FunctionSize(funcs, addr) != 0 {
 		if symName, ok := f.AddressToSymbol[addr]; ok {
 			if shoudDemangle {
 				return ok, demangle.Do(symName)

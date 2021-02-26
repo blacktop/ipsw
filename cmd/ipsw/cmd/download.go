@@ -143,7 +143,7 @@ func getDestName(url string, removeCommas bool) string {
 
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
-	Use:   "download",
+	Use:   "download [options]",
 	Short: "Download and parse IPSW(s) from the internets",
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -35,7 +35,7 @@ import (
 
 // dyldMachoCmd represents the macho command
 var dyldMachoCmd = &cobra.Command{
-	Use:   "macho <dyld_shared_cache> <dylib>",
+	Use:   "macho [options] <dyld_shared_cache> <dylib>",
 	Short: "Parse a dylib file",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -158,8 +158,12 @@ var dyldMachoCmd = &cobra.Command{
 						fmt.Println("===============")
 					}
 					if m.FunctionStarts() != nil {
-						for _, vaddr := range m.FunctionStartAddrs() {
-							fmt.Printf("0x%016X\n", vaddr)
+						for _, fn := range m.GetFunctions() {
+							if Verbose {
+								fmt.Printf("%#016x-%#016x\n", fn.StartAddr, fn.EndAddr)
+							} else {
+								fmt.Printf("0x%016X\n", fn.StartAddr)
+							}
 						}
 					}
 				}
