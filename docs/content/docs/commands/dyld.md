@@ -218,19 +218,20 @@ $ ipsw dyld symaddr dyld_shared_cache
 
 ### **dyld a2s**
 
-Lookup what symbol is at a given _unslid_ address _(in hex)_
+Lookup what symbol is at a given _unslid_ or _slid_ address _(in hex)_
 
 ```bash
-$ ipsw dyld a2s dyld_shared_cache 0x190a7221c
-   • parsing public symbols...
-   • parsing private symbols...
-0x190a7221c: _xmlCtxtGetLastError
+$ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
+
+   • Address location          dylib=/usr/lib/libobjc.A.dylib section=__TEXT.__text
+
+0x19538e1e0: _objc_msgSend + 32
 ```
 
 This will also create a cached version of the lookup hash table so the next time you lookup it will be much faster
 
 ```bash
-$ time dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c
+$ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
    • parsing public symbols...
    • parsing private symbols...
 0x190a7221c: _xmlCtxtGetLastError
