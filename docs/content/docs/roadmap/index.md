@@ -12,7 +12,6 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 
 ### TODO
 
-- [ ] Add vaddr lookup to dyld cmd _(just add more detail to a2s)_
 - [ ] Impliment a symbolicate for crashlogs by implimenting (`/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash`)
 - [ ] MachO read/write
 - [ ] pure Go dyld splitter
