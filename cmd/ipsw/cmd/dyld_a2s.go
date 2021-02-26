@@ -22,11 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"compress/gzip"
-	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -37,12 +36,17 @@ import (
 
 func init() {
 	dyldCmd.AddCommand(a2sCmd)
+
+	a2sCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
+	otaDLCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
+	otaDLCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
+
 	a2sCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // a2sCmd represents the a2s command
 var a2sCmd = &cobra.Command{
-	Use:   "a2s",
+	Use:   "a2s [options] <dyld_shared_cache> <vaddr>",
 	Short: "Lookup symbol at unslid address",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -51,11 +55,17 @@ var a2sCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		slide, _ := cmd.Flags().GetUint64("slide")
+		showImage, _ := cmd.Flags().GetBool("image")
+		showMapping, _ := cmd.Flags().GetBool("mapping")
+
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
 			return err
 		}
-
+		if slide > 0 {
+			addr = addr - slide
+		}
 		dscPath := filepath.Clean(args[0])
 
 		fileInfo, err := os.Lstat(dscPath)
@@ -82,45 +92,170 @@ var a2sCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-			log.Warn("parsing public symbols...")
-			err = f.GetAllExportedSymbols(false)
-			if err != nil {
-				return err
+		if showMapping {
+			for _, mapping := range f.MappingsWithSlideInfo {
+				if mapping.Address <= addr && addr < mapping.Address+mapping.Size {
+					fmt.Printf("\nMAPPING")
+					fmt.Println("=======")
+					fmt.Println(mapping.String())
+					break
+				}
 			}
-			log.Warn("parsing private symbols...")
-			err = f.ParseLocalSyms()
-			if err != nil {
-				return err
-			}
-			fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
-			// save lookup map to disk to speed up subsequent requests
-			return f.SaveAddrToSymMap(dscPath + ".a2s")
 		}
 
-		a2sFile, err := os.Open(dscPath + ".a2s")
+		image, err := f.GetImageContainingVMAddr(addr)
 		if err != nil {
 			return err
 		}
-		defer a2sFile.Close()
 
-		gzr, err := gzip.NewReader(a2sFile)
-		if err != nil {
-			return fmt.Errorf("failed to create gzip reader: %v", err)
-		}
-		defer gzr.Close()
-
-		// Decoding the serialized data
-		err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+		m, err := image.GetPartialMacho()
 		if err != nil {
 			return err
+		}
+		defer m.Close()
+
+		if showImage {
+			fmt.Println("IMAGE")
+			fmt.Println("-----")
+			fmt.Printf(" > %s\n\n", image.Name)
+			if s := m.FindSegmentForVMAddr(addr); s != nil {
+				fmt.Println(s)
+				if s.Nsect > 0 {
+					if c := m.FindSectionForVMAddr(addr); c != nil {
+						secFlags := ""
+						if !c.Flags.IsRegular() {
+							secFlags = fmt.Sprintf("(%s)", c.Flags)
+						}
+						fmt.Printf("\tsz=0x%08x off=0x%08x-0x%08x addr=0x%09x-0x%09x\t\t%s.%s%s%s %s\n", c.Size, c.Offset, uint64(c.Offset)+c.Size, c.Addr, c.Addr+c.Size, s.Name, c.Name, pad(32-(len(s.Name)+len(c.Name)+1)), c.Flags.AttributesString(), secFlags)
+					}
+				}
+			}
+			fmt.Println()
+		} else {
+			if s := m.FindSegmentForVMAddr(addr); s != nil {
+				if s.Nsect > 0 {
+					if c := m.FindSectionForVMAddr(addr); c != nil {
+						log.WithFields(log.Fields{
+							"dylib":   image.Name,
+							"section": fmt.Sprintf("%s.%s", s.Name, c.Name),
+						}).Info("Address location")
+					}
+				} else {
+					log.WithFields(log.Fields{
+						"dylib":   image.Name,
+						"segment": s.Name,
+					}).Info("Address location")
+				}
+			}
+		}
+
+		// Load all symbol
+		if err := f.GetAllExportedSymbolsForImage(image.Name, false); err != nil {
+			log.Error("failed to parse exported symbols")
+		}
+		if err := f.GetLocalSymbolsForImage(image.Name); err != nil {
+			log.Error("failed to parse local symbols")
+		}
+		// if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
+		// 	log.Info("Generating dyld_shared_cache companion symbol map file...")
+
+		// 	utils.Indent(log.Warn, 2)("parsing public symbols...")
+		// 	err = f.GetAllExportedSymbols(false)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	utils.Indent(log.Warn, 2)("parsing private symbols...")
+		// 	err = f.ParseLocalSyms()
+		// 	if err != nil {
+		// 		utils.Indent(log.Warn, 2)(err.Error())
+		// 		utils.Indent(log.Warn, 2)("parsing patch exports...")
+		// 		for _, img := range f.Images {
+		// 			for _, patch := range img.PatchableExports {
+		// 				addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+		// 				if err != nil {
+		// 					return err
+		// 				}
+		// 				f.AddressToSymbol[addr] = patch.Name
+		// 			}
+		// 		}
+		// 	}
+
+		// 	// save lookup map to disk to speed up subsequent requests
+		// 	err = f.SaveAddrToSymMap(dscPath + ".a2s")
+		// 	if err != nil {
+		// 		return err
+		// 	}
+
+		// } else {
+		// 	log.Info("Found dyld_shared_cache companion symbol map file...")
+		// 	a2sFile, err := os.Open(dscPath + ".a2s")
+		// 	if err != nil {
+		// 		return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
+		// 	}
+
+		// 	gzr, err := gzip.NewReader(a2sFile)
+		// 	if err != nil {
+		// 		return fmt.Errorf("failed to create gzip reader: %v", err)
+		// 	}
+
+		// 	// Decoding the serialized data
+		// 	err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+		// 	if err != nil {
+		// 		return fmt.Errorf("failed to decode addr2sym map; %v", err)
+		// 	}
+		// 	gzr.Close()
+		// 	a2sFile.Close()
+		// }
+
+		if m.HasObjC() {
+			log.Debug("Parsing ObjC runtime structures...")
+			err = f.CFStringsForImage(image.Name)
+			if err != nil {
+				return errors.Wrapf(err, "failed to parse objc cfstrings")
+			}
+			err = f.MethodsForImage(image.Name)
+			if err != nil {
+				return errors.Wrapf(err, "failed to parse objc methods")
+			}
+			if strings.Contains(image.Name, "libobjc.A.dylib") {
+				_, err = f.GetAllSelectors(false)
+			} else {
+				err = f.SelectorsForImage(image.Name)
+			}
+			if err != nil {
+				return errors.Wrapf(err, "failed to parse objc selectors")
+			}
+			err = f.ClassesForImage(image.Name)
+			if err != nil {
+				return errors.Wrapf(err, "failed to parse objc classes")
+			}
+		}
+
+		log.Debug("Parsing MachO symbol stubs...")
+		err = f.ParseSymbolStubs(m)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse symbol stubs")
+		}
+
+		log.Debug("Parsing MachO global offset table...")
+		err = f.ParseGOT(m)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse GOT")
 		}
 
 		if symName, ok := f.AddressToSymbol[addr]; ok {
-			fmt.Printf("%#x: %s\n", addr, symName)
-		} else {
-			log.Error("no symbol found")
+			fmt.Printf("\n%#x: %s\n", addr, symName)
+			return nil
 		}
+
+		if fn, err := m.GetFunctionForVMAddr(addr); err == nil {
+			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+				fmt.Printf("\n%#x: %s + %d\n", addr, symName, addr-fn.StartAddr)
+				return nil
+			}
+		}
+
+		log.Error("no symbol found")
 
 		return nil
 	},
