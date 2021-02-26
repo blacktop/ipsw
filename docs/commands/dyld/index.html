@@ -11,7 +11,7 @@
 
   
   
-  <link rel="stylesheet" href="/ipsw/css/style.min.23f3327716fc2145edbd26a6f4376c8a5714dcacbda9df343602eb6b7f9ba2a0.css">
+  <link rel="stylesheet" href="/ipsw/css/style.min.21175f7e98575d70951f4c9a99c617ecaa019e3d4894ca0f8c839365a079ab42.css">
   
 
   
@@ -363,13 +363,14 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 <p>Dump ALL teh symbolz!!!</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache
 </code></pre></div><h3 id="dyld-a2s"><strong>dyld a2s</strong></h3>
-<p>Lookup what symbol is at a given <em>unslid</em> address <em>(in hex)</em></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld a2s dyld_shared_cache 0x190a7221c
-   • parsing public symbols...
-   • parsing private symbols...
-0x190a7221c: _xmlCtxtGetLastError
+<p>Lookup what symbol is at a given <em>unslid</em> or <em>slid</em> address <em>(in hex)</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
+
+   • Address location          <span class="nv">dylib</span><span class="o">=</span>/usr/lib/libobjc.A.dylib <span class="nv">section</span><span class="o">=</span>__TEXT.__text
+
+0x19538e1e0: _objc_msgSend + <span class="m">32</span>
 </code></pre></div><p>This will also create a cached version of the lookup hash table so the next time you lookup it will be much faster</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> dist/ipsw_darwin_amd64/ipsw dyld a2s dyld_shared_cache 0x190a7221c
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
    • parsing public symbols...
    • parsing private symbols...
 0x190a7221c: _xmlCtxtGetLastError
@@ -551,7 +552,7 @@ offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
   
 
   
-  <script type="text/javascript" src="/ipsw/js/scripts.min.1237ff71925bb8625c97a9af8db4c54525258bedfd7c47493daaff723bea755e.js"></script>
+  <script type="text/javascript" src="/ipsw/js/scripts.min.eaf147370baecdd07c022597db631f99cab1c9cd6479de586f30327a568d6a0f.js"></script>
   
 
   
