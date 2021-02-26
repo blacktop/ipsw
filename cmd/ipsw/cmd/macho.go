@@ -315,8 +315,12 @@ var machoCmd = &cobra.Command{
 				fmt.Println("===============")
 			}
 			if m.FunctionStarts() != nil {
-				for _, vaddr := range m.FunctionStartAddrs() {
-					fmt.Printf("0x%016X\n", vaddr)
+				for _, fn := range m.GetFunctions() {
+					if Verbose {
+						fmt.Printf("%#016x-%#016x\n", fn.StartAddr, fn.EndAddr)
+					} else {
+						fmt.Printf("0x%016X\n", fn.StartAddr)
+					}
 				}
 			}
 		}

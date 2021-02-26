@@ -48,7 +48,7 @@ func init() {
 
 // otaDLCmd represents the ota download command
 var otaDLCmd = &cobra.Command{
-	Use:   "ota",
+	Use:   "ota [options]",
 	Short: "Download OTA betas",
 	RunE: func(cmd *cobra.Command, args []string) error {
 

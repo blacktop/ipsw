@@ -58,7 +58,7 @@ type symbol struct {
 
 // symbolsetsCmd represents the symbolsets command
 var symbolsetsCmd = &cobra.Command{
-	Use:   "symbolsets",
+	Use:   "symbolsets <kernelcache>",
 	Short: "Dump kernel symbolsets",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

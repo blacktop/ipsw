@@ -52,7 +52,7 @@ func init() {
 
 // disassCmd represents the disass command
 var dyldDisassCmd = &cobra.Command{
-	Use:   "disass",
+	Use:   "disass [options] <dyld_shared_cache> <symbol_name>",
 	Short: "🚧 [WIP] Disassemble dyld_shared_cache symbol in an image",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -186,7 +186,7 @@ var dyldDisassCmd = &cobra.Command{
 			}
 			// fmt.Println(m.FileTOC.String())
 
-			starts := m.FunctionStartAddrs()
+			fns := m.GetFunctions()
 
 			if instructions > 0 {
 				data, err = f.ReadBytes(int64(off), instructions*4)
@@ -194,7 +194,7 @@ var dyldDisassCmd = &cobra.Command{
 					return err
 				}
 			} else {
-				data, err = f.ReadBytes(int64(off), uint64(f.FunctionSize(starts, symAddr)))
+				data, err = f.ReadBytes(int64(off), uint64(f.FunctionSize(fns, symAddr)))
 				if err != nil {
 					return err
 				}
@@ -245,7 +245,7 @@ var dyldDisassCmd = &cobra.Command{
 				opStr := i.Instruction.OpStr()
 
 				// check for start of a new function
-				if yes, fname := f.IsFunctionStart(starts, i.Instruction.Address(), demangleFlag); yes {
+				if yes, fname := f.IsFunctionStart(fns, i.Instruction.Address(), demangleFlag); yes {
 					if len(fname) > 0 {
 						fmt.Printf("\n%s:\n", fname)
 					} else {

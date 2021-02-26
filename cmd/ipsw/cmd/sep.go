@@ -111,7 +111,7 @@ func init() {
 
 // sepCmd represents the sep command
 var sepCmd = &cobra.Command{
-	Use:    "sep",
+	Use:    "sep <SEP_BIN>",
 	Short:  "🚧 [WIP] Dump MachOs 🚧",
 	Args:   cobra.MinimumNArgs(1),
 	Hidden: true,

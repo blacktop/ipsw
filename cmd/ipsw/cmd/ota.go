@@ -44,7 +44,7 @@ func init() {
 
 // otaCmd represents the ota command
 var otaCmd = &cobra.Command{
-	Use:   "ota",
+	Use:   "ota <OTA.zip>",
 	Short: "Extract file(s) from OTA",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

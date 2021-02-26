@@ -43,7 +43,7 @@ func init() {
 
 // symaddrCmd represents the symaddr command
 var symaddrCmd = &cobra.Command{
-	Use:   "symaddr",
+	Use:   "symaddr [options] <dyld_shared_cache>",
 	Short: "Lookup or dump symbol(s)",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

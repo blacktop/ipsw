@@ -66,7 +66,7 @@ func retry(attempts int, sleep time.Duration, f func() error) error {
 
 // downloadKernelCmd represents the downloadKernel command
 var downloadKernelCmd = &cobra.Command{
-	Use:   "kernel",
+	Use:   "kernel [options]",
 	Short: "Download just the kernelcache",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
