@@ -6,24 +6,8 @@ FROM golang:1 as builder
 COPY . /go/src/github.com/blacktop/ipsw
 WORKDIR /go/src/github.com/blacktop/ipsw
 
-RUN \
-    apt-get update \
-    && apt-get install -y cmake liblzma-dev \
-    && cd /tmp \
-    && echo "===> Installing lzfse..." \
-    && git clone https://github.com/lzfse/lzfse.git \
-    && cd lzfse \
-    && mkdir build \
-    && cd build \
-    && cmake .. \
-    && make install
-
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-
-RUN CGO_ENABLED=1 go build \
+RUN CGO_ENABLED=0 go build \
     -o /bin/ipsw \
-    -a -tags netgo \
-    -ldflags '-s -w -extldflags "-static"' \
     -ldflags "-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION)" \
     -ldflags "-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" \
     ./cmd/ipsw
@@ -40,17 +24,8 @@ ARG DEBIAN_FRONTEND=noninteractive
 RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git libattr1-dev' \
     && apt-get update \
     && apt-get install -y $buildDeps fuse3 unzip lzma \
-    && echo "===> Installing lzfse..." \
-    && cd /tmp \    
-    && git clone https://github.com/lzfse/lzfse.git \
-    && cd lzfse \
-    && mkdir build \
-    && cd build \
-    && cmake .. \
-    && make install \
-    && cd /tmp \    
     && echo "===> Installing apfs-fuse..." \
-    && cd /tmp \    
+    && cd /tmp \
     && git clone https://github.com/sgan81/apfs-fuse.git \
     && cd apfs-fuse \
     && git submodule init \
