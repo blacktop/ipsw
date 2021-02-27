@@ -50,7 +50,6 @@ func (f *File) ParseLocalSyms() error {
 	return nil
 }
 
-// TODO: fix this as it is missing symbols (symbolicate cmd was missing things for example)
 func (f *File) GetLocalSymbolsForImage(imagePath string) error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
@@ -59,39 +58,13 @@ func (f *File) GetLocalSymbolsForImage(imagePath string) error {
 	}
 
 	image := f.Image(imagePath)
-	if image == nil {
-		return fmt.Errorf("image not found: %s", imagePath)
-	}
-
-	sr.Seek(int64(f.LocalSymbolsOffset), os.SEEK_SET)
-
-	if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
-		return err
-	}
-
-	if f.Is64bit() {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 16
-	} else {
-		f.LocalSymInfo.NListByteSize = f.LocalSymInfo.NlistCount * 12
-	}
-	f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
-	f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
-
-	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
-
-	for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
-		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
-			return err
-		}
-	}
 
 	stringPool := io.NewSectionReader(sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
-
 	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
 
-	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
+	for idx := uint32(0); idx < f.LocalSymInfo.EntriesCount; idx++ {
 		// skip over other images
-		if uint32(idx) != image.Index {
+		if idx != image.Index {
 			sr.Seek(int64(int(f.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), os.SEEK_CUR)
 			continue
 		}
@@ -107,6 +80,7 @@ func (f *File) GetLocalSymbolsForImage(imagePath string) error {
 			if err != nil {
 				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
 			}
+			f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
 			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
 				Name:    strings.Trim(s, "\x00"),
 				Nlist64: nlist,
