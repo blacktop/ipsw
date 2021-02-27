@@ -10,6 +10,8 @@ I'd like to get to a 1-to-1 feature match with `jtool2` _(VERY close now)_
 
 My main goal is to create a mantainable _dyld_shared_cache_ splitter
 
+My strech goal is to make the worlds first _dyld_shared_cache_ disassembler that doesn't take days/a super computer 😏 to analyze
+
 ### TODO
 
 - [ ] MachO read/write
