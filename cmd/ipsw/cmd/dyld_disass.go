@@ -43,7 +43,7 @@ func init() {
 	// dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
-	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
+	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
 	// dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 

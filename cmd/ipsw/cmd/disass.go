@@ -52,7 +52,7 @@ func init() {
 	disCmd.Flags().StringVarP(&symbolName, "symbol", "s", "", "Function to disassemble")
 	disCmd.PersistentFlags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	disCmd.PersistentFlags().Uint64P("instrs", "i", 0, "Number of instructions to disassemble")
-	disCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demandle symbol names")
+	disCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
 	disCmd.Flags().StringVarP(&symbolMapFile, "companion", "c", "", "Companion symbol map file")
 	disCmd.MarkZshCompPositionalArgumentFile(1)
 }

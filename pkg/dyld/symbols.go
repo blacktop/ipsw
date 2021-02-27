@@ -50,6 +50,7 @@ func (f *File) ParseLocalSyms() error {
 	return nil
 }
 
+// TODO: fix this as it is missing symbols (symbolicate cmd was missing things for example)
 func (f *File) GetLocalSymbolsForImage(imagePath string) error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 

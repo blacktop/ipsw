@@ -103,7 +103,7 @@ func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
 			return nil, nil, fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
 		}
 
-		log.Debugf("Objective-C Optimization:\n%s", opt)
+		// log.Debugf("Objective-C Optimization:\n%s", opt)
 		return s, &opt, nil
 	}
 
@@ -1022,7 +1022,7 @@ func (s *StringHash) Read(r *io.SectionReader) error {
 		return err
 	}
 
-	log.Debugf("Objective-C StringHash:\n%s", s)
+	// log.Debugf("Objective-C StringHash:\n%s", s)
 
 	s.Tab = make([]byte, s.Mask+1)
 	if err := binary.Read(r, binary.LittleEndian, &s.Tab); err != nil {

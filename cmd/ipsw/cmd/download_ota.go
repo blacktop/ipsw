@@ -42,7 +42,7 @@ func init() {
 
 	otaDLCmd.Flags().BoolP("ios13", "", false, "Download iOS 13.x OTAs (defaults to iOS14)")
 	otaDLCmd.Flags().BoolP("public", "p", false, "Download Public (non-beta) OTAs")
-	otaDLCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache from remote OTA zip")
+	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
 
