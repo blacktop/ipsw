@@ -125,6 +125,15 @@
     </item>
     
     <item>
+      <title>symbolicate</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/symbolicate/</link>
+      <pubDate>Fri, 26 Feb 2021 23:44:13 -0500</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/symbolicate/</guid>
+      <description>Symbolicate crashlogs.</description>
+    </item>
+    
+    <item>
       <title>completion</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/completion/</link>
       <pubDate>Sun, 26 Jan 2020 11:05:13 -0500</pubDate>
