@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
@@ -205,6 +206,17 @@ var dyldDisassCmd = &cobra.Command{
 				if err := f.GetLocalSymbolsForImage(dep); err != nil {
 					log.Errorf("failed to parse local symbols for %s", dep)
 				}
+				dM, err := f.Image(dep).GetPartialMacho()
+				if err != nil {
+					return err
+				}
+				// TODO: create a dep tree and analyze them all (lazily if possible)
+				// fmt.Println(dM.ImportedLibraries())
+				err = f.ParseSymbolStubs(dM)
+				if err != nil {
+					return err
+				}
+				dM.Close()
 			}
 		}
 
@@ -254,8 +266,11 @@ var dyldDisassCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrapf(err, "failed to parse objc methods")
 			}
-			err = f.SelectorsForImage(image.Name)
-			// _, err = f.GetAllSelectors(false)
+			if strings.Contains(image.Name, "libobjc.A.dylib") {
+				_, err = f.GetAllSelectors(false)
+			} else {
+				err = f.SelectorsForImage(image.Name)
+			}
 			if err != nil {
 				return errors.Wrapf(err, "failed to parse objc selectors")
 			}
