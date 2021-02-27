@@ -12,7 +12,6 @@ My main goal is to create a mantainable _dyld_shared_cache_ splitter
 
 ### TODO
 
-- [ ] Impliment a symbolicate for crashlogs by implimenting (`/Applications/Xcode.app/Contents/SharedFrameworks/DVTFoundation.framework/Versions/A/Resources/symbolicatecrash`)
 - [ ] MachO read/write
 - [ ] pure Go dyld splitter
 - [ ] APFS/HFS parsing to pull dyld without mounting
