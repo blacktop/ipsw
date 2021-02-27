@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"compress/gzip"
-	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -32,7 +30,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/demangle"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -96,59 +93,59 @@ var symbolicateCmd = &cobra.Command{
 			defer f.Close()
 
 			// Load all symbols
-			if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-				log.Info("Generating dyld_shared_cache companion symbol map file...")
+			// if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
+			// 	log.Info("Generating dyld_shared_cache companion symbol map file...")
 
-				// utils.Indent(log.Warn, 2)("parsing public symbols...")
-				// err = f.GetAllExportedSymbols(false)
-				// if err != nil {
-				// 	return err
-				// }
-				utils.Indent(log.Warn, 2)("parsing private symbols...")
-				err = f.ParseLocalSyms()
-				if err != nil {
-					utils.Indent(log.Warn, 2)(err.Error())
-					utils.Indent(log.Warn, 2)("parsing patch exports...")
-					for _, img := range f.Images {
-						for _, patch := range img.PatchableExports {
-							addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
-							if err != nil {
-								return err
-							}
-							f.AddressToSymbol[addr] = patch.Name
-						}
-					}
-				}
-				// cache all sels
-				f.GetAllSelectors(false)
-				f.GetAllClasses(false)
-				f.GetAllProtocols(false)
-				// save lookup map to disk to speed up subsequent requests
-				err = f.SaveAddrToSymMap(dscPath + ".a2s")
-				if err != nil {
-					return err
-				}
+			// 	// utils.Indent(log.Warn, 2)("parsing public symbols...")
+			// 	// err = f.GetAllExportedSymbols(false)
+			// 	// if err != nil {
+			// 	// 	return err
+			// 	// }
+			// 	utils.Indent(log.Warn, 2)("parsing private symbols...")
+			// 	err = f.ParseLocalSyms()
+			// 	if err != nil {
+			// 		utils.Indent(log.Warn, 2)(err.Error())
+			// 		utils.Indent(log.Warn, 2)("parsing patch exports...")
+			// 		for _, img := range f.Images {
+			// 			for _, patch := range img.PatchableExports {
+			// 				addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+			// 				if err != nil {
+			// 					return err
+			// 				}
+			// 				f.AddressToSymbol[addr] = patch.Name
+			// 			}
+			// 		}
+			// 	}
+			// 	// cache all sels
+			// f.GetAllSelectors(false)
+			// f.GetAllClasses(false)
+			// f.GetAllProtocols(false)
+			// 	// save lookup map to disk to speed up subsequent requests
+			// 	err = f.SaveAddrToSymMap(dscPath + ".a2s")
+			// 	if err != nil {
+			// 		return err
+			// 	}
 
-			} else {
-				log.Info("Found dyld_shared_cache companion symbol map file...")
-				a2sFile, err := os.Open(dscPath + ".a2s")
-				if err != nil {
-					return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
-				}
+			// } else {
+			// 	log.Info("Found dyld_shared_cache companion symbol map file...")
+			// 	a2sFile, err := os.Open(dscPath + ".a2s")
+			// 	if err != nil {
+			// 		return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
+			// 	}
 
-				gzr, err := gzip.NewReader(a2sFile)
-				if err != nil {
-					return fmt.Errorf("failed to create gzip reader: %v", err)
-				}
+			// 	gzr, err := gzip.NewReader(a2sFile)
+			// 	if err != nil {
+			// 		return fmt.Errorf("failed to create gzip reader: %v", err)
+			// 	}
 
-				// Decoding the serialized data
-				err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
-				if err != nil {
-					return fmt.Errorf("failed to decode addr2sym map; %v", err)
-				}
-				gzr.Close()
-				a2sFile.Close()
-			}
+			// 	// Decoding the serialized data
+			// 	err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+			// 	if err != nil {
+			// 		return fmt.Errorf("failed to decode addr2sym map; %v", err)
+			// 	}
+			// 	gzr.Close()
+			// 	a2sFile.Close()
+			// }
 
 			// Symbolicate the crashing thread's backtrace
 			for idx, bt := range crashLog.Threads[crashLog.CrashedThread].BackTrace {
@@ -186,9 +183,9 @@ var symbolicateCmd = &cobra.Command{
 					log.Error("failed to parse exported symbols")
 				}
 
-				// if err := f.GetLocalSymbolsForImage(image.Name); err != nil {
-				// 	log.Error("failed to parse local symbols")
-				// }
+				if err := f.GetLocalSymbolsForImage(image.Name); err != nil {
+					log.Error("failed to parse local symbols")
+				}
 
 				if m.HasObjC() {
 					err = f.CFStringsForImage(image.Name)
