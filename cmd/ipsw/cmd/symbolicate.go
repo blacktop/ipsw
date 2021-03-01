@@ -178,15 +178,6 @@ var symbolicateCmd = &cobra.Command{
 					}
 				}
 
-				// Load all symbol
-				if err := f.GetAllExportedSymbolsForImage(image.Name, false); err != nil {
-					log.Error("failed to parse exported symbols")
-				}
-
-				if err := f.GetLocalSymbolsForImage(image.Name); err != nil {
-					log.Error("failed to parse local symbols")
-				}
-
 				if m.HasObjC() {
 					err = f.CFStringsForImage(image.Name)
 					if err != nil {
@@ -218,14 +209,18 @@ var symbolicateCmd = &cobra.Command{
 					f.AddressToSymbol[addr] = patch.Name
 				}
 
-				if err := f.ParseSymbolStubs(m); err != nil {
-					log.Errorf("failed to parse symbol stubs: %#v", err)
+				// Load all symbol
+				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
+					log.Error("failed to parse exported symbols")
 				}
 
-				err = f.ParseGOT(m)
-				if err != nil {
-					return errors.Wrapf(err, "failed to parse GOT")
+				if err := f.GetLocalSymbolsForImage(image); err != nil {
+					log.Error("failed to parse local symbols")
 				}
+
+				// if err := f.AnalyzeImage(image); err != nil {
+				// 	return fmt.Errorf("failed to analyze image %s; %#v", image.Name, err)
+				// }
 
 				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 					if demangleFlag {

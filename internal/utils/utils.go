@@ -69,6 +69,14 @@ func getFmtStr() string {
 	return "\033[1m%s\033[0m"
 }
 
+// Pad creates left padding for printf members
+func Pad(length int) string {
+	if length > 0 {
+		return strings.Repeat(" ", length)
+	}
+	return " "
+}
+
 // StrSliceContains returns true if string slice contains given string
 func StrSliceContains(slice []string, item string) bool {
 	for _, s := range slice {

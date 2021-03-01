@@ -50,43 +50,49 @@ func (f *File) ParseLocalSyms() error {
 	return nil
 }
 
-func (f *File) GetLocalSymbolsForImage(imagePath string) error {
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 
-	if f.LocalSymbolsOffset == 0 {
-		return fmt.Errorf("dyld shared cache does not contain local symbols info")
-	}
+	if !image.Analysis.State.IsPrivatesDone() {
 
-	image := f.Image(imagePath)
+		sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	stringPool := io.NewSectionReader(sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
-	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
-
-	for idx := uint32(0); idx < f.LocalSymInfo.EntriesCount; idx++ {
-		// skip over other images
-		if idx != image.Index {
-			sr.Seek(int64(int(f.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), os.SEEK_CUR)
-			continue
+		if f.LocalSymbolsOffset == 0 {
+			return fmt.Errorf("dyld shared cache does not contain local symbols info")
 		}
-		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
 
-			nlist := types.Nlist64{}
-			if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
-				return err
+		stringPool := io.NewSectionReader(sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
+		sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+
+		for idx := uint32(0); idx < f.LocalSymInfo.EntriesCount; idx++ {
+			// skip over other images
+			if idx != image.Index {
+				sr.Seek(int64(int(f.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), os.SEEK_CUR)
+				continue
 			}
 
-			stringPool.Seek(int64(nlist.Name), os.SEEK_SET)
-			s, err := bufio.NewReader(stringPool).ReadString('\x00')
-			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
+			for e := 0; e < int(f.Images[idx].NlistCount); e++ {
+
+				nlist := types.Nlist64{}
+				if err := binary.Read(sr, f.ByteOrder, &nlist); err != nil {
+					return err
+				}
+
+				stringPool.Seek(int64(nlist.Name), os.SEEK_SET)
+				s, err := bufio.NewReader(stringPool).ReadString('\x00')
+				if err != nil {
+					log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
+				}
+
+				f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
+				f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
+					Name:    strings.Trim(s, "\x00"),
+					Nlist64: nlist,
+				})
 			}
-			f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
-			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
-				Name:    strings.Trim(s, "\x00"),
-				Nlist64: nlist,
-			})
+
+			image.Analysis.State.SetPrivates(true)
+			return nil
 		}
-		return nil
 	}
 
 	return nil
@@ -318,34 +324,35 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 }
 
 // GetAllExportedSymbolsForImage prints out all the exported symbols for a given image
-func (f *File) GetAllExportedSymbolsForImage(imageName string, dump bool) error {
+func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error {
 
-	image := f.Image(imageName)
-	if image == nil {
-		return fmt.Errorf("image %s not found", imageName)
-	}
+	if !image.Analysis.State.IsExportsDone() {
 
-	exportTrie, err := f.getExportTrieData(image)
-	if err != nil {
-		return err
-	}
-	if len(exportTrie) == 0 {
-		return fmt.Errorf("image does NOT have an export trie")
-	}
-
-	syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
-	if err != nil {
-		return err
-	}
-
-	if dump {
-		for _, sym := range syms {
-			fmt.Printf("%#8x:\t%s\n", sym.Address, sym.Name)
+		exportTrie, err := f.getExportTrieData(image)
+		if err != nil {
+			return err
 		}
-	} else {
-		for _, sym := range syms {
-			f.AddressToSymbol[sym.Address] = sym.Name
+
+		if len(exportTrie) == 0 {
+			return fmt.Errorf("image does NOT have an export trie")
 		}
+
+		syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
+		if err != nil {
+			return err
+		}
+
+		if dump {
+			for _, sym := range syms {
+				fmt.Printf("%#8x:\t%s\n", sym.Address, sym.Name)
+			}
+		} else {
+			for _, sym := range syms {
+				f.AddressToSymbol[sym.Address] = sym.Name
+			}
+		}
+
+		image.Analysis.State.SetExports(true)
 	}
 
 	return nil

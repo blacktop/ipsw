@@ -27,7 +27,6 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
@@ -259,7 +258,6 @@ func parseSymbolStubs(m *macho.File) error {
 						symbolMap[prevInstruction.Address()] = symbolMap[adrpImm]
 					}
 				}
-				// fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), i.Instruction.OpStr())
 				prevInstruction = *i.Instruction
 			}
 		}
@@ -280,7 +278,7 @@ func parseGOT(m *macho.File) error {
 	// 	return err
 	// }
 	// for _, ptr := range ptrs {
-	// 	newPtr := convertToVMAddr(m, ptr)
+	// 	newPtr := f.SlideInfo.SlidePointer(m, ptr)
 	// 	fmt.Printf("ptr: %#x\n", ptr)
 	// 	fmt.Printf("newPtr: %#x, %s\n", newPtr, symbolMap[newPtr])
 	// }
@@ -332,13 +330,6 @@ func parseGOT(m *macho.File) error {
 	}
 
 	return nil
-}
-
-func pad(length int) string {
-	if length > 0 {
-		return strings.Repeat(" ", length)
-	}
-	return " "
 }
 
 // disCmd represents the dis command
@@ -472,7 +463,7 @@ var disCmd = &cobra.Command{
 				}
 			}
 
-			fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
+			fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
 
 			prevInstruction = *i.Instruction
 		}

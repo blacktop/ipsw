@@ -224,7 +224,7 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		f.Images = append(f.Images, &CacheImage{
 			Index:     i,
 			Info:      iinfo,
-			Mappings:  f.Mappings,
+			Mappings:  f.MappingsWithSlideInfo,
 			sr:        sr,
 			SlideInfo: f.SlideInfo,
 		})
@@ -776,13 +776,14 @@ func (f *File) Image(name string) *CacheImage {
 }
 
 // GetImageContainingTextAddr returns a dylib whose __TEXT segment contains a given virtual address
+// NOTE: this can be faster than GetImageContainingVMAddr as it avoids parsing the MachO
 func (f *File) GetImageContainingTextAddr(addr uint64) (*CacheImage, error) {
 	for _, img := range f.Images {
 		if img.CacheImageTextInfo.LoadAddress <= addr && addr < img.CacheImageTextInfo.LoadAddress+uint64(img.TextSegmentSize) {
 			return img, nil
 		}
 	}
-	return nil, fmt.Errorf("address not in any dylib __TEXT")
+	return nil, fmt.Errorf("address %#x not in any dylib __TEXT", addr)
 }
 
 // GetImageContainingVMAddr returns a dylib whose segment contains a given virtual address
@@ -792,14 +793,12 @@ func (f *File) GetImageContainingVMAddr(addr uint64) (*CacheImage, error) {
 		if err != nil {
 			return nil, err
 		}
-		for _, seg := range m.Segments() {
-			if seg.Addr <= addr && addr < seg.Addr+seg.Memsz {
-				return img, nil
-			}
+		if seg := m.FindSegmentForVMAddr(addr); seg != nil {
+			return img, nil
 		}
 		m.Close()
 	}
-	return nil, fmt.Errorf("address not in any dylib __TEXT")
+	return nil, fmt.Errorf("address %#x not in any dylib", addr)
 }
 
 // HasImagePath returns the index of a given image path

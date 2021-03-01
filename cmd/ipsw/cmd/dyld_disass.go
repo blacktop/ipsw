@@ -107,56 +107,67 @@ var dyldDisassCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(symbolName) > 0 {
-			// Load all symbols
-			if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-				log.Info("Generating dyld_shared_cache companion symbol map file...")
+			if len(imageName) == 0 {
+				// Load all symbols
+				if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
+					log.Info("Generating dyld_shared_cache companion symbol map file...")
 
-				utils.Indent(log.Warn, 2)("parsing public symbols...")
-				err = f.GetAllExportedSymbols(false)
-				if err != nil {
-					return err
-				}
-				utils.Indent(log.Warn, 2)("parsing private symbols...")
-				err = f.ParseLocalSyms()
-				if err != nil {
-					utils.Indent(log.Warn, 2)(err.Error())
-					utils.Indent(log.Warn, 2)("parsing patch exports...")
-					for _, img := range f.Images {
-						for _, patch := range img.PatchableExports {
-							addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
-							if err != nil {
-								return err
+					utils.Indent(log.Warn, 2)("parsing public symbols...")
+					err = f.GetAllExportedSymbols(false)
+					if err != nil {
+						return err
+					}
+					utils.Indent(log.Warn, 2)("parsing private symbols...")
+					err = f.ParseLocalSyms()
+					if err != nil {
+						utils.Indent(log.Warn, 2)(err.Error())
+						utils.Indent(log.Warn, 2)("parsing patch exports...")
+						for _, img := range f.Images {
+							for _, patch := range img.PatchableExports {
+								addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+								if err != nil {
+									return err
+								}
+								f.AddressToSymbol[addr] = patch.Name
 							}
-							f.AddressToSymbol[addr] = patch.Name
 						}
 					}
-				}
 
-				// save lookup map to disk to speed up subsequent requests
-				err = f.SaveAddrToSymMap(dscPath + ".a2s")
-				if err != nil {
-					return err
-				}
+					// save lookup map to disk to speed up subsequent requests
+					err = f.SaveAddrToSymMap(dscPath + ".a2s")
+					if err != nil {
+						return err
+					}
 
+				} else {
+					log.Info("Found dyld_shared_cache companion symbol map file...")
+					a2sFile, err := os.Open(dscPath + ".a2s")
+					if err != nil {
+						return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
+					}
+
+					gzr, err := gzip.NewReader(a2sFile)
+					if err != nil {
+						return fmt.Errorf("failed to create gzip reader: %v", err)
+					}
+
+					// Decoding the serialized data
+					err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+					if err != nil {
+						return fmt.Errorf("failed to decode addr2sym map; %v", err)
+					}
+					gzr.Close()
+					a2sFile.Close()
+				}
 			} else {
-				log.Info("Found dyld_shared_cache companion symbol map file...")
-				a2sFile, err := os.Open(dscPath + ".a2s")
-				if err != nil {
-					return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
+				utils.Indent(log.Warn, 2)("parsing public symbols...")
+				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
+					log.Error("failed to parse exported symbols")
 				}
-
-				gzr, err := gzip.NewReader(a2sFile)
-				if err != nil {
-					return fmt.Errorf("failed to create gzip reader: %v", err)
+				utils.Indent(log.Warn, 2)("parsing private symbols...")
+				if err := f.GetLocalSymbolsForImage(image); err != nil {
+					log.Error("failed to parse local symbols")
 				}
-
-				// Decoding the serialized data
-				err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
-				if err != nil {
-					return fmt.Errorf("failed to decode addr2sym map; %v", err)
-				}
-				gzr.Close()
-				a2sFile.Close()
 			}
 
 			log.Info("Locating symbol: " + symbolName)
@@ -164,13 +175,12 @@ var dyldDisassCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+
 		} else { // startVMAddr > 0
 			symAddr = startVMAddr
 		}
 
 		startAddr = symAddr
-
-		off, _ := f.GetOffset(symAddr)
 
 		if image == nil {
 			image, err = f.GetImageContainingTextAddr(symAddr)
@@ -181,45 +191,43 @@ var dyldDisassCmd = &cobra.Command{
 
 		log.WithFields(log.Fields{"dylib": image.Name}).Info("Found symbol")
 
-		if len(symbolName) == 0 {
-			utils.Indent(log.Warn, 2)("parsing public symbols...")
-			if err := f.GetAllExportedSymbolsForImage(image.Name, false); err != nil {
-				log.Error("failed to parse exported symbols")
-			}
-			utils.Indent(log.Warn, 2)("parsing private symbols...")
-			if err := f.GetLocalSymbolsForImage(image.Name); err != nil {
-				log.Error("failed to parse local symbols")
-			}
-		}
-
 		m, err := image.GetPartialMacho()
 		if err != nil {
 			return err
 		}
 
-		if len(symbolName) == 0 {
-			utils.Indent(log.Warn, 2)("parsing imported dylib symbols...")
-			for _, dep := range m.ImportedLibraries() {
-				if err := f.GetAllExportedSymbolsForImage(dep, false); err != nil {
-					log.Errorf("failed to parse exported symbols for %s", dep)
-				}
-				if err := f.GetLocalSymbolsForImage(dep); err != nil {
-					log.Errorf("failed to parse local symbols for %s", dep)
-				}
-				dM, err := f.Image(dep).GetPartialMacho()
+		/*
+		 * Read in data to disassemble
+		 */
+		if instructions > 0 {
+			off, err := f.GetOffset(symAddr)
+			if err != nil {
+				return err
+			}
+			data, err = f.ReadBytes(int64(off), instructions*4)
+			if err != nil {
+				return err
+			}
+		} else {
+			if fn, err := m.GetFunctionForVMAddr(symAddr); err == nil {
+				soff, err := f.GetOffset(fn.StartAddr)
 				if err != nil {
 					return err
 				}
-				// TODO: create a dep tree and analyze them all (lazily if possible)
-				// fmt.Println(dM.ImportedLibraries())
-				err = f.ParseSymbolStubs(dM)
+				data, err = f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
 				if err != nil {
 					return err
 				}
-				dM.Close()
+				if symAddr != fn.StartAddr {
+					isMiddle = true
+					startAddr = fn.StartAddr
+				}
 			}
 		}
 
+		/*
+		 * Load symbols from the target sym/addr's image
+		 */
 		// if f.LocalSymbolsOffset == 0 {
 		// 	utils.Indent(log.Warn, 2)("parsing symbol table...")
 		// 	for _, sym := range m.Symtab.Syms {
@@ -228,33 +236,59 @@ var dyldDisassCmd = &cobra.Command{
 		// 		}
 		// 	}
 		// }
-
-		fns := m.GetFunctions()
-
-		if instructions > 0 {
-			data, err = f.ReadBytes(int64(off), instructions*4)
-			if err != nil {
-				return err
+		if len(symbolName) == 0 {
+			utils.Indent(log.Warn, 2)("parsing public symbols...")
+			if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
+				log.Error("failed to parse exported symbols")
 			}
-		} else {
-			for _, fn := range fns {
-				if symAddr >= fn.StartAddr && symAddr < fn.EndAddr {
-					if symAddr != fn.StartAddr {
-						isMiddle = true
-						startAddr = fn.StartAddr
-					}
-					soff, err := f.GetOffset(fn.StartAddr)
-					if err != nil {
-						return err
-					}
-					data, err = f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
-					if err != nil {
-						return err
-					}
-					break
+			utils.Indent(log.Warn, 2)("parsing private symbols...")
+			if err := f.GetLocalSymbolsForImage(image); err != nil {
+				log.Error("failed to parse local symbols")
+			}
+		}
+
+		//***********************
+		//* First pass ANALYSIS *
+		//***********************
+		immAddrs := f.FirstPass(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)})
+
+		for _, imA := range immAddrs {
+			if img, err := f.GetImageContainingVMAddr(imA); err == nil {
+				if err := f.AnalyzeImage(img); err != nil {
+					return err
 				}
 			}
 		}
+
+		/*
+		 * Load symbols from all of the dylibs loaded by the target sym/addr's image
+		 */
+		// if len(symbolName) == 0 {
+		// 	if !image.Analysis.State.IsDepsDone() {
+		// 		utils.Indent(log.Warn, 2)("parsing imported dylib symbols...")
+		// 		if err := f.ImageDependencies(image.Name); err == nil {
+		// 			for _, dep := range image.Analysis.Dependencies {
+		// 				if err := f.GetAllExportedSymbolsForImage(dep, false); err != nil {
+		// 					log.Errorf("failed to parse exported symbols for %s", dep)
+		// 				}
+		// 				if err := f.GetLocalSymbolsForImage(dep); err != nil {
+		// 					log.Errorf("failed to parse local symbols for %s", dep)
+		// 				}
+		// 				dM, err := f.Image(dep).GetPartialMacho()
+		// 				if err != nil {
+		// 					return err
+		// 				}
+		// 				// TODO: create a dep tree and analyze them all (lazily if possible)
+		// 				fmt.Println(dep)
+		// 				if err := f.ParseSymbolStubs(dM); err != nil {
+		// 					return err
+		// 				}
+		// 				dM.Close()
+		// 			}
+		// 		}
+		// 		image.Analysis.State.SetDeps(true)
+		// 	}
+		// }
 
 		if m.HasObjC() {
 			log.Info("Parsing ObjC runtime structures...")
@@ -280,17 +314,13 @@ var dyldDisassCmd = &cobra.Command{
 			}
 		}
 
-		log.Info("Parsing MachO symbol stubs...")
-		err = f.ParseSymbolStubs(m)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse symbol stubs")
+		if err := f.AnalyzeImage(image); err != nil {
+			return err
 		}
 
-		log.Info("Parsing MachO global offset table...")
-		err = f.ParseGOT(m)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse GOT")
-		}
+		//***************
+		//* DISASSEMBLE *
+		//***************
 
 		var prevInstruction arm64.Instruction
 
@@ -304,7 +334,7 @@ var dyldDisassCmd = &cobra.Command{
 			opStr := i.Instruction.OpStr()
 
 			// check for start of a new function
-			if yes, fname := f.IsFunctionStart(fns, i.Instruction.Address(), demangleFlag); yes {
+			if yes, fname := f.IsFunctionStart(m.GetFunctions(), i.Instruction.Address(), demangleFlag); yes {
 				if len(fname) > 0 {
 					fmt.Printf("\n%s:\n", fname)
 				} else {
@@ -362,9 +392,9 @@ var dyldDisassCmd = &cobra.Command{
 			}
 
 			if isMiddle && i.Instruction.Address() == symAddr {
-				fmt.Printf("%#08x:  %s\t%s%s%s\t👈\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
+				fmt.Printf("%#08x:  %s\t%-10v%s\t👈\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
 			} else {
-				fmt.Printf("%#08x:  %s\t%s%s%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), pad(10-len(i.Instruction.Operation().String())), opStr)
+				fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
 			}
 
 			prevInstruction = *i.Instruction

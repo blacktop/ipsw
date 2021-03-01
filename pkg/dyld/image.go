@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -26,13 +27,86 @@ type patchableExport struct {
 	PatchLocations []CachePatchableLocation
 }
 
+type astate struct {
+	mu sync.Mutex
+
+	Deps     bool
+	Got      bool
+	Stubs    bool
+	Exports  bool
+	Privates bool
+}
+
+func (a *astate) SetDeps(done bool) {
+	a.mu.Lock()
+	a.Deps = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsDepsDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Deps
+}
+func (a *astate) SetGot(done bool) {
+	a.mu.Lock()
+	a.Got = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsGotDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Got
+}
+func (a *astate) SetStubs(done bool) {
+	a.mu.Lock()
+	a.Stubs = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsStubsDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Stubs
+}
+func (a *astate) SetExports(done bool) {
+	a.mu.Lock()
+	a.Exports = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsExportsDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Exports
+}
+func (a *astate) SetPrivates(done bool) {
+	a.mu.Lock()
+	a.Privates = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsPrivatesDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Privates
+}
+
+type analysis struct {
+	State        astate
+	Dependencies []string
+	GotPointers  map[uint64]uint64
+	SymbolStubs  map[uint64]uint64
+}
+
 // CacheImage represents a dyld dylib image.
 type CacheImage struct {
 	Name         string
 	Index        uint32
 	Info         CacheImageInfo
 	LocalSymbols []*CacheLocalSymbol64
-	Mappings     cacheMappings
+	Mappings     cacheMappingsWithSlideInfo
 	CacheLocalSymbolsEntry
 	CacheImageInfoExtra
 	CacheImageTextInfo
@@ -43,6 +117,9 @@ type CacheImage struct {
 	RangeEntries     []rangeEntry
 	PatchableExports []patchableExport
 	ObjC             objcInfo
+
+	Analysis analysis
+
 	// Embed ReaderAt for ReadAt method.
 	// Do not embed SectionReader directly
 	// to avoid having Read and Seek.
