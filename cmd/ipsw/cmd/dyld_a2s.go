@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -38,8 +37,8 @@ func init() {
 	dyldCmd.AddCommand(a2sCmd)
 
 	a2sCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
-	otaDLCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
-	otaDLCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
+	a2sCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
+	a2sCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
 
 	a2sCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -150,15 +149,20 @@ var a2sCmd = &cobra.Command{
 		// 	a2sFile.Close()
 		// }
 
-		if showMapping {
-			for _, mapping := range f.MappingsWithSlideInfo {
-				if mapping.Address <= unslidAddr && unslidAddr < mapping.Address+mapping.Size {
-					fmt.Printf("\nMAPPING")
-					fmt.Println("=======")
+		foundMapping := false
+		for _, mapping := range f.MappingsWithSlideInfo {
+			if mapping.Address <= unslidAddr && unslidAddr < mapping.Address+mapping.Size {
+				foundMapping = true
+				if showMapping {
+					fmt.Printf("\nMAPPING\n")
+					fmt.Printf("=======\n\n")
 					fmt.Println(mapping.String())
-					break
 				}
+				break
 			}
+		}
+		if !foundMapping {
+			return fmt.Errorf("no mapping contains address %#x", unslidAddr)
 		}
 
 		image, err := f.GetImageContainingVMAddr(unslidAddr)
@@ -176,43 +180,36 @@ var a2sCmd = &cobra.Command{
 			fmt.Println("IMAGE")
 			fmt.Println("-----")
 			fmt.Printf(" > %s\n\n", image.Name)
-			if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
-				fmt.Println(s)
-				if s.Nsect > 0 {
-					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
+		}
+
+		if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
+			if s.Nsect > 0 {
+				if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
+					if showImage {
+						fmt.Println(s)
 						secFlags := ""
 						if !c.Flags.IsRegular() {
 							secFlags = fmt.Sprintf("(%s)", c.Flags)
 						}
-						fmt.Printf("\tsz=0x%08x off=0x%08x-0x%08x addr=0x%09x-0x%09x\t\t%s.%s%s%s %s\n", c.Size, c.Offset, uint64(c.Offset)+c.Size, c.Addr, c.Addr+c.Size, s.Name, c.Name, pad(32-(len(s.Name)+len(c.Name)+1)), c.Flags.AttributesString(), secFlags)
-					}
-				}
-			}
-			fmt.Println()
-		} else {
-			if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
-				if s.Nsect > 0 {
-					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
+						fmt.Printf("\tsz=0x%08x off=0x%08x-0x%08x addr=0x%09x-0x%09x\t\t%s.%-20v%s %s\n", c.Size, c.Offset, uint64(c.Offset)+c.Size, c.Addr, c.Addr+c.Size, s.Name, c.Name, c.Flags.AttributesString(), secFlags)
+					} else {
 						log.WithFields(log.Fields{
 							"dylib":   image.Name,
 							"section": fmt.Sprintf("%s.%s", s.Name, c.Name),
 						}).Info("Address location")
 					}
-				} else {
-					log.WithFields(log.Fields{
-						"dylib":   image.Name,
-						"segment": s.Name,
-					}).Info("Address location")
 				}
+			} else {
+				log.WithFields(log.Fields{
+					"dylib":   image.Name,
+					"segment": s.Name,
+				}).Info("Address location")
 			}
 		}
 
 		// Load all symbols
-		if err := f.GetAllExportedSymbolsForImage(image.Name, false); err != nil {
-			log.Error("failed to parse exported symbols")
-		}
-		if err := f.GetLocalSymbolsForImage(image.Name); err != nil {
-			log.Error("failed to parse local symbols")
+		if err := f.AnalyzeImage(image); err != nil {
+			return err
 		}
 
 		// TODO: add objc methods in the -[Class sel:] form
@@ -226,11 +223,11 @@ var a2sCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrapf(err, "failed to parse objc methods")
 			}
-			if strings.Contains(image.Name, "libobjc.A.dylib") {
-				_, err = f.GetAllSelectors(false)
-			} else {
-				err = f.SelectorsForImage(image.Name)
-			}
+			// if strings.Contains(image.Name, "libobjc.A.dylib") { // TODO: should I put this back in?
+			// 	_, err = f.GetAllSelectors(false)
+			// } else {
+			err = f.SelectorsForImage(image.Name)
+			// }
 			if err != nil {
 				return errors.Wrapf(err, "failed to parse objc selectors")
 			}
@@ -238,18 +235,6 @@ var a2sCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrapf(err, "failed to parse objc classes")
 			}
-		}
-
-		log.Debug("Parsing MachO symbol stubs...")
-		err = f.ParseSymbolStubs(m)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse symbol stubs")
-		}
-
-		log.Debug("Parsing MachO global offset table...")
-		err = f.ParseGOT(m)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse GOT")
 		}
 
 		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {

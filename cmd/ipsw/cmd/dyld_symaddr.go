@@ -110,7 +110,7 @@ var symaddrCmd = &cobra.Command{
 
 		} else if len(imageName) > 0 {
 			// Dump ALL symbols for a dylib
-			if err := f.GetLocalSymbolsForImage(imageName); err != nil {
+			if err := f.GetLocalSymbolsForImage(f.Image(imageName)); err != nil {
 				log.Error(err.Error())
 				m, err := f.Image(imageName).GetPartialMacho()
 				if err != nil {
@@ -130,7 +130,7 @@ var symaddrCmd = &cobra.Command{
 				for _, sym := range f.Image(imageName).LocalSymbols {
 					fmt.Printf("0x%8x: %s\n", sym.Value, sym.Name)
 				}
-				if err := f.GetAllExportedSymbolsForImage(imageName, true); err != nil {
+				if err := f.GetAllExportedSymbolsForImage(f.Image(imageName), true); err != nil {
 					log.Error(err.Error())
 				}
 			}

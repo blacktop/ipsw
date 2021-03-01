@@ -296,7 +296,7 @@ type header_info_rw struct {
 // 			sr.Seek(int64(int32(fileOffset)), io.SeekStart)
 // 			var opt objc_headeropt_ro_t
 
-// 			// off, err = f.GetOffset(convertToVMAddr(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
+// 			// off, err = f.GetOffset(f.SlideInfo.SlidePointer(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
 // 			// if err != nil {
 // 			// 	return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
 // 			// }
@@ -714,8 +714,8 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 		if err := binary.Read(r, f.ByteOrder, &scoffs); err != nil {
 			return err
 		}
-		selectorStringVMAddrStart = convertToVMAddr(scoffs[0])
-		selectorStringVMAddrEnd = convertToVMAddr(scoffs[1])
+		selectorStringVMAddrStart = f.SlideInfo.SlidePointer(scoffs[0])
+		selectorStringVMAddrEnd = f.SlideInfo.SlidePointer(scoffs[1])
 		// inlinedSelectorsVMAddrStart = scoffs[2]
 		// inlinedSelectorsVMAddrEnd = scoffs[3]
 	} else {
@@ -758,8 +758,8 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 					return err
 				}
 
-				if convertToVMAddr(c.MethodCacheProperties) > 0 {
-					off, err := f.GetOffset(convertToVMAddr(c.MethodCacheProperties))
+				if f.SlideInfo.SlidePointer(c.MethodCacheProperties) > 0 {
+					off, err := f.GetOffset(f.SlideInfo.SlidePointer(c.MethodCacheProperties))
 					if err != nil {
 						return fmt.Errorf("failed to convert vmaddr: %v", err)
 					}
@@ -876,14 +876,14 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 		return nil, fmt.Errorf("failed to read swift_class_metadata_t: %v", err)
 	}
 
-	// info, err := f.GetObjCClassInfo(convertToVMAddr(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
+	// info, err := f.GetObjCClassInfo(f.SlideInfo.SlidePointer(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("failed to get class info at vmaddr: 0x%x; %v", classPtr.DataVMAddrAndFastFlags&objc.FAST_DATA_MASK64, err)
 	// }
 
 	var info objc.ClassRO64
 
-	off, err = f.GetOffset(convertToVMAddr(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
+	off, err = f.GetOffset(f.SlideInfo.SlidePointer(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
 	}
@@ -893,14 +893,14 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 		return nil, fmt.Errorf("failed to read class_ro_t: %v", err)
 	}
 
-	name, err := f.GetCString(convertToVMAddr(info.NameVMAddr))
+	name, err := f.GetCString(f.SlideInfo.SlidePointer(info.NameVMAddr))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read cstring: %v", err)
 	}
 
 	// var methods []objc.Method
 	// if info.BaseMethodsVMAddr > 0 {
-	// 	methods, err = f.GetObjCMethods(convertToVMAddr(info.BaseMethodsVMAddr))
+	// 	methods, err = f.GetObjCMethods(f.SlideInfo.SlidePointer(info.BaseMethodsVMAddr))
 	// 	if err != nil {
 	// 		return nil, fmt.Errorf("failed to get methods at vmaddr: 0x%x; %v", info.BaseMethodsVMAddr, err)
 	// 	}
@@ -916,7 +916,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 
 	// var ivars []objc.Ivar
 	// if info.IvarsVMAddr > 0 {
-	// 	ivars, err = f.GetObjCIvars(convertToVMAddr(info.IvarsVMAddr))
+	// 	ivars, err = f.GetObjCIvars(f.SlideInfo.SlidePointer(info.IvarsVMAddr))
 	// 	if err != nil {
 	// 		return nil, fmt.Errorf("failed to get ivars at vmaddr: 0x%x; %v", info.IvarsVMAddr, err)
 	// 	}
@@ -924,7 +924,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 
 	// var props []objc.Property
 	// if info.BasePropertiesVMAddr > 0 {
-	// 	props, err = f.GetObjCProperties(convertToVMAddr(info.BasePropertiesVMAddr))
+	// 	props, err = f.GetObjCProperties(f.SlideInfo.SlidePointer(info.BasePropertiesVMAddr))
 	// 	if err != nil {
 	// 		return nil, fmt.Errorf("failed to get props at vmaddr: 0x%x; %v", info.BasePropertiesVMAddr, err)
 	// 	}
@@ -933,7 +933,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 	// superClass := &objc.Class{Name: "<ROOT>"}
 	// if classPtr.SuperclassVMAddr > 0 {
 	// 	if !info.Flags.IsRoot() {
-	// 		superClass, err = f.GetObjCClass(convertToVMAddr(classPtr.SuperclassVMAddr))
+	// 		superClass, err = f.GetObjCClass(f.SlideInfo.SlidePointer(classPtr.SuperclassVMAddr))
 	// 		if err != nil {
 	// 			bindName, err := f.GetBindName(classPtr.SuperclassVMAddr)
 	// 			if err == nil {
@@ -949,7 +949,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 	var cMethods []objc.Method
 	if classPtr.IsaVMAddr > 0 {
 		if !info.Flags.IsMeta() {
-			isaClass, err = f.GetObjCClass(convertToVMAddr(classPtr.IsaVMAddr))
+			isaClass, err = f.GetObjCClass(f.SlideInfo.SlidePointer(classPtr.IsaVMAddr))
 			if err != nil {
 				// bindName, err := f.GetBindName(classPtr.IsaVMAddr)
 				// if err == nil {
@@ -978,11 +978,11 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 			VMAdder: vmaddr,
 			Offset:  uint64(off),
 		},
-		IsaVMAddr:             convertToVMAddr(classPtr.IsaVMAddr),
-		SuperclassVMAddr:      convertToVMAddr(classPtr.SuperclassVMAddr),
+		IsaVMAddr:             f.SlideInfo.SlidePointer(classPtr.IsaVMAddr),
+		SuperclassVMAddr:      f.SlideInfo.SlidePointer(classPtr.SuperclassVMAddr),
 		MethodCacheBuckets:    classPtr.MethodCacheBuckets,
 		MethodCacheProperties: classPtr.MethodCacheProperties,
-		DataVMAddr:            convertToVMAddr(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64,
+		DataVMAddr:            f.SlideInfo.SlidePointer(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64,
 		IsSwiftLegacy:         (classPtr.DataVMAddrAndFastFlags&objc.FAST_IS_SWIFT_LEGACY == 1),
 		IsSwiftStable:         (classPtr.DataVMAddrAndFastFlags&objc.FAST_IS_SWIFT_STABLE == 1),
 		ReadOnlyData:          info,
