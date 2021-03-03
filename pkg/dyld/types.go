@@ -344,26 +344,17 @@ func (p CacheSlidePointer3) Authenticated() bool {
 }
 
 func (p CacheSlidePointer3) String() string {
-	var pStr string
-	if p.Authenticated() && p.HasAddressDiversity() {
-		pStr = fmt.Sprintf("value: %x, next: %x, diversity: %x, key: %s, auth: %t",
+	if p.Authenticated() {
+		return fmt.Sprintf("value: %#x, next: %02x, diversity: %04x, addr_div: %t, key: %s, auth: %t",
 			p.Value(),
 			p.OffsetToNextPointer(),
 			p.DiversityData(),
+			p.HasAddressDiversity(),
 			KeyName(uint64(p)),
 			p.Authenticated(),
 		)
-	} else if p.Authenticated() && !p.HasAddressDiversity() {
-		pStr = fmt.Sprintf("value: %x, next: %x, key: %s, auth: %t",
-			p.Value(),
-			p.OffsetToNextPointer(),
-			KeyName(uint64(p)),
-			p.Authenticated(),
-		)
-	} else {
-		pStr = fmt.Sprintf("value: %x, offset: %x", p.Value(), p.OffsetToNextPointer())
 	}
-	return pStr
+	return fmt.Sprintf("value: %#x, offset: %02x", p.Value(), p.OffsetToNextPointer())
 }
 
 type CacheSlideInfo4 struct {
