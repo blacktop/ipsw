@@ -387,14 +387,14 @@ var machoCmd = &cobra.Command{
 								}
 								sec = m.FindSectionForVMAddr(addr)
 								lib := m.LibraryOrdinalName(dcf.Imports[f.Ordinal()].LibOrdinal())
-								if sec != lastSec {
+								if sec != nil && sec != lastSec {
 									fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
 								}
 								fmt.Printf("%s\t%s/%s%s\n", fixupchains.Bind(f).String(m.GetBaseAddress()), lib, f.Name(), addend)
 							case fixupchains.Rebase:
 								addr := uint64(f.Offset()) + m.GetBaseAddress()
 								sec = m.FindSectionForVMAddr(addr)
-								if sec != lastSec {
+								if sec != nil && sec != lastSec {
 									fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
 								}
 								fmt.Println(f.String(m.GetBaseAddress()))
