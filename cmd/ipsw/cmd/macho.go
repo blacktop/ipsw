@@ -22,7 +22,9 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"strings"
@@ -48,6 +50,7 @@ func init() {
 	machoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	machoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	machoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
+	machoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
 	machoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	machoCmd.Flags().BoolP("fixups", "x", false, "Print fixup chains")
 	machoCmd.Flags().StringP("fileset-entry", "t", viper.GetString("IPSW_FILESET_ENTRY"), "Which fileset entry to analyze")
@@ -77,12 +80,14 @@ var machoCmd = &cobra.Command{
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		symbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
+		dumpStrings, _ := cmd.Flags().GetBool("strings")
 		showFixups, _ := cmd.Flags().GetBool("fixups")
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showFixups && !showFuncStarts
-		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showFixups && !showFuncStarts
-		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && showFuncStarts
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts && !dumpStrings
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showFixups && !showFuncStarts && !dumpStrings
+		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showFixups && !showFuncStarts && !dumpStrings
+		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && showFuncStarts && !dumpStrings
+		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts && dumpStrings
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
@@ -145,7 +150,7 @@ var machoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts) {
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts && !dumpStrings) {
 			fmt.Println(m.FileTOC.String())
 		}
 
@@ -405,6 +410,42 @@ var machoCmd = &cobra.Command{
 				}
 			} else {
 				fmt.Println("  - no fixups")
+			}
+		}
+
+		if dumpStrings {
+			if !onlyStrings {
+				fmt.Println("STRINGS")
+				fmt.Println("=======")
+			}
+			for _, sec := range m.Sections {
+
+				if sec.Flags.IsCstringLiterals() {
+					dat, err := sec.Data()
+					if err != nil {
+						return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
+					}
+
+					csr := bytes.NewBuffer(dat[:])
+
+					for {
+						pos := sec.Addr + uint64(csr.Cap()-csr.Len())
+
+						s, err := csr.ReadString('\x00')
+
+						if err == io.EOF {
+							break
+						}
+
+						if err != nil {
+							return fmt.Errorf("failed to read string: %v", err)
+						}
+
+						if len(s) > 0 {
+							fmt.Printf("%#x: %#v\n", pos, strings.Trim(s, "\x00"))
+						}
+					}
+				}
 			}
 		}
 

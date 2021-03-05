@@ -22,9 +22,12 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
@@ -32,6 +35,21 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
+
+func init() {
+	dyldCmd.AddCommand(dyldMachoCmd)
+
+	// dyldMachoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
+	dyldMachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	// dyldMachoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
+	// dyldMachoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
+	dyldMachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
+	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
+	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
+	dyldMachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
+
+	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
+}
 
 // dyldMachoCmd represents the macho command
 var dyldMachoCmd = &cobra.Command{
@@ -48,6 +66,7 @@ var dyldMachoCmd = &cobra.Command{
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
+		dumpStrings, _ := cmd.Flags().GetBool("strings")
 
 		onlyFuncStarts := !showLoadCommands && !showObjC && showFuncStarts
 
@@ -84,7 +103,7 @@ var dyldMachoCmd = &cobra.Command{
 					return err
 				}
 
-				if showLoadCommands || !showObjC && !dumpSymbols {
+				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings {
 					fmt.Println(m.FileTOC.String())
 				}
 
@@ -203,6 +222,38 @@ var dyldMachoCmd = &cobra.Command{
 					}
 				}
 
+				if dumpStrings {
+					for _, sec := range m.Sections {
+
+						if sec.Flags.IsCstringLiterals() {
+							dat, err := sec.Data()
+							if err != nil {
+								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
+							}
+
+							csr := bytes.NewBuffer(dat[:])
+
+							for {
+								pos := sec.Addr + uint64(csr.Cap()-csr.Len())
+
+								s, err := csr.ReadString('\x00')
+
+								if err == io.EOF {
+									break
+								}
+
+								if err != nil {
+									return fmt.Errorf("failed to read string: %v", err)
+								}
+
+								if len(s) > 0 {
+									fmt.Printf("%#x: %#v\n", pos, strings.Trim(s, "\x00"))
+								}
+							}
+						}
+					}
+				}
+
 			} else {
 				log.Errorf("dylib %s not found in %s", args[1], dscPath)
 			}
@@ -212,18 +263,4 @@ var dyldMachoCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-func init() {
-	dyldCmd.AddCommand(dyldMachoCmd)
-
-	// dyldMachoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
-	dyldMachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
-	// dyldMachoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
-	// dyldMachoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
-	dyldMachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
-	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
-	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
-
-	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
