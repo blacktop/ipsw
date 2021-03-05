@@ -247,6 +247,13 @@ var a2sCmd = &cobra.Command{
 				fmt.Printf("\n%#x: %s + %d\n", addr, symName, unslidAddr-fn.StartAddr)
 				return nil
 			}
+			fmt.Printf("\n%#x: func_%x\n", addr, addr)
+			return nil
+		}
+
+		if cstr, err := f.IsCString(m, unslidAddr); err == nil {
+			fmt.Printf("\n%#x: %#v\n", addr, cstr)
+			return nil
 		}
 
 		log.Error("no symbol found")
