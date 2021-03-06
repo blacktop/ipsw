@@ -167,12 +167,6 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 		log.Errorf("failed to parse local symbols for %s", image.Name)
 	}
 
-	if strings.Contains(strings.ToLower(image.Name), "/usr/lib/system/libcorecrypto.dylib") {
-		// TODO: figure out why libcorecrypto is a problem child
-		log.Debug("Skipping /usr/lib/system/libcorecrypto.dylib (unable to parse symbol stubs)")
-		return nil
-	}
-
 	if !image.Analysis.State.IsStubsDone() {
 		log.Debugf("parsing %s symbol stubs", image.Name)
 		if err := f.ParseSymbolStubs(image); err != nil {
@@ -245,11 +239,15 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 	for _, sec := range m.Sections {
 		if sec.Flags.IsSymbolStubs() {
 
-			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
-
 			var adrpImm uint64
 			var adrpAddr uint64
 			var prevInst arm64.Instruction
+
+			offset, err := f.GetOffset(sec.Addr)
+			if err != nil {
+				return err
+			}
+			r := io.NewSectionReader(f.r, int64(offset), int64(sec.Size))
 
 			for i := range arm64.Disassemble(r, arm64.Options{StartAddress: int64(sec.Addr)}) {
 				if i.Instruction.Operation() == arm64.ARM64_ADD && prevInst.Operation() == arm64.ARM64_ADRP {
