@@ -195,6 +195,7 @@ var dyldDisassCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		defer m.Close()
 
 		/*
 		 * Read in data to disassemble
@@ -250,15 +251,15 @@ var dyldDisassCmd = &cobra.Command{
 		//***********************
 		//* First pass ANALYSIS *
 		//***********************
-		immAddrs := f.FirstPass(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)})
+		// immAddrs := f.FirstPass(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)})
 
-		for _, imA := range immAddrs {
-			if img, err := f.GetImageContainingVMAddr(imA); err == nil {
-				if err := f.AnalyzeImage(img); err != nil {
-					return err
-				}
-			}
-		}
+		// for _, imA := range immAddrs {
+		// 	if img, err := f.GetImageContainingVMAddr(imA); err == nil {
+		// 		if err := f.AnalyzeImage(img); err != nil {
+		// 			return err
+		// 		}
+		// 	}
+		// }
 
 		/*
 		 * Load symbols from all of the dylibs loaded by the target sym/addr's image
