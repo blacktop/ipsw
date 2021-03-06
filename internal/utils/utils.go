@@ -87,6 +87,16 @@ func StrSliceContains(slice []string, item string) bool {
 	return false
 }
 
+// Uint64SliceContains returns true if uint64 slice contains given uint64
+func Uint64SliceContains(slice []uint64, item uint64) bool {
+	for _, s := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
+}
+
 // Unique returns a slice with only unique strings
 func Unique(s []string) []string {
 	unique := make(map[string]bool, len(s))
