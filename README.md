@@ -39,7 +39,7 @@
 
 ## Getting Started
 
-```bash
+```
 ❯ ipsw
 
 Download and Parse IPSWs
@@ -49,7 +49,7 @@ Usage:
 
 Available Commands:
   device-list     List all iOS devices
-  disass          Disassemble ARM binaries at address or symbol
+  disass          🚧 [WIP] Disassemble ARM binaries at address or symbol
   download        Download and parse IPSW(s) from the internets
   dtree           Parse DeviceTree
   dyld            Parse dyld_shared_cache
@@ -61,6 +61,7 @@ Available Commands:
   kernel          Parse kernelcache
   macho           Parse a MachO file
   ota             Extract file(s) from OTA
+  symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
   version         Print the version number of ipsw
 
 Flags:

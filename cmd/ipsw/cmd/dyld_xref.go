@@ -100,6 +100,10 @@ var xrefCmd = &cobra.Command{
 			return err
 		}
 
+		log.WithFields(log.Fields{
+			"dylib": image.Name,
+		}).Info("Address location")
+
 		if err := f.AnalyzeImage(image); err != nil {
 			return fmt.Errorf("failed to analyze image: %s; %#v", image.Name, err)
 		}
@@ -114,11 +118,6 @@ var xrefCmd = &cobra.Command{
 			soff, err := f.GetOffset(fn.StartAddr)
 			if err != nil {
 				return err
-			}
-
-			if fn.StartAddr > fn.EndAddr {
-				log.Errorf("bad function: start=%#x, end=%#x", fn.StartAddr, fn.EndAddr)
-				continue
 			}
 
 			data, err := f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
