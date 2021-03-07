@@ -48,7 +48,6 @@ func (f *File) FirstPass(r io.ReadSeeker, options arm64.Options) []uint64 {
 	for i := range arm64.Disassemble(r, options) {
 
 		if i.Error != nil {
-			fmt.Println(i.StrRepr)
 			continue
 		}
 
