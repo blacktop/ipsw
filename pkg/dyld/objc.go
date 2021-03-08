@@ -504,33 +504,33 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 		}
 
 		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
-
-		sec := m.Section("__DATA", "__objc_classrefs")
-		if sec != nil {
-			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
-			classPtrs := make([]uint64, sec.Size/8)
-			if err := binary.Read(r, f.ByteOrder, &classPtrs); err != nil {
-				return err
-			}
-			for idx, ptr := range classPtrs {
-				classPtrs[idx] = ptr & mask // TODO use chain fixups
-			}
-
-			for idx, ptr := range classPtrs {
-				c, err := f.GetObjCClass(ptr)
-				if err != nil {
+		for _, secName := range []string{"__objc_classrefs", "__objc_superrefs"} {
+			sec := m.Section("__DATA", secName)
+			if sec != nil {
+				r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+				classPtrs := make([]uint64, sec.Size/8)
+				if err := binary.Read(r, f.ByteOrder, &classPtrs); err != nil {
 					return err
 				}
+				for idx, ptr := range classPtrs {
+					classPtrs[idx] = ptr & mask // TODO use chain fixups
+				}
 
-				image.ObjC.ClassRefs[ptr] = c
+				for idx, ptr := range classPtrs {
+					c, err := f.GetObjCClass(ptr)
+					if err != nil {
+						return err
+					}
 
-				if len(image.ObjC.ClassRefs[ptr].Name) > 0 {
-					f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("class_%s", image.ObjC.ClassRefs[ptr].Name)
-					f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
+					image.ObjC.ClassRefs[ptr] = c
+
+					if len(image.ObjC.ClassRefs[ptr].Name) > 0 {
+						f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("class_%s", image.ObjC.ClassRefs[ptr].Name)
+						f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
+					}
 				}
 			}
 		}
-
 		m.Close()
 	}
 

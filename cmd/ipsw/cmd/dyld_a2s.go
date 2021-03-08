@@ -215,24 +215,20 @@ var a2sCmd = &cobra.Command{
 		// TODO: add objc methods in the -[Class sel:] form
 		if m.HasObjC() {
 			log.Debug("Parsing ObjC runtime structures...")
-			err = f.CFStringsForImage(image.Name)
-			if err != nil {
+			if err := f.CFStringsForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc cfstrings")
 			}
-			err = f.MethodsForImage(image.Name)
-			if err != nil {
+			if err := f.MethodsForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc methods")
 			}
 			// if strings.Contains(image.Name, "libobjc.A.dylib") { // TODO: should I put this back in?
 			// 	_, err = f.GetAllSelectors(false)
 			// } else {
-			err = f.SelectorsForImage(image.Name)
-			// }
-			if err != nil {
+			if err := f.SelectorsForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc selectors")
 			}
-			err = f.ClassesForImage(image.Name)
-			if err != nil {
+			// }
+			if err := f.ClassesForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc classes")
 			}
 		}
