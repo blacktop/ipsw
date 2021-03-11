@@ -163,21 +163,25 @@ var machoCmd = &cobra.Command{
 				cds := m.CodeSignature().CodeDirectories
 				if len(cds) > 0 {
 					for _, cd := range cds {
+						var teamID string
+						if len(strings.Trim(cd.TeamID, "\x00")) > 0 {
+							teamID = fmt.Sprintf("\tTeamID:      %s\n", strings.Trim(cd.TeamID, "\x00"))
+						}
 						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
 						fmt.Printf("\tVersion:     %s\n"+
 							"\tFlags:       %s\n"+
 							"\tCodeLimit:   0x%x\n"+
 							"\tIdentifier:  %s (@0x%x)\n"+
-							"\tTeamID:      %s\n"+
+							"%s"+
 							"\tCDHash:      %s (computed)\n"+
 							"\t# of hashes: %d code (%d pages) + %d special\n"+
 							"\tHashes @%d size: %d Type: %s\n",
 							cd.Header.Version,
 							cd.Header.Flags,
 							cd.Header.CodeLimit,
-							cd.ID,
+							strings.Trim(cd.ID, "\x00"),
 							cd.Header.IdentOffset,
-							cd.TeamID,
+							teamID,
 							cd.CDHash,
 							cd.Header.NCodeSlots,
 							int(math.Pow(2, float64(cd.Header.PageSize))),

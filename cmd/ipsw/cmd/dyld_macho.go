@@ -39,10 +39,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldMachoCmd)
 
-	// dyldMachoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
 	dyldMachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
-	// dyldMachoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
-	// dyldMachoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	dyldMachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
