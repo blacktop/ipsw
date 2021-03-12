@@ -12,6 +12,7 @@ summary: Parse a MachO file
 - [**macho --ent**](#macho---ent)
 - [**macho --objc**](#macho---objc)
 - [**macho --fileset-entry**](#macho---fileset-entry)
+- [**macho lipo**](#macho-lipo)
 
 ### **macho -d**
 
