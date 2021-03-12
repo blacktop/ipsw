@@ -79,7 +79,7 @@ var importsCmd = &cobra.Command{
 		defer f.Close()
 
 		if argImage := f.Image(args[1]); argImage != nil {
-			title := fmt.Sprintf("%s Imported By:\n", filepath.Base(argImage.Name))
+			title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(argImage.Name))
 			fmt.Printf(title)
 			fmt.Println(strings.Repeat("=", len(title)-1))
 			for _, image := range f.Images {
