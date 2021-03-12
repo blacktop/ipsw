@@ -6,7 +6,19 @@ weight: 15
 summary: Dump shsh blobs.
 ---
 
-#### Dump shsh blob
+### Dump shsh blob
+
+#### Setup
+
+[Jailbreak](https://checkra.in/) your iDevice and install openssh
+
+```bash
+$ brew install libusbmuxd
+```
+
+```bash
+$ iproxy 2222 22
+```
 
 Dumping shsh blobs allows you to downgrade iOS later.
 
@@ -18,5 +30,3 @@ $ ipsw shsh
       • Parsing IMG4
          • Dumped SHSH blob to 1249767383957670.dumped.shsh
 ```
-
-> **NOTE:** This requires you have a jailbroken iDevice that you can ssh into.

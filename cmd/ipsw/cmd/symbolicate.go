@@ -219,7 +219,7 @@ var symbolicateCmd = &cobra.Command{
 				}
 
 				// if err := f.AnalyzeImage(image); err != nil {
-				// 	return fmt.Errorf("failed to analyze image %s; %#v", image.Name, err)
+				// 	return fmt.Errorf("failed to analyze image %s; %v", image.Name, err)
 				// }
 
 				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {

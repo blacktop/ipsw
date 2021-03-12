@@ -108,7 +108,7 @@ var machoCmd = &cobra.Command{
 			var shortOptions []string
 			for _, arch := range fat.Arches {
 				options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-				shortOptions = append(shortOptions, strings.ToLower(arch.CPU.String()))
+				shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
 			}
 
 			if len(selectedArch) > 0 {
@@ -139,7 +139,7 @@ var machoCmd = &cobra.Command{
 			if m.FileTOC.FileHeader.Type == types.FileSet {
 				m, err = m.GetFileSetFileByName(filesetEntry)
 				if err != nil {
-					return fmt.Errorf("failed to parse entry %s; %#v", filesetEntry, err)
+					return fmt.Errorf("failed to parse entry %s; %v", filesetEntry, err)
 				}
 			} else {
 				log.Error("MachO type is not FileSet")

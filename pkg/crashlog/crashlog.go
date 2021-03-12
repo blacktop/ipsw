@@ -110,48 +110,48 @@ func Open(name string) (*CrashLog, error) {
 	}
 
 	if err := crash.getReportVersion(); err != nil {
-		return nil, fmt.Errorf("failed to parse report version: %#v", err)
+		return nil, fmt.Errorf("failed to parse report version: %v", err)
 	}
 	if err := crash.getHardwareModel(); err != nil {
-		return nil, fmt.Errorf("failed to parse hardware model: %#v", err)
+		return nil, fmt.Errorf("failed to parse hardware model: %v", err)
 	}
 	if err := crash.getOSVersion(); err != nil {
-		return nil, fmt.Errorf("failed to parse os version: %#v", err)
+		return nil, fmt.Errorf("failed to parse os version: %v", err)
 	}
 	if err := crash.getProcess(); err != nil {
-		return nil, fmt.Errorf("failed to parse process: %#v", err)
+		return nil, fmt.Errorf("failed to parse process: %v", err)
 	}
 	if crash.ReportVersion != 104 && crash.ReportVersion != 105 {
 		return nil, fmt.Errorf("unsupported crash log report version: %d", crash.ReportVersion)
 	}
 
 	if err := crash.getExceptionType(); err != nil {
-		return nil, fmt.Errorf("failed to parse exception type: %#v", err)
+		return nil, fmt.Errorf("failed to parse exception type: %v", err)
 	}
 	if err := crash.getExceptionSubtype(); err != nil {
-		return nil, fmt.Errorf("failed to parse exception subtype: %#v", err)
+		return nil, fmt.Errorf("failed to parse exception subtype: %v", err)
 	}
 	if err := crash.getTerminationSignal(); err != nil {
-		return nil, fmt.Errorf("failed to parse termination signal: %#v", err)
+		return nil, fmt.Errorf("failed to parse termination signal: %v", err)
 	}
 	if err := crash.getTerminationReason(); err != nil {
-		return nil, fmt.Errorf("failed to parse termination reason: %#v", err)
+		return nil, fmt.Errorf("failed to parse termination reason: %v", err)
 	}
 	if err := crash.getTerminatingProcess(); err != nil {
-		return nil, fmt.Errorf("failed to parse terminating process: %#v", err)
+		return nil, fmt.Errorf("failed to parse terminating process: %v", err)
 	}
 	if err := crash.getTriggeringThread(); err != nil {
-		return nil, fmt.Errorf("failed to parse triggering thread: %#v", err)
+		return nil, fmt.Errorf("failed to parse triggering thread: %v", err)
 	}
 
 	if err := crash.getImages(); err != nil {
-		return nil, fmt.Errorf("failed to parse images: %#v", err)
+		return nil, fmt.Errorf("failed to parse images: %v", err)
 	}
 	if err := crash.getThreads(); err != nil {
-		return nil, fmt.Errorf("failed to parse threads: %#v", err)
+		return nil, fmt.Errorf("failed to parse threads: %v", err)
 	}
 	if err := crash.getBackTraces(); err != nil {
-		return nil, fmt.Errorf("failed to parse back traces: %#v", err)
+		return nil, fmt.Errorf("failed to parse back traces: %v", err)
 	}
 
 	// TODO: prune unused images?
