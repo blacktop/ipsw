@@ -63,11 +63,10 @@ func Extract(ipsw string) error {
 		}
 
 		utils.Indent(log.Info, 2)("Mounting DMG")
-		device, err := utils.Mount(dmgs[0], mountPoint)
-		if err != nil {
+		if err := utils.Mount(dmgs[0], mountPoint); err != nil {
 			return errors.Wrapf(err, "failed to mount %s", dmgs[0])
 		}
-		defer unmount(device)
+		defer unmount(mountPoint)
 
 		matches, err := filepath.Glob(filepath.Join(mountPoint, searchStr))
 		if err != nil {

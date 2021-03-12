@@ -44,10 +44,9 @@ func init() {
 
 // lipoCmd represents the lipo command
 var lipoCmd = &cobra.Command{
-	Use:    "lipo",
-	Short:  "Extract single MachO out of a universal/fat MachO",
-	Args:   cobra.MinimumNArgs(1),
-	Hidden: true,
+	Use:   "lipo",
+	Short: "Extract single MachO out of a universal/fat MachO",
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var farch macho.FatArch
@@ -67,7 +66,7 @@ var lipoCmd = &cobra.Command{
 		// first check for fat file
 		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {
-			return fmt.Errorf("failed to open file: %#v", err)
+			return fmt.Errorf("failed to open file: %v", err)
 		}
 		defer fat.Close()
 
@@ -107,18 +106,18 @@ var lipoCmd = &cobra.Command{
 
 			f, err := os.Open(machoPath)
 			if err != nil {
-				return fmt.Errorf("failed to open file %s: %#v", machoPath, err)
+				return fmt.Errorf("failed to open file %s: %v", machoPath, err)
 			}
 			defer f.Close()
 
 			dat := make([]byte, farch.Size)
 			if _, err := f.ReadAt(dat, int64(farch.Offset)); err != nil {
-				return fmt.Errorf("failed to read data in file at %#x: %#v", farch.Offset, err)
+				return fmt.Errorf("failed to read data in file at %#x: %v", farch.Offset, err)
 			}
 
 			outFile := fmt.Sprintf("%s.%s", args[0], strings.ToLower(farch.SubCPU.String(farch.CPU)))
 			if err := ioutil.WriteFile(outFile, dat, 0755); err != nil {
-				return fmt.Errorf("failed to create file %s: %#v", outFile, err)
+				return fmt.Errorf("failed to create file %s: %v", outFile, err)
 			}
 			log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), outFile)
 		}

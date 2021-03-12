@@ -79,7 +79,7 @@ var symbolsetsCmd = &cobra.Command{
 		if m.FileTOC.FileHeader.Type == types.FileSet {
 			m, err = m.GetFileSetFileByName("com.apple.kernel")
 			if err != nil {
-				return fmt.Errorf("failed to parse entry com.apple.kernel; %#v", err)
+				return fmt.Errorf("failed to parse entry com.apple.kernel; %v", err)
 			}
 		}
 

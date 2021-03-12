@@ -35,7 +35,7 @@ func (f *File) GetVMAddress(offset uint64) (uint64, error) {
 func (f *File) ReadBytes(offset int64, size uint64) ([]byte, error) {
 	data := make([]byte, size)
 	if _, err := f.r.ReadAt(data, offset); err != nil {
-		return nil, fmt.Errorf("failed to read bytes at offset %#x: %#v", offset, err)
+		return nil, fmt.Errorf("failed to read bytes at offset %#x: %v", offset, err)
 	}
 	return data, nil
 }
@@ -44,7 +44,7 @@ func (f *File) ReadBytes(offset int64, size uint64) ([]byte, error) {
 func (f *File) ReadPointer(offset uint64) (uint64, error) {
 	u64 := make([]byte, 8)
 	if _, err := f.r.ReadAt(u64, int64(offset)); err != nil {
-		return 0, fmt.Errorf("failed to read pointer at offset %#x: %#v", offset, err)
+		return 0, fmt.Errorf("failed to read pointer at offset %#x: %v", offset, err)
 	}
 	return binary.LittleEndian.Uint64(u64), nil
 }
@@ -53,7 +53,7 @@ func (f *File) ReadPointer(offset uint64) (uint64, error) {
 func (f *File) ReadPointerAtAddress(addr uint64) (uint64, error) {
 	offset, err := f.GetOffset(addr)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get offset: %#v", err)
+		return 0, fmt.Errorf("failed to get offset: %v", err)
 	}
 	return f.ReadPointer(offset)
 }
