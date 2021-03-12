@@ -21,6 +21,8 @@ summary: Parse dyld_shared_cache.
 - [**dyld a2o**](#dyld-a2o)
 - [**dyld o2a**](#dyld-o2a)
 - [**dyld disass**](#dyld-disass)
+- [**dyld imports**](#dyld-imports)
+- [**dyld xref**](#dyld-xref)
 
 ---
 
@@ -110,7 +112,7 @@ $ docker run --init -it --rm \
 
 ### **dyld macho**
 
-Parse a dyld_shared_cache dylib _(same as ipsw macho cmd)_
+Parse a dyld*shared_cache dylib *(same as ipsw macho cmd)\_
 
 ```bash
 $ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads | bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
@@ -467,4 +469,87 @@ _NSLog:
 0x1808b9984:  ff 83 00 91       add             sp, sp, #0x20
 0x1808b9988:  ff 0f 5f d6       retab
 0x1808b998c:  55 c1 e0 97       bl              ___stack_chk_fail
+```
+
+### **dyld imports**
+
+Disassemble a function in the _dyld_shared_cache_
+
+```bash
+$ ipsw dyld imports dyld_shared_cache JavaScriptCore
+
+JavaScriptCore Imported By:
+===========================
+/System/Library/Frameworks/WebKit.framework/WebKit
+/System/Library/PrivateFrameworks/WebCore.framework/WebCore
+/System/Library/PrivateFrameworks/WebBookmarks.framework/WebBookmarks
+/System/Library/PrivateFrameworks/SafariShared.framework/SafariShared
+/System/Library/PrivateFrameworks/JetEngine.framework/JetEngine
+/System/Library/Frameworks/SafariServices.framework/SafariServices
+/System/Library/PrivateFrameworks/WebKitLegacy.framework/WebKitLegacy
+/System/Library/PrivateFrameworks/SafariSharedUI.framework/SafariSharedUI
+/System/Library/PrivateFrameworks/VideosUI.framework/VideosUI
+/System/Library/PrivateFrameworks/StoreKitUI.framework/StoreKitUI
+/System/Library/PrivateFrameworks/iTunesStoreUI.framework/iTunesStoreUI
+/System/Library/PrivateFrameworks/ITMLKit.framework/ITMLKit
+/System/Library/PrivateFrameworks/AppStoreKit.framework/AppStoreKit
+/System/Library/PrivateFrameworks/WorkflowKit.framework/WorkflowKit
+/System/Library/PreferenceBundles/MobileSafariSettings.bundle/MobileSafariSettings
+/System/Library/PrivateFrameworks/ActionKit.framework/ActionKit
+/System/Library/PrivateFrameworks/Cards.framework/Cards
+/System/Library/PrivateFrameworks/CommunicationsSetupUI.framework/CommunicationsSetupUI
+/System/Library/PrivateFrameworks/CoreChart.framework/CoreChart
+/System/Library/PrivateFrameworks/JITAppKit.framework/JITAppKit
+/System/Library/PrivateFrameworks/MailWebProcessSupport.framework/MailWebProcessSupport
+/System/Library/PrivateFrameworks/MetricsKit.framework/MetricsKit
+/System/Library/PrivateFrameworks/RemoteUI.framework/RemoteUI
+/System/Library/PrivateFrameworks/SeymourServices.framework/SeymourServices
+/System/Library/PrivateFrameworks/SlideshowKit.framework/Frameworks/OpusKit.framework/OpusKit
+/System/Library/PrivateFrameworks/TVMLKit.framework/TVMLKit
+/System/Library/PrivateFrameworks/TelephonyPreferences.framework/TelephonyPreferences
+/System/Library/PrivateFrameworks/TouchML.framework/TouchML
+/System/Library/PrivateFrameworks/VideoSubscriberAccountUI.framework/VideoSubscriberAccountUI
+/System/Library/PrivateFrameworks/WebApp.framework/WebApp
+/System/Library/PrivateFrameworks/WebInspector.framework/WebInspector
+/System/Library/PrivateFrameworks/WebUI.framework/WebUI
+/System/Library/PrivateFrameworks/WorkflowEditor.framework/WorkflowEditor
+```
+
+### **dyld xref**
+
+List all the cross-references in the _dyld_shared_cache_ for a given virtual address
+
+```bash
+ipsw dyld symaddr dyld_shared_cache_arm64e _NSLog
+0x1817e73e4: (Regular) _NSLog   /System/Library/Frameworks/Foundation.framework/Foundation
+```
+
+```bash
+$ ipsw dyld xref dyld_shared_cache 0x1817e73e4
+   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation
+
+XREFS
+=====
+0x1817bd1b8: _addValueToTopContainerE
+0x1817c9bd8: _NSNextMapEnumeratorPair
+0x1818544a0: -[NSTransitInformationCheckingResult initWithCoder:]
+0x1816e744c: -[__NSConcreteURLComponents setHost:]
+0x1816f268c: +[_NSObserverList destroyObserverListForObject:]
+0x1817a03c0: ___73-[NSUTIPredicateOperator performPrimitiveOperationUsingObject:andObject:]_block_invoke
+0x1817ca24c: _NSAllMapTableValues
+0x1817ec064: ___destroyPortContext
+0x1817914c4: _NSEndHashTableEnumeration
+0x1817b0690: __NSKVONotifyingEnableForInfoAndKey
+0x1817ec980: ___NSFireMessagePort
+0x18188bf30: ___70-[NSFileCoordinator(NSPrivate) _blockOnAccessClaim:withAccessArbiter:]_block_invoke_2
+0x1816d4e84: -[NSConcreteMutableAttributedString initWithString:attributes:]
+0x181748d68: -[__NSConcreteURLComponents rangeOfPath]
+0x1817c9c74: _NSEndMapTableEnumeration
+0x181866158: ___32-[NSUserActivity typeIdentifier]_block_invoke
+0x1818dbc6c: -[NSXPCConnection stop]
+0x181713a98: -[__NSConcreteURLComponents setQueryItems:]
+0x18173406c: -[__NSConcreteURLComponents query]
+0x181827854: -[__NSConcreteURLComponents user]
+0x181828264: -[__NSConcreteURLComponents percentEncodedQuery]
+<SNIP>
 ```

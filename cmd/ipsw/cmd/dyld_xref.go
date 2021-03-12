@@ -137,7 +137,7 @@ var xrefCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Println("XREFS")
+		fmt.Printf("\nXREFS\n")
 		fmt.Println("=====")
 		for addr, sym := range xrefs {
 			fmt.Printf("%#x: %s\n", addr, sym)
