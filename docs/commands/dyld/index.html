@@ -206,6 +206,8 @@
 <li><a href="#dyld-a2o"><strong>dyld a2o</strong></a></li>
 <li><a href="#dyld-o2a"><strong>dyld o2a</strong></a></li>
 <li><a href="#dyld-disass"><strong>dyld disass</strong></a></li>
+<li><a href="#dyld-imports"><strong>dyld imports</strong></a></li>
+<li><a href="#dyld-xref"><strong>dyld xref</strong></a></li>
 </ul>
 <hr>
 <h3 id="dyld-info"><strong>dyld info</strong></h3>
@@ -281,7 +283,7 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 </span><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
 </span><span class="se"></span>             blacktop/ipsw -V dyld extract iPhone11_2_12.4.1_16G102_Restore.ipsw
 </code></pre></div><h3 id="dyld-macho"><strong>dyld macho</strong></h3>
-<p>Parse a dyld_shared_cache dylib <em>(same as ipsw macho cmd)</em></p>
+<p>Parse a dyld*shared_cache dylib *(same as ipsw macho cmd)_</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads <span class="p">|</span> bat -l m --tabs <span class="m">0</span> -p --theme Nord --wrap<span class="o">=</span>never --pager <span class="s2">&#34;less -S&#34;</span>
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
@@ -523,6 +525,76 @@ offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
 <span class="mh">0x1808b9984</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">83</span> <span class="m">00</span> <span class="m">91</span>       <span class="n">add</span>             <span class="n">sp</span><span class="p">,</span> <span class="n">sp</span><span class="p">,</span> <span class="c1">#0x20</span>
 <span class="mh">0x1808b9988</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">0</span><span class="n">f</span> <span class="m">5</span><span class="n">f</span> <span class="n">d6</span>       <span class="n">retab</span>
 <span class="mh">0x1808b998c</span><span class="o">:</span>  <span class="m">55</span> <span class="n">c1</span> <span class="n">e0</span> <span class="m">97</span>       <span class="n">bl</span>              <span class="n">___stack_chk_fail</span>
+</code></pre></div><h3 id="dyld-imports"><strong>dyld imports</strong></h3>
+<p>Disassemble a function in the <em>dyld_shared_cache</em></p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld imports dyld_shared_cache JavaScriptCore
+
+JavaScriptCore Imported By:
+<span class="o">===========================</span>
+/System/Library/Frameworks/WebKit.framework/WebKit
+/System/Library/PrivateFrameworks/WebCore.framework/WebCore
+/System/Library/PrivateFrameworks/WebBookmarks.framework/WebBookmarks
+/System/Library/PrivateFrameworks/SafariShared.framework/SafariShared
+/System/Library/PrivateFrameworks/JetEngine.framework/JetEngine
+/System/Library/Frameworks/SafariServices.framework/SafariServices
+/System/Library/PrivateFrameworks/WebKitLegacy.framework/WebKitLegacy
+/System/Library/PrivateFrameworks/SafariSharedUI.framework/SafariSharedUI
+/System/Library/PrivateFrameworks/VideosUI.framework/VideosUI
+/System/Library/PrivateFrameworks/StoreKitUI.framework/StoreKitUI
+/System/Library/PrivateFrameworks/iTunesStoreUI.framework/iTunesStoreUI
+/System/Library/PrivateFrameworks/ITMLKit.framework/ITMLKit
+/System/Library/PrivateFrameworks/AppStoreKit.framework/AppStoreKit
+/System/Library/PrivateFrameworks/WorkflowKit.framework/WorkflowKit
+/System/Library/PreferenceBundles/MobileSafariSettings.bundle/MobileSafariSettings
+/System/Library/PrivateFrameworks/ActionKit.framework/ActionKit
+/System/Library/PrivateFrameworks/Cards.framework/Cards
+/System/Library/PrivateFrameworks/CommunicationsSetupUI.framework/CommunicationsSetupUI
+/System/Library/PrivateFrameworks/CoreChart.framework/CoreChart
+/System/Library/PrivateFrameworks/JITAppKit.framework/JITAppKit
+/System/Library/PrivateFrameworks/MailWebProcessSupport.framework/MailWebProcessSupport
+/System/Library/PrivateFrameworks/MetricsKit.framework/MetricsKit
+/System/Library/PrivateFrameworks/RemoteUI.framework/RemoteUI
+/System/Library/PrivateFrameworks/SeymourServices.framework/SeymourServices
+/System/Library/PrivateFrameworks/SlideshowKit.framework/Frameworks/OpusKit.framework/OpusKit
+/System/Library/PrivateFrameworks/TVMLKit.framework/TVMLKit
+/System/Library/PrivateFrameworks/TelephonyPreferences.framework/TelephonyPreferences
+/System/Library/PrivateFrameworks/TouchML.framework/TouchML
+/System/Library/PrivateFrameworks/VideoSubscriberAccountUI.framework/VideoSubscriberAccountUI
+/System/Library/PrivateFrameworks/WebApp.framework/WebApp
+/System/Library/PrivateFrameworks/WebInspector.framework/WebInspector
+/System/Library/PrivateFrameworks/WebUI.framework/WebUI
+/System/Library/PrivateFrameworks/WorkflowEditor.framework/WorkflowEditor
+</code></pre></div><h3 id="dyld-xref"><strong>dyld xref</strong></h3>
+<p>List all the cross-references in the <em>dyld_shared_cache</em> for a given virtual address</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld symaddr dyld_shared_cache_arm64e _NSLog
+0x1817e73e4: <span class="o">(</span>Regular<span class="o">)</span> _NSLog   /System/Library/Frameworks/Foundation.framework/Foundation
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld xref dyld_shared_cache 0x1817e73e4
+   • Address location          <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/Foundation.framework/Foundation
+
+<span class="nv">XREFS</span>
+<span class="o">=====</span>
+0x1817bd1b8: _addValueToTopContainerE
+0x1817c9bd8: _NSNextMapEnumeratorPair
+0x1818544a0: -<span class="o">[</span>NSTransitInformationCheckingResult initWithCoder:<span class="o">]</span>
+0x1816e744c: -<span class="o">[</span>__NSConcreteURLComponents setHost:<span class="o">]</span>
+0x1816f268c: +<span class="o">[</span>_NSObserverList destroyObserverListForObject:<span class="o">]</span>
+0x1817a03c0: ___73-<span class="o">[</span>NSUTIPredicateOperator performPrimitiveOperationUsingObject:andObject:<span class="o">]</span>_block_invoke
+0x1817ca24c: _NSAllMapTableValues
+0x1817ec064: ___destroyPortContext
+0x1817914c4: _NSEndHashTableEnumeration
+0x1817b0690: __NSKVONotifyingEnableForInfoAndKey
+0x1817ec980: ___NSFireMessagePort
+0x18188bf30: ___70-<span class="o">[</span>NSFileCoordinator<span class="o">(</span>NSPrivate<span class="o">)</span> _blockOnAccessClaim:withAccessArbiter:<span class="o">]</span>_block_invoke_2
+0x1816d4e84: -<span class="o">[</span>NSConcreteMutableAttributedString initWithString:attributes:<span class="o">]</span>
+0x181748d68: -<span class="o">[</span>__NSConcreteURLComponents rangeOfPath<span class="o">]</span>
+0x1817c9c74: _NSEndMapTableEnumeration
+0x181866158: ___32-<span class="o">[</span>NSUserActivity typeIdentifier<span class="o">]</span>_block_invoke
+0x1818dbc6c: -<span class="o">[</span>NSXPCConnection stop<span class="o">]</span>
+0x181713a98: -<span class="o">[</span>__NSConcreteURLComponents setQueryItems:<span class="o">]</span>
+0x18173406c: -<span class="o">[</span>__NSConcreteURLComponents query<span class="o">]</span>
+0x181827854: -<span class="o">[</span>__NSConcreteURLComponents user<span class="o">]</span>
+0x181828264: -<span class="o">[</span>__NSConcreteURLComponents percentEncodedQuery<span class="o">]</span>
+&lt;SNIP&gt;
 </code></pre></div>
 </div>
 </div>
