@@ -44,7 +44,9 @@ import (
 
 func init() {
 	rootCmd.AddCommand(debugserverCmd)
+	debugserverCmd.Flags().StringP("host", "t", "localhost", "ssh host")
 	debugserverCmd.Flags().StringP("port", "p", "2222", "ssh port")
+	debugserverCmd.Flags().StringP("image", "i", "", "path to DeveloperDiskImage.dmg")
 	debugserverCmd.Flags().BoolP("force", "f", false, "overwrite file on device")
 }
 
@@ -61,17 +63,21 @@ var debugserverCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		sshHost, _ := cmd.Flags().GetString("host")
 		sshPort, _ := cmd.Flags().GetString("port")
+		imagePath, _ := cmd.Flags().GetString("image")
 		force, _ := cmd.Flags().GetBool("force")
 
 		home, err := homedir.Dir()
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Error(err.Error())
+			return
 		}
 
 		hostKeyCallback, err := knownhosts.New(filepath.Join(home, ".ssh/known_hosts"))
 		if err != nil {
-			log.Fatal(err.Error())
+			log.Error(err.Error())
+			return
 		}
 
 		sshConfig := &ssh.ClientConfig{
@@ -82,9 +88,9 @@ var debugserverCmd = &cobra.Command{
 			HostKeyCallback: hostKeyCallback,
 		}
 
-		utils.Indent(log.Info, 1)(fmt.Sprintf("Connecting to root@localhost:%s", sshPort))
+		utils.Indent(log.Info, 1)(fmt.Sprintf("Connecting to root@%s:%s", sshHost, sshPort))
 
-		client, err := ssh.Dial("tcp", "localhost:"+sshPort, sshConfig)
+		client, err := ssh.Dial("tcp", sshHost+":"+sshPort, sshConfig)
 		if err != nil {
 			log.Fatalf("failed to dial: %s", err)
 		}
@@ -104,26 +110,29 @@ var debugserverCmd = &cobra.Command{
 			// Find all the DeveloperDiskImages
 			images, err := filepath.Glob("/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/*/DeveloperDiskImage.dmg")
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
 			betaImages, err := filepath.Glob("/Applications/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/*/DeveloperDiskImage.dmg")
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
 			images = append(images, betaImages...)
 
-			choice := 0
-			prompt := &survey.Select{
-				Message: fmt.Sprintf("Select the DeveloperDiskImage you want to extract the debugserver from:"),
-				Options: images,
+			if len(imagePath) == 0 {
+				choice := 0
+				prompt := &survey.Select{
+					Message: fmt.Sprintf("Select the DeveloperDiskImage you want to extract the debugserver from:"),
+					Options: images,
+				}
+				survey.AskOne(prompt, &choice)
+				imagePath = images[choice]
 			}
-			survey.AskOne(prompt, &choice)
-			// dmg := "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/14.4/DeveloperDiskImage.dmg"
+
 			utils.Indent(log.Info, 2)("Mounting DeveloperDiskImage")
-			// if err := utils.Mount(dmg, "/tmp/dev_img"); err != nil {
-			if err := utils.Mount(images[choice], "/tmp/dev_img"); err != nil {
-				utils.Indent(log.Fatal, 2)(fmt.Sprintf("failed to mount %s: %v", images[choice], err))
-				// utils.Indent(log.Fatal, 2)(fmt.Sprintf("failed to mount %s: %v", dmg, err))
+			if err := utils.Mount(imagePath, "/tmp/dev_img"); err != nil {
+				utils.Indent(log.Fatal, 2)(fmt.Sprintf("failed to mount %s: %v", imagePath, err))
 			}
 			defer func() {
 				utils.Indent(log.Info, 2)("Unmounting DeveloperDiskImage")
@@ -132,58 +141,73 @@ var debugserverCmd = &cobra.Command{
 				}
 			}()
 
+			// Read entitlements.plist and write to tmp file
 			statikFS, err := fs.New()
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
 			plist, err := statikFS.Open("/debugserver.plist")
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
-
 			data, err := ioutil.ReadAll(plist)
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
-
 			tmpEntsFile, err := ioutil.TempFile("", "entitlements.plist")
 			if err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
 			defer os.Remove(tmpEntsFile.Name()) // clean up
-
-			f, err := os.Open("/tmp/dev_img/usr/bin/debugserver")
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			defer f.Close()
-
-			tmpDbgSrvFile, err := ioutil.TempFile("", "debugserver")
-			if err != nil {
-				log.Fatal(err.Error())
-			}
-			defer os.Remove(tmpDbgSrvFile.Name()) // clean up
-
-			if _, err := io.Copy(tmpDbgSrvFile, f); err != nil {
-				log.Fatal(err.Error())
-			}
-			if err := tmpDbgSrvFile.Close(); err != nil {
-				log.Fatal(err.Error())
-			}
-
 			if _, err := tmpEntsFile.Write(data); err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
 			if err := tmpEntsFile.Close(); err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
+			}
+
+			// Read debugserver and write to tmp file
+			roDbgSvr, err := os.Open("/tmp/dev_img/usr/bin/debugserver")
+			if err != nil {
+				log.Error(err.Error())
+				return
+			}
+			defer roDbgSvr.Close()
+			tmpDbgSrvFile, err := ioutil.TempFile("", "debugserver")
+			if err != nil {
+				log.Error(err.Error())
+				return
+			}
+			defer os.Remove(tmpDbgSrvFile.Name()) // clean up
+			if _, err := io.Copy(tmpDbgSrvFile, roDbgSvr); err != nil {
+				log.Error(err.Error())
+				return
+			}
+			if err := tmpDbgSrvFile.Close(); err != nil {
+				log.Error(err.Error())
+				return
 			}
 
 			utils.Indent(log.Info, 2)("Adding entitlements to /usr/bin/debugserver")
 			if err := utils.CodeSignWithEntitlements(tmpDbgSrvFile.Name(), tmpEntsFile.Name(), "-"); err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
 
 			utils.Indent(log.Info, 2)("Copying /usr/bin/debugserver to device")
+			dbgSvr, err := os.Open(tmpDbgSrvFile.Name())
+			if err != nil {
+				log.Error(err.Error())
+				return
+			}
+			defer dbgSvr.Close()
+
 			sessionSCP, err := client.NewSession()
 			if err != nil {
 				log.Fatalf("failed to create scp session: %s", err)
@@ -193,22 +217,43 @@ var debugserverCmd = &cobra.Command{
 			go func() error {
 				w, _ := sessionSCP.StdinPipe()
 				defer w.Close()
-				count, err := io.Copy(w, f)
+
+				count, err := io.Copy(w, dbgSvr)
 				if err != nil {
-					log.Fatal(err.Error())
+					log.Error(err.Error())
+					return err
 				}
 				if count == 0 {
 					return fmt.Errorf("%d bytes copied to device", count)
 				}
+
 				return nil
 			}()
 
 			if err := sessionSCP.Start("cat > /usr/bin/debugserver"); err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
 			}
 
 			if err := sessionSCP.Wait(); err != nil {
-				log.Fatal(err.Error())
+				log.Error(err.Error())
+				return
+			}
+
+			// chmod /usr/bin/debugserver
+			sessionCHMOD, err := client.NewSession()
+			if err != nil {
+				log.Fatalf("failed to create chmod session: %s", err)
+			}
+			defer sessionCHMOD.Close()
+			if err := sessionCHMOD.Start("chmod 0755 /usr/bin/debugserver"); err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			if err := sessionCHMOD.Wait(); err != nil {
+				log.Error(err.Error())
+				return
 			}
 
 		} else {
