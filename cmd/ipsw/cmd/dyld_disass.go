@@ -32,6 +32,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -58,11 +59,12 @@ var dyldDisassCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var data []byte
+		var isMiddle bool
 		var symAddr uint64
 		var startAddr uint64
 		var image *dyld.CacheImage
-		var data []byte
-		var isMiddle bool
+		var dFunc *types.Function
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -191,7 +193,7 @@ var dyldDisassCmd = &cobra.Command{
 
 		log.WithFields(log.Fields{"dylib": image.Name}).Info("Found symbol")
 
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
 			return err
 		}
@@ -211,6 +213,7 @@ var dyldDisassCmd = &cobra.Command{
 			}
 		} else {
 			if fn, err := m.GetFunctionForVMAddr(symAddr); err == nil {
+				dFunc = &fn
 				soff, err := f.GetOffset(fn.StartAddr)
 				if err != nil {
 					return err
@@ -224,6 +227,10 @@ var dyldDisassCmd = &cobra.Command{
 					startAddr = fn.StartAddr
 				}
 			}
+		}
+
+		if data == nil {
+			log.Fatal("failed to disassemble")
 		}
 
 		/*
@@ -251,15 +258,15 @@ var dyldDisassCmd = &cobra.Command{
 		//***********************
 		//* First pass ANALYSIS *
 		//***********************
-		// immAddrs := f.FirstPass(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)})
-
-		// for _, imA := range immAddrs {
-		// 	if img, err := f.GetImageContainingVMAddr(imA); err == nil {
-		// 		if err := f.AnalyzeImage(img); err != nil {
-		// 			return err
-		// 		}
-		// 	}
-		// }
+		if tri, err := f.FirstPassTriage(m, dFunc, bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}, true); err == nil {
+			for _, img := range tri.Dylibs {
+				if err := f.AnalyzeImage(img); err != nil {
+					return err
+				}
+			}
+		} else {
+			log.Errorf("first pass triage failed: %v", err)
+		}
 
 		/*
 		 * Load symbols from all of the dylibs loaded by the target sym/addr's image
@@ -275,7 +282,7 @@ var dyldDisassCmd = &cobra.Command{
 		// 				if err := f.GetLocalSymbolsForImage(dep); err != nil {
 		// 					log.Errorf("failed to parse local symbols for %s", dep)
 		// 				}
-		// 				dM, err := f.Image(dep).GetPartialMacho()
+		// 				dM, err := f.Image(dep).GetMacho()
 		// 				if err != nil {
 		// 					return err
 		// 				}
@@ -293,12 +300,10 @@ var dyldDisassCmd = &cobra.Command{
 
 		if m.HasObjC() {
 			log.Info("Parsing ObjC runtime structures...")
-			err = f.CFStringsForImage(image.Name)
-			if err != nil {
+			if err := f.CFStringsForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc cfstrings")
 			}
-			err = f.MethodsForImage(image.Name)
-			if err != nil {
+			if err := f.MethodsForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc methods")
 			}
 			if strings.Contains(image.Name, "libobjc.A.dylib") {
@@ -309,8 +314,7 @@ var dyldDisassCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrapf(err, "failed to parse objc selectors")
 			}
-			err = f.ClassesForImage(image.Name)
-			if err != nil {
+			if err := f.ClassesForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc classes")
 			}
 		}
@@ -372,13 +376,23 @@ var dyldDisassCmd = &cobra.Command{
 				}
 
 			} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
-				operands := i.Instruction.Operands()
-				if operands != nil && operands[0].OpClass == arm64.LABEL {
-					symName := f.FindSymbol(operands[0].Immediate, demangleFlag)
-					if len(symName) > 0 {
-						opStr = fmt.Sprintf("\t%s", symName)
+				if operands := i.Instruction.Operands(); operands != nil {
+					for _, operand := range operands {
+						if operand.OpClass == arm64.LABEL {
+							symName := f.FindSymbol(operand.Immediate, demangleFlag)
+							if len(symName) > 0 {
+								opStr = fmt.Sprintf("\t%s", symName)
+							} else {
+								if dFunc != nil {
+									if operand.Immediate >= dFunc.StartAddr && operand.Immediate < dFunc.EndAddr {
+										opStr = strings.Replace(opStr, fmt.Sprintf("#%#x", operand.Immediate), fmt.Sprintf("loc_%x", operand.Immediate), 1)
+									}
+								}
+							}
+						}
 					}
 				}
+
 			} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
 				operation := i.Instruction.Operation()
 				if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
@@ -387,6 +401,12 @@ var dyldDisassCmd = &cobra.Command{
 						symName := f.FindSymbol(operands[1].Immediate, demangleFlag)
 						if len(symName) > 0 {
 							opStr += fmt.Sprintf(" ; %s", symName)
+						} else {
+							if dFunc != nil {
+								if operands[1].Immediate >= dFunc.StartAddr && operands[1].Immediate < dFunc.EndAddr {
+									opStr = fmt.Sprintf("\tloc_%x", operands[1].Immediate)
+								}
+							}
 						}
 					}
 				}
