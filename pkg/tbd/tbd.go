@@ -21,30 +21,26 @@ type TBD struct {
 }
 
 // NewTBD creates a new tbd object
-func NewTBD(dyldPath, imageName string) (*TBD, error) {
+func NewTBD(f *dyld.File, image *dyld.CacheImage) (*TBD, error) {
 	var syms []string
-	// get dyld
-	f, err := dyld.Open(dyldPath)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	// get image
-	i := f.Image(imageName)
-	if i == nil {
-		return nil, fmt.Errorf("image not found")
-	}
-	// get macho
-	m, err := i.GetMacho()
+
+	m, err := image.GetMacho()
 	if err != nil {
 		return nil, err
 	}
 	defer m.Close()
+
 	// get symbols
-	for _, sym := range m.Symtab.Syms {
-		if sym.Type.IsAbsoluteSym() {
+	if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
+		exports, err := m.DyldExports()
+		if err != nil {
+			return nil, err
+		}
+		for _, sym := range exports {
 			syms = append(syms, sym.Name)
 		}
+	} else {
+		return nil, fmt.Errorf("%s contains no exported symbols", image.Name)
 	}
 
 	archs := strings.Fields(strings.ToLower(m.SubCPU.String(m.CPU)))[0]
@@ -56,7 +52,7 @@ func NewTBD(dyldPath, imageName string) (*TBD, error) {
 		UUID:     m.UUID().ID,
 		Archs:    []string{archs},
 		Platform: strings.ToLower(f.Platform.String()),
-		Path:     i.Name,
+		Path:     image.Name,
 		Version:  m.SourceVersion().Version,
 		Symbols:  syms,
 	}, nil

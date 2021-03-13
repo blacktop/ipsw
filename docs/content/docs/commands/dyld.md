@@ -23,6 +23,7 @@ summary: Parse dyld_shared_cache.
 - [**dyld disass**](#dyld-disass)
 - [**dyld imports**](#dyld-imports)
 - [**dyld xref**](#dyld-xref)
+- [**dyld tbd**](#dyld-tbd)
 
 ---
 
@@ -552,4 +553,26 @@ XREFS
 0x181827854: -[__NSConcreteURLComponents user]
 0x181828264: -[__NSConcreteURLComponents percentEncodedQuery]
 <SNIP>
+```
+
+### **dyld tbd**
+
+Generate a `.tbd` file for a dylib
+
+```bash
+$ ipsw dyld tbd dyld_shared_cache CoreSymbolication
+   • Created CoreSymbolication.tbd
+```
+
+```bash
+$ cat CoreSymbolication.tbd
+---
+archs:           [ arm64e ]
+platform:        ios
+install-name:    /System/Library/PrivateFrameworks/CoreSymbolication.framework/CoreSymbolication
+current-version: 64544.69.1.0.0
+exports:
+  - archs:           [ arm64e ]
+    symbols:         [ _unmap_node, _thread_name_for_thread_port, <SNIP> ]
+...
 ```
