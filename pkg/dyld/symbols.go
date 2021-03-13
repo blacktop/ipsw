@@ -260,7 +260,7 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if i.CacheImageInfoExtra.ExportsTrieAddr == 0 {
-		m, err := i.GetPartialMacho()
+		m, err := i.GetMacho()
 		if err != nil {
 			return nil, err
 		}

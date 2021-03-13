@@ -103,7 +103,6 @@ func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
 			return nil, nil, fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
 		}
 
-		// log.Debugf("Objective-C Optimization:\n%s", opt)
 		return s, &opt, nil
 	}
 

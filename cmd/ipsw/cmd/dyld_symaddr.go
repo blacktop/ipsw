@@ -112,7 +112,7 @@ var symaddrCmd = &cobra.Command{
 			// Dump ALL symbols for a dylib
 			if err := f.GetLocalSymbolsForImage(f.Image(imageName)); err != nil {
 				log.Error(err.Error())
-				m, err := f.Image(imageName).GetPartialMacho()
+				m, err := f.Image(imageName).GetMacho()
 				if err != nil {
 					return err
 				}

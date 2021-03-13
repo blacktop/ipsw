@@ -62,7 +62,7 @@ update_keys:
 
 .PHONY: dry_release
 dry_release:
-	goreleaser --skip-publish --rm-dist --skip-validate
+	goreleaser build --rm-dist --skip-validate
 
 .PHONY: bump
 bump: ## Incriment version patch number

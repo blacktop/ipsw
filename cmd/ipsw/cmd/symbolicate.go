@@ -153,7 +153,7 @@ var symbolicateCmd = &cobra.Command{
 				image := f.Image(bt.Image.Name)
 				bt.Image.Slide = bt.Image.Start - image.CacheImageTextInfo.LoadAddress
 				unslidAddr := bt.Address - bt.Image.Slide
-				m, err := image.GetPartialMacho()
+				m, err := image.GetMacho()
 				if err != nil {
 					return err
 				}

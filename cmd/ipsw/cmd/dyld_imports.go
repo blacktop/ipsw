@@ -42,10 +42,9 @@ func init() {
 
 // importsCmd represents the imports command
 var importsCmd = &cobra.Command{
-	Use:    "imports",
-	Short:  "List all dylibs that load a given dylib",
-	Args:   cobra.MinimumNArgs(2),
-	Hidden: true,
+	Use:   "imports",
+	Short: "List all dylibs that load a given dylib",
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
