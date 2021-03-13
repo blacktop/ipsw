@@ -208,6 +208,7 @@
 <li><a href="#dyld-disass"><strong>dyld disass</strong></a></li>
 <li><a href="#dyld-imports"><strong>dyld imports</strong></a></li>
 <li><a href="#dyld-xref"><strong>dyld xref</strong></a></li>
+<li><a href="#dyld-tbd"><strong>dyld tbd</strong></a></li>
 </ul>
 <hr>
 <h3 id="dyld-info"><strong>dyld info</strong></h3>
@@ -526,7 +527,7 @@ offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
 <span class="mh">0x1808b9988</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">0</span><span class="n">f</span> <span class="m">5</span><span class="n">f</span> <span class="n">d6</span>       <span class="n">retab</span>
 <span class="mh">0x1808b998c</span><span class="o">:</span>  <span class="m">55</span> <span class="n">c1</span> <span class="n">e0</span> <span class="m">97</span>       <span class="n">bl</span>              <span class="n">___stack_chk_fail</span>
 </code></pre></div><h3 id="dyld-imports"><strong>dyld imports</strong></h3>
-<p>Disassemble a function in the <em>dyld_shared_cache</em></p>
+<p>List all dylibs that import/load a given dylib in the <em>dyld_shared_cache</em></p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld imports dyld_shared_cache JavaScriptCore
 
 JavaScriptCore Imported By:
@@ -595,6 +596,20 @@ JavaScriptCore Imported By:
 0x181827854: -<span class="o">[</span>__NSConcreteURLComponents user<span class="o">]</span>
 0x181828264: -<span class="o">[</span>__NSConcreteURLComponents percentEncodedQuery<span class="o">]</span>
 &lt;SNIP&gt;
+</code></pre></div><h3 id="dyld-tbd"><strong>dyld tbd</strong></h3>
+<p>Generate a <code>.tbd</code> file for a dylib</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld tbd dyld_shared_cache CoreSymbolication
+   • Created CoreSymbolication.tbd
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ cat CoreSymbolication.tbd
+---
+archs:           <span class="o">[</span> arm64e <span class="o">]</span>
+platform:        ios
+install-name:    /System/Library/PrivateFrameworks/CoreSymbolication.framework/CoreSymbolication
+current-version: 64544.69.1.0.0
+exports:
+  - archs:           <span class="o">[</span> arm64e <span class="o">]</span>
+    symbols:         <span class="o">[</span> _unmap_node, _thread_name_for_thread_port, &lt;SNIP&gt; <span class="o">]</span>
+...
 </code></pre></div>
 </div>
 </div>
