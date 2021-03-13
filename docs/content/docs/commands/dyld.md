@@ -473,7 +473,7 @@ _NSLog:
 
 ### **dyld imports**
 
-Disassemble a function in the _dyld_shared_cache_
+List all dylibs that import/load a given dylib in the _dyld_shared_cache_
 
 ```bash
 $ ipsw dyld imports dyld_shared_cache JavaScriptCore

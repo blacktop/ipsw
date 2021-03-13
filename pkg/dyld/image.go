@@ -1,18 +1,12 @@
 package dyld
 
 import (
-	"bytes"
 	"fmt"
 	"io"
-	"os"
-	"strings"
 	"sync"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/buffer"
-	"github.com/pkg/errors"
 )
 
 type rangeEntry struct {
@@ -130,106 +124,23 @@ type CacheImage struct {
 	sr *io.SectionReader
 }
 
-// Data reads and returns the contents of the dylib's Mach-O.
-func (i *CacheImage) Data() ([]byte, error) {
-	// var buff bytes.Buffer
-	buff := buffer.NewReadWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
-
-	i.sr.Seek(0, io.SeekStart)
-
-	for idx, rEntry := range i.RangeEntries {
-		dat := make([]byte, rEntry.Size)
-		n, err := i.sr.ReadAt(dat, int64(rEntry.FileOffset))
-		if err != nil {
-			return nil, err
-		}
-		if n != len(dat) {
-			return nil, fmt.Errorf("failed to read all the bytes")
-		}
-		if idx == 0 {
-			n, err = buff.WriteAt(dat, 0)
-			if err != nil {
-				return nil, err
-			}
-		}
-		n, err = buff.WriteAt(dat, int64(rEntry.FileOffset))
-		// n, err = buff.WriteAt(dat, int64(rEntry.StartAddr-i.Info.Address))
-		if err != nil {
-			return nil, err
-		}
-		if n != len(dat) {
-			return nil, fmt.Errorf("failed to write all the bytes")
-		}
-	}
-
-	return buff.Bytes(), nil
-}
-
-// SegmentData reads the __TEXT header and returns the contents of the dylib's Mach-O.
-func (i *CacheImage) SegmentData() ([]byte, error) {
-	// var buff bytes.Buffer
-	buff := buffer.NewReadWriteBuffer(int(i.TextSegmentSize), 1<<63-1)
-
-	i.sr.Seek(0, io.SeekStart)
-
-	m, err := i.GetPartialMacho()
-	if err != nil {
-		return nil, err
-	}
-	for idx, seg := range m.Segments() {
-		dat := make([]byte, seg.Filesz)
-		n, err := i.sr.ReadAt(dat, int64(seg.Offset))
-		if err != nil {
-			return nil, err
-		}
-		if n != len(dat) {
-			return nil, fmt.Errorf("failed to read all the bytes")
-		}
-		if idx == 0 {
-			n, err = buff.WriteAt(dat, 0)
-			if err != nil {
-				return nil, err
-			}
-		}
-		n, err = buff.WriteAt(dat, int64(seg.Offset))
-		// n, err = buff.WriteAt(dat, int64(rEntry.StartAddr-i.Info.Address))
-		if err != nil {
-			return nil, err
-		}
-		if n != len(dat) {
-			return nil, fmt.Errorf("failed to write all the bytes")
-		}
-	}
-
-	return buff.Bytes(), nil
-}
-
-// Open returns a new ReadSeeker reading the dylib's Mach-O data.
-func (i *CacheImage) Open() io.ReadSeeker {
-	return io.NewSectionReader(i.sr, int64(i.DylibOffset), 1<<63-1)
-}
-
-// GetPartialMacho parses dyld image header as a partial MachO
+// GetPartialMacho parses dyld image as a partial MachO (fast)
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	return macho.NewFile(io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize)), macho.FileConfig{
-		// LoadFilter: []types.LoadCmd{
-		// 	types.LC_SEGMENT_64,
-		// 	types.LC_DYLD_INFO,
-		// 	types.LC_DYLD_INFO_ONLY,
-		// 	types.LC_ID_DYLIB,
-		// 	types.LC_SYMTAB,
-		// 	types.LC_DYSYMTAB,
-		// 	types.LC_UUID,
-		// 	types.LC_BUILD_VERSION,
-		// 	types.LC_SOURCE_VERSION,
-		// 	types.LC_SUB_FRAMEWORK,
-		// 	types.LC_SUB_CLIENT,
-		// 	types.LC_REEXPORT_DYLIB,
-		// 	types.LC_LOAD_DYLIB,
-		// 	types.LC_LOAD_WEAK_DYLIB,
-		// 	types.LC_LOAD_UPWARD_DYLIB,
-		// 	types.LC_FUNCTION_STARTS,
-		// 	types.LC_DYLD_EXPORTS_TRIE},
+		LoadFilter: []types.LoadCmd{
+			types.LC_SEGMENT_64,
+			types.LC_DYLD_INFO,
+			types.LC_DYLD_INFO_ONLY,
+			types.LC_ID_DYLIB,
+			types.LC_UUID,
+			types.LC_BUILD_VERSION,
+			types.LC_SOURCE_VERSION,
+			types.LC_SUB_FRAMEWORK,
+			types.LC_SUB_CLIENT,
+			types.LC_REEXPORT_DYLIB,
+			types.LC_LOAD_DYLIB,
+			types.LC_LOAD_WEAK_DYLIB,
+			types.LC_LOAD_UPWARD_DYLIB},
 		Offset:    int64(i.DylibOffset),
 		SrcReader: i.sr,
 		VMAddrConverter: types.VMAddrConverter{
@@ -256,67 +167,31 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	})
 }
 
-// GetMacho parses dyld image as a MachO
+// GetMacho parses dyld image as a MachO (slow)
 func (i *CacheImage) GetMacho() (*macho.File, error) {
-	dat, err := i.SegmentData()
-	if err != nil {
-		return nil, err
-	}
-	m, err := macho.NewFile(bytes.NewReader(dat))
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-// Strings returns all the dylib image's cstring literals
-func (i *CacheImage) Strings() []string {
-
-	var imgStrings []string
-
-	imgData, err := i.Data()
-	if err != nil {
-		return nil
-	}
-
-	m, err := macho.NewFile(bytes.NewReader(imgData))
-	if err != nil {
-		log.Error(errors.Wrap(err, "failed to parse macho").Error())
-	}
-	defer m.Close()
-
-	imgReader := i.Open()
-
-	for _, sec := range m.Sections {
-
-		if sec.Flags.IsCstringLiterals() {
-			fmt.Printf("%s %s\n", sec.Seg, sec.Name)
-			// csr := bufio.NewReader(sec.Open())
-			data := make([]byte, sec.Size)
-
-			imgReader.Seek(int64(sec.Offset), os.SEEK_SET)
-			imgReader.Read(data)
-
-			csr := bytes.NewBuffer(data[:])
-
-			for {
-				s, err := csr.ReadString('\x00')
-
-				if err == io.EOF {
-					break
+	return macho.NewFile(io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize)), macho.FileConfig{
+		Offset:    int64(i.DylibOffset),
+		SrcReader: i.sr,
+		VMAddrConverter: types.VMAddrConverter{
+			Converter: func(addr uint64) uint64 {
+				return i.SlideInfo.SlidePointer(addr)
+			},
+			VMAddr2Offet: func(address uint64) (uint64, error) {
+				for _, mapping := range i.Mappings {
+					if mapping.Address <= address && address < mapping.Address+mapping.Size {
+						return (address - mapping.Address) + mapping.FileOffset, nil
+					}
 				}
-
-				if err != nil {
-					log.Fatal(err.Error())
+				return 0, fmt.Errorf("address not within any mappings address range")
+			},
+			Offet2VMAddr: func(offset uint64) (uint64, error) {
+				for _, mapping := range i.Mappings {
+					if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
+						return (offset - mapping.FileOffset) + mapping.Address, nil
+					}
 				}
-
-				if len(s) > 0 {
-					imgStrings = append(imgStrings, strings.Trim(s, "\x00"))
-					// fmt.Printf("%s: %#v\n", i.Name, strings.Trim(s, "\x00"))
-				}
-			}
-		}
-	}
-
-	return imgStrings
+				return 0, fmt.Errorf("offset not within any mappings file offset range")
+			},
+		},
+	})
 }

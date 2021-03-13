@@ -170,7 +170,7 @@ var a2sCmd = &cobra.Command{
 			return err
 		}
 
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
 			return err
 		}

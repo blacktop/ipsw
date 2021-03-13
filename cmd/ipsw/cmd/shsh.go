@@ -43,8 +43,6 @@ var shshCmd = &cobra.Command{
 	Use:   "shsh",
 	Short: "Get shsh blobs from device",
 	Args:  cobra.NoArgs,
-	// Args:   cobra.MinimumNArgs(1),
-	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {

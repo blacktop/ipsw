@@ -95,7 +95,7 @@ var dyldMachoCmd = &cobra.Command{
 
 		if len(args) > 1 {
 			if i := f.Image(args[1]); i != nil {
-				m, err := i.GetPartialMacho()
+				m, err := i.GetMacho()
 				if err != nil {
 					return err
 				}
