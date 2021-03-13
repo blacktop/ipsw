@@ -529,8 +529,8 @@ ipsw dyld symaddr dyld_shared_cache_arm64e _NSLog
 $ ipsw dyld xref dyld_shared_cache 0x1817e73e4
    • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation sym=_NSLog
 
-XREFS
-=====
+XREFS (304)
+===========
 0x181828034: -[__NSConcreteURLComponents percentEncodedHost] + 96
 0x1817ca15c: _NSCountMapTable + 48
 0x1817fc33c: -[NSItemProvider loadDataRepresentationForTypeIdentifier:completionHandler:] + 264

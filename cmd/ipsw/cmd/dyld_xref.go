@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
@@ -181,8 +182,9 @@ var xrefCmd = &cobra.Command{
 		}
 
 		if len(xrefs) > 0 {
-			fmt.Printf("\nXREFS\n")
-			fmt.Println("=====")
+			title := fmt.Sprintf("XREFS (%d)", len(xrefs))
+			fmt.Printf("\n%s\n", title)
+			fmt.Println(strings.Repeat("=", len(title)))
 			for addr, sym := range xrefs {
 				fmt.Printf("%#x: %s\n", addr, sym)
 			}
