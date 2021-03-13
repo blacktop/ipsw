@@ -15,47 +15,84 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
-// GetSymbolAddress returns the virtual address and possibly the dylib containing a given symbol
-func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, error) {
-	if len(imageName) > 0 {
-		if sym, _ := f.FindExportedSymbolInImage(imageName, symbol); sym != nil {
-			return sym.Address, f.Image(imageName), nil
-		}
-	} else {
-		// Search ALL dylibs for the symbol
-		for _, image := range f.Images {
-			if sym, _ := f.FindExportedSymbolInImage(image.Name, symbol); sym != nil {
-				return sym.Address, image, nil
-			}
+type dylibArray []*CacheImage
+
+func (arr dylibArray) contains(img *CacheImage) bool {
+	for _, i := range arr {
+		if i == img {
+			return true
 		}
 	}
-
-	// Search addr2sym map
-	for addr, sym := range f.AddressToSymbol {
-		if strings.EqualFold(sym, symbol) {
-			return addr, nil, nil
-		}
-	}
-
-	return 0, nil, fmt.Errorf("failed to find symbol %s", symbol)
+	return false
 }
 
-func (f *File) FirstPass(r io.ReadSeeker, options arm64.Options) []uint64 {
-	var addrs []uint64
+type addrDetails struct {
+	Image   string
+	Segment string
+	Section string
+}
 
+func (d addrDetails) String() string {
+	return fmt.Sprintf("%s: %s.%s", d.Image, d.Segment, d.Section)
+}
+
+type Triage struct {
+	Dylibs    dylibArray
+	Details   map[uint64]addrDetails
+	function  *types.Function
+	addresses map[uint64]uint64
+}
+
+// Contains returns true if Triage immediates contains a given address and will return the instruction address
+func (t *Triage) Contains(address uint64) (bool, uint64) {
+	for loc, addr := range t.addresses {
+		if addr == address {
+			return true, loc
+		}
+	}
+	return false, 0
+}
+
+// IsLocation returns if given address is a local branch location within the disassembled function
+func (t *Triage) IsLocation(addr uint64) bool {
+	if t.function != nil {
+		if addr >= t.function.StartAddr && addr < t.function.EndAddr {
+			return true
+		}
+	}
+	return false
+}
+
+// IsData returns if given address is a data variable address referenced in the disassembled function
+func (t *Triage) IsData(addr uint64) bool {
+	if detail, ok := t.Details[addr]; ok {
+		if strings.Contains(strings.ToLower(detail.Segment), "data") {
+			return true
+		}
+	}
+	return false
+}
+
+// FirstPassTriage walks a function and analyzes all immediates
+func (f *File) FirstPassTriage(m *macho.File, fn *types.Function, r io.ReadSeeker, options arm64.Options, details bool) (*Triage, error) {
+	var triage Triage
 	var prevInstruction arm64.Instruction
 
+	triage.function = fn
+	triage.addresses = make(map[uint64]uint64)
+
+	// extract all immediates
 	for i := range arm64.Disassemble(r, options) {
 
 		if i.Error != nil {
 			continue
 		}
 
-		// lookup adrp/ldr or add address as a cstring or symbol name
 		operation := i.Instruction.Operation().String()
+
+		// lookup adrp/ldr or add address as a cstring or symbol name
 		if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
-			operands := i.Instruction.Operands()
-			if operands != nil && prevInstruction.Operands() != nil {
+			if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
 				adrpRegister := prevInstruction.Operands()[0].Reg[0]
 				adrpImm := prevInstruction.Operands()[1].Immediate
 				if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
@@ -63,27 +100,64 @@ func (f *File) FirstPass(r io.ReadSeeker, options arm64.Options) []uint64 {
 				} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
 					adrpImm += operands[2].Immediate
 				}
-				addrs = append(addrs, adrpImm)
+				triage.addresses[i.Instruction.Address()] = adrpImm
 			}
 
 		} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
-			operands := i.Instruction.Operands()
-			if operands != nil && operands[0].OpClass == arm64.LABEL {
-				addrs = append(addrs, operands[0].Immediate)
+			if operands := i.Instruction.Operands(); operands != nil {
+				for _, operand := range operands {
+					if operand.OpClass == arm64.LABEL {
+						triage.addresses[i.Instruction.Address()] = operand.Immediate
+					}
+				}
 			}
 		} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
 			operation := i.Instruction.Operation()
 			if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
-				operands := i.Instruction.Operands()
-				if operands[1].OpClass == arm64.LABEL {
-					addrs = append(addrs, operands[1].Immediate)
+				if operands := i.Instruction.Operands(); operands != nil {
+					for _, operand := range operands {
+						if operand.OpClass == arm64.LABEL {
+							triage.addresses[i.Instruction.Address()] = operand.Immediate
+						}
+					}
 				}
 			}
 		}
 
 		prevInstruction = *i.Instruction
 	}
-	return addrs
+
+	if details {
+		triage.Details = make(map[uint64]addrDetails)
+
+		for _, addr := range triage.addresses {
+			image, err := f.GetImageContainingVMAddr(addr)
+			if err != nil {
+				return nil, err
+			}
+
+			if !triage.Dylibs.contains(image) {
+				triage.Dylibs = append(triage.Dylibs, image)
+			}
+
+			m, err := image.GetPartialMacho()
+			if err != nil {
+				return nil, err
+			}
+
+			if c := m.FindSectionForVMAddr(addr); c != nil {
+				triage.Details[addr] = addrDetails{
+					Image:   image.Name,
+					Segment: c.Seg,
+					Section: c.Name,
+				}
+			}
+
+			m.Close()
+		}
+	}
+
+	return &triage, nil
 }
 
 // ImageDependencies recursively returns all the image's loaded dylibs and those dylibs' loaded dylibs etc
@@ -129,6 +203,31 @@ func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shouldDemang
 		}
 	}
 	return false, ""
+}
+
+// GetSymbolAddress returns the virtual address and possibly the dylib containing a given symbol
+func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, error) {
+	if len(imageName) > 0 {
+		if sym, _ := f.FindExportedSymbolInImage(imageName, symbol); sym != nil {
+			return sym.Address, f.Image(imageName), nil
+		}
+	} else {
+		// Search ALL dylibs for the symbol
+		for _, image := range f.Images {
+			if sym, _ := f.FindExportedSymbolInImage(image.Name, symbol); sym != nil {
+				return sym.Address, image, nil
+			}
+		}
+	}
+
+	// Search addr2sym map
+	for addr, sym := range f.AddressToSymbol {
+		if strings.EqualFold(sym, symbol) {
+			return addr, nil, nil
+		}
+	}
+
+	return 0, nil, fmt.Errorf("failed to find symbol %s", symbol)
 }
 
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
@@ -229,7 +328,7 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 
 	m, err := image.GetPartialMacho()
 	if err != nil {
-		return fmt.Errorf("failed to get MachO for image %s; %#v", image.Name, err)
+		return fmt.Errorf("failed to get MachO for image %s; %v", image.Name, err)
 	}
 	defer m.Close()
 
@@ -267,7 +366,7 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 					if addRegister == i.Instruction.Operands()[1].Reg[0] {
 						addr, err := f.ReadPointerAtAddress(adrpImm)
 						if err != nil {
-							return fmt.Errorf("failed to read pointer at %#x: %#v", adrpImm, err)
+							return fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
 						}
 						image.Analysis.SymbolStubs[adrpAddr] = f.SlideInfo.SlidePointer(addr)
 					}
@@ -296,7 +395,7 @@ func (f *File) ParseGOT(image *CacheImage) error {
 
 	m, err := image.GetPartialMacho()
 	if err != nil {
-		return fmt.Errorf("failed to get MachO for image %s; %#v", image.Name, err)
+		return fmt.Errorf("failed to get MachO for image %s; %v", image.Name, err)
 	}
 	defer m.Close()
 
@@ -307,7 +406,7 @@ func (f *File) ParseGOT(image *CacheImage) error {
 
 		ptrs := make([]uint64, authPtr.Size/8)
 		if err := binary.Read(r, binary.LittleEndian, &ptrs); err != nil {
-			return fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr ptrs; %#v", err)
+			return fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr ptrs; %v", err)
 		}
 
 		for idx, ptr := range ptrs {
@@ -321,7 +420,7 @@ func (f *File) ParseGOT(image *CacheImage) error {
 
 			ptrs := make([]uint64, sec.Size/8)
 			if err := binary.Read(r, binary.LittleEndian, &ptrs); err != nil {
-				return fmt.Errorf("failed to read %s.%s NonLazySymbol pointers; %#v", sec.Seg, sec.Name, err)
+				return fmt.Errorf("failed to read %s.%s NonLazySymbol pointers; %v", sec.Seg, sec.Name, err)
 			}
 
 			for idx, ptr := range ptrs {

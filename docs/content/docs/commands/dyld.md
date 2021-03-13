@@ -17,7 +17,7 @@ summary: Parse dyld_shared_cache.
   - [**dyld objc sel**](#dyld-objc-sel)
 - [**dyld split**](#dyld-split)
 - [**dyld webkit**](#dyld-webkit)
-- [**dyld patches** 🆕](#dyld-patches-)
+- [**dyld patches**](#dyld-patches-)
 - [**dyld a2o**](#dyld-a2o)
 - [**dyld o2a**](#dyld-o2a)
 - [**dyld disass**](#dyld-disass)
@@ -369,7 +369,7 @@ $ ipsw dyld webkit --rev dyld_shared_cache
    • WebKit Version: 609.1.17.0.1 (svn rev 256416)
 ```
 
-### **dyld patches** 🆕
+### **dyld patches**
 
 List dyld patch info
 
@@ -527,31 +527,18 @@ ipsw dyld symaddr dyld_shared_cache_arm64e _NSLog
 
 ```bash
 $ ipsw dyld xref dyld_shared_cache 0x1817e73e4
-   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation
+   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation sym=_NSLog
 
 XREFS
 =====
-0x1817bd1b8: _addValueToTopContainerE
-0x1817c9bd8: _NSNextMapEnumeratorPair
-0x1818544a0: -[NSTransitInformationCheckingResult initWithCoder:]
-0x1816e744c: -[__NSConcreteURLComponents setHost:]
-0x1816f268c: +[_NSObserverList destroyObserverListForObject:]
-0x1817a03c0: ___73-[NSUTIPredicateOperator performPrimitiveOperationUsingObject:andObject:]_block_invoke
-0x1817ca24c: _NSAllMapTableValues
-0x1817ec064: ___destroyPortContext
-0x1817914c4: _NSEndHashTableEnumeration
-0x1817b0690: __NSKVONotifyingEnableForInfoAndKey
-0x1817ec980: ___NSFireMessagePort
-0x18188bf30: ___70-[NSFileCoordinator(NSPrivate) _blockOnAccessClaim:withAccessArbiter:]_block_invoke_2
-0x1816d4e84: -[NSConcreteMutableAttributedString initWithString:attributes:]
-0x181748d68: -[__NSConcreteURLComponents rangeOfPath]
-0x1817c9c74: _NSEndMapTableEnumeration
-0x181866158: ___32-[NSUserActivity typeIdentifier]_block_invoke
-0x1818dbc6c: -[NSXPCConnection stop]
-0x181713a98: -[__NSConcreteURLComponents setQueryItems:]
-0x18173406c: -[__NSConcreteURLComponents query]
-0x181827854: -[__NSConcreteURLComponents user]
-0x181828264: -[__NSConcreteURLComponents percentEncodedQuery]
+0x181828034: -[__NSConcreteURLComponents percentEncodedHost] + 96
+0x1817ca15c: _NSCountMapTable + 48
+0x1817fc33c: -[NSItemProvider loadDataRepresentationForTypeIdentifier:completionHandler:] + 264
+0x18181a8fc: +[NSString(NSStringOtherEncodings) localizedNameOfStringEncoding:] + 84
+0x181760ef0: -[NSCharacterSet mutableCopyWithZone:] + 60
+0x181790fcc: _NSFreeHashTable + 48
+0x181791244: _NSHashInsertKnownAbsent + 52
+0x1817c9b70: _NSEnumerateMapTable + 56
 <SNIP>
 ```
 
