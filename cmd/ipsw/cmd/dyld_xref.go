@@ -38,6 +38,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(xrefCmd)
 
+	xrefCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	xrefCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 
 	xrefCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
@@ -45,10 +46,9 @@ func init() {
 
 // xrefCmd represents the xref command
 var xrefCmd = &cobra.Command{
-	Use:    "xref [options] <dyld_shared_cache> <vaddr>",
-	Short:  "🚧 [WIP] Find all cross references to an address",
-	Args:   cobra.MinimumNArgs(2),
-	Hidden: true,
+	Use:   "xref [options] <dyld_shared_cache> <vaddr>",
+	Short: "🚧 [WIP] Find all cross references to an address",
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -56,6 +56,9 @@ var xrefCmd = &cobra.Command{
 		}
 
 		xrefs := make(map[uint64]string)
+
+		imageName, _ := cmd.Flags().GetString("image")
+
 		// TODO: add slide support (add to output addrs)
 		slide, _ := cmd.Flags().GetUint64("slide")
 
@@ -95,24 +98,55 @@ var xrefCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		image, err := f.GetImageContainingVMAddr(unslidAddr)
-		if err != nil {
-			return err
+		var image *dyld.CacheImage
+		if len(imageName) > 0 {
+			image = f.Image(imageName)
+			if image == nil {
+				return fmt.Errorf("no image found matching %s", imageName)
+			}
+		} else {
+			image, err = f.GetImageContainingVMAddr(unslidAddr)
+			if err != nil {
+				return err
+			}
 		}
-
-		log.WithFields(log.Fields{
-			"dylib": image.Name,
-		}).Info("Address location")
 
 		if err := f.AnalyzeImage(image); err != nil {
-			return fmt.Errorf("failed to analyze image: %s; %#v", image.Name, err)
+			return fmt.Errorf("failed to analyze image: %s; %v", image.Name, err)
 		}
 
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
 			return err
 		}
 		defer m.Close()
+
+		if m.HasObjC() {
+			log.Debug("Parsing ObjC runtime structures...")
+			if err := f.CFStringsForImage(image.Name); err != nil {
+				return errors.Wrapf(err, "failed to parse objc cfstrings")
+			}
+			if err := f.MethodsForImage(image.Name); err != nil {
+				return errors.Wrapf(err, "failed to parse objc methods")
+			}
+			if err := f.SelectorsForImage(image.Name); err != nil {
+				return errors.Wrapf(err, "failed to parse objc selectors")
+			}
+			if err := f.ClassesForImage(image.Name); err != nil {
+				return errors.Wrapf(err, "failed to parse objc classes")
+			}
+		}
+
+		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+			log.WithFields(log.Fields{
+				"sym":   symName,
+				"dylib": image.Name,
+			}).Info("Address location")
+		} else {
+			log.WithFields(log.Fields{
+				"dylib": image.Name,
+			}).Info("Address location")
+		}
 
 		for _, fn := range m.GetFunctions() {
 			soff, err := f.GetOffset(fn.StartAddr)
@@ -125,22 +159,35 @@ var xrefCmd = &cobra.Command{
 				return err
 			}
 
-			addrs := f.FirstPass(bytes.NewReader(data), arm64.Options{StartAddress: int64(fn.StartAddr)})
+			triage, err := f.FirstPassTriage(m, &fn, bytes.NewReader(data), arm64.Options{StartAddress: int64(fn.StartAddr)}, false)
+			if err != nil {
+				return err
+			}
 
-			if utils.Uint64SliceContains(addrs, unslidAddr) {
-				sym := f.FindSymbol(fn.StartAddr, false)
-				if len(sym) > 0 {
-					xrefs[fn.StartAddr] = sym
+			if ok, loc := triage.Contains(unslidAddr); ok {
+				if sym := f.FindSymbol(fn.StartAddr, false); len(sym) > 0 {
+					xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
 				} else {
-					xrefs[fn.StartAddr] = fmt.Sprintf("func_%x", fn.StartAddr)
+					xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
 				}
+				// } else if triage.IsData(unslidAddr) {
+				// 	xrefs[fn.StartAddr] = fmt.Sprintf("data_%x", fn.StartAddr)
+				// } else {
+				// 	if detail, ok := triage.Details[unslidAddr]; ok {
+				// 		xrefs[fn.StartAddr] = detail.String()
+				// 	}
+				// }
 			}
 		}
 
-		fmt.Printf("\nXREFS\n")
-		fmt.Println("=====")
-		for addr, sym := range xrefs {
-			fmt.Printf("%#x: %s\n", addr, sym)
+		if len(xrefs) > 0 {
+			fmt.Printf("\nXREFS\n")
+			fmt.Println("=====")
+			for addr, sym := range xrefs {
+				fmt.Printf("%#x: %s\n", addr, sym)
+			}
+		} else {
+			log.Info("No XREFS found")
 		}
 
 		return nil
