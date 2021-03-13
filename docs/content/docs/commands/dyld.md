@@ -432,44 +432,42 @@ ipsw dyld a2o dyld_shared_cache 0x4C6C0000
 Disassemble a function in the _dyld_shared_cache_
 
 ```bash
-$ ipsw dyld disass --image Foundation dyld_shared_cache _NSLog
-
+$ ipsw dyld disass dyld_shared_cache_arm64e --symbol _NSLog
    • Found dyld_shared_cache companion symbol map file...
    • Locating symbol: _NSLog
    • Found symbol              dylib=/System/Library/Frameworks/Foundation.framework/Foundation
    • Parsing ObjC runtime structures...
-   • Parsing MachO symbol stubs...
-   • Parsing MachO global offset table...
 ```
 
 > **NOTE:** You can speed up symbol lookups by supplying the `--image` flag or you can use the `--vaddr` flag
 
 ```s
 _NSLog:
-0x1808b9930:  7f 23 03 d5       pacibsp
-0x1808b9934:  ff 83 00 d1       sub             sp, sp, #0x20
-0x1808b9938:  fd 7b 01 a9       stp             x29, x30, [sp, #0x10]
-0x1808b993c:  fd 43 00 91       add             x29, sp, #0x10
-0x1808b9940:  88 4d 27 f0       adrp            x8, #0x1cf26c000
-0x1808b9944:  08 5d 46 f9       ldr             x8, [x8, #0xcb8] ; __got.___stack_chk_guard
-0x1808b9948:  08 01 40 f9       ldr             x8, [x8]
-0x1808b994c:  e8 07 00 f9       str             x8, [sp, #0x8]
-0x1808b9950:  a8 43 00 91       add             x8, x29, #0x10
-0x1808b9954:  e8 03 00 f9       str             x8, [sp]
-0x1808b9958:  e2 03 1e aa       mov             x2, x30
-0x1808b995c:  e2 43 c1 da       xpaci           x2
-0x1808b9960:  a1 43 00 91       add             x1, x29, #0x10
-0x1808b9964:  d2 ff ff 97       bl              __NSLogv
-0x1808b9968:  e8 07 40 f9       ldr             x8, [sp, #0x8]
-0x1808b996c:  89 4d 27 f0       adrp            x9, #0x1cf26c000
-0x1808b9970:  29 5d 46 f9       ldr             x9, [x9, #0xcb8] ; __got.___stack_chk_guard
-0x1808b9974:  29 01 40 f9       ldr             x9, [x9]
-0x1808b9978:  3f 01 08 eb       cmp             x9, x8
-0x1808b997c:  81 00 00 54       b.ne            #0x1808b998c
-0x1808b9980:  fd 7b 41 a9       ldp             x29, x30, [sp, #0x10]
-0x1808b9984:  ff 83 00 91       add             sp, sp, #0x20
-0x1808b9988:  ff 0f 5f d6       retab
-0x1808b998c:  55 c1 e0 97       bl              ___stack_chk_fail
+0x1817e73e4:  7f 23 03 d5       pacibsp
+0x1817e73e8:  ff 83 00 d1       sub             sp, sp, #0x20
+0x1817e73ec:  fd 7b 01 a9       stp             x29, x30, [sp, #0x10]
+0x1817e73f0:  fd 43 00 91       add             x29, sp, #0x10
+0x1817e73f4:  a8 5a 2a b0       adrp            x8, #0x1d633c000
+0x1817e73f8:  08 25 40 f9       ldr             x8, [x8, #0x48] ; __got.___stack_chk_guard
+0x1817e73fc:  08 01 40 f9       ldr             x8, [x8]
+0x1817e7400:  e8 07 00 f9       str             x8, [sp, #0x8]
+0x1817e7404:  a8 43 00 91       add             x8, x29, #0x10
+0x1817e7408:  e8 03 00 f9       str             x8, [sp]
+0x1817e740c:  e2 03 1e aa       mov             x2, x30
+0x1817e7410:  e2 43 c1 da       xpaci           x2
+0x1817e7414:  a1 43 00 91       add             x1, x29, #0x10
+0x1817e7418:  cf ff ff 97       bl              __NSLogv
+0x1817e741c:  e8 07 40 f9       ldr             x8, [sp, #0x8]
+0x1817e7420:  a9 5a 2a b0       adrp            x9, #0x1d633c000
+0x1817e7424:  29 25 40 f9       ldr             x9, [x9, #0x48] ; __got.___stack_chk_guard
+0x1817e7428:  29 01 40 f9       ldr             x9, [x9]
+0x1817e742c:  3f 01 08 eb       cmp             x9, x8
+0x1817e7430:  81 00 00 54       b.ne            loc_1817e7440
+0x1817e7434:  fd 7b 41 a9       ldp             x29, x30, [sp, #0x10]
+0x1817e7438:  ff 83 00 91       add             sp, sp, #0x20
+0x1817e743c:  ff 0f 5f d6       retab
+; loc_1817e7440
+0x1817e7440:  64 52 fe 95       bl              ___stack_chk_fail
 ```
 
 ### **dyld imports**
