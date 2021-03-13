@@ -525,11 +525,18 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 
 					if len(image.ObjC.ClassRefs[ptr].Name) > 0 {
 						f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("class_%s", image.ObjC.ClassRefs[ptr].Name)
-						f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
+						if sym, ok := f.AddressToSymbol[ptr]; ok {
+							if len(sym) < len(image.ObjC.ClassRefs[ptr].Name) {
+								f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
+							}
+						} else {
+							f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
+						}
 					}
 				}
 			}
 		}
+
 		m.Close()
 	}
 
@@ -596,7 +603,13 @@ func (f *File) SelectorsForImage(imageNames ...string) error {
 
 				if len(image.ObjC.SelRefs[ptr].Name) > 0 {
 					f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("sel_%s", image.ObjC.SelRefs[ptr].Name)
-					f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
+					if sym, ok := f.AddressToSymbol[ptr]; ok {
+						if len(sym) < len(image.ObjC.SelRefs[ptr].Name) {
+							f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
+						}
+					} else {
+						f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
+					}
 				}
 			}
 		}
@@ -677,7 +690,13 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 						},
 					})
 					if len(n) > 0 {
-						f.AddressToSymbol[impVMAddr] = n
+						if sym, ok := f.AddressToSymbol[impVMAddr]; ok {
+							if len(sym) < len(n) {
+								f.AddressToSymbol[impVMAddr] = n
+							}
+						} else {
+							f.AddressToSymbol[impVMAddr] = n
+						}
 					}
 				}
 
