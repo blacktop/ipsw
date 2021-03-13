@@ -28,8 +28,8 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/tbd"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -41,51 +41,61 @@ func init() {
 
 // tbdCmd represents the tbd command
 var tbdCmd = &cobra.Command{
-	Use:    "tbd <dyld_shared_cache> <image>",
-	Short:  "Generate a .tbd file for a dylib",
-	Args:   cobra.MinimumNArgs(2),
-	Hidden: true,
+	Use:   "tbd <dyld_shared_cache> <image>",
+	Short: "Generate a .tbd file for a dylib",
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		fileInfo, err := os.Lstat(args[0])
-		if err != nil {
-			return fmt.Errorf("file %s does not exist", args[0])
-		}
+		dscPath := filepath.Clean(args[0])
 
-		dyldFile := args[0]
+		fileInfo, err := os.Lstat(dscPath)
+		if err != nil {
+			return fmt.Errorf("file %s does not exist", dscPath)
+		}
 
 		// Check if file is a symlink
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			dyldFile, err = os.Readlink(args[0])
+			symlinkPath, err := os.Readlink(dscPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", args[0])
+				return fmt.Errorf("failed to read symlink %s: %v", dscPath, err)
 			}
 			// TODO: this seems like it would break
-			linkParent := filepath.Dir(args[0])
+			linkParent := filepath.Dir(dscPath)
 			linkRoot := filepath.Dir(linkParent)
 
-			dyldFile = filepath.Join(linkRoot, dyldFile)
+			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
 
-		t, err := tbd.NewTBD(args[0], args[1])
+		f, err := dyld.Open(dscPath, &dyld.Config{ParsePatchInfo: true})
 		if err != nil {
-			return errors.Wrapf(err, "failed to create tbd file for %s", args[1])
+			return err
 		}
+		defer f.Close()
 
-		outTBD, err := t.Generate()
-		if err != nil {
-			return errors.Wrapf(err, "failed to create tbd file for %s", args[1])
-		}
+		if image := f.Image(args[1]); image != nil {
+			t, err := tbd.NewTBD(f, image)
+			if err != nil {
+				return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
+			}
 
-		tbdFile := filepath.Base(t.Path)
+			outTBD, err := t.Generate()
+			if err != nil {
+				return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
+			}
 
-		err = ioutil.WriteFile(tbdFile+".tbd", []byte(outTBD), 0644)
-		if err != nil {
-			return errors.Wrapf(err, "failed to write tbd file %s", tbdFile+".tbd")
+			tbdFile := filepath.Base(t.Path)
+
+			log.Info("Created " + tbdFile + ".tbd")
+			err = ioutil.WriteFile(tbdFile+".tbd", []byte(outTBD), 0644)
+			if err != nil {
+				return fmt.Errorf("failed to write tbd file %s: %v", tbdFile+".tbd", err)
+			}
+		} else {
+			log.Errorf("%s is not a dylib in %s", args[1], dscPath)
 		}
 
 		return nil
