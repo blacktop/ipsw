@@ -462,11 +462,11 @@ _NSLog:
 0x1817e7424:  29 25 40 f9       ldr             x9, [x9, #0x48] ; __got.___stack_chk_guard
 0x1817e7428:  29 01 40 f9       ldr             x9, [x9]
 0x1817e742c:  3f 01 08 eb       cmp             x9, x8
-0x1817e7430:  81 00 00 54       b.ne            loc_1817e7440
+0x1817e7430:  81 00 00 54       b.ne            loc_1817e7440 ; ⤵️ 0x10
 0x1817e7434:  fd 7b 41 a9       ldp             x29, x30, [sp, #0x10]
 0x1817e7438:  ff 83 00 91       add             sp, sp, #0x20
 0x1817e743c:  ff 0f 5f d6       retab
-; loc_1817e7440
+0x1817e7440:  ; loc_1817e7440
 0x1817e7440:  64 52 fe 95       bl              ___stack_chk_fail
 ```
 

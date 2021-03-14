@@ -258,8 +258,9 @@ var dyldDisassCmd = &cobra.Command{
 		//***********************
 		//* First pass ANALYSIS *
 		//***********************
-		if tri, err := f.FirstPassTriage(m, dFunc, bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}, true); err == nil {
-			for _, img := range tri.Dylibs {
+		triage, err := f.FirstPassTriage(m, dFunc, bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}, true)
+		if err == nil {
+			for _, img := range triage.Dylibs {
 				if err := f.AnalyzeImage(img); err != nil {
 					return err
 				}
@@ -347,6 +348,10 @@ var dyldDisassCmd = &cobra.Command{
 				}
 			}
 
+			if triage.IsBranchLocation(i.Instruction.Address()) {
+				fmt.Printf("%#08x:  ; loc_%x\n", i.Instruction.Address(), i.Instruction.Address())
+			}
+
 			// lookup adrp/ldr or add address as a cstring or symbol name
 			operation := i.Instruction.Operation().String()
 			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
@@ -385,7 +390,16 @@ var dyldDisassCmd = &cobra.Command{
 							} else {
 								if dFunc != nil {
 									if operand.Immediate >= dFunc.StartAddr && operand.Immediate < dFunc.EndAddr {
-										opStr = strings.Replace(opStr, fmt.Sprintf("#%#x", operand.Immediate), fmt.Sprintf("loc_%x", operand.Immediate), 1)
+										direction := ""
+										delta := int(operand.Immediate) - int(i.Instruction.Address())
+										if delta > 0 {
+											direction = fmt.Sprintf(" ; ⤵️ %#x", delta)
+										} else if delta == 0 {
+											direction = " ; ∞ loop"
+										} else {
+											direction = fmt.Sprintf(" ; ⤴️ %#x", delta)
+										}
+										opStr = strings.Replace(opStr, fmt.Sprintf("#%#x", operand.Immediate), fmt.Sprintf("loc_%x%s", operand.Immediate, direction), 1)
 									}
 								}
 							}

@@ -41,6 +41,7 @@ type Triage struct {
 	Details   map[uint64]addrDetails
 	function  *types.Function
 	addresses map[uint64]uint64
+	locations []uint64
 }
 
 // Contains returns true if Triage immediates contains a given address and will return the instruction address
@@ -54,9 +55,9 @@ func (t *Triage) Contains(address uint64) (bool, uint64) {
 }
 
 // IsLocation returns if given address is a local branch location within the disassembled function
-func (t *Triage) IsLocation(addr uint64) bool {
-	if t.function != nil {
-		if addr >= t.function.StartAddr && addr < t.function.EndAddr {
+func (t *Triage) IsBranchLocation(addr uint64) bool {
+	for _, loc := range t.locations {
+		if addr == loc {
 			return true
 		}
 	}
@@ -138,6 +139,13 @@ func (f *File) FirstPassTriage(m *macho.File, fn *types.Function, r io.ReadSeeke
 
 			if !triage.Dylibs.contains(image) {
 				triage.Dylibs = append(triage.Dylibs, image)
+			}
+
+			if triage.function != nil {
+				if triage.function.StartAddr <= addr && addr < triage.function.EndAddr {
+					triage.locations = append(triage.locations, addr)
+					continue
+				}
 			}
 
 			m, err := image.GetPartialMacho()
