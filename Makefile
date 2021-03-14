@@ -1,16 +1,11 @@
 REPO=blacktop
 NAME=ipsw
-VERSION=$(shell cat VERSION)
-MESSAGE?="New release ${VERSION}"
+CUR_VERSION=$(shell svu current)
+NEXT_VERSION=$(shell svu patch)
 
-# TODO remove \|/templates/\|/api
 SOURCE_FILES?=$$(go list ./... | grep -v /vendor/)
 TEST_PATTERN?=.
 TEST_OPTIONS?=
-
-GIT_COMMIT=$(git rev-parse HEAD)
-GIT_DIRTY=$(test -n "`git status --porcelain`" && echo "+CHANGES" || true)
-GIT_DESCRIBE=$(git describe --tags)
 
 
 setup: ## Install all the build and lint dependencies
@@ -62,26 +57,26 @@ update_keys:
 
 .PHONY: dry_release
 dry_release:
-	goreleaser build --rm-dist --skip-validate
-
-.PHONY: bump
-bump: ## Incriment version patch number
-	@echo " > Bumping VERSION"
-	@hack/bump/version -p $(shell cat VERSION) > VERSION
-	@git commit -am "bumping version to $(shell cat VERSION)"
-	@git push
+	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
+	@goreleaser build --rm-dist --skip-validate
 
 .PHONY: release
-release: bump ## Create a new release from the VERSION
-	@echo " > Creating Release"
-	@hack/make/release v$(shell cat VERSION)
+release: ## Create a new release from the NEXT_VERSION
+	@echo " > Creating Release ${NEXT_VERSION}"
+	@hack/make/release ${NEXT_VERSION}
 	@goreleaser --rm-dist
 
-destroy: ## Remove release from the VERSION
-	@echo " > Deleting Release"
+.PHONY: release-minor
+release-minor: ## Create a new minor semver release
+	@echo " > Creating Release $(shell svu minor)"
+	@hack/make/release $(shell svu minor)
+	@goreleaser --rm-dist
+
+destroy: ## Remove release from the CUR_VERSION
+	@echo " > Deleting Release ${CUR_VERSION}"
 	rm -rf dist
-	git tag -d v${VERSION}
-	git push origin :refs/tags/v${VERSION}
+	git tag -d ${CUR_VERSION}
+	git push origin :refs/tags/${CUR_VERSION}
 
 ci: lint test ## Run all the tests and code checks
 
@@ -97,30 +92,30 @@ docs:
 .PHONY: docker
 docker: ## Build docker image
 	@echo "===> Building Docker Image"
-	docker build -t $(REPO)/$(NAME):$(VERSION) .
+	docker build -t $(REPO)/$(NAME):$(NEXT_VERSION) .
 
 docker-tag: docker
-	docker tag $(REPO)/$(NAME):$(VERSION) docker.pkg.github.com/blacktop/ipsw/$(NAME):$(VERSION)
+	docker tag $(REPO)/$(NAME):$(NEXT_VERSION) docker.pkg.github.com/blacktop/ipsw/$(NAME):$(NEXT_VERSION)
 
 docker-push: docker-tag
-	docker push docker.pkg.github.com/blacktop/ipsw/$(NAME):$(VERSION)
+	docker push docker.pkg.github.com/blacktop/ipsw/$(NAME):$(NEXT_VERSION)
 
 .PHONY: test-docker
 test-docker: ## Run docker test
 	@echo "===> Testing Docker Image"
-	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(VERSION) -V extract --dyld /data/iPhone12_1_13.2.3_17B111_Restore.ipsw
+	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(NEXT_VERSION) -V extract --dyld /data/iPhone12_1_13.2.3_17B111_Restore.ipsw
 
 .PHONY: size
 size: ## Get built image size
-	sed -i.bu 's/docker%20image-.*-blue/docker%20image-$(shell docker images --format "{{.Size}}" $(REPO)/$(NAME):$(VERSION)| cut -d' ' -f1)-blue/' README.md
+	sed -i.bu 's/docker%20image-.*-blue/docker%20image-$(shell docker images --format "{{.Size}}" $(REPO)/$(NAME):$(NEXT_VERSION)| cut -d' ' -f1)-blue/' README.md
 
 .PHONY: ssh
 ssh:
-	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data --entrypoint=bash $(REPO)/$(NAME):$(VERSION)
+	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data --entrypoint=bash $(REPO)/$(NAME):$(NEXT_VERSION)
 
 .PHONY: run
 run:
-	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data $(REPO)/$(NAME):$(VERSION)
+	@docker run --init -it --rm --device /dev/fuse --cap-add SYS_ADMIN --mount type=tmpfs,destination=/app -v `pwd`/test-caches/ipsws:/data $(REPO)/$(NAME):$(NEXT_VERSION)
 	@go run cmd/ipsw/main.go dyld webkit `pwd`/test-caches/ipsws/dyld_shared_cache_*
 
 clean: ## Clean up artifacts
