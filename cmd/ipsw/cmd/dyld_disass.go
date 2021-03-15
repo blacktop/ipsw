@@ -55,7 +55,7 @@ func init() {
 // disassCmd represents the disass command
 var dyldDisassCmd = &cobra.Command{
 	Use:   "disass [options] <dyld_shared_cache>",
-	Short: "🚧 [WIP] Disassemble dyld_shared_cache symbol in an image",
+	Short: "🚧 [WIP] Disassemble dyld_shared_cache symbol/vaddr in an image",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -352,6 +352,16 @@ var dyldDisassCmd = &cobra.Command{
 				fmt.Printf("%#08x:  ; loc_%x\n", i.Instruction.Address(), i.Instruction.Address())
 			}
 
+			// if ok, imm := triage.HasLoc(i.Instruction.Address()); ok {
+			// 	if detail, ok := triage.Details[imm]; ok {
+			// 		if triage.IsData(imm) {
+			// 			opStr += fmt.Sprintf(" ; %s", detail)
+			// 		} else {
+			// 			opStr += fmt.Sprintf(" ; %s", detail)
+			// 		}
+			// 	}
+			// }
+
 			// lookup adrp/ldr or add address as a cstring or symbol name
 			operation := i.Instruction.Operation().String()
 			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
@@ -393,11 +403,11 @@ var dyldDisassCmd = &cobra.Command{
 										direction := ""
 										delta := int(operand.Immediate) - int(i.Instruction.Address())
 										if delta > 0 {
-											direction = fmt.Sprintf(" ; ⤵️ %#x", delta)
+											direction = fmt.Sprintf(" ; ⤵ %#x", delta)
 										} else if delta == 0 {
 											direction = " ; ∞ loop"
 										} else {
-											direction = fmt.Sprintf(" ; ⤴️ %#x", delta)
+											direction = fmt.Sprintf(" ; ⤴ %#x", delta)
 										}
 										opStr = strings.Replace(opStr, fmt.Sprintf("#%#x", operand.Immediate), fmt.Sprintf("loc_%x%s", operand.Immediate, direction), 1)
 									}
@@ -427,7 +437,7 @@ var dyldDisassCmd = &cobra.Command{
 			}
 
 			if isMiddle && i.Instruction.Address() == symAddr {
-				fmt.Printf("%#08x:  %s\t%-10v%s\t👈\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
+				fmt.Printf("👉 %#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
 			} else {
 				fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
 			}
