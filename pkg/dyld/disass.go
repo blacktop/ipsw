@@ -33,7 +33,7 @@ type addrDetails struct {
 }
 
 func (d addrDetails) String() string {
-	return fmt.Sprintf("%s: %s.%s", d.Image, d.Segment, d.Section)
+	return fmt.Sprintf("%s/%s.%s", d.Image, d.Segment, d.Section)
 }
 
 type Triage struct {
@@ -49,6 +49,15 @@ func (t *Triage) Contains(address uint64) (bool, uint64) {
 	for loc, addr := range t.addresses {
 		if addr == address {
 			return true, loc
+		}
+	}
+	return false, 0
+}
+
+func (t *Triage) HasLoc(location uint64) (bool, uint64) {
+	for loc, addr := range t.addresses {
+		if loc == location {
+			return true, addr
 		}
 	}
 	return false, 0
@@ -155,7 +164,7 @@ func (f *File) FirstPassTriage(m *macho.File, fn *types.Function, r io.ReadSeeke
 
 			if c := m.FindSectionForVMAddr(addr); c != nil {
 				triage.Details[addr] = addrDetails{
-					Image:   image.Name,
+					Image:   filepath.Base(image.Name),
 					Segment: c.Seg,
 					Section: c.Name,
 				}
