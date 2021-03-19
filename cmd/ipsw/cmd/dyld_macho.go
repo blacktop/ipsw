@@ -39,6 +39,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldMachoCmd)
 
+	dyldMachoCmd.Flags().BoolP("all", "a", false, "Parse ALL dylibs")
 	dyldMachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
 	dyldMachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
@@ -64,6 +65,7 @@ var dyldMachoCmd = &cobra.Command{
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
+		dumpALL, _ := cmd.Flags().GetBool("all")
 
 		onlyFuncStarts := !showLoadCommands && !showObjC && showFuncStarts
 
@@ -93,8 +95,27 @@ var dyldMachoCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(args) > 1 {
-			if i := f.Image(args[1]); i != nil {
+		if len(args) > 1 || dumpALL {
+
+			var images []*dyld.CacheImage
+
+			if dumpALL {
+				images = f.Images
+			} else {
+				if img := f.Image(args[1]); img != nil {
+					images = append(images, img)
+				} else {
+					log.Errorf("dylib %s not found in %s", args[1], dscPath)
+					return nil
+				}
+			}
+
+			for _, i := range images {
+
+				if dumpALL {
+					fmt.Printf("IMAGE: %s\n\n", i.Name)
+				}
+
 				m, err := i.GetMacho()
 				if err != nil {
 					return err
@@ -109,6 +130,7 @@ var dyldMachoCmd = &cobra.Command{
 					fmt.Println("===========")
 					if m.HasObjC() {
 						if info, err := m.GetObjCImageInfo(); err == nil {
+							fmt.Println(m.GetObjCInfo())
 							fmt.Println(info.Flags)
 						}
 
@@ -150,8 +172,31 @@ var dyldMachoCmd = &cobra.Command{
 								}
 							}
 						}
+						if protRefs, err := m.GetObjCProtoReferences(); err == nil {
+							fmt.Printf("\n@protocol refs\n")
+							for off, prot := range protRefs {
+								fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr.VMAdder, prot.Name)
+							}
+						}
+						if clsRefs, err := m.GetObjCClassReferences(); err == nil {
+							fmt.Printf("\n@class refs\n")
+							for off, cls := range clsRefs {
+								fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr.VMAdder, cls.Name)
+								// if Verbose {
+								// 	fmt.Println(cls.Verbose())
+								// } else {
+								// 	fmt.Println(cls.String())
+								// }
+							}
+						}
+						if supRefs, err := m.GetObjCSuperReferences(); err == nil {
+							fmt.Printf("\n@super refs\n")
+							for off, sup := range supRefs {
+								fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr.VMAdder, sup.Name)
+							}
+						}
 						if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
-							fmt.Println("@selectors refs")
+							fmt.Printf("\n@selectors refs\n")
 							for off, sel := range selRefs {
 								fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
 							}
@@ -251,8 +296,6 @@ var dyldMachoCmd = &cobra.Command{
 					}
 				}
 
-			} else {
-				log.Errorf("dylib %s not found in %s", args[1], dscPath)
 			}
 		} else {
 			log.Error("you must supply a dylib MachO to parse")
