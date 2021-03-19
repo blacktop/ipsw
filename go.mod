@@ -7,7 +7,7 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20201125194554-85d881c3777e // indirect
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-macho v1.1.28
+	github.com/blacktop/go-macho v1.1.29
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -35,8 +35,8 @@ require (
 	github.com/spf13/viper v1.7.1
 	github.com/therootcompany/xz v1.0.1
 	github.com/vbauerster/mpb/v5 v5.4.0
-	golang.org/x/crypto v0.0.0-20210220033148-5ea612d1eb83
+	golang.org/x/crypto v0.0.0-20210317152858-513c2a44f670
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210309074719-68d13333faf2
+	golang.org/x/sys v0.0.0-20210317225723-c4fcb01b228e
 	gopkg.in/ini.v1 v1.62.0 // indirect
 )
