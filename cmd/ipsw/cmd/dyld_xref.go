@@ -26,7 +26,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
@@ -41,6 +40,7 @@ func init() {
 
 	xrefCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	xrefCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
+	xrefCmd.Flags().BoolP("imports", "", false, "Search all other dylibs that import the dylib containing the xref src")
 
 	xrefCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -56,12 +56,11 @@ var xrefCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		xrefs := make(map[uint64]string)
-
 		imageName, _ := cmd.Flags().GetString("image")
 
 		// TODO: add slide support (add to output addrs)
 		slide, _ := cmd.Flags().GetUint64("slide")
+		searchImports, _ := cmd.Flags().GetBool("imports")
 
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
@@ -99,97 +98,118 @@ var xrefCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		var image *dyld.CacheImage
+		var srcImage *dyld.CacheImage
+		var images []*dyld.CacheImage
 		if len(imageName) > 0 {
-			image = f.Image(imageName)
-			if image == nil {
+			srcImage = f.Image(imageName)
+			if srcImage == nil {
 				return fmt.Errorf("no image found matching %s", imageName)
 			}
+			images = append(images, srcImage)
 		} else {
-			image, err = f.GetImageContainingVMAddr(unslidAddr)
+			srcImage, err = f.GetImageContainingVMAddr(unslidAddr)
 			if err != nil {
 				return err
 			}
+			images = append(images, srcImage)
 		}
 
-		if err := f.AnalyzeImage(image); err != nil {
-			return fmt.Errorf("failed to analyze image: %s; %v", image.Name, err)
-		}
-
-		m, err := image.GetMacho()
-		if err != nil {
-			return err
-		}
-		defer m.Close()
-
-		if m.HasObjC() {
-			log.Debug("Parsing ObjC runtime structures...")
-			if err := f.CFStringsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc cfstrings")
-			}
-			if err := f.MethodsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc methods")
-			}
-			if err := f.SelectorsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc selectors")
-			}
-			if err := f.ClassesForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc classes")
-			}
-		}
-
-		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
-			log.WithFields(log.Fields{
-				"sym":   symName,
-				"dylib": image.Name,
-			}).Info("Address location")
-		} else {
-			log.WithFields(log.Fields{
-				"dylib": image.Name,
-			}).Info("Address location")
-		}
-
-		for _, fn := range m.GetFunctions() {
-			soff, err := f.GetOffset(fn.StartAddr)
-			if err != nil {
-				return err
-			}
-
-			data, err := f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
-			if err != nil {
-				return err
-			}
-
-			triage, err := f.FirstPassTriage(m, &fn, bytes.NewReader(data), arm64.Options{StartAddress: int64(fn.StartAddr)}, false)
-			if err != nil {
-				return err
-			}
-
-			if ok, loc := triage.Contains(unslidAddr); ok {
-				if sym := f.FindSymbol(fn.StartAddr, false); len(sym) > 0 {
-					xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
-				} else {
-					xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
+		if searchImports {
+			log.Info("Searching for importing dylibs")
+			for _, i := range f.Images {
+				m, err := i.GetPartialMacho()
+				if err != nil {
+					return err
 				}
-				// } else if triage.IsData(unslidAddr) {
-				// 	xrefs[fn.StartAddr] = fmt.Sprintf("data_%x", fn.StartAddr)
-				// } else {
-				// 	if detail, ok := triage.Details[unslidAddr]; ok {
-				// 		xrefs[fn.StartAddr] = detail.String()
-				// 	}
-				// }
+				if utils.StrSliceContains(m.ImportedLibraries(), srcImage.Name) {
+					images = append(images, i)
+				}
+				m.Close()
 			}
 		}
 
-		if len(xrefs) > 0 {
-			title := fmt.Sprintf("XREFS (%d)", len(xrefs))
-			fmt.Printf("\n%s\n", title)
-			fmt.Println(strings.Repeat("=", len(title)))
-			for addr, sym := range xrefs {
-				fmt.Printf("%#x: %s\n", addr, sym)
+		for _, img := range images {
+			xrefs := make(map[uint64]string)
+
+			if err := f.AnalyzeImage(img); err != nil {
+				return fmt.Errorf("failed to analyze image: %s; %v", img.Name, err)
 			}
-		} else {
-			log.Info("No XREFS found")
+
+			m, err := img.GetMacho()
+			if err != nil {
+				return err
+			}
+			defer m.Close()
+
+			if m.HasObjC() {
+				log.Debug("Parsing ObjC runtime structures...")
+				if err := f.CFStringsForImage(img.Name); err != nil {
+					return errors.Wrapf(err, "failed to parse objc cfstrings")
+				}
+				if err := f.MethodsForImage(img.Name); err != nil {
+					return errors.Wrapf(err, "failed to parse objc methods")
+				}
+				if err := f.SelectorsForImage(img.Name); err != nil {
+					return errors.Wrapf(err, "failed to parse objc selectors")
+				}
+				if err := f.ClassesForImage(img.Name); err != nil {
+					return errors.Wrapf(err, "failed to parse objc classes")
+				}
+			}
+
+			for _, fn := range m.GetFunctions() {
+				soff, err := f.GetOffset(fn.StartAddr)
+				if err != nil {
+					return err
+				}
+
+				data, err := f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+				if err != nil {
+					return err
+				}
+
+				triage, err := f.FirstPassTriage(m, &fn, bytes.NewReader(data), arm64.Options{StartAddress: int64(fn.StartAddr)}, false)
+				if err != nil {
+					return err
+				}
+
+				if ok, loc := triage.Contains(unslidAddr); ok {
+					if sym := f.FindSymbol(fn.StartAddr, false); len(sym) > 0 {
+						xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
+					} else {
+						xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)
+					}
+					// } else if triage.IsData(unslidAddr) {
+					// 	xrefs[fn.StartAddr] = fmt.Sprintf("data_%x", fn.StartAddr)
+					// } else {
+					// 	if detail, ok := triage.Details[unslidAddr]; ok {
+					// 		xrefs[fn.StartAddr] = detail.String()
+					// 	}
+					// }
+				}
+			}
+
+			msg := "XREFS"
+			if len(xrefs) == 0 {
+				msg = "No XREFS found"
+			}
+			if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+				log.WithFields(log.Fields{
+					"sym":   symName,
+					"dylib": img.Name,
+					"xrefs": len(xrefs),
+				}).Info(msg)
+			} else {
+				log.WithFields(log.Fields{
+					"dylib": img.Name,
+					"xrefs": len(xrefs),
+				}).Info(msg)
+			}
+			if len(xrefs) > 0 {
+				for addr, sym := range xrefs {
+					fmt.Printf("%#x: %s\n", addr, sym)
+				}
+			}
 		}
 
 		return nil
