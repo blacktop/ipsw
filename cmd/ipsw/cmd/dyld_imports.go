@@ -91,6 +91,7 @@ var importsCmd = &cobra.Command{
 				}
 				m.Close()
 			}
+
 		} else {
 			log.Errorf("no image found matching %s", args[1])
 		}
