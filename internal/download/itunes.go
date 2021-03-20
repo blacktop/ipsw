@@ -15,7 +15,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-const iTunesVersionURL = "https://itunes.apple.com/WebObjects/MZStore.woa/wa/com.apple.jingle.appserver.client.MZITunesClientCheck/version/"
+const (
+	iTunesVersionURL = "https://itunes.apple.com/WebObjects/MZStore.woa/wa/com.apple.jingle.appserver.client.MZITunesClientCheck/version/"
+	macOSIpswURL     = "https://mesu.apple.com/assets/macos/com_apple_macOSIPSW/com_apple_macOSIPSW.xml"
+)
 
 // Identifier object
 type Identifier string
@@ -154,18 +157,18 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 	newestVersion := versions[len(versions)-1]
 	utils.Indent(log.Info, 1)(fmt.Sprintf("Latest iOS release found is: %s", newestVersion.Original()))
 
-	// check canijailbreak.com
-	jbs, _ := GetJailbreaks()
-	if iCan, index, err := jbs.CanIBreak(newestVersion.Original()); err != nil {
-		log.Error(err.Error())
-	} else {
-		if iCan {
-			utils.Indent(log.WithField("url", jbs.Jailbreaks[index].URL).Warn, 2)(fmt.Sprintf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name))
-			utils.Indent(log.Warn, 3)(jbs.Jailbreaks[index].Caveats)
-		} else {
-			utils.Indent(log.Warn, 2)(fmt.Sprintf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", GetRandomResearcher()))
-		}
-	}
+	// // check canijailbreak.com
+	// jbs, _ := GetJailbreaks()
+	// if iCan, index, err := jbs.CanIBreak(newestVersion.Original()); err != nil {
+	// 	log.Error(err.Error())
+	// } else {
+	// 	if iCan {
+	// 		utils.Indent(log.WithField("url", jbs.Jailbreaks[index].URL).Warn, 2)(fmt.Sprintf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name))
+	// 		utils.Indent(log.Warn, 3)(jbs.Jailbreaks[index].Caveats)
+	// 	} else {
+	// 		utils.Indent(log.Warn, 2)(fmt.Sprintf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", GetRandomResearcher()))
+	// 	}
+	// }
 
 	for _, build := range vm.GetBuilds() {
 		if strings.EqualFold(build.ProductVersion, newestVersion.Original()) {
@@ -305,6 +308,26 @@ func (vm *ITunesVersionMaster) GetSoftwareURLsForBuildID(buildID string) ([]stri
 // NewiTunesVersionMaster downloads and parses the itumes plist
 func NewiTunesVersionMaster() (*ITunesVersionMaster, error) {
 	resp, err := http.Get(iTunesVersionURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create http client")
+	}
+
+	document, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read plist")
+	}
+
+	vm := ITunesVersionMaster{}
+
+	dec := plist.NewDecoder(bytes.NewReader(document))
+	dec.Decode(&vm)
+
+	return &vm, nil
+}
+
+// NewiTunesVersionMaster downloads and parses the itumes plist
+func NewMacOsXML() (*ITunesVersionMaster, error) {
+	resp, err := http.Get(macOSIpswURL)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create http client")
 	}
