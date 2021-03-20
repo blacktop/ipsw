@@ -11,6 +11,7 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download pattern**](#download-pattern)
 - [**download beta**](#download-beta)
 - [**download ota**](#download-ota)
+- [**download macos**](#download-macos)
 
 ---
 
@@ -216,4 +217,22 @@ $ ipsw download ota --device iPod9,1 --kernel --dyld
       • Decompressing Kernelcache
       • Kernelcache is LZFSE compressed
       • Writing "iPod9,1_N112AP_17F5054h/kernelcache.beta"
+```
+
+## **download macos**
+
+Download and parse macOS IPSWs
+
+```bash
+$ ipsw download macos --kernel
+   • Latest release found is: 11.2.3
+? You are about to download 1 ipsw files. Continue? Yes
+   • Getting Kernelcache       build=20D91 device=Macmini9,1 version=11.2.3
+   • Extracting remote kernelcache
+      • Writing ADP3,2_J273AAP_20D91/kernelcache.production
+      • Writing ADP3,1_J273AP_20D91/kernelcache.production
+      • Writing Macmini9,1_J274AP_20D91/kernelcache.production
+      • Writing MacBookPro17,1_J293AP_20D91/kernelcache.production
+      • Writing MacBookAir10,1_J313AP_20D91/kernelcache.production
+      • Writing iProd99,1_T485AP_20D91/kernelcache.production
 ```
