@@ -155,7 +155,7 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 
 	sort.Sort(version.Collection(versions))
 	newestVersion := versions[len(versions)-1]
-	utils.Indent(log.Info, 1)(fmt.Sprintf("Latest iOS release found is: %s", newestVersion.Original()))
+	utils.Indent(log.Info, 1)(fmt.Sprintf("Latest release found is: %s", newestVersion.Original()))
 
 	// // check canijailbreak.com
 	// jbs, _ := GetJailbreaks()
