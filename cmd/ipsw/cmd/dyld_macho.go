@@ -42,6 +42,7 @@ func init() {
 	dyldMachoCmd.Flags().BoolP("all", "a", false, "Parse ALL dylibs")
 	dyldMachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
 	dyldMachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
+	dyldMachoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
 	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	dyldMachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
@@ -62,6 +63,7 @@ var dyldMachoCmd = &cobra.Command{
 
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
 		showObjC, _ := cmd.Flags().GetBool("objc")
+		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
@@ -130,7 +132,7 @@ var dyldMachoCmd = &cobra.Command{
 					fmt.Println("===========")
 					if m.HasObjC() {
 						if info, err := m.GetObjCImageInfo(); err == nil {
-							fmt.Println(m.GetObjCInfo())
+							// fmt.Println(m.GetObjCInfo())
 							fmt.Println(info.Flags)
 						}
 
@@ -172,41 +174,44 @@ var dyldMachoCmd = &cobra.Command{
 								}
 							}
 						}
-						if protRefs, err := m.GetObjCProtoReferences(); err == nil {
-							fmt.Printf("\n@protocol refs\n")
-							for off, prot := range protRefs {
-								fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr.VMAdder, prot.Name)
+						if showObjcRefs {
+							if protRefs, err := m.GetObjCProtoReferences(); err == nil {
+								fmt.Printf("\n@protocol refs\n")
+								for off, prot := range protRefs {
+									fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr.VMAdder, prot.Name)
+								}
+							}
+							if clsRefs, err := m.GetObjCClassReferences(); err == nil {
+								fmt.Printf("\n@class refs\n")
+								for off, cls := range clsRefs {
+									fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr.VMAdder, cls.Name)
+									// if Verbose {
+									// 	fmt.Println(cls.Verbose())
+									// } else {
+									// 	fmt.Println(cls.String())
+									// }
+								}
+							}
+							if supRefs, err := m.GetObjCSuperReferences(); err == nil {
+								fmt.Printf("\n@super refs\n")
+								for off, sup := range supRefs {
+									fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr.VMAdder, sup.Name)
+								}
+							}
+							if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
+								fmt.Printf("\n@selectors refs\n")
+								for off, sel := range selRefs {
+									fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
+								}
+							}
+							if methods, err := m.GetObjCMethodNames(); err == nil {
+								fmt.Printf("\n@methods\n")
+								for method, vmaddr := range methods {
+									fmt.Printf("0x%011x: %s\n", vmaddr, method)
+								}
 							}
 						}
-						if clsRefs, err := m.GetObjCClassReferences(); err == nil {
-							fmt.Printf("\n@class refs\n")
-							for off, cls := range clsRefs {
-								fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr.VMAdder, cls.Name)
-								// if Verbose {
-								// 	fmt.Println(cls.Verbose())
-								// } else {
-								// 	fmt.Println(cls.String())
-								// }
-							}
-						}
-						if supRefs, err := m.GetObjCSuperReferences(); err == nil {
-							fmt.Printf("\n@super refs\n")
-							for off, sup := range supRefs {
-								fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr.VMAdder, sup.Name)
-							}
-						}
-						if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
-							fmt.Printf("\n@selectors refs\n")
-							for off, sel := range selRefs {
-								fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
-							}
-						}
-						if methods, err := m.GetObjCMethodNames(); err == nil {
-							fmt.Printf("\n@methods\n")
-							for method, vmaddr := range methods {
-								fmt.Printf("0x%011x: %s\n", vmaddr, method)
-							}
-						}
+
 					} else {
 						fmt.Println("  - no objc")
 					}
