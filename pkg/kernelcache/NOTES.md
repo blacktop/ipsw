@@ -1,4 +1,9 @@
 # NOTES
 
-* <https://bazad.github.io/2018/06/ios-12-kernelcache-tagged-pointers/>
+## Tagged Pointers
 
+- https://bazad.github.io/2018/06/ios-12-kernelcache-tagged-pointers
+
+## Sandbox
+
+- https://github.com/malus-security/sandblaster
