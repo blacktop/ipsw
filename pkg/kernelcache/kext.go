@@ -118,6 +118,7 @@ func getKextInfos(m *macho.File) ([]KmodInfoT, error) {
 			return nil, err
 		}
 		for _, ptr := range ptrs {
+			// fmt.Printf("ptr: %#x, untagged: %#x\n", ptr, unTag(ptr))
 			off, err := m.GetOffset(ptr | tagPtrMask)
 			if err != nil {
 				return nil, err
@@ -144,7 +145,7 @@ func getKextInfos(m *macho.File) ([]KmodInfoT, error) {
 	return nil, fmt.Errorf("section __PRELINK_INFO.__kmod_start not found")
 }
 
-func DumpSandboxOpts(m *macho.File) ([]string, error) {
+func GetSandboxOpts(m *macho.File) ([]string, error) {
 	var bcOpts []string
 
 	if dconst := m.Section("__DATA_CONST", "__const"); dconst != nil {
@@ -159,11 +160,9 @@ func DumpSandboxOpts(m *macho.File) ([]string, error) {
 		found := false
 		for _, ptr := range ptrs {
 			if ptr == 0 {
-				if found {
-					break
-				}
 				continue
 			}
+
 			str, err := m.GetCString(ptr | tagPtrMask)
 			if err != nil {
 				if found {
@@ -178,12 +177,47 @@ func DumpSandboxOpts(m *macho.File) ([]string, error) {
 
 			if found {
 				bcOpts = append(bcOpts, str)
+				if getTag(ptr) != 0x17 { // always directly followed by another pointer
+					break
+				}
 			}
 		}
-
 	}
 
+	// GetSandboxProfiles(m)
+
 	return bcOpts, nil
+}
+
+// TODO: finish this
+func GetSandboxProfiles(m *macho.File) ([]byte, error) {
+	var profiles []byte
+
+	if tConst := m.Section("__TEXT", "__const"); tConst != nil {
+		data, err := tConst.Data()
+		if err != nil {
+			return nil, err
+		}
+		index := 0
+		for {
+			if found := bytes.Index(data[index:], []byte{'\x00', '\x80'}); found != -1 {
+				// fmt.Println(hex.Dump(data[index+found : index+found+100]))
+				index += found + 1
+			} else {
+				break
+			}
+		}
+	}
+
+	return profiles, nil
+}
+
+func getTag(ptr uint64) uint64 {
+	return ptr >> 48
+}
+
+func unTag(ptr uint64) uint64 {
+	return (ptr & ((1 << 48) - 1)) | (0xffff << 48)
 }
 
 // KextList lists all the kernel extensions in the kernelcache
