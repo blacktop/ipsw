@@ -147,15 +147,6 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 				return nil, err
 			}
 
-			if flags.StubAndResolver() {
-				symOtherInt, err = readUleb128(r)
-				if err != nil {
-					return nil, err
-				}
-				// TODO: handle stubs
-				log.Debugf("StubAndResolver: %d", symOtherInt)
-			}
-
 			if flags.Regular() || flags.ThreadLocal() {
 				symValueInt += loadAddress
 			}
@@ -163,7 +154,20 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 			if len(reExportSymBytes) > 0 {
 				symName = fmt.Sprintf("%s (%s)", string(tNode.SymBytes), string(reExportSymBytes))
 			} else {
-				symName = fmt.Sprintf("%s", string(tNode.SymBytes))
+				symName = string(tNode.SymBytes)
+			}
+
+			if flags.StubAndResolver() {
+				symOtherInt, err = readUleb128(r)
+				if err != nil {
+					return nil, err
+				}
+				// TODO: handle stubs
+				log.WithFields(log.Fields{
+					"address": fmt.Sprintf("%#x", symValueInt),
+					"other":   fmt.Sprintf("%#x", symOtherInt+loadAddress),
+					"symbol":  symName,
+				}).Debug("StubAndResolver")
 			}
 
 			entries = append(entries, trieEntry{
