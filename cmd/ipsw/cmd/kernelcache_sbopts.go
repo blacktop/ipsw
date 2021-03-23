@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -40,7 +41,7 @@ func init() {
 
 // kernelSandboxCmd represents the kernelSandboxCmd command
 var kernelSandboxCmd = &cobra.Command{
-	Use:   "sb",
+	Use:   "sbopts",
 	Short: "List kernel sandbox operations",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,13 +62,13 @@ var kernelSandboxCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sbOpts, err := kernelcache.DumpSandboxOpts(m)
+		sbOpts, err := kernelcache.GetSandboxOpts(m)
 		if err != nil {
 			return err
 		}
-
-		fmt.Println("Sandbox Operations")
-		fmt.Println("==================")
+		title := fmt.Sprintf("Sandbox Operations (%d)", len(sbOpts))
+		fmt.Println(title)
+		fmt.Println(strings.Repeat("=", len(title)))
 		for _, opt := range sbOpts {
 			fmt.Println(opt)
 		}
