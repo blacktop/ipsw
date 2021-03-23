@@ -38,6 +38,7 @@ func init() {
 	downloadCmd.AddCommand(macosCmd)
 
 	macosCmd.Flags().BoolP("info", "i", false, "Show latest macOS version")
+	macosCmd.Flags().BoolP("installer", "", false, "Show latest macOS installers")
 	macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote IPSW")
 }
 
@@ -67,7 +68,22 @@ var macosCmd = &cobra.Command{
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
 		iosInfo, _ := cmd.Flags().GetBool("info")
+		showInstallers, _ := cmd.Flags().GetBool("installer")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
+
+		if showInstallers {
+			if prods, err := download.GetProductInfo(); err != nil {
+				log.Error(err.Error())
+			} else {
+				fmt.Println(prods)
+				// for _, prod := range prods {
+				// 	if prod.ProductID == "071-14766" {
+				// 		prod.DownloadInstaller(proxy, insecure, skipAll)
+				// 	}
+				// }
+			}
+			return nil
+		}
 
 		macOS, err := download.NewMacOsXML()
 		if err != nil {
