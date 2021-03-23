@@ -1,0 +1,313 @@
+package download
+
+import (
+	"bytes"
+	"encoding/xml"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"path"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/apex/log"
+	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/dustin/go-humanize"
+	"github.com/olekukonko/tablewriter"
+	"github.com/pkg/errors"
+)
+
+const (
+	seedCatalogsPlist = "/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/Resources/SeedCatalogs.plist"
+	sucatalogs17      = "https://swscan.apple.com/content/catalogs/others/index-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs18      = "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs19      = "https://swscan.apple.com/content/catalogs/others/index-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-11-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+)
+
+type Package struct {
+	Digest            string `plist:"Digest,omitempty"`
+	Size              int    `plist:"Size,omitempty"`
+	IntegrityDataURL  string `plist:"IntegrityDataURL,omitempty"`
+	MetadataURL       string `plist:"MetadataURL,omitempty"`
+	URL               string `plist:"URL,omitempty"`
+	IntegrityDataSize int    `plist:"IntegrityDataSize,omitempty"`
+}
+
+type ExtendedMetaInfo struct {
+	InstallAssistantPackageIdentifiers map[string]string
+}
+
+type Product struct {
+	ServerMetadataURL string
+	Packages          []Package
+	PostDate          time.Time
+	Distributions     map[string]string
+	ExtendedMetaInfo  ExtendedMetaInfo `plist:"ExtendedMetaInfo,omitempty"`
+}
+
+type Catalog struct {
+	CatalogVersion int
+	ApplePostURL   string
+	IndexDate      time.Time
+	Products       map[string]Product
+}
+
+type localization struct {
+	Description   []byte `plist:"description,omitempty"`
+	ServerComment string `plist:"serverComment,omitempty"`
+	Title         string `plist:"title,omitempty"`
+}
+
+type ServerMetadata struct {
+	CFBundleShortVersionString string
+	Localization               map[string]localization `plist:"localization,omitempty"`
+	Platforms                  map[string][]string     `plist:"platforms,omitempty"`
+}
+
+type auxInfo struct {
+	XMLName xml.Name `xml:"auxinfo"`
+	Keys    []string `xml:"dict>key"`
+	Values  []string `xml:"dict>string"`
+}
+
+type distribution struct {
+	XMLName xml.Name `xml:"installer-gui-script"`
+	Version string   `xml:"minSpecVersion,attr"`
+	Title   string   `xml:"title"`
+	AuxInfo auxInfo  `xml:"auxinfo"`
+}
+
+type ProductInfo struct {
+	ProductID string
+	Version   string
+	Build     string
+	PostDate  time.Time
+	Title     string
+	Product   Product
+}
+
+func (i ProductInfo) String() string {
+	return fmt.Sprintf("Title: %s, Version: %s, Build: %s, PostDate: %s",
+		i.Title,
+		i.Version,
+		i.Build,
+		i.PostDate.Format("2006-01-02"))
+}
+
+type ProductInfos []ProductInfo
+
+func (infos ProductInfos) String() string {
+	tableString := &strings.Builder{}
+
+	pdata := [][]string{}
+	for _, pinfo := range infos {
+		pdata = append(pdata, []string{
+			pinfo.Title,
+			pinfo.Version,
+			pinfo.Build,
+			pinfo.PostDate.Format("2006-01-02"),
+		})
+	}
+	table := tablewriter.NewWriter(tableString)
+	table.SetHeader([]string{"Title", "Version", "Build", "Post Date"})
+	table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+	table.SetCenterSeparator("|")
+	table.AppendBulk(pdata)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.Render()
+
+	return tableString.String()
+}
+
+func zipArrays(arr1, arr2 []string) (map[string]string, error) {
+	if len(arr1) != len(arr2) {
+		return nil, fmt.Errorf("both arrays are NOT equal in length")
+	}
+	out := make(map[string]string)
+	for i := 0; i < len(arr1); i++ {
+		out[strings.ToLower(arr1[i])] = arr2[i]
+	}
+	return out, nil
+}
+
+func getDestName(url string, removeCommas bool) string {
+	var destName string
+	if removeCommas {
+		destName = strings.Replace(path.Base(url), ",", "_", -1)
+	} else {
+		destName = path.Base(url)
+	}
+	return destName
+}
+
+// GetProductInfo downloads and parses the macOS installer product infos
+func GetProductInfo() (ProductInfos, error) {
+
+	var prods ProductInfos
+
+	resp, err := http.Get(sucatalogs20)
+	if err != nil {
+		return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
+	}
+
+	document, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
+	}
+
+	// gzr, err := gzip.NewReader(bytes.NewReader(document))
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create gzip reader: %v", err)
+	// }
+	// gzr.Close()
+
+	// var buff bytes.Buffer
+	// if _, err := gzr.Read(buff.Bytes()); err != nil {
+	// 	return fmt.Errorf("failed to read gzip data: %v", err)
+	// }
+
+	cat := Catalog{}
+	if err := plist.NewDecoder(bytes.NewReader(document)).Decode(&cat); err != nil {
+		return nil, fmt.Errorf("failed to decode sucatalogs plist: %v", err)
+	}
+
+	for key, prod := range cat.Products {
+
+		// filter
+		if len(prod.ExtendedMetaInfo.InstallAssistantPackageIdentifiers) == 0 {
+			continue
+		}
+
+		pInfo := ProductInfo{ProductID: key, PostDate: prod.PostDate, Product: prod}
+
+		if len(prod.ServerMetadataURL) > 0 {
+			resp, err := http.Get(prod.ServerMetadataURL)
+			if err != nil {
+				return nil, fmt.Errorf("failed to download the server metadata %s: %v", prod.ServerMetadataURL, err)
+			}
+
+			serverMetadata, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read server metadata: %v", err)
+			}
+
+			smeta := ServerMetadata{}
+			if err := plist.NewDecoder(bytes.NewReader(serverMetadata)).Decode(&smeta); err != nil {
+				return nil, fmt.Errorf("failed to decode server metadata plist: %v", err)
+			}
+
+			for lang, loc := range smeta.Localization {
+				if strings.HasPrefix(strings.ToLower(lang), "english") {
+					pInfo.Title = loc.Title
+					pInfo.Version = smeta.CFBundleShortVersionString
+					break
+				}
+			}
+		}
+
+		var distURL string
+		if dist, ok := prod.Distributions["English"]; ok {
+			distURL = dist
+		} else {
+			if dist, ok := prod.Distributions["en"]; ok {
+				distURL = dist
+			} else {
+				return nil, fmt.Errorf("failed to find English distribution for product: %s", key)
+			}
+		}
+
+		resp, err = http.Get(distURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to download the distribution: %v", err)
+		}
+
+		distInfo, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read distribution data: %v", err)
+		}
+
+		dist := distribution{}
+		if err := xml.Unmarshal(distInfo, &dist); err != nil {
+			return nil, fmt.Errorf("failed decode distribution XML data: %v", err)
+		}
+
+		if !strings.EqualFold(dist.Title, "SU_TITLE") {
+			pInfo.Title = dist.Title
+		}
+
+		if len(dist.AuxInfo.Keys) > 0 {
+			info, err := zipArrays(dist.AuxInfo.Keys, dist.AuxInfo.Values)
+			if err != nil {
+				return nil, fmt.Errorf("failed to zip distribution auxinfo: %v", err)
+			}
+			pInfo.Build = info["build"]
+			pInfo.Version = info["version"]
+		}
+
+		prods = append(prods, pInfo)
+	}
+
+	sort.Slice(prods[:], func(i, j int) bool {
+		return prods[i].PostDate.Before(prods[j].PostDate)
+	})
+
+	return prods, nil
+}
+
+func (i *ProductInfo) DownloadInstaller(proxy string, insecure, skipAll bool) error {
+	downloader := NewDownload(proxy, insecure, skipAll)
+	folder := i.Title
+	os.MkdirAll(folder, os.ModePerm)
+	for _, pkg := range i.Product.Packages {
+		if len(pkg.URL) > 0 {
+			destName := getDestName(pkg.URL, false)
+			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
+				log.WithFields(log.Fields{
+					"size":     humanize.Bytes(uint64(pkg.Size)),
+					"destName": destName,
+				}).Info("Getting Package")
+				// download file
+				downloader.URL = pkg.URL
+				downloader.DestName = filepath.Join(folder, destName)
+
+				err = downloader.Do()
+				if err != nil {
+					return errors.Wrap(err, "failed to download file")
+				}
+			} else {
+				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
+			}
+		} else if len(pkg.MetadataURL) > 0 {
+			destName := getDestName(pkg.MetadataURL, false)
+			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
+				log.WithFields(log.Fields{
+					"size":     humanize.Bytes(uint64(pkg.Size)),
+					"destName": destName,
+				}).Info("Getting Package")
+				// download file
+				downloader.URL = pkg.URL
+				downloader.DestName = filepath.Join(folder, destName)
+
+				err = downloader.Do()
+				if err != nil {
+					return errors.Wrap(err, "failed to download file")
+				}
+			} else {
+				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
+			}
+		}
+	}
+
+	out, err := utils.CreateSparseDiskImage(fmt.Sprintf("Install_macOS_%s-%s", i.Version, i.Build))
+	if err != nil {
+		return err
+	}
+	fmt.Println(out)
+
+	return nil
+}

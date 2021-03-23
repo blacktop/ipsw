@@ -1,12 +1,15 @@
 package utils
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+
+	"github.com/blacktop/go-plist"
 )
 
 // Cp copies a file from src to dest
@@ -63,6 +66,27 @@ func CodeSignWithEntitlements(filePath, entitlementsPath, signature string) erro
 // CodeSignAdHoc codesigns a given binary with ad-hoc signature
 func CodeSignAdHoc(filePath string) error {
 	return CodeSign(filePath, "-")
+}
+
+// CreateSparseDiskImage mounts a DMG with hdiutil
+func CreateSparseDiskImage(volumeName string) (string, error) {
+	if runtime.GOOS == "darwin" {
+
+		cmd := exec.Command("hdiutil", "create", "-size", "16g", "-fs", "HFS+", "-volname", volumeName, "-type", "SPARSE", "-plist", volumeName+".sparseimage")
+
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+
+		var paths []string
+		if err := plist.NewDecoder(bytes.NewReader(out)).Decode(&paths); err != nil {
+			return "", fmt.Errorf("failed to parse hdiutil output plist: %v", err)
+		}
+		fmt.Println(paths)
+		return paths[0], nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
 }
 
 // Mount mounts a DMG with hdiutil
