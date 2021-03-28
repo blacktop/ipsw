@@ -16,6 +16,7 @@ const (
 	iOS13OtaPublicURL  = "https://mesu.apple.com/assets/iOS13PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 	iOS14OtaDevBetaURL = "https://mesu.apple.com/assets/iOS14DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 	iOS14OtaPublicURL  = "https://mesu.apple.com/assets/iOS14PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
+	otaPublicURL       = "https://mesu.apple.com/assets/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 )
 
 type OtaAsset struct {
@@ -49,7 +50,7 @@ func NewOTA(proxy string, insecure, ios13, public bool) (*Ota, error) {
 	var url string
 
 	if public {
-		url = iOS14OtaPublicURL
+		url = otaPublicURL
 		if ios13 {
 			url = iOS13OtaPublicURL
 		}
@@ -85,9 +86,7 @@ func NewOTA(proxy string, insecure, ios13, public bool) (*Ota, error) {
 	}
 
 	ota := Ota{}
-
-	dec := plist.NewDecoder(bytes.NewReader(document))
-	dec.Decode(&ota)
+	plist.NewDecoder(bytes.NewReader(document)).Decode(&ota)
 
 	return &ota, nil
 }
