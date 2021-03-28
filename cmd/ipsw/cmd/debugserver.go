@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -123,7 +124,7 @@ var debugserverCmd = &cobra.Command{
 			if len(imagePath) == 0 {
 				choice := 0
 				prompt := &survey.Select{
-					Message: fmt.Sprintf("Select the DeveloperDiskImage you want to extract the debugserver from:"),
+					Message: "Select the DeveloperDiskImage you want to extract the debugserver from:",
 					Options: images,
 				}
 				survey.AskOne(prompt, &choice)
@@ -252,6 +253,67 @@ var debugserverCmd = &cobra.Command{
 			}
 
 			if err := sessionCHMOD.Wait(); err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			// CREDIT: https://github.com/EthanArbuckle/unredact-private-os_logs
+			loggingPlist, err := statikFS.Open("/com.apple.system.logging.plist")
+			if err != nil {
+				log.Error(err.Error())
+				return
+			}
+			loggingData, err := ioutil.ReadAll(loggingPlist)
+			if err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			sessionLogSCP, err := client.NewSession()
+			if err != nil {
+				log.Fatalf("failed to create scp session: %s", err)
+			}
+			defer sessionLogSCP.Close()
+
+			go func() error {
+				w, _ := sessionLogSCP.StdinPipe()
+				defer w.Close()
+
+				count, err := io.Copy(w, bytes.NewReader(loggingData))
+				if err != nil {
+					log.Error(err.Error())
+					return err
+				}
+				if count == 0 {
+					return fmt.Errorf("%d bytes copied to device", count)
+				}
+
+				return nil
+			}()
+
+			if err := sessionLogSCP.Start("cat > /Library/Preferences/Logging/com.apple.system.logging.plist"); err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			if err := sessionLogSCP.Wait(); err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			/*
+			 * killall logd
+			 */
+			sessionKillAll, err := client.NewSession()
+			if err != nil {
+				log.Fatalf("failed to create killall session: %s", err)
+			}
+			defer sessionKillAll.Close()
+			if err := sessionKillAll.Start("killall logd"); err != nil {
+				log.Error(err.Error())
+				return
+			}
+			if err := sessionKillAll.Wait(); err != nil {
 				log.Error(err.Error())
 				return
 			}
