@@ -16,7 +16,7 @@ import (
 
 func unmount(device string) error {
 	utils.Indent(log.Info, 2)("Unmounting DMG")
-	err := utils.Unmount(device)
+	err := utils.Unmount(device, false)
 	if err != nil {
 		return errors.Wrapf(err, "failed to unmount %s", device)
 	}

@@ -137,7 +137,7 @@ var debugserverCmd = &cobra.Command{
 			}
 			defer func() {
 				utils.Indent(log.Info, 2)("Unmounting DeveloperDiskImage")
-				if err := utils.Unmount("/tmp/dev_img"); err != nil {
+				if err := utils.Unmount("/tmp/dev_img", false); err != nil {
 					utils.Indent(log.Fatal, 2)(fmt.Sprintf("failed to unmount /tmp/dev_img: %v", err))
 				}
 			}()
