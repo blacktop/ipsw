@@ -39,6 +39,7 @@ func init() {
 
 	macosCmd.Flags().BoolP("info", "i", false, "Show latest macOS version")
 	macosCmd.Flags().BoolP("installer", "", false, "Show latest macOS installers")
+	// macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
 	macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote IPSW")
 }
 
@@ -69,6 +70,7 @@ var macosCmd = &cobra.Command{
 
 		iosInfo, _ := cmd.Flags().GetBool("info")
 		showInstallers, _ := cmd.Flags().GetBool("installer")
+		// workDir, _ := cmd.Flags().GetString("work-dir")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
 		if showInstallers {
@@ -77,8 +79,11 @@ var macosCmd = &cobra.Command{
 			} else {
 				fmt.Println(prods)
 				// for _, prod := range prods {
-				// 	if prod.ProductID == "071-14766" {
-				// 		prod.DownloadInstaller(proxy, insecure, skipAll)
+				// 	// if prod.ProductID == "071-14766" {
+				// 	if prod.ProductID == "001-68446" {
+				// 		if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll); err != nil {
+				// 			log.Error(err.Error())
+				// 		}
 				// 	}
 				// }
 			}
