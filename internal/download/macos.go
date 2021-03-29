@@ -2,6 +2,7 @@ package download
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -9,6 +10,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -21,6 +23,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// CREDIT: https://github.com/munki/macadmin-scripts
+
 const (
 	seedCatalogsPlist = "/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/Resources/SeedCatalogs.plist"
 	sucatalogs17      = "https://swscan.apple.com/content/catalogs/others/index-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
@@ -28,6 +32,12 @@ const (
 	sucatalogs19      = "https://swscan.apple.com/content/catalogs/others/index-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-11-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 )
+
+type seedCatalog struct {
+	CustomerSeed  string
+	DeveloperSeed string
+	PublicSeed    string
+}
 
 type Package struct {
 	Digest            string `plist:"Digest,omitempty"`
@@ -89,6 +99,8 @@ type ProductInfo struct {
 	PostDate  time.Time
 	Title     string
 	Product   Product
+
+	distributionData []byte
 }
 
 func (i ProductInfo) String() string {
@@ -148,31 +160,57 @@ func getDestName(url string, removeCommas bool) string {
 // GetProductInfo downloads and parses the macOS installer product infos
 func GetProductInfo() (ProductInfos, error) {
 
+	var catData []byte
 	var prods ProductInfos
 
-	resp, err := http.Get(sucatalogs20)
-	if err != nil {
-		return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
+	if runtime.GOOS == "darwin" {
+		data, err := ioutil.ReadFile(seedCatalogsPlist)
+		if err != nil {
+			return nil, err
+		}
+
+		seed := seedCatalog{}
+		if err := plist.NewDecoder(bytes.NewReader(data)).Decode(&seed); err != nil {
+			return nil, fmt.Errorf("failed to decode sucatalogs plist: %v", err)
+		}
+
+		// resp, err := http.Get(seed.CustomerSeed)
+		resp, err := http.Get(seed.DeveloperSeed)
+		if err != nil {
+			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
+		}
+
+		document, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
+		}
+
+		gzr, err := gzip.NewReader(bytes.NewReader(document))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %v", err)
+		}
+		gzr.Close()
+
+		var buff bytes.Buffer
+		if _, err := buff.ReadFrom(gzr); err != nil {
+			return nil, fmt.Errorf("failed to read gzip data: %v", err)
+		}
+		catData = buff.Bytes()
+
+	} else {
+		resp, err := http.Get(sucatalogs20)
+		if err != nil {
+			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
+		}
+
+		catData, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
+		}
 	}
-
-	document, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
-	}
-
-	// gzr, err := gzip.NewReader(bytes.NewReader(document))
-	// if err != nil {
-	// 	return fmt.Errorf("failed to create gzip reader: %v", err)
-	// }
-	// gzr.Close()
-
-	// var buff bytes.Buffer
-	// if _, err := gzr.Read(buff.Bytes()); err != nil {
-	// 	return fmt.Errorf("failed to read gzip data: %v", err)
-	// }
 
 	cat := Catalog{}
-	if err := plist.NewDecoder(bytes.NewReader(document)).Decode(&cat); err != nil {
+	if err := plist.NewDecoder(bytes.NewReader(catData)).Decode(&cat); err != nil {
 		return nil, fmt.Errorf("failed to decode sucatalogs plist: %v", err)
 	}
 
@@ -221,18 +259,18 @@ func GetProductInfo() (ProductInfos, error) {
 			}
 		}
 
-		resp, err = http.Get(distURL)
+		resp, err := http.Get(distURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to download the distribution: %v", err)
 		}
 
-		distInfo, err := ioutil.ReadAll(resp.Body)
+		pInfo.distributionData, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read distribution data: %v", err)
 		}
 
 		dist := distribution{}
-		if err := xml.Unmarshal(distInfo, &dist); err != nil {
+		if err := xml.Unmarshal(pInfo.distributionData, &dist); err != nil {
 			return nil, fmt.Errorf("failed decode distribution XML data: %v", err)
 		}
 
@@ -259,10 +297,15 @@ func GetProductInfo() (ProductInfos, error) {
 	return prods, nil
 }
 
-func (i *ProductInfo) DownloadInstaller(proxy string, insecure, skipAll bool) error {
+func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll bool) error {
+
 	downloader := NewDownload(proxy, insecure, skipAll)
-	folder := i.Title
+
+	folder := filepath.Join(workDir, i.Title)
+
 	os.MkdirAll(folder, os.ModePerm)
+
+	log.Info("Downloading packages")
 	for _, pkg := range i.Product.Packages {
 		if len(pkg.URL) > 0 {
 			destName := getDestName(pkg.URL, false)
@@ -273,15 +316,17 @@ func (i *ProductInfo) DownloadInstaller(proxy string, insecure, skipAll bool) er
 				}).Info("Getting Package")
 				// download file
 				downloader.URL = pkg.URL
+				downloader.Sha1 = pkg.Digest
 				downloader.DestName = filepath.Join(folder, destName)
-
 				err = downloader.Do()
 				if err != nil {
 					return errors.Wrap(err, "failed to download file")
 				}
+
 			} else {
 				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
 			}
+
 		} else if len(pkg.MetadataURL) > 0 {
 			destName := getDestName(pkg.MetadataURL, false)
 			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
@@ -291,23 +336,84 @@ func (i *ProductInfo) DownloadInstaller(proxy string, insecure, skipAll bool) er
 				}).Info("Getting Package")
 				// download file
 				downloader.URL = pkg.URL
+				downloader.Sha1 = pkg.Digest
 				downloader.DestName = filepath.Join(folder, destName)
 
 				err = downloader.Do()
 				if err != nil {
 					return errors.Wrap(err, "failed to download file")
 				}
+
 			} else {
 				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
 			}
 		}
 	}
 
-	out, err := utils.CreateSparseDiskImage(fmt.Sprintf("Install_macOS_%s-%s", i.Version, i.Build))
-	if err != nil {
-		return err
+	volumeName := fmt.Sprintf("Install_macOS_%s-%s", i.Version, i.Build)
+	sparseDiskimagePath := filepath.Join(folder, volumeName+".sparseimage")
+
+	if _, err := os.Stat(sparseDiskimagePath); os.IsNotExist(err) {
+		log.Info("Creating empty sparseimage")
+		sparseDiskimagePath, err = utils.CreateSparseDiskImage(volumeName, sparseDiskimagePath)
+		if err != nil {
+			return err
+		}
+		defer os.Remove(sparseDiskimagePath)
 	}
-	fmt.Println(out)
+
+	sparseDiskimageMount := fmt.Sprintf("/tmp/sparseimage_%s-%s", i.Version, i.Build)
+	if _, err := os.Stat(sparseDiskimageMount); os.IsNotExist(err) {
+		log.Infof("Mounting %s", sparseDiskimageMount)
+		if err := utils.Mount(sparseDiskimagePath, sparseDiskimageMount); err != nil {
+			return err
+		}
+	}
+
+	distPath := filepath.Join(folder, getDestName(i.Product.Distributions["English"], false))
+	if _, err := os.Stat(sparseDiskimagePath); os.IsNotExist(err) {
+		if err := ioutil.WriteFile(distPath, i.distributionData, 0755); err != nil {
+			return err
+		}
+	}
+
+	log.Infof("Creating installer from distribution %s", distPath)
+	if err := utils.CreateInstaller(distPath, sparseDiskimageMount); err != nil {
+		// return err
+		log.Error(err.Error())
+	}
+
+	var appPath string
+	filepath.Walk(sparseDiskimageMount, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if filepath.Ext(info.Name()) == ".app" {
+			appPath = path
+		}
+		return nil
+	})
+	if len(appPath) == 0 {
+		return fmt.Errorf("app not found in sparse disk image mount")
+	}
+
+	// if err := xattr.Set(appPath, "SeedProgram", []byte(sucatalogs20)); err != nil {
+	// 	return err
+	// }
+
+	dmgPath := filepath.Join(folder, volumeName+".dmg")
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		log.Infof("Creating compressed DMG %s", dmgPath)
+		if err := utils.CreateCompressedDMG(appPath, dmgPath); err != nil {
+			return err
+		}
+	}
+
+	if _, err := os.Stat(sparseDiskimageMount); os.IsExist(err) {
+		if err := utils.Unmount(sparseDiskimageMount, false); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
