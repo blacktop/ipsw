@@ -258,6 +258,7 @@ var debugserverCmd = &cobra.Command{
 			}
 
 			// CREDIT: https://github.com/EthanArbuckle/unredact-private-os_logs
+			utils.Indent(log.Info, 2)("Enabling private data in logs")
 			loggingPlist, err := statikFS.Open("/com.apple.system.logging.plist")
 			if err != nil {
 				log.Error(err.Error())
@@ -304,6 +305,7 @@ var debugserverCmd = &cobra.Command{
 			/*
 			 * killall logd
 			 */
+			utils.Indent(log.Info, 2)("Restarting logd")
 			sessionKillAll, err := client.NewSession()
 			if err != nil {
 				log.Fatalf("failed to create killall session: %s", err)
