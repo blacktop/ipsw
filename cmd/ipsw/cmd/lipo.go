@@ -36,7 +36,7 @@ import (
 )
 
 func init() {
-	machoCmd.AddCommand(lipoCmd)
+	rootCmd.AddCommand(lipoCmd)
 
 	lipoCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
 	lipoCmd.MarkZshCompPositionalArgumentFile(1)
