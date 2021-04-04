@@ -37,6 +37,7 @@ usr
 dist/
 test-caches/
 pkg/info/data
+cmd/ipsw/cmd/data
 *.txt
 *.prof
 *.download
