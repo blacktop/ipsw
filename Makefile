@@ -11,8 +11,11 @@ TEST_OPTIONS?=
 setup: ## Install all the build and lint dependencies
 	@echo "===> Installing deps"
 	go get -u github.com/alecthomas/gometalinter
+	go install github.com/goreleaser/goreleaser
 	go get -u github.com/pierrre/gotestcover
+	go get -u github.com/spf13/cobra/cobra 
 	go get -u golang.org/x/tools/cmd/cover
+	go get -u github.com/caarlos0/svu
 	gometalinter --install
 
 test: ## Run all the tests
@@ -49,7 +52,7 @@ update_mod:
 
 .PHONY: update_devs
 update_devs:
-	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/info/data/device_traits.json
+	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/device_traits.json
 
 .PHONY: update_keys
 update_keys:

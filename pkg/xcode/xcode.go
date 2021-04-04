@@ -1,14 +1,14 @@
 package xcode
 
 import (
+	_ "embed"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
-
-	// importing statik data
-	_ "github.com/blacktop/ipsw/internal/statik"
-	"github.com/rakyll/statik/fs"
 )
+
+//go:embed device_traits.json
+var traitsData []byte
 
 // Device object
 type Device struct {
@@ -35,7 +35,9 @@ func (d Devices) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
 
 type ByProductType struct{ Devices }
 
-func (s ByProductType) Less(i, j int) bool { return s.Devices[i].ProductType < s.Devices[j].ProductType }
+func (s ByProductType) Less(i, j int) bool {
+	return s.Devices[i].ProductType < s.Devices[j].ProductType
+}
 
 // DeviceTrait object
 type DeviceTrait struct {
@@ -70,21 +72,7 @@ func WriteToJSON(devices []Device, dest string) error {
 func GetDevices() ([]Device, error) {
 	var devices []Device
 
-	statikFS, err := fs.New()
-	if err != nil {
-		return nil, err
-	}
-	traits, err := statikFS.Open("/device_traits.json")
-	if err != nil {
-		return nil, err
-	}
-
-	data, err := ioutil.ReadAll(traits)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(data, &devices)
+	err := json.Unmarshal(traitsData, &devices)
 	if err != nil {
 		return nil, err
 	}

@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -34,13 +35,9 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	homedir "github.com/mitchellh/go-homedir"
-	"github.com/rakyll/statik/fs"
 	"github.com/spf13/cobra"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
-
-	// importing statik data
-	_ "github.com/blacktop/ipsw/internal/statik"
 )
 
 func init() {
@@ -50,6 +47,13 @@ func init() {
 	debugserverCmd.Flags().StringP("image", "i", "", "path to DeveloperDiskImage.dmg")
 	debugserverCmd.Flags().BoolP("force", "f", false, "overwrite file on device")
 }
+
+var (
+	//go:embed data/debugserver.plist
+	entitlementsData []byte
+	//go:embed data/com.apple.system.logging.plist
+	loggingPlistData []byte
+)
 
 // debugserverCmd represents the debugserver command
 var debugserverCmd = &cobra.Command{
@@ -143,28 +147,13 @@ var debugserverCmd = &cobra.Command{
 			}()
 
 			// Read entitlements.plist and write to tmp file
-			statikFS, err := fs.New()
-			if err != nil {
-				log.Error(err.Error())
-				return
-			}
-			plist, err := statikFS.Open("/debugserver.plist")
-			if err != nil {
-				log.Error(err.Error())
-				return
-			}
-			data, err := ioutil.ReadAll(plist)
-			if err != nil {
-				log.Error(err.Error())
-				return
-			}
 			tmpEntsFile, err := ioutil.TempFile("", "entitlements.plist")
 			if err != nil {
 				log.Error(err.Error())
 				return
 			}
 			defer os.Remove(tmpEntsFile.Name()) // clean up
-			if _, err := tmpEntsFile.Write(data); err != nil {
+			if _, err := tmpEntsFile.Write(entitlementsData); err != nil {
 				log.Error(err.Error())
 				return
 			}
@@ -259,16 +248,6 @@ var debugserverCmd = &cobra.Command{
 
 			// CREDIT: https://github.com/EthanArbuckle/unredact-private-os_logs
 			utils.Indent(log.Info, 2)("Enabling private data in logs")
-			loggingPlist, err := statikFS.Open("/com.apple.system.logging.plist")
-			if err != nil {
-				log.Error(err.Error())
-				return
-			}
-			loggingData, err := ioutil.ReadAll(loggingPlist)
-			if err != nil {
-				log.Error(err.Error())
-				return
-			}
 
 			sessionLogSCP, err := client.NewSession()
 			if err != nil {
@@ -280,7 +259,7 @@ var debugserverCmd = &cobra.Command{
 				w, _ := sessionLogSCP.StdinPipe()
 				defer w.Close()
 
-				count, err := io.Copy(w, bytes.NewReader(loggingData))
+				count, err := io.Copy(w, bytes.NewReader(loggingPlistData))
 				if err != nil {
 					log.Error(err.Error())
 					return err

@@ -1,12 +1,10 @@
-//go:generate statik -src=./data -dest=../../internal
-
 package info
 
 import (
 	"archive/zip"
+	_ "embed"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"path/filepath"
 	"strings"
@@ -14,11 +12,14 @@ import (
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/blacktop/ipsw/pkg/xcode"
-	"github.com/rakyll/statik/fs"
-
-	// importing statik data
-	_ "github.com/blacktop/ipsw/internal/statik"
 	"github.com/pkg/errors"
+)
+
+var (
+	//go:embed procs.json
+	procsData []byte
+	//go:embed firmware_keys.json
+	keysJsonData []byte
 )
 
 // Info in the info object
@@ -48,21 +49,7 @@ type processors struct {
 func getProcessor(cpuid string) processors {
 	var ps []processors
 
-	statikFS, err := fs.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-	procs, err := statikFS.Open("/procs.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	data, err := ioutil.ReadAll(procs)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = json.Unmarshal(data, &ps)
+	err := json.Unmarshal(procsData, &ps)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,21 +66,7 @@ func getProcessor(cpuid string) processors {
 func getFirmwareKeys(device, build string) map[string]string {
 	var keys map[string]map[string]map[string]string
 
-	statikFS, err := fs.New()
-	if err != nil {
-		log.Fatal(err)
-	}
-	keysJSON, err := statikFS.Open("/firmware_keys.json")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	data, err := ioutil.ReadAll(keysJSON)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = json.Unmarshal(data, &keys)
+	err := json.Unmarshal(keysJsonData, &keys)
 	if err != nil {
 		log.Fatal(err)
 	}
