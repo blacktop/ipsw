@@ -24,7 +24,6 @@ __debug_bin
 kernelcache.*
 dyld_shared_cache*
 *_Restore
-*.plist
 System
 usr
 *.xz
@@ -36,8 +35,6 @@ usr
 *.bu
 dist/
 test-caches/
-pkg/info/data
-cmd/ipsw/cmd/data
 *.txt
 *.prof
 *.download
