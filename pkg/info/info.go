@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	//go:embed procs.json
+	//go:embed data/procs.json
 	procsData []byte
-	//go:embed firmware_keys.json
+	//go:embed data/firmware_keys.json
 	keysJsonData []byte
 )
 
