@@ -24,7 +24,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/pelletier/go-toml v1.8.1 // indirect
+	github.com/pelletier/go-toml v1.9.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
@@ -36,6 +36,6 @@ require (
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57
+	golang.org/x/sys v0.0.0-20210412220455-f1c623a9e750
 	gopkg.in/ini.v1 v1.62.0 // indirect
 )
