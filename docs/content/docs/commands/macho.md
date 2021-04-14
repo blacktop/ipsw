@@ -12,7 +12,6 @@ summary: Parse a MachO file
 - [**macho --ent**](#macho---ent)
 - [**macho --objc**](#macho---objc)
 - [**macho --fileset-entry**](#macho---fileset-entry)
-- [**macho lipo**](#macho-lipo)
 
 ### **macho -d**
 
@@ -562,15 +561,3 @@ Flags         = NoUndefs, PIE, DylibInCache
         sz=0x000000f8 off=0x00d33ef8-0x00d33ff0 addr=0xfffffe0007d37ef8-0xfffffe0007d37ff0              __TEXT.__eh_frame
 <SNIP>
 ```
-
-### **macho lipo**
-
-Extract file from Universal/FAT MachO
-
-```bash
-$ ipsw macho lipo debugserver
-
-• Extracted ARM64e file as debugserver.arm64e
-```
-
-> **NOTE:** you can supply `--arch arm64e` instead of using the arch picker

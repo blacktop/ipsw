@@ -2,7 +2,7 @@
 title: "ota"
 date: 2020-02-23T21:07:22-05:00
 draft: false
-weight: 14
+weight: 15
 summary: Parse OTA zip files.
 ---
 

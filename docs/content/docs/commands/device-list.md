@@ -2,7 +2,7 @@
 title: "device-list"
 date: 2020-01-26T11:31:22-05:00
 draft: false
-weight: 13
+weight: 14
 summary: List all iOS devices.
 ---
 

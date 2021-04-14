@@ -2,7 +2,7 @@
 title: "dtree"
 date: 2020-01-26T11:02:56-05:00
 draft: false
-weight: 11
+weight: 12
 summary: Parse DeviceTrees.
 ---
 
@@ -52,4 +52,3 @@ $ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Re
       • Model: iPod9,1
       • BoardConfig: N112AP
 ```
-
