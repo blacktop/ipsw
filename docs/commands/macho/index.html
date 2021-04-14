@@ -131,6 +131,10 @@
     </li>
     
     <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/lipo/">lipo</a>
+    </li>
+    
+    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
     </li>
     
@@ -194,7 +198,6 @@
 <li><a href="#macho---ent"><strong>macho &ndash;ent</strong></a></li>
 <li><a href="#macho---objc"><strong>macho &ndash;objc</strong></a></li>
 <li><a href="#macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></a></li>
-<li><a href="#macho-lipo"><strong>macho lipo</strong></a></li>
 </ul>
 <h3 id="macho--d"><strong>macho -d</strong></h3>
 <p>Similar to <code>otool -h</code></p>
@@ -711,15 +714,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         <span class="nv">sz</span><span class="o">=</span>0x00000000 <span class="nv">off</span><span class="o">=</span>0x00d33ef7-0x00d33ef7 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d37ef7-0xfffffe0007d37ef7              __TEXT.__thread_starts
         <span class="nv">sz</span><span class="o">=</span>0x000000f8 <span class="nv">off</span><span class="o">=</span>0x00d33ef8-0x00d33ff0 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d37ef8-0xfffffe0007d37ff0              __TEXT.__eh_frame
 &lt;SNIP&gt;
-</code></pre></div><h3 id="macho-lipo"><strong>macho lipo</strong></h3>
-<p>Extract file from Universal/FAT MachO</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho lipo debugserver
-
-• Extracted ARM64e file as debugserver.arm64e
-</code></pre></div><blockquote>
-<p><strong>NOTE:</strong> you can supply <code>--arch arm64e</code> instead of using the arch picker</p>
-</blockquote>
-
+</code></pre></div>
 </div>
 </div>
 
