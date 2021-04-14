@@ -2,7 +2,7 @@
 title: "kernel"
 date: 2020-01-26T09:17:30-05:00
 draft: false
-weight: 9
+weight: 10
 summary: Parse kernelcache.
 ---
 

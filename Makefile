@@ -13,7 +13,7 @@ setup: ## Install all the build and lint dependencies
 	go get -u github.com/alecthomas/gometalinter
 	go install github.com/goreleaser/goreleaser
 	go get -u github.com/pierrre/gotestcover
-	go get -u github.com/spf13/cobra/cobra 
+	go get -u github.com/spf13/cobra/cobra
 	go get -u golang.org/x/tools/cmd/cover
 	go get -u github.com/caarlos0/svu
 	gometalinter --install
@@ -91,6 +91,11 @@ build: ## Build a beta version of malice
 docs:
 	@echo "===> Building Docs"
 	hack/publish/gh-pages
+
+.PHONY: test-docs
+test-docs:
+	@echo "===> Testing Docs"
+	cd docs; hugo server -D
 
 .PHONY: docker
 docker: ## Build docker image

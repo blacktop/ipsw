@@ -2,7 +2,7 @@
 title: "disass"
 date: 2020-01-26T09:15:48-05:00
 draft: false
-weight: 12
+weight: 13
 summary: Disassemble ARMv8.5 binaries.
 ---
 
