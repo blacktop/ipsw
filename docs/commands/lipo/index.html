@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <title>dtree - ipsw</title>
+  <title>lipo - ipsw</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   
   <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
@@ -130,7 +130,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/macho/">macho</a>
     </li>
     
-    <li class="">
+    <li class="active ">
       <a href="https://blacktop.github.io/ipsw/docs/commands/lipo/">lipo</a>
     </li>
     
@@ -142,7 +142,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/dyld/">dyld</a>
     </li>
     
-    <li class="active ">
+    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/device-tree/">dtree</a>
     </li>
     
@@ -189,37 +189,17 @@
         </div>
         <div class="col-12 col-md-9">
           
-<h1 class="title">dtree</h1>
+<h1 class="title">lipo</h1>
 <div class="content ">
-  <h3 id="parse-devicetrees">Parse DeviceTrees</h3>
-<p>Print out SUMMARY</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree DeviceTree.d431ap.im4p
+  <h2 id="lipo"><strong>lipo</strong></h2>
+<p>Extract file from Universal/FAT MachO</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw lipo debugserver
 
-      • Product Name: iPhone <span class="m">11</span> Pro Max
-      • Model: iPhone12,5
-      • BoardConfig: D431AP
-</code></pre></div><p>Or print out JSON</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree --json DeviceTree.d431ap.im4p <span class="p">|</span> jq .
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-  <span class="nt">&#34;device-tree&#34;</span><span class="p">:</span> <span class="p">{</span>
-    <span class="nt">&#34;#address-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-    <span class="nt">&#34;#size-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-    <span class="nt">&#34;AAPL,phandle&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="nt">&#34;children&#34;</span><span class="p">:</span> <span class="p">[</span>
-      <span class="p">{</span>
-        <span class="nt">&#34;chosen&#34;</span><span class="p">:</span> <span class="p">{</span>
-          <span class="nt">&#34;#address-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-          <span class="nt">&#34;AAPL,phandle&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-   <span class="err">&lt;SNIP&gt;</span>
-</code></pre></div><p>Or remotely</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
+• Extracted ARM64e file as debugserver.arm64e
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> you can supply <code>--arch arm64e</code> instead of using the arch picker</p>
+</blockquote>
 
-   • DeviceTree.n112ap.im4p
-      • Product Name: iPod touch
-      • Model: iPod9,1
-      • BoardConfig: N112AP
-</code></pre></div>
 </div>
 </div>
 

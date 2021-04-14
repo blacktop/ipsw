@@ -44,6 +44,15 @@
     </item>
     
     <item>
+      <title>lipo</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/lipo/</link>
+      <pubDate>Mon, 12 Apr 2021 14:14:22 -0400</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/lipo/</guid>
+      <description>Extract file from Universal/FAT MachO.</description>
+    </item>
+    
+    <item>
       <title>kernel</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/kernel/</link>
       <pubDate>Sun, 26 Jan 2020 09:17:30 -0500</pubDate>

@@ -130,6 +130,10 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/macho/">macho</a>
     </li>
     
+    <li class="">
+      <a href="https://blacktop.github.io/ipsw/docs/commands/lipo/">lipo</a>
+    </li>
+    
     <li class="active ">
       <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
     </li>
@@ -191,6 +195,7 @@
 <li><a href="#kernel-extract"><strong>kernel extract</strong></a></li>
 <li><a href="#kernel-dec"><strong>kernel dec</strong></a></li>
 <li><a href="#kernel-kexts"><strong>kernel kexts</strong></a></li>
+<li><a href="#kernel-sb"><strong>kernel sb</strong></a></li>
 <li><a href="#kernel-diff"><strong>kernel diff</strong></a></li>
 </ul>
 <hr>
@@ -224,6 +229,61 @@ com.apple.driver.IOACIPCFamily <span class="o">(</span>1<span class="o">)</span>
 com.apple.iokit.IOSkywalkFamily <span class="o">(</span>1<span class="o">)</span>
 com.apple.driver.AppleIPAppender <span class="o">(</span>1.0<span class="o">)</span>
 &lt;SNIP&gt;
+</code></pre></div><h3 id="kernel-sb"><strong>kernel sb</strong></h3>
+<p>List kernel sandbox operations</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw kernel sb 18A8395/kernelcache &gt; sb.txt <span class="c1"># iOS 14.1</span>
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw kernel sb 18E5178a/kernelcache &gt; sb.txt <span class="c1"># iOS 14.5beta4</span>
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git diff --no-index sb.txt sb1.txt
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-diff" data-lang="diff"><span class="gh">diff --git a/sb.txt b/sb1.txt
+</span><span class="gh">index b682adf..7492255 100644
+</span><span class="gh"></span><span class="gd">--- a/sb.txt
+</span><span class="gd"></span><span class="gi">+++ b/sb1.txt
+</span><span class="gi"></span><span class="gu">@@ -89,7 +89,10 @@ mach-priv*
+</span><span class="gu"></span> mach-priv-host-port
+ mach-priv-task-port
+ mach-register
+<span class="gi">+mach-task*
+</span><span class="gi">+mach-task-inspect
+</span><span class="gi"></span> mach-task-name
+<span class="gi">+mach-task-read
+</span><span class="gi"></span> network*
+ network-inbound
+ network-bind
+<span class="gu">@@ -100,9 +103,16 @@ nvram-get
+</span><span class="gu"></span> nvram-set
+ opendirectory-user-modify
+ process*
+<span class="gi">+process-codesigning*
+</span><span class="gi">+process-codesigning-blob-get
+</span><span class="gi">+process-codesigning-cdhash-get
+</span><span class="gi">+process-codesigning-entitlements-blob-get
+</span><span class="gi">+process-codesigning-identity-get
+</span><span class="gi"></span> process-codesigning-status*
+ process-codesigning-status-set
+ process-codesigning-status-get
+<span class="gi">+process-codesigning-teamid-get
+</span><span class="gi">+process-codesigning-text-offset-get
+</span><span class="gi"></span> process-exec*
+ process-exec-interpreter
+ process-fork
+<span class="gu">@@ -119,6 +129,9 @@ process-info-setcontrol
+</span><span class="gu"></span> pseudo-tty
+ signal
+ socket-ioctl
+<span class="gi">+socket-option*
+</span><span class="gi">+socket-option-get
+</span><span class="gi">+socket-option-set
+</span><span class="gi"></span> sysctl*
+ sysctl-read
+ sysctl-write
+<span class="gu">@@ -127,6 +140,7 @@ system-acct
+</span><span class="gu"></span> system-audit
+ system-automount
+ system-debug
+<span class="gi">+system-fcntl
+</span><span class="gi"></span> system-fsctl
+ system-info
+ system-kext*
 </code></pre></div><h3 id="kernel-diff"><strong>kernel diff</strong></h3>
 <p>🚧 <strong>[WIP]</strong> 🚧</p>
 <p>I am playing with the idea of <code>diffing</code> kernelcaches by creating directory structures of Apple&rsquo;s src from assert strings.</p>
