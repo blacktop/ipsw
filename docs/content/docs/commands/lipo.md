@@ -6,8 +6,6 @@ weight: 9
 summary: Extract file from Universal/FAT MachO.
 ---
 
-## **lipo**
-
 Extract file from Universal/FAT MachO
 
 ```bash

@@ -6,8 +6,6 @@ weight: 18
 summary: Parse iboot files.
 ---
 
-## **iboot**
-
 ### Dump embedded firmwares
 
 ```bash
