@@ -6,9 +6,7 @@ weight: 100
 summary: Symbolicate crashlogs.
 ---
 
-## **symbolicate**
-
-### Symbolicate ARM 64-bit crash logs (similar to Apple's `symbolicatecrash`)
+#### Symbolicate ARM 64-bit crash logs (similar to Apple's `symbolicatecrash`)
 
 It will detect the `dyld_shared_cache` needed to symbolicate the crashlog
 
