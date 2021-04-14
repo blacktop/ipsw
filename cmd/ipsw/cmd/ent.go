@@ -174,6 +174,8 @@ var entCmd = &cobra.Command{
 		}
 
 		log.Infof("Files containing entitlement: %s", entitlement)
+		fmt.Println()
+
 		for f, ent := range entDB {
 			if strings.Contains(ent, entitlement) {
 				fmt.Println(f)
