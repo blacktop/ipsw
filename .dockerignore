@@ -21,7 +21,6 @@ hack
 kernelcache.*
 dyld_shared_cache*
 *_Restore
-*.plist
 public
 System
 usr
@@ -37,7 +36,6 @@ appveyor.yml
 *.bu
 dist/
 test-caches/
-pkg/info/data
 pkg/dyld/slide_info.txt
 
 *.download
