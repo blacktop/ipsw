@@ -29,10 +29,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/spf13/cobra"
@@ -43,6 +46,8 @@ func init() {
 
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
 }
+
+type Entitlements map[string]interface{}
 
 // entCmd represents the ent command
 var entCmd = &cobra.Command{
@@ -152,6 +157,7 @@ var entCmd = &cobra.Command{
 					return fmt.Errorf("failed to write entitlement db to gzip file: %v", err)
 				}
 			}
+
 		} else {
 			log.Info("Found ipsw entitlement database file...")
 			edbFile, err := os.Open(entDBPath)
@@ -167,7 +173,7 @@ var entCmd = &cobra.Command{
 			// Decoding the serialized data
 			err = gob.NewDecoder(gzr).Decode(&entDB)
 			if err != nil {
-				return fmt.Errorf("failed to decode addr2sym map; %v", err)
+				return fmt.Errorf("failed to decode entitlement database; %v", err)
 			}
 			gzr.Close()
 			edbFile.Close()
@@ -175,12 +181,28 @@ var entCmd = &cobra.Command{
 
 		log.Infof("Files containing entitlement: %s", entitlement)
 		fmt.Println()
-
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 		for f, ent := range entDB {
 			if strings.Contains(ent, entitlement) {
-				fmt.Println(f)
+				ents := Entitlements{}
+				if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
+					return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
+				}
+				for k, v := range ents {
+					if strings.Contains(k, entitlement) {
+						switch v := reflect.ValueOf(v); v.Kind() {
+						case reflect.Bool:
+							if v.Bool() {
+								fmt.Fprintf(w, "%s\t%s\n", k, f)
+							}
+						default:
+							log.Error(fmt.Sprintf("unhandled entitlement kind %s in %s", f, v.Kind()))
+						}
+					}
+				}
 			}
 		}
+		w.Flush()
 
 		return nil
 	},
