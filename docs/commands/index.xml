@@ -134,6 +134,15 @@
     </item>
     
     <item>
+      <title>ent</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/ent/</link>
+      <pubDate>Wed, 14 Apr 2021 14:14:22 -0400</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/ent/</guid>
+      <description>Search IPSW filesystem DMG for MachOs with a given entitlement.</description>
+    </item>
+    
+    <item>
       <title>symbolicate</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/symbolicate/</link>
       <pubDate>Fri, 26 Feb 2021 23:44:13 -0500</pubDate>
