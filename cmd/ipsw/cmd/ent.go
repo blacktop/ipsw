@@ -45,6 +45,7 @@ func init() {
 	rootCmd.AddCommand(entCmd)
 
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
+	entCmd.Flags().StringP("file", "f", "", "Output entitlements for file")
 }
 
 type Entitlements map[string]interface{}
@@ -64,9 +65,14 @@ var entCmd = &cobra.Command{
 		}
 
 		entitlement, _ := cmd.Flags().GetString("ent")
+		searchFile, _ := cmd.Flags().GetString("file")
 
-		if len(entitlement) == 0 {
-			return fmt.Errorf("you must supply a --ent search for")
+		if len(entitlement) == 0 && len(searchFile) == 0 {
+			log.Errorf("you must supply a --ent OR --file")
+			return nil
+		} else if len(entitlement) > 0 && len(searchFile) > 0 {
+			log.Errorf("you can only use --ent OR --file (not both)")
+			return nil
 		}
 
 		ipswPath := filepath.Clean(args[0])
@@ -179,30 +185,44 @@ var entCmd = &cobra.Command{
 			edbFile.Close()
 		}
 
-		log.Infof("Files containing entitlement: %s", entitlement)
-		fmt.Println()
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-		for f, ent := range entDB {
-			if strings.Contains(ent, entitlement) {
-				ents := Entitlements{}
-				if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
-					return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
+		if len(searchFile) > 0 {
+			for f, ent := range entDB {
+				if strings.Contains(strings.ToLower(f), strings.ToLower(searchFile)) {
+					log.Infof(f)
+					if len(ent) > 0 {
+						fmt.Printf("\n%s\n", ent)
+					} else {
+						fmt.Printf("\n\t- no entitlements\n")
+					}
 				}
-				for k, v := range ents {
-					if strings.Contains(k, entitlement) {
-						switch v := reflect.ValueOf(v); v.Kind() {
-						case reflect.Bool:
-							if v.Bool() {
-								fmt.Fprintf(w, "%s\t%s\n", k, f)
+			}
+		} else {
+			log.Infof("Files containing entitlement: %s", entitlement)
+			fmt.Println()
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+			for f, ent := range entDB {
+				if strings.Contains(ent, entitlement) {
+					fmt.Println(ent)
+					ents := Entitlements{}
+					if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
+						return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
+					}
+					for k, v := range ents {
+						if strings.Contains(k, entitlement) {
+							switch v := reflect.ValueOf(v); v.Kind() {
+							case reflect.Bool:
+								if v.Bool() {
+									fmt.Fprintf(w, "%s\t%s\n", k, f)
+								}
+							default:
+								log.Error(fmt.Sprintf("unhandled entitlement kind %s in %s", f, v.Kind()))
 							}
-						default:
-							log.Error(fmt.Sprintf("unhandled entitlement kind %s in %s", f, v.Kind()))
 						}
 					}
 				}
 			}
+			w.Flush()
 		}
-		w.Flush()
 
 		return nil
 	},
