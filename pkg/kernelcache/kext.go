@@ -333,7 +333,6 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	}
 
 	var cstrRefVMAddr uint64
-
 	for k, v := range addresses {
 		if v == refStrVMAddr {
 			cstrRefVMAddr = k - 4
@@ -342,15 +341,16 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 		}
 	}
 
-	var profileVMAddr uint64
+	var panicRefVMAddr uint64
 	for k, v := range addresses {
 		if v == cstrRefVMAddr {
-			log.Debugf("panic REF %#x => %#x", k, v)
-			profileVMAddr = k - 0x10
+			panicRefVMAddr = k
+			log.Debugf("panic REF %#x => %#x", panicRefVMAddr, v)
 			break
 		}
 	}
 
+	var profileVMAddr uint64
 	var profileSize uint64
 
 	for i := range arm64.Disassemble(bytes.NewReader(sbData), arm64.Options{StartAddress: int64(sandboxMachoStartVaddr)}) {
@@ -361,41 +361,49 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 
 		operation := i.Instruction.Operation().String()
 
-		if operation == "mov" && i.Instruction.Address() == profileVMAddr+4 {
-			if operands := i.Instruction.Operands(); operands != nil {
-				for _, operand := range operands {
-					if operand.OpClass == arm64.IMM64 {
-						profileSize = operand.Immediate
+		if panicRefVMAddr-0x20 < i.Instruction.Address() && i.Instruction.Address() < panicRefVMAddr {
+			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
+				if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
+					adrpRegister := prevInstruction.Operands()[0].Reg[0]
+					adrpImm := prevInstruction.Operands()[1].Immediate
+					if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
+						adrpImm += operands[1].Immediate
+					} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
+						adrpImm += operands[2].Immediate
+					}
+					profileVMAddr = adrpImm
+				}
+			} else if operation == "mov" {
+				if operands := i.Instruction.Operands(); operands != nil {
+					for _, operand := range operands {
+						if operand.OpClass == arm64.IMM64 {
+							profileSize = operand.Immediate
+						}
+					}
+				}
+			} else if operation == "movk" && prevInstruction.Operation().String() == "mov" {
+				if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
+					movRegister := prevInstruction.Operands()[0].Reg[0]
+					movImm := prevInstruction.Operands()[1].Immediate
+					if movRegister == operands[1].Reg[0] {
+						if operands[1].OpClass == arm64.IMM32 && operands[1].ShiftType == arm64.SHIFT_LSL {
+							profileSize = movImm + (operands[1].Immediate << uint64(operands[1].ShiftValue))
+						}
 					}
 				}
 			}
 		}
 
-		if operation == "movk" && i.Instruction.Address() == profileVMAddr+8 {
-			if operands := i.Instruction.Operands(); operands != nil {
-				for _, operand := range operands {
-					if operand.OpClass == arm64.IMM32 && operand.ShiftType == arm64.SHIFT_LSL {
-						profileSize += (operand.Immediate << uint64(operand.ShiftValue))
-					}
-				}
-			}
-			break
-		}
+		prevInstruction = *i.Instruction
 	}
 
-	var profileOffset uint64
-	for k, v := range addresses {
-		if k == profileVMAddr {
-			log.WithFields(log.Fields{
-				"vmaddr": fmt.Sprintf("%#x", v),
-				"size":   fmt.Sprintf("%#x", profileSize),
-			}).Info("Located sb_profile data")
-			profileOffset, err = m.GetOffset(v)
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
+	log.WithFields(log.Fields{
+		"vmaddr": fmt.Sprintf("%#x", profileVMAddr),
+		"size":   fmt.Sprintf("%#x", profileSize),
+	}).Info("Located sb_profile data")
+	profileOffset, err := m.GetOffset(profileVMAddr)
+	if err != nil {
+		return nil, err
 	}
 
 	profiles = make([]byte, profileSize)
