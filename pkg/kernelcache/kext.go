@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const tagPtrMask = 0xffff000000000000
@@ -228,13 +229,13 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 }
 
 // TODO: finish this (make it so when I look at it I don't want to 🤮)
-func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
+func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error) {
 	var profiles []byte
 	var sandboxMachoStartVaddr uint64
 	var sandboxMachoStartOffset uint64
 	var sandboxMachoEndVaddr uint64
 
-	refStrVMAddr, err := findCStringVMaddr(m, "\"failed to initialize platform sandbox\"")
+	refStrVMAddr, err := findCStringVMaddr(m, panic)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +249,7 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	}).Debug("Found: \"failed to initialize platform sandbox\"")
 
 	// TODO: add support for sb collection as well
-	// refStrVMAddr, err := findCStringVMaddr(m, "\"failed to initialize collection\"")
+	// refStrVMAddr, err := findCStringVMaddr(m,
 	// if err != nil {
 	// 	return nil, err
 	// }
@@ -361,6 +362,7 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 
 		operation := i.Instruction.Operation().String()
 
+		// TODO: identify basic blocks so I could only disass the block that contains the Xref
 		if panicRefVMAddr-0x20 < i.Instruction.Address() && i.Instruction.Address() < panicRefVMAddr {
 			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
 				if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
@@ -385,7 +387,7 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 				if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
 					movRegister := prevInstruction.Operands()[0].Reg[0]
 					movImm := prevInstruction.Operands()[1].Immediate
-					if movRegister == operands[1].Reg[0] {
+					if movRegister == operands[0].Reg[0] {
 						if operands[1].OpClass == arm64.IMM32 && operands[1].ShiftType == arm64.SHIFT_LSL {
 							profileSize = movImm + (operands[1].Immediate << uint64(operands[1].ShiftValue))
 						}
@@ -397,10 +399,11 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 		prevInstruction = *i.Instruction
 	}
 
-	log.WithFields(log.Fields{
+	utils.Indent(log.WithFields(log.Fields{
 		"vmaddr": fmt.Sprintf("%#x", profileVMAddr),
 		"size":   fmt.Sprintf("%#x", profileSize),
-	}).Info("Located sb_profile data")
+	}).Info, 2)("Located data")
+
 	profileOffset, err := m.GetOffset(profileVMAddr)
 	if err != nil {
 		return nil, err
@@ -413,6 +416,16 @@ func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	}
 
 	return profiles, nil
+}
+
+func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
+	log.Info("Searching for sandbox profile data")
+	return getSandboxData(m, r, "\"failed to initialize platform sandbox\"")
+}
+
+func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
+	log.Info("Searching for sandbox collection data")
+	return getSandboxData(m, r, "\"failed to initialize collection\"")
 }
 
 func getTag(ptr uint64) uint64 {
