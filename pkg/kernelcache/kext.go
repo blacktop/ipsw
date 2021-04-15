@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"strings"
 
+	"github.com/apex/log"
+	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-plist"
@@ -145,6 +149,40 @@ func getKextInfos(m *macho.File) ([]KmodInfoT, error) {
 	return nil, fmt.Errorf("section __PRELINK_INFO.__kmod_start not found")
 }
 
+func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
+	for _, sec := range m.Sections {
+
+		if sec.Flags.IsCstringLiterals() {
+			dat, err := sec.Data()
+			if err != nil {
+				return 0, fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
+			}
+
+			csr := bytes.NewBuffer(dat[:])
+
+			for {
+				pos := sec.Addr + uint64(csr.Cap()-csr.Len())
+
+				s, err := csr.ReadString('\x00')
+
+				if err == io.EOF {
+					break
+				}
+
+				if err != nil {
+					return 0, fmt.Errorf("failed to read string: %v", err)
+				}
+
+				if len(s) > 0 && strings.EqualFold(strings.Trim(s, "\x00"), cstr) {
+					return pos, nil
+				}
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("string not found in MachO")
+}
+
 func GetSandboxOpts(m *macho.File) ([]string, error) {
 	var bcOpts []string
 
@@ -189,24 +227,181 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 	return bcOpts, nil
 }
 
-// TODO: finish this
-func GetSandboxProfiles(m *macho.File) ([]byte, error) {
+// TODO: finish this (make it so when I look at it I don't want to 🤮)
+func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	var profiles []byte
+	var sandboxMachoStartVaddr uint64
+	var sandboxMachoStartOffset uint64
+	var sandboxMachoEndVaddr uint64
 
-	if tConst := m.Section("__TEXT", "__const"); tConst != nil {
-		data, err := tConst.Data()
-		if err != nil {
-			return nil, err
+	refStrVMAddr, err := findCStringVMaddr(m, "\"failed to initialize platform sandbox\"")
+	if err != nil {
+		return nil, err
+	}
+	off, err := m.GetOffset(refStrVMAddr)
+	if err != nil {
+		return nil, err
+	}
+	log.WithFields(log.Fields{
+		"vmaddr": fmt.Sprintf("%#x", refStrVMAddr),
+		"offset": fmt.Sprintf("%#x", off),
+	}).Debug("Found: \"failed to initialize platform sandbox\"")
+
+	// TODO: add support for sb collection as well
+	// refStrVMAddr, err := findCStringVMaddr(m, "\"failed to initialize collection\"")
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	startAdders, err := getKextStartVMAddrs(m)
+	if err != nil {
+		return nil, err
+	}
+
+	infos, err := getKextInfos(m)
+	if err != nil {
+		return nil, err
+	}
+
+	for idx, info := range infos {
+		if strings.Contains(string(info.Name[:]), "sandbox") {
+			// fmt.Println(info)
+			sandboxMachoStartVaddr = startAdders[idx] | tagPtrMask
+			sandboxMachoEndVaddr = startAdders[idx+1] | tagPtrMask
+			sandboxMachoStartOffset, err = m.GetOffset(sandboxMachoStartVaddr)
+			if err != nil {
+				return nil, err
+			}
+			// fmt.Printf("%#x => %#x\n", sandboxMachoStartVaddr, sandboxMachoStartOffset)
+			break
 		}
-		index := 0
-		for {
-			if found := bytes.Index(data[index:], []byte{'\x00', '\x80'}); found != -1 {
-				// fmt.Println(hex.Dump(data[index+found : index+found+100]))
-				index += found + 1
-			} else {
-				break
+	}
+
+	// sandbox, err := macho.NewFile(io.NewSectionReader(r, int64(sandboxMachoStartOffset), int64(sandboxMachoEndVaddr-sandboxMachoStartVaddr)), macho.FileConfig{
+	// 	Offset:    int64(sandboxMachoStartOffset),
+	// 	SrcReader: io.NewSectionReader(r, 0, 1<<63-1),
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// fmt.Println(sandbox.FileTOC.String())
+
+	sbData := make([]byte, sandboxMachoEndVaddr-sandboxMachoStartVaddr)
+	_, err = m.ReadAt(sbData, int64(sandboxMachoStartOffset))
+	if err != nil {
+		return nil, err
+	}
+
+	var prevInstruction arm64.Instruction
+
+	addresses := make(map[uint64]uint64)
+
+	// extract all immediates
+	for i := range arm64.Disassemble(bytes.NewReader(sbData), arm64.Options{StartAddress: int64(sandboxMachoStartVaddr)}) {
+
+		if i.Error != nil {
+			continue
+		}
+
+		operation := i.Instruction.Operation().String()
+
+		if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
+			if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
+				adrpRegister := prevInstruction.Operands()[0].Reg[0]
+				adrpImm := prevInstruction.Operands()[1].Immediate
+				if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
+					adrpImm += operands[1].Immediate
+				} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
+					adrpImm += operands[2].Immediate
+				}
+				addresses[i.Instruction.Address()] = adrpImm
 			}
 		}
+		if operation == "cbnz" {
+			if operands := i.Instruction.Operands(); operands != nil {
+				for _, operand := range operands {
+					if operand.OpClass == arm64.LABEL {
+						addresses[i.Instruction.Address()] = operand.Immediate
+					}
+				}
+			}
+		}
+
+		// fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), i.Instruction.OpStr())
+		prevInstruction = *i.Instruction
+	}
+
+	var cstrRefVMAddr uint64
+
+	for k, v := range addresses {
+		if v == refStrVMAddr {
+			cstrRefVMAddr = k - 4
+			log.Debugf("cstring REF %#x => %#x", cstrRefVMAddr, v)
+			break
+		}
+	}
+
+	var profileVMAddr uint64
+	for k, v := range addresses {
+		if v == cstrRefVMAddr {
+			log.Debugf("panic REF %#x => %#x", k, v)
+			profileVMAddr = k - 0x10
+			break
+		}
+	}
+
+	var profileSize uint64
+
+	for i := range arm64.Disassemble(bytes.NewReader(sbData), arm64.Options{StartAddress: int64(sandboxMachoStartVaddr)}) {
+
+		if i.Error != nil {
+			continue
+		}
+
+		operation := i.Instruction.Operation().String()
+
+		if operation == "mov" && i.Instruction.Address() == profileVMAddr+4 {
+			if operands := i.Instruction.Operands(); operands != nil {
+				for _, operand := range operands {
+					if operand.OpClass == arm64.IMM64 {
+						profileSize = operand.Immediate
+					}
+				}
+			}
+		}
+
+		if operation == "movk" && i.Instruction.Address() == profileVMAddr+8 {
+			if operands := i.Instruction.Operands(); operands != nil {
+				for _, operand := range operands {
+					if operand.OpClass == arm64.IMM32 && operand.ShiftType == arm64.SHIFT_LSL {
+						profileSize += (operand.Immediate << uint64(operand.ShiftValue))
+					}
+				}
+			}
+			break
+		}
+	}
+
+	var profileOffset uint64
+	for k, v := range addresses {
+		if k == profileVMAddr {
+			log.WithFields(log.Fields{
+				"vmaddr": fmt.Sprintf("%#x", v),
+				"size":   fmt.Sprintf("%#x", profileSize),
+			}).Info("Located sb_profile data")
+			profileOffset, err = m.GetOffset(v)
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	profiles = make([]byte, profileSize)
+	_, err = m.ReadAt(profiles, int64(profileOffset))
+	if err != nil {
+		return nil, err
 	}
 
 	return profiles, nil
