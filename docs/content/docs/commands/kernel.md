@@ -9,7 +9,7 @@ summary: Parse kernelcache.
 - [**kernel extract**](#kernel-extract)
 - [**kernel dec**](#kernel-dec)
 - [**kernel kexts**](#kernel-kexts)
-- [**kernel sb**](#kernel-sb)
+- [**kernel sbopts**](#kernel-sb)
 - [**kernel diff**](#kernel-diff)
 
 ---
@@ -59,20 +59,20 @@ com.apple.driver.AppleIPAppender (1.0)
 <SNIP>
 ```
 
-### **kernel sb**
+### **kernel sbopts**
 
 List kernel sandbox operations
 
 ```bash
-$ ipsw kernel sb 18A8395/kernelcache > sb.txt # iOS 14.1
+$ ipsw kernel sbopts 18A8395/kernelcache > sbopts_14_1.txt # iOS 14.1
 ```
 
 ```bash
-$ ipsw kernel sb 18E5178a/kernelcache > sb.txt # iOS 14.5beta4
+$ ipsw kernel sbopts 18E5178a/kernelcache > sbopts_14_5beta4.txt # iOS 14.5beta4
 ```
 
 ```bash
-$ git diff --no-index sb.txt sb1.txt
+$ git diff --no-index sbopts_14_1.txt sbopts_14_5beta4.txt
 ```
 
 ```diff
