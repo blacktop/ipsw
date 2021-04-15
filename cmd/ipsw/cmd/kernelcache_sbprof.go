@@ -74,10 +74,24 @@ var sbprofCmd = &cobra.Command{
 			return err
 		}
 
-		err = ioutil.WriteFile(filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin"), sbProfData, 0755)
+		sbProfPath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
+		err = ioutil.WriteFile(sbProfPath, sbProfData, 0755)
 		if err != nil {
 			return err
 		}
+		log.Info("Created " + sbProfPath)
+
+		sbColData, err := kernelcache.GetSandboxCollections(m, bytes.NewReader(data))
+		if err != nil {
+			return err
+		}
+
+		sbColPath := filepath.Join(filepath.Dir(kcPath), "sandbox_collection.bin")
+		err = ioutil.WriteFile(sbColPath, sbColData, 0755)
+		if err != nil {
+			return err
+		}
+		log.Info("Created " + sbColPath)
 
 		return nil
 	},
