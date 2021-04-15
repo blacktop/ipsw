@@ -53,6 +53,8 @@ var (
 	entitlementsData []byte
 	//go:embed data/com.apple.system.logging.plist
 	loggingPlistData []byte
+	//go:embed data/com.apple.CrashReporter.plist
+	symbolicationPlistData []byte
 )
 
 // debugserverCmd represents the debugserver command
@@ -277,6 +279,41 @@ var debugserverCmd = &cobra.Command{
 			}
 
 			if err := sessionLogSCP.Wait(); err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			// CREDIT: https://github.com/dlevi309/ios-scripts
+			utils.Indent(log.Info, 2)("Enabling symbolication of mobile crash logs")
+
+			sessionSymSCP, err := client.NewSession()
+			if err != nil {
+				log.Fatalf("failed to create scp session: %s", err)
+			}
+			defer sessionSymSCP.Close()
+
+			go func() error {
+				w, _ := sessionSymSCP.StdinPipe()
+				defer w.Close()
+
+				count, err := io.Copy(w, bytes.NewReader(symbolicationPlistData))
+				if err != nil {
+					log.Error(err.Error())
+					return err
+				}
+				if count == 0 {
+					return fmt.Errorf("%d bytes copied to device", count)
+				}
+
+				return nil
+			}()
+
+			if err := sessionSymSCP.Start("cat > /var/root/Library/Preferences/com.apple.CrashReporter.plist"); err != nil {
+				log.Error(err.Error())
+				return
+			}
+
+			if err := sessionSymSCP.Wait(); err != nil {
 				log.Error(err.Error())
 				return
 			}
