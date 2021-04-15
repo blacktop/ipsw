@@ -199,7 +199,7 @@
 <li><a href="#kernel-extract"><strong>kernel extract</strong></a></li>
 <li><a href="#kernel-dec"><strong>kernel dec</strong></a></li>
 <li><a href="#kernel-kexts"><strong>kernel kexts</strong></a></li>
-<li><a href="#kernel-sb"><strong>kernel sb</strong></a></li>
+<li><a href="#kernel-sb"><strong>kernel sbopts</strong></a></li>
 <li><a href="#kernel-diff"><strong>kernel diff</strong></a></li>
 </ul>
 <hr>
@@ -233,11 +233,11 @@ com.apple.driver.IOACIPCFamily <span class="o">(</span>1<span class="o">)</span>
 com.apple.iokit.IOSkywalkFamily <span class="o">(</span>1<span class="o">)</span>
 com.apple.driver.AppleIPAppender <span class="o">(</span>1.0<span class="o">)</span>
 &lt;SNIP&gt;
-</code></pre></div><h3 id="kernel-sb"><strong>kernel sb</strong></h3>
+</code></pre></div><h3 id="kernel-sbopts"><strong>kernel sbopts</strong></h3>
 <p>List kernel sandbox operations</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw kernel sb 18A8395/kernelcache &gt; sb.txt <span class="c1"># iOS 14.1</span>
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw kernel sb 18E5178a/kernelcache &gt; sb.txt <span class="c1"># iOS 14.5beta4</span>
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git diff --no-index sb.txt sb1.txt
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw kernel sbopts 18A8395/kernelcache &gt; sbopts_14_1.txt <span class="c1"># iOS 14.1</span>
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw kernel sbopts 18E5178a/kernelcache &gt; sbopts_14_5beta4.txt <span class="c1"># iOS 14.5beta4</span>
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git diff --no-index sbopts_14_1.txt sbopts_14_5beta4.txt
 </code></pre></div><div class="highlight"><pre class="chroma"><code class="language-diff" data-lang="diff"><span class="gh">diff --git a/sb.txt b/sb1.txt
 </span><span class="gh">index b682adf..7492255 100644
 </span><span class="gh"></span><span class="gd">--- a/sb.txt
