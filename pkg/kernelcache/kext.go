@@ -231,28 +231,22 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 // TODO: finish this (make it so when I look at it I don't want to 🤮)
 func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error) {
 	var profiles []byte
-	var sandboxMachoStartVaddr uint64
-	var sandboxMachoStartOffset uint64
-	var sandboxMachoEndVaddr uint64
+	var sandboxKextStartVaddr uint64
+	var sandboxKextStartOffset uint64
+	var sandboxKextEndVaddr uint64
 
-	refStrVMAddr, err := findCStringVMaddr(m, panic)
+	panicStrVMAddr, err := findCStringVMaddr(m, panic)
 	if err != nil {
 		return nil, err
 	}
-	off, err := m.GetOffset(refStrVMAddr)
+	panicStrOffset, err := m.GetOffset(panicStrVMAddr)
 	if err != nil {
 		return nil, err
 	}
-	log.WithFields(log.Fields{
-		"vmaddr": fmt.Sprintf("%#x", refStrVMAddr),
-		"offset": fmt.Sprintf("%#x", off),
-	}).Debug("Found: \"failed to initialize platform sandbox\"")
-
-	// TODO: add support for sb collection as well
-	// refStrVMAddr, err := findCStringVMaddr(m,
-	// if err != nil {
-	// 	return nil, err
-	// }
+	utils.Indent(log.WithFields(log.Fields{
+		"vmaddr": fmt.Sprintf("%#x", panicStrVMAddr),
+		"offset": fmt.Sprintf("%#x", panicStrOffset),
+	}).Debug, 2)(fmt.Sprintf("Found: %v", panic))
 
 	startAdders, err := getKextStartVMAddrs(m)
 	if err != nil {
@@ -266,20 +260,18 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 
 	for idx, info := range infos {
 		if strings.Contains(string(info.Name[:]), "sandbox") {
-			// fmt.Println(info)
-			sandboxMachoStartVaddr = startAdders[idx] | tagPtrMask
-			sandboxMachoEndVaddr = startAdders[idx+1] | tagPtrMask
-			sandboxMachoStartOffset, err = m.GetOffset(sandboxMachoStartVaddr)
+			sandboxKextStartVaddr = startAdders[idx] | tagPtrMask
+			sandboxKextEndVaddr = startAdders[idx+1] | tagPtrMask
+			sandboxKextStartOffset, err = m.GetOffset(sandboxKextStartVaddr)
 			if err != nil {
 				return nil, err
 			}
-			// fmt.Printf("%#x => %#x\n", sandboxMachoStartVaddr, sandboxMachoStartOffset)
 			break
 		}
 	}
 
-	// sandbox, err := macho.NewFile(io.NewSectionReader(r, int64(sandboxMachoStartOffset), int64(sandboxMachoEndVaddr-sandboxMachoStartVaddr)), macho.FileConfig{
-	// 	Offset:    int64(sandboxMachoStartOffset),
+	// sandbox, err := macho.NewFile(io.NewSectionReader(r, int64(sandboxKextStartOffset), int64(sandboxKextEndVaddr-sandboxKextStartVaddr)), macho.FileConfig{
+	// 	Offset:    int64(sandboxKextStartOffset),
 	// 	SrcReader: io.NewSectionReader(r, 0, 1<<63-1),
 	// })
 	// if err != nil {
@@ -288,18 +280,18 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 
 	// fmt.Println(sandbox.FileTOC.String())
 
-	sbData := make([]byte, sandboxMachoEndVaddr-sandboxMachoStartVaddr)
-	_, err = m.ReadAt(sbData, int64(sandboxMachoStartOffset))
+	sbInstrData := make([]byte, sandboxKextEndVaddr-sandboxKextStartVaddr)
+	_, err = m.ReadAt(sbInstrData, int64(sandboxKextStartOffset))
 	if err != nil {
 		return nil, err
 	}
 
 	var prevInstruction arm64.Instruction
 
-	addresses := make(map[uint64]uint64)
+	references := make(map[uint64]uint64)
 
 	// extract all immediates
-	for i := range arm64.Disassemble(bytes.NewReader(sbData), arm64.Options{StartAddress: int64(sandboxMachoStartVaddr)}) {
+	for i := range arm64.Disassemble(bytes.NewReader(sbInstrData), arm64.Options{StartAddress: int64(sandboxKextStartVaddr)}) {
 
 		if i.Error != nil {
 			continue
@@ -316,14 +308,14 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 				} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
 					adrpImm += operands[2].Immediate
 				}
-				addresses[i.Instruction.Address()] = adrpImm
+				references[i.Instruction.Address()] = adrpImm
 			}
 		}
 		if operation == "cbnz" {
 			if operands := i.Instruction.Operands(); operands != nil {
 				for _, operand := range operands {
 					if operand.OpClass == arm64.LABEL {
-						addresses[i.Instruction.Address()] = operand.Immediate
+						references[i.Instruction.Address()] = operand.Immediate
 					}
 				}
 			}
@@ -333,20 +325,20 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 		prevInstruction = *i.Instruction
 	}
 
-	var cstrRefVMAddr uint64
-	for k, v := range addresses {
-		if v == refStrVMAddr {
-			cstrRefVMAddr = k - 4
-			log.Debugf("cstring REF %#x => %#x", cstrRefVMAddr, v)
+	var panicXrefVMAddr uint64
+	for k, v := range references {
+		if v == panicStrVMAddr {
+			panicXrefVMAddr = k - 4
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Panic string Xref %#x => %#x", panicXrefVMAddr, v))
 			break
 		}
 	}
 
-	var panicRefVMAddr uint64
-	for k, v := range addresses {
-		if v == cstrRefVMAddr {
-			panicRefVMAddr = k
-			log.Debugf("panic REF %#x => %#x", panicRefVMAddr, v)
+	var failXrefVMAddr uint64
+	for k, v := range references {
+		if v == panicXrefVMAddr {
+			failXrefVMAddr = k
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Failure path Xref %#x => %#x", failXrefVMAddr, v))
 			break
 		}
 	}
@@ -354,7 +346,7 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 	var profileVMAddr uint64
 	var profileSize uint64
 
-	for i := range arm64.Disassemble(bytes.NewReader(sbData), arm64.Options{StartAddress: int64(sandboxMachoStartVaddr)}) {
+	for i := range arm64.Disassemble(bytes.NewReader(sbInstrData), arm64.Options{StartAddress: int64(sandboxKextStartVaddr)}) {
 
 		if i.Error != nil {
 			continue
@@ -363,7 +355,7 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 		operation := i.Instruction.Operation().String()
 
 		// TODO: identify basic blocks so I could only disass the block that contains the Xref
-		if panicRefVMAddr-0x20 < i.Instruction.Address() && i.Instruction.Address() < panicRefVMAddr {
+		if failXrefVMAddr-0x20 < i.Instruction.Address() && i.Instruction.Address() < failXrefVMAddr {
 			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
 				if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
 					adrpRegister := prevInstruction.Operands()[0].Reg[0]
