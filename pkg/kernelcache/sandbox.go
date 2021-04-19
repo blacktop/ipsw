@@ -3,7 +3,9 @@ package kernelcache
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/apex/log"
@@ -15,11 +17,23 @@ import (
 type SandboxProfileCollection struct {
 	Version        uint16
 	OpNodeSize     uint16
-	OpCount        uint16
+	OpCount        uint8
+	GlobalVarCount uint8
 	ProfileCount   uint16
 	RegexItemCount uint16
-	GlobalVarCount uint16
 	MsgItemCount   uint16
+}
+
+type SandboxOperation struct {
+	Name  string
+	Index uint16
+	Value uint64
+}
+
+type SandboxProfile struct {
+	Name       string
+	Version    uint16
+	Operations []SandboxOperation
 }
 
 func GetSandboxOpts(m *macho.File) ([]string, error) {
@@ -258,8 +272,9 @@ func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	return getSandboxData(m, r, "\"failed to initialize collection\"")
 }
 
-func ParseSandboxCollection(data []byte) error {
+func ParseSandboxCollection(data []byte, opsList []string) error {
 	var collection SandboxProfileCollection
+	var profiles []SandboxProfile
 
 	r := bytes.NewReader(data)
 
@@ -267,34 +282,188 @@ func ParseSandboxCollection(data []byte) error {
 		return fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
 	}
 
-	fmt.Printf("%#v\n", collection)
+	regexOffsets := make([]uint16, collection.RegexItemCount)
+	if err := binary.Read(r, binary.LittleEndian, &regexOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile regex offets: %v", err)
+	}
 
-	profileSize := collection.OpCount*2 + uint16(binary.Size(uint16(0)))*2
-	fmt.Printf("[+] profile size: %d\n", profileSize)
+	globalOffsets := make([]uint16, collection.GlobalVarCount)
+	if err := binary.Read(r, binary.LittleEndian, &globalOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
+	}
 
-	globalVarStart := 2*collection.RegexItemCount + 12
-	globalVarEnd := globalVarStart + 2*collection.GlobalVarCount
-	fmt.Printf("[+] global var start: %#x, end: %#x\n", globalVarStart, globalVarEnd)
+	msgOffsets := make([]uint16, collection.MsgItemCount)
+	if err := binary.Read(r, binary.LittleEndian, &msgOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile message offets: %v", err)
+	}
 
-	opNodeStartTmp := globalVarEnd + 2*collection.MsgItemCount + profileSize*collection.ProfileCount
-	fmt.Printf("[+] temp op node start: 0x%x\n", opNodeStartTmp)
+	profileSize := uint32(collection.OpCount+uint8(binary.Size(uint16(0)))) * 2
+	log.Debugf("[+] profile size: %d", profileSize)
+
+	globalVarStart := 2*uint32(collection.RegexItemCount) + 12
+	globalVarEnd := globalVarStart + 2*uint32(collection.GlobalVarCount)
+	log.Debugf("[+] global var start: %#x, end: %#x", globalVarStart, globalVarEnd)
+
+	opNodeStartTmp := globalVarEnd + 2*uint32(collection.MsgItemCount) + profileSize*uint32(collection.ProfileCount)
+	log.Debugf("[+] temp op node start: %#x", opNodeStartTmp)
 
 	// delta op node start
 	opNodeStartDelta := 8 - (opNodeStartTmp & 6)
-	// if (opNodeStartTmp & 6) == 0 {
-	// 	opNodeStartDelta = 0
-	// }
-	fmt.Printf("[+] delta op node start: 0x%x\n", opNodeStartDelta)
+	if (opNodeStartTmp & 6) == 0 {
+		opNodeStartDelta = 0
+	}
+	log.Debugf("[+] delta op node start: %#x", opNodeStartDelta)
 
 	// op node start
 	opNodeStart := opNodeStartDelta + opNodeStartTmp
-	fmt.Printf("[+] op node start: 0x%x\n", opNodeStart)
+	log.Debugf("[+] op node start: %#x", opNodeStart)
 
 	// start address of regex, global, messsages
-	baseAddr := opNodeStart + collection.OpNodeSize
-	fmt.Printf("[+] start address of regex, global, messsages: 0x%x\n", baseAddr)
+	baseAddr := opNodeStart + uint32(collection.OpNodeSize)*8
+	log.Debugf("[+] start address of regex, global, messsages: %#x", baseAddr)
 
-	// fmt.Printf("[+] op node start: %#x\n", opNodeStart)
+	var profileDatas [][]byte
+	for i := uint16(0); i < collection.ProfileCount; i++ {
+		profile := make([]byte, profileSize)
+		if err := binary.Read(r, binary.LittleEndian, &profile); err != nil {
+			return fmt.Errorf("failed to read sandbox profiles: %v", err)
+		}
+		profileDatas = append(profileDatas, profile)
+	}
+
+	for idx, prof := range profileDatas {
+		sp := SandboxProfile{}
+
+		pr := bytes.NewReader(prof)
+
+		var nameOffset uint16
+		if err := binary.Read(pr, binary.LittleEndian, &nameOffset); err != nil {
+			return fmt.Errorf("failed to read profile name offset for index %d: %v", idx, err)
+		}
+
+		if err := binary.Read(pr, binary.LittleEndian, &sp.Version); err != nil {
+			return fmt.Errorf("failed to read profile version for index %d: %v", idx, err)
+		}
+
+		for i := 0; i < int(collection.OpCount); i++ {
+			so := SandboxOperation{Name: opsList[i]}
+			if err := binary.Read(pr, binary.LittleEndian, &so.Index); err != nil {
+				return fmt.Errorf("failed to read sandbox operation index for %s: %v", opsList[i], err)
+			}
+			// TODO: lookup operation value
+			sp.Operations = append(sp.Operations, so)
+		}
+
+		r.Seek(int64(baseAddr+8*uint32(nameOffset)), io.SeekStart)
+		var nameLength uint16
+		if err := binary.Read(r, binary.LittleEndian, &nameLength); err != nil {
+			return fmt.Errorf("failed to read profile name length for index %d: %v", idx, err)
+		}
+
+		str := make([]byte, nameLength)
+		_, err := r.Read(str)
+		if err != nil {
+			return err
+		}
+
+		sp.Name = strings.Trim(string(str[:]), "\x00")
+
+		profiles = append(profiles, sp)
+	}
+
+	profileDatas = nil
+
+	// fmt.Printf("\nOperation Nodes\n")
+	// fmt.Println("===============")
+	r.Seek(int64(opNodeStart), io.SeekStart)
+	opNodeCount := (baseAddr - opNodeStart) / 8
+	opNodeOffsets := make([]uint16, opNodeCount)
+	if err := binary.Read(r, binary.LittleEndian, &opNodeOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox op node offets: %v", err)
+	}
+	opNodes := make([]uint64, opNodeCount)
+	for _, opoff := range opNodeOffsets {
+		var opNodeValue uint64
+		r.Seek(int64(opoff), io.SeekStart)
+		if err := binary.Read(r, binary.LittleEndian, &opNodeValue); err != nil {
+			return fmt.Errorf("failed to read sandbox op node offets: %v", err)
+		}
+		opNodes = append(opNodes, opNodeValue)
+	}
+
+	for i, prof := range profiles {
+		for j, o := range prof.Operations {
+			profiles[i].Operations[j].Value = opNodes[o.Index]
+		}
+	}
+
+	// fmt.Println("Messages")
+	// fmt.Println("========")
+	// for _, moff := range msgOffsets {
+	// 	r.Seek(int64(baseAddr+uint32(moff)), io.SeekStart)
+
+	// 	length, err := r.ReadByte()
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	str := make([]byte, length)
+	// 	_, err = r.Read(str)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+
+	// 	fmt.Println(string(str[:]))
+	// }
+
+	fmt.Printf("\nGlobal Vars\n")
+	fmt.Println("===========")
+	for _, goff := range globalOffsets {
+		r.Seek(int64(baseAddr+8*uint32(goff)), io.SeekStart)
+
+		var globalLength uint16
+		if err := binary.Read(r, binary.LittleEndian, &globalLength); err != nil {
+			return fmt.Errorf("failed to read global variable length: %v", err)
+		}
+
+		str := make([]byte, globalLength)
+		_, err := r.Read(str)
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(strings.Trim(string(str[:]), "\x00"))
+	}
+
+	fmt.Printf("\nRegex Table\n")
+	fmt.Println("===========")
+	for idx, roff := range regexOffsets {
+
+		r.Seek(int64(baseAddr+8*uint32(roff)), io.SeekStart)
+
+		var itemLength uint16
+		if err := binary.Read(r, binary.LittleEndian, &itemLength); err != nil {
+			return fmt.Errorf("failed to read regex table offset: %v", err)
+		}
+
+		data := make([]byte, itemLength)
+		_, err := r.Read(data)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("[+] idx: %03d, offset: %#x, location: %#x, length: %#x\n", idx, baseAddr+8*uint32(roff), 8*roff, itemLength)
+		fmt.Println(hex.Dump(data))
+	}
+
+	fmt.Printf("\nProfiles\n")
+	fmt.Println("========")
+	for _, prof := range profiles {
+		fmt.Printf("\n[+] %s, verion: %d\n", prof.Name, prof.Version)
+		for _, o := range prof.Operations {
+			fmt.Printf("  name: %s, index: %#x, value: %#016x\n", o.Name, o.Index, o.Value)
+		}
+	}
 
 	return nil
 }
