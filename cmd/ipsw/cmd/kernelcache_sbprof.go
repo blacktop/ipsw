@@ -69,29 +69,39 @@ var sbprofCmd = &cobra.Command{
 			return err
 		}
 
-		sbProfData, err := kernelcache.GetSandboxProfiles(m, bytes.NewReader(data))
+		the_real_platform_profile_data, err := kernelcache.GetSandboxProfiles(m, bytes.NewReader(data))
 		if err != nil {
 			return err
 		}
 
 		sbProfPath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
-		err = ioutil.WriteFile(sbProfPath, sbProfData, 0755)
+		err = ioutil.WriteFile(sbProfPath, the_real_platform_profile_data, 0755)
 		if err != nil {
 			return err
 		}
 		log.Info("Created " + sbProfPath)
 
-		sbColData, err := kernelcache.GetSandboxCollections(m, bytes.NewReader(data))
+		collection_data, err := kernelcache.GetSandboxCollections(m, bytes.NewReader(data))
 		if err != nil {
 			return err
 		}
 
 		sbColPath := filepath.Join(filepath.Dir(kcPath), "sandbox_collection.bin")
-		err = ioutil.WriteFile(sbColPath, sbColData, 0755)
+		err = ioutil.WriteFile(sbColPath, collection_data, 0755)
 		if err != nil {
 			return err
 		}
 		log.Info("Created " + sbColPath)
+
+		log.Info("Parsing " + sbColPath)
+		sbOpsList, err := kernelcache.GetSandboxOpts(m)
+		if err != nil {
+			return err
+		}
+		err = kernelcache.ParseSandboxCollection(collection_data, sbOpsList)
+		if err != nil {
+			return err
+		}
 
 		return nil
 	},
