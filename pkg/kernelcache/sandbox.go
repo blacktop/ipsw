@@ -459,7 +459,7 @@ func ParseSandboxCollection(data []byte, opsList []string) error {
 	fmt.Printf("\nProfiles\n")
 	fmt.Println("========")
 	for _, prof := range profiles {
-		fmt.Printf("\n[+] %s, verion: %d\n", prof.Name, prof.Version)
+		fmt.Printf("\n[+] %s, version: %d\n", prof.Name, prof.Version)
 		for _, o := range prof.Operations {
 			fmt.Printf("  name: %s, index: %#x, value: %#016x\n", o.Name, o.Index, o.Value)
 		}
