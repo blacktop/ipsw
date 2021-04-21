@@ -25,5 +25,3 @@ typedef struct
 LittleEndian();
 
 CollectionHeader header;
-// FSeek(header.indexOffset);
-// BOMBlockTable indexHeader;
