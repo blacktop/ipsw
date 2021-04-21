@@ -9,7 +9,7 @@ summary: Parse kernelcache.
 - [**kernel extract**](#kernel-extract)
 - [**kernel dec**](#kernel-dec)
 - [**kernel kexts**](#kernel-kexts)
-- [**kernel sbopts**](#kernel-sb)
+- [**kernel sbopts**](#kernel-sbopts)
 - [**kernel diff**](#kernel-diff)
 
 ---
