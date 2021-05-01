@@ -27,6 +27,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 
@@ -91,17 +92,19 @@ var machoCmd = &cobra.Command{
 		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && showFuncStarts && !dumpStrings
 		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts && dumpStrings
 
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
+		machoPath := filepath.Clean(args[0])
+
+		if _, err := os.Stat(machoPath); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exist", machoPath)
 		}
 
 		// first check for fat file
-		fat, err := macho.OpenFat(args[0])
+		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {
 			return err
 		}
 		if err == macho.ErrNotFat {
-			m, err = macho.Open(args[0])
+			m, err = macho.Open(machoPath)
 			if err != nil {
 				return err
 			}
@@ -143,6 +146,10 @@ var machoCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to parse entry %s; %v", filesetEntry, err)
 				}
+				// err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry))
+				// if err != nil {
+				// 	return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
+				// }
 			} else {
 				log.Error("MachO type is not FileSet")
 				return nil
