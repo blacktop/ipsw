@@ -14,6 +14,13 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
+type Sandbox struct {
+	Globals  map[uint16]string
+	Regexes  map[uint16][]byte
+	OpNodes  map[uint16]uint64
+	Profiles []SandboxProfile
+}
+
 type SandboxProfileCollection struct {
 	Version        uint16
 	OpNodeSize     uint16
@@ -34,6 +41,14 @@ type SandboxProfile struct {
 	Name       string
 	Version    uint16
 	Operations []SandboxOperation
+}
+
+func (sp SandboxProfile) String() string {
+	out := fmt.Sprintf("[+] %s, version: %d\n", sp.Name, sp.Version)
+	for _, o := range sp.Operations {
+		out += fmt.Sprintf("  name: %s, index: %#x, value: %#016x\n", o.Name, o.Index, o.Value)
+	}
+	return out
 }
 
 func GetSandboxOpts(m *macho.File) ([]string, error) {
@@ -272,29 +287,34 @@ func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	return getSandboxData(m, r, "\"failed to initialize collection\"")
 }
 
-func ParseSandboxCollection(data []byte, opsList []string) error {
+func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 	var collection SandboxProfileCollection
-	var profiles []SandboxProfile
+
+	// init Sandbox
+	sb := &Sandbox{}
+	sb.Globals = make(map[uint16]string)
+	sb.OpNodes = make(map[uint16]uint64)
+	sb.Regexes = make(map[uint16][]byte)
 
 	r := bytes.NewReader(data)
 
 	if err := binary.Read(r, binary.LittleEndian, &collection); err != nil {
-		return fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
+		return nil, fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
 	}
 
 	regexOffsets := make([]uint16, collection.RegexItemCount)
 	if err := binary.Read(r, binary.LittleEndian, &regexOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox profile regex offets: %v", err)
+		return nil, fmt.Errorf("failed to read sandbox profile regex offets: %v", err)
 	}
 
 	globalOffsets := make([]uint16, collection.GlobalVarCount)
 	if err := binary.Read(r, binary.LittleEndian, &globalOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
+		return nil, fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
 	msgOffsets := make([]uint16, collection.MsgItemCount)
 	if err := binary.Read(r, binary.LittleEndian, &msgOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox profile message offets: %v", err)
+		return nil, fmt.Errorf("failed to read sandbox profile message offets: %v", err)
 	}
 
 	profileSize := uint32(collection.OpCount+uint8(binary.Size(uint16(0)))) * 2
@@ -326,7 +346,7 @@ func ParseSandboxCollection(data []byte, opsList []string) error {
 	for i := uint16(0); i < collection.ProfileCount; i++ {
 		profile := make([]byte, profileSize)
 		if err := binary.Read(r, binary.LittleEndian, &profile); err != nil {
-			return fmt.Errorf("failed to read sandbox profiles: %v", err)
+			return nil, fmt.Errorf("failed to read sandbox profiles: %v", err)
 		}
 		profileDatas = append(profileDatas, profile)
 	}
@@ -338,17 +358,17 @@ func ParseSandboxCollection(data []byte, opsList []string) error {
 
 		var nameOffset uint16
 		if err := binary.Read(pr, binary.LittleEndian, &nameOffset); err != nil {
-			return fmt.Errorf("failed to read profile name offset for index %d: %v", idx, err)
+			return nil, fmt.Errorf("failed to read profile name offset for index %d: %v", idx, err)
 		}
 
 		if err := binary.Read(pr, binary.LittleEndian, &sp.Version); err != nil {
-			return fmt.Errorf("failed to read profile version for index %d: %v", idx, err)
+			return nil, fmt.Errorf("failed to read profile version for index %d: %v", idx, err)
 		}
 
 		for i := 0; i < int(collection.OpCount); i++ {
 			so := SandboxOperation{Name: opsList[i]}
 			if err := binary.Read(pr, binary.LittleEndian, &so.Index); err != nil {
-				return fmt.Errorf("failed to read sandbox operation index for %s: %v", opsList[i], err)
+				return nil, fmt.Errorf("failed to read sandbox operation index for %s: %v", opsList[i], err)
 			}
 			// TODO: lookup operation value
 			sp.Operations = append(sp.Operations, so)
@@ -357,18 +377,18 @@ func ParseSandboxCollection(data []byte, opsList []string) error {
 		r.Seek(int64(baseAddr+8*uint32(nameOffset)), io.SeekStart)
 		var nameLength uint16
 		if err := binary.Read(r, binary.LittleEndian, &nameLength); err != nil {
-			return fmt.Errorf("failed to read profile name length for index %d: %v", idx, err)
+			return nil, fmt.Errorf("failed to read profile name length for index %d: %v", idx, err)
 		}
 
 		str := make([]byte, nameLength)
 		_, err := r.Read(str)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		sp.Name = strings.Trim(string(str[:]), "\x00")
 
-		profiles = append(profiles, sp)
+		sb.Profiles = append(sb.Profiles, sp)
 	}
 
 	profileDatas = nil
@@ -379,21 +399,23 @@ func ParseSandboxCollection(data []byte, opsList []string) error {
 	opNodeCount := (baseAddr - opNodeStart) / 8
 	opNodeOffsets := make([]uint16, opNodeCount)
 	if err := binary.Read(r, binary.LittleEndian, &opNodeOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox op node offets: %v", err)
+		return nil, fmt.Errorf("failed to read sandbox op node offets: %v", err)
 	}
+	// TODO: refactor to only use sb.OpNodes
 	opNodes := make([]uint64, opNodeCount)
 	for _, opoff := range opNodeOffsets {
 		var opNodeValue uint64
 		r.Seek(int64(opoff), io.SeekStart)
 		if err := binary.Read(r, binary.LittleEndian, &opNodeValue); err != nil {
-			return fmt.Errorf("failed to read sandbox op node offets: %v", err)
+			return nil, fmt.Errorf("failed to read sandbox op node offets: %v", err)
 		}
 		opNodes = append(opNodes, opNodeValue)
+		sb.OpNodes[opoff] = opNodeValue
 	}
 
-	for i, prof := range profiles {
+	for i, prof := range sb.Profiles {
 		for j, o := range prof.Operations {
-			profiles[i].Operations[j].Value = opNodes[o.Index]
+			sb.Profiles[i].Operations[j].Value = opNodes[o.Index]
 		}
 	}
 
@@ -404,68 +426,57 @@ func ParseSandboxCollection(data []byte, opsList []string) error {
 
 	// 	length, err := r.ReadByte()
 	// 	if err != nil {
-	// 		return err
+	// 		return nil, err
 	// 	}
 
 	// 	str := make([]byte, length)
 	// 	_, err = r.Read(str)
 	// 	if err != nil {
-	// 		return err
+	// 		return nil, err
 	// 	}
 
 	// 	fmt.Println(string(str[:]))
 	// }
 
-	fmt.Printf("\nGlobal Vars\n")
-	fmt.Println("===========")
 	for _, goff := range globalOffsets {
 		r.Seek(int64(baseAddr+8*uint32(goff)), io.SeekStart)
 
 		var globalLength uint16
 		if err := binary.Read(r, binary.LittleEndian, &globalLength); err != nil {
-			return fmt.Errorf("failed to read global variable length: %v", err)
+			return nil, fmt.Errorf("failed to read global variable length: %v", err)
 		}
 
 		str := make([]byte, globalLength)
 		_, err := r.Read(str)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		fmt.Println(strings.Trim(string(str[:]), "\x00"))
+		sb.Globals[goff] = strings.Trim(string(str[:]), "\x00")
 	}
 
-	fmt.Printf("\nRegex Table\n")
-	fmt.Println("===========")
 	for idx, roff := range regexOffsets {
 
 		r.Seek(int64(baseAddr+8*uint32(roff)), io.SeekStart)
 
 		var itemLength uint16
 		if err := binary.Read(r, binary.LittleEndian, &itemLength); err != nil {
-			return fmt.Errorf("failed to read regex table offset: %v", err)
+			return nil, fmt.Errorf("failed to read regex table offset: %v", err)
 		}
 
 		data := make([]byte, itemLength)
 		_, err := r.Read(data)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		fmt.Printf("[+] idx: %03d, offset: %#x, location: %#x, length: %#x\n", idx, baseAddr+8*uint32(roff), 8*roff, itemLength)
-		fmt.Println(hex.Dump(data))
+		log.Debugf("[+] idx: %03d, offset: %#x, location: %#x, length: %#x\n", idx, baseAddr+8*uint32(roff), 8*roff, itemLength)
+		log.Debug(hex.Dump(data))
+
+		sb.Regexes[roff] = data
 	}
 
-	fmt.Printf("\nProfiles\n")
-	fmt.Println("========")
-	for _, prof := range profiles {
-		fmt.Printf("\n[+] %s, version: %d\n", prof.Name, prof.Version)
-		for _, o := range prof.Operations {
-			fmt.Printf("  name: %s, index: %#x, value: %#016x\n", o.Name, o.Index, o.Value)
-		}
-	}
-
-	return nil
+	return sb, nil
 }
 
 func getTag(ptr uint64) uint64 {

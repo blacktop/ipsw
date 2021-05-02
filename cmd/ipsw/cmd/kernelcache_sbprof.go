@@ -98,10 +98,21 @@ var sbprofCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		err = kernelcache.ParseSandboxCollection(collection_data, sbOpsList)
+		_, err = kernelcache.ParseSandboxCollection(collection_data, sbOpsList)
 		if err != nil {
 			return err
 		}
+
+		// regexFolder := filepath.Join(filepath.Dir(kcPath), "regex")
+		// os.MkdirAll(regexFolder, 0755)
+
+		// for off, data := range sb.Regexes {
+		// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%x", off))
+		// 	err = ioutil.WriteFile(regexPath, data, 0755)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// }
 
 		return nil
 	},
