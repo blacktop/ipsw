@@ -3,6 +3,7 @@ package download
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
@@ -79,6 +80,10 @@ func NewOTA(proxy string, insecure, ios13, public bool) (*Ota, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
+	}
 
 	document, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
