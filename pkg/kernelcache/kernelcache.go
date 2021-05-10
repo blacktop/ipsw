@@ -68,10 +68,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 func Extract(ipsw string) error {
 	log.Debug("Extracting Kernelcache from IPSW")
 	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		if strings.Contains(f.Name, "kernelcache") {
-			return true
-		}
-		return false
+		return strings.Contains(f.Name, "kernelcache")
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
