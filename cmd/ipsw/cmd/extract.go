@@ -212,10 +212,7 @@ var extractCmd = &cobra.Command{
 				log.Info("Extracting iBoot")
 				_, err := utils.Unzip(args[0], "", func(f *zip.File) bool {
 					var validIBoot = regexp.MustCompile(`.*iBoot.*im4p$`)
-					if validIBoot.MatchString(f.Name) {
-						return true
-					}
-					return false
+					return validIBoot.MatchString(f.Name)
 				})
 
 				if err != nil {
@@ -227,10 +224,7 @@ var extractCmd = &cobra.Command{
 				log.Info("Extracting sep-firmwares")
 				_, err := utils.Unzip(args[0], "", func(f *zip.File) bool {
 					var validSEP = regexp.MustCompile(`.*sep-firmware.*im4p$`)
-					if validSEP.MatchString(f.Name) {
-						return true
-					}
-					return false
+					return validSEP.MatchString(f.Name)
 				})
 
 				if err != nil {
