@@ -546,18 +546,65 @@ Objective-C
 Analyze FileSet entry MachO
 
 ```bash
-$ ipsw macho MacBookAir10,1_J313AP_20B29/kernelcache.production --fileset-entry kernel
+$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 Magic         = 64-bit MachO
 Type          = Exec
-CPU           = AARCH64, ARM64e caps: PAK00
-Commands      = 29 (Size: 5992)
+CPU           = AARCH64, ARM64e caps: KER00
+Commands      = 30 (Size: 5904)
 Flags         = NoUndefs, PIE, DylibInCache
-000: LC_SEGMENT_64 sz=0x000c7ff0 off=0x00c6c000-0x00d33ff0 addr=0xfffffe0007c70000-0xfffffe0007d38000 r-x/r-x   __TEXT
-        sz=0x000340e0 off=0x00c70120-0x00ca4200 addr=0xfffffe0007c74120-0xfffffe0007ca8200              __TEXT.__const
-        sz=0x0007bd97 off=0x00ca4200-0x00d1ff97 addr=0xfffffe0007ca8200-0xfffffe0007d23f97              __TEXT.__cstring                 (CstringLiterals)
-        sz=0x00013f60 off=0x00d1ff97-0x00d33ef7 addr=0xfffffe0007d23f97-0xfffffe0007d37ef7              __TEXT.__os_log
-        sz=0x00000000 off=0x00d33ef7-0x00d33ef7 addr=0xfffffe0007d37ef7-0xfffffe0007d37ef7              __TEXT.__thread_starts
-        sz=0x000000f8 off=0x00d33ef8-0x00d33ff0 addr=0xfffffe0007d37ef8-0xfffffe0007d37ff0              __TEXT.__eh_frame
+000: LC_SEGMENT_64 sz=0x000c7ff8 off=0x00000000-0x000c7ff8 addr=0xfffffe0007b44000-0xfffffe0007c0c000 r-x/r-x   __TEXT
+        sz=0x00034330 off=0x00001820-0x00035b50 addr=0xfffffe0007b45820-0xfffffe0007b79b50              __TEXT.__const
+        sz=0x0007de25 off=0x00035b50-0x000b3975 addr=0xfffffe0007b79b50-0xfffffe0007bf7975              __TEXT.__cstring                 (CstringLiterals)
+        sz=0x00014586 off=0x000b3975-0x000c7efb addr=0xfffffe0007bf7975-0xfffffe0007c0befb              __TEXT.__os_log
+        sz=0x00000000 off=0x000c7efb-0x000c7efb addr=0xfffffe0007c0befb-0xfffffe0007c0befb              __TEXT.__thread_starts
+        sz=0x000000f8 off=0x000c7f00-0x000c7ff8 addr=0xfffffe0007c0bf00-0xfffffe0007c0bff8              __TEXT.__eh_frame
 <SNIP>
+```
+
+Extract a fileset entry to disk
+
+```bash
+$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry
+
+Magic         = 64-bit MachO
+Type          = KextBundle
+CPU           = AARCH64, ARM64e caps: KER00
+Commands      = 9 (Size: 1304)
+Flags         = NoUndefs, DyldLink, TwoLevel, DylibInCache
+000: LC_SEGMENT_64 sz=0x00018aee off=0x00000000-0x00018aee addr=0xfffffe0007a10000-0xfffffe0007a2c000 r--/r--   __TEXT
+        sz=0x00014362 off=0x00000580-0x000148e2 addr=0xfffffe0007a10580-0xfffffe0007a248e2              __TEXT.__const
+        sz=0x000031f9 off=0x000148e2-0x00017adb addr=0xfffffe0007a248e2-0xfffffe0007a27adb              __TEXT.__cstring                 (CstringLiterals)
+        sz=0x00001013 off=0x00017adb-0x00018aee addr=0xfffffe0007a27adb-0xfffffe0007a28aee              __TEXT.__os_log
+001: LC_SEGMENT_64 sz=0x0002f2d0 off=0x00018aee-0x00047dbe addr=0xfffffe000a678000-0xfffffe000a6a8000 r-x/r-x   __TEXT_EXEC
+        sz=0x0002e610 off=0x00018aee-0x000470fe addr=0xfffffe000a678000-0xfffffe000a6a6610              __TEXT_EXEC.__text              PureInstructions|SomeInstructions
+        sz=0x00000cc0 off=0x000470fe-0x00047dbe addr=0xfffffe000a6a6610-0xfffffe000a6a72d0              __TEXT_EXEC.__stubs             PureInstructions|SomeInstructions (SymbolStubs)
+002: LC_SEGMENT_64 sz=0x00004000 off=0x00047dbe-0x0004bdbe addr=0xfffffe000c048000-0xfffffe000c060000 rw-/rw-   __DATA
+        sz=0x000002f8 off=0x00047dbe-0x000480b6 addr=0xfffffe000c048000-0xfffffe000c0482f8              __DATA.__data
+        sz=0x00015fb0 off=0x00000000-0x00015fb0 addr=0xfffffe000c0482f8-0xfffffe000c05e2a8              __DATA.__bss                     (Zerofill)
+003: LC_SEGMENT_64 sz=0x00002568 off=0x0004bdbe-0x0004e326 addr=0xfffffe000b620000-0xfffffe000b624000 rw-/rw-   __DATA_CONST
+        sz=0x00000978 off=0x0004bdbe-0x0004c736 addr=0xfffffe000b620000-0xfffffe000b620978              __DATA_CONST.__got
+        sz=0x00000008 off=0x0004c736-0x0004c73e addr=0xfffffe000b620978-0xfffffe000b620980              __DATA_CONST.__auth_ptr
+        sz=0x00001be8 off=0x0004c73e-0x0004e326 addr=0xfffffe000b620980-0xfffffe000b622568              __DATA_CONST.__const
+004: LC_SEGMENT_64 sz=0x00eb90e5 off=0x0004e326-0x00f0740b addr=0xfffffe000c180000-0xfffffe000d0390e5 r--/r--   __LINKEDIT
+005: LC_SYMTAB                   Symbol offset=0x0054BEF6, Num Syms: "1238", String offset=0x005D1BFE-0x00F0740B
+006: LC_DYSYMTAB
+                     Local Syms: 923 at 0
+                  External Syms: 8 at 923
+                 Undefined Syms: 307 at 931
+                            TOC: No
+                         Modtab: No
+        External symtab Entries: None
+        Indirect symtab Entries: 575 at 0x005cb3da
+         External Reloc Entries: None
+            Local Reloc Entries: None
+007: LC_UUID                     08D7639F-818E-3551-9B32-0565198961A8
+008: LC_SOURCE_VERSION           1441.101.1.0.0
+```
+
+```bash
+$ ll
+
+-rwxr-xr-x  1 blacktop    15M May  9 22:08 com.apple.security.sandbox
+-rw-r--r--  1 blacktop    96M Apr 29 21:56 kernelcache.production
 ```
