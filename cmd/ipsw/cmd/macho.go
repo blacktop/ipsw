@@ -145,7 +145,7 @@ var machoCmd = &cobra.Command{
 			if m.FileTOC.FileHeader.Type == types.FileSet {
 				m, err = m.GetFileSetFileByName(filesetEntry)
 				if err != nil {
-					return fmt.Errorf("failed to parse entry %s; %v", filesetEntry, err)
+					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
 				}
 				// err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry))
 				// if err != nil {
