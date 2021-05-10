@@ -54,7 +54,7 @@ func init() {
 	machoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	machoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
 	machoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
-	machoCmd.Flags().BoolP("fixups", "x", false, "Print fixup chains")
+	machoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
 	machoCmd.Flags().StringP("fileset-entry", "t", viper.GetString("IPSW_FILESET_ENTRY"), "Which fileset entry to analyze")
 	machoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
 	machoCmd.MarkZshCompPositionalArgumentFile(1)
