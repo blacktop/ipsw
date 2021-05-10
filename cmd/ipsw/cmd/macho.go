@@ -62,9 +62,10 @@ func init() {
 
 // machoCmd represents the macho command
 var machoCmd = &cobra.Command{
-	Use:   "macho <macho_file>",
-	Short: "Parse a MachO file",
-	Args:  cobra.MinimumNArgs(1),
+	Use:          "macho <macho_file>",
+	Short:        "Parse a MachO file",
+	Args:         cobra.MinimumNArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File
