@@ -81,16 +81,17 @@ var machoCmd = &cobra.Command{
 		showEntitlements, _ := cmd.Flags().GetBool("ent")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
-		symbols, _ := cmd.Flags().GetBool("symbols")
+		showSymbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
 		showFixups, _ := cmd.Flags().GetBool("fixups")
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts && !dumpStrings
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showFixups && !showFuncStarts && !dumpStrings
-		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showFixups && !showFuncStarts && !dumpStrings
-		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && showFuncStarts && !dumpStrings
-		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts && dumpStrings
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
+		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings
+		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings
+		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings
+		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings
 
 		machoPath := filepath.Clean(args[0])
 
@@ -131,7 +132,7 @@ var machoCmd = &cobra.Command{
 			} else {
 				choice := 0
 				prompt := &survey.Select{
-					Message: fmt.Sprintf("Detected a fat MachO file, please select an architecture to analyze:"),
+					Message: "Detected a fat MachO file, please select an architecture to analyze:",
 					Options: options,
 				}
 				survey.AskOne(prompt, &choice)
@@ -159,7 +160,7 @@ var machoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showFixups && !showFuncStarts && !dumpStrings) {
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings) {
 			fmt.Println(m.FileTOC.String())
 		}
 
@@ -370,9 +371,11 @@ var machoCmd = &cobra.Command{
 			}
 		}
 
-		if symbols {
-			fmt.Println("SYMBOLS")
-			fmt.Println("=======")
+		if showSymbols {
+			if !onlySymbols {
+				fmt.Println("SYMBOLS")
+				fmt.Println("=======")
+			}
 			var sec string
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 			for _, sym := range m.Symtab.Syms {
