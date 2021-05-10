@@ -56,6 +56,7 @@ func init() {
 	machoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	machoCmd.Flags().BoolP("fixups", "x", false, "Print fixup chains")
 	machoCmd.Flags().StringP("fileset-entry", "t", viper.GetString("IPSW_FILESET_ENTRY"), "Which fileset entry to analyze")
+	machoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
 	machoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -74,7 +75,6 @@ var machoCmd = &cobra.Command{
 		}
 
 		selectedArch, _ := cmd.Flags().GetString("arch")
-		filesetEntry, _ := cmd.Flags().GetString("fileset-entry")
 		showHeader, _ := cmd.Flags().GetBool("header")
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
 		showSignature, _ := cmd.Flags().GetBool("sig")
@@ -85,6 +85,12 @@ var machoCmd = &cobra.Command{
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
 		showFixups, _ := cmd.Flags().GetBool("fixups")
+		filesetEntry, _ := cmd.Flags().GetString("fileset-entry")
+		extractfilesetEntry, _ := cmd.Flags().GetBool("extract-fileset-entry")
+
+		if len(filesetEntry) == 0 && extractfilesetEntry {
+			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
+		}
 
 		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
 		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
