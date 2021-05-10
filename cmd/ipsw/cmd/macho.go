@@ -153,10 +153,12 @@ var machoCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
 				}
-				// err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry))
-				// if err != nil {
-				// 	return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
-				// }
+				if extractfilesetEntry {
+					err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry))
+					if err != nil {
+						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
+					}
+				}
 			} else {
 				log.Error("MachO type is not FileSet")
 				return nil
