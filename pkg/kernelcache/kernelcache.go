@@ -15,6 +15,7 @@ import (
 	"github.com/apex/log"
 	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/lzfse"
@@ -68,10 +69,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 func Extract(ipsw string) error {
 	log.Debug("Extracting Kernelcache from IPSW")
 	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		if strings.Contains(f.Name, "kernelcache") {
-			return true
-		}
-		return false
+		return strings.Contains(f.Name, "kernelcache")
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
@@ -95,12 +93,29 @@ func Extract(ipsw string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
+
+		m, err := macho.NewFile(bytes.NewReader(dec))
+		if err != nil {
+			return fmt.Errorf("failed to parse kernelcache MachO: %v", err)
+		}
+
 		for _, folder := range i.GetKernelCacheFolders(kcache) {
 			os.Mkdir(folder, os.ModePerm)
 			fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(kcache)))
-			err = ioutil.WriteFile(fname, dec, 0644)
-			if err != nil {
-				return errors.Wrap(err, "failed to write kernelcache")
+			if m.FileTOC.FileHeader.Type == types.FileSet {
+				m, err = m.GetFileSetFileByName("kernel")
+				if err != nil {
+					return fmt.Errorf("failed to parse file-set entry kernel: %v", err)
+				}
+				err = m.Export(fname)
+				if err != nil {
+					return fmt.Errorf("failed to export file-set entry kernel MachO: %v", err)
+				}
+			} else {
+				err = ioutil.WriteFile(fname, dec, 0644)
+				if err != nil {
+					return errors.Wrap(err, "failed to write kernelcache")
+				}
 			}
 			utils.Indent(log.Info, 2)("Created " + fname)
 			os.Remove(kcache)
@@ -129,9 +144,26 @@ func Decompress(kcache string) error {
 		return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 	}
 
-	err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
+	fname := kcache + ".decompressed"
+
+	m, err := macho.NewFile(bytes.NewReader(dec))
 	if err != nil {
-		return errors.Wrap(err, "failed to write kernelcache")
+		return fmt.Errorf("failed to parse kernelcache MachO: %v", err)
+	}
+	if m.FileTOC.FileHeader.Type == types.FileSet {
+		m, err = m.GetFileSetFileByName("kernel")
+		if err != nil {
+			return fmt.Errorf("failed to parse file-set entry kernel: %v", err)
+		}
+		err = m.Export(fname)
+		if err != nil {
+			return fmt.Errorf("failed to export file-set entry kernel MachO: %v", err)
+		}
+	} else {
+		err = ioutil.WriteFile(fname, dec, 0644)
+		if err != nil {
+			return errors.Wrap(err, "failed to write kernelcache")
+		}
 	}
 	utils.Indent(log.Info, 2)("Created " + kcache + ".decompressed")
 	return nil
@@ -237,9 +269,25 @@ func RemoteParse(zr *zip.Reader) error {
 					}
 
 					os.Mkdir(folder, os.ModePerm)
-					err = ioutil.WriteFile(fname, dec, 0644)
+
+					m, err := macho.NewFile(bytes.NewReader(dec))
 					if err != nil {
-						return errors.Wrap(err, "failed to write kernelcache")
+						return fmt.Errorf("failed to parse kernelcache MachO: %v", err)
+					}
+					if m.FileTOC.FileHeader.Type == types.FileSet {
+						m, err = m.GetFileSetFileByName("kernel")
+						if err != nil {
+							return fmt.Errorf("failed to parse file-set entry kernel: %v", err)
+						}
+						err = m.Export(fname)
+						if err != nil {
+							return fmt.Errorf("failed to export file-set entry kernel MachO: %v", err)
+						}
+					} else {
+						err = ioutil.WriteFile(fname, dec, 0644)
+						if err != nil {
+							return errors.Wrap(err, "failed to write kernelcache")
+						}
 					}
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
 				} else {
@@ -278,9 +326,25 @@ func RemoteParseV2(zr *zip.Reader, destFolder string) error {
 				}
 
 				os.Mkdir(destFolder, os.ModePerm)
-				err = ioutil.WriteFile(fname, dec, 0644)
+
+				m, err := macho.NewFile(bytes.NewReader(dec))
 				if err != nil {
-					return errors.Wrap(err, "failed to write kernelcache")
+					return fmt.Errorf("failed to parse kernelcache MachO: %v", err)
+				}
+				if m.FileTOC.FileHeader.Type == types.FileSet {
+					m, err = m.GetFileSetFileByName("kernel")
+					if err != nil {
+						return fmt.Errorf("failed to parse file-set entry kernel: %v", err)
+					}
+					err = m.Export(fname)
+					if err != nil {
+						return fmt.Errorf("failed to export file-set entry kernel MachO: %v", err)
+					}
+				} else {
+					err = ioutil.WriteFile(fname, dec, 0644)
+					if err != nil {
+						return errors.Wrap(err, "failed to write kernelcache")
+					}
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
 			} else {
