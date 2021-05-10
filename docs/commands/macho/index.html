@@ -11,7 +11,7 @@
 
   
   
-  <link rel="stylesheet" href="/ipsw/css/style.min.21175f7e98575d70951f4c9a99c617ecaa019e3d4894ca0f8c839365a079ab42.css">
+  <link rel="stylesheet" href="/ipsw/css/style.min.e3048cc2646800adab9f0cfd04e3efcd5ccdf4ae85a9b908f97487e961d5b641.css">
   
 
   
@@ -704,20 +704,60 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 <span class="mi">0</span><span class="n">x00000032caf</span><span class="p">:</span> <span class="n">isEqual</span><span class="p">:</span>
 </code></pre></div><h3 id="macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></h3>
 <p>Analyze FileSet entry MachO</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho MacBookAir10,1_J313AP_20B29/kernelcache.production --fileset-entry kernel
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Exec
-<span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e caps: PAK00
-<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">29</span> <span class="o">(</span>Size: 5992<span class="o">)</span>
+<span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e caps: KER00
+<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">30</span> <span class="o">(</span>Size: 5904<span class="o">)</span>
 <span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, PIE, DylibInCache
-000: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x000c7ff0 <span class="nv">off</span><span class="o">=</span>0x00c6c000-0x00d33ff0 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c70000-0xfffffe0007d38000 r-x/r-x   __TEXT
-        <span class="nv">sz</span><span class="o">=</span>0x000340e0 <span class="nv">off</span><span class="o">=</span>0x00c70120-0x00ca4200 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c74120-0xfffffe0007ca8200              __TEXT.__const
-        <span class="nv">sz</span><span class="o">=</span>0x0007bd97 <span class="nv">off</span><span class="o">=</span>0x00ca4200-0x00d1ff97 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007ca8200-0xfffffe0007d23f97              __TEXT.__cstring                 <span class="o">(</span>CstringLiterals<span class="o">)</span>
-        <span class="nv">sz</span><span class="o">=</span>0x00013f60 <span class="nv">off</span><span class="o">=</span>0x00d1ff97-0x00d33ef7 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d23f97-0xfffffe0007d37ef7              __TEXT.__os_log
-        <span class="nv">sz</span><span class="o">=</span>0x00000000 <span class="nv">off</span><span class="o">=</span>0x00d33ef7-0x00d33ef7 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d37ef7-0xfffffe0007d37ef7              __TEXT.__thread_starts
-        <span class="nv">sz</span><span class="o">=</span>0x000000f8 <span class="nv">off</span><span class="o">=</span>0x00d33ef8-0x00d33ff0 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007d37ef8-0xfffffe0007d37ff0              __TEXT.__eh_frame
+000: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x000c7ff8 <span class="nv">off</span><span class="o">=</span>0x00000000-0x000c7ff8 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007b44000-0xfffffe0007c0c000 r-x/r-x   __TEXT
+        <span class="nv">sz</span><span class="o">=</span>0x00034330 <span class="nv">off</span><span class="o">=</span>0x00001820-0x00035b50 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007b45820-0xfffffe0007b79b50              __TEXT.__const
+        <span class="nv">sz</span><span class="o">=</span>0x0007de25 <span class="nv">off</span><span class="o">=</span>0x00035b50-0x000b3975 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007b79b50-0xfffffe0007bf7975              __TEXT.__cstring                 <span class="o">(</span>CstringLiterals<span class="o">)</span>
+        <span class="nv">sz</span><span class="o">=</span>0x00014586 <span class="nv">off</span><span class="o">=</span>0x000b3975-0x000c7efb <span class="nv">addr</span><span class="o">=</span>0xfffffe0007bf7975-0xfffffe0007c0befb              __TEXT.__os_log
+        <span class="nv">sz</span><span class="o">=</span>0x00000000 <span class="nv">off</span><span class="o">=</span>0x000c7efb-0x000c7efb <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c0befb-0xfffffe0007c0befb              __TEXT.__thread_starts
+        <span class="nv">sz</span><span class="o">=</span>0x000000f8 <span class="nv">off</span><span class="o">=</span>0x000c7f00-0x000c7ff8 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c0bf00-0xfffffe0007c0bff8              __TEXT.__eh_frame
 &lt;SNIP&gt;
+</code></pre></div><p>Extract a fileset entry to disk</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry <span class="s2">&#34;com.apple.security.sandbox&#34;</span> --extract-fileset-entry
+
+<span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
+<span class="nv">Type</span>          <span class="o">=</span> KextBundle
+<span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e caps: KER00
+<span class="nv">Commands</span>      <span class="o">=</span> <span class="m">9</span> <span class="o">(</span>Size: 1304<span class="o">)</span>
+<span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, DylibInCache
+000: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x00018aee <span class="nv">off</span><span class="o">=</span>0x00000000-0x00018aee <span class="nv">addr</span><span class="o">=</span>0xfffffe0007a10000-0xfffffe0007a2c000 r--/r--   __TEXT
+        <span class="nv">sz</span><span class="o">=</span>0x00014362 <span class="nv">off</span><span class="o">=</span>0x00000580-0x000148e2 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007a10580-0xfffffe0007a248e2              __TEXT.__const
+        <span class="nv">sz</span><span class="o">=</span>0x000031f9 <span class="nv">off</span><span class="o">=</span>0x000148e2-0x00017adb <span class="nv">addr</span><span class="o">=</span>0xfffffe0007a248e2-0xfffffe0007a27adb              __TEXT.__cstring                 <span class="o">(</span>CstringLiterals<span class="o">)</span>
+        <span class="nv">sz</span><span class="o">=</span>0x00001013 <span class="nv">off</span><span class="o">=</span>0x00017adb-0x00018aee <span class="nv">addr</span><span class="o">=</span>0xfffffe0007a27adb-0xfffffe0007a28aee              __TEXT.__os_log
+001: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x0002f2d0 <span class="nv">off</span><span class="o">=</span>0x00018aee-0x00047dbe <span class="nv">addr</span><span class="o">=</span>0xfffffe000a678000-0xfffffe000a6a8000 r-x/r-x   __TEXT_EXEC
+        <span class="nv">sz</span><span class="o">=</span>0x0002e610 <span class="nv">off</span><span class="o">=</span>0x00018aee-0x000470fe <span class="nv">addr</span><span class="o">=</span>0xfffffe000a678000-0xfffffe000a6a6610              __TEXT_EXEC.__text              PureInstructions<span class="p">|</span>SomeInstructions
+        <span class="nv">sz</span><span class="o">=</span>0x00000cc0 <span class="nv">off</span><span class="o">=</span>0x000470fe-0x00047dbe <span class="nv">addr</span><span class="o">=</span>0xfffffe000a6a6610-0xfffffe000a6a72d0              __TEXT_EXEC.__stubs             PureInstructions<span class="p">|</span>SomeInstructions <span class="o">(</span>SymbolStubs<span class="o">)</span>
+002: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x00004000 <span class="nv">off</span><span class="o">=</span>0x00047dbe-0x0004bdbe <span class="nv">addr</span><span class="o">=</span>0xfffffe000c048000-0xfffffe000c060000 rw-/rw-   __DATA
+        <span class="nv">sz</span><span class="o">=</span>0x000002f8 <span class="nv">off</span><span class="o">=</span>0x00047dbe-0x000480b6 <span class="nv">addr</span><span class="o">=</span>0xfffffe000c048000-0xfffffe000c0482f8              __DATA.__data
+        <span class="nv">sz</span><span class="o">=</span>0x00015fb0 <span class="nv">off</span><span class="o">=</span>0x00000000-0x00015fb0 <span class="nv">addr</span><span class="o">=</span>0xfffffe000c0482f8-0xfffffe000c05e2a8              __DATA.__bss                     <span class="o">(</span>Zerofill<span class="o">)</span>
+003: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x00002568 <span class="nv">off</span><span class="o">=</span>0x0004bdbe-0x0004e326 <span class="nv">addr</span><span class="o">=</span>0xfffffe000b620000-0xfffffe000b624000 rw-/rw-   __DATA_CONST
+        <span class="nv">sz</span><span class="o">=</span>0x00000978 <span class="nv">off</span><span class="o">=</span>0x0004bdbe-0x0004c736 <span class="nv">addr</span><span class="o">=</span>0xfffffe000b620000-0xfffffe000b620978              __DATA_CONST.__got
+        <span class="nv">sz</span><span class="o">=</span>0x00000008 <span class="nv">off</span><span class="o">=</span>0x0004c736-0x0004c73e <span class="nv">addr</span><span class="o">=</span>0xfffffe000b620978-0xfffffe000b620980              __DATA_CONST.__auth_ptr
+        <span class="nv">sz</span><span class="o">=</span>0x00001be8 <span class="nv">off</span><span class="o">=</span>0x0004c73e-0x0004e326 <span class="nv">addr</span><span class="o">=</span>0xfffffe000b620980-0xfffffe000b622568              __DATA_CONST.__const
+004: LC_SEGMENT_64 <span class="nv">sz</span><span class="o">=</span>0x00eb90e5 <span class="nv">off</span><span class="o">=</span>0x0004e326-0x00f0740b <span class="nv">addr</span><span class="o">=</span>0xfffffe000c180000-0xfffffe000d0390e5 r--/r--   __LINKEDIT
+005: LC_SYMTAB                   Symbol <span class="nv">offset</span><span class="o">=</span>0x0054BEF6, Num Syms: <span class="s2">&#34;1238&#34;</span>, String <span class="nv">offset</span><span class="o">=</span>0x005D1BFE-0x00F0740B
+006: LC_DYSYMTAB
+                     Local Syms: <span class="m">923</span> at <span class="m">0</span>
+                  External Syms: <span class="m">8</span> at <span class="m">923</span>
+                 Undefined Syms: <span class="m">307</span> at <span class="m">931</span>
+                            TOC: No
+                         Modtab: No
+        External symtab Entries: None
+        Indirect symtab Entries: <span class="m">575</span> at 0x005cb3da
+         External Reloc Entries: None
+            Local Reloc Entries: None
+007: LC_UUID                     08D7639F-818E-3551-9B32-0565198961A8
+008: LC_SOURCE_VERSION           1441.101.1.0.0
+</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ll
+
+-rwxr-xr-x  <span class="m">1</span> blacktop    15M May  <span class="m">9</span> 22:08 com.apple.security.sandbox
+-rw-r--r--  <span class="m">1</span> blacktop    96M Apr <span class="m">29</span> 21:56 kernelcache.production
 </code></pre></div>
 </div>
 </div>
