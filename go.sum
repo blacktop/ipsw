@@ -76,8 +76,8 @@ github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c h1:+0HFd5KSZ/mm3
 github.com/bketelsen/crypt v0.0.3-0.20200106085610-5cbc8cc4026c/go.mod h1:MKsuJmJgSg28kpZDP6UIiPt0e0Oz0kqKNGyRaWEPv84=
 github.com/blacktop/go-arm64 v0.6.18 h1:QzQaqkZ61nN9fP04Q0SrHv4e7Ln0hMTYgfR7hzxeUiE=
 github.com/blacktop/go-arm64 v0.6.18/go.mod h1:MadXPi/vTAx0FYNcQllHRMZrRRuwPfjzhr7d1UUWQc0=
-github.com/blacktop/go-macho v1.1.34 h1:zQ6OEcb17baiAAeAmyA9YASsmyul/HXNGF++sYYgFUE=
-github.com/blacktop/go-macho v1.1.34/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
+github.com/blacktop/go-macho v1.1.36 h1:AVpL/ihIyontyVVweqZ1g6gm2Ah2ANpIpeUUMsIeLHU=
+github.com/blacktop/go-macho v1.1.36/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
 github.com/blacktop/go-plist v1.0.0 h1:bBpFGaiCdJZbQgOKxjxAUdvugySX+C3RtGvZODcOOoI=
 github.com/blacktop/go-plist v1.0.0/go.mod h1:niIOeDMEBISbJ9w0PPuc67iLvLh7Ve0N1gAfxIRWSk4=
 github.com/blacktop/lzss v0.1.1 h1:ADOUgVH3hq2miBfaxhV1GgY97wNSv5fBiXRnUVe8QSg=

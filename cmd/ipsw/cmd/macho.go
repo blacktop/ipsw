@@ -150,16 +150,27 @@ var machoCmd = &cobra.Command{
 		// Fileset MachO type
 		if len(filesetEntry) > 0 {
 			if m.FileTOC.FileHeader.Type == types.FileSet {
+				var dcf *fixupchains.DyldChainedFixups
+				if m.HasFixups() {
+					dcf, err = m.DyldChainedFixups()
+					if err != nil {
+						return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
+					}
+				}
+
+				baseAddress := m.GetBaseAddress()
 				m, err = m.GetFileSetFileByName(filesetEntry)
 				if err != nil {
 					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
 				}
+
 				if extractfilesetEntry {
-					err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry))
+					err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry), dcf, baseAddress)
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
 				}
+
 			} else {
 				log.Error("MachO type is not FileSet")
 				return nil
