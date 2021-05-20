@@ -92,6 +92,7 @@ var patternCmd = &cobra.Command{
 
 			for _, f := range zr.File {
 				if strings.Contains(f.Name, args[0]) {
+					found = true
 					folder := ipsw.GetFolderForFile(path.Base(f.Name))
 					os.Mkdir(folder, os.ModePerm)
 
