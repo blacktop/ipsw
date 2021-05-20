@@ -91,8 +91,6 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 		return nil, fmt.Errorf("you must also supply a --version OR a --build (or use download latest)")
 	}
 
-	checkCanIJailbreak(version)
-
 	for _, i := range ipsws {
 		if len(device) > 0 {
 			if strings.EqualFold(device, i.Identifier) {
