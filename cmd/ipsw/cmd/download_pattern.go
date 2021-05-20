@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -100,7 +101,7 @@ var patternCmd = &cobra.Command{
 						rc.Close()
 
 						utils.Indent(log.Info, 2)(fmt.Sprintf("Downloading file %s", fileName))
-						err = ioutil.WriteFile(fileName), data, 0644)
+						err = ioutil.WriteFile(fileName, data, 0644)
 						if err != nil {
 							return errors.Wrapf(err, "failed to write %s", f.Name)
 						}
