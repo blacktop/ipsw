@@ -27,6 +27,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -87,20 +88,26 @@ var patternCmd = &cobra.Command{
 			}
 
 			for _, f := range zr.File {
-				folder := ipsw.GetFolderForFile(path.Base(f.Name))
-				os.Mkdir(folder, os.ModePerm)
-				if _, err := os.Stat(filepath.Join(folder, filepath.Base(f.Name))); os.IsNotExist(err) {
-					data := make([]byte, f.UncompressedSize64)
-					rc, _ := f.Open()
-					io.ReadFull(rc, data)
-					rc.Close()
+				if strings.Contains(f.Name, args[0]) {
+					folder := ipsw.GetFolderForFile(path.Base(f.Name))
+					os.Mkdir(folder, os.ModePerm)
 
-					err = ioutil.WriteFile(filepath.Join(folder, filepath.Base(f.Name)), data, 0644)
-					if err != nil {
-						return errors.Wrapf(err, "failed to write %s", f.Name)
+					fileName := filepath.Join(folder, filepath.Base(f.Name))
+					if _, err := os.Stat(fileName); os.IsNotExist(err) {
+						data := make([]byte, f.UncompressedSize64)
+						rc, _ := f.Open()
+						io.ReadFull(rc, data)
+						rc.Close()
+
+						utils.Indent(log.Info, 2)(fmt.Sprintf("Downloading file %s", fileName))
+						err = ioutil.WriteFile(fileName), data, 0644)
+						if err != nil {
+							return errors.Wrapf(err, "failed to write %s", f.Name)
+						}
+
+					} else {
+						log.Warnf("%s already exists", fileName)
 					}
-				} else {
-					log.Warnf("%s already exists", filepath.Join(folder, filepath.Base(f.Name)))
 				}
 			}
 		}
