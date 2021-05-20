@@ -88,6 +88,8 @@ var patternCmd = &cobra.Command{
 				return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 			}
 
+			found := false
+
 			for _, f := range zr.File {
 				if strings.Contains(f.Name, args[0]) {
 					folder := ipsw.GetFolderForFile(path.Base(f.Name))
@@ -110,6 +112,10 @@ var patternCmd = &cobra.Command{
 						log.Warnf("%s already exists", fileName)
 					}
 				}
+			}
+
+			if !found {
+				utils.Indent(log.Error, 2)(fmt.Sprintf("No files contain pattern %s", args[0]))
 			}
 		}
 
