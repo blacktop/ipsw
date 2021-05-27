@@ -84,6 +84,7 @@ var otaDLCmd = &cobra.Command{
 			}
 			otas = append(otas, o)
 		} else {
+			log.Info("Querying Apple servers...")
 			otas = otaXML.GetOTAs(device, doDownload, doNotDownload)
 			if len(otas) == 0 {
 				log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
