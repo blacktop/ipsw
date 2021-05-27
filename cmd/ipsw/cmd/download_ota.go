@@ -39,7 +39,7 @@ import (
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
-	otaDLCmd.Flags().BoolP("public", "p", false, "Download Public (non-beta) OTAs")
+	otaDLCmd.Flags().BoolP("release", "r", false, "Download Release (non-beta) OTAs")
 	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
@@ -65,12 +65,12 @@ var otaDLCmd = &cobra.Command{
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
-		public, _ := cmd.Flags().GetBool("public")
+		release, _ := cmd.Flags().GetBool("release")
 
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
-		otaXML, err := download.NewOTA(proxy, insecure, public)
+		otaXML, err := download.NewOTA(proxy, insecure, release)
 		if err != nil {
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
 		}
