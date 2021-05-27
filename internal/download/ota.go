@@ -272,14 +272,29 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 		return OtaAsset{}, err
 	}
 
-	resp, err := http.Post(
-		"https://gdmf.apple.com/v2/assets",
-		"application/json",
-		bytes.NewBuffer(jdata))
+	req, err := http.NewRequest("POST", "https://gdmf.apple.com/v2/assets", bytes.NewBuffer(jdata))
+	if err != nil {
+		return OtaAsset{}, fmt.Errorf("failed to create https request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("User-Agent", utils.RandomAgent())
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           getProxy(o.Config.Proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: o.Config.Insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return OtaAsset{}, err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return OtaAsset{}, fmt.Errorf("failed to connect to URL: got status %s", resp.Status)
+	}
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
