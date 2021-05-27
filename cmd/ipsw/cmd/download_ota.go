@@ -40,7 +40,6 @@ import (
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
-	otaDLCmd.Flags().BoolP("ios13", "", false, "Download iOS 13.x OTAs (defaults to iOS14)")
 	otaDLCmd.Flags().BoolP("public", "p", false, "Download Public (non-beta) OTAs")
 	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
@@ -67,20 +66,28 @@ var otaDLCmd = &cobra.Command{
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
-		ios13, _ := cmd.Flags().GetBool("ios13")
 		public, _ := cmd.Flags().GetBool("public")
 
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
-		otaXML, err := download.NewOTA(proxy, insecure, ios13, public)
+		otaXML, err := download.NewOTA(proxy, insecure, public)
 		if err != nil {
-			return errors.Wrap(err, "failed to create itunes API")
+			return errors.Wrap(err, "failed to parse OTA plist")
 		}
 
-		otas := otaXML.GetOTAs(device, doDownload, doNotDownload)
-		if len(otas) == 0 {
-			log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
+		var otas []download.OtaAsset
+		if len(device) > 0 {
+			o, err := otaXML.GetOtaForDevice(device, "")
+			if err != nil {
+				return fmt.Errorf("failed to get OTA asset for device %s: %v", device, err)
+			}
+			otas = append(otas, o)
+		} else {
+			otas = otaXML.GetOTAs(device, doDownload, doNotDownload)
+			if len(otas) == 0 {
+				log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
+			}
 		}
 
 		log.Debug("URLs to Download:")
