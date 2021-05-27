@@ -12,7 +12,7 @@ require (
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
 	github.com/dustin/go-humanize v1.0.0
-	github.com/fatih/color v1.11.0 // indirect
+	github.com/fatih/color v1.12.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gocolly/colly/v2 v2.1.0
@@ -36,6 +36,6 @@ require (
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210514084401-e8d321eab015
+	golang.org/x/sys v0.0.0-20210525143221-35b2ab0089ea
 	gopkg.in/ini.v1 v1.62.0 // indirect
 )
