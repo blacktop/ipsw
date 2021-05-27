@@ -12,7 +12,6 @@ import (
 
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -102,7 +101,7 @@ func NewOTA(proxy string, insecure, public bool) (*Ota, error) {
 
 	req, err := http.NewRequest("GET", otaPublicURL, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot create http request")
+		return nil, fmt.Errorf("cannot create http request: %v", err)
 	}
 	req.Header.Add("User-Agent", utils.RandomAgent())
 
@@ -238,11 +237,13 @@ func (o *Ota) lookupHWModel(device string) (string, error) {
 		if utils.StrSliceContains(ota.SupportedDevices, device) {
 			if len(ota.SupportedDeviceModels) > 1 {
 				return "0", fmt.Errorf("found more than one hw model for device %s", device)
+			} else if len(ota.SupportedDeviceModels) == 0 {
+				return "0", fmt.Errorf("device %s has 0 supported device models", device)
 			}
 			return ota.SupportedDeviceModels[0], nil
 		}
 	}
-	return "0", fmt.Errorf("failed to find HWModel for device %s", device)
+	return "0", fmt.Errorf("failed to find device %s in list of OTAs", device)
 }
 
 // GetOtaForDevice returns an OTA asset for a given device using the newstyle OTA - CREDIT: https://gist.github.com/Siguza/0331c183c8c59e4850cd0b62fd501424
@@ -286,10 +287,9 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 	}
 
 	// repair/parse base64 response data
-	b64Str := strings.ReplaceAll(string(body), ".", " ")
-	parts := strings.Split(b64Str, " ")
-	b64Str = parts[1]
-	// b64Str = strings.ReplaceAll(parts[1], "-", "+")
+	parts := strings.Split(string(body), ".")
+	b64Str := parts[1]
+	// b64Str = strings.ReplaceAll(b64Str, "-", "+")
 	// b64Str = strings.ReplaceAll(b64Str, "_", "/")
 	// addEq := len(b64Str) % 4
 	// b64Str += strings.Repeat("=", addEq)
@@ -298,7 +298,7 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 	b64data, err := base64.StdEncoding.DecodeString(b64Str)
 	if err != nil {
 		if idx, ok := err.(base64.CorruptInputError); ok {
-			return OtaAsset{}, fmt.Errorf("base64 corrupt input for char %c: %v", []rune(b64Str)[idx], err)
+			return OtaAsset{}, fmt.Errorf("base64 corrupt input at %d in input (char %c): %v", idx, []rune(b64Str)[idx], err)
 		}
 		return OtaAsset{}, err
 	}
