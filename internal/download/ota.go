@@ -88,7 +88,7 @@ type ota struct {
 type conf struct {
 	Proxy    string
 	Insecure bool
-	Public   bool
+	Release  bool
 }
 
 type Ota struct {
@@ -96,8 +96,8 @@ type Ota struct {
 	Config conf
 }
 
-// NewOTA downloads and parses the itumes plist for iOS13 or iOS14 developer beta OTAs
-func NewOTA(proxy string, insecure, public bool) (*Ota, error) {
+// NewOTA downloads and parses the itumes plist for iOS14 release/developer beta OTAs
+func NewOTA(proxy string, insecure, release bool) (*Ota, error) {
 
 	req, err := http.NewRequest("GET", otaPublicURL, nil)
 	if err != nil {
@@ -130,7 +130,7 @@ func NewOTA(proxy string, insecure, public bool) (*Ota, error) {
 	o := Ota{Config: conf{
 		Proxy:    proxy,
 		Insecure: insecure,
-		Public:   public,
+		Release:  release,
 	}}
 
 	if err := plist.NewDecoder(bytes.NewReader(document)).Decode(&o.ota); err != nil {
@@ -257,10 +257,15 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 		}
 	}
 
+	assetAudience := audienceiOS_14DeveloperBeta
+	if o.Config.Release {
+		assetAudience = audienceiOSRelease
+	}
+
 	data := map[string]string{
 		"ClientVersion":  "2",
 		"AssetType":      "com.apple.MobileAsset.SoftwareUpdate",
-		"AssetAudience":  audienceiOS_14DeveloperBeta,
+		"AssetAudience":  assetAudience,
 		"ProductType":    device,
 		"HWModelStr":     hwmodel,
 		"ProductVersion": "0",
@@ -304,10 +309,10 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 	// repair/parse base64 response data
 	parts := strings.Split(string(body), ".")
 	b64Str := parts[1]
-	// b64Str = strings.ReplaceAll(b64Str, "-", "+")
-	// b64Str = strings.ReplaceAll(b64Str, "_", "/")
-	// addEq := len(b64Str) % 4
-	// b64Str += strings.Repeat("=", addEq)
+	b64Str = strings.ReplaceAll(b64Str, "-", "+")
+	b64Str = strings.ReplaceAll(b64Str, "_", "/")
+	addEq := len(b64Str) % 4
+	b64Str += strings.Repeat("=", addEq)
 
 	// bas64 decode the results
 	b64data, err := base64.StdEncoding.DecodeString(b64Str)
