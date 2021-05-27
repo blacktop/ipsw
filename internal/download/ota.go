@@ -221,9 +221,6 @@ func (o *Ota) GetOTAs(device string, doDownload, doNotDownload []string) []OtaAs
 	for _, o := range filteredOtas {
 		if len(o.SupportedDevices) == 1 && len(o.SupportedDeviceModels) == 1 {
 			deviceList[o.SupportedDevices[0]] = o.SupportedDeviceModels[0]
-		} else {
-			fmt.Println(o.SupportedDevices)
-			fmt.Println(o.SupportedDeviceModels)
 		}
 	}
 
