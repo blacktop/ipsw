@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -73,7 +72,7 @@ var otaDLCmd = &cobra.Command{
 
 		otaXML, err := download.NewOTA(proxy, insecure, public)
 		if err != nil {
-			return errors.Wrap(err, "failed to parse OTA plist")
+			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
 		}
 
 		var otas []download.OtaAsset
@@ -118,20 +117,20 @@ var otaDLCmd = &cobra.Command{
 						Insecure: insecure,
 					})
 					if err != nil {
-						return errors.Wrap(err, "failed to open remote zip to OTA")
+						return fmt.Errorf("failed to open remote zip to OTA: %v", err)
 					}
 					if remoteDyld {
 						log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
 						err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
 						if err != nil {
-							return errors.Wrap(err, "failed to download dyld_shared_cache from remote ota")
+							return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
 						}
 					}
 					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
 						err = kernelcache.RemoteParse(zr)
 						if err != nil {
-							return errors.Wrap(err, "failed to download kernelcache from remote ota")
+							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
 						}
 					}
 				}
@@ -151,7 +150,7 @@ var otaDLCmd = &cobra.Command{
 						downloader.DestName = destName
 						err = downloader.Do()
 						if err != nil {
-							return errors.Wrap(err, "failed to download file")
+							return fmt.Errorf("failed to download file: %v", err)
 						}
 					} else {
 						log.Warnf("ota already exists: %s", destName)
