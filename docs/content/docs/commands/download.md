@@ -192,16 +192,10 @@ $ ipsw download beta 17C5046a
 
 ## **download ota**
 
-Download **iOS14.x beta** OTA _(over the air updates)_
+Download **iOS14.x developer beta** OTA _(over the air updates)_
 
 ```bash
 $ ipsw download ota --device iPhone12,3
-```
-
-Download **iOS13.x beta** OTA _(over the air updates)_
-
-```bash
-$ ipsw download ota --ios13 --device iPhone12,3
 ```
 
 Just download the _kernelcache_ and _dyld_shared_cache_
