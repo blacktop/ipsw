@@ -465,13 +465,11 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 		}
 
 		data := make([]byte, itemLength)
-		_, err := r.Read(data)
-		if err != nil {
+		if _, err := r.Read(data); err != nil {
 			return nil, err
 		}
 
-		log.Debugf("[+] idx: %03d, offset: %#x, location: %#x, length: %#x\n", idx, baseAddr+8*uint32(roff), 8*roff, itemLength)
-		log.Debug(hex.Dump(data))
+		log.Debugf("[+] idx: %03d, offset: %#x, location: %#x, length: %#x\n\n%s", idx, baseAddr+8*uint32(roff), 8*roff, itemLength, hex.Dump(data))
 
 		sb.Regexes[roff] = data
 	}

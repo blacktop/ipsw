@@ -69,14 +69,16 @@ var deviceListCmd = &cobra.Command{
 		for _, device := range devices {
 			data = append(data, []string{
 				device.ProductType,
+				device.Target,
 				strings.Replace(device.ProductDescription, "generation", "gen", 1),
+				device.Platform,
 				device.DeviceTrait.PreferredArchitecture,
 				strconv.Itoa(device.DeviceTrait.DevicePerformanceMemoryClass),
 			})
 		}
 
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Product", "Description", "Architecture", "Memory(GB)"})
+		table.SetHeader([]string{"Product", "Model", "Description", "CPU", "Architecture", "Memory(GB)"})
 		table.AppendBulk(data)
 		table.SetAlignment(tablewriter.ALIGN_LEFT)
 		table.Render() // Send output
