@@ -36,6 +36,6 @@ require (
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210601080250-7ecdf8ef093b
+	golang.org/x/sys v0.0.0-20210603125802-9665404d3644
 	gopkg.in/ini.v1 v1.62.0 // indirect
 )
