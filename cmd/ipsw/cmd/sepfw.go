@@ -42,6 +42,7 @@ import (
 // NOTE: http://mista.nu/research/sep-paper.pdf
 // NOTE: https://gist.github.com/xerub/0161aacd7258d31c6a27584f90fa2e8c
 // NOTE: https://github.com/matteyeux/sepsplit/blob/master/sepsplit.c
+// NOTE: https://gist.github.com/bazad/fe4e76a0a3b761d9fde7e74654ac14e4
 
 const legionStr = "Built by legion2"
 const appListOffsetFromSEPOS32bit = 0xec8
@@ -266,9 +267,6 @@ var sepCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
 			}
-			if Verbose {
-				fmt.Println(m.FileTOC.LoadsString())
-			}
 			fname := fmt.Sprintf("%s_%s", "kernel", m.SourceVersion())
 			utils.Indent(log.WithFields(log.Fields{
 				"uuid":   hdr.KernelUUID,
@@ -277,14 +275,14 @@ var sepCmd = &cobra.Command{
 			if err := m.Export(fname, nil, 0); err != nil {
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
+			if Verbose {
+				fmt.Println(m.FileTOC.LoadsString())
+			}
 
 			// SEPOS
 			m, err = macho.NewFile(bytes.NewReader(dat[hdr.InitTextOffset:]))
 			if err != nil {
 				return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
-			}
-			if Verbose {
-				fmt.Println(m.FileTOC.LoadsString())
 			}
 			fname = fmt.Sprintf("%s_%s", strings.TrimSpace(string(hdr.InitName[:])), m.SourceVersion())
 			utils.Indent(log.WithFields(log.Fields{
@@ -294,16 +292,15 @@ var sepCmd = &cobra.Command{
 			if err := m.Export(fname, nil, 0); err != nil {
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
+			if Verbose {
+				fmt.Println(m.FileTOC.LoadsString())
+			}
 
 			// APPS
 			for _, app := range appList {
 				m, err := macho.NewFile(bytes.NewReader(dat[app.TextOffset:]))
 				if err != nil {
 					return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
-				}
-
-				if Verbose {
-					fmt.Println(m.FileTOC.LoadsString())
 				}
 
 				fname := fmt.Sprintf("%s_%s", strings.TrimSpace(string(app.Name[:])), m.SourceVersion())
@@ -313,6 +310,9 @@ var sepCmd = &cobra.Command{
 				}).Info, 2)(fmt.Sprintf("Dumping %s", strings.TrimSpace(string(app.Name[:]))))
 				if err := m.Export(fname, nil, 0); err != nil {
 					return fmt.Errorf("failed to write %s to disk: %v", fname, err)
+				}
+				if Verbose {
+					fmt.Println(m.FileTOC.LoadsString())
 				}
 			}
 

@@ -30,3 +30,5 @@ $ ipsw sepfw sep-firmware.d53p.RELEASE.im4p.dec
       • Dumping sse_r1            offset=0x528000-0x564000 uuid=B1096477-879C-3E41-9057-F486FE3EC0EB
 
 ```
+
+> **NOTE:** This was tested on an iPhone12,1 (A14) running iOS14.5beta7 _(most likely won't work on older versions)_
