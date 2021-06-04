@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <title>ent - ipsw</title>
+  <title>sepfw - ipsw</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   
   <link rel="icon" href="https://blacktop.github.io/ipsw/favicon.png">
@@ -162,7 +162,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/shsh/">shsh</a>
     </li>
     
-    <li class="">
+    <li class="active ">
       <a href="https://blacktop.github.io/ipsw/docs/commands/sepfw/">sepfw</a>
     </li>
     
@@ -174,7 +174,7 @@
       <a href="https://blacktop.github.io/ipsw/docs/commands/iboot/">iboot</a>
     </li>
     
-    <li class="active ">
+    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/ent/">ent</a>
     </li>
     
@@ -197,95 +197,29 @@
         </div>
         <div class="col-12 col-md-9">
           
-<h1 class="title">ent</h1>
+<h1 class="title">sepfw</h1>
 <div class="content ">
-  <p>Search IPSW filesystem DMG for MachOs with a given <strong>entitlement</strong> <code>&lt;true/&gt;</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --ent platform-application
-   • Found ipsw entitlement database file...
-   • Files containing entitlement: platform-application
+  <h3 id="dump-sep-firmware-machos">Dump sep-firmware MachOs</h3>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw sepfw sep-firmware.d53p.RELEASE.im4p.dec
 
-platform-application /System/Library/PrivateFrameworks/MobileAccessoryUpdater.framework/XPCServices/EAUpdaterService.xpc/EAUpdaterService
-platform-application /private/var/staged_system_apps/Home.app/Home
-platform-application /usr/libexec/morphunassetsupdaterd
-platform-application /System/Library/Frameworks/CryptoTokenKit.framework/PlugIns/setoken.appex/setoken
-platform-application /usr/libexec/swcd
-&lt;SNIP&gt;
-</code></pre></div><p>Search IPSW filesystem DMG for MachOs with a given <strong>file name</strong> and dump it&rsquo;s entitlements</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --file WebContent
-   • Found ipsw entitlement database file...
-   • /Applications/WebContentAnalysisUI.app/WebContentAnalysisUI
+   • DUMPING: kernel, SEPOS and <span class="m">14</span> Apps
+      • Dumping kernel            <span class="nv">offset</span><span class="o">=</span>0x4000 <span class="nv">uuid</span><span class="o">=</span>CECFDD94-2E4F-3118-9EC3-C3933F0DE2CA
+      • Dumping SEPOS             <span class="nv">offset</span><span class="o">=</span>0x564000 <span class="nv">uuid</span><span class="o">=</span>FF2C31BE-DED5-35DA-8619-BFF27234B26A
+      • Dumping SEPD              <span class="nv">offset</span><span class="o">=</span>0x2a4000-0x2b8000 <span class="nv">uuid</span><span class="o">=</span>75159F79-BA1A-3550-8016-1AC5FF7D9257
+      • Dumping AESSEP            <span class="nv">offset</span><span class="o">=</span>0x2b8000-0x2c4000 <span class="nv">uuid</span><span class="o">=</span>B0BC153A-B351-369F-9B36-A8455216114F
+      • Dumping dxio              <span class="nv">offset</span><span class="o">=</span>0x2c4000-0x2d0000 <span class="nv">uuid</span><span class="o">=</span>34C40942-4077-3C4F-9EF5-06FF1364CF0F
+      • Dumping entitlement       <span class="nv">offset</span><span class="o">=</span>0x2d0000-0x2e8000 <span class="nv">uuid</span><span class="o">=</span>AD029F43-02FA-340B-9ADA-3A179706518E
+      • Dumping skg               <span class="nv">offset</span><span class="o">=</span>0x2e8000-0x2f8000 <span class="nv">uuid</span><span class="o">=</span>49E2B275-9182-3459-87F3-F622EE4816DC
+      • Dumping sars              <span class="nv">offset</span><span class="o">=</span>0x2f8000-0x31c000 <span class="nv">uuid</span><span class="o">=</span>F61FA097-212F-363D-A82E-96EF73CAC6CD
+      • Dumping ARTM              <span class="nv">offset</span><span class="o">=</span>0x31c000-0x324000 <span class="nv">uuid</span><span class="o">=</span>62B3072F-52E4-32FF-8D4A-CF2FB15F9575
+      • Dumping xART              <span class="nv">offset</span><span class="o">=</span>0x324000-0x334000 <span class="nv">uuid</span><span class="o">=</span>8DE03D03-9EF0-31F1-93D0-F686C5CBB93C
+      • Dumping eispAppl_d5x      <span class="nv">offset</span><span class="o">=</span>0x334000-0x3cc000 <span class="nv">uuid</span><span class="o">=</span>519872B2-8A6F-34B6-AD82-2A120ED5C42B
+      • Dumping scrd              <span class="nv">offset</span><span class="o">=</span>0x3cc000-0x3e8000 <span class="nv">uuid</span><span class="o">=</span>4D033F31-23C4-3959-B002-836AF5776E83
+      • Dumping pass_ocelot       <span class="nv">offset</span><span class="o">=</span>0x3e8000-0x3f0000 <span class="nv">uuid</span><span class="o">=</span>0A91FBC3-EBC3-35BD-B7E3-005AE9E2D94B
+      • Dumping sks               <span class="nv">offset</span><span class="o">=</span>0x3f0000-0x494000 <span class="nv">uuid</span><span class="o">=</span>19673D6F-A2A5-3696-9007-DC8C6FC6DD79
+      • Dumping sprl_d5x          <span class="nv">offset</span><span class="o">=</span>0x494000-0x528000 <span class="nv">uuid</span><span class="o">=</span>BEA0B3EB-1BA3-38D5-83D0-B1B52E28A52B
+      • Dumping sse_r1            <span class="nv">offset</span><span class="o">=</span>0x528000-0x564000 <span class="nv">uuid</span><span class="o">=</span>B1096477-879C-3E41-9057-F486FE3EC0EB
 
-&lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">&#34;UTF-8&#34;</span>?&gt;
-&lt;!DOCTYPE plist PUBLIC <span class="s2">&#34;-//Apple//DTD PLIST 1.0//EN&#34;</span> <span class="s2">&#34;http://www.apple.com/DTDs/PropertyList-1.0.dtd&#34;</span>&gt;
-&lt;plist <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span>&gt;
-&lt;dict&gt;
-	&lt;key&gt;com.apple.UIKit.vends-view-services&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.screen-time&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.security.container-required&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.security.exception.shared-preference.read-only&lt;/key&gt;
-	&lt;array&gt;
-		&lt;string&gt;com.apple.springboard&lt;/string&gt;
-	&lt;/array&gt;
-	&lt;key&gt;keychain-access-groups&lt;/key&gt;
-	&lt;array&gt;
-		&lt;string&gt;apple&lt;/string&gt;
-		&lt;string&gt;com.apple.preferences&lt;/string&gt;
-	&lt;/array&gt;
-&lt;/dict&gt;
-&lt;/plist&gt;
-
-   • /System/Library/Frameworks/WebKit.framework/XPCServices/com.apple.WebKit.WebContent.xpc/com.apple.WebKit.WebContent
-
-&lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">&#34;UTF-8&#34;</span>?&gt;
-&lt;!DOCTYPE plist PUBLIC <span class="s2">&#34;-//Apple//DTD PLIST 1.0//EN&#34;</span> <span class="s2">&#34;http://www.apple.com/DTDs/PropertyList-1.0.dtd&#34;</span>&gt;
-&lt;plist <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span>&gt;
-&lt;dict&gt;
-	&lt;key&gt;com.apple.QuartzCore.secure-mode&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.QuartzCore.webkit-end-points&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.mediaremote.set-playback-state&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.pac.shared_region_id&lt;/key&gt;
-	&lt;string&gt;WebContent&lt;/string&gt;
-	&lt;key&gt;com.apple.private.allow-explicit-graphics-priority&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.coremedia.extensions.audiorecording.allow&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.coremedia.pidinheritance.allow&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.memorystatus&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.network.socket-delegate&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.pac.exception&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.security.message-filter&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.webinspector.allow-remote-inspection&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.webinspector.proxy-application&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.private.webkit.use-xpc-endpoint&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.runningboard.assertions.webkit&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;com.apple.tcc.delegated-services&lt;/key&gt;
-	&lt;array&gt;
-		&lt;string&gt;kTCCServiceCamera&lt;/string&gt;
-		&lt;string&gt;kTCCServiceMicrophone&lt;/string&gt;
-	&lt;/array&gt;
-	&lt;key&gt;dynamic-codesigning&lt;/key&gt;
-	&lt;true/&gt;
-	&lt;key&gt;seatbelt-profiles&lt;/key&gt;
-	&lt;array&gt;
-		&lt;string&gt;com.apple.WebKit.WebContent&lt;/string&gt;
-	&lt;/array&gt;
-&lt;/dict&gt;
-&lt;/plist&gt;
 </code></pre></div>
 </div>
 </div>
