@@ -33,6 +33,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -46,28 +47,95 @@ const legionStr = "Built by legion2"
 const appListOffsetFromSEPOS32bit = 0xec8
 
 type sepHeader64 struct {
-	KernelUUID         types.UUID
-	Unknown0           uint64
-	KernelBasePaddr    uint64
-	KernelMaxPaddr     uint64
-	AppImagesBasePaddr uint64
-	AppImagesMaxPaddr  uint64
-	PaddrMax           uint64 // size of SEP firmware image
-	Unknown1           uint64
-	Unknown2           uint64
-	Unknown3           uint64
-	InitBasePaddr      uint64
-	InitVaddr          uint64
-	InitSize           uint64
-	InitEntry          uint64
-	Unknown7           uint64
-	Unknown8           uint64
-	Unknown9           uint64
-	InitName           [16]byte
-	InitUUID           types.UUID
-	Unknown10          uint64
-	Unknown11          uint64
-	NumApps            uint64
+	KernelUUID       types.UUID
+	Unknown0         uint64
+	KernelTextOffset uint64
+	KernelDataOffset uint64
+	StartOfText      uint64
+	StartOfData      uint64
+	SepFwSize        uint64 // size of SEP firmware image
+	Unknown1         uint64
+	Unknown2         uint64
+	Unknown3         uint64
+	Unknown4         uint64
+	IsZero1          uint64
+	IsZero2          uint64
+	InitTextOffset   uint64
+	InitTextVaddr    uint64
+	InitVMSize       uint64
+	InitEntry        uint64
+	IsZero3          uint64
+	IsZero4          uint64
+	Unknown5         uint64
+	Unknown6         uint64
+	IsZero5          uint64
+	IsZero6          uint64
+	InitName         [16]byte
+	InitUUID         types.UUID
+	SourceVersion    types.SrcVersion
+	Unknown7         uint64
+	NumApps          uint64
+}
+
+func (h sepHeader64) String() string {
+	return fmt.Sprintf(
+		"KernelUUID       : %s\n"+
+			"Unknown0         : %#x\n"+
+			"KernelTextOffset : %#x\n"+
+			"KernelDataOffset   : %#x\n"+
+			"StartOfText      : %#x\n"+
+			"StartOfData      : %#x\n"+
+			"SepFwSize        : %#x\n"+
+			"Unknown1         : %#x\n"+
+			"Unknown2         : %#x\n"+
+			"Unknown3         : %#x\n"+
+			"Unknown4         : %#x\n"+
+			"IsZero1          : %#x\n"+
+			"IsZero2          : %#x\n"+
+			"InitTextOffset   : %#x\n"+
+			"InitTextVaddr    : %#x\n"+
+			"InitVMSize       : %#x\n"+
+			"InitEntry        : %#x\n"+
+			"IsZero3          : %#x\n"+
+			"IsZero4          : %#x\n"+
+			"Unknown5         : %#x\n"+
+			"Unknown6         : %#x\n"+
+			"IsZero5          : %#x\n"+
+			"IsZero6          : %#x\n"+
+			"InitName         : %s\n"+
+			"InitUUID         : %s\n"+
+			"SourceVersion    : %s\n"+
+			"Unknown7         : %#x\n"+
+			"NumApps          : %d",
+		h.KernelUUID,
+		h.Unknown0,
+		h.KernelTextOffset,
+		h.KernelDataOffset,
+		h.StartOfText,
+		h.StartOfData,
+		h.SepFwSize,
+		h.Unknown1,
+		h.Unknown2,
+		h.Unknown3,
+		h.Unknown4,
+		h.IsZero1,
+		h.IsZero2,
+		h.InitTextOffset,
+		h.InitTextVaddr,
+		h.InitVMSize,
+		h.InitEntry,
+		h.IsZero3,
+		h.IsZero4,
+		h.Unknown5,
+		h.Unknown6,
+		h.IsZero5,
+		h.IsZero6,
+		strings.TrimSpace(string(h.InitName[:])),
+		h.InitUUID,
+		h.SourceVersion,
+		h.Unknown7,
+		h.NumApps,
+	)
 }
 
 type application struct {
@@ -79,30 +147,51 @@ type application struct {
 	VMBase     uint32
 	Unknown1   uint32
 
-	Unknown2 uint32
-	Magic    uint64
-	Name     [12]byte
-	UUID     types.UUID
-
-	Version  uint32
-	Unknown3 uint32
+	Unknown2      uint32
+	Magic         uint64
+	Name          [12]byte
+	UUID          types.UUID
+	SourceVersion types.SrcVersion
 }
 
 type application64 struct {
-	PhysText uint64
-	SizeText uint64
-	PhysData uint64
-	SizeData uint64
-	Virt     uint64
-	Entry    uint64
-	Unknown1 uint64
-	Unknown2 uint64
-	Unknown3 uint64
-	MinusOne uint32
-	Unknown4 uint32
-	Name     [16]byte
-	UUID     types.UUID
-	Unknown5 uint64
+	TextOffset    uint64
+	TextSize      uint64
+	DataOffset    uint64
+	DataSize      uint64
+	VMBase        uint64
+	Entry         uint64
+	PageSize      uint64
+	Unknown       uint64
+	IsZero1       uint64
+	IsZero2       uint64
+	Magic         uint64
+	Name          [16]byte
+	UUID          types.UUID
+	SourceVersion types.SrcVersion
+}
+
+func (a application64) String() string {
+	return fmt.Sprintf(
+		"Name:          %s\n"+
+			"UUID:          %s\n"+
+			"Version:       %s\n"+
+			"Text:          %#x -> %#x\n"+
+			"Data:          %#x -> %#x\n"+
+			"VMBase:        %#x\n"+
+			"Entry:         %#x\n"+
+			"PageSize:      %#x\n"+
+			"Unknown:       %#x",
+		strings.TrimSpace(string(a.Name[:])),
+		a.UUID,
+		a.SourceVersion,
+		a.TextOffset, a.TextOffset+a.TextSize,
+		a.DataOffset, a.DataOffset+a.DataSize,
+		a.VMBase,
+		a.Entry,
+		a.PageSize,
+		a.Unknown,
+	)
 }
 
 func init() {
@@ -111,10 +200,10 @@ func init() {
 
 // sepCmd represents the sep command
 var sepCmd = &cobra.Command{
-	Use:    "sep <SEP_BIN>",
-	Short:  "🚧 [WIP] Dump MachOs 🚧",
-	Args:   cobra.MinimumNArgs(1),
-	Hidden: true,
+	Use:   "sepfw <SEP_FIRMWARE>",
+	Short: "🚧 [WIP] Dump MachOs 🚧",
+	Args:  cobra.MinimumNArgs(1),
+	// Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -149,6 +238,7 @@ var sepCmd = &cobra.Command{
 
 		// 64-bit SEP
 		if hdrPtr > 0 {
+
 			r.Seek(int64(hdrPtr), io.SeekStart)
 
 			var hdr sepHeader64
@@ -157,59 +247,75 @@ var sepCmd = &cobra.Command{
 				return errors.Wrapf(err, "failed to read sep-firmware 64bit header")
 			}
 
+			log.Debugf("Header:\n\n%s\n", hdr)
+
 			appList := make([]application64, hdr.NumApps)
 			err = binary.Read(r, binary.LittleEndian, &appList)
 			if err != nil {
 				return errors.Wrapf(err, "failed to read app-list")
 			}
-			log.WithFields(log.Fields{
-				"uuid":  hdr.KernelUUID,
-				"start": fmt.Sprintf("0x%x", hdr.KernelBasePaddr),
-				"size":  fmt.Sprintf("0x%x", hdr.KernelMaxPaddr),
-			}).Info("kernel")
-			if Verbose {
-				m, err := macho.NewFile(bytes.NewReader(dat[hdr.KernelBasePaddr:]))
-				if err != nil {
-					return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
-				}
-				fmt.Println(m.FileTOC.LoadsString())
-			}
-			log.WithFields(log.Fields{
-				"uuid":  hdr.InitUUID,
-				"start": fmt.Sprintf("0x%x", hdr.InitBasePaddr),
-				"size":  fmt.Sprintf("0x%x", hdr.PaddrMax),
-			}).Info(strings.TrimSpace(string(hdr.InitName[:])))
-			if Verbose {
-				m, err := macho.NewFile(bytes.NewReader(dat[hdr.InitBasePaddr:]))
-				if err != nil {
-					return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
-				}
-				fmt.Println(m.FileTOC.LoadsString())
-			}
 
 			for _, app := range appList {
-				log.WithFields(log.Fields{
-					"uuid":  app.UUID,
-					"start": fmt.Sprintf("0x%x", app.PhysText),
-					"size":  fmt.Sprintf("0x%x", app.SizeText),
-				}).Info(strings.TrimSpace(string(app.Name[:])))
-				// fmt.Printf("name: %sUUID: %s, start: 0x%x(%d)\tsize: 0x%x(%d)\n", app.Name, app.UUID, app.PhysText, app.PhysText, app.SizeText, app.SizeText)
-				// m, err := macho.NewFile(bytes.NewReader(dat[app.PhysText:app.PhysText+app.SizeText]), types.LC_SEGMENT_64, types.LC_UUID, types.LC_SOURCE_VERSION)
+				log.Debugf("App:\n\n%s\n", app)
+			}
+
+			log.Infof("DUMPING: kernel, SEPOS and %d Apps", hdr.NumApps)
+
+			// KERNEL
+			m, err := macho.NewFile(bytes.NewReader(dat[hdr.KernelTextOffset:]))
+			if err != nil {
+				return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
+			}
+			if Verbose {
+				fmt.Println(m.FileTOC.LoadsString())
+			}
+			fname := fmt.Sprintf("%s_%s", "kernel", m.SourceVersion())
+			utils.Indent(log.WithFields(log.Fields{
+				"uuid":   hdr.KernelUUID,
+				"offset": fmt.Sprintf("%#x", hdr.KernelTextOffset),
+			}).Info, 2)("Dumping kernel")
+			if err := m.Export(fname, nil, 0); err != nil {
+				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
+			}
+
+			// SEPOS
+			m, err = macho.NewFile(bytes.NewReader(dat[hdr.InitTextOffset:]))
+			if err != nil {
+				return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
+			}
+			if Verbose {
+				fmt.Println(m.FileTOC.LoadsString())
+			}
+			fname = fmt.Sprintf("%s_%s", strings.TrimSpace(string(hdr.InitName[:])), m.SourceVersion())
+			utils.Indent(log.WithFields(log.Fields{
+				"uuid":   hdr.InitUUID,
+				"offset": fmt.Sprintf("%#x", hdr.InitTextOffset),
+			}).Info, 2)(fmt.Sprintf("Dumping %s", strings.TrimSpace(string(hdr.InitName[:]))))
+			if err := m.Export(fname, nil, 0); err != nil {
+				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
+			}
+
+			// APPS
+			for _, app := range appList {
+				m, err := macho.NewFile(bytes.NewReader(dat[app.TextOffset:]))
+				if err != nil {
+					return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
+				}
+
 				if Verbose {
-					m, err := macho.NewFile(bytes.NewReader(dat[app.PhysText:]))
-					if err != nil {
-						return errors.Wrapf(err, "failed to create MachO from embedded sep file data")
-					}
 					fmt.Println(m.FileTOC.LoadsString())
+				}
+
+				fname := fmt.Sprintf("%s_%s", strings.TrimSpace(string(app.Name[:])), m.SourceVersion())
+				utils.Indent(log.WithFields(log.Fields{
+					"uuid":   app.UUID,
+					"offset": fmt.Sprintf("%#x-%#x", app.TextOffset, app.TextOffset+app.TextSize),
+				}).Info, 2)(fmt.Sprintf("Dumping %s", strings.TrimSpace(string(app.Name[:]))))
+				if err := m.Export(fname, nil, 0); err != nil {
+					return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 				}
 			}
 
-			// 	fname := fmt.Sprintf("sepdump_%s_%s", macho.Name, m.SourceVersion())
-			// 	utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", fname))
-			// 	ioutil.WriteFile(fname, outDat, 0644)
-			// 	if err != nil {
-			// 		return errors.Wrapf(err, "unabled to write file: %s", fname)
-			// 	}
 			return nil
 		}
 
