@@ -143,6 +143,15 @@
     </item>
     
     <item>
+      <title>sepfw</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/sepfw/</link>
+      <pubDate>Thu, 03 Jun 2021 23:14:17 -0600</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/sepfw/</guid>
+      <description>Dump sep-firmware MachOs.</description>
+    </item>
+    
+    <item>
       <title>img4</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/img4/</link>
       <pubDate>Mon, 30 Mar 2020 17:48:08 -0400</pubDate>
