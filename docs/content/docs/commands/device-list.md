@@ -10,150 +10,161 @@ summary: List all iOS devices.
 
 ```bash
 ❯ ipsw device-list
-
-+---------------+--------------------------------+--------------+------------+
-|    PRODUCT    |          DESCRIPTION           | ARCHITECTURE | MEMORY(GB) |
-+---------------+--------------------------------+--------------+------------+
-| AppleTV3,1    | AppleTV                        | armv7        | 0          |
-| AppleTV3,2    | AppleTV                        | armv7        | 0          |
-| AppleTV5,3    | Apple TV                       | arm64        | 2          |
-| AppleTV6,2    | Apple TV 4K                    | arm64        | 4          |
-| MacFamily20,1 | Mac                            | arm64e       | 16         |
-| Watch1,1      | Apple Watch (1st gen) 38mm     | armv7k       | 0          |
-| Watch1,2      | Apple Watch (1st gen) 42mm     | armv7k       | 0          |
-| Watch2,3      | Apple Watch Series 2 38mm      | armv7k       | 0          |
-| Watch2,4      | Apple Watch Series 2 42mm      | armv7k       | 0          |
-| Watch2,6      | Apple Watch Series 1 38mm      | armv7k       | 0          |
-| Watch2,7      | Apple Watch Series 1 42mm      | armv7k       | 0          |
-| Watch3,1      | Apple Watch Series 3 (GPS +    | armv7k       | 0          |
-|               | Cellular) 38mm                 |              |            |
-| Watch3,2      | Apple Watch Series 3 (GPS +    | armv7k       | 0          |
-|               | Cellular) 42mm                 |              |            |
-| Watch3,3      | Apple Watch Series 3 (GPS)     | armv7k       | 0          |
-|               | 38mm                           |              |            |
-| Watch3,4      | Apple Watch Series 3 (GPS)     | armv7k       | 0          |
-|               | 42mm                           |              |            |
-| Watch4,1      | Apple Watch Series 4           | arm64e       | 1          |
-| Watch4,2      | Apple Watch Series 4           | arm64e       | 1          |
-| Watch4,3      | Apple Watch Series 4           | arm64e       | 1          |
-| Watch4,4      | Apple Watch Series 4           | arm64e       | 1          |
-| Watch5,1      | Apple Watch Series 5           | arm64e       | 1          |
-| Watch5,10     | Apple Watch SE (GPS)           | arm64e       | 1          |
-| Watch5,11     | Apple Watch SE (GPS +          | arm64e       | 1          |
-|               | Cellular)                      |              |            |
-| Watch5,12     | Apple Watch SE (GPS +          | arm64e       | 1          |
-|               | Cellular)                      |              |            |
-| Watch5,2      | Apple Watch Series 5           | arm64e       | 1          |
-| Watch5,3      | Apple Watch Series 5           | arm64e       | 1          |
-| Watch5,4      | Apple Watch Series 5           | arm64e       | 1          |
-| Watch5,9      | Apple Watch SE (GPS)           | arm64e       | 1          |
-| Watch6,1      | Apple Watch Series 6 (GPS)     | arm64e       | 15         |
-| Watch6,2      | Apple Watch Series 6 (GPS)     | arm64e       | 15         |
-| Watch6,3      | Apple Watch Series 6 (GPS +    | arm64e       | 15         |
-|               | Cellular)                      |              |            |
-| Watch6,4      | Apple Watch Series 6 (GPS +    | arm64e       | 15         |
-|               | Cellular)                      |              |            |
-| iPad11,1      | iPad mini (5th gen)            | arm64e       | 4          |
-| iPad11,2      | iPad mini (5th gen)            | arm64e       | 4          |
-| iPad11,3      | iPad Air (3rd gen)             | arm64e       | 4          |
-| iPad11,4      | iPad Air (3rd gen)             | arm64e       | 4          |
-| iPad11,6      | iPad (8th gen)                 | arm64e       | 4          |
-| iPad11,7      | iPad (8th gen)                 | arm64e       | 4          |
-| iPad13,1      | iPad Air (4th gen)             | arm64e       | 3          |
-| iPad13,2      | iPad Air (4th gen)             | arm64e       | 3          |
-| iPad2,1       | iPad 2                         | armv7        | 0          |
-| iPad2,2       | iPad 2                         | armv7        | 0          |
-| iPad2,3       | iPad 2                         | armv7        | 0          |
-| iPad2,4       | iPad 2                         | armv7        | 0          |
-| iPad2,5       | iPad mini                      | armv7        | 0          |
-| iPad2,6       | iPad mini                      | armv7        | 0          |
-| iPad2,7       | iPad mini                      | armv7        | 0          |
-| iPad3,1       | iPad (3rd gen)                 | armv7        | 1          |
-| iPad3,2       | iPad (3rd gen)                 | armv7        | 1          |
-| iPad3,3       | iPad (3rd gen)                 | armv7        | 1          |
-| iPad3,4       | iPad (4th gen)                 | armv7s       | 1          |
-| iPad3,5       | iPad (4th gen)                 | armv7s       | 1          |
-| iPad3,6       | iPad (4th gen)                 | armv7s       | 1          |
-| iPad4,1       | iPad Air                       | arm64        | 1          |
-| iPad4,2       | iPad Air                       | arm64        | 1          |
-| iPad4,3       | iPad Air                       | arm64        | 1          |
-| iPad4,4       | iPad mini 2                    | arm64        | 1          |
-| iPad4,5       | iPad mini 2                    | arm64        | 1          |
-| iPad4,6       | iPad mini 2                    | arm64        | 1          |
-| iPad4,7       | iPad mini 3                    | arm64        | 1          |
-| iPad4,8       | iPad mini 3                    | arm64        | 1          |
-| iPad4,9       | iPad mini 3                    | arm64        | 1          |
-| iPad5,1       | iPad mini 4                    | arm64        | 2          |
-| iPad5,2       | iPad mini 4                    | arm64        | 2          |
-| iPad5,3       | iPad Air 2                     | arm64        | 2          |
-| iPad5,4       | iPad Air 2                     | arm64        | 2          |
-| iPad6,11      | iPad (5th gen)                 | arm64        | 2          |
-| iPad6,11      | iPad (5th gen)                 | arm64        | 2          |
-| iPad6,12      | iPad (5th gen)                 | arm64        | 2          |
-| iPad6,12      | iPad (5th gen)                 | arm64        | 2          |
-| iPad6,3       | iPad Pro (9.7-inch)            | arm64        | 2          |
-| iPad6,4       | iPad Pro (9.7-inch)            | arm64        | 2          |
-| iPad6,7       | iPad Pro (12.9-inch)           | arm64        | 3          |
-| iPad6,8       | iPad Pro (12.9-inch)           | arm64        | 3          |
-| iPad7,1       | iPad Pro (12.9-inch) (2nd gen) | arm64        | 3          |
-| iPad7,11      | iPad (7th gen)                 | arm64        | 4          |
-| iPad7,12      | iPad (7th gen)                 | arm64        | 4          |
-| iPad7,2       | iPad Pro (12.9-inch) (2nd gen) | arm64        | 3          |
-| iPad7,3       | iPad Pro (10.5-inch)           | arm64        | 3          |
-| iPad7,4       | iPad Pro (10.5-inch)           | arm64        | 3          |
-| iPad7,5       | iPad (6th gen)                 | arm64        | 2          |
-| iPad7,6       | iPad (6th gen)                 | arm64        | 2          |
-| iPad8,1       | iPad Pro (11-inch)             | arm64e       | 3          |
-| iPad8,10      | iPad Pro (11-inch) (2nd gen)   | arm64e       | 6          |
-| iPad8,11      | iPad Pro (12.9-inch) (4th gen) | arm64e       | 6          |
-| iPad8,12      | iPad Pro (12.9-inch) (4th gen) | arm64e       | 6          |
-| iPad8,2       | iPad Pro (11-inch)             | arm64e       | 6          |
-| iPad8,3       | iPad Pro (11-inch)             | arm64e       | 3          |
-| iPad8,4       | iPad Pro (11-inch)             | arm64e       | 6          |
-| iPad8,5       | iPad Pro (12.9-inch) (3rd gen) | arm64e       | 3          |
-| iPad8,6       | iPad Pro (12.9-inch) (3rd gen) | arm64e       | 6          |
-| iPad8,7       | iPad Pro (12.9-inch) (3rd gen) | arm64e       | 3          |
-| iPad8,8       | iPad Pro (12.9-inch) (3rd gen) | arm64e       | 6          |
-| iPad8,9       | iPad Pro (11-inch) (2nd gen)   | arm64e       | 6          |
-| iPhone10,1    | iPhone 8                       | arm64        | 2          |
-| iPhone10,2    | iPhone 8 Plus                  | arm64        | 4          |
-| iPhone10,3    | iPhone X                       | arm64        | 4          |
-| iPhone10,4    | iPhone 8                       | arm64        | 2          |
-| iPhone10,5    | iPhone 8 Plus                  | arm64        | 4          |
-| iPhone10,6    | iPhone X                       | arm64        | 4          |
-| iPhone11,2    | iPhone XS                      | arm64e       | 3          |
-| iPhone11,4    | iPhone XS Max                  | arm64e       | 3          |
-| iPhone11,6    | iPhone XS Max                  | arm64e       | 3          |
-| iPhone11,8    | iPhone XR                      | arm64e       | 4          |
-| iPhone12,1    | iPhone 11                      | arm64e       | 3          |
-| iPhone12,3    | iPhone 11 Pro                  | arm64e       | 3          |
-| iPhone12,5    | iPhone 11 Pro Max              | arm64e       | 3          |
-| iPhone12,8    | iPhone SE (2nd gen)            | arm64e       | 4          |
-| iPhone13,1    | iPhone 12 mini                 | arm64e       | 3          |
-| iPhone13,2    | iPhone 12                      | arm64e       | 3          |
-| iPhone13,3    | iPhone 12 Pro                  | arm64e       | 6          |
-| iPhone13,4    | iPhone 12 Pro Max              | arm64e       | 6          |
-| iPhone4,1     | iPhone 4S                      | armv7        | 0          |
-| iPhone5,1     | iPhone 5                       | armv7s       | 1          |
-| iPhone5,2     | iPhone 5                       | armv7s       | 1          |
-| iPhone5,3     | iPhone 5c                      | armv7s       | 1          |
-| iPhone5,4     | iPhone 5c                      | armv7s       | 1          |
-| iPhone6,1     | iPhone 5s                      | arm64        | 1          |
-| iPhone6,2     | iPhone 5s                      | arm64        | 1          |
-| iPhone7,1     | iPhone 6 Plus                  | arm64        | 1          |
-| iPhone7,2     | iPhone 6                       | arm64        | 1          |
-| iPhone8,1     | iPhone 6s                      | arm64        | 2          |
-| iPhone8,1     | iPhone 6s                      | arm64        | 2          |
-| iPhone8,2     | iPhone 6s Plus                 | arm64        | 2          |
-| iPhone8,2     | iPhone 6s Plus                 | arm64        | 2          |
-| iPhone8,4     | iPhone SE (1st gen)            | arm64        | 2          |
-| iPhone8,4     | iPhone SE (1st gen)            | arm64        | 2          |
-| iPhone9,1     | iPhone 7                       | arm64        | 2          |
-| iPhone9,2     | iPhone 7 Plus                  | arm64        | 4          |
-| iPhone9,3     | iPhone 7                       | arm64        | 2          |
-| iPhone9,4     | iPhone 7 Plus                  | arm64        | 4          |
-| iPod5,1       | iPod touch                     | armv7        | 0          |
-| iPod7,1       | iPod touch (6th gen)           | arm64        | 1          |
-| iPod9,1       | iPod touch (7th gen)           | arm64        | 2          |
-+---------------+--------------------------------+--------------+------------+
 ```
+
+| PRODUCT        | MODEL   | DESCRIPTION                                | CPU      | ARCH   | MEM(GB) |
+| -------------- | ------- | ------------------------------------------ | -------- | ------ | ------- |
+| ADP3,1         | j273ap  | J273                                       | t8027    | arm64e | 6       |
+| ADP3,2         | j273aap | Developer Transition Kit                   | t8027    | arm64e | 16      |
+| AppleTV11,1    | j305ap  | Apple TV 4K (2nd gen)                      | t8020    | arm64e | 4       |
+| AppleTV3,1     | j33ap   | AppleTV                                    | s5l8942x | armv7  | 0       |
+| AppleTV3,2     | j33iap  | AppleTV                                    | s5l8947x | armv7  | 0       |
+| AppleTV5,3     | j42dap  | Apple TV                                   | t7000    | arm64  | 2       |
+| AppleTV6,2     | j105aap | Apple TV 4K                                | t8011    | arm64  | 4       |
+| MacBookAir10,1 | j313ap  | MacBook Air (M1, 2020)                     | t8103    | arm64e | 16      |
+| MacBookPro17,1 | j293ap  | MacBook Pro (13-inch, M1, 2020)            | t8103    | arm64e | 16      |
+| MacFamily20,1  | j129aap | Mac                                        | t8103    | arm64e | 16      |
+| Macmini9,1     | j274ap  | Mac mini (M1, 2020)                        | t8103    | arm64e | 16      |
+| Watch1,1       | n27aap  | Apple Watch (1st gen) 38mm                 | s7002    | armv7k | 0       |
+| Watch1,2       | n28aap  | Apple Watch (1st gen) 42mm                 | s7002    | armv7k | 0       |
+| Watch2,3       | n74ap   | Apple Watch Series 2 38mm                  | t8002    | armv7k | 0       |
+| Watch2,4       | n75ap   | Apple Watch Series 2 42mm                  | t8002    | armv7k | 0       |
+| Watch2,6       | n27dap  | Apple Watch Series 1 38mm                  | t8002    | armv7k | 0       |
+| Watch2,7       | n28dap  | Apple Watch Series 1 42mm                  | t8002    | armv7k | 0       |
+| Watch3,1       | n111sap | Apple Watch Series 3 (GPS + Cellular) 38mm | t8004    | armv7k | 0       |
+| Watch3,2       | n111bap | Apple Watch Series 3 (GPS + Cellular) 42mm | t8004    | armv7k | 0       |
+| Watch3,3       | n121sap | Apple Watch Series 3 (GPS) 38mm            | t8004    | armv7k | 0       |
+| Watch3,4       | n121bap | Apple Watch Series 3 (GPS) 42mm            | t8004    | armv7k | 0       |
+| Watch4,1       | n131sap | Apple Watch Series 4                       | t8006    | arm64e | 1       |
+| Watch4,2       | n131bap | Apple Watch Series 4                       | t8006    | arm64e | 1       |
+| Watch4,3       | n141sap | Apple Watch Series 4                       | t8006    | arm64e | 1       |
+| Watch4,4       | n141bap | Apple Watch Series 4                       | t8006    | arm64e | 1       |
+| Watch5,1       | n144sap | Apple Watch Series 5                       | t8006    | arm64e | 1       |
+| Watch5,10      | n140bap | Apple Watch SE (GPS)                       | t8006    | arm64e | 1       |
+| Watch5,11      | n142sap | Apple Watch SE (GPS + Cellular)            | t8006    | arm64e | 1       |
+| Watch5,12      | n142bap | Apple Watch SE (GPS + Cellular)            | t8006    | arm64e | 1       |
+| Watch5,2       | n144bap | Apple Watch Series 5                       | t8006    | arm64e | 1       |
+| Watch5,3       | n146sap | Apple Watch Series 5                       | t8006    | arm64e | 1       |
+| Watch5,4       | n146bap | Apple Watch Series 5                       | t8006    | arm64e | 1       |
+| Watch5,9       | n140sap | Apple Watch SE (GPS)                       | t8006    | arm64e | 1       |
+| Watch6,1       | n157sap | Apple Watch Series 6 (GPS)                 | t8301    | arm64e | 15      |
+| Watch6,2       | n157bap | Apple Watch Series 6 (GPS)                 | t8301    | arm64e | 15      |
+| Watch6,3       | n158sap | Apple Watch Series 6 (GPS + Cellular)      | t8301    | arm64e | 15      |
+| Watch6,4       | n158bap | Apple Watch Series 6 (GPS + Cellular)      | t8301    | arm64e | 15      |
+| iMac21,2       | j457ap  | iMac (24-inch, M1, 2021)                   | t8103    | arm64e | 16      |
+| iPad11,1       | j210ap  | iPad mini (5th gen)                        | t8020    | arm64e | 4       |
+| iPad11,2       | j211ap  | iPad mini (5th gen)                        | t8020    | arm64e | 4       |
+| iPad11,3       | j217ap  | iPad Air (3rd gen)                         | t8020    | arm64e | 4       |
+| iPad11,4       | j218ap  | iPad Air (3rd gen)                         | t8020    | arm64e | 4       |
+| iPad11,6       | j171aap | iPad (8th gen)                             | t8020    | arm64e | 4       |
+| iPad11,7       | j172aap | iPad (8th gen)                             | t8020    | arm64e | 4       |
+| iPad13,1       | j307ap  | iPad Air (4th gen)                         | t8101    | arm64e | 3       |
+| iPad13,10      | j523ap  | iPad Pro (12.9-inch) (5th gen)             | t8103    | arm64e | 8       |
+| iPad13,11      | j523xap | iPad Pro (12.9-inch) (5th gen)             | t8103    | arm64e | 16      |
+| iPad13,2       | j308ap  | iPad Air (4th gen)                         | t8101    | arm64e | 3       |
+| iPad13,4       | j517ap  | iPad Pro (11-inch) (3rd gen)               | t8103    | arm64e | 8       |
+| iPad13,5       | j517xap | iPad Pro (11-inch) (3rd gen)               | t8103    | arm64e | 16      |
+| iPad13,6       | j518ap  | iPad Pro (11-inch) (3rd gen)               | t8103    | arm64e | 8       |
+| iPad13,7       | j518xap | iPad Pro (11-inch) (3rd gen)               | t8103    | arm64e | 16      |
+| iPad13,8       | j522ap  | iPad Pro (12.9-inch) (5th gen)             | t8103    | arm64e | 8       |
+| iPad13,9       | j522xap | iPad Pro (12.9-inch) (5th gen)             | t8103    | arm64e | 16      |
+| iPad2,1        | k93ap   | iPad 2                                     | s5l8940x | armv7  | 0       |
+| iPad2,2        | k94ap   | iPad 2                                     | s5l8940x | armv7  | 0       |
+| iPad2,3        | k95ap   | iPad 2                                     | s5l8940x | armv7  | 0       |
+| iPad2,4        | k93aap  | iPad 2                                     | s5l8942x | armv7  | 0       |
+| iPad2,5        | p105ap  | iPad mini                                  | s5l8942x | armv7  | 0       |
+| iPad2,6        | p106ap  | iPad mini                                  | s5l8942x | armv7  | 0       |
+| iPad2,7        | p107ap  | iPad mini                                  | s5l8942x | armv7  | 0       |
+| iPad3,1        | j1ap    | iPad (3rd gen)                             | s5l8945x | armv7  | 1       |
+| iPad3,2        | j2ap    | iPad (3rd gen)                             | s5l8945x | armv7  | 1       |
+| iPad3,3        | j2aap   | iPad (3rd gen)                             | s5l8945x | armv7  | 1       |
+| iPad3,4        | p101ap  | iPad (4th gen)                             | s5l8955x | armv7s | 1       |
+| iPad3,5        | p102ap  | iPad (4th gen)                             | s5l8955x | armv7s | 1       |
+| iPad3,6        | p103ap  | iPad (4th gen)                             | s5l8955x | armv7s | 1       |
+| iPad4,1        | j71ap   | iPad Air                                   | s5l8960x | arm64  | 1       |
+| iPad4,2        | j72ap   | iPad Air                                   | s5l8960x | arm64  | 1       |
+| iPad4,3        | j73ap   | iPad Air                                   | s5l8960x | arm64  | 1       |
+| iPad4,4        | j85ap   | iPad mini 2                                | s5l8960x | arm64  | 1       |
+| iPad4,5        | j86ap   | iPad mini 2                                | s5l8960x | arm64  | 1       |
+| iPad4,6        | j87ap   | iPad mini 2                                | s5l8960x | arm64  | 1       |
+| iPad4,7        | j85map  | iPad mini 3                                | s5l8960x | arm64  | 1       |
+| iPad4,8        | j86map  | iPad mini 3                                | s5l8960x | arm64  | 1       |
+| iPad4,9        | j87map  | iPad mini 3                                | s5l8960x | arm64  | 1       |
+| iPad5,1        | j96ap   | iPad mini 4                                | t7000    | arm64  | 2       |
+| iPad5,2        | j97ap   | iPad mini 4                                | t7000    | arm64  | 2       |
+| iPad5,3        | j81ap   | iPad Air 2                                 | t7001    | arm64  | 2       |
+| iPad5,4        | j82ap   | iPad Air 2                                 | t7001    | arm64  | 2       |
+| iPad6,11       | j71sap  | iPad (5th gen)                             | s8000    | arm64  | 2       |
+| iPad6,11       | j71tap  | iPad (5th gen)                             | s8003    | arm64  | 2       |
+| iPad6,12       | j72sap  | iPad (5th gen)                             | s8000    | arm64  | 2       |
+| iPad6,12       | j72tap  | iPad (5th gen)                             | s8003    | arm64  | 2       |
+| iPad6,3        | j127ap  | iPad Pro (9.7-inch)                        | s8001    | arm64  | 2       |
+| iPad6,4        | j128ap  | iPad Pro (9.7-inch)                        | s8001    | arm64  | 2       |
+| iPad6,7        | j98aap  | iPad Pro (12.9-inch)                       | s8001    | arm64  | 3       |
+| iPad6,8        | j99aap  | iPad Pro (12.9-inch)                       | s8001    | arm64  | 3       |
+| iPad7,1        | j120ap  | iPad Pro (12.9-inch) (2nd gen)             | t8011    | arm64  | 3       |
+| iPad7,10       | t368ap  | iPad Pro XXX (T368)                        | t8011    | arm64  | 3       |
+| iPad7,11       | j171ap  | iPad (7th gen)                             | t8010    | arm64  | 4       |
+| iPad7,12       | j172ap  | iPad (7th gen)                             | t8010    | arm64  | 4       |
+| iPad7,2        | j121ap  | iPad Pro (12.9-inch) (2nd gen)             | t8011    | arm64  | 3       |
+| iPad7,3        | j207ap  | iPad Pro (10.5-inch)                       | t8011    | arm64  | 3       |
+| iPad7,4        | j208ap  | iPad Pro (10.5-inch)                       | t8011    | arm64  | 3       |
+| iPad7,5        | j71bap  | iPad (6th gen)                             | t8010    | arm64  | 2       |
+| iPad7,6        | j72bap  | iPad (6th gen)                             | t8010    | arm64  | 2       |
+| iPad7,7        | t365ap  | iPad Pro XXX (T365)                        | t8011    | arm64  | 3       |
+| iPad7,8        | t366ap  | iPad Pro XXX (T366)                        | t8011    | arm64  | 3       |
+| iPad7,9        | t367ap  | iPad Pro XXX (T367)                        | t8011    | arm64  | 3       |
+| iPad8,1        | j317ap  | iPad Pro (11-inch)                         | t8027    | arm64e | 3       |
+| iPad8,10       | j418ap  | iPad Pro (11-inch) (2nd gen)               | t8027    | arm64e | 6       |
+| iPad8,11       | j420ap  | iPad Pro (12.9-inch) (4th gen)             | t8027    | arm64e | 6       |
+| iPad8,12       | j421ap  | iPad Pro (12.9-inch) (4th gen)             | t8027    | arm64e | 6       |
+| iPad8,2        | j317xap | iPad Pro (11-inch)                         | t8027    | arm64e | 6       |
+| iPad8,3        | j318ap  | iPad Pro (11-inch)                         | t8027    | arm64e | 3       |
+| iPad8,4        | j318xap | iPad Pro (11-inch)                         | t8027    | arm64e | 6       |
+| iPad8,5        | j320ap  | iPad Pro (12.9-inch) (3rd gen)             | t8027    | arm64e | 3       |
+| iPad8,6        | j320xap | iPad Pro (12.9-inch) (3rd gen)             | t8027    | arm64e | 6       |
+| iPad8,7        | j321ap  | iPad Pro (12.9-inch) (3rd gen)             | t8027    | arm64e | 3       |
+| iPad8,8        | j321xap | iPad Pro (12.9-inch) (3rd gen)             | t8027    | arm64e | 6       |
+| iPad8,9        | j417ap  | iPad Pro (11-inch) (2nd gen)               | t8027    | arm64e | 6       |
+| iPhone10,1     | d20ap   | iPhone 8                                   | t8015    | arm64  | 2       |
+| iPhone10,2     | d21ap   | iPhone 8 Plus                              | t8015    | arm64  | 4       |
+| iPhone10,3     | d22ap   | iPhone X                                   | t8015    | arm64  | 4       |
+| iPhone10,4     | d201ap  | iPhone 8                                   | t8015    | arm64  | 2       |
+| iPhone10,5     | d211ap  | iPhone 8 Plus                              | t8015    | arm64  | 4       |
+| iPhone10,6     | d221ap  | iPhone X                                   | t8015    | arm64  | 4       |
+| iPhone11,2     | d321ap  | iPhone XS                                  | t8020    | arm64e | 3       |
+| iPhone11,4     | d331ap  | iPhone XS Max                              | t8020    | arm64e | 3       |
+| iPhone11,6     | d331pap | iPhone XS Max                              | t8020    | arm64e | 3       |
+| iPhone11,8     | n841ap  | iPhone XR                                  | t8020    | arm64e | 4       |
+| iPhone12,1     | n104ap  | iPhone 11                                  | t8030    | arm64e | 3       |
+| iPhone12,3     | d421ap  | iPhone 11 Pro                              | t8030    | arm64e | 3       |
+| iPhone12,5     | d431ap  | iPhone 11 Pro Max                          | t8030    | arm64e | 3       |
+| iPhone12,8     | d79ap   | iPhone SE (2nd gen)                        | t8030    | arm64e | 4       |
+| iPhone13,1     | d52gap  | iPhone 12 mini                             | t8101    | arm64e | 3       |
+| iPhone13,2     | d53gap  | iPhone 12                                  | t8101    | arm64e | 3       |
+| iPhone13,3     | d53pap  | iPhone 12 Pro                              | t8101    | arm64e | 6       |
+| iPhone13,4     | d54pap  | iPhone 12 Pro Max                          | t8101    | arm64e | 6       |
+| iPhone4,1      | n94ap   | iPhone 4S                                  | s5l8940x | armv7  | 0       |
+| iPhone5,1      | n41ap   | iPhone 5                                   | s5l8950x | armv7s | 1       |
+| iPhone5,2      | n42ap   | iPhone 5                                   | s5l8950x | armv7s | 1       |
+| iPhone5,3      | n48ap   | iPhone 5c                                  | s5l8950x | armv7s | 1       |
+| iPhone5,4      | n49ap   | iPhone 5c                                  | s5l8950x | armv7s | 1       |
+| iPhone6,1      | n51ap   | iPhone 5s                                  | s5l8960x | arm64  | 1       |
+| iPhone6,2      | n53ap   | iPhone 5s                                  | s5l8960x | arm64  | 1       |
+| iPhone7,1      | n56ap   | iPhone 6 Plus                              | t7000    | arm64  | 1       |
+| iPhone7,2      | n61ap   | iPhone 6                                   | t7000    | arm64  | 1       |
+| iPhone8,1      | n71ap   | iPhone 6s                                  | s8000    | arm64  | 2       |
+| iPhone8,1      | n71map  | iPhone 6s                                  | s8003    | arm64  | 2       |
+| iPhone8,2      | n66map  | iPhone 6s Plus                             | s8003    | arm64  | 2       |
+| iPhone8,2      | n66ap   | iPhone 6s Plus                             | s8000    | arm64  | 2       |
+| iPhone8,4      | n69uap  | iPhone SE (1st gen)                        | s8000    | arm64  | 2       |
+| iPhone8,4      | n69ap   | iPhone SE (1st gen)                        | s8003    | arm64  | 2       |
+| iPhone9,1      | d10ap   | iPhone 7                                   | t8010    | arm64  | 2       |
+| iPhone9,2      | d11ap   | iPhone 7 Plus                              | t8010    | arm64  | 4       |
+| iPhone9,3      | d101ap  | iPhone 7                                   | t8010    | arm64  | 2       |
+| iPhone9,4      | d111ap  | iPhone 7 Plus                              | t8010    | arm64  | 4       |
+| iPod5,1        | n78ap   | iPod touch                                 | s5l8942x | armv7  | 0       |
+| iPod7,1        | n102ap  | iPod touch (6th gen)                       | t7000    | arm64  | 1       |
+| iPod9,1        | n112ap  | iPod touch (7th gen)                       | t8010    | arm64  | 2       |
+| iProd9,4       | z41aap  | Meerkat                                    | t8006    | arm64e | 1       |
+| iRef13,4       | z41ap   | iPod Nano                                  | t8006    | arm64e | 1       |
