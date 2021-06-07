@@ -35,11 +35,13 @@ const (
 	audienceTvOs_12Beta           = "5b220c65-fe50-460b-bac5-b6774b2ff475" // tvOS 12 beta
 	audienceTvOs_13Beta           = "975af5cb-019b-42db-9543-20327280f1b2" // tvOS 13 beta
 	audienceTvOs_14Beta           = "65254ac3-f331-4c19-8559-cbe22f5bc1a6" // tvOS 14 beta
+	audienceTvOs_15Beta           = "4d0dcdf7-12f2-4ebf-9672-ac4a4459a8bc" // tvOS 15 beta
 	audienceWatchOsRelease        = "b82fcf9c-c284-41c9-8eb2-e69bf5a5269f" // watchOS release
 	audienceWatchOs_4Beta         = "f659e06d-86a2-4bab-bcbb-61b7c60969ce" // watchOS 4 beta (returns 404)
 	audienceWatchOs_5Beta         = "e841259b-ad2e-4046-b80f-ca96bc2e17f3" // watchOS 5 beta
 	audienceWatchOs_6Beta         = "d08cfd47-4a4a-4825-91b5-3353dfff194f" // watchOS 6 beta
 	audienceWatchOs_7Beta         = "ff6df985-3cbe-4d54-ba5f-50d02428d2a3" // watchOS 7 beta
+	audienceWatchOs_8Beta         = "b407c130-d8af-42fc-ad7a-171efea5a3d0" // watchOS 8 beta
 	audienceAudioOsRelease        = "0322d49d-d558-4ddf-bdff-c0443d0e6fac" // audioOS release
 	audienceAudioOs_14Beta        = "b05ddb59-b26d-4c89-9d09-5fda15e99207" // audioOS 14 beta
 	audienceMacOs_11DeveloperBeta = "ca60afc6-5954-46fd-8cb9-60dde6ac39fd" // macOS 11.0 developer beta
