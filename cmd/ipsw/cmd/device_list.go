@@ -78,7 +78,10 @@ var deviceListCmd = &cobra.Command{
 		}
 
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{"Product", "Model", "Description", "CPU", "Architecture", "Memory(GB)"})
+		table.SetHeader([]string{"Product", "Model", "Description", "CPU", "Arch", "Mem(GB)"})
+		table.SetAutoWrapText(false)
+		table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+		table.SetCenterSeparator("|")
 		table.AppendBulk(data)
 		table.SetAlignment(tablewriter.ALIGN_LEFT)
 		table.Render() // Send output
