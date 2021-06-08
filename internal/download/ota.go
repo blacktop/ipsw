@@ -22,6 +22,9 @@ const (
 	otaPublicURL       = "https://mesu.apple.com/assets/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 
 	// CREDIT: Siguza
+	assetType_SoftwareUpdate    = "com.apple.MobileAsset.SoftwareUpdate"
+	assetType_MacSoftwareUpdate = "com.apple.MobileAsset.MacSoftwareUpdate"
+
 	audienceiOSRelease            = "01c1d682-6e8f-4908-b724-5501fe3f5e5c" // iOS release
 	audienceiOSInternal           = "ce9c2203-903b-4fb3-9f03-040dc2202694" // iOS internal (not publicly accessible)
 	audienceiOS_11Beta            = "b7580fda-59d3-43ae-9488-a81b825e3c73" // iOS 11 beta
@@ -30,22 +33,23 @@ const (
 	audienceiOS_14DeveloperBeta   = "dbbb0481-d521-4cdf-a2a4-5358affc224b" // iOS 14 developer beta
 	audienceiOS_14PublicBeta      = "84da8706-e267-4554-8207-865ae0c3a120" // iOS 14 public beta
 	audienceiOS_15DeveloperBeta   = "ce48f60c-f590-4157-a96f-41179ca08278" // iOS 15 developer beta
-	audienceTvOsRelease           = "356d9da0-eee4-4c6c-bbe5-99b60eadddf0" // tvOS release
-	audienceTvOs_11Beta           = "ebd90ea1-6216-4a7c-920e-666faccb2d50" // tvOS 11 beta (returns 404)
-	audienceTvOs_12Beta           = "5b220c65-fe50-460b-bac5-b6774b2ff475" // tvOS 12 beta
-	audienceTvOs_13Beta           = "975af5cb-019b-42db-9543-20327280f1b2" // tvOS 13 beta
-	audienceTvOs_14Beta           = "65254ac3-f331-4c19-8559-cbe22f5bc1a6" // tvOS 14 beta
-	audienceTvOs_15Beta           = "4d0dcdf7-12f2-4ebf-9672-ac4a4459a8bc" // tvOS 15 beta
-	audienceWatchOsRelease        = "b82fcf9c-c284-41c9-8eb2-e69bf5a5269f" // watchOS release
-	audienceWatchOs_4Beta         = "f659e06d-86a2-4bab-bcbb-61b7c60969ce" // watchOS 4 beta (returns 404)
-	audienceWatchOs_5Beta         = "e841259b-ad2e-4046-b80f-ca96bc2e17f3" // watchOS 5 beta
-	audienceWatchOs_6Beta         = "d08cfd47-4a4a-4825-91b5-3353dfff194f" // watchOS 6 beta
-	audienceWatchOs_7Beta         = "ff6df985-3cbe-4d54-ba5f-50d02428d2a3" // watchOS 7 beta
-	audienceWatchOs_8Beta         = "b407c130-d8af-42fc-ad7a-171efea5a3d0" // watchOS 8 beta
-	audienceAudioOsRelease        = "0322d49d-d558-4ddf-bdff-c0443d0e6fac" // audioOS release
-	audienceAudioOs_14Beta        = "b05ddb59-b26d-4c89-9d09-5fda15e99207" // audioOS 14 beta
-	audienceMacOs_11DeveloperBeta = "ca60afc6-5954-46fd-8cb9-60dde6ac39fd" // macOS 11.0 developer beta
-	audienceMacOs_11PublicBeta    = "60b55e25-a8ed-4f45-826c-c1495a4ccc65" // macOS 11.0 public beta
+	audienceTvOSRelease           = "356d9da0-eee4-4c6c-bbe5-99b60eadddf0" // tvOS release
+	audienceTvOS_11Beta           = "ebd90ea1-6216-4a7c-920e-666faccb2d50" // tvOS 11 beta (returns 404)
+	audienceTvOS_12Beta           = "5b220c65-fe50-460b-bac5-b6774b2ff475" // tvOS 12 beta
+	audienceTvOS_13Beta           = "975af5cb-019b-42db-9543-20327280f1b2" // tvOS 13 beta
+	audienceTvOS_14Beta           = "65254ac3-f331-4c19-8559-cbe22f5bc1a6" // tvOS 14 beta
+	audienceTvOS_15Beta           = "4d0dcdf7-12f2-4ebf-9672-ac4a4459a8bc" // tvOS 15 beta
+	audienceWatchOSRelease        = "b82fcf9c-c284-41c9-8eb2-e69bf5a5269f" // watchOS release
+	audienceWatchOS_4Beta         = "f659e06d-86a2-4bab-bcbb-61b7c60969ce" // watchOS 4 beta (returns 404)
+	audienceWatchOS_5Beta         = "e841259b-ad2e-4046-b80f-ca96bc2e17f3" // watchOS 5 beta
+	audienceWatchOS_6Beta         = "d08cfd47-4a4a-4825-91b5-3353dfff194f" // watchOS 6 beta
+	audienceWatchOS_7Beta         = "ff6df985-3cbe-4d54-ba5f-50d02428d2a3" // watchOS 7 beta
+	audienceWatchOS_8Beta         = "b407c130-d8af-42fc-ad7a-171efea5a3d0" // watchOS 8 beta
+	audienceAudioOSRelease        = "0322d49d-d558-4ddf-bdff-c0443d0e6fac" // audioOS release
+	audienceAudioOS_14Beta        = "b05ddb59-b26d-4c89-9d09-5fda15e99207" // audioOS 14 beta
+	audienceMacOS_11DeveloperBeta = "ca60afc6-5954-46fd-8cb9-60dde6ac39fd" // macOS 11.0 developer beta
+	audienceMacOS_11PublicBeta    = "60b55e25-a8ed-4f45-826c-c1495a4ccc65" // macOS 11.0 public beta
+	audienceMacOS_12DeveloperBeta = "298e518d-b45e-4d36-94be-34a63d6777ec" // macOS 12.0 developer beta
 )
 
 type OtaAsset struct {
@@ -92,15 +96,19 @@ type conf struct {
 	Proxy    string
 	Insecure bool
 	Release  bool
+	MacOS    bool
+	WatchOS  bool
+	TvOS     bool
 }
 
+// Ota is an OTA object
 type Ota struct {
 	ota
 	Config conf
 }
 
 // NewOTA downloads and parses the itumes plist for iOS14 release/developer beta OTAs
-func NewOTA(proxy string, insecure, release bool) (*Ota, error) {
+func NewOTA(proxy string, insecure, release, macos bool) (*Ota, error) {
 
 	req, err := http.NewRequest("GET", otaPublicURL, nil)
 	if err != nil {
@@ -134,6 +142,7 @@ func NewOTA(proxy string, insecure, release bool) (*Ota, error) {
 		Proxy:    proxy,
 		Insecure: insecure,
 		Release:  release,
+		MacOS:    macos,
 	}}
 
 	if err := plist.NewDecoder(bytes.NewReader(document)).Decode(&o.ota); err != nil {
@@ -246,7 +255,7 @@ func (o *Ota) lookupHWModel(device string) (string, error) {
 			return ota.SupportedDeviceModels[0], nil
 		}
 	}
-	return "0", fmt.Errorf("failed to find device %s in list of OTAs", device)
+	return "0", fmt.Errorf("failed to find device %s in list of OTAs (please supply a --model)", device)
 }
 
 // GetOtaForDevice returns an OTA asset for a given device using the newstyle OTA - CREDIT: https://gist.github.com/Siguza/0331c183c8c59e4850cd0b62fd501424
@@ -259,15 +268,19 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 			return OtaAsset{}, err
 		}
 	}
-
+	assetType := assetType_SoftwareUpdate
 	assetAudience := audienceiOS_15DeveloperBeta
 	if o.Config.Release {
 		assetAudience = audienceiOSRelease
 	}
+	if o.Config.MacOS {
+		assetType = assetType_MacSoftwareUpdate
+		assetAudience = audienceMacOS_12DeveloperBeta
+	}
 
 	data := map[string]string{
 		"ClientVersion":  "2",
-		"AssetType":      "com.apple.MobileAsset.SoftwareUpdate",
+		"AssetType":      assetType,
 		"AssetAudience":  assetAudience,
 		"ProductType":    device,
 		"HWModelStr":     hwmodel,

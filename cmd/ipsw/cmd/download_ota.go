@@ -34,12 +34,15 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
 	otaDLCmd.Flags().BoolP("release", "r", false, "Download Release (non-beta) OTAs")
+	otaDLCmd.Flags().BoolP("macos", "m", false, "Download macOS OTA")
+	otaDLCmd.Flags().StringP("model", "", viper.GetString("IPSW_MODEL"), "iOS HW Model (i.e. D52gAP)")
 	otaDLCmd.Flags().BoolP("dyld", "", false, "Extract dyld_shared_cache from remote OTA zip")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 }
@@ -62,22 +65,27 @@ var otaDLCmd = &cobra.Command{
 
 		// filters
 		device, _ := cmd.Flags().GetString("device")
+		model, _ := cmd.Flags().GetString("model")
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 
 		release, _ := cmd.Flags().GetBool("release")
+		macOsOTA, _ := cmd.Flags().GetBool("macos")
 
+		if release && macOsOTA {
+			log.Fatal("you cannot supply a --release AND a --macos flag (they are mutually exclusive)")
+		}
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 
-		otaXML, err := download.NewOTA(proxy, insecure, release)
+		otaXML, err := download.NewOTA(proxy, insecure, release, macOsOTA)
 		if err != nil {
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
 		}
 
 		var otas []download.OtaAsset
 		if len(device) > 0 {
-			o, err := otaXML.GetOtaForDevice(device, "")
+			o, err := otaXML.GetOtaForDevice(device, model)
 			if err != nil {
 				return fmt.Errorf("failed to get OTA asset for device %s: %v", device, err)
 			}

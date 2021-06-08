@@ -31,6 +31,7 @@ const (
 	sucatalogs18      = "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs19      = "https://swscan.apple.com/content/catalogs/others/index-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-11-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs21      = "https://swscan.apple.com/content/catalogs/others/index-12seed-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 )
 
 type seedCatalog struct {
@@ -198,7 +199,7 @@ func GetProductInfo() (ProductInfos, error) {
 		catData = buff.Bytes()
 
 	} else {
-		resp, err := http.Get(sucatalogs20)
+		resp, err := http.Get(sucatalogs21)
 		if err != nil {
 			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
 		}
