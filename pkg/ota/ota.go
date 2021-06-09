@@ -93,11 +93,12 @@ type Entry struct {
 	Uid  uint16      // user id
 	Gid  uint16      // group id
 	Mod  fs.FileMode // access mode
-	Flag byte        // BSD flags
+	Flag uint32      // BSD flags
 	Mtm  time.Time   // modification time
 	Size uint32      // file data size
 	Aft  byte
 	Afr  uint32
+	Fli  uint32
 }
 
 func sortFileBySize(files []*zip.File) {
@@ -271,7 +272,13 @@ func yaaDecodeHeader(r *bytes.Reader) (*Entry, error) {
 		case "FLG":
 			switch field[3] {
 			case '1':
-				if entry.Flag, err = r.ReadByte(); err != nil {
+				flag, err := r.ReadByte()
+				if err != nil {
+					return nil, err
+				}
+				entry.Flag = uint32(flag)
+			case '4':
+				if err := binary.Read(r, binary.LittleEndian, &entry.Flag); err != nil {
 					return nil, err
 				}
 			default:
@@ -289,6 +296,12 @@ func yaaDecodeHeader(r *bytes.Reader) (*Entry, error) {
 					return nil, err
 				}
 				entry.Mtm = time.Unix(secs, int64(nsecs))
+			case 'S':
+				var secs int64
+				if err := binary.Read(r, binary.LittleEndian, &secs); err != nil {
+					return nil, err
+				}
+				entry.Mtm = time.Unix(secs, 0)
 			default:
 				return nil, fmt.Errorf("found unknown MTM field: %s", string(field))
 			}
@@ -337,6 +350,15 @@ func yaaDecodeHeader(r *bytes.Reader) (*Entry, error) {
 				entry.Afr = uint32(dat)
 			default:
 				return nil, fmt.Errorf("found unknown AFR field: %s", string(field))
+			}
+		case "FLI":
+			switch field[3] {
+			case '4':
+				if err := binary.Read(r, binary.LittleEndian, &entry.Fli); err != nil {
+					return nil, err
+				}
+			default:
+				return nil, fmt.Errorf("found unknown FLI field: %s", string(field))
 			}
 		default:
 			return nil, fmt.Errorf("found unknown YAA header field: %s", string(field))
@@ -510,7 +532,7 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 			if err := binary.Read(rr, binary.LittleEndian, &header); err != nil {
 				return false, err
 			}
-
+			ioutil.WriteFile("ota_header", header, 0644)
 			ent, err = yaaDecodeHeader(bytes.NewReader(header))
 			if err != nil {
 				// dump header if in Verbose mode
