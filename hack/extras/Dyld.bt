@@ -16,6 +16,8 @@
 #define MH_MAGIC 0xfeedface    /* the mach magic number */
 #define MH_CIGAM 0xcefaedfe    /* NXSwapInt(MH_MAGIC) */
 
+typedef ubyte Uuid[16]<read = readUUID, format = hex>;
+
 typedef struct
 {
     union
@@ -49,8 +51,8 @@ typedef struct
     char magic[16]<bgcolor = cLtBlue>; // e.g. "dyld_v0    i386"
     uint mappingOffset;                // file offset to first dyld_cache_mapping_info
     uint mappingCount;                 // number of dyld_cache_mapping_info entries
-    uint imagesOffset;                 // file offset to first dyld_cache_image_info
-    uint imagesCount;                  // number of dyld_cache_image_info entries
+    uint imagesOffsetUnused;           // unused
+    uint imagesCountUnused;            // unused
     uint64 dyldBaseAddress;            // base address of dyld when cache was built
     uint64 codeSignatureOffset;        // file offset of code signature blob
     uint64 codeSignatureSize;          // size of code signature blob (zero means to end of file)
@@ -58,7 +60,7 @@ typedef struct
     uint64 slideInfoSize;              // size of kernel slid info
     uint64 localSymbolsOffset;         // file offset of where local symbols are stored
     uint64 localSymbolsSize;           // size of local symbols information
-    ubyte uuid[16]<format = hex>;      // unique value for each shared cache file
+    Uuid uuid;                         // unique value for each shared cache file
     uint64 cacheType;                  // 0 for development, 1 for production
     uint branchPoolsOffset;            // file offset to table of uint64 pool addresses
     uint branchPoolsCount;             // number of uint64 entries
@@ -91,7 +93,31 @@ typedef struct
     uint64 otherImageArrayAddr;        // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
     uint64 otherImageArraySize;        // size of ImageArray for dylibs and bundles with dlopen closures
     uint64 otherTrieAddr;              // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
-    uint64 otherTrieSize;
+    uint64 otherTrieSize;              // size of trie of dylibs and bundles with dlopen closures
+    uint32 mappingWithSlideOffset;     // file offset to first dyld_cache_mapping_and_slide_info
+    uint32 mappingWithSlideCount;      // number of dyld_cache_mapping_and_slide_info entries
+    uint64 unknown1;
+    uint64 unknown2;
+    uint64 unknown3;
+    uint64 unknown4;
+    uint64 unknown5;
+    uint32 unknown6;
+    uint32 unknown7;
+    uint64 zero1;
+    uint64 unknown8;
+    uint64 unknown9;
+    uint32 unknown10;
+    uint32 numSplits; // number of dyld_shared_cache .1,.2,.3 files
+    uint32 unknown11;
+    uint32 unknown12;
+    uint32 unknown13;
+    uint32 unknown14;
+    uint64 zero2;
+    uint64 zero3;
+    uint64 zero4;
+    uint64 zero5;
+    uint imagesOffset; // file offset to first dyld_cache_image_info
+    uint imagesCount;  // number of dyld_cache_image_info entries
 } dyld_cache_header;
 
 typedef struct
@@ -102,6 +128,18 @@ typedef struct
     uint32 maxProt;
     uint32 initProt;
 } dyld_cache_mapping_info<bgcolor = cBlue>;
+
+typedef struct
+{
+    uint64 address;
+    uint64 size;
+    uint64 fileOffset;
+    uint64 slideInfoFileOffset;
+    uint64 slideInfoFileSize;
+    uint64 flags;
+    uint32 maxProt;
+    uint32 initProt;
+} dyld_cache_mapping_and_slide_info<bgcolor = cBlue>;
 
 typedef struct
 {
@@ -170,11 +208,16 @@ typedef struct
 
 typedef struct
 {
-    char uuid[16]<format = hex>;
+    Uuid uuid;
     uint64 loadAddress; // unslid address of start of __TEXT
     uint32 textSegmentSize;
     uint32 pathOffset; // offset from start of cache file
-} dyld_cache_image_text_info;
+} dyld_cache_image_text_info<read = readimagetextname, bgcolor = cGreen>;
+
+string readimagetextname(dyld_cache_image_text_info &tinfo)
+{
+    return ReadString(tinfo.pathOffset);
+}
 
 // typedef struct
 // {
@@ -287,6 +330,9 @@ local uint64 strtableoff;
 dyld_cache_header header;
 FSeek(header.mappingOffset);
 dyld_cache_mapping_info mapinfo[header.mappingCount];
+FSeek(header.mappingWithSlideOffset);
+dyld_cache_mapping_and_slide_info mapWithSlideInfo[header.mappingWithSlideCount];
+
 for (i = 0; i < header.mappingCount; i++)
 {
     sig = ReadUInt(mapinfo[i].fileOffset);
@@ -295,8 +341,13 @@ for (i = 0; i < header.mappingCount; i++)
         isbit64 = 1;
     }
 }
+
 FSeek(header.imagesOffset);
 dyld_cache_image_info imageinfo[header.imagesCount];
+
+FSeek(header.imagesTextOffset);
+dyld_cache_image_text_info imagetext[header.imagesTextCount];
+
 // FSeek(header.codeSignatureOffset);
 // if (header.codeSignatureSize > 0)
 // {
@@ -307,6 +358,7 @@ dyld_cache_image_info imageinfo[header.imagesCount];
 //     FSeek(header.slideInfoOffset);
 //     get_dyld_cache_slide_info(header.slideInfoSize);
 // }
+
 if (header.localSymbolsOffset > 0)
 {
     FSeek(header.localSymbolsOffset);

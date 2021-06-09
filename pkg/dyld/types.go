@@ -121,6 +121,28 @@ type CacheHeader struct {
 	OtherTrieSize          uint64   // size of trie of dylibs and bundles with dlopen closures
 	MappingWithSlideOffset uint32   // file offset to first dyld_cache_mapping_and_slide_info
 	MappingWithSlideCount  uint32   // number of dyld_cache_mapping_and_slide_info entries
+	Unknown1               uint64
+	Unknown2               uint64
+	Unknown3               uint64
+	Unknown4               uint64
+	Unknown5               uint64
+	Unknown6               uint32
+	Unknown7               uint32
+	IsZero1                uint64
+	Unknown8               uint64
+	Unknown9               uint64
+	SplitFileCount         uint32 // number of dyld_shared_cache .1,.2,.3 files
+	Unknown10              uint32
+	Unknown11              uint32
+	Unknown12              uint32
+	Unknown13              uint32
+	Unknown14              uint32
+	IsZero2                uint64
+	IsZero3                uint64
+	IsZero4                uint64
+	IsZero5                uint64
+	NewImagesOffset        uint32 // file offset to first dyld_cache_image_info
+	NewImagesCount         uint32 // number of dyld_cache_image_info entries
 }
 
 type CacheMappingInfo struct {

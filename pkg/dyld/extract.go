@@ -50,13 +50,13 @@ func Extract(ipsw string) error {
 
 		var searchStr, searchStrMacOS, dyldDest, mountPoint string
 		if runtime.GOOS == "darwin" {
-			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
-			searchStrMacOS = "System/Library/dyld/dyld_shared_cache_*"
+			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64*"
+			searchStrMacOS = "System/Library/dyld/dyld_shared_cache_arm64*"
 			os.MkdirAll(folder, os.ModePerm)
 			dyldDest = filepath.Join(folder, "dyld_shared_cache")
 			mountPoint = "/tmp/ios"
 		} else if runtime.GOOS == "linux" {
-			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_*"
+			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64*"
 			os.MkdirAll(filepath.Join("/data", folder), os.ModePerm)
 			dyldDest = filepath.Join("/data", folder, "dyld_shared_cache")
 			mountPoint = "/mnt"
@@ -83,10 +83,12 @@ func Extract(ipsw string) error {
 			}
 		}
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", matches[0], dyldDest))
-		err = utils.Cp(matches[0], dyldDest)
-		if err != nil {
-			return err
+		for _, match := range matches {
+			utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", match, dyldDest))
+			err = utils.Cp(match, filepath.Join(folder, filepath.Base(match)))
+			if err != nil {
+				return err
+			}
 		}
 
 		// Create symlinks for all the other folders to save space

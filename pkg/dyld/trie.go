@@ -96,7 +96,7 @@ func parseTrie(trieData []byte, loadAddress uint64) ([]trieEntry, error) {
 	var tNode trieNode
 	var entries []trieEntry
 
-	nodes := []trieNode{trieNode{
+	nodes := []trieNode{{
 		Offset:   0,
 		SymBytes: make([]byte, 0),
 	}}
