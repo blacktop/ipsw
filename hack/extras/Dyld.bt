@@ -107,11 +107,8 @@ typedef struct
     uint64 unknown8;
     uint64 unknown9;
     uint32 unknown10;
-    uint32 numSplits; // number of dyld_shared_cache .1,.2,.3 files
-    uint32 unknown11;
-    uint32 unknown12;
-    uint32 unknown13;
-    uint32 unknown14;
+    uint32 numSubCaches; // number of dyld_shared_cache .1,.2,.3 files
+    Uuid symbolSubCacheUUID;
     uint64 zero2;
     uint64 zero3;
     uint64 zero4;
