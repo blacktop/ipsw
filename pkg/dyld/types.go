@@ -131,12 +131,9 @@ type CacheHeader struct {
 	IsZero1                uint64
 	Unknown8               uint64
 	Unknown9               uint64
-	SplitFileCount         uint32 // number of dyld_shared_cache .1,.2,.3 files
 	Unknown10              uint32
-	Unknown11              uint32
-	Unknown12              uint32
-	Unknown13              uint32
-	Unknown14              uint32
+	NumSubCaches           uint32     // number of dyld_shared_cache .1,.2,.3 files
+	SymbolsSubCacheUUID    types.UUID // unique value for .symbols sub-cache
 	IsZero2                uint64
 	IsZero3                uint64
 	IsZero4                uint64
