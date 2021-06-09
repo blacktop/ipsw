@@ -24,6 +24,7 @@ const (
 	// CREDIT: Siguza
 	assetType_SoftwareUpdate    = "com.apple.MobileAsset.SoftwareUpdate"
 	assetType_MacSoftwareUpdate = "com.apple.MobileAsset.MacSoftwareUpdate"
+	assetType_SFRSoftwareUpdate = "com.apple.MobileAsset.SFRSoftwareUpdate"
 
 	audienceiOSRelease            = "01c1d682-6e8f-4908-b724-5501fe3f5e5c" // iOS release
 	audienceiOSInternal           = "ce9c2203-903b-4fb3-9f03-040dc2202694" // iOS internal (not publicly accessible)
@@ -47,9 +48,14 @@ const (
 	audienceWatchOS_8Beta         = "b407c130-d8af-42fc-ad7a-171efea5a3d0" // watchOS 8 beta
 	audienceAudioOSRelease        = "0322d49d-d558-4ddf-bdff-c0443d0e6fac" // audioOS release
 	audienceAudioOS_14Beta        = "b05ddb59-b26d-4c89-9d09-5fda15e99207" // audioOS 14 beta
-	audienceMacOS_11DeveloperBeta = "ca60afc6-5954-46fd-8cb9-60dde6ac39fd" // macOS 11.0 developer beta
-	audienceMacOS_11PublicBeta    = "60b55e25-a8ed-4f45-826c-c1495a4ccc65" // macOS 11.0 public beta
-	audienceMacOS_12DeveloperBeta = "298e518d-b45e-4d36-94be-34a63d6777ec" // macOS 12.0 developer beta
+	audienceAudioOS_15Beta        = "58ff8d56-1d77-4473-ba88-ee1690475e40" // audioOS 15 beta
+	audienceMacOS_Release         = "60b55e25-a8ed-4f45-826c-c1495a4ccc65" // macOS release
+	audienceMacOS_11CustomerBeta  = "215447a0-bb03-4e18-8598-7b6b6e7d34fd" //  macOS 11 customer beta
+	audienceMacOS_11DeveloperBeta = "ca60afc6-5954-46fd-8cb9-60dde6ac39fd" //  macOS 11 developer beta
+	audienceMacOS_11PublicBeta    = "902eb66c-8e37-451f-b0f2-ffb3e878560b" //  macOS 11 public beta
+	audienceMacOS_12CustomerBeta  = "a3799e8a-246d-4dee-b418-76b4519a15a2" //  macOS 12 customer beta
+	audienceMacOS_12DeveloperBeta = "298e518d-b45e-4d36-94be-34a63d6777ec" //  macOS 12 developer beta
+	audienceMacOS_12PublicBeta    = "9f86c787-7c59-45a7-a79a-9c164b00f866" //  macOS 12 public beta
 )
 
 type OtaAsset struct {

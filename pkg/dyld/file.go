@@ -214,9 +214,16 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	}
 
 	// Read dyld images.
-	sr.Seek(int64(f.ImagesOffset), os.SEEK_SET)
+	var imagesCount uint32
+	if f.ImagesOffset > 0 {
+		imagesCount = f.ImagesCount
+		sr.Seek(int64(f.ImagesOffset), os.SEEK_SET)
+	} else {
+		imagesCount = f.NewImagesCount
+		sr.Seek(int64(f.NewImagesOffset), os.SEEK_SET)
+	}
 
-	for i := uint32(0); i != f.ImagesCount; i++ {
+	for i := uint32(0); i != imagesCount; i++ {
 		iinfo := CacheImageInfo{}
 		if err := binary.Read(sr, f.ByteOrder, &iinfo); err != nil {
 			return nil, err
@@ -273,8 +280,21 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
 		for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
-			if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
+			var localSymEntry CacheLocalSymbolsEntry
+			if err := binary.Read(sr, f.ByteOrder, &localSymEntry); err != nil {
 				return nil, err
+			}
+			if len(f.Images) > i {
+				f.Images[i].CacheLocalSymbolsEntry = localSymEntry
+			} else {
+				f.Images = append(f.Images, &CacheImage{
+					Index: uint32(i),
+					// Info:      iinfo,
+					Mappings:               f.MappingsWithSlideInfo,
+					sr:                     sr,
+					SlideInfo:              f.SlideInfo,
+					CacheLocalSymbolsEntry: localSymEntry,
+				})
 			}
 			// f.Images[i].ReaderAt = io.NewSectionReader(r, int64(f.Images[i].DylibOffset), 1<<63-1)
 		}
@@ -383,8 +403,21 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	// Read dyld text_info entries.
 	sr.Seek(int64(f.ImagesTextOffset), os.SEEK_SET)
 	for i := uint64(0); i != f.ImagesTextCount; i++ {
-		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
+		var textInfo CacheImageTextInfo
+		if err := binary.Read(sr, f.ByteOrder, &textInfo); err != nil {
 			return nil, err
+		}
+		if len(f.Images) > int(i) {
+			f.Images[i].CacheImageTextInfo = textInfo
+		} else {
+			f.Images = append(f.Images, &CacheImage{
+				Index: uint32(i),
+				// Info:      iinfo,
+				Mappings:           f.MappingsWithSlideInfo,
+				sr:                 sr,
+				SlideInfo:          f.SlideInfo,
+				CacheImageTextInfo: textInfo,
+			})
 		}
 	}
 
@@ -825,6 +858,36 @@ func (f *File) HasImagePath(path string) (int, bool, error) {
 		}
 	}
 	return int(imageIndex), true, nil
+}
+
+// GetDylibIndex returns the index of a given dylib
+func (f *File) GetDylibIndex(path string) (uint64, error) {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	off, err := f.GetOffset(f.DylibsTrieAddr)
+	if err != nil {
+		return 0, err
+	}
+
+	sr.Seek(int64(off), io.SeekStart)
+
+	dylibTrie := make([]byte, f.DylibsTrieSize)
+	if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
+		return 0, err
+	}
+
+	dylibs, err := parseTrie(dylibTrie, 0)
+	if err != nil {
+		return 0, err
+	}
+
+	for _, d := range dylibs {
+		if d.Name == path {
+			return uint64(d.Flags), nil
+		}
+	}
+
+	return 0, fmt.Errorf("dylib not found in Dylibs Trie")
 }
 
 // FindDlopenOtherImage returns the dlopen OtherImage for a given path
