@@ -183,24 +183,46 @@ func (images cacheImages) Print() {
 func (f *File) String() string {
 	var slideVersion uint32
 	var mappings string
+	var subCacheInfo string
+
 	if f.SlideInfo != nil {
 		slideVersion = f.SlideInfo.GetVersion()
-	} else {
-		slideVersion = 0
 	}
+
 	if f.CacheHeader.SlideInfoOffsetUnused > 0 {
 		mappings = f.Mappings.String()
 	} else {
 		mappings = f.MappingsWithSlideInfo.String()
 	}
+
+	imagesCount := f.ImagesCount
+	imageHumanSize := int(f.ImagesCount) * binary.Size(CacheImageInfo{}) / 1024
+	imagesOffset := int(f.ImagesOffset)
+	imagesSize := int(imagesCount) * binary.Size(CacheImageInfo{})
+
+	if f.ImagesOffset == 0 && f.ImagesCount == 0 {
+		subCacheInfo = fmt.Sprintf(
+			"Num SubCaches     = %d\n"+
+				"SubCache Group ID = %#x\n"+
+				"Sym SubCache UUID = %s\n",
+			f.NumSubCaches,
+			f.SubCachesUUID,
+			f.SymbolsSubCacheUUID,
+		)
+		imagesCount = f.NewImagesCount
+		imageHumanSize = int(f.NewImagesCount) * binary.Size(CacheImageInfo{}) / 1024
+		imagesOffset = int(f.NewImagesOffset)
+		imagesSize = int(f.NewImagesCount) * binary.Size(CacheImageInfo{})
+	}
+
 	return fmt.Sprintf(
 		"Header\n"+
 			"======\n"+
-			"Magic            = \"%s\"\n"+
-			"UUID             = %s\n"+
-			"Platform         = %s\n"+
-			"Format           = %s\n"+
-			"Max Slide        = %s\n\n"+
+			"Magic             = \"%s\"\n"+
+			"UUID              = %s\n"+
+			"Platform          = %s\n"+
+			"Format            = %s\n"+
+			"Max Slide         = %s\n%s\n"+
 			"Local Symbols (nlist array):    %3dMB,  offset:  0x%09X -> 0x%09X\n"+
 			"Local Symbols (string pool):    %3dMB,  offset:  0x%09X -> 0x%09X\n"+
 			"Code Signature:                 %3dMB,  offset:  0x%09X -> 0x%09X\n"+
@@ -208,7 +230,7 @@ func (f *File) String() string {
 			"Slide Info (v%d):               %4dKB,  offset:  0x%09X -> 0x%09X\n"+
 			"Branch Pool:                    %3dMB,  offset:  0x%09X -> 0x%09X\n"+
 			"Accelerate Tab:                 %3dKB,  address: 0x%09X -> 0x%09X\n"+
-			"Patch Info:                     %3dKB,  address: 0x%09X -> 0x%09X\n"+
+			"Patch Info:                    %3dKB,  address: 0x%09X -> 0x%09X\n"+
 			"Closures:                       %3dMB,  address: 0x%09X -> 0x%09X\n"+
 			"Closures Trie:                  %3dKB,  address: 0x%09X -> 0x%09X\n"+
 			"Shared Region:                  %3dGB,  address: 0x%09X -> 0x%09X\n"+
@@ -220,10 +242,11 @@ func (f *File) String() string {
 		f.Platform,
 		f.FormatVersion,
 		f.MaxSlide,
+		subCacheInfo,
 		f.LocalSymInfo.NListByteSize/(1024*1024), f.LocalSymInfo.NListFileOffset, f.LocalSymInfo.NListFileOffset+f.LocalSymInfo.NListByteSize,
 		f.LocalSymInfo.StringsSize/(1024*1024), f.LocalSymInfo.StringsFileOffset, f.LocalSymInfo.StringsFileOffset+f.LocalSymInfo.StringsSize,
 		f.CodeSignatureSize/(1024*1024), f.CodeSignatureOffset, f.CodeSignatureOffset+f.CodeSignatureSize,
-		f.ImagesCount, int(f.ImagesCount)*binary.Size(CacheImageInfo{})/1024, f.ImagesOffset, int(f.ImagesOffset)+int(f.ImagesCount)*binary.Size(CacheImageInfo{}),
+		imagesCount, imageHumanSize, imagesOffset, imagesOffset+imagesSize,
 		slideVersion, f.SlideInfoSizeUnused/1024, f.SlideInfoOffsetUnused, f.SlideInfoOffsetUnused+f.SlideInfoSizeUnused,
 		binary.Size(f.BranchPools), f.BranchPoolsOffset, int(f.BranchPoolsOffset)+binary.Size(f.BranchPools),
 		f.AccelerateInfoSize/1024, f.AccelerateInfoAddr, f.AccelerateInfoAddr+f.AccelerateInfoSize,

@@ -103,16 +103,17 @@ typedef struct
     uint64 unknown5;
     uint32 unknown6;
     uint32 unknown7;
+    uint32 unknown8;
+    uint32 unknown9;
+    uint64 unknown10;
+    uint64 unknown11;
+    uint32 subCacheUUID;
+    uint32 numSubCaches;     // number of dyld_shared_cache .1,.2,.3 files
+    Uuid symbolSubCacheUUID; // unique value for .symbols sub-cache
     uint64 zero1;
-    uint64 unknown8;
-    uint64 unknown9;
-    uint32 unknown10;
-    uint32 numSubCaches; // number of dyld_shared_cache .1,.2,.3 files
-    Uuid symbolSubCacheUUID;
     uint64 zero2;
     uint64 zero3;
     uint64 zero4;
-    uint64 zero5;
     uint imagesOffset; // file offset to first dyld_cache_image_info
     uint imagesCount;  // number of dyld_cache_image_info entries
 } dyld_cache_header;
