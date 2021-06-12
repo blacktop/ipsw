@@ -108,39 +108,39 @@ type CacheHeader struct {
 	   locallyBuiltCache      : 1,  // 0 for B&I built cache, 1 for locally built cache
 	   builtFromChainedFixups : 1,  // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
 	   padding                : 20; // TBD */
-	SharedRegionStart      uint64   // base load address of cache if not slid
-	SharedRegionSize       uint64   // overall size of region cache can be mapped into
-	MaxSlide               maxSlide // runtime slide of cache can be between zero and this value
-	DylibsImageArrayAddr   uint64   // (unslid) address of ImageArray for dylibs in this cache
-	DylibsImageArraySize   uint64   // size of ImageArray for dylibs in this cache
-	DylibsTrieAddr         uint64   // (unslid) address of trie of indexes of all cached dylibs
-	DylibsTrieSize         uint64   // size of trie of cached dylib paths
-	OtherImageArrayAddr    uint64   // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
-	OtherImageArraySize    uint64   // size of ImageArray for dylibs and bundles with dlopen closures
-	OtherTrieAddr          uint64   // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
-	OtherTrieSize          uint64   // size of trie of dylibs and bundles with dlopen closures
-	MappingWithSlideOffset uint32   // file offset to first dyld_cache_mapping_and_slide_info
-	MappingWithSlideCount  uint32   // number of dyld_cache_mapping_and_slide_info entries
-	Unknown1               uint64
-	Unknown2               uint64
-	Unknown3               uint64
-	Unknown4               uint64
-	Unknown5               uint64
-	Unknown6               uint32
-	Unknown7               uint32
-	Unknown8               uint32
-	Unknown9               uint32
-	Unknown10              uint64
-	Unknown11              uint64
-	SubCachesUUID          uint32
-	NumSubCaches           uint32     // number of dyld_shared_cache .1,.2,.3 files
-	SymbolsSubCacheUUID    types.UUID // unique value for .symbols sub-cache
-	IsZero1                uint64
-	IsZero2                uint64
-	IsZero3                uint64
-	IsZero4                uint64
-	NewImagesOffset        uint32 // file offset to first dyld_cache_image_info
-	NewImagesCount         uint32 // number of dyld_cache_image_info entries
+	SharedRegionStart                 uint64   // base load address of cache if not slid
+	SharedRegionSize                  uint64   // overall size of region cache can be mapped into
+	MaxSlide                          maxSlide // runtime slide of cache can be between zero and this value
+	DylibsImageArrayAddr              uint64   // (unslid) address of ImageArray for dylibs in this cache
+	DylibsImageArraySize              uint64   // size of ImageArray for dylibs in this cache
+	DylibsTrieAddr                    uint64   // (unslid) address of trie of indexes of all cached dylibs
+	DylibsTrieSize                    uint64   // size of trie of cached dylib paths
+	OtherImageArrayAddr               uint64   // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
+	OtherImageArraySize               uint64   // size of ImageArray for dylibs and bundles with dlopen closures
+	OtherTrieAddr                     uint64   // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
+	OtherTrieSize                     uint64   // size of trie of dylibs and bundles with dlopen closures
+	MappingWithSlideOffset            uint32   // file offset to first dyld_cache_mapping_and_slide_info
+	MappingWithSlideCount             uint32   // number of dyld_cache_mapping_and_slide_info entries
+	DataMappingStartAddr              uint64   // (unslid) address of the __DATA mapping of the first sub cache (w/ no ext .1,.2 etc)
+	DylibsImageArrayWithSubCachesAddr uint64   // NOTICE: no Size, but you can calculate by progClosuresWithSubCachesAddr - dylibsImageArrayWithSubCachesAddr
+	ProgClosuresWithSubCachesAddr     uint64
+	ProgClosuresWithSubCachesSize     uint64
+	ProgClosuresTrieWithSubCachesAddr uint64
+	ProgClosuresTrieWithSubCachesSize uint64
+	Unknown7                          uint32
+	Unknown8                          uint32
+	Unknown9                          uint32
+	NewFieldOffset                    uint64
+	NewFieldSize                      uint64
+	SubCachesUUID                     uint32
+	NumSubCaches                      uint32     // number of dyld_shared_cache .1,.2,.3 files
+	SymbolsSubCacheUUID               types.UUID // unique value for .symbols sub-cache
+	IsZero1                           uint64
+	IsZero2                           uint64
+	IsZero3                           uint64
+	IsZero4                           uint64
+	ImagesWithSubCachesOffset         uint32 // file offset to first dyld_cache_image_info
+	ImagesWithSubCachesCount          uint32 // number of dyld_cache_image_info entries
 }
 
 type CacheMappingInfo struct {

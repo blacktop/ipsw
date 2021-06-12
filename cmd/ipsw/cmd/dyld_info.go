@@ -58,31 +58,47 @@ var dyldInfoCmd = &cobra.Command{
 		showDylibs, _ := cmd.Flags().GetBool("dylibs")
 		showSignature, _ := cmd.Flags().GetBool("sig")
 
-		fileInfo, err := os.Lstat(args[0])
-		if err != nil {
-			return fmt.Errorf("file %s does not exist", args[0])
-		}
+		dscPath := filepath.Clean(args[0])
 
-		dyldFile := args[0]
+		fileInfo, err := os.Lstat(dscPath)
+		if err != nil {
+			return fmt.Errorf("file %s does not exist", dscPath)
+		}
 
 		// Check if file is a symlink
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			dyldFile, err = os.Readlink(args[0])
+			symlinkPath, err := os.Readlink(dscPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", args[0])
+				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
 			}
 			// TODO: this seems like it would break
-			linkParent := filepath.Dir(args[0])
+			linkParent := filepath.Dir(dscPath)
 			linkRoot := filepath.Dir(linkParent)
 
-			dyldFile = filepath.Join(linkRoot, dyldFile)
+			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
+
+		// if header.ImagesOffset == 0 && header.ImagesCount == 0 {
+		// 	if header.SymbolsSubCacheUUID != [16]byte{0} {
+		// 		header, err = dyld.ReadHeader(dscPath + ".symbols")
+		// 		if err != nil {
+		// 			return err
+		// 		}
+		// 	}
+		// 	for i := 1; i <= int(header.NumSubCaches); i++ {
+		// 		header, err = dyld.ReadHeader(fmt.Sprintf("%s.%d", dscPath, i))
+		// 		if err != nil {
+		// 			return err
+		// 		}
+
+		// 	}
+		// }
 
 		// TODO: check for
 		// if ( dylibInfo->isAlias )
 		//   	printf("[alias] %s\n", dylibInfo->path);
 
-		f, err := dyld.Open(dyldFile)
+		f, err := dyld.Open(dscPath)
 		if err != nil {
 			return err
 		}

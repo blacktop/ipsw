@@ -102,6 +102,38 @@ func Open(name string, config ...*Config) (*File, error) {
 		f.Close()
 		return nil, err
 	}
+	if ff.ImagesOffset == 0 && ff.ImagesCount == 0 {
+		// if ff.SymbolsSubCacheUUID != [16]byte{0} {
+		// 	f, err := os.Open(name + ".symbols")
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// 	ffsym, err := NewFile(f, config...)
+		// 	if err != nil {
+		// 		f.Close()
+		// 		return nil, err
+		// 	}
+		// }
+		lastFileOffset := ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
+		for i := 1; i <= int(ff.NumSubCaches); i++ {
+			f, err := os.Open(fmt.Sprintf("%s.%d", name, i))
+			if err != nil {
+				return nil, err
+			}
+			ffsc, err := NewFile(f, config...)
+			if err != nil {
+				ffsc.Close()
+				return nil, err
+			}
+			for i := 0; i < int(ff.MappingWithSlideCount); i++ {
+				ffsc.Mappings[i].FileOffset = ffsc.Mappings[i].FileOffset + lastFileOffset
+				ffsc.MappingsWithSlideInfo[i].FileOffset = ffsc.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
+				ff.Mappings = append(ff.Mappings, ffsc.Mappings[i])
+				ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsc.MappingsWithSlideInfo[i])
+			}
+			ffsc.Close()
+		}
+	}
 	ff.closer = f
 	return ff, nil
 }
@@ -116,6 +148,22 @@ func (f *File) Close() error {
 		f.closer = nil
 	}
 	return err
+}
+
+// ReadHeader opens a given cache and returns the dyld_shared_cache header
+func ReadHeader(path string) (*CacheHeader, error) {
+	var header CacheHeader
+
+	cache, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := binary.Read(cache, binary.LittleEndian, &header); err != nil {
+		return nil, err
+	}
+
+	return &header, nil
 }
 
 // NewFile creates a new File for accessing a dyld binary in an underlying reader.
