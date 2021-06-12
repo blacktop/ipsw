@@ -120,7 +120,10 @@ var dyldMachoCmd = &cobra.Command{
 
 				m, err := i.GetMacho()
 				if err != nil {
-					return err
+					m, err = i.GetPartialMacho()
+					if err != nil {
+						return err
+					}
 				}
 
 				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings {

@@ -51,8 +51,8 @@ typedef struct
     char magic[16]<bgcolor = cLtBlue>; // e.g. "dyld_v0    i386"
     uint mappingOffset;                // file offset to first dyld_cache_mapping_info
     uint mappingCount;                 // number of dyld_cache_mapping_info entries
-    uint imagesOffsetUnused;           // unused
-    uint imagesCountUnused;            // unused
+    uint imagesOffset;                 // file offset to first dyld_cache_image_info
+    uint imagesCount;                  // number of dyld_cache_image_info entries
     uint64 dyldBaseAddress;            // base address of dyld when cache was built
     uint64 codeSignatureOffset;        // file offset of code signature blob
     uint64 codeSignatureSize;          // size of code signature blob (zero means to end of file)
@@ -96,17 +96,17 @@ typedef struct
     uint64 otherTrieSize;              // size of trie of dylibs and bundles with dlopen closures
     uint32 mappingWithSlideOffset;     // file offset to first dyld_cache_mapping_and_slide_info
     uint32 mappingWithSlideCount;      // number of dyld_cache_mapping_and_slide_info entries
-    uint64 unknown1;
-    uint64 unknown2;
-    uint64 unknown3;
-    uint64 unknown4;
-    uint64 unknown5;
-    uint32 unknown6;
+    uint64 dataMappingStartAddr;
+    uint64 dylibsImageArrayWithSubCachesAddr; // NOTICE: no Size, but you can calculate by progClosuresWithSubCachesAddr - dylibsImageArrayWithSubCachesAddr
+    uint64 progClosuresWithSubCachesAddr;
+    uint64 progClosuresWithSubCachesSize;
+    uint64 progClosuresTrieWithSubCachesAddr;
+    uint32 progClosuresTrieWithSubCachesSize;
     uint32 unknown7;
     uint32 unknown8;
     uint32 unknown9;
-    uint64 unknown10;
-    uint64 unknown11;
+    uint64 unknown10Offset;
+    uint64 unknown10Size;
     uint32 subCacheUUID;
     uint32 numSubCaches;     // number of dyld_shared_cache .1,.2,.3 files
     Uuid symbolSubCacheUUID; // unique value for .symbols sub-cache
@@ -114,8 +114,8 @@ typedef struct
     uint64 zero2;
     uint64 zero3;
     uint64 zero4;
-    uint imagesOffset; // file offset to first dyld_cache_image_info
-    uint imagesCount;  // number of dyld_cache_image_info entries
+    uint imagesOffsetWithSubCaches; // file offset to first dyld_cache_image_info
+    uint imagesCountWithSubCaches;  // number of dyld_cache_image_info entries
 } dyld_cache_header;
 
 typedef struct
@@ -340,8 +340,16 @@ for (i = 0; i < header.mappingCount; i++)
     }
 }
 
-FSeek(header.imagesOffset);
-dyld_cache_image_info imageinfo[header.imagesCount];
+if (header.imagesOffset > 0)
+{
+    FSeek(header.imagesOffset);
+    dyld_cache_image_info imageinfo[header.imagesCount];
+}
+else if (header.imagesOffsetWithSubCaches > 0)
+{
+    FSeek(header.imagesOffsetWithSubCaches);
+    dyld_cache_image_info imageinfo[header.imagesCountWithSubCaches];
+}
 
 FSeek(header.imagesTextOffset);
 dyld_cache_image_text_info imagetext[header.imagesTextCount];
@@ -1285,10 +1293,10 @@ typedef struct(uint64 offset)
 }
 machoParser;
 
-if (header.localSymbolsOffset > 0)
-{
-    for (i = 0; i < symbolinfo.entriesCount; i++)
-    {
-        machoParser parser(symbolinfo.nlistentry[i].dylibOffset);
-    }
-}
+// if (header.localSymbolsOffset > 0)
+// {
+//     for (i = 0; i < symbolinfo.entriesCount; i++)
+//     {
+//         machoParser parser(symbolinfo.nlistentry[i].dylibOffset);
+//     }
+// }
