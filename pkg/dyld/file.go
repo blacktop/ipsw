@@ -116,6 +116,9 @@ func Open(name string, config ...*Config) (*File, error) {
 		// }
 		lastFileOffset := ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
 		for i := 1; i <= int(ff.NumSubCaches); i++ {
+			log.WithFields(log.Fields{
+				"cache": fmt.Sprintf("%s.%d", name, i),
+			}).Debug("Parsing SubCache")
 			f, err := os.Open(fmt.Sprintf("%s.%d", name, i))
 			if err != nil {
 				return nil, err
@@ -125,9 +128,10 @@ func Open(name string, config ...*Config) (*File, error) {
 				ffsc.Close()
 				return nil, err
 			}
-			for i := 0; i < int(ff.MappingWithSlideCount); i++ {
+			for i := 0; i < int(ffsc.MappingWithSlideCount); i++ {
 				ffsc.Mappings[i].FileOffset = ffsc.Mappings[i].FileOffset + lastFileOffset
 				ffsc.MappingsWithSlideInfo[i].FileOffset = ffsc.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
+				ffsc.MappingsWithSlideInfo[i].SlideInfoOffset = ffsc.MappingsWithSlideInfo[i].SlideInfoOffset + lastFileOffset
 				ff.Mappings = append(ff.Mappings, ffsc.Mappings[i])
 				ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsc.MappingsWithSlideInfo[i])
 			}
@@ -267,8 +271,8 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		imagesCount = f.ImagesCount
 		sr.Seek(int64(f.ImagesOffset), os.SEEK_SET)
 	} else {
-		imagesCount = f.NewImagesCount
-		sr.Seek(int64(f.NewImagesOffset), os.SEEK_SET)
+		imagesCount = f.ImagesWithSubCachesCount
+		sr.Seek(int64(f.ImagesWithSubCachesOffset), os.SEEK_SET)
 	}
 
 	for i := uint32(0); i != imagesCount; i++ {
