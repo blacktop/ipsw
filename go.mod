@@ -7,7 +7,7 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20210429232723-e923ed2d1db5 // indirect
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-macho v1.1.36
+	github.com/blacktop/go-macho v1.1.37
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -24,7 +24,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5
-	github.com/pelletier/go-toml v1.9.1 // indirect
+	github.com/pelletier/go-toml v1.9.2 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.3.1 // indirect
@@ -36,6 +36,6 @@ require (
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210603125802-9665404d3644
+	golang.org/x/sys v0.0.0-20210611083646-a4fc73990273
 	gopkg.in/ini.v1 v1.62.0 // indirect
 )
