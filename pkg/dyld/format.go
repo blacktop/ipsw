@@ -209,10 +209,10 @@ func (f *File) String() string {
 			f.SubCachesUUID,
 			f.SymbolsSubCacheUUID,
 		)
-		imagesCount = f.NewImagesCount
-		imageHumanSize = int(f.NewImagesCount) * binary.Size(CacheImageInfo{}) / 1024
-		imagesOffset = int(f.NewImagesOffset)
-		imagesSize = int(f.NewImagesCount) * binary.Size(CacheImageInfo{})
+		imagesCount = f.ImagesWithSubCachesCount
+		imageHumanSize = int(f.ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{}) / 1024
+		imagesOffset = int(f.ImagesWithSubCachesOffset)
+		imagesSize = int(f.ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{})
 	}
 
 	return fmt.Sprintf(
