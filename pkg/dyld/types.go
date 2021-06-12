@@ -127,7 +127,7 @@ type CacheHeader struct {
 	ProgClosuresWithSubCachesSize     uint64
 	ProgClosuresTrieWithSubCachesAddr uint64
 	ProgClosuresTrieWithSubCachesSize uint32
-	Unknown7                          uint32
+	Dyld4FormatVersion                formatVersion
 	Unknown8                          uint32
 	Unknown9                          uint32
 	NewFieldOffset                    uint64

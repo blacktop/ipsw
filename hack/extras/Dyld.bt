@@ -102,7 +102,13 @@ typedef struct
     uint64 progClosuresWithSubCachesSize;
     uint64 progClosuresTrieWithSubCachesAddr;
     uint32 progClosuresTrieWithSubCachesSize;
-    uint32 unknown7;
+    //uint32 unknown7;
+    uint dyld4FormatVersion : 8;     // dyld4::closure::kFormatVersion
+    uint dylibsExpectedOnDisk : 1;   // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
+    uint simulator : 1;              // for simulator of specified platform
+    uint locallyBuiltCache : 1;      // 0 for B&I built cache, 1 for locally built cache
+    uint builtFromChainedFixups : 1; // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
+    uint padding : 20;               // TBD
     uint32 unknown8;
     uint32 unknown9;
     uint64 unknown10Offset;
