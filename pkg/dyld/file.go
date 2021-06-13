@@ -102,7 +102,7 @@ func Open(name string, config ...*Config) (*File, error) {
 		f.Close()
 		return nil, err
 	}
-	if ff.ImagesOffset == 0 && ff.ImagesCount == 0 {
+	if ff.ImagesOffset == 0 && ff.ImagesCount == 0 { // NEW iOS15 dyld4 style caches
 		// if ff.SymbolsSubCacheUUID != [16]byte{0} {
 		// 	f, err := os.Open(name + ".symbols")
 		// 	if err != nil {
