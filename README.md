@@ -34,7 +34,7 @@
 ## Install
 
 ```bash
-❯ brew install blacktop/tap/ipsw
+brew install blacktop/tap/ipsw
 ```
 
 ## Getting Started
