@@ -279,6 +279,9 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 					return nil, errors.Wrap(err, "failed to parse Restore.plist")
 				}
 			case strings.HasSuffix(f.Name, "BuildManifest.plist"):
+				if strings.Contains(f.Name, "Restore") {
+					continue
+				}
 				pData := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
 				if err != nil {
