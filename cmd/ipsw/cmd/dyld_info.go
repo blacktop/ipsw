@@ -115,12 +115,16 @@ var dyldInfoCmd = &cobra.Command{
 				cds := f.CodeSignature.CodeDirectories
 				if len(cds) > 0 {
 					for _, cd := range cds {
+						var teamID string
+						if len(cd.TeamID) > 0 {
+							teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
+						}
 						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
 						fmt.Printf("\tVersion:     %s\n"+
 							"\tFlags:       %s\n"+
 							"\tCodeLimit:   0x%x\n"+
 							"\tIdentifier:  %s (@0x%x)\n"+
-							"\tTeamID:      %s\n"+
+							"%s"+
 							"\tCDHash:      %s (computed)\n"+
 							"\t# of hashes: %d code (%d pages) + %d special\n"+
 							"\tHashes @%d size: %d Type: %s\n",
@@ -129,7 +133,7 @@ var dyldInfoCmd = &cobra.Command{
 							cd.Header.CodeLimit,
 							cd.ID,
 							cd.Header.IdentOffset,
-							cd.TeamID,
+							teamID,
 							cd.CDHash,
 							cd.Header.NCodeSlots,
 							int(math.Pow(2, float64(cd.Header.PageSize))),
@@ -183,6 +187,69 @@ var dyldInfoCmd = &cobra.Command{
 							cert.NotAfter.Format("2006-01-02"))
 					}
 					w.Flush()
+				}
+				if f.GetSubCacheCodeSignatures() != nil {
+					fmt.Println()
+					fmt.Println("SubCache Code Signature(s)")
+					fmt.Println("--------------------------")
+					for uuid, cs := range f.GetSubCacheCodeSignatures() {
+						cds := cs.CodeDirectories
+						if len(cds) > 0 {
+							for _, cd := range cds {
+								var teamID string
+								if len(cd.TeamID) > 0 {
+									teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
+								}
+								fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
+								fmt.Printf("\tVersion:     %s\n"+
+									"\tFlags:       %s\n"+
+									"\tCodeLimit:   0x%x\n"+
+									"\tIdentifier:  %s (@0x%x)\n"+
+									"\tUUID:        %s\n"+
+									"%s"+
+									"\tCDHash:      %s (computed)\n"+
+									"\t# of hashes: %d code (%d pages) + %d special\n"+
+									"\tHashes @%d size: %d Type: %s\n",
+									cd.Header.Version,
+									cd.Header.Flags,
+									cd.Header.CodeLimit,
+									cd.ID,
+									cd.Header.IdentOffset,
+									uuid,
+									teamID,
+									cd.CDHash,
+									cd.Header.NCodeSlots,
+									int(math.Pow(2, float64(cd.Header.PageSize))),
+									cd.Header.NSpecialSlots,
+									cd.Header.HashOffset,
+									cd.Header.HashSize,
+									cd.Header.HashType)
+								if Verbose {
+									for _, sslot := range cd.SpecialSlots {
+										fmt.Printf("\t\t%s\n", sslot.Desc)
+									}
+									for _, cslot := range cd.CodeSlots {
+										fmt.Printf("\t\t%s\n", cslot.Desc)
+									}
+								}
+							}
+						}
+						reqs := f.CodeSignature.Requirements
+						if len(reqs) > 0 {
+							fmt.Printf("Requirement Set (%d bytes) with %d requirement\n",
+								reqs[0].Length, // TODO: fix this (needs to be length - sizeof(header))
+								len(reqs))
+							for idx, req := range reqs {
+								fmt.Printf("\t%d: %s (@%d, %d bytes): %s\n",
+									idx,
+									req.Type,
+									req.Offset,
+									req.Length,
+									req.Detail)
+							}
+						}
+						fmt.Println()
+					}
 				}
 			} else {
 				fmt.Println("  - no code signature data")
