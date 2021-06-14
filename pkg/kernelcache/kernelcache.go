@@ -213,7 +213,8 @@ func RemoteParse(zr *zip.Reader) error {
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
 			for _, folder := range i.GetKernelCacheFolders(f.Name) {
-				fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(f.Name)))
+				// fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(f.Name)))
+				fname := filepath.Join(folder, "kernelcache")
 				if _, err := os.Stat(fname); os.IsNotExist(err) {
 					kdata := make([]byte, f.UncompressedSize64)
 					rc, err := f.Open()
