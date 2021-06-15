@@ -100,7 +100,7 @@ type CacheImage struct {
 	Index        uint32
 	Info         CacheImageInfo
 	LocalSymbols []*CacheLocalSymbol64
-	Mappings     cacheMappingsWithSlideInfo
+	Mappings     *cacheMappingsWithSlideInfo
 	CacheLocalSymbolsEntry
 	CacheImageInfoExtra
 	CacheImageTextInfo
@@ -114,19 +114,16 @@ type CacheImage struct {
 
 	Analysis analysis
 
-	// Embed ReaderAt for ReadAt method.
-	// Do not embed SectionReader directly
-	// to avoid having Read and Seek.
-	// If a client wants Read and Seek it must use
-	// Open() to avoid fighting over the seek offset
-	// with other clients.
-	// io.ReaderAt
-	sr *io.SectionReader
+	cache *File // pointer back to the dyld cache that the image belongs to
 }
 
 // GetPartialMacho parses dyld image as a partial MachO (fast)
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
-	return macho.NewFile(io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize)), macho.FileConfig{
+	offset, err := i.cache.GetOffset(i.LoadAddress)
+	if err != nil {
+		return nil, err
+	}
+	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		LoadFilter: []types.LoadCmd{
 			types.LC_SEGMENT_64,
 			types.LC_DYLD_INFO,
@@ -141,14 +138,14 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			types.LC_LOAD_DYLIB,
 			types.LC_LOAD_WEAK_DYLIB,
 			types.LC_LOAD_UPWARD_DYLIB},
-		Offset:    int64(i.DylibOffset),
-		SrcReader: i.sr,
+		Offset:    int64(offset),
+		SrcReader: io.NewSectionReader(i.cache.r, 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
 				return i.SlideInfo.SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
-				for _, mapping := range i.Mappings {
+				for _, mapping := range i.cache.Mappings {
 					if mapping.Address <= address && address < mapping.Address+mapping.Size {
 						return (address - mapping.Address) + mapping.FileOffset, nil
 					}
@@ -156,7 +153,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 				return 0, fmt.Errorf("address not within any mappings address range")
 			},
 			Offet2VMAddr: func(offset uint64) (uint64, error) {
-				for _, mapping := range i.Mappings {
+				for _, mapping := range i.cache.Mappings {
 					if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
 						return (offset - mapping.FileOffset) + mapping.Address, nil
 					}
@@ -169,15 +166,19 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 
 // GetMacho parses dyld image as a MachO (slow)
 func (i *CacheImage) GetMacho() (*macho.File, error) {
-	return macho.NewFile(io.NewSectionReader(i.sr, int64(i.DylibOffset), int64(i.TextSegmentSize)), macho.FileConfig{
-		Offset:    int64(i.DylibOffset),
-		SrcReader: i.sr,
+	offset, err := i.cache.GetOffset(i.LoadAddress)
+	if err != nil {
+		return nil, err
+	}
+	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+		Offset:    int64(offset),
+		SrcReader: io.NewSectionReader(i.cache.r, 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
 				return i.SlideInfo.SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
-				for _, mapping := range i.Mappings {
+				for _, mapping := range i.cache.Mappings {
 					if mapping.Address <= address && address < mapping.Address+mapping.Size {
 						return (address - mapping.Address) + mapping.FileOffset, nil
 					}
@@ -185,7 +186,7 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 				return 0, fmt.Errorf("address not within any mappings address range")
 			},
 			Offet2VMAddr: func(offset uint64) (uint64, error) {
-				for _, mapping := range i.Mappings {
+				for _, mapping := range i.cache.Mappings {
 					if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
 						return (offset - mapping.FileOffset) + mapping.Address, nil
 					}
