@@ -14,6 +14,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
+	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -59,8 +60,9 @@ type File struct {
 	LocalSymInfo    localSymbolInfo
 	AcceleratorInfo CacheAcceleratorInfo
 
-	BranchPools   []uint64
-	CodeSignature codesignature
+	BranchPools            []uint64
+	CodeSignature          codesignature
+	subCacheCodeSignatures map[mtypes.UUID]codesignature
 
 	AddressToSymbol map[uint64]string
 
@@ -103,17 +105,7 @@ func Open(name string, config ...*Config) (*File, error) {
 		return nil, err
 	}
 	if ff.ImagesOffset == 0 && ff.ImagesCount == 0 { // NEW iOS15 dyld4 style caches
-		// if ff.SymbolsSubCacheUUID != [16]byte{0} {
-		// 	f, err := os.Open(name + ".symbols")
-		// 	if err != nil {
-		// 		return nil, err
-		// 	}
-		// 	ffsym, err := NewFile(f, config...)
-		// 	if err != nil {
-		// 		f.Close()
-		// 		return nil, err
-		// 	}
-		// }
+		ff.subCacheCodeSignatures = make(map[mtypes.UUID]codesignature)
 		lastFileOffset := ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
 		for i := 1; i <= int(ff.NumSubCaches); i++ {
 			log.WithFields(log.Fields{
@@ -128,6 +120,15 @@ func Open(name string, config ...*Config) (*File, error) {
 				ffsc.Close()
 				return nil, err
 			}
+
+			if ffsc.SubCachesUUID != ff.SubCachesUUID {
+				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
+					ff.SubCachesUUID,
+					ffsc.SubCachesUUID)
+			}
+
+			ff.subCacheCodeSignatures[ffsc.UUID] = ffsc.CodeSignature
+
 			for i := 0; i < int(ffsc.MappingWithSlideCount); i++ {
 				ffsc.Mappings[i].FileOffset = ffsc.Mappings[i].FileOffset + lastFileOffset
 				ffsc.MappingsWithSlideInfo[i].FileOffset = ffsc.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
@@ -135,7 +136,33 @@ func Open(name string, config ...*Config) (*File, error) {
 				ff.Mappings = append(ff.Mappings, ffsc.Mappings[i])
 				ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsc.MappingsWithSlideInfo[i])
 			}
+			ff.AppendData(io.NewSectionReader(ffsc.r, 0, 1<<63-1), lastFileOffset)
 			ffsc.Close()
+		}
+		if ff.SymbolsSubCacheUUID != [16]byte{0} {
+			log.WithFields(log.Fields{
+				"cache": name + ".symbols",
+			}).Debug("Parsing SubCache")
+			f, err := os.Open(name + ".symbols")
+			if err != nil {
+				return nil, err
+			}
+			ffsym, err := NewFile(f, config...)
+			if err != nil {
+				f.Close()
+				return nil, err
+			}
+			lastFileOffset = ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
+			ff.subCacheCodeSignatures[ffsym.UUID] = ffsym.CodeSignature
+			ff.LocalSymInfo.CacheLocalSymbolsInfo = ffsym.LocalSymInfo.CacheLocalSymbolsInfo
+			ff.LocalSymInfo.NListFileOffset = ffsym.LocalSymInfo.NListFileOffset + uint32(lastFileOffset)
+			ff.LocalSymInfo.NListByteSize = ffsym.LocalSymInfo.NListByteSize
+			ff.LocalSymInfo.StringsFileOffset = ffsym.LocalSymInfo.StringsFileOffset + uint32(lastFileOffset)
+			for idx, img := range ffsym.Images {
+				ff.Images[idx].LocalSymbols = img.LocalSymbols
+			}
+			ff.AppendData(io.NewSectionReader(ffsym.r, 0, 1<<63-1), lastFileOffset)
+			ffsym.Close()
 		}
 	}
 	ff.closer = f
@@ -281,11 +308,9 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 			return nil, err
 		}
 		f.Images = append(f.Images, &CacheImage{
-			Index:     i,
-			Info:      iinfo,
-			Mappings:  f.MappingsWithSlideInfo,
-			sr:        sr,
-			SlideInfo: f.SlideInfo,
+			Index: i,
+			Info:  iinfo,
+			cache: f,
 		})
 	}
 	for idx, image := range f.Images {
@@ -332,6 +357,9 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
 		for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
+			// if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
+			// 	return nil, err
+			// }
 			var localSymEntry CacheLocalSymbolsEntry
 			if err := binary.Read(sr, f.ByteOrder, &localSymEntry); err != nil {
 				return nil, err
@@ -342,9 +370,7 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 				f.Images = append(f.Images, &CacheImage{
 					Index: uint32(i),
 					// Info:      iinfo,
-					Mappings:               f.MappingsWithSlideInfo,
-					sr:                     sr,
-					SlideInfo:              f.SlideInfo,
+					cache:                  f,
 					CacheLocalSymbolsEntry: localSymEntry,
 				})
 			}
@@ -455,21 +481,8 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	// Read dyld text_info entries.
 	sr.Seek(int64(f.ImagesTextOffset), os.SEEK_SET)
 	for i := uint64(0); i != f.ImagesTextCount; i++ {
-		var textInfo CacheImageTextInfo
-		if err := binary.Read(sr, f.ByteOrder, &textInfo); err != nil {
+		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
 			return nil, err
-		}
-		if len(f.Images) > int(i) {
-			f.Images[i].CacheImageTextInfo = textInfo
-		} else {
-			f.Images = append(f.Images, &CacheImage{
-				Index: uint32(i),
-				// Info:      iinfo,
-				Mappings:           f.MappingsWithSlideInfo,
-				sr:                 sr,
-				SlideInfo:          f.SlideInfo,
-				CacheImageTextInfo: textInfo,
-			})
 		}
 	}
 
@@ -1000,4 +1013,8 @@ func (f *File) FindClosure(executablePath string) error {
 	}
 
 	return nil
+}
+
+func (f *File) GetSubCacheCodeSignatures() map[mtypes.UUID]codesignature {
+	return f.subCacheCodeSignatures
 }

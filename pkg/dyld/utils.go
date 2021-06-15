@@ -1,8 +1,11 @@
 package dyld
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"strings"
 )
 
@@ -56,4 +59,29 @@ func (f *File) ReadPointerAtAddress(addr uint64) (uint64, error) {
 		return 0, fmt.Errorf("failed to get offset: %v", err)
 	}
 	return f.ReadPointer(offset)
+}
+
+// AppendData appends data to the dyld.File's io.ReaderAt backing data store
+func (f *File) AppendData(r *io.SectionReader, offset uint64) error {
+	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+
+	newData, err := ioutil.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	data, err := ioutil.ReadAll(sr)
+	if err != nil {
+		return err
+	}
+
+	// log.WithFields(log.Fields{
+	// 	"data_size": fmt.Sprintf("%#x", len(data)),
+	// 	"new_size":  fmt.Sprintf("%#x", len(newData)),
+	// 	"offset":    fmt.Sprintf("%#x", offset),
+	// }).Debug("Appending data to dyld_shared_cache")
+	data = append(data[:offset], newData...)
+	f.r = bytes.NewReader(data)
+
+	return nil
 }

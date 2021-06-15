@@ -126,7 +126,7 @@ var dyldMachoCmd = &cobra.Command{
 					}
 				}
 
-				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings {
+				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts {
 					fmt.Println(m.FileTOC.String())
 				}
 
@@ -238,18 +238,20 @@ var dyldMachoCmd = &cobra.Command{
 				}
 
 				if dumpSymbols {
-					fmt.Println("SYMBOLS")
-					fmt.Println("=======")
-					var sec string
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
-					for _, sym := range m.Symtab.Syms {
-						if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-							sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+					if m.Symtab != nil {
+						fmt.Println("SYMBOLS")
+						fmt.Println("=======")
+						var sec string
+						for _, sym := range m.Symtab.Syms {
+							if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+								sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+							}
+							fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+							// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 						}
-						fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
-						// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+						w.Flush()
 					}
-					w.Flush()
 					// Dedup these symbols (has repeats but also additional symbols??)
 					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
 						fmt.Printf("\nDyldExport SYMBOLS\n")
