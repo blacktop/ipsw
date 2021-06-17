@@ -105,7 +105,7 @@ var dyldInfoCmd = &cobra.Command{
 		defer f.Close()
 
 		// if showHeader {
-		fmt.Println(f)
+		fmt.Println(f.String(Verbose))
 		// }
 
 		if showSignature {

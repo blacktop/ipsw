@@ -73,7 +73,7 @@ var slideCmd = &cobra.Command{
 			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
 
-		f, err := dyld.Open(dscPath, &dyld.Config{ParseSlideInfo: true})
+		f, err := dyld.Open(dscPath)
 		if err != nil {
 			return err
 		}
