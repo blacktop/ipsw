@@ -86,7 +86,7 @@ var symbolicateCmd = &cobra.Command{
 				dscPath = filepath.Join(linkRoot, symlinkPath)
 			}
 
-			f, err := dyld.Open(dscPath, &dyld.Config{ParsePatchInfo: true})
+			f, err := dyld.Open(dscPath)
 			if err != nil {
 				return err
 			}
