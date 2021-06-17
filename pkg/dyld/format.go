@@ -148,22 +148,28 @@ func (mapping CacheMappingWithSlideInfo) String() string {
 	return tableString.String()
 }
 
-func (mappings cacheMappingsWithSlideInfo) String(slideVersion uint32) string {
+func (mappings cacheMappingsWithSlideInfo) String(slideVersion uint32, verbose bool) string {
 	tableString := &strings.Builder{}
 
 	mdata := [][]string{}
 	for _, mapping := range mappings {
-		slideInfoSize := fmt.Sprintf("%#08x -> %#08x", mapping.SlideInfoOffset, mapping.SlideInfoOffset+mapping.SlideInfoSize)
-		if mapping.SlideInfoSize == 0 {
-			slideInfoSize = fmt.Sprintf("%#08x", mapping.SlideInfoOffset)
+		mappingAddr := fmt.Sprintf("%#08x", mapping.Address)
+		mappingOff := fmt.Sprintf("%#08x", mapping.FileOffset)
+		if verbose {
+			mappingAddr = fmt.Sprintf("%#08x -> %#08x", mapping.Address, mapping.Address+mapping.Size)
+			mappingOff = fmt.Sprintf("%#08x -> %#08x", mapping.FileOffset, mapping.FileOffset+mapping.Size)
+		}
+		var slideInfoSize string
+		if mapping.SlideInfoSize > 0 {
+			slideInfoSize = fmt.Sprintf("%#08x -> %#08x", mapping.SlideInfoOffset, mapping.SlideInfoOffset+mapping.SlideInfoSize)
 		}
 		mdata = append(mdata, []string{
 			mapping.Name,
 			mapping.InitProt.String(),
 			mapping.MaxProt.String(),
 			fmt.Sprintf("%#08x (%s)", mapping.Size, humanize.Bytes(mapping.Size)),
-			fmt.Sprintf("%#08x", mapping.Address),
-			fmt.Sprintf("%#08x", mapping.FileOffset),
+			mappingAddr,
+			mappingOff,
 			slideInfoSize,
 			fmt.Sprintf("%d", mapping.Flags),
 		})
@@ -187,7 +193,7 @@ func (images cacheImages) Print() {
 	}
 }
 
-func (f *File) String() string {
+func (f *File) String(verbose bool) string {
 	var slideVersion uint32
 
 	if f.SlideInfo != nil {
@@ -232,7 +238,7 @@ func (f *File) String() string {
 		f.getProgClosures(),
 		f.getProgClosuresTrie(),
 		f.getSharedRegion(),
-		f.getMappings(slideVersion),
+		f.getMappings(slideVersion, verbose),
 	)
 }
 
@@ -409,12 +415,12 @@ func (f *File) getSharedRegion() string {
 	return output
 }
 
-func (f *File) getMappings(slideVersion uint32) string {
+func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 	var output string
 	if f.CacheHeader.SlideInfoOffsetUnused > 0 {
 		output = f.Mappings.String()
 	} else {
-		output = f.MappingsWithSlideInfo.String(slideVersion)
+		output = f.MappingsWithSlideInfo.String(slideVersion, verbose)
 	}
 	return output
 }
