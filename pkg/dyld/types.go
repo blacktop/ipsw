@@ -424,6 +424,12 @@ type CacheLocalSymbolsInfo struct {
 }
 
 type CacheLocalSymbolsEntry struct {
+	DylibOffset     uint64 // offset in cache file of start of dylib
+	NlistStartIndex uint32 // start index of locals for this dylib
+	NlistCount      uint32 // number of local symbols for this dylib
+}
+
+type preDyld4cacheLocalSymbolsEntry struct {
 	DylibOffset     uint32 // offset in cache file of start of dylib
 	NlistStartIndex uint32 // start index of locals for this dylib
 	NlistCount      uint32 // number of local symbols for this dylib

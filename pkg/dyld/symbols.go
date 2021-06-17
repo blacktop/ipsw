@@ -37,7 +37,7 @@ func (f *File) ParseLocalSyms() error {
 			stringPool.Seek(int64(nlist.Name), io.SeekStart)
 			s, err := bufio.NewReader(stringPool).ReadString('\x00')
 			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
+				return fmt.Errorf("failed to read string at: %#x; %v", f.LocalSymInfo.StringsFileOffset+nlist.Name, err)
 			}
 			f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
 			f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{

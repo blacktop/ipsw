@@ -70,12 +70,6 @@ type File struct {
 	closer io.Closer
 }
 
-// Config is the dyld file config
-type Config struct {
-	ParseSlideInfo bool
-	ParsePatchInfo bool
-}
-
 // FormatError is returned by some operations if the data does
 // not have the correct format for an object file.
 type FormatError struct {
@@ -94,12 +88,12 @@ func (e *FormatError) Error() string {
 }
 
 // Open opens the named file using os.Open and prepares it for use as a dyld binary.
-func Open(name string, config ...*Config) (*File, error) {
+func Open(name string) (*File, error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
 	}
-	ff, err := NewFile(f, config...)
+	ff, err := NewFile(f)
 	if err != nil {
 		f.Close()
 		return nil, err
@@ -115,17 +109,17 @@ func Open(name string, config ...*Config) (*File, error) {
 			if err != nil {
 				return nil, err
 			}
-			ffsc, err := NewFile(f, config...)
+			ffsc, err := NewFile(f)
 			if err != nil {
 				ffsc.Close()
 				return nil, err
 			}
 
-			if ffsc.SubCachesUUID != ff.SubCachesUUID {
-				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
-					ff.SubCachesUUID,
-					ffsc.SubCachesUUID)
-			}
+			// if ffsc.SubCachesUUID != ff.SubCachesUUID {
+			// 	return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
+			// 		ff.SubCachesUUID,
+			// 		ffsc.SubCachesUUID)
+			// }
 
 			ff.subCacheCodeSignatures[ffsc.UUID] = ffsc.CodeSignature
 
@@ -147,21 +141,33 @@ func Open(name string, config ...*Config) (*File, error) {
 			if err != nil {
 				return nil, err
 			}
-			ffsym, err := NewFile(f, config...)
+			ffsym, err := NewFile(f)
 			if err != nil {
 				f.Close()
 				return nil, err
 			}
 			lastFileOffset = ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
 			ff.subCacheCodeSignatures[ffsym.UUID] = ffsym.CodeSignature
-			ff.LocalSymInfo.CacheLocalSymbolsInfo = ffsym.LocalSymInfo.CacheLocalSymbolsInfo
+			// Copy local symbols info from .symbols sub cache
+			ff.LocalSymbolsOffset = ffsym.LocalSymbolsOffset
+			ff.LocalSymbolsSize = ffsym.LocalSymbolsSize
+			ff.LocalSymInfo = ffsym.LocalSymInfo
 			ff.LocalSymInfo.NListFileOffset = ffsym.LocalSymInfo.NListFileOffset + uint32(lastFileOffset)
-			ff.LocalSymInfo.NListByteSize = ffsym.LocalSymInfo.NListByteSize
 			ff.LocalSymInfo.StringsFileOffset = ffsym.LocalSymInfo.StringsFileOffset + uint32(lastFileOffset)
 			for idx, img := range ffsym.Images {
-				ff.Images[idx].LocalSymbols = img.LocalSymbols
+				ff.Images[idx].CacheLocalSymbolsEntry = img.CacheLocalSymbolsEntry
+			}
+			for i := 0; i < int(ffsym.MappingWithSlideCount); i++ {
+				ffsym.Mappings[i].FileOffset = ffsym.Mappings[i].FileOffset + lastFileOffset
+				ffsym.MappingsWithSlideInfo[i].FileOffset = ffsym.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
+				ffsym.MappingsWithSlideInfo[i].SlideInfoOffset = ffsym.MappingsWithSlideInfo[i].SlideInfoOffset + lastFileOffset
+				ff.Mappings = append(ff.Mappings, ffsym.Mappings[i])
+				ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsym.MappingsWithSlideInfo[i])
 			}
 			ff.AppendData(io.NewSectionReader(ffsym.r, 0, 1<<63-1), lastFileOffset)
+			// if b, err := io.ReadAll(io.NewSectionReader(ff.r, 0, 1<<63-1)); err == nil {
+			// 	ioutil.WriteFile(fmt.Sprintf("%s.BIGG", name), b, 0755)
+			// }
 			ffsym.Close()
 		}
 	}
@@ -199,16 +205,12 @@ func ReadHeader(path string) (*CacheHeader, error) {
 
 // NewFile creates a new File for accessing a dyld binary in an underlying reader.
 // The dyld binary is expected to start at position 0 in the ReaderAt.
-func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
-	var config Config
+func NewFile(r io.ReaderAt) (*File, error) {
 	f := new(File)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 	f.r = r
 	f.AddressToSymbol = make(map[uint64]string, 7000000)
 
-	if len(userConfig) > 0 {
-		config = *userConfig[0]
-	}
 	// Read and decode dyld magic
 	var ident [16]byte
 	if _, err := r.ReadAt(ident[0:], 0); err != nil {
@@ -319,9 +321,9 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		if name, err := r.ReadString(byte(0)); err == nil {
 			f.Images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
 		}
-		if offset, err := f.GetOffset(image.Info.Address); err == nil {
-			f.Images[idx].CacheLocalSymbolsEntry.DylibOffset = uint32(offset)
-		}
+		// if offset, err := f.GetOffset(image.Info.Address); err == nil {
+		// 	f.Images[idx].CacheLocalSymbolsEntry.DylibOffset = offset
+		// }
 	}
 
 	// Read dyld code signature.
@@ -354,16 +356,27 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 		f.LocalSymInfo.NListFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
 		f.LocalSymInfo.StringsFileOffset = uint32(f.LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
 
-		sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+		sr.Seek(int64(f.LocalSymbolsOffset+uint64(f.LocalSymInfo.EntriesOffset)), os.SEEK_SET)
 
 		for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
 			// if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
 			// 	return nil, err
 			// }
 			var localSymEntry CacheLocalSymbolsEntry
-			if err := binary.Read(sr, f.ByteOrder, &localSymEntry); err != nil {
-				return nil, err
+			if f.ImagesOffset == 0 && f.ImagesCount == 0 { // NEW iOS15 dyld4 style caches
+				if err := binary.Read(sr, f.ByteOrder, &localSymEntry); err != nil {
+					return nil, err
+				}
+			} else {
+				var preDyld4LSEntry preDyld4cacheLocalSymbolsEntry
+				if err := binary.Read(sr, f.ByteOrder, &preDyld4LSEntry); err != nil {
+					return nil, err
+				}
+				localSymEntry.DylibOffset = uint64(preDyld4LSEntry.DylibOffset)
+				localSymEntry.NlistStartIndex = preDyld4LSEntry.NlistStartIndex
+				localSymEntry.NlistCount = preDyld4LSEntry.NlistCount
 			}
+
 			if len(f.Images) > i {
 				f.Images[i].CacheLocalSymbolsEntry = localSymEntry
 			} else {
@@ -483,91 +496,6 @@ func NewFile(r io.ReaderAt, userConfig ...*Config) (*File, error) {
 	for i := uint64(0); i != f.ImagesTextCount; i++ {
 		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
 			return nil, err
-		}
-	}
-
-	if config.ParsePatchInfo {
-		if f.PatchInfoAddr > 0 {
-			// Read dyld patch_info entries.
-			patchInfoOffset, err := f.GetOffset(f.PatchInfoAddr)
-			if err != nil {
-				return nil, err
-			}
-
-			sr.Seek(int64(patchInfoOffset), io.SeekStart)
-			if err := binary.Read(sr, f.ByteOrder, &f.PatchInfo); err != nil {
-				return nil, err
-			}
-
-			// Read all the other patch_info structs
-			patchTableArrayOffset, err := f.GetOffset(f.PatchInfo.PatchTableArrayAddr)
-			if err != nil {
-				return nil, err
-			}
-
-			sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
-			imagePatches := make([]CacheImagePatches, f.PatchInfo.PatchTableArrayCount)
-			if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
-				return nil, err
-			}
-
-			patchExportNamesOffset, err := f.GetOffset(f.PatchInfo.PatchExportNamesAddr)
-			if err != nil {
-				return nil, err
-			}
-
-			exportNames := io.NewSectionReader(f.r, int64(patchExportNamesOffset), int64(f.PatchInfo.PatchExportNamesSize))
-
-			patchExportArrayOffset, err := f.GetOffset(f.PatchInfo.PatchExportArrayAddr)
-			if err != nil {
-				return nil, err
-			}
-
-			sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
-			patchExports := make([]CachePatchableExport, f.PatchInfo.PatchExportArrayCount)
-			if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
-				return nil, err
-			}
-
-			patchLocationArrayOffset, err := f.GetOffset(f.PatchInfo.PatchLocationArrayAddr)
-			if err != nil {
-				return nil, err
-			}
-
-			sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
-			patchableLocations := make([]CachePatchableLocation, f.PatchInfo.PatchLocationArrayCount)
-			if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
-				return nil, err
-			}
-
-			// Add patchabled export info to images
-			for i, iPatch := range imagePatches {
-				if iPatch.PatchExportsCount > 0 {
-					for exportIndex := uint32(0); exportIndex != iPatch.PatchExportsCount; exportIndex++ {
-						patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
-						var exportName string
-						if uint64(patchExport.ExportNameOffset) < f.PatchInfo.PatchExportNamesSize {
-							exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
-							s, err := bufio.NewReader(exportNames).ReadString('\x00')
-							if err != nil {
-								return nil, errors.Wrapf(err, "failed to read string at: %x", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset)
-							}
-							exportName = strings.Trim(s, "\x00")
-						} else {
-							exportName = ""
-						}
-						plocs := make([]CachePatchableLocation, patchExport.PatchLocationsCount)
-						for locationIndex := uint32(0); locationIndex != patchExport.PatchLocationsCount; locationIndex++ {
-							plocs[locationIndex] = patchableLocations[patchExport.PatchLocationsStartIndex+locationIndex]
-						}
-						f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, patchableExport{
-							Name:           exportName,
-							OffsetOfImpl:   patchExport.CacheOffsetOfImpl,
-							PatchLocations: plocs,
-						})
-					}
-				}
-			}
 		}
 	}
 
@@ -857,6 +785,97 @@ func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error
 		log.Errorf("got unexpected dyld slide info version: %d", slideInfoVersion)
 	}
 	return nil
+}
+
+// ParsePatchInfo parses dyld patch info
+func (f *File) ParsePatchInfo() error {
+	if f.PatchInfoAddr > 0 {
+		sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+		// Read dyld patch_info entries.
+		patchInfoOffset, err := f.GetOffset(f.PatchInfoAddr + 8)
+		if err != nil {
+			return err
+		}
+
+		sr.Seek(int64(patchInfoOffset), io.SeekStart)
+		if err := binary.Read(sr, f.ByteOrder, &f.PatchInfo); err != nil {
+			return err
+		}
+
+		// Read all the other patch_info structs
+		patchTableArrayOffset, err := f.GetOffset(f.PatchInfo.PatchTableArrayAddr)
+		if err != nil {
+			return err
+		}
+
+		sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
+		imagePatches := make([]CacheImagePatches, f.PatchInfo.PatchTableArrayCount)
+		if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
+			return err
+		}
+
+		patchExportNamesOffset, err := f.GetOffset(f.PatchInfo.PatchExportNamesAddr)
+		if err != nil {
+			return err
+		}
+
+		exportNames := io.NewSectionReader(f.r, int64(patchExportNamesOffset), int64(f.PatchInfo.PatchExportNamesSize))
+
+		patchExportArrayOffset, err := f.GetOffset(f.PatchInfo.PatchExportArrayAddr)
+		if err != nil {
+			return err
+		}
+
+		sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
+		patchExports := make([]CachePatchableExport, f.PatchInfo.PatchExportArrayCount)
+		if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
+			return err
+		}
+
+		patchLocationArrayOffset, err := f.GetOffset(f.PatchInfo.PatchLocationArrayAddr)
+		if err != nil {
+			return err
+		}
+
+		sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
+		patchableLocations := make([]CachePatchableLocation, f.PatchInfo.PatchLocationArrayCount)
+		if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
+			return err
+		}
+
+		// Add patchabled export info to images
+		for i, iPatch := range imagePatches {
+			if iPatch.PatchExportsCount > 0 {
+				for exportIndex := uint32(0); exportIndex != iPatch.PatchExportsCount; exportIndex++ {
+					patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
+					var exportName string
+					if uint64(patchExport.ExportNameOffset) < f.PatchInfo.PatchExportNamesSize {
+						exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
+						s, err := bufio.NewReader(exportNames).ReadString('\x00')
+						if err != nil {
+							return errors.Wrapf(err, "failed to read string at: %x", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset)
+						}
+						exportName = strings.Trim(s, "\x00")
+					} else {
+						exportName = ""
+					}
+					plocs := make([]CachePatchableLocation, patchExport.PatchLocationsCount)
+					for locationIndex := uint32(0); locationIndex != patchExport.PatchLocationsCount; locationIndex++ {
+						plocs[locationIndex] = patchableLocations[patchExport.PatchLocationsStartIndex+locationIndex]
+					}
+					f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, patchableExport{
+						Name:           exportName,
+						OffsetOfImpl:   patchExport.CacheOffsetOfImpl,
+						PatchLocations: plocs,
+					})
+				}
+			}
+		}
+
+		return nil
+	}
+
+	return fmt.Errorf("cache does NOT contain patch info")
 }
 
 // Image returns the first Image with the given name, or nil if no such image exists.

@@ -141,7 +141,8 @@ var symaddrCmd = &cobra.Command{
 		 * Dump ALL symbols
 		 */
 		if err = f.GetAllExportedSymbols(true); err != nil {
-			return errors.Wrap(err, "failed to get all exported symbols")
+			log.Errorf("failed to get all exported symbols: %v", err)
+			// return fmt.Errorf("failed to get all exported symbols: %v", err)
 		}
 
 		log.Warn("parsing local symbols (slow)...")
