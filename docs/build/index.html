@@ -199,16 +199,22 @@
           
 <h1 class="title">Build</h1>
 <div class="content ">
-  <h4 id="install-the-go-binary">Install the Go binary</h4>
+  <h3 id="install-the-go-binary">Install the Go binary</h3>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/blacktop/ipsw.git
 $ <span class="nb">cd</span> ipsw
-$ <span class="nv">CGO_ENABLED</span><span class="o">=</span><span class="m">0</span> go build ./cmd/ipsw
-</code></pre></div><h2 id="without-internet"><strong>WITHOUT</strong> internet</h2>
-<p>On internet connected machine with Go installed</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ go mod vendor
+$ make build
+</code></pre></div><h4 id="to-dev-and-build-without-internet">To dev and build <strong>WITHOUT</strong> internet</h4>
+<p>On internet connected machine with Go installed download all Golang lib dependencies</p>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/blacktop/ipsw.git
+$ <span class="nb">cd</span> ipsw
+$ go mod vendor <span class="c1"># this downloads all of the dependencies into the `vendor` folder</span>
 </code></pre></div><p>Now copy the project&rsquo;s directory to <em>no-net</em> machine</p>
 <p>Add <code>--mod=vendor</code> to use the Go deps in the vendor folder</p>
 <div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ go build --mod<span class="o">=</span>vendor ./cmd/ipsw
+</code></pre></div><h3 id="build-for-all-supported-platforms-using-goreleaserhttpsgoreleasercom">Build for all supported platforms using <a href="https://goreleaser.com">goreleaser</a></h3>
+<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ git clone https://github.com/blacktop/ipsw.git
+$ <span class="nb">cd</span> ipsw
+$ make dry_release
 </code></pre></div>
 </div>
 </div>
