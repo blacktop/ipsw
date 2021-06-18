@@ -83,7 +83,8 @@ var slideCmd = &cobra.Command{
 			log.Warn("parsing public symbols...")
 			err = f.GetAllExportedSymbols(false)
 			if err != nil {
-				return err
+				// return err
+				log.Errorf("failed to parse all exported symbols: %v", err)
 			}
 			log.Warn("parsing private symbols...")
 			err = f.ParseLocalSyms()
