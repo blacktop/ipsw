@@ -6,20 +6,22 @@ weight: 3
 summary: Build from source
 ---
 
-#### Install the Go binary
+### Install the Go binary
 
 ```bash
 $ git clone https://github.com/blacktop/ipsw.git
 $ cd ipsw
-$ CGO_ENABLED=0 go build ./cmd/ipsw
+$ make build
 ```
 
-## **WITHOUT** internet
+#### To dev and build **WITHOUT** internet
 
-On internet connected machine with Go installed
+On internet connected machine with Go installed download all Golang lib dependencies
 
 ```bash
-$ go mod vendor
+$ git clone https://github.com/blacktop/ipsw.git
+$ cd ipsw
+$ go mod vendor # this downloads all of the dependencies into the `vendor` folder
 ```
 
 Now copy the project's directory to _no-net_ machine
@@ -28,4 +30,12 @@ Add `--mod=vendor` to use the Go deps in the vendor folder
 
 ```bash
 $ go build --mod=vendor ./cmd/ipsw
+```
+
+### Build for all supported platforms using [goreleaser](https://goreleaser.com)
+
+```bash
+$ git clone https://github.com/blacktop/ipsw.git
+$ cd ipsw
+$ make dry_release
 ```
