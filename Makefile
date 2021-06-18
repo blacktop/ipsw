@@ -6,12 +6,12 @@ NEXT_VERSION=$(shell svu patch)
 
 .PHONY: build-deps
 build-deps: ## Install the build dependencies
-	@echo "===> Installing build deps"
+	@echo " > Installing build deps"
 	brew install go goreleaser
 
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
-	@echo "===> Installing dev deps"
+	@echo " > Installing dev deps"
 	go get -u github.com/spf13/cobra/cobra
 	go get -u golang.org/x/tools/cmd/cover
 	go get -u github.com/caarlos0/svu
@@ -44,36 +44,40 @@ destroy: ## Remove release from the CUR_VERSION
 	git push origin :refs/tags/${CUR_VERSION}
 
 build: ## Build ipsw
+	@echo " > Building ipsw"
 	@go mod download
 	@CGO_ENABLED=0 go build ./cmd/ipsw
 
 .PHONY: docs
 docs: ## Build the hugo docs
-	@echo "===> Building Docs"
+	@echo " > Building Docs"
 	hack/publish/gh-pages
 
 .PHONY: test-docs
 test-docs: ## Start local server hosting hugo docs
-	@echo "===> Testing Docs"
+	@echo " > Testing Docs"
 	cd docs; hugo server -D
 
 .PHONY: update_mod
 update_mod: ## Update go.mod file
+	@echo " > Updating go.mod"
 	rm go.sum
 	go mod download
 	go mod tidy
 
 .PHONY: update_devs
 update_devs: ## Parse XCode database for new devices
+	@echo " > Updating device_traits.json"
 	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/device_traits.json
 
 .PHONY: update_keys
 update_keys: ## Scrape the iPhoneWiki for AES keys
+	@echo " > Updating firmware_keys.json"
 	CGO_ENABLED=0 go run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
 
 .PHONY: docker
 docker: ## Build docker image
-	@echo "===> Building Docker Image"
+	@echo " > Building Docker Image"
 	docker build -t $(REPO)/$(NAME):$(NEXT_VERSION) .
 
 .PHONY: docker-tag
@@ -90,10 +94,11 @@ docker-push: docker-tag ## Push docker image to github
 
 .PHONY: docker-test
 docker-test: ## Run docker test
-	@echo "===> Testing Docker Image"
+	@echo " > Testing Docker Image"
 	docker run --init -it --rm --device /dev/fuse --cap-add=SYS_ADMIN -v `pwd`:/data $(REPO)/$(NAME):$(NEXT_VERSION) -V extract --dyld /data/iPhone12_1_13.2.3_17B111_Restore.ipsw
 
 clean: ## Clean up artifacts
+	@echo " > Cleaning"
 	rm *.tar || true
 	rm *.ipsw || true
 	rm kernelcache.release.* || true
