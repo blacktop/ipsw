@@ -330,6 +330,17 @@ typedef struct
     }
 } dyld_cache_local_symbols_info;
 
+typedef struct
+{
+    uint64 version;
+    uint64 offset1;
+    uint64 offset2;
+    uint64 offset3;
+    uint32 size1;
+    uint32 size2;
+    uint32 count;
+} new_struct<bgcolor = cPurple>;
+
 void get_dyld_cache_local_symbols_info(uint64 totalsize)
 {
     dyld_cache_local_symbols_info symbolinfo;
@@ -373,6 +384,9 @@ else if (header.imagesOffsetWithSubCaches > 0)
 
 FSeek(header.imagesTextOffset);
 dyld_cache_image_text_info imagetext[header.imagesTextCount];
+
+FSeek(header.unknown10Offset);
+new_struct new;
 
 // FSeek(header.codeSignatureOffset);
 // if (header.codeSignatureSize > 0)
