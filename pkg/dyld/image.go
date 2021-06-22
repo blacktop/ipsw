@@ -119,11 +119,7 @@ type CacheImage struct {
 
 // GetPartialMacho parses dyld image as a partial MachO (fast)
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
-	offset, err := i.cache.GetOffset(i.LoadAddress)
-	if err != nil {
-		return nil, err
-	}
-	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(i.DylibOffset), int64(i.TextSegmentSize)), macho.FileConfig{
 		LoadFilter: []types.LoadCmd{
 			types.LC_SEGMENT_64,
 			types.LC_DYLD_INFO,
@@ -138,11 +134,11 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			types.LC_LOAD_DYLIB,
 			types.LC_LOAD_WEAK_DYLIB,
 			types.LC_LOAD_UPWARD_DYLIB},
-		Offset:    int64(offset),
+		Offset:    int64(i.DylibOffset),
 		SrcReader: io.NewSectionReader(i.cache.r, 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
-				return i.SlideInfo.SlidePointer(addr)
+				return i.cache.SlideInfo.SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
 				for _, mapping := range i.cache.Mappings {
@@ -166,16 +162,12 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 
 // GetMacho parses dyld image as a MachO (slow)
 func (i *CacheImage) GetMacho() (*macho.File, error) {
-	offset, err := i.cache.GetOffset(i.LoadAddress)
-	if err != nil {
-		return nil, err
-	}
-	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
-		Offset:    int64(offset),
+	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(i.DylibOffset), int64(i.TextSegmentSize)), macho.FileConfig{
+		Offset:    int64(i.DylibOffset),
 		SrcReader: io.NewSectionReader(i.cache.r, 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
-				return i.SlideInfo.SlidePointer(addr)
+				return i.cache.SlideInfo.SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
 				for _, mapping := range i.cache.Mappings {
