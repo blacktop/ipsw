@@ -100,9 +100,14 @@ var a2oCmd = &cobra.Command{
 			} else if inHex {
 				fmt.Printf("%#x\n", off)
 			} else {
+				m, err := f.GetMappingForOffset(off)
+				if err != nil {
+					return err
+				}
 				log.WithFields(log.Fields{
-					"hex": fmt.Sprintf("%#x", off),
-					"dec": fmt.Sprintf("%d", off),
+					"hex":     fmt.Sprintf("%#x", off),
+					"dec":     fmt.Sprintf("%d", off),
+					"mapping": m.Name,
 				}).Info("Offset")
 			}
 		}
