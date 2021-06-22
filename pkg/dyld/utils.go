@@ -34,6 +34,26 @@ func (f *File) GetVMAddress(offset uint64) (uint64, error) {
 	return 0, fmt.Errorf("offset %#x not within any mappings file offset range", offset)
 }
 
+// GetMappingForOffset returns the mapping containing a given file offset
+func (f *File) GetMappingForOffset(offset uint64) (*CacheMapping, error) {
+	for _, mapping := range f.Mappings {
+		if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
+			return mapping, nil
+		}
+	}
+	return nil, fmt.Errorf("offset %#x not within any mappings file offset range", offset)
+}
+
+// GetMappingForVMAddress returns the mapping containing a given virtual address
+func (f *File) GetMappingForVMAddress(address uint64) (*CacheMapping, error) {
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= address && address < mapping.Address+mapping.Size {
+			return mapping, nil
+		}
+	}
+	return nil, fmt.Errorf("address %#x not within any mappings address range", address)
+}
+
 // ReadBytes returns bytes at a given offset
 func (f *File) ReadBytes(offset int64, size uint64) ([]byte, error) {
 	data := make([]byte, size)

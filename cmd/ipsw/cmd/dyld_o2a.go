@@ -100,9 +100,14 @@ var o2aCmd = &cobra.Command{
 			} else if inHex {
 				fmt.Printf("%#x\n", address)
 			} else {
+				m, err := f.GetMappingForVMAddress(address)
+				if err != nil {
+					return err
+				}
 				log.WithFields(log.Fields{
-					"hex": fmt.Sprintf("%#x", address),
-					"dec": fmt.Sprintf("%d", address),
+					"hex":     fmt.Sprintf("%#x", address),
+					"dec":     fmt.Sprintf("%d", address),
+					"mapping": m.Name,
 				}).Info("Address")
 			}
 		}
