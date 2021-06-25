@@ -17,6 +17,9 @@ jobs:
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
+      - name: Set output
+        id: vars
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
 
       - name: Build Dependencies (Linux)
         if: matrix.platform == 'ubuntu-latest'
@@ -53,14 +56,15 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-          CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+          CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=${{ steps.vars.outputs.tag }}-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (macOS)
         if: matrix.platform == 'macos-latest'
-        run: sudo CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+        run: sudo CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=${{ steps.vars.outputs.tag }} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
         env:
           CGO_LDFLAGS: -LD:\a\ipsw\ipsw\lzfse\build\Debug
+          RELEASE_VERSION: ${{ steps.vars.outputs.tag }}
         run: |
           go build -o build/dist/ipsw.exe -ldflags "-linkmode external -extldflags -static" ./cmd/ipsw
           dir build/dist
