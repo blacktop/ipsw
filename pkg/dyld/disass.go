@@ -212,7 +212,7 @@ func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shouldDemang
 		if addr == fn.StartAddr {
 			if symName, ok := f.AddressToSymbol[addr]; ok {
 				if shouldDemangle {
-					return ok, demangle.Do(symName)
+					return ok, demangle.Do(symName, false, false)
 				}
 				return ok, symName
 			}
@@ -251,7 +251,7 @@ func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, 
 func (f *File) FindSymbol(addr uint64, shouldDemangle bool) string {
 	if symName, ok := f.AddressToSymbol[addr]; ok {
 		if shouldDemangle {
-			return demangle.Do(symName)
+			return demangle.Do(symName, false, false)
 		}
 		return symName
 	}

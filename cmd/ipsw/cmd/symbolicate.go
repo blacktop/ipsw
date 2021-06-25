@@ -162,7 +162,7 @@ var symbolicateCmd = &cobra.Command{
 				// check if symbol is cached
 				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 					if demangleFlag {
-						symName = demangle.Do(symName)
+						symName = demangle.Do(symName, false, false)
 					}
 					crashLog.Threads[crashLog.CrashedThread].BackTrace[idx].Symbol = symName
 					continue
@@ -171,7 +171,7 @@ var symbolicateCmd = &cobra.Command{
 				if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
 					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						if demangleFlag {
-							symName = demangle.Do(symName)
+							symName = demangle.Do(symName, false, false)
 						}
 						crashLog.Threads[crashLog.CrashedThread].BackTrace[idx].Symbol = fmt.Sprintf("%s + %d", symName, unslidAddr-fn.StartAddr)
 						continue
@@ -224,7 +224,7 @@ var symbolicateCmd = &cobra.Command{
 
 				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 					if demangleFlag {
-						symName = demangle.Do(symName)
+						symName = demangle.Do(symName, false, false)
 					}
 					crashLog.Threads[crashLog.CrashedThread].BackTrace[idx].Symbol = symName
 					continue
@@ -233,7 +233,7 @@ var symbolicateCmd = &cobra.Command{
 				if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
 					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						if demangleFlag {
-							symName = demangle.Do(symName)
+							symName = demangle.Do(symName, false, false)
 						}
 						crashLog.Threads[crashLog.CrashedThread].BackTrace[idx].Symbol = fmt.Sprintf("%s + %d", symName, unslidAddr-fn.StartAddr)
 					}

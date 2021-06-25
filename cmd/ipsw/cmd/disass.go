@@ -138,7 +138,7 @@ func lookupSymbol(m *macho.File, addr uint64) string {
 
 	if symName, ok := symbolMap[addr]; ok {
 		if demangleFlag {
-			return demangle.Do(symName)
+			return demangle.Do(symName, false, false)
 		}
 		return symName
 	}
@@ -154,7 +154,7 @@ func lookupSymbol(m *macho.File, addr uint64) string {
 
 	var symName string
 	if demangleFlag {
-		symName = demangle.Do(syms[0].Name)
+		symName = demangle.Do(syms[0].Name, false, false)
 	} else {
 		for _, sym := range syms {
 			if len(sym.Name) > 0 {
