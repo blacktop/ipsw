@@ -3,8 +3,11 @@ package xcode
 import (
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"path/filepath"
+
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 //go:embed device_traits.json
@@ -36,7 +39,9 @@ func (d Devices) Swap(i, j int) { d[i], d[j] = d[j], d[i] }
 type ByProductType struct{ Devices }
 
 func (s ByProductType) Less(i, j int) bool {
-	return s.Devices[i].ProductType < s.Devices[j].ProductType
+	devI := utils.DeconstructDevice(s.Devices[i].ProductType)
+	devJ := utils.DeconstructDevice(s.Devices[j].ProductType)
+	return fmt.Sprintf("%s%02d%02d", devI.Family, devI.Major, devI.Minor) < fmt.Sprintf("%s%02d%02d", devJ.Family, devJ.Major, devJ.Minor)
 }
 
 // DeviceTrait object
