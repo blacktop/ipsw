@@ -103,6 +103,12 @@ jobs:
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v 14.4 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
 
+      - name: Run ipsw update
+        if: matrix.platform == 'macos-latest'
+        run: |
+          build/dist/ipsw update --platform windows_x86_64 -V
+          build/dist/ipsw update --detect
+
       - uses: actions/upload-artifact@v2
         with:
           name: Releases
