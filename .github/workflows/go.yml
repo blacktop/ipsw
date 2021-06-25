@@ -21,33 +21,6 @@ jobs:
         id: vars
         run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
 
-      - name: Build Dependencies (Linux)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update && sudo apt-get install -y cmake libtool libc6-dev
-          cd /tmp
-          git clone https://github.com/lzfse/lzfse.git
-          cd lzfse
-          mkdir build
-          cd build
-          cmake ..
-          sudo make install
-      - name: Build Dependencies (macOS)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          brew install lzfse
-      # - name: Build Dependencies (Windows)
-      #   if: matrix.platform == 'windows-latest'
-      #   run: |
-      #     git clone https://github.com/lzfse/lzfse.git
-      #     cd lzfse
-      #     mkdir build
-      #     cd build
-      #     cmake -G "Visual Studio 16 2019" ..
-      #     cmake --build . --config Debug
-      #     cd Debug
-      #     dlltool --def D:\a\ipsw\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
-
       - name: Get dependencies
         run: |
           go mod download
@@ -56,10 +29,10 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-          CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=${{ steps.vars.outputs.tag }}-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+          CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (macOS)
         if: matrix.platform == 'macos-latest'
-        run: sudo CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=${{ steps.vars.outputs.tag }} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+        run: sudo CGO_ENABLED=1 go build -o build/dist/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
         env:
