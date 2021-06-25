@@ -53,15 +53,20 @@ Available Commands:
   download        Download and parse IPSW(s) from the internets
   dtree           Parse DeviceTree
   dyld            Parse dyld_shared_cache
+  ent             Search IPSW filesystem DMG for MachOs with a given entitlement
   extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
   help            Help about any command
   iboot           Dump firmwares
   img4            Parse Img4
   info            Display IPSW Info
   kernel          Parse kernelcache
+  lipo            Extract single MachO out of a universal/fat MachO
   macho           Parse a MachO file
   ota             Extract file(s) from OTA
+  sepfw           Dump MachOs
+  shsh            Get shsh blobs from device
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
+  update          Download an ipsw update if one exists
   version         Print the version number of ipsw
 
 Flags:

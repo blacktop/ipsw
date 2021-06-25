@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/vbauerster/mpb/v5"
 	"github.com/vbauerster/mpb/v5/decor"
+	"golang.org/x/net/http/httpproxy"
 )
 
 // Download is a downloader object
@@ -45,21 +46,29 @@ func NewDownload(proxy string, insecure, skipAll bool) *Download {
 		skipAll: skipAll,
 		client: &http.Client{
 			Transport: &http.Transport{
-				Proxy:           getProxy(proxy),
+				Proxy:           GetProxy(proxy),
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 			},
 		},
 	}
 }
 
-func getProxy(proxy string) func(*http.Request) (*url.URL, error) {
+// GetProxy takes either an input string or read the enviornment and returns a proxy function
+func GetProxy(proxy string) func(*http.Request) (*url.URL, error) {
 	if len(proxy) > 0 {
 		proxyURL, err := url.Parse(proxy)
 		if err != nil {
 			log.WithError(err).Error("bad proxy url")
 		}
+		log.Debugf("proxy set to: %s", proxyURL)
 		return http.ProxyURL(proxyURL)
 	}
+	conf := httpproxy.FromEnvironment()
+	log.WithFields(log.Fields{
+		"http_proxy":  conf.HTTPProxy,
+		"https_proxy": conf.HTTPSProxy,
+		"no_proxy":    conf.NoProxy,
+	}).Debugf("proxy info from environment")
 	return http.ProxyFromEnvironment
 }
 
