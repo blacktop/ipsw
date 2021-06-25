@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"crypto/sha1"
 	"fmt"
 	"io"
@@ -236,6 +238,55 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 	}
 
 	return fNames, nil
+}
+
+// UnTarGz - https://stackoverflow.com/a/57640231
+func UnTarGz(tarfile, destPath string) error {
+
+	r, err := os.Open(tarfile)
+	if err != nil {
+		return err
+	}
+	uncompressedStream, err := gzip.NewReader(r)
+	if err != nil {
+		return err
+	}
+
+	tarReader := tar.NewReader(uncompressedStream)
+
+	for true {
+		header, err := tarReader.Next()
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return fmt.Errorf("tarReader.Next() failed: %v", err)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeDir:
+			if err := os.Mkdir(header.Name, 0755); err != nil {
+				return fmt.Errorf("os.Mkdir failed: %v", err)
+			}
+		case tar.TypeReg:
+			outFile, err := os.Create(filepath.Join(destPath, header.Name))
+			if err != nil {
+				return fmt.Errorf("os.Create failed: %v", err)
+			}
+			defer outFile.Close()
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return fmt.Errorf("io.Copy failed: %v", err)
+			}
+
+		default:
+			return fmt.Errorf("uknown type: %v in %s",
+				header.Typeflag,
+				header.Name)
+		}
+	}
+	return nil
 }
 
 // GrepStrings returns all matching strings in []byte

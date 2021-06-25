@@ -124,7 +124,7 @@ func NewOTA(proxy string, insecure, release, macos bool) (*Ota, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			Proxy:           getProxy(proxy),
+			Proxy:           GetProxy(proxy),
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 		},
 	}
@@ -308,7 +308,7 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 
 	client := &http.Client{
 		Transport: &http.Transport{
-			Proxy:           getProxy(o.Config.Proxy),
+			Proxy:           GetProxy(o.Config.Proxy),
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: o.Config.Insecure},
 		},
 	}

@@ -30,7 +30,7 @@ func NewRemoteZipReader(zipURL string, config *RemoteConfig) (*zip.Reader, error
 		UserAgent: utils.RandomAgent(),
 		Client: &http.Client{
 			Transport: &http.Transport{
-				Proxy:           getProxy(config.Proxy),
+				Proxy:           GetProxy(config.Proxy),
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
 			},
 		},

@@ -202,7 +202,7 @@ func init() {
 // sepCmd represents the sep command
 var sepCmd = &cobra.Command{
 	Use:   "sepfw <SEP_FIRMWARE>",
-	Short: "🚧 [WIP] Dump MachOs 🚧",
+	Short: "Dump MachOs",
 	Args:  cobra.MinimumNArgs(1),
 	// Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
