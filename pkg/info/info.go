@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/blacktop/ipsw/pkg/xcode"
@@ -125,13 +126,23 @@ func (i *Info) String() string {
 	return iStr
 }
 
+// GetFolder returns a folder name for all the devices included in an IPSW
+func (i *Info) GetFolder() string {
+	var devs []string
+	for _, dtree := range i.DeviceTrees {
+		dt, _ := dtree.Summary()
+		devs = append(devs, dt.Model)
+	}
+	devs = utils.SortDevices(utils.Unique(devs))
+	return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs))
+}
+
 // GetFolders returns a list of the IPSW name folders
 func (i *Info) GetFolders() []string {
 	var folders []string
 	for _, dtree := range i.DeviceTrees {
 		dt, _ := dtree.Summary()
 		folders = append(folders, fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion))
-
 	}
 	return folders
 }
@@ -194,6 +205,56 @@ func (i *Info) GetKernelCacheFolders(kc string) []string {
 		}
 	}
 	return folders
+}
+
+// GetKernelCacheFileName returns a short new kernelcache name including all the supported devices
+func (i *Info) GetKernelCacheFileName(kc string) string {
+	devList := getAbbreviatedDevList(i.GetDevicesForKernelCache(kc))
+	return fmt.Sprintf("%s.%s", strings.TrimSuffix(kc, filepath.Ext(kc)), devList)
+}
+
+// GetDevicesForKernelCache returns a sorted array of devices that support the kernelcache
+func (i *Info) GetDevicesForKernelCache(kc string) []string {
+	var devices []string
+
+	for bconf, kcache := range i.Plists.BuildManifest.GetKernelCaches() {
+		if utils.StrSliceContains(kcache, kc) {
+			for _, dtree := range i.DeviceTrees {
+				dt, _ := dtree.Summary()
+				if strings.ToLower(bconf) == strings.ToLower(dt.BoardConfig) {
+					devices = append(devices, dt.Model)
+				}
+			}
+		}
+	}
+
+	return utils.SortDevices(utils.Unique(devices))
+}
+
+func getAbbreviatedDevList(devices []string) string {
+	var devList string
+
+	if len(devices) == 0 {
+		return ""
+	} else if len(devices) == 1 {
+		return devices[0]
+	}
+
+	currentDev := devices[0]
+	devPrefix := strings.Split(currentDev, ",")[0]
+	devList += currentDev
+
+	for _, dev := range devices[1:] {
+		if strings.HasPrefix(dev, devPrefix) {
+			devList += fmt.Sprintf("_%s", strings.Split(dev, ",")[1])
+		} else {
+			currentDev = dev
+			devPrefix = strings.Split(currentDev, ",")[0]
+			devList += "_" + currentDev
+		}
+	}
+
+	return devList
 }
 
 // Parse parses plist files in a local ipsw file

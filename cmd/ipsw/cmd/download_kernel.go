@@ -22,6 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"path/filepath"
+
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -52,6 +54,11 @@ var downloadKernelCmd = &cobra.Command{
 
 		specFolders, _ := cmd.Flags().GetBool("spec")
 
+		var destPath string
+		if len(args) > 0 {
+			destPath = filepath.Clean(args[0])
+		}
+
 		ipsws, err := filterIPSWs(cmd)
 		if err != nil {
 			log.Fatal(err.Error())
@@ -81,7 +88,7 @@ var downloadKernelCmd = &cobra.Command{
 					return errors.Wrap(err, "failed to create remote zip reader of ipsw")
 				}
 				if specFolders {
-					err = kernelcache.RemoteParse(zr)
+					err = kernelcache.RemoteParse(zr, destPath)
 				} else {
 					err = kernelcache.RemoteParseV2(zr, i.BuildID)
 				}

@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -72,6 +73,11 @@ var macosCmd = &cobra.Command{
 		showInstallers, _ := cmd.Flags().GetBool("installer")
 		// workDir, _ := cmd.Flags().GetString("work-dir")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
+
+		var destPath string
+		if len(args) > 0 {
+			destPath = filepath.Clean(args[0])
+		}
 
 		if showInstallers {
 			if prods, err := download.GetProductInfo(); err != nil {
@@ -157,7 +163,7 @@ var macosCmd = &cobra.Command{
 						return errors.Wrap(err, "failed to open remote zip to OTA")
 					}
 					log.Info("Extracting remote kernelcache")
-					err = kernelcache.RemoteParse(zr)
+					err = kernelcache.RemoteParse(zr, destPath)
 					if err != nil {
 						return errors.Wrap(err, "failed to download kernelcache from remote ota")
 					}

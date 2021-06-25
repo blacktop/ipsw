@@ -65,7 +65,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 }
 
 // Extract extracts and decompresses a kernelcache from ipsw
-func Extract(ipsw string) error {
+func Extract(ipsw, destPath string) error {
 	log.Debug("Extracting Kernelcache from IPSW")
 	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
 		return strings.Contains(f.Name, "kernelcache")
@@ -73,11 +73,19 @@ func Extract(ipsw string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed extract kernelcache from ipsw")
 	}
+
 	i, err := info.Parse(ipsw)
 	if err != nil {
 		return errors.Wrap(err, "failed to parse ipsw info")
 	}
+
+	folder := filepath.Join(destPath, i.GetFolder())
+
 	for _, kcache := range kcaches {
+		fname := i.GetKernelCacheFileName(kcache)
+		// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(kcache, filepath.Ext(kcache)), strings.Join(i.GetDevicesForKernelCache(kcache), "_"))
+		fname = filepath.Join(folder, fname)
+
 		content, err := ioutil.ReadFile(kcache)
 		if err != nil {
 			return errors.Wrap(err, "failed to read Kernelcache")
@@ -92,16 +100,15 @@ func Extract(ipsw string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
-		for _, folder := range i.GetKernelCacheFolders(kcache) {
-			os.Mkdir(folder, os.ModePerm)
-			fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(kcache)))
-			err = ioutil.WriteFile(fname, dec, 0644)
-			if err != nil {
-				return errors.Wrap(err, "failed to write kernelcache")
-			}
-			utils.Indent(log.Info, 2)("Created " + fname)
-			os.Remove(kcache)
+
+		os.Mkdir(folder, os.ModePerm)
+
+		err = ioutil.WriteFile(fname, dec, 0644)
+		if err != nil {
+			return errors.Wrap(err, "failed to write kernelcache")
 		}
+		utils.Indent(log.Info, 2)("Created " + fname)
+		os.Remove(kcache)
 	}
 
 	return nil
@@ -203,47 +210,49 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 }
 
 // RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(zr *zip.Reader) error {
+func RemoteParse(zr *zip.Reader, destPath string) error {
 
 	i, err := info.ParseZipFiles(zr.File)
 	if err != nil {
 		return err
 	}
 
+	folder := filepath.Join(destPath, i.GetFolder())
+
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
-			for _, folder := range i.GetKernelCacheFolders(f.Name) {
-				// fname := filepath.Join(folder, "kernelcache."+strings.ToLower(i.Plists.GetKernelType(f.Name)))
-				fname := filepath.Join(folder, "kernelcache")
-				if _, err := os.Stat(fname); os.IsNotExist(err) {
-					kdata := make([]byte, f.UncompressedSize64)
-					rc, err := f.Open()
-					if err != nil {
-						return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-					}
-					io.ReadFull(rc, kdata)
-					rc.Close()
-
-					kcomp, err := ParseImg4Data(kdata)
-					if err != nil {
-						return errors.Wrap(err, "failed parse kernelcache img4")
-					}
-
-					dec, err := DecompressData(kcomp)
-					if err != nil {
-						return errors.Wrapf(err, "failed to decompress kernelcache %s", fname)
-					}
-
-					os.Mkdir(folder, os.ModePerm)
-					err = ioutil.WriteFile(fname, dec, 0644)
-					if err != nil {
-						return errors.Wrap(err, "failed to write kernelcache")
-					}
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
-				} else {
-					log.Warnf("kernelcache already exists: %s", fname)
+			fname := i.GetKernelCacheFileName(f.Name)
+			// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(f.Name, filepath.Ext(f.Name)), strings.Join(i.GetDevicesForKernelCache(f.Name), "_"))
+			fname = filepath.Join(folder, fname)
+			if _, err := os.Stat(fname); os.IsNotExist(err) {
+				kdata := make([]byte, f.UncompressedSize64)
+				rc, err := f.Open()
+				if err != nil {
+					return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
 				}
+				io.ReadFull(rc, kdata)
+				rc.Close()
+
+				kcomp, err := ParseImg4Data(kdata)
+				if err != nil {
+					return errors.Wrap(err, "failed parse kernelcache img4")
+				}
+
+				dec, err := DecompressData(kcomp)
+				if err != nil {
+					return errors.Wrapf(err, "failed to decompress kernelcache %s", fname)
+				}
+
+				os.Mkdir(folder, os.ModePerm)
+				err = ioutil.WriteFile(fname, dec, 0644)
+				if err != nil {
+					return errors.Wrap(err, "failed to write kernelcache")
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
+			} else {
+				log.Warnf("kernelcache already exists: %s", fname)
 			}
+			// }
 		}
 	}
 
