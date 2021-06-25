@@ -374,7 +374,7 @@ func (p CacheSlidePointer3) String() string {
 			p.Authenticated(),
 		)
 	}
-	return fmt.Sprintf("value: %#x, offset: %02x", p.Value(), p.OffsetToNextPointer())
+	return fmt.Sprintf("value: %#x, next: %02x", p.Value(), p.OffsetToNextPointer())
 }
 
 type CacheSlideInfo4 struct {

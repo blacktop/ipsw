@@ -690,7 +690,7 @@ func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error
 						symName = sym
 					}
 
-					fmt.Printf("    [% 5d + 0x%04X] 0x%x @ offset: %x => 0x%x, %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), (uint64)(pageAddress+delta), (uint64)(pageOffset+delta), targetValue, pointer, symName)
+					fmt.Printf("    [% 5d + 0x%04X] (%#x @ offset %#x => %#x) %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), (uint64)(pageAddress+delta), (uint64)(pageOffset+delta), targetValue, pointer, symName)
 
 					if pointer.OffsetToNextPointer() == 0 {
 						break
