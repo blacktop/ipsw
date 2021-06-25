@@ -24,7 +24,7 @@ func unmount(device string) error {
 }
 
 // Extract extracts dyld_shared_cache from ipsw
-func Extract(ipsw string) error {
+func Extract(ipsw, destPath string) error {
 
 	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
 		if strings.EqualFold(filepath.Ext(f.Name), ".dmg") {
@@ -45,20 +45,18 @@ func Extract(ipsw string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed to parse ipsw info")
 		}
-		folders := i.GetFolders()
-		folder := folders[0]
 
-		var searchStr, searchStrMacOS, dyldDest, mountPoint string
+		folder := filepath.Join(destPath, i.GetFolder())
+
+		var searchStr, searchStrMacOS, mountPoint string
 		if runtime.GOOS == "darwin" {
 			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64*"
 			searchStrMacOS = "System/Library/dyld/dyld_shared_cache_arm64*"
 			os.MkdirAll(folder, os.ModePerm)
-			dyldDest = filepath.Join(folder, "dyld_shared_cache")
 			mountPoint = "/tmp/ios"
 		} else if runtime.GOOS == "linux" {
 			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64*"
 			os.MkdirAll(filepath.Join("/data", folder), os.ModePerm)
-			dyldDest = filepath.Join("/data", folder, "dyld_shared_cache")
 			mountPoint = "/mnt"
 		}
 
@@ -82,30 +80,12 @@ func Extract(ipsw string) error {
 				return errors.Errorf("failed to find dyld_shared_cache in ipsw: %s", ipsw)
 			}
 		}
-
 		for _, match := range matches {
+			dyldDest := filepath.Join(folder, filepath.Base(match))
 			utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", match, dyldDest))
-			err = utils.Cp(match, filepath.Join(folder, filepath.Base(match)))
+			err = utils.Cp(match, dyldDest)
 			if err != nil {
 				return err
-			}
-		}
-
-		// Create symlinks for all the other folders to save space
-		for _, folder = range folders[1:] {
-			symlinkPath := filepath.Join(folder, "dyld_shared_cache")
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Creating symlink from %s to %s", dyldDest, symlinkPath))
-			os.MkdirAll(folder, os.ModePerm)
-			symlinkPath, err = filepath.Abs(symlinkPath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to get abs path to %s", symlinkPath)
-			}
-			if _, err := os.Lstat(symlinkPath); err == nil {
-				os.Remove(symlinkPath)
-			}
-			err = os.Symlink(dyldDest, symlinkPath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to symlink %s to %s", dyldDest, symlinkPath)
 			}
 		}
 

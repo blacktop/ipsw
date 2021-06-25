@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -71,6 +72,11 @@ var otaDLCmd = &cobra.Command{
 
 		release, _ := cmd.Flags().GetBool("release")
 		macOsOTA, _ := cmd.Flags().GetBool("macos")
+
+		var destPath string
+		if len(args) > 0 {
+			destPath = filepath.Clean(args[0])
+		}
 
 		if release && macOsOTA {
 			log.Fatal("you cannot supply a --release AND a --macos flag (they are mutually exclusive)")
@@ -136,7 +142,7 @@ var otaDLCmd = &cobra.Command{
 					}
 					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
-						err = kernelcache.RemoteParse(zr)
+						err = kernelcache.RemoteParse(zr, destPath)
 						if err != nil {
 							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
 						}

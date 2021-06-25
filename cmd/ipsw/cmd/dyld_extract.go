@@ -23,11 +23,13 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
-	"os"
-	"runtime"
 )
 
 func init() {
@@ -38,16 +40,20 @@ func init() {
 
 // extractDyldCmd represents the extractDyld command
 var extractDyldCmd = &cobra.Command{
-	Use:   "extract <IPSW>",
+	Use:   "extract <IPSW> <DEST>",
 	Short: "Extract dyld_shared_cache from DMG in IPSW",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
+		var destPath string
+		ipswPath := filepath.Clean(args[0])
+		if len(args) > 1 {
+			destPath = filepath.Clean(args[1])
+		}
+		if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exist", ipswPath)
 		}
 
 		if runtime.GOOS == "windows" {
@@ -55,6 +61,6 @@ var extractDyldCmd = &cobra.Command{
 		}
 
 		log.Info("Extracting dyld_shared_cache")
-		return dyld.Extract(args[0])
+		return dyld.Extract(ipswPath, destPath)
 	},
 }

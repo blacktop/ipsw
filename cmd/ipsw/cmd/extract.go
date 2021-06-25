@@ -66,7 +66,7 @@ func isURL(str string) bool {
 
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
-	Use:   "extract <IPSW | URL>",
+	Use:   "extract <IPSW | URL> <DEST>",
 	Short: "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -81,6 +81,11 @@ var extractCmd = &cobra.Command{
 		ibootFlag, _ := cmd.Flags().GetBool("iboot")
 		sepFlag, _ := cmd.Flags().GetBool("sep")
 		remote, _ := cmd.Flags().GetBool("remote")
+
+		var destPath string
+		if len(args) > 1 {
+			destPath = filepath.Clean(args[1])
+		}
 
 		if remote {
 			proxy, _ := cmd.Flags().GetString("proxy")
@@ -98,7 +103,7 @@ var extractCmd = &cobra.Command{
 				// }
 			}
 			if dyldFlag {
-				log.Error("unable to extract dyld_shared_cache remotely")
+				log.Error("unable to extract dyld_shared_cache remotely (try download ota)")
 			}
 			// Get handle to remote ipsw zip
 			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
@@ -111,7 +116,7 @@ var extractCmd = &cobra.Command{
 
 			if kernelFlag {
 				log.Info("Extracting Kernelcache")
-				err = kernelcache.RemoteParse(zr)
+				err = kernelcache.RemoteParse(zr, destPath)
 				if err != nil {
 					return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
 				}
@@ -180,13 +185,16 @@ var extractCmd = &cobra.Command{
 			}
 
 		} else {
-			if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-				return fmt.Errorf("file %s does not exist", args[0])
+
+			ipswPath := filepath.Clean(args[0])
+
+			if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
+				return fmt.Errorf("file %s does not exist", ipswPath)
 			}
 
 			if kernelFlag {
 				log.Info("Extracting kernelcaches")
-				err := kernelcache.Extract(args[0])
+				err := kernelcache.Extract(ipswPath, destPath)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract kernelcaches")
 				}
@@ -194,7 +202,7 @@ var extractCmd = &cobra.Command{
 
 			if dyldFlag {
 				log.Info("Extracting dyld_shared_cache")
-				err := dyld.Extract(args[0])
+				err := dyld.Extract(ipswPath, destPath)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract dyld_shared_cache")
 				}
@@ -202,7 +210,7 @@ var extractCmd = &cobra.Command{
 
 			if deviceTreeFlag {
 				log.Info("Extracting DeviceTrees")
-				err := devicetree.Extract(args[0])
+				err := devicetree.Extract(ipswPath, destPath)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract DeviceTrees")
 				}
@@ -210,7 +218,7 @@ var extractCmd = &cobra.Command{
 
 			if ibootFlag {
 				log.Info("Extracting iBoot")
-				_, err := utils.Unzip(args[0], "", func(f *zip.File) bool {
+				_, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
 					var validIBoot = regexp.MustCompile(`.*iBoot.*im4p$`)
 					return validIBoot.MatchString(f.Name)
 				})
@@ -222,7 +230,7 @@ var extractCmd = &cobra.Command{
 
 			if sepFlag {
 				log.Info("Extracting sep-firmwares")
-				_, err := utils.Unzip(args[0], "", func(f *zip.File) bool {
+				_, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
 					var validSEP = regexp.MustCompile(`.*sep-firmware.*im4p$`)
 					return validSEP.MatchString(f.Name)
 				})

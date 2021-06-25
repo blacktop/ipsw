@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
@@ -38,17 +39,26 @@ func init() {
 
 // kerExtractCmd represents the kerExtract command
 var kerExtractCmd = &cobra.Command{
-	Use:   "extract <IPSW>",
+	Use:   "extract <IPSW> [DEST]",
 	Short: "Extract and decompress a kernelcache from IPSW",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
+
+		kcPath := filepath.Clean(args[0])
+
+		var destPath string
+		if len(args) > 1 {
+			destPath = filepath.Clean(args[1])
 		}
+
+		if _, err := os.Stat(kcPath); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exist", kcPath)
+		}
+
 		log.Info("Extracting kernelcaches")
-		return kernelcache.Extract(args[0])
+		return kernelcache.Extract(kcPath, destPath)
 	},
 }
