@@ -46,7 +46,7 @@ destroy: ## Remove release from the CUR_VERSION
 build: ## Build ipsw
 	@echo " > Building ipsw"
 	@go mod download
-	@CGO_ENABLED=0 go build ./cmd/ipsw
+	@CGO_ENABLED=1 go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
 
 .PHONY: docs
 docs: ## Build the hugo docs
