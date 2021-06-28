@@ -202,6 +202,16 @@ type compressedBlockHeaderV2 struct {
 		LZFSE_ENCODE_D_SYMBOLS + LZFSE_ENCODE_LITERAL_SYMBOLS)]uint8
 }
 
+// lzvnCompressedBlockHeader LZVN compressed block header.
+type lzvnCompressedBlockHeader struct {
+	// Magic number, always LZFSE_COMPRESSEDLZVN_BLOCK_MAGIC.
+	Magic magic
+	// Number of decoded (output) bytes.
+	NRawBytes uint32
+	// Number of encoded (source) bytes.
+	NPayloadBytes uint32
+}
+
 var lExtraBits = [LZFSE_ENCODE_L_SYMBOLS]uint8{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 5, 8,
 }
