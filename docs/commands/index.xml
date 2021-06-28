@@ -134,6 +134,15 @@
     </item>
     
     <item>
+      <title>update</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/update/</link>
+      <pubDate>Fri, 25 Jun 2021 01:20:03 -0600</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/update/</guid>
+      <description>Update ipsw.</description>
+    </item>
+    
+    <item>
       <title>iboot</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/iboot/</link>
       <pubDate>Sun, 12 Apr 2020 14:14:22 -0400</pubDate>
