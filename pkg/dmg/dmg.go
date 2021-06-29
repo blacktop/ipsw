@@ -10,10 +10,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
-	"strings"
 
+	"github.com/apex/log"
 	lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-plist"
@@ -62,15 +61,16 @@ func (s udifSignature) String() string {
 	return string(s[:])
 }
 
-type UDIFChecksumType uint32
+type udifChecksumType uint32
 
 const (
-	NONE_TYPE  UDIFChecksumType = 0
-	CRC32_TYPE UDIFChecksumType = 2
+	NONE_TYPE  udifChecksumType = 0
+	CRC32_TYPE udifChecksumType = 2
 )
 
+// UDIFChecksum object
 type UDIFChecksum struct {
-	Type UDIFChecksumType
+	Type udifChecksumType
 	Size uint32
 	Data [32]uint32
 }
@@ -80,11 +80,11 @@ const (
 	udifRFVersion   = 4
 )
 
-type UDIFResourceFileFlag uint32
+type udifResourceFileFlag uint32
 
 const (
-	Flattened       UDIFResourceFileFlag = 0x00000001
-	InternetEnabled UDIFResourceFileFlag = 0x00000004
+	Flattened       udifResourceFileFlag = 0x00000001
+	InternetEnabled udifResourceFileFlag = 0x00000004
 )
 
 // UDIFResourceFile - Universal Disk Image Format (UDIF)
@@ -92,7 +92,7 @@ type UDIFResourceFile struct {
 	Signature             udifSignature // magic 'koly'
 	Version               uint32        // 4 (as of 2013)
 	HeaderSize            uint32        // sizeof(this) =  512 (as of 2013)
-	Flags                 UDIFResourceFileFlag
+	Flags                 udifResourceFileFlag
 	RunningDataForkOffset uint64
 	DataForkOffset        uint64 // usually 0, beginning of file
 	DataForkLength        uint64
@@ -124,57 +124,6 @@ type UDIFResourceFile struct {
 	Reserved5 uint32
 }
 
-type UDIFBlockChunkType uint32
-
-const (
-	ZERO_FILL       UDIFBlockChunkType = 0x00000000
-	UNCOMPRESSED    UDIFBlockChunkType = 0x00000001
-	IGNORED         UDIFBlockChunkType = 0x00000002 // Sparse (used for Apple_Free)
-	COMPRESS_ADC    UDIFBlockChunkType = 0x80000004
-	COMPRESS_ZLIB   UDIFBlockChunkType = 0x80000005
-	COMPRESSS_BZ2   UDIFBlockChunkType = 0x80000006
-	COMPRESSS_LZFSE UDIFBlockChunkType = 0x80000007
-	COMPRESSS_LZMA  UDIFBlockChunkType = 0x80000008
-	COMMENT         UDIFBlockChunkType = 0x7ffffffe
-	LAST_BLOCK      UDIFBlockChunkType = 0xffffffff
-)
-
-func (i UDIFBlockChunkType) String() string {
-	switch i {
-	case ZERO_FILL:
-		return "ZERO_FILL"
-	case UNCOMPRESSED:
-		return "UNCOMPRESSED"
-	case IGNORED:
-		return "IGNORED"
-	case COMPRESS_ADC:
-		return "COMPRESS_ADC"
-	case COMPRESS_ZLIB:
-		return "COMPRESS_ZLIB"
-	case COMPRESSS_BZ2:
-		return "COMPRESSS_BZ2"
-	case COMPRESSS_LZFSE:
-		return "COMPRESSS_LZFSE"
-	case COMPRESSS_LZMA:
-		return "COMPRESSS_LZMA"
-	case COMMENT:
-		return "COMMENT"
-	case LAST_BLOCK:
-		return "LAST_BLOCK"
-	default:
-		return "UNKNOWN"
-	}
-}
-
-type UDIFBlockChunk struct {
-	Type             UDIFBlockChunkType
-	Comment          uint32
-	StartSector      uint64 // Logical chunk offset and length, in sectors.
-	SectorCount      uint64
-	CompressedOffset uint64 // Compressed offset and length, in bytes.
-	CompressedLength uint64
-}
-
 const (
 	udifBDSignature = "mish"
 	udifBDVersion   = 1
@@ -202,112 +151,133 @@ type udifBlockData struct {
 	ChunkCount uint32
 }
 
+// UDIFBlockData object
 type UDIFBlockData struct {
 	Name string
 	udifBlockData
-	Chunks []UDIFBlockChunk
+	Chunks []udifBlockChunk
+
+	sr *io.SectionReader
 }
 
-// DecompressBlkxChunks decompresses the chunks for a given block
-func (d *DMG) DecompressBlkxChunks(blkName, outputFile string) ([]byte, error) {
+type udifBlockChunkType uint32
 
-	for _, block := range d.Blocks {
-		if strings.Contains(block.Name, blkName) {
-			fo, err := os.Create(outputFile)
+const (
+	ZERO_FILL       udifBlockChunkType = 0x00000000
+	UNCOMPRESSED    udifBlockChunkType = 0x00000001
+	IGNORED         udifBlockChunkType = 0x00000002 // Sparse (used for Apple_Free)
+	COMPRESS_ADC    udifBlockChunkType = 0x80000004
+	COMPRESS_ZLIB   udifBlockChunkType = 0x80000005
+	COMPRESSS_BZ2   udifBlockChunkType = 0x80000006
+	COMPRESSS_LZFSE udifBlockChunkType = 0x80000007
+	COMPRESSS_LZMA  udifBlockChunkType = 0x80000008
+	COMMENT         udifBlockChunkType = 0x7ffffffe
+	LAST_BLOCK      udifBlockChunkType = 0xffffffff
+)
+
+type udifBlockChunk struct {
+	Type             udifBlockChunkType
+	Comment          uint32
+	StartSector      uint64 // Logical chunk offset and length, in sectors.
+	SectorCount      uint64
+	CompressedOffset uint64 // Compressed offset and length, in bytes.
+	CompressedLength uint64
+}
+
+func (b *UDIFBlockData) maxChunkSize() int {
+	var max int
+	for _, chunk := range b.Chunks {
+		if max < int(chunk.CompressedLength) {
+			max = int(chunk.CompressedLength)
+		}
+	}
+	return max
+}
+
+// DecompressChunks decompresses the chunks for a given block and writes them to supplied bufio.Writer
+func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
+	var n int
+	var err error
+
+	buff := make([]byte, 0, b.maxChunkSize())
+
+	for _, chunk := range b.Chunks {
+		switch chunk.Type {
+		case ZERO_FILL:
+			// write a chunk
+			n, err = w.Write(make([]byte, chunk.CompressedLength))
 			if err != nil {
-				return nil, err
+				return err
 			}
-			defer func() {
-				if err := fo.Close(); err != nil {
-					panic(err)
-				}
-			}()
-			w := bufio.NewWriter(fo)
-
-			for _, chunk := range block.Chunks {
-				switch chunk.Type {
-				case ZERO_FILL:
-					// write a chunk
-					if _, err := w.Write(make([]byte, chunk.CompressedLength)); err != nil {
-						return nil, err
-					}
-				case UNCOMPRESSED:
-					d.sr.Seek(int64(chunk.CompressedOffset), io.SeekStart)
-					buff := make([]byte, chunk.CompressedLength)
-					if err := binary.Read(d.sr, binary.BigEndian, &buff); err != nil {
-						return nil, err
-					}
-					// write a chunk
-					if _, err := w.Write(buff); err != nil {
-						return nil, err
-					}
-				case IGNORED:
-					continue
-				case COMPRESS_ADC:
-					return nil, fmt.Errorf("COMPRESS_ADC is currently unsupported")
-				case COMPRESS_ZLIB:
-					d.sr.Seek(int64(chunk.CompressedOffset), io.SeekStart)
-					buff := make([]byte, chunk.CompressedLength)
-					if err := binary.Read(d.sr, binary.BigEndian, &buff); err != nil {
-						return nil, err
-					}
-
-					r, err := zlib.NewReader(bytes.NewReader(buff))
-					if err != nil {
-						return nil, err
-					}
-					defer r.Close()
-
-					dat, err := ioutil.ReadAll(r)
-					if err != nil {
-						return nil, err
-					}
-					// write a chunk
-					if _, err := w.Write(dat); err != nil {
-						return nil, err
-					}
-				case COMPRESSS_BZ2:
-					d.sr.Seek(int64(chunk.CompressedOffset), io.SeekStart)
-					buff := make([]byte, chunk.CompressedLength)
-					if err := binary.Read(d.sr, binary.BigEndian, &buff); err != nil {
-						return nil, err
-					}
-					dat, err := ioutil.ReadAll(bzip2.NewReader(bytes.NewReader(buff)))
-					if err != nil {
-						return nil, err
-					}
-					// write a chunk
-					if _, err := w.Write(dat); err != nil {
-						return nil, err
-					}
-				case COMPRESSS_LZFSE:
-					d.sr.Seek(int64(chunk.CompressedOffset), io.SeekStart)
-					buff := make([]byte, chunk.CompressedLength)
-					if err := binary.Read(d.sr, binary.BigEndian, &buff); err != nil {
-						return nil, err
-					}
-					decompressed := lzfse.DecodeBuffer(buff)
-					// write a chunk
-					if _, err := w.Write(decompressed); err != nil {
-						return nil, err
-					}
-				case COMPRESSS_LZMA:
-					return nil, fmt.Errorf("COMPRESSS_LZMA is currently unsupported")
-				case COMMENT:
-					continue // TODO: how to parse comments?
-				case LAST_BLOCK:
-					if err = w.Flush(); err != nil {
-						return nil, err
-					}
-				default:
-					return nil, fmt.Errorf("chuck has unsupported compression type: %#x (%s)", chunk.Type, chunk.Type)
-				}
+			log.Debugf("Wrote %#x bytes of ZERO_FILL data", n)
+		case UNCOMPRESSED:
+			buff = buff[:chunk.CompressedLength]
+			_, err = b.sr.ReadAt(buff, int64(chunk.CompressedOffset))
+			if err != nil {
+				return err
 			}
-			return nil, nil
+			// write a chunk
+			n, err = w.Write(buff)
+			if err != nil {
+				return err
+			}
+			log.Debugf("Wrote %#x bytes of UNCOMPRESSED data", n)
+		case IGNORED:
+			continue
+		case COMPRESS_ADC:
+			return fmt.Errorf("COMPRESS_ADC is currently unsupported")
+		case COMPRESS_ZLIB:
+			buff = buff[:chunk.CompressedLength]
+			_, err = b.sr.ReadAt(buff, int64(chunk.CompressedOffset))
+			if err != nil {
+				return err
+			}
+			r, err := zlib.NewReader(bytes.NewReader(buff))
+			if err != nil {
+				return err
+			}
+			// write a chunk
+			n, err := w.ReadFrom(r)
+			if err != nil {
+				return err
+			}
+			r.Close()
+			log.Debugf("Wrote %#x bytes of COMPRESS_ZLIB data", n)
+		case COMPRESSS_BZ2:
+			buff = buff[:chunk.CompressedLength]
+			if _, err := b.sr.ReadAt(buff, int64(chunk.CompressedOffset)); err != nil {
+				return err
+			}
+			// write a chunk
+			n, err := w.ReadFrom(bzip2.NewReader(bytes.NewReader(buff)))
+			if err != nil {
+				return err
+			}
+			log.Debugf("Wrote %#x bytes of COMPRESSS_BZ2 data", n)
+		case COMPRESSS_LZFSE:
+			buff = buff[:chunk.CompressedLength]
+			if _, err := b.sr.ReadAt(buff, int64(chunk.CompressedOffset)); err != nil {
+				return err
+			}
+			n, err = w.Write(lzfse.DecodeBuffer(buff))
+			if err != nil {
+				return err
+			}
+			log.Debugf("Wrote %#x bytes of COMPRESSS_LZFSE data", n)
+		case COMPRESSS_LZMA:
+			return fmt.Errorf("COMPRESSS_LZMA is currently unsupported")
+		case COMMENT:
+			continue // TODO: how to parse comments?
+		case LAST_BLOCK:
+			if err := w.Flush(); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("chuck has unsupported compression type: %#x", chunk.Type)
 		}
 	}
 
-	return nil, fmt.Errorf("no blkx matched name %s", blkName)
+	return nil
 }
 
 // Open opens the named file using os.Open and prepares it for use as a dmg.
@@ -339,24 +309,30 @@ func (d *DMG) Close() error {
 
 // NewDMG creates a new DMG for accessing a dmg in an underlying reader.
 // The dmg is expected to start at position 0 in the ReaderAt.
-func NewDMG(r io.ReaderAt) (*DMG, error) {
+func NewDMG(r *os.File) (*DMG, error) {
 
 	d := new(DMG)
 	d.sr = io.NewSectionReader(r, 0, 1<<63-1)
 
-	d.sr.Seek(int64(-binary.Size(d.Footer)), io.SeekEnd)
+	if _, err := r.Seek(int64(-binary.Size(UDIFResourceFile{})), io.SeekEnd); err != nil {
+		return nil, fmt.Errorf("failed to seek to DMG footer: %v", err)
+	}
 
-	if err := binary.Read(d.sr, binary.BigEndian, &d.Footer); err != nil {
-		return nil, err
+	if err := binary.Read(r, binary.BigEndian, &d.Footer); err != nil {
+		return nil, fmt.Errorf("failed to read DMG footer: %v", err)
+	}
+
+	if d.Footer.Signature.String() != udifRFSignature {
+		return nil, fmt.Errorf("found unexpected UDIFResourceFile signure: %s, expected: %s", d.Footer.Signature.String(), udifRFSignature)
 	}
 
 	// TODO: parse Code Signnature
 
-	d.sr.Seek(int64(d.Footer.PlistOffset), io.SeekStart)
+	r.Seek(int64(d.Footer.PlistOffset), io.SeekStart)
 
 	pdata := make([]byte, d.Footer.PlistLength)
-	if err := binary.Read(d.sr, binary.BigEndian, &pdata); err != nil {
-		return nil, err
+	if err := binary.Read(r, binary.BigEndian, &pdata); err != nil {
+		return nil, fmt.Errorf("failed to read DMG plist data: %v", err)
 	}
 
 	pl := plist.NewDecoder(bytes.NewReader(pdata))
@@ -378,24 +354,24 @@ func NewDMG(r io.ReaderAt) (*DMG, error) {
 		r := bytes.NewReader(block.Data)
 
 		bdata.Name = block.Name
+		bdata.sr = d.sr
 
 		if err := binary.Read(r, binary.BigEndian, &bdata.udifBlockData); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read UDIFBlockData in block %s: %v", block.Name, err)
+		}
+
+		if bdata.udifBlockData.Signature.String() != udifBDSignature {
+			return nil, fmt.Errorf("found unexpected UDIFBlockData signure: %s, expected: %s", bdata.udifBlockData.Signature.String(), udifBDSignature)
 		}
 
 		for i := 0; i < int(bdata.udifBlockData.ChunkCount); i++ {
-			var chunk UDIFBlockChunk
+			var chunk udifBlockChunk
 			binary.Read(r, binary.BigEndian, &chunk)
 			bdata.Chunks = append(bdata.Chunks, chunk)
 		}
 
 		d.Blocks = append(d.Blocks, bdata)
 	}
-
-	// _, err = d.DecompressBlkxChunks("Apple_APFS", "Apple_APFS")
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	return d, nil
 }
