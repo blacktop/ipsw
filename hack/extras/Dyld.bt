@@ -336,10 +336,20 @@ typedef struct
     uint64 offset1;
     uint64 offset2;
     uint64 offset3;
-    uint32 size1;
-    uint32 size2;
-    uint32 count;
 } new_struct<bgcolor = cPurple>;
+
+typedef struct
+{
+    uint32 unknown1;
+    uint32 unknown2;
+    uint32 unknown3;
+    uint64 mask;
+    uint32 unknown4;
+    uint32 unknown5;
+    uint32 unknown6;
+    uint32 unknown7;
+    uint32 unknown8;
+} new_sub_struct<bgcolor = cLtPurple>;
 
 void get_dyld_cache_local_symbols_info(uint64 totalsize)
 {
@@ -385,8 +395,21 @@ else if (header.imagesOffsetWithSubCaches > 0)
 FSeek(header.imagesTextOffset);
 dyld_cache_image_text_info imagetext[header.imagesTextCount];
 
-FSeek(header.unknown10Offset);
-new_struct new;
+if (header.imagesOffset == 0 && header.unknown10Offset > 0)
+{
+    FSeek(header.unknown10Offset);
+    char new_data[header.unknown10Size]<bgcolor = cLtBlue>;
+    new_struct new;
+    // BigEndian();
+    FSeek(new.offset1);
+    new_sub_struct new_sub1;
+    FSeek(new.offset2);
+    new_sub_struct new_sub2;
+    FSeek(new.offset3);
+    new_sub_struct new_sub3;
+}
+
+// LittleEndian();
 
 // FSeek(header.codeSignatureOffset);
 // if (header.codeSignatureSize > 0)
