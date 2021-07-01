@@ -47,10 +47,11 @@ func init() {
 }
 
 type dylib struct {
-	Index   int    `json:"index,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-	UUID    string `json:"uuid,omitempty"`
+	Index       int    `json:"index,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Version     string `json:"version,omitempty"`
+	UUID        string `json:"uuid,omitempty"`
+	LoadAddress uint64 `json:"load_address,omitempty"`
 }
 
 type dyldInfo struct {
@@ -143,10 +144,11 @@ var dyldInfoCmd = &cobra.Command{
 					return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 				}
 				dinfo.Dylibs = append(dinfo.Dylibs, dylib{
-					Index:   idx + 1,
-					Name:    img.Name,
-					Version: m.DylibID().CurrentVersion,
-					UUID:    m.UUID().String(),
+					Index:       idx + 1,
+					Name:        img.Name,
+					Version:     m.DylibID().CurrentVersion,
+					UUID:        m.UUID().String(),
+					LoadAddress: img.Info.Address,
 				})
 				m.Close()
 			}

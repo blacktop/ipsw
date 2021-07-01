@@ -174,14 +174,14 @@ func (f CacheMappingFlag) IsConstData() bool {
 }
 
 type CacheMappingAndSlideInfo struct {
-	Address         uint64
-	Size            uint64
-	FileOffset      uint64
-	SlideInfoOffset uint64
-	SlideInfoSize   uint64
-	Flags           CacheMappingFlag
-	MaxProt         types.VmProtection
-	InitProt        types.VmProtection
+	Address         uint64             `json:"address,omitempty"`
+	Size            uint64             `json:"size,omitempty"`
+	FileOffset      uint64             `json:"file_offset,omitempty"`
+	SlideInfoOffset uint64             `json:"slide_info_offset,omitempty"`
+	SlideInfoSize   uint64             `json:"slide_info_size,omitempty"`
+	Flags           CacheMappingFlag   `json:"flags,omitempty"`
+	MaxProt         types.VmProtection `json:"max_prot,omitempty"`
+	InitProt        types.VmProtection `json:"init_prot,omitempty"`
 }
 
 type CacheMapping struct {
@@ -190,7 +190,7 @@ type CacheMapping struct {
 }
 
 type CacheMappingWithSlideInfo struct {
-	Name string
+	Name string `json:"name,omitempty"`
 	CacheMappingAndSlideInfo
 }
 
