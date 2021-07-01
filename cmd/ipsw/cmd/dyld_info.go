@@ -31,6 +31,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
@@ -63,6 +64,7 @@ type dyldInfo struct {
 	SubCacheGroupID int                              `json:"sub_cache_group_id,omitempty"`
 	SymSubCacheUUID string                           `json:"sym_sub_cache_uuid,omitempty"`
 	Mappings        []dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
+	CodeSignature   types.CodeSignature              `json:"code_signature,omitempty"`
 	Dylibs          []dylib                          `json:"dylibs,omitempty"`
 }
 
@@ -135,22 +137,30 @@ var dyldInfoCmd = &cobra.Command{
 				Platform: f.Platform.String(),
 				MaxSlide: int(f.MaxSlide),
 			}
+
 			for _, mapping := range f.MappingsWithSlideInfo {
 				dinfo.Mappings = append(dinfo.Mappings, *mapping)
 			}
-			for idx, img := range f.Images {
-				m, err := img.GetPartialMacho()
-				if err != nil {
-					return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+
+			if showSignature {
+				dinfo.CodeSignature = *f.CodeSignature
+			}
+
+			if showDylibs {
+				for idx, img := range f.Images {
+					m, err := img.GetPartialMacho()
+					if err != nil {
+						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+					}
+					dinfo.Dylibs = append(dinfo.Dylibs, dylib{
+						Index:       idx + 1,
+						Name:        img.Name,
+						Version:     m.DylibID().CurrentVersion,
+						UUID:        m.UUID().String(),
+						LoadAddress: img.Info.Address,
+					})
+					m.Close()
 				}
-				dinfo.Dylibs = append(dinfo.Dylibs, dylib{
-					Index:       idx + 1,
-					Name:        img.Name,
-					Version:     m.DylibID().CurrentVersion,
-					UUID:        m.UUID().String(),
-					LoadAddress: img.Info.Address,
-				})
-				m.Close()
 			}
 
 			j, err := json.Marshal(dinfo)
@@ -159,6 +169,7 @@ var dyldInfoCmd = &cobra.Command{
 			}
 
 			fmt.Println(string(j))
+
 			return nil
 		}
 
