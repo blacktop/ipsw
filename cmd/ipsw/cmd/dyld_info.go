@@ -143,7 +143,7 @@ var dyldInfoCmd = &cobra.Command{
 					return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 				}
 				dinfo.Dylibs = append(dinfo.Dylibs, dylib{
-					Index:   idx,
+					Index:   idx + 1,
 					Name:    img.Name,
 					Version: m.DylibID().CurrentVersion,
 					UUID:    m.UUID().String(),
