@@ -398,9 +398,8 @@ dyld_cache_image_text_info imagetext[header.imagesTextCount];
 if (header.imagesOffset == 0 && header.unknown10Offset > 0)
 {
     FSeek(header.unknown10Offset);
-    char new_data[header.unknown10Size]<bgcolor = cLtBlue>;
     new_struct new;
-    // BigEndian();
+
     FSeek(new.offset1);
     new_sub_struct new_sub1;
     FSeek(new.offset2);
@@ -408,8 +407,6 @@ if (header.imagesOffset == 0 && header.unknown10Offset > 0)
     FSeek(new.offset3);
     new_sub_struct new_sub3;
 }
-
-// LittleEndian();
 
 // FSeek(header.codeSignatureOffset);
 // if (header.codeSignatureSize > 0)
