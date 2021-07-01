@@ -120,7 +120,7 @@ var dyldMachoCmd = &cobra.Command{
 
 				m, err := i.GetMacho()
 				if err != nil {
-					log.Warnf("failed to parse full MachO for %s", i.Name)
+					log.Warnf("failed to parse full MachO for %s: %v", i.Name, err)
 					m, err = i.GetPartialMacho()
 					if err != nil {
 						return err

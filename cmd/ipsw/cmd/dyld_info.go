@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -41,7 +42,27 @@ func init() {
 
 	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
 	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
+	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dyldInfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
+type dylib struct {
+	Index   int    `json:"index,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Version string `json:"version,omitempty"`
+	UUID    string `json:"uuid,omitempty"`
+}
+
+type dyldInfo struct {
+	Magic           string                           `json:"magic,omitempty"`
+	UUID            string                           `json:"uuid,omitempty"`
+	Platform        string                           `json:"platform,omitempty"`
+	MaxSlide        int                              `json:"max_slide,omitempty"`
+	NumSubCaches    int                              `json:"num_sub_caches,omitempty"`
+	SubCacheGroupID int                              `json:"sub_cache_group_id,omitempty"`
+	SymSubCacheUUID string                           `json:"sym_sub_cache_uuid,omitempty"`
+	Mappings        []dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
+	Dylibs          []dylib                          `json:"dylibs,omitempty"`
 }
 
 // infoCmd represents the info command
@@ -57,6 +78,8 @@ var dyldInfoCmd = &cobra.Command{
 		// showHeader, _ := cmd.Flags().GetBool("header")
 		showDylibs, _ := cmd.Flags().GetBool("dylibs")
 		showSignature, _ := cmd.Flags().GetBool("sig")
+
+		outAsJSON, _ := cmd.Flags().GetBool("json")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -104,9 +127,41 @@ var dyldInfoCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		// if showHeader {
+		if outAsJSON {
+			dinfo := dyldInfo{
+				Magic:    string(f.Magic[:]),
+				UUID:     f.UUID.String(),
+				Platform: f.Platform.String(),
+				MaxSlide: int(f.MaxSlide),
+			}
+			for _, mapping := range f.MappingsWithSlideInfo {
+				dinfo.Mappings = append(dinfo.Mappings, *mapping)
+			}
+			for idx, img := range f.Images {
+				m, err := img.GetPartialMacho()
+				if err != nil {
+					return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+				}
+				dinfo.Dylibs = append(dinfo.Dylibs, dylib{
+					Index:   idx,
+					Name:    img.Name,
+					Version: m.DylibID().CurrentVersion,
+					UUID:    m.UUID().String(),
+				})
+				m.Close()
+			}
+
+			j, err := json.Marshal(dinfo)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(j))
+			return nil
+		}
+
+		// print HEADER info
 		fmt.Println(f.String(Verbose))
-		// }
 
 		if showSignature {
 			fmt.Println("Code Signature")
@@ -280,10 +335,10 @@ var dyldInfoCmd = &cobra.Command{
 				} else {
 					m, err := img.GetPartialMacho()
 					if err != nil {
-						return errors.Wrap(err, "failed to create MachO")
+						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
 					if Verbose {
-						fmt.Printf("%4d:  %#0X  %s  (%s)\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion)
+						fmt.Printf("%4d:  %#0X  %s  (%s) uuid: %s\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion, m.UUID())
 					} else {
 						fmt.Printf("%4d:  %s  (%s)\n", idx+1, img.Name, m.DylibID().CurrentVersion)
 					}
@@ -291,6 +346,7 @@ var dyldInfoCmd = &cobra.Command{
 				}
 			}
 		}
+
 		return nil
 	},
 }
