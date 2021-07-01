@@ -3,7 +3,7 @@ module github.com/blacktop/ipsw
 go 1.16
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.2.12
+	github.com/AlecAivazis/survey/v2 v2.2.13
 	github.com/Netflix/go-expect v0.0.0-20210429232723-e923ed2d1db5 // indirect
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
@@ -32,5 +32,5 @@ require (
 	golang.org/x/crypto v0.0.0-20210616213533-5ff15b29337e
 	golang.org/x/net v0.0.0-20210614182718-04defd469f4e
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210616094352-59db8d763f22
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c
 )
