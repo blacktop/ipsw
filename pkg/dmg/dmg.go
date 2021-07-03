@@ -78,6 +78,7 @@ type UDIFChecksum struct {
 const (
 	udifRFSignature = "koly"
 	udifRFVersion   = 4
+	udifSectorSize  = 512
 )
 
 type udifResourceFileFlag uint32
@@ -197,11 +198,13 @@ func (b *UDIFBlockData) maxChunkSize() int {
 // DecompressChunks decompresses the chunks for a given block and writes them to supplied bufio.Writer
 func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 	var n int
+	var total int
 	var err error
 
 	buff := make([]byte, 0, b.maxChunkSize())
 
 	for _, chunk := range b.Chunks {
+		// TODO: verify chunk (size not greater than block etc)
 		switch chunk.Type {
 		case ZERO_FILL:
 			// write a chunk
@@ -209,7 +212,8 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 			if err != nil {
 				return err
 			}
-			log.Debugf("Wrote %#x bytes of ZERO_FILL data", n)
+			total += n
+			log.Debugf("Wrote %#x bytes of ZERO_FILL data (output size: %#x)", n, total)
 		case UNCOMPRESSED:
 			buff = buff[:chunk.CompressedLength]
 			_, err = b.sr.ReadAt(buff, int64(chunk.CompressedOffset))
@@ -221,9 +225,16 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 			if err != nil {
 				return err
 			}
-			log.Debugf("Wrote %#x bytes of UNCOMPRESSED data", n)
+			total += n
+			log.Debugf("Wrote %#x bytes of UNCOMPRESSED data (output size: %#x)", n, total)
 		case IGNORED:
-			continue
+			// write a chunk
+			n, err = w.Write(make([]byte, chunk.SectorCount*udifSectorSize))
+			if err != nil {
+				return err
+			}
+			total += n
+			log.Debugf("Wrote %#x bytes of IGNORED data (output size: %#x)", n, total)
 		case COMPRESS_ADC:
 			return fmt.Errorf("COMPRESS_ADC is currently unsupported")
 		case COMPRESS_ZLIB:
@@ -242,7 +253,8 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 				return err
 			}
 			r.Close()
-			log.Debugf("Wrote %#x bytes of COMPRESS_ZLIB data", n)
+			total += int(n)
+			log.Debugf("Wrote %#x bytes of COMPRESS_ZLIB data (output size: %#x)", n, total)
 		case COMPRESSS_BZ2:
 			buff = buff[:chunk.CompressedLength]
 			if _, err := b.sr.ReadAt(buff, int64(chunk.CompressedOffset)); err != nil {
@@ -253,7 +265,8 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 			if err != nil {
 				return err
 			}
-			log.Debugf("Wrote %#x bytes of COMPRESSS_BZ2 data", n)
+			total += int(n)
+			log.Debugf("Wrote %#x bytes of COMPRESSS_BZ2 data (output size: %#x)", n, total)
 		case COMPRESSS_LZFSE:
 			buff = buff[:chunk.CompressedLength]
 			if _, err := b.sr.ReadAt(buff, int64(chunk.CompressedOffset)); err != nil {
@@ -263,7 +276,8 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 			if err != nil {
 				return err
 			}
-			log.Debugf("Wrote %#x bytes of COMPRESSS_LZFSE data", n)
+			total += n
+			log.Debugf("Wrote %#x bytes of COMPRESSS_LZFSE data (output size: %#x)", n, total)
 		case COMPRESSS_LZMA:
 			return fmt.Errorf("COMPRESSS_LZMA is currently unsupported")
 		case COMMENT:
