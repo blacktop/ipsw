@@ -3,7 +3,7 @@ package types
 /** `nx_efi_jumpstart_t` **/
 
 // typedef struct {
-//     obj_phys_t  nej_o;
+//     ObjPhysT  nej_o;
 //     uint32_t    nej_magic;
 //     uint32_t    nej_version;
 //     uint32_t    nej_efi_file_len;

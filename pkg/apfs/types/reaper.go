@@ -3,7 +3,7 @@ package types
 /** `nx_repear_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t  nr_o;
+//     ObjPhysT  nr_o;
 //     uint64_t    nr_next_reap_id;
 //     uint64_t    nr_completed_id;
 //     oid_t       nr_head;
@@ -35,7 +35,7 @@ package types
 // /** `nx_reap_list_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t              nrl_o;
+//     ObjPhysT              nrl_o;
 //     oid_t                   nrl_next;
 //     uint32_t                nrl_flags;
 //     uint32_t                nrl_max;

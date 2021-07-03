@@ -23,7 +23,7 @@ const (
 
 // NxSuperblockT nx_superblock_t struct
 type NxSuperblockT struct {
-	Obj        obj_phys_t
+	Obj        ObjPhysT
 	Magic      magic
 	BlockSize  uint32
 	BlockCount uint64
@@ -78,39 +78,38 @@ type NxSuperblockT struct {
 
 const (
 	/** Container Flags **/
-
 	NX_RESERVED_1 = 0x00000001
 	NX_RESERVED_2 = 0x00000002
 	NX_CRYPTO_SW  = 0x00000004
 
 	/** Optional Container Feature Flags **/
-
 	NX_FEATURE_DEFRAG          = 0x0000000000000001
 	NX_FEATURE_LCFD            = 0x0000000000000002
 	NX_SUPPORTED_FEATURES_MASK = (NX_FEATURE_DEFRAG | NX_FEATURE_LCFD)
 
 	/** Read-Only Compatible Container Feature Flags **/
-
 	NX_SUPPORTED_ROCOMPAT_MASK = 0
 
 	/** Incompatible Container Feature Flags **/
-
 	NX_INCOMPAT_VERSION1       = 0x0000000000000001
 	NX_INCOMPAT_VERSION2       = 0x0000000000000002
 	NX_INCOMPAT_FUSION         = 0x0000000000000100
 	NX_SUPPORTED_INCOMPAT_MASK = (NX_INCOMPAT_VERSION2 | NX_INCOMPAT_FUSION)
 
 	/** Block and Container Size **/
-
 	NX_MINIMUM_BLOCK_SIZE     = 0x1000   // =    4 Ki
 	NX_DEFAULT_BLOCK_SIZE     = 0x1000   // =    4 Ki
 	NX_MAXIMUM_BLOCK_SIZE     = 0x10000  // =   64 Ki
 	NX_MINIMUM_CONTAINER_SIZE = 0x100000 // = 1024 Ki = 1 Mi
-
 )
 
+type CheckpointDesc struct {
+	Obj  ObjPhysT
+	Body interface{}
+}
+
 type CheckpointMappingT struct {
-	Type    uint32
+	Type    objType
 	Subtype uint32
 	Size    uint32
 	Pad     uint32
@@ -120,10 +119,15 @@ type CheckpointMappingT struct {
 }
 
 type CheckpointMapPhysT struct {
-	Obj   obj_phys_t
+	Obj   ObjPhysT
 	Flags uint32
 	Count uint32
-	Map   []CheckpointMappingT
+	// Map   []CheckpointMappingT
+}
+
+type CheckpointMapPhys struct {
+	Hdr CheckpointMapPhysT
+	Map []CheckpointMappingT
 }
 
 /** Checkpoint Flags **/

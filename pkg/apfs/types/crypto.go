@@ -82,7 +82,7 @@ type kb_locker_t struct {
 const APFS_KEYBAG_VERSION = 2
 
 type media_keybag_t struct {
-	Obj    obj_phys_t
+	Obj    ObjPhysT
 	Locker kb_locker_t
 }
 

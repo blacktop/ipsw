@@ -32,7 +32,7 @@ const (
 )
 
 type omap_phys_t struct {
-	Obj              obj_phys_t
+	Obj              ObjPhysT
 	Flags            uint32
 	SnapCount        uint32
 	TreeType         uint32

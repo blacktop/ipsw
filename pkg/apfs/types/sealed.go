@@ -25,7 +25,7 @@ package types
 // /** `integrity_meta_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t          im_o;
+//     ObjPhysT          im_o;
 //     uint32_t            im_version;
 
 //     // Fields supported by `im_version` >= 1

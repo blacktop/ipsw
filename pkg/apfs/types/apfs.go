@@ -4,7 +4,6 @@ import "github.com/blacktop/go-macho/types"
 
 const (
 	/** Volume Flags **/
-
 	APFS_FS_UNENCRYPTED            = 0x00000001
 	APFS_FS_RESERVED_2             = 0x00000002
 	APFS_FS_RESERVED_4             = 0x00000004
@@ -20,7 +19,6 @@ const (
 	APFS_FS_CRYPTOFLAGS = (APFS_FS_UNENCRYPTED | APFS_FS_ONEKEY)
 
 	/** Volume Roles **/
-
 	APFS_VOL_ROLE_NONE = 0x0000
 
 	APFS_VOL_ROLE_SYSTEM    = 0x0001
@@ -47,7 +45,6 @@ const (
 	APFS_VOL_ROLE_PRELOGIN    = (11 << APFS_VOLUME_ENUM_SHIFT) // = 0x02c0
 
 	/** Optional Volume Feature Flags **/
-
 	APFS_FEATURE_DEFRAG_PRERELEASE       = 0x00000001
 	APFS_FEATURE_HARDLINK_MAP_RECORDS    = 0x00000002
 	APFS_FEATURE_DEFRAG                  = 0x00000004
@@ -57,11 +54,9 @@ const (
 	APFS_SUPPORTED_FEATURES_MASK = (APFS_FEATURE_DEFRAG | APFS_FEATURE_DEFRAG_PRERELEASE | APFS_FEATURE_HARDLINK_MAP_RECORDS | APFS_FEATURE_STRICTATIME | APFS_FEATURE_VOLGRP_SYSTEM_INO_SPACE)
 
 	/** Read-Only Comaptible Volume Feature Flags **/
-
 	APFS_SUPPORTED_ROCOMPAT_MASK = 0
 
 	/** Incompatible Volume Feature Flags **/
-
 	APFS_INCOMPAT_CASE_INSENSITIVE          = 0x00000001
 	APFS_INCOMPAT_DATALESS_SNAPS            = 0x00000002
 	APFS_INCOMPAT_ENC_ROLLED                = 0x00000004
@@ -76,92 +71,92 @@ const (
 const APFS_MODIFIED_NAMELEN = 32
 
 type apfs_modified_by_t struct {
-	id        [APFS_MODIFIED_NAMELEN]byte
-	timestamp uint64
-	last_xid  xid_t
+	ID        [APFS_MODIFIED_NAMELEN]byte
+	Timestamp uint64
+	LastXid   xid_t
 }
 
 const (
-	APFS_MAGIC       = `BSPA`
+	APFS_MAGIC       = "APSB"
 	APFS_MAX_HIST    = 8
 	APFS_VOLNAME_LEN = 256
 )
 
 type apfs_superblock_t struct {
-	apfs_o obj_phys_t
+	Obj ObjPhysT
 
-	apfs_magic    uint32
-	apfs_fs_index uint32
+	Magic   uint32
+	FsIndex uint32
 
-	apfs_features                     uint64
-	apfs_readonly_compatible_features uint64
-	apfs_incompatible_features        uint64
+	Features                   uint64
+	ReadonlyCompatibleFeatures uint64
+	IncompatibleFeatures       uint64
 
-	apfs_unmount_time uint64
+	UnmountTime uint64
 
-	apfs_fs_reserve_block_count uint64
-	apfs_fs_quota_block_count   uint64
-	apfs_fs_alloc_count         uint64
+	FsReserveBlockCount uint64
+	FsQuotaBlockCount   uint64
+	FsAllocCount        uint64
 
-	apfs_meta_crypto wrapped_meta_crypto_state_t
+	MetaCrypto wrapped_meta_crypto_state_t
 
-	apfs_root_tree_type      uint32
-	apfs_extentref_tree_type uint32
-	apfs_snap_meta_tree_type uint32
+	RootTreeType      uint32
+	ExtentrefTreeType uint32
+	SnapMetaTreeType  uint32
 
-	apfs_omap_oid           oid_t
-	apfs_root_tree_oid      oid_t
-	apfs_extentref_tree_oid oid_t
-	apfs_snap_meta_tree_oid oid_t
+	OmapOid          oid_t
+	RootTreeOid      oid_t
+	ExtentrefTreeOid oid_t
+	SnapMetaTreeOid  oid_t
 
-	apfs_revert_to_xid        xid_t
-	apfs_revert_to_sblock_oid oid_t
+	RevertToXid       xid_t
+	RevertToSblockOid oid_t
 
-	apfs_next_obj_id uint64
+	NextObjID uint64
 
-	apfs_num_files           uint64
-	apfs_num_directories     uint64
-	apfs_num_symlinks        uint64
-	apfs_num_other_fsobjects uint64
-	apfs_num_snapshots       uint64
+	NumFiles          uint64
+	NumDirectories    uint64
+	NumSymlinks       uint64
+	NumOtherFsobjects uint64
+	NumSnapshots      uint64
 
-	apfs_total_block_alloced uint64
-	apfs_total_blocks_freed  uint64
+	TotalBlockAlloced uint64
+	TotalBlocksFreed  uint64
 
-	apfs_vol_uuid      types.UUID
-	apfs_last_mod_time uint64
+	VolumeUUID  types.UUID
+	LastModTime uint64
 
-	apfs_fs_flags uint64
+	FsFlags uint64
 
-	apfs_formatted_by apfs_modified_by_t
-	apfs_modified_by  [APFS_MAX_HIST]apfs_modified_by_t
+	FormattedBy apfs_modified_by_t
+	ModifiedBy  [APFS_MAX_HIST]apfs_modified_by_t
 
-	apfs_volname     [APFS_VOLNAME_LEN]byte
-	apfs_next_doc_id uint32
+	VolumeName [APFS_VOLNAME_LEN]byte
+	NextDocID  uint32
 
-	apfs_role uint16
-	reserved  uint16
+	role     uint16
+	reserved uint16
 
-	apfs_root_to_xid  xid_t
-	apfs_er_state_oid oid_t
+	RootToXid  xid_t
+	ErStateOid oid_t
 
-	// Fields introduced in revision 2020-05-15
+	/* Fields introduced in revision 2020-05-15 */
 
 	// Fields supported on macOS 10.13.3+
-	apfs_cloneinfo_id_epoch uint64
-	apfs_cloneinfo_xid      uint64
+	CloneinfoIDEpoch uint64
+	CloneinfoXid     uint64
 
 	// Fields supported on macOS 10.15+
-	apfs_snap_meta_ext_oid oid_t
-	apfs_volume_group_id   types.UUID
+	SnapMetaExtOid oid_t
+	VolumeGroupID  types.UUID
 
-	// Fields introduced in revision 2020-06-22
+	/* Fields introduced in revision 2020-06-22 */
 
 	// Fields supported on macOS 11+
-	apfs_integrity_meta_oid oid_t
-	apfs_fext_tree_oid      oid_t
-	apfs_fext_tree_type     uint32
+	IntegrityMetaOid oid_t
+	FextTreeOid      oid_t
+	FextTreeType     uint32
 
-	reserved_type uint32
-	reserved_oid  oid_t
+	ReservedType uint32
+	ReservedOid  oid_t
 }
