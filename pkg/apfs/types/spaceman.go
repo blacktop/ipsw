@@ -9,14 +9,14 @@ type chunk_info_t struct {
 }
 
 type chunk_info_block_t struct {
-	Obj            obj_phys_t
+	Obj            ObjPhysT
 	Index          uint32
 	ChunkInfoCount uint32
 	ChunkInfo      []chunk_info_t
 }
 
 type cib_addr_block_t struct {
-	Obj      obj_phys_t
+	Obj      ObjPhysT
 	Index    uint32
 	CibCount uint32
 	CibAddr  []uint64
@@ -95,7 +95,7 @@ const (
 )
 
 type spaceman_phys_t struct {
-	Obj            obj_phys_t
+	Obj            ObjPhysT
 	BlockSize      uint32
 	BlocksPerChunk uint32
 	ChunksPerCib   uint32

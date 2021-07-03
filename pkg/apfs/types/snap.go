@@ -55,6 +55,6 @@ package types
 // /** `snap_meta_ext_obj_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t          smeop_o;
+//     ObjPhysT          smeop_o;
 //     snap_meta_ext_t     smeop_sme;
 // } __attribute__((packed)) snap_meta_ext_obj_phys_t;

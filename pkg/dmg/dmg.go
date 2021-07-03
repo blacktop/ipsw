@@ -201,6 +201,7 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 	var total int
 	var err error
 
+	// TODO: add progress bar
 	buff := make([]byte, 0, b.maxChunkSize())
 
 	for _, chunk := range b.Chunks {

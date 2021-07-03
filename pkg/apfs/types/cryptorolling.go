@@ -4,7 +4,7 @@ package types
 
 // // Forward declared for `er_state_phys[_v1]_t`
 // typedef struct {
-//     obj_phys_t  ersb_o;
+//     ObjPhysT  ersb_o;
 //     uint32_t    ersb_magic;
 //     uint32_t    ersb_version;
 // } er_state_phys_header_t;
@@ -52,7 +52,7 @@ package types
 // /** `er_recovery_block_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t  erb_o;
+//     ObjPhysT  erb_o;
 //     uint64_t    erb_offset;
 //     oid_t       erb_next_oid;
 //     uint8_t     erb_data[0];
@@ -61,14 +61,14 @@ package types
 // /** `gbitmap_block_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t  bmb_o;
+//     ObjPhysT  bmb_o;
 //     uint64_t    bmb_field[0];
 // } gbitmap_block_phys_t;
 
 // /** `gbitmap_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t  bm_o;
+//     ObjPhysT  bm_o;
 //     oid_t       bm_tree_oid;
 //     uint64_t    bm_bit_count;
 //     uint64_t    bm_flags;

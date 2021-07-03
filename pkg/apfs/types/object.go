@@ -1,13 +1,18 @@
 package types
 
+//go:generate stringer -type=objType -output object_string.go
+
 const (
 	MAX_CKSUM_SIZE = 8
-	/** Object Identifier Constants **/
+
+	// Object Identifier Constants
+
 	OID_NX_SUPERBLOCK  = 1
 	OID_INVALID        = 0
 	OID_RESERVED_COUNT = 1024
 
-	/** Object Type Masks **/
+	// Object Type Masks
+
 	OBJECT_TYPE_MASK       = 0x0000ffff
 	OBJECT_TYPE_FLAGS_MASK = 0xffff0000
 
@@ -50,7 +55,7 @@ const (
 	OBJECT_TYPE_GBITMAP       objType = 0x00000019
 	OBJECT_TYPE_GBITMAP_TREE  objType = 0x0000001a
 	OBJECT_TYPE_GBITMAP_BLOCK objType = 0x0000001b
-
+	// new in 2020-06-22
 	OBJECT_TYPE_ER_RECOVERY_BLOCK objType = 0x0000001c
 	OBJECT_TYPE_SNAP_META_EXT     objType = 0x0000001d
 	OBJECT_TYPE_INTEGRITY_META    objType = 0x0000001e
@@ -65,22 +70,30 @@ const (
 	OBJECT_TYPE_MEDIA_KEYBAG     = `mkey`
 
 	/** Object Type Flags **/
-	OBJ_VIRTUAL   = 0x00000000
-	OBJ_EPHEMERAL = 0x80000000
-	OBJ_PHYSICAL  = 0x40000000
+	OBJ_VIRTUAL   objType = 0x00000000
+	OBJ_EPHEMERAL objType = 0x80000000
+	OBJ_PHYSICAL  objType = 0x40000000
 
-	OBJ_NOHEADER      = 0x20000000
-	OBJ_ENCRYPTED     = 0x10000000
-	OBJ_NONPERSISTENT = 0x08000000
+	OBJ_NOHEADER      objType = 0x20000000
+	OBJ_ENCRYPTED     objType = 0x10000000
+	OBJ_NONPERSISTENT objType = 0x08000000
 )
 
 type oid_t uint64
 type xid_t uint64
 
-type obj_phys_t struct {
+type ObjPhysT struct {
 	Cksum   [MAX_CKSUM_SIZE]byte
 	Oid     oid_t
 	Xid     xid_t
 	Type    objType
 	Subtype uint32
+}
+
+func (o ObjPhysT) GetType() objType {
+	return o.Type & OBJECT_TYPE_MASK
+}
+
+func (o ObjPhysT) GetFlag() objType {
+	return o.Type & OBJECT_TYPE_FLAGS_MASK
 }

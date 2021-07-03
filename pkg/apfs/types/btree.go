@@ -37,7 +37,7 @@ type nloc_t struct {
 }
 
 type btree_node_phys_t struct {
-	BtnO           obj_phys_t
+	BtnO           ObjPhysT
 	BtnFlags       uint16
 	BtnLevel       uint16
 	BtnNkeys       uint32

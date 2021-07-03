@@ -8,7 +8,7 @@ package types
 /** `fusion_wbc_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t  fwp_obj_hdr;
+//     ObjPhysT  fwp_obj_hdr;
 //     uint64_t    fwp_version;
 //     oid_t       fwp_list_head_oid;
 //     oid_t       fwp_list_tail_oid;
@@ -31,7 +31,7 @@ package types
 // /** `fusion_wbc_list_phys_t` **/
 
 // typedef struct {
-//     obj_phys_t  fwlp_obj_hdr;
+//     ObjPhysT  fwlp_obj_hdr;
 //     uint64_t    fwlp_version;
 //     uint64_t    fwlp_tail_offset;
 //     uint32_t    fwlp_index_begin;
