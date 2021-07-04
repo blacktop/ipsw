@@ -15,6 +15,7 @@
 - https://objectivebythesea.com/v1/talks/OBTS_v1_Levin.pdf
 - http://newosxbook.com/files/APFS.pdf
 - http://docs.macsysadmin.se/2018/video/Day4Session2.mp4
+- https://blog.cugu.eu/post/apfs/
 
 ## Credit
 

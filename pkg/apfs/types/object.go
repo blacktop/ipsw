@@ -79,13 +79,13 @@ const (
 	OBJ_NONPERSISTENT objType = 0x08000000
 )
 
-type oid_t uint64
-type xid_t uint64
+type OidT uint64
+type XidT uint64
 
 type ObjPhysT struct {
 	Cksum   [MAX_CKSUM_SIZE]byte
-	Oid     oid_t
-	Xid     xid_t
+	Oid     OidT
+	Xid     XidT
 	Type    objType
 	Subtype uint32
 }

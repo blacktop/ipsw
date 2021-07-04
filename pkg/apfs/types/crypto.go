@@ -37,6 +37,7 @@ type wrapped_meta_crypto_state_t struct {
 	PersistentClass cp_key_class_t
 	KeyOsVersion    cp_key_os_version_t
 	KeyRevision     cp_key_revision_t
+	_               uint16
 } // __attribute__((aligned(2), packed))
 
 const (

@@ -10,8 +10,8 @@ package types
 // typedef struct {
 //     ObjPhysT  fwp_obj_hdr;
 //     uint64_t    fwp_version;
-//     oid_t       fwp_list_head_oid;
-//     oid_t       fwp_list_tail_oid;
+//     OidT       fwp_list_head_oid;
+//     OidT       fwp_list_tail_oid;
 //     uint64_t    fwp_stable_head_offset;
 //     uint64_t    fwp_stable_tail_offset;
 //     uint32_t    fwp_list_blocks_count;

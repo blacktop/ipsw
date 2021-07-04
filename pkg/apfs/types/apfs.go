@@ -1,6 +1,10 @@
 package types
 
-import "github.com/blacktop/go-macho/types"
+import (
+	"time"
+
+	"github.com/blacktop/go-macho/types"
+)
 
 const (
 	/** Volume Flags **/
@@ -70,10 +74,17 @@ const (
 
 const APFS_MODIFIED_NAMELEN = 32
 
+type EpochTime uint64
+
+func (e EpochTime) String() string {
+	t := time.Unix(0, int64(e))
+	return t.Format(time.UnixDate)
+}
+
 type apfs_modified_by_t struct {
 	ID        [APFS_MODIFIED_NAMELEN]byte
-	Timestamp uint64
-	LastXid   xid_t
+	Timestamp EpochTime
+	LastXid   XidT
 }
 
 const (
@@ -82,17 +93,18 @@ const (
 	APFS_VOLNAME_LEN = 256
 )
 
-type apfs_superblock_t struct {
+// ApfsSuperblockT is a apfs_superblock_t struct
+type ApfsSuperblockT struct {
 	Obj ObjPhysT
 
-	Magic   uint32
+	Magic   magic
 	FsIndex uint32
 
 	Features                   uint64
 	ReadonlyCompatibleFeatures uint64
 	IncompatibleFeatures       uint64
 
-	UnmountTime uint64
+	UnmountTime EpochTime
 
 	FsReserveBlockCount uint64
 	FsQuotaBlockCount   uint64
@@ -104,13 +116,13 @@ type apfs_superblock_t struct {
 	ExtentrefTreeType uint32
 	SnapMetaTreeType  uint32
 
-	OmapOid          oid_t
-	RootTreeOid      oid_t
-	ExtentrefTreeOid oid_t
-	SnapMetaTreeOid  oid_t
+	OmapOid          OidT
+	RootTreeOid      OidT
+	ExtentrefTreeOid OidT
+	SnapMetaTreeOid  OidT
 
-	RevertToXid       xid_t
-	RevertToSblockOid oid_t
+	RevertToXid       XidT
+	RevertToSblockOid OidT
 
 	NextObjID uint64
 
@@ -124,7 +136,7 @@ type apfs_superblock_t struct {
 	TotalBlocksFreed  uint64
 
 	VolumeUUID  types.UUID
-	LastModTime uint64
+	LastModTime EpochTime
 
 	FsFlags uint64
 
@@ -134,29 +146,29 @@ type apfs_superblock_t struct {
 	VolumeName [APFS_VOLNAME_LEN]byte
 	NextDocID  uint32
 
-	role     uint16
-	reserved uint16
+	Role     uint16
+	Reserved uint16
 
-	RootToXid  xid_t
-	ErStateOid oid_t
+	RootToXid  XidT
+	ErStateOid OidT
 
 	/* Fields introduced in revision 2020-05-15 */
 
 	// Fields supported on macOS 10.13.3+
-	CloneinfoIDEpoch uint64
+	CloneinfoIDEpoch EpochTime
 	CloneinfoXid     uint64
 
 	// Fields supported on macOS 10.15+
-	SnapMetaExtOid oid_t
+	SnapMetaExtOid OidT
 	VolumeGroupID  types.UUID
 
 	/* Fields introduced in revision 2020-06-22 */
 
 	// Fields supported on macOS 11+
-	IntegrityMetaOid oid_t
-	FextTreeOid      oid_t
+	IntegrityMetaOid OidT
+	FextTreeOid      OidT
 	FextTreeType     uint32
 
 	ReservedType uint32
-	ReservedOid  oid_t
+	ReservedOid  OidT
 }
