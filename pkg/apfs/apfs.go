@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/apfs/types"
 )
 
@@ -74,6 +75,7 @@ func NewAPFS(r *os.File) (*APFS, error) {
 	a.xpDesc = make([]interface{}, xpDescBlocks)
 	block := make([]byte, a.nxsb.BlockSize)
 
+	var iLatestNx uint32
 	for i := uint32(0); i < xpDescBlocks; i++ {
 		if err := binary.Read(r, binary.LittleEndian, &block); err != nil {
 			return nil, fmt.Errorf("failed to read APFS checkpoint block: %v", err)
@@ -112,10 +114,115 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		}
 		// check checksum
 		if !types.VerifyChecksum(block) {
-			log.Warnf("block at index %d within this area failed checksum validation. Skipping it.", i)
+			log.Debugf("block at index %d within this area failed checksum validation. Skipping it.", i)
 			continue
 		}
+		iLatestNx = i
 	}
+
+	nxsb := a.xpDesc[iLatestNx].(types.NxSuperblockT)
+	if nxsb.XpDescIndex+nxsb.XpDescLen <= xpDescBlocks {
+		fmt.Println("contig")
+	} else {
+		fmt.Println("shizzzz")
+	}
+	xp := a.xpDesc[nxsb.XpDescIndex].(types.CheckpointMapPhys)
+	fmt.Println(xp)
+
+	log.Infof("the container superblock states that the container object map has physical OID %#016x", nxsb.OmapOid)
+
+	r.Seek(int64(uint64(nxsb.OmapOid)*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+	var omap types.OmapPhysT
+	if err := binary.Read(r, binary.LittleEndian, &omap); err != nil {
+		return nil, fmt.Errorf("failed to read APFS omap_phys_t: %v", err)
+	}
+	fmt.Println(omap)
+
+	r.Seek(int64(uint64(omap.TreeOid)*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+	if err := binary.Read(r, binary.LittleEndian, &block); err != nil {
+		return nil, fmt.Errorf("failed to read APFS btree_node_phys_t block: %v", err)
+	}
+
+	r.Seek(int64(uint64(omap.TreeOid)*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+	var omapBtree types.BTreeNodePhys
+	if err := binary.Read(r, binary.LittleEndian, &omapBtree.BTreeNodePhysT); err != nil {
+		return nil, fmt.Errorf("failed to read APFS btree_node_phys_t: %v", err)
+	}
+
+	omapBtree.Data = make([]uint64, (a.nxsb.BlockSize-uint32(binary.Size(omapBtree.BTreeNodePhysT)))/uint32(binary.Size(uint64(1))))
+	if err := binary.Read(r, binary.LittleEndian, &omapBtree.Data); err != nil {
+		return nil, fmt.Errorf("failed to read APFS btree_node_phys_t Data: %v", err)
+	}
+	fmt.Println(omapBtree)
+
+	var numFileSystems uint32
+	for _, fsOid := range nxsb.FsOids {
+		if fsOid == 0 {
+			break
+		}
+		numFileSystems++
+	}
+
+	log.Infof("the container superblock lists %d APFS volumes, whose superblocks have the following virtual OIDs:", numFileSystems)
+	apsbs := make([]types.ApfsSuperblockT, numFileSystems)
+	for i := uint32(0); i < numFileSystems; i++ {
+		utils.Indent(log.Info, 2)(fmt.Sprintf("- %#x", nxsb.FsOids[i]))
+		// omap_entry_t* fs_entry = get_btree_phys_omap_entry(nx_omap_btree, nxsb->nx_fs_oid[i], nxsb->nx_o.o_xid);
+		fsEntry, err := a.GetBTreePhysOMapEntry(bytes.NewReader(block), nxsb.FsOids[i], nxsb.Obj.Xid)
+		if err != nil {
+			// fprintf(stderr, "\nABORT: No objects with Virtual OID 0x%" PRIx64 " and maximum XID 0x%" PRIx64 " exist in `nx_omap_btree`.\n", nxsb->nx_fs_oid[i], nxsb->nx_o.o_xid);
+			return nil, fmt.Errorf("failed to get btree phys omap entry: %v", err)
+		}
+
+		r.Seek(int64(fsEntry.Val.Paddr*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+		if err := binary.Read(r, binary.LittleEndian, &apsbs[i]); err != nil {
+			return nil, fmt.Errorf("failed to read apfs_superblock_t data: %v", err)
+		}
+	}
+
+	var apsb types.ApfsSuperblockT
+	if len(apsbs) == 1 {
+		apsb = apsbs[0]
+	}
+
+	r.Seek(int64(uint64(apsb.OmapOid)*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+	var fsOMap types.OmapPhysT
+	if err := binary.Read(r, binary.LittleEndian, &fsOMap); err != nil {
+		return nil, fmt.Errorf("failed to read omap_phys_t data for volume: %v", err)
+	}
+
+	r.Seek(int64(uint64(fsOMap.TreeOid)*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+	if err := binary.Read(r, binary.LittleEndian, &block); err != nil {
+		return nil, fmt.Errorf("failed to read APFS btree_node_phys_t block: %v", err)
+	}
+
+	r.Seek(int64(uint64(fsOMap.TreeOid)*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+	var fsOMapBTree types.BTreeNodePhys
+	if err := binary.Read(r, binary.LittleEndian, &fsOMapBTree.BTreeNodePhysT); err != nil {
+		return nil, fmt.Errorf("failed to read btree_node_phys_t data for root node of the volume object map B-tree: %v", err)
+	}
+	// TODO: get Data ??
+	fsRootEntry, err := a.GetBTreePhysOMapEntry(bytes.NewReader(block), apsb.RootTreeOid, apsb.Obj.Xid)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get btree phys omap entry: %v", err)
+	}
+
+	r.Seek(int64(fsRootEntry.Val.Paddr*uint64(a.nxsb.BlockSize)), io.SeekStart)
+
+	var fsRootBTree types.BTreeNodePhys
+	if err := binary.Read(r, binary.LittleEndian, &fsRootBTree.BTreeNodePhysT); err != nil {
+		return nil, fmt.Errorf("failed to read btree_node_phys_t data for root node of the filesystem object map B-tree: %v", err)
+	}
+	// TODO: get Data ??
+
+	fmt.Println(fsRootBTree)
 
 	return a, nil
 }

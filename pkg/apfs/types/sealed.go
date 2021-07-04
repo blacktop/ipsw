@@ -32,7 +32,7 @@ package types
 //     uint32_t            im_flags;
 //     apfs_hash_type_t    im_hash_type;
 //     uint32_t            im_root_hash_offset;
-//     xid_t               im_broken_xid;
+//     XidT               im_broken_xid;
 
 //     // Fields supported by `im_version` >= 2
 //     uint64_t            im_reserved[9];

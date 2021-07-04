@@ -6,15 +6,15 @@ package types
 //     ObjPhysT  nr_o;
 //     uint64_t    nr_next_reap_id;
 //     uint64_t    nr_completed_id;
-//     oid_t       nr_head;
-//     oid_t       nr_tail;
+//     OidT       nr_head;
+//     OidT       nr_tail;
 //     uint32_t    nr_flags;
 //     uint32_t    nr_rlcount;
 //     uint32_t    nr_type;
 //     uint32_t    nr_size;
-//     oid_t       nr_fs_oid;
-//     oid_t       nr_oid;
-//     xid_t       nr_xid;
+//     OidT       nr_fs_oid;
+//     OidT       nr_oid;
+//     XidT       nr_xid;
 //     uint32_t    nr_nrle_flags;
 //     uint32_t    nr_state_buffer_size;
 //     uint8_t     nr_state_buffer[];
@@ -27,16 +27,16 @@ package types
 //     uint32_t    nrle_flags;
 //     uint32_t    nrle_type;
 //     uint32_t    nrle_size;
-//     oid_t       nrle_fs_oid;
-//     oid_t       nrle_oid;
-//     xid_t       nrle_xid;
+//     OidT       nrle_fs_oid;
+//     OidT       nrle_oid;
+//     XidT       nrle_xid;
 // } nx_reap_list_entry_t;
 
 // /** `nx_reap_list_phys_t` **/
 
 // typedef struct {
 //     ObjPhysT              nrl_o;
-//     oid_t                   nrl_next;
+//     OidT                   nrl_next;
 //     uint32_t                nrl_flags;
 //     uint32_t                nrl_max;
 //     uint32_t                nrl_count;
@@ -77,7 +77,7 @@ package types
 
 // typedef struct {
 //     uint32_t    omr_phase;
-//     omap_key_t  omr_ok;
+//     OMapKey  omr_ok;
 // } omap_reap_state_t;
 
 // /** `omap_cleanup_state_t` **/
@@ -85,17 +85,17 @@ package types
 // typedef struct {
 //     uint32_t    omc_cleaning;
 //     uint32_t    omc_omsflags;
-//     xid_t       omc_sxidprev;
-//     xid_t       omc_sxidstart;
-//     xid_t       omc_sxidenf;
-//     xid_t       omc_sxidnext;
-//     omap_key_t  omc_curkey;
+//     XidT       omc_sxidprev;
+//     XidT       omc_sxidstart;
+//     XidT       omc_sxidenf;
+//     XidT       omc_sxidnext;
+//     OMapKey  omc_curkey;
 // } omap_cleanup_state_t;
 
 // /** `apfs_reap_state_t` **/
 
 // typedef struct {
 //     uint64_t    last_pbn;
-//     xid_t       cur_snap_xid;
+//     XidT       cur_snap_xid;
 //     uint32_t    phase;
 // } __attribute__((packed))   apfs_reap_state_t;

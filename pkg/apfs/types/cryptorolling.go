@@ -17,10 +17,10 @@ package types
 //     uint64_t    ersb_file_offset;
 //     uint64_t    ersb_progress;
 //     uint64_t    ersb_total_blk_to_encrypt;
-//     oid_t       ersb_blockmap_oid;
+//     OidT       ersb_blockmap_oid;
 //     uint64_t    ersb_tidemark_obj_id;
 //     uint64_t    ersb_recovery_extents_count;
-//     oid_t       ersb_recovery_list_oid;
+//     OidT       ersb_recovery_list_oid;
 //     uint64_t    ersb_recovery_length;
 // } er_state_phys_t;
 
@@ -54,7 +54,7 @@ package types
 // typedef struct {
 //     ObjPhysT  erb_o;
 //     uint64_t    erb_offset;
-//     oid_t       erb_next_oid;
+//     OidT       erb_next_oid;
 //     uint8_t     erb_data[0];
 // } er_recovery_block_phys_t;
 
@@ -69,7 +69,7 @@ package types
 
 // typedef struct {
 //     ObjPhysT  bm_o;
-//     oid_t       bm_tree_oid;
+//     OidT       bm_tree_oid;
 //     uint64_t    bm_bit_count;
 //     uint64_t    bm_flags;
 // } gbitmap_phys_t;

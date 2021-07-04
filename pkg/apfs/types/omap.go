@@ -31,25 +31,28 @@ const (
 	OMAP_REAP_PHASE_SNAPSHOT_TREE = 2
 )
 
-type omap_phys_t struct {
+// OmapPhysT is a omap_phys_t struct
+type OmapPhysT struct {
 	Obj              ObjPhysT
 	Flags            uint32
 	SnapCount        uint32
 	TreeType         uint32
 	SnapshotTreeType uint32
-	TreeOid          oid_t
-	SnapshotTreeOid  oid_t
-	MostRecentSnap   xid_t
-	PendingRevertMin xid_t
-	PendingRevertMax xid_t
+	TreeOid          OidT
+	SnapshotTreeOid  OidT
+	MostRecentSnap   XidT
+	PendingRevertMin XidT
+	PendingRevertMax XidT
 }
 
-type omap_key_t struct {
-	Oid oid_t
-	Xid xid_t
+// OMapKey is a omap_key_t struct
+type OMapKey struct {
+	Oid OidT
+	Xid XidT
 }
 
-type omap_val_t struct {
+// OMapVal is a omap_val_t struct
+type OMapVal struct {
 	Flags uint32
 	Size  uint32
 	Paddr uint64
@@ -58,5 +61,5 @@ type omap_val_t struct {
 type omap_snapshot_t struct {
 	Flags uint32
 	Pad   uint32
-	Oid   oid_t
+	Oid   OidT
 }

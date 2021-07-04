@@ -1,7 +1,7 @@
 package types
 
 type chunk_info_t struct {
-	Xid        xid_t // Spec says ``, but I assume it is meant to be `xid_t` they're equivalent, anyway
+	Xid        XidT // Spec says ``, but I assume it is meant to be `XidT` they're equivalent, anyway
 	Addr       uint64
 	BlockCount uint32
 	FreeCount  uint32
@@ -23,7 +23,7 @@ type cib_addr_block_t struct {
 }
 
 type spaceman_free_queue_key_t struct {
-	SfqkXid   xid_t
+	SfqkXid   XidT
 	SfqkPaddr uint64
 }
 
@@ -36,8 +36,8 @@ type spaceman_free_queue_entry_t struct {
 
 type spaceman_free_queue_t struct {
 	Count         uint64
-	TreeOid       oid_t
-	OldestXid     xid_t
+	TreeOid       OidT
+	OldestXid     XidT
 	TreeNodeLimit uint16
 	Pad16         uint16
 	Pad32         uint32

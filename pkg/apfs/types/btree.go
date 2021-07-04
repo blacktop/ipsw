@@ -36,16 +36,23 @@ type nloc_t struct {
 	Len uint16
 }
 
-type btree_node_phys_t struct {
-	BtnO           ObjPhysT
-	BtnFlags       uint16
-	BtnLevel       uint16
-	BtnNkeys       uint32
-	BtnTableSpace  nloc_t
-	BtnFreeSpace   nloc_t
-	BtnKeyFreeList nloc_t
-	BtnValFreeList nloc_t
-	BtnData        []uint64
+// BTreeNodePhysT is a btree_node_phys_t struct
+type BTreeNodePhysT struct {
+	Obj         ObjPhysT
+	Flags       uint16
+	Level       uint16
+	Nkeys       uint32
+	TableSpace  nloc_t
+	FreeSpace   nloc_t
+	KeyFreeList nloc_t
+	ValFreeList nloc_t
+	// Data        []uint64
+}
+
+// BTreeNodePhys is a btree_node_phys_t struct with data array
+type BTreeNodePhys struct {
+	BTreeNodePhysT
+	Data []uint64
 }
 
 type btree_info_fixed_t struct {
@@ -55,7 +62,8 @@ type btree_info_fixed_t struct {
 	BtValSize  uint32
 }
 
-type btree_info_t struct {
+// BTreeInfoT is a btree_info_t struct
+type BTreeInfoT struct {
 	BtFixed      btree_info_fixed_t
 	BtLongestKey uint32
 	BtLongestVal uint32
@@ -66,7 +74,7 @@ type btree_info_t struct {
 const BTREE_NODE_HASH_SIZE_MAX = 64
 
 type btn_index_node_val_t struct {
-	BinvChildOid  oid_t
+	BinvChildOid  OidT
 	BinvChildHash [BTREE_NODE_HASH_SIZE_MAX]byte
 }
 
@@ -75,18 +83,18 @@ type kvloc_t struct {
 	Val nloc_t
 }
 
-type kvoff_t struct {
+// KVOffT is a kvoff_t struct
+type KVOffT struct {
 	Key uint16
 	Val uint16
 }
 
-/**
- * Custom data structure used to store the key and value of an object map entry
- * together.
- */
-type omap_entry_t struct {
-	Key omap_key_t
-	Val omap_val_t
+// OMapEntry is a omap_entry_t struct
+// Custom data structure used to store the key and value of an object map entry
+// together.
+type OMapEntry struct {
+	Key OMapKey
+	Val OMapVal
 }
 
 /**
@@ -110,7 +118,7 @@ type omap_entry_t struct {
  *          key-part data, and index `key_len` through `key_len + val_len - 1`
  *          (inclusive) contain the value-part data.
  */
-type j_rec_t struct {
+type JRecT struct {
 	KeyLen uint16
 	ValLen uint16
 	Data   []byte

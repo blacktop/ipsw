@@ -9,8 +9,8 @@ package types
 // /** `j_snap_metadata_val_t` **/
 
 // typedef struct {
-//     oid_t       extentref_tree_oid;
-//     oid_t       sblock_oid;
+//     OidT       extentref_tree_oid;
+//     OidT       sblock_oid;
 //     uint64_t    create_time;
 //     uint64_t    change_time;
 //     uint64_t    inum;
@@ -31,7 +31,7 @@ package types
 // /** `j_snap_name_val_t` **/
 
 // typedef struct {
-//     xid_t   snap_xid;
+//     XidT   snap_xid;
 // } __attribute__((packed))   j_snap_name_val_t;
 
 // /** `snap_meta_flags` **/
@@ -46,7 +46,7 @@ package types
 //     uint32_t    sme_version;
 
 //     uint32_t    sme_flags;
-//     xid_t       sme_snap_xid;
+//     XidT       sme_snap_xid;
 //     uuid_t      sme_uuid;
 
 //     uint64_t    sme_token;

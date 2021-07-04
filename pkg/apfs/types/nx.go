@@ -34,8 +34,8 @@ type NxSuperblockT struct {
 
 	UUID types.UUID
 
-	NextOid oid_t
-	NextXid xid_t
+	NextOid OidT
+	NextXid XidT
 
 	XpDescBlocks uint32
 	XpDataBlocks uint32
@@ -48,27 +48,27 @@ type NxSuperblockT struct {
 	XpDataIndex  uint32
 	XpDataLen    uint32
 
-	SpacemanOid oid_t
-	OmapOid     oid_t
-	ReaperOid   oid_t
+	SpacemanOid OidT
+	OmapOid     OidT
+	ReaperOid   OidT
 
 	TestType uint32
 
 	MaxFileSystems      uint32
-	FsOid               [NX_MAX_FILE_SYSTEMS]oid_t
+	FsOids              [NX_MAX_FILE_SYSTEMS]OidT
 	Counters            [NX_NUM_COUNTERS]uint64
 	BlockedOutPrange    prange
-	EvictMappingTreeOid oid_t
+	EvictMappingTreeOid OidT
 	Flags               uint64
 	EFIJumpstart        uint64
 	FusionUUID          types.UUID
 	Keylocker           prange
-	EphemeralInfo       [NX_EPH_INFO_COUNT]uint64
+	EphemeralInfos      [NX_EPH_INFO_COUNT]uint64
 
-	TestOid oid_t
+	TestOid OidT
 
-	FusionMtOid  oid_t
-	FusionWbcOid oid_t
+	FusionMtOid  OidT
+	FusionWbcOid OidT
 	FusionWbc    prange
 
 	NewestMountedVersion uint64
@@ -113,9 +113,9 @@ type CheckpointMappingT struct {
 	Subtype uint32
 	Size    uint32
 	Pad     uint32
-	FsOid   oid_t
-	Oid     oid_t
-	Paddr   oid_t
+	FsOid   OidT
+	Oid     OidT
+	Paddr   OidT
 }
 
 type CheckpointMapPhysT struct {
