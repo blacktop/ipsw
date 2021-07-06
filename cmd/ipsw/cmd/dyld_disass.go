@@ -108,6 +108,11 @@ var dyldDisassCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if !f.IsArm64() {
+			log.Errorf("can only disassemble arm64 caches")
+			return nil
+		}
+
 		if len(symbolName) > 0 {
 			if len(imageName) == 0 {
 				// Load all symbols

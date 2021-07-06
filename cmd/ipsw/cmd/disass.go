@@ -27,6 +27,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-arm64"
@@ -334,9 +335,10 @@ func parseGOT(m *macho.File) error {
 
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
-	Use:   "disass [options] <MACHO>",
-	Short: "🚧 [WIP] Disassemble ARM binaries at address or symbol",
-	Args:  cobra.MinimumNArgs(1),
+	Use:          "disass [options] <MACHO>",
+	Short:        "🚧 [WIP] Disassemble ARM64 binaries at address or symbol",
+	Args:         cobra.MinimumNArgs(1),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var startAddr uint64
@@ -348,6 +350,11 @@ var disCmd = &cobra.Command{
 		m, err := macho.Open(args[0])
 		if err != nil {
 			return errors.Wrapf(err, "%s appears to not be a valid MachO", args[0])
+		}
+
+		if !strings.Contains(strings.ToLower(m.FileHeader.SubCPU.String(m.CPU)), "arm64") {
+			log.Errorf("can only disassemble arm64 binaries")
+			return nil
 		}
 
 		if len(symbolName) > 0 {

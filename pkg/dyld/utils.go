@@ -14,6 +14,11 @@ func (f *File) Is64bit() bool {
 	return strings.Contains(string(f.Magic[:16]), "64")
 }
 
+// IsArm64 returns if dyld is arm64 or not (meaning I can disassemble it)
+func (f *File) IsArm64() bool {
+	return strings.Contains(string(f.Magic[:16]), "arm64")
+}
+
 // GetOffset returns the offset for a given virtual address
 func (f *File) GetOffset(address uint64) (uint64, error) {
 	for _, mapping := range f.Mappings {

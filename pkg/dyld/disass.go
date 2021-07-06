@@ -282,7 +282,7 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 		log.Errorf("failed to parse local symbols for %s", image.Name)
 	}
 
-	if !image.Analysis.State.IsStubsDone() {
+	if !image.Analysis.State.IsStubsDone() && f.IsArm64() {
 		log.Debugf("parsing %s symbol stubs", image.Name)
 		if err := f.ParseSymbolStubs(image); err != nil {
 			return err
@@ -309,7 +309,7 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 		}
 	}
 
-	if !image.Analysis.State.IsGotDone() {
+	if !image.Analysis.State.IsGotDone() && f.IsArm64() {
 		log.Debugf("parsing %s global offset table", image.Name)
 		if err := f.ParseGOT(image); err != nil {
 			return err

@@ -98,6 +98,11 @@ var xrefCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if !f.IsArm64() {
+			log.Errorf("can only disassemble arm64 caches (disassembly required to find Xrefs)")
+			return nil
+		}
+
 		var srcImage *dyld.CacheImage
 		var images []*dyld.CacheImage
 		if len(imageName) > 0 {

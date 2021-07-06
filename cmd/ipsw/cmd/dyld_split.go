@@ -113,7 +113,7 @@ var splitCmd = &cobra.Command{
 		}
 
 		if runtime.GOOS != "darwin" {
-			log.Fatal("dyld_shared_cache splitting only works on macOS :(")
+			log.Fatal("dyld_shared_cache splitting only works on macOS")
 		}
 
 		if len(outputPath) > 0 {
