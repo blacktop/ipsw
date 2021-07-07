@@ -3,11 +3,10 @@ module github.com/blacktop/ipsw
 go 1.16
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.2.13
+	github.com/AlecAivazis/survey/v2 v2.2.14
 	github.com/Netflix/go-expect v0.0.0-20210429232723-e923ed2d1db5 // indirect
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-lzfse v1.1.12
 	github.com/blacktop/go-macho v1.1.39
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
