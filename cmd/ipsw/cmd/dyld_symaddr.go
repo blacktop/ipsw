@@ -38,6 +38,7 @@ func init() {
 
 	symaddrCmd.Flags().BoolP("all", "a", false, "Find all symbol matches")
 	symaddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	// symaddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -53,6 +54,7 @@ var symaddrCmd = &cobra.Command{
 		}
 
 		imageName, _ := cmd.Flags().GetString("image")
+		// cacheFile, _ := cmd.Flags().GetString("cache")
 		allMatches, _ := cmd.Flags().GetBool("all")
 
 		dscPath := filepath.Clean(args[0])

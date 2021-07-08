@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"compress/gzip"
-	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -37,6 +35,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(slideCmd)
 	slideCmd.Flags().BoolP("auth", "a", false, "Print only slide info for mappings with auth flags")
+	slideCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	slideCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -52,6 +51,7 @@ var slideCmd = &cobra.Command{
 		}
 
 		printAuthSlideInfo, _ := cmd.Flags().GetBool("auth")
+		cacheFile, _ := cmd.Flags().GetString("cache")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -79,38 +79,12 @@ var slideCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-			log.Warn("parsing public symbols...")
-			err = f.GetAllExportedSymbols(false)
-			if err != nil {
-				// return err
-				log.Errorf("failed to parse all exported symbols: %v", err)
-			}
-			log.Warn("parsing private symbols...")
-			err = f.ParseLocalSyms()
-			if err != nil {
-				return err
-			}
-			err = f.SaveAddrToSymMap(dscPath + ".a2s")
-			if err != nil {
-				return err
-			}
-		} else {
-			a2sFile, err := os.Open(dscPath + ".a2s")
-			if err != nil {
-				return err
-			}
-			gzr, err := gzip.NewReader(a2sFile)
-			if err != nil {
-				return fmt.Errorf("failed to create gzip reader: %v", err)
-			}
-			// Decoding the serialized data
-			err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
-			if err != nil {
-				return err
-			}
-			gzr.Close()
-			a2sFile.Close()
+		if len(cacheFile) == 0 {
+			cacheFile = dscPath + ".a2s"
+		}
+
+		if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+			return err
 		}
 
 		if f.SlideInfoOffsetUnused > 0 {

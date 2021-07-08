@@ -9,20 +9,26 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
+
+// ErrNoLocals is the error for a shared cache that has no LocalSymbolsOffset
+var ErrNoLocals = errors.New("dyld shared cache does NOT contain local symbols info")
 
 // ParseLocalSyms parses dyld's private symbols
 func (f *File) ParseLocalSyms() error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
-		return fmt.Errorf("dyld shared cache does not contain local symbols info")
+		return fmt.Errorf("failed to parse local syms: %w", ErrNoLocals)
 	}
 
 	stringPool := io.NewSectionReader(f.r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
@@ -358,23 +364,89 @@ func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error
 	return nil
 }
 
+// OpenOrCreateA2SCache returns an address to symbol map if the cache file exists
+// otherwise it will create a NEW one
+func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
+	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
+		log.Info("parsing public symbols...")
+		err = f.GetAllExportedSymbols(false)
+		if err != nil {
+			// return err
+			log.Errorf("failed to parse all exported symbols: %v", err)
+		}
+
+		log.Info("parsing private symbols...")
+		err = f.ParseLocalSyms()
+		if errors.Is(err, ErrNoLocals) {
+			utils.Indent(log.Warn, 2)("cache does NOT contain local symbols")
+		} else if err != nil {
+			return err
+		}
+
+		log.Info("parsing private symbols...")
+		err = f.SaveAddrToSymMap(cacheFile)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	a2sFile, err := os.Open(cacheFile)
+	if err != nil {
+		return err
+	}
+	gzr, err := gzip.NewReader(a2sFile)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %v", err)
+	}
+	// Decoding the serialized data
+	err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+	if err != nil {
+		return err
+	}
+	gzr.Close()
+	a2sFile.Close()
+
+	return nil
+}
+
 // SaveAddrToSymMap saves the dyld address-to-symbol map to disk
 func (f *File) SaveAddrToSymMap(dest string) error {
+	var err error
+	var of *os.File
+
 	buff := new(bytes.Buffer)
+
+	of, err = os.Create(dest)
+	if errors.Is(err, os.ErrPermission) {
+		var e *os.PathError
+		if errors.As(err, &e) {
+			log.Errorf("failed to create address to symbol cache file %s (%v)", e.Path, e.Err)
+		}
+		tmpDir := os.TempDir()
+		if runtime.GOOS == "darwin" {
+			tmpDir = "/tmp"
+		}
+		tempa2sfile := filepath.Join(tmpDir, f.UUID.String()+".a2s")
+		of, err = os.Create(tempa2sfile)
+		if err != nil {
+			return err
+		}
+		utils.Indent(log.Warn, 2)("creating in the temp folder")
+		utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future you must supply the flag: --cache %s ", tempa2sfile))
+	} else if err != nil {
+		return err
+	}
+	defer of.Close()
 
 	e := gob.NewEncoder(buff)
 
 	// Encoding the map
-	err := e.Encode(f.AddressToSymbol)
+	err = e.Encode(f.AddressToSymbol)
 	if err != nil {
 		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
-
-	of, err := os.Create(dest)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %v", dest, err)
-	}
-	defer of.Close()
 
 	gzw := gzip.NewWriter(of)
 	defer gzw.Close()
