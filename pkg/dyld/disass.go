@@ -13,6 +13,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/pkg/errors"
 )
 
 type dylibArray []*CacheImage
@@ -279,7 +280,11 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 	}
 
 	if err := f.GetLocalSymbolsForImage(image); err != nil {
-		log.Errorf("failed to parse local symbols for %s", image.Name)
+		if errors.Is(err, ErrNoLocals) {
+			utils.Indent(log.Warn, 2)(err.Error())
+		} else if err != nil {
+			return err
+		}
 	}
 
 	if !image.Analysis.State.IsStubsDone() && f.IsArm64() {

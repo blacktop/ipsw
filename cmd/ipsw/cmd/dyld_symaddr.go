@@ -28,6 +28,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -113,11 +114,17 @@ var symaddrCmd = &cobra.Command{
 		} else if len(imageName) > 0 {
 			// Dump ALL symbols for a dylib
 			if err := f.GetLocalSymbolsForImage(f.Image(imageName)); err != nil {
-				log.Error(err.Error())
+				if errors.Is(err, dyld.ErrNoLocals) {
+					utils.Indent(log.Warn, 2)(err.Error())
+				} else if err != nil {
+					return err
+				}
+
 				m, err := f.Image(imageName).GetMacho()
 				if err != nil {
 					return err
 				}
+
 				var sec string
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
 				for _, sym := range m.Symtab.Syms {
