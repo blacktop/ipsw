@@ -17,8 +17,8 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
-	"github.com/vbauerster/mpb/v5"
-	"github.com/vbauerster/mpb/v5/decor"
+	"github.com/vbauerster/mpb/v7"
+	"github.com/vbauerster/mpb/v7/decor"
 	"golang.org/x/net/http/httpproxy"
 )
 
@@ -198,7 +198,8 @@ func (d *Download) Do() error {
 		mpb.WithRefreshRate(180*time.Millisecond),
 	)
 
-	bar := p.AddBar(d.size, mpb.BarStyle("[=>-|"),
+	bar := p.Add(d.size,
+		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
 		mpb.PrependDecorators(
 			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),

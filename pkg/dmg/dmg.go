@@ -16,6 +16,8 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/pkg/lzfse"
+	"github.com/vbauerster/mpb/v7"
+	"github.com/vbauerster/mpb/v7/decor"
 )
 
 // DMG apple disk image object
@@ -201,7 +203,24 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 	var total int
 	var err error
 
-	// TODO: add progress bar
+	log.Info("Decompressing DMG")
+
+	// initialize progress bar
+	p := mpb.New(mpb.WithWidth(80))
+	// adding a single bar, which will inherit container's width
+	bar := p.Add(int64(len(b.Chunks)),
+		// progress bar filler with customized style
+		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+		mpb.PrependDecorators(
+			decor.Name("     ", decor.WC{W: len("     ") + 1, C: decor.DidentRight}),
+			// replace ETA decorator with "done" message, OnComplete event
+			decor.OnComplete(
+				decor.AverageETA(decor.ET_STYLE_GO, decor.WC{W: 4}), "✅ ",
+			),
+		),
+		mpb.AppendDecorators(decor.Percentage()),
+	)
+
 	buff := make([]byte, 0, b.maxChunkSize())
 
 	for _, chunk := range b.Chunks {
@@ -294,7 +313,10 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 		default:
 			return fmt.Errorf("chuck has unsupported compression type: %#x", chunk.Type)
 		}
+		bar.Increment()
 	}
+	// wait for our bar to complete and flush
+	p.Wait()
 
 	return nil
 }
