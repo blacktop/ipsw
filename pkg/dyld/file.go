@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
@@ -66,6 +67,7 @@ type File struct {
 
 	AddressToSymbol map[uint64]string
 
+	mu     sync.Mutex
 	r      io.ReaderAt
 	closer io.Closer
 }
