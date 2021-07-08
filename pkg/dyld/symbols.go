@@ -63,7 +63,8 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 		sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 		if f.LocalSymbolsOffset == 0 {
-			return fmt.Errorf("dyld shared cache does not contain local symbols info")
+			image.Analysis.State.SetPrivates(true) // TODO: does this have any bad side-effects ?
+			return fmt.Errorf("failed to parse local syms for image %s: %w", image.Name, ErrNoLocals)
 		}
 
 		stringPool := io.NewSectionReader(sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
@@ -108,7 +109,7 @@ func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
-		return nil, fmt.Errorf("dyld shared cache does not contain local symbols info")
+		return nil, fmt.Errorf("failed to parse local symbol %s: %w", symbol, ErrNoLocals)
 	}
 
 	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
@@ -140,7 +141,7 @@ func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymb
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
-		return nil, fmt.Errorf("dyld shared cache does not contain local symbols info")
+		return nil, fmt.Errorf("failed to parse local symbol %s in image %s: %w", symbol, imageName, ErrNoLocals)
 	}
 
 	image := f.Image(imageName)

@@ -126,7 +126,11 @@ var dyldDisassCmd = &cobra.Command{
 				}
 				utils.Indent(log.Warn, 2)("parsing private symbols...")
 				if err := f.GetLocalSymbolsForImage(image); err != nil {
-					log.Error("failed to parse local symbols")
+					if errors.Is(err, dyld.ErrNoLocals) {
+						utils.Indent(log.Warn, 2)(err.Error())
+					} else if err != nil {
+						return err
+					}
 				}
 			}
 
@@ -209,7 +213,11 @@ var dyldDisassCmd = &cobra.Command{
 			}
 			utils.Indent(log.Warn, 2)("parsing private symbols...")
 			if err := f.GetLocalSymbolsForImage(image); err != nil {
-				log.Error("failed to parse local symbols")
+				if errors.Is(err, dyld.ErrNoLocals) {
+					utils.Indent(log.Warn, 2)(err.Error())
+				} else if err != nil {
+					return err
+				}
 			}
 		}
 
