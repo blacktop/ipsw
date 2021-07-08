@@ -18,6 +18,8 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
+	"github.com/vbauerster/mpb/v7"
+	"github.com/vbauerster/mpb/v7/decor"
 )
 
 // ErrNoLocals is the error for a shared cache that has no LocalSymbolsOffset
@@ -30,6 +32,22 @@ func (f *File) ParseLocalSyms() error {
 	if f.LocalSymbolsOffset == 0 {
 		return fmt.Errorf("failed to parse local syms: %w", ErrNoLocals)
 	}
+
+	// initialize progress bar
+	p := mpb.New(mpb.WithWidth(80))
+	// adding a single bar, which will inherit container's width
+	bar := p.Add(int64(f.LocalSymInfo.EntriesCount),
+		// progress bar filler with customized style
+		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+		mpb.PrependDecorators(
+			decor.Name("     ", decor.WC{W: len("     ") + 1, C: decor.DidentRight}),
+			// replace ETA decorator with "done" message, OnComplete event
+			decor.OnComplete(
+				decor.AverageETA(decor.ET_STYLE_GO, decor.WC{W: 4}), "✅ ",
+			),
+		),
+		mpb.AppendDecorators(decor.Percentage()),
+	)
 
 	stringPool := io.NewSectionReader(f.r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
 	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
@@ -51,7 +69,10 @@ func (f *File) ParseLocalSyms() error {
 				Nlist64: nlist,
 			})
 		}
+		bar.Increment()
 	}
+	// wait for our bar to complete and flush
+	p.Wait()
 
 	return nil
 }
@@ -300,7 +321,35 @@ func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
 // GetAllExportedSymbols prints out all the exported symbols
 func (f *File) GetAllExportedSymbols(dump bool) error {
 
+	// initialize progress bar
+	p := mpb.New(mpb.WithWidth(80))
+	// adding a single bar, which will inherit container's width
+	bar := p.Add(int64(len(f.Images)),
+		// progress bar filler with customized style
+		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+		mpb.PrependDecorators(
+			decor.Name("     ", decor.WC{W: len("     ") + 1, C: decor.DidentRight}),
+			// replace ETA decorator with "done" message, OnComplete event
+			decor.OnComplete(
+				decor.AverageETA(decor.ET_STYLE_GO, decor.WC{W: 4}), "✅ ",
+			),
+		),
+		mpb.AppendDecorators(decor.Percentage()),
+	)
+
+	// var wg sync.WaitGroup
+	// wg.Add(len(f.Images))
+
 	for _, image := range f.Images {
+		// go func(wg sync.WaitGroup, i *CacheImage, bar *mpb.Bar) {
+		// 	// Decrement the counter when the goroutine completes.
+		// 	defer wg.Done()
+		// 	// Fetch the URL.
+		// 	f.GetAllExportedSymbolsForImage(i, false)
+
+		// 	bar.Increment()
+		// }(wg, image, bar)
+
 		// if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
 		exportTrie, err := f.getExportTrieData(image)
 		if err != nil {
@@ -325,7 +374,13 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 			}
 		}
 		// }
+		bar.Increment()
 	}
+
+	// wg.Wait()
+
+	// wait for our bar to complete and flush
+	p.Wait()
 
 	return nil
 }
@@ -354,6 +409,8 @@ func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error
 				fmt.Printf("%#8x:\t%s\n", sym.Address, sym.Name)
 			}
 		} else {
+			f.mu.Lock()
+			defer f.mu.Unlock()
 			for _, sym := range syms {
 				f.AddressToSymbol[sym.Address] = sym.Name
 			}
