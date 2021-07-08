@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -29,6 +30,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -63,9 +65,22 @@ var img4ExtractCmd = &cobra.Command{
 		outFile := args[0] + ".payload"
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Exracting payload to file %s", outFile))
 
-		err = ioutil.WriteFile(outFile, i.Data, 0644)
-		if err != nil {
-			return errors.Wrapf(err, "failed to write file: ", outFile)
+		if bytes.Contains(i.Data[:4], []byte("bvx2")) {
+			utils.Indent(log.Debug, 2)("Detected LZFSE compression")
+			dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
+			if err != nil {
+				return fmt.Errorf("failed to lzfse decompress %s: %v", args[0], err)
+			}
+
+			err = ioutil.WriteFile(outFile, dat, 0644)
+			if err != nil {
+				return errors.Wrapf(err, "failed to write file: ", outFile)
+			}
+		} else {
+			err = ioutil.WriteFile(outFile, i.Data, 0644)
+			if err != nil {
+				return errors.Wrapf(err, "failed to write file: ", outFile)
+			}
 		}
 
 		return nil
