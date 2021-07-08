@@ -16,7 +16,7 @@ builds:
       - darwin
     goarch:
       - amd64
-      # - arm64
+      - arm64
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
   - main: ./cmd/ipsw
     id: "others"
