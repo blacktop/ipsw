@@ -113,7 +113,7 @@ jobs:
       - name: Run dyld info
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info /System/Library/dyld/dyld_shared_cache_x86_64 --dylibs --sig -V
+          ls -lah /System/Library/dyld/
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info /System/Library/dyld/dyld_shared_cache_arm64e --dylibs --sig -V
 
       - name: Run dyldsymaddr (img)
