@@ -113,7 +113,8 @@ jobs:
       - name: Run download latest
         if: matrix.platform == 'macos-latest'
         run: |
-          cd /tmp && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download latest --device iPhone13,2
+          export PATH=$PWD/build/dist:$PATH
+          cd /tmp && LD_LIBRARY_PATH=/usr/local/lib ipsw download latest --device iPhone13,2
           ls /tmp
       #
       # DYLD CMD (macOS)
