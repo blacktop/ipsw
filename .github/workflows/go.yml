@@ -107,14 +107,20 @@ jobs:
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v 14.6 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
-
+      #
+      # DOWNLOAD CMD(macOS)
+      #
+      - name: Run download latest
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd /tmp && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download latest --device iPhone13,2
+          ls /tmp
       #
       # DYLD CMD (macOS)
       #
       - name: Run dyld info
         if: matrix.platform == 'macos-latest'
         run: |
-          find / -iname "dyld_shared_cache*" 2>&1 | grep -v "Permission denied"
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info /System/Library/dyld/dyld_shared_cache_arm64e --dylibs --sig -V
 
       - name: Run dyldsymaddr (img)
