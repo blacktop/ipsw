@@ -114,7 +114,7 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd /tmp && LD_LIBRARY_PATH=/usr/local/lib ipsw download latest --v 14.6 -d iPhone12,1 --yes
+          cd /tmp && LD_LIBRARY_PATH=/usr/local/lib ipsw download latest --yes
       #
       # EXTRACT CMD (macOS)
       #
