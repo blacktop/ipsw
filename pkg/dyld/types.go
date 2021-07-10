@@ -5,6 +5,7 @@ import (
 	"math/bits"
 	"strings"
 
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 )
 
@@ -444,13 +445,20 @@ type CacheLocalSymbol64 struct {
 	types.Nlist64
 	Name         string
 	FoundInDylib string
+	Sections     []*macho.Section
 }
 
-func (ls CacheLocalSymbol64) String() string {
-	if len(ls.FoundInDylib) > 0 {
-		return fmt.Sprintf("0x%8x: %s, %s", ls.Value, ls.Name, ls.FoundInDylib)
+func (s CacheLocalSymbol64) String() string {
+	// ord := s.Nlist64.Desc.GetLibraryOrdinal() // TODO: how to handle ord ?
+	var found string
+	var sec string
+	if len(s.FoundInDylib) > 0 {
+		found = fmt.Sprintf(", %s", s.FoundInDylib)
 	}
-	return fmt.Sprintf("0x%8x: %s", ls.Value, ls.Name)
+	if s.Sect > 0 && s.Sections != nil {
+		sec = fmt.Sprintf("%s.%s", s.Sections[s.Sect-1].Seg, s.Sections[s.Sect-1].Name)
+	}
+	return fmt.Sprintf("%#016x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
 }
 
 type CacheImageInfoExtra struct {
@@ -608,17 +616,19 @@ func (f CacheExportFlag) StubAndResolver() bool {
 }
 func (f CacheExportFlag) String() string {
 	var fStr string
-	if f.Regular() {
-		fStr += "Regular "
+	if f.Regular() && !f.ReExport() {
+		fStr += "Regular"
 		if f.StubAndResolver() {
-			fStr += "(Has Resolver Function)"
+			fStr += "|Has Resolver Function"
 		} else if f.WeakDefinition() {
-			fStr += "(Weak Definition)"
+			fStr += "|Weak Definition"
 		}
 	} else if f.ThreadLocal() {
 		fStr += "Thread Local"
 	} else if f.Absolute() {
 		fStr += "Absolute"
+	} else if f.ReExport() {
+		fStr += "ReExport"
 	}
 	return strings.TrimSpace(fStr)
 }
