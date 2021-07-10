@@ -132,7 +132,7 @@ jobs:
         run: |
           ls /tmp/*iPhone11,8_iPhone12,1
           ls /tmp
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info /tmp/*iPhone11,8_iPhone12,1/dyld_share_cache* --dylibs --sig -V
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig -V
 
       - name: Run dyldsymaddr (img)
         if: matrix.platform == 'macos-latest'
