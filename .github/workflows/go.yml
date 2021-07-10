@@ -137,19 +137,19 @@ jobs:
       - name: Run dyldsymaddr (img)
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_share_cache* --image libsystem_c.dylib
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib
       - name: Run dyld symaddr (sym)
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_share_cache* _memcpy
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e _memcpy
       - name: Run dyld symaddr (img+sym)
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_share_cache* --image libsystem_c.dylib _memcpy
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
       - name: Run dyld symaddr (ALL)
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_share_cache* | grep _memcpy
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
 
       # - name: Run ipsw update
       #   if: matrix.platform == 'macos-latest'
