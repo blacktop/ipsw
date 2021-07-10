@@ -122,16 +122,23 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd /tmp && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree *.ipsw
-          ls /tmp/*iPhone11,8_iPhone12,1
-          ls /tmp
+      #
+      # KERNEL CMD (macOS)
+      #
+      - name: Run kernel kexts
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel kexts /tmp/*iPhone11,8_iPhone12,1/kernelcache.release.iPhone11,8
+      - name: Run kernel sbopts
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel sbopts /tmp/*iPhone11,8_iPhone12,1/kernelcache.release.iPhone11,8
       #
       # DYLD CMD (macOS)
       #
       - name: Run dyld info
         if: matrix.platform == 'macos-latest'
         run: |
-          ls /tmp/*iPhone11,8_iPhone12,1
-          ls /tmp
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig -V
 
       - name: Run dyldsymaddr (img)
@@ -150,6 +157,81 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
+
+      - name: Run dyld macho
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld macho /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e JavaScriptCore --loads --objc --strings --symbols --starts -V
+
+      - name: Run dyld webkit
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --rev
+
+      - name: Run dyld slide
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --auth
+
+      - name: Run dyld patches
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+
+      - name: Run dyld imports
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld imports /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e JavaScriptCore
+
+      - name: Run dyld disass
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld disass /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --demangle --symbol _NSLog
+
+      - name: Run dyld objc sel --image
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc sel /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image JavaScriptCore
+      - name: Run dyld objc --class
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --class /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+      - name: Run dyld objc --imp-cache
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --imp-cache /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+      - name: Run dyld objc --proto
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --proto /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+
+      - name: Run dyld split
+        if: matrix.platform == 'macos-latest'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd /tmp && LD_LIBRARY_PATH=/usr/local/lib ipsw dyld split /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e /tmp
+      #
+      # MACHO CMD (macOS)
+      #
+      - name: Run macho
+        if: matrix.platform == 'macos-latest'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd /tmp && LD_LIBRARY_PATH=/usr/local/lib ipsw macho /tmp/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
+      #
+      # ENT CMD (macOS)
+      #
+      - name: Run ents
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw ent /tmp/*.ipsw --ent platform-application
+      #
+      # INFO CMD (macOS)
+      #
+      - name: Run info
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw info /tmp/*.ipsw
 
       # - name: Run ipsw update
       #   if: matrix.platform == 'macos-latest'
