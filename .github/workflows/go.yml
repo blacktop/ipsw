@@ -168,15 +168,15 @@ jobs:
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --rev
 
-      - name: Run dyld slide
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --auth
+      # - name: Run dyld slide
+      #   if: matrix.platform == 'macos-latest'
+      #   run: |
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --auth
 
-      - name: Run dyld patches
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+      # - name: Run dyld patches TODO: fix this
+      #   if: matrix.platform == 'macos-latest'
+      #   run: |
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches /tmp/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
 
       - name: Run dyld imports
         if: matrix.platform == 'macos-latest'
