@@ -44,6 +44,7 @@ type App struct {
 
 	authService authService
 	authOptions authOptions
+	codeRequest authOptions
 }
 
 // DevDownloads are all the downloads from https://developer.apple.com/download/
@@ -100,6 +101,8 @@ type securityCode struct {
 }
 
 type authOptions struct {
+	TrustedDeviceCount              int                 `json:"trustedDeviceCount,omitempty"`
+	OtherTrustedDeviceClass         string              `json:"otherTrustedDeviceClass,omitempty"`
 	TrustedPhoneNumbers             trustedPhoneNumbers `json:"trustedPhoneNumbers,omitempty"`
 	PhoneNumber                     trustedPhoneNumber  `json:"phoneNumber,omitempty"`
 	TrustedPhoneNumber              trustedPhoneNumber  `json:"trustedPhoneNumber,omitempty"`
@@ -121,6 +124,7 @@ type authOptions struct {
 	SupportsRecovery                bool                `json:"supportsRecovery,omitempty"`
 	SupportsCustodianRecovery       bool                `json:"supportsCustodianRecovery,omitempty"`
 	ServiceErrors                   []serviceError      `json:"serviceErrors,omitempty"`
+	NoTrustedDevices                bool                `json:"noTrustedDevices,omitempty"`
 }
 
 type secCode struct {
@@ -282,10 +286,12 @@ func (app *App) requestCode() error {
 		Number: phoneNumber{
 			ID: 1,
 		},
-		Mode: "sms",
+		// Mode: "sms",
+		Mode: "push",
 	})
 
-	req, err := http.NewRequest("PUT", "https://idmsa.apple.com/appleauth/auth/verify/phone", buf)
+	// req, err := http.NewRequest("PUT", "https://idmsa.apple.com/appleauth/auth/verify/phone", buf)
+	req, err := http.NewRequest("PUT", "https://idmsa.apple.com/appleauth/auth/verify/trusteddevice/securitycode", buf)
 	if err != nil {
 		return fmt.Errorf("failed to create http PUT request: %v", err)
 	}
@@ -302,33 +308,16 @@ func (app *App) requestCode() error {
 		return err
 	}
 
-	log.Debugf("PUT requestCode: %s\n", string(body))
+	log.Debugf("PUT requestCode (%d): %s\n", response.StatusCode, string(body))
 
-	if response.StatusCode == 423 { // code rate limiting
-		var requestCodeResp authOptions
-		if err := json.Unmarshal(body, &requestCodeResp); err != nil {
-			return fmt.Errorf("failed to deserialize response body JSON: %v", err)
-		}
-		if requestCodeResp.ServiceErrors != nil {
-			for _, svcErr := range requestCodeResp.ServiceErrors {
-				log.Error(svcErr.Message)
-			}
-		}
-		return nil
-
-	} else if response.StatusCode != 200 {
-		return fmt.Errorf("failed to request verification code: response received %s", response.Status)
+	if err := json.Unmarshal(body, &app.codeRequest); err != nil {
+		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
-	if response.StatusCode != 200 {
-		var requestCodeResp authOptions
-		if err := json.Unmarshal(body, &requestCodeResp); err != nil {
-			return fmt.Errorf("failed to deserialize response body JSON: %v", err)
-		}
-
+	if 200 > response.StatusCode && response.StatusCode >= 300 {
 		var errStr string
-		if requestCodeResp.ServiceErrors != nil {
-			for _, svcErr := range requestCodeResp.ServiceErrors {
+		if app.codeRequest.ServiceErrors != nil {
+			for _, svcErr := range app.codeRequest.ServiceErrors {
 				errStr += fmt.Sprintf(": %s", svcErr.Message)
 			}
 			return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
@@ -477,7 +466,10 @@ func (app *App) signIn(username, password string) error {
 		}
 		survey.AskOne(prompt, &code)
 
+		// TODO: how do I tell what type of code it is?
+
 		if err := app.verifyCode("phone", code); err != nil {
+			// if err := app.verifyCode("trusteddevice", code); err != nil {
 			return err
 		}
 
@@ -585,16 +577,7 @@ func (app *App) GetDevDownloads(beta bool) ([]DevDownloads, error) {
 		return nil, fmt.Errorf("failed to GET %s: response received %s", downloadURL, response.Status)
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse GET request body: %v", err)
-	}
-
-	log.Debugf("GetDevDownloads: %s\n", string(body))
-
-	ioutil.WriteFile("download_bad.html", body, 0755)
-
-	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(body))
+	doc, err := goquery.NewDocumentFromReader(response.Body)
 	if err != nil {
 		return nil, err
 	}

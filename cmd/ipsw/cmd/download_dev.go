@@ -49,7 +49,7 @@ var devCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		beta, _ := cmd.Flags().GetBool("spec")
+		beta, _ := cmd.Flags().GetBool("beta")
 
 		app := download.NewApp()
 
