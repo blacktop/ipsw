@@ -7,11 +7,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
+	"os"
 	"strings"
 
 	"time"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
 )
@@ -26,15 +28,14 @@ const (
 )
 
 var (
-	scnt                   string
-	xAppleIDSessionID      string
-	xAppleIDAccountCountry string
-	redirect               string
+	redirect string
 )
 
 const (
-	ERROR_CODE_BAD_CREDS        = -20101 // Your Apple ID or password was incorrect.
-	ERROR_CODE_BAD_VERIFICATION = -21669 // Incorrect verification code.
+	ERROR_CODE_TOO_MANY_CODES_SENT      = -22981 // Too many verification codes have been sent.
+	ERROR_CODE_BAD_CREDS                = -20101 // Your Apple ID or password was incorrect.
+	ERROR_CODE_FAILED_TO_UPDATE_SESSION = -20528 // Error Description not available
+	ERROR_CODE_BAD_VERIFICATION         = -21669 // Incorrect verification code.
 	// TODO: flesh out the rest of the error codes
 )
 
@@ -42,9 +43,15 @@ const (
 type App struct {
 	Client *http.Client
 
+	PreferSMS bool
+
 	authService authService
 	authOptions authOptions
 	codeRequest authOptions
+	// header values
+	scnt                   string
+	xAppleIDSessionID      string
+	xAppleIDAccountCountry string
 }
 
 // DevDownloads are all the downloads from https://developer.apple.com/download/
@@ -82,8 +89,6 @@ type auth struct {
 	TrustTokens []string `json:"trust_tokens,omitempty"`
 }
 
-type trustedPhoneNumbers []trustedPhoneNumber
-
 type trustedPhoneNumber struct {
 	ID                 int    `json:"id,omitempty"`
 	ObfuscatedNumber   string `json:"obfuscatedNumber,omitempty"`
@@ -101,42 +106,45 @@ type securityCode struct {
 }
 
 type authOptions struct {
-	TrustedDeviceCount              int                 `json:"trustedDeviceCount,omitempty"`
-	OtherTrustedDeviceClass         string              `json:"otherTrustedDeviceClass,omitempty"`
-	TrustedPhoneNumbers             trustedPhoneNumbers `json:"trustedPhoneNumbers,omitempty"`
-	PhoneNumber                     trustedPhoneNumber  `json:"phoneNumber,omitempty"`
-	TrustedPhoneNumber              trustedPhoneNumber  `json:"trustedPhoneNumber,omitempty"`
-	SecurityCode                    securityCode        `json:"securityCode,omitempty"`
-	Mode                            string              `json:"mode,omitempty"`
-	Type                            string              `json:"type,omitempty"`
-	AuthenticationType              string              `json:"authenticationType,omitempty"`
-	RecoveryURL                     string              `json:"recoveryUrl,omitempty"`
-	CantUsePhoneNumberURL           string              `json:"cantUsePhoneNumberUrl,omitempty"`
-	RecoveryWebURL                  string              `json:"recoveryWebUrl,omitempty"`
-	RepairPhoneNumberURL            string              `json:"repairPhoneNumberUrl,omitempty"`
-	RepairPhoneNumberWebURL         string              `json:"repairPhoneNumberWebUrl,omitempty"`
-	AboutTwoFactorAuthenticationURL string              `json:"aboutTwoFactorAuthenticationUrl,omitempty"`
-	AutoVerified                    bool                `json:"autoVerified,omitempty"`
-	ShowAutoVerificationUI          bool                `json:"showAutoVerificationUI,omitempty"`
-	ManagedAccount                  bool                `json:"managedAccount,omitempty"`
-	Hsa2Account                     bool                `json:"hsa2Account,omitempty"`
-	RestrictedAccount               bool                `json:"restrictedAccount,omitempty"`
-	SupportsRecovery                bool                `json:"supportsRecovery,omitempty"`
-	SupportsCustodianRecovery       bool                `json:"supportsCustodianRecovery,omitempty"`
-	ServiceErrors                   []serviceError      `json:"serviceErrors,omitempty"`
-	NoTrustedDevices                bool                `json:"noTrustedDevices,omitempty"`
+	TrustedDeviceCount              int                  `json:"trustedDeviceCount,omitempty"`
+	OtherTrustedDeviceClass         string               `json:"otherTrustedDeviceClass,omitempty"`
+	TrustedPhoneNumbers             []trustedPhoneNumber `json:"trustedPhoneNumbers,omitempty"`
+	PhoneNumber                     trustedPhoneNumber   `json:"phoneNumber,omitempty"`
+	TrustedPhoneNumber              trustedPhoneNumber   `json:"trustedPhoneNumber,omitempty"`
+	SecurityCode                    securityCode         `json:"securityCode,omitempty"`
+	Mode                            string               `json:"mode,omitempty"`
+	Type                            string               `json:"type,omitempty"`
+	AuthenticationType              string               `json:"authenticationType,omitempty"`
+	RecoveryURL                     string               `json:"recoveryUrl,omitempty"`
+	CantUsePhoneNumberURL           string               `json:"cantUsePhoneNumberUrl,omitempty"`
+	RecoveryWebURL                  string               `json:"recoveryWebUrl,omitempty"`
+	RepairPhoneNumberURL            string               `json:"repairPhoneNumberUrl,omitempty"`
+	RepairPhoneNumberWebURL         string               `json:"repairPhoneNumberWebUrl,omitempty"`
+	AboutTwoFactorAuthenticationURL string               `json:"aboutTwoFactorAuthenticationUrl,omitempty"`
+	AutoVerified                    bool                 `json:"autoVerified,omitempty"`
+	ShowAutoVerificationUI          bool                 `json:"showAutoVerificationUI,omitempty"`
+	ManagedAccount                  bool                 `json:"managedAccount,omitempty"`
+	Hsa2Account                     bool                 `json:"hsa2Account,omitempty"`
+	RestrictedAccount               bool                 `json:"restrictedAccount,omitempty"`
+	SupportsRecovery                bool                 `json:"supportsRecovery,omitempty"`
+	SupportsCustodianRecovery       bool                 `json:"supportsCustodianRecovery,omitempty"`
+	ServiceErrors                   []serviceError       `json:"serviceErrors,omitempty"`
+	NoTrustedDevices                bool                 `json:"noTrustedDevices,omitempty"`
 }
 
-type secCode struct {
+type scode struct {
 	Code string `json:"code,omitempty"`
 }
 type phoneNumber struct {
 	ID int `json:"id"`
 }
 type phone struct {
-	SecurityCode secCode     `json:"securityCode,omitempty"`
-	Number       phoneNumber `json:"phoneNumber"`
-	Mode         string      `json:"mode"`
+	SecurityCode scode       `json:"securityCode,omitempty"`
+	Number       phoneNumber `json:"phoneNumber,omitempty"`
+	Mode         string      `json:"mode,omitempty"`
+}
+type trustedDevice struct {
+	SecurityCode scode `json:"securityCode,omitempty"`
 }
 
 type signInResponse struct {
@@ -151,7 +159,7 @@ type serviceError struct {
 }
 
 type serviceErrorsResponse struct {
-	Errors   []serviceError `json:"serviceErrors,omitempty"`
+	Errors   []serviceError `json:"service_errors,omitempty"`
 	HasError bool           `json:"hasError,omitempty"`
 }
 
@@ -199,15 +207,15 @@ func (app *App) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	req.Header.Set("X-Apple-Id-Session-Id", xAppleIDSessionID)
+	req.Header.Set("X-Apple-Id-Session-Id", app.xAppleIDSessionID)
 	req.Header.Set("X-Apple-Widget-Key", app.authService.Key)
-	req.Header.Set("Scnt", scnt)
+	req.Header.Set("Scnt", app.scnt)
 
 	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
 }
 
 // NewApp returns a new instance of teh dev portal app
-func NewApp() *App {
+func NewApp(sms bool) *App {
 	jar, _ := cookiejar.New(nil)
 
 	app := App{
@@ -215,9 +223,30 @@ func NewApp() *App {
 			Jar: jar,
 			// CheckRedirect: noRedirect,
 		},
+		PreferSMS: sms,
 	}
 
 	return &app
+}
+
+// Login to Apple
+func (app *App) Login(username, password string) error {
+
+	// TODO: add the ability to cache the session/cookies so you don't have to signin again (cronjob)
+	// if _, err := os.Stat(".devcache"); err == nil {
+	// 	cache, err := os.Open(".devcache")
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	// Decoding the serialized data
+	// 	return gob.NewDecoder(cache).Decode(&app.Client)
+	// }
+
+	if err := app.getITCServiceKey(); err != nil {
+		return err
+	}
+
+	return app.signIn(username, password)
 }
 
 func (app *App) getITCServiceKey() error {
@@ -237,7 +266,7 @@ func (app *App) getITCServiceKey() error {
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
-	log.Debugf("GET iTC Service Key: %s\n", string(body))
+	log.Debugf("GET iTC Service Key: (%d):\n%s\n", response.StatusCode, string(body))
 
 	if response.StatusCode != 200 {
 		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
@@ -246,175 +275,7 @@ func (app *App) getITCServiceKey() error {
 	return nil
 }
 
-func (app *App) getAuthOptions() error {
-	req, err := http.NewRequest("GET", "https://idmsa.apple.com/appleauth/auth", nil)
-	if err != nil {
-		return fmt.Errorf("failed to create http GET request: %v", err)
-	}
-	app.updateRequestHeaders(req)
-
-	response, err := app.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("GET getAuthOptions: %s\n", string(body))
-
-	if err := json.Unmarshal(body, &app.authOptions); err != nil {
-		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
-	}
-
-	// TODO: parse out trusted device/phone info
-
-	if response.StatusCode != 200 {
-		return fmt.Errorf("failed to get auth options: response received %s", response.Status)
-	}
-
-	return nil
-}
-
-func (app *App) requestCode() error {
-	buf := new(bytes.Buffer)
-
-	json.NewEncoder(buf).Encode(&phone{
-		Number: phoneNumber{
-			ID: 1,
-		},
-		// Mode: "sms",
-		Mode: "push",
-	})
-
-	// req, err := http.NewRequest("PUT", "https://idmsa.apple.com/appleauth/auth/verify/phone", buf)
-	req, err := http.NewRequest("PUT", "https://idmsa.apple.com/appleauth/auth/verify/trusteddevice/securitycode", buf)
-	if err != nil {
-		return fmt.Errorf("failed to create http PUT request: %v", err)
-	}
-	app.updateRequestHeaders(req)
-
-	response, err := app.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("PUT requestCode (%d): %s\n", response.StatusCode, string(body))
-
-	if err := json.Unmarshal(body, &app.codeRequest); err != nil {
-		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
-	}
-
-	if 200 > response.StatusCode && response.StatusCode >= 300 {
-		var errStr string
-		if app.codeRequest.ServiceErrors != nil {
-			for _, svcErr := range app.codeRequest.ServiceErrors {
-				errStr += fmt.Sprintf(": %s", svcErr.Message)
-			}
-			return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
-		}
-
-		if response.StatusCode == 423 { // code rate limiting
-			log.Error(errStr)
-			return nil
-		}
-
-		return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
-	}
-
-	return nil
-}
-
-func (app *App) verifyCode(codeType, code string) error {
-	buf := new(bytes.Buffer)
-
-	json.NewEncoder(buf).Encode(&phone{
-		Number: phoneNumber{
-			ID: 1,
-		},
-		Mode: "sms",
-		SecurityCode: secCode{
-			Code: code,
-		},
-	})
-
-	req, err := http.NewRequest("POST", fmt.Sprintf("https://idmsa.apple.com/appleauth/auth/verify/%s/securitycode", codeType), buf)
-	if err != nil {
-		return fmt.Errorf("failed to create http POST request: %v", err)
-	}
-	app.updateRequestHeaders(req)
-
-	response, err := app.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("POST verifyCode: %s\n", string(body))
-
-	if response.StatusCode != 200 {
-		var requestCodeResp authOptions
-		if err := json.Unmarshal(body, &requestCodeResp); err != nil {
-			return fmt.Errorf("failed to deserialize response body JSON: %v", err)
-		}
-		if requestCodeResp.ServiceErrors != nil {
-			var errStr string
-			for _, svcErr := range requestCodeResp.ServiceErrors {
-				errStr += fmt.Sprintf(": %s", svcErr.Message)
-			}
-			return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
-		}
-
-		return fmt.Errorf("failed to verify code: response received %s", response.Status)
-	}
-
-	return nil
-}
-
-func (app *App) updateSession() error {
-
-	req, err := http.NewRequest("GET", trustURL, nil)
-	if err != nil {
-		return fmt.Errorf("failed to create http GET request: %v", err)
-	}
-	app.updateRequestHeaders(req)
-
-	response, err := app.Client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return err
-	}
-
-	log.Debugf("GET updateSession: %s\n", string(body))
-
-	if 200 > response.StatusCode && response.StatusCode >= 300 {
-		return fmt.Errorf("failed to update to trusted session: response received %s", response.Status)
-	}
-
-	return nil
-}
-
 func (app *App) signIn(username, password string) error {
-
 	buf := new(bytes.Buffer)
 
 	json.NewEncoder(buf).Encode(&auth{
@@ -445,31 +306,73 @@ func (app *App) signIn(username, password string) error {
 		return err
 	}
 
-	log.Debugf("POST Login: %s\n", string(body))
+	log.Debugf("POST Login: (%d):\n%s\n", response.StatusCode, string(body))
 
 	if response.StatusCode == 409 {
-		xAppleIDAccountCountry = response.Header.Get("X-Apple-Id-Session-Id")
-		xAppleIDSessionID = response.Header.Get("X-Apple-Id-Session-Id")
-		scnt = response.Header.Get("Scnt")
+		app.xAppleIDAccountCountry = response.Header.Get("X-Apple-Id-Account-Country")
+		app.xAppleIDSessionID = response.Header.Get("X-Apple-Id-Session-Id")
+		app.scnt = response.Header.Get("Scnt")
 
 		if err := app.getAuthOptions(); err != nil {
 			return err
 		}
 
-		if err := app.requestCode(); err != nil {
-			return err
+		codeType := "phone"
+
+		// SMS was sent automatically
+		if app.authOptions.NoTrustedDevices && len(app.authOptions.TrustedPhoneNumbers) == 1 {
+			codeType = "phone"
+			// User needs to choose a phone to send to
+		} else if app.authOptions.NoTrustedDevices && len(app.authOptions.TrustedPhoneNumbers) > 1 {
+			codeType = "phone"
+			phoneNumber := 0
+			var choices []string
+			for _, num := range app.authOptions.TrustedPhoneNumbers {
+				choices = append(choices, num.NumberWithDialCode)
+			}
+			prompt := &survey.Select{
+				Message: "Choose a phone number to send the SMS code to:",
+				Options: choices,
+			}
+			if err := survey.AskOne(prompt, &phoneNumber); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				return err
+			}
+			if err := app.requestCode(app.authOptions.TrustedPhoneNumbers[phoneNumber].ID); err != nil {
+				return err
+			}
+
+		} else { // Code is shown on trusted devices
+			codeType = "trusteddevice"
+			if app.PreferSMS {
+				codeType = "phone"
+				if err := app.requestCode(1); err != nil {
+					if app.codeRequest.SecurityCode.TooManyCodesSent {
+						codeType = "trusteddevice"
+						log.Warn("you must use the trusted device code (SMS codes have been disabled on your account)")
+					} else {
+						return err
+					}
+				}
+			}
 		}
 
 		code := ""
 		prompt := &survey.Password{
 			Message: "Please type your verification code",
 		}
-		survey.AskOne(prompt, &code)
+		if err := survey.AskOne(prompt, &code); err != nil {
+			if err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				os.Exit(0)
+			}
+			return err
+		}
 
-		// TODO: how do I tell what type of code it is?
-
-		if err := app.verifyCode("phone", code); err != nil {
-			// if err := app.verifyCode("trusteddevice", code); err != nil {
+		if err := app.verifyCode(codeType, code); err != nil {
 			return err
 		}
 
@@ -500,24 +403,187 @@ func (app *App) signIn(username, password string) error {
 	return nil
 }
 
-// Login to Apple
-func (app *App) Login(username, password string) error {
+func (app *App) getAuthOptions() error {
 
-	// TODO: add the ability to cache the session/cookies so you don't have to signin again (cronjob)
-	// if _, err := os.Stat(".devcache"); err == nil {
-	// 	cache, err := os.Open(".devcache")
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	// Decoding the serialized data
-	// 	return gob.NewDecoder(cache).Decode(&app.Client)
-	// }
+	req, err := http.NewRequest("GET", "https://idmsa.apple.com/appleauth/auth", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create http GET request: %v", err)
+	}
+	app.updateRequestHeaders(req)
 
-	if err := app.getITCServiceKey(); err != nil {
+	response, err := app.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
 		return err
 	}
 
-	return app.signIn(username, password)
+	log.Debugf("GET getAuthOptions (%d):\n%s\n", response.StatusCode, string(body))
+
+	if err := json.Unmarshal(body, &app.authOptions); err != nil {
+		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	}
+
+	if 200 > response.StatusCode || 300 <= response.StatusCode {
+		return fmt.Errorf("failed to get auth options: response received %s", response.Status)
+	}
+
+	return nil
+}
+
+func (app *App) requestCode(phoneID int) error {
+	buf := new(bytes.Buffer)
+
+	json.NewEncoder(buf).Encode(&phone{
+		Number: phoneNumber{
+			ID: phoneID,
+		},
+		Mode: "sms",
+	})
+
+	req, err := http.NewRequest("PUT", "https://idmsa.apple.com/appleauth/auth/verify/phone", buf)
+	if err != nil {
+		return fmt.Errorf("failed to create http PUT request: %v", err)
+	}
+	app.updateRequestHeaders(req)
+
+	response, err := app.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("PUT requestCode (%d):\n%s\n", response.StatusCode, string(body))
+
+	if err := json.Unmarshal(body, &app.codeRequest); err != nil {
+		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	}
+
+	if 200 > response.StatusCode || 300 <= response.StatusCode {
+		var errStr string
+		if app.codeRequest.ServiceErrors != nil {
+			for _, svcErr := range app.codeRequest.ServiceErrors {
+				errStr += fmt.Sprintf(": %s", svcErr.Message)
+			}
+			return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
+		}
+
+		if response.StatusCode == 423 { // code rate limiting
+			log.Error(errStr)
+			return nil
+		}
+
+		return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
+	}
+
+	return nil
+}
+
+func (app *App) verifyCode(codeType, code string) error {
+	buf := new(bytes.Buffer)
+
+	if codeType == "phone" {
+		json.NewEncoder(buf).Encode(&phone{
+			Number: phoneNumber{
+				ID: 1,
+			},
+			Mode: "sms",
+			SecurityCode: scode{
+				Code: code,
+			},
+		})
+	} else { // trusteddevice
+		json.NewEncoder(buf).Encode(&trustedDevice{
+			SecurityCode: scode{
+				Code: code,
+			},
+		})
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("https://idmsa.apple.com/appleauth/auth/verify/%s/securitycode", codeType), buf)
+	if err != nil {
+		return fmt.Errorf("failed to create http POST request: %v", err)
+	}
+	app.updateRequestHeaders(req)
+
+	response, err := app.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("POST verifyCode (%d):\n%s\n", response.StatusCode, string(body))
+
+	if 200 > response.StatusCode || 300 <= response.StatusCode {
+		var svcErr serviceErrorsResponse
+		if err := json.Unmarshal(body, &svcErr); err != nil {
+			return fmt.Errorf("failed to deserialize response body JSON: %v", err)
+		}
+		if svcErr.HasError {
+			var errStr string
+			for _, svcErr := range svcErr.Errors {
+				errStr += fmt.Sprintf(": %s", svcErr.Message)
+			}
+			return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
+		}
+
+		return fmt.Errorf("failed to verify code: response received %s", response.Status)
+	}
+
+	return nil
+}
+
+func (app *App) updateSession() error {
+
+	req, err := http.NewRequest("GET", trustURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create http GET request: %v", err)
+	}
+	app.updateRequestHeaders(req)
+
+	response, err := app.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	body, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("GET updateSession: (%d):\n%s\n", response.StatusCode, string(body))
+
+	if 200 > response.StatusCode || 300 <= response.StatusCode {
+		var svcErr serviceErrorsResponse
+		if err := json.Unmarshal(body, &svcErr); err != nil {
+			return fmt.Errorf("failed to deserialize response body JSON: %v", err)
+		}
+		if svcErr.HasError {
+			var errStr string
+			for _, svcErr := range svcErr.Errors {
+				errStr += fmt.Sprintf(": %s", svcErr.Message)
+			}
+			return fmt.Errorf("failed to update to trusted session: response received %s%s", response.Status, errStr)
+		}
+		return fmt.Errorf("failed to update to trusted session: response received %s", response.Status)
+	}
+
+	return nil
 }
 
 // GetDownloads returns all the downloads in "More Downloads" - https://developer.apple.com/download/all/
@@ -545,21 +611,20 @@ func (app *App) GetDownloads() (*Downloads, error) {
 		return nil, fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
-	log.Debugf("Get Downloads: %s\n", string(body))
+	log.Debugf("Get Downloads: (%d):\n%s\n", response.StatusCode, string(body))
 
 	return &downloads, nil
 }
 
 // GetDevDownloads scrapes the https://developer.apple.com/download/ page for links
-func (app *App) GetDevDownloads(beta bool) ([]DevDownloads, error) {
-
+func (app *App) GetDevDownloads(release bool) ([]DevDownloads, error) {
 	var ipsws []DevDownloads
 
 	var downloadURL string
-	if beta {
-		downloadURL = betaDownloadsURL
-	} else {
+	if release {
 		downloadURL = releaseDownloadsURL
+	} else {
+		downloadURL = betaDownloadsURL
 	}
 
 	req, err := http.NewRequest("GET", downloadURL, nil)
@@ -633,13 +698,15 @@ func (app *App) GetDevDownloads(beta bool) ([]DevDownloads, error) {
 				href, _ := a.Attr("href")
 				if strings.Contains(href, "/services-account/download") {
 					version := a.Parent().Parent().Find("h2")
-					ipsw := DevDownloads{
-						Version: version.Text(),
-						URL:     href,
-						Type:    "app",
-					}
+					if len(version.Text()) > 0 {
+						ipsw := DevDownloads{
+							Version: version.Text(),
+							URL:     href,
+							Type:    "app",
+						}
 
-					ipsws = append(ipsws, ipsw)
+						ipsws = append(ipsws, ipsw)
+					}
 				}
 			})
 		})
@@ -653,13 +720,15 @@ func (app *App) GetDevDownloads(beta bool) ([]DevDownloads, error) {
 					href, _ := a.Attr("href")
 					if strings.Contains(href, "/services-account/download") {
 						version := a.Parent().Parent().Find("h2")
-						ipsw := DevDownloads{
-							Version: version.Text(),
-							URL:     href,
-							Type:    "app",
-						}
+						if len(version.Text()) > 0 {
+							ipsw := DevDownloads{
+								Version: version.Text(),
+								URL:     href,
+								Type:    "app",
+							}
 
-						ipsws = append(ipsws, ipsw)
+							ipsws = append(ipsws, ipsw)
+						}
 					}
 				})
 			})

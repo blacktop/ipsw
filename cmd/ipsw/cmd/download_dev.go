@@ -27,6 +27,7 @@ import (
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 
 	"github.com/blacktop/ipsw/internal/download"
@@ -36,7 +37,8 @@ import (
 func init() {
 	downloadCmd.AddCommand(devCmd)
 
-	devCmd.Flags().BoolP("beta", "", false, "Download beta OSs/Apps")
+	devCmd.Flags().BoolP("sms", "", false, "Prefer SMS Two-factor authentication")
+	devCmd.Flags().BoolP("release", "", false, "Download release OSs/Apps")
 }
 
 // devCmd represents the dev command
@@ -49,24 +51,38 @@ var devCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		beta, _ := cmd.Flags().GetBool("beta")
+		release, _ := cmd.Flags().GetBool("release")
+		sms, _ := cmd.Flags().GetBool("sms")
 
-		app := download.NewApp()
+		app := download.NewApp(sms)
 
+		// get username
 		username := os.Getenv("IPSW_DEV_USERNAME")
 		if len(username) == 0 {
 			prompt := &survey.Input{
 				Message: "Please type your username",
 			}
-			survey.AskOne(prompt, &username)
+			if err := survey.AskOne(prompt, &username); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				log.Fatal(err.Error())
+			}
 		}
-
+		// get password
 		password := os.Getenv("IPSW_DEV_PASSWORD")
 		if len(password) == 0 {
-			pwPrompt := &survey.Password{
+			prompt := &survey.Password{
 				Message: "Please type your password",
 			}
-			survey.AskOne(pwPrompt, &password)
+			if err := survey.AskOne(prompt, &password); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				log.Fatal(err.Error())
+			}
 		}
 
 		if err := app.Login(username, password); err != nil {
@@ -77,7 +93,7 @@ var devCmd = &cobra.Command{
 		// 	fmt.Println(dloads)
 		// }
 
-		ipsws, err := app.GetDevDownloads(beta)
+		ipsws, err := app.GetDevDownloads(release)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
