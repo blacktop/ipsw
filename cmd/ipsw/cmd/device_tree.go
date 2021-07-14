@@ -48,9 +48,6 @@ var (
 func init() {
 	rootCmd.AddCommand(deviceTreeCmd)
 
-	deviceTreeCmd.PersistentFlags().String("proxy", "", "HTTP/HTTPS proxy")
-	deviceTreeCmd.PersistentFlags().Bool("insecure", false, "do not verify ssl certs")
-
 	deviceTreeCmd.Flags().BoolVarP(&jsonFlag, "json", "j", false, "Output to stdout as JSON")
 	deviceTreeCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
 
@@ -68,14 +65,8 @@ var deviceTreeCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-
 		if remoteFlag {
-			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
-				Proxy:    proxy,
-				Insecure: insecure,
-			})
+			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{})
 			if err != nil {
 				return errors.Wrap(err, "failed to create new remote zip reader")
 			}

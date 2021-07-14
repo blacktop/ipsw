@@ -30,7 +30,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/demangle"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -216,11 +215,7 @@ var symbolicateCmd = &cobra.Command{
 				}
 
 				if err := f.GetLocalSymbolsForImage(image); err != nil {
-					if errors.Is(err, dyld.ErrNoLocals) {
-						utils.Indent(log.Warn, 2)(err.Error())
-					} else if err != nil {
-						return err
-					}
+					log.Error("failed to parse local symbols")
 				}
 
 				// if err := f.AnalyzeImage(image); err != nil {

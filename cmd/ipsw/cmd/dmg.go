@@ -1,3 +1,5 @@
+// +build darwin,cgo
+
 /*
 Copyright © 2021 blacktop
 
@@ -22,59 +24,56 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
+	"bufio"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/download"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/pkg/errors"
+	"github.com/blacktop/ipsw/pkg/dmg"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	rootCmd.AddCommand(infoCmd)
-
-	infoCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
-	infoCmd.MarkZshCompPositionalArgumentFile(1, "*ipsw")
+	rootCmd.AddCommand(dmgCmd)
 }
 
-// infoCmd represents the info command
-var infoCmd = &cobra.Command{
-	Use:   "info <IPSW>",
-	Short: "Display IPSW Info",
-	Long:  longDesc,
-	Args:  cobra.MinimumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
+// dmgCmd represents the dmg command
+var dmgCmd = &cobra.Command{
+	Use:    "dmg",
+	Short:  "🚧 Parse DMG file",
+	Args:   cobra.MinimumNArgs(1),
+	Hidden: true,
+	Run: func(cmd *cobra.Command, args []string) {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		var err error
-		var pIPSW *info.Info
+		dmgPath := filepath.Clean(args[0])
 
-		if remoteFlag {
-			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{})
-			if err != nil {
-				return errors.Wrap(err, "failed to create new remote zip reader")
-			}
-			pIPSW, err = info.ParseZipFiles(zr.File)
-			if err != nil {
-				return errors.Wrap(err, "failed to extract remote plists")
-			}
-		} else {
-			if _, err = os.Stat(args[0]); os.IsNotExist(err) {
-				return fmt.Errorf("file %s does not exist", args[0])
-			}
-			pIPSW, err = info.Parse(args[0])
-			if err != nil {
-				return errors.Wrap(err, "failed to extract and parse IPSW info")
+		d, err := dmg.Open(dmgPath)
+		if err != nil {
+			panic(err)
+		}
+		defer d.Close()
+
+		for _, block := range d.Blocks {
+			if strings.Contains(block.Name, "Apple_APFS") {
+				fo, err := os.Create("Apple_APFS.bin")
+				if err != nil {
+					panic(err)
+				}
+				defer func() {
+					if err := fo.Close(); err != nil {
+						panic(err)
+					}
+				}()
+				w := bufio.NewWriter(fo)
+
+				if err := block.DecompressChunks(w); err != nil {
+					panic(err)
+				}
 			}
 		}
-
-		fmt.Println("\n[IPSW Info]")
-		fmt.Println("===========")
-		fmt.Println(pIPSW)
-		return nil
 	},
 }

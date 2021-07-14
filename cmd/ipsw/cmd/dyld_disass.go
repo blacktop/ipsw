@@ -23,6 +23,8 @@ package cmd
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/gob"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,7 +46,7 @@ func init() {
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
-	dyldDisassCmd.Flags().StringP("cache", "", "", "Path to addr to sym cache file (speeds up analysis)")
+	// dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
@@ -72,7 +74,7 @@ var dyldDisassCmd = &cobra.Command{
 		instructions, _ := cmd.Flags().GetUint64("count")
 		startVMAddr, _ := cmd.Flags().GetUint64("vaddr")
 		symbolName, _ := cmd.Flags().GetString("symbol")
-		cacheFile, _ := cmd.Flags().GetString("cache")
+		// doDemangle, _ := cmd.Flags().GetBool("demangle")
 
 		if len(symbolName) > 0 && startVMAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
@@ -113,11 +115,56 @@ var dyldDisassCmd = &cobra.Command{
 
 		if len(symbolName) > 0 {
 			if len(imageName) == 0 {
-				if len(cacheFile) == 0 {
-					cacheFile = dscPath + ".a2s"
-				}
-				if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
-					return err
+				// Load all symbols
+				if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
+					log.Info("Generating dyld_shared_cache companion symbol map file...")
+
+					utils.Indent(log.Warn, 2)("parsing public symbols...")
+					err = f.GetAllExportedSymbols(false)
+					if err != nil {
+						return err
+					}
+					utils.Indent(log.Warn, 2)("parsing private symbols...")
+					err = f.ParseLocalSyms()
+					if err != nil {
+						utils.Indent(log.Warn, 2)(err.Error())
+						utils.Indent(log.Warn, 2)("parsing patch exports...")
+						for _, img := range f.Images {
+							for _, patch := range img.PatchableExports {
+								addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+								if err != nil {
+									return err
+								}
+								f.AddressToSymbol[addr] = patch.Name
+							}
+						}
+					}
+
+					// save lookup map to disk to speed up subsequent requests
+					err = f.SaveAddrToSymMap(dscPath + ".a2s")
+					if err != nil {
+						return err
+					}
+
+				} else {
+					log.Info("Found dyld_shared_cache companion symbol map file...")
+					a2sFile, err := os.Open(dscPath + ".a2s")
+					if err != nil {
+						return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
+					}
+
+					gzr, err := gzip.NewReader(a2sFile)
+					if err != nil {
+						return fmt.Errorf("failed to create gzip reader: %v", err)
+					}
+
+					// Decoding the serialized data
+					err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+					if err != nil {
+						return fmt.Errorf("failed to decode addr2sym map; %v", err)
+					}
+					gzr.Close()
+					a2sFile.Close()
 				}
 			} else {
 				utils.Indent(log.Warn, 2)("parsing public symbols...")
@@ -126,11 +173,7 @@ var dyldDisassCmd = &cobra.Command{
 				}
 				utils.Indent(log.Warn, 2)("parsing private symbols...")
 				if err := f.GetLocalSymbolsForImage(image); err != nil {
-					if errors.Is(err, dyld.ErrNoLocals) {
-						utils.Indent(log.Warn, 2)(err.Error())
-					} else if err != nil {
-						return err
-					}
+					log.Error("failed to parse local symbols")
 				}
 			}
 
@@ -213,11 +256,7 @@ var dyldDisassCmd = &cobra.Command{
 			}
 			utils.Indent(log.Warn, 2)("parsing private symbols...")
 			if err := f.GetLocalSymbolsForImage(image); err != nil {
-				if errors.Is(err, dyld.ErrNoLocals) {
-					utils.Indent(log.Warn, 2)(err.Error())
-				} else if err != nil {
-					return err
-				}
+				log.Error("failed to parse local symbols")
 			}
 		}
 

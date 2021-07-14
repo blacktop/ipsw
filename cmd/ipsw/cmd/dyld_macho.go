@@ -262,14 +262,9 @@ var dyldMachoCmd = &cobra.Command{
 							return err
 						}
 						for _, export := range exports {
-							if export.Flags.ReExport() {
-								export.FoundInDylib = m.ImportedLibraries()[export.Other-1]
-								if rexpSym, err := f.FindExportedSymbolInImage(export.FoundInDylib, export.ReExport); err == nil {
-									export.Address = rexpSym.Address
-								}
-							}
-							fmt.Println(export)
+							fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
 						}
+						w.Flush()
 					}
 					if cfstrs, err := m.GetCFStrings(); err == nil {
 						fmt.Printf("\nCFStrings\n")
