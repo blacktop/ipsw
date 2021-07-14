@@ -61,14 +61,19 @@ func GetProxy(proxy string) func(*http.Request) (*url.URL, error) {
 			log.WithError(err).Error("bad proxy url")
 		}
 		log.Debugf("proxy set to: %s", proxyURL)
+
 		return http.ProxyURL(proxyURL)
 	}
+
 	conf := httpproxy.FromEnvironment()
-	log.WithFields(log.Fields{
-		"http_proxy":  conf.HTTPProxy,
-		"https_proxy": conf.HTTPSProxy,
-		"no_proxy":    conf.NoProxy,
-	}).Debugf("proxy info from environment")
+	if len(conf.HTTPProxy) > 0 || len(conf.HTTPSProxy) > 0 {
+		log.WithFields(log.Fields{
+			"http_proxy":  conf.HTTPProxy,
+			"https_proxy": conf.HTTPSProxy,
+			"no_proxy":    conf.NoProxy,
+		}).Debugf("proxy info from environment")
+	}
+
 	return http.ProxyFromEnvironment
 }
 

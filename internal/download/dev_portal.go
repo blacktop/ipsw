@@ -57,11 +57,10 @@ type App struct {
 
 // DevDownload are all the downloads from https://developer.apple.com/download/
 type DevDownload struct {
-	Version string `json:"version,omitempty"`
-	Title   string `json:"title,omitempty"`
-	Build   string `json:"build,omitempty"`
-	URL     string `json:"url,omitempty"`
-	Type    string `json:"type,omitempty"`
+	Title string `json:"title,omitempty"`
+	Build string `json:"build,omitempty"`
+	URL   string `json:"url,omitempty"`
+	Type  string `json:"type,omitempty"`
 }
 
 // Downloads listDownloads.action response
@@ -364,7 +363,7 @@ func (app *App) signIn(username, password string) error {
 
 		code := ""
 		prompt := &survey.Password{
-			Message: "Please type your verification code",
+			Message: "Please type your verification code:",
 		}
 		if err := survey.AskOne(prompt, &code); err != nil {
 			if err == terminal.InterruptErr {
@@ -602,9 +601,22 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 		}
 
+		versions := make([]string, 0, len(ipsws))
+		for v := range ipsws {
+			versions = append(versions, v)
+		}
+		sort.Strings(versions)
+
+		version := ""
+		promptVer := &survey.Select{
+			Message: "Choose an OS version:",
+			Options: versions,
+		}
+		survey.AskOne(promptVer, &version)
+
 		var choices []string
-		for _, ipsw := range ipsws {
-			choices = append(choices, ipsw.Version)
+		for _, ipsw := range ipsws[version] {
+			choices = append(choices, ipsw.Title)
 		}
 
 		dfiles := []int{}
@@ -616,7 +628,7 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 		survey.AskOne(prompt, &dfiles)
 
 		for _, df := range dfiles {
-			app.Download(ipsws[df].URL)
+			app.Download(ipsws[version][df].URL)
 		}
 
 	case "more":
@@ -723,8 +735,8 @@ func (app *App) getDownloads() (*Downloads, error) {
 }
 
 // getDevDownloads scrapes the https://developer.apple.com/download/ page for links
-func (app *App) getDevDownloads(release bool) ([]DevDownload, error) {
-	var ipsws []DevDownload
+func (app *App) getDevDownloads(release bool) (map[string][]DevDownload, error) {
+	ipsws := make(map[string][]DevDownload)
 
 	var downloadURL string
 	if release {
@@ -763,15 +775,12 @@ func (app *App) getDevDownloads(release bool) ([]DevDownload, error) {
 					href, _ := a.Attr("href")
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h2")
-					ipsw := DevDownload{
-						Title:   a.Text(),
-						Version: version.Text(),
-						Build:   p.Text(),
-						URL:     href,
-						Type:    "ios",
-					}
-
-					ipsws = append(ipsws, ipsw)
+					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
+						Title: a.Text(),
+						Build: p.Text(),
+						URL:   href,
+						Type:  "ios",
+					})
 				})
 			})
 
@@ -782,15 +791,12 @@ func (app *App) getDevDownloads(release bool) ([]DevDownload, error) {
 					href, _ := a.Attr("href")
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h2")
-					ipsw := DevDownload{
-						Title:   a.Text(),
-						Version: version.Text(),
-						Build:   p.Text(),
-						URL:     href,
-						Type:    "tvos",
-					}
-
-					ipsws = append(ipsws, ipsw)
+					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
+						Title: a.Text(),
+						Build: p.Text(),
+						URL:   href,
+						Type:  "tvos",
+					})
 				})
 			})
 
@@ -805,13 +811,10 @@ func (app *App) getDevDownloads(release bool) ([]DevDownload, error) {
 				if strings.Contains(href, "/services-account/download") {
 					version := a.Parent().Parent().Find("h2")
 					if len(version.Text()) > 0 {
-						ipsw := DevDownload{
-							Version: version.Text(),
-							URL:     fmt.Sprintf("https://developer.apple.com%s", href),
-							Type:    "app",
-						}
-
-						ipsws = append(ipsws, ipsw)
+						ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
+							URL:  fmt.Sprintf("https://developer.apple.com%s", href),
+							Type: "app",
+						})
 					}
 				}
 			})
@@ -827,13 +830,10 @@ func (app *App) getDevDownloads(release bool) ([]DevDownload, error) {
 					if strings.Contains(href, "/services-account/download") {
 						version := a.Parent().Parent().Find("h2")
 						if len(version.Text()) > 0 {
-							ipsw := DevDownload{
-								Version: version.Text(),
-								URL:     fmt.Sprintf("https://developer.apple.com%s", href),
-								Type:    "app",
-							}
-
-							ipsws = append(ipsws, ipsw)
+							ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
+								URL:  fmt.Sprintf("https://developer.apple.com%s", href),
+								Type: "app",
+							})
 						}
 					}
 				})

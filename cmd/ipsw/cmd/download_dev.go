@@ -63,7 +63,7 @@ var devCmd = &cobra.Command{
 		username := os.Getenv("IPSW_DEV_USERNAME")
 		if len(username) == 0 {
 			prompt := &survey.Input{
-				Message: "Please type your username",
+				Message: "Please type your username:",
 			}
 			if err := survey.AskOne(prompt, &username); err != nil {
 				if err == terminal.InterruptErr {
@@ -77,7 +77,7 @@ var devCmd = &cobra.Command{
 		password := os.Getenv("IPSW_DEV_PASSWORD")
 		if len(password) == 0 {
 			prompt := &survey.Password{
-				Message: "Please type your password",
+				Message: "Please type your password:",
 			}
 			if err := survey.AskOne(prompt, &password); err != nil {
 				if err == terminal.InterruptErr {
