@@ -52,12 +52,19 @@ var devCmd = &cobra.Command{
 
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
+		skipAll, _ := cmd.Flags().GetBool("skip-all")
+		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
 
 		// release, _ := cmd.Flags().GetBool("release")
 		sms, _ := cmd.Flags().GetBool("sms")
 		pageSize, _ := cmd.Flags().GetInt("page")
 
-		app := download.NewDevPortal(proxy, insecure, sms)
+		app := download.NewDevPortal(
+			proxy,
+			insecure,
+			skipAll,
+			removeCommas,
+			sms)
 
 		// get username
 		username := os.Getenv("IPSW_DEV_USERNAME")
