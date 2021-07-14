@@ -52,10 +52,12 @@ jobs:
       # CACHE
       #
       - name: Cache Downloaded IPSWs
+        id: cache-ipsws
         if: matrix.platform == 'macos-latest'
         uses: actions/cache@v2
         with:
           path: ~/.ipsw
+          key: ${{ runner.os }}-ipsw
 
       - name: Cache go.mod (macOS)
         if: matrix.platform == 'macos-latest'
@@ -155,7 +157,7 @@ jobs:
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v 14.6 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
       - name: Run download latest
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-latest' && steps.cache-ipsws.outputs.cache-hit != 'true'
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download latest --device iPhone12,1 --yes
