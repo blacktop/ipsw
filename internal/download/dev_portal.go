@@ -609,8 +609,9 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 
 		version := ""
 		promptVer := &survey.Select{
-			Message: "Choose an OS version:",
-			Options: versions,
+			Message:  "Choose an OS version:",
+			Options:  versions,
+			PageSize: 15,
 		}
 		survey.AskOne(promptVer, &version)
 
