@@ -57,8 +57,7 @@ jobs:
         uses: actions/cache@v2
         with:
           path: ~/.ipsw
-          key: ${{ runner.os }}-ipsw
-
+          key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
       - name: Cache go.mod (macOS)
         if: matrix.platform == 'macos-latest'
         uses: actions/cache@v2
@@ -188,7 +187,7 @@ jobs:
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig -V
 
-      - name: Run dyldsymaddr (img)
+      - name: Run dyld symaddr (img)
         if: matrix.platform == 'macos-latest'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib
