@@ -40,11 +40,17 @@ const (
 	// TODO: flesh out the rest of the error codes
 )
 
+type config struct {
+	SkipAll      bool
+	RemoveCommas bool
+	PreferSMS    bool
+}
+
 // App is the app object
 type App struct {
 	Client *http.Client
 
-	PreferSMS bool
+	Config config
 
 	authService authService
 	authOptions authOptions
@@ -213,7 +219,7 @@ func (app *App) updateRequestHeaders(req *http.Request) {
 }
 
 // NewDevPortal returns a new instance of teh dev portal app
-func NewDevPortal(proxy string, insecure, sms bool) *App {
+func NewDevPortal(proxy string, insecure, skipAll, removeCommas, sms bool) *App {
 	jar, _ := cookiejar.New(nil)
 
 	app := App{
@@ -224,7 +230,11 @@ func NewDevPortal(proxy string, insecure, sms bool) *App {
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 			},
 		},
-		PreferSMS: sms,
+		Config: config{
+			SkipAll:      skipAll,
+			RemoveCommas: removeCommas,
+			PreferSMS:    sms,
+		},
 	}
 
 	return &app
@@ -348,7 +358,7 @@ func (app *App) signIn(username, password string) error {
 
 		} else { // Code is shown on trusted devices
 			codeType = "trusteddevice"
-			if app.PreferSMS {
+			if app.Config.PreferSMS {
 				codeType = "phone"
 				if err := app.requestCode(1); err != nil {
 					if app.codeRequest.SecurityCode.TooManyCodesSent {
@@ -664,13 +674,12 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 // Download downloads a file that requires a valid dev portal session
 func (app *App) Download(url string) error {
 
-	// downloader := NewDownload(proxy, insecure, skipAll)
-	downloader := NewDownload("", false, false)
-
+	// proxy, insecure are null because we override the client below
+	downloader := NewDownload("", false, app.Config.SkipAll)
+	// use authenticated client
 	downloader.client = app.Client
 
-	destName := getDestName(url, false)
-	// destName := getDestName(url, removeCommas)
+	destName := getDestName(url, app.Config.RemoveCommas)
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
 
 		log.WithFields(log.Fields{
@@ -685,6 +694,7 @@ func (app *App) Download(url string) error {
 		if err != nil {
 			return fmt.Errorf("failed to download file: %v", err)
 		}
+
 	} else {
 		log.Warnf("file already exists: %s", destName)
 	}
