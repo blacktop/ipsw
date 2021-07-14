@@ -79,6 +79,7 @@ jobs:
             ${{ runner.os }}-go-
       - name: Cache go.mod (Windows)
         if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v2
         with:
           path: |
             %LocalAppData%\go-build
