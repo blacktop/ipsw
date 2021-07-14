@@ -771,6 +771,11 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 			}
 
 			for _, ptr := range classPtrs {
+
+				if ptr == 0 {
+					continue // TODO: why does this happen?
+				}
+
 				c, err := f.GetObjCClass(ptr)
 				if err != nil {
 					return err
