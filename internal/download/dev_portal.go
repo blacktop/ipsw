@@ -2,12 +2,14 @@ package download
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"sort"
 	"strings"
 
 	"time"
@@ -22,13 +24,12 @@ const (
 	betaDownloadsURL    = "https://developer.apple.com/download/"
 	releaseDownloadsURL = "https://developer.apple.com/download/release/"
 
+	downloadActionURL      = "https://developer.apple.com/devcenter/download.action"
+	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
+
 	loginURL      = "https://idmsa.apple.com/appleauth/auth/signin"
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
 	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
-)
-
-var (
-	redirect string
 )
 
 const (
@@ -54,8 +55,8 @@ type App struct {
 	xAppleIDAccountCountry string
 }
 
-// DevDownloads are all the downloads from https://developer.apple.com/download/
-type DevDownloads struct {
+// DevDownload are all the downloads from https://developer.apple.com/download/
+type DevDownload struct {
 	Version string `json:"version,omitempty"`
 	Title   string `json:"title,omitempty"`
 	Build   string `json:"build,omitempty"`
@@ -74,7 +75,7 @@ type Downloads struct {
 	HTTPResponseHeaders struct {
 		SetCookie string `json:"Set-Cookie,omitempty"`
 	} `json:"httpResponseHeaders,omitempty"`
-	Downloads []download
+	Downloads []dload
 }
 
 type authService struct {
@@ -185,7 +186,11 @@ type dfile struct {
 	FileFormat   fformat `json:"fileFormat,omitempty"`
 }
 
-type download struct {
+func (d dfile) URL() string {
+	return fmt.Sprintf("%s?path=%s", downloadActionURL, d.RemotePath)
+}
+
+type dload struct {
 	Name          string     `json:"name,omitempty"`
 	Description   string     `json:"description,omitempty"`
 	IsReleased    int        `json:"isReleased,omitempty"`
@@ -194,12 +199,6 @@ type download struct {
 	DateModified  string     `json:"dateModified,omitempty"`
 	Categories    []category `json:"categories,omitempty"`
 	Files         []dfile    `json:"files,omitempty"`
-}
-
-func noRedirect(req *http.Request, via []*http.Request) error {
-	redirect = req.Response.Header.Get("Location")
-	log.Infof("redirecting to %s", redirect)
-	return nil
 }
 
 func (app *App) updateRequestHeaders(req *http.Request) {
@@ -214,14 +213,17 @@ func (app *App) updateRequestHeaders(req *http.Request) {
 	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
 }
 
-// NewApp returns a new instance of teh dev portal app
-func NewApp(sms bool) *App {
+// NewDevPortal returns a new instance of teh dev portal app
+func NewDevPortal(proxy string, insecure, sms bool) *App {
 	jar, _ := cookiejar.New(nil)
 
 	app := App{
 		Client: &http.Client{
 			Jar: jar,
-			// CheckRedirect: noRedirect,
+			Transport: &http.Transport{
+				Proxy:           GetProxy(proxy),
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+			},
 		},
 		PreferSMS: sms,
 	}
@@ -586,11 +588,102 @@ func (app *App) updateSession() error {
 	return nil
 }
 
-// GetDownloads returns all the downloads in "More Downloads" - https://developer.apple.com/download/all/
-func (app *App) GetDownloads() (*Downloads, error) {
+// DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
+func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
+	isRelease := true
+
+	switch downloadType {
+	case "beta":
+		isRelease = false
+		fallthrough
+	case "release":
+		ipsws, err := app.getDevDownloads(isRelease)
+		if err != nil {
+			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
+		}
+
+		var choices []string
+		for _, ipsw := range ipsws {
+			choices = append(choices, ipsw.Version)
+		}
+
+		dfiles := []int{}
+		prompt := &survey.MultiSelect{
+			Message:  "Select what file(s) to download:",
+			Options:  choices,
+			PageSize: pageSize,
+		}
+		survey.AskOne(prompt, &dfiles)
+
+		for _, df := range dfiles {
+			app.Download(ipsws[df].URL)
+		}
+
+	case "more":
+		dloads, err := app.getDownloads()
+		if err != nil {
+			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
+		}
+
+		var choices []string
+		for _, dl := range dloads.Downloads {
+			choices = append(choices, dl.Name)
+		}
+
+		dfiles := []int{}
+		prompt := &survey.MultiSelect{
+			Message:  "Select what file(s) to download:",
+			Options:  choices,
+			PageSize: pageSize,
+		}
+		survey.AskOne(prompt, &dfiles)
+
+		for _, idx := range dfiles {
+			for _, f := range dloads.Downloads[idx].Files {
+				app.Download(f.URL())
+			}
+		}
+	}
+
+	return nil
+}
+
+// Download downloads a file that requires a valid dev portal session
+func (app *App) Download(url string) error {
+
+	// downloader := NewDownload(proxy, insecure, skipAll)
+	downloader := NewDownload("", false, false)
+
+	downloader.client = app.Client
+
+	destName := getDestName(url, false)
+	// destName := getDestName(url, removeCommas)
+	if _, err := os.Stat(destName); os.IsNotExist(err) {
+
+		log.WithFields(log.Fields{
+			"file": destName,
+		}).Info("Downloading")
+
+		// download file
+		downloader.URL = url
+		downloader.DestName = destName
+
+		err = downloader.Do()
+		if err != nil {
+			return fmt.Errorf("failed to download file: %v", err)
+		}
+	} else {
+		log.Warnf("file already exists: %s", destName)
+	}
+
+	return nil
+}
+
+// getDownloads returns all the downloads in "More Downloads" - https://developer.apple.com/download/all/
+func (app *App) getDownloads() (*Downloads, error) {
 	var downloads Downloads
 
-	req, err := http.NewRequest("POST", "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action", nil)
+	req, err := http.NewRequest("POST", listDownloadsActionURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create http POST request: %v", err)
 	}
@@ -613,12 +706,25 @@ func (app *App) GetDownloads() (*Downloads, error) {
 
 	log.Debugf("Get Downloads: (%d):\n%s\n", response.StatusCode, string(body))
 
+	// sort by file name
+	// sort.Slice(downloads.Downloads, func(i, j int) bool {
+	// 	return downloads.Downloads[i].Name < downloads.Downloads[j].Name
+	// })
+
+	// sort by date created
+	sort.Slice(downloads.Downloads, func(i, j int) bool {
+		layout := "01/02/06 15:04"
+		di, _ := time.Parse(layout, downloads.Downloads[i].DateCreated)
+		dj, _ := time.Parse(layout, downloads.Downloads[j].DateCreated)
+		return dj.Before(di)
+	})
+
 	return &downloads, nil
 }
 
-// GetDevDownloads scrapes the https://developer.apple.com/download/ page for links
-func (app *App) GetDevDownloads(release bool) ([]DevDownloads, error) {
-	var ipsws []DevDownloads
+// getDevDownloads scrapes the https://developer.apple.com/download/ page for links
+func (app *App) getDevDownloads(release bool) ([]DevDownload, error) {
+	var ipsws []DevDownload
 
 	var downloadURL string
 	if release {
@@ -657,7 +763,7 @@ func (app *App) GetDevDownloads(release bool) ([]DevDownloads, error) {
 					href, _ := a.Attr("href")
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h2")
-					ipsw := DevDownloads{
+					ipsw := DevDownload{
 						Title:   a.Text(),
 						Version: version.Text(),
 						Build:   p.Text(),
@@ -676,7 +782,7 @@ func (app *App) GetDevDownloads(release bool) ([]DevDownloads, error) {
 					href, _ := a.Attr("href")
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h2")
-					ipsw := DevDownloads{
+					ipsw := DevDownload{
 						Title:   a.Text(),
 						Version: version.Text(),
 						Build:   p.Text(),
@@ -699,9 +805,9 @@ func (app *App) GetDevDownloads(release bool) ([]DevDownloads, error) {
 				if strings.Contains(href, "/services-account/download") {
 					version := a.Parent().Parent().Find("h2")
 					if len(version.Text()) > 0 {
-						ipsw := DevDownloads{
+						ipsw := DevDownload{
 							Version: version.Text(),
-							URL:     href,
+							URL:     fmt.Sprintf("https://developer.apple.com%s", href),
 							Type:    "app",
 						}
 
@@ -721,9 +827,9 @@ func (app *App) GetDevDownloads(release bool) ([]DevDownloads, error) {
 					if strings.Contains(href, "/services-account/download") {
 						version := a.Parent().Parent().Find("h2")
 						if len(version.Text()) > 0 {
-							ipsw := DevDownloads{
+							ipsw := DevDownload{
 								Version: version.Text(),
-								URL:     href,
+								URL:     fmt.Sprintf("https://developer.apple.com%s", href),
 								Type:    "app",
 							}
 

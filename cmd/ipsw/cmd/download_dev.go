@@ -22,8 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -38,7 +36,8 @@ func init() {
 	downloadCmd.AddCommand(devCmd)
 
 	devCmd.Flags().BoolP("sms", "", false, "Prefer SMS Two-factor authentication")
-	devCmd.Flags().BoolP("release", "", false, "Download release OSs/Apps")
+	// devCmd.Flags().BoolP("release", "", false, "Download release OSs/Apps")
+	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
 }
 
 // devCmd represents the dev command
@@ -51,10 +50,14 @@ var devCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		release, _ := cmd.Flags().GetBool("release")
-		sms, _ := cmd.Flags().GetBool("sms")
+		proxy, _ := cmd.Flags().GetString("proxy")
+		insecure, _ := cmd.Flags().GetBool("insecure")
 
-		app := download.NewApp(sms)
+		// release, _ := cmd.Flags().GetBool("release")
+		sms, _ := cmd.Flags().GetBool("sms")
+		pageSize, _ := cmd.Flags().GetInt("page")
+
+		app := download.NewDevPortal(proxy, insecure, sms)
 
 		// get username
 		username := os.Getenv("IPSW_DEV_USERNAME")
@@ -89,20 +92,15 @@ var devCmd = &cobra.Command{
 			log.Fatal(err.Error())
 		}
 
-		// if dloads, err := app.GetDownloads(); err == nil {
-		// 	fmt.Println(dloads)
-		// }
+		dlType := ""
+		prompt := &survey.Select{
+			Message: "Choose a download type:",
+			Options: []string{"beta", "release", "more"},
+		}
+		survey.AskOne(prompt, &dlType)
 
-		ipsws, err := app.GetDevDownloads(release)
-		if err != nil {
+		if err := app.DownloadPrompt(dlType, pageSize); err != nil {
 			log.Fatal(err.Error())
 		}
-
-		dat, err := json.MarshalIndent(ipsws, "", "    ")
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-
-		fmt.Println(string(dat))
 	},
 }
