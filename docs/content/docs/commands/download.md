@@ -12,6 +12,7 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download beta**](#download-beta)
 - [**download ota**](#download-ota)
 - [**download macos**](#download-macos)
+- [**download dev**](#download-dev)
 
 ---
 
@@ -229,4 +230,22 @@ $ ipsw download macos --kernel
       • Writing MacBookPro17,1_J293AP_20D91/kernelcache.production
       • Writing MacBookAir10,1_J313AP_20D91/kernelcache.production
       • Writing iProd99,1_T485AP_20D91/kernelcache.production
+```
+
+## **download dev**
+
+Download IPSWs (and more) from https://developer.apple.com/download
+
+```bash
+❯ ipsw download dev
+
+? Please type your username: blacktop
+? Please type your password: ***********************************
+? Please type your verification code: ******
+? Choose a download type: "beta"
+? Choose an OS version: "macOS Monterey beta 2"
+? Select what file(s) to download: "Mac computers with the M1 chip"
+
+   • Downloading               file="UniversalMac_12.0_21A5268h_Restore.ipsw"
+        65.9 MiB / 12.8 GiB [----------------------------------------------------------| 2h20m56s ]  1.54 MiB/s
 ```
