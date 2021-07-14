@@ -284,7 +284,11 @@ func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 			return nil, fmt.Errorf("failed to parse MachO for image %s: %v", i.Name, err)
 		}
 		if m.DyldExportsTrie() != nil {
-			return m.DyldExports()
+			syms, err := m.DyldExports()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", i.Name, err)
+			}
+			return syms, nil
 		} else if m.DyldInfo() != nil {
 			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldInfo().ExportOff))
 			eTrieSize = uint64(m.DyldInfo().ExportSize)
@@ -307,8 +311,12 @@ func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 		return nil, fmt.Errorf("failed to read export trie data: %v", err)
 	}
 
-	return trie.ParseTrie(exportTrie, i.LoadAddress)
+	syms, err := trie.ParseTrie(exportTrie, i.LoadAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", i.Name, err)
+	}
 
+	return syms, nil
 }
 
 // GetAllExportedSymbols prints out all the exported symbols
@@ -398,7 +406,6 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 			return err
 		}
 
-		log.Info("parsing private symbols...")
 		err = f.SaveAddrToSymMap(cacheFile)
 		if err != nil {
 			return err
