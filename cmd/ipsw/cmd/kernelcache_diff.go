@@ -23,12 +23,15 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
+	"os"
 )
+
+const longDesc = `
+
+`
 
 func init() {
 	kernelcacheCmd.AddCommand(diffCmd)
@@ -37,10 +40,9 @@ func init() {
 // diffCmd represents the diff command
 var diffCmd = &cobra.Command{
 	Use:   "diff",
-	Short: "🚧 diff kernelcache (using assert strings)",
-	// Long:   longDesc,
-	Args:   cobra.MinimumNArgs(1),
-	Hidden: true,
+	Short: "diff kernelcache (using assert strings)",
+	Long:  longDesc,
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)

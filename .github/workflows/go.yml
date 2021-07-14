@@ -50,54 +50,10 @@ jobs:
       #     cd Debug
       #     dlltool --def D:\a\ipsw\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
 
-      #
-      # CACHE
-      #
-      - name: Cache Downloaded IPSWs
-        id: cache-ipsws
-        if: matrix.platform == 'macos-latest'
-        uses: actions/cache@v2
-        with:
-          path: ~/.ipsw
-          key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
-      - name: Cache go.mod (macOS)
-        if: matrix.platform == 'macos-latest'
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/Library/Caches/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Cache go.mod (Linux)
-        if: matrix.platform == 'ubuntu-latest'
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Cache go.mod (Windows)
-        if: matrix.platform == 'windows-latest'
-        uses: actions/cache@v2
-        with:
-          path: |
-            %LocalAppData%\go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-
       - name: Get dependencies
         run: |
           go mod download
 
-      #
-      # BUILD
-      #
       - name: Build (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
@@ -116,25 +72,19 @@ jobs:
           dir build/dist
           dir
 
-      #
-      # (Windows)
-      #
-      - name: Run Device List (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe device-list
+      # - name: Run Help
+      #   if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
+      #   run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw --help
+      # - name: Run Help (Windows)
+      #   if: matrix.platform == 'windows-latest'
+      #   run: D:\a\ipsw\ipsw\build\dist\ipsw.exe --help
 
-      - name: Run Extract Remote Kernelcache (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 14.6 -d iPhone12,1
-          dir
-
-      #
-      # (Unix)
-      #
       - name: Run Device List
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
         run: LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw device-list
+      - name: Run Device List (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: D:\a\ipsw\ipsw\build\dist\ipsw.exe device-list
 
       - id: get-latest
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-latest'
@@ -146,140 +96,18 @@ jobs:
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download kernel -v 14.6 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
-      - name: Make cache folder
-        if: matrix.platform == 'macos-latest'
-        run: mkdir ~/.ipsw
-      #
-      # DOWNLOAD CMD (macOS)
-      #
+
+      - name: Run Extract Remote Kernelcache (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download kernel -v 14.6 -d iPhone12,1
+          dir
+
       - name: Run Extract ALL Remote Kernelcaches
         if: matrix.platform == 'macos-latest'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download kernel -v 14.6 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho */kernelcache*
-      - name: Run download latest
-        if: matrix.platform == 'macos-latest' && steps.cache-ipsws.outputs.cache-hit != 'true'
-        run: |
-          export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download latest --device iPhone12,1 --yes
-      #
-      # EXTRACT CMD (macOS)
-      #
-      - name: Run extract - (kernel, dsc and dtree)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree *.ipsw
-      #
-      # KERNEL CMD (macOS)
-      #
-      - name: Run kernel kexts
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel kexts ~/.ipsw/*iPhone11,8_iPhone12,1/kernelcache.release.iPhone11,8
-      - name: Run kernel sbopts
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel sbopts ~/.ipsw/*iPhone11,8_iPhone12,1/kernelcache.release.iPhone11,8
-      #
-      # DYLD CMD (macOS)
-      #
-      - name: Run dyld info
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig -V
-
-      - name: Run dyld symaddr (img)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib
-      - name: Run dyld symaddr (sym)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e _memcpy
-      - name: Run dyld symaddr (img+sym)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
-      - name: Run dyld symaddr (ALL)
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
-
-      - name: Run dyld macho
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld macho ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e JavaScriptCore --loads --objc --strings --symbols --starts -V
-
-      - name: Run dyld webkit
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --rev
-
-      # - name: Run dyld slide
-      #   if: matrix.platform == 'macos-latest'
-      #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --auth
-
-      # - name: Run dyld patches TODO: fix this
-      #   if: matrix.platform == 'macos-latest'
-      #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
-
-      - name: Run dyld imports
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld imports ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e JavaScriptCore
-
-      - name: Run dyld disass
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld disass ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --demangle --symbol _NSLog
-
-      - name: Run dyld objc sel --image
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc sel ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image JavaScriptCore
-      - name: Run dyld objc --class
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --class ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
-      - name: Run dyld objc --imp-cache
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --imp-cache ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
-      - name: Run dyld objc --proto
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --proto ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
-
-      - name: Run dyld split
-        if: matrix.platform == 'macos-latest'
-        run: |
-          export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw dyld split ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e ~/.ipsw
-      #
-      # MACHO CMD (macOS)
-      #
-      - name: Run macho
-        if: matrix.platform == 'macos-latest'
-        run: |
-          export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw macho ~/.ipsw/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
-      #
-      # ENT CMD (macOS)
-      #
-      # - name: Run ents
-      #   if: matrix.platform == 'macos-latest'
-      #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw ent ~/.ipsw/*.ipsw --ent platform-application
-      #
-      # INFO CMD (macOS)
-      #
-      - name: Run info
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw info ~/.ipsw/*.ipsw
 
       # - name: Run ipsw update
       #   if: matrix.platform == 'macos-latest'

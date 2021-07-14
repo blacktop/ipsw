@@ -98,7 +98,7 @@ var entCmd = &cobra.Command{
 			fileSystem, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
 				return strings.EqualFold(f.Name, fsDMG)
 			})
-			if err != nil || len(fileSystem) != 1 {
+			if err != nil || len(fileSystem) == 1 {
 				return fmt.Errorf("failed extract %s from ipsw, found %v: %v", fsDMG, fileSystem, err)
 			}
 			defer os.Remove(fileSystem[0])
@@ -196,7 +196,6 @@ var entCmd = &cobra.Command{
 					}
 				}
 			}
-
 		} else {
 			log.Infof("Files containing entitlement: %s", entitlement)
 			fmt.Println()

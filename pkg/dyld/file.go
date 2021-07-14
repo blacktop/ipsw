@@ -14,7 +14,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
-	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
@@ -879,18 +878,14 @@ func (f *File) ParsePatchInfo() error {
 	return fmt.Errorf("cache does NOT contain patch info")
 }
 
-// Image returns the Image with the given name, or nil if no such image exists.
+// Image returns the first Image with the given name, or nil if no such image exists.
 func (f *File) Image(name string) *CacheImage {
-	// fast path
-	if idx, err := f.GetDylibIndex(name); err == nil {
-		return f.Images[idx]
-	}
-	// slow path
 	for _, i := range f.Images {
 		if strings.EqualFold(strings.ToLower(i.Name), strings.ToLower(name)) {
 			return i
 		}
-		if strings.EqualFold(strings.ToLower(filepath.Base(i.Name)), strings.ToLower(name)) {
+		base := filepath.Base(i.Name)
+		if strings.EqualFold(strings.ToLower(base), strings.ToLower(name)) {
 			return i
 		}
 	}
@@ -936,11 +931,11 @@ func (f *File) HasImagePath(path string) (int, bool, error) {
 			if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
 				return 0, false, err
 			}
-			imageNode, err := trie.WalkTrie(dylibTrie, path)
+			imageNode, err := walkTrie(dylibTrie, path)
 			if err != nil {
 				return 0, false, err
 			}
-			imageIndex, _, err = trie.ReadUleb128FromBuffer(bytes.NewBuffer(dylibTrie[imageNode:]))
+			imageIndex, _, err = readUleb128FromBuffer(bytes.NewBuffer(dylibTrie[imageNode:]))
 			if err != nil {
 				return 0, false, err
 			}
@@ -952,10 +947,6 @@ func (f *File) HasImagePath(path string) (int, bool, error) {
 // GetDylibIndex returns the index of a given dylib
 func (f *File) GetDylibIndex(path string) (uint64, error) {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
-	if f.DylibsTrieAddr == 0 {
-		return 0, fmt.Errorf("cache does not contain dylibs trie info")
-	}
 
 	off, err := f.GetOffset(f.DylibsTrieAddr)
 	if err != nil {
@@ -969,81 +960,78 @@ func (f *File) GetDylibIndex(path string) (uint64, error) {
 		return 0, err
 	}
 
-	imageNode, err := trie.WalkTrie(dylibTrie, path)
+	dylibs, err := parseTrie(dylibTrie, 0)
 	if err != nil {
-		return 0, fmt.Errorf("dylib not found in dylibs trie")
+		return 0, err
 	}
 
-	imageIndex, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(dylibTrie[imageNode:]))
-	if err != nil {
-		return 0, fmt.Errorf("failed to read ULEB at image node in dyblibs trie")
+	for _, d := range dylibs {
+		if d.Name == path {
+			return uint64(d.Flags), nil
+		}
 	}
 
-	return imageIndex, nil
+	return 0, fmt.Errorf("dylib not found in Dylibs Trie")
 }
 
 // FindDlopenOtherImage returns the dlopen OtherImage for a given path
-func (f *File) FindDlopenOtherImage(path string) (uint64, error) {
+func (f *File) FindDlopenOtherImage(path string) error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	if f.OtherTrieAddr == 0 {
-		return 0, fmt.Errorf("cache does not contain dlopen other image trie info")
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= f.OtherTrieAddr && f.OtherTrieAddr < mapping.Address+mapping.Size {
+			otherTriePtr := int64(f.OtherTrieAddr - mapping.Address + mapping.FileOffset)
+			// Read dyld trie containing TODO
+			sr.Seek(otherTriePtr, os.SEEK_SET)
+			otherTrie := make([]byte, f.OtherTrieSize)
+			if err := binary.Read(sr, f.ByteOrder, &otherTrie); err != nil {
+				return err
+			}
+			imageNode, err := walkTrie(otherTrie, path)
+			if err != nil {
+				return err
+			}
+			imageNum, _, err := readUleb128FromBuffer(bytes.NewBuffer(otherTrie[imageNode:]))
+			if err != nil {
+				return err
+			}
+			fmt.Println("imageNum:", imageNum)
+			arrayAddrOffset := f.OtherImageArrayAddr - f.Mappings[0].Address
+			fmt.Println("otherImageArray:", arrayAddrOffset)
+		}
 	}
-
-	offset, err := f.GetOffset(f.OtherTrieAddr)
-	if err != nil {
-		return 0, err
-	}
-
-	sr.Seek(int64(offset), io.SeekStart)
-
-	otherTrie := make([]byte, f.OtherTrieSize)
-	if err := binary.Read(sr, f.ByteOrder, &otherTrie); err != nil {
-		return 0, err
-	}
-
-	imageNode, err := trie.WalkTrie(otherTrie, path)
-	if err != nil {
-		return 0, err
-	}
-
-	imageNum, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(otherTrie[imageNode:]))
-	if err != nil {
-		return 0, err
-	}
-
-	return imageNum, nil
+	return nil
 }
 
-// FindClosure returns the closure pointer for a given path
-func (f *File) FindClosure(executablePath string) (uint64, error) {
+// FindClosure returns the closure for a given path
+func (f *File) FindClosure(executablePath string) error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	if f.ProgClosuresTrieAddr == 0 {
-		return 0, fmt.Errorf("cache does not contain prog closures trie info")
+	for _, mapping := range f.Mappings {
+		if mapping.Address <= f.ProgClosuresTrieAddr && f.ProgClosuresTrieAddr < mapping.Address+mapping.Size {
+			progClosuresTriePtr := int64(f.ProgClosuresTrieAddr - mapping.Address + mapping.FileOffset)
+			// Read dyld trie containing TODO
+			sr.Seek(progClosuresTriePtr, os.SEEK_SET)
+			progClosuresTrie := make([]byte, f.ProgClosuresTrieSize)
+			if err := binary.Read(sr, f.ByteOrder, &progClosuresTrie); err != nil {
+				return err
+			}
+			imageNode, err := walkTrie(progClosuresTrie, executablePath)
+			if err != nil {
+				return err
+			}
+			closureOffset, _, err := readUleb128FromBuffer(bytes.NewBuffer(progClosuresTrie[imageNode:]))
+			if err != nil {
+				return err
+			}
+			if closureOffset < f.CacheHeader.ProgClosuresSize {
+				closurePtr := f.CacheHeader.ProgClosuresAddr + closureOffset
+				fmt.Println("closurePtr:", closurePtr)
+			}
+		}
 	}
 
-	offset, err := f.GetOffset(f.ProgClosuresTrieAddr)
-	if err != nil {
-		return 0, err
-	}
-
-	sr.Seek(int64(offset), io.SeekStart)
-
-	progClosuresTrie := make([]byte, f.ProgClosuresTrieSize)
-	if err := binary.Read(sr, f.ByteOrder, &progClosuresTrie); err != nil {
-		return 0, err
-	}
-	imageNode, err := trie.WalkTrie(progClosuresTrie, executablePath)
-	if err != nil {
-		return 0, err
-	}
-	closureOffset, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(progClosuresTrie[imageNode:]))
-	if err != nil {
-		return 0, err
-	}
-
-	return f.CacheHeader.ProgClosuresAddr + closureOffset, nil
+	return nil
 }
 
 func (f *File) GetSubCacheCodeSignatures() map[mtypes.UUID]codesignature {
