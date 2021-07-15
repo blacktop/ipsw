@@ -654,7 +654,7 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 
 		var choices []string
 		for _, dl := range dloads.Downloads {
-			choices = append(choices, dl.Name)
+			choices = append(choices, fmt.Sprintf("%s (%s)", dl.Name, dl.DateCreated))
 		}
 
 		dfiles := []int{}
