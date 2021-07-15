@@ -125,11 +125,15 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 		return nil, err
 	}
 
+	var sandboxInfo KmodInfoT
 	for idx, info := range infos {
+		// for _, info := range infos {
 		if strings.Contains(string(info.Name[:]), "sandbox") {
-			sandboxKextStartVaddr = startAdders[idx] | tagPtrMask
+			log.Debug(info.String())
+			sandboxInfo = info
+			// sandboxKextStartVaddr = startAdders[idx] | tagPtrMask
 			sandboxKextEndVaddr = startAdders[idx+1] | tagPtrMask
-			sandboxKextStartOffset, err = m.GetOffset(sandboxKextStartVaddr)
+			sandboxKextStartOffset, err = m.GetOffset(sandboxInfo.StartAddr | tagPtrMask)
 			if err != nil {
 				return nil, err
 			}
@@ -147,7 +151,7 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 
 	// fmt.Println(sandbox.FileTOC.String())
 
-	sbInstrData := make([]byte, sandboxKextEndVaddr-sandboxKextStartVaddr)
+	sbInstrData := make([]byte, sandboxKextEndVaddr-sandboxInfo.StartAddr)
 	_, err = m.ReadAt(sbInstrData, int64(sandboxKextStartOffset))
 	if err != nil {
 		return nil, err
@@ -158,7 +162,7 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 	references := make(map[uint64]uint64)
 
 	// extract all immediates
-	for i := range arm64.Disassemble(bytes.NewReader(sbInstrData), arm64.Options{StartAddress: int64(sandboxKextStartVaddr)}) {
+	for i := range arm64.Disassemble(bytes.NewReader(sbInstrData), arm64.Options{StartAddress: int64(sandboxInfo.StartAddr)}) {
 
 		if i.Error != nil {
 			continue
@@ -201,6 +205,10 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 		}
 	}
 
+	if panicXrefVMAddr == 0 {
+		return nil, fmt.Errorf("failed to find Xrefs to the panic cstring")
+	}
+
 	var failXrefVMAddr uint64
 	for k, v := range references {
 		if v == panicXrefVMAddr {
@@ -208,6 +216,10 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Failure path Xref %#x => %#x", failXrefVMAddr, v))
 			break
 		}
+	}
+
+	if failXrefVMAddr == 0 {
+		return nil, fmt.Errorf("failed to find failure path Xrefs to the panic")
 	}
 
 	var profileVMAddr uint64
@@ -279,12 +291,14 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 
 func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	log.Info("Searching for sandbox profile data")
-	return getSandboxData(m, r, "\"failed to initialize platform sandbox\"")
+	// return getSandboxData(m, r, "\"failed to initialize platform sandbox\"")
+	return getSandboxData(m, r, "\"failed to initialize platform sandbox: %d\" @%s:%d")
 }
 
 func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	log.Info("Searching for sandbox collection data")
-	return getSandboxData(m, r, "\"failed to initialize collection\"")
+	// return getSandboxData(m, r, "\"failed to initialize collection\"")
+	return getSandboxData(m, r, "\"failed to initialize builtin collection: %d\" @%s:%d")
 }
 
 func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
