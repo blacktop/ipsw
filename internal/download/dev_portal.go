@@ -625,21 +625,25 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 		}
 		survey.AskOne(promptVer, &version)
 
-		var choices []string
-		for _, ipsw := range ipsws[version] {
-			choices = append(choices, ipsw.Title)
-		}
+		if len(ipsws[version]) > 1 {
+			var choices []string
+			for _, ipsw := range ipsws[version] {
+				choices = append(choices, ipsw.Title)
+			}
 
-		dfiles := []int{}
-		prompt := &survey.MultiSelect{
-			Message:  "Select what file(s) to download:",
-			Options:  choices,
-			PageSize: pageSize,
-		}
-		survey.AskOne(prompt, &dfiles)
+			dfiles := []int{}
+			prompt := &survey.MultiSelect{
+				Message:  "Select what file(s) to download:",
+				Options:  choices,
+				PageSize: pageSize,
+			}
+			survey.AskOne(prompt, &dfiles)
 
-		for _, df := range dfiles {
-			app.Download(ipsws[version][df].URL)
+			for _, df := range dfiles {
+				app.Download(ipsws[version][df].URL)
+			}
+		} else {
+			app.Download(ipsws[version][0].URL)
 		}
 
 	case "more":
