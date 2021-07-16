@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
@@ -133,12 +132,7 @@ var symaddrCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				if strings.Contains(image.Name, "/System/Library/PrivateFrameworks/CMCapture.framework/CMCapture") {
-					fmt.Println("WTF")
-				}
-				if strings.Contains(image.Name, "libsystem_platform.dylib") {
-					fmt.Println("WTF")
-				}
+
 				if sym, err := f.FindExportedSymbolInImage(image.Name, args[1]); err != nil {
 					if err != nil && !errors.Is(err, dyld.ErrSymbolNotInImage) {
 						// return fmt.Errorf("failed to find symbol in image: %v", err)

@@ -281,19 +281,19 @@ func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 	} else {
 		m, err := i.GetMacho()
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse MachO for image %s: %v", i.Name, err)
+			return nil, fmt.Errorf("failed to parse MachO for image %s: %v", filepath.Base(i.Name), err)
 		}
 		if m.DyldExportsTrie() != nil {
 			syms, err := m.DyldExports()
 			if err != nil {
-				return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", i.Name, err)
+				return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", filepath.Base(i.Name), err)
 			}
 			return syms, nil
 		} else if m.DyldInfo() != nil {
 			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldInfo().ExportOff))
 			eTrieSize = uint64(m.DyldInfo().ExportSize)
 		} else {
-			return nil, fmt.Errorf("failed to get export trie data for image %s: %w", i.Name, ErrNoExportTrieInMachO)
+			return nil, fmt.Errorf("failed to get export trie data for image %s: %w", filepath.Base(i.Name), ErrNoExportTrieInMachO)
 		}
 	}
 
@@ -313,7 +313,7 @@ func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 
 	syms, err := trie.ParseTrie(exportTrie, i.LoadAddress)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", i.Name, err)
+		return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", filepath.Base(i.Name), err)
 	}
 
 	return syms, nil
