@@ -403,7 +403,7 @@ var dyldDisassCmd = &cobra.Command{
 			}
 
 			if isMiddle && i.Instruction.Address() == symAddr {
-				fmt.Printf("👉 %#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
+				fmt.Printf("👉%08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
 			} else {
 				fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
 			}
