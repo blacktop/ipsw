@@ -212,6 +212,7 @@
 <li><a href="#download-ota"><strong>download ota</strong></a></li>
 <li><a href="#download-macos"><strong>download macos</strong></a></li>
 <li><a href="#download-dev"><strong>download dev</strong></a></li>
+<li><a href="#download-oss"><strong>download oss</strong></a></li>
 </ul>
 <hr>
 <blockquote>
@@ -386,6 +387,9 @@ iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
 
    • Downloading               <span class="nv">file</span><span class="o">=</span><span class="s2">&#34;UniversalMac_12.0_21A5268h_Restore.ipsw&#34;</span>
         65.9 MiB / 12.8 GiB <span class="o">[</span>----------------------------------------------------------<span class="p">|</span> 2h20m56s <span class="o">]</span>  1.54 MiB/s
+</code></pre></div><h2 id="download-oss"><strong>download oss</strong></h2>
+<p>Download <a href="https://opensource.apple.com">opensource.apple.com</a> file for macOS version</p>
+<div class="highlight"><pre class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw download oss 11.4 | jq .projects.dyld.url | xargs wget
 </code></pre></div>
 </div>
 </div>
