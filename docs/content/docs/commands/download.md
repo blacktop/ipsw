@@ -13,6 +13,7 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download ota**](#download-ota)
 - [**download macos**](#download-macos)
 - [**download dev**](#download-dev)
+- [**download oss**](#download-oss)
 
 ---
 
@@ -248,4 +249,12 @@ Download IPSWs (and more) from https://developer.apple.com/download
 
    • Downloading               file="UniversalMac_12.0_21A5268h_Restore.ipsw"
         65.9 MiB / 12.8 GiB [----------------------------------------------------------| 2h20m56s ]  1.54 MiB/s
+```
+
+## **download oss**
+
+Download [opensource.apple.com](https://opensource.apple.com) file for macOS version
+
+```
+❯ ipsw download oss 11.4 | jq .projects.dyld.url | xargs wget
 ```
