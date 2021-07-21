@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 )
@@ -26,6 +28,35 @@ type Oss struct {
 	Build    string             `plist:"build,omitempty" json:"build,omitempty"`
 	Inherits string             `plist:"inherits,omitempty" json:"inherits,omitempty"`
 	Projects map[string]project `plist:"projects,omitempty" json:"projects,omitempty"`
+}
+
+// Download downloads a file from product URL
+func (p *project) Download() error {
+
+	// proxy, insecure are null because we override the client below
+	downloader := NewDownload("", false, false)
+
+	destName := getDestName(p.URL, false)
+	if _, err := os.Stat(destName); os.IsNotExist(err) {
+
+		log.WithFields(log.Fields{
+			"file": destName,
+		}).Info("Downloading")
+
+		// download file
+		downloader.URL = p.URL
+		downloader.DestName = destName
+
+		err = downloader.Do()
+		if err != nil {
+			return fmt.Errorf("failed to download file: %v", err)
+		}
+
+	} else {
+		log.Warnf("file already exists: %s", destName)
+	}
+
+	return nil
 }
 
 // NewOSS downloads and parses the opensource.apple.com plist
