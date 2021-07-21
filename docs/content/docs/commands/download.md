@@ -253,8 +253,56 @@ Download IPSWs (and more) from https://developer.apple.com/download
 
 ## **download oss**
 
-Download [opensource.apple.com](https://opensource.apple.com) file for macOS version
+> Download [opensource.apple.com](https://opensource.apple.com) file for macOS version
+
+Download them all
 
 ```
-❯ ipsw download oss 11.4 | jq .projects.dyld.url | xargs wget
+❯ ipsw download oss --macos 11.4 --all
+```
+
+Download single product
+
+```
+❯ ipsw download oss --macos 11.4 --product dyld
+```
+
+List all downloads
+
+```
+❯ ipsw download oss --macos 11.4
+```
+
+```json
+{
+   "build": "GoldenGateF20F71",
+   "inherits": "GoldenGateE20E232",
+   "projects": {
+      "AppleFileSystemDriver": {
+         "version": "27",
+         "url": "https://opensource.apple.com/tarballs/AppleFileSystemDriver/AppleFileSystemDriver-27.tar.gz"
+      },
+      <SNIP>
+      "xar": {
+         "version": "452",
+         "url": "https://opensource.apple.com/tarballs/xar/xar-452.tar.gz"
+      },
+      "xnu": {
+         "version": "7195.121.3",
+         "url": "https://opensource.apple.com/tarballs/xnu/xnu-7195.121.3.tar.gz"
+      },
+      "zip": {
+         "version": "18",
+         "url": "https://opensource.apple.com/tarballs/zip/zip-18.tar.gz"
+      },
+      "zlib": {
+         "version": "76",
+         "url": "https://opensource.apple.com/tarballs/zlib/zlib-76.tar.gz"
+      },
+      "zsh": {
+         "version": "87",
+         "url": "https://opensource.apple.com/tarballs/zsh/zsh-87.tar.gz"
+      }
+   }
+}
 ```

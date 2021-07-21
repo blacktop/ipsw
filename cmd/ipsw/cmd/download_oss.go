@@ -28,20 +28,26 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	downloadCmd.AddCommand(ossCmd)
 
-	// devCmd.Flags().StringP("macos", "m", viper.GetString("IPSW_OSS_MACOS_VERSION"), "macOS version to download")
+	ossCmd.Flags().StringP("macos", "m", viper.GetString("IPSW_OSS_MACOS_VERSION"), "macOS version to download")
+	ossCmd.MarkFlagRequired("macos")
+
+	ossCmd.Flags().BoolP("all", "", false, "Download all the files")
+	ossCmd.Flags().StringP("product", "", "", "macOS product to download (i.e. dyld)")
 }
 
 // ossCmd represents the oss command
 var ossCmd = &cobra.Command{
 	Use:   "oss <macOS version>",
 	Short: "Download opensource.apple.com file list for macOS version",
-	Args:  cobra.MinimumNArgs(1),
+	// Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if Verbose {
@@ -51,17 +57,40 @@ var ossCmd = &cobra.Command{
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 
-		// macOS, _ := cmd.Flags().GetString("macos")
+		macOS, _ := cmd.Flags().GetString("macos")
 
-		o, err := download.NewOSS(strings.Replace(args[0], ".", "", -1), proxy, insecure)
+		downloadAll, _ := cmd.Flags().GetBool("all")
+		downloadProduct, _ := cmd.Flags().GetString("product")
+
+		o, err := download.NewOSS(strings.Replace(macOS, ".", "", -1), proxy, insecure)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 
-		if dat, err := json.MarshalIndent(o, "", "   "); err == nil {
-			fmt.Println(string(dat))
+		if downloadAll {
+			for _, product := range o.Projects {
+				err = product.Download()
+				if err != nil {
+					utils.Indent(log.Error, 2)(err.Error())
+				}
+			}
+
+		} else if len(downloadProduct) > 0 {
+			for name, product := range o.Projects {
+				if strings.Contains(strings.ToLower(name), downloadProduct) {
+					err = product.Download()
+					if err != nil {
+						utils.Indent(log.Error, 2)(err.Error())
+					}
+				}
+			}
+
 		} else {
-			log.Fatal(err.Error())
+			if dat, err := json.MarshalIndent(o, "", "   "); err == nil {
+				fmt.Println(string(dat))
+			} else {
+				log.Fatal(err.Error())
+			}
 		}
 	},
 }
