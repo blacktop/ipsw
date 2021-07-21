@@ -282,7 +282,7 @@ func Mount(image, mountPoint string) error {
 
 		return nil
 
-	} else if runtime.GOOS == "linux" {
+	} else if runtime.GOOS != "windows" {
 		cmd := exec.Command("apfs-fuse", image, mountPoint)
 
 		out, err := cmd.CombinedOutput()
@@ -312,7 +312,7 @@ func Unmount(mountPoint string, force bool) error {
 			return fmt.Errorf("failed to unmount %s: %v", mountPoint, err)
 		}
 
-	} else if runtime.GOOS == "linux" {
+	} else if runtime.GOOS != "windows" {
 		cmd := exec.Command("umount", mountPoint)
 
 		err := cmd.Run()

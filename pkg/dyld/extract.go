@@ -54,7 +54,7 @@ func Extract(ipsw, destPath string) error {
 			searchStrMacOS = "System/Library/dyld/dyld_shared_cache_arm64*"
 			os.MkdirAll(folder, os.ModePerm)
 			mountPoint = "/tmp/ios"
-		} else if runtime.GOOS == "linux" {
+		} else if runtime.GOOS != "windows" {
 			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64*"
 			os.MkdirAll(filepath.Join("/data", folder), os.ModePerm)
 			mountPoint = "/mnt"
