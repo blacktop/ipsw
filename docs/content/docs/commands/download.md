@@ -251,6 +251,20 @@ Download IPSWs (and more) from https://developer.apple.com/download
         65.9 MiB / 12.8 GiB [----------------------------------------------------------| 2h20m56s ]  1.54 MiB/s
 ```
 
+Watch for 🆕 **beta** IPSWs
+
+```bash
+ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
+? Please type your username: blacktop
+? Please type your password: ***********************************
+? Please type your verification code: ******
+   • Downloading               file=iPhone11,8,iPhone12,1_15.0_19A5307g_Restore.ipsw
+	6.1 GiB / 6.1 GiB [==========================================================| ✅  ]  4.15 MiB/s
+   <SNIP>
+```
+
+> **NOTE:** This will check every 5 minutes for new files and download them.
+
 ## **download oss**
 
 > Download [opensource.apple.com](https://opensource.apple.com) file for macOS version
