@@ -205,15 +205,15 @@
 <div class="content ">
   <h3 id="parse-devicetrees">Parse DeviceTrees</h3>
 <p>Print out SUMMARY</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree DeviceTree.d431ap.im4p
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree DeviceTree.d431ap.im4p
 
       • Product Name: iPhone <span class="m">11</span> Pro Max
       • Model: iPhone12,5
       • BoardConfig: D431AP
 </code></pre></div><p>Or print out JSON</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree --json DeviceTree.d431ap.im4p <span class="p">|</span> jq .
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree --json DeviceTree.d431ap.im4p <span class="p">|</span> jq .
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
   <span class="nt">&#34;device-tree&#34;</span><span class="p">:</span> <span class="p">{</span>
     <span class="nt">&#34;#address-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
     <span class="nt">&#34;#size-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
@@ -225,7 +225,7 @@
           <span class="nt">&#34;AAPL,phandle&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
    <span class="err">&lt;SNIP&gt;</span>
 </code></pre></div><p>Or remotely</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
 
    • DeviceTree.n112ap.im4p
       • Product Name: iPod touch

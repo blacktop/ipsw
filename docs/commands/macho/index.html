@@ -213,7 +213,7 @@
 </ul>
 <h3 id="macho--d"><strong>macho -d</strong></h3>
 <p>Similar to <code>otool -h</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
@@ -222,7 +222,7 @@
 <span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
 </code></pre></div><h3 id="macho--l"><strong>macho -l</strong></h3>
 <p>Similar to <code>otool -h -l</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
@@ -294,7 +294,7 @@
 24: LC_DATA_IN_CODE             <span class="nv">offset</span><span class="o">=</span>0x0102ba28-0x0102ba28, <span class="nv">size</span><span class="o">=</span>    0, <span class="nv">entries</span><span class="o">=</span><span class="m">0</span>
 </code></pre></div><h3 id="macho---sig"><strong>macho &ndash;sig</strong></h3>
 <p>Similar to <code>jtool --sig</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
 
 Code Directory <span class="o">(</span><span class="m">167849</span> bytes<span class="o">)</span>
 	Version:     Scatter
@@ -323,7 +323,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         OU: Apple Certification Authority CN: Software Signing                           <span class="o">(</span>2013-04-12 thru 2021-04-12<span class="o">)</span>
 </code></pre></div><h3 id="macho---ent"><strong>macho &ndash;ent</strong></h3>
 <p>Similar to <code>jtool --ent</code></p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/libexec/amfid --ent
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/libexec/amfid --ent
 &lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">&#34;UTF-8&#34;</span>?&gt;
 &lt;!DOCTYPE plist PUBLIC <span class="s2">&#34;-//Apple//DTD PLIST 1.0//EN&#34;</span> <span class="s2">&#34;http://www.apple.com/DTDs/PropertyList-1.0.dtd&#34;</span>&gt;
 &lt;plist <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span>&gt;
@@ -341,8 +341,8 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 </code></pre></div><h3 id="macho---objc"><strong>macho &ndash;objc</strong></h3>
 <p>Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></p>
 <p><strong>NOTE:</strong> Currently only supports <em>64-bit</em> architechtures</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-m" data-lang="m"><span class="n">Objective</span><span class="o">-</span><span class="n">C</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-m" data-lang="m"><span class="n">Objective</span><span class="o">-</span><span class="n">C</span>
 <span class="o">==========</span><span class="p">=</span>
 
 <span class="p">@</span><span class="n">protocol</span> <span class="n">NSObject</span>
@@ -712,7 +712,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 <span class="mi">0</span><span class="n">x00000032caf</span><span class="p">:</span> <span class="n">isEqual</span><span class="p">:</span>
 </code></pre></div><h3 id="macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></h3>
 <p>Analyze FileSet entry MachO</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Exec
@@ -727,7 +727,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         <span class="nv">sz</span><span class="o">=</span>0x000000f8 <span class="nv">off</span><span class="o">=</span>0x000c7f00-0x000c7ff8 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c0bf00-0xfffffe0007c0bff8              __TEXT.__eh_frame
 &lt;SNIP&gt;
 </code></pre></div><p>Extract a fileset entry to disk</p>
-<div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry <span class="s2">&#34;com.apple.security.sandbox&#34;</span> --extract-fileset-entry
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry <span class="s2">&#34;com.apple.security.sandbox&#34;</span> --extract-fileset-entry
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> KextBundle
@@ -762,7 +762,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
             Local Reloc Entries: None
 007: LC_UUID                     08D7639F-818E-3551-9B32-0565198961A8
 008: LC_SOURCE_VERSION           1441.101.1.0.0
-</code></pre></div><div class="highlight"><pre class="chroma"><code class="language-bash" data-lang="bash">$ ll
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ll
 
 -rwxr-xr-x  <span class="m">1</span> blacktop    15M May  <span class="m">9</span> 22:08 com.apple.security.sandbox
 -rw-r--r--  <span class="m">1</span> blacktop    96M Apr <span class="m">29</span> 21:56 kernelcache.production
