@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -18,7 +19,15 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 )
+
+/*
+	NOTES:
+		- https://github.com/picklepete/pyicloud
+		- https://github.com/michaljirman/fmidevice
+		- https://github.com/majd/ipatool
+*/
 
 const (
 	betaDownloadsURL    = "https://developer.apple.com/download/"
@@ -40,24 +49,34 @@ const (
 	// TODO: flesh out the rest of the error codes
 )
 
-type config struct {
+type DevConfig struct {
+	// Login session
+	SessionID string
+	SCNT      string
+	WidgetKey string
+	// download config
+	Proxy    string
+	Insecure bool
+	// download type config
+	Beta      bool
+	WatchList []string
+	// behavior config
 	SkipAll      bool
 	RemoveCommas bool
 	PreferSMS    bool
+	PageSize     int
 }
 
 // App is the app object
 type App struct {
 	Client *http.Client
 
-	Config config
+	config *DevConfig
 
 	authService authService
 	authOptions authOptions
 	codeRequest authOptions
 	// header values
-	scnt                   string
-	xAppleIDSessionID      string
 	xAppleIDAccountCountry string
 }
 
@@ -206,58 +225,58 @@ type dload struct {
 	Files         []dfile    `json:"files,omitempty"`
 }
 
-func (app *App) updateRequestHeaders(req *http.Request) {
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-
-	req.Header.Set("X-Apple-Id-Session-Id", app.xAppleIDSessionID)
-	req.Header.Set("X-Apple-Widget-Key", app.authService.Key)
-	req.Header.Set("Scnt", app.scnt)
-
-	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
-}
-
 // NewDevPortal returns a new instance of teh dev portal app
-func NewDevPortal(proxy string, insecure, skipAll, removeCommas, sms bool) *App {
+func NewDevPortal(config *DevConfig) *App {
 	jar, _ := cookiejar.New(nil)
 
 	app := App{
 		Client: &http.Client{
 			Jar: jar,
 			Transport: &http.Transport{
-				Proxy:           GetProxy(proxy),
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+				Proxy:           GetProxy(config.Proxy),
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
 			},
 		},
-		Config: config{
-			SkipAll:      skipAll,
-			RemoveCommas: removeCommas,
-			PreferSMS:    sms,
-		},
+		config: config,
 	}
 
 	return &app
 }
 
+func (app *App) GetSessionID() string {
+	return app.config.SessionID
+}
+func (app *App) GetSCNT() string {
+	return app.config.SCNT
+}
+func (app *App) GetWidgetKey() string {
+	return app.config.WidgetKey
+}
+
 // Login to Apple
 func (app *App) Login(username, password string) error {
-
-	// TODO: add the ability to cache the session/cookies so you don't have to signin again (cronjob)
-	// if _, err := os.Stat(".devcache"); err == nil {
-	// 	cache, err := os.Open(".devcache")
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	// Decoding the serialized data
-	// 	return gob.NewDecoder(cache).Decode(&app.Client)
-	// }
 
 	if err := app.getITCServiceKey(); err != nil {
 		return err
 	}
 
+	if len(app.config.SessionID) > 0 {
+		return app.updateSession()
+	}
+
 	return app.signIn(username, password)
+}
+
+func (app *App) updateRequestHeaders(req *http.Request) {
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	req.Header.Set("X-Apple-Id-Session-Id", app.config.SessionID)
+	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
+	req.Header.Set("Scnt", app.config.SCNT)
+
+	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
 }
 
 func (app *App) getITCServiceKey() error {
@@ -283,6 +302,8 @@ func (app *App) getITCServiceKey() error {
 		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
 	}
 
+	app.config.WidgetKey = app.authService.Key
+
 	return nil
 }
 
@@ -292,7 +313,7 @@ func (app *App) signIn(username, password string) error {
 	json.NewEncoder(buf).Encode(&auth{
 		AccountName: username,
 		Password:    password,
-		RememberMe:  false,
+		RememberMe:  true,
 	})
 
 	req, err := http.NewRequest("POST", loginURL, buf)
@@ -302,7 +323,7 @@ func (app *App) signIn(username, password string) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("X-Apple-Widget-Key", app.authService.Key)
+	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
 	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
 	req.Header.Set("Accept", "application/json, text/javascript")
 
@@ -321,8 +342,8 @@ func (app *App) signIn(username, password string) error {
 
 	if response.StatusCode == 409 {
 		app.xAppleIDAccountCountry = response.Header.Get("X-Apple-Id-Account-Country")
-		app.xAppleIDSessionID = response.Header.Get("X-Apple-Id-Session-Id")
-		app.scnt = response.Header.Get("Scnt")
+		app.config.SessionID = response.Header.Get("X-Apple-Id-Session-Id")
+		app.config.SCNT = response.Header.Get("Scnt")
 
 		if err := app.getAuthOptions(); err != nil {
 			return err
@@ -358,7 +379,7 @@ func (app *App) signIn(username, password string) error {
 
 		} else { // Code is shown on trusted devices
 			codeType = "trusteddevice"
-			if app.Config.PreferSMS {
+			if app.config.PreferSMS {
 				codeType = "phone"
 				if err := app.requestCode(1); err != nil {
 					if app.codeRequest.SecurityCode.TooManyCodesSent {
@@ -372,15 +393,28 @@ func (app *App) signIn(username, password string) error {
 		}
 
 		code := ""
-		prompt := &survey.Password{
-			Message: "Please type your verification code:",
-		}
-		if err := survey.AskOne(prompt, &code); err != nil {
-			if err == terminal.InterruptErr {
-				log.Warn("Exiting...")
-				os.Exit(0)
+		// USED FOR DEBUGGING
+		// for {
+		// 	codeSTR, err := ioutil.ReadFile("CODE")
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	if len(codeSTR) > 0 {
+		// 		code = string(codeSTR)
+		// 		break
+		// 	}
+		// }
+		if len(code) == 0 {
+			prompt := &survey.Password{
+				Message: "Please type your verification code:",
 			}
-			return err
+			if err := survey.AskOne(prompt, &code); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				return err
+			}
 		}
 
 		if err := app.verifyCode(codeType, code); err != nil {
@@ -390,20 +424,6 @@ func (app *App) signIn(username, password string) error {
 		if err := app.updateSession(); err != nil {
 			return err
 		}
-
-		// TODO: add the ability to cache the session/cookies so you don't have to signin again (cronjob)
-		// NOTE: you can't serialize cookie jars (non-exported fields)
-
-		// buff := new(bytes.Buffer)
-		// enc := gob.NewEncoder(buff)
-
-		// if err := enc.Encode(app.Client); err != nil {
-		// 	return err
-		// }
-
-		// if err := ioutil.WriteFile(".devcache", buf.Bytes(), 0755); err != nil {
-		// 	return err
-		// }
 
 	} else if response.StatusCode == 200 {
 		log.Warn("not tested with (non-two-factor enabled accounts) if fails; please let author know")
@@ -540,16 +560,18 @@ func (app *App) verifyCode(codeType, code string) error {
 	log.Debugf("POST verifyCode (%d):\n%s\n", response.StatusCode, string(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
-		var svcErr serviceErrorsResponse
-		if err := json.Unmarshal(body, &svcErr); err != nil {
-			return fmt.Errorf("failed to deserialize response body JSON: %v", err)
-		}
-		if svcErr.HasError {
-			var errStr string
-			for _, svcErr := range svcErr.Errors {
-				errStr += fmt.Sprintf(": %s", svcErr.Message)
+		if len(body) > 0 {
+			var svcErr serviceErrorsResponse
+			if err := json.Unmarshal(body, &svcErr); err != nil {
+				return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 			}
-			return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
+			if svcErr.HasError {
+				var errStr string
+				for _, svcErr := range svcErr.Errors {
+					errStr += fmt.Sprintf(": %s", svcErr.Message)
+				}
+				return fmt.Errorf("failed to update to trusted session: response received %s%s", response.Status, errStr)
+			}
 		}
 
 		return fmt.Errorf("failed to verify code: response received %s", response.Status)
@@ -580,16 +602,18 @@ func (app *App) updateSession() error {
 	log.Debugf("GET updateSession: (%d):\n%s\n", response.StatusCode, string(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
-		var svcErr serviceErrorsResponse
-		if err := json.Unmarshal(body, &svcErr); err != nil {
-			return fmt.Errorf("failed to deserialize response body JSON: %v", err)
-		}
-		if svcErr.HasError {
-			var errStr string
-			for _, svcErr := range svcErr.Errors {
-				errStr += fmt.Sprintf(": %s", svcErr.Message)
+		if len(body) > 0 {
+			var svcErr serviceErrorsResponse
+			if err := json.Unmarshal(body, &svcErr); err != nil {
+				return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 			}
-			return fmt.Errorf("failed to update to trusted session: response received %s%s", response.Status, errStr)
+			if svcErr.HasError {
+				var errStr string
+				for _, svcErr := range svcErr.Errors {
+					errStr += fmt.Sprintf(": %s", svcErr.Message)
+				}
+				return fmt.Errorf("failed to update to trusted session: response received %s%s", response.Status, errStr)
+			}
 		}
 		return fmt.Errorf("failed to update to trusted session: response received %s", response.Status)
 	}
@@ -597,8 +621,46 @@ func (app *App) updateSession() error {
 	return nil
 }
 
+// Watch watches for NEW downloads
+func (app *App) Watch() error {
+
+	var prevIPSWs map[string][]DevDownload
+
+	for {
+		// scrape dev portal
+		ipsws, err := app.getDevDownloads(app.config.Beta)
+		if err != nil {
+			return err
+		}
+
+		// check for NEW downloads
+		if reflect.DeepEqual(prevIPSWs, ipsws) {
+			time.Sleep(5 * time.Minute)
+
+			if err := app.updateSession(); err != nil {
+				return err
+			}
+
+			continue
+
+		} else {
+			prevIPSWs = ipsws
+		}
+
+		for version := range ipsws {
+			if utils.StrSliceContains(app.config.WatchList, version) {
+				for _, ipsw := range ipsws[version] {
+					if err := app.Download(ipsw.URL); err != nil {
+						log.Error(err.Error())
+					}
+				}
+			}
+		}
+	}
+}
+
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
-func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
+func (app *App) DownloadPrompt(downloadType string) error {
 	isRelease := true
 
 	switch downloadType {
@@ -623,7 +685,13 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 			Options:  versions,
 			PageSize: 15,
 		}
-		survey.AskOne(promptVer, &version)
+		if err := survey.AskOne(promptVer, &version); err != nil {
+			if err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				os.Exit(0)
+			}
+			return err
+		}
 
 		if len(ipsws[version]) > 1 {
 			var choices []string
@@ -635,9 +703,15 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 			prompt := &survey.MultiSelect{
 				Message:  "Select what file(s) to download:",
 				Options:  choices,
-				PageSize: pageSize,
+				PageSize: app.config.PageSize,
 			}
-			survey.AskOne(prompt, &dfiles)
+			if err := survey.AskOne(prompt, &dfiles); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				return err
+			}
 
 			for _, df := range dfiles {
 				app.Download(ipsws[version][df].URL)
@@ -661,9 +735,12 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 		prompt := &survey.MultiSelect{
 			Message:  "Select what file(s) to download:",
 			Options:  choices,
-			PageSize: pageSize,
+			PageSize: app.config.PageSize,
 		}
-		survey.AskOne(prompt, &dfiles)
+		if err := survey.AskOne(prompt, &dfiles); err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			os.Exit(0)
+		}
 
 		for _, idx := range dfiles {
 			for _, f := range dloads.Downloads[idx].Files {
@@ -679,11 +756,11 @@ func (app *App) DownloadPrompt(downloadType string, pageSize int) error {
 func (app *App) Download(url string) error {
 
 	// proxy, insecure are null because we override the client below
-	downloader := NewDownload("", false, app.Config.SkipAll)
+	downloader := NewDownload("", false, app.config.SkipAll)
 	// use authenticated client
 	downloader.client = app.Client
 
-	destName := getDestName(url, app.Config.RemoveCommas)
+	destName := getDestName(url, app.config.RemoveCommas)
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
 
 		log.WithFields(log.Fields{
@@ -750,14 +827,14 @@ func (app *App) getDownloads() (*Downloads, error) {
 }
 
 // getDevDownloads scrapes the https://developer.apple.com/download/ page for links
-func (app *App) getDevDownloads(release bool) (map[string][]DevDownload, error) {
+func (app *App) getDevDownloads(beta bool) (map[string][]DevDownload, error) {
 	ipsws := make(map[string][]DevDownload)
 
 	var downloadURL string
-	if release {
-		downloadURL = releaseDownloadsURL
-	} else {
+	if beta {
 		downloadURL = betaDownloadsURL
+	} else {
+		downloadURL = releaseDownloadsURL
 	}
 
 	req, err := http.NewRequest("GET", downloadURL, nil)
