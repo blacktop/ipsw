@@ -30,14 +30,21 @@ import (
 
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	downloadCmd.AddCommand(devCmd)
 
-	devCmd.Flags().BoolP("sms", "", false, "Prefer SMS Two-factor authentication")
-	// devCmd.Flags().BoolP("release", "", false, "Download release OSs/Apps")
+	devCmd.Flags().StringArrayP("watch", "", []string{viper.GetString("IPSW_DEV_PORTAL_WATCH_LIST")}, "dev portal type to watch")
+
+	devCmd.Flags().BoolP("release", "", false, "Download 'Release' OSs/Apps")
+	devCmd.Flags().BoolP("beta", "", false, "Download 'Beta' OSs/Apps")
+	devCmd.Flags().BoolP("more", "", false, "Download 'More' OSs/Apps")
+
 	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
+
+	devCmd.Flags().BoolP("sms", "", false, "Prefer SMS Two-factor authentication")
 }
 
 // devCmd represents the dev command
@@ -55,43 +62,54 @@ var devCmd = &cobra.Command{
 		skipAll, _ := cmd.Flags().GetBool("skip-all")
 		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
 
-		// release, _ := cmd.Flags().GetBool("release")
-		sms, _ := cmd.Flags().GetBool("sms")
+		release, _ := cmd.Flags().GetBool("release")
+		beta, _ := cmd.Flags().GetBool("beta")
+		more, _ := cmd.Flags().GetBool("more")
+		watchList, _ := cmd.Flags().GetStringArray("watch")
 		pageSize, _ := cmd.Flags().GetInt("page")
 
-		app := download.NewDevPortal(
-			proxy,
-			insecure,
-			skipAll,
-			removeCommas,
-			sms)
+		sms, _ := cmd.Flags().GetBool("sms")
 
-		// get username
+		app := download.NewDevPortal(&download.DevConfig{
+			Proxy:        proxy,
+			Insecure:     insecure,
+			SkipAll:      skipAll,
+			RemoveCommas: removeCommas,
+			PreferSMS:    sms,
+			PageSize:     pageSize,
+			Beta:         beta,
+			WatchList:    watchList,
+		})
+
 		username := os.Getenv("IPSW_DEV_USERNAME")
-		if len(username) == 0 {
-			prompt := &survey.Input{
-				Message: "Please type your username:",
-			}
-			if err := survey.AskOne(prompt, &username); err != nil {
-				if err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					os.Exit(0)
-				}
-				log.Fatal(err.Error())
-			}
-		}
-		// get password
 		password := os.Getenv("IPSW_DEV_PASSWORD")
-		if len(password) == 0 {
-			prompt := &survey.Password{
-				Message: "Please type your password:",
-			}
-			if err := survey.AskOne(prompt, &password); err != nil {
-				if err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					os.Exit(0)
+
+		if len(viper.GetString("session_id")) == 0 {
+			// get username
+			if len(username) == 0 {
+				prompt := &survey.Input{
+					Message: "Please type your username:",
 				}
-				log.Fatal(err.Error())
+				if err := survey.AskOne(prompt, &username); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					log.Fatal(err.Error())
+				}
+			}
+			// get password
+			if len(password) == 0 {
+				prompt := &survey.Password{
+					Message: "Please type your password:",
+				}
+				if err := survey.AskOne(prompt, &password); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					log.Fatal(err.Error())
+				}
 			}
 		}
 
@@ -99,14 +117,36 @@ var devCmd = &cobra.Command{
 			log.Fatal(err.Error())
 		}
 
-		dlType := ""
-		prompt := &survey.Select{
-			Message: "Choose a download type:",
-			Options: []string{"beta", "release", "more"},
+		if len(watchList) > 0 {
+			if err := app.Watch(); err != nil {
+				log.Fatal(err.Error())
+			}
 		}
-		survey.AskOne(prompt, &dlType)
 
-		if err := app.DownloadPrompt(dlType, pageSize); err != nil {
+		dlType := ""
+		if release {
+			dlType = "release"
+		} else if beta {
+			dlType = "beta"
+		} else if more {
+			dlType = "more"
+		} else {
+
+			prompt := &survey.Select{
+				Message: "Choose a download type:",
+				Options: []string{"beta", "release", "more"},
+			}
+			if err := survey.AskOne(prompt, &dlType); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				log.Fatal(err.Error())
+			}
+
+		}
+
+		if err := app.DownloadPrompt(dlType); err != nil {
 			log.Fatal(err.Error())
 		}
 	},
