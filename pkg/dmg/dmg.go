@@ -15,7 +15,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-plist"
-	"github.com/blacktop/ipsw/pkg/lzfse"
+	lzfse "github.com/blacktop/lzfse-cgo"
 	"github.com/vbauerster/mpb/v7"
 	"github.com/vbauerster/mpb/v7/decor"
 )
@@ -292,11 +292,11 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 			if _, err := b.sr.ReadAt(buff, int64(chunk.CompressedOffset)); err != nil {
 				return err
 			}
-			dec, err := lzfse.NewDecoder(buff).DecodeBuffer() // FIXME: this is slow as sh1zzzzzz
-			if err != nil {
-				return err
-			}
-			n, err = w.Write(dec)
+			// dec, err := lzfse.NewDecoder(buff).DecodeBuffer() // FIXME: this is slow as sh1zzzzzz
+			// if err != nil {
+			// 	return err
+			// }
+			n, err = w.Write(lzfse.DecodeBuffer(buff))
 			if err != nil {
 				return err
 			}
