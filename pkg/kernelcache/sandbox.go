@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-arm64"
+	arm64 "github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
 )
@@ -98,7 +98,7 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 // TODO: finish this (make it so when I look at it I don't want to 🤮)
 func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error) {
 	var profiles []byte
-	var sandboxKextStartVaddr uint64
+	// var sandboxKextStartVaddr uint64
 	var sandboxKextStartOffset uint64
 	var sandboxKextEndVaddr uint64
 
@@ -157,43 +157,47 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 		return nil, err
 	}
 
-	var prevInstruction arm64.Instruction
+	instructions, err := arm64.GetInstructions(sandboxInfo.StartAddr, sbInstrData)
+	if err != nil {
+		return nil, err
+	}
+
+	var prevInstruction *arm64.Instruction
 
 	references := make(map[uint64]uint64)
 
 	// extract all immediates
-	for i := range arm64.Disassemble(bytes.NewReader(sbInstrData), arm64.Options{StartAddress: int64(sandboxInfo.StartAddr)}) {
+	for idx, i := range instructions {
 
-		if i.Error != nil {
-			continue
+		if idx > 0 {
+			prevInstruction = instructions[idx-1]
 		}
 
-		operation := i.Instruction.Operation().String()
+		operation := i.Operation.String()
 
-		if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
-			if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
-				adrpRegister := prevInstruction.Operands()[0].Reg[0]
-				adrpImm := prevInstruction.Operands()[1].Immediate
-				if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
+		if (operation == "ldr" || operation == "add") && prevInstruction.Operation.String() == "adrp" {
+			if operands := i.Operands; operands != nil && prevInstruction.Operands != nil {
+				adrpRegister := prevInstruction.Operands[0].Registers[0]
+				adrpImm := prevInstruction.Operands[1].Immediate
+				if operation == "ldr" && adrpRegister == operands[1].Registers[0] {
 					adrpImm += operands[1].Immediate
-				} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
+				} else if operation == "add" && adrpRegister == operands[1].Registers[0] {
 					adrpImm += operands[2].Immediate
 				}
-				references[i.Instruction.Address()] = adrpImm
+				references[i.Address] = adrpImm
 			}
 		}
 		if operation == "cbnz" {
-			if operands := i.Instruction.Operands(); operands != nil {
+			if operands := i.Operands; operands != nil {
 				for _, operand := range operands {
-					if operand.OpClass == arm64.LABEL {
-						references[i.Instruction.Address()] = operand.Immediate
+					if operand.Class == arm64.LABEL {
+						references[i.Address] = operand.Immediate
 					}
 				}
 			}
 		}
 
-		// fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), i.Instruction.OpStr())
-		prevInstruction = *i.Instruction
+		// log.Debugf("%#08x:  %s\t%s", i.Address, i.OpCodes(), i)
 	}
 
 	var panicXrefVMAddr uint64
@@ -209,9 +213,14 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 		return nil, fmt.Errorf("failed to find Xrefs to the panic cstring")
 	}
 
+	panicBlock, err := instructions.GetAddressBlock(panicXrefVMAddr)
+	if err != nil {
+		return nil, err
+	}
+
 	var failXrefVMAddr uint64
 	for k, v := range references {
-		if v == panicXrefVMAddr {
+		if v == panicBlock[0].Address {
 			failXrefVMAddr = k
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Failure path Xref %#x => %#x", failXrefVMAddr, v))
 			break
@@ -222,52 +231,54 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 		return nil, fmt.Errorf("failed to find failure path Xrefs to the panic")
 	}
 
+	sandboxDataBlock, err := instructions.GetAddressBlock(failXrefVMAddr)
+	if err != nil {
+		return nil, err
+	}
+
 	var profileVMAddr uint64
 	var profileSize uint64
 
-	for i := range arm64.Disassemble(bytes.NewReader(sbInstrData), arm64.Options{StartAddress: int64(sandboxKextStartVaddr)}) {
+	for idx, i := range sandboxDataBlock {
 
-		if i.Error != nil {
+		log.Debugf("%#08x:  %s\t%s", i.Address, i.OpCodes(), i)
+
+		if idx == 0 {
 			continue
 		}
 
-		operation := i.Instruction.Operation().String()
+		prevInstruction = sandboxDataBlock[idx-1]
 
-		// TODO: identify basic blocks so I could only disass the block that contains the Xref
-		if failXrefVMAddr-0x20 < i.Instruction.Address() && i.Instruction.Address() < failXrefVMAddr {
-			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
-				if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
-					adrpRegister := prevInstruction.Operands()[0].Reg[0]
-					adrpImm := prevInstruction.Operands()[1].Immediate
-					if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
-						adrpImm += operands[1].Immediate
-					} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
-						adrpImm += operands[2].Immediate
-					}
-					profileVMAddr = adrpImm
-				}
-			} else if operation == "mov" {
-				if operands := i.Instruction.Operands(); operands != nil {
-					for _, operand := range operands {
-						if operand.OpClass == arm64.IMM64 {
-							profileSize = operand.Immediate
-						}
-					}
-				}
-			} else if operation == "movk" && prevInstruction.Operation().String() == "mov" {
-				if operands := i.Instruction.Operands(); operands != nil && prevInstruction.Operands() != nil {
-					movRegister := prevInstruction.Operands()[0].Reg[0]
-					movImm := prevInstruction.Operands()[1].Immediate
-					if movRegister == operands[0].Reg[0] {
-						if operands[1].OpClass == arm64.IMM32 && operands[1].ShiftType == arm64.SHIFT_LSL {
-							profileSize = movImm + (operands[1].Immediate << uint64(operands[1].ShiftValue))
-						}
+		operation := i.Operation.String()
+
+		if (operation == "ldr" || operation == "add") && prevInstruction.Operation.String() == "adrp" {
+			adrpRegister := prevInstruction.Operands[0].Registers[0]
+			adrpImm := prevInstruction.Operands[1].Immediate
+			if operation == "ldr" && adrpRegister == i.Operands[1].Registers[0] {
+				adrpImm += i.Operands[1].Immediate
+			} else if operation == "add" && adrpRegister == i.Operands[1].Registers[0] {
+				adrpImm += i.Operands[2].Immediate
+			}
+			if i.Operands[0].Registers[0] == arm64.REG_X1 { // ARG 2
+				profileVMAddr = adrpImm
+			}
+		} else if operation == "mov" {
+			if operands := i.Operands; operands != nil {
+				for _, operand := range operands {
+					if operand.Class == arm64.IMM64 {
+						profileSize = operand.Immediate
 					}
 				}
 			}
+		} else if operation == "movk" && prevInstruction.Operation.String() == "mov" {
+			movRegister := prevInstruction.Operands[0].Registers[0]
+			movImm := prevInstruction.Operands[1].Immediate
+			if movRegister == i.Operands[0].Registers[0] {
+				if i.Operands[1].Class == arm64.IMM32 && i.Operands[1].ShiftType == arm64.SHIFT_TYPE_LSL {
+					profileSize = movImm + (i.Operands[1].Immediate << uint64(i.Operands[1].ShiftValue))
+				}
+			}
 		}
-
-		prevInstruction = *i.Instruction
 	}
 
 	utils.Indent(log.WithFields(log.Fields{
