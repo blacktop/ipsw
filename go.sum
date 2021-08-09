@@ -74,8 +74,8 @@ github.com/aws/aws-sdk-go v1.20.6/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN
 github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59/go.mod h1:q/89r3U2H7sSsE2t6Kca0lfwTK8JdoNGS/yzM/4iH5I=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
-github.com/blacktop/arm64-cgo v1.0.23 h1:NxAJ490GpIzH6V9u8Ez+ng636WsJT1AnQLFUMDJH7Dc=
-github.com/blacktop/arm64-cgo v1.0.23/go.mod h1:YJFf35tuCTSPYfofBYNZ1104477y/Epoa1fzoCB19Fk=
+github.com/blacktop/arm64-cgo v1.0.24 h1:WL4WOotutIXK+9a2lHlHLsVtR72gfS+aq+TVc5EXdL4=
+github.com/blacktop/arm64-cgo v1.0.24/go.mod h1:YJFf35tuCTSPYfofBYNZ1104477y/Epoa1fzoCB19Fk=
 github.com/blacktop/go-arm64 v0.6.18 h1:QzQaqkZ61nN9fP04Q0SrHv4e7Ln0hMTYgfR7hzxeUiE=
 github.com/blacktop/go-arm64 v0.6.18/go.mod h1:MadXPi/vTAx0FYNcQllHRMZrRRuwPfjzhr7d1UUWQc0=
 github.com/blacktop/go-macho v1.1.45 h1:UifkEaM3QGMRPpXjbX1my3+cy+udQYwIGybeDJuEebg=

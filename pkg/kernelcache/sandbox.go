@@ -96,7 +96,7 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 }
 
 // TODO: finish this (make it so when I look at it I don't want to 🤮)
-func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error) {
+func getSandboxData(m *macho.File, r *bytes.Reader, panic string, dataRegister arm64.Register) ([]byte, error) {
 	var profiles []byte
 	// var sandboxKextStartVaddr uint64
 	var sandboxKextStartOffset uint64
@@ -127,7 +127,6 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 
 	var sandboxInfo KmodInfoT
 	for idx, info := range infos {
-		// for _, info := range infos {
 		if strings.Contains(string(info.Name[:]), "sandbox") {
 			log.Debug(info.String())
 			sandboxInfo = info
@@ -259,7 +258,7 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 			} else if operation == "add" && adrpRegister == i.Operands[1].Registers[0] {
 				adrpImm += i.Operands[2].Immediate
 			}
-			if i.Operands[0].Registers[0] == arm64.REG_X1 { // ARG 2
+			if i.Operands[0].Registers[0] == dataRegister { // sandbox data array ARG
 				profileVMAddr = adrpImm
 			}
 		} else if operation == "mov" {
@@ -303,13 +302,13 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	log.Info("Searching for sandbox profile data")
 	// return getSandboxData(m, r, "\"failed to initialize platform sandbox\"")
-	return getSandboxData(m, r, "\"failed to initialize platform sandbox: %d\" @%s:%d")
+	return getSandboxData(m, r, "\"failed to initialize platform sandbox: %d\" @%s:%d", arm64.REG_X1)
 }
 
 func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	log.Info("Searching for sandbox collection data")
 	// return getSandboxData(m, r, "\"failed to initialize collection\"")
-	return getSandboxData(m, r, "\"failed to initialize builtin collection: %d\" @%s:%d")
+	return getSandboxData(m, r, "\"failed to initialize builtin collection: %d\" @%s:%d", arm64.REG_X2)
 }
 
 func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {

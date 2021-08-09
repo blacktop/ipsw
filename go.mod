@@ -7,7 +7,7 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20210722184520-ef0bf57d82b3 // indirect
 	github.com/PuerkitoBio/goquery v1.7.1
 	github.com/apex/log v1.9.0
-	github.com/blacktop/arm64-cgo v1.0.23
+	github.com/blacktop/arm64-cgo v1.0.24
 	github.com/blacktop/go-arm64 v0.6.18
 	github.com/blacktop/go-macho v1.1.45
 	github.com/blacktop/go-plist v1.0.0
