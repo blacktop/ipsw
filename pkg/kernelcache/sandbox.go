@@ -1,3 +1,5 @@
+// +build cgo
+
 package kernelcache
 
 import (
@@ -113,7 +115,7 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string, dataRegister a
 	utils.Indent(log.WithFields(log.Fields{
 		"vmaddr": fmt.Sprintf("%#x", panicStrVMAddr),
 		"offset": fmt.Sprintf("%#x", panicStrOffset),
-	}).Debug, 2)(fmt.Sprintf("Found: %v", panic))
+	}).Debug, 2)(fmt.Sprintf("Found: %#v", panic))
 
 	startAdders, err := getKextStartVMAddrs(m)
 	if err != nil {
@@ -161,42 +163,40 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string, dataRegister a
 		return nil, err
 	}
 
-	var prevInstruction *arm64.Instruction
+	var prev *arm64.Instruction
 
 	references := make(map[uint64]uint64)
 
 	// extract all immediates
 	for idx, i := range instructions {
 
-		if idx > 0 {
-			prevInstruction = instructions[idx-1]
-		}
-
-		operation := i.Operation.String()
-
-		if (operation == "ldr" || operation == "add") && prevInstruction.Operation.String() == "adrp" {
-			if operands := i.Operands; operands != nil && prevInstruction.Operands != nil {
-				adrpRegister := prevInstruction.Operands[0].Registers[0]
-				adrpImm := prevInstruction.Operands[1].Immediate
-				if operation == "ldr" && adrpRegister == operands[1].Registers[0] {
-					adrpImm += operands[1].Immediate
-				} else if operation == "add" && adrpRegister == operands[1].Registers[0] {
-					adrpImm += operands[2].Immediate
-				}
-				references[i.Address] = adrpImm
-			}
-		}
-		if operation == "cbnz" {
-			if operands := i.Operands; operands != nil {
-				for _, operand := range operands {
-					if operand.Class == arm64.LABEL {
-						references[i.Address] = operand.Immediate
-					}
-				}
-			}
-		}
-
 		// log.Debugf("%#08x:  %s\t%s", i.Address, i.OpCodes(), i)
+
+		if idx == 0 {
+			continue
+		}
+
+		prev = instructions[idx-1]
+
+		op := i.Operation.String()
+
+		if prev.Operation.String() == "adrp" && (op == "ldr" || op == "add") {
+			adrpRegister := prev.Operands[0].Registers[0]
+			adrpImm := prev.Operands[1].Immediate
+			if op == "ldr" && adrpRegister == i.Operands[1].Registers[0] {
+				adrpImm += i.Operands[1].Immediate
+			} else if op == "add" && adrpRegister == i.Operands[1].Registers[0] {
+				adrpImm += i.Operands[2].Immediate
+			}
+			references[i.Address] = adrpImm
+
+		} else if op == "cbnz" {
+			for _, operand := range i.Operands {
+				if operand.Class == arm64.LABEL {
+					references[i.Address] = operand.Immediate
+				}
+			}
+		}
 	}
 
 	var panicXrefVMAddr uint64
@@ -246,32 +246,32 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string, dataRegister a
 			continue
 		}
 
-		prevInstruction = sandboxDataBlock[idx-1]
+		prev = sandboxDataBlock[idx-1]
 
-		operation := i.Operation.String()
+		op := i.Operation.String()
 
-		if (operation == "ldr" || operation == "add") && prevInstruction.Operation.String() == "adrp" {
-			adrpRegister := prevInstruction.Operands[0].Registers[0]
-			adrpImm := prevInstruction.Operands[1].Immediate
-			if operation == "ldr" && adrpRegister == i.Operands[1].Registers[0] {
+		if prev.Operation.String() == "adrp" && (op == "ldr" || op == "add") {
+			adrpRegister := prev.Operands[0].Registers[0]
+			adrpImm := prev.Operands[1].Immediate
+			if op == "ldr" && adrpRegister == i.Operands[1].Registers[0] {
 				adrpImm += i.Operands[1].Immediate
-			} else if operation == "add" && adrpRegister == i.Operands[1].Registers[0] {
+			} else if op == "add" && adrpRegister == i.Operands[1].Registers[0] {
 				adrpImm += i.Operands[2].Immediate
 			}
 			if i.Operands[0].Registers[0] == dataRegister { // sandbox data array ARG
 				profileVMAddr = adrpImm
 			}
-		} else if operation == "mov" {
-			if operands := i.Operands; operands != nil {
-				for _, operand := range operands {
-					if operand.Class == arm64.IMM64 {
-						profileSize = operand.Immediate
-					}
+
+		} else if op == "mov" {
+			for _, operand := range i.Operands {
+				if operand.Class == arm64.IMM64 {
+					profileSize = operand.Immediate
 				}
 			}
-		} else if operation == "movk" && prevInstruction.Operation.String() == "mov" {
-			movRegister := prevInstruction.Operands[0].Registers[0]
-			movImm := prevInstruction.Operands[1].Immediate
+
+		} else if prev.Operation.String() == "mov" && op == "movk" {
+			movRegister := prev.Operands[0].Registers[0]
+			movImm := prev.Operands[1].Immediate
 			if movRegister == i.Operands[0].Registers[0] {
 				if i.Operands[1].Class == arm64.IMM32 && i.Operands[1].ShiftType == arm64.SHIFT_TYPE_LSL {
 					profileSize = movImm + (i.Operands[1].Immediate << uint64(i.Operands[1].ShiftValue))

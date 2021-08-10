@@ -1,3 +1,5 @@
+// +build cgo
+
 /*
 Copyright © 2021 blacktop
 
