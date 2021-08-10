@@ -300,13 +300,13 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string, dataRegister a
 }
 
 func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
-	log.Info("Searching for sandbox profile data")
+	log.Info("Searching for sandbox platform_profile_data")
 	// return getSandboxData(m, r, "\"failed to initialize platform sandbox\"")
-	return getSandboxData(m, r, "\"failed to initialize platform sandbox: %d\" @%s:%d", arm64.REG_X1)
+	return getSandboxData(m, r, "\"failed to initialize platform sandbox: %d\" @%s:%d", arm64.REG_X1) // _profile_init(_platform_profile, _platform_profile_data, data_size);
 }
 
 func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
-	log.Info("Searching for sandbox collection data")
+	log.Info("Searching for sandbox collection_data")
 	// return getSandboxData(m, r, "\"failed to initialize collection\"")
 	return getSandboxData(m, r, "\"failed to initialize builtin collection: %d\" @%s:%d", arm64.REG_X2)
 }
