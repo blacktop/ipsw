@@ -169,6 +169,7 @@ var machoCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
+					log.Infof("Created %s", filepath.Join(filepath.Dir(machoPath), filesetEntry))
 				}
 
 			} else {
