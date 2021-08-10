@@ -661,14 +661,14 @@ func (app *App) Watch() error {
 
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
 func (app *App) DownloadPrompt(downloadType string) error {
-	isRelease := true
+	isBeta := false
 
 	switch downloadType {
 	case "beta":
-		isRelease = false
+		isBeta = true
 		fallthrough
 	case "release":
-		ipsws, err := app.getDevDownloads(isRelease)
+		ipsws, err := app.getDevDownloads(isBeta)
 		if err != nil {
 			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 		}
