@@ -141,16 +141,6 @@ func (i *Info) String() string {
 		}
 		iStr += fmt.Sprintf("\n%s\n", prodName)
 		iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
-		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
-			iStr += fmt.Sprintf("   - BootLoaders\n")
-			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
-				if _, key, err := getT8030ApFirmwareKey(dt.Model, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
-					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
-				} else {
-					iStr += fmt.Sprintf("       * %s 🔑 -> %s\n", filepath.Base(bl), key)
-				}
-			}
-		}
 		if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
 			iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
 		}
@@ -159,6 +149,16 @@ func (i *Info) String() string {
 				if strings.ToLower(device.BoardConfig) == strings.ToLower(dt.BoardConfig) {
 					proc := getProcessor(device.Platform)
 					iStr += fmt.Sprintf("   - CPU: %s (%s), ID: %s\n", proc.Name, proc.CPUISA, device.Platform)
+				}
+			}
+		}
+		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
+			iStr += fmt.Sprintf("   - BootLoaders\n")
+			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
+				if _, key, err := getT8030ApFirmwareKey(dt.Model, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
+					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
+				} else {
+					iStr += fmt.Sprintf("       * %s 🔑 -> %s\n", filepath.Base(bl), key)
 				}
 			}
 		}
