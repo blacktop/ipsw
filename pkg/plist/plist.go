@@ -150,6 +150,22 @@ func (b *BuildManifest) GetKernelCaches() map[string][]string {
 	return kernelCaches
 }
 
+func (b *BuildManifest) GetBootLoaders() map[string][]string {
+	bootLoaders := make(map[string][]string, len(b.BuildIdentities))
+	for _, bID := range b.BuildIdentities {
+		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path) {
+			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path)
+		} else if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
+			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path)
+		} else if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
+			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path)
+		} else if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
+			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path)
+		}
+	}
+	return bootLoaders
+}
+
 func (i *Plists) String() string {
 	var iStr string
 	iStr += fmt.Sprintf(
