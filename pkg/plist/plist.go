@@ -155,11 +155,14 @@ func (b *BuildManifest) GetBootLoaders() map[string][]string {
 	for _, bID := range b.BuildIdentities {
 		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path) {
 			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path)
-		} else if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
+		}
+		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
 			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path)
-		} else if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
+		}
+		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
 			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path)
-		} else if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
+		}
+		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
 			bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path)
 		}
 	}
