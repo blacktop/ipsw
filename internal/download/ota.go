@@ -34,6 +34,7 @@ const (
 	audienceiOS_14DeveloperBeta   = "dbbb0481-d521-4cdf-a2a4-5358affc224b" // iOS 14 developer beta
 	audienceiOS_14PublicBeta      = "84da8706-e267-4554-8207-865ae0c3a120" // iOS 14 public beta
 	audienceiOS_15DeveloperBeta   = "ce48f60c-f590-4157-a96f-41179ca08278" // iOS 15 developer beta
+	audienceiOS_15PublicBeta      = "9e12a7a5-36ac-4583-b4fb-484736c739a8" // iOS 15 public beta
 	audienceTvOSRelease           = "356d9da0-eee4-4c6c-bbe5-99b60eadddf0" // tvOS release
 	audienceTvOS_11Beta           = "ebd90ea1-6216-4a7c-920e-666faccb2d50" // tvOS 11 beta (returns 404)
 	audienceTvOS_12Beta           = "5b220c65-fe50-460b-bac5-b6774b2ff475" // tvOS 12 beta
