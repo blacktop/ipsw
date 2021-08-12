@@ -5,11 +5,15 @@ import (
 	"crypto/sha1"
 	"crypto/tls"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
+	"strings"
+	"syscall"
 	"time"
 
 	// "github.com/gofrs/flock"
@@ -37,6 +41,23 @@ type Download struct {
 	client *http.Client
 }
 
+type geoQuery struct {
+	Query       string `json:"query,omitempty"`
+	Status      string `json:"status,omitempty"`
+	Country     string `json:"country,omitempty"`
+	CountryCode string `json:"country_code,omitempty"`
+	Region      string `json:"region,omitempty"`
+	RegionName  string `json:"region_name,omitempty"`
+	City        string `json:"city,omitempty"`
+	Zip         string `json:"zip,omitempty"`
+	Lat         string `json:"lat,omitempty"`
+	Lon         string `json:"lon,omitempty"`
+	Timezone    string `json:"timezone,omitempty"`
+	Isp         string `json:"isp,omitempty"`
+	Org         string `json:"org,omitempty"`
+	As          string `json:"as,omitempty"`
+}
+
 // NewDownload creates a new downloader
 func NewDownload(proxy string, insecure, skipAll bool) *Download {
 	return &Download{
@@ -46,8 +67,10 @@ func NewDownload(proxy string, insecure, skipAll bool) *Download {
 		skipAll: skipAll,
 		client: &http.Client{
 			Transport: &http.Transport{
-				Proxy:           GetProxy(proxy),
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+				Proxy:             GetProxy(proxy),
+				TLSClientConfig:   &tls.Config{InsecureSkipVerify: insecure},
+				MaxConnsPerHost:   50,
+				ForceAttemptHTTP2: true,
 			},
 		},
 	}
@@ -154,10 +177,31 @@ func (d *Download) Do() error {
 		}
 	}
 
+	trace := &httptrace.ClientTrace{
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			addr := connInfo.Conn.RemoteAddr().String()
+			addr = strings.Split(addr, ":")[0]
+			res, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s", addr))
+			if err != nil {
+				log.Error("failed to lookup IP's geolocation")
+			}
+			defer res.Body.Close()
+			data := &geoQuery{}
+			json.NewDecoder(res.Body).Decode(data)
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("URL resolved to: %s (%s - %s, %s. %s)", addr, data.Org, data.City, data.Region, data.Country))
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+
 	utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Downloading")
 	resp, err := d.client.Do(req)
 	if err != nil {
-		return err
+		if errors.Is(err, syscall.ECONNRESET) {
+			utils.Indent(log.Error, 2)(fmt.Sprintf("CONNECTION RESET: %v", err))
+			utils.Indent(log.Warn, 3)("trying again...")
+			return d.Do()
+		}
+		return fmt.Errorf("failed to download file: %v", err)
 	}
 	defer resp.Body.Close()
 
