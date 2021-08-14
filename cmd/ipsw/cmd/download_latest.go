@@ -72,11 +72,11 @@ var latestCmd = &cobra.Command{
 		}
 
 		if iosInfo {
-			latestVersion, err := itunes.GetLatestVersion()
+			assets, err := download.GetAssetSets()
 			if err != nil {
 				return errors.Wrap(err, "failed to get latest iOS version")
 			}
-			fmt.Print(latestVersion)
+			fmt.Print(assets.Latest("iOS"))
 			return nil
 		}
 
