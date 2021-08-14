@@ -27,6 +27,7 @@ import (
 		- https://github.com/picklepete/pyicloud
 		- https://github.com/michaljirman/fmidevice
 		- https://github.com/majd/ipatool
+		- https://jpmens.net/2021/04/18/storing-passwords-in-macos-keychain/
 */
 
 const (
