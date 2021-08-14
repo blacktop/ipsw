@@ -16,6 +16,16 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
+/*
+	NOTES:
+		- https://github.com/dionthegod/XNUSandbox
+		- https://github.com/sektioneins/sandbox_toolkit/blob/master/sb2dot/sb2dot.py
+		- https://github.com/zcutlip/ios13-sandbox-profile-format
+		- https://github.com/malus-security/sandblaster
+		- https://arxiv.org/pdf/1608.04303.pdf
+		- https://speakerdeck.com/argp/vs-com-dot-apple-dot-security-dot-sandbox
+*/
+
 type Sandbox struct {
 	Globals  map[uint16]string
 	Regexes  map[uint16][]byte
