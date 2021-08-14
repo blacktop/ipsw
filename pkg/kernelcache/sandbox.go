@@ -24,6 +24,8 @@ import (
 		- https://github.com/malus-security/sandblaster
 		- https://arxiv.org/pdf/1608.04303.pdf
 		- https://speakerdeck.com/argp/vs-com-dot-apple-dot-security-dot-sandbox
+		- https://developer.apple.com/library/archive/documentation/Security/Conceptual/AppSandboxDesignGuide/AboutAppSandbox/AboutAppSandbox.html
+		- https://developer.apple.com/library/archive/documentation/Security/Conceptual/AppSandboxDesignGuide/AppSandboxInDepth/AppSandboxInDepth.html
 */
 
 type Sandbox struct {
