@@ -12,6 +12,8 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download beta**](#download-beta)
 - [**download ota**](#download-ota)
 - [**download macos**](#download-macos)
+- [**download dev**](#download-dev)
+- [**download oss**](#download-oss)
 
 ---
 
@@ -229,4 +231,92 @@ $ ipsw download macos --kernel
       • Writing MacBookPro17,1_J293AP_20D91/kernelcache.production
       • Writing MacBookAir10,1_J313AP_20D91/kernelcache.production
       • Writing iProd99,1_T485AP_20D91/kernelcache.production
+```
+
+## **download dev**
+
+Download IPSWs (and more) from https://developer.apple.com/download
+
+```bash
+❯ ipsw download dev
+
+? Please type your username: blacktop
+? Please type your password: ***********************************
+? Please type your verification code: ******
+? Choose a download type: "beta"
+? Choose an OS version: "macOS Monterey beta 2"
+? Select what file(s) to download: "Mac computers with the M1 chip"
+
+   • Downloading               file="UniversalMac_12.0_21A5268h_Restore.ipsw"
+        65.9 MiB / 12.8 GiB [----------------------------------------------------------| 2h20m56s ]  1.54 MiB/s
+```
+
+Watch for 🆕 **beta** IPSWs
+
+```bash
+ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
+? Please type your username: blacktop
+? Please type your password: ***********************************
+? Please type your verification code: ******
+   • Downloading               file=iPhone11,8,iPhone12,1_15.0_19A5307g_Restore.ipsw
+	6.1 GiB / 6.1 GiB [==========================================================| ✅  ]  4.15 MiB/s
+   <SNIP>
+```
+
+> **NOTE:** This will check every 5 minutes for new files and download them.
+
+## **download oss**
+
+> Download [opensource.apple.com](https://opensource.apple.com) file for macOS version
+
+Download them all
+
+```
+❯ ipsw download oss --macos 11.4 --all
+```
+
+Download single product
+
+```
+❯ ipsw download oss --macos 11.4 --product dyld
+```
+
+List all downloads
+
+```
+❯ ipsw download oss --macos 11.4
+```
+
+```json
+{
+   "build": "GoldenGateF20F71",
+   "inherits": "GoldenGateE20E232",
+   "projects": {
+      "AppleFileSystemDriver": {
+         "version": "27",
+         "url": "https://opensource.apple.com/tarballs/AppleFileSystemDriver/AppleFileSystemDriver-27.tar.gz"
+      },
+      <SNIP>
+      "xar": {
+         "version": "452",
+         "url": "https://opensource.apple.com/tarballs/xar/xar-452.tar.gz"
+      },
+      "xnu": {
+         "version": "7195.121.3",
+         "url": "https://opensource.apple.com/tarballs/xnu/xnu-7195.121.3.tar.gz"
+      },
+      "zip": {
+         "version": "18",
+         "url": "https://opensource.apple.com/tarballs/zip/zip-18.tar.gz"
+      },
+      "zlib": {
+         "version": "76",
+         "url": "https://opensource.apple.com/tarballs/zlib/zlib-76.tar.gz"
+      },
+      "zsh": {
+         "version": "87",
+         "url": "https://opensource.apple.com/tarballs/zsh/zsh-87.tar.gz"
+      }
+   }
+}
 ```

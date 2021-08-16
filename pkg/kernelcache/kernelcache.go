@@ -15,6 +15,7 @@ import (
 	"github.com/apex/log"
 	// lzfse "github.com/blacktop/go-lzfse"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/lzfse"
@@ -204,6 +205,8 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 		cc.Data = buffer.Next(int(lzssHeader.CompressedSize))
 		dec := lzss.Decompress(cc.Data)
 		return dec[:], nil
+	} else if types.Magic(binary.LittleEndian.Uint64(cc.Data[0:8])) == types.Magic64 { // uncompressed
+		return cc.Data, nil
 	}
 
 	return []byte{}, errors.New("unsupported compression")

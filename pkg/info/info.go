@@ -20,8 +20,19 @@ var (
 	//go:embed data/procs.json
 	procsData []byte
 	//go:embed data/firmware_keys.json
-	keysJsonData []byte
+	keysJSONData []byte
+	//go:embed data/t8030_ap_keys.json
+	t8030APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/2b8c2d6d37da5a04a222469987fcfa2b
 )
+
+type t8030APKey struct {
+	Device   string
+	Build    string
+	Type     string
+	Filename string
+	KBag     string
+	Key      string
+}
 
 // Info in the info object
 type Info struct {
@@ -67,12 +78,29 @@ func getProcessor(cpuid string) processors {
 func getFirmwareKeys(device, build string) map[string]string {
 	var keys map[string]map[string]map[string]string
 
-	err := json.Unmarshal(keysJsonData, &keys)
+	err := json.Unmarshal(keysJSONData, &keys)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return keys[device][build]
+}
+
+func getT8030ApFirmwareKey(device, build, filename string) (string, string, error) {
+	var keys []t8030APKey
+
+	err := json.Unmarshal(t8030APKeysJSONData, &keys)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, key := range keys {
+		if key.Device == device && key.Build == build && key.Filename == filename {
+			return key.KBag, key.Key, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("failed to find key for device: %s, build: %s, filename: %s", device, build, filename)
 }
 
 func (i *Info) String() string {
@@ -92,6 +120,7 @@ func (i *Info) String() string {
 		}
 	}
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
+	bls := i.Plists.BuildManifest.GetBootLoaders()
 	iStr += fmt.Sprintf("\nDevices\n")
 	iStr += fmt.Sprintf("-------\n")
 	for _, dtree := range i.DeviceTrees {
@@ -112,12 +141,24 @@ func (i *Info) String() string {
 		}
 		iStr += fmt.Sprintf("\n%s\n", prodName)
 		iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
-		iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
+		if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
+			iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
+		}
 		if i.Plists.Restore != nil {
 			for _, device := range i.Plists.Restore.DeviceMap {
 				if strings.ToLower(device.BoardConfig) == strings.ToLower(dt.BoardConfig) {
 					proc := getProcessor(device.Platform)
 					iStr += fmt.Sprintf("   - CPU: %s (%s), ID: %s\n", proc.Name, proc.CPUISA, device.Platform)
+				}
+			}
+		}
+		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
+			iStr += fmt.Sprintf("   - BootLoaders\n")
+			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
+				if _, key, err := getT8030ApFirmwareKey(dt.Model, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
+					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
+				} else {
+					iStr += fmt.Sprintf("       * %s 🔑 -> %s\n", filepath.Base(bl), key)
 				}
 			}
 		}

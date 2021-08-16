@@ -9,20 +9,34 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
+
+// ErrNoLocals is the error for a shared cache that has no LocalSymbolsOffset
+var ErrNoLocals = errors.New("dyld shared cache does NOT contain local symbols info")
+
+// ErrNoExportTrieInCache is the error for a shared cache that has no LocalSymbolsOffset
+var ErrNoExportTrieInCache = errors.New("dyld shared cache does NOT contain export trie info")
+
+// ErrNoExportTrieInMachO is the error for a shared cache that has no LocalSymbolsOffset
+var ErrNoExportTrieInMachO = errors.New("dylib does NOT contain export trie info")
+var ErrSymbolNotInImage = errors.New("dylib does NOT contain symbol")
 
 // ParseLocalSyms parses dyld's private symbols
 func (f *File) ParseLocalSyms() error {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
-		return fmt.Errorf("dyld shared cache does not contain local symbols info")
+		return fmt.Errorf("failed to parse local syms: %w", ErrNoLocals)
 	}
 
 	stringPool := io.NewSectionReader(f.r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
@@ -57,7 +71,8 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 		sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 		if f.LocalSymbolsOffset == 0 {
-			return fmt.Errorf("dyld shared cache does not contain local symbols info")
+			image.Analysis.State.SetPrivates(true) // TODO: does this have any bad side-effects ?
+			return fmt.Errorf("failed to parse local syms for image %s: %w", image.Name, ErrNoLocals)
 		}
 
 		stringPool := io.NewSectionReader(sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
@@ -102,7 +117,7 @@ func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
-		return nil, fmt.Errorf("dyld shared cache does not contain local symbols info")
+		return nil, fmt.Errorf("failed to parse local symbol %s: %w", symbol, ErrNoLocals)
 	}
 
 	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
@@ -134,7 +149,7 @@ func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymb
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
 	if f.LocalSymbolsOffset == 0 {
-		return nil, fmt.Errorf("dyld shared cache does not contain local symbols info")
+		return nil, fmt.Errorf("failed to parse local symbol %s in image %s: %w", symbol, imageName, ErrNoLocals)
 	}
 
 	image := f.Image(imageName)
@@ -255,69 +270,86 @@ func (f *File) GetCStringAtOffset(offset uint64) (string, error) {
 	return "", fmt.Errorf("string not found at offset 0x%x", offset)
 }
 
-func (f *File) getExportTrieData(i *CacheImage) ([]byte, error) {
+func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 	var eTrieAddr, eTrieSize uint64
+
 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	if i.CacheImageInfoExtra.ExportsTrieAddr == 0 {
+	if i.CacheImageInfoExtra.ExportsTrieAddr > 0 {
+		eTrieAddr = i.CacheImageInfoExtra.ExportsTrieAddr
+		eTrieSize = uint64(i.CacheImageInfoExtra.ExportsTrieSize)
+	} else {
 		m, err := i.GetMacho()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse MachO for image %s: %v", filepath.Base(i.Name), err)
 		}
 		if m.DyldExportsTrie() != nil {
-			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldExportsTrie().Offset))
-			eTrieSize = uint64(m.DyldExportsTrie().Size)
+			syms, err := m.DyldExports()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", filepath.Base(i.Name), err)
+			}
+			return syms, nil
 		} else if m.DyldInfo() != nil {
 			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldInfo().ExportOff))
 			eTrieSize = uint64(m.DyldInfo().ExportSize)
-		}
-	} else {
-		eTrieAddr = i.CacheImageInfoExtra.ExportsTrieAddr
-		eTrieSize = uint64(i.CacheImageInfoExtra.ExportsTrieSize)
-	}
-
-	for _, mapping := range f.Mappings {
-		if mapping.Address <= eTrieAddr && (eTrieAddr+eTrieSize) < mapping.Address+mapping.Size {
-			sr.Seek(int64(eTrieAddr-mapping.Address+mapping.FileOffset), os.SEEK_SET)
-			exportTrie := make([]byte, eTrieSize)
-			if err := binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
-				return nil, err
-			}
-			return exportTrie, nil
+		} else {
+			return nil, fmt.Errorf("failed to get export trie data for image %s: %w", filepath.Base(i.Name), ErrNoExportTrieInMachO)
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find export trie for image %s", i.Name)
+	eTrieOffset, err := f.GetOffset(eTrieAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get offset of export trie addr")
+	}
+
+	if _, err := sr.Seek(int64(eTrieOffset), io.SeekStart); err != nil {
+		return nil, fmt.Errorf("failed to seek to export trie offset in cache: %v", err)
+	}
+
+	exportTrie := make([]byte, eTrieSize)
+	if err := binary.Read(sr, f.ByteOrder, &exportTrie); err != nil {
+		return nil, fmt.Errorf("failed to read export trie data: %v", err)
+	}
+
+	syms, err := trie.ParseTrie(exportTrie, i.LoadAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", filepath.Base(i.Name), err)
+	}
+
+	return syms, nil
 }
 
 // GetAllExportedSymbols prints out all the exported symbols
 func (f *File) GetAllExportedSymbols(dump bool) error {
-
 	for _, image := range f.Images {
-		// if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
-		exportTrie, err := f.getExportTrieData(image)
+
+		syms, err := f.getExportTrieSymbols(image)
 		if err != nil {
 			return err
 		}
-		if len(exportTrie) == 0 {
-			continue
-		}
-		syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
+
+		m, err := image.GetPartialMacho()
 		if err != nil {
 			return err
 		}
-		if dump {
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-			for _, sym := range syms {
-				fmt.Fprintf(w, "0x%8x:\t[%s]\t%s\t%s\n", sym.Address, sym.Flags, sym.Name, image.Name)
+
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		for _, sym := range syms {
+			if sym.Flags.ReExport() {
+				sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+			} else {
+				sym.FoundInDylib = image.Name
 			}
-			w.Flush()
-		} else {
-			for _, sym := range syms {
+
+			if dump {
+				fmt.Fprintf(w, "%s\n", sym)
+				// fmt.Println(sym)
+			} else {
 				f.AddressToSymbol[sym.Address] = sym.Name
+				image.Analysis.State.SetExports(true)
 			}
 		}
-		// }
+		w.Flush()
 	}
 
 	return nil
@@ -327,54 +359,116 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error {
 
 	if !image.Analysis.State.IsExportsDone() {
-
-		exportTrie, err := f.getExportTrieData(image)
+		syms, err := f.getExportTrieSymbols(image)
 		if err != nil {
 			return err
 		}
 
-		if len(exportTrie) == 0 {
-			return fmt.Errorf("image does NOT have an export trie")
-		}
-
-		syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
+		m, err := image.GetPartialMacho()
 		if err != nil {
 			return err
 		}
 
-		if dump {
-			for _, sym := range syms {
-				fmt.Printf("%#8x:\t%s\n", sym.Address, sym.Name)
+		for _, sym := range syms {
+			if sym.Flags.ReExport() {
+				sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
 			}
-		} else {
-			for _, sym := range syms {
+
+			if dump {
+				fmt.Println(sym)
+			} else {
 				f.AddressToSymbol[sym.Address] = sym.Name
+				image.Analysis.State.SetExports(true)
 			}
 		}
 
-		image.Analysis.State.SetExports(true)
 	}
+
+	return nil
+}
+
+// OpenOrCreateA2SCache returns an address to symbol map if the cache file exists
+// otherwise it will create a NEW one
+func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
+	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
+		log.Info("parsing public symbols...")
+		err = f.GetAllExportedSymbols(false)
+		if err != nil {
+			// return err
+			log.Errorf("failed to parse all exported symbols: %v", err)
+		}
+
+		log.Info("parsing private symbols...")
+		err = f.ParseLocalSyms()
+		if errors.Is(err, ErrNoLocals) {
+			utils.Indent(log.Warn, 2)("cache does NOT contain local symbols")
+		} else if err != nil {
+			return err
+		}
+
+		err = f.SaveAddrToSymMap(cacheFile)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	a2sFile, err := os.Open(cacheFile)
+	if err != nil {
+		return err
+	}
+	gzr, err := gzip.NewReader(a2sFile)
+	if err != nil {
+		return fmt.Errorf("failed to create gzip reader: %v", err)
+	}
+	// Decoding the serialized data
+	err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+	if err != nil {
+		return err
+	}
+	gzr.Close()
+	a2sFile.Close()
 
 	return nil
 }
 
 // SaveAddrToSymMap saves the dyld address-to-symbol map to disk
 func (f *File) SaveAddrToSymMap(dest string) error {
+	var err error
+	var of *os.File
+
 	buff := new(bytes.Buffer)
+
+	of, err = os.Create(dest)
+	if errors.Is(err, os.ErrPermission) {
+		var e *os.PathError
+		if errors.As(err, &e) {
+			log.Errorf("failed to create address to symbol cache file %s (%v)", e.Path, e.Err)
+		}
+		tmpDir := os.TempDir()
+		if runtime.GOOS == "darwin" {
+			tmpDir = "/tmp"
+		}
+		tempa2sfile := filepath.Join(tmpDir, f.UUID.String()+".a2s")
+		of, err = os.Create(tempa2sfile)
+		if err != nil {
+			return err
+		}
+		utils.Indent(log.Warn, 2)("creating in the temp folder")
+		utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future you must supply the flag: --cache %s ", tempa2sfile))
+	} else if err != nil {
+		return err
+	}
+	defer of.Close()
 
 	e := gob.NewEncoder(buff)
 
 	// Encoding the map
-	err := e.Encode(f.AddressToSymbol)
+	err = e.Encode(f.AddressToSymbol)
 	if err != nil {
 		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
-
-	of, err := os.Create(dest)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %v", dest, err)
-	}
-	defer of.Close()
 
 	gzw := gzip.NewWriter(of)
 	defer gzw.Close()
@@ -387,16 +481,12 @@ func (f *File) SaveAddrToSymMap(dest string) error {
 	return nil
 }
 
-func (f *File) FindExportedSymbol(symbolName string) (*trieEntry, error) {
+func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieEntry, error) {
 
 	for _, image := range f.Images {
 		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
 			log.Debugf("Scanning Image: %s", image.Name)
-			exportTrie, err := f.getExportTrieData(image)
-			if err != nil {
-				return nil, err
-			}
-			syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
+			syms, err := f.getExportTrieSymbols(image)
 			if err != nil {
 				return nil, err
 			}
@@ -411,114 +501,114 @@ func (f *File) FindExportedSymbol(symbolName string) (*trieEntry, error) {
 	return nil, fmt.Errorf("symbol was not found in exports")
 }
 
-func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trieEntry, error) {
+func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trie.TrieEntry, error) {
 
 	image := f.Image(imagePath)
-	exportTrie, err := f.getExportTrieData(image)
+	if image == nil {
+		return nil, fmt.Errorf("cache does not contain image %s", imagePath)
+	}
+
+	syms, err := f.getExportTrieSymbols(image)
 	if err != nil {
 		return nil, err
 	}
-	syms, err := parseTrie(exportTrie, image.CacheImageTextInfo.LoadAddress)
-	if err != nil {
-		return nil, err
-	}
+
 	for _, sym := range syms {
 		if sym.Name == symbolName {
 			return &sym, nil
 		}
-		// fmt.Println(sym.Name)
 	}
 
-	return nil, fmt.Errorf("symbol was not found in exports")
+	return nil, fmt.Errorf("failed to find in image %s: %w", imagePath, ErrSymbolNotInImage)
 }
 
 // GetExportedSymbolAddress returns the address of an images exported symbol
-func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, error) {
-	for _, image := range f.Images {
-		if exportSym, err := f.findSymbolInExportTrieForImage(symbol, image); err == nil {
-			return exportSym, nil
-		}
-	}
-	return nil, fmt.Errorf("symbol was not found in ExportsTrie")
-}
+// func (f *File) GetExportedSymbolAddress(symbol string) (*CacheExportedSymbol, error) {
+// 	for _, image := range f.Images {
+// 		if exportSym, err := f.findSymbolInExportTrieForImage(symbol, image); err == nil {
+// 			return exportSym, nil
+// 		}
+// 	}
+// 	return nil, fmt.Errorf("symbol was not found in ExportsTrie")
+// }
 
 // GetExportedSymbolAddressInImage returns the address of an given image's exported symbol
-func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*CacheExportedSymbol, error) {
-	return f.findSymbolInExportTrieForImage(symbol, f.Image(imagePath))
-}
+// func (f *File) GetExportedSymbolAddressInImage(imagePath, symbol string) (*CacheExportedSymbol, error) {
+// 	return f.findSymbolInExportTrieForImage(symbol, f.Image(imagePath))
+// }
 
-func (f *File) findSymbolInExportTrieForImage(symbol string, image *CacheImage) (*CacheExportedSymbol, error) {
+// func (f *File) findSymbolInExportTrieForImage(symbol string, image *CacheImage) (*CacheExportedSymbol, error) {
 
-	var reExportSymBytes []byte
+// 	var reExportSymBytes []byte
 
-	exportedSymbol := &CacheExportedSymbol{
-		FoundInDylib: image.Name,
-		Name:         symbol,
-	}
+// 	exportedSymbol := &CacheExportedSymbol{
+// 		FoundInDylib: image.Name,
+// 		Name:         symbol,
+// 	}
 
-	exportTrie, err := f.getExportTrieData(image)
-	if err != nil {
-		return nil, err
-	}
+// 	exportTrie, err := f.getExportTrieData(image)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	symbolNode, err := walkTrie(exportTrie, symbol)
-	if err != nil {
-		return nil, fmt.Errorf("symbol was not found in ExportsTrie")
-	}
+// 	symbolNode, err := trie.WalkTrie(exportTrie, symbol)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("symbol was not found in ExportsTrie")
+// 	}
 
-	r := bytes.NewReader(exportTrie)
+// 	r := bytes.NewReader(exportTrie)
 
-	r.Seek(int64(symbolNode), io.SeekStart)
+// 	r.Seek(int64(symbolNode), io.SeekStart)
 
-	symFlagInt, err := readUleb128(r)
-	if err != nil {
-		return nil, err
-	}
+// 	symFlagInt, err := trie.ReadUleb128(r)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	exportedSymbol.Flags = CacheExportFlag(symFlagInt)
+// 	exportedSymbol.Flags = CacheExportFlag(symFlagInt)
 
-	if exportedSymbol.Flags.ReExport() {
-		symOrdinalInt, err := readUleb128(r)
-		if err != nil {
-			return nil, err
-		}
-		log.Debugf("ReExport symOrdinal: %d", symOrdinalInt)
-		for {
-			s, err := r.ReadByte()
-			if err == io.EOF {
-				break
-			}
-			if s == '\x00' {
-				break
-			}
-			reExportSymBytes = append(reExportSymBytes, s)
-		}
-	}
+// 	if exportedSymbol.Flags.ReExport() {
+// 		symOrdinalInt, err := trie.ReadUleb128(r)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		log.Debugf("ReExport symOrdinal: %d", symOrdinalInt)
+// 		for {
+// 			s, err := r.ReadByte()
+// 			if err == io.EOF {
+// 				break
+// 			}
+// 			if s == '\x00' {
+// 				break
+// 			}
+// 			reExportSymBytes = append(reExportSymBytes, s)
+// 		}
+// 	}
 
-	symValueInt, err := readUleb128(r)
-	if err != nil {
-		return nil, err
-	}
-	exportedSymbol.Value = symValueInt
+// 	symValueInt, err := trie.ReadUleb128(r)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	exportedSymbol.Value = symValueInt
 
-	if exportedSymbol.Flags.StubAndResolver() {
-		symOtherInt, err := readUleb128(r)
-		if err != nil {
-			return nil, err
-		}
-		// TODO: handle stubs
-		log.Debugf("StubAndResolver: %d", symOtherInt)
-	}
+// 	if exportedSymbol.Flags.StubAndResolver() {
+// 		symOtherInt, err := trie.ReadUleb128(r)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		// TODO: handle stubs
+// 		log.Debugf("StubAndResolver: %d", symOtherInt)
+// 	}
 
-	if exportedSymbol.Flags.Absolute() {
-		exportedSymbol.Address = symValueInt
-	} else {
-		exportedSymbol.Address = symValueInt + image.CacheImageTextInfo.LoadAddress
-	}
+// 	if exportedSymbol.Flags.Absolute() {
+// 		exportedSymbol.Address = symValueInt
+// 	} else {
+// 		exportedSymbol.Address = symValueInt + image.CacheImageTextInfo.LoadAddress
+// 	}
 
-	if len(reExportSymBytes) > 0 {
-		exportedSymbol.Name = fmt.Sprintf("%s (%s)", exportedSymbol.Name, string(reExportSymBytes))
-	}
+// 	if len(reExportSymBytes) > 0 {
+// 		exportedSymbol.Name = fmt.Sprintf("%s (%s)", exportedSymbol.Name, string(reExportSymBytes))
+// 	}
 
-	return exportedSymbol, nil
-}
+// 	return exportedSymbol, nil
+// }

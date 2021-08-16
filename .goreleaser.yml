@@ -12,13 +12,11 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CGO_CFLAGS=-I/usr/local/include
-      - CGO_LDFLAGS=-L/usr/local/lib
     goos:
       - darwin
     goarch:
       - amd64
-      # - arm64
+      - arm64
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
   - main: ./cmd/ipsw
     id: "others"
@@ -48,7 +46,6 @@ brews:
     description: "Download and parse ipsw(s)"
     dependencies:
       - bat
-      - lzfse
     install: |
       bin.install "ipsw"
     test: |

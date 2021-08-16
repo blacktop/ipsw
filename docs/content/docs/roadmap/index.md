@@ -25,3 +25,8 @@ My strech goal is to make the worlds first _dyld_shared_cache_ disassembler that
 - [ ] maybe use https://github.com/AllenDang/giu for disassembler
 - [ ] add https://github.com/mermaid-js/mermaid to docs
 - [ ] API maybe use (github.com/minio/simdjson-go)
+- [ ] Switch docs to https://squidfunk.github.io/mkdocs-material/getting-started/
+- [ ] store download dev session or creds using - https://github.com/keybase/go-keychain
+- [ ] speed up downloads w/ https://github.com/ynsgnr/aria2go
+- [ ] make a color syntax highlighter like https://github.com/trishume/syntect but for Golang
+- [ ] use https://github.com/google/gousb to detect what device(s) are connected (maybe filter downloads?)

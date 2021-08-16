@@ -27,8 +27,8 @@ import (
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+
 	// "github.com/spf13/cobra/doc"
 	"github.com/spf13/viper"
 )
@@ -72,13 +72,13 @@ func Execute() {
 func init() {
 	log.SetHandler(clihander.Default)
 
-	// cobra.OnInitialize(initConfig)
+	cobra.OnInitialize(initConfig)
 
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
 }
 
@@ -89,21 +89,18 @@ func initConfig() {
 		viper.SetConfigFile(cfgFile)
 	} else {
 		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
+		home, err := os.UserHomeDir()
+		cobra.CheckErr(err)
 
 		// Search config in home directory with name ".ipsw" (without extension).
 		viper.AddConfigPath(home)
+		viper.SetConfigType("yaml")
 		viper.SetConfigName(".ipsw")
 	}
 
-	viper.AutomaticEnv() // read in environment variables that match
+	viper.AutomaticEnv()
 
-	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Println("Using config file:", viper.ConfigFileUsed())
+		log.Debugf("Using config file: %s", viper.ConfigFileUsed())
 	}
 }
