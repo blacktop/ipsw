@@ -37,6 +37,7 @@ type Download struct {
 	resume       bool
 	canResume    bool
 	skipAll      bool
+	verbose      bool
 
 	client *http.Client
 }
@@ -59,12 +60,13 @@ type geoQuery struct {
 }
 
 // NewDownload creates a new downloader
-func NewDownload(proxy string, insecure, skipAll bool) *Download {
+func NewDownload(proxy string, insecure, skipAll, verbose bool) *Download {
 	return &Download{
 		// URL:     url,
 		// Sha1:    sha1,
 		resume:  false,
 		skipAll: skipAll,
+		verbose: verbose,
 		client: &http.Client{
 			Transport: &http.Transport{
 				Proxy:           GetProxy(proxy),
@@ -179,16 +181,25 @@ func (d *Download) Do() error {
 
 	trace := &httptrace.ClientTrace{
 		GotConn: func(connInfo httptrace.GotConnInfo) {
-			addr := connInfo.Conn.RemoteAddr().String()
-			addr = strings.Split(addr, ":")[0]
-			res, err := http.Get(fmt.Sprintf("http://ip-api.com/json/%s", addr))
-			if err != nil {
-				log.Error("failed to lookup IP's geolocation")
+			if d.verbose {
+				addr := strings.Split(connInfo.Conn.RemoteAddr().String(), ":")[0]
+
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://ip-api.com/json/%s", addr), nil)
+				if err != nil {
+					log.Error("failed to create http GET request")
+				}
+				req.Header.Add("User-Agent", utils.RandomAgent())
+
+				res, err := d.client.Do(req)
+				if err != nil {
+					log.Error("failed to lookup IP's geolocation")
+				}
+				defer res.Body.Close()
+
+				data := &geoQuery{}
+				json.NewDecoder(res.Body).Decode(data)
+				utils.Indent(log.Debug, 2)(fmt.Sprintf("URL resolved to: %s (%s - %s, %s. %s)", addr, data.Org, data.City, data.Region, data.Country))
 			}
-			defer res.Body.Close()
-			data := &geoQuery{}
-			json.NewDecoder(res.Body).Decode(data)
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("URL resolved to: %s (%s - %s, %s. %s)", addr, data.Org, data.City, data.Region, data.Country))
 		},
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))

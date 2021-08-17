@@ -149,7 +149,7 @@ var otaDLCmd = &cobra.Command{
 					}
 				}
 			} else {
-				downloader := download.NewDownload(proxy, insecure, skipAll)
+				downloader := download.NewDownload(proxy, insecure, skipAll, Verbose)
 				for _, o := range otas {
 					url := o.BaseURL + o.RelativePath
 					destName := strings.Replace(path.Base(url), ",", "_", -1)
