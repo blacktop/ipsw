@@ -72,7 +72,7 @@ func NewDownload(proxy string, insecure, skipAll, verbose bool) *Download {
 				Proxy:           GetProxy(proxy),
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
 				// MaxConnsPerHost:   50,
-				// ForceAttemptHTTP2: true,
+				ForceAttemptHTTP2: true,
 			},
 		},
 	}
