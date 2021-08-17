@@ -29,10 +29,10 @@ require (
 	github.com/spf13/viper v1.8.1
 	github.com/therootcompany/xz v1.0.1
 	github.com/vbauerster/mpb/v5 v5.4.0
-	golang.org/x/crypto v0.0.0-20210813211128-0a44fdfbc16e
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 	golang.org/x/net v0.0.0-20210813160813-60bc85c4be6d
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210817142637-7d9622a276b7
+	golang.org/x/sys v0.0.0-20210817190340-bfb29a6856f2
 )
 
 require (
