@@ -188,7 +188,7 @@ var downloadCmd = &cobra.Command{
 						"signed":  i.Signed,
 					}).Info("Getting IPSW")
 
-					downloader := download.NewDownload(proxy, insecure, skipAll)
+					downloader := download.NewDownload(proxy, insecure, skipAll, Verbose)
 					downloader.URL = i.URL
 					downloader.Sha1 = i.SHA1
 					downloader.DestName = destName

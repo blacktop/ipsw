@@ -757,7 +757,7 @@ func (app *App) DownloadPrompt(downloadType string) error {
 func (app *App) Download(url string) error {
 
 	// proxy, insecure are null because we override the client below
-	downloader := NewDownload("", false, app.config.SkipAll)
+	downloader := NewDownload("", false, app.config.SkipAll, true)
 	// use authenticated client
 	downloader.client = app.Client
 

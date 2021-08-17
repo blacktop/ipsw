@@ -91,7 +91,7 @@ var betaCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := download.NewDownload(proxy, insecure, skipAll)
+			downloader := download.NewDownload(proxy, insecure, skipAll, Verbose)
 			for _, url := range filteredURLS {
 				destName := getDestName(url, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {

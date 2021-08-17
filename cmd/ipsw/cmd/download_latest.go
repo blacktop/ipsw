@@ -118,7 +118,7 @@ var latestCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := download.NewDownload(proxy, insecure, skipAll)
+			downloader := download.NewDownload(proxy, insecure, skipAll, Verbose)
 			for _, build := range filteredBuilds {
 				destName := getDestName(build.FirmwareURL, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {

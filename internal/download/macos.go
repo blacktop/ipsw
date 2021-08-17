@@ -300,7 +300,7 @@ func GetProductInfo() (ProductInfos, error) {
 
 func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll bool) error {
 
-	downloader := NewDownload(proxy, insecure, skipAll)
+	downloader := NewDownload(proxy, insecure, skipAll, true)
 
 	folder := filepath.Join(workDir, i.Title)
 
