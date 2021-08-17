@@ -30,6 +30,7 @@ builds:
       - amd64
       - arm64
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    gobinary: "go1.17"
 archives:
   - replacements:
       darwin: macOS
