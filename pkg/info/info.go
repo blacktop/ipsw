@@ -22,10 +22,12 @@ var (
 	//go:embed data/firmware_keys.json
 	keysJSONData []byte
 	//go:embed data/t8030_ap_keys.json
-	t8030APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/2b8c2d6d37da5a04a222469987fcfa2b
+	t8030APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/2b8c2d6d37da5a04a222469987fcfa2b - A13 Bionic
+	//go:embed data/t8101_ap_keys.json
+	t8101APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/fd627adebaa4120269754cd613e81877 - A14 Bionic
 )
 
-type t8030APKey struct {
+type apKey struct {
 	Device   string
 	Build    string
 	Type     string
@@ -86,15 +88,27 @@ func getFirmwareKeys(device, build string) map[string]string {
 	return keys[device][build]
 }
 
-func getT8030ApFirmwareKey(device, build, filename string) (string, string, error) {
-	var keys []t8030APKey
+func getApFirmwareKey(device, build, filename string) (string, string, error) {
+	var a13Keys []apKey
+	var a14Keys []apKey
 
-	err := json.Unmarshal(t8030APKeysJSONData, &keys)
+	err := json.Unmarshal(t8030APKeysJSONData, &a13Keys)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, key := range keys {
+	for _, key := range a13Keys {
+		if key.Device == device && key.Build == build && key.Filename == filename {
+			return key.KBag, key.Key, nil
+		}
+	}
+
+	err = json.Unmarshal(t8101APKeysJSONData, &a14Keys)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, key := range a14Keys {
 		if key.Device == device && key.Build == build && key.Filename == filename {
 			return key.KBag, key.Key, nil
 		}
@@ -155,7 +169,7 @@ func (i *Info) String() string {
 		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
 			iStr += fmt.Sprintf("   - BootLoaders\n")
 			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
-				if _, key, err := getT8030ApFirmwareKey(dt.Model, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
+				if _, key, err := getApFirmwareKey(dt.Model, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
 					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
 				} else {
 					iStr += fmt.Sprintf("       * %s 🔑 -> %s\n", filepath.Base(bl), key)
