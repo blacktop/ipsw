@@ -1,6 +1,12 @@
 package ctf
 
-import "math"
+//go:generate stringer -type=kind,floatEncoding -output types_string.go
+
+import (
+	"fmt"
+	"math"
+	"strings"
+)
 
 /*
  * CTF - Compact ANSI-C Type Format
@@ -65,28 +71,28 @@ import "math"
  */
 
 const (
-	CTF_MAGIC       = 0xcff1     /* magic number identifying header */
-	CTF_MAX_TYPE    = 0xffff     /* max type identifier value */
-	CTF_MAX_NAME    = 0x7fffffff /* max offset into a string table */
-	CTF_MAX_VLEN    = 0x3ff      /* max struct, union, enum members or args */
-	CTF_MAX_INTOFF  = 0xff       /* max offset of intrinsic value in bits */
-	CTF_MAX_INTBITS = 0xffff     /* max size of an intrinsic in bits */
+	MAGIC       = 0xcff1     /* magic number identifying header */
+	MAX_TYPE    = 0xffff     /* max type identifier value */
+	MAX_NAME    = 0x7fffffff /* max offset into a string table */
+	MAX_VLEN    = 0x3ff      /* max struct, union, enum members or args */
+	MAX_INTOFF  = 0xff       /* max offset of intrinsic value in bits */
+	MAX_INTBITS = 0xffff     /* max size of an intrinsic in bits */
 	/* See ctf_type_t */
-	CTF_MAX_SIZE   = 0xfffe /* max size of a type in bytes */
-	CTF_LSIZE_SENT = 0xffff /* sentinel for ctt_size */
-	CTF_MAX_LSIZE  = math.MaxUint64
+	MAX_SIZE   = 0xfffe /* max size of a type in bytes */
+	LSIZE_SENT = 0xffff /* sentinel for ctt_size */
+	MAX_LSIZE  = math.MaxUint64
 	/* data format version number */
-	CTF_VERSION_1  = 1
-	CTF_VERSION_2  = 2
-	CTF_VERSION_3  = 3
-	CTF_VERSION    = CTF_VERSION_3 /* current version */
-	CTF_F_COMPRESS = 0x1           /* data buffer is compressed */
+	VERSION_1  = 1
+	VERSION_2  = 2
+	VERSION_3  = 3
+	VERSION    = VERSION_3 /* current version */
+	F_COMPRESS = 0x1       /* data buffer is compressed */
 )
 
 // ctf_preamble
 type preamble struct {
-	Magic   uint16 /* magic number (CTF_MAGIC) */
-	Version uint8  /* data format version number (CTF_VERSION) */
+	Magic   uint16 /* magic number (MAGIC) */
+	Version uint8  /* data format version number (VERSION) */
 	Flags   uint8  /* flags (see below) */
 }
 
@@ -129,12 +135,12 @@ type stype struct {
  * ctf_type_t
  * type sizes, measured in bytes, come in two flavors.  99% of them fit within
  * (USHRT_MAX - 1), and thus can be stored in the ctt_size member of a
- * ctf_stype_t.  The maximum value for these sizes is CTF_MAX_SIZE.  The sizes
- * larger than CTF_MAX_SIZE must be stored in the ctt_lsize member of a
+ * ctf_stype_t.  The maximum value for these sizes is MAX_SIZE.  The sizes
+ * larger than MAX_SIZE must be stored in the ctt_lsize member of a
  * ctf_type_t.  Use of this member is indicated by the presence of
- * CTF_LSIZE_SENT in ctt_size.
+ * LSIZE_SENT in ctt_size.
  */
-type ctfType struct {
+type Type struct {
 	Name       name   /* reference to name in string table */
 	Info       info   /* encoded kind, variant length (see below) */
 	SizeOrType uint16 /* UNION {
@@ -143,6 +149,10 @@ type ctfType struct {
 	} */
 	LSizeHI uint32 /* high 32 bits of type size in bytes */
 	LSizeLO uint32 /* low 32 bits of type size in bytes */
+}
+
+func (t Type) LSize() uint64 {
+	return uint64(t.LSizeHI)<<32 | uint64(t.LSizeLO)
 }
 
 type info uint16
@@ -154,7 +164,7 @@ func (i info) IsRoot() bool {
 	return ((i & 0x0400) >> 10) != 0
 }
 func (i info) VarLen() uint16 {
-	return uint16(i) & CTF_MAX_VLEN
+	return uint16(i) & MAX_VLEN
 }
 
 type name uint32
@@ -170,13 +180,13 @@ type kind uint16
 
 const (
 	/*
-	 * Values for CTF_TYPE_KIND().  If the kind has an associated data list,
-	 * CTF_INFO_VLEN() will extract the number of elements in the list, and
+	 * Values for TYPE_KIND().  If the kind has an associated data list,
+	 * INFO_VLEN() will extract the number of elements in the list, and
 	 * the type of each element is shown in the comments below.
 	 */
 	UNKNOWN  kind = 0 /* unknown type (used for padding) */
-	INTEGER  kind = 1 /* variant data is CTF_INT_DATA() (see below) */
-	FLOAT    kind = 2 /* variant data is CTF_FP_DATA() (see below) */
+	INTEGER  kind = 1 /* variant data is INT_DATA() (see below) */
+	FLOAT    kind = 2 /* variant data is DATA() (see below) */
 	POINTER  kind = 3 /* ctt_type is referenced type */
 	ARRAY    kind = 4 /* variant data is single ctf_array_t */
 	FUNCTION kind = 5 /* ctt_type is return type, variant data is */
@@ -190,10 +200,105 @@ const (
 	CONST    kind = 12 /* ctt_type is base type */
 	RESTRICT kind = 13 /* ctt_type is base type */
 
-	PTRAUTH kind = 14 /* variant data is CTF_PTRAUTH_DATA (see below) */
+	PTRAUTH kind = 14 /* variant data is PTRAUTH_DATA (see below) */
 
-	MAX kind = 31 /* Maximum possible CTF_K_* value */
+	MAX kind = 31 /* Maximum possible K_* value */
 )
+
+/*
+* Values for ctt_type when kind is INTEGER.  The flags, offset in bits,
+* and size in bits are encoded as a single word using the following macros.
+ */
+type intEncoding uint32
+
+func (e intEncoding) Encoding() intEncoding {
+	return e & 0xff000000 >> 24
+}
+func (e intEncoding) Offset() uint32 {
+	return uint32(e&0x00ff0000) >> 16
+}
+func (e intEncoding) Bits() uint32 {
+	return uint32(e & 0x0000ffff)
+}
+func (e intEncoding) String() string {
+	var fmtStr string
+	if e == 0 || e&^(SIGNED|CHAR|BOOL|VARARGS) != 0 {
+		return fmt.Sprintf("%#x", uint32(e))
+	}
+	if (e & SIGNED) != 0 {
+		fmtStr += " SIGNED"
+	}
+	if (e & CHAR) != 0 {
+		fmtStr += " CHAR"
+	}
+	if (e & BOOL) != 0 {
+		fmtStr += " BOOL"
+	}
+	if (e & VARARGS) != 0 {
+		fmtStr += " VARARGS"
+	}
+	return strings.TrimSpace(fmtStr)
+}
+
+const (
+	SIGNED  intEncoding = 0x01 /* integer is signed (otherwise unsigned) */
+	CHAR    intEncoding = 0x02 /* character display format */
+	BOOL    intEncoding = 0x04 /* boolean display format */
+	VARARGS intEncoding = 0x08 /* varargs display format */
+)
+
+/*
+* Values for ctt_type when kind is K_FLOAT.  The encoding, offset in bits,
+* and size in bits are encoded as a single word using the following macros.
+ */
+type floatEncoding uint32
+
+func (e floatEncoding) Encoding() floatEncoding {
+	return e & 0xff000000 >> 24
+}
+func (e floatEncoding) Offset() uint32 {
+	return uint32(e&0x00ff0000) >> 16
+}
+func (e floatEncoding) Bits() uint32 {
+	return uint32(e & 0x0000ffff)
+}
+
+const (
+	SINGLE   floatEncoding = 1  /* IEEE 32-bit float encoding */
+	DOUBLE   floatEncoding = 2  /* IEEE 64-bit float encoding */
+	CPLX     floatEncoding = 3  /* Complex encoding */
+	DCPLX    floatEncoding = 4  /* Double complex encoding */
+	LDCPLX   floatEncoding = 5  /* Long double complex encoding */
+	LDOUBLE  floatEncoding = 6  /* Long double encoding */
+	INTRVL   floatEncoding = 7  /* Interval (2x32-bit) encoding */
+	DINTRVL  floatEncoding = 8  /* Double interval (2x64-bit) encoding */
+	LDINTRVL floatEncoding = 9  /* Long double interval (2x128-bit) encoding */
+	IMAGRY   floatEncoding = 10 /* Imaginary (32-bit) encoding */
+	DIMAGRY  floatEncoding = 11 /* Long imaginary (64-bit) encoding */
+	LDIMAGRY floatEncoding = 12 /* Long double imaginary (128-bit) encoding */
+)
+
+/*
+* Variant data associated with PTRAUTH. The key, discriminator
+* and whether the pointer is discriminated are encoded as a single word
+* using the following macros.
+ */
+type ptrAuthData uint32
+
+func (p ptrAuthData) Discriminated() bool {
+	return uint32(p&0xff000000>>24) != 0
+}
+func (p ptrAuthData) Key() string {
+	name := []string{"IA", "IB", "DA", "DB"}
+	key := uint64(p&0x00ff0000) >> 16
+	if key >= 4 {
+		return "ERROR"
+	}
+	return name[key]
+}
+func (p ptrAuthData) Discriminator() uint32 {
+	return uint32(p & 0x0000ffff)
+}
 
 // ctf_array_t
 type array struct {
@@ -209,7 +314,7 @@ type array struct {
  * latter case.  If ctt_size for a given struct is >= 8192 bytes, all members
  * will be stored as type ctf_lmember_t.
  */
-const CTF_LSTRUCT_THRESH = 8192
+const LSTRUCT_THRESH = 8192
 
 // ctf_member_t
 type member struct {
@@ -235,7 +340,4 @@ func (l lmember) Offset() uint64 {
 type enum struct {
 	Name  uint32 /* reference to name in string table */
 	Value int32  /* value associated with this name */
-}
-
-type data struct {
 }

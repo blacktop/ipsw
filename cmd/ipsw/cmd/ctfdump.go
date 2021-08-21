@@ -107,21 +107,14 @@ var ctfdumpCmd = &cobra.Command{
 			}
 		}
 
-		sec := m.Section("__CTF", "__ctf")
-
-		dat, err := sec.Data()
-		if err != nil {
-			return err
-		}
-
-		// ioutil.WriteFile("ctf_data.bin", dat, 0755)
-
-		c, err := ctf.Parse(dat)
+		c, err := ctf.Parse(m)
 		if err != nil {
 			return err
 		}
 
 		fmt.Println(c.Header.String(Verbose))
+
+		c.GetDataTypes()
 
 		return nil
 	},
