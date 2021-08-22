@@ -14,8 +14,10 @@ import (
 
 // CTF is the Compact ANSI-C Type Format object
 type CTF struct {
-	Header header
-	Types  map[int]Type
+	Header    header
+	Types     map[int]Type
+	Globals   []global
+	Functions []function
 
 	data []byte
 	m    *macho.File
@@ -62,9 +64,13 @@ func Parse(m *macho.File) (*CTF, error) {
 		return nil, err
 	}
 
-	// if err := c.GetFunctions(); err != nil {
-	// 	return nil, err
-	// }
+	if err := c.GetDataObjects(); err != nil {
+		return nil, err
+	}
+
+	if err := c.GetFunctions(); err != nil {
+		return nil, err
+	}
 
 	return &c, nil
 }
@@ -129,80 +135,6 @@ func (c *CTF) getFunctionSymbols() []macho.Symbol {
 		}
 	}
 	return fsyms
-}
-
-// GetDataObjects returns all the CTF data objects
-func (c *CTF) GetDataObjects() error {
-
-	c.sr.Seek(int64(c.Header.ObjOffset), io.SeekStart)
-
-	dataSyms := c.getGlobalSymbols()
-
-	dataObjects := make([]uint16, (c.Header.FuncOffset-c.Header.ObjOffset)/uint32(binary.Size(uint16(0))))
-	if err := binary.Read(c.sr, binary.LittleEndian, &dataObjects); err != nil {
-		return fmt.Errorf("failed to read data objects: %v", err)
-	}
-
-	if len(dataSyms) != len(dataObjects) {
-		return fmt.Errorf("size of global symbols does NOT match that of the CTF data objects")
-	}
-
-	for idx, sym := range dataSyms {
-		fmt.Printf("[%d] %d %s\n", idx, dataObjects[idx], strings.TrimPrefix(sym.Name, "_"))
-	}
-
-	return nil
-}
-
-// GetFunctions returns all the CTF function definitions
-func (c *CTF) GetFunctions() error {
-
-	c.sr.Seek(int64(c.Header.FuncOffset), io.SeekStart)
-
-	for idx, fsym := range c.getFunctionSymbols() {
-
-		var inf info
-		var dat uint16
-		if err := binary.Read(c.sr, binary.LittleEndian, &inf); err != nil {
-			return fmt.Errorf("failed to read info: %v", err)
-		}
-
-		if inf.Kind() == UNKNOWN && inf.VarLen() == 0 {
-			continue /* skip padding */
-		}
-
-		if inf.Kind() != FUNCTION {
-			return fmt.Errorf("  [%d] unexpected kind -- %d", idx, inf.Kind())
-		}
-
-		fsym.Name = strings.TrimPrefix(fsym.Name, "_") // Lop off omnipresent underscore to match DWARF convention
-
-		fmt.Printf("  [%d] FUNC ", idx)
-		if len(fsym.Name) > 0 {
-			fmt.Printf("(%s) ", fsym.Name)
-		}
-		if err := binary.Read(c.sr, binary.LittleEndian, &dat); err != nil {
-			return fmt.Errorf("failed to read info: %v", err)
-		}
-		fmt.Printf("returns: %d args: (", dat)
-
-		if inf.VarLen() != 0 {
-			if err := binary.Read(c.sr, binary.LittleEndian, &dat); err != nil {
-				return fmt.Errorf("failed to read info: %v", err)
-			}
-			fmt.Printf("%d", dat)
-			for i := uint16(1); i < inf.VarLen(); i++ {
-				if err := binary.Read(c.sr, binary.LittleEndian, &dat); err != nil {
-					return fmt.Errorf("failed to read info: %v", err)
-				}
-
-				fmt.Printf(", %d", dat)
-			}
-		}
-		fmt.Printf(")\n")
-	}
-
-	return nil
 }
 
 func (c *CTF) lookup(id int) Type {
@@ -449,6 +381,82 @@ func (c *CTF) GetDataTypes() error {
 		}
 
 		id++
+	}
+
+	return nil
+}
+
+// GetDataObjects returns all the CTF data objects
+func (c *CTF) GetDataObjects() error {
+
+	c.sr.Seek(int64(c.Header.ObjOffset), io.SeekStart)
+
+	dataSyms := c.getGlobalSymbols()
+
+	dataObjects := make([]uint16, (c.Header.FuncOffset-c.Header.ObjOffset)/uint32(binary.Size(uint16(0))))
+	if err := binary.Read(c.sr, binary.LittleEndian, &dataObjects); err != nil {
+		return fmt.Errorf("failed to read data objects: %v", err)
+	}
+
+	if len(dataSyms) != len(dataObjects) {
+		return fmt.Errorf("size of global symbols does NOT match that of the CTF data objects")
+	}
+
+	for idx, sym := range dataSyms {
+		c.Globals = append(c.Globals, global{
+			Address:   sym.Value,
+			Name:      strings.TrimPrefix(sym.Name, "_"),
+			Type:      c.lookup(int(dataObjects[idx])),
+			Reference: int(dataObjects[idx]),
+		})
+	}
+
+	return nil
+}
+
+// GetFunctions returns all the CTF function definitions
+func (c *CTF) GetFunctions() error {
+
+	var inf info
+	var ret uint16
+	var args []uint16
+
+	c.sr.Seek(int64(c.Header.FuncOffset), io.SeekStart)
+
+	for idx, fsym := range c.getFunctionSymbols() {
+
+		if err := binary.Read(c.sr, binary.LittleEndian, &inf); err != nil {
+			return fmt.Errorf("failed to read function info: %v", err)
+		}
+
+		if inf.Kind() == UNKNOWN && inf.VarLen() == 0 {
+			continue /* skip padding */
+		}
+
+		if inf.Kind() != FUNCTION {
+			return fmt.Errorf("[%d] unexpected kind -- %d", idx, inf.Kind())
+		}
+
+		if err := binary.Read(c.sr, binary.LittleEndian, &ret); err != nil {
+			return fmt.Errorf("failed to read return type: %v", err)
+		}
+
+		f := function{
+			Address: fsym.Value,
+			Name:    strings.TrimPrefix(fsym.Name, "_"), // Lop off omnipresent underscore to match DWARF convention
+			Return:  c.lookup(int(ret)),
+		}
+
+		args = make([]uint16, inf.VarLen())
+		if err := binary.Read(c.sr, binary.LittleEndian, &args); err != nil {
+			return fmt.Errorf("failed to read arg types: %v", err)
+		}
+
+		for _, arg := range args {
+			f.Arguments = append(f.Arguments, c.lookup(int(arg)))
+		}
+
+		c.Functions = append(c.Functions, f)
 	}
 
 	return nil

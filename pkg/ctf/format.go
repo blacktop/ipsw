@@ -1,9 +1,11 @@
 package ctf
 
 import (
+	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 )
 
 type Type interface {
@@ -11,6 +13,7 @@ type Type interface {
 	Name() string
 	Info() info
 	ParentID() int
+	Type() string
 	String() string
 	Dump() string
 }
@@ -25,35 +28,30 @@ type Integer struct {
 func (i *Integer) ID() int {
 	return i.id
 }
-
 func (i *Integer) Name() string {
 	return i.name
 }
-
 func (i *Integer) Info() info {
 	return i.info
 }
-
 func (i *Integer) Encoding() string {
 	return i.encoding.Encoding().String()
 }
-
 func (i *Integer) Offset() uint32 {
 	return i.encoding.Offset()
 }
-
 func (i *Integer) Bits() uint32 {
 	return i.encoding.Bits()
 }
-
 func (i *Integer) ParentID() int {
 	return 0
 }
-
+func (i *Integer) Type() string {
+	return i.name
+}
 func (i *Integer) String() string {
 	return i.name
 }
-
 func (i *Integer) Dump() string {
 	return fmt.Sprintf("%s %s %s encoding=%s offset=%d bits=%d\n",
 		isRootIDFmtStr(i.info.IsRoot(), i.id),
@@ -100,6 +98,10 @@ func (f *Float) ParentID() int {
 	return 0
 }
 
+func (f *Float) Type() string {
+	return f.name
+}
+
 func (f *Float) String() string {
 	return f.name
 }
@@ -137,7 +139,7 @@ func (a *Array) Info() info {
 
 func (a *Array) Contents() string {
 	if t := a.lookupFn(int(a.array.Contents)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<type not found>"
 }
@@ -146,13 +148,15 @@ func (a *Array) ParentID() int {
 	return 0
 }
 
+func (a *Array) Type() string { return a.String() }
+
 func (a *Array) String() string {
 	var n string
 	if a.name != "(anon)" {
 		n = a.name
 	}
 	return fmt.Sprintf(
-		"%s %s[%d];",
+		"%s %s[%d]",
 		a.Contents(),
 		n,
 		a.NumElements,
@@ -164,9 +168,9 @@ func (a *Array) Dump() string {
 		isRootIDFmtStr(a.info.IsRoot(), a.id),
 		a.info.Kind(),
 		a.name,
-		a.Contents,
-		a.Index,
-		a.NumElements,
+		a.array.Contents,
+		a.array.Index,
+		a.array.NumElements,
 	)
 }
 
@@ -193,7 +197,7 @@ func (f *Function) Info() info {
 
 func (f *Function) Return() string {
 	if t := f.lookupFn(int(f.ret)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<return type not found>"
 }
@@ -214,6 +218,9 @@ func (f *Function) ParentID() int {
 	return 0
 }
 
+func (f *Function) Type() string {
+	return f.String()
+}
 func (f *Function) String() string {
 	return fmt.Sprintf(
 		"%s %s(%s);",
@@ -255,7 +262,7 @@ func (m Member) Name() string {
 }
 func (m Member) Type() string {
 	if t := m.lookupFn(int(m.reference)); t != nil {
-		return t.Name()
+		return t.Type()
 	}
 	return "<member type not found>"
 }
@@ -294,40 +301,51 @@ func (s *Struct) Size() uint64 {
 	return s.size
 }
 
+func (s *Struct) Type() string {
+	if s.name == "(anon)" {
+		return s.String()
+	}
+	return "struct " + s.Name()
+}
+
 func (s *Struct) String() string {
-	var sout string
-	sout = fmt.Sprintf(
-		"struct %s {\t// (%d bytes)\n",
+	buf := bytes.NewBufferString("")
+	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+	fmt.Fprintf(w,
+		"struct %s {\t\t// (%d bytes)\n",
 		s.Name(),
 		s.size,
 	)
 	for _, f := range s.Fields {
-		sout += fmt.Sprintf("\t%s\t%s;\t// off=%d\n",
+		fmt.Fprintf(w, "    %s\t%s;\t// off=%d\n",
 			f.Type(),
 			f.name,
 			f.offset,
 		)
 	}
-	sout += "};"
-	return sout
+	fmt.Fprintf(w, "};")
+	w.Flush()
+	return buf.String()
 }
 
 func (s *Struct) Dump() string {
-	var sdump string
-	sdump = fmt.Sprintf("%s %s %s (%d bytes)\n",
+	buf := bytes.NewBufferString("")
+	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+	fmt.Fprintf(w, "%s %s %s (%d bytes)\n",
 		isRootIDFmtStr(s.info.IsRoot(), s.id),
 		s.info.Kind(),
 		s.name,
 		s.size,
 	)
 	for _, f := range s.Fields {
-		sdump += fmt.Sprintf("\t%s type=%d off=%d\n",
+		fmt.Fprintf(w, "    %s\ttype=%d\toff=%d\n",
 			f.Name(),
 			f.reference,
 			f.offset,
 		)
 	}
-	return sdump
+	w.Flush()
+	return buf.String()
 }
 
 type Union struct {
@@ -360,7 +378,9 @@ func (s *Union) ParentID() int {
 func (s *Union) Size() uint64 {
 	return s.size
 }
-
+func (s *Union) Type() string {
+	return "union " + s.name
+}
 func (s *Union) String() string {
 	var sout string
 	sout = fmt.Sprintf(
@@ -424,6 +444,7 @@ func (e *Enum) ParentID() int {
 	return 0
 }
 
+func (e *Enum) Type() string { return e.String() }
 func (e *Enum) String() string {
 	eout := "enum {\n"
 	for _, f := range e.Fields {
@@ -474,6 +495,9 @@ func (f *Forward) ParentID() int {
 	return 0
 }
 
+func (f *Forward) Type() string {
+	return f.name
+}
 func (f *Forward) String() string {
 	return f.name
 }
@@ -508,7 +532,7 @@ func (p *Pointer) Info() info {
 
 func (p *Pointer) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<reference type not found>"
 }
@@ -517,8 +541,12 @@ func (p *Pointer) ParentID() int {
 	return int(p.reference)
 }
 
+func (p *Pointer) Type() string {
+	return fmt.Sprintf("%s *", p.Reference())
+}
+
 func (p *Pointer) String() string {
-	return fmt.Sprintf("%s*", p.Reference())
+	return fmt.Sprintf("%s *", p.Reference())
 }
 
 func (p *Pointer) Dump() string {
@@ -552,13 +580,17 @@ func (p *Typedef) Info() info {
 
 func (p *Typedef) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<reference type not found>"
 }
 
 func (p *Typedef) ParentID() int {
 	return int(p.reference)
+}
+
+func (p *Typedef) Type() string {
+	return p.Name()
 }
 
 func (p *Typedef) String() string {
@@ -596,7 +628,7 @@ func (p *Volatile) Info() info {
 
 func (p *Volatile) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<reference type not found>"
 }
@@ -605,6 +637,9 @@ func (p *Volatile) ParentID() int {
 	return int(p.reference)
 }
 
+func (p *Volatile) Type() string {
+	return fmt.Sprintf("volatile %s", p.Reference())
+}
 func (p *Volatile) String() string {
 	return fmt.Sprintf("volatile %s", p.Reference())
 }
@@ -640,13 +675,17 @@ func (p *Const) Info() info {
 
 func (p *Const) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<reference type not found>"
 }
 
 func (p *Const) ParentID() int {
 	return int(p.reference)
+}
+
+func (p *Const) Type() string {
+	return fmt.Sprintf("const %s", p.Reference())
 }
 
 func (p *Const) String() string {
@@ -684,13 +723,17 @@ func (p *Restrict) Info() info {
 
 func (p *Restrict) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<reference type not found>"
 }
 
 func (p *Restrict) ParentID() int {
 	return int(p.reference)
+}
+
+func (p *Restrict) Type() string {
+	return fmt.Sprintf("restrict %s", p.Reference())
 }
 
 func (p *Restrict) String() string {
@@ -729,7 +772,7 @@ func (p *PtrAuth) Info() info {
 
 func (p *PtrAuth) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
-		return t.String()
+		return t.Type()
 	}
 	return "<reference type not found>"
 }
@@ -738,6 +781,7 @@ func (p *PtrAuth) ParentID() int {
 	return int(p.reference)
 }
 
+func (p *PtrAuth) Type() string { return p.String() }
 func (p *PtrAuth) String() string {
 	return fmt.Sprintf(
 		"__ptrauth(%s, %t, %04x) %s",
@@ -760,6 +804,28 @@ func (p *PtrAuth) Dump() string {
 	)
 }
 
+type global struct {
+	Address   uint64
+	Name      string
+	Reference int
+	Type      Type
+}
+
+type function struct {
+	Address   uint64
+	Name      string
+	Return    Type
+	Arguments []Type
+}
+
+func (f function) String() string {
+	var args []string
+	for _, arg := range f.Arguments {
+		args = append(args, arg.Type())
+	}
+	return fmt.Sprintf("%#x: %s %s(%s);", f.Address, f.Return.Type(), f.Name, strings.Join(args, ", "))
+}
+
 func isRootIDFmtStr(isroot bool, id int) string {
 	if isroot {
 		return fmt.Sprintf("<%d>", id)
@@ -767,13 +833,9 @@ func isRootIDFmtStr(isroot bool, id int) string {
 	return fmt.Sprintf("[%d]", id)
 }
 
-func (h header) String(verbose bool) string {
-	title := ""
-	if verbose {
-		title = "- CTF Header -----------------------------------------------------------------\n\n"
-	}
+func (h header) String() string {
 	return fmt.Sprintf(
-		"%sMagic        = %#x\n"+
+		"Magic        = %#x\n"+
 			"Version      = %d\n"+
 			"Flags        = %#x\n"+
 			"Parent Label = %s\n"+
@@ -784,7 +846,6 @@ func (h header) String(verbose bool) string {
 			"Type Offset  = %#x\n"+
 			"Str Offset   = %#x\n"+
 			"Str Len      = %#x\n",
-		title,
 		h.Preamble.Magic,
 		h.Preamble.Version,
 		h.Preamble.Flags,

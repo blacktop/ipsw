@@ -25,7 +25,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -74,7 +76,6 @@ var ctfdumpCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-
 		} else {
 			var options []string
 			var shortOptions []string
@@ -112,11 +113,49 @@ var ctfdumpCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println(c.Header.String(Verbose))
+		ids := make([]int, 0, len(c.Types))
+		for id := range c.Types {
+			ids = append(ids, id)
+		}
+		sort.Ints(ids)
 
-		for _, t := range c.Types {
-			if t.Info().Kind() == ctf.UNION {
-				fmt.Printf("%s:\n%s\n", t.Info().Kind().String(), t.String())
+		if len(args) > 1 {
+			for _, id := range ids {
+				if c.Types[id].Name() == args[1] {
+					fmt.Println(c.Types[id])
+					break
+				}
+			}
+		} else { // DUMP
+
+			fmt.Printf("- CTF Header -----------------------------------------------------------------\n\n")
+			fmt.Println(c.Header)
+
+			fmt.Printf("- Types ----------------------------------------------------------------------\n\n")
+			for _, id := range ids {
+				if c.Types[id].Info().IsRoot() {
+					fmt.Println(c.Types[id].Dump())
+				}
+			}
+
+			fmt.Printf("- Data Objects ---------------------------------------------------------------\n\n")
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+			for _, g := range c.Globals {
+				if g.Type != nil {
+					fmt.Fprintf(w, "%#x: %s %s\n", g.Address, g.Type, g.Name)
+				} else {
+					if g.Reference == 0 {
+						fmt.Fprintf(w, "%#x: <unknown> %s\n", g.Address, g.Name)
+					} else {
+						fmt.Fprintf(w, "%#x: %d %s\n", g.Address, g.Reference, g.Name)
+					}
+				}
+			}
+			w.Flush()
+
+			fmt.Printf("- Functions ------------------------------------------------------------------\n\n")
+			for _, f := range c.Functions {
+				fmt.Println(f)
 			}
 		}
 
