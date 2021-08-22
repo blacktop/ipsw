@@ -114,7 +114,11 @@ var ctfdumpCmd = &cobra.Command{
 
 		fmt.Println(c.Header.String(Verbose))
 
-		c.GetDataTypes()
+		for _, t := range c.Types {
+			if t.Info().Kind() == ctf.UNION {
+				fmt.Printf("%s:\n%s\n", t.Info().Kind().String(), t.String())
+			}
+		}
 
 		return nil
 	},

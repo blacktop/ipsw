@@ -140,18 +140,13 @@ type stype struct {
  * ctf_type_t.  Use of this member is indicated by the presence of
  * LSIZE_SENT in ctt_size.
  */
-type Type struct {
-	Name       name   /* reference to name in string table */
-	Info       info   /* encoded kind, variant length (see below) */
-	SizeOrType uint16 /* UNION {
-	size of entire type in bytes
-	reference to another type
-	} */
+type ctftype struct {
+	stype
 	LSizeHI uint32 /* high 32 bits of type size in bytes */
 	LSizeLO uint32 /* low 32 bits of type size in bytes */
 }
 
-func (t Type) LSize() uint64 {
+func (t ctftype) LSize() uint64 {
 	return uint64(t.LSizeHI)<<32 | uint64(t.LSizeLO)
 }
 
