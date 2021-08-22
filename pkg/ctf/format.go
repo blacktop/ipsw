@@ -317,7 +317,7 @@ func (s *Struct) String() string {
 		s.size,
 	)
 	for _, f := range s.Fields {
-		fmt.Fprintf(w, "    %s\t%s;\t// off=%d\n",
+		fmt.Fprintf(w, "    %s\t%s;\t// off=%#x\n",
 			f.Type(),
 			f.name,
 			f.offset,
@@ -338,7 +338,7 @@ func (s *Struct) Dump() string {
 		s.size,
 	)
 	for _, f := range s.Fields {
-		fmt.Fprintf(w, "    %s\ttype=%d\toff=%d\n",
+		fmt.Fprintf(w, "    %s\ttype=%d\toff=%#x\n",
 			f.Name(),
 			f.reference,
 			f.offset,
@@ -407,7 +407,7 @@ func (s *Union) Dump() string {
 		s.size,
 	)
 	for _, f := range s.Fields {
-		sdump += fmt.Sprintf("\t%s type=%d off=%d\n",
+		sdump += fmt.Sprintf("\t%s type=%d off=%#x\n",
 			f.Name(),
 			f.reference,
 			f.offset,

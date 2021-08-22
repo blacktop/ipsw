@@ -127,7 +127,6 @@ var ctfdumpCmd = &cobra.Command{
 				}
 			}
 		} else { // DUMP
-
 			fmt.Printf("- CTF Header -----------------------------------------------------------------\n\n")
 			fmt.Println(c.Header)
 
