@@ -148,15 +148,17 @@ func (a *Array) ParentID() int {
 	return 0
 }
 
-func (a *Array) Type() string { return a.String() }
+func (a *Array) Type() string {
+	return strings.TrimSuffix(a.String(), ";")
+}
 
 func (a *Array) String() string {
 	var n string
 	if a.name != "(anon)" {
-		n = a.name
+		n = " " + a.name
 	}
 	return fmt.Sprintf(
-		"%s %s[%d]",
+		"%s%s[%d];",
 		a.Contents(),
 		n,
 		a.NumElements,
@@ -206,9 +208,10 @@ func (f *Function) Args() string {
 	var argStrs []string
 	for idx, arg := range f.args {
 		if t := f.lookupFn(int(arg)); t != nil {
-			argStrs = append(argStrs, t.String())
+			argStrs = append(argStrs, t.Type())
+		} else {
+			return fmt.Sprintf("<arg%d type not found>", idx)
 		}
-		return fmt.Sprintf("<arg%d type not found>", idx)
 	}
 
 	return strings.Join(argStrs, ", ")
@@ -219,7 +222,7 @@ func (f *Function) ParentID() int {
 }
 
 func (f *Function) Type() string {
-	return f.String()
+	return strings.TrimSuffix(f.String(), ";")
 }
 func (f *Function) String() string {
 	return fmt.Sprintf(
@@ -271,11 +274,12 @@ func (m Member) Offset() uint64 {
 }
 
 type Struct struct {
-	id     int
-	name   string
-	info   info
-	size   uint64
-	Fields []Member
+	id       int
+	name     string
+	info     info
+	size     uint64
+	Fields   []Member
+	lookupFn func(int) Type
 }
 
 func (s *Struct) ID() int {
@@ -303,7 +307,7 @@ func (s *Struct) Size() uint64 {
 
 func (s *Struct) Type() string {
 	if s.name == "(anon)" {
-		return s.String()
+		return strings.TrimSuffix(s.String(), ";")
 	}
 	return "struct " + s.Name()
 }
@@ -317,11 +321,21 @@ func (s *Struct) String() string {
 		s.size,
 	)
 	for _, f := range s.Fields {
-		fmt.Fprintf(w, "    %s\t%s;\t// off=%#x\n",
-			f.Type(),
-			f.name,
-			f.offset,
-		)
+		t := s.lookupFn(int(f.reference))
+		if t != nil && t.Info().Kind() == ARRAY {
+			fmt.Fprintf(w, "    %s\t%s[%d];\t// off=%#x\n",
+				t.(*Array).Contents(),
+				f.name,
+				t.(*Array).NumElements,
+				f.offset,
+			)
+		} else {
+			fmt.Fprintf(w, "    %s\t%s;\t// off=%#x\n",
+				f.Type(),
+				f.name,
+				f.offset,
+			)
+		}
 	}
 	fmt.Fprintf(w, "};")
 	w.Flush()
@@ -349,11 +363,12 @@ func (s *Struct) Dump() string {
 }
 
 type Union struct {
-	id     int
-	name   string
-	info   info
-	size   uint64
-	Fields []Member
+	id       int
+	name     string
+	info     info
+	size     uint64
+	Fields   []Member
+	lookupFn func(int) Type
 }
 
 func (s *Union) ID() int {
@@ -382,20 +397,31 @@ func (s *Union) Type() string {
 	return "union " + s.name
 }
 func (s *Union) String() string {
-	var sout string
-	sout = fmt.Sprintf(
+	buf := bytes.NewBufferString("")
+	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+	fmt.Fprintf(w,
 		"union %s {\t\t// (%d bytes)\n",
 		s.Name(),
 		s.size,
 	)
 	for _, f := range s.Fields {
-		sout += fmt.Sprintf("\t%s\t%s;\n",
-			f.Type(),
-			f.name,
-		)
+		t := s.lookupFn(int(f.reference))
+		if t != nil && t.Info().Kind() == ARRAY {
+			fmt.Fprintf(w, "    %s\t%s[%d];\n",
+				t.(*Array).Contents(),
+				f.name,
+				t.(*Array).NumElements,
+			)
+		} else {
+			fmt.Fprintf(w, "    %s\t%s;\n",
+				f.Type(),
+				f.name,
+			)
+		}
 	}
-	sout += "};"
-	return sout
+	fmt.Fprintf(w, "};")
+	w.Flush()
+	return buf.String()
 }
 
 func (s *Union) Dump() string {
@@ -453,7 +479,7 @@ func (e *Enum) String() string {
 			f.Value,
 		)
 	}
-	eout += "}"
+	eout += "};"
 	return eout
 }
 
@@ -542,11 +568,11 @@ func (p *Pointer) ParentID() int {
 }
 
 func (p *Pointer) Type() string {
-	return fmt.Sprintf("%s *", p.Reference())
+	return strings.TrimSuffix(p.String(), ";")
 }
 
 func (p *Pointer) String() string {
-	return fmt.Sprintf("%s *", p.Reference())
+	return fmt.Sprintf("%s *;", p.Reference())
 }
 
 func (p *Pointer) Dump() string {
@@ -784,11 +810,11 @@ func (p *PtrAuth) ParentID() int {
 func (p *PtrAuth) Type() string { return p.String() }
 func (p *PtrAuth) String() string {
 	return fmt.Sprintf(
-		"__ptrauth(%s, %t, %04x) %s",
+		"%s __ptrauth(%s, %t, %04x)",
+		p.Reference(),
 		p.data.Key(),
 		p.data.Discriminated(),
 		p.data.Discriminator(),
-		p.Reference(),
 	)
 }
 

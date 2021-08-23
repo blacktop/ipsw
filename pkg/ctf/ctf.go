@@ -226,10 +226,11 @@ func (c *CTF) GetDataTypes() error {
 			}
 		case STRUCT:
 			s := &Struct{
-				id:   id,
-				name: c.getString(uint32(t.Name)),
-				info: t.Info,
-				size: size,
+				id:       id,
+				name:     c.getString(uint32(t.Name)),
+				info:     t.Info,
+				size:     size,
+				lookupFn: c.lookup,
 			}
 			if size >= LSTRUCT_THRESH {
 				lmps := make([]lmember, t.Info.VarLen())
@@ -263,10 +264,11 @@ func (c *CTF) GetDataTypes() error {
 			c.Types[id] = s
 		case UNION:
 			u := &Union{
-				id:   id,
-				name: c.getString(uint32(t.Name)),
-				info: t.Info,
-				size: size,
+				id:       id,
+				name:     c.getString(uint32(t.Name)),
+				info:     t.Info,
+				size:     size,
+				lookupFn: c.lookup,
 			}
 			if size >= LSTRUCT_THRESH {
 				lmps := make([]lmember, t.Info.VarLen())

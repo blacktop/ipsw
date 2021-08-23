@@ -131,9 +131,9 @@ var ctfdumpCmd = &cobra.Command{
 
 			fmt.Printf("- Types ----------------------------------------------------------------------\n\n")
 			for _, id := range ids {
-				if c.Types[id].Info().IsRoot() {
-					fmt.Println(c.Types[id].Dump())
-				}
+				// if c.Types[id].Info().IsRoot() {
+				fmt.Println(c.Types[id].Dump())
+				// }
 			}
 
 			fmt.Printf("- Data Objects ---------------------------------------------------------------\n\n")
