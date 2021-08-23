@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -138,19 +137,17 @@ var ctfdumpCmd = &cobra.Command{
 			}
 
 			fmt.Printf("- Data Objects ---------------------------------------------------------------\n\n")
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, g := range c.Globals {
 				if g.Type != nil {
-					fmt.Fprintf(w, "%#x: %s %s\n", g.Address, g.Type, g.Name)
+					fmt.Printf("%#x: %s %s\n", g.Address, g.Type, g.Name)
 				} else {
 					if g.Reference == 0 {
-						fmt.Fprintf(w, "%#x: <unknown> %s\n", g.Address, g.Name)
+						fmt.Printf("%#x: <unknown> %s\n", g.Address, g.Name)
 					} else {
-						fmt.Fprintf(w, "%#x: %d %s\n", g.Address, g.Reference, g.Name)
+						fmt.Printf("%#x: %d %s\n", g.Address, g.Reference, g.Name)
 					}
 				}
 			}
-			w.Flush()
 
 			fmt.Printf("- Functions ------------------------------------------------------------------\n\n")
 			for _, f := range c.Functions {

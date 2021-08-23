@@ -444,9 +444,9 @@ func (e *Enum) ParentID() int {
 	return 0
 }
 
-func (e *Enum) Type() string { return e.String() }
+func (e *Enum) Type() string { return "enum " + e.name }
 func (e *Enum) String() string {
-	eout := "enum {\n"
+	eout := fmt.Sprintf("enum %s {\n", e.name)
 	for _, f := range e.Fields {
 		eout += fmt.Sprintf("\t%s = %d\n",
 			f.Name,
