@@ -129,17 +129,17 @@ var ctfdumpCmd = &cobra.Command{
 			fmt.Printf("- CTF Header -----------------------------------------------------------------\n\n")
 			fmt.Println(c.Header)
 
-			fmt.Printf("- Types ----------------------------------------------------------------------\n\n")
+			fmt.Printf("\n- Types ----------------------------------------------------------------------\n\n")
 			for _, id := range ids {
 				// if c.Types[id].Info().IsRoot() {
 				fmt.Println(c.Types[id].Dump())
 				// }
 			}
 
-			fmt.Printf("- Data Objects ---------------------------------------------------------------\n\n")
+			fmt.Printf("\n- Data Objects ---------------------------------------------------------------\n\n")
 			for _, g := range c.Globals {
 				if g.Type != nil {
-					fmt.Printf("%#x: %s %s\n", g.Address, g.Type, g.Name)
+					fmt.Printf("%#x: %s %s\n", g.Address, g.Type.Type(), g.Name)
 				} else {
 					if g.Reference == 0 {
 						fmt.Printf("%#x: <unknown> %s\n", g.Address, g.Name)
@@ -149,7 +149,7 @@ var ctfdumpCmd = &cobra.Command{
 				}
 			}
 
-			fmt.Printf("- Functions ------------------------------------------------------------------\n\n")
+			fmt.Printf("\n- Functions ------------------------------------------------------------------\n\n")
 			for _, f := range c.Functions {
 				fmt.Println(f)
 			}
