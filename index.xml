@@ -179,6 +179,15 @@
     </item>
     
     <item>
+      <title>ctfdump</title>
+      <link>https://blacktop.github.io/ipsw/docs/commands/ctfdump/</link>
+      <pubDate>Sun, 22 Aug 2021 23:34:02 -0600</pubDate>
+      
+      <guid>https://blacktop.github.io/ipsw/docs/commands/ctfdump/</guid>
+      <description>Dump CTF info.</description>
+    </item>
+    
+    <item>
       <title>ent</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/ent/</link>
       <pubDate>Wed, 14 Apr 2021 14:14:22 -0400</pubDate>
