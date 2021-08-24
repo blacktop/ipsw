@@ -2,6 +2,7 @@ package ctf
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -62,6 +63,19 @@ func (i *Integer) Dump() string {
 		i.encoding.Bits(),
 	)
 }
+func (i *Integer) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID       int         `json:"id,omitempty"`
+		Name     string      `json:"name,omitempty"`
+		Info     info        `json:"info,omitempty"`
+		Encoding intEncoding `json:"encoding,omitempty"`
+	}{
+		ID:       i.id,
+		Name:     i.name,
+		Info:     i.info,
+		Encoding: i.encoding,
+	})
+}
 
 type Float struct {
 	id       int
@@ -116,6 +130,19 @@ func (f *Float) Dump() string {
 		f.encoding.Bits(),
 	)
 }
+func (f *Float) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID       int           `json:"id,omitempty"`
+		Name     string        `json:"name,omitempty"`
+		Info     info          `json:"info,omitempty"`
+		Encoding floatEncoding `json:"encoding,omitempty"`
+	}{
+		ID:       f.id,
+		Name:     f.name,
+		Info:     f.info,
+		Encoding: f.encoding,
+	})
+}
 
 type Array struct {
 	id   int
@@ -130,7 +157,10 @@ func (a *Array) ID() int {
 }
 
 func (a *Array) Name() string {
-	return a.name
+	if a.name == "(anon)" {
+		return ""
+	}
+	return " " + a.name
 }
 
 func (a *Array) Info() info {
@@ -153,14 +183,10 @@ func (a *Array) Type() string {
 }
 
 func (a *Array) String() string {
-	var n string
-	if a.name != "(anon)" {
-		n = " " + a.name
-	}
 	return fmt.Sprintf(
 		"%s%s[%d];",
 		a.Contents(),
-		n,
+		a.Name(),
 		a.NumElements,
 	)
 }
@@ -174,6 +200,23 @@ func (a *Array) Dump() string {
 		a.array.Index,
 		a.array.NumElements,
 	)
+}
+func (a *Array) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID          int    `json:"id,omitempty"`
+		Name        string `json:"name,omitempty"`
+		Info        info   `json:"info,omitempty"`
+		Contents    string `json:"contents,omitempty"`     /* reference to type of array contents */
+		Index       uint16 `json:"index,omitempty"`        /* reference to type of array index */
+		NumElements uint32 `json:"num_elements,omitempty"` /* number of elements */
+	}{
+		ID:          a.id,
+		Name:        a.name,
+		Info:        a.info,
+		Contents:    a.Contents(),
+		Index:       a.array.Index,
+		NumElements: a.array.NumElements,
+	})
 }
 
 type Function struct {
@@ -249,6 +292,30 @@ func (f *Function) Dump() string {
 	return fdump
 }
 
+func (f *Function) MarshalJSON() ([]byte, error) {
+	var argStrs []string
+	for idx, arg := range f.args {
+		if t := f.lookupFn(int(arg)); t != nil {
+			argStrs = append(argStrs, t.Type())
+		} else {
+			argStrs = append(argStrs, fmt.Sprintf("<arg%d type ref %d not found>", idx, arg))
+		}
+	}
+	return json.Marshal(&struct {
+		ID        int      `json:"id,omitempty"`
+		Name      string   `json:"name,omitempty"`
+		Info      info     `json:"info,omitempty"`
+		Return    string   `json:"return,omitempty"`
+		Arguments []string `json:"arguments,omitempty"`
+	}{
+		ID:        f.id,
+		Name:      f.name,
+		Info:      f.info,
+		Return:    f.Return(),
+		Arguments: argStrs,
+	})
+}
+
 type Member struct {
 	parent    int
 	name      string
@@ -271,6 +338,17 @@ func (m Member) Type() string {
 }
 func (m Member) Offset() uint64 {
 	return m.offset
+}
+func (m Member) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Name   string `json:"name,omitempty"`
+		Type   string `json:"type,omitempty"`
+		Offset uint64 `json:"offset"`
+	}{
+		Name:   m.name,
+		Type:   m.Type(),
+		Offset: m.offset,
+	})
 }
 
 type Struct struct {
@@ -362,6 +440,22 @@ func (s *Struct) Dump() string {
 	return buf.String()
 }
 
+func (s *Struct) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID     int      `json:"id,omitempty"`
+		Name   string   `json:"name,omitempty"`
+		Info   info     `json:"info,omitempty"`
+		Size   uint64   `json:"size,omitempty"`
+		Fields []Member `json:"fields,omitempty"`
+	}{
+		ID:     s.id,
+		Name:   s.name,
+		Info:   s.info,
+		Size:   s.size,
+		Fields: s.Fields,
+	})
+}
+
 type Union struct {
 	id       int
 	name     string
@@ -441,10 +535,25 @@ func (s *Union) Dump() string {
 	}
 	return sdump
 }
+func (s *Union) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID     int      `json:"id,omitempty"`
+		Name   string   `json:"name,omitempty"`
+		Info   info     `json:"info,omitempty"`
+		Size   uint64   `json:"size,omitempty"`
+		Fields []Member `json:"fields,omitempty"`
+	}{
+		ID:     s.id,
+		Name:   s.name,
+		Info:   s.info,
+		Size:   s.size,
+		Fields: s.Fields,
+	})
+}
 
 type enumField struct {
-	Name  string
-	Value int32
+	Name  string `json:"name,omitempty"`
+	Value int32  `json:"value,omitempty"`
 }
 
 type Enum struct {
@@ -498,6 +607,19 @@ func (e *Enum) Dump() string {
 	}
 	return edump
 }
+func (e *Enum) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID     int         `json:"id,omitempty"`
+		Name   string      `json:"name,omitempty"`
+		Info   info        `json:"info,omitempty"`
+		Fields []enumField `json:"fields,omitempty"`
+	}{
+		ID:     e.id,
+		Name:   e.name,
+		Info:   e.info,
+		Fields: e.Fields,
+	})
+}
 
 type Forward struct {
 	id   int
@@ -534,6 +656,18 @@ func (f *Forward) Dump() string {
 		f.info.Kind(),
 		f.name,
 	)
+}
+
+func (f *Forward) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID   int    `json:"id,omitempty"`
+		Name string `json:"name,omitempty"`
+		Info info   `json:"info,omitempty"`
+	}{
+		ID:   f.id,
+		Name: f.name,
+		Info: f.info,
+	})
 }
 
 type Pointer struct {
@@ -583,6 +717,19 @@ func (p *Pointer) Dump() string {
 		p.reference,
 	)
 }
+func (p *Pointer) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID        int    `json:"id,omitempty"`
+		Name      string `json:"name,omitempty"`
+		Info      info   `json:"info,omitempty"`
+		Reference string `json:"reference,omitempty"`
+	}{
+		ID:        p.id,
+		Name:      p.name,
+		Info:      p.info,
+		Reference: p.Reference(),
+	})
+}
 
 type Typedef struct {
 	id        int
@@ -631,6 +778,19 @@ func (p *Typedef) Dump() string {
 		p.reference,
 	)
 }
+func (p *Typedef) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID        int    `json:"id,omitempty"`
+		Name      string `json:"name,omitempty"`
+		Info      info   `json:"info,omitempty"`
+		Reference string `json:"reference,omitempty"`
+	}{
+		ID:        p.id,
+		Name:      p.name,
+		Info:      p.info,
+		Reference: p.Reference(),
+	})
+}
 
 type Volatile struct {
 	id        int
@@ -677,6 +837,19 @@ func (p *Volatile) Dump() string {
 		p.name,
 		p.reference,
 	)
+}
+func (p *Volatile) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID        int    `json:"id,omitempty"`
+		Name      string `json:"name,omitempty"`
+		Info      info   `json:"info,omitempty"`
+		Reference string `json:"reference,omitempty"`
+	}{
+		ID:        p.id,
+		Name:      p.name,
+		Info:      p.info,
+		Reference: p.Reference(),
+	})
 }
 
 type Const struct {
@@ -726,6 +899,19 @@ func (p *Const) Dump() string {
 		p.reference,
 	)
 }
+func (p *Const) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID        int    `json:"id,omitempty"`
+		Name      string `json:"name,omitempty"`
+		Info      info   `json:"info,omitempty"`
+		Reference string `json:"reference,omitempty"`
+	}{
+		ID:        p.id,
+		Name:      p.name,
+		Info:      p.info,
+		Reference: p.Reference(),
+	})
+}
 
 type Restrict struct {
 	id        int
@@ -773,6 +959,19 @@ func (p *Restrict) Dump() string {
 		p.name,
 		p.reference,
 	)
+}
+func (p *Restrict) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID        int    `json:"id,omitempty"`
+		Name      string `json:"name,omitempty"`
+		Info      info   `json:"info,omitempty"`
+		Reference string `json:"reference,omitempty"`
+	}{
+		ID:        p.id,
+		Name:      p.name,
+		Info:      p.info,
+		Reference: p.Reference(),
+	})
 }
 
 type PtrAuth struct {
@@ -829,19 +1028,34 @@ func (p *PtrAuth) Dump() string {
 		p.data.Discriminator(),
 	)
 }
+func (p *PtrAuth) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		ID        int         `json:"id,omitempty"`
+		Name      string      `json:"name,omitempty"`
+		Info      info        `json:"info,omitempty"`
+		Data      ptrAuthData `json:"data,omitempty"`
+		Reference string      `json:"reference,omitempty"`
+	}{
+		ID:        p.id,
+		Name:      p.name,
+		Info:      p.info,
+		Data:      p.data,
+		Reference: p.Reference(),
+	})
+}
 
 type global struct {
-	Address   uint64
-	Name      string
-	Reference int
-	Type      Type
+	Address   uint64 `json:"address,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Reference int    `json:"reference,omitempty"`
+	Type      Type   `json:"type,omitempty"`
 }
 
 type function struct {
-	Address   uint64
-	Name      string
-	Return    Type
-	Arguments []Type
+	Address   uint64 `json:"address,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Return    Type   `json:"return,omitempty"`
+	Arguments []Type `json:"arguments,omitempty"`
 }
 
 func (f function) String() string {

@@ -3,6 +3,7 @@ package ctf
 //go:generate stringer -type=kind,floatEncoding -output types_string.go
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -91,28 +92,28 @@ const (
 
 // ctf_preamble
 type preamble struct {
-	Magic   uint16 /* magic number (MAGIC) */
-	Version uint8  /* data format version number (VERSION) */
-	Flags   uint8  /* flags (see below) */
+	Magic   uint16 `json:"magic,omitempty"`   /* magic number (MAGIC) */
+	Version uint8  `json:"version,omitempty"` /* data format version number (VERSION) */
+	Flags   uint8  `json:"flags,omitempty"`   /* flags (see below) */
 }
 
 // ctf_header_t
 type header_t struct {
-	Preamble       preamble
-	ParentLabelRef uint32 /* ref to name of parent lbl uniq'd against */
-	ParentNameRef  uint32 /* ref to basename of parent */
-	LabelOffset    uint32 /* offset of label section */
-	ObjOffset      uint32 /* offset of object section */
-	FuncOffset     uint32 /* offset of function section */
-	TypeOffset     uint32 /* offset of type section */
-	StrOffset      uint32 /* offset of string section */
-	StrLen         uint32 /* length of string section in bytes */
+	Preamble       preamble `json:"preamble,omitempty"`
+	ParentLabelRef uint32   `json:"parent_label_ref,omitempty"` /* ref to name of parent lbl uniq'd against */
+	ParentNameRef  uint32   `json:"parent_name_ref,omitempty"`  /* ref to basename of parent */
+	LabelOffset    uint32   `json:"label_offset,omitempty"`     /* offset of label section */
+	ObjOffset      uint32   `json:"obj_offset,omitempty"`       /* offset of object section */
+	FuncOffset     uint32   `json:"func_offset,omitempty"`      /* offset of function section */
+	TypeOffset     uint32   `json:"type_offset,omitempty"`      /* offset of type section */
+	StrOffset      uint32   `json:"str_offset,omitempty"`       /* offset of string section */
+	StrLen         uint32   `json:"str_len,omitempty"`          /* length of string section in bytes */
 }
 
 type header struct {
 	header_t
-	ParentLabel string /* name of parent lbl uniq'd against */
-	ParentName  string /* basename of parent */
+	ParentLabel string `json:"parent_label,omitempty"` /* name of parent lbl uniq'd against */
+	ParentName  string `json:"parent_name,omitempty"`  /* basename of parent */
 }
 
 // ctf_lblent_t
@@ -160,6 +161,17 @@ func (i info) IsRoot() bool {
 }
 func (i info) VarLen() uint16 {
 	return uint16(i) & MAX_VLEN
+}
+func (i info) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Kind   string `json:"kind,omitempty"`
+		IsRoot bool   `json:"is_root,omitempty"`
+		VarLen uint16 `json:"var_len,omitempty"`
+	}{
+		Kind:   i.Kind().String(),
+		IsRoot: i.IsRoot(),
+		VarLen: i.VarLen(),
+	})
 }
 
 type name uint32
@@ -234,6 +246,17 @@ func (e intEncoding) String() string {
 	}
 	return strings.TrimSpace(fmtStr)
 }
+func (e intEncoding) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Encoding string `json:"encoding,omitempty"`
+		Offset   uint32 `json:"offset,omitempty"`
+		Bits     uint32 `json:"bits,omitempty"`
+	}{
+		Encoding: e.Encoding().String(),
+		Offset:   e.Offset(),
+		Bits:     e.Bits(),
+	})
+}
 
 const (
 	SIGNED  intEncoding = 0x01 /* integer is signed (otherwise unsigned) */
@@ -256,6 +279,17 @@ func (e floatEncoding) Offset() uint32 {
 }
 func (e floatEncoding) Bits() uint32 {
 	return uint32(e & 0x0000ffff)
+}
+func (e floatEncoding) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Encoding string `json:"encoding,omitempty"`
+		Offset   uint32 `json:"offset,omitempty"`
+		Bits     uint32 `json:"bits,omitempty"`
+	}{
+		Encoding: e.Encoding().String(),
+		Offset:   e.Offset(),
+		Bits:     e.Bits(),
+	})
 }
 
 const (
@@ -294,12 +328,23 @@ func (p ptrAuthData) Key() string {
 func (p ptrAuthData) Discriminator() uint32 {
 	return uint32(p & 0x0000ffff)
 }
+func (p ptrAuthData) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Key       string `json:"key,omitempty"`
+		AddrDiv   bool   `json:"addr_div,omitempty"`
+		Diversity uint32 `json:"diversity,omitempty"`
+	}{
+		Key:       p.Key(),
+		AddrDiv:   p.Discriminated(),
+		Diversity: p.Discriminator(),
+	})
+}
 
 // ctf_array_t
 type array struct {
-	Contents    uint16 /* reference to type of array contents */
-	Index       uint16 /* reference to type of array index */
-	NumElements uint32 /* number of elements */
+	Contents    uint16 `json:"contents,omitempty"`     /* reference to type of array contents */
+	Index       uint16 `json:"index,omitempty"`        /* reference to type of array index */
+	NumElements uint32 `json:"num_elements,omitempty"` /* number of elements */
 }
 
 /*

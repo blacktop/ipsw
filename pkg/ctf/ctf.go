@@ -14,10 +14,10 @@ import (
 
 // CTF is the Compact ANSI-C Type Format object
 type CTF struct {
-	Header    header
-	Types     map[int]Type
-	Globals   []global
-	Functions []function
+	Header    header       `json:"header,omitempty"`
+	Types     map[int]Type `json:"types,omitempty"`
+	Globals   []global     `json:"globals,omitempty"`
+	Functions []function   `json:"functions,omitempty"`
 
 	data []byte
 	m    *macho.File
