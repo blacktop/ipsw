@@ -210,8 +210,7 @@
   <h3 id="dump-ctf-info">Dump CTF info</h3>
 <p>KDK kernelcaches contain CTF - <em>Compact ANSI-C Type Format</em> data which is used by dtrace. It&rsquo;s a data format much like DWARF and contains and absolute treasure trove for peeps REing the kernels (types, globals and func signatures).</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ctfdump KDK
-
-- CTF Header -----------------------------------------------------------------
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">- CTF Header -----------------------------------------------------------------
 
 <span class="nv">Magic</span>        <span class="o">=</span> 0xcff1
 <span class="nv">Version</span>      <span class="o">=</span> <span class="m">3</span>
@@ -251,6 +250,81 @@ Str <span class="nv">Len</span>      <span class="o">=</span> 0x763dc
     rm_rmu    <span class="nv">type</span><span class="o">=</span><span class="m">7</span>  <span class="nv">off</span><span class="o">=</span>0x80
     rm_refs   <span class="nv">type</span><span class="o">=</span><span class="m">8</span>  <span class="nv">off</span><span class="o">=</span>0xc0
 &lt;SNIP&gt;
+
+- Data Objects ---------------------------------------------------------------
+
+0xfffffe00072bf0a0: &lt;unknown&gt; AccelerateCrypto_SHA256_compress
+0xfffffe00071b4ce8: boot_args * BootArgs
+0xfffffe0007dc0b20: cpu_data_entry_t<span class="o">[</span>8<span class="o">]</span> CpuDataEntries
+0xfffffe00072a4a58: RealDTEntry DTRootNode
+0xfffffe0007dc1dd0: unsigned int DebugContextCount
+0xfffffe0007dfd708: &lt;unknown&gt; IOLockGroup
+0xfffffe0007dfd6fc: &lt;unknown&gt; IOZeroTvalspec
+0xfffffe000700b114: const audit_token_t KERNEL_AUDIT_TOKEN
+0xfffffe000700b10c: const security_token_t KERNEL_SECURITY_TOKEN
+0xfffffe00071ab838: struct kalloc_heap<span class="o">[</span>1<span class="o">]</span> KHEAP_DATA_BUFFERS
+0xfffffe00071ab240: struct kalloc_heap<span class="o">[</span>1<span class="o">]</span> KHEAP_DEFAULT
+0xfffffe0007243660: struct kalloc_heap<span class="o">[</span>1<span class="o">]</span> KHEAP_DTRACE
+0xfffffe00071abd10: struct kalloc_heap<span class="o">[</span>1<span class="o">]</span> KHEAP_KEXT
+0xfffffe00072458a0: struct kalloc_heap<span class="o">[</span>1<span class="o">]</span> KHEAP_VFS_BIO
+&lt;SNIP&gt;
+
+- Functions ------------------------------------------------------------------
+
+0xfffffe0007cce944: void Assert<span class="o">()</span><span class="p">;</span>
+0xfffffe0007943624: int CURSIG<span class="o">(</span>proc_t<span class="o">)</span><span class="p">;</span>
+0xfffffe00074df8c8: void ClearIdlePop<span class="o">()</span><span class="p">;</span>
+0xfffffe00073250dc: void Debugger<span class="o">()</span><span class="p">;</span>
+0xfffffe00074dd82c: void DebuggerCall<span class="o">()</span><span class="p">;</span>
+0xfffffe0007324ebc: kern_return_t DebuggerTrapWithState<span class="o">(</span>debugger_op, const char *, const char *, va_list *, uint64_t, void *, boolean_t, unsigned long<span class="o">)</span><span class="p">;</span>
+0xfffffe00073250f0: void DebuggerWithContext<span class="o">()</span><span class="p">;</span>
+0xfffffe00074dd608: void DebuggerXCall<span class="o">()</span><span class="p">;</span>
+0xfffffe00074dd070: kern_return_t DebuggerXCallEnter<span class="o">(</span>boolean_t<span class="o">)</span><span class="p">;</span>
+0xfffffe00074dd554: void DebuggerXCallReturn<span class="o">()</span><span class="p">;</span>
+0xfffffe000748eb1c: unsigned int IODefaultCacheBits<span class="o">(</span>addr64_t<span class="o">)</span><span class="p">;</span>
+0xfffffe000748ee0c: ppnum_t IOGetLastPageNumber<span class="o">()</span><span class="p">;</span>
+0xfffffe000748ee14: void IOGetTime<span class="o">()</span><span class="p">;</span>
+0xfffffe000748eb2c: kern_return_t IOMapPages<span class="o">(</span>vm_map_t, mach_vm_address_t, mach_vm_address_t, mach_vm_size_t, unsigned int<span class="o">)</span><span class="p">;</span>
+</code></pre></div><h3 id="dump-as-json">Dump as JSON</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ctfdump KDK --json
+   • Creating ctfdump.json
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+    <span class="nt">&#34;header&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;preamble&#34;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&#34;magic&#34;</span><span class="p">:</span> <span class="mi">53233</span><span class="p">,</span>
+            <span class="nt">&#34;version&#34;</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span>
+            <span class="nt">&#34;flags&#34;</span><span class="p">:</span> <span class="mi">1</span>
+        <span class="p">},</span>
+        <span class="nt">&#34;obj_offset&#34;</span><span class="p">:</span> <span class="mi">8</span><span class="p">,</span>
+        <span class="nt">&#34;func_offset&#34;</span><span class="p">:</span> <span class="mi">9338</span><span class="p">,</span>
+        <span class="nt">&#34;type_offset&#34;</span><span class="p">:</span> <span class="mi">109816</span><span class="p">,</span>
+        <span class="nt">&#34;str_offset&#34;</span><span class="p">:</span> <span class="mi">894196</span><span class="p">,</span>
+        <span class="nt">&#34;str_len&#34;</span><span class="p">:</span> <span class="mi">484316</span><span class="p">,</span>
+        <span class="nt">&#34;parent_label&#34;</span><span class="p">:</span> <span class="s2">&#34;(anon)&#34;</span><span class="p">,</span>
+        <span class="nt">&#34;parent_name&#34;</span><span class="p">:</span> <span class="s2">&#34;(anon)&#34;</span>
+    <span class="p">},</span>
+    <span class="nt">&#34;types&#34;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&#34;1&#34;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+            <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;short&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;info&#34;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="nt">&#34;kind&#34;</span><span class="p">:</span> <span class="s2">&#34;INTEGER&#34;</span><span class="p">,</span>
+                <span class="nt">&#34;var_len&#34;</span><span class="p">:</span> <span class="mi">1</span>
+            <span class="p">},</span>
+            <span class="nt">&#34;encoding&#34;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="nt">&#34;encoding&#34;</span><span class="p">:</span> <span class="s2">&#34;SIGNED&#34;</span><span class="p">,</span>
+                <span class="nt">&#34;bits&#34;</span><span class="p">:</span> <span class="mi">16</span>
+            <span class="p">}</span>
+        <span class="p">},</span>
+        <span class="nt">&#34;10&#34;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&#34;id&#34;</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span>
+            <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;(anon)&#34;</span><span class="p">,</span>
+            <span class="nt">&#34;info&#34;</span><span class="p">:</span> <span class="p">{</span>
+                <span class="nt">&#34;kind&#34;</span><span class="p">:</span> <span class="s2">&#34;POINTER&#34;</span>
+            <span class="p">},</span>
+            <span class="nt">&#34;reference&#34;</span><span class="p">:</span> <span class="s2">&#34;struct radix_mask&#34;</span>
+        <span class="p">},</span>
+<span class="err">&lt;SNIP&gt;</span>
 </code></pre></div><h3 id="dump-a-single-type">Dump a single <code>type</code></h3>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ctfdump KDK/macOS12beta/kernel.development.t8101 task &gt; task.h
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ cat task.h
