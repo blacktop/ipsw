@@ -22,7 +22,9 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,6 +41,7 @@ import (
 func init() {
 	rootCmd.AddCommand(ctfdumpCmd)
 
+	ctfdumpCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	ctfdumpCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
 	ctfdumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -57,6 +60,7 @@ var ctfdumpCmd = &cobra.Command{
 		}
 
 		selectedArch, _ := cmd.Flags().GetString("arch")
+		outAsJSON, _ := cmd.Flags().GetBool("json")
 
 		machoPath := filepath.Clean(args[0])
 
@@ -126,32 +130,45 @@ var ctfdumpCmd = &cobra.Command{
 				}
 			}
 		} else { // DUMP
-			fmt.Printf("- CTF Header -----------------------------------------------------------------\n\n")
-			fmt.Println(c.Header)
+			if outAsJSON {
+				b, err := json.MarshalIndent(c, "", "    ")
+				// b, err := json.Marshal(c)
+				if err != nil {
+					return fmt.Errorf("failed to marshal function as JSON: %v", err)
+				}
+				cwd, _ := os.Getwd()
+				log.Infof("Creating %s", filepath.Join(cwd, "ctfdump.json"))
+				if err := ioutil.WriteFile("ctfdump.json", b, 0755); err != nil {
+					return err
+				}
+			} else {
+				fmt.Printf("- CTF Header -----------------------------------------------------------------\n\n")
+				fmt.Println(c.Header)
 
-			fmt.Printf("\n- Types ----------------------------------------------------------------------\n\n")
-			for _, id := range ids {
-				// if c.Types[id].Info().IsRoot() {
-				fmt.Println(c.Types[id].Dump())
-				// }
-			}
+				fmt.Printf("\n- Types ----------------------------------------------------------------------\n\n")
+				for _, id := range ids {
+					// if c.Types[id].Info().IsRoot() {
+					fmt.Println(c.Types[id].Dump())
+					// }
+				}
 
-			fmt.Printf("\n- Data Objects ---------------------------------------------------------------\n\n")
-			for _, g := range c.Globals {
-				if g.Type != nil {
-					fmt.Printf("%#x: %s %s\n", g.Address, g.Type.Type(), g.Name)
-				} else {
-					if g.Reference == 0 {
-						fmt.Printf("%#x: <unknown> %s\n", g.Address, g.Name)
+				fmt.Printf("\n- Data Objects ---------------------------------------------------------------\n\n")
+				for _, g := range c.Globals {
+					if g.Type != nil {
+						fmt.Printf("%#x: %s %s\n", g.Address, g.Type.Type(), g.Name)
 					} else {
-						fmt.Printf("%#x: %d %s\n", g.Address, g.Reference, g.Name)
+						if g.Reference == 0 {
+							fmt.Printf("%#x: <unknown> %s\n", g.Address, g.Name)
+						} else {
+							fmt.Printf("%#x: %d %s\n", g.Address, g.Reference, g.Name)
+						}
 					}
 				}
-			}
 
-			fmt.Printf("\n- Functions ------------------------------------------------------------------\n\n")
-			for _, f := range c.Functions {
-				fmt.Println(f)
+				fmt.Printf("\n- Functions ------------------------------------------------------------------\n\n")
+				for _, f := range c.Functions {
+					fmt.Println(f)
+				}
 			}
 		}
 

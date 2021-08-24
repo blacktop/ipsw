@@ -11,7 +11,9 @@ KDK kernelcaches contain CTF - _Compact ANSI-C Type Format_ data which is used b
 
 ```bash
 $ ipsw ctfdump KDK
+```
 
+```bash
 - CTF Header -----------------------------------------------------------------
 
 Magic        = 0xcff1
@@ -51,6 +53,88 @@ Str Len      = 0x763dc
     rm_mklist type=10 off=0x40
     rm_rmu    type=7  off=0x80
     rm_refs   type=8  off=0xc0
+<SNIP>
+
+- Data Objects ---------------------------------------------------------------
+
+0xfffffe00072bf0a0: <unknown> AccelerateCrypto_SHA256_compress
+0xfffffe00071b4ce8: boot_args * BootArgs
+0xfffffe0007dc0b20: cpu_data_entry_t[8] CpuDataEntries
+0xfffffe00072a4a58: RealDTEntry DTRootNode
+0xfffffe0007dc1dd0: unsigned int DebugContextCount
+0xfffffe0007dfd708: <unknown> IOLockGroup
+0xfffffe0007dfd6fc: <unknown> IOZeroTvalspec
+0xfffffe000700b114: const audit_token_t KERNEL_AUDIT_TOKEN
+0xfffffe000700b10c: const security_token_t KERNEL_SECURITY_TOKEN
+0xfffffe00071ab838: struct kalloc_heap[1] KHEAP_DATA_BUFFERS
+0xfffffe00071ab240: struct kalloc_heap[1] KHEAP_DEFAULT
+0xfffffe0007243660: struct kalloc_heap[1] KHEAP_DTRACE
+0xfffffe00071abd10: struct kalloc_heap[1] KHEAP_KEXT
+0xfffffe00072458a0: struct kalloc_heap[1] KHEAP_VFS_BIO
+<SNIP>
+
+- Functions ------------------------------------------------------------------
+
+0xfffffe0007cce944: void Assert();
+0xfffffe0007943624: int CURSIG(proc_t);
+0xfffffe00074df8c8: void ClearIdlePop();
+0xfffffe00073250dc: void Debugger();
+0xfffffe00074dd82c: void DebuggerCall();
+0xfffffe0007324ebc: kern_return_t DebuggerTrapWithState(debugger_op, const char *, const char *, va_list *, uint64_t, void *, boolean_t, unsigned long);
+0xfffffe00073250f0: void DebuggerWithContext();
+0xfffffe00074dd608: void DebuggerXCall();
+0xfffffe00074dd070: kern_return_t DebuggerXCallEnter(boolean_t);
+0xfffffe00074dd554: void DebuggerXCallReturn();
+0xfffffe000748eb1c: unsigned int IODefaultCacheBits(addr64_t);
+0xfffffe000748ee0c: ppnum_t IOGetLastPageNumber();
+0xfffffe000748ee14: void IOGetTime();
+0xfffffe000748eb2c: kern_return_t IOMapPages(vm_map_t, mach_vm_address_t, mach_vm_address_t, mach_vm_size_t, unsigned int);
+```
+
+### Dump as JSON
+
+```bash
+$ ipsw ctfdump KDK --json
+   • Creating ctfdump.json
+```
+
+```json
+{
+    "header": {
+        "preamble": {
+            "magic": 53233,
+            "version": 3,
+            "flags": 1
+        },
+        "obj_offset": 8,
+        "func_offset": 9338,
+        "type_offset": 109816,
+        "str_offset": 894196,
+        "str_len": 484316,
+        "parent_label": "(anon)",
+        "parent_name": "(anon)"
+    },
+    "types": {
+        "1": {
+            "id": 1,
+            "name": "short",
+            "info": {
+                "kind": "INTEGER",
+                "var_len": 1
+            },
+            "encoding": {
+                "encoding": "SIGNED",
+                "bits": 16
+            }
+        },
+        "10": {
+            "id": 10,
+            "name": "(anon)",
+            "info": {
+                "kind": "POINTER"
+            },
+            "reference": "struct radix_mask"
+        },
 <SNIP>
 ```
 
