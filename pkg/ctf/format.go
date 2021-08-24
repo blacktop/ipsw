@@ -87,39 +87,30 @@ type Float struct {
 func (f *Float) ID() int {
 	return f.id
 }
-
 func (f *Float) Name() string {
 	return f.name
 }
-
 func (f *Float) Info() info {
 	return f.info
 }
-
 func (f *Float) Encoding() string {
 	return f.encoding.Encoding().String()
 }
-
 func (f *Float) Offset() uint32 {
 	return f.encoding.Offset()
 }
-
 func (f *Float) Bits() uint32 {
 	return f.encoding.Bits()
 }
-
 func (f *Float) ParentID() int {
 	return 0
 }
-
 func (f *Float) Type() string {
 	return f.name
 }
-
 func (f *Float) String() string {
 	return f.name
 }
-
 func (f *Float) Dump() string {
 	return fmt.Sprintf("%s %s %s encoding=%s offset=%d bits=%d",
 		isRootIDFmtStr(f.info.IsRoot(), f.id),
@@ -155,33 +146,33 @@ type Array struct {
 func (a *Array) ID() int {
 	return a.id
 }
-
 func (a *Array) Name() string {
 	if a.name == "(anon)" {
 		return ""
 	}
 	return " " + a.name
 }
-
 func (a *Array) Info() info {
 	return a.info
 }
-
+func (a *Array) Index() string {
+	if t := a.lookupFn(int(a.array.Index)); t != nil {
+		return t.Type()
+	}
+	return "<type not found>"
+}
 func (a *Array) Contents() string {
 	if t := a.lookupFn(int(a.array.Contents)); t != nil {
 		return t.Type()
 	}
 	return "<type not found>"
 }
-
 func (a *Array) ParentID() int {
 	return 0
 }
-
 func (a *Array) Type() string {
 	return strings.TrimSuffix(a.String(), ";")
 }
-
 func (a *Array) String() string {
 	return fmt.Sprintf(
 		"%s%s[%d];",
@@ -190,7 +181,6 @@ func (a *Array) String() string {
 		a.NumElements,
 	)
 }
-
 func (a *Array) Dump() string {
 	return fmt.Sprintf("%s %s %s content: %d index: %d nelems: %d",
 		isRootIDFmtStr(a.info.IsRoot(), a.id),
@@ -206,15 +196,19 @@ func (a *Array) MarshalJSON() ([]byte, error) {
 		ID          int    `json:"id,omitempty"`
 		Name        string `json:"name,omitempty"`
 		Info        info   `json:"info,omitempty"`
+		ContentsID  uint16 `json:"contents_id,omitempty"`  /* reference to type of array contents */
 		Contents    string `json:"contents,omitempty"`     /* reference to type of array contents */
-		Index       uint16 `json:"index,omitempty"`        /* reference to type of array index */
+		IndexID     uint16 `json:"index_id,omitempty"`     /* reference to type of array index */
+		IndexType   string `json:"index_type,omitempty"`   /* reference to type of array index */
 		NumElements uint32 `json:"num_elements,omitempty"` /* number of elements */
 	}{
 		ID:          a.id,
 		Name:        a.name,
 		Info:        a.info,
+		ContentsID:  a.array.Contents,
 		Contents:    a.Contents(),
-		Index:       a.array.Index,
+		IndexID:     a.array.Index,
+		IndexType:   a.Index(),
 		NumElements: a.array.NumElements,
 	})
 }
@@ -228,25 +222,26 @@ type Function struct {
 	lookupFn func(int) Type
 }
 
+type funcArg struct {
+	ID   int    `json:"id,omitempty"`
+	Type string `json:"type,omitempty"`
+}
+
 func (f *Function) ID() int {
 	return f.id
 }
-
 func (f *Function) Name() string {
 	return f.name
 }
-
 func (f *Function) Info() info {
 	return f.info
 }
-
 func (f *Function) Return() string {
 	if t := f.lookupFn(int(f.ret)); t != nil {
 		return t.Type()
 	}
 	return "<return type not found>"
 }
-
 func (f *Function) Args() string {
 	var argStrs []string
 	for idx, arg := range f.args {
@@ -256,14 +251,11 @@ func (f *Function) Args() string {
 			return fmt.Sprintf("<arg%d type not found>", idx)
 		}
 	}
-
 	return strings.Join(argStrs, ", ")
 }
-
 func (f *Function) ParentID() int {
 	return 0
 }
-
 func (f *Function) Type() string {
 	return strings.TrimSuffix(f.String(), ";")
 }
@@ -275,7 +267,6 @@ func (f *Function) String() string {
 		f.Args(),
 	)
 }
-
 func (f *Function) Dump() string {
 	var fdump string
 	fdump = fmt.Sprintf("%s %s %s returns: %d args: (",
@@ -291,28 +282,35 @@ func (f *Function) Dump() string {
 	fdump = fmt.Sprintf("%s)", strings.Join(sargs, ","))
 	return fdump
 }
-
 func (f *Function) MarshalJSON() ([]byte, error) {
-	var argStrs []string
+	var args []funcArg
 	for idx, arg := range f.args {
 		if t := f.lookupFn(int(arg)); t != nil {
-			argStrs = append(argStrs, t.Type())
+			args = append(args, funcArg{
+				ID:   int(arg),
+				Type: t.Type(),
+			})
 		} else {
-			argStrs = append(argStrs, fmt.Sprintf("<arg%d type ref %d not found>", idx, arg))
+			args = append(args, funcArg{
+				ID:   int(arg),
+				Type: fmt.Sprintf("<arg%d type ref %d not found>", idx, arg),
+			})
 		}
 	}
 	return json.Marshal(&struct {
-		ID        int      `json:"id,omitempty"`
-		Name      string   `json:"name,omitempty"`
-		Info      info     `json:"info,omitempty"`
-		Return    string   `json:"return,omitempty"`
-		Arguments []string `json:"arguments,omitempty"`
+		ID        int       `json:"id,omitempty"`
+		Name      string    `json:"name,omitempty"`
+		Info      info      `json:"info,omitempty"`
+		ReturnID  uint16    `json:"return_id,omitempty"`
+		Return    string    `json:"return,omitempty"`
+		Arguments []funcArg `json:"arguments,omitempty"`
 	}{
 		ID:        f.id,
 		Name:      f.name,
 		Info:      f.info,
+		ReturnID:  f.ret,
 		Return:    f.Return(),
-		Arguments: argStrs,
+		Arguments: args,
 	})
 }
 
@@ -341,10 +339,12 @@ func (m Member) Offset() uint64 {
 }
 func (m Member) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
+		ID     int    `json:"id,omitempty"`
 		Name   string `json:"name,omitempty"`
 		Type   string `json:"type,omitempty"`
 		Offset uint64 `json:"offset"`
 	}{
+		ID:     int(m.reference),
 		Name:   m.name,
 		Type:   m.Type(),
 		Offset: m.offset,
@@ -363,33 +363,27 @@ type Struct struct {
 func (s *Struct) ID() int {
 	return s.id
 }
-
 func (s *Struct) Name() string {
 	if s.name == "(anon)" {
 		return ""
 	}
 	return s.name
 }
-
 func (s *Struct) Info() info {
 	return s.info
 }
-
 func (s *Struct) ParentID() int {
 	return 0
 }
-
 func (s *Struct) Size() uint64 {
 	return s.size
 }
-
 func (s *Struct) Type() string {
 	if s.name == "(anon)" {
 		return strings.TrimSuffix(s.String(), ";")
 	}
 	return "struct " + s.Name()
 }
-
 func (s *Struct) String() string {
 	buf := bytes.NewBufferString("")
 	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
@@ -419,7 +413,6 @@ func (s *Struct) String() string {
 	w.Flush()
 	return buf.String()
 }
-
 func (s *Struct) Dump() string {
 	buf := bytes.NewBufferString("")
 	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
@@ -439,7 +432,6 @@ func (s *Struct) Dump() string {
 	w.Flush()
 	return buf.String()
 }
-
 func (s *Struct) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID     int      `json:"id,omitempty"`
@@ -468,22 +460,18 @@ type Union struct {
 func (s *Union) ID() int {
 	return s.id
 }
-
 func (s *Union) Name() string {
 	if s.name == "(anon)" {
 		return ""
 	}
 	return s.name
 }
-
 func (s *Union) Info() info {
 	return s.info
 }
-
 func (s *Union) ParentID() int {
 	return 0
 }
-
 func (s *Union) Size() uint64 {
 	return s.size
 }
@@ -517,7 +505,6 @@ func (s *Union) String() string {
 	w.Flush()
 	return buf.String()
 }
-
 func (s *Union) Dump() string {
 	var sdump string
 	sdump = fmt.Sprintf("%s %s %s (%d bytes)\n",
@@ -566,19 +553,15 @@ type Enum struct {
 func (e *Enum) ID() int {
 	return e.id
 }
-
 func (e *Enum) Name() string {
 	return e.name
 }
-
 func (e *Enum) Info() info {
 	return e.info
 }
-
 func (e *Enum) ParentID() int {
 	return 0
 }
-
 func (e *Enum) Type() string { return "enum " + e.name }
 func (e *Enum) String() string {
 	eout := fmt.Sprintf("enum %s {\n", e.name)
@@ -591,7 +574,6 @@ func (e *Enum) String() string {
 	eout += "};"
 	return eout
 }
-
 func (e *Enum) Dump() string {
 	var edump string
 	edump = fmt.Sprintf("%s %s %s\n",
@@ -630,26 +612,21 @@ type Forward struct {
 func (f *Forward) ID() int {
 	return f.id
 }
-
 func (f *Forward) Name() string {
 	return f.name
 }
-
 func (f *Forward) Info() info {
 	return f.info
 }
-
 func (f *Forward) ParentID() int {
 	return 0
 }
-
 func (f *Forward) Type() string {
 	return f.name
 }
 func (f *Forward) String() string {
 	return f.name
 }
-
 func (f *Forward) Dump() string {
 	return fmt.Sprintf("%s %s %s",
 		isRootIDFmtStr(f.info.IsRoot(), f.id),
@@ -657,7 +634,6 @@ func (f *Forward) Dump() string {
 		f.name,
 	)
 }
-
 func (f *Forward) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID   int    `json:"id,omitempty"`
@@ -681,34 +657,27 @@ type Pointer struct {
 func (p *Pointer) ID() int {
 	return p.id
 }
-
 func (p *Pointer) Name() string {
 	return p.name
 }
-
 func (p *Pointer) Info() info {
 	return p.info
 }
-
 func (p *Pointer) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
 		return t.Type()
 	}
 	return "<reference type not found>"
 }
-
 func (p *Pointer) ParentID() int {
 	return int(p.reference)
 }
-
 func (p *Pointer) Type() string {
 	return strings.TrimSuffix(p.String(), ";")
 }
-
 func (p *Pointer) String() string {
 	return fmt.Sprintf("%s *;", p.Reference())
 }
-
 func (p *Pointer) Dump() string {
 	return fmt.Sprintf("%s %s %s refers to %d",
 		isRootIDFmtStr(p.info.IsRoot(), p.id),
@@ -719,15 +688,17 @@ func (p *Pointer) Dump() string {
 }
 func (p *Pointer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		ID        int    `json:"id,omitempty"`
-		Name      string `json:"name,omitempty"`
-		Info      info   `json:"info,omitempty"`
-		Reference string `json:"reference,omitempty"`
+		ID          int    `json:"id,omitempty"`
+		Name        string `json:"name,omitempty"`
+		Info        info   `json:"info,omitempty"`
+		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Reference   string `json:"reference,omitempty"`
 	}{
-		ID:        p.id,
-		Name:      p.name,
-		Info:      p.info,
-		Reference: p.Reference(),
+		ID:          p.id,
+		Name:        p.name,
+		Info:        p.info,
+		ReferenceID: p.reference,
+		Reference:   p.Reference(),
 	})
 }
 
@@ -742,34 +713,27 @@ type Typedef struct {
 func (p *Typedef) ID() int {
 	return p.id
 }
-
 func (p *Typedef) Name() string {
 	return p.name
 }
-
 func (p *Typedef) Info() info {
 	return p.info
 }
-
 func (p *Typedef) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
 		return t.Type()
 	}
 	return "<reference type not found>"
 }
-
 func (p *Typedef) ParentID() int {
 	return int(p.reference)
 }
-
 func (p *Typedef) Type() string {
 	return p.Name()
 }
-
 func (p *Typedef) String() string {
 	return fmt.Sprintf("typedef %s %s", p.name, p.Reference())
 }
-
 func (p *Typedef) Dump() string {
 	return fmt.Sprintf("%s %s %s refers to %d",
 		isRootIDFmtStr(p.info.IsRoot(), p.id),
@@ -780,15 +744,17 @@ func (p *Typedef) Dump() string {
 }
 func (p *Typedef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		ID        int    `json:"id,omitempty"`
-		Name      string `json:"name,omitempty"`
-		Info      info   `json:"info,omitempty"`
-		Reference string `json:"reference,omitempty"`
+		ID          int    `json:"id,omitempty"`
+		Name        string `json:"name,omitempty"`
+		Info        info   `json:"info,omitempty"`
+		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Reference   string `json:"reference,omitempty"`
 	}{
-		ID:        p.id,
-		Name:      p.name,
-		Info:      p.info,
-		Reference: p.Reference(),
+		ID:          p.id,
+		Name:        p.name,
+		Info:        p.info,
+		ReferenceID: p.reference,
+		Reference:   p.Reference(),
 	})
 }
 
@@ -803,33 +769,27 @@ type Volatile struct {
 func (p *Volatile) ID() int {
 	return p.id
 }
-
 func (p *Volatile) Name() string {
 	return p.name
 }
-
 func (p *Volatile) Info() info {
 	return p.info
 }
-
 func (p *Volatile) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
 		return t.Type()
 	}
 	return "<reference type not found>"
 }
-
 func (p *Volatile) ParentID() int {
 	return int(p.reference)
 }
-
 func (p *Volatile) Type() string {
 	return fmt.Sprintf("volatile %s", p.Reference())
 }
 func (p *Volatile) String() string {
 	return fmt.Sprintf("volatile %s", p.Reference())
 }
-
 func (p *Volatile) Dump() string {
 	return fmt.Sprintf("%s %s %s refers to %d",
 		isRootIDFmtStr(p.info.IsRoot(), p.id),
@@ -840,15 +800,17 @@ func (p *Volatile) Dump() string {
 }
 func (p *Volatile) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		ID        int    `json:"id,omitempty"`
-		Name      string `json:"name,omitempty"`
-		Info      info   `json:"info,omitempty"`
-		Reference string `json:"reference,omitempty"`
+		ID          int    `json:"id,omitempty"`
+		Name        string `json:"name,omitempty"`
+		Info        info   `json:"info,omitempty"`
+		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Reference   string `json:"reference,omitempty"`
 	}{
-		ID:        p.id,
-		Name:      p.name,
-		Info:      p.info,
-		Reference: p.Reference(),
+		ID:          p.id,
+		Name:        p.name,
+		Info:        p.info,
+		ReferenceID: p.reference,
+		Reference:   p.Reference(),
 	})
 }
 
@@ -863,34 +825,27 @@ type Const struct {
 func (p *Const) ID() int {
 	return p.id
 }
-
 func (p *Const) Name() string {
 	return p.name
 }
-
 func (p *Const) Info() info {
 	return p.info
 }
-
 func (p *Const) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
 		return t.Type()
 	}
 	return "<reference type not found>"
 }
-
 func (p *Const) ParentID() int {
 	return int(p.reference)
 }
-
 func (p *Const) Type() string {
 	return fmt.Sprintf("const %s", p.Reference())
 }
-
 func (p *Const) String() string {
 	return fmt.Sprintf("const %s", p.Reference())
 }
-
 func (p *Const) Dump() string {
 	return fmt.Sprintf("%s %s %s refers to %d",
 		isRootIDFmtStr(p.info.IsRoot(), p.id),
@@ -901,15 +856,17 @@ func (p *Const) Dump() string {
 }
 func (p *Const) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		ID        int    `json:"id,omitempty"`
-		Name      string `json:"name,omitempty"`
-		Info      info   `json:"info,omitempty"`
-		Reference string `json:"reference,omitempty"`
+		ID          int    `json:"id,omitempty"`
+		Name        string `json:"name,omitempty"`
+		Info        info   `json:"info,omitempty"`
+		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Reference   string `json:"reference,omitempty"`
 	}{
-		ID:        p.id,
-		Name:      p.name,
-		Info:      p.info,
-		Reference: p.Reference(),
+		ID:          p.id,
+		Name:        p.name,
+		Info:        p.info,
+		ReferenceID: p.reference,
+		Reference:   p.Reference(),
 	})
 }
 
@@ -924,34 +881,27 @@ type Restrict struct {
 func (p *Restrict) ID() int {
 	return p.id
 }
-
 func (p *Restrict) Name() string {
 	return p.name
 }
-
 func (p *Restrict) Info() info {
 	return p.info
 }
-
 func (p *Restrict) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
 		return t.Type()
 	}
 	return "<reference type not found>"
 }
-
 func (p *Restrict) ParentID() int {
 	return int(p.reference)
 }
-
 func (p *Restrict) Type() string {
 	return fmt.Sprintf("restrict %s", p.Reference())
 }
-
 func (p *Restrict) String() string {
 	return fmt.Sprintf("restrict %s", p.Reference())
 }
-
 func (p *Restrict) Dump() string {
 	return fmt.Sprintf("%s %s %s refers to %d",
 		isRootIDFmtStr(p.info.IsRoot(), p.id),
@@ -962,15 +912,17 @@ func (p *Restrict) Dump() string {
 }
 func (p *Restrict) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		ID        int    `json:"id,omitempty"`
-		Name      string `json:"name,omitempty"`
-		Info      info   `json:"info,omitempty"`
-		Reference string `json:"reference,omitempty"`
+		ID          int    `json:"id,omitempty"`
+		Name        string `json:"name,omitempty"`
+		Info        info   `json:"info,omitempty"`
+		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Reference   string `json:"reference,omitempty"`
 	}{
-		ID:        p.id,
-		Name:      p.name,
-		Info:      p.info,
-		Reference: p.Reference(),
+		ID:          p.id,
+		Name:        p.name,
+		Info:        p.info,
+		ReferenceID: p.reference,
+		Reference:   p.Reference(),
 	})
 }
 
@@ -986,26 +938,21 @@ type PtrAuth struct {
 func (p *PtrAuth) ID() int {
 	return p.id
 }
-
 func (p *PtrAuth) Name() string {
 	return p.name
 }
-
 func (p *PtrAuth) Info() info {
 	return p.info
 }
-
 func (p *PtrAuth) Reference() string {
 	if t := p.lookupFn(int(p.reference)); t != nil {
 		return t.Type()
 	}
 	return "<reference type not found>"
 }
-
 func (p *PtrAuth) ParentID() int {
 	return int(p.reference)
 }
-
 func (p *PtrAuth) Type() string { return p.String() }
 func (p *PtrAuth) String() string {
 	return fmt.Sprintf(
@@ -1016,7 +963,6 @@ func (p *PtrAuth) String() string {
 		p.data.Discriminator(),
 	)
 }
-
 func (p *PtrAuth) Dump() string {
 	return fmt.Sprintf("%s %s %s refers to %d (key=%s, addr_div=%t, div=%04x)",
 		isRootIDFmtStr(p.info.IsRoot(), p.id),
@@ -1030,17 +976,19 @@ func (p *PtrAuth) Dump() string {
 }
 func (p *PtrAuth) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		ID        int         `json:"id,omitempty"`
-		Name      string      `json:"name,omitempty"`
-		Info      info        `json:"info,omitempty"`
-		Data      ptrAuthData `json:"data,omitempty"`
-		Reference string      `json:"reference,omitempty"`
+		ID          int         `json:"id,omitempty"`
+		Name        string      `json:"name,omitempty"`
+		Info        info        `json:"info,omitempty"`
+		Data        ptrAuthData `json:"data,omitempty"`
+		ReferenceID uint16      `json:"reference_id,omitempty"`
+		Reference   string      `json:"reference,omitempty"`
 	}{
-		ID:        p.id,
-		Name:      p.name,
-		Info:      p.info,
-		Data:      p.data,
-		Reference: p.Reference(),
+		ID:          p.id,
+		Name:        p.name,
+		Info:        p.info,
+		Data:        p.data,
+		ReferenceID: p.reference,
+		Reference:   p.Reference(),
 	})
 }
 
@@ -1049,6 +997,16 @@ type global struct {
 	Name      string `json:"name,omitempty"`
 	Reference int    `json:"reference,omitempty"`
 	Type      Type   `json:"type,omitempty"`
+}
+
+func (g global) String() string {
+	if g.Type != nil {
+		return fmt.Sprintf("%#x: %s %s\n", g.Address, g.Type.Type(), g.Name)
+	}
+	if g.Reference == 0 {
+		return fmt.Sprintf("%#x: <unknown> %s\n", g.Address, g.Name)
+	}
+	return fmt.Sprintf("%#x: %d %s\n", g.Address, g.Reference, g.Name)
 }
 
 type function struct {
