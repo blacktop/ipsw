@@ -2,19 +2,19 @@ REPO=blacktop
 NAME=ipsw
 CUR_VERSION=$(shell svu current)
 NEXT_VERSION=$(shell svu patch)
-
+GO_BIN=go
 
 .PHONY: build-deps
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
-	brew install go goreleaser
+	brew install $(GO_BIN) goreleaser
 
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
-	go get -u github.com/spf13/cobra/cobra
-	go get -u golang.org/x/tools/cmd/cover
-	go get -u github.com/caarlos0/svu
+	$(GO_BIN) get -u github.com/spf13/cobra/cobra
+	$(GO_BIN) get -u golang.org/x/tools/cmd/cover
+	$(GO_BIN) get -u github.com/caarlos0/svu
 
 .PHONY: setup
 setup: build-deps dev-deps ## Install all the build and dev dependencies
@@ -22,7 +22,7 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@goreleaser build --rm-dist --skip-validate
+	@goreleaser build --rm-dist --skip-validate --single-target
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
@@ -45,8 +45,8 @@ destroy: ## Remove release from the CUR_VERSION
 
 build: ## Build ipsw
 	@echo " > Building ipsw"
-	@go mod download
-	@CGO_ENABLED=1 go build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+	@$(GO_BIN) mod download
+	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
 
 .PHONY: docs
 docs: ## Build the hugo docs
@@ -62,18 +62,18 @@ test-docs: ## Start local server hosting hugo docs
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
 	rm go.sum
-	go mod download
-	go mod tidy
+	$(GO_BIN) mod download
+	$(GO_BIN) mod tidy
 
 .PHONY: update_devs
 update_devs: ## Parse XCode database for new devices
 	@echo " > Updating device_traits.json"
-	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc go run ./cmd/ipsw/main.go device-list-gen pkg/xcode/device_traits.json
+	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc $(GO_BIN) run ./cmd/ipsw/main.go device-list-gen pkg/xcode/device_traits.json
 
 .PHONY: update_keys
 update_keys: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating firmware_keys.json"
-	CGO_ENABLED=0 go run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
+	CGO_ENABLED=0 $(GO_BIN) run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
 
 .PHONY: docker
 docker: ## Build docker image

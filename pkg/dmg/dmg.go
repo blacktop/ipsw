@@ -1,3 +1,4 @@
+//go:build darwin && cgo
 // +build darwin,cgo
 
 package dmg
@@ -223,6 +224,7 @@ func (b *UDIFBlockData) DecompressChunks(w *bufio.Writer) error {
 
 	buff := make([]byte, 0, b.maxChunkSize())
 
+	// for _, chunk := range b.Chunks[:50] {
 	for _, chunk := range b.Chunks {
 		// TODO: verify chunk (size not greater than block etc)
 		switch chunk.Type {

@@ -63,6 +63,66 @@ type KVOffT struct {
 	Val uint16
 }
 
+// BTreeInfoFixedT is a btree_info_fixed_t struct
+type BTreeInfoFixedT struct {
+	Flags    btreeInfoFixedFlags
+	NodeSize uint32
+	KeySize  uint32
+	ValSize  uint32
+}
+
+// BTreeInfoT is a btree_info_t struct
+type BTreeInfoT struct {
+	Fixed      BTreeInfoFixedT
+	LongestKey uint32
+	LongestVal uint32
+	KeyCount   uint64
+	NodeCount  uint64
+}
+
+const BTREE_NODE_HASH_SIZE_MAX = 64
+
+// BTreeNodeIndexNodeValT is a btn_index_node_val_t
+type BTreeNodeIndexNodeValT struct {
+	ChildOid  OidT
+	ChildHash [BTREE_NODE_HASH_SIZE_MAX]byte
+}
+
+// OMapEntry is a omap_entry_t struct
+// Custom data structure used to store the key and value of an object map entry
+// together.
+type OMapEntry struct {
+	Key OMapKey
+	Val OMapVal
+}
+
+/**
+ * Custom data structure used to store a full file-system record (i.e. a single
+ * key–value pair from a file-system root tree) alongside each other for easier
+ * data access and manipulation.
+ *
+ * One can make use of an instance of this datatype by determining the strctures
+ * contained within its `data` field by appealing to the `obj_id_and_type` field
+ * of the `j_key_t` structure for the record, which is guaranteed to exist and
+ * start at `data[0]`. That is, a pointer to this instance of `j_key_t` can be
+ * obtained with `j_key_t* record_header = record->data`, where `record` is an
+ * instance of this type, `j_rec_t`.
+ *
+ * key_len: Length of the file-system record's key-part, in bytes.
+ *
+ * val_len: Length of the file-system record's value-part, in bytes.
+ *
+ * data:    Array of `key_len + val_len` bytes of data, of which,
+ *          index `0` through `key_len - 1` (inclusive) contain the
+ *          key-part data, and index `key_len` through `key_len + val_len - 1`
+ *          (inclusive) contain the value-part data.
+ */
+type JRecT struct {
+	KeyLen uint16
+	ValLen uint16
+	Data   []byte
+}
+
 // BTreeNodePhysT is a btree_node_phys_t struct
 type BTreeNodePhysT struct {
 	Obj         ObjPhysT
@@ -76,52 +136,84 @@ type BTreeNodePhysT struct {
 	// Data        []uint64
 }
 
+type block struct {
+	Addr uint64
+	Size uint64
+	Data []byte
+
+	r *bytes.Reader
+}
+
 // BTreeNodePhys is a btree_node_phys_t struct with data array
 type BTreeNodePhys struct {
 	BTreeNodePhysT
-	Data    []uint64
+	// Data    []uint64
 	Entries []interface{}
 	Info    *BTreeInfoT
 
 	Parent *BTreeNodePhys
 
-	Block     uint64
-	blockSize int64
-
-	raw []byte
-	r   *bytes.Reader
+	block
 }
 
-// NewBTreeNode creates a NEW BTree node
-func NewBTreeNode(r io.ReadSeekCloser, blockAddr, blockSize int64) (*BTreeNodePhys, error) {
-	node := BTreeNodePhys{
-		Block:     uint64(blockAddr),
-		blockSize: blockSize,
+// ReadBTreeNode creates a NEW BTree node
+func ReadBTreeNode(r *io.SectionReader, blockAddr uint64) (*BTreeNodePhys, error) {
+
+	node := &BTreeNodePhys{
+		block: block{
+			Addr: blockAddr,
+			Size: NX_DEFAULT_BLOCK_SIZE,
+			Data: make([]byte, NX_DEFAULT_BLOCK_SIZE),
+		},
 	}
 
-	r.Seek(blockAddr*blockSize, io.SeekStart)
+	r.Seek(int64(blockAddr*NX_DEFAULT_BLOCK_SIZE), io.SeekStart)
 
-	node.raw = make([]byte, blockSize)
-	if err := binary.Read(r, binary.LittleEndian, &node.raw); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &node.Data); err != nil {
 		return nil, fmt.Errorf("failed to read btree node block data: %v", err)
 	}
-	node.r = bytes.NewReader(node.raw)
 
-	r.Seek(blockAddr*blockSize, io.SeekStart) // rewind
+	if !VerifyChecksum(node.Data) {
+		return nil, fmt.Errorf("btree_node_phys_t data block failed checksum validation")
+	}
 
-	if err := binary.Read(r, binary.LittleEndian, &node.BTreeNodePhysT); err != nil {
+	node.r = bytes.NewReader(node.Data)
+
+	if err := binary.Read(node.r, binary.LittleEndian, &node.BTreeNodePhysT); err != nil {
 		return nil, fmt.Errorf("failed to read btree_node_phys_t struct: %v", err)
 	}
 
-	switch node.Obj.Subtype {
-	case OBJECT_TYPE_OMAP:
-
+	if node.Nkeys > 0 {
+		switch node.Obj.Subtype {
+		case OBJECT_TYPE_OMAP:
+			for i := uint32(0); i < node.Nkeys; i++ {
+				err := node.ReadOMapNodeEntry()
+				if err != nil {
+					return node, fmt.Errorf("failed to read omap node entry")
+				}
+			}
+		case OBJECT_TYPE_SPACEMAN_FREE_QUEUE:
+			panic("node with OBJECT_TYPE_SPACEMAN_FREE_QUEUE entries is NOT supported yet")
+		case OBJECT_TYPE_FEXT_TREE:
+			if node.Level > 0 {
+				// node.Entries = make([]byte, node.Nkeys)
+				// if err := binary.Read(r, binary.LittleEndian, &node.raw); err != nil {
+				// 	return nil, fmt.Errorf("failed to read btree node block data: %v", err)
+				// }
+			} else {
+				panic("node with OBJECT_TYPE_FEXT_TREE entries is NOT supported yet")
+			}
+		case objType(0): // in case of NOHEADER flag, value will be 0
+			panic("node with objType(0) entries is NOT supported yet")
+		default:
+			panic(fmt.Sprintf("unsupported sub_type: %s", node.Obj.GetSubType()))
+		}
 	}
 
-	node.Data = make([]uint64, blockSize-int64(binary.Size(node.BTreeNodePhysT)/binary.Size(uint64(1))))
-	if err := binary.Read(r, binary.LittleEndian, &node.Data); err != nil {
-		return nil, fmt.Errorf("failed to read btree_node_phys_t data array: %v", err)
-	}
+	// node.Data = make([]uint64, blockSize-int64(binary.Size(node.BTreeNodePhysT)/binary.Size(uint64(1))))
+	// if err := binary.Read(r, binary.LittleEndian, &node.Data); err != nil {
+	// 	return nil, fmt.Errorf("failed to read btree_node_phys_t data array: %v", err)
+	// }
 
 	if (node.Flags & BTNODE_ROOT) != 0 {
 		var err error
@@ -131,12 +223,45 @@ func NewBTreeNode(r io.ReadSeekCloser, blockAddr, blockSize int64) (*BTreeNodePh
 
 	}
 
-	return &node, nil
+	return node, nil
+}
+
+// ReadOMapNodeEntry reads a omap node entry from reader
+func (n *BTreeNodePhys) ReadOMapNodeEntry() error {
+	var oent OMapNodeEntry
+
+	if err := binary.Read(n.r, binary.LittleEndian, &oent.Offset); err != nil {
+		return fmt.Errorf("failed to read offsets: %v", err)
+	}
+
+	pos, _ := n.r.Seek(0, io.SeekCurrent)
+
+	n.r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart)
+
+	if err := binary.Read(n.r, binary.LittleEndian, &oent.Key); err != nil {
+		return fmt.Errorf("failed to read omap_key_t: %v", err)
+	}
+
+	n.r.Seek(int64(NX_DEFAULT_BLOCK_SIZE-oent.Offset.Val-40*uint16(n.Flags&1)), io.SeekStart)
+
+	if n.Level > 0 {
+		panic("level > 0 not implimented yet")
+	} else {
+		if err := binary.Read(n.r, binary.LittleEndian, &oent.Val); err != nil {
+			return fmt.Errorf("failed to read omap_key_t: %v", err)
+		}
+	}
+
+	n.Entries = append(n.Entries, oent)
+
+	n.r.Seek(pos, io.SeekEnd) // reset reader to right after we read the offsets
+
+	return nil
 }
 
 // GetBlockSize returns a nodes block size
 func (n *BTreeNodePhys) GetBlockSize() int64 {
-	return n.blockSize
+	return int64(n.block.Size)
 }
 
 // GetBytes returns a byte array from the node block
@@ -156,7 +281,7 @@ func (n *BTreeNodePhys) GetInfo() (*BTreeInfoT, error) {
 	if err := binary.Read(n.r, binary.LittleEndian, &btInfo); err != nil {
 		return nil, fmt.Errorf("failed to read node's btree_info_t data: %v", err)
 	}
-	n.r.Seek(0, io.SeekStart)
+	n.r.Seek(0, io.SeekStart) // reset reader
 	return &btInfo, nil
 }
 
@@ -276,68 +401,11 @@ func (n *BTreeNodePhys) GetChildNode(r io.ReadSeekCloser, offset int64) (*BTreeN
 	if err := binary.Read(n.r, binary.LittleEndian, &childNodeAddr); err != nil {
 		return nil, fmt.Errorf("failed to read child_node addr: %v", err)
 	}
-	return NewBTreeNode(r, int64(childNodeAddr), n.blockSize)
+	// return ReadBTreeNode(n.r, childNodeAddr) // FIXME: do we still need this?
+	return nil, nil
 }
 
 // ValidChecksum returns true if checksum is valid
 func (n *BTreeNodePhys) ValidChecksum() bool {
-	return VerifyChecksum(n.raw)
-}
-
-type btree_info_fixed_t struct {
-	Flags    btreeInfoFixedFlags
-	NodeSize uint32
-	KeySize  uint32
-	ValSize  uint32
-}
-
-// BTreeInfoT is a btree_info_t struct
-type BTreeInfoT struct {
-	Fixed      btree_info_fixed_t
-	LongestKey uint32
-	LongestVal uint32
-	KeyCount   uint64
-	NodeCount  uint64
-}
-
-const BTREE_NODE_HASH_SIZE_MAX = 64
-
-type btn_index_node_val_t struct {
-	ChildOid  OidT
-	ChildHash [BTREE_NODE_HASH_SIZE_MAX]byte
-}
-
-// OMapEntry is a omap_entry_t struct
-// Custom data structure used to store the key and value of an object map entry
-// together.
-type OMapEntry struct {
-	Key OMapKey
-	Val OMapVal
-}
-
-/**
- * Custom data structure used to store a full file-system record (i.e. a single
- * key–value pair from a file-system root tree) alongside each other for easier
- * data access and manipulation.
- *
- * One can make use of an instance of this datatype by determining the strctures
- * contained within its `data` field by appealing to the `obj_id_and_type` field
- * of the `j_key_t` structure for the record, which is guaranteed to exist and
- * start at `data[0]`. That is, a pointer to this instance of `j_key_t` can be
- * obtained with `j_key_t* record_header = record->data`, where `record` is an
- * instance of this type, `j_rec_t`.
- *
- * key_len: Length of the file-system record's key-part, in bytes.
- *
- * val_len: Length of the file-system record's value-part, in bytes.
- *
- * data:    Array of `key_len + val_len` bytes of data, of which,
- *          index `0` through `key_len - 1` (inclusive) contain the
- *          key-part data, and index `key_len` through `key_len + val_len - 1`
- *          (inclusive) contain the value-part data.
- */
-type JRecT struct {
-	KeyLen uint16
-	ValLen uint16
-	Data   []byte
+	return VerifyChecksum(n.Data)
 }

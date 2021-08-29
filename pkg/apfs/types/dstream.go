@@ -1,67 +1,55 @@
 package types
 
-// /** `j_phys_ext_key_t` **/
+type j_phys_ext_key_t struct {
+	Hdr JKeyT
+}
 
-// typedef struct {
-//     JKeyT     hdr;
-// } __attribute__((packed))   j_phys_ext_key_t;
+type j_phys_ext_val_t struct {
+	LenAndKind  uint64
+	OwningObjID uint64
+	RefConnt    int32
+}
 
-// /** `j_phys_ext_val_t` **/
+const (
+	PEXT_LEN_MASK   = 0x0fffffffffffffff
+	PEXT_KIND_MASK  = 0xf000000000000000
+	PEXT_KIND_SHIFT = 60
+)
 
-// typedef struct {
-//     uint64_t    len_and_kind;
-//     uint64_t    owning_obj_id;
-//     int32_t     refcnt;
-// } __attribute__((packed))   j_phys_ext_val_t;
+type j_file_extent_key_t struct {
+	Hdr         JKeyT
+	LogicalAddr uint64
+}
 
-// #define PEXT_LEN_MASK       0x0fffffffffffffffULL
-// #define PEXT_KIND_MASK      0xf000000000000000ULL
-// #define PEXT_KIND_SHIFT     60
+type j_file_extent_val_t struct {
+	LenAndFlags  uint64
+	PhysBlockNum uint64
+	CryptoID     uint64
+}
 
-// /** `j_file_extent_key_t` **/
+const (
+	J_FILE_EXTENT_LEN_MASK   = 0x00ffffffffffffff
+	J_FILE_EXTENT_FLAG_MASK  = 0xff00000000000000
+	J_FILE_EXTENT_FLAG_SHIFT = 56
+)
 
-// typedef struct {
-//     JKeyT     hdr;
-//     uint64_t    logical_addr;
-// } __attribute__((packed))   j_file_extent_key_t;
+type j_dstream_id_key_t struct {
+	Hdr JKeyT
+}
 
-// /** `j_file_extent_val_t` **/
+type j_dstream_id_val_t struct {
+	RefConnt uint32
+}
 
-// typedef struct {
-//     uint64_t    len_and_flags;
-//     uint64_t    phys_block_num;
-//     uint64_t    crypto_id;
-// } __attribute__((packed))   j_file_extent_val_t;
+type j_dstream_t struct {
+	Size              uint64
+	AllocedSize       uint64
+	DefaultCryptoID   uint64
+	TotalBytesWritten uint64
+	TotalBytesRead    uint64
+}
 
-// #define J_FILE_EXTENT_LEN_MASK      0x00ffffffffffffffULL
-// #define J_FILE_EXTENT_FLAG_MASK     0xff00000000000000ULL
-// #define J_FILE_EXTENT_FLAG_SHIFT    56
-
-// /** `j_dstream_id_key_t` **/
-
-// typedef struct {
-//     JKeyT     hdr;
-// } __attribute__((packed))   j_dstream_id_key_t;
-
-// /** `j_dstream_id_val_t` **/
-
-// typedef struct {
-//     uint32_t    refcnt;
-// } __attribute__((packed))   j_dstream_id_val_t;
-
-// /** `j_dstream_t` --- forward declared for `j_xattr_dstream` **/
-
-// typedef struct {
-//     uint64_t    size;
-//     uint64_t    alloced_size;
-//     uint64_t    default_crypto_id;
-//     uint64_t    total_bytes_written;
-//     uint64_t    total_bytes_read;
-// } __attribute__((aligned(8),packed))   j_dstream_t;
-
-// /** `j_xattr_dstream` **/
-
-// typedef struct {
-//     uint64_t        xattr_obj_id;
-//     j_dstream_t     dstream;
-// } j_xattr_dstream_t;
+type j_xattr_dstream_t struct {
+	XattrObjID uint64
+	DStream    j_dstream_t
+}

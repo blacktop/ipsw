@@ -1,6 +1,12 @@
 package types
 
-import "math"
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+	"math"
+)
 
 type omapValFlag uint32
 type omapSnapshotFlag uint32
@@ -35,8 +41,8 @@ const (
 	OMAP_REAP_PHASE_SNAPSHOT_TREE = 2
 )
 
-// OmapPhysT is a omap_phys_t struct
-type OmapPhysT struct {
+// OMapPhysT is a omap_phys_t struct
+type OMapPhysT struct {
 	Obj              ObjPhysT
 	Flags            omapFlag
 	SnapCount        uint32
@@ -47,6 +53,13 @@ type OmapPhysT struct {
 	MostRecentSnap   XidT
 	PendingRevertMin XidT
 	PendingRevertMax XidT
+}
+
+type OMap struct {
+	OMapPhysT
+	Tree *BTreeNodePhys
+
+	block
 }
 
 // OMapKey is a omap_key_t struct
@@ -62,8 +75,60 @@ type OMapVal struct {
 	Paddr uint64
 }
 
-type omap_snapshot_t struct {
+// OMapSnapshotT is a omap_snapshot_t
+type OMapSnapshotT struct {
 	Flags omapSnapshotFlag
 	Pad   uint32
 	Oid   OidT
+}
+
+type OMapNodeEntry struct {
+	Offset KVOffT
+	Key    OMapKey
+	PAddr  uint64
+	OMap   *Obj
+	Val    OMapVal
+}
+
+// ReadOMap returns a verified omap or error if block does not verify
+func ReadOMap(r *io.SectionReader, blockAddr uint64) (*OMap, error) {
+
+	var err error
+
+	o := &OMap{
+		block: block{
+			Addr: blockAddr,
+			Size: NX_DEFAULT_BLOCK_SIZE,
+			Data: make([]byte, NX_DEFAULT_BLOCK_SIZE),
+		},
+	}
+
+	r.Seek(int64(blockAddr*NX_DEFAULT_BLOCK_SIZE), io.SeekStart)
+
+	if err := binary.Read(r, binary.LittleEndian, &o.Data); err != nil {
+		return nil, fmt.Errorf("failed to read %#x sized block data: %v", NX_DEFAULT_BLOCK_SIZE, err)
+	}
+
+	if !VerifyChecksum(o.Data) {
+		return nil, fmt.Errorf("nx_superblock_t data block failed checksum validation")
+	}
+
+	o.r = bytes.NewReader(o.Data)
+
+	if err := binary.Read(o.r, binary.LittleEndian, &o.OMapPhysT); err != nil {
+		return nil, fmt.Errorf("failed to read omap_phys_t: %v", err)
+	}
+
+	if o.TreeOid > 0 {
+		o.Tree, err = ReadBTreeNode(r, uint64(o.TreeOid))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", o.TreeOid, err)
+		}
+	}
+
+	if o.SnapshotTreeOid > 0 {
+		panic("SnapshotTreeOid parsing is not implimented yet")
+	}
+
+	return o, nil
 }
