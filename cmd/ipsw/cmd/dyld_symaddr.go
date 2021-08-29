@@ -111,7 +111,7 @@ var symaddrCmd = &cobra.Command{
 				}
 
 				if sym, _ := f.FindLocalSymbolInImage(args[1], imageName); sym != nil {
-					sym.Sections = m.Sections
+					// sym.Sections = m.Sections
 					fmt.Println(sym)
 				}
 
@@ -170,13 +170,13 @@ var symaddrCmd = &cobra.Command{
 				}
 			}
 
-			m, err := f.Image(imageName).GetPartialMacho()
-			if err != nil {
-				return err
-			}
+			// m, err := f.Image(imageName).GetPartialMacho()
+			// if err != nil {
+			// 	return err
+			// }
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, sym := range f.Image(imageName).LocalSymbols {
-				sym.Sections = m.Sections
+				// sym.Sections = m.Sections
 				fmt.Fprintf(w, "%s\n", sym)
 			}
 			w.Flush()
@@ -222,13 +222,13 @@ var symaddrCmd = &cobra.Command{
 
 		for _, image := range f.Images {
 			fmt.Printf("\n%s\n", image.Name)
-			m, err := image.GetPartialMacho()
-			if err != nil {
-				return err
-			}
+			// m, err := image.GetPartialMacho()
+			// if err != nil {
+			// 	return err
+			// }
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, sym := range image.LocalSymbols {
-				sym.Sections = m.Sections
+				// sym.Sections = m.Sections
 				fmt.Fprintf(w, "%s\n", sym)
 			}
 			w.Flush()

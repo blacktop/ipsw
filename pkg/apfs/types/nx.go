@@ -1,6 +1,13 @@
 package types
 
-import "github.com/blacktop/go-macho/types"
+import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
+
+	"github.com/blacktop/go-macho/types"
+)
 
 type nx_counter_id_t byte //FIXME: what type
 const (
@@ -60,7 +67,7 @@ type NxSuperblockT struct {
 	BlockCount uint64
 
 	Features                   nxFeature
-	ReadonlyCompatibleFeatures uint64
+	ReadOnlyCompatibleFeatures uint64
 	IncompatibleFeatures       nxIncompatFeature
 
 	UUID types.UUID
@@ -88,7 +95,7 @@ type NxSuperblockT struct {
 	MaxFileSystems      uint32
 	FsOids              [NX_MAX_FILE_SYSTEMS]OidT
 	Counters            [NX_NUM_COUNTERS]uint64
-	BlockedOutPrange    prange
+	BlockedOutPRange    prange
 	EvictMappingTreeOid OidT
 	Flags               nxContainerFlag
 	EFIJumpstart        uint64
@@ -104,7 +111,48 @@ type NxSuperblockT struct {
 
 	NewestMountedVersion uint64
 
-	MkbLocker prange
+	MkBLocker prange
+}
+
+type NxSuperblock struct {
+	NxSuperblockT
+
+	OMap *OMap
+
+	block
+}
+
+// ReadNxSuperblock returns a verified NxSuperblock or error if block does not verify
+func ReadNxSuperblock(r *io.SectionReader) (*NxSuperblock, error) {
+	sr := io.NewSectionReader(r, 0, 1<<63-1)
+
+	sb := &NxSuperblock{
+		block: block{
+			Addr: 0,
+			Size: NX_DEFAULT_BLOCK_SIZE,
+			Data: make([]byte, NX_DEFAULT_BLOCK_SIZE),
+		},
+	}
+
+	if err := binary.Read(sr, binary.LittleEndian, &sb.Data); err != nil {
+		return nil, fmt.Errorf("failed to read %#x sized block data: %v", NX_DEFAULT_BLOCK_SIZE, err)
+	}
+
+	sb.r = bytes.NewReader(sb.Data)
+
+	if err := binary.Read(sb.r, binary.LittleEndian, &sb.NxSuperblockT); err != nil {
+		return nil, fmt.Errorf("failed to read APFS nx_superblock_t: %v", err)
+	}
+
+	if sb.Magic.String() != NX_MAGIC {
+		return nil, fmt.Errorf("found unexpected nx_superblock_t magic: %s, expected: %s", sb.Magic.String(), NX_MAGIC)
+	}
+
+	if !VerifyChecksum(sb.Data) {
+		return nil, fmt.Errorf("nx_superblock_t data block failed checksum validation")
+	}
+
+	return sb, nil
 }
 
 type CheckpointDesc struct {
@@ -114,7 +162,7 @@ type CheckpointDesc struct {
 
 type CheckpointMappingT struct {
 	Type    objType
-	Subtype objType
+	SubType objType
 	Size    uint32
 	Pad     uint32
 	FsOid   OidT

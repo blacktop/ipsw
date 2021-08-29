@@ -1,5 +1,10 @@
 package types
 
+import (
+	"encoding/binary"
+	"fmt"
+)
+
 //go:generate stringer -type=objType -output object_string.go
 
 const (
@@ -90,10 +95,27 @@ type ObjPhysT struct {
 	Subtype objType
 }
 
+func (o ObjPhysT) Checksum() uint64 {
+	return binary.LittleEndian.Uint64(o.Cksum[:])
+}
+
 func (o ObjPhysT) GetType() objType {
 	return o.Type & OBJECT_TYPE_MASK
 }
 
+func (o ObjPhysT) GetSubType() objType {
+	return o.Subtype & OBJECT_TYPE_MASK
+}
+
 func (o ObjPhysT) GetFlag() objType {
 	return o.Type & OBJECT_TYPE_FLAGS_MASK
+}
+
+type Obj struct {
+	Hdr  ObjPhysT
+	Body interface{}
+}
+
+func (o Obj) String() string {
+	return fmt.Sprintf("%s cksum=%#x, oid=%#x, xid=%#x, sub_type=%x", o.Hdr.GetType(), o.Hdr.Checksum(), o.Hdr.Oid, o.Hdr.Xid, o.Hdr.GetSubType())
 }

@@ -35,7 +35,8 @@ const (
 	APFS_KIND_INVALID j_obj_kinds = 255
 )
 
-type j_inode_flags uint32 // FIXME: what type
+type j_inode_flags uint32
+
 const (
 	INODE_IS_APFS_PRIVATE        j_inode_flags = 0x00000001
 	INODE_MAINTAIN_DIR_STATS     j_inode_flags = 0x00000002
@@ -68,7 +69,8 @@ const (
 	APFS_INODE_PINNED_MASK          j_inode_flags = (INODE_PINNED_TO_MAIN | INODE_PINNED_TO_TIER2)
 )
 
-type j_xattr_flags byte // FIXME: what type
+type j_xattr_flags uint32
+
 const (
 	XATTR_DATA_STREAM       j_xattr_flags = 0x00000001
 	XATTR_DATA_EMBEDDED     j_xattr_flags = 0x00000002
@@ -76,7 +78,8 @@ const (
 	XATTR_RESERVED_8        j_xattr_flags = 0x00000008
 )
 
-type dir_rec_flags byte // FIXME: what type
+type dir_rec_flags uint16
+
 const (
 	DREC_TYPE_MASK dir_rec_flags = 0x000f
 	RESERVED_10    dir_rec_flags = 0x0010
@@ -121,29 +124,30 @@ const (
  * non-Apple platforms, so we use a distinct name for portability.
  */
 type apfs_mode_t uint16
+type dir_ent_file_tye uint64
 
 const (
 	S_IFMT = 0170000
 
-	S_IFIFO  = 0010000
-	S_IFCHR  = 0020000
-	S_IFDIR  = 0040000
-	S_IFBLK  = 0060000
-	S_IFREG  = 0100000
-	S_IFLNK  = 0120000
-	S_IFSOCK = 0140000
-	S_IFWHT  = 0160000
+	S_IFIFO  apfs_mode_t = 0010000
+	S_IFCHR  apfs_mode_t = 0020000
+	S_IFDIR  apfs_mode_t = 0040000
+	S_IFBLK  apfs_mode_t = 0060000
+	S_IFREG  apfs_mode_t = 0100000
+	S_IFLNK  apfs_mode_t = 0120000
+	S_IFSOCK apfs_mode_t = 0140000
+	S_IFWHT  apfs_mode_t = 0160000
 
 	/** Directory Entry File Types **/
-	DT_UNKNOWN = 0
-	DT_FIFO    = 1
-	DT_CHR     = 2
-	DT_DIR     = 4
-	DT_BLK     = 6
-	DT_REG     = 8
-	DT_LNK     = 10
-	DT_SOCK    = 12
-	DT_WHT     = 14
+	DT_UNKNOWN dir_ent_file_tye = 0
+	DT_FIFO    dir_ent_file_tye = 1
+	DT_CHR     dir_ent_file_tye = 2
+	DT_DIR     dir_ent_file_tye = 4
+	DT_BLK     dir_ent_file_tye = 6
+	DT_REG     dir_ent_file_tye = 8
+	DT_LNK     dir_ent_file_tye = 10
+	DT_SOCK    dir_ent_file_tye = 12
+	DT_WHT     dir_ent_file_tye = 14
 )
 
 // JKeyT is a j_key_t
@@ -231,7 +235,7 @@ const (
 type j_drec_val_t struct {
 	FileID    uint64
 	DateAdded uint64
-	Flags     uint64
+	Flags     dir_ent_file_tye
 	Xfields   []uint8
 } // __attribute__((packed))
 
