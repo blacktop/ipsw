@@ -1,11 +1,6 @@
 package types
 
 import (
-	"bytes"
-	"encoding/binary"
-	"fmt"
-	"io"
-
 	"github.com/blacktop/go-macho/types"
 )
 
@@ -61,7 +56,7 @@ const (
 
 // NxSuperblockT nx_superblock_t struct
 type NxSuperblockT struct {
-	Obj        ObjPhysT
+	// Obj        ObjPhysT
 	Magic      magic
 	BlockSize  uint32
 	BlockCount uint64
@@ -117,42 +112,9 @@ type NxSuperblockT struct {
 type NxSuperblock struct {
 	NxSuperblockT
 
-	OMap *OMap
+	OMap *Obj
 
 	block
-}
-
-// ReadNxSuperblock returns a verified NxSuperblock or error if block does not verify
-func ReadNxSuperblock(r *io.SectionReader) (*NxSuperblock, error) {
-	sr := io.NewSectionReader(r, 0, 1<<63-1)
-
-	sb := &NxSuperblock{
-		block: block{
-			Addr: 0,
-			Size: NX_DEFAULT_BLOCK_SIZE,
-			Data: make([]byte, NX_DEFAULT_BLOCK_SIZE),
-		},
-	}
-
-	if err := binary.Read(sr, binary.LittleEndian, &sb.Data); err != nil {
-		return nil, fmt.Errorf("failed to read %#x sized block data: %v", NX_DEFAULT_BLOCK_SIZE, err)
-	}
-
-	sb.r = bytes.NewReader(sb.Data)
-
-	if err := binary.Read(sb.r, binary.LittleEndian, &sb.NxSuperblockT); err != nil {
-		return nil, fmt.Errorf("failed to read APFS nx_superblock_t: %v", err)
-	}
-
-	if sb.Magic.String() != NX_MAGIC {
-		return nil, fmt.Errorf("found unexpected nx_superblock_t magic: %s, expected: %s", sb.Magic.String(), NX_MAGIC)
-	}
-
-	if !VerifyChecksum(sb.Data) {
-		return nil, fmt.Errorf("nx_superblock_t data block failed checksum validation")
-	}
-
-	return sb, nil
 }
 
 type CheckpointDesc struct {
@@ -171,7 +133,7 @@ type CheckpointMappingT struct {
 }
 
 type CheckpointMapPhysT struct {
-	Obj   ObjPhysT
+	// Obj   ObjPhysT
 	Flags cpMapFlag
 	Count uint32
 	// Map   []CheckpointMappingT

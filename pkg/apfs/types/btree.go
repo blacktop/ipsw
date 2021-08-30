@@ -125,7 +125,7 @@ type JRecT struct {
 
 // BTreeNodePhysT is a btree_node_phys_t struct
 type BTreeNodePhysT struct {
-	Obj         ObjPhysT
+	// Obj         ObjPhysT
 	Flags       btreeNodeFlag
 	Level       uint16
 	Nkeys       uint32
@@ -147,114 +147,48 @@ type block struct {
 // BTreeNodePhys is a btree_node_phys_t struct with data array
 type BTreeNodePhys struct {
 	BTreeNodePhysT
-	// Data    []uint64
 	Entries []interface{}
-	Info    *BTreeInfoT
-
-	Parent *BTreeNodePhys
+	Parent  *BTreeNodePhys
+	Info    BTreeInfoT
 
 	block
 }
 
-// ReadBTreeNode creates a NEW BTree node
-func ReadBTreeNode(r *io.SectionReader, blockAddr uint64) (*BTreeNodePhys, error) {
-
-	node := &BTreeNodePhys{
-		block: block{
-			Addr: blockAddr,
-			Size: NX_DEFAULT_BLOCK_SIZE,
-			Data: make([]byte, NX_DEFAULT_BLOCK_SIZE),
-		},
-	}
-
-	r.Seek(int64(blockAddr*NX_DEFAULT_BLOCK_SIZE), io.SeekStart)
-
-	if err := binary.Read(r, binary.LittleEndian, &node.Data); err != nil {
-		return nil, fmt.Errorf("failed to read btree node block data: %v", err)
-	}
-
-	if !VerifyChecksum(node.Data) {
-		return nil, fmt.Errorf("btree_node_phys_t data block failed checksum validation")
-	}
-
-	node.r = bytes.NewReader(node.Data)
-
-	if err := binary.Read(node.r, binary.LittleEndian, &node.BTreeNodePhysT); err != nil {
-		return nil, fmt.Errorf("failed to read btree_node_phys_t struct: %v", err)
-	}
-
-	if node.Nkeys > 0 {
-		switch node.Obj.Subtype {
-		case OBJECT_TYPE_OMAP:
-			for i := uint32(0); i < node.Nkeys; i++ {
-				err := node.ReadOMapNodeEntry()
-				if err != nil {
-					return node, fmt.Errorf("failed to read omap node entry")
-				}
-			}
-		case OBJECT_TYPE_SPACEMAN_FREE_QUEUE:
-			panic("node with OBJECT_TYPE_SPACEMAN_FREE_QUEUE entries is NOT supported yet")
-		case OBJECT_TYPE_FEXT_TREE:
-			if node.Level > 0 {
-				// node.Entries = make([]byte, node.Nkeys)
-				// if err := binary.Read(r, binary.LittleEndian, &node.raw); err != nil {
-				// 	return nil, fmt.Errorf("failed to read btree node block data: %v", err)
-				// }
-			} else {
-				panic("node with OBJECT_TYPE_FEXT_TREE entries is NOT supported yet")
-			}
-		case objType(0): // in case of NOHEADER flag, value will be 0
-			panic("node with objType(0) entries is NOT supported yet")
-		default:
-			panic(fmt.Sprintf("unsupported sub_type: %s", node.Obj.GetSubType()))
-		}
-	}
-
-	// node.Data = make([]uint64, blockSize-int64(binary.Size(node.BTreeNodePhysT)/binary.Size(uint64(1))))
-	// if err := binary.Read(r, binary.LittleEndian, &node.Data); err != nil {
-	// 	return nil, fmt.Errorf("failed to read btree_node_phys_t data array: %v", err)
-	// }
-
-	if (node.Flags & BTNODE_ROOT) != 0 {
-		var err error
-		if node.Info, err = node.GetInfo(); err != nil {
-			return nil, fmt.Errorf("")
-		}
-
-	}
-
-	return node, nil
-}
-
 // ReadOMapNodeEntry reads a omap node entry from reader
-func (n *BTreeNodePhys) ReadOMapNodeEntry() error {
+func (n *BTreeNodePhys) ReadOMapNodeEntry(r *bytes.Reader) error {
 	var oent OMapNodeEntry
 
-	if err := binary.Read(n.r, binary.LittleEndian, &oent.Offset); err != nil {
-		return fmt.Errorf("failed to read offsets: %v", err)
+	if n.Flags&BTNODE_FIXED_KV_SIZE == 0 {
+		panic("unimplimented")
+	} else {
+		if err := binary.Read(r, binary.LittleEndian, &oent.Offset); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
 	}
 
-	pos, _ := n.r.Seek(0, io.SeekCurrent)
+	pos, _ := r.Seek(0, io.SeekCurrent)
 
-	n.r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart)
+	r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart)
 
-	if err := binary.Read(n.r, binary.LittleEndian, &oent.Key); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &oent.Key); err != nil {
 		return fmt.Errorf("failed to read omap_key_t: %v", err)
 	}
 
-	n.r.Seek(int64(NX_DEFAULT_BLOCK_SIZE-oent.Offset.Val-40*uint16(n.Flags&1)), io.SeekStart)
+	r.Seek(int64(BLOCK_SIZE-uint64(oent.Offset.Val)-40*uint64(n.Flags&1)), io.SeekStart)
 
 	if n.Level > 0 {
-		panic("level > 0 not implimented yet")
+		if err := binary.Read(r, binary.LittleEndian, &oent.PAddr); err != nil {
+			return fmt.Errorf("failed to read paddr_t: %v", err)
+		}
 	} else {
-		if err := binary.Read(n.r, binary.LittleEndian, &oent.Val); err != nil {
+		if err := binary.Read(r, binary.LittleEndian, &oent.Val); err != nil {
 			return fmt.Errorf("failed to read omap_key_t: %v", err)
 		}
 	}
 
 	n.Entries = append(n.Entries, oent)
 
-	n.r.Seek(pos, io.SeekEnd) // reset reader to right after we read the offsets
+	r.Seek(pos, io.SeekStart) // reset reader to right after we read the offsets
 
 	return nil
 }
@@ -272,17 +206,6 @@ func (n *BTreeNodePhys) GetBytes(offset int64, length uint16) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read data from block: %v", err)
 	}
 	return dat, nil
-}
-
-// GetInfo returns a nodes B-tree info
-func (n *BTreeNodePhys) GetInfo() (*BTreeInfoT, error) {
-	n.r.Seek(-int64(binary.Size(BTreeInfoT{})), io.SeekEnd)
-	var btInfo BTreeInfoT
-	if err := binary.Read(n.r, binary.LittleEndian, &btInfo); err != nil {
-		return nil, fmt.Errorf("failed to read node's btree_info_t data: %v", err)
-	}
-	n.r.Seek(0, io.SeekStart) // reset reader
-	return &btInfo, nil
 }
 
 // GetOid returns a oid_t

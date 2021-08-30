@@ -1,12 +1,10 @@
 package types
 
 import (
-	"bytes"
-	"encoding/binary"
-	"fmt"
-	"io"
 	"math"
 )
+
+//go:generate stringer -type=omapValFlag,omapSnapshotFlag,omapFlag -output omap_string.go
 
 type omapValFlag uint32
 type omapSnapshotFlag uint32
@@ -43,7 +41,7 @@ const (
 
 // OMapPhysT is a omap_phys_t struct
 type OMapPhysT struct {
-	Obj              ObjPhysT
+	// Obj              ObjPhysT
 	Flags            omapFlag
 	SnapCount        uint32
 	TreeType         objType
@@ -57,7 +55,9 @@ type OMapPhysT struct {
 
 type OMap struct {
 	OMapPhysT
-	Tree *BTreeNodePhys
+
+	Tree         *Obj
+	SnapshotTree *Obj
 
 	block
 }
@@ -88,47 +88,4 @@ type OMapNodeEntry struct {
 	PAddr  uint64
 	OMap   *Obj
 	Val    OMapVal
-}
-
-// ReadOMap returns a verified omap or error if block does not verify
-func ReadOMap(r *io.SectionReader, blockAddr uint64) (*OMap, error) {
-
-	var err error
-
-	o := &OMap{
-		block: block{
-			Addr: blockAddr,
-			Size: NX_DEFAULT_BLOCK_SIZE,
-			Data: make([]byte, NX_DEFAULT_BLOCK_SIZE),
-		},
-	}
-
-	r.Seek(int64(blockAddr*NX_DEFAULT_BLOCK_SIZE), io.SeekStart)
-
-	if err := binary.Read(r, binary.LittleEndian, &o.Data); err != nil {
-		return nil, fmt.Errorf("failed to read %#x sized block data: %v", NX_DEFAULT_BLOCK_SIZE, err)
-	}
-
-	if !VerifyChecksum(o.Data) {
-		return nil, fmt.Errorf("nx_superblock_t data block failed checksum validation")
-	}
-
-	o.r = bytes.NewReader(o.Data)
-
-	if err := binary.Read(o.r, binary.LittleEndian, &o.OMapPhysT); err != nil {
-		return nil, fmt.Errorf("failed to read omap_phys_t: %v", err)
-	}
-
-	if o.TreeOid > 0 {
-		o.Tree, err = ReadBTreeNode(r, uint64(o.TreeOid))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", o.TreeOid, err)
-		}
-	}
-
-	if o.SnapshotTreeOid > 0 {
-		panic("SnapshotTreeOid parsing is not implimented yet")
-	}
-
-	return o, nil
 }

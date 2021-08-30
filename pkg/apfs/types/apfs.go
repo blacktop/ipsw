@@ -100,7 +100,7 @@ const (
 
 // ApfsSuperblockT is a apfs_superblock_t struct
 type ApfsSuperblockT struct {
-	Obj ObjPhysT
+	// Obj ObjPhysT
 
 	Magic   magic
 	FsIndex uint32
@@ -118,7 +118,7 @@ type ApfsSuperblockT struct {
 	MetaCrypto wrapped_meta_crypto_state_t
 
 	RootTreeType      objType
-	ExtentrefTreeType objType
+	ExtentRefTreeType objType
 	SnapMetaTreeType  objType
 
 	OmapOid          OidT
@@ -176,4 +176,14 @@ type ApfsSuperblockT struct {
 
 	ReservedType uint32
 	ReservedOid  OidT
+}
+
+type ApfsSuperblock struct {
+	ApfsSuperblockT
+
+	OMap          *Obj
+	ExtentRefTree *Obj
+	SnapMetaTree  *Obj
+
+	block
 }
