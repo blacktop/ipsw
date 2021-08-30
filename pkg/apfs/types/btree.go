@@ -149,9 +149,17 @@ type BTreeNodePhys struct {
 	BTreeNodePhysT
 	Entries []interface{}
 	Parent  *BTreeNodePhys
-	Info    BTreeInfoT
+	Info    *BTreeInfoT
 
 	block
+}
+
+func (n *BTreeNodePhys) IsRoot() bool {
+	return (n.Flags & BTNODE_ROOT) != 0
+}
+
+func (n *BTreeNodePhys) IsLeaf() bool {
+	return (n.Flags & BTNODE_LEAF) != 0
 }
 
 // ReadOMapNodeEntry reads a omap node entry from reader
@@ -168,7 +176,7 @@ func (n *BTreeNodePhys) ReadOMapNodeEntry(r *bytes.Reader) error {
 
 	pos, _ := r.Seek(0, io.SeekCurrent)
 
-	r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart)
+	r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart) // key_hdr
 
 	if err := binary.Read(r, binary.LittleEndian, &oent.Key); err != nil {
 		return fmt.Errorf("failed to read omap_key_t: %v", err)
@@ -193,142 +201,29 @@ func (n *BTreeNodePhys) ReadOMapNodeEntry(r *bytes.Reader) error {
 	return nil
 }
 
-// GetBlockSize returns a nodes block size
-func (n *BTreeNodePhys) GetBlockSize() int64 {
-	return int64(n.block.Size)
-}
+// GetNodeEntry returns an FIXME: create type
+func (n *BTreeNodePhys) GetNodeEntry(r *bytes.Reader) error {
+	var oent OMapNodeEntry
 
-// GetBytes returns a byte array from the node block
-func (n *BTreeNodePhys) GetBytes(offset int64, length uint16) ([]byte, error) {
-	n.r.Seek(offset, io.SeekStart)
-	dat := make([]byte, length)
-	if err := binary.Read(n.r, binary.LittleEndian, &dat); err != nil {
-		return nil, fmt.Errorf("failed to read data from block: %v", err)
-	}
-	return dat, nil
-}
-
-// GetOid returns a oid_t
-func (n *BTreeNodePhys) GetOid(offset int64) (*OidT, error) {
-	n.r.Seek(offset, io.SeekStart)
-	var o OidT
-	if err := binary.Read(n.r, binary.LittleEndian, &o); err != nil {
-		return nil, fmt.Errorf("failed to read kvoff_t data: %v", err)
-	}
-	return &o, nil
-}
-
-// GetTocKVOffEntry returns a kvoff_t
-func (n *BTreeNodePhys) GetTocKVOffEntry(offset int64) (*KVOffT, error) {
-	n.r.Seek(offset, io.SeekStart)
-	var tocEntry KVOffT
-	if err := binary.Read(n.r, binary.LittleEndian, &tocEntry); err != nil {
-		return nil, fmt.Errorf("failed to read kvoff_t data: %v", err)
-	}
-	return &tocEntry, nil
-}
-
-// GetTocKVLocEntry returns a kvoff_t
-func (n *BTreeNodePhys) GetTocKVLocEntry(offset int64) (*KVLocT, error) {
-	n.r.Seek(offset, io.SeekStart)
-	var tocEntry KVLocT
-	if err := binary.Read(n.r, binary.LittleEndian, &tocEntry); err != nil {
-		return nil, fmt.Errorf("failed to read kvoff_t data: %v", err)
-	}
-	return &tocEntry, nil
-}
-
-func (n *BTreeNodePhys) GetTocKVOffEntries(offset int, length uint16) ([]KVOffT, error) {
-	entries := make([]KVOffT, length/uint16(binary.Size(KVOffT{})))
-	n.r.Seek(int64(offset), io.SeekStart)
-	if err := binary.Read(n.r, binary.LittleEndian, entries); err != nil {
-		return nil, fmt.Errorf("failed to read kvoff_t data: %v", err)
-	}
-	return entries, nil
-}
-
-func (n *BTreeNodePhys) GetTocKVLocEntries(offset int64, length uint16) ([]KVLocT, error) {
-	entries := make([]KVLocT, length/uint16(binary.Size(KVLocT{})))
-	n.r.Seek(offset, io.SeekStart)
-	if err := binary.Read(n.r, binary.LittleEndian, entries); err != nil {
-		return nil, fmt.Errorf("failed to read kvloc_t data: %v", err)
-	}
-	return entries, nil
-}
-
-// GetOMapKey returns an omap_key_t
-func (n *BTreeNodePhys) GetOMapKey(offset int64) (*OMapKey, error) {
-	n.r.Seek(offset, io.SeekStart)
-	var key OMapKey
-	if err := binary.Read(n.r, binary.LittleEndian, &key); err != nil {
-		return nil, fmt.Errorf("failed to read omap_key_t data: %v", err)
-	}
-	return &key, nil
-}
-
-func (n *BTreeNodePhys) GetOMapKeys(offset int64, count uint64) ([]OMapKey, error) {
-	keys := make([]OMapKey, count)
-	n.r.Seek(offset, io.SeekStart)
-	if err := binary.Read(n.r, binary.LittleEndian, keys); err != nil {
-		return nil, fmt.Errorf("failed to read omap keys: %v", err)
-	}
-	return keys, nil
-}
-
-// GetJKey returns an j_key_t
-func (n *BTreeNodePhys) GetJKey(offset int64) (*JKeyT, error) {
-	n.r.Seek(offset, io.SeekStart)
-	var key JKeyT
-	if err := binary.Read(n.r, binary.LittleEndian, &key); err != nil {
-		return nil, fmt.Errorf("failed to read j_key_t data: %v", err)
-	}
-	return &key, nil
-}
-
-func (n *BTreeNodePhys) GetJKeys(offset int64, count uint64) ([]JKeyT, error) {
-	keys := make([]JKeyT, count)
-	n.r.Seek(offset, io.SeekStart)
-	if err := binary.Read(n.r, binary.LittleEndian, keys); err != nil {
-		return nil, fmt.Errorf("failed to read J keys: %v", err)
-	}
-	return keys, nil
-}
-
-// GetOMapEntry returns an omap_entry_t
-func (n *BTreeNodePhys) GetOMapEntry(keyOff, valOff int64, oid OidT, maxXid XidT) (*OMapEntry, error) {
-	omapEntry := OMapEntry{}
-
-	n.r.Seek(keyOff, io.SeekStart)
-
-	if err := binary.Read(n.r, binary.LittleEndian, &omapEntry.Key); err != nil {
-		return nil, fmt.Errorf("failed to read omap_key_t data: %v", err)
+	if n.Flags&BTNODE_FIXED_KV_SIZE == 0 {
+		panic("unimplimented")
+	} else {
+		if err := binary.Read(r, binary.LittleEndian, &oent.Offset); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
 	}
 
-	if omapEntry.Key.Oid != oid || omapEntry.Key.Xid > maxXid {
-		return nil, fmt.Errorf("key.Oid != oid || key.Xid > maxXid")
+	pos, _ := r.Seek(0, io.SeekCurrent)
+
+	r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart) // key_hdr
+
+	if err := binary.Read(r, binary.LittleEndian, &oent.Key); err != nil {
+		return fmt.Errorf("failed to read omap_key_t: %v", err)
 	}
 
-	n.r.Seek(valOff, io.SeekStart)
+	n.Entries = append(n.Entries, oent)
 
-	if err := binary.Read(n.r, binary.LittleEndian, &omapEntry.Val); err != nil {
-		return nil, fmt.Errorf("failed to read omap_val_t data: %v", err)
-	}
+	r.Seek(pos, io.SeekStart) // reset reader to right after we read the offsets
 
-	return &omapEntry, nil
-}
-
-// GetChildNode returns a node's child node
-func (n *BTreeNodePhys) GetChildNode(r io.ReadSeekCloser, offset int64) (*BTreeNodePhys, error) {
-	n.r.Seek(offset, io.SeekStart)
-	var childNodeAddr uint64
-	if err := binary.Read(n.r, binary.LittleEndian, &childNodeAddr); err != nil {
-		return nil, fmt.Errorf("failed to read child_node addr: %v", err)
-	}
-	// return ReadBTreeNode(n.r, childNodeAddr) // FIXME: do we still need this?
-	return nil, nil
-}
-
-// ValidChecksum returns true if checksum is valid
-func (n *BTreeNodePhys) ValidChecksum() bool {
-	return VerifyChecksum(n.Data)
+	return nil
 }

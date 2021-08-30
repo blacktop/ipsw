@@ -16,11 +16,13 @@ type APFS struct {
 	Container *types.NxSuperblock
 	Valid     *types.NxSuperblock
 	Volume    *types.ApfsSuperblock
+	RootTree  *types.BTreeNodePhys
 
 	nxsb            *types.Obj // Container
 	checkPointDesc  []*types.Obj
 	validCheckPoint *types.Obj
 	volume          *types.Obj
+	rootBTree       *types.Obj
 
 	r      *os.File
 	closer io.Closer
@@ -122,6 +124,42 @@ func NewAPFS(r *os.File) (*APFS, error) {
 
 				a.Volume = &vol
 			}
+		}
+	}
+
+	for _, entry := range a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys).Entries {
+		if entry.(types.OMapNodeEntry).Key.Oid == a.Volume.RootTreeOid {
+			log.Debugf("Root TreeAddr: %#x, TreeOid: %#x", entry.(types.OMapNodeEntry).PAddr, a.Volume.RootTreeOid)
+			a.rootBTree, err = types.ReadObj(sr, uint64(entry.(types.OMapNodeEntry).PAddr))
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	for _, entry := range a.rootBTree.Body.(types.BTreeNodePhys).Entries {
+		if entry.(types.OMapNodeEntry).Key.Oid == a.Volume.RootTreeOid {
+			log.Debugf("Root TreeAddr: %#x, TreeOid: %#x", entry.(types.OMapNodeEntry).PAddr, a.Volume.RootTreeOid)
+			a.rootBTree, err = types.ReadObj(sr, uint64(entry.(types.OMapNodeEntry).PAddr))
+			if err != nil {
+				return nil, err
+			}
+			break
+		}
+	}
+
+	for _, entry := range a.rootBTree.Body.(types.BTreeNodePhys).Entries {
+		if entry.(types.OMapNodeEntry).Key.Oid == a.Volume.RootTreeOid {
+			log.Debugf("Root TreeAddr: %#x, TreeOid: %#x", entry.(types.OMapNodeEntry).Val.Paddr, a.Volume.RootTreeOid)
+			a.rootBTree, err = types.ReadObj(sr, uint64(entry.(types.OMapNodeEntry).Val.Paddr))
+			if err != nil {
+				return nil, err
+			}
+			if rtree, ok := a.rootBTree.Body.(types.BTreeNodePhys); ok {
+				a.RootTree = &rtree
+			}
+			break
 		}
 	}
 

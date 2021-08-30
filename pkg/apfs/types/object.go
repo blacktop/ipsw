@@ -205,6 +205,7 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 					// if err := binary.Read(r, binary.LittleEndian, &node.raw); err != nil {
 					// 	return nil, fmt.Errorf("failed to read btree node block data: %v", err)
 					// }
+					panic("node with OBJECT_TYPE_FEXT_TREE entries is NOT supported yet")
 				} else {
 					panic("node with OBJECT_TYPE_FEXT_TREE entries is NOT supported yet")
 				}
@@ -214,11 +215,13 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 				panic(fmt.Sprintf("unsupported sub_type: %s", o.Hdr.GetSubType()))
 			}
 		}
-		if (node.Flags & BTNODE_ROOT) != 0 {
+		if node.IsRoot() {
 			o.r.Seek(-int64(binary.Size(BTreeInfoT{})), io.SeekEnd)
-			if err := binary.Read(o.r, binary.LittleEndian, &node.Info); err != nil {
+			var info BTreeInfoT
+			if err := binary.Read(o.r, binary.LittleEndian, &info); err != nil {
 				return nil, fmt.Errorf("failed to read node's btree_info_t data: %v", err)
 			}
+			node.Info = &info
 		}
 		o.Body = node
 	case OBJECT_TYPE_SPACEMAN:
