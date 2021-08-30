@@ -1,8 +1,7 @@
 package apfs
 
 import (
-	"bytes"
-	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,9 +13,14 @@ import (
 
 // APFS apple file system object
 type APFS struct {
-	nxsb            *types.NxSuperblock // Container
-	checkPointDesc  []interface{}
-	validCheckPoint *types.NxSuperblockT
+	Container *types.NxSuperblock
+	Valid     *types.NxSuperblock
+	Volume    *types.ApfsSuperblock
+
+	nxsb            *types.Obj // Container
+	checkPointDesc  []*types.Obj
+	validCheckPoint *types.Obj
+	volume          *types.Obj
 
 	r      *os.File
 	closer io.Closer
@@ -49,9 +53,8 @@ func (a *APFS) Close() error {
 	return err
 }
 
-// SeekBlock seeks to a given block ID's block in the apfs file data
-func (a *APFS) SeekBlock(blockID uint64) (ret int64, err error) {
-	return a.r.Seek(int64(blockID*uint64(a.nxsb.BlockSize)), io.SeekStart)
+func init() {
+	types.BLOCK_SIZE = types.NX_DEFAULT_BLOCK_SIZE
 }
 
 // NewAPFS creates a new APFS for accessing a apple filesystem container or file in an underlying reader.
@@ -64,168 +67,63 @@ func NewAPFS(r *os.File) (*APFS, error) {
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
 	a.r = r
 
-	a.nxsb, err = types.ReadNxSuperblock(sr)
+	a.nxsb, err = types.ReadObj(sr, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read APFS container")
 	}
 
+	if nxsb, ok := a.nxsb.Body.(types.NxSuperblock); ok {
+		a.Container = &nxsb
+	}
+
+	if a.Container.BlockSize != types.NX_DEFAULT_BLOCK_SIZE {
+		types.BLOCK_SIZE = uint64(a.Container.BlockSize)
+		log.Warnf("found non-standard blocksize in APFS nx_superblock_t: %#x", types.BLOCK_SIZE)
+	}
+
 	log.WithFields(log.Fields{
-		"checksum": fmt.Sprintf("%#x", a.nxsb.Obj.Checksum()),
-		"oid":      fmt.Sprintf("%#x", a.nxsb.Obj.Oid),
-		"xid":      fmt.Sprintf("%#x", a.nxsb.Obj.Xid),
-		"type":     a.nxsb.Obj.GetType(),
-		"sub_type": a.nxsb.Obj.GetSubType(),
-		"flag":     a.nxsb.Obj.GetFlag(),
-		"magic":    a.nxsb.Magic.String(),
+		"checksum": fmt.Sprintf("%#x", a.nxsb.Hdr.Checksum()),
+		"oid":      fmt.Sprintf("%#x", a.nxsb.Hdr.Oid),
+		"xid":      fmt.Sprintf("%#x", a.nxsb.Hdr.Xid),
+		"type":     a.nxsb.Hdr.GetType(),
+		"sub_type": a.nxsb.Hdr.GetSubType(),
+		"flag":     a.nxsb.Hdr.GetFlag(),
+		"magic":    a.Container.Magic.String(),
 	}).Debug("APFS Container")
 
-	sr.Seek(int64(a.nxsb.XpDescBase*uint64(a.nxsb.BlockSize)), io.SeekStart)
+	utils.Indent(log.WithFields(log.Fields{
+		"checksum": fmt.Sprintf("%#x", a.Container.OMap.Hdr.Checksum()),
+		"type":     a.Container.OMap.Hdr.GetType(),
+		"oid":      fmt.Sprintf("%#x", a.Container.OMap.Hdr.Oid),
+		"xid":      fmt.Sprintf("%#x", a.Container.OMap.Hdr.Xid),
+		"sub_type": a.Container.OMap.Hdr.GetSubType(),
+		"flag":     a.Container.OMap.Hdr.GetFlag(),
+	}).Debug, 2)("Object Map")
 
-	if (a.nxsb.XpDescBlocks >> 31) != 0 {
-		return nil, fmt.Errorf("unable to parse non-contiguous checkpoint descriptor area")
+	if err := a.getValidCSB(); err != nil {
+		return nil, fmt.Errorf("failed to find the container superblock that has the largest transaction identifier and isnʼt malformed: %v", err)
 	}
 
-	xpDescBlocks := a.nxsb.XpDescBlocks & ^(uint32(1) << 31)
-	a.checkPointDesc = make([]interface{}, xpDescBlocks)
-	block := make([]byte, a.nxsb.BlockSize)
-
-	log.Debug("Parsing Checkpoint Descrip")
-
-	var iLatestNx uint32
-	for i := uint32(0); i < xpDescBlocks; i++ {
-		if err := binary.Read(sr, binary.LittleEndian, &block); err != nil {
-			return nil, fmt.Errorf("failed to read APFS checkpoint block: %v", err)
-		}
-
-		// check checksum
-		if !types.VerifyChecksum(block) {
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("checkpoint block at index %d within this area failed checksum validation. Skipping it.", i))
-			continue
-		}
-
-		rr := bytes.NewReader(block)
-
-		var o types.ObjPhysT
-		if err := binary.Read(rr, binary.LittleEndian, &o); err != nil {
-			return nil, fmt.Errorf("failed to read APFS checkpoint desc obj_phys_t: %v", err)
-		}
-
-		rr.Seek(0, io.SeekStart)
-
-		switch o.GetType() {
-		case types.OBJECT_TYPE_CHECKPOINT_MAP:
-			var checkpointMap types.CheckpointMapPhys
-			if err := binary.Read(rr, binary.LittleEndian, &checkpointMap.Hdr); err != nil {
-				return nil, fmt.Errorf("failed to read APFS checkpoint_map_phys_t: %v", err)
+	if len(a.Valid.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys).Entries) == 1 {
+		if entry, ok := a.Valid.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys).Entries[0].(types.OMapNodeEntry); ok {
+			a.volume, err = types.ReadObj(sr, uint64(entry.Val.Paddr))
+			if err != nil {
+				return nil, fmt.Errorf("failed to read APFS omap.tree.entry.omap (volume): %v", err)
 			}
-			checkpointMap.Map = make([]types.CheckpointMappingT, checkpointMap.Hdr.Count)
-			if err := binary.Read(rr, binary.LittleEndian, &checkpointMap.Map); err != nil {
-				return nil, fmt.Errorf("failed to read APFS checkpoint_mapping_t array: %v", err)
+			if vol, ok := a.volume.Body.(types.ApfsSuperblock); ok {
+				log.WithFields(log.Fields{
+					"checksum": fmt.Sprintf("%#x", a.volume.Hdr.Checksum()),
+					"type":     a.volume.Hdr.GetType(),
+					"oid":      fmt.Sprintf("%#x", a.volume.Hdr.Oid),
+					"xid":      fmt.Sprintf("%#x", a.volume.Hdr.Xid),
+					"sub_type": a.volume.Hdr.GetSubType(),
+					"flag":     a.volume.Hdr.GetFlag(),
+				}).Debug(fmt.Sprintf("APFS Volume (%s)", string(vol.VolumeName[:])))
+
+				a.Volume = &vol
 			}
-			a.checkPointDesc[i] = checkpointMap
-		case types.OBJECT_TYPE_NX_SUPERBLOCK:
-			var nxsb types.NxSuperblockT
-			if err := binary.Read(rr, binary.LittleEndian, &nxsb); err != nil {
-				return nil, fmt.Errorf("failed to read APFS checkpoint nx_superblock_t: %v", err)
-			}
-			a.checkPointDesc[i] = nxsb
-		case types.OBJECT_TYPE_INVALID:
-			break
-		default:
-			log.Fatalf("found unsupported object type: %s", o.GetType().String())
 		}
-
-		iLatestNx = i
 	}
-
-	if valid, ok := a.checkPointDesc[iLatestNx].(types.NxSuperblockT); ok {
-		a.validCheckPoint = &valid
-	} else {
-		return nil, fmt.Errorf("last valid checkpoint is NOT a nx_superblock_t")
-	}
-
-	if a.validCheckPoint.XpDescIndex+a.validCheckPoint.XpDescLen <= xpDescBlocks {
-		fmt.Println("contiguous")
-	} else {
-		fmt.Println("shizzzz")
-	}
-
-	a.nxsb.OMap, err = types.ReadOMap(sr, uint64(a.validCheckPoint.OmapOid))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read APFS omap_phys_t: %v", err)
-	}
-
-	log.WithFields(log.Fields{
-		"checksum": fmt.Sprintf("%#x", a.nxsb.OMap.Obj.Checksum()),
-		"type":     a.nxsb.OMap.Obj.GetType(),
-		"oid":      fmt.Sprintf("%#x", a.nxsb.OMap.Obj.Oid),
-		"xid":      fmt.Sprintf("%#x", a.nxsb.OMap.Obj.Xid),
-		"sub_type": a.nxsb.OMap.Obj.GetSubType(),
-		"flag":     a.nxsb.OMap.Obj.GetFlag(),
-	}).Debug("APFS Container Object Map")
-
-	entry, ok := a.nxsb.OMap.Tree.Entries[0].(types.OMapNodeEntry)
-	if !ok {
-		log.Error("can't cast Entries[0] to OMapNodeEntry")
-	}
-	volOMap, err := types.ReadOMap(sr, uint64(entry.Val.Paddr))
-	if err != nil {
-		return nil, fmt.Errorf("failed to read APFS omap_phys_t: %v", err)
-	}
-
-	log.WithFields(log.Fields{
-		"checksum": fmt.Sprintf("%#x", volOMap.Obj.Checksum()),
-		"type":     volOMap.Obj.GetType(),
-		"oid":      fmt.Sprintf("%#x", volOMap.Obj.Oid),
-		"xid":      fmt.Sprintf("%#x", volOMap.Obj.Xid),
-		"sub_type": volOMap.Obj.GetSubType(),
-		"flag":     volOMap.Obj.GetFlag(),
-	}).Debug("APFS Volume")
-
-	var numFileSystems uint32
-	for _, fsOid := range a.validCheckPoint.FsOids {
-		if fsOid == 0 {
-			break
-		}
-		numFileSystems++
-	}
-
-	// log.Infof("the container superblock lists %d APFS volumes, whose superblocks have the following virtual OIDs:", numFileSystems)
-	// vols := make([]types.ApfsSuperblockT, numFileSystems)
-	// for i := uint32(0); i < numFileSystems; i++ {
-	// 	utils.Indent(log.Info, 2)(fmt.Sprintf("%#x", validContSB.FsOids[i]))
-	// 	// omap_entry_t* fs_entry = get_btree_phys_omap_entry(nx_omap_btree, nxsb->nx_fs_oid[i], nxsb->nx_o.o_xid);
-	// 	fsEntry, err := a.GetBTreePhysOMapEntry(oMapBtree, validContSB.FsOids[i], validContSB.Obj.Xid)
-	// 	if err != nil {
-	// 		// fprintf(stderr, "\nABORT: No objects with Virtual OID 0x%" PRIx64 " and maximum XID 0x%" PRIx64 " exist in `nx_omap_btree`.\n", nxsb->nx_fs_oid[i], nxsb->nx_o.o_xid);
-	// 		return nil, fmt.Errorf("failed to get btree phys omap entry: %v", err)
-	// 	}
-
-	// 	r.Seek(int64(fsEntry.Val.Paddr*uint64(a.nxsb.BlockSize)), io.SeekStart)
-
-	// 	if err := binary.Read(r, binary.LittleEndian, &vols[i]); err != nil {
-	// 		return nil, fmt.Errorf("failed to read apfs_superblock_t data: %v", err)
-	// 	}
-	// }
-
-	// var vol types.ApfsSuperblockT
-	// if len(vols) == 1 {
-	// 	vol = vols[0]
-	// }
-
-	// log.WithField("name", string(vol.VolumeName[:])).Info("Volume")
-
-	// r.Seek(int64(uint64(vol.OmapOid)*uint64(a.nxsb.BlockSize)), io.SeekStart)
-
-	// var fsOMap types.OmapPhysT
-	// if err := binary.Read(r, binary.LittleEndian, &fsOMap); err != nil {
-	// 	return nil, fmt.Errorf("failed to read omap_phys_t data for volume: %v", err)
-	// }
-
-	// fsOMapBTree, err := types.NewBTreeNode(r, int64(fsOMap.TreeOid), int64(a.nxsb.BlockSize))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", omap.TreeOid, err)
-	// }
 
 	// fsRootEntry, err := a.GetBTreePhysOMapEntry(fsOMapBTree, vol.RootTreeOid, vol.Obj.Xid)
 	// if err != nil {
@@ -245,4 +143,44 @@ func NewAPFS(r *os.File) (*APFS, error) {
 	// fmt.Println(fsRecords)
 
 	return a, nil
+}
+
+// getValidCSB returns the container superblock that has the largest transaction identifier and isnʼt malformed
+func (a *APFS) getValidCSB() error {
+	log.Debug("Parsing Checkpoint Description")
+
+	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
+
+	nxsb := a.nxsb.Body.(types.NxSuperblock)
+
+	if (nxsb.XpDescBlocks >> 31) != 0 {
+		return fmt.Errorf("unable to parse non-contiguous checkpoint descriptor area")
+	}
+	xpDescBlocks := nxsb.XpDescBlocks & ^(uint32(1) << 31)
+
+	for i := uint32(0); i < xpDescBlocks; i++ {
+		o, err := types.ReadObj(sr, nxsb.XpDescBase+uint64(i))
+		if err != nil {
+			if errors.Is(err, types.ErrBadBlockChecksum) {
+				utils.Indent(log.Debug, 2)(fmt.Sprintf("checkpoint block at index %d failed checksum validation. Skipping...", i))
+				continue
+			}
+			return fmt.Errorf("failed to read XpDescBlock: %v", err)
+		}
+		a.checkPointDesc = append(a.checkPointDesc, o)
+	}
+
+	a.validCheckPoint = a.checkPointDesc[len(a.checkPointDesc)-1]
+
+	if nxsb, ok := a.validCheckPoint.Body.(types.NxSuperblock); ok {
+		a.Valid = &nxsb
+	}
+
+	if a.Valid.XpDescIndex+a.Valid.XpDescLen <= xpDescBlocks {
+		log.Debug("contiguous")
+	} else {
+		log.Warn("shizzzz")
+	}
+
+	return nil
 }

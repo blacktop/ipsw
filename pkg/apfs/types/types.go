@@ -2,9 +2,13 @@ package types
 
 import "encoding/binary"
 
+var BLOCK_SIZE uint64
+
+type paddr_t int64
+
 type prange struct {
-	PrStartPaddr uint64
-	PrBlockCount uint64
+	StartPaddr paddr_t
+	BlockCount uint64
 }
 
 type magic [4]byte
