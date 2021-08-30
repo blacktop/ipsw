@@ -1,5 +1,7 @@
 package types
 
+//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,j_xattr_flags,dir_rec_flags,apfs_mode_t,dir_ent_file_tye -output j_string.go
+
 type j_obj_types byte // FIXME: what type
 
 const (
@@ -150,11 +152,6 @@ const (
 	DT_WHT     dir_ent_file_tye = 14
 )
 
-// JKeyT is a j_key_t
-type JKeyT struct {
-	ObjIDAndType uint64
-} // __attribute__((packed))
-
 const (
 	OBJ_ID_MASK    = 0x0fffffffffffffff
 	OBJ_TYPE_MASK  = 0xf000000000000000
@@ -162,6 +159,18 @@ const (
 
 	SYSTEM_OBJ_ID_MARK = 0x0fffffff00000000
 )
+
+// JKeyT is a j_key_t
+type JKeyT struct {
+	ObjIDAndType uint64
+} // __attribute__((packed))
+
+func (j JKeyT) GetID() uint64 {
+	return j.ObjIDAndType & OBJ_ID_MASK
+}
+func (j JKeyT) GetType() j_obj_types {
+	return j_obj_types((j.ObjIDAndType & OBJ_TYPE_MASK) >> OBJ_TYPE_SHIFT)
+}
 
 type j_inode_key_t struct {
 	Hdr JKeyT
