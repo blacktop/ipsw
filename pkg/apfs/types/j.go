@@ -206,9 +206,9 @@ type j_inode_val_t struct {
 } // __attribute__((packed))
 
 type j_drec_key_t struct {
-	Hdr     JKeyT
+	// Hdr     JKeyT
 	NameLen uint16 // NOTE: Not `name_len_and_hash` as the spec erroneously says.
-	Name    [0]uint8
+	Name    string
 } // __attribute__((packed))
 
 /**
@@ -230,22 +230,30 @@ type j_drec_key_t struct {
  */
 
 type j_drec_hashed_key_t struct {
-	Hdr            JKeyT
+	// Hdr            JKeyT
 	NameLenAndHash uint32
-	Name           [0]uint8
+	Name           string
 } // __attribute__((packed))
 
 const (
-	J_DREC_LEN_MASK   = 0x000003ff
-	J_DREC_HASH_MASK  = 0xfffffc00 // Spec incorrectly says `0xfffff400`
-	J_DREC_HASH_SHIFT = 10
+	J_DREC_LEN_MASK   uint32 = 0x000003ff
+	J_DREC_HASH_MASK  uint32 = 0xfffffc00 // Spec incorrectly says `0xfffff400`
+	J_DREC_HASH_SHIFT        = 10
 )
+
+func (k j_drec_hashed_key_t) Length() uint32 {
+	return k.NameLenAndHash & J_DREC_LEN_MASK
+}
+
+func (k j_drec_hashed_key_t) Hash() uint32 {
+	return (k.NameLenAndHash & J_DREC_HASH_MASK) >> J_DREC_HASH_SHIFT
+}
 
 type j_drec_val_t struct {
 	FileID    uint64
 	DateAdded uint64
 	Flags     dir_ent_file_tye
-	Xfields   []uint8
+	Xfields   []byte
 } // __attribute__((packed))
 
 type j_dir_stats_key_t struct {
@@ -260,13 +268,13 @@ type j_dir_stats_val_t struct {
 } // __attribute__((packed))
 
 type j_xattr_key_t struct {
-	Hdr     JKeyT
+	// Hdr     JKeyT
 	NameLen uint16
-	Name    [0]uint8
+	Name    string
 } // __attribute__((packed))
 
 type j_xattr_val_t struct {
 	Flags    uint16
 	XdataLen uint16
-	Xdata    [0]uint8
+	Xdata    []byte
 } // __attribute__((packed))

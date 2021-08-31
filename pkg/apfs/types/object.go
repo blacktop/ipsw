@@ -209,10 +209,20 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 				} else {
 					panic("node with OBJECT_TYPE_FEXT_TREE entries is NOT supported yet")
 				}
-			case objType(0): // in case of NOHEADER flag, value will be 0
-				panic("node with objType(0) entries is NOT supported yet")
 			default:
-				panic(fmt.Sprintf("unsupported sub_type: %s", o.Hdr.GetSubType()))
+				for i := uint32(0); i < node.Nkeys; i++ {
+					err := node.ReadNodeEntry(o.r)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read node entry: %v", err)
+					}
+					// if oent, ok := node.Entries[i].(OMapNodeEntry); ok {
+					// 	oent.OMap, err = ReadObj(r, uint64(node.Entries[i].(OMapNodeEntry).Val.Paddr))
+					// 	if err != nil {
+					// 		return nil, fmt.Errorf("failed to read omap node entry omap")
+					// 	}
+					// 	node.Entries[i] = oent
+					// }
+				}
 			}
 		}
 		if node.IsRoot() {
