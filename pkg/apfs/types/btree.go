@@ -371,7 +371,7 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
-			nent.Val = v
+			nent.Val = v // TODO: deal with Name field
 		case APFS_TYPE_EXTENT:
 			var v j_phys_ext_val_t
 			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
@@ -395,7 +395,7 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
-			nent.Val = v
+			nent.Val = v // TODO: deal with Name field
 		case APFS_TYPE_DSTREAM_ID:
 			var v j_dstream_id_val_t
 			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {

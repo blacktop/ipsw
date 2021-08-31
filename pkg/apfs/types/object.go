@@ -121,8 +121,6 @@ func (o ObjPhysT) GetFlag() objFlag {
 type Obj struct {
 	Hdr  ObjPhysT
 	Body interface{}
-
-	block
 }
 
 func (o Obj) String() string {
@@ -133,35 +131,30 @@ func (o Obj) String() string {
 func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 
 	var err error
-
-	o := &Obj{
-		block: block{
-			Addr: blockAddr,
-			Size: BLOCK_SIZE,
-			Data: make([]byte, BLOCK_SIZE),
-		},
-	}
+	var o Obj
 
 	r.Seek(int64(blockAddr*BLOCK_SIZE), io.SeekStart)
 
-	if err := binary.Read(r, binary.LittleEndian, &o.Data); err != nil {
+	block := make([]byte, BLOCK_SIZE)
+
+	if err := binary.Read(r, binary.LittleEndian, &block); err != nil {
 		return nil, fmt.Errorf("failed to read %#x sized block data: %v", BLOCK_SIZE, err)
 	}
 
-	if !VerifyChecksum(o.Data) {
+	if !VerifyChecksum(block) {
 		return nil, fmt.Errorf("obj_phys_t data block failed checksum validation: %w", ErrBadBlockChecksum)
 	}
 
-	o.r = bytes.NewReader(o.Data)
+	rr := bytes.NewReader(block)
 
-	if err := binary.Read(o.r, binary.LittleEndian, &o.Hdr); err != nil {
+	if err := binary.Read(rr, binary.LittleEndian, &o.Hdr); err != nil {
 		return nil, fmt.Errorf("failed to read obj_phys_t: %v", err)
 	}
 
 	switch o.Hdr.GetType() {
 	case OBJECT_TYPE_NX_SUPERBLOCK:
 		var nxsb NxSuperblock
-		if err := binary.Read(o.r, binary.LittleEndian, &nxsb.NxSuperblockT); err != nil {
+		if err := binary.Read(rr, binary.LittleEndian, &nxsb.NxSuperblockT); err != nil {
 			return nil, fmt.Errorf("failed to read APFS nx_superblock_t: %v", err)
 		}
 		if nxsb.Magic.String() != NX_MAGIC {
@@ -178,14 +171,14 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 		fallthrough
 	case OBJECT_TYPE_BTREE_NODE:
 		var node BTreeNodePhys
-		if err := binary.Read(o.r, binary.LittleEndian, &node.BTreeNodePhysT); err != nil {
+		if err := binary.Read(rr, binary.LittleEndian, &node.BTreeNodePhysT); err != nil {
 			return nil, fmt.Errorf("failed to read btree_node_phys_t struct: %v", err)
 		}
 		if node.Nkeys > 0 {
 			switch o.Hdr.GetSubType() {
 			case OBJECT_TYPE_OMAP:
 				for i := uint32(0); i < node.Nkeys; i++ {
-					err := node.ReadOMapNodeEntry(o.r)
+					err := node.ReadOMapNodeEntry(rr)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read omap node entry: %v", err)
 					}
@@ -211,24 +204,17 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 				}
 			default:
 				for i := uint32(0); i < node.Nkeys; i++ {
-					err := node.ReadNodeEntry(o.r)
+					err := node.ReadNodeEntry(rr)
 					if err != nil {
 						return nil, fmt.Errorf("failed to read node entry: %v", err)
 					}
-					// if oent, ok := node.Entries[i].(OMapNodeEntry); ok {
-					// 	oent.OMap, err = ReadObj(r, uint64(node.Entries[i].(OMapNodeEntry).Val.Paddr))
-					// 	if err != nil {
-					// 		return nil, fmt.Errorf("failed to read omap node entry omap")
-					// 	}
-					// 	node.Entries[i] = oent
-					// }
 				}
 			}
 		}
 		if node.IsRoot() {
-			o.r.Seek(-int64(binary.Size(BTreeInfoT{})), io.SeekEnd)
+			rr.Seek(-int64(binary.Size(BTreeInfoT{})), io.SeekEnd)
 			var info BTreeInfoT
-			if err := binary.Read(o.r, binary.LittleEndian, &info); err != nil {
+			if err := binary.Read(rr, binary.LittleEndian, &info); err != nil {
 				return nil, fmt.Errorf("failed to read node's btree_info_t data: %v", err)
 			}
 			node.Info = &info
@@ -248,7 +234,7 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 		panic("not implimented yet")
 	case OBJECT_TYPE_OMAP:
 		var omap OMap
-		if err := binary.Read(o.r, binary.LittleEndian, &omap.OMapPhysT); err != nil {
+		if err := binary.Read(rr, binary.LittleEndian, &omap.OMapPhysT); err != nil {
 			return nil, fmt.Errorf("failed to read omap_phys_t: %v", err)
 		}
 		if omap.TreeOid > 0 {
@@ -266,17 +252,17 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 		o.Body = omap
 	case OBJECT_TYPE_CHECKPOINT_MAP:
 		var checkpointMap CheckpointMapPhys
-		if err := binary.Read(o.r, binary.LittleEndian, &checkpointMap.Hdr); err != nil {
+		if err := binary.Read(rr, binary.LittleEndian, &checkpointMap.Hdr); err != nil {
 			return nil, fmt.Errorf("failed to read APFS checkpoint_map_phys_t: %v", err)
 		}
 		checkpointMap.Map = make([]CheckpointMappingT, checkpointMap.Hdr.Count)
-		if err := binary.Read(o.r, binary.LittleEndian, &checkpointMap.Map); err != nil {
+		if err := binary.Read(rr, binary.LittleEndian, &checkpointMap.Map); err != nil {
 			return nil, fmt.Errorf("failed to read APFS checkpoint_mapping_t array: %v", err)
 		}
 		o.Body = checkpointMap
 	case OBJECT_TYPE_FS:
 		var apsb ApfsSuperblock
-		if err := binary.Read(o.r, binary.LittleEndian, &apsb.ApfsSuperblockT); err != nil {
+		if err := binary.Read(rr, binary.LittleEndian, &apsb.ApfsSuperblockT); err != nil {
 			return nil, fmt.Errorf("failed to read omap_phys_t: %v", err)
 		}
 		if apsb.Magic.String() != APFS_MAGIC {
@@ -342,8 +328,8 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 	case OBJECT_TYPE_INVALID:
 		return nil, fmt.Errorf("found %s @ oid=%#x", o.Hdr.GetType(), blockAddr)
 	default:
-		return nil, fmt.Errorf("unknown obj header type %#x @ oid=%#", o.Hdr.Type, blockAddr)
+		return nil, fmt.Errorf("unknown obj header type %s @ oid=%#x", o.Hdr.GetType(), blockAddr)
 	}
 
-	return o, nil
+	return &o, nil
 }
