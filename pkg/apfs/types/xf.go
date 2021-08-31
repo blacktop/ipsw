@@ -1,17 +1,5 @@
 package types
 
-type xf_blob_t struct {
-	XfNumExts  uint16
-	XfUsedData uint16
-	XfData     []byte
-}
-
-type x_field_t struct {
-	XType  xfType
-	XFlags xfFlag
-	XSize  uint16
-}
-
 type xfType byte
 type xfFlag byte
 
@@ -46,3 +34,15 @@ const (
 	XF_RESERVED_40      xfFlag = 0x0040
 	XF_RESERVED_80      xfFlag = 0x0080
 )
+
+type xf_blob_t struct {
+	XfNumExts  uint16
+	XfUsedData uint16
+	XfData     []byte
+}
+
+type x_field_t struct {
+	XType  xfType
+	XFlags xfFlag
+	XSize  uint16
+}

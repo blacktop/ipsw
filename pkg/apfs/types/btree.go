@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"strings"
 )
 
 const (
@@ -85,7 +86,8 @@ const BTREE_NODE_HASH_SIZE_MAX = 64
 // BTreeNodeIndexNodeValT is a btn_index_node_val_t
 type BTreeNodeIndexNodeValT struct {
 	ChildOid  OidT
-	ChildHash [BTREE_NODE_HASH_SIZE_MAX]byte
+	ChildHash [32]byte //BTREE_NODE_HASH_SIZE_MAX=64 acc to spec, but in reality appears to be max size of hash type used! 32 seen // FIXME: what?
+	// ChildHash [BTREE_NODE_HASH_SIZE_MAX]byte
 }
 
 // OMapEntry is a omap_entry_t struct
@@ -162,27 +164,46 @@ func (n *BTreeNodePhys) IsLeaf() bool {
 	return (n.Flags & BTNODE_LEAF) != 0
 }
 
+func (n *BTreeNodePhys) FixedKvSize() bool {
+	return (n.Flags & BTNODE_FIXED_KV_SIZE) != 0
+}
+func (n *BTreeNodePhys) Hashed() bool {
+	return (n.Flags & BTNODE_HASHED) != 0
+}
+
 // ReadOMapNodeEntry reads a omap node entry from reader
 func (n *BTreeNodePhys) ReadOMapNodeEntry(r *bytes.Reader) error {
 	var oent OMapNodeEntry
+	var keyOffset uint16
+	var valOffset uint16
 
-	if n.Flags&BTNODE_FIXED_KV_SIZE == 0 {
-		panic("unimplimented")
-	} else {
-		if err := binary.Read(r, binary.LittleEndian, &oent.Offset); err != nil {
+	if n.FixedKvSize() {
+		var off KVOffT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
 			return fmt.Errorf("failed to read offsets: %v", err)
 		}
+		keyOffset = off.Key
+		valOffset = off.Val
+		oent.Offset = off
+	} else {
+		var off KVLocT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
+		keyOffset = off.Key.Off
+		valOffset = off.Val.Off
+		oent.Offset = off
 	}
 
 	pos, _ := r.Seek(0, io.SeekCurrent)
 
-	r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart) // key_hdr
+	r.Seek(int64(keyOffset+n.TableSpace.Len+56), io.SeekStart) // key
 
 	if err := binary.Read(r, binary.LittleEndian, &oent.Key); err != nil {
 		return fmt.Errorf("failed to read omap_key_t: %v", err)
 	}
 
-	r.Seek(int64(BLOCK_SIZE-uint64(oent.Offset.Val)-40*uint64(n.Flags&1)), io.SeekStart)
+	r.Seek(int64(BLOCK_SIZE-uint64(valOffset)-40*uint64(n.Flags&1)), io.SeekStart) // val
 
 	if n.Level > 0 {
 		if err := binary.Read(r, binary.LittleEndian, &oent.PAddr); err != nil {
@@ -201,27 +222,234 @@ func (n *BTreeNodePhys) ReadOMapNodeEntry(r *bytes.Reader) error {
 	return nil
 }
 
-// GetNodeEntry returns an FIXME: create type
-func (n *BTreeNodePhys) GetNodeEntry(r *bytes.Reader) error {
-	var oent OMapNodeEntry
+// ReadNodeEntry reads a node entry from reader
+func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 
-	if n.Flags&BTNODE_FIXED_KV_SIZE == 0 {
-		panic("unimplimented")
-	} else {
-		if err := binary.Read(r, binary.LittleEndian, &oent.Offset); err != nil {
+	var nent NodeEntry
+	var keyOffset uint16
+	var valOffset uint16
+
+	if n.FixedKvSize() {
+		var off KVOffT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
 			return fmt.Errorf("failed to read offsets: %v", err)
 		}
+		keyOffset = off.Key
+		valOffset = off.Val
+		nent.Offset = off
+	} else {
+		var off KVLocT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
+		keyOffset = off.Key.Off
+		valOffset = off.Val.Off
+		nent.Offset = off
 	}
 
 	pos, _ := r.Seek(0, io.SeekCurrent)
 
-	r.Seek(int64(oent.Offset.Key+n.TableSpace.Len+56), io.SeekStart) // key_hdr
+	r.Seek(int64(keyOffset+n.TableSpace.Len+56), io.SeekStart) // key
 
-	if err := binary.Read(r, binary.LittleEndian, &oent.Key); err != nil {
-		return fmt.Errorf("failed to read omap_key_t: %v", err)
+	if err := binary.Read(r, binary.LittleEndian, &nent.Hdr); err != nil {
+		return fmt.Errorf("failed to read j_key_t: %v", err)
 	}
 
-	n.Entries = append(n.Entries, oent)
+	switch nent.Hdr.GetType() {
+	case APFS_TYPE_SNAP_METADATA:
+	case APFS_TYPE_EXTENT:
+	case APFS_TYPE_INODE:
+	case APFS_TYPE_XATTR:
+		var k j_xattr_key_t
+		if err := binary.Read(r, binary.LittleEndian, &k.NameLen); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		n := make([]byte, k.NameLen)
+		if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		k.Name = strings.Trim(string(n[:]), "\x00")
+		nent.Key = k
+	case APFS_TYPE_SIBLING_LINK:
+		var k SiblingKeyT
+		if err := binary.Read(r, binary.LittleEndian, &k); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		nent.Key = k
+	case APFS_TYPE_DSTREAM_ID:
+	case APFS_TYPE_CRYPTO_STATE:
+	case APFS_TYPE_FILE_EXTENT:
+		var k j_file_extent_key_t
+		if err := binary.Read(r, binary.LittleEndian, &k); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		nent.Key = k
+	case APFS_TYPE_DIR_REC:
+		var k j_drec_hashed_key_t
+		if err := binary.Read(r, binary.LittleEndian, &k.NameLenAndHash); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		n := make([]byte, k.Length())
+		if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		k.Name = strings.Trim(string(n[:]), "\x00")
+		nent.Key = k
+	case APFS_TYPE_DIR_STATS:
+	case APFS_TYPE_SNAP_NAME:
+		var k j_snap_name_key_t
+		if err := binary.Read(r, binary.LittleEndian, &k.NameLen); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		n := make([]byte, k.NameLen)
+		if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		k.Name = strings.Trim(string(n[:]), "\x00")
+		nent.Key = k
+	case APFS_TYPE_SIBLING_MAP:
+	case APFS_TYPE_FILE_INFO:
+		var k j_file_info_key_t
+		if err := binary.Read(r, binary.LittleEndian, &k); err != nil {
+			return fmt.Errorf("failed to read %T: %v", k, err)
+		}
+		nent.Key = k
+	default:
+		return fmt.Errorf("got unsupported APFS type %s", nent.Hdr.GetType())
+	}
+
+	r.Seek(int64(BLOCK_SIZE-uint64(valOffset)-40*uint64(n.Flags&1)), io.SeekStart) // val
+
+	if n.Level > 0 {
+		switch nent.Hdr.GetType() {
+		case APFS_TYPE_SNAP_METADATA:
+		case APFS_TYPE_SNAP_NAME:
+		case APFS_TYPE_EXTENT:
+			if err := binary.Read(r, binary.LittleEndian, &nent.PAddr); err != nil {
+				return fmt.Errorf("failed to read paddr_t: %v", err)
+			}
+			// TODO: make sure to read Obj for paddr later
+		case APFS_TYPE_INODE:
+			fallthrough
+		case APFS_TYPE_XATTR:
+			fallthrough
+		case APFS_TYPE_SIBLING_LINK:
+			fallthrough
+		case APFS_TYPE_DSTREAM_ID:
+			fallthrough
+		case APFS_TYPE_CRYPTO_STATE:
+			fallthrough
+		case APFS_TYPE_FILE_EXTENT:
+			fallthrough
+		case APFS_TYPE_DIR_REC:
+			fallthrough
+		case APFS_TYPE_DIR_STATS:
+			fallthrough
+		case APFS_TYPE_SIBLING_MAP:
+			fallthrough
+		case APFS_TYPE_FILE_INFO:
+			if n.Hashed() {
+				var v BTreeNodeIndexNodeValT
+				if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+					return fmt.Errorf("failed to read paddr_t: %v", err)
+				}
+				nent.Val = v
+			} else {
+				var v uint64
+				if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+					return fmt.Errorf("failed to read uint64: %v", err)
+				}
+				nent.Val = v
+			}
+		default:
+			return fmt.Errorf("got unsupported APFS type %s", nent.Hdr.GetType())
+		}
+	} else {
+		switch nent.Hdr.GetType() {
+		case APFS_TYPE_SNAP_METADATA:
+			var v j_snap_metadata_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_EXTENT:
+			var v j_phys_ext_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_INODE:
+			var v j_inode_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_XATTR:
+			var v j_xattr_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_SIBLING_LINK:
+			var v SiblingValT
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_DSTREAM_ID:
+			var v j_dstream_id_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_CRYPTO_STATE:
+			var v j_crypto_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_FILE_EXTENT:
+			var v j_file_extent_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_DIR_REC:
+			var v j_drec_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_DIR_STATS:
+			var v j_dir_stats_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_SNAP_NAME:
+			var v j_snap_name_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_SIBLING_MAP:
+			var v SiblingMapValT
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		case APFS_TYPE_FILE_INFO:
+			var v j_file_info_val_t
+			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			nent.Val = v
+		default:
+			return fmt.Errorf("got unsupported APFS type %s", nent.Hdr.GetType())
+		}
+	}
+
+	n.Entries = append(n.Entries, nent)
 
 	r.Seek(pos, io.SeekStart) // reset reader to right after we read the offsets
 

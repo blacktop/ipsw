@@ -83,9 +83,17 @@ type OMapSnapshotT struct {
 }
 
 type OMapNodeEntry struct {
-	Offset KVOffT
+	Offset interface{}
 	Key    OMapKey
 	PAddr  uint64
 	OMap   *Obj
 	Val    OMapVal
+}
+
+type NodeEntry struct {
+	Offset interface{}
+	Hdr    JKeyT
+	Key    interface{}
+	PAddr  uint64
+	Val    interface{}
 }

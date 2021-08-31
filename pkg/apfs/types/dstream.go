@@ -17,7 +17,7 @@ const (
 )
 
 type j_file_extent_key_t struct {
-	Hdr         JKeyT
+	// Hdr         JKeyT
 	LogicalAddr uint64
 }
 

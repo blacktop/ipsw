@@ -1,28 +1,24 @@
 package types
 
-/** `j_sibling_key_t` **/
+// SiblingKeyT is a j_sibling_key_t object
+type SiblingKeyT struct {
+	// Hdr       JKeyT
+	SiblingID uint64
+} // __attribute__((packed))
 
-// typedef struct {
-//     JKeyT     hdr;
-//     uint64_t    sibling_id;
-// } __attribute__((packed))   j_sibling_key_t;
+// SiblingValT is a j_sibling_val_t object
+type SiblingValT struct {
+	ParentID uint64
+	NameLen  uint16
+	Name     [0]uint8
+} // __attribute__((packed))
 
-// /** `j_sibling_val_t` **/
+// SiblingMapKeyT is a j_sibling_map_key_t object
+type SiblingMapKeyT struct {
+	Hdr JKeyT
+} // __attribute__((packed))
 
-// typedef struct {
-//     uint64_t    parent_id;
-//     uint16_t    name_len;
-//     uint8_t     name[0];
-// } __attribute__((packed))   j_sibling_val_t;
-
-// /** `j_sibling_map_key_t` **/
-
-// typedef struct {
-//     JKeyT     hdr;
-// } __attribute__((packed))   j_sibling_map_key_t;
-
-// /** `j_sibling_map_val_t` **/
-
-// typedef struct {
-//     uint64_t    file_id;
-// } __attribute__((packed))   j_sibling_map_val_t;
+// SiblingMapValT is a j_sibling_map_val_t object
+type SiblingMapValT struct {
+	FileID uint64
+} // __attribute__((packed))
