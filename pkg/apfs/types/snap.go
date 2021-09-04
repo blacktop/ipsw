@@ -1,6 +1,10 @@
 package types
 
-import "github.com/blacktop/go-macho"
+import (
+	"fmt"
+
+	"github.com/blacktop/go-macho"
+)
 
 type j_snap_metadata_key_t struct {
 	Hdr JKeyT
@@ -9,14 +13,31 @@ type j_snap_metadata_key_t struct {
 type j_snap_metadata_val_t struct {
 	ExtentrefTreeOid  OidT
 	SblockOid         OidT
-	CreateTime        uint64
-	ChangeTime        uint64
+	CreateTime        EpochTime
+	ChangeTime        EpochTime
 	INum              uint64
 	ExtentRefTreeType objType
 	Flags             uint32
 	NameLen           uint16
 	Name              [0]uint8
 } // __attribute__((packed))
+
+type j_snap_metadata_val struct {
+	j_snap_metadata_val_t
+	Name string
+} // __attribute__((packed))
+
+func (val j_snap_metadata_val) String() string {
+	return fmt.Sprintf("name=%s, etree_oid=%d, etree_type=%s, flags=%#x, sblock_oid=%d, createtime=%s, changetime=%s, inum=%d",
+		val.Name,
+		val.ExtentrefTreeOid,
+		val.ExtentRefTreeType.String(),
+		val.Flags,
+		val.SblockOid,
+		val.CreateTime,
+		val.ChangeTime,
+		val.INum)
+}
 
 type j_snap_name_key_t struct {
 	// Hdr     JKeyT
@@ -29,6 +50,10 @@ type j_snap_name_key_t struct {
 type j_snap_name_val_t struct {
 	SnapXid XidT
 } // __attribute__((packed))
+
+func (val j_snap_name_val_t) String() string {
+	return fmt.Sprintf("snap_id=%#x", val.SnapXid)
+}
 
 type snap_meta_flags uint32
 

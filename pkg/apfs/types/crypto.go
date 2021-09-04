@@ -1,12 +1,61 @@
 package types
 
-import "github.com/blacktop/go-macho/types"
+import (
+	"encoding/hex"
+	"fmt"
+
+	"github.com/blacktop/go-macho/types"
+)
+
+const (
+	/** Protection Classes **/
+	PROTECTION_CLASS_DIR_NONE cp_key_class_t = 0
+	PROTECTION_CLASS_A        cp_key_class_t = 1
+	PROTECTION_CLASS_B        cp_key_class_t = 2
+	PROTECTION_CLASS_C        cp_key_class_t = 3
+	PROTECTION_CLASS_D        cp_key_class_t = 4
+	PROTECTION_CLASS_F        cp_key_class_t = 6
+	PROTECTION_CLASS_M        cp_key_class_t = 14
+
+	CP_EFFECTIVE_CLASSMASK = 0x0000001f
+
+	/** Encryption Identifiers **/
+	CRYPTO_SW_ID      = 4
+	CRYPTO_RESERVED_5 = 5
+
+	APFS_UNASSIGNED_CRYPTO_ID = 0xFFFFFFFFFFFFFFFF // ~0ULL
+)
 
 /** Encryption Types **/
 type cp_key_class_t uint32
 type cp_key_os_version_t uint32
 type cp_key_revision_t uint16
 type crypto_flags_t uint32
+
+func (c cp_key_class_t) String() string {
+	switch c & 0x0000001f {
+	case PROTECTION_CLASS_DIR_NONE:
+		return "directory default (iOS only)"
+	case PROTECTION_CLASS_A:
+		return "complete protection"
+	case PROTECTION_CLASS_B:
+		return "protected unless open"
+	case PROTECTION_CLASS_C:
+		return "protected until first user authentication"
+	case PROTECTION_CLASS_D:
+		return "no protection"
+	case PROTECTION_CLASS_F:
+		return "no protection with nonpersistent key"
+	case PROTECTION_CLASS_M:
+		return "no overview available"
+	default:
+		return fmt.Sprintf("unknown key class %d", c)
+	}
+}
+
+func (v cp_key_os_version_t) String() string {
+	return fmt.Sprintf("%d%c%d", v>>24, (v&0x00FF0000)>>16, v&0x0000FFFF)
+}
 
 type j_crypto_key_t struct {
 	Hdr JKeyT
@@ -20,15 +69,36 @@ type wrapped_crypto_state_t struct {
 	KeyOsVersion    cp_key_os_version_t
 	KeyRevision     cp_key_revision_t
 	KeyLen          uint16
-	PersistentKey   [0]byte
+	// PersistentKey   [0]byte
 } // __attribute__((aligned(2), packed))
+
+type wrapped_crypto_state struct {
+	wrapped_crypto_state_t
+	PersistentKey []byte
+} // __attribute__((aligned(2), packed))
+
+func (s wrapped_crypto_state) String() string {
+	return fmt.Sprintf("major_version=%d, minor_version=%d, cpflags=%#x, persistent_class=%s, key_os_version=%s, key_revision=%d\npersistent_key:\n%s",
+		s.MajorVersion,
+		s.MinorVersion,
+		s.Cpflags,
+		s.PersistentClass,
+		s.KeyOsVersion,
+		s.KeyRevision,
+		hex.Dump(s.PersistentKey),
+	)
+}
 
 const CP_MAX_WRAPPEDKEYSIZE = 128
 
 type j_crypto_val_t struct {
-	Refcnt uint32
-	State  wrapped_crypto_state_t
+	RefCount uint32
+	State    wrapped_crypto_state
 } // __attribute__((aligned(4), packed))
+
+func (v j_crypto_val_t) String() string {
+	return fmt.Sprintf("ref_count=%d, state=(%s)", v.RefCount, v.State)
+}
 
 type wrapped_meta_crypto_state_t struct {
 	MajorVersion    uint16
@@ -39,25 +109,6 @@ type wrapped_meta_crypto_state_t struct {
 	KeyRevision     cp_key_revision_t
 	_               uint16
 } // __attribute__((aligned(2), packed))
-
-const (
-	/** Protection Classes **/
-	PROTECTION_CLASS_DIR_NONE = 0
-	PROTECTION_CLASS_A        = 1
-	PROTECTION_CLASS_B        = 2
-	PROTECTION_CLASS_C        = 3
-	PROTECTION_CLASS_D        = 4
-	PROTECTION_CLASS_F        = 6
-	PROTECTION_CLASS_M        = 14
-
-	CP_EFFECTIVE_CLASSMASK = 0x0000001f
-
-	/** Encryption Identifiers **/
-	CRYPTO_SW_ID      = 4
-	CRYPTO_RESERVED_5 = 5
-
-	APFS_UNASSIGNED_CRYPTO_ID = 0xFFFFFFFFFFFFFFFF // ~0ULL
-)
 
 type keybag_entry_t struct {
 	UUID    types.UUID

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 
 	"github.com/apex/log"
@@ -140,6 +141,22 @@ func NewAPFS(r *os.File) (*APFS, error) {
 	}
 
 	fmt.Println(fsRootBtree)
+
+	// fsOid := uint64(2)
+
+	for _, ent := range fsRootBtree.Body.(types.BTreeNodePhys).Entries {
+		fmt.Println(ent)
+
+		// if ent.(types.NodeEntry).Hdr.GetID() >= fsOid {
+		childNodeOmapEntry, err := fsOMapBtree.GetOMapEntry(sr, types.OidT(ent.(types.NodeEntry).Val.(uint64)), math.MaxUint64)
+		if err != nil {
+			log.Error(err.Error())
+			// return nil, err
+		} else {
+			fmt.Println(childNodeOmapEntry)
+		}
+		// }
+	}
 
 	// fsRootEntry, err := a.GetBTreePhysOMapEntry(fsOMapBTree, vol.RootTreeOid, vol.Obj.Xid)
 	// if err != nil {

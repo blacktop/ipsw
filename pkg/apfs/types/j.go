@@ -1,6 +1,11 @@
 package types
 
-//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,j_xattr_flags,dir_rec_flags,apfs_mode_t,dir_ent_file_tye -output j_string.go
+import (
+	"fmt"
+	"strings"
+)
+
+//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,apfs_mode_t,dir_ent_file_type -output j_string.go
 
 type j_obj_types byte // FIXME: what type
 
@@ -26,7 +31,8 @@ const (
 	APFS_TYPE_INVALID j_obj_types = 15
 )
 
-type j_obj_kinds byte // FIXME: what type
+type j_obj_kinds byte
+
 const (
 	APFS_KIND_ANY           j_obj_kinds = 0
 	APFS_KIND_NEW           j_obj_kinds = 1
@@ -71,7 +77,7 @@ const (
 	APFS_INODE_PINNED_MASK          j_inode_flags = (INODE_PINNED_TO_MAIN | INODE_PINNED_TO_TIER2)
 )
 
-type j_xattr_flags uint32
+type j_xattr_flags uint16
 
 const (
 	XATTR_DATA_STREAM       j_xattr_flags = 0x00000001
@@ -79,6 +85,29 @@ const (
 	XATTR_FILE_SYSTEM_OWNED j_xattr_flags = 0x00000004
 	XATTR_RESERVED_8        j_xattr_flags = 0x00000008
 )
+
+func (f j_xattr_flags) DataStream() bool {
+	return (f & XATTR_DATA_STREAM) != 0
+}
+func (f j_xattr_flags) DataEmbedded() bool {
+	return (f & XATTR_DATA_EMBEDDED) != 0
+}
+func (f j_xattr_flags) FileSystemOwned() bool {
+	return (f & XATTR_FILE_SYSTEM_OWNED) != 0
+}
+func (f j_xattr_flags) String() string {
+	var fout []string
+	if f.DataStream() {
+		fout = append(fout, "DATA_STREAM")
+	}
+	if f.DataEmbedded() {
+		fout = append(fout, "DATA_EMBEDDED")
+	}
+	if f.FileSystemOwned() {
+		fout = append(fout, "FILE_SYSTEM_OWNED")
+	}
+	return strings.Join(fout, "|")
+}
 
 type dir_rec_flags uint16
 
@@ -126,7 +155,7 @@ const (
  * non-Apple platforms, so we use a distinct name for portability.
  */
 type apfs_mode_t uint16
-type dir_ent_file_tye uint64
+type dir_ent_file_type uint64
 
 const (
 	S_IFMT = 0170000
@@ -141,15 +170,15 @@ const (
 	S_IFWHT  apfs_mode_t = 0160000
 
 	/** Directory Entry File Types **/
-	DT_UNKNOWN dir_ent_file_tye = 0
-	DT_FIFO    dir_ent_file_tye = 1
-	DT_CHR     dir_ent_file_tye = 2
-	DT_DIR     dir_ent_file_tye = 4
-	DT_BLK     dir_ent_file_tye = 6
-	DT_REG     dir_ent_file_tye = 8
-	DT_LNK     dir_ent_file_tye = 10
-	DT_SOCK    dir_ent_file_tye = 12
-	DT_WHT     dir_ent_file_tye = 14
+	DT_UNKNOWN dir_ent_file_type = 0
+	DT_FIFO    dir_ent_file_type = 1
+	DT_CHR     dir_ent_file_type = 2
+	DT_DIR     dir_ent_file_type = 4
+	DT_BLK     dir_ent_file_type = 6
+	DT_REG     dir_ent_file_type = 8
+	DT_LNK     dir_ent_file_type = 10
+	DT_SOCK    dir_ent_file_type = 12
+	DT_WHT     dir_ent_file_type = 14
 )
 
 const (
@@ -182,7 +211,7 @@ type gid_t uint32
 type j_inode_val_t struct {
 	ParentId      uint64
 	PrivateId     uint64
-	CreateTime    uint64
+	CreateTime    EpochTime
 	ModTime       uint64
 	ChangeTime    uint64
 	AccessTime    uint64
@@ -251,10 +280,18 @@ func (k j_drec_hashed_key_t) Hash() uint32 {
 
 type j_drec_val_t struct {
 	FileID    uint64
-	DateAdded uint64
-	Flags     dir_ent_file_tye
+	DateAdded EpochTime
+	Flags     dir_ent_file_type
 	Xfields   []byte
 } // __attribute__((packed))
+
+func (val j_drec_val_t) String() string {
+	return fmt.Sprintf("file_id=%#x, date_added=%s, flags=%s, xfields=<data>", // TODO: parse xfields
+		val.FileID,
+		val.DateAdded,
+		val.Flags.String(),
+	)
+}
 
 type j_dir_stats_key_t struct {
 	Hdr JKeyT
@@ -267,6 +304,14 @@ type j_dir_stats_val_t struct {
 	GenCount    uint64
 } // __attribute__((packed))
 
+func (val j_dir_stats_val_t) String() string {
+	return fmt.Sprintf("num_children=%d, total_size=%d, chained_key=%#x, gen_count=%d",
+		val.NumChildren,
+		val.TotalSize,
+		val.ChainedKey,
+		val.GenCount)
+}
+
 type j_xattr_key_t struct {
 	// Hdr     JKeyT
 	NameLen uint16
@@ -274,7 +319,20 @@ type j_xattr_key_t struct {
 } // __attribute__((packed))
 
 type j_xattr_val_t struct {
-	Flags    uint16
-	XdataLen uint16
-	Xdata    []byte
+	Flags   j_xattr_flags // The extended attribute recordʼs flags.
+	DataLen uint16        // The length of the extended attribute data.
+	Data    interface{}   // The extended attribute data or the identifier of a data stream that contains the data.
 } // __attribute__((packed))
+
+func (val j_xattr_val_t) String() string {
+	var vout []string
+	vout = append(vout, fmt.Sprintf("flags=%s", val.Flags.String()))
+	if val.Flags.DataEmbedded() {
+		vout = append(vout, fmt.Sprintf("data_len=%#x", val.DataLen))
+		vout = append(vout, fmt.Sprintf("data=%s", string(val.Data.([]byte)[:]))) // FIXME: don't string print data
+	} else {
+		vout = append(vout, fmt.Sprintf("dstream_oid=%#x", val.Data.(uint64)))
+	}
+
+	return strings.Join(vout, ", ")
+}
