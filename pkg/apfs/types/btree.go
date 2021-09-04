@@ -3,6 +3,7 @@ package types
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"strings"
@@ -88,6 +89,10 @@ type BTreeNodeIndexNodeValT struct {
 	ChildOid  OidT
 	ChildHash [32]byte //BTREE_NODE_HASH_SIZE_MAX=64 acc to spec, but in reality appears to be max size of hash type used! 32 seen // FIXME: what?
 	// ChildHash [BTREE_NODE_HASH_SIZE_MAX]byte
+}
+
+func (v BTreeNodeIndexNodeValT) String() string {
+	return fmt.Sprintf("child_oid=%#x, child_hash=%s", v.ChildOid, hex.EncodeToString(v.ChildHash[:]))
 }
 
 // OMapEntry is a omap_entry_t struct
@@ -367,11 +372,16 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 	} else {
 		switch nent.Hdr.GetType() {
 		case APFS_TYPE_SNAP_METADATA:
-			var v j_snap_metadata_val_t
-			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+			var v j_snap_metadata_val
+			if err := binary.Read(r, binary.LittleEndian, &v.j_snap_metadata_val_t); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
-			nent.Val = v // TODO: deal with Name field
+			n := make([]byte, v.NameLen)
+			if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			v.Name = strings.Trim(string(n[:]), "\x00")
+			nent.Val = v
 		case APFS_TYPE_EXTENT:
 			var v j_phys_ext_val_t
 			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
@@ -386,16 +396,38 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			nent.Val = v
 		case APFS_TYPE_XATTR:
 			var v j_xattr_val_t
-			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+			if err := binary.Read(r, binary.LittleEndian, &v.Flags); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			if err := binary.Read(r, binary.LittleEndian, &v.DataLen); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			if v.Flags.DataEmbedded() {
+				v.Data = make([]byte, v.DataLen)
+				if err := binary.Read(r, binary.LittleEndian, &v.Data); err != nil {
+					return fmt.Errorf("failed to read %T: %v", v, err)
+				}
+			} else {
+				v.Data = uint64(0)
+				if err := binary.Read(r, binary.LittleEndian, &v.Data); err != nil {
+					return fmt.Errorf("failed to read %T: %v", v, err)
+				}
 			}
 			nent.Val = v
 		case APFS_TYPE_SIBLING_LINK:
 			var v SiblingValT
-			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+			if err := binary.Read(r, binary.LittleEndian, &v.ParentID); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
-			nent.Val = v // TODO: deal with Name field
+			if err := binary.Read(r, binary.LittleEndian, &v.NameLen); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			n := make([]byte, v.NameLen)
+			if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+				return fmt.Errorf("failed to read %T: %v", v, err)
+			}
+			v.Name = strings.Trim(string(n[:]), "\x00")
+			nent.Val = v
 		case APFS_TYPE_DSTREAM_ID:
 			var v j_dstream_id_val_t
 			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
@@ -404,8 +436,15 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			nent.Val = v
 		case APFS_TYPE_CRYPTO_STATE:
 			var v j_crypto_val_t
-			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
-				return fmt.Errorf("failed to read %T: %v", v, err)
+			if err := binary.Read(r, binary.LittleEndian, &v.RefCount); err != nil {
+				return fmt.Errorf("failed to read %T RefCount: %v", v, err)
+			}
+			if err := binary.Read(r, binary.LittleEndian, &v.State.wrapped_crypto_state_t); err != nil {
+				return fmt.Errorf("failed to read %T wrapped_crypto_state_t: %v", v, err)
+			}
+			v.State.PersistentKey = make([]byte, v.State.KeyLen)
+			if err := binary.Read(r, binary.LittleEndian, &v.State.PersistentKey); err != nil {
+				return fmt.Errorf("failed to read %T PersistentKey: %v", v, err)
 			}
 			nent.Val = v
 		case APFS_TYPE_FILE_EXTENT:
@@ -466,9 +505,6 @@ func (n *BTreeNodePhys) GetOMapEntry(r *io.SectionReader, oid OidT, maxXid XidT)
 
 		for idx, entry := range node.Entries {
 			if entry.(OMapNodeEntry).Key.Oid != oid && entry.(OMapNodeEntry).Key.Xid <= maxXid {
-				if idx >= len(node.Entries)-1 {
-					return nil, fmt.Errorf("no matching records exist in this B-tree")
-				}
 				continue
 			}
 			entIdx = idx
