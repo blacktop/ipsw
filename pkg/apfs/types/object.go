@@ -274,18 +274,18 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 				return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", apsb.OmapOid, err)
 			}
 		}
-		// if apsb.ExtentrefTreeOid > 0 {
-		// 	apsb.ExtentRefTree, err = ReadObj(r, uint64(apsb.ExtentrefTreeOid))
-		// 	if err != nil {
-		// 		return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", apsb.ExtentrefTreeOid, err)
-		// 	}
-		// }
-		// if apsb.SnapMetaTreeOid > 0 {
-		// 	apsb.SnapMetaTree, err = ReadObj(r, uint64(apsb.SnapMetaTreeOid))
-		// 	if err != nil {
-		// 		return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", apsb.SnapMetaTreeOid, err)
-		// 	}
-		// }
+		if apsb.ExtentrefTreeOid > 0 {
+			apsb.ExtentRefTree, err = ReadObj(r, uint64(apsb.ExtentrefTreeOid))
+			if err != nil {
+				return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", apsb.ExtentrefTreeOid, err)
+			}
+		}
+		if apsb.SnapMetaTreeOid > 0 {
+			apsb.SnapMetaTree, err = ReadObj(r, uint64(apsb.SnapMetaTreeOid))
+			if err != nil {
+				return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", apsb.SnapMetaTreeOid, err)
+			}
+		}
 		o.Body = apsb
 	case OBJECT_TYPE_FSTREE:
 		fallthrough
