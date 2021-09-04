@@ -455,3 +455,46 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 
 	return nil
 }
+
+// GetOMapEntry returns the omap entry for a given oid
+func (n *BTreeNodePhys) GetOMapEntry(r *io.SectionReader, oid OidT, maxXid XidT) (*OMapNodeEntry, error) {
+
+	node := n
+	var entIdx int
+
+	for {
+
+		for idx, entry := range node.Entries {
+			if entry.(OMapNodeEntry).Key.Oid != oid && entry.(OMapNodeEntry).Key.Xid <= maxXid {
+				if idx >= len(node.Entries)-1 {
+					return nil, fmt.Errorf("no matching records exist in this B-tree")
+				}
+				continue
+			}
+			entIdx = idx
+			break
+		}
+
+		if node.IsLeaf() {
+			if node.Entries[entIdx].(OMapNodeEntry).Key.Oid != oid || node.Entries[entIdx].(OMapNodeEntry).Key.Xid > maxXid {
+				return nil, fmt.Errorf("no matching records exist in this B-tree")
+			}
+
+			if oentry, ok := node.Entries[entIdx].(OMapNodeEntry); ok {
+				return &oentry, nil
+			}
+
+			return nil, fmt.Errorf("no matching records exist in this B-tree")
+		}
+
+		o, err := ReadObj(r, uint64(node.Entries[entIdx].(OMapNodeEntry).PAddr))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read child node of entry %d", entIdx)
+		}
+
+		if child, ok := o.Body.(BTreeNodePhys); ok {
+			node = &child
+		}
+
+	}
+}

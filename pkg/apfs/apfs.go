@@ -127,41 +127,19 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		}
 	}
 
-	for _, entry := range a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys).Entries {
-		if entry.(types.OMapNodeEntry).Key.Oid == a.Volume.RootTreeOid {
-			log.Debugf("Root TreeAddr: %#x, TreeOid: %#x", entry.(types.OMapNodeEntry).PAddr, a.Volume.RootTreeOid)
-			a.rootBTree, err = types.ReadObj(sr, uint64(entry.(types.OMapNodeEntry).PAddr))
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
+	fsOMapBtree := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys)
+
+	fsRootEntry, err := fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, entry := range a.rootBTree.Body.(types.BTreeNodePhys).Entries {
-		if entry.(types.OMapNodeEntry).Key.Oid == a.Volume.RootTreeOid {
-			log.Debugf("Root TreeAddr: %#x, TreeOid: %#x", entry.(types.OMapNodeEntry).PAddr, a.Volume.RootTreeOid)
-			a.rootBTree, err = types.ReadObj(sr, uint64(entry.(types.OMapNodeEntry).PAddr))
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
+	fsRootBtree, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
+	if err != nil {
+		return nil, err
 	}
 
-	for _, entry := range a.rootBTree.Body.(types.BTreeNodePhys).Entries {
-		if entry.(types.OMapNodeEntry).Key.Oid == a.Volume.RootTreeOid {
-			log.Debugf("Root TreeAddr: %#x, TreeOid: %#x", entry.(types.OMapNodeEntry).Val.Paddr, a.Volume.RootTreeOid)
-			a.rootBTree, err = types.ReadObj(sr, uint64(entry.(types.OMapNodeEntry).Val.Paddr))
-			if err != nil {
-				return nil, err
-			}
-			if rtree, ok := a.rootBTree.Body.(types.BTreeNodePhys); ok {
-				a.RootTree = &rtree
-			}
-			break
-		}
-	}
+	fmt.Println(fsRootBtree)
 
 	// fsRootEntry, err := a.GetBTreePhysOMapEntry(fsOMapBTree, vol.RootTreeOid, vol.Obj.Xid)
 	// if err != nil {
