@@ -191,16 +191,29 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 					// }
 				}
 			case OBJECT_TYPE_SPACEMAN_FREE_QUEUE:
-				panic("node with OBJECT_TYPE_SPACEMAN_FREE_QUEUE entries is NOT supported yet")
+				for i := uint32(0); i < node.Nkeys; i++ {
+					err := node.ReadSpacemanFreeQueueNodeEntry(rr)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read omap node entry: %v", err)
+					}
+				}
+			// case OBJECT_TYPE_FSTREE:
+			// 	fallthrough
 			case OBJECT_TYPE_FEXT_TREE:
 				if node.Level > 0 {
-					// node.Entries = make([]byte, node.Nkeys)
-					// if err := binary.Read(r, binary.LittleEndian, &node.raw); err != nil {
-					// 	return nil, fmt.Errorf("failed to read btree node block data: %v", err)
-					// }
-					panic("node with OBJECT_TYPE_FEXT_TREE entries is NOT supported yet")
+					for i := uint32(0); i < node.Nkeys; i++ {
+						err := node.ReadOMapNodeEntry(rr)
+						if err != nil {
+							return nil, fmt.Errorf("failed to read omap node entry: %v", err)
+						}
+					}
 				} else {
-					panic("node with OBJECT_TYPE_FEXT_TREE entries is NOT supported yet")
+					for i := uint32(0); i < node.Nkeys; i++ {
+						err := node.ReadFextNodeEntry(rr)
+						if err != nil {
+							return nil, fmt.Errorf("failed to read fext node entry: %v", err)
+						}
+					}
 				}
 			default:
 				for i := uint32(0); i < node.Nkeys; i++ {
@@ -325,10 +338,8 @@ func ReadObj(r *io.SectionReader, blockAddr uint64) (*Obj, error) {
 		fallthrough
 	case OBJECT_TYPE_RESERVED_20:
 		panic("not implimented yet")
-	case OBJECT_TYPE_INVALID:
-		return nil, fmt.Errorf("found %s @ oid=%#x", o.Hdr.GetType(), blockAddr)
 	default:
-		return nil, fmt.Errorf("unknown obj header type %s @ oid=%#x", o.Hdr.GetType(), blockAddr)
+		return nil, fmt.Errorf("unknown or unsupported obj header type %s @ oid=%#x", o.Hdr.GetType(), blockAddr)
 	}
 
 	return &o, nil

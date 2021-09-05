@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,apfs_mode_t,dir_ent_file_type -output j_string.go
+//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,mode_t,dir_ent_file_type,bsd_flags_t -output j_string.go
 
 type j_obj_types byte // FIXME: what type
 
@@ -43,7 +43,7 @@ const (
 	APFS_KIND_INVALID j_obj_kinds = 255
 )
 
-type j_inode_flags uint32
+type j_inode_flags uint64
 
 const (
 	INODE_IS_APFS_PRIVATE        j_inode_flags = 0x00000001
@@ -154,20 +154,20 @@ const (
  * Called `mode_t` in the spec, but this clashes with the GNU `mode_t` on
  * non-Apple platforms, so we use a distinct name for portability.
  */
-type apfs_mode_t uint16
-type dir_ent_file_type uint64
+type mode_t uint16
+type dir_ent_file_type uint16
 
 const (
 	S_IFMT = 0170000
 
-	S_IFIFO  apfs_mode_t = 0010000
-	S_IFCHR  apfs_mode_t = 0020000
-	S_IFDIR  apfs_mode_t = 0040000
-	S_IFBLK  apfs_mode_t = 0060000
-	S_IFREG  apfs_mode_t = 0100000
-	S_IFLNK  apfs_mode_t = 0120000
-	S_IFSOCK apfs_mode_t = 0140000
-	S_IFWHT  apfs_mode_t = 0160000
+	FIFO mode_t = 0010000
+	CHR  mode_t = 0020000
+	DIR  mode_t = 0040000
+	BLK  mode_t = 0060000
+	REG  mode_t = 0100000
+	LNK  mode_t = 0120000
+	SOCK mode_t = 0140000
+	WHT  mode_t = 0160000
 
 	/** Directory Entry File Types **/
 	DT_UNKNOWN dir_ent_file_type = 0
@@ -207,32 +207,106 @@ type j_inode_key_t struct {
 
 type uid_t uint32
 type gid_t uint32
+type bsd_flags_t uint32
+
+const (
+	/*
+	 * Definitions of flags stored in file flags word.
+	 *
+	 * Super-user and owner changeable flags.
+	 */
+	UF_SETTABLE bsd_flags_t = 0x0000ffff /* mask of owner changeable flags */
+	NODUMP      bsd_flags_t = 0x00000001 /* do not dump file */
+	IMMUTABLE   bsd_flags_t = 0x00000002 /* file may not be changed */
+	APPEND      bsd_flags_t = 0x00000004 /* writes to file may only append */
+	OPAQUE      bsd_flags_t = 0x00000008 /* directory is opaque wrt. union */
+	/*
+	 * The following bit is reserved for FreeBSD.  It is not implemented
+	 * in Mac OS X.
+	 */
+	/* NOUNLINK	0x00000010 */ /* file may not be removed or renamed */
+	COMPRESSED                bsd_flags_t = 0x00000020 /* file is compressed (some file-systems) */
+
+	/* UF_TRACKED is used for dealing with document IDs.  We no longer issue
+	 *  notifications for deletes or renames for files which have UF_TRACKED set. */
+	TRACKED bsd_flags_t = 0x00000040
+
+	DATAVAULT bsd_flags_t = 0x00000080 /* entitlement required for reading and writing */
+
+	/* Bits 0x0100 through 0x4000 are currently undefined. */
+	HIDDEN bsd_flags_t = 0x00008000 /* hint that this item should not be displayed in a GUI */
+	/*
+	 * Super-user changeable flags.
+	 */
+	SF_SUPPORTED  bsd_flags_t = 0x009f0000 /* mask of superuser supported flags */
+	SF_SETTABLE   bsd_flags_t = 0x3fff0000 /* mask of superuser changeable flags */
+	SF_SYNTHETIC  bsd_flags_t = 0xc0000000 /* mask of system read-only synthetic flags */
+	SF_ARCHIVED   bsd_flags_t = 0x00010000 /* file is archived */
+	SF_IMMUTABLE  bsd_flags_t = 0x00020000 /* file may not be changed */
+	SF_APPEND     bsd_flags_t = 0x00040000 /* writes to file may only append */
+	SF_RESTRICTED bsd_flags_t = 0x00080000 /* entitlement required for writing */
+	SF_NOUNLINK   bsd_flags_t = 0x00100000 /* Item may not be removed, renamed or mounted on */
+	/*
+	 * The following two bits are reserved for FreeBSD.  They are not
+	 * implemented in Mac OS X.
+	 */
+	/* SNAPSHOT	0x00200000 */ /* snapshot inode */
+	/* NOTE: There is no SF_HIDDEN bit. */
+
+	SF_FIRMLINK bsd_flags_t = 0x00800000 /* file is a firmlink */
+	/*
+	 * Synthetic flags.
+	 *
+	 * These are read-only.  We keep them out of SF_SUPPORTED so that
+	 * attempts to set them will fail.
+	 */
+	SF_DATALESS bsd_flags_t = 0x40000000 /* file is dataless object */
+)
 
 type j_inode_val_t struct {
-	ParentId      uint64
-	PrivateId     uint64
-	CreateTime    EpochTime
-	ModTime       uint64
-	ChangeTime    uint64
-	AccessTime    uint64
-	InternalFlags uint64
-
-	// union {
-	//     int32_t     nchildren;
-	//     int32_t     nlink;
-	// };
-	NchildrenOrNlink int32
-
+	ParentID               uint64
+	PrivateID              uint64
+	CreateTime             EpochTime
+	ModTime                EpochTime
+	ChangeTime             EpochTime
+	AccessTime             EpochTime
+	InternalFlags          j_inode_flags
+	NchildrenOrNlink       int32 // union
 	DefaultProtectionClass cp_key_class_t
 	WriteGenerationCounter uint32
-	BsdFlags               uint32
+	BsdFlags               bsd_flags_t
 	Owner                  uid_t
 	Group                  gid_t
-	Mode                   apfs_mode_t
+	Mode                   mode_t
 	Pad1                   uint16
 	UncompressedSize       uint64 // formerly `pad2`
-	Xfields                []uint8
+	// Xfields                []uint8
 } // __attribute__((packed))
+
+type j_inode_val struct {
+	j_inode_val_t
+	Xfields []uint8
+}
+
+func (v j_inode_val) String() string {
+	return fmt.Sprintf("parent_id=%#x, private_id=%#x, create_time=%s, mod_time=%s, change_time=%s, access_time=%s, flags=%s, nchildren_or_nlink=%d, default_protection_class=%s, write_gen_cnt=%d, bsd_flags=%s, owner=%d, group=%d, mode=%s, uncompressed_size=%d", // TODO: parse xfields
+		v.ParentID,
+		v.PrivateID,
+		v.CreateTime,
+		v.ModTime,
+		v.ChangeTime,
+		v.AccessTime,
+		v.InternalFlags,
+		v.NchildrenOrNlink,
+		v.DefaultProtectionClass,
+		v.WriteGenerationCounter,
+		v.BsdFlags,
+		v.Owner,
+		v.Group,
+		v.Mode&S_IFMT,
+		v.UncompressedSize,
+	)
+}
 
 type j_drec_key_t struct {
 	// Hdr     JKeyT
@@ -282,10 +356,15 @@ type j_drec_val_t struct {
 	FileID    uint64
 	DateAdded EpochTime
 	Flags     dir_ent_file_type
-	Xfields   []byte
+	// Xfields   []byte
 } // __attribute__((packed))
 
-func (val j_drec_val_t) String() string {
+type j_drec_val struct {
+	j_drec_val_t
+	Xfields []byte
+}
+
+func (val j_drec_val) String() string {
 	return fmt.Sprintf("file_id=%#x, date_added=%s, flags=%s, xfields=<data>", // TODO: parse xfields
 		val.FileID,
 		val.DateAdded,

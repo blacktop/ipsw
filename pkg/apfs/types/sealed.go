@@ -53,14 +53,32 @@ const (
 const APFS_SEAL_BROKEN = (1 << 0)
 
 type fext_tree_key_t struct {
-	PrivateID   uint64
-	LogicalAddr uint64
+	PrivateID   uint64 // The object identifier of the file.
+	LogicalAddr uint64 // The offset within the fileʼs data, in bytes, for the data stored in this extent.
 } // __attribute__((packed))
+
+func (k fext_tree_key_t) String() string {
+	return fmt.Sprintf("private_id=%#x, logical_addr=%#x", k.PrivateID, k.LogicalAddr)
+}
 
 type fext_tree_val_t struct {
 	LenAndFlags  uint64
 	PhysBlockNum uint64
 } // __attribute__((packed))
+
+func (v fext_tree_val_t) Length() uint64 {
+	return v.LenAndFlags & J_FILE_EXTENT_LEN_MASK
+}
+
+func (v fext_tree_val_t) Flags() uint64 {
+	return (v.LenAndFlags & J_FILE_EXTENT_FLAG_MASK) >> J_FILE_EXTENT_FLAG_SHIFT
+}
+func (v fext_tree_val_t) String() string {
+	return fmt.Sprintf("flags=%#x, length=%#x, phys_block_num=%#x",
+		v.Flags(),
+		v.Length(),
+		v.PhysBlockNum)
+}
 
 const (
 	J_FILE_INFO_LBA_MASK   = 0x00ffffffffffffff
