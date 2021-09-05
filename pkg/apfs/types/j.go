@@ -285,7 +285,8 @@ type j_inode_val_t struct {
 
 type j_inode_val struct {
 	j_inode_val_t
-	Xfields []uint8
+	blob    xf_blob
+	Xfields []Xfield
 }
 
 func (v j_inode_val) String() string {
@@ -332,7 +333,7 @@ type j_drec_key_t struct {
  * We assume that (a) is true, i.e. we exclusively use `j_drec_hashed_key_t`.
  */
 
-type j_drec_hashed_key_t struct {
+type JDrecHashedKeyT struct {
 	// Hdr            JKeyT
 	NameLenAndHash uint32
 	Name           string
@@ -344,11 +345,11 @@ const (
 	J_DREC_HASH_SHIFT        = 10
 )
 
-func (k j_drec_hashed_key_t) Length() uint32 {
+func (k JDrecHashedKeyT) Length() uint32 {
 	return k.NameLenAndHash & J_DREC_LEN_MASK
 }
 
-func (k j_drec_hashed_key_t) Hash() uint32 {
+func (k JDrecHashedKeyT) Hash() uint32 {
 	return (k.NameLenAndHash & J_DREC_HASH_MASK) >> J_DREC_HASH_SHIFT
 }
 
@@ -359,12 +360,13 @@ type j_drec_val_t struct {
 	// Xfields   []byte
 } // __attribute__((packed))
 
-type j_drec_val struct {
+type JDrecVal struct {
 	j_drec_val_t
-	Xfields []byte
+	blob    xf_blob
+	Xfields []Xfield
 }
 
-func (val j_drec_val) String() string {
+func (val JDrecVal) String() string {
 	return fmt.Sprintf("file_id=%#x, date_added=%s, flags=%s, xfields=<data>", // TODO: parse xfields
 		val.FileID,
 		val.DateAdded,
@@ -408,7 +410,7 @@ func (val j_xattr_val_t) String() string {
 	vout = append(vout, fmt.Sprintf("flags=%s", val.Flags.String()))
 	if val.Flags.DataEmbedded() {
 		vout = append(vout, fmt.Sprintf("data_len=%#x", val.DataLen))
-		vout = append(vout, fmt.Sprintf("data=%s", string(val.Data.([]byte)[:]))) // FIXME: don't string print data
+		// vout = append(vout, fmt.Sprintf("data=%s", string(val.Data.([]byte)[:]))) // FIXME: don't string print data
 	} else {
 		vout = append(vout, fmt.Sprintf("dstream_oid=%#x", val.Data.(uint64)))
 	}
