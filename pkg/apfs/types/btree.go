@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/apex/log"
 )
 
 const (
@@ -174,6 +176,98 @@ func (n *BTreeNodePhys) FixedKvSize() bool {
 }
 func (n *BTreeNodePhys) Hashed() bool {
 	return (n.Flags & BTNODE_HASHED) != 0
+}
+
+// ReadFextNodeEntry reads a fext node entry from reader
+func (n *BTreeNodePhys) ReadFextNodeEntry(r *bytes.Reader) error {
+	var fent FextNodeEntry
+	var keyOffset uint16
+	var valOffset uint16
+
+	if n.FixedKvSize() {
+		var off KVOffT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
+		keyOffset = off.Key
+		valOffset = off.Val
+		fent.Offset = off
+	} else {
+		var off KVLocT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
+		keyOffset = off.Key.Off
+		valOffset = off.Val.Off
+		fent.Offset = off
+	}
+
+	pos, _ := r.Seek(0, io.SeekCurrent)
+
+	r.Seek(int64(keyOffset+n.TableSpace.Len+56), io.SeekStart) // key
+
+	if err := binary.Read(r, binary.LittleEndian, &fent.Key); err != nil {
+		return fmt.Errorf("failed to read %T: %v", fent.Key, err)
+	}
+
+	if valOffset != 0xFFFF {
+		r.Seek(int64(BLOCK_SIZE-uint64(valOffset)-40*uint64(n.Flags&1)), io.SeekStart) // val
+		if err := binary.Read(r, binary.LittleEndian, &fent.Val); err != nil {
+			return fmt.Errorf("failed to read %T: %v", fent.Val, err)
+		}
+	}
+
+	n.Entries = append(n.Entries, fent)
+
+	r.Seek(pos, io.SeekStart) // reset reader to right after we read the offsets
+
+	return nil
+}
+
+// ReadSpacemanFreeQueueNodeEntry reads a spaceman free queue node entry from reader
+func (n *BTreeNodePhys) ReadSpacemanFreeQueueNodeEntry(r *bytes.Reader) error {
+	var sent SpacemanFreeQueueNodeEntry
+	var keyOffset uint16
+	var valOffset uint16
+
+	if n.FixedKvSize() {
+		var off KVOffT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
+		keyOffset = off.Key
+		valOffset = off.Val
+		sent.Offset = off
+	} else {
+		var off KVLocT
+		if err := binary.Read(r, binary.LittleEndian, &off); err != nil {
+			return fmt.Errorf("failed to read offsets: %v", err)
+		}
+		keyOffset = off.Key.Off
+		valOffset = off.Val.Off
+		sent.Offset = off
+	}
+
+	pos, _ := r.Seek(0, io.SeekCurrent)
+
+	r.Seek(int64(keyOffset+n.TableSpace.Len+56), io.SeekStart) // key
+
+	if err := binary.Read(r, binary.LittleEndian, &sent.Key); err != nil {
+		return fmt.Errorf("failed to read %T: %v", sent.Key, err)
+	}
+
+	if valOffset != 0xFFFF {
+		r.Seek(int64(BLOCK_SIZE-uint64(valOffset)-40*uint64(n.Flags&1)), io.SeekStart) // val
+		if err := binary.Read(r, binary.LittleEndian, &sent.Val); err != nil {
+			return fmt.Errorf("failed to read %T: %v", sent.Val, err)
+		}
+	}
+
+	n.Entries = append(n.Entries, sent)
+
+	r.Seek(pos, io.SeekStart) // reset reader to right after we read the offsets
+
+	return nil
 }
 
 // ReadOMapNodeEntry reads a omap node entry from reader
@@ -389,10 +483,13 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			}
 			nent.Val = v
 		case APFS_TYPE_INODE:
-			var v j_inode_val_t
-			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+			var v j_inode_val
+			if err := binary.Read(r, binary.LittleEndian, &v.j_inode_val_t); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
+			// if valOffset != uint16(binary.Size(j_inode_val_t{})) {
+			// 	// TODO: parse XFields
+			// }
 			nent.Val = v
 		case APFS_TYPE_XATTR:
 			var v j_xattr_val_t
@@ -454,10 +551,12 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			}
 			nent.Val = v
 		case APFS_TYPE_DIR_REC:
-			var v j_drec_val_t
-			if err := binary.Read(r, binary.LittleEndian, &v); err != nil {
+			var v j_drec_val
+			if err := binary.Read(r, binary.LittleEndian, &v.j_drec_val_t); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
+			// if n.Parent.TableSpace.Len
+			// n.n
 			nent.Val = v
 		case APFS_TYPE_DIR_STATS:
 			var v j_dir_stats_val_t
@@ -498,39 +597,226 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 // GetOMapEntry returns the omap entry for a given oid
 func (n *BTreeNodePhys) GetOMapEntry(r *io.SectionReader, oid OidT, maxXid XidT) (*OMapNodeEntry, error) {
 
-	node := n
 	var entIdx int
+	var tocEntry OMapNodeEntry
+
+	node := n
 
 	for {
-
+		// walk entries
 		for idx, entry := range node.Entries {
-			if entry.(OMapNodeEntry).Key.Oid != oid && entry.(OMapNodeEntry).Key.Xid <= maxXid {
+			tocEntry = entry.(OMapNodeEntry)
+			if tocEntry.Key.Oid > oid || (tocEntry.Key.Oid == oid && tocEntry.Key.Xid > maxXid) {
+				// go back one entry
+				idx--
+				if idx < 0 {
+					return nil, fmt.Errorf("no matching records exist in this B-tree")
+				}
+				tocEntry = node.Entries[idx].(OMapNodeEntry)
+				break
+			}
+		}
+		// handle leaf
+		if node.IsLeaf() {
+			if tocEntry.Key.Oid != oid || tocEntry.Key.Xid > maxXid {
+				return nil, fmt.Errorf("no matching records exist in this B-tree")
+			}
+			return &tocEntry, nil
+		}
+		// get child
+		if o, err := ReadObj(r, uint64(tocEntry.PAddr)); err != nil {
+			return nil, fmt.Errorf("failed to read child node of entry %d", entIdx)
+		} else if child, ok := o.Body.(BTreeNodePhys); ok {
+			node = &child
+		}
+	}
+}
+
+// GetFSRecordsForOid returns an array of all the file-system records with a given Virtual OID from a given file-system root tree.
+func (n *BTreeNodePhys) GetFSRecordsForOid(r *io.SectionReader, volFsRootNode BTreeNodePhys, oid OidT, maxXid XidT) (FSRecords, error) {
+
+	var records FSRecords
+	var tocEntry NodeEntry
+
+	treeHeight := volFsRootNode.Level + 1
+	descPath := make([]uint32, treeHeight)
+
+	node := volFsRootNode
+
+	for i := uint16(0); i < treeHeight; i++ {
+		for idx, entry := range node.Entries {
+
+			tocEntry = entry.(NodeEntry)
+			log.Debugf("  %d) %s", idx, tocEntry)
+
+			if node.IsLeaf() {
+				if tocEntry.Hdr.GetID() == uint64(oid) {
+					/**
+					 * This is the first matching record, and `desc_path`
+					 * now describes the path to it in the tree.
+					 */
+					break
+				}
+				if tocEntry.Hdr.GetID() > uint64(oid) {
+					/**
+					 * If a record with the desired OID existed, we would've
+					 * encountered it by now, so no such records exist.
+					 */
+					return nil, fmt.Errorf("no records exist for oid=%#x", oid)
+				}
+				descPath[i]++
 				continue
 			}
-			entIdx = idx
+
+			if tocEntry.Hdr.GetID() >= uint64(oid) {
+				if descPath[i] != 0 {
+					/**
+					 * We've encountered the first entry in this non-leaf node
+					 * whose key states an OID that is greater than or equal to the
+					 * desired OID. Thus, if this *isn't* the first entry in this
+					 * node, we descend the previous entry, as a record with the
+					 * desired OID may exist in that sub-tree.
+					 */
+					descPath[i]--
+					idx--
+					tocEntry = node.Entries[idx].(NodeEntry)
+					break
+				}
+
+				if tocEntry.Hdr.GetID() == uint64(oid) {
+					/**
+					 * However, if this *is* the first entry in this node, we only
+					 * descend it if its key's stated OID matches the desired OID;
+					 * else it exceeds the desired OID, and thus no records with the
+					 * desired OID exist *in the whole tree*.
+					 */
+					break
+				}
+
+				return nil, fmt.Errorf("no such records exist for oid=%#x", oid)
+			}
+
+			descPath[i]++
+		}
+
+		/**
+		 * One of the following is now true about `toc_entry`:
+		 *
+		 * (a) it points directly after the last TOC entry, in which case:
+		 *      (i)  if this is a leaf node, we're looking at it because the
+		 *              first record in the *next* leaf node has the desired
+		 *              OID, or no records with the desired OID exist in the
+		 *              whole tree. We just break from the descent loop, and the
+		 *              walk loop will handle the current value of `desc_path`
+		 *              correctly.
+		 *      (ii) if this is a non-leaf node, we should descend the last
+		 *              entry.
+		 * (b) it points to the correct entry to descend.
+		 */
+
+		/**
+		 * If this is a leaf node, then we have finished descending the tree,
+		 * and `desc_path` describes the path to the first record with the
+		 * desired OID. We break from this while-loop (the descent loop) and
+		 * enter the next while-loop (the walk loop), which should behave
+		 * correctly based on the vale of `desc_path`.
+		 *
+		 * This handles case (a)(i) above, and also case (b) when we're looking
+		 * at a leaf node.
+		 */
+		if node.IsLeaf() {
 			break
 		}
 
-		if node.IsLeaf() {
-			if node.Entries[entIdx].(OMapNodeEntry).Key.Oid != oid || node.Entries[entIdx].(OMapNodeEntry).Key.Xid > maxXid {
-				return nil, fmt.Errorf("no matching records exist in this B-tree")
-			}
-
-			if oentry, ok := node.Entries[entIdx].(OMapNodeEntry); ok {
-				return &oentry, nil
-			}
-
-			return nil, fmt.Errorf("no matching records exist in this B-tree")
-		}
-
-		o, err := ReadObj(r, uint64(node.Entries[entIdx].(OMapNodeEntry).PAddr))
+		// get child node
+		childNodeOmapEntry, err := n.GetOMapEntry(r, OidT(tocEntry.Val.(uint64)), maxXid)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read child node of entry %d", entIdx)
+			return nil, fmt.Errorf("failed to get omap entry for oid %#x: %v", tocEntry.Val.(uint64), err)
 		}
-
-		if child, ok := o.Body.(BTreeNodePhys); ok {
-			node = &child
+		log.Debugf("Child Node Entry: %s", childNodeOmapEntry)
+		nodeObj, err := ReadObj(r, childNodeOmapEntry.Val.Paddr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read child node: %v", err)
 		}
+		node = nodeObj.Body.(BTreeNodePhys)
+	}
 
+	for {
+
+		node = volFsRootNode
+
+		for i := uint16(0); i < treeHeight; i++ {
+
+			/**
+			 * If `desc_path[i]` isn't a valid entry index in this node, that
+			 * means we've already looked at all the entries in this node, and
+			 * should look at the next node on this level.
+			 */
+			if descPath[i] >= node.Nkeys {
+				/**
+				 * If this is a root node, then there are no other nodes on this
+				 * level; we've gone through the whole tree, return the results.
+				 */
+				if node.IsRoot() {
+					return records, nil
+				}
+
+				/**
+				 * Else, we adjust the value of `desc_path` so that it refers
+				 * to the leftmost descendant of the next node on this level.
+				 * We then break from this for-loop so that we loop inside the
+				 * while-loop (the walk loop), which will result in us making
+				 * a new descent from the root based on the new value of
+				 * `desc_path`.
+				 */
+				descPath[i-1]++
+				for j := uint16(i); j < treeHeight; j++ {
+					descPath[j] = 0
+				}
+				break
+			}
+
+			/**
+			 * Handle leaf nodes:
+			 * The entry we're looking at is the next record, so add it to the
+			 * records array, then adjust `desc_path` and loop.
+			 */
+			if node.IsLeaf() {
+				for idx := descPath[i]; idx < node.Nkeys; idx++ {
+
+					tocEntry = node.Entries[idx].(NodeEntry)
+					log.Debugf("  %d) %s", idx, tocEntry)
+
+					if tocEntry.Hdr.GetID() != uint64(oid) {
+						// This record doesn't have the right OID, so we must have
+						// found all of the relevant records; return the results
+						return records, nil
+					}
+
+					records = append(records, tocEntry)
+				}
+				/**
+				 * We've run off the end of this leaf node, and `desc_path` now
+				 * refers to the first record of the next leaf node.
+				 * Loop so that we correctly make a new descent to that record
+				 * from the root node.
+				 */
+				break
+			}
+
+			tocEntry = node.Entries[descPath[i]].(NodeEntry)
+
+			// get child node
+			childNodeOmapEntry, err := n.GetOMapEntry(r, OidT(tocEntry.Val.(uint64)), maxXid)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get omap entry for oid %#x: %v", tocEntry.Val.(uint64), err)
+			}
+			log.Debugf("Child Node Entry: %s", childNodeOmapEntry)
+			nodeObj, err := ReadObj(r, childNodeOmapEntry.Val.Paddr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read child node: %v", err)
+			}
+			node = nodeObj.Body.(BTreeNodePhys)
+		}
 	}
 }

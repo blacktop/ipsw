@@ -1,5 +1,7 @@
 package types
 
+import "fmt"
+
 type chunk_info_t struct {
 	Xid        XidT // Spec says ``, but I assume it is meant to be `XidT` they're equivalent, anyway
 	Addr       uint64
@@ -27,7 +29,15 @@ type spaceman_free_queue_key_t struct {
 	SfqkPaddr uint64
 }
 
+func (k spaceman_free_queue_key_t) String() string {
+	return fmt.Sprintf("sfqk_xid=%#x, sfqk_paddr=%#x", k.SfqkXid, k.SfqkPaddr)
+}
+
 type spaceman_free_queue_val_t uint64
+
+func (v spaceman_free_queue_val_t) String() string {
+	return fmt.Sprintf("value=%#x", v)
+}
 
 type spaceman_free_queue_entry_t struct {
 	SfqeKey   spaceman_free_queue_key_t

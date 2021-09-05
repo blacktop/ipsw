@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math"
 	"os"
 
 	"github.com/apex/log"
@@ -128,6 +127,7 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		}
 	}
 
+	log.Debugf("File System OMap Btree: %s", a.Volume.OMap.Body.(types.OMap).Tree)
 	fsOMapBtree := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys)
 
 	fsRootEntry, err := fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
@@ -135,45 +135,25 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		return nil, err
 	}
 
-	fsRootBtree, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
+	log.Debugf("File System Root Entry: %s", fsRootEntry)
+
+	fsRootBtreeObj, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println(fsRootBtree)
+	fmt.Println(fsRootBtreeObj)
 
-	// fsOid := uint64(2)
+	fsRootBtree := fsRootBtreeObj.Body.(types.BTreeNodePhys)
 
-	for _, ent := range fsRootBtree.Body.(types.BTreeNodePhys).Entries {
-		fmt.Println(ent)
+	fsOid := types.OidT(2)
 
-		// if ent.(types.NodeEntry).Hdr.GetID() >= fsOid {
-		childNodeOmapEntry, err := fsOMapBtree.GetOMapEntry(sr, types.OidT(ent.(types.NodeEntry).Val.(uint64)), math.MaxUint64)
-		if err != nil {
-			log.Error(err.Error())
-			// return nil, err
-		} else {
-			fmt.Println(childNodeOmapEntry)
-		}
-		// }
+	fsRecords, err := fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, fsOid, types.XidT(^uint64(0)))
+	if err != nil {
+		return nil, err
 	}
 
-	// fsRootEntry, err := a.GetBTreePhysOMapEntry(fsOMapBTree, vol.RootTreeOid, vol.Obj.Xid)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to get btree phys omap entry: %v", err)
-	// }
-
-	// fsRootBTree, err := types.NewBTreeNode(r, int64(fsRootEntry.Val.Paddr), int64(a.nxsb.BlockSize))
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to read root node of the container object map B-tree at block %#x: %v", omap.TreeOid, err)
-	// }
-
-	// fsRecords, err := a.GetFSRecords(fsOMapBTree, fsRootBTree, 2, types.XidT(^uint64(0)))
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// fmt.Println(fsRecords)
+	fmt.Println(fsRecords.Tree())
 
 	return a, nil
 }
