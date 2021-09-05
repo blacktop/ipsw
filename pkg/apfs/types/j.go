@@ -1,11 +1,12 @@
 package types
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 )
 
-//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,mode_t,dir_ent_file_type,bsd_flags_t -output j_string.go
+//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,mode_t,dir_ent_file_type,bsd_flags_t,compMethod -output j_string.go
 
 type j_obj_types byte // FIXME: what type
 
@@ -290,7 +291,11 @@ type j_inode_val struct {
 }
 
 func (v j_inode_val) String() string {
-	return fmt.Sprintf("parent_id=%#x, private_id=%#x, create_time=%s, mod_time=%s, change_time=%s, access_time=%s, flags=%s, nchildren_or_nlink=%d, default_protection_class=%s, write_gen_cnt=%d, bsd_flags=%s, owner=%d, group=%d, mode=%s, uncompressed_size=%d", // TODO: parse xfields
+	var xfout []string
+	for _, xf := range v.Xfields {
+		xfout = append(xfout, fmt.Sprintf("%s: %s", xf.XType, xf))
+	}
+	return fmt.Sprintf("parent_id=%#x, private_id=%#x, create_time=%s, mod_time=%s, change_time=%s, access_time=%s, flags=%s, nchildren_or_nlink=%d, default_protection_class=%s, write_gen_cnt=%d, bsd_flags=%s, owner=%d, group=%d, mode=%s, uncompressed_size=%d, xfields={%s}", // TODO: parse xfields
 		v.ParentID,
 		v.PrivateID,
 		v.CreateTime,
@@ -306,6 +311,7 @@ func (v j_inode_val) String() string {
 		v.Group,
 		v.Mode&S_IFMT,
 		v.UncompressedSize,
+		strings.Join(xfout, ", "),
 	)
 }
 
@@ -367,10 +373,15 @@ type JDrecVal struct {
 }
 
 func (val JDrecVal) String() string {
-	return fmt.Sprintf("file_id=%#x, date_added=%s, flags=%s, xfields=<data>", // TODO: parse xfields
+	var xfout []string
+	for _, xf := range val.Xfields {
+		xfout = append(xfout, fmt.Sprintf("%s: %s", xf.XType, xf))
+	}
+	return fmt.Sprintf("file_id=%#x, date_added=%s, flags=%s, xfields={%x}",
 		val.FileID,
 		val.DateAdded,
 		val.Flags.String(),
+		strings.Join(xfout, ", "),
 	)
 }
 
@@ -405,12 +416,33 @@ type j_xattr_val_t struct {
 	Data    interface{}   // The extended attribute data or the identifier of a data stream that contains the data.
 } // __attribute__((packed))
 
+type compMethod uint32
+
+const (
+	CMP_UNKNOWN  compMethod = 1 // CMP_Type1 - Unknown (uncompressed extended attribute data)
+	CMP_ZLIB     compMethod = 3
+	CMP_64K_ZLIB compMethod = 4
+	CMP_LZVN     compMethod = 7
+	CMP_64K_LZVN compMethod = 8
+
+	CMP_LZFSE     compMethod = 11
+	CMP_64K_LZFSE compMethod = 12
+	CMP_MAX       compMethod = 0x80000001 // faulting file ?
+)
+
+type decmpfs struct {
+	Magic            magic
+	Method           compMethod
+	UncompressedSize uint64
+}
+
 func (val j_xattr_val_t) String() string {
 	var vout []string
 	vout = append(vout, fmt.Sprintf("flags=%s", val.Flags.String()))
 	if val.Flags.DataEmbedded() {
 		vout = append(vout, fmt.Sprintf("data_len=%#x", val.DataLen))
 		// vout = append(vout, fmt.Sprintf("data=%s", string(val.Data.([]byte)[:]))) // FIXME: don't string print data
+		vout = append(vout, fmt.Sprintf("data=\n%s", hex.Dump(val.Data.([]byte)))) // FIXME: don't string print data
 	} else {
 		vout = append(vout, fmt.Sprintf("dstream_oid=%#x", val.Data.(uint64)))
 	}

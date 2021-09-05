@@ -156,7 +156,9 @@ func NewAPFS(r *os.File) (*APFS, error) {
 	}
 
 	fmt.Println(fsRecords.Tree("/"))
-
+	for _, rec := range fsRecords {
+		fmt.Println(rec)
+	}
 	for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.symbols", string(filepath.Separator)) {
 		// for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e", string(filepath.Separator)) {
 		if len(part) > 0 {
@@ -169,6 +171,9 @@ func NewAPFS(r *os.File) (*APFS, error) {
 							return nil, err
 						}
 						fmt.Println(fsRecords.Tree(part))
+						for _, rec := range fsRecords {
+							fmt.Println(rec)
+						}
 					}
 				}
 

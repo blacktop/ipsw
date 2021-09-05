@@ -75,7 +75,7 @@ func (f Xfield) String() string {
 	case INO_EXT_TYPE_DOCUMENT_ID:
 		return fmt.Sprintf("document_id=%#x", f.Field.(uint32))
 	case INO_EXT_TYPE_NAME:
-		return fmt.Sprintf("name=%#x", f.Field.(string))
+		return fmt.Sprintf("name=%s", f.Field.(string))
 	case INO_EXT_TYPE_PREV_FSIZE:
 		return fmt.Sprintf("prev_file_size=%#x", f.Field.(uint64))
 	case INO_EXT_TYPE_DSTREAM:
