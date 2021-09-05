@@ -1,5 +1,14 @@
 package types
 
+import (
+	"encoding/hex"
+	"fmt"
+
+	"github.com/blacktop/go-macho"
+)
+
+//go:generate stringer -type=xfType,xfFlag -output xf_string.go
+
 type xfType byte
 type xfFlag byte
 
@@ -38,11 +47,60 @@ const (
 type xf_blob_t struct {
 	XfNumExts  uint16
 	XfUsedData uint16
-	XfData     []byte
+	// XfData     []byte
+}
+
+type xf_blob struct {
+	xf_blob_t
+	XfData []byte
 }
 
 type x_field_t struct {
 	XType  xfType
 	XFlags xfFlag
 	XSize  uint16
+}
+
+type Xfield struct {
+	x_field_t
+	Field interface{}
+}
+
+func (f Xfield) String() string {
+	switch f.XType {
+	case INO_EXT_TYPE_SNAP_XID:
+		return fmt.Sprintf("snapshot_xid=%#x", f.Field.(XidT))
+	case INO_EXT_TYPE_DELTA_TREE_OID:
+		return fmt.Sprintf("delta_tree_oid=%#x", f.Field.(OidT))
+	case INO_EXT_TYPE_DOCUMENT_ID:
+		return fmt.Sprintf("document_id=%#x", f.Field.(uint32))
+	case INO_EXT_TYPE_NAME:
+		return fmt.Sprintf("name=%#x", f.Field.(string))
+	case INO_EXT_TYPE_PREV_FSIZE:
+		return fmt.Sprintf("prev_file_size=%#x", f.Field.(uint64))
+	case INO_EXT_TYPE_DSTREAM:
+		return f.Field.(j_dstream_t).String()
+	case INO_EXT_TYPE_DIR_STATS_KEY:
+		return f.Field.(j_dir_stats_val_t).String()
+	case INO_EXT_TYPE_FS_UUID:
+		return f.Field.(macho.UUID).UUID.String()
+	case INO_EXT_TYPE_SPARSE_BYTES:
+		return fmt.Sprintf("sparse_bytes=%d", f.Field.(uint64))
+	case INO_EXT_TYPE_RDEV:
+		return fmt.Sprintf("device_id=%#x", f.Field.(uint32))
+	case INO_EXT_TYPE_ORIG_SYNC_ROOT_ID:
+		return fmt.Sprintf("inode_num=%#x", f.Field.(uint64))
+	case INO_EXT_TYPE_RESERVED_6:
+		fallthrough
+	case INO_EXT_TYPE_RESERVED_9:
+		fallthrough
+	case INO_EXT_TYPE_RESERVED_12:
+		fallthrough
+	case INO_EXT_TYPE_FINDER_INFO:
+		fallthrough
+	case INO_EXT_TYPE_PURGEABLE_FLAGS:
+		fallthrough
+	default:
+		return hex.Dump(f.Field.([]byte))
+	}
 }

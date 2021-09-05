@@ -199,7 +199,7 @@ func (ne NodeEntry) String() string {
 	case APFS_TYPE_FILE_EXTENT:
 		nout = append(nout, fmt.Sprintf("logical_addr=%#x", ne.Key.(j_file_extent_key_t).LogicalAddr))
 	case APFS_TYPE_DIR_REC:
-		nout = append(nout, fmt.Sprintf("name=%s, hash=%#x", ne.Key.(j_drec_hashed_key_t).Name, ne.Key.(j_drec_hashed_key_t).Hash()))
+		nout = append(nout, fmt.Sprintf("name=%s, hash=%#x", ne.Key.(JDrecHashedKeyT).Name, ne.Key.(JDrecHashedKeyT).Hash()))
 	case APFS_TYPE_DIR_STATS:
 	case APFS_TYPE_SNAP_NAME:
 		nout = append(nout, fmt.Sprintf("name=%s", ne.Key.(j_snap_name_key_t).Name))
@@ -277,7 +277,7 @@ func (ne NodeEntry) String() string {
 			nout = append(nout, val.String())
 		case uint64:
 			nout = append(nout, fmt.Sprintf("val=%#x", val))
-		case j_drec_val:
+		case JDrecVal:
 			nout = append(nout, val.String())
 		}
 	case APFS_TYPE_DIR_STATS:
@@ -438,14 +438,35 @@ func (p *printer) printItems(t []FSTree, spaces []bool) string {
 // FSRecords are an array of file system records
 type FSRecords []NodeEntry
 
+// func (recs FSRecords) Ls(fsOMapBtree BTreeNodePhys, path string) string {
+// 	var err error
+// 	var fsRecords FSRecords
+
+// 	for _, part := range strings.Split("System/Library/Caches/com.apple.dyld", string(filepath.Separator)) {
+// 		for _, rec := range recs {
+// 			switch rec.Hdr.GetType() {
+// 			case APFS_TYPE_DIR_REC:
+// 				if rec.Key.(j_drec_hashed_key_t).Name == part {
+// 					fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00006f47), types.XidT(^uint64(0)))
+// 					if err != nil {
+// 						return nil, err
+// 					}
+// 					fmt.Println(fsRecords.Tree())
+// 				}
+// 			}
+
+// 		}
+// 	}
+// }
+
 // Tree prints a FSRecords array as a tree
-func (recs FSRecords) Tree() string {
-	t := NewFSTree("/")
+func (recs FSRecords) Tree(root string) string {
+	t := NewFSTree(root)
 	var fs []string
 	for _, rec := range recs {
 		switch rec.Hdr.GetType() {
 		case APFS_TYPE_DIR_REC:
-			fs = append(fs, rec.Key.(j_drec_hashed_key_t).Name)
+			fs = append(fs, rec.Key.(JDrecHashedKeyT).Name)
 		}
 	}
 	sort.Strings(fs)
@@ -460,7 +481,7 @@ func (recs FSRecords) String() string {
 	for _, rec := range recs {
 		switch rec.Hdr.GetType() {
 		case APFS_TYPE_DIR_REC:
-			rsout += fmt.Sprintf("%s\n", rec.Key.(j_drec_hashed_key_t).Name)
+			rsout += fmt.Sprintf("%s\n", rec.Key.(JDrecHashedKeyT).Name)
 		}
 	}
 	return rsout

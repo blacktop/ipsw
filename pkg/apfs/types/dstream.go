@@ -87,6 +87,16 @@ type j_dstream_t struct {
 	TotalBytesRead    uint64
 }
 
+func (d j_dstream_t) String() string {
+	return fmt.Sprintf("size=%d, alloced_size=%d, default_crypto_id=%#x, total_bytes_written=%d, total_bytes_read=%d",
+		d.Size,
+		d.AllocedSize,
+		d.DefaultCryptoID,
+		d.TotalBytesWritten,
+		d.TotalBytesRead,
+	)
+}
+
 type j_xattr_dstream_t struct {
 	XattrObjID uint64
 	DStream    j_dstream_t

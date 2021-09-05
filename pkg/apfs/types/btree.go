@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 )
 
 const (
@@ -384,7 +385,7 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 		}
 		nent.Key = k
 	case APFS_TYPE_DIR_REC:
-		var k j_drec_hashed_key_t
+		var k JDrecHashedKeyT
 		if err := binary.Read(r, binary.LittleEndian, &k.NameLenAndHash); err != nil {
 			return fmt.Errorf("failed to read %T: %v", k, err)
 		}
@@ -487,9 +488,140 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			if err := binary.Read(r, binary.LittleEndian, &v.j_inode_val_t); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
-			// if valOffset != uint16(binary.Size(j_inode_val_t{})) {
-			// 	// TODO: parse XFields
-			// }
+			if nent.Offset.(KVLocT).Val.Len != uint16(binary.Size(j_inode_val_t{})) {
+				if err := binary.Read(r, binary.LittleEndian, &v.blob.xf_blob_t); err != nil {
+					return fmt.Errorf("failed to read %T: %v", v.blob, err)
+				}
+				hdrs := make([]x_field_t, v.blob.XfNumExts)
+				if err := binary.Read(r, binary.LittleEndian, &hdrs); err != nil {
+					return fmt.Errorf("failed to read %T: %v", hdrs, err)
+				}
+				for _, hdr := range hdrs {
+					switch hdr.XType {
+					case INO_EXT_TYPE_SNAP_XID:
+						var snapXID XidT
+						if err := binary.Read(r, binary.LittleEndian, &snapXID); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", snapXID, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     snapXID,
+						})
+					case INO_EXT_TYPE_DELTA_TREE_OID:
+						var dtreeOID OidT
+						if err := binary.Read(r, binary.LittleEndian, &dtreeOID); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", dtreeOID, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dtreeOID,
+						})
+					case INO_EXT_TYPE_DOCUMENT_ID:
+						var docID uint32
+						if err := binary.Read(r, binary.LittleEndian, &docID); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", docID, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     docID,
+						})
+					case INO_EXT_TYPE_NAME:
+						n := make([]byte, hdr.XSize)
+						if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", n, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     strings.Trim(string(n[:]), "\x00"),
+						})
+					case INO_EXT_TYPE_PREV_FSIZE:
+						var size uint64
+						if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", size, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     size,
+						})
+					case INO_EXT_TYPE_DSTREAM:
+						var dstream j_dstream_t
+						if err := binary.Read(r, binary.LittleEndian, &dstream); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", dstream, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dstream,
+						})
+					case INO_EXT_TYPE_DIR_STATS_KEY:
+						var dirStats j_dir_stats_val_t
+						if err := binary.Read(r, binary.LittleEndian, &dirStats); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", dirStats, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dirStats,
+						})
+					case INO_EXT_TYPE_FS_UUID:
+						var uuid macho.UUID
+						if err := binary.Read(r, binary.LittleEndian, &uuid); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", uuid, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     uuid,
+						})
+					case INO_EXT_TYPE_SPARSE_BYTES:
+						var bs uint64
+						if err := binary.Read(r, binary.LittleEndian, &bs); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", bs, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     bs,
+						})
+					case INO_EXT_TYPE_RDEV:
+						var rdev uint32
+						if err := binary.Read(r, binary.LittleEndian, &rdev); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", rdev, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     rdev,
+						})
+					case INO_EXT_TYPE_ORIG_SYNC_ROOT_ID:
+						var inodeNum uint64
+						if err := binary.Read(r, binary.LittleEndian, &inodeNum); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", inodeNum, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     inodeNum,
+						})
+					case INO_EXT_TYPE_RESERVED_6:
+						fallthrough
+					case INO_EXT_TYPE_RESERVED_9:
+						fallthrough
+					case INO_EXT_TYPE_RESERVED_12:
+						fallthrough
+					case INO_EXT_TYPE_FINDER_INFO:
+						fallthrough
+					case INO_EXT_TYPE_PURGEABLE_FLAGS:
+						fallthrough
+					default:
+						dat := make([]byte, hdr.XSize)
+						if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", n, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dat,
+						})
+					}
+					if ((8 - hdr.XSize) % 8) > 0 {
+						r.Seek(int64((8-hdr.XSize)%8), io.SeekCurrent) // 8 byte align
+					}
+				}
+			}
 			nent.Val = v
 		case APFS_TYPE_XATTR:
 			var v j_xattr_val_t
@@ -500,15 +632,17 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
 			if v.Flags.DataEmbedded() {
-				v.Data = make([]byte, v.DataLen)
-				if err := binary.Read(r, binary.LittleEndian, &v.Data); err != nil {
+				dat := make([]byte, v.DataLen)
+				if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
 					return fmt.Errorf("failed to read %T: %v", v, err)
 				}
+				v.Data = dat
 			} else {
-				v.Data = uint64(0)
-				if err := binary.Read(r, binary.LittleEndian, &v.Data); err != nil {
+				var val uint64
+				if err := binary.Read(r, binary.LittleEndian, &val); err != nil {
 					return fmt.Errorf("failed to read %T: %v", v, err)
 				}
+				v.Data = val
 			}
 			nent.Val = v
 		case APFS_TYPE_SIBLING_LINK:
@@ -551,12 +685,144 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			}
 			nent.Val = v
 		case APFS_TYPE_DIR_REC:
-			var v j_drec_val
+			var v JDrecVal
 			if err := binary.Read(r, binary.LittleEndian, &v.j_drec_val_t); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
-			// if n.Parent.TableSpace.Len
-			// n.n
+			if nent.Offset.(KVLocT).Val.Len != uint16(binary.Size(j_drec_val_t{})) {
+				if err := binary.Read(r, binary.LittleEndian, &v.blob.xf_blob_t); err != nil {
+					return fmt.Errorf("failed to read %T: %v", v.blob, err)
+				}
+				hdrs := make([]x_field_t, v.blob.XfNumExts)
+				if err := binary.Read(r, binary.LittleEndian, &hdrs); err != nil {
+					return fmt.Errorf("failed to read %T: %v", hdrs, err)
+				}
+				for _, hdr := range hdrs {
+					switch hdr.XType {
+					case INO_EXT_TYPE_SNAP_XID:
+						var snapXID XidT
+						if err := binary.Read(r, binary.LittleEndian, &snapXID); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", snapXID, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     snapXID,
+						})
+					case INO_EXT_TYPE_DELTA_TREE_OID:
+						var dtreeOID OidT
+						if err := binary.Read(r, binary.LittleEndian, &dtreeOID); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", dtreeOID, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dtreeOID,
+						})
+					case INO_EXT_TYPE_DOCUMENT_ID:
+						var docID uint32
+						if err := binary.Read(r, binary.LittleEndian, &docID); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", docID, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     docID,
+						})
+					case INO_EXT_TYPE_NAME:
+						n := make([]byte, hdr.XSize)
+						if err := binary.Read(r, binary.LittleEndian, &n); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", n, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     strings.Trim(string(n[:]), "\x00"),
+						})
+					case INO_EXT_TYPE_PREV_FSIZE:
+						var size uint64
+						if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", size, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     size,
+						})
+					case INO_EXT_TYPE_DSTREAM:
+						var dstream j_dstream_t
+						if err := binary.Read(r, binary.LittleEndian, &dstream); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", dstream, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dstream,
+						})
+					case INO_EXT_TYPE_DIR_STATS_KEY:
+						var dirStats j_dir_stats_val_t
+						if err := binary.Read(r, binary.LittleEndian, &dirStats); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", dirStats, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dirStats,
+						})
+					case INO_EXT_TYPE_FS_UUID:
+						var uuid macho.UUID
+						if err := binary.Read(r, binary.LittleEndian, &uuid); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", uuid, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     uuid,
+						})
+					case INO_EXT_TYPE_SPARSE_BYTES:
+						var bs uint64
+						if err := binary.Read(r, binary.LittleEndian, &bs); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", bs, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     bs,
+						})
+					case INO_EXT_TYPE_RDEV:
+						var rdev uint32
+						if err := binary.Read(r, binary.LittleEndian, &rdev); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", rdev, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     rdev,
+						})
+					case INO_EXT_TYPE_ORIG_SYNC_ROOT_ID:
+						var inodeNum uint64
+						if err := binary.Read(r, binary.LittleEndian, &inodeNum); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", inodeNum, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     inodeNum,
+						})
+					case INO_EXT_TYPE_RESERVED_6:
+						fallthrough
+					case INO_EXT_TYPE_RESERVED_9:
+						fallthrough
+					case INO_EXT_TYPE_RESERVED_12:
+						fallthrough
+					case INO_EXT_TYPE_FINDER_INFO:
+						fallthrough
+					case INO_EXT_TYPE_PURGEABLE_FLAGS:
+						fallthrough
+					default:
+						dat := make([]byte, hdr.XSize)
+						if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
+							return fmt.Errorf("failed to read xfield %T: %v", n, err)
+						}
+						v.Xfields = append(v.Xfields, Xfield{
+							x_field_t: hdr,
+							Field:     dat,
+						})
+					}
+					if ((8 - hdr.XSize) % 8) > 0 {
+						r.Seek(int64((8-hdr.XSize)%8), io.SeekCurrent) // 8 byte align
+					}
+				}
+			}
 			nent.Val = v
 		case APFS_TYPE_DIR_STATS:
 			var v j_dir_stats_val_t
@@ -794,6 +1060,7 @@ func (n *BTreeNodePhys) GetFSRecordsForOid(r *io.SectionReader, volFsRootNode BT
 					}
 
 					records = append(records, tocEntry)
+					descPath[i]++
 				}
 				/**
 				 * We've run off the end of this leaf node, and `desc_path` now

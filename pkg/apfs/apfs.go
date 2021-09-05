@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -153,7 +155,50 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		return nil, err
 	}
 
-	fmt.Println(fsRecords.Tree())
+	fmt.Println(fsRecords.Tree("/"))
+
+	for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.symbols", string(filepath.Separator)) {
+		// for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e", string(filepath.Separator)) {
+		if len(part) > 0 {
+			for _, rec := range fsRecords {
+				switch rec.Hdr.GetType() {
+				case types.APFS_TYPE_DIR_REC:
+					if rec.Key.(types.JDrecHashedKeyT).Name == part {
+						fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(rec.Val.(types.JDrecVal).FileID), types.XidT(^uint64(0)))
+						if err != nil {
+							return nil, err
+						}
+						fmt.Println(fsRecords.Tree(part))
+					}
+				}
+
+			}
+		}
+	}
+
+	for _, rec := range fsRecords {
+		fmt.Println(rec)
+	}
+
+	fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00019f2c), types.XidT(^uint64(0)))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, rec := range fsRecords {
+		fmt.Println(rec)
+	}
+
+	// ent, err := fsOMapBtree.GetOMapEntry(sr, types.OidT(0xfffffff00019f2c), a.volume.Hdr.Xid)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// fmt.Println(ent)
+	// oo, err := types.ReadObj(sr, 1152921500311985964)
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// fmt.Println(oo)
 
 	return a, nil
 }
