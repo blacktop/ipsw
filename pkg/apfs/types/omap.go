@@ -224,7 +224,7 @@ func (ne NodeEntry) String() string {
 		case uint64:
 			nout = append(nout, fmt.Sprintf("val=%#x", val))
 		case j_inode_val:
-			nout = append(nout, ne.Val.(j_inode_val).String())
+			nout = append(nout, val.String())
 		}
 	case APFS_TYPE_XATTR:
 		switch val := ne.Val.(type) {
