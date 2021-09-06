@@ -5,11 +5,10 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
 
-	"github.com/apex/log"
+	lzfse "github.com/blacktop/lzfse-cgo"
 )
 
 //go:generate stringer -type=compMethod -output decmpfs_string.go
@@ -114,7 +113,7 @@ func DecompressFile(r *io.SectionReader, decomp *bufio.Writer, hdr *DecmpfsDiskH
 
 	switch hdr.CompressionType {
 	case CMP_ATTR_ZLIB:
-		fallthrough
+		panic("CMP_ATTR_ZLIB not supported (need to figure out where to grab compressed data from)")
 	case CMP_RSRC_ZLIB:
 		var rsrcHdr CmpfRsrcHead
 		if err := binary.Read(r, binary.BigEndian, &rsrcHdr); err != nil {
@@ -127,7 +126,6 @@ func DecompressFile(r *io.SectionReader, decomp *bufio.Writer, hdr *DecmpfsDiskH
 		if err := binary.Read(r, binary.BigEndian, &blkHdr.DataSize); err != nil {
 			return err
 		}
-
 		if err := binary.Read(r, binary.LittleEndian, &blkHdr.NumBlocks); err != nil {
 			return err
 		}
@@ -137,16 +135,17 @@ func DecompressFile(r *io.SectionReader, decomp *bufio.Writer, hdr *DecmpfsDiskH
 			return err
 		}
 
+		var n int64
+		var total int64
+
 		var max int
 		for _, blk := range blocks {
 			if max < int(blk.Size) {
 				max = int(blk.Size)
 			}
 		}
-
-		var n int64
-		var total int64
 		buff := make([]byte, 0, max)
+
 		for _, blk := range blocks {
 			r.Seek(int64(rsrcHdr.HeaderSize+blk.Offset+4), io.SeekStart)
 
@@ -154,36 +153,96 @@ func DecompressFile(r *io.SectionReader, decomp *bufio.Writer, hdr *DecmpfsDiskH
 			if err := binary.Read(r, binary.LittleEndian, &buff); err != nil {
 				return err
 			}
-			zr, err := zlib.NewReader(bytes.NewReader(buff))
-			if err != nil {
-				log.Warn("found non-zlib data block")
-				fmt.Println(hex.Dump(buff[:4]))
-				// write uncompressed chunk
+
+			if buff[0] == 0x78 { // zlib block
+				zr, err := zlib.NewReader(bytes.NewReader(buff))
+				if err != nil {
+					return fmt.Errorf("failed to create zlib reader: %v", err)
+				}
+				n, err = decomp.ReadFrom(zr)
+				if err != nil {
+					return err
+				}
+				zr.Close()
+				total += n
+			} else if (buff[0] & 0x0F) == 0x0F { // uncompressed block
 				nn, err := decomp.Write(buff[1:])
 				if err != nil {
 					return err
 				}
 				total += int64(nn)
-				continue
+			} else {
+				return fmt.Errorf("found unknown chunk type data in resource fork compressed data")
 			}
-
-			n, err = decomp.ReadFrom(zr)
-			if err != nil {
-				return err
-			}
-			zr.Close()
-
-			total += n
 		}
-		var footer CmpfEnd
-		if err := binary.Read(r, binary.BigEndian, &footer); err != nil {
-			return err
-		}
-		fmt.Println(footer)
+		// var footer CmpfEnd
+		// if err := binary.Read(r, binary.BigEndian, &footer); err != nil {
+		// 	return err
+		// }
 	case CMP_ATTR_LZVN:
-		fallthrough
+		panic("CMP_ATTR_LZVN not supported (need to figure out where to grab compressed data from)")
 	case CMP_RSRC_LZVN:
 		fallthrough
+	case CMP_RSRC_LZFSE:
+		var rsrcHdr CmpfRsrcHead
+		if err := binary.Read(r, binary.BigEndian, &rsrcHdr); err != nil {
+			return err
+		}
+
+		r.Seek(int64(rsrcHdr.HeaderSize), io.SeekStart)
+
+		var blkHdr CmpfRsrcBlockHead
+		if err := binary.Read(r, binary.BigEndian, &blkHdr.DataSize); err != nil {
+			return err
+		}
+		if err := binary.Read(r, binary.LittleEndian, &blkHdr.NumBlocks); err != nil {
+			return err
+		}
+
+		blocks := make([]cmpfRsrcBlock, blkHdr.NumBlocks)
+		if err := binary.Read(r, binary.LittleEndian, &blocks); err != nil {
+			return err
+		}
+
+		var n int
+		var total int
+		var err error
+
+		var max int
+		for _, blk := range blocks {
+			if max < int(blk.Size) {
+				max = int(blk.Size)
+			}
+		}
+		buff := make([]byte, 0, max)
+
+		for _, blk := range blocks {
+			r.Seek(int64(rsrcHdr.HeaderSize+blk.Offset+4), io.SeekStart)
+
+			buff = buff[:blk.Size]
+			if err := binary.Read(r, binary.LittleEndian, &buff); err != nil {
+				return err
+			}
+
+			if buff[0] == 0x78 { // lzvn block
+				n, err = decomp.Write(lzfse.DecodeBuffer(buff))
+				if err != nil {
+					return err
+				}
+			} else if (buff[0] & 0x0F) == 0x0F { // uncompressed block
+				n, err = decomp.Write(buff[1:])
+				if err != nil {
+					return err
+				}
+			} else {
+				return fmt.Errorf("found unknown chunk type data in resource fork compressed data")
+			}
+			total += n
+		}
+		// var footer CmpfEnd
+		// if err := binary.Read(r, binary.BigEndian, &footer); err != nil {
+		// 	return err
+		// }
 	default:
 		return fmt.Errorf("unknown compression type: %s", hdr.CompressionType)
 	}
