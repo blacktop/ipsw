@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,mode_t,dir_ent_file_type,bsd_flags_t,compMethod -output j_string.go
+//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,mode_t,dir_ent_file_type,bsd_flags_t -output j_string.go
 
 type j_obj_types byte // FIXME: what type
 
@@ -415,26 +415,6 @@ type j_xattr_val_t struct {
 	DataLen uint16        // The length of the extended attribute data.
 	Data    interface{}   // The extended attribute data or the identifier of a data stream that contains the data.
 } // __attribute__((packed))
-
-type compMethod uint32
-
-const (
-	CMP_UNKNOWN  compMethod = 1 // CMP_Type1 - Unknown (uncompressed extended attribute data)
-	CMP_ZLIB     compMethod = 3
-	CMP_64K_ZLIB compMethod = 4
-	CMP_LZVN     compMethod = 7
-	CMP_64K_LZVN compMethod = 8
-
-	CMP_LZFSE     compMethod = 11
-	CMP_64K_LZFSE compMethod = 12
-	CMP_MAX       compMethod = 0x80000001 // faulting file ?
-)
-
-type decmpfs struct {
-	Magic            magic
-	Method           compMethod
-	UncompressedSize uint64
-}
 
 func (val j_xattr_val_t) String() string {
 	var vout []string

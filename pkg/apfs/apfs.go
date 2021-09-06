@@ -1,6 +1,7 @@
 package apfs
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -156,9 +157,7 @@ func NewAPFS(r *os.File) (*APFS, error) {
 	}
 
 	fmt.Println(fsRecords.Tree("/"))
-	for _, rec := range fsRecords {
-		fmt.Println(rec)
-	}
+
 	for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.symbols", string(filepath.Separator)) {
 		// for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e", string(filepath.Separator)) {
 		if len(part) > 0 {
@@ -171,9 +170,6 @@ func NewAPFS(r *os.File) (*APFS, error) {
 							return nil, err
 						}
 						fmt.Println(fsRecords.Tree(part))
-						for _, rec := range fsRecords {
-							fmt.Println(rec)
-						}
 					}
 				}
 
@@ -181,8 +177,13 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		}
 	}
 
+	var decmpfsHdr *types.DecmpfsDiskHeader
 	for _, rec := range fsRecords {
 		fmt.Println(rec)
+		decmpfsHdr, err = types.GetDecmpfsHeader(rec)
+		if err != nil {
+			log.Error(err.Error())
+		}
 	}
 
 	fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00019f2c), types.XidT(^uint64(0)))
@@ -194,16 +195,20 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		fmt.Println(rec)
 	}
 
-	// ent, err := fsOMapBtree.GetOMapEntry(sr, types.OidT(0xfffffff00019f2c), a.volume.Hdr.Xid)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println(ent)
-	// oo, err := types.ReadObj(sr, 1152921500311985964)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println(oo)
+	fo, err := os.Create("dyld_shared_cache_arm64e.symbols")
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := fo.Close(); err != nil {
+			panic(err)
+		}
+	}()
+	w := bufio.NewWriter(fo)
+
+	if err := types.DecompressFile(io.NewSectionReader(r, int64(0xc943d*types.BLOCK_SIZE), 0x5010000), w, decmpfsHdr); err != nil {
+		return nil, err
+	}
 
 	return a, nil
 }
