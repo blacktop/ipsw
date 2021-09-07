@@ -1,6 +1,10 @@
 package types
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fatih/color"
+)
 
 // SiblingKeyT is a j_sibling_key_t object
 type SiblingKeyT struct {
@@ -16,7 +20,8 @@ type SiblingValT struct {
 } // __attribute__((packed))
 
 func (v SiblingValT) String() string {
-	return fmt.Sprintf("name=%s, parent_id=%#x", v.Name, v.ParentID)
+	nameColor := color.New(color.Bold, color.FgHiBlue).SprintFunc()
+	return fmt.Sprintf("name=%s, parent_id=%#x", nameColor(v.Name), v.ParentID)
 }
 
 // SiblingMapKeyT is a j_sibling_map_key_t object

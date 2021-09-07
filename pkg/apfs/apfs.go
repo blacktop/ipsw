@@ -1,7 +1,6 @@
 package apfs
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -16,16 +15,16 @@ import (
 
 // APFS apple file system object
 type APFS struct {
-	Container *types.NxSuperblock
-	Valid     *types.NxSuperblock
-	Volume    *types.ApfsSuperblock
-	RootTree  *types.BTreeNodePhys
+	Container   *types.NxSuperblock
+	Valid       *types.NxSuperblock
+	Volume      *types.ApfsSuperblock
+	FSRootBtree types.BTreeNodePhys
 
 	nxsb            *types.Obj // Container
 	checkPointDesc  []*types.Obj
 	validCheckPoint *types.Obj
 	volume          *types.Obj
-	rootBTree       *types.Obj
+	fsOMapBtree     *types.BTreeNodePhys
 
 	r      *os.File
 	closer io.Closer
@@ -131,9 +130,12 @@ func NewAPFS(r *os.File) (*APFS, error) {
 	}
 
 	log.Debugf("File System OMap Btree: %s", a.Volume.OMap.Body.(types.OMap).Tree)
-	fsOMapBtree := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys)
 
-	fsRootEntry, err := fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
+	if ombtree, ok := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys); ok {
+		a.fsOMapBtree = &ombtree
+	}
+
+	fsRootEntry, err := a.fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
 	if err != nil {
 		return nil, err
 	}
@@ -145,69 +147,8 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		return nil, err
 	}
 
-	fmt.Println(fsRootBtreeObj)
-
-	fsRootBtree := fsRootBtreeObj.Body.(types.BTreeNodePhys)
-
-	fsOid := types.OidT(2)
-
-	fsRecords, err := fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, fsOid, types.XidT(^uint64(0)))
-	if err != nil {
-		return nil, err
-	}
-
-	fmt.Println(fsRecords.Tree("/"))
-
-	for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.symbols", string(filepath.Separator)) {
-		// for _, part := range strings.Split("System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e", string(filepath.Separator)) {
-		if len(part) > 0 {
-			for _, rec := range fsRecords {
-				switch rec.Hdr.GetType() {
-				case types.APFS_TYPE_DIR_REC:
-					if rec.Key.(types.JDrecHashedKeyT).Name == part {
-						fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(rec.Val.(types.JDrecVal).FileID), types.XidT(^uint64(0)))
-						if err != nil {
-							return nil, err
-						}
-						fmt.Println(fsRecords.Tree(part))
-					}
-				}
-
-			}
-		}
-	}
-
-	var decmpfsHdr *types.DecmpfsDiskHeader
-	for _, rec := range fsRecords {
-		fmt.Println(rec)
-		decmpfsHdr, err = types.GetDecmpfsHeader(rec)
-		if err != nil {
-			log.Error(err.Error())
-		}
-	}
-
-	fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00019f2c), types.XidT(^uint64(0)))
-	if err != nil {
-		return nil, err
-	}
-
-	for _, rec := range fsRecords {
-		fmt.Println(rec)
-	}
-
-	fo, err := os.Create("dyld_shared_cache_arm64e.symbols")
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := fo.Close(); err != nil {
-			panic(err)
-		}
-	}()
-	w := bufio.NewWriter(fo)
-
-	if err := types.DecompressFile(io.NewSectionReader(r, int64(0xc943d*types.BLOCK_SIZE), 0x5010000), w, decmpfsHdr); err != nil {
-		return nil, err
+	if root, ok := fsRootBtreeObj.Body.(types.BTreeNodePhys); ok {
+		a.FSRootBtree = root
 	}
 
 	return a, nil
@@ -252,3 +193,160 @@ func (a *APFS) getValidCSB() error {
 
 	return nil
 }
+
+// Ls lists files at a given path
+func (a *APFS) Ls(path string) error {
+
+	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
+
+	fsRecords, err := a.fsOMapBtree.GetFSRecordsForOid(sr, a.FSRootBtree, types.OidT(types.FSROOT_OID), types.XidT(^uint64(0)))
+	if err != nil {
+		return err
+	}
+
+	for _, part := range strings.Split(path, string(filepath.Separator)) {
+		if len(part) > 0 {
+			for _, rec := range fsRecords {
+				switch rec.Hdr.GetType() {
+				case types.APFS_TYPE_DIR_REC:
+					if rec.Key.(types.JDrecHashedKeyT).Name == part {
+						fsRecords, err = a.fsOMapBtree.GetFSRecordsForOid(sr, a.FSRootBtree, types.OidT(rec.Val.(types.JDrecVal).FileID), types.XidT(^uint64(0)))
+						if err != nil {
+							return err
+						}
+					}
+					// default:
+					// 	log.Warnf("found fs record type %s", rec.Hdr.GetType())
+				}
+			}
+		}
+	}
+
+	fmt.Println(fsRecords)
+
+	return nil
+}
+
+// Tree list contents of directories in a tree-like format. TODO: finish this
+func (a *APFS) Tree(path string) error {
+
+	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
+
+	fsOMapBtree := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys)
+
+	fsRootEntry, err := fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
+	if err != nil {
+		return err
+	}
+
+	fsRootBtreeObj, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
+	if err != nil {
+		return err
+	}
+
+	fsRootBtree := fsRootBtreeObj.Body.(types.BTreeNodePhys)
+
+	fsRecords, err := fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(types.FSROOT_OID), types.XidT(^uint64(0)))
+	if err != nil {
+		return err
+	}
+
+	fstree := types.NewFSTree("/")
+
+	for _, part := range strings.Split(path, string(filepath.Separator)) {
+		if len(part) > 0 {
+			for _, rec := range fsRecords {
+				switch rec.Hdr.GetType() {
+				case types.APFS_TYPE_DIR_REC:
+					if rec.Key.(types.JDrecHashedKeyT).Name == part {
+						fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(rec.Val.(types.JDrecVal).FileID), types.XidT(^uint64(0)))
+						if err != nil {
+							return err
+						}
+						fstree.AddTree(fsRecords.Tree())
+					} else {
+						fstree.Add(rec.Key.(types.JDrecHashedKeyT).Name)
+					}
+				// case types.APFS_TYPE_INODE:
+				// 	for _, xf := range rec.Val.(j_inode_val).Xfields {
+				// 		if xf.XType == INO_EXT_TYPE_NAME {
+				// 			if xf.Field.(string) == "root" {
+				// 				t = NewFSTree("/")
+				// 			} else {
+				// 				t = NewFSTree(xf.Field.(string))
+				// 				}
+				// 			}
+				// 		}
+				// 	}
+				default:
+					log.Warnf("found fs record type %s", rec.Hdr.GetType())
+				}
+			}
+		}
+	}
+
+	fmt.Println(fstree.Print())
+
+	return nil
+}
+
+// Copy copies the contents of the src file to the dest file TODO: finish this
+// func (a *APFS) Copy(src, dest string) error {
+
+// 	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
+
+// 	fsOMapBtree := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys)
+
+// 	fsRootEntry, err := fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	fsRootBtreeObj, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	fsRootBtree := fsRootBtreeObj.Body.(types.BTreeNodePhys)
+
+// 	fsRecords, err := fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(types.FSROOT_OID), types.XidT(^uint64(0)))
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	// TODO: need to find the file's record
+
+// 	var decmpfsHdr *types.DecmpfsDiskHeader
+// 	for _, rec := range fsRecords {
+// 		fmt.Println(rec)
+// 		decmpfsHdr, err = types.GetDecmpfsHeader(rec)
+// 		if err != nil {
+// 			log.Error(err.Error())
+// 		}
+// 	}
+
+// 	fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00019f2c), types.XidT(^uint64(0)))
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	for _, rec := range fsRecords {
+// 		fmt.Println(rec)
+// 	}
+
+// 	fo, err := os.Create(dest)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer fo.Close()
+
+// 	w := bufio.NewWriter(fo)
+
+// 	if err := types.DecompressFile(io.NewSectionReader(sr, int64(0xc943d*types.BLOCK_SIZE), 0x5010000), w, decmpfsHdr); err != nil {
+// 		return err
+// 	}
+
+// 	w.Flush()
+
+// 	return nil
+// }

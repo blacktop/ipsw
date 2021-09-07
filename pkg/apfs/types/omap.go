@@ -3,7 +3,6 @@ package types
 import (
 	"fmt"
 	"math"
-	"sort"
 	"strings"
 )
 
@@ -177,21 +176,21 @@ type NodeEntry struct {
 func (ne NodeEntry) String() string {
 	var nout []string
 
-	nout = append(nout, fmt.Sprintf("%s oid=%d", ne.Hdr.GetType(), ne.Hdr.GetID()))
+	nout = append(nout, fmt.Sprintf("%s oid=%d", typeColor(ne.Hdr.GetType()), ne.Hdr.GetID()))
 
-	switch off := ne.Offset.(type) {
-	case KVOffT:
-		nout = append(nout, fmt.Sprintf("(key_offset=%d, val_offset=%d)", off.Key, off.Val))
-	case KVLocT:
-		nout = append(nout, fmt.Sprintf("(key_off=%d, key_len=%d, val_off=%d, val_len=%d)", off.Key.Off, off.Key.Len, off.Val.Off, off.Val.Len))
-	}
+	// switch off := ne.Offset.(type) {
+	// case KVOffT:
+	// 	nout = append(nout, fmt.Sprintf("(key_offset=%d, val_offset=%d)", off.Key, off.Val))
+	// case KVLocT:
+	// 	nout = append(nout, fmt.Sprintf("(key_off=%d, key_len=%d, val_off=%d, val_len=%d)", off.Key.Off, off.Key.Len, off.Val.Off, off.Val.Len))
+	// }
 
 	switch ne.Hdr.GetType() {
 	case APFS_TYPE_SNAP_METADATA:
 	case APFS_TYPE_EXTENT:
 	case APFS_TYPE_INODE:
 	case APFS_TYPE_XATTR:
-		nout = append(nout, fmt.Sprintf("name=%s", ne.Key.(j_xattr_key_t).Name))
+		nout = append(nout, fmt.Sprintf("name=%s", nameColor(ne.Key.(j_xattr_key_t).Name)))
 	case APFS_TYPE_SIBLING_LINK:
 		nout = append(nout, fmt.Sprintf("sibling_id=%#x", ne.Key.(SiblingKeyT).SiblingID))
 	case APFS_TYPE_DSTREAM_ID:
@@ -199,10 +198,10 @@ func (ne NodeEntry) String() string {
 	case APFS_TYPE_FILE_EXTENT:
 		nout = append(nout, fmt.Sprintf("logical_addr=%#x", ne.Key.(j_file_extent_key_t).LogicalAddr))
 	case APFS_TYPE_DIR_REC:
-		nout = append(nout, fmt.Sprintf("name=%s, hash=%#x", ne.Key.(JDrecHashedKeyT).Name, ne.Key.(JDrecHashedKeyT).Hash()))
+		nout = append(nout, fmt.Sprintf("name=%s, hash=%#x", nameColor(ne.Key.(JDrecHashedKeyT).Name), ne.Key.(JDrecHashedKeyT).Hash()))
 	case APFS_TYPE_DIR_STATS:
 	case APFS_TYPE_SNAP_NAME:
-		nout = append(nout, fmt.Sprintf("name=%s", ne.Key.(j_snap_name_key_t).Name))
+		nout = append(nout, fmt.Sprintf("name=%s", nameColor(ne.Key.(j_snap_name_key_t).Name)))
 	case APFS_TYPE_SIBLING_MAP:
 	case APFS_TYPE_FILE_INFO:
 		nout = append(nout, fmt.Sprintf("lba=%#x, info=%s", ne.Key.(j_file_info_key_t).LBA(), ne.Key.(j_file_info_key_t).Info()))
@@ -312,177 +311,4 @@ func (ne NodeEntry) String() string {
 	}
 
 	return strings.Join(nout, ", ")
-}
-
-const (
-	newLine      = "\n"
-	emptySpace   = "    "
-	middleItem   = "├── "
-	continueItem = "│   "
-	lastItem     = "└── "
-)
-
-// FSTree file system tree - credit: https://github.com/d6o/GoTree
-type FSTree interface {
-	Add(text string) FSTree
-	AddTree(tree FSTree)
-	Items() []FSTree
-	Text() string
-	Print() string
-}
-
-type tree struct {
-	text  string
-	items []FSTree
-}
-
-type printer struct {
-}
-
-// Printer is printer interface
-type Printer interface {
-	Print(FSTree) string
-}
-
-// NewFSTree returns a new FSTree
-func NewFSTree(text string) FSTree {
-	return &tree{
-		text:  text,
-		items: []FSTree{},
-	}
-}
-
-// Add adds a node to the tree
-func (t *tree) Add(text string) FSTree {
-	n := NewFSTree(text)
-	t.items = append(t.items, n)
-	return n
-}
-
-// AddTree adds a tree as an item
-func (t *tree) AddTree(tree FSTree) {
-	t.items = append(t.items, tree)
-}
-
-// Text returns the node's value
-func (t *tree) Text() string {
-	return t.text
-}
-
-// Items returns all items in the tree
-func (t *tree) Items() []FSTree {
-	return t.items
-}
-
-// Print returns an visual representation of the tree
-func (t *tree) Print() string {
-	return newPrinter().Print(t)
-}
-
-func newPrinter() Printer {
-	return &printer{}
-}
-
-// Print prints a tree to a string
-func (p *printer) Print(t FSTree) string {
-	return t.Text() + newLine + p.printItems(t.Items(), []bool{})
-}
-
-func (p *printer) printText(text string, spaces []bool, last bool) string {
-	var result string
-	for _, space := range spaces {
-		if space {
-			result += emptySpace
-		} else {
-			result += continueItem
-		}
-	}
-
-	indicator := middleItem
-	if last {
-		indicator = lastItem
-	}
-
-	var out string
-	lines := strings.Split(text, "\n")
-	for i := range lines {
-		text := lines[i]
-		if i == 0 {
-			out += result + indicator + text + newLine
-			continue
-		}
-		if last {
-			indicator = emptySpace
-		} else {
-			indicator = continueItem
-		}
-		out += result + indicator + text + newLine
-	}
-
-	return out
-}
-
-func (p *printer) printItems(t []FSTree, spaces []bool) string {
-	var result string
-	for i, f := range t {
-		last := i == len(t)-1
-		result += p.printText(f.Text(), spaces, last)
-		if len(f.Items()) > 0 {
-			spacesChild := append(spaces, last)
-			result += p.printItems(f.Items(), spacesChild)
-		}
-	}
-	return result
-}
-
-// FSRecords are an array of file system records
-type FSRecords []NodeEntry
-
-// func (recs FSRecords) Ls(fsOMapBtree BTreeNodePhys, path string) string {
-// 	var err error
-// 	var fsRecords FSRecords
-
-// 	for _, part := range strings.Split("System/Library/Caches/com.apple.dyld", string(filepath.Separator)) {
-// 		for _, rec := range recs {
-// 			switch rec.Hdr.GetType() {
-// 			case APFS_TYPE_DIR_REC:
-// 				if rec.Key.(j_drec_hashed_key_t).Name == part {
-// 					fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00006f47), types.XidT(^uint64(0)))
-// 					if err != nil {
-// 						return nil, err
-// 					}
-// 					fmt.Println(fsRecords.Tree())
-// 				}
-// 			}
-
-// 		}
-// 	}
-// }
-
-// Tree prints a FSRecords array as a tree
-func (recs FSRecords) Tree(root string) string {
-	t := NewFSTree(root)
-	var fs []string
-	for _, rec := range recs {
-		switch rec.Hdr.GetType() {
-		case APFS_TYPE_DIR_REC:
-			fs = append(fs, rec.Key.(JDrecHashedKeyT).Name)
-		}
-	}
-	sort.Strings(fs)
-	for _, f := range fs {
-		t.Add(f)
-	}
-	return t.Print()
-}
-
-func (recs FSRecords) String() string {
-	var rsout string
-	for _, rec := range recs {
-		switch rec.Hdr.GetType() {
-		case APFS_TYPE_DIR_REC:
-			rsout += fmt.Sprintf("%s\n", rec.Key.(JDrecHashedKeyT).Name)
-		}
-	}
-	return rsout
 }

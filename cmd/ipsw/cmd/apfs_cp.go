@@ -22,19 +22,51 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"path/filepath"
+
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/apfs"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	rootCmd.AddCommand(apfsCmd)
+	apfsCmd.AddCommand(apfsCpCmd)
 }
 
-// apfsCmd represents the apfs command
-var apfsCmd = &cobra.Command{
-	Use:   "apfs",
-	Short: "🚧 Parse APFS container", // TODO: change this once we can work on DMGs or volumes
-	Args:  cobra.NoArgs,
+// apfsCpCmd represents the cp command
+var apfsCpCmd = &cobra.Command{
+	Use:    "cp <APFS_CONTAINER> <SRC> <DST>",
+	Short:  "🚧 Copy file from APFS container",
+	Args:   cobra.MinimumNArgs(2),
+	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+
+		apfsPath := filepath.Clean(args[0])
+
+		a, err := apfs.Open(apfsPath)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		defer a.Close()
+
+		panic("not implimented yet")
+
+		// if len(args) > 1 {
+		// 	if err := a.Copy(args[1], args[2]); err != nil {
+		// 		log.Fatal(err.Error())
+		// 	}
+		// } else {
+		// 	cwd, err := os.Getwd()
+		// 	if err != nil {
+		// 		log.Fatal(err.Error())
+		// 	}
+		// 	if err := a.Copy(args[1], filepath.Join(cwd, filepath.Base(args[1]))); err != nil {
+		// 		log.Fatal(err.Error())
+		// 	}
+		// }
 	},
 }
