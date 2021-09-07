@@ -235,27 +235,27 @@ type mode_t uint16
 type dir_ent_file_type uint16
 
 const (
-	S_IFMT = 0170000
+	S_IFMT = 0170000 // The bit mask used to access the file type.
 
-	FIFO mode_t = 0010000
-	CHR  mode_t = 0020000
-	DIR  mode_t = 0040000
-	BLK  mode_t = 0060000
-	REG  mode_t = 0100000
-	LNK  mode_t = 0120000
-	SOCK mode_t = 0140000
-	WHT  mode_t = 0160000
+	FIFO mode_t = 0010000 // A named pipe.
+	CHR  mode_t = 0020000 // A character-special file.
+	DIR  mode_t = 0040000 // A directory.
+	BLK  mode_t = 0060000 // A block-special file.
+	REG  mode_t = 0100000 // A regular file.
+	LNK  mode_t = 0120000 // A symbolic link.
+	SOCK mode_t = 0140000 // A socket.
+	WHT  mode_t = 0160000 // A whiteout.
 
 	/** Directory Entry File Types **/
 	DT_UNKNOWN dir_ent_file_type = 0
-	DT_FIFO    dir_ent_file_type = 1
-	DT_CHR     dir_ent_file_type = 2
-	DT_DIR     dir_ent_file_type = 4
-	DT_BLK     dir_ent_file_type = 6
-	DT_REG     dir_ent_file_type = 8
-	DT_LNK     dir_ent_file_type = 10
-	DT_SOCK    dir_ent_file_type = 12
-	DT_WHT     dir_ent_file_type = 14
+	DT_FIFO    dir_ent_file_type = 1  // A named pipe.
+	DT_CHR     dir_ent_file_type = 2  // A character-special file.
+	DT_DIR     dir_ent_file_type = 4  // A directory.
+	DT_BLK     dir_ent_file_type = 6  // A block-special file.
+	DT_REG     dir_ent_file_type = 8  // A regular file.
+	DT_LNK     dir_ent_file_type = 10 // A symbolic link.
+	DT_SOCK    dir_ent_file_type = 12 // A socket.
+	DT_WHT     dir_ent_file_type = 14 // A whiteout.
 )
 
 const (
@@ -282,8 +282,6 @@ type j_inode_key_t struct {
 	Hdr JKeyT
 } // __attribute__((packed))
 
-type uid_t uint32
-type gid_t uint32
 type bsd_flags_t uint32
 
 const (
@@ -361,13 +359,13 @@ type j_inode_val_t struct {
 	// Xfields                []uint8
 } // __attribute__((packed))
 
-type j_inode_val struct {
+type JInodeVal struct {
 	j_inode_val_t
 	blob    xf_blob
 	Xfields []Xfield
 }
 
-func (v j_inode_val) String() string {
+func (v JInodeVal) String() string {
 	vout := fmt.Sprintf("parent_id=%#x, private_id=%#x, create_time=%s, mod_time=%s, change_time=%s, access_time=%s, flags=%s, nchildren_or_nlink=%d, default_protection_class=%s, write_gen_cnt=%d, bsd_flags=%s, owner=%d, group=%d, mode=%s, uncompressed_size=%d",
 		v.ParentID,
 		v.PrivateID,

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/dustin/go-humanize"
 )
 
 const (
@@ -139,7 +141,7 @@ func (recs FSRecords) Tree() FSTree {
 		case APFS_TYPE_DIR_REC:
 			fs = append(fs, rec.Key.(JDrecHashedKeyT).Name)
 		case APFS_TYPE_INODE:
-			for _, xf := range rec.Val.(j_inode_val).Xfields {
+			for _, xf := range rec.Val.(JInodeVal).Xfields {
 				if xf.XType == INO_EXT_TYPE_NAME {
 					if xf.Field.(string) == "root" {
 						t = NewFSTree("/")
@@ -175,4 +177,24 @@ func (recs FSRecords) String() string {
 	}
 	sort.Strings(fs)
 	return strings.Join(fs, "")
+}
+
+type RegFile struct {
+	Name       string
+	Owner      uid_t
+	Group      gid_t
+	Mode       mode_t
+	CreateTime EpochTime
+	Size       uint64
+}
+
+func (f RegFile) String() string {
+	return fmt.Sprintf("%s %s | %s | %s | %s | %s",
+		f.Owner,
+		f.Group,
+		f.Mode&S_IFMT,
+		humanize.Bytes(f.Size),
+		f.CreateTime,
+		f.Name,
+	)
 }

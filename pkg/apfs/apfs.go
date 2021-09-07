@@ -203,8 +203,8 @@ func (a *APFS) Ls(path string) error {
 	if err != nil {
 		return err
 	}
-
-	for _, part := range strings.Split(path, string(filepath.Separator)) {
+	parts := strings.Split(path, string(filepath.Separator))
+	for idx, part := range parts {
 		if len(part) > 0 {
 			for _, rec := range fsRecords {
 				switch rec.Hdr.GetType() {
@@ -213,6 +213,36 @@ func (a *APFS) Ls(path string) error {
 						fsRecords, err = a.fsOMapBtree.GetFSRecordsForOid(sr, a.FSRootBtree, types.OidT(rec.Val.(types.JDrecVal).FileID), types.XidT(^uint64(0)))
 						if err != nil {
 							return err
+						}
+						if idx == len(parts)-1 { // last part
+							if rec.Val.(types.JDrecVal).Flags == types.DT_REG {
+								var rFile types.RegFile
+								for _, regRec := range fsRecords {
+									switch regRec.Hdr.GetType() {
+									case types.APFS_TYPE_INODE:
+										rFile.Owner = regRec.Val.(types.JInodeVal).Owner
+										rFile.Group = regRec.Val.(types.JInodeVal).Group
+										rFile.Mode = regRec.Val.(types.JInodeVal).Mode
+										rFile.CreateTime = regRec.Val.(types.JInodeVal).CreateTime
+
+										for _, xf := range regRec.Val.(types.JInodeVal).Xfields {
+											switch xf.XType {
+											case types.INO_EXT_TYPE_NAME:
+												rFile.Name = xf.Field.(string)
+											case types.INO_EXT_TYPE_DSTREAM:
+												rFile.Size = xf.Field.(types.JDstreamT).Size
+											}
+										}
+
+										if regRec.Val.(types.JInodeVal).InternalFlags&types.INODE_HAS_UNCOMPRESSED_SIZE != 0 {
+											rFile.Size = regRec.Val.(types.JInodeVal).UncompressedSize
+										}
+									}
+								}
+
+								fmt.Println(rFile)
+								return nil
+							}
 						}
 					}
 					// default:

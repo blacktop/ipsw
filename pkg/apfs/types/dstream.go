@@ -79,7 +79,7 @@ func (v j_dstream_id_val_t) String() string {
 	return fmt.Sprintf("ref_count=%d", v.RefCount)
 }
 
-type j_dstream_t struct {
+type JDstreamT struct {
 	Size              uint64
 	AllocedSize       uint64
 	DefaultCryptoID   uint64
@@ -87,7 +87,7 @@ type j_dstream_t struct {
 	TotalBytesRead    uint64
 }
 
-func (d j_dstream_t) String() string {
+func (d JDstreamT) String() string {
 	return fmt.Sprintf("size=%d, alloced_size=%d, default_crypto_id=%#x, total_bytes_written=%d, total_bytes_read=%d",
 		d.Size,
 		d.AllocedSize,
@@ -99,5 +99,5 @@ func (d j_dstream_t) String() string {
 
 type j_xattr_dstream_t struct {
 	XattrObjID uint64
-	DStream    j_dstream_t
+	DStream    JDstreamT
 }

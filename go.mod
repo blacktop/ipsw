@@ -14,7 +14,7 @@ require (
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
 	github.com/dustin/go-humanize v1.0.0
-	github.com/fatih/color v1.12.0 // indirect
+	github.com/fatih/color v1.12.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/hashicorp/go-version v1.3.0
