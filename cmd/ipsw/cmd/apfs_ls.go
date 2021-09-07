@@ -22,19 +22,45 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"path/filepath"
+
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/apfs"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	rootCmd.AddCommand(apfsCmd)
+	apfsCmd.AddCommand(apfsLsCmd)
 }
 
-// apfsCmd represents the apfs command
-var apfsCmd = &cobra.Command{
-	Use:   "apfs",
-	Short: "🚧 Parse APFS container", // TODO: change this once we can work on DMGs or volumes
-	Args:  cobra.NoArgs,
+// apfsLsCmd represents the ls command
+var apfsLsCmd = &cobra.Command{
+	Use:    "ls <APFS_CONTAINER> <PATH>",
+	Short:  "🚧 List files in APFS container",
+	Args:   cobra.MinimumNArgs(1),
+	Hidden: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+
+		apfsPath := filepath.Clean(args[0])
+
+		a, err := apfs.Open(apfsPath)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		defer a.Close()
+
+		if len(args) > 1 {
+			if err := a.Ls(args[1]); err != nil {
+				log.Fatal(err.Error())
+			}
+		} else {
+			if err := a.Ls("/"); err != nil {
+				log.Fatal(err.Error())
+			}
+		}
 	},
 }

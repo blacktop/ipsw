@@ -1,6 +1,12 @@
 package types
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"github.com/fatih/color"
+)
+
+const FSROOT_OID = 2
 
 var BLOCK_SIZE uint64
 
@@ -47,3 +53,8 @@ func VerifyChecksum(data []byte) bool {
 
 	return (sum2<<32)|sum1 != 0
 }
+
+var nameColor = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var dirColor = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var typeColor = color.New(color.Bold, color.FgHiYellow).SprintFunc()
+var hexdumpColor = color.New(color.Faint, color.FgHiWhite).SprintFunc()

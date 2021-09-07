@@ -1,12 +1,14 @@
 package types
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
 )
 
-//go:generate stringer -type=j_obj_types,j_obj_kinds,j_inode_flags,dir_rec_flags,mode_t,dir_ent_file_type,bsd_flags_t -output j_string.go
+//go:generate stringer -type=j_obj_types,j_obj_kinds,dir_rec_flags,mode_t,dir_ent_file_type,bsd_flags_t -output j_string.go
 
 type j_obj_types byte // FIXME: what type
 
@@ -77,6 +79,80 @@ const (
 	APFS_VALID_INTERNAL_INODE_FLAGS j_inode_flags = (INODE_IS_APFS_PRIVATE | INODE_MAINTAIN_DIR_STATS | INODE_DIR_STATS_ORIGIN | INODE_PROT_CLASS_EXPLICIT | INODE_WAS_CLONED | INODE_HAS_SECURITY_EA | INODE_BEING_TRUNCATED | INODE_HAS_FINDER_INFO | INODE_IS_SPARSE | INODE_WAS_EVER_CLONED | INODE_ACTIVE_FILE_TRIMMED | INODE_PINNED_TO_MAIN | INODE_PINNED_TO_TIER2 | INODE_HAS_RSRC_FORK | INODE_NO_RSRC_FORK | INODE_ALLOCATION_SPILLEDOVER | INODE_FAST_PROMOTE | INODE_HAS_UNCOMPRESSED_SIZE | INODE_IS_PURGEABLE | INODE_WANTS_TO_BE_PURGEABLE | INODE_IS_SYNC_ROOT | INODE_SNAPSHOT_COW_EXEMPTION)
 	APFS_INODE_PINNED_MASK          j_inode_flags = (INODE_PINNED_TO_MAIN | INODE_PINNED_TO_TIER2)
 )
+
+func (f j_inode_flags) String() string {
+	var out []string
+	if f&INODE_IS_APFS_PRIVATE != 0 {
+		out = append(out, "IS_APFS_PRIVATE")
+	}
+	if f&INODE_MAINTAIN_DIR_STATS != 0 {
+		out = append(out, "MAINTAIN_DIR_STATS")
+	}
+	if f&INODE_DIR_STATS_ORIGIN != 0 {
+		out = append(out, "DIR_STATS_ORIGIN")
+	}
+	if f&INODE_PROT_CLASS_EXPLICIT != 0 {
+		out = append(out, "PROT_CLASS_EXPLICIT")
+	}
+	if f&INODE_WAS_CLONED != 0 {
+		out = append(out, "WAS_CLONED")
+	}
+	if f&INODE_FLAG_UNUSED != 0 {
+		out = append(out, "FLAG_UNUSED")
+	}
+	if f&INODE_HAS_SECURITY_EA != 0 {
+		out = append(out, "HAS_SECURITY_EA")
+	}
+	if f&INODE_BEING_TRUNCATED != 0 {
+		out = append(out, "BEING_TRUNCATED")
+	}
+	if f&INODE_HAS_FINDER_INFO != 0 {
+		out = append(out, "HAS_FINDER_INFO")
+	}
+	if f&INODE_IS_SPARSE != 0 {
+		out = append(out, "IS_SPARSE")
+	}
+	if f&INODE_WAS_EVER_CLONED != 0 {
+		out = append(out, "WAS_EVER_CLONED")
+	}
+	if f&INODE_ACTIVE_FILE_TRIMMED != 0 {
+		out = append(out, "ACTIVE_FILE_TRIMMED")
+	}
+	if f&INODE_PINNED_TO_MAIN != 0 {
+		out = append(out, "PINNED_TO_MAIN")
+	}
+	if f&INODE_PINNED_TO_TIER2 != 0 {
+		out = append(out, "PINNED_TO_TIER2")
+	}
+	if f&INODE_HAS_RSRC_FORK != 0 {
+		out = append(out, "HAS_RSRC_FORK")
+	}
+	if f&INODE_NO_RSRC_FORK != 0 {
+		out = append(out, "NO_RSRC_FORK")
+	}
+	if f&INODE_ALLOCATION_SPILLEDOVER != 0 {
+		out = append(out, "ALLOCATION_SPILLEDOVER")
+	}
+	if f&INODE_FAST_PROMOTE != 0 {
+		out = append(out, "FAST_PROMOTE")
+	}
+	if f&INODE_HAS_UNCOMPRESSED_SIZE != 0 {
+		out = append(out, "HAS_UNCOMPRESSED_SIZE")
+	}
+	if f&INODE_IS_PURGEABLE != 0 {
+		out = append(out, "IS_PURGEABLE")
+	}
+	if f&INODE_WANTS_TO_BE_PURGEABLE != 0 {
+		out = append(out, "WANTS_TO_BE_PURGEABLE")
+	}
+	if f&INODE_IS_SYNC_ROOT != 0 {
+		out = append(out, "IS_SYNC_ROOT")
+	}
+	if f&INODE_SNAPSHOT_COW_EXEMPTION != 0 {
+		out = append(out, "SNAPSHOT_COW_EXEMPTIO")
+	}
+	return strings.Join(out, "|")
+}
 
 type j_xattr_flags uint16
 
@@ -217,6 +293,7 @@ const (
 	 * Super-user and owner changeable flags.
 	 */
 	UF_SETTABLE bsd_flags_t = 0x0000ffff /* mask of owner changeable flags */
+	NONE        bsd_flags_t = 0x00000000
 	NODUMP      bsd_flags_t = 0x00000001 /* do not dump file */
 	IMMUTABLE   bsd_flags_t = 0x00000002 /* file may not be changed */
 	APPEND      bsd_flags_t = 0x00000004 /* writes to file may only append */
@@ -291,11 +368,7 @@ type j_inode_val struct {
 }
 
 func (v j_inode_val) String() string {
-	var xfout []string
-	for _, xf := range v.Xfields {
-		xfout = append(xfout, fmt.Sprintf("%s: %s", xf.XType, xf))
-	}
-	return fmt.Sprintf("parent_id=%#x, private_id=%#x, create_time=%s, mod_time=%s, change_time=%s, access_time=%s, flags=%s, nchildren_or_nlink=%d, default_protection_class=%s, write_gen_cnt=%d, bsd_flags=%s, owner=%d, group=%d, mode=%s, uncompressed_size=%d, xfields={%s}", // TODO: parse xfields
+	vout := fmt.Sprintf("parent_id=%#x, private_id=%#x, create_time=%s, mod_time=%s, change_time=%s, access_time=%s, flags=%s, nchildren_or_nlink=%d, default_protection_class=%s, write_gen_cnt=%d, bsd_flags=%s, owner=%d, group=%d, mode=%s, uncompressed_size=%d",
 		v.ParentID,
 		v.PrivateID,
 		v.CreateTime,
@@ -311,8 +384,15 @@ func (v j_inode_val) String() string {
 		v.Group,
 		v.Mode&S_IFMT,
 		v.UncompressedSize,
-		strings.Join(xfout, ", "),
 	)
+	if len(v.Xfields) > 0 {
+		var xfout []string
+		for _, xf := range v.Xfields {
+			xfout = append(xfout, fmt.Sprintf("%s: %s", xf.XType, xf))
+		}
+		vout += fmt.Sprintf(", xfields={%s}", strings.Join(xfout, " ,"))
+	}
+	return vout
 }
 
 type j_drec_key_t struct {
@@ -372,17 +452,20 @@ type JDrecVal struct {
 	Xfields []Xfield
 }
 
-func (val JDrecVal) String() string {
-	var xfout []string
-	for _, xf := range val.Xfields {
-		xfout = append(xfout, fmt.Sprintf("%s: %s", xf.XType, xf))
-	}
-	return fmt.Sprintf("file_id=%#x, date_added=%s, flags=%s, xfields={%x}",
-		val.FileID,
-		val.DateAdded,
-		val.Flags.String(),
-		strings.Join(xfout, ", "),
+func (v JDrecVal) String() string {
+	vout := fmt.Sprintf("file_id=%#x, date_added=%s, flags=%s",
+		v.FileID,
+		v.DateAdded,
+		v.Flags.String(),
 	)
+	if len(v.Xfields) > 0 {
+		var xfout []string
+		for _, xf := range v.Xfields {
+			xfout = append(xfout, fmt.Sprintf("%s: %s", xf.XType, xf))
+		}
+		vout += fmt.Sprintf(", xfields={%s}", strings.Join(xfout, " ,"))
+	}
+	return vout
 }
 
 type j_dir_stats_key_t struct {
@@ -421,8 +504,13 @@ func (val j_xattr_val_t) String() string {
 	vout = append(vout, fmt.Sprintf("flags=%s", val.Flags.String()))
 	if val.Flags.DataEmbedded() {
 		vout = append(vout, fmt.Sprintf("data_len=%#x", val.DataLen))
-		// vout = append(vout, fmt.Sprintf("data=%s", string(val.Data.([]byte)[:]))) // FIXME: don't string print data
-		vout = append(vout, fmt.Sprintf("data=\n%s", hex.Dump(val.Data.([]byte)))) // FIXME: don't string print data
+		if val.DataLen == 0x10 {
+			var hdr DecmpfsDiskHeader
+			binary.Read(bytes.NewReader(val.Data.([]byte)), binary.LittleEndian, &hdr)
+			vout = append(vout, fmt.Sprintf("data={%s}\n%s", hdr, hexdumpColor(hex.Dump(val.Data.([]byte)))))
+		} else {
+			vout = append(vout, fmt.Sprintf("data=\n%s", hexdumpColor(hex.Dump(val.Data.([]byte))))) // FIXME: don't string print data
+		}
 	} else {
 		vout = append(vout, fmt.Sprintf("dstream_oid=%#x", val.Data.(uint64)))
 	}

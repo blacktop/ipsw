@@ -994,12 +994,16 @@ func (n *BTreeNodePhys) GetFSRecordsForOid(r *io.SectionReader, volFsRootNode BT
 			break
 		}
 
+		/** Convert case (a)(ii) to case (b) */
+		if descPath[i] >= node.Nkeys {
+			descPath[i] = node.Nkeys - 1
+		}
+
 		// get child node
 		childNodeOmapEntry, err := n.GetOMapEntry(r, OidT(tocEntry.Val.(uint64)), maxXid)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get omap entry for oid %#x: %v", tocEntry.Val.(uint64), err)
 		}
-		log.Debugf("Child Node Entry: %s", childNodeOmapEntry)
 		nodeObj, err := ReadObj(r, childNodeOmapEntry.Val.Paddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read child node: %v", err)
@@ -1078,7 +1082,6 @@ func (n *BTreeNodePhys) GetFSRecordsForOid(r *io.SectionReader, volFsRootNode BT
 			if err != nil {
 				return nil, fmt.Errorf("failed to get omap entry for oid %#x: %v", tocEntry.Val.(uint64), err)
 			}
-			log.Debugf("Child Node Entry: %s", childNodeOmapEntry)
 			nodeObj, err := ReadObj(r, childNodeOmapEntry.Val.Paddr)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read child node: %v", err)

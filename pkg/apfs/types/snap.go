@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/blacktop/go-macho"
+	"github.com/fatih/color"
 )
 
 type j_snap_metadata_key_t struct {
@@ -28,8 +29,9 @@ type j_snap_metadata_val struct {
 } // __attribute__((packed))
 
 func (val j_snap_metadata_val) String() string {
+	nameColor := color.New(color.Bold, color.FgHiBlue).SprintFunc()
 	return fmt.Sprintf("name=%s, etree_oid=%d, etree_type=%s, flags=%#x, sblock_oid=%d, createtime=%s, changetime=%s, inum=%d",
-		val.Name,
+		nameColor(val.Name),
 		val.ExtentrefTreeOid,
 		val.ExtentRefTreeType.String(),
 		val.Flags,

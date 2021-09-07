@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"io"
 
-	lzfse "github.com/blacktop/lzfse-cgo"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 )
 
 //go:generate stringer -type=compMethod -output decmpfs_string.go
@@ -48,6 +48,14 @@ type DecmpfsDiskHeader struct {
 	CompressionType  compMethod
 	UncompressedSize uint64
 	AttrBytes        [0]byte
+}
+
+func (h DecmpfsDiskHeader) String() string {
+	return fmt.Sprintf("magic=%s, compression_type=%s, uncompressed_size=%d",
+		h.Magic,
+		h.CompressionType,
+		h.UncompressedSize,
+	)
 }
 
 // DecmpfsHeader this structure represents the xattr in memory; the fields below are host-endian
@@ -225,11 +233,16 @@ func DecompressFile(r *io.SectionReader, decomp *bufio.Writer, hdr *DecmpfsDiskH
 			}
 
 			if buff[0] == 0x78 { // lzvn block
-				n, err = decomp.Write(lzfse.DecodeBuffer(buff))
+				dec, err := lzfse.NewDecoder(buff).DecodeBuffer()
 				if err != nil {
 					return err
 				}
-			} else if (buff[0] & 0x0F) == 0x0F { // uncompressed block
+				// n, err = decomp.Write(lzfse.DecodeBuffer(buff))
+				n, err = decomp.Write(dec)
+				if err != nil {
+					return err
+				}
+			} else if buff[0] == 0x06 { // uncompressed block TODO: make sure this is the same for lzvn AND lzfse
 				n, err = decomp.Write(buff[1:])
 				if err != nil {
 					return err
