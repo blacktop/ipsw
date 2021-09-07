@@ -79,7 +79,7 @@ func (f Xfield) String() string {
 	case INO_EXT_TYPE_PREV_FSIZE:
 		return fmt.Sprintf("prev_file_size=%#x", f.Field.(uint64))
 	case INO_EXT_TYPE_DSTREAM:
-		return f.Field.(j_dstream_t).String()
+		return f.Field.(JDstreamT).String()
 	case INO_EXT_TYPE_DIR_STATS_KEY:
 		return f.Field.(j_dir_stats_val_t).String()
 	case INO_EXT_TYPE_FS_UUID:

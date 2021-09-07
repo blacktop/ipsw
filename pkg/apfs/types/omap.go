@@ -222,7 +222,7 @@ func (ne NodeEntry) String() string {
 			nout = append(nout, val.String())
 		case uint64:
 			nout = append(nout, fmt.Sprintf("val=%#x", val))
-		case j_inode_val:
+		case JInodeVal:
 			nout = append(nout, val.String())
 		}
 	case APFS_TYPE_XATTR:

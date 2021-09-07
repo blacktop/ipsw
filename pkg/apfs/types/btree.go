@@ -484,7 +484,7 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 			}
 			nent.Val = v
 		case APFS_TYPE_INODE:
-			var v j_inode_val
+			var v JInodeVal
 			if err := binary.Read(r, binary.LittleEndian, &v.j_inode_val_t); err != nil {
 				return fmt.Errorf("failed to read %T: %v", v, err)
 			}
@@ -544,7 +544,7 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 							Field:     size,
 						})
 					case INO_EXT_TYPE_DSTREAM:
-						var dstream j_dstream_t
+						var dstream JDstreamT
 						if err := binary.Read(r, binary.LittleEndian, &dstream); err != nil {
 							return fmt.Errorf("failed to read xfield %T: %v", dstream, err)
 						}
@@ -745,7 +745,7 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 							Field:     size,
 						})
 					case INO_EXT_TYPE_DSTREAM:
-						var dstream j_dstream_t
+						var dstream JDstreamT
 						if err := binary.Read(r, binary.LittleEndian, &dstream); err != nil {
 							return fmt.Errorf("failed to read xfield %T: %v", dstream, err)
 						}
