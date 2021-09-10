@@ -26,6 +26,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/apfs"
+	"github.com/blacktop/ipsw/pkg/disk/dmg"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +36,7 @@ func init() {
 
 // apfsLsCmd represents the ls command
 var apfsLsCmd = &cobra.Command{
-	Use:    "ls <APFS_CONTAINER> <PATH>",
+	Use:    "ls <DMG> <PATH>",
 	Short:  "🚧 List files in APFS container",
 	Args:   cobra.MinimumNArgs(1),
 	Hidden: true,
@@ -45,20 +46,26 @@ var apfsLsCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		apfsPath := filepath.Clean(args[0])
+		dmgPath := filepath.Clean(args[0])
 
-		a, err := apfs.Open(apfsPath)
+		dev, err := dmg.Open(dmgPath)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		defer dev.Close()
+
+		a, err := apfs.NewAPFS(dev)
 		if err != nil {
 			log.Fatal(err.Error())
 		}
 		defer a.Close()
 
 		if len(args) > 1 {
-			if err := a.Ls(args[1]); err != nil {
+			if err := a.List(args[1]); err != nil {
 				log.Fatal(err.Error())
 			}
 		} else {
-			if err := a.Ls("/"); err != nil {
+			if err := a.List("/"); err != nil {
 				log.Fatal(err.Error())
 			}
 		}

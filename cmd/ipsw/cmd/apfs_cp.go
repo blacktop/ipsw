@@ -22,10 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"path/filepath"
-
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/apfs"
 	"github.com/spf13/cobra"
 )
 
@@ -45,15 +42,13 @@ var apfsCpCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		apfsPath := filepath.Clean(args[0])
+		// apfsPath := filepath.Clean(args[0])
 
-		a, err := apfs.Open(apfsPath)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		defer a.Close()
-
-		panic("not implimented yet")
+		// a, err := apfs.Open(apfsPath)
+		// if err != nil {
+		// 	log.Fatal(err.Error())
+		// }
+		// defer a.Close()
 
 		// if len(args) > 1 {
 		// 	if err := a.Copy(args[1], args[2]); err != nil {
