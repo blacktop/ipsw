@@ -861,7 +861,7 @@ func (n *BTreeNodePhys) ReadNodeEntry(r *bytes.Reader) error {
 }
 
 // GetOMapEntry returns the omap entry for a given oid
-func (n *BTreeNodePhys) GetOMapEntry(r *io.SectionReader, oid OidT, maxXid XidT) (*OMapNodeEntry, error) {
+func (n *BTreeNodePhys) GetOMapEntry(r io.ReaderAt, oid OidT, maxXid XidT) (*OMapNodeEntry, error) {
 
 	var entIdx int
 	var tocEntry OMapNodeEntry
@@ -899,7 +899,7 @@ func (n *BTreeNodePhys) GetOMapEntry(r *io.SectionReader, oid OidT, maxXid XidT)
 }
 
 // GetFSRecordsForOid returns an array of all the file-system records with a given Virtual OID from a given file-system root tree.
-func (n *BTreeNodePhys) GetFSRecordsForOid(r *io.SectionReader, volFsRootNode BTreeNodePhys, oid OidT, maxXid XidT) (FSRecords, error) {
+func (n *BTreeNodePhys) GetFSRecordsForOid(r io.ReaderAt, volFsRootNode BTreeNodePhys, oid OidT, maxXid XidT) (FSRecords, error) {
 
 	var records FSRecords
 	var tocEntry NodeEntry

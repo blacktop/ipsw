@@ -1,6 +1,7 @@
 package apfs
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
@@ -26,24 +27,24 @@ type APFS struct {
 	volume          *types.Obj
 	fsOMapBtree     *types.BTreeNodePhys
 
-	r      *os.File
+	r      io.ReaderAt
 	closer io.Closer
 }
 
-// Open opens the named file using os.Open and prepares it for use as an APFS.
-func Open(name string) (*APFS, error) {
-	f, err := os.Open(name)
-	if err != nil {
-		return nil, err
-	}
-	ff, err := NewAPFS(f)
-	if err != nil {
-		f.Close()
-		return nil, err
-	}
-	ff.closer = f
-	return ff, nil
-}
+// // Open opens the named file using os.Open and prepares it for use as an APFS.
+// func Open(name string) (*APFS, error) {
+// 	f, err := os.Open(name)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	ff, err := NewAPFS(f)
+// 	if err != nil {
+// 		f.Close()
+// 		return nil, err
+// 	}
+// 	ff.closer = f
+// 	return ff, nil
+// }
 
 // Close closes the APFS.
 // If the APFS was created using NewFile directly instead of Open,
@@ -63,15 +64,15 @@ func init() {
 
 // NewAPFS creates a new APFS for accessing a apple filesystem container or file in an underlying reader.
 // The apfs is expected to start at position 0 in the ReaderAt.
-func NewAPFS(r *os.File) (*APFS, error) {
+func NewAPFS(r io.ReaderAt) (*APFS, error) {
 
 	var err error
 
 	a := new(APFS)
-	sr := io.NewSectionReader(r, 0, 1<<63-1)
+	// sr := io.NewSectionReader(r, 0, 1<<63-1)
 	a.r = r
 
-	a.nxsb, err = types.ReadObj(sr, 0)
+	a.nxsb, err = types.ReadObj(r, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read APFS container")
 	}
@@ -110,7 +111,7 @@ func NewAPFS(r *os.File) (*APFS, error) {
 
 	if len(a.Valid.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys).Entries) == 1 {
 		if entry, ok := a.Valid.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys).Entries[0].(types.OMapNodeEntry); ok {
-			a.volume, err = types.ReadObj(sr, uint64(entry.Val.Paddr))
+			a.volume, err = types.ReadObj(r, uint64(entry.Val.Paddr))
 			if err != nil {
 				return nil, fmt.Errorf("failed to read APFS omap.tree.entry.omap (volume): %v", err)
 			}
@@ -135,14 +136,14 @@ func NewAPFS(r *os.File) (*APFS, error) {
 		a.fsOMapBtree = &ombtree
 	}
 
-	fsRootEntry, err := a.fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
+	fsRootEntry, err := a.fsOMapBtree.GetOMapEntry(r, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Debugf("File System Root Entry: %s", fsRootEntry)
 
-	fsRootBtreeObj, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
+	fsRootBtreeObj, err := types.ReadObj(r, fsRootEntry.Val.Paddr)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +159,7 @@ func NewAPFS(r *os.File) (*APFS, error) {
 func (a *APFS) getValidCSB() error {
 	log.Debug("Parsing Checkpoint Description")
 
-	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
+	// sr := io.NewSectionReader(a.r, 0, 1<<63-1)
 
 	nxsb := a.nxsb.Body.(types.NxSuperblock)
 
@@ -168,7 +169,7 @@ func (a *APFS) getValidCSB() error {
 	xpDescBlocks := nxsb.XpDescBlocks & ^(uint32(1) << 31)
 
 	for i := uint32(0); i < xpDescBlocks; i++ {
-		o, err := types.ReadObj(sr, nxsb.XpDescBase+uint64(i))
+		o, err := types.ReadObj(a.r, nxsb.XpDescBase+uint64(i))
 		if err != nil {
 			if errors.Is(err, types.ErrBadBlockChecksum) {
 				utils.Indent(log.Debug, 2)(fmt.Sprintf("checkpoint block at index %d failed checksum validation. Skipping...", i))
@@ -194,8 +195,8 @@ func (a *APFS) getValidCSB() error {
 	return nil
 }
 
-// Ls lists files at a given path
-func (a *APFS) Ls(path string) error {
+// List lists files at a given path
+func (a *APFS) List(path string) error {
 
 	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
 
@@ -321,62 +322,62 @@ func (a *APFS) Tree(path string) error {
 }
 
 // Copy copies the contents of the src file to the dest file TODO: finish this
-// func (a *APFS) Copy(src, dest string) error {
+func (a *APFS) Copy(src, dest string) error {
 
-// 	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
+	sr := io.NewSectionReader(a.r, 0, 1<<63-1)
 
-// 	fsOMapBtree := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys)
+	fsOMapBtree := a.Volume.OMap.Body.(types.OMap).Tree.Body.(types.BTreeNodePhys)
 
-// 	fsRootEntry, err := fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
-// 	if err != nil {
-// 		return err
-// 	}
+	fsRootEntry, err := fsOMapBtree.GetOMapEntry(sr, a.Volume.RootTreeOid, a.volume.Hdr.Xid)
+	if err != nil {
+		return err
+	}
 
-// 	fsRootBtreeObj, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
-// 	if err != nil {
-// 		return err
-// 	}
+	fsRootBtreeObj, err := types.ReadObj(sr, fsRootEntry.Val.Paddr)
+	if err != nil {
+		return err
+	}
 
-// 	fsRootBtree := fsRootBtreeObj.Body.(types.BTreeNodePhys)
+	fsRootBtree := fsRootBtreeObj.Body.(types.BTreeNodePhys)
 
-// 	fsRecords, err := fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(types.FSROOT_OID), types.XidT(^uint64(0)))
-// 	if err != nil {
-// 		return err
-// 	}
+	fsRecords, err := fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(types.FSROOT_OID), types.XidT(^uint64(0)))
+	if err != nil {
+		return err
+	}
 
-// 	// TODO: need to find the file's record
+	// TODO: need to find the file's record
 
-// 	var decmpfsHdr *types.DecmpfsDiskHeader
-// 	for _, rec := range fsRecords {
-// 		fmt.Println(rec)
-// 		decmpfsHdr, err = types.GetDecmpfsHeader(rec)
-// 		if err != nil {
-// 			log.Error(err.Error())
-// 		}
-// 	}
+	var decmpfsHdr *types.DecmpfsDiskHeader
+	for _, rec := range fsRecords {
+		fmt.Println(rec)
+		decmpfsHdr, err = types.GetDecmpfsHeader(rec)
+		if err != nil {
+			log.Error(err.Error())
+		}
+	}
 
-// 	fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00019f2c), types.XidT(^uint64(0)))
-// 	if err != nil {
-// 		return err
-// 	}
+	fsRecords, err = fsOMapBtree.GetFSRecordsForOid(sr, fsRootBtree, types.OidT(0xfffffff00019f2c), types.XidT(^uint64(0)))
+	if err != nil {
+		return err
+	}
 
-// 	for _, rec := range fsRecords {
-// 		fmt.Println(rec)
-// 	}
+	for _, rec := range fsRecords {
+		fmt.Println(rec)
+	}
 
-// 	fo, err := os.Create(dest)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer fo.Close()
+	fo, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer fo.Close()
 
-// 	w := bufio.NewWriter(fo)
+	w := bufio.NewWriter(fo)
 
-// 	if err := types.DecompressFile(io.NewSectionReader(sr, int64(0xc943d*types.BLOCK_SIZE), 0x5010000), w, decmpfsHdr); err != nil {
-// 		return err
-// 	}
+	if err := types.DecompressFile(io.NewSectionReader(sr, int64(0xc943d*types.BLOCK_SIZE), 0x5010000), w, decmpfsHdr); err != nil {
+		return err
+	}
 
-// 	w.Flush()
+	w.Flush()
 
-// 	return nil
-// }
+	return nil
+}
