@@ -109,7 +109,7 @@ func (i ProductInfo) String() string {
 		i.Title,
 		i.Version,
 		i.Build,
-		i.PostDate.Format("2006-01-02"))
+		i.PostDate.Format("01Jan06 15:04:05"))
 }
 
 type ProductInfos []ProductInfo
@@ -123,7 +123,7 @@ func (infos ProductInfos) String() string {
 			pinfo.Title,
 			pinfo.Version,
 			pinfo.Build,
-			pinfo.PostDate.Format("2006-01-02"),
+			pinfo.PostDate.Format("01Jan06 15:04:05"),
 		})
 	}
 	table := tablewriter.NewWriter(tableString)

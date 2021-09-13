@@ -267,8 +267,8 @@ var machoCmd = &cobra.Command{
 						fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
 							ou,
 							cert.Subject.CommonName,
-							cert.NotBefore.Format("2006-01-02"),
-							cert.NotAfter.Format("2006-01-02"))
+							cert.NotBefore.Format("01Jan06 15:04:05"),
+							cert.NotAfter.Format("01Jan06 15:04:05"))
 					}
 					w.Flush()
 				}

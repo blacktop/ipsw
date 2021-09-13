@@ -236,7 +236,7 @@ var updateCmd = &cobra.Command{
 		if _, err := os.Stat(fname); os.IsNotExist(err) {
 			log.WithFields(log.Fields{
 				"version":        latestRelease.Tag,
-				"published_at":   latestRelease.PublishedAt.Format("2006-01-02"),
+				"published_at":   latestRelease.PublishedAt.Format("01Jan06 15:04:05"),
 				"size":           humanize.Bytes(uint64(asset.Size)),
 				"download_count": asset.DownloadCount,
 			}).Info("Getting Update")
