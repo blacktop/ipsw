@@ -264,8 +264,11 @@ func (i *Info) GetKernelCacheFolders(kc string) []string {
 
 // GetKernelCacheFileName returns a short new kernelcache name including all the supported devices
 func (i *Info) GetKernelCacheFileName(kc string) string {
-	devList := getAbbreviatedDevList(i.GetDevicesForKernelCache(kc))
-	return fmt.Sprintf("%s.%s", strings.TrimSuffix(kc, filepath.Ext(kc)), devList)
+	devList := getAbbreviatedDevList(i.GetDevicesForKernelCache(filepath.Base(kc)))
+	if len(devList) == 0 {
+		return filepath.Base(kc)
+	}
+	return fmt.Sprintf("%s.%s", strings.TrimSuffix(filepath.Base(kc), filepath.Ext(kc)), devList)
 }
 
 // GetDevicesForKernelCache returns a sorted array of devices that support the kernelcache
