@@ -48,27 +48,30 @@ type codesignature *ctypes.CodeSignature
 
 // A File represents an open dyld file.
 type File struct {
-	CacheHeader
+	UUID    mtypes.UUID
+	Headers map[mtypes.UUID]CacheHeader
+
 	ByteOrder binary.ByteOrder
 
-	Mappings              cacheMappings
-	MappingsWithSlideInfo cacheMappingsWithSlideInfo
+	Mappings              map[mtypes.UUID]cacheMappings
+	MappingsWithSlideInfo map[mtypes.UUID]cacheMappingsWithSlideInfo
 
-	Images cacheImages
+	Images map[mtypes.UUID]cacheImages
 
-	SlideInfo       slideInfo
+	SlideInfo       map[mtypes.UUID]slideInfo
 	PatchInfo       CachePatchInfo
 	LocalSymInfo    localSymbolInfo
 	AcceleratorInfo CacheAcceleratorInfo
 
-	BranchPools            []uint64
-	CodeSignature          codesignature
-	subCacheCodeSignatures map[mtypes.UUID]codesignature
+	BranchPools    []uint64
+	CodeSignatures map[mtypes.UUID]codesignature
 
 	AddressToSymbol map[uint64]string
 
-	r      io.ReaderAt
-	closer io.Closer
+	isDyld4 bool
+
+	r      map[mtypes.UUID]io.ReaderAt
+	closer map[mtypes.UUID]io.Closer
 }
 
 // FormatError is returned by some operations if the data does
@@ -100,77 +103,78 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 	if ff.ImagesOffset == 0 && ff.ImagesCount == 0 { // NEW iOS15 dyld4 style caches
-		ff.subCacheCodeSignatures = make(map[mtypes.UUID]codesignature)
-		lastFileOffset := ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
-		for i := 1; i <= int(ff.NumSubCaches); i++ {
-			log.WithFields(log.Fields{
-				"cache": fmt.Sprintf("%s.%d", name, i),
-			}).Debug("Parsing SubCache")
-			f, err := os.Open(fmt.Sprintf("%s.%d", name, i))
-			if err != nil {
-				return nil, err
-			}
-			ffsc, err := NewFile(f)
-			if err != nil {
-				ffsc.Close()
-				return nil, err
-			}
+		ff.isDyld4 = true
+		// ff.subCacheCodeSignatures = make(map[mtypes.UUID]codesignature)
+		// lastFileOffset := ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
+		// for i := 1; i <= int(ff.NumSubCaches); i++ {
+		// 	log.WithFields(log.Fields{
+		// 		"cache": fmt.Sprintf("%s.%d", name, i),
+		// 	}).Debug("Parsing SubCache")
+		// 	f, err := os.Open(fmt.Sprintf("%s.%d", name, i))
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// 	ffsc, err := NewFile(f)
+		// 	if err != nil {
+		// 		ffsc.Close()
+		// 		return nil, err
+		// 	}
 
-			// if ffsc.SubCachesUUID != ff.SubCachesUUID {
-			// 	return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
-			// 		ff.SubCachesUUID,
-			// 		ffsc.SubCachesUUID)
-			// }
+		// 	// if ffsc.SubCachesUUID != ff.SubCachesUUID {
+		// 	// 	return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
+		// 	// 		ff.SubCachesUUID,
+		// 	// 		ffsc.SubCachesUUID)
+		// 	// }
 
-			ff.subCacheCodeSignatures[ffsc.UUID] = ffsc.CodeSignature
+		// 	ff.subCacheCodeSignatures[ffsc.UUID] = ffsc.CodeSignature
 
-			for i := 0; i < int(ffsc.MappingWithSlideCount); i++ {
-				ffsc.Mappings[i].FileOffset = ffsc.Mappings[i].FileOffset + lastFileOffset
-				ffsc.MappingsWithSlideInfo[i].FileOffset = ffsc.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
-				ffsc.MappingsWithSlideInfo[i].SlideInfoOffset = ffsc.MappingsWithSlideInfo[i].SlideInfoOffset + lastFileOffset
-				ff.Mappings = append(ff.Mappings, ffsc.Mappings[i])
-				ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsc.MappingsWithSlideInfo[i])
-			}
-			ff.AppendData(io.NewSectionReader(ffsc.r, 0, 1<<63-1), lastFileOffset)
-			ffsc.Close()
-		}
-		if ff.SymbolsSubCacheUUID != [16]byte{0} {
-			log.WithFields(log.Fields{
-				"cache": name + ".symbols",
-			}).Debug("Parsing SubCache")
-			f, err := os.Open(name + ".symbols")
-			if err != nil {
-				return nil, err
-			}
-			ffsym, err := NewFile(f)
-			if err != nil {
-				f.Close()
-				return nil, err
-			}
-			lastFileOffset = ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
-			ff.subCacheCodeSignatures[ffsym.UUID] = ffsym.CodeSignature
-			// Copy local symbols info from .symbols sub cache
-			ff.LocalSymbolsOffset = ffsym.LocalSymbolsOffset
-			ff.LocalSymbolsSize = ffsym.LocalSymbolsSize
-			ff.LocalSymInfo = ffsym.LocalSymInfo
-			ff.LocalSymInfo.NListFileOffset = ffsym.LocalSymInfo.NListFileOffset + uint32(lastFileOffset)
-			ff.LocalSymInfo.StringsFileOffset = ffsym.LocalSymInfo.StringsFileOffset + uint32(lastFileOffset)
-			for idx, img := range ffsym.Images {
-				ff.Images[idx].CacheLocalSymbolsEntry = img.CacheLocalSymbolsEntry
-			}
-			for i := 0; i < int(ffsym.MappingWithSlideCount); i++ {
-				ffsym.Mappings[i].FileOffset = ffsym.Mappings[i].FileOffset + lastFileOffset
-				ffsym.MappingsWithSlideInfo[i].FileOffset = ffsym.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
-				ffsym.MappingsWithSlideInfo[i].SlideInfoOffset = ffsym.MappingsWithSlideInfo[i].SlideInfoOffset + lastFileOffset
-				ff.Mappings = append(ff.Mappings, ffsym.Mappings[i])
-				ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsym.MappingsWithSlideInfo[i])
-			}
-			ff.AppendData(io.NewSectionReader(ffsym.r, 0, 1<<63-1), lastFileOffset)
-			// if b, err := io.ReadAll(io.NewSectionReader(ff.r, 0, 1<<63-1)); err == nil {
-			// 	ioutil.WriteFile(fmt.Sprintf("%s.BIGG", name), b, 0755)
-			// }
-			ffsym.Close()
-		}
+		// 	for i := 0; i < int(ffsc.MappingWithSlideCount); i++ {
+		// 		ffsc.Mappings[i].FileOffset = ffsc.Mappings[i].FileOffset + lastFileOffset
+		// 		ffsc.MappingsWithSlideInfo[i].FileOffset = ffsc.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
+		// 		ffsc.MappingsWithSlideInfo[i].SlideInfoOffset = ffsc.MappingsWithSlideInfo[i].SlideInfoOffset + lastFileOffset
+		// 		ff.Mappings = append(ff.Mappings, ffsc.Mappings[i])
+		// 		ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsc.MappingsWithSlideInfo[i])
+		// 	}
+		// 	ff.AppendData(io.NewSectionReader(ffsc.r, 0, 1<<63-1), lastFileOffset)
+		// 	ffsc.Close()
+		// }
+		// if ff.SymbolsSubCacheUUID != [16]byte{0} {
+		// 	log.WithFields(log.Fields{
+		// 		"cache": name + ".symbols",
+		// 	}).Debug("Parsing SubCache")
+		// 	f, err := os.Open(name + ".symbols")
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// 	ffsym, err := NewFile(f)
+		// 	if err != nil {
+		// 		f.Close()
+		// 		return nil, err
+		// 	}
+		// 	lastFileOffset = ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].FileOffset + ff.MappingsWithSlideInfo[len(ff.MappingsWithSlideInfo)-1].Size
+		// 	ff.subCacheCodeSignatures[ffsym.UUID] = ffsym.CodeSignature
+		// 	// Copy local symbols info from .symbols sub cache
+		// 	ff.LocalSymbolsOffset = ffsym.LocalSymbolsOffset
+		// 	ff.LocalSymbolsSize = ffsym.LocalSymbolsSize
+		// 	ff.LocalSymInfo = ffsym.LocalSymInfo
+		// 	ff.LocalSymInfo.NListFileOffset = ffsym.LocalSymInfo.NListFileOffset + uint32(lastFileOffset)
+		// 	ff.LocalSymInfo.StringsFileOffset = ffsym.LocalSymInfo.StringsFileOffset + uint32(lastFileOffset)
+		// 	for idx, img := range ffsym.Images {
+		// 		ff.Images[idx].CacheLocalSymbolsEntry = img.CacheLocalSymbolsEntry
+		// 	}
+		// 	for i := 0; i < int(ffsym.MappingWithSlideCount); i++ {
+		// 		ffsym.Mappings[i].FileOffset = ffsym.Mappings[i].FileOffset + lastFileOffset
+		// 		ffsym.MappingsWithSlideInfo[i].FileOffset = ffsym.MappingsWithSlideInfo[i].FileOffset + lastFileOffset
+		// 		ffsym.MappingsWithSlideInfo[i].SlideInfoOffset = ffsym.MappingsWithSlideInfo[i].SlideInfoOffset + lastFileOffset
+		// 		ff.Mappings = append(ff.Mappings, ffsym.Mappings[i])
+		// 		ff.MappingsWithSlideInfo = append(ff.MappingsWithSlideInfo, ffsym.MappingsWithSlideInfo[i])
+		// 	}
+		// 	ff.AppendData(io.NewSectionReader(ffsym.r, 0, 1<<63-1), lastFileOffset)
+		// 	// if b, err := io.ReadAll(io.NewSectionReader(ff.r, 0, 1<<63-1)); err == nil {
+		// 	// 	ioutil.WriteFile(fmt.Sprintf("%s.BIGG", name), b, 0755)
+		// 	// }
+		// 	ffsym.Close()
+		// }
 	}
 	ff.closer = f
 	return ff, nil
@@ -189,7 +193,7 @@ func (f *File) Close() error {
 }
 
 // ReadHeader opens a given cache and returns the dyld_shared_cache header
-func ReadHeader(path string) (*CacheHeader, error) {
+func parseSubCache(name string) error {
 	var header CacheHeader
 
 	cache, err := os.Open(path)
@@ -209,8 +213,17 @@ func ReadHeader(path string) (*CacheHeader, error) {
 func NewFile(r io.ReaderAt) (*File, error) {
 	f := new(File)
 	sr := io.NewSectionReader(r, 0, 1<<63-1)
-	f.r = r
+
+	// init all maps
 	f.AddressToSymbol = make(map[uint64]string, 7000000)
+	f.Headers = make(map[mtypes.UUID]CacheHeader)
+	f.Mappings = make(map[mtypes.UUID]cacheMappings)
+	f.MappingsWithSlideInfo = make(map[mtypes.UUID]cacheMappingsWithSlideInfo)
+	f.Images = make(map[mtypes.UUID]cacheImages)
+	f.SlideInfo = make(map[mtypes.UUID]slideInfo)
+	f.CodeSignatures = make(map[mtypes.UUID]codesignature)
+	f.r = make(map[mtypes.UUID]io.ReaderAt)
+	f.closer = make(map[mtypes.UUID]io.Closer)
 
 	// Read and decode dyld magic
 	var ident [16]byte
@@ -224,15 +237,28 @@ func NewFile(r io.ReaderAt) (*File, error) {
 
 	f.ByteOrder = binary.LittleEndian
 
+	var uuidBytes [16]byte
+	if _, err := r.ReadAt(uuidBytes[0:], 0x58); err != nil {
+		return nil, err
+	}
+
+	f.UUID = mtypes.UUID(uuidBytes)
+
+	if f.UUID.IsNull() {
+		return nil, fmt.Errorf("file's UUID is empty") // FIXME: should this actually stop or continue
+	}
+
+	f.r[f.UUID] = r
+
 	// Read entire file header.
-	if err := binary.Read(sr, f.ByteOrder, &f.CacheHeader); err != nil {
+	if err := binary.Read(sr, f.ByteOrder, f.Headers[f.UUID]); err != nil {
 		return nil, err
 	}
 
 	// Read dyld mappings.
-	sr.Seek(int64(f.MappingOffset), os.SEEK_SET)
+	sr.Seek(int64(f.Headers[f.UUID].MappingOffset), os.SEEK_SET)
 
-	for i := uint32(0); i != f.MappingCount; i++ {
+	for i := uint32(0); i != f.Headers[f.UUID].MappingCount; i++ {
 		cmInfo := CacheMappingInfo{}
 		if err := binary.Read(sr, f.ByteOrder, &cmInfo); err != nil {
 			return nil, err
@@ -245,24 +271,24 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		} else if cmInfo.InitProt.Read() {
 			cm.Name = "__LINKEDIT"
 		}
-		f.Mappings = append(f.Mappings, cm)
+		f.Mappings[f.UUID] = append(f.Mappings[f.UUID], cm)
 	}
 
 	/***********************
 	 * Read dyld slide info
 	 ***********************/
-	if f.SlideInfoOffsetUnused > 0 {
+	if f.Headers[f.UUID].SlideInfoOffsetUnused > 0 {
 		f.ParseSlideInfo(CacheMappingAndSlideInfo{
-			Address:         f.Mappings[1].Address,
-			Size:            f.Mappings[1].Size,
-			FileOffset:      f.Mappings[1].FileOffset,
-			SlideInfoOffset: f.SlideInfoOffsetUnused,
-			SlideInfoSize:   f.SlideInfoSizeUnused,
+			Address:         f.Mappings[f.UUID][1].Address,
+			Size:            f.Mappings[f.UUID][1].Size,
+			FileOffset:      f.Mappings[f.UUID][1].FileOffset,
+			SlideInfoOffset: f.Headers[f.UUID].SlideInfoOffsetUnused,
+			SlideInfoSize:   f.Headers[f.UUID].SlideInfoSizeUnused,
 		}, false)
 	} else {
 		// Read NEW (in iOS 14) dyld mappings with slide info.
-		sr.Seek(int64(f.MappingWithSlideOffset), os.SEEK_SET)
-		for i := uint32(0); i != f.MappingWithSlideCount; i++ {
+		sr.Seek(int64(f.Headers[f.UUID].MappingWithSlideOffset), os.SEEK_SET)
+		for i := uint32(0); i != f.Headers[f.UUID].MappingWithSlideCount; i++ {
 			cxmInfo := CacheMappingAndSlideInfo{}
 			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
 				return nil, err
@@ -291,18 +317,18 @@ func NewFile(r io.ReaderAt) (*File, error) {
 				f.ParseSlideInfo(cm.CacheMappingAndSlideInfo, false)
 			}
 
-			f.MappingsWithSlideInfo = append(f.MappingsWithSlideInfo, cm)
+			f.MappingsWithSlideInfo[f.UUID] = append(f.MappingsWithSlideInfo[f.UUID], cm)
 		}
 	}
 
 	// Read dyld images.
 	var imagesCount uint32
-	if f.ImagesOffset > 0 {
-		imagesCount = f.ImagesCount
-		sr.Seek(int64(f.ImagesOffset), os.SEEK_SET)
+	if f.Headers[f.UUID].ImagesOffset > 0 {
+		imagesCount = f.Headers[f.UUID].ImagesCount
+		sr.Seek(int64(f.Headers[f.UUID].ImagesOffset), os.SEEK_SET)
 	} else {
-		imagesCount = f.ImagesWithSubCachesCount
-		sr.Seek(int64(f.ImagesWithSubCachesOffset), os.SEEK_SET)
+		imagesCount = f.Headers[f.UUID].ImagesWithSubCachesCount
+		sr.Seek(int64(f.Headers[f.UUID].ImagesWithSubCachesOffset), os.SEEK_SET)
 	}
 
 	for i := uint32(0); i != imagesCount; i++ {
@@ -310,7 +336,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		if err := binary.Read(sr, f.ByteOrder, &iinfo); err != nil {
 			return nil, err
 		}
-		f.Images = append(f.Images, &CacheImage{
+		if f.
+		f.Images[f.UUID] = append(f.Images[f.UUID], &CacheImage{
 			Index: i,
 			Info:  iinfo,
 			cache: f,

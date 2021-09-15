@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -30,7 +29,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fullsailor/pkcs7"
@@ -150,7 +148,8 @@ var dyldInfoCmd = &cobra.Command{
 				for idx, img := range f.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
-						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+						continue
+						// return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
 					dinfo.Dylibs = append(dinfo.Dylibs, dylib{
 						Index:       idx + 1,
@@ -163,12 +162,18 @@ var dyldInfoCmd = &cobra.Command{
 				}
 			}
 
-			j, err := json.Marshal(dinfo)
-			if err != nil {
-				return err
+			fmt.Println("Images")
+			fmt.Println("======")
+			for idx, img := range dinfo.Dylibs {
+				fmt.Printf("%4d:  %#0X  %s  (%s) uuid: %s\n", idx+1, img.LoadAddress, img.Name, img.Version, img.UUID)
 			}
 
-			fmt.Println(string(j))
+			// j, err := json.Marshal(dinfo)
+			// if err != nil {
+			// 	return err
+			// }
+
+			// fmt.Println(string(j))
 
 			return nil
 		}
@@ -326,38 +331,41 @@ var dyldInfoCmd = &cobra.Command{
 		}
 
 		if showDylibs {
-			fmt.Println("Images")
-			fmt.Println("======")
-			for idx, img := range f.Images {
-				if f.FormatVersion.IsDylibsExpectedOnDisk() {
-					m, err := macho.Open(img.Name)
-					if err != nil {
-						if serr, ok := err.(*macho.FormatError); !ok {
-							return errors.Wrapf(serr, "failed to open MachO %s", img.Name)
-						}
-						fat, err := macho.OpenFat(img.Name)
-						if err != nil {
-							return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
-						}
-						fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
-						fat.Close()
-						continue
-					}
-					fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
-					m.Close()
-				} else {
-					m, err := img.GetPartialMacho()
-					if err != nil {
-						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-					}
-					if Verbose {
-						fmt.Printf("%4d:  %#0X  %s  (%s) uuid: %s\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion, m.UUID())
-					} else {
-						fmt.Printf("%4d:  %s  (%s)\n", idx+1, img.Name, m.DylibID().CurrentVersion)
-					}
-					m.Close()
-				}
-			}
+			// fmt.Println("Images")
+			// fmt.Println("======")
+			// for idx, img := range dinfo.Dylibs {
+			// 	fmt.Printf("%4d:  %#0X  %s  (%s) uuid: %s\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion, m.UUID())
+			// }
+			// for idx, img := range f.Images {
+			// 	if f.FormatVersion.IsDylibsExpectedOnDisk() {
+			// 		m, err := macho.Open(img.Name)
+			// 		if err != nil {
+			// 			if serr, ok := err.(*macho.FormatError); !ok {
+			// 				return errors.Wrapf(serr, "failed to open MachO %s", img.Name)
+			// 			}
+			// 			fat, err := macho.OpenFat(img.Name)
+			// 			if err != nil {
+			// 				return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
+			// 			}
+			// 			fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
+			// 			fat.Close()
+			// 			continue
+			// 		}
+			// 		fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
+			// 		m.Close()
+			// 	} else {
+			// 		m, err := img.GetPartialMacho()
+			// 		if err != nil {
+			// 			return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+			// 		}
+			// 		if Verbose {
+			// 			fmt.Printf("%4d:  %#0X  %s  (%s) uuid: %s\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion, m.UUID())
+			// 		} else {
+			// 			fmt.Printf("%4d:  %s  (%s)\n", idx+1, img.Name, m.DylibID().CurrentVersion)
+			// 		}
+			// 		m.Close()
+			// 	}
+			// }
 		}
 
 		return nil
