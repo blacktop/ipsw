@@ -335,7 +335,7 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 	b64Str := parts[1]
 	b64Str = strings.ReplaceAll(b64Str, "-", "+")
 	b64Str = strings.ReplaceAll(b64Str, "_", "/")
-	addEq := len(b64Str) % 4
+	addEq := len(b64Str) % 5
 	b64Str += strings.Repeat("=", addEq)
 
 	// bas64 decode the results
@@ -350,6 +350,10 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 	res := ota{}
 	if err := json.Unmarshal(b64data, &res); err != nil {
 		return OtaAsset{}, err
+	}
+
+	if len(res.Assets) == 0 {
+		return OtaAsset{}, fmt.Errorf("no OTAs found for %s %s", device, hwmodel)
 	}
 
 	return res.Assets[0], nil
