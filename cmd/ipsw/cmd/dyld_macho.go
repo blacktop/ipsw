@@ -281,6 +281,8 @@ var dyldMachoCmd = &cobra.Command{
 				}
 
 				if dumpStrings {
+					fmt.Printf("\nCStrings\n")
+					fmt.Println("--------")
 					for _, sec := range m.Sections {
 
 						if sec.Flags.IsCstringLiterals() {
@@ -289,7 +291,7 @@ var dyldMachoCmd = &cobra.Command{
 								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 							}
 
-							csr := bytes.NewBuffer(dat[:])
+							csr := bytes.NewBuffer(dat)
 
 							for {
 								pos := sec.Addr + uint64(csr.Cap()-csr.Len())

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/blacktop/go-macho/types"
 	"github.com/dustin/go-humanize"
 	"github.com/olekukonko/tablewriter"
 )
@@ -197,7 +198,7 @@ func (f *File) String(verbose bool) string {
 	var slideVersion uint32
 
 	if f.SlideInfo != nil {
-		slideVersion = f.SlideInfo.GetVersion()
+		slideVersion = f.SlideInfo[f.UUID].GetVersion()
 	}
 
 	return fmt.Sprintf(
@@ -222,56 +223,56 @@ func (f *File) String(verbose bool) string {
 			"\nMappings\n"+
 			"========\n"+
 			"%s",
-		bytes.Trim(f.Magic[:], "\x00"),
+		f.Headers[f.UUID].Magic.String(),
 		f.UUID,
-		f.Platform,
-		f.getFormatVersion(),
-		f.getMaxSlide(),
+		f.Headers[f.UUID].Platform,
+		f.getFormatVersion(f.UUID),
+		f.getMaxSlide(f.UUID),
 		f.getSubCacheInfo(),
 		f.getLocalSymbols(),
-		f.getCodeSignature(),
-		f.getImagesTextInfo(),
-		f.getSlideInfo(slideVersion),
-		f.getBranchPools(),
-		f.getAccelerateInfo(),
-		f.getPatchInfo(),
-		f.getProgClosures(),
-		f.getProgClosuresTrie(),
-		f.getSharedRegion(),
+		f.getCodeSignature(f.UUID), // TODO: show ALL subcache's code signature blocks
+		f.getImagesTextInfo(f.UUID),
+		f.getSlideInfo(f.UUID, slideVersion),
+		f.getBranchPools(f.UUID),
+		f.getAccelerateInfo(f.UUID),
+		f.getPatchInfo(f.UUID),
+		f.getProgClosures(f.UUID),
+		f.getProgClosuresTrie(f.UUID),
+		f.getSharedRegion(f.UUID),
 		f.getMappings(slideVersion, verbose),
 	)
 }
 
-func (f *File) getFormatVersion() string {
+func (f *File) getFormatVersion(uuid types.UUID) string {
 	var output string
-	if f.FormatVersion > 0 {
-		output = fmt.Sprintf("Format            = %s\n", f.FormatVersion)
+	if f.Headers[uuid].FormatVersion > 0 {
+		output = fmt.Sprintf("Format            = %s\n", f.Headers[uuid].FormatVersion)
 	}
 	return output
 }
 
-func (f *File) getMaxSlide() string {
+func (f *File) getMaxSlide(uuid types.UUID) string {
 	var output string
-	if f.MaxSlide > 0 {
-		output = fmt.Sprintf("Max Slide         = %s\n", f.MaxSlide)
+	if f.Headers[uuid].MaxSlide > 0 {
+		output = fmt.Sprintf("Max Slide         = %s\n", f.Headers[uuid].MaxSlide)
 	}
 	return output
 }
 
 func (f *File) getSubCacheInfo() string {
 	var output string
-	if f.ImagesOffset == 0 && f.ImagesCount == 0 {
-		if f.SubCachesUUID > 0 {
+	if f.IsDyld4 {
+		if f.Headers[f.UUID].SubCachesUUID > 0 {
 			var symSCUUID string
-			if !f.SymbolsSubCacheUUID.IsNull() {
-				symSCUUID = fmt.Sprintf("Sym SubCache UUID = %s\n", f.SymbolsSubCacheUUID)
+			if !f.Headers[f.UUID].SymbolsSubCacheUUID.IsNull() {
+				symSCUUID = fmt.Sprintf("Symbol Cache UUID = %s\n", f.Headers[f.UUID].SymbolsSubCacheUUID)
 			}
 			output = fmt.Sprintf(
 				"Num SubCaches     = %d\n"+
 					"SubCache Group ID = %#x\n"+
 					"%s",
-				f.NumSubCaches,
-				f.SubCachesUUID,
+				f.Headers[f.UUID].NumSubCaches,
+				f.Headers[f.UUID].SubCachesUUID,
 				symSCUUID,
 			)
 		}
@@ -296,29 +297,29 @@ func (f *File) getLocalSymbols() string {
 	return output
 }
 
-func (f *File) getCodeSignature() string {
+func (f *File) getCodeSignature(uuid types.UUID) string {
 	var output string
-	if f.CodeSignatureSize > 0 {
+	if f.Headers[uuid].CodeSignatureSize > 0 {
 		output = fmt.Sprintf("Code Signature:                 %3dMB, offset:  0x%09X -> 0x%09X\n",
-			f.CodeSignatureSize/(1024*1024),
-			f.CodeSignatureOffset,
-			f.CodeSignatureOffset+f.CodeSignatureSize)
+			f.Headers[uuid].CodeSignatureSize/(1024*1024),
+			f.Headers[uuid].CodeSignatureOffset,
+			f.Headers[uuid].CodeSignatureOffset+f.Headers[uuid].CodeSignatureSize)
 	}
 	return output
 }
 
-func (f *File) getImagesTextInfo() string {
+func (f *File) getImagesTextInfo(uuid types.UUID) string {
 	var output string
-	imagesCount := f.ImagesCount
-	imageHumanSize := int(f.ImagesCount) * binary.Size(CacheImageInfo{}) / 1024
-	imagesOffset := int(f.ImagesOffset)
+	imagesCount := f.Headers[uuid].ImagesCount
+	imageHumanSize := int(f.Headers[uuid].ImagesCount) * binary.Size(CacheImageInfo{}) / 1024
+	imagesOffset := int(f.Headers[uuid].ImagesOffset)
 	imagesSize := int(imagesCount) * binary.Size(CacheImageInfo{})
 
-	if f.ImagesOffset == 0 && f.ImagesCount == 0 {
-		imagesCount = f.ImagesWithSubCachesCount
-		imageHumanSize = int(f.ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{}) / 1024
-		imagesOffset = int(f.ImagesWithSubCachesOffset)
-		imagesSize = int(f.ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{})
+	if f.Headers[uuid].ImagesOffset == 0 && f.Headers[uuid].ImagesCount == 0 {
+		imagesCount = f.Headers[uuid].ImagesWithSubCachesCount
+		imageHumanSize = int(f.Headers[uuid].ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{}) / 1024
+		imagesOffset = int(f.Headers[uuid].ImagesWithSubCachesOffset)
+		imagesSize = int(f.Headers[uuid].ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{})
 	}
 
 	if imagesCount > 0 || imagesOffset > 0 || imagesSize > 0 {
@@ -328,99 +329,109 @@ func (f *File) getImagesTextInfo() string {
 	return output
 }
 
-func (f *File) getSlideInfo(slideVersion uint32) string {
+func (f *File) getSlideInfo(uuid types.UUID, slideVersion uint32) string {
 	var output string
-	if f.SlideInfoOffsetUnused > 0 {
+	if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
 		output = fmt.Sprintf("Slide Info (v%d):               %4dKB, offset:  0x%09X -> 0x%09X\n",
 			slideVersion,
-			f.SlideInfoSizeUnused/1024,
-			f.SlideInfoOffsetUnused,
-			f.SlideInfoOffsetUnused+f.SlideInfoSizeUnused)
+			f.Headers[uuid].SlideInfoSizeUnused/1024,
+			f.Headers[uuid].SlideInfoOffsetUnused,
+			f.Headers[uuid].SlideInfoOffsetUnused+f.Headers[uuid].SlideInfoSizeUnused)
 	}
 	return output
 }
 
-func (f *File) getBranchPools() string {
+func (f *File) getBranchPools(uuid types.UUID) string {
 	var output string
-	if f.BranchPoolsOffset > 0 {
+	if f.Headers[uuid].BranchPoolsOffset > 0 {
 		output = fmt.Sprintf("Branch Pool:                    %3dMB, offset:  0x%09X -> 0x%09X\n",
 			binary.Size(f.BranchPools),
-			f.BranchPoolsOffset,
-			int(f.BranchPoolsOffset)+binary.Size(f.BranchPools))
+			f.Headers[uuid].BranchPoolsOffset,
+			int(f.Headers[uuid].BranchPoolsOffset)+binary.Size(f.BranchPools))
 	}
 	return output
 }
 
-func (f *File) getAccelerateInfo() string {
+func (f *File) getAccelerateInfo(uuid types.UUID) string {
 	var output string
-	if f.AccelerateInfoAddr > 0 {
+	if f.Headers[uuid].AccelerateInfoAddr > 0 {
 		output = fmt.Sprintf("Accelerate Tab:                 %3dKB, address: 0x%09X -> 0x%09X\n",
-			f.AccelerateInfoSize/1024,
-			f.AccelerateInfoAddr,
-			f.AccelerateInfoAddr+f.AccelerateInfoSize)
+			f.Headers[uuid].AccelerateInfoSize/1024,
+			f.Headers[uuid].AccelerateInfoAddr,
+			f.Headers[uuid].AccelerateInfoAddr+f.Headers[uuid].AccelerateInfoSize)
 	}
 	return output
 }
 
-func (f *File) getPatchInfo() string {
+func (f *File) getPatchInfo(uuid types.UUID) string {
 	var output string
-	if f.PatchInfoAddr > 0 || f.PatchInfoSize > 0 {
+	if f.Headers[uuid].PatchInfoAddr > 0 || f.Headers[uuid].PatchInfoSize > 0 {
 		output = fmt.Sprintf("Patch Info:                     %3dMB, address: 0x%09X -> 0x%09X\n",
-			f.PatchInfoSize/(1024*1024),
-			f.PatchInfoAddr, f.PatchInfoAddr+f.PatchInfoSize)
+			f.Headers[uuid].PatchInfoSize/(1024*1024),
+			f.Headers[uuid].PatchInfoAddr, f.Headers[uuid].PatchInfoAddr+f.Headers[uuid].PatchInfoSize)
 	}
 	return output
 }
 
-func (f *File) getProgClosures() string {
+func (f *File) getProgClosures(uuid types.UUID) string {
 	var output string
-	if f.ProgClosuresAddr > 0 {
+	if f.Headers[uuid].ProgClosuresAddr > 0 {
 		output = fmt.Sprintf("Closures:                       %3dMB, address: 0x%09X -> 0x%09X\n",
-			f.ProgClosuresSize/(1024*1024),
-			f.ProgClosuresAddr,
-			f.ProgClosuresAddr+f.ProgClosuresSize)
-	} else if f.ProgClosuresWithSubCachesAddr > 0 {
+			f.Headers[uuid].ProgClosuresSize/(1024*1024),
+			f.Headers[uuid].ProgClosuresAddr,
+			f.Headers[uuid].ProgClosuresAddr+f.Headers[uuid].ProgClosuresSize)
+	} else if f.Headers[uuid].ProgClosuresWithSubCachesAddr > 0 {
 		output = fmt.Sprintf("Closures:                       %3dMB, address: 0x%09X -> 0x%09X\n",
-			f.ProgClosuresWithSubCachesSize/(1024*1024),
-			f.ProgClosuresWithSubCachesAddr,
-			f.ProgClosuresWithSubCachesAddr+f.ProgClosuresWithSubCachesSize)
+			f.Headers[uuid].ProgClosuresWithSubCachesSize/(1024*1024),
+			f.Headers[uuid].ProgClosuresWithSubCachesAddr,
+			f.Headers[uuid].ProgClosuresWithSubCachesAddr+f.Headers[uuid].ProgClosuresWithSubCachesSize)
 	}
 	return output
 }
 
-func (f *File) getProgClosuresTrie() string {
+func (f *File) getProgClosuresTrie(uuid types.UUID) string {
 	var output string
-	if f.ProgClosuresTrieAddr > 0 {
+	if f.Headers[uuid].ProgClosuresTrieAddr > 0 {
 		output = fmt.Sprintf("Closures Trie:                  %3dKB, address: 0x%09X -> 0x%09X\n",
-			f.ProgClosuresTrieSize/1024,
-			f.ProgClosuresTrieAddr,
-			f.ProgClosuresTrieAddr+f.ProgClosuresTrieSize)
-	} else if f.ProgClosuresTrieWithSubCachesAddr > 0 {
+			f.Headers[uuid].ProgClosuresTrieSize/1024,
+			f.Headers[uuid].ProgClosuresTrieAddr,
+			f.Headers[uuid].ProgClosuresTrieAddr+f.Headers[uuid].ProgClosuresTrieSize)
+	} else if f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr > 0 {
 		output = fmt.Sprintf("Closures Trie:                  %3dKB, address: 0x%09X -> 0x%09X\n",
-			f.ProgClosuresTrieWithSubCachesSize/1024,
-			f.ProgClosuresTrieWithSubCachesAddr,
-			f.ProgClosuresTrieWithSubCachesAddr+uint64(f.ProgClosuresTrieWithSubCachesSize))
+			f.Headers[uuid].ProgClosuresTrieWithSubCachesSize/1024,
+			f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr,
+			f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr+uint64(f.Headers[uuid].ProgClosuresTrieWithSubCachesSize))
 	}
 	return output
 }
 
-func (f *File) getSharedRegion() string {
+func (f *File) getSharedRegion(uuid types.UUID) string {
 	var output string
-	if f.SharedRegionSize > 0 {
+	if f.Headers[uuid].SharedRegionSize > 0 {
 		output = fmt.Sprintf("Shared Region:                  %3dGB, address: 0x%09X -> 0x%09X\n",
-			f.SharedRegionSize/(1024*1024*1024),
-			f.SharedRegionStart,
-			f.SharedRegionStart+f.SharedRegionSize)
+			f.Headers[uuid].SharedRegionSize/(1024*1024*1024),
+			f.Headers[uuid].SharedRegionStart,
+			f.Headers[uuid].SharedRegionStart+f.Headers[uuid].SharedRegionSize)
 	}
 	return output
 }
 
 func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 	var output string
-	if f.CacheHeader.SlideInfoOffsetUnused > 0 {
-		output = f.Mappings.String()
+	if f.Headers[f.UUID].SlideInfoOffsetUnused > 0 {
+		for uuid, cacheMappings := range f.Mappings {
+			if uuid != f.UUID {
+				output += fmt.Sprintf("\n> SubCache %s", uuid)
+			}
+			output += cacheMappings.String()
+		}
 	} else {
-		output = f.MappingsWithSlideInfo.String(slideVersion, verbose)
+		for uuid, cacheMappings := range f.MappingsWithSlideInfo {
+			if uuid != f.UUID {
+				output += fmt.Sprintf("\n> SubCache %s\n", uuid)
+			}
+			output += cacheMappings.String(slideVersion, verbose)
+		}
 	}
 	return output
 }

@@ -114,16 +114,68 @@ type CacheImage struct {
 
 	Analysis analysis
 
+	cuuid types.UUID
 	cache *File // pointer back to the dyld cache that the image belongs to
+}
+
+// ReadAt impliments the io.ReadAt interface requirement
+func (i *CacheImage) ReadAt(buf []byte, off int64) (n int, err error) {
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return -1, err
+	}
+	le := m.Segment("__LINKEDIT")
+	if le == nil {
+		return -1, fmt.Errorf("failed to read at offset %#x: failed to find __LINKEDIT segment", off)
+	}
+	uuid, _, err := i.cache.GetOffset(le.Addr)
+	if err != nil {
+		return -1, err
+	}
+	return i.cache.r[uuid].ReadAt(buf, off)
+}
+
+// GetOffset returns the offset for a given virtual address
+func (i *CacheImage) GetOffset(address uint64) (uint64, error) {
+	return i.cache.GetOffsetForUUID(i.cuuid, address)
+}
+
+// GetVMAddress returns the virtual address for a given offset
+func (i *CacheImage) GetVMAddress(offset uint64) (uint64, error) {
+	return i.cache.GetVMAddressForUUID(i.cuuid, offset)
+}
+
+// GetMacho parses dyld image as a MachO (slow)
+func (i *CacheImage) GetMacho() (*macho.File, error) {
+	offset, err := i.GetOffset(i.LoadAddress)
+	if err != nil {
+		return nil, err
+	}
+	return macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+		Offset:             int64(offset),
+		SectionReader:      io.NewSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
+		LinkEditDataReader: io.NewSectionReader(i, 0, 1<<63-1),
+		VMAddrConverter: types.VMAddrConverter{
+			Converter: func(addr uint64) uint64 {
+				return i.cache.SlideInfo[i.cuuid].SlidePointer(addr)
+			},
+			VMAddr2Offet: func(address uint64) (uint64, error) {
+				return i.GetOffset(address)
+			},
+			Offet2VMAddr: func(offset uint64) (uint64, error) {
+				return i.GetVMAddress(offset)
+			},
+		},
+	})
 }
 
 // GetPartialMacho parses dyld image as a partial MachO (fast)
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
-	offset, err := i.cache.GetOffset(i.LoadAddress)
+	offset, err := i.GetOffset(i.LoadAddress)
 	if err != nil {
 		return nil, err
 	}
-	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+	return macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		LoadFilter: []types.LoadCmd{
 			types.LC_SEGMENT_64,
 			types.LC_DYLD_INFO,
@@ -138,60 +190,17 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			types.LC_LOAD_DYLIB,
 			types.LC_LOAD_WEAK_DYLIB,
 			types.LC_LOAD_UPWARD_DYLIB},
-		Offset:    int64(offset),
-		SrcReader: io.NewSectionReader(i.cache.r, 0, 1<<63-1),
+		Offset:        int64(offset),
+		SectionReader: io.NewSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
-				return i.cache.SlideInfo.SlidePointer(addr)
+				return i.cache.SlideInfo[i.cuuid].SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
-				for _, mapping := range i.cache.Mappings {
-					if mapping.Address <= address && address < mapping.Address+mapping.Size {
-						return (address - mapping.Address) + mapping.FileOffset, nil
-					}
-				}
-				return 0, fmt.Errorf("address not within any mappings address range")
+				return i.GetOffset(address)
 			},
 			Offet2VMAddr: func(offset uint64) (uint64, error) {
-				for _, mapping := range i.cache.Mappings {
-					if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
-						return (offset - mapping.FileOffset) + mapping.Address, nil
-					}
-				}
-				return 0, fmt.Errorf("offset not within any mappings file offset range")
-			},
-		},
-	})
-}
-
-// GetMacho parses dyld image as a MachO (slow)
-func (i *CacheImage) GetMacho() (*macho.File, error) {
-	offset, err := i.cache.GetOffset(i.LoadAddress)
-	if err != nil {
-		return nil, err
-	}
-	return macho.NewFile(io.NewSectionReader(i.cache.r, int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
-		Offset:    int64(offset),
-		SrcReader: io.NewSectionReader(i.cache.r, 0, 1<<63-1),
-		VMAddrConverter: types.VMAddrConverter{
-			Converter: func(addr uint64) uint64 {
-				return i.cache.SlideInfo.SlidePointer(addr)
-			},
-			VMAddr2Offet: func(address uint64) (uint64, error) {
-				for _, mapping := range i.cache.Mappings {
-					if mapping.Address <= address && address < mapping.Address+mapping.Size {
-						return (address - mapping.Address) + mapping.FileOffset, nil
-					}
-				}
-				return 0, fmt.Errorf("address not within any mappings address range")
-			},
-			Offet2VMAddr: func(offset uint64) (uint64, error) {
-				for _, mapping := range i.cache.Mappings {
-					if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
-						return (offset - mapping.FileOffset) + mapping.Address, nil
-					}
-				}
-				return 0, fmt.Errorf("offset not within any mappings file offset range")
+				return i.GetVMAddress(offset)
 			},
 		},
 	})

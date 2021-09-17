@@ -163,12 +163,12 @@ var xrefCmd = &cobra.Command{
 			}
 
 			for _, fn := range m.GetFunctions() {
-				soff, err := f.GetOffset(fn.StartAddr)
+				uuid, soff, err := f.GetOffset(fn.StartAddr)
 				if err != nil {
 					return err
 				}
 
-				data, err := f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+				data, err := f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
 				if err != nil {
 					return err
 				}

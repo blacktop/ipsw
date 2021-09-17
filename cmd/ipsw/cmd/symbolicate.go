@@ -203,7 +203,7 @@ var symbolicateCmd = &cobra.Command{
 				}
 
 				for _, patch := range image.PatchableExports {
-					addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+					addr, err := image.GetVMAddress(uint64(patch.OffsetOfImpl))
 					if err != nil {
 						return err
 					}

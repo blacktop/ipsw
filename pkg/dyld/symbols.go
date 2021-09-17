@@ -33,13 +33,22 @@ var ErrSymbolNotInImage = errors.New("dylib does NOT contain symbol")
 
 // ParseLocalSyms parses dyld's private symbols
 func (f *File) ParseLocalSyms() error {
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	if f.LocalSymbolsOffset == 0 {
+	var uuid types.UUID
+
+	if f.IsDyld4 {
+		uuid = f.symUUID
+	} else {
+		uuid = f.UUID
+	}
+
+	if f.Headers[uuid].LocalSymbolsOffset == 0 {
 		return fmt.Errorf("failed to parse local syms: %w", ErrNoLocals)
 	}
 
-	stringPool := io.NewSectionReader(f.r, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
+	stringPool := io.NewSectionReader(f.r[uuid], int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
 	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
 
 	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
@@ -68,12 +77,20 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 
 	if !image.Analysis.State.IsPrivatesDone() {
 
-		sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+		var uuid types.UUID
 
-		if f.LocalSymbolsOffset == 0 {
+		if f.IsDyld4 {
+			uuid = f.symUUID
+		} else {
+			uuid = f.UUID
+		}
+
+		if f.Headers[uuid].LocalSymbolsOffset == 0 {
 			image.Analysis.State.SetPrivates(true) // TODO: does this have any bad side-effects ?
 			return fmt.Errorf("failed to parse local syms for image %s: %w", image.Name, ErrNoLocals)
 		}
+
+		sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 		stringPool := io.NewSectionReader(sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
 		sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
@@ -114,13 +131,22 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 }
 
 func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	if f.LocalSymbolsOffset == 0 {
+	var uuid types.UUID
+
+	if f.IsDyld4 {
+		uuid = f.symUUID
+	} else {
+		uuid = f.UUID
+	}
+
+	if f.Headers[uuid].LocalSymbolsOffset == 0 {
 		return nil, fmt.Errorf("failed to parse local symbol %s: %w", symbol, ErrNoLocals)
 	}
 
-	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
+	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 	stringPool := make([]byte, f.LocalSymInfo.StringsSize)
 	sr.ReadAt(stringPool, int64(f.LocalSymInfo.StringsFileOffset))
 	nlistName := bytes.Index(stringPool, []byte(symbol))
@@ -146,15 +172,24 @@ func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
 }
 
 func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymbol64, error) {
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
 
-	if f.LocalSymbolsOffset == 0 {
+	var uuid types.UUID
+
+	if f.IsDyld4 {
+		uuid = f.symUUID
+	} else {
+		uuid = f.UUID
+	}
+
+	if f.Headers[uuid].LocalSymbolsOffset == 0 {
 		return nil, fmt.Errorf("failed to parse local symbol %s in image %s: %w", symbol, imageName, ErrNoLocals)
 	}
 
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
 	image := f.Image(imageName)
 
-	sr.Seek(int64(uint32(f.LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
 	stringPool := make([]byte, f.LocalSymInfo.StringsSize)
 	sr.ReadAt(stringPool, int64(f.LocalSymInfo.StringsFileOffset))
@@ -226,12 +261,12 @@ func (f *File) GetLocalSymbolInImage(imageName, symbolName string) *CacheLocalSy
 // GetCString returns a c-string at a given virtual address
 func (f *File) GetCString(strVMAdr uint64) (string, error) {
 
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
-	strOffset, err := f.GetOffset(strVMAdr)
+	uuid, strOffset, err := f.GetOffset(strVMAdr)
 	if err != nil {
 		return "", err
 	}
+
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	if _, err := sr.Seek(int64(strOffset), io.SeekStart); err != nil {
 		return "", fmt.Errorf("failed to Seek to offset 0x%x: %v", strOffset, err)
@@ -249,10 +284,10 @@ func (f *File) GetCString(strVMAdr uint64) (string, error) {
 	return "", fmt.Errorf("string not found at offset 0x%x", strOffset)
 }
 
-// GetCStringAtOffset returns a c-string at a given offset
-func (f *File) GetCStringAtOffset(offset uint64) (string, error) {
+// GetCStringAtOffsetForUUID returns a c-string at a given offset
+func (f *File) GetCStringAtOffsetForUUID(uuid types.UUID, offset uint64) (string, error) {
 
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	if _, err := sr.Seek(int64(offset), io.SeekStart); err != nil {
 		return "", fmt.Errorf("failed to Seek to offset 0x%x: %v", offset, err)
@@ -273,8 +308,6 @@ func (f *File) GetCStringAtOffset(offset uint64) (string, error) {
 func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 	var eTrieAddr, eTrieSize uint64
 
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
 	if i.CacheImageInfoExtra.ExportsTrieAddr > 0 {
 		eTrieAddr = i.CacheImageInfoExtra.ExportsTrieAddr
 		eTrieSize = uint64(i.CacheImageInfoExtra.ExportsTrieSize)
@@ -290,17 +323,19 @@ func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 			}
 			return syms, nil
 		} else if m.DyldInfo() != nil {
-			eTrieAddr, _ = f.GetVMAddress(uint64(m.DyldInfo().ExportOff))
+			eTrieAddr, _ = i.GetVMAddress(uint64(m.DyldInfo().ExportOff))
 			eTrieSize = uint64(m.DyldInfo().ExportSize)
 		} else {
 			return nil, fmt.Errorf("failed to get export trie data for image %s: %w", filepath.Base(i.Name), ErrNoExportTrieInMachO)
 		}
 	}
 
-	eTrieOffset, err := f.GetOffset(eTrieAddr)
+	eTrieOffset, err := i.GetOffset(eTrieAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get offset of export trie addr")
 	}
+
+	sr := io.NewSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1)
 
 	if _, err := sr.Seek(int64(eTrieOffset), io.SeekStart); err != nil {
 		return nil, fmt.Errorf("failed to seek to export trie offset in cache: %v", err)
