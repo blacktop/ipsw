@@ -143,35 +143,38 @@ func Open(name string) (*File, error) {
 			ff.parseCache(fsub, uuid)
 
 			ff.closers[uuid] = fsub
-			// if ffsc.SubCachesUUID != ff.SubCachesUUID {
-			// 	return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
-			// 		ff.SubCachesUUID,
-			// 		ffsc.SubCachesUUID)
-			// }
+
+			if ff.Headers[uuid].SubCachesUUID != ff.Headers[ff.UUID].SubCachesUUID {
+				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
+					ff.Headers[ff.UUID].SubCachesUUID,
+					ff.Headers[uuid].SubCachesUUID)
+			}
 		}
 
-		log.WithFields(log.Fields{
-			"cache": name + ".symbols",
-		}).Debug("Parsing SubCache")
-		fsym, err := os.Open(name + ".symbols")
-		if err != nil {
-			return nil, err
+		if !ff.Headers[ff.UUID].SymbolsSubCacheUUID.IsNull() {
+			log.WithFields(log.Fields{
+				"cache": name + ".symbols",
+			}).Debug("Parsing SubCache")
+			fsym, err := os.Open(name + ".symbols")
+			if err != nil {
+				return nil, err
+			}
+
+			uuid, err := getUUID(fsym)
+			if err != nil {
+				return nil, err
+			}
+
+			if uuid != ff.Headers[ff.UUID].SymbolsSubCacheUUID {
+				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid, ff.Headers[ff.UUID].SymbolsSubCacheUUID)
+			}
+
+			ff.symUUID = uuid // FIXME: what if there IS no .symbols like on M1 macOS
+
+			ff.parseCache(fsym, uuid)
+
+			ff.closers[uuid] = fsym
 		}
-
-		uuid, err := getUUID(fsym)
-		if err != nil {
-			return nil, err
-		}
-
-		if uuid != ff.Headers[ff.UUID].SymbolsSubCacheUUID {
-			return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid, ff.Headers[ff.UUID].SymbolsSubCacheUUID)
-		}
-
-		ff.symUUID = uuid
-
-		ff.parseCache(fsym, uuid)
-
-		ff.closers[uuid] = fsym
 	}
 
 	ff.closers[ff.UUID] = f

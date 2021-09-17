@@ -223,7 +223,7 @@ func (f *File) String(verbose bool) string {
 			"\nMappings\n"+
 			"========\n"+
 			"%s",
-		f.Headers[f.UUID].Magic.String(),
+		strings.Trim(f.Headers[f.UUID].Magic.String(), "\x00"),
 		f.UUID,
 		f.Headers[f.UUID].Platform,
 		f.getFormatVersion(f.UUID),
@@ -426,11 +426,25 @@ func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 			output += cacheMappings.String()
 		}
 	} else {
-		for uuid, cacheMappings := range f.MappingsWithSlideInfo {
-			if uuid != f.UUID {
-				output += fmt.Sprintf("\n> SubCache %s\n", uuid)
+		var max uint64
+		var sortedMaps []types.UUID
+		for uuid, cacheMappings := range f.MappingsWithSlideInfo { // TODO this is disgusting
+			if uuid == f.symUUID {
+				sortedMaps = append(sortedMaps, uuid)
+			} else if cacheMappings[0].Address > max {
+				sortedMaps = append(sortedMaps, uuid)
+				max = cacheMappings[0].Address
+			} else {
+				sortedMaps = append([]types.UUID{uuid}, sortedMaps...)
 			}
-			output += cacheMappings.String(slideVersion, verbose)
+		}
+		for i := 0; i < len(sortedMaps); i++ {
+			if sortedMaps[i] == f.symUUID {
+				output += fmt.Sprintf("\n> Symbol Cache %s\n", sortedMaps[i])
+			} else if sortedMaps[i] != f.UUID {
+				output += fmt.Sprintf("\n> SubCache %s\n", sortedMaps[i])
+			}
+			output += f.MappingsWithSlideInfo[sortedMaps[i]].String(slideVersion, verbose)
 		}
 	}
 	return output

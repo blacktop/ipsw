@@ -181,6 +181,19 @@ func (i *Info) String() string {
 	return iStr
 }
 
+// GetOsDmg returns the name of the OS dmg
+func (i *Info) GetOsDmg() string {
+	var dmgs []string
+	for _, bID := range i.Plists.BuildIdentities {
+		dmgs = append(dmgs, bID.Manifest["OS"].Info.Path)
+	}
+	dmgs = utils.Unique(dmgs)
+	if len(dmgs) > 1 {
+		panic("when getting the OS dmg name out of the ipsw BuildManifest.plist we found more than 1")
+	}
+	return dmgs[0]
+}
+
 // GetFolder returns a folder name for all the devices included in an IPSW
 func (i *Info) GetFolder() string {
 	var devs []string
