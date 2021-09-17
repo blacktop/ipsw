@@ -76,7 +76,7 @@ func (m maxSlide) String() string {
 type magic [16]byte
 
 func (m magic) String() string {
-	return string(m[:])
+	return strings.Trim(string(m[:]), "\x00")
 }
 
 type CacheHeader struct {

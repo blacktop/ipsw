@@ -223,7 +223,7 @@ func (f *File) String(verbose bool) string {
 			"\nMappings\n"+
 			"========\n"+
 			"%s",
-		strings.Trim(f.Headers[f.UUID].Magic.String(), "\x00"),
+		f.Headers[f.UUID].Magic.String(),
 		f.UUID,
 		f.Headers[f.UUID].Platform,
 		f.getFormatVersion(f.UUID),
@@ -444,9 +444,9 @@ func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 		}
 		for i := 0; i < len(sortedMaps); i++ {
 			if sortedMaps[i] == f.symUUID {
-				output += fmt.Sprintf("\n> Symbol Cache %s\n", sortedMaps[i])
+				output += fmt.Sprintf("\n> Symbol Cache %s\n\n", sortedMaps[i])
 			} else if sortedMaps[i] != f.UUID {
-				output += fmt.Sprintf("\n> SubCache %s\n", sortedMaps[i])
+				output += fmt.Sprintf("\n> SubCache %s\n\n", sortedMaps[i])
 			}
 			output += f.MappingsWithSlideInfo[sortedMaps[i]].String(slideVersion, verbose)
 		}
