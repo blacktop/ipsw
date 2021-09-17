@@ -429,14 +429,18 @@ func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 		var max uint64
 		var sortedMaps []types.UUID
 		for uuid, cacheMappings := range f.MappingsWithSlideInfo { // TODO this is disgusting
-			if uuid == f.symUUID {
-				sortedMaps = append(sortedMaps, uuid)
-			} else if cacheMappings[0].Address > max {
-				sortedMaps = append(sortedMaps, uuid)
-				max = cacheMappings[0].Address
-			} else {
-				sortedMaps = append([]types.UUID{uuid}, sortedMaps...)
+			if uuid != f.UUID && cacheMappings[0].Address > 0 {
+				if cacheMappings[0].Address > max {
+					sortedMaps = append(sortedMaps, uuid)
+					max = cacheMappings[0].Address
+				} else {
+					sortedMaps = append([]types.UUID{uuid}, sortedMaps...)
+				}
 			}
+		}
+		sortedMaps = append([]types.UUID{f.UUID}, sortedMaps...)
+		if !f.symUUID.IsNull() {
+			sortedMaps = append(sortedMaps, f.symUUID)
 		}
 		for i := 0; i < len(sortedMaps); i++ {
 			if sortedMaps[i] == f.symUUID {

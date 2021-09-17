@@ -111,6 +111,10 @@ func getUUID(r io.ReaderAt) (mtypes.UUID, error) {
 
 // Open opens the named file using os.Open and prepares it for use as a dyld binary.
 func Open(name string) (*File, error) {
+
+	log.WithFields(log.Fields{
+		"cache": name,
+	}).Debug("Parsing Cache")
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
@@ -308,7 +312,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	 * Read dyld slide info
 	 ***********************/
 	if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
-		f.ParseSlideInfo(CacheMappingAndSlideInfo{
+		f.ParseSlideInfo(uuid, CacheMappingAndSlideInfo{
 			Address:         f.Mappings[uuid][1].Address,
 			Size:            f.Mappings[uuid][1].Size,
 			FileOffset:      f.Mappings[uuid][1].FileOffset,
@@ -344,7 +348,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			}
 
 			if cm.SlideInfoSize > 0 {
-				f.ParseSlideInfo(cm.CacheMappingAndSlideInfo, false)
+				f.ParseSlideInfo(uuid, cm.CacheMappingAndSlideInfo, false)
 			}
 
 			f.MappingsWithSlideInfo[uuid] = append(f.MappingsWithSlideInfo[uuid], cm)
@@ -567,8 +571,8 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 }
 
 // ParseSlideInfo parses dyld slide info
-func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error {
-	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
+func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo, dump bool) error {
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	sr.Seek(int64(mapping.SlideInfoOffset), os.SEEK_SET)
 
@@ -585,7 +589,7 @@ func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error
 			return err
 		}
 
-		f.SlideInfo[f.UUID] = slideInfo
+		f.SlideInfo[uuid] = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)
@@ -618,7 +622,7 @@ func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error
 			return err
 		}
 
-		f.SlideInfo[f.UUID] = slideInfo
+		f.SlideInfo[uuid] = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)
@@ -699,7 +703,7 @@ func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error
 		if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
 			return err
 		}
-		f.SlideInfo[f.UUID] = slideInfo
+		f.SlideInfo[uuid] = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)
@@ -770,7 +774,7 @@ func (f *File) ParseSlideInfo(mapping CacheMappingAndSlideInfo, dump bool) error
 			return err
 		}
 
-		f.SlideInfo[f.UUID] = slideInfo
+		f.SlideInfo[uuid] = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)

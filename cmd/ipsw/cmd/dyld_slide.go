@@ -89,7 +89,7 @@ var slideCmd = &cobra.Command{
 
 		for uuid := range f.Mappings {
 			if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
-				f.ParseSlideInfo(dyld.CacheMappingAndSlideInfo{
+				f.ParseSlideInfo(uuid, dyld.CacheMappingAndSlideInfo{
 					Address:         f.Mappings[uuid][1].Address,
 					Size:            f.Mappings[uuid][1].Size,
 					FileOffset:      f.Mappings[uuid][1].FileOffset,
@@ -102,7 +102,7 @@ var slideCmd = &cobra.Command{
 						continue
 					}
 					if extMapping.SlideInfoSize > 0 {
-						f.ParseSlideInfo(extMapping.CacheMappingAndSlideInfo, true)
+						f.ParseSlideInfo(uuid, extMapping.CacheMappingAndSlideInfo, true)
 					}
 				}
 			}
