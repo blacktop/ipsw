@@ -26,11 +26,14 @@ func unmount(device string) error {
 // Extract extracts dyld_shared_cache from ipsw
 func Extract(ipsw, destPath string) error {
 
+	i, err := info.Parse(ipsw)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse ipsw info")
+	}
+
 	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		if strings.EqualFold(filepath.Ext(f.Name), ".dmg") {
-			if f.UncompressedSize64 > 1024*1024*1024 {
-				return true
-			}
+		if strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg()) {
+			return true
 		}
 		return false
 	})
@@ -40,11 +43,6 @@ func Extract(ipsw, destPath string) error {
 
 	if len(dmgs) == 1 {
 		defer os.Remove(dmgs[0])
-
-		i, err := info.Parse(ipsw)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse ipsw info")
-		}
 
 		folder := filepath.Join(destPath, i.GetFolder())
 

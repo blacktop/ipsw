@@ -1,6 +1,7 @@
 package dyld
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -363,11 +364,11 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 			var adrpAddr uint64
 			var prevInst arm64.Instruction
 
-			offset, err := f.GetOffset(sec.Addr)
+			uuid, offset, err := f.GetOffset(sec.Addr)
 			if err != nil {
 				return err
 			}
-			r := io.NewSectionReader(f.r, int64(offset), int64(sec.Size))
+			r := io.NewSectionReader(f.r[uuid], int64(offset), int64(sec.Size))
 
 			for i := range arm64.Disassemble(r, arm64.Options{StartAddress: int64(sec.Addr)}) {
 				if i.Instruction.Operation() == arm64.ARM64_ADD && prevInst.Operation() == arm64.ARM64_ADRP {
@@ -390,7 +391,7 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 						if err != nil {
 							return fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
 						}
-						image.Analysis.SymbolStubs[adrpAddr] = f.SlideInfo.SlidePointer(addr)
+						image.Analysis.SymbolStubs[adrpAddr] = f.SlideInfo[uuid].SlidePointer(addr)
 					}
 				} else if i.Instruction.Operation() == arm64.ARM64_BR && prevInst.Operation() == arm64.ARM64_ADD {
 					// add       	x16, x16, #0x828
@@ -424,7 +425,11 @@ func (f *File) ParseGOT(image *CacheImage) error {
 	image.Analysis.GotPointers = make(map[uint64]uint64)
 
 	if authPtr := m.Section("__AUTH_CONST", "__auth_ptr"); authPtr != nil {
-		r := io.NewSectionReader(f.r, int64(authPtr.Offset), int64(authPtr.Size))
+		dat, err := authPtr.Data()
+		if err != nil {
+			return fmt.Errorf("failed to get %s.%s section data: %v", authPtr.Seg, authPtr.Name, err)
+		}
+		r := bytes.NewReader(dat)
 
 		ptrs := make([]uint64, authPtr.Size/8)
 		if err := binary.Read(r, binary.LittleEndian, &ptrs); err != nil {
@@ -432,13 +437,17 @@ func (f *File) ParseGOT(image *CacheImage) error {
 		}
 
 		for idx, ptr := range ptrs {
-			image.Analysis.GotPointers[authPtr.Addr+uint64(idx*8)] = f.SlideInfo.SlidePointer(ptr)
+			image.Analysis.GotPointers[authPtr.Addr+uint64(idx*8)] = f.SlideInfo[f.UUID].SlidePointer(ptr) // TODO: should this be subcache specific
 		}
 	}
 
 	for _, sec := range m.Sections {
 		if sec.Flags.IsNonLazySymbolPointers() {
-			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+			dat, err := sec.Data()
+			if err != nil {
+				return fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+			}
+			r := bytes.NewReader(dat)
 
 			ptrs := make([]uint64, sec.Size/8)
 			if err := binary.Read(r, binary.LittleEndian, &ptrs); err != nil {
@@ -446,7 +455,7 @@ func (f *File) ParseGOT(image *CacheImage) error {
 			}
 
 			for idx, ptr := range ptrs {
-				image.Analysis.GotPointers[sec.Addr+uint64(idx*8)] = f.SlideInfo.SlidePointer(ptr)
+				image.Analysis.GotPointers[sec.Addr+uint64(idx*8)] = f.SlideInfo[f.UUID].SlidePointer(ptr) // TODO: should this be subcache specific
 			}
 		}
 	}

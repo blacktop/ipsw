@@ -91,7 +91,7 @@ var o2aCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		address, err := f.GetVMAddress(offset)
+		address, err := f.GetVMAddressForUUID(f.UUID, offset)
 		if err != nil {
 			log.Error(err.Error())
 		} else {

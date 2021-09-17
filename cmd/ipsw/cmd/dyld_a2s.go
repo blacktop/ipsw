@@ -149,20 +149,14 @@ var a2sCmd = &cobra.Command{
 		// 	a2sFile.Close()
 		// }
 
-		foundMapping := false
-		for _, mapping := range f.MappingsWithSlideInfo {
-			if mapping.Address <= unslidAddr && unslidAddr < mapping.Address+mapping.Size {
-				foundMapping = true
-				if showMapping {
-					fmt.Printf("\nMAPPING\n")
-					fmt.Printf("=======\n\n")
-					fmt.Println(mapping.String())
-				}
-				break
+		if showMapping {
+			mapping, err := f.GetMappingForVMAddress(unslidAddr)
+			if err != nil {
+				return err
 			}
-		}
-		if !foundMapping {
-			return fmt.Errorf("no mapping contains address %#x", unslidAddr)
+			fmt.Printf("\nMAPPING\n")
+			fmt.Printf("=======\n\n")
+			fmt.Println(mapping.String())
 		}
 
 		image, err := f.GetImageContainingVMAddr(unslidAddr)
