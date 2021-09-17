@@ -130,6 +130,8 @@ var dyldInfoCmd = &cobra.Command{
 				}
 			}
 
+			dinfo.CodeSignature = make(map[string]types.CodeSignature)
+
 			if showSignature {
 				for u, cs := range f.CodeSignatures {
 					dinfo.CodeSignature[u.String()] = *cs
@@ -146,7 +148,7 @@ var dyldInfoCmd = &cobra.Command{
 					dinfo.Dylibs = append(dinfo.Dylibs, dylib{
 						Index:       idx + 1,
 						Name:        img.Name,
-						Version:     m.DylibID().CurrentVersion,
+						Version:     m.SourceVersion().Version,
 						UUID:        m.UUID().String(),
 						LoadAddress: img.Info.Address,
 					})
@@ -273,11 +275,11 @@ var dyldInfoCmd = &cobra.Command{
 						if err != nil {
 							return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
 						}
-						fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
+						fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].SourceVersion().Version, img.Name)
 						fat.Close()
 						continue
 					}
-					fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
+					fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, m.SourceVersion().Version, img.Name)
 					m.Close()
 				} else {
 					m, err := img.GetPartialMacho()
@@ -285,7 +287,7 @@ var dyldInfoCmd = &cobra.Command{
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
 					if Verbose {
-						fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), m.DylibID().CurrentVersion, img.Name)
+						fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), m.SourceVersion().Version, img.Name)
 					} else {
 						fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, m.DylibID().CurrentVersion, img.Name)
 					}
