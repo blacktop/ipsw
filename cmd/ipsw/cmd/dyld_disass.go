@@ -165,22 +165,22 @@ var dyldDisassCmd = &cobra.Command{
 		 * Read in data to disassemble
 		 */
 		if instructions > 0 {
-			off, err := f.GetOffset(symAddr)
+			uuid, off, err := f.GetOffset(symAddr)
 			if err != nil {
 				return err
 			}
-			data, err = f.ReadBytes(int64(off), instructions*4)
+			data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
 			if err != nil {
 				return err
 			}
 		} else {
 			if fn, err := m.GetFunctionForVMAddr(symAddr); err == nil {
 				dFunc = &fn
-				soff, err := f.GetOffset(fn.StartAddr)
+				uuid, soff, err := f.GetOffset(fn.StartAddr)
 				if err != nil {
 					return err
 				}
-				data, err = f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+				data, err = f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
 				if err != nil {
 					return err
 				}

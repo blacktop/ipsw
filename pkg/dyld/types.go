@@ -73,8 +73,14 @@ func (m maxSlide) String() string {
 	return fmt.Sprintf("0x%08X (ASLR entropy: %d-bits)", uint64(m), m.EntropyBits())
 }
 
+type magic [16]byte
+
+func (m magic) String() string {
+	return strings.Trim(string(m[:]), "\x00")
+}
+
 type CacheHeader struct {
-	Magic                     [16]byte       // e.g. "dyld_v0    i386"
+	Magic                     magic          // e.g. "dyld_v0    i386"
 	MappingOffset             uint32         // file offset to first dyld_cache_mapping_info
 	MappingCount              uint32         // number of dyld_cache_mapping_info entries
 	ImagesOffset              uint32         // file offset to first dyld_cache_image_info

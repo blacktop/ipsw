@@ -9,10 +9,10 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Set up Go 1.16
+      - name: Set up Go 1.17.1
         uses: actions/setup-go@v1
         with:
-          go-version: 1.16
+          go-version: 1.17.1
         id: go
 
       - name: Check out code into the Go module directory
@@ -188,6 +188,7 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig -V
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig --json
 
       - name: Run dyld symaddr (img)
         if: matrix.platform == 'macos-latest'

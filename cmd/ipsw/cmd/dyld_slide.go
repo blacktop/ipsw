@@ -87,21 +87,23 @@ var slideCmd = &cobra.Command{
 			return err
 		}
 
-		if f.SlideInfoOffsetUnused > 0 {
-			f.ParseSlideInfo(dyld.CacheMappingAndSlideInfo{
-				Address:         f.Mappings[1].Address,
-				Size:            f.Mappings[1].Size,
-				FileOffset:      f.Mappings[1].FileOffset,
-				SlideInfoOffset: f.SlideInfoOffsetUnused,
-				SlideInfoSize:   f.SlideInfoSizeUnused,
-			}, false)
-		} else {
-			for _, extMapping := range f.MappingsWithSlideInfo {
-				if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
-					continue
-				}
-				if extMapping.SlideInfoSize > 0 {
-					f.ParseSlideInfo(extMapping.CacheMappingAndSlideInfo, true)
+		for uuid := range f.Mappings {
+			if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
+				f.ParseSlideInfo(uuid, dyld.CacheMappingAndSlideInfo{
+					Address:         f.Mappings[uuid][1].Address,
+					Size:            f.Mappings[uuid][1].Size,
+					FileOffset:      f.Mappings[uuid][1].FileOffset,
+					SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
+					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
+				}, false)
+			} else {
+				for _, extMapping := range f.MappingsWithSlideInfo[uuid] {
+					if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
+						continue
+					}
+					if extMapping.SlideInfoSize > 0 {
+						f.ParseSlideInfo(uuid, extMapping.CacheMappingAndSlideInfo, true)
+					}
 				}
 			}
 		}
