@@ -58,7 +58,7 @@ $ unzip -l iPhone11,8,iPhone12,1_14.0_18A5319i_Restore.zip | grep dmg
 
 The **BIG** one _(4.7G)_ is the _file system_ (aka the one that has the _dyld_shared_cache_).
 
-The other two are the `arm64eCustomerRamDisk` and the `arm64eUpdateRamDisk`, however, you cannot mount them as they are actually **Img4** files. 😕
+The other two are the `arm64eCustomerRamDisk` and the `arm64eUpdateRamDisk`, however, you cannot mount them as they are actually **im4p** files. 😕
 
 You can now extract the Img4 payloads with the following command:
 
