@@ -578,6 +578,8 @@ Objective-C
 
 ### **macho --fixups**
 
+Print fixup chains
+
 ```bash
 ❯ ipsw macho /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
 
