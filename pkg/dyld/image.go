@@ -137,6 +137,11 @@ func (i *CacheImage) ReadAt(buf []byte, off int64) (n int, err error) {
 
 // GetOffset returns the offset for a given virtual address
 func (i *CacheImage) GetOffset(address uint64) (uint64, error) {
+	// u, o, e := i.cache.GetOffset(address)
+	// if e != nil {
+	// 	return 0, e
+	// }
+	// fmt.Printf("prim_uuid=%s, cache_uuid=%s, uuid=%s, off=%#x\n", i.cache.UUID, i.cuuid, u, o)
 	return i.cache.GetOffsetForUUID(i.cuuid, address)
 }
 
@@ -151,6 +156,17 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var rsBase uint64
+	sec, opt, err := i.cache.getOptimizations()
+	if err != nil {
+		return nil, err
+	}
+
+	if opt.Version == 16 {
+		rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
+	}
+
 	return macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		Offset:             int64(offset),
 		SectionReader:      io.NewSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
@@ -166,6 +182,7 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 				return i.GetVMAddress(offset)
 			},
 		},
+		RelativeSelectorBase: rsBase,
 	})
 }
 

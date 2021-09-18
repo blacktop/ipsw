@@ -39,14 +39,17 @@ type objcInfo struct {
 
 // Optimization structure
 type Optimization struct {
-	Version                 uint32
-	Flags                   optFlags
-	SelectorOptOffset       int32
-	HeaderOptRoOffset       int32
-	ClassOptOffset          int32
-	UnusedProtocolOptOffset int32
-	HeaderOptRwOffset       int32
-	ProtocolOptOffset       int32
+	Version                                      uint32
+	Flags                                        optFlags
+	SelectorOptOffset                            int32
+	HeaderOptRoOffset                            int32
+	UnusedClassOptOffset                         int32
+	UnusedProtocolOptOffset                      int32
+	HeaderoptRwOffset                            int32
+	UnusedProtocolOpt2Offset                     int32
+	LargeSharedCachesClassOffset                 int32
+	LargeSharedCachesProtocolOffset              int32
+	RelativeMethodSelectorBaseAddressCacheOffset uint64
 }
 
 func (o Optimization) isPointerAligned() bool {
@@ -55,23 +58,29 @@ func (o Optimization) isPointerAligned() bool {
 
 func (o Optimization) String() string {
 	return fmt.Sprintf(
-		"Version                 = %d\n"+
-			"Flags                   = %d\n"+
-			"SelectorOptOffset       = %016X\n"+
-			"HeaderOptRoOffset       = %016X\n"+
-			"ClassOptOffset          = %016X\n"+
-			"UnusedProtocolOptOffset = %016X\n"+
-			"HeaderOptRwOffset       = %016X\n"+
-			"ProtocolOptOffset       = %016X\n"+
-			"isPointerAligned        = %t\n",
+		"Version                                      = %d\n"+
+			"Flags                                        = %d\n"+
+			"SelectorOptOffset                            = %#x\n"+
+			"HeaderOptRoOffset                            = %#x\n"+
+			"ClassOptOffset                               = %#x\n"+
+			"ProtocolOptOffset                            = %#x\n"+
+			"HeaderOptRwOffset                            = %#x\n"+
+			"ProtocolOpt2Offset                           = %#x\n"+
+			"LargeSharedCachesClassOffset                 = %#x\n"+
+			"LargeSharedCachesProtocolOffset              = %#x\n"+
+			"RelativeMethodSelectorBaseAddressCacheOffset = %#x\n"+
+			"isPointerAligned                             = %t\n",
 		o.Version,
 		o.Flags,
 		o.SelectorOptOffset,
 		o.HeaderOptRoOffset,
-		o.ClassOptOffset,
+		o.UnusedClassOptOffset,
 		o.UnusedProtocolOptOffset,
-		o.HeaderOptRwOffset,
-		o.ProtocolOptOffset,
+		o.HeaderoptRwOffset,
+		o.UnusedProtocolOpt2Offset,
+		o.LargeSharedCachesClassOffset,
+		o.LargeSharedCachesProtocolOffset,
+		o.RelativeMethodSelectorBaseAddressCacheOffset,
 		o.isPointerAligned())
 }
 
@@ -102,10 +111,10 @@ func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
 		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &opt); err != nil {
 			return nil, nil, err
 		}
-		if opt.Version != 15 {
-			return nil, nil, fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
+		if opt.Version > 16 {
+			return nil, nil, fmt.Errorf("objc optimization version should be 16 or less, but found %d", opt.Version)
 		}
-
+		log.Debugf("Objective-C Optimizations:\n%s", opt)
 		return s, &opt, nil
 	}
 
@@ -159,11 +168,11 @@ func (f *File) getClassStringHash() (*StringHash, error) {
 		return nil, err
 	}
 
-	if opt.ClassOptOffset == 0 {
+	if opt.UnusedClassOptOffset == 0 {
 		return nil, fmt.Errorf("clsopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.ClassOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedClassOptOffset)}
 
 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
@@ -199,11 +208,11 @@ func (f *File) getProtocol2StringHash() (*StringHash, error) {
 		return nil, err
 	}
 
-	if opt.ProtocolOptOffset == 0 {
+	if opt.UnusedProtocolOptOffset == 0 {
 		return nil, fmt.Errorf("protocolopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.ProtocolOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedProtocolOptOffset)}
 
 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
