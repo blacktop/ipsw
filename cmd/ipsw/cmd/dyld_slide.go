@@ -42,7 +42,7 @@ func init() {
 // slideCmd represents the slide command
 var slideCmd = &cobra.Command{
 	Use:   "slide [options] <dyld_shared_cache>",
-	Short: "Get slide info chained pointers",
+	Short: "Dump slide info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
