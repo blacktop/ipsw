@@ -222,7 +222,8 @@
 </li>
 <li><a href="#dyld-split"><strong>dyld split</strong></a></li>
 <li><a href="#dyld-webkit"><strong>dyld webkit</strong></a></li>
-<li><a href="#dyld-patches-"><strong>dyld patches</strong></a></li>
+<li><a href="#dyld-patches"><strong>dyld patches</strong></a></li>
+<li><a href="#dyld-slide"><strong>dyld slide</strong></a></li>
 <li><a href="#dyld-a2o"><strong>dyld a2o</strong></a></li>
 <li><a href="#dyld-o2a"><strong>dyld o2a</strong></a></li>
 <li><a href="#dyld-disass"><strong>dyld disass</strong></a></li>
@@ -498,6 +499,29 @@ offset: 0x57b3db98, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
 offset: 0x57b79850, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
 offset: 0x57b88138, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
 offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
+</code></pre></div><h3 id="dyld-slide"><strong>dyld slide</strong></h3>
+<p>Dump <em>dyld_shared_cache</em> slide info</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld slide dyld_shared_cache_arm64e
+
+slide info <span class="nv">version</span> <span class="o">=</span> <span class="m">3</span>
+<span class="nv">page_size</span>          <span class="o">=</span> <span class="m">4096</span>
+<span class="nv">page_starts_count</span>  <span class="o">=</span> <span class="m">11956</span>
+<span class="nv">auth_value_add</span>     <span class="o">=</span> 0x0000000180000000
+page<span class="o">[</span>    0<span class="o">]</span>: <span class="nv">start</span><span class="o">=</span>0x0000
+    <span class="o">[</span>    <span class="m">0</span> + 0x0000<span class="o">]</span> <span class="o">(</span>0x1d1e48000 @ offset <span class="nv">0x4fe48000</span> <span class="o">=</span>&gt; 0x1d70dabb8<span class="o">)</span> value: 0x1d70dabb8, next: 01, sym: __DefaultRuneLocale
+    <span class="o">[</span>    <span class="m">0</span> + 0x0008<span class="o">]</span> <span class="o">(</span>0x1d1e48008 @ offset <span class="nv">0x4fe48008</span> <span class="o">=</span>&gt; 0x2028f50e0<span class="o">)</span> value: 0x2028f50e0, next: 01, sym: _OBJC_CLASS_<span class="nv">$___NSStackBlock__</span>
+    <span class="o">[</span>    <span class="m">0</span> + 0x0018<span class="o">]</span> <span class="o">(</span>0x1d1e48010 @ offset <span class="nv">0x4fe48010</span> <span class="o">=</span>&gt; 0x1d9a3dc60<span class="o">)</span> value: 0x1d9a3dc60, next: 01, sym: ___stack_chk_guard
+    <span class="o">[</span>    <span class="m">0</span> + 0x0030<span class="o">]</span> <span class="o">(</span>0x1d1e48018 @ offset <span class="nv">0x4fe48018</span> <span class="o">=</span>&gt; 0x1d70da940<span class="o">)</span> value: 0x1d70da940, next: 01, sym: ___stderrp
+    <span class="o">[</span>    <span class="m">0</span> + 0x0050<span class="o">]</span> <span class="o">(</span>0x1d1e48020 @ offset <span class="nv">0x4fe48020</span> <span class="o">=</span>&gt; 0x1db4ecc20<span class="o">)</span> value: 0x1db4ecc20, next: 01, sym: __dispatch_source_type_mach_recv
+    <span class="o">[</span>    <span class="m">0</span> + 0x0078<span class="o">]</span> <span class="o">(</span>0x1d1e48028 @ offset <span class="nv">0x4fe48028</span> <span class="o">=</span>&gt; 0x191eb91dc<span class="o">)</span> value: 0x191eb91dc, next: 01, sym: _free
+    <span class="o">[</span>    <span class="m">0</span> + 0x00A8<span class="o">]</span> <span class="o">(</span>0x1d1e48030 @ offset <span class="nv">0x4fe48030</span> <span class="o">=</span>&gt; 0x1d9a3c02c<span class="o">)</span> value: 0x1d9a3c02c, next: 01, sym: _mach_task_self_
+    <span class="o">[</span>    <span class="m">0</span> + 0x00E0<span class="o">]</span> <span class="o">(</span>0x1d1e48038 @ offset <span class="nv">0x4fe48038</span> <span class="o">=</span>&gt; 0x1d9a3c048<span class="o">)</span> value: 0x1d9a3c048, next: 01, sym: _vm_page_size
+    <span class="o">[</span>    <span class="m">0</span> + 0x0120<span class="o">]</span> <span class="o">(</span>0x1d1e48040 @ offset <span class="nv">0x4fe48040</span> <span class="o">=</span>&gt; 0x1800a087c<span class="o">)</span> value: 0x1800a087c, next: 01, sym: ?
+    <span class="o">[</span>    <span class="m">0</span> + 0x0168<span class="o">]</span> <span class="o">(</span>0x1d1e48048 @ offset <span class="nv">0x4fe48048</span> <span class="o">=</span>&gt; 0x1800a0855<span class="o">)</span> value: 0x1800a0855, next: 03, sym: ?
+    <span class="o">[</span>    <span class="m">0</span> + 0x01C8<span class="o">]</span> <span class="o">(</span>0x1d1e48060 @ offset <span class="nv">0x4fe48060</span> <span class="o">=</span>&gt; 0x1800a0958<span class="o">)</span> value: 0x1800a0958, next: 04, sym: ?
+    <span class="o">[</span>    <span class="m">0</span> + 0x0248<span class="o">]</span> <span class="o">(</span>0x1d1e48080 @ offset <span class="nv">0x4fe48080</span> <span class="o">=</span>&gt; 0x1800a0958<span class="o">)</span> value: 0x1800a0958, next: 04, sym: ?
+    <span class="o">[</span>    <span class="m">0</span> + 0x02E8<span class="o">]</span> <span class="o">(</span>0x1d1e480a0 @ offset <span class="nv">0x4fe480a0</span> <span class="o">=</span>&gt; 0x1800a0958<span class="o">)</span> value: 0x1800a0958, next: 04, sym: ?
+&lt;SNIP&gt;
 </code></pre></div><h3 id="dyld-a2o"><strong>dyld a2o</strong></h3>
 <p>Convert <em>dyld_shared_cache</em> address to offset</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld a2o dyld_shared_cache 1D7B18000
