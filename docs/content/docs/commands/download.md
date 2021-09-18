@@ -70,13 +70,13 @@ Use "ipsw download [command] --help" for more information about a command.
 - Download an ipsw and extract/decompress the kernelcache
 
 ```bash
-$ ipsw download --device iPhone11,2 --build 16A366
+❯ ipsw download --device iPhone11,2 --build 16A366
 
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
       • verifying sha1sum...
 
-$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 
    • Extracting Kernelcache from IPSW
       • Parsing Compressed Kernelcache
@@ -87,7 +87,7 @@ $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 ⚠️ notice that the kernelcache was extracted from the ipsw and decompressed 😈
 
 ```bash
-$ file kernelcache.release.iphone11.decompressed
+❯ file kernelcache.release.iphone11.decompressed
 
 kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 ```
@@ -95,7 +95,7 @@ kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
 - Download all the iOS 12.0 ipsws
 
 ```bash
-$ ipsw download --version 12.0
+❯ ipsw download --version 12.0
 
 ? You are about to download 17 ipsw files. Continue? Yes
    • Getting IPSW              build=16A366 device=iPhone11,4 signed=true version=12.0
@@ -111,13 +111,13 @@ $ ipsw download --version 12.0
 This will download and decompress the kernelcache for an **iPhone XS** running **iOS 12.1** behind a corporate proxy
 
 ```bash
-$ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
+❯ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
 ```
 
 - To disable cert verification
 
 ```bash
-$ ipsw download --insecure --device iPhone11,2 --build 16B92
+❯ ipsw download --insecure --device iPhone11,2 --build 16B92
 ```
 
 ## **download latest**
@@ -127,7 +127,7 @@ $ ipsw download --insecure --device iPhone11,2 --build 16B92
 - Download all the latest ipsws
 
 ```bash
-$ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
+❯ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPhone6,2 version=12.4.1
@@ -138,7 +138,7 @@ $ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
 This will also generate a `checksums.txt.sha1` file that you can use to verify the downloads
 
 ```bash
-$ sha1sum -c checksums.txt.sha1
+❯ sha1sum -c checksums.txt.sha1
 
 iPad_64bit_TouchID_13.2.3_17B111_Restore.ipsw: OK
 iPadPro_9.7_13.2.3_17B111_Restore.ipsw: OK
@@ -150,7 +150,7 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 - To grab _only_ the iPods
 
 ```bash
-$ ipsw download -V latest --yes --white-list ipod
+❯ ipsw download -V latest --yes --white-list ipod
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPod9,1 version=12.4.1
@@ -161,7 +161,7 @@ $ ipsw download -V latest --yes --white-list ipod
 - To just output the latest iOS version
 
 ```bash
-$ ipsw download latest --info
+❯ ipsw download latest --info
 
 13.6.1
 ```
@@ -181,7 +181,7 @@ ipsw download kernel --device iPhone11,2 --build 16B92
 - All of dem!!!
 
 ```bash
-$ time ipsw download kernel --version 12.0.1
+❯ time ipsw download kernel --version 12.0.1
 
 "8.40s user 1.19s system 53% cpu 17.784 total"
 ```
@@ -189,7 +189,7 @@ $ time ipsw download kernel --version 12.0.1
 That's **14** decompressed kernelcaches in under **9 seconds** 😏
 
 ```bash
-$ ls -1
+❯ ls -1
 
 kernelcache.release.ipad4b.decompressed
 kernelcache.release.ipad5b.decompressed
@@ -214,11 +214,11 @@ kernelcache.release.n102.decompressed
 Only download files that match a given name/path
 
 ```bash
-$ ipsw download -v 13.4 -d iPhone12,3 pattern iBoot
+❯ ipsw download -v 13.4 -d iPhone12,3 pattern iBoot
 ```
 
 ```bash
-$ ls iBoot*
+❯ ls iBoot*
 iBoot.d321.RELEASE.im4p        iBoot.d331p.RELEASE.im4p.plist
 iBoot.d321.RELEASE.im4p.plist  iBoot.d421.RELEASE.im4p
 iBoot.d331.RELEASE.im4p        iBoot.d421.RELEASE.im4p.plist
@@ -233,23 +233,23 @@ iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
 Download BETA ipsws
 
 ```bash
-$ ipsw download beta 17C5046a
+❯ ipsw download beta 17C5046a
 ```
 
 ## **download ota**
 
-Download **iOS14.x developer beta** OTA _(over the air updates)_
+Download **iOS15.x developer beta** OTA _(over the air updates)_
 
 ```bash
-$ ipsw download ota --device iPhone12,3
+❯ ipsw download ota --device iPhone12,3
 ```
 
 Just download the _kernelcache_ and _dyld_shared_cache_
 
 ```bash
-$ ipsw download ota --device iPod9,1 --kernel --dyld
-? You are about to download 1 ipsw files. Continue? Yes
-   • Parsing remote OTA        build=17F5054h device=iPod9,1 version=iOS135DevBeta3
+❯ ipsw download ota --device iPod9,1 --kernel --dyld
+? You are about to download 1 OTA files. Continue? Yes
+   • Parsing remote OTA        build=19A344 device=iPod9,1 version=iOS15Long
    • Extracting remote dyld_shared_cache (can be a bit CPU intensive)
       • Extracting -rwxr-xr-x uid=0, gid=80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64 to "iPod9,1_N112AP_17F5054h/dyld_shared_cache_arm64"
    • Extracting remote kernelcache
@@ -264,7 +264,7 @@ $ ipsw download ota --device iPod9,1 --kernel --dyld
 Download and parse macOS IPSWs
 
 ```bash
-$ ipsw download macos --kernel
+❯ ipsw download macos --kernel
    • Latest release found is: 11.2.3
 ? You are about to download 1 ipsw files. Continue? Yes
    • Getting Kernelcache       build=20D91 device=Macmini9,1 version=11.2.3
@@ -307,7 +307,7 @@ ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
    <SNIP>
 ```
 
-> **NOTE:** This will check every 5 minutes for new files and download them.
+> **NOTE:** This will check every 5 minutes for new files and download them. (I've seem apple expire the session and am not sure how to prevent it yet.)
 
 ## **download oss**
 

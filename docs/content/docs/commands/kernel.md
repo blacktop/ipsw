@@ -19,7 +19,7 @@ summary: Parse kernelcache.
 Extract and decompress a kernelcache from IPSW
 
 ```bash
-$ ipsw kernel extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
+❯ ipsw kernel extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
    • Extracting kernelcaches
    • Extracting Kernelcache from IPSW
       • Parsing Kernelcache IMG4
@@ -33,7 +33,7 @@ $ ipsw kernel extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
 Decompress a previously extracted **kernelcache**
 
 ```bash
-$ ipsw kernel dec kernelcache.release.iphone11
+❯ ipsw kernel dec kernelcache.release.iphone11
 ```
 
 ### **kernel kexts**
@@ -41,7 +41,7 @@ $ ipsw kernel dec kernelcache.release.iphone11
 List all the kernelcache's KEXTs
 
 ```bash
-$ ipsw kernel kexts kernelcache.release.iphone12.decompressed
+❯ ipsw kernel kexts kernelcache.release.iphone12.decompressed
 
 FOUND: 230
 com.apple.kpi.mach (19.2.0)
@@ -64,15 +64,15 @@ com.apple.driver.AppleIPAppender (1.0)
 List kernel sandbox operations
 
 ```bash
-$ ipsw kernel sbopts 18A8395/kernelcache > sbopts_14_1.txt # iOS 14.1
+❯ ipsw kernel sbopts 18A8395/kernelcache > sbopts_14_1.txt # iOS 14.1
 ```
 
 ```bash
-$ ipsw kernel sbopts 18E5178a/kernelcache > sbopts_14_5beta4.txt # iOS 14.5beta4
+❯ ipsw kernel sbopts 18E5178a/kernelcache > sbopts_14_5beta4.txt # iOS 14.5beta4
 ```
 
 ```bash
-$ git diff --no-index sbopts_14_1.txt sbopts_14_5beta4.txt
+❯ git diff --no-index sbopts_14_1.txt sbopts_14_5beta4.txt
 ```
 
 ```diff
@@ -137,7 +137,7 @@ I am playing with the idea of `diffing` kernelcaches by creating directory struc
 Then you could use `git diff` or something to get a quick **high** level view of what Apple has changed by seeing new files being added or removed as well as seeing the line numbers of the assert strings move around.
 
 ```bash
-$ ipsw kernel diff kernelcache.release.iphone11
+❯ ipsw kernel diff kernelcache.release.iphone11
 ```
 
 You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/pkg/kernelcache/diff/Library/Caches/com.apple.xbs/Sources)

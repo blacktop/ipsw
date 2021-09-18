@@ -9,7 +9,7 @@ summary: Combine extract commands together.
 ### Extract _kernelcache_ from a previously downloaded _ipsw_
 
 ```bash
-$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 ```
 
 ### Extract _dyld_shared_cache_ from a previously downloaded _ipsw_
@@ -17,7 +17,7 @@ $ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 - `macOS`
 
 ```bash
-$ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
+❯ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
    • Extracting dyld_shared_cache from IPSW
    • Mounting DMG
    • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
@@ -27,7 +27,7 @@ $ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
 - `docker`
 
 ```bash
-$ docker run --init -it --rm \
+❯ docker run --init -it --rm \
              --device /dev/fuse \
              --cap-add=SYS_ADMIN \
              -v `pwd` :/data \

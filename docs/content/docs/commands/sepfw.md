@@ -9,7 +9,7 @@ summary: Dump sep-firmware MachOs.
 ### Dump sep-firmware MachOs
 
 ```bash
-$ ipsw sepfw sep-firmware.d53p.RELEASE.im4p.dec
+❯ ipsw sepfw sep-firmware.d53p.RELEASE.im4p.dec
 
    • DUMPING: kernel, SEPOS and 14 Apps
       • Dumping kernel            offset=0x4000 uuid=CECFDD94-2E4F-3118-9EC3-C3933F0DE2CA

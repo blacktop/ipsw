@@ -9,7 +9,7 @@ summary: Display info about IPSW(s).
 ### Display info about IPSWs
 
 ```bash
-$ ipsw info iPhone11,2,iPhone11,4,iPhone11,6,iPhone12,3,iPhone12,5_15.0_19A5318f_Restore.ipsw
+❯ ipsw info iPhone11,2,iPhone11,4,iPhone11,6,iPhone12,3,iPhone12,5_15.0_19A5318f_Restore.ipsw
 
 [IPSW Info]
 ===========
@@ -76,5 +76,5 @@ iPhone XS Max
 ### Or remotely
 
 ```bash
-$ ipsw info --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
+❯ ipsw info --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
 ```

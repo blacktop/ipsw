@@ -9,7 +9,7 @@ summary: Search IPSW filesystem DMG for MachOs with a given entitlement.
 Search IPSW filesystem DMG for MachOs with a given **entitlement** `<true/>`
 
 ```bash
-$ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --ent platform-application
+❯ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --ent platform-application
    • Found ipsw entitlement database file...
    • Files containing entitlement: platform-application
 
@@ -24,7 +24,7 @@ platform-application /usr/libexec/swcd
 Search IPSW filesystem DMG for MachOs with a given **file name** and dump it's entitlements
 
 ```bash
-$ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --file WebContent
+❯ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --file WebContent
    • Found ipsw entitlement database file...
    • /Applications/WebContentAnalysisUI.app/WebContentAnalysisUI
 

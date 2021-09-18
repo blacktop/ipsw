@@ -10,7 +10,7 @@ summary: Dump CTF info.
 KDK kernelcaches contain CTF - _Compact ANSI-C Type Format_ data which is used by dtrace. It's a data format much like DWARF and contains and absolute treasure trove for peeps REing the kernels (types, globals and func signatures).
 
 ```bash
-$ ipsw ctfdump KDK
+❯ ipsw ctfdump KDK
 ```
 
 ```bash
@@ -94,7 +94,7 @@ Str Len      = 0x763dc
 ### Dump as JSON
 
 ```bash
-$ ipsw ctfdump KDK --json
+❯ ipsw ctfdump KDK --json
    • Creating ctfdump.json
 ```
 
@@ -141,11 +141,11 @@ $ ipsw ctfdump KDK --json
 ### Dump a single `type`
 
 ```bash
-$ ipsw ctfdump KDK/macOS12beta/kernel.development.t8101 task > task.h
+❯ ipsw ctfdump KDK/macOS12beta/kernel.development.t8101 task > task.h
 ```
 
 ```bash
-$ cat task.h
+❯ cat task.h
 ```
 
 ```cpp
