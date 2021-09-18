@@ -208,6 +208,7 @@
 <h1 class="title">dyld</h1>
 <div class="content ">
   <ul>
+<li><a href="#dyld---help"><strong>dyld &ndash;help</strong></a></li>
 <li><a href="#dyld-info"><strong>dyld info</strong></a></li>
 <li><a href="#dyld-extract"><strong>dyld extract</strong></a></li>
 <li><a href="#dyld-macho"><strong>dyld macho</strong></a></li>
@@ -232,7 +233,43 @@
 <li><a href="#dyld-tbd"><strong>dyld tbd</strong></a></li>
 </ul>
 <hr>
-<h3 id="dyld-info"><strong>dyld info</strong></h3>
+<h3 id="dyld---help"><strong>dyld &ndash;help</strong></h3>
+<p>Help for dyld cmd</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld --help
+
+Parse dyld_shared_cache
+
+Usage:
+  ipsw dyld <span class="o">[</span>flags<span class="o">]</span>
+  ipsw dyld <span class="o">[</span>command<span class="o">]</span>
+
+Available Commands:
+  a2o         Convert dyld_shared_cache address to offset
+  a2s         Lookup symbol at unslid address
+  disass      🚧 <span class="o">[</span>WIP<span class="o">]</span> Disassemble dyld_shared_cache symbol/vaddr in an image
+  extract     Extract dyld_shared_cache from DMG in IPSW
+  imports     List all dylibs that load a given dylib
+  info        Parse dyld_shared_cache
+  macho       Parse a dylib file
+  o2a         Convert dyld_shared_cache offset to address
+  objc        Dump Objective-C Optimization Info
+  patches     Dump dyld patch info
+  slide       Get slide info chained pointers
+  split       Extracts all the dyld_shared_cache libraries
+  symaddr     Lookup or dump symbol<span class="o">(</span>s<span class="o">)</span>
+  tbd         Generate a .tbd file <span class="k">for</span> a dylib
+  webkit      Get WebKit version from a dyld_shared_cache
+  xref        🚧 <span class="o">[</span>WIP<span class="o">]</span> Find all cross references to an address
+
+Flags:
+  -h, --help   <span class="nb">help</span> <span class="k">for</span> dyld
+
+Global Flags:
+      --config string   config file <span class="o">(</span>default is <span class="nv">$HOME</span>/.ipsw.yaml<span class="o">)</span>
+  -V, --verbose         verbose output
+
+Use <span class="s2">&#34;ipsw dyld [command] --help&#34;</span> <span class="k">for</span> more information about a command.
+</code></pre></div><h3 id="dyld-info"><strong>dyld info</strong></h3>
 <p>Similar to <code>jtool -h -l dyld_shared_cache</code></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld info -l -s dyld_shared_cache <span class="p">|</span> head -n35
 

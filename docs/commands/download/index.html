@@ -208,6 +208,7 @@
 <h1 class="title">download</h1>
 <div class="content ">
   <ul>
+<li><a href="#download---help"><strong>download &ndash;help</strong></a></li>
 <li><a href="#download"><strong>download</strong></a></li>
 <li><a href="#download-latest"><strong>download latest</strong></a></li>
 <li><a href="#download-kernel"><strong>download kernel</strong></a></li>
@@ -222,7 +223,45 @@
 <blockquote>
 <p>⚠️ <strong>NOTICE:</strong> Apple seems to be removing old <code>ipsws</code> from their CDN servers so if you get a 404 or some other error that might be the reason why.</p>
 </blockquote>
-<h2 id="download"><strong>download</strong></h2>
+<h2 id="download---help"><strong>download &ndash;help</strong></h2>
+<p>Help for download cmd</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download --help
+
+Download and parse IPSW<span class="o">(</span>s<span class="o">)</span> from the internets
+
+Usage:
+  ipsw download <span class="o">[</span>options<span class="o">]</span> <span class="o">[</span>flags<span class="o">]</span>
+  ipsw download <span class="o">[</span>command<span class="o">]</span>
+
+Available Commands:
+  beta        Download beta IPSWs from theiphonewiki.com
+  dev         Download IPSWs <span class="o">(</span>and more<span class="o">)</span> from https://developer.apple.com/download
+  kernel      Download just the kernelcache
+  latest      Download latest release version
+  macos       Download and parse macOS IPSWs
+  oss         Download opensource.apple.com file list <span class="k">for</span> macOS version
+  ota         Download OTA betas
+  pattern     Download files that contain file name part
+
+Flags:
+      --black-list stringArray   iOS device black list
+  -b, --build string             iOS BuildID <span class="o">(</span>i.e. 16F203<span class="o">)</span>
+  -d, --device string            iOS Device <span class="o">(</span>i.e. iPhone11,2<span class="o">)</span>
+  -h, --help                     <span class="nb">help</span> <span class="k">for</span> download
+      --insecure                 <span class="k">do</span> not verify ssl certs
+      --proxy string             HTTP/HTTPS proxy
+  -_, --remove-commas            replace commas in IPSW filename with underscores
+  -s, --skip-all                 Always skip resumable IPSWs
+  -v, --version string           iOS Version <span class="o">(</span>i.e. 12.3.1<span class="o">)</span>
+      --white-list stringArray   iOS device white list
+  -y, --yes                      <span class="k">do</span> not prompt user
+
+Global Flags:
+      --config string   config file <span class="o">(</span>default is <span class="nv">$HOME</span>/.ipsw.yaml<span class="o">)</span>
+  -V, --verbose         verbose output
+
+Use <span class="s2">&#34;ipsw download [command] --help&#34;</span> <span class="k">for</span> more information about a command.
+</code></pre></div><h2 id="download"><strong>download</strong></h2>
 <blockquote>
 <p>Queries the <a href="https://ipsw.me">ipsw.me</a> API</p>
 </blockquote>
