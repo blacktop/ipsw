@@ -208,11 +208,11 @@ func (f *File) getProtocol2StringHash() (*StringHash, error) {
 		return nil, err
 	}
 
-	if opt.UnusedProtocolOptOffset == 0 {
+	if opt.UnusedProtocolOpt2Offset == 0 {
 		return nil, fmt.Errorf("protocolopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedProtocolOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedProtocolOpt2Offset)}
 
 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
