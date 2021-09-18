@@ -271,7 +271,7 @@ Global Flags:
 Use <span class="s2">&#34;ipsw dyld [command] --help&#34;</span> <span class="k">for</span> more information about a command.
 </code></pre></div><h3 id="dyld-info"><strong>dyld info</strong></h3>
 <p>Similar to <code>jtool -h -l dyld_shared_cache</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld info -l -s dyld_shared_cache <span class="p">|</span> head -n35
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld info -l -s dyld_shared_cache <span class="p">|</span> head -n35
 
 <span class="nv">Header</span>
 <span class="o">======</span>
@@ -328,7 +328,7 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 <ul>
 <li><code>macOS</code></li>
 </ul>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld extract iPhone11,2_12.0_16A366_Restore.ipsw
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld extract iPhone11,2_12.0_16A366_Restore.ipsw
    • Extracting dyld_shared_cache from IPSW
    • Mounting DMG
    • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
@@ -336,14 +336,14 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 </code></pre></div><ul>
 <li><code>docker</code></li>
 </ul>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ docker run --init -it --rm <span class="se">\
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ docker run --init -it --rm <span class="se">\
 </span><span class="se"></span>             --device /dev/fuse <span class="se">\
 </span><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
 </span><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
 </span><span class="se"></span>             blacktop/ipsw -V dyld extract iPhone11_2_12.4.1_16G102_Restore.ipsw
 </code></pre></div><h3 id="dyld-macho"><strong>dyld macho</strong></h3>
 <p>Parse a dyld*shared_cache dylib *(same as ipsw macho cmd)_</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads <span class="p">|</span> bat -l m --tabs <span class="m">0</span> -p --theme Nord --wrap<span class="o">=</span>never --pager <span class="s2">&#34;less -S&#34;</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads <span class="p">|</span> bat -l m --tabs <span class="m">0</span> -p --theme Nord --wrap<span class="o">=</span>never --pager <span class="s2">&#34;less -S&#34;</span>
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
@@ -421,59 +421,59 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 <span class="o">&lt;</span><span class="n">SNIP</span><span class="o">&gt;</span>
 </code></pre></div><h3 id="dyld-symaddr"><strong>dyld symaddr</strong></h3>
 <p>Find all instances of a symbol&rsquo;s <em>(unslid)</em> addresses in shared cache</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache &lt;SYMBOL_NAME&gt;
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld symaddr dyld_shared_cache &lt;SYMBOL_NAME&gt;
 </code></pre></div><p>Speed it up by supplying the dylib name</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache &lt;SYMBOL_NAME&gt;
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache &lt;SYMBOL_NAME&gt;
 </code></pre></div><p><strong>NOTE:</strong> you don&rsquo;t have to supply the full image path</p>
 <p>Dump ALL teh symbolz!!!</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld symaddr dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld symaddr dyld_shared_cache
 </code></pre></div><h3 id="dyld-a2s"><strong>dyld a2s</strong></h3>
 <p>Lookup what symbol is at a given <em>unslid</em> or <em>slid</em> address <em>(in hex)</em></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
 
    • Address location          <span class="nv">dylib</span><span class="o">=</span>/usr/lib/libobjc.A.dylib <span class="nv">section</span><span class="o">=</span>__TEXT.__text
 
 0x19538e1e0: _objc_msgSend + <span class="m">32</span>
 </code></pre></div><p>This will also create a cached version of the lookup hash table so the next time you lookup it will be much faster</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
    • parsing public symbols...
    • parsing private symbols...
 0x190a7221c: _xmlCtxtGetLastError
 61.59s user 9.80s system 233% cpu <span class="s2">&#34;30.545 total&#34;</span>
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
 0x190a7221c: _xmlCtxtGetLastError
 2.12s user 0.51s system 109% cpu <span class="s2">&#34;2.407 total&#34;</span>
 </code></pre></div><h3 id="dyld-objc"><strong>dyld objc</strong></h3>
 <h4 id="dump-objc-addresses">Dump ObjC addresses</h4>
 <p>Dump all the classes</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --class dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc --class dyld_shared_cache
 </code></pre></div><p>Dump all the protocols</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --proto dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc --proto dyld_shared_cache
 </code></pre></div><p>Dump all the selectors</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --sel dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc --sel dyld_shared_cache
 </code></pre></div><p>Dump all the imp-caches</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc --imp-cache dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc --imp-cache dyld_shared_cache
 </code></pre></div><h3 id="dyld-objc-class"><strong>dyld objc class</strong></h3>
 <p>Lookup a class&rsquo;s address</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc class dyld_shared_cache release
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc class dyld_shared_cache release
 
 0x1b92c85a8: release
 </code></pre></div><p>Or get all the classes for an image</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc class --image libobjc.A.dylib dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc class --image libobjc.A.dylib dyld_shared_cache
 </code></pre></div><h3 id="dyld-objc-proto"><strong>dyld objc proto</strong></h3>
 <p>Lookup a protocol&rsquo;s address</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc proto dyld_shared_cache release
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc proto dyld_shared_cache release
 
 0x1b92c85a8: release
 </code></pre></div><p>Or get all the protocols for an image</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
 </code></pre></div><h3 id="dyld-objc-sel"><strong>dyld objc sel</strong></h3>
 <p>Lookup a selector&rsquo;s address</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc sel dyld_shared_cache release
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc sel dyld_shared_cache release
 
 0x1b92c85a8: release
 </code></pre></div><p>Or get all the selectors for an image</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld objc sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld objc sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
 
 Objective-C Selectors:
 /usr/lib/libobjc.A.dylib
@@ -493,7 +493,7 @@ Objective-C Selectors:
 </code></pre></div><h3 id="dyld-split"><strong>dyld split</strong></h3>
 <p><em>(only on macOS and requires XCode to be installed)</em></p>
 <p>Split up a <em>dyld_shared_cache</em></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld split dyld_shared_cache .
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld split dyld_shared_cache .
    • Splitting dyld_shared_cache
 
 0/1445
@@ -507,11 +507,11 @@ Objective-C Selectors:
 1444/1445
 </code></pre></div><h3 id="dyld-webkit"><strong>dyld webkit</strong></h3>
 <p>Extract WebKit version from <em>dyld_shared_cache</em></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld webkit --rev dyld_shared_cache
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld webkit --rev dyld_shared_cache
    • WebKit Version: 609.1.17.0.1 <span class="o">(</span>svn rev 256416<span class="o">)</span>
 </code></pre></div><h3 id="dyld-patches"><strong>dyld patches</strong></h3>
 <p>List dyld patch info</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld patches dyld_shared_cache <span class="p">|</span> grep entries
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld patches dyld_shared_cache <span class="p">|</span> grep entries
    • <span class="o">[</span><span class="m">68</span> entries<span class="o">]</span> /usr/lib/system/libsystem_c.dylib
    • <span class="o">[</span><span class="m">243</span> entries<span class="o">]</span> /usr/lib/system/libdispatch.dylib
    • <span class="o">[</span><span class="m">13</span> entries<span class="o">]</span> /usr/lib/system/libsystem_malloc.dylib
@@ -521,10 +521,10 @@ Objective-C Selectors:
    • <span class="o">[</span><span class="m">23</span> entries<span class="o">]</span> /usr/lib/libc++abi.dylib
    • <span class="o">[</span><span class="m">45</span> entries<span class="o">]</span> /usr/lib/system/libsystem_kernel.dylib
    • <span class="o">[</span><span class="m">2</span> entries<span class="o">]</span> /usr/lib/system/libdyld.dylib
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld patches dyld_shared_cache -i libdyld.dylib
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld patches dyld_shared_cache -i libdyld.dylib
 0x0028074C <span class="o">(</span><span class="m">63</span> patches<span class="o">)</span>  _dlclose
 0x00280820 <span class="o">(</span><span class="m">399</span> patches<span class="o">)</span> _dlopen
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld patches dyld_shared_cache -i libdyld.dylib -s _dlopen <span class="p">|</span> head
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld patches dyld_shared_cache -i libdyld.dylib -s _dlopen <span class="p">|</span> head
    • _dlopen patch locations
 offset: 0x57b18898, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
 offset: 0x57b19170, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
@@ -538,7 +538,7 @@ offset: 0x57b88138, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb
 offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: <span class="nb">true</span>
 </code></pre></div><h3 id="dyld-slide"><strong>dyld slide</strong></h3>
 <p>Dump <em>dyld_shared_cache</em> slide info</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld slide dyld_shared_cache_arm64e
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld slide dyld_shared_cache_arm64e
 
 slide info <span class="nv">version</span> <span class="o">=</span> <span class="m">3</span>
 <span class="nv">page_size</span>          <span class="o">=</span> <span class="m">4096</span>
@@ -571,7 +571,7 @@ page<span class="o">[</span>    0<span class="o">]</span>: <span class="nv">star
 0x1ce6c0000
 </code></pre></div><h3 id="dyld-disass"><strong>dyld disass</strong></h3>
 <p>Disassemble a function in the <em>dyld_shared_cache</em></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld disass dyld_shared_cache_arm64e --symbol _NSLog
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld disass dyld_shared_cache_arm64e --symbol _NSLog
    • Found dyld_shared_cache companion symbol map file...
    • Locating symbol: _NSLog
    • Found symbol              <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/Foundation.framework/Foundation
@@ -607,7 +607,7 @@ page<span class="o">[</span>    0<span class="o">]</span>: <span class="nv">star
 <span class="mh">0x1817e7440</span><span class="o">:</span>  <span class="m">64</span> <span class="m">52</span> <span class="n">fe</span> <span class="m">95</span>       <span class="n">bl</span>              <span class="n">___stack_chk_fail</span>
 </code></pre></div><h3 id="dyld-imports"><strong>dyld imports</strong></h3>
 <p>List all dylibs that import/load a given dylib in the <em>dyld_shared_cache</em></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld imports dyld_shared_cache JavaScriptCore
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld imports dyld_shared_cache JavaScriptCore
 
 JavaScriptCore Imported By:
 <span class="o">===========================</span>
@@ -648,7 +648,7 @@ JavaScriptCore Imported By:
 <p>List all the cross-references in the <em>dyld_shared_cache</em> for a given virtual address</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld symaddr dyld_shared_cache_arm64e _NSLog
 0x1817e73e4: <span class="o">(</span>Regular<span class="o">)</span> _NSLog   /System/Library/Frameworks/Foundation.framework/Foundation
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld xref dyld_shared_cache 0x1817e73e4
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld xref dyld_shared_cache 0x1817e73e4
    • Address location          <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/Foundation.framework/Foundation <span class="nv">sym</span><span class="o">=</span>_NSLog
 
 XREFS <span class="o">(</span>304<span class="o">)</span>
@@ -664,9 +664,9 @@ XREFS <span class="o">(</span>304<span class="o">)</span>
 &lt;SNIP&gt;
 </code></pre></div><h3 id="dyld-tbd"><strong>dyld tbd</strong></h3>
 <p>Generate a <code>.tbd</code> file for a dylib</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw dyld tbd dyld_shared_cache CoreSymbolication
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld tbd dyld_shared_cache CoreSymbolication
    • Created CoreSymbolication.tbd
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ cat CoreSymbolication.tbd
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ cat CoreSymbolication.tbd
 ---
 archs:           <span class="o">[</span> arm64e <span class="o">]</span>
 platform:        ios

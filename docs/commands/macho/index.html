@@ -214,6 +214,7 @@
 <li><a href="#macho---sig"><strong>macho &ndash;sig</strong></a></li>
 <li><a href="#macho---ent"><strong>macho &ndash;ent</strong></a></li>
 <li><a href="#macho---objc"><strong>macho &ndash;objc</strong></a></li>
+<li><a href="#macho---fixups"><strong>macho &ndash;fixups</strong></a></li>
 <li><a href="#macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></a></li>
 </ul>
 <h3 id="macho---help"><strong>macho &ndash;help</strong></h3>
@@ -246,7 +247,7 @@ Global Flags:
   -V, --verbose         verbose output
 </code></pre></div><h3 id="macho--d"><strong>macho -d</strong></h3>
 <p>Similar to <code>otool -h</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho JavaScriptCore
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
@@ -255,7 +256,7 @@ Global Flags:
 <span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
 </code></pre></div><h3 id="macho--l"><strong>macho -l</strong></h3>
 <p>Similar to <code>otool -h -l</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho JavaScriptCore
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
@@ -327,7 +328,7 @@ Global Flags:
 24: LC_DATA_IN_CODE             <span class="nv">offset</span><span class="o">=</span>0x0102ba28-0x0102ba28, <span class="nv">size</span><span class="o">=</span>    0, <span class="nv">entries</span><span class="o">=</span><span class="m">0</span>
 </code></pre></div><h3 id="macho---sig"><strong>macho &ndash;sig</strong></h3>
 <p>Similar to <code>jtool --sig</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
 
 Code Directory <span class="o">(</span><span class="m">167849</span> bytes<span class="o">)</span>
 	Version:     Scatter
@@ -356,7 +357,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         OU: Apple Certification Authority CN: Software Signing                           <span class="o">(</span>2013-04-12 thru 2021-04-12<span class="o">)</span>
 </code></pre></div><h3 id="macho---ent"><strong>macho &ndash;ent</strong></h3>
 <p>Similar to <code>jtool --ent</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/libexec/amfid --ent
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /usr/libexec/amfid --ent
 &lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">&#34;UTF-8&#34;</span>?&gt;
 &lt;!DOCTYPE plist PUBLIC <span class="s2">&#34;-//Apple//DTD PLIST 1.0//EN&#34;</span> <span class="s2">&#34;http://www.apple.com/DTDs/PropertyList-1.0.dtd&#34;</span>&gt;
 &lt;plist <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span>&gt;
@@ -374,7 +375,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 </code></pre></div><h3 id="macho---objc"><strong>macho &ndash;objc</strong></h3>
 <p>Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></p>
 <p><strong>NOTE:</strong> Currently only supports <em>64-bit</em> architechtures</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-m" data-lang="m"><span class="n">Objective</span><span class="o">-</span><span class="n">C</span>
 <span class="o">==========</span><span class="p">=</span>
 
@@ -743,9 +744,36 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 <span class="mi">0</span><span class="n">x00000032ea3</span><span class="p">:</span> <span class="n">mutableCopy</span>
 <span class="mi">0</span><span class="n">x00000032bee</span><span class="p">:</span> <span class="n">resolveInstanceMethod</span><span class="p">:</span>
 <span class="mi">0</span><span class="n">x00000032caf</span><span class="p">:</span> <span class="n">isEqual</span><span class="p">:</span>
+</code></pre></div><h3 id="macho---fixups"><strong>macho &ndash;fixups</strong></h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
+
+__DATA_CONST.__auth_got
+0x100008000:  raw: 0xc009000000000000      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 000<span class="o">)</span>       libSystem.B.dylib/___error
+0x100008008:  raw: 0xc009000000000001      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 001<span class="o">)</span>       libSystem.B.dylib/___stack_chk_fail
+0x100008010:  raw: 0xc009000000000002      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 002<span class="o">)</span>       libSystem.B.dylib/___strlcat_chk
+0x100008018:  raw: 0xc009000000000003      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 003<span class="o">)</span>       libSystem.B.dylib/___strlcpy_chk
+0x100008020:  raw: 0xc009000000000004      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 004<span class="o">)</span>       libSystem.B.dylib/_access
+0x100008028:  raw: 0xc009000000000005      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 005<span class="o">)</span>       libSystem.B.dylib/_asprintf
+0x100008030:  raw: 0xc009000000000006      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 006<span class="o">)</span>       libSystem.B.dylib/_atoi
+0x100008038:  raw: 0xc009000000000007      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 007<span class="o">)</span>       libSystem.B.dylib/_bsearch
+0x100008040:  raw: 0xc009000000000008      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 008<span class="o">)</span>       libSystem.B.dylib/_calloc
+0x100008048:  raw: 0xc009000000000009      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 009<span class="o">)</span>       libSystem.B.dylib/_compat_mode
+0x100008050:  raw: 0xc00900000000000a      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 010<span class="o">)</span>       libSystem.B.dylib/_devname
+0x100008058:  raw: 0xc00900000000000b      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 011<span class="o">)</span>       libSystem.B.dylib/_err
+0x100008060:  raw: 0xc00900000000000c      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 012<span class="o">)</span>       libSystem.B.dylib/_errx
+&lt;SNIP&gt;
+__DATA_CONST.__got
+0x100008218:  raw: 0x4008000000000043    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 067, addend: 0<span class="o">)</span>    libSystem.B.dylib/__DefaultRuneLocale
+0x100008220:  raw: 0x4008000000000044    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 068, addend: 0<span class="o">)</span>    libSystem.B.dylib/___stack_chk_guard
+0x100008228:  raw: 0x4008000000000045    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 069, addend: 0<span class="o">)</span>    libSystem.B.dylib/___stderrp
+0x100008230:  raw: 0x4008000000000046    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 070, addend: 0<span class="o">)</span>    libSystem.B.dylib/___stdoutp
+0x100008238:  raw: 0x4008000000000047    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 071, addend: 0<span class="o">)</span>    libSystem.B.dylib/_mach_task_self_
+0x100008240:  raw: 0x4008000000000048    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 072, addend: 0<span class="o">)</span>    libSystem.B.dylib/_optarg
+0x100008248:  raw: 0x4008000000000049    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 073, addend: 0<span class="o">)</span>    libSystem.B.dylib/_optind
+&lt;SNIP&gt;
 </code></pre></div><h3 id="macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></h3>
 <p>Analyze FileSet entry MachO</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Exec
@@ -760,7 +788,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         <span class="nv">sz</span><span class="o">=</span>0x000000f8 <span class="nv">off</span><span class="o">=</span>0x000c7f00-0x000c7ff8 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c0bf00-0xfffffe0007c0bff8              __TEXT.__eh_frame
 &lt;SNIP&gt;
 </code></pre></div><p>Extract a fileset entry to disk</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry <span class="s2">&#34;com.apple.security.sandbox&#34;</span> --extract-fileset-entry
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry <span class="s2">&#34;com.apple.security.sandbox&#34;</span> --extract-fileset-entry
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> KextBundle
@@ -795,7 +823,7 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
             Local Reloc Entries: None
 007: LC_UUID                     08D7639F-818E-3551-9B32-0565198961A8
 008: LC_SOURCE_VERSION           1441.101.1.0.0
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ll
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ll
 
 -rwxr-xr-x  <span class="m">1</span> blacktop    15M May  <span class="m">9</span> 22:08 com.apple.security.sandbox
 -rw-r--r--  <span class="m">1</span> blacktop    96M Apr <span class="m">29</span> 21:56 kernelcache.production

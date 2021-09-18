@@ -209,7 +209,7 @@
 <div class="content ">
   <h3 id="dump-ctf-info">Dump CTF info</h3>
 <p>KDK kernelcaches contain CTF - <em>Compact ANSI-C Type Format</em> data which is used by dtrace. It&rsquo;s a data format much like DWARF and contains and absolute treasure trove for peeps REing the kernels (types, globals and func signatures).</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ctfdump KDK
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw ctfdump KDK
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">- CTF Header -----------------------------------------------------------------
 
 <span class="nv">Magic</span>        <span class="o">=</span> 0xcff1
@@ -286,7 +286,7 @@ Str <span class="nv">Len</span>      <span class="o">=</span> 0x763dc
 0xfffffe000748ee14: void IOGetTime<span class="o">()</span><span class="p">;</span>
 0xfffffe000748eb2c: kern_return_t IOMapPages<span class="o">(</span>vm_map_t, mach_vm_address_t, mach_vm_address_t, mach_vm_size_t, unsigned int<span class="o">)</span><span class="p">;</span>
 </code></pre></div><h3 id="dump-as-json">Dump as JSON</h3>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ctfdump KDK --json
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw ctfdump KDK --json
    • Creating ctfdump.json
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
     <span class="nt">&#34;header&#34;</span><span class="p">:</span> <span class="p">{</span>
@@ -326,8 +326,8 @@ Str <span class="nv">Len</span>      <span class="o">=</span> 0x763dc
         <span class="p">},</span>
 <span class="err">&lt;SNIP&gt;</span>
 </code></pre></div><h3 id="dump-a-single-type">Dump a single <code>type</code></h3>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw ctfdump KDK/macOS12beta/kernel.development.t8101 task &gt; task.h
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ cat task.h
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw ctfdump KDK/macOS12beta/kernel.development.t8101 task &gt; task.h
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ cat task.h
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-cpp" data-lang="cpp"><span class="k">struct</span> <span class="nc">task</span>
 <span class="p">{</span>                                                                 <span class="c1">// (1728 bytes)
 </span><span class="c1"></span>    <span class="n">lck_mtx_t</span> <span class="n">lock</span><span class="p">;</span>                                               <span class="c1">// off=0x0

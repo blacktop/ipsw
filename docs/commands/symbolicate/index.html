@@ -209,16 +209,16 @@
 <div class="content ">
   <h4 id="symbolicate-arm-64-bit-crash-logs-similar-to-apples-symbolicatecrash">Symbolicate ARM 64-bit crash logs (similar to Apple&rsquo;s <code>symbolicatecrash</code>)</h4>
 <p>It will detect the <code>dyld_shared_cache</code> needed to symbolicate the crashlog</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">$ ipsw symbolicate solitaire-2021-02-23-185510.ips
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw symbolicate solitaire-2021-02-23-185510.ips
 
    ⨯ please supply a dyld_shared_cache for iPhone12,1 running 14.5 (18E5154f)
 </code></pre></div><p>You can <a href="./download.md">download</a> current <code>beta</code> shared caches like so</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw download ota --device iPhone12,1 --dyld
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ota --device iPhone12,1 --dyld
 ? You are about to download <span class="m">1</span> OTA files. Continue? Yes
    • Parsing remote OTA        <span class="nv">build</span><span class="o">=</span>18E5154f <span class="nv">device</span><span class="o">=</span>iPhone12,1 iPhone11,8 <span class="nv">version</span><span class="o">=</span>iOS145DevBeta2
    • Extracting remote dyld_shared_cache <span class="o">(</span>can be a bit CPU intensive<span class="o">)</span>
 ...
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">$ ipsw symbolicate solitaire-2021-02-23-185510.ips dyld_shared_cache_arm64e
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw symbolicate solitaire-2021-02-23-185510.ips dyld_shared_cache_arm64e
 
 Process:             solitaire [12345]
 Hardware Model:      iPhone12,1
