@@ -17,7 +17,8 @@ summary: Parse dyld_shared_cache.
   - [**dyld objc sel**](#dyld-objc-sel)
 - [**dyld split**](#dyld-split)
 - [**dyld webkit**](#dyld-webkit)
-- [**dyld patches**](#dyld-patches-)
+- [**dyld patches**](#dyld-patches)
+- [**dyld slide**](#dyld-slide)
 - [**dyld a2o**](#dyld-a2o)
 - [**dyld o2a**](#dyld-o2a)
 - [**dyld disass**](#dyld-disass)
@@ -405,6 +406,34 @@ offset: 0x57b3db98, addend: 0, diversity: 0x0000, key: IA, auth: true
 offset: 0x57b79850, addend: 0, diversity: 0x0000, key: IA, auth: true
 offset: 0x57b88138, addend: 0, diversity: 0x0000, key: IA, auth: true
 offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: true
+```
+
+### **dyld slide**
+
+Dump _dyld_shared_cache_ slide info
+
+```bash
+$ ipsw dyld slide dyld_shared_cache_arm64e
+
+slide info version = 3
+page_size          = 4096
+page_starts_count  = 11956
+auth_value_add     = 0x0000000180000000
+page[    0]: start=0x0000
+    [    0 + 0x0000] (0x1d1e48000 @ offset 0x4fe48000 => 0x1d70dabb8) value: 0x1d70dabb8, next: 01, sym: __DefaultRuneLocale
+    [    0 + 0x0008] (0x1d1e48008 @ offset 0x4fe48008 => 0x2028f50e0) value: 0x2028f50e0, next: 01, sym: _OBJC_CLASS_$___NSStackBlock__
+    [    0 + 0x0018] (0x1d1e48010 @ offset 0x4fe48010 => 0x1d9a3dc60) value: 0x1d9a3dc60, next: 01, sym: ___stack_chk_guard
+    [    0 + 0x0030] (0x1d1e48018 @ offset 0x4fe48018 => 0x1d70da940) value: 0x1d70da940, next: 01, sym: ___stderrp
+    [    0 + 0x0050] (0x1d1e48020 @ offset 0x4fe48020 => 0x1db4ecc20) value: 0x1db4ecc20, next: 01, sym: __dispatch_source_type_mach_recv
+    [    0 + 0x0078] (0x1d1e48028 @ offset 0x4fe48028 => 0x191eb91dc) value: 0x191eb91dc, next: 01, sym: _free
+    [    0 + 0x00A8] (0x1d1e48030 @ offset 0x4fe48030 => 0x1d9a3c02c) value: 0x1d9a3c02c, next: 01, sym: _mach_task_self_
+    [    0 + 0x00E0] (0x1d1e48038 @ offset 0x4fe48038 => 0x1d9a3c048) value: 0x1d9a3c048, next: 01, sym: _vm_page_size
+    [    0 + 0x0120] (0x1d1e48040 @ offset 0x4fe48040 => 0x1800a087c) value: 0x1800a087c, next: 01, sym: ?
+    [    0 + 0x0168] (0x1d1e48048 @ offset 0x4fe48048 => 0x1800a0855) value: 0x1800a0855, next: 03, sym: ?
+    [    0 + 0x01C8] (0x1d1e48060 @ offset 0x4fe48060 => 0x1800a0958) value: 0x1800a0958, next: 04, sym: ?
+    [    0 + 0x0248] (0x1d1e48080 @ offset 0x4fe48080 => 0x1800a0958) value: 0x1800a0958, next: 04, sym: ?
+    [    0 + 0x02E8] (0x1d1e480a0 @ offset 0x4fe480a0 => 0x1800a0958) value: 0x1800a0958, next: 04, sym: ?
+<SNIP>
 ```
 
 ### **dyld a2o**
