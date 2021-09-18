@@ -11,11 +11,11 @@ summary: Parse DeviceTrees.
 Print out SUMMARY
 
 ```bash
-$ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
+❯ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
 ```
 
 ```bash
-$ ipsw dtree DeviceTree.d431ap.im4p
+❯ ipsw dtree DeviceTree.d431ap.im4p
 
       • Product Name: iPhone 11 Pro Max
       • Model: iPhone12,5
@@ -25,7 +25,7 @@ $ ipsw dtree DeviceTree.d431ap.im4p
 Or print out JSON
 
 ```bash
-$ ipsw dtree --json DeviceTree.d431ap.im4p | jq .
+❯ ipsw dtree --json DeviceTree.d431ap.im4p | jq .
 ```
 
 ```json
@@ -45,7 +45,7 @@ $ ipsw dtree --json DeviceTree.d431ap.im4p | jq .
 Or remotely
 
 ```bash
-$ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
+❯ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
 
    • DeviceTree.n112ap.im4p
       • Product Name: iPod touch

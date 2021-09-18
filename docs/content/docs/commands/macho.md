@@ -12,6 +12,7 @@ summary: Parse a MachO file
 - [**macho --sig**](#macho---sig)
 - [**macho --ent**](#macho---ent)
 - [**macho --objc**](#macho---objc)
+- [**macho --fixups**](#macho---fixups)
 - [**macho --fileset-entry**](#macho---fileset-entry)
 
 ### **macho --help**
@@ -52,7 +53,7 @@ Global Flags:
 Similar to `otool -h`
 
 ```bash
-$ ipsw macho JavaScriptCore
+❯ ipsw macho JavaScriptCore
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -66,7 +67,7 @@ Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, A
 Similar to `otool -h -l`
 
 ```bash
-$ ipsw macho JavaScriptCore
+❯ ipsw macho JavaScriptCore
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -143,7 +144,7 @@ Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, A
 Similar to `jtool --sig`
 
 ```bash
-$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
+❯ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
 
 Code Directory (167849 bytes)
 	Version:     Scatter
@@ -177,7 +178,7 @@ CMS (RFC3852) signature:
 Similar to `jtool --ent`
 
 ```bash
-$ ipsw macho /usr/libexec/amfid --ent
+❯ ipsw macho /usr/libexec/amfid --ent
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -201,7 +202,7 @@ Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
 **NOTE:** Currently only supports _64-bit_ architechtures
 
 ```bash
-$ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
+❯ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
 ```
 
 ```m
@@ -575,12 +576,43 @@ Objective-C
 0x00000032caf: isEqual:
 ```
 
+### **macho --fixups**
+
+```bash
+❯ ipsw macho /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
+
+__DATA_CONST.__auth_got
+0x100008000:  raw: 0xc009000000000000      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 000)       libSystem.B.dylib/___error
+0x100008008:  raw: 0xc009000000000001      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 001)       libSystem.B.dylib/___stack_chk_fail
+0x100008010:  raw: 0xc009000000000002      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 002)       libSystem.B.dylib/___strlcat_chk
+0x100008018:  raw: 0xc009000000000003      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 003)       libSystem.B.dylib/___strlcpy_chk
+0x100008020:  raw: 0xc009000000000004      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 004)       libSystem.B.dylib/_access
+0x100008028:  raw: 0xc009000000000005      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 005)       libSystem.B.dylib/_asprintf
+0x100008030:  raw: 0xc009000000000006      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 006)       libSystem.B.dylib/_atoi
+0x100008038:  raw: 0xc009000000000007      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 007)       libSystem.B.dylib/_bsearch
+0x100008040:  raw: 0xc009000000000008      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 008)       libSystem.B.dylib/_calloc
+0x100008048:  raw: 0xc009000000000009      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 009)       libSystem.B.dylib/_compat_mode
+0x100008050:  raw: 0xc00900000000000a      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 010)       libSystem.B.dylib/_devname
+0x100008058:  raw: 0xc00900000000000b      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 011)       libSystem.B.dylib/_err
+0x100008060:  raw: 0xc00900000000000c      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 012)       libSystem.B.dylib/_errx
+<SNIP>
+__DATA_CONST.__got
+0x100008218:  raw: 0x4008000000000043    arm64e bind24: (next: 001, ordinal: 067, addend: 0)    libSystem.B.dylib/__DefaultRuneLocale
+0x100008220:  raw: 0x4008000000000044    arm64e bind24: (next: 001, ordinal: 068, addend: 0)    libSystem.B.dylib/___stack_chk_guard
+0x100008228:  raw: 0x4008000000000045    arm64e bind24: (next: 001, ordinal: 069, addend: 0)    libSystem.B.dylib/___stderrp
+0x100008230:  raw: 0x4008000000000046    arm64e bind24: (next: 001, ordinal: 070, addend: 0)    libSystem.B.dylib/___stdoutp
+0x100008238:  raw: 0x4008000000000047    arm64e bind24: (next: 001, ordinal: 071, addend: 0)    libSystem.B.dylib/_mach_task_self_
+0x100008240:  raw: 0x4008000000000048    arm64e bind24: (next: 001, ordinal: 072, addend: 0)    libSystem.B.dylib/_optarg
+0x100008248:  raw: 0x4008000000000049    arm64e bind24: (next: 001, ordinal: 073, addend: 0)    libSystem.B.dylib/_optind
+<SNIP>
+```
+
 ### **macho --fileset-entry**
 
 Analyze FileSet entry MachO
 
 ```bash
-$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
+❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 Magic         = 64-bit MachO
 Type          = Exec
@@ -599,7 +631,7 @@ Flags         = NoUndefs, PIE, DylibInCache
 Extract a fileset entry to disk
 
 ```bash
-$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry
+❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry
 
 Magic         = 64-bit MachO
 Type          = KextBundle
@@ -637,7 +669,7 @@ Flags         = NoUndefs, DyldLink, TwoLevel, DylibInCache
 ```
 
 ```bash
-$ ll
+❯ ll
 
 -rwxr-xr-x  1 blacktop    15M May  9 22:08 com.apple.security.sandbox
 -rw-r--r--  1 blacktop    96M Apr 29 21:56 kernelcache.production

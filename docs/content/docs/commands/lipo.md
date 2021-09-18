@@ -9,7 +9,7 @@ summary: Extract file from Universal/FAT MachO.
 Extract file from Universal/FAT MachO
 
 ```bash
-$ ipsw lipo debugserver
+❯ ipsw lipo debugserver
 
 • Extracted ARM64e file as debugserver.arm64e
 ```

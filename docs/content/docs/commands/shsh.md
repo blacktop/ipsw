@@ -13,17 +13,17 @@ summary: Dump shsh blobs.
 [Jailbreak](https://checkra.in/) your iDevice and install openssh
 
 ```bash
-$ brew install libusbmuxd
+❯ brew install libusbmuxd
 ```
 
 ```bash
-$ iproxy 2222 22
+❯ iproxy 2222 22
 ```
 
 Dumping shsh blobs allows you to downgrade iOS later.
 
 ```bash
-$ ipsw shsh
+❯ ipsw shsh
 
    • Connecting to root@localhost:2222
       • Parsing shsh

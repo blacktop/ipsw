@@ -75,7 +75,7 @@ Use "ipsw dyld [command] --help" for more information about a command.
 Similar to `jtool -h -l dyld_shared_cache`
 
 ```bash
-$ ipsw dyld info -l -s dyld_shared_cache | head -n35
+❯ ipsw dyld info -l -s dyld_shared_cache | head -n35
 
 Header
 ======
@@ -137,7 +137,7 @@ Extract _dyld_shared_cache_ from a previously downloaded _ipsw_
 - `macOS`
 
 ```bash
-$ ipsw dyld extract iPhone11,2_12.0_16A366_Restore.ipsw
+❯ ipsw dyld extract iPhone11,2_12.0_16A366_Restore.ipsw
    • Extracting dyld_shared_cache from IPSW
    • Mounting DMG
    • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
@@ -147,7 +147,7 @@ $ ipsw dyld extract iPhone11,2_12.0_16A366_Restore.ipsw
 - `docker`
 
 ```bash
-$ docker run --init -it --rm \
+❯ docker run --init -it --rm \
              --device /dev/fuse \
              --cap-add=SYS_ADMIN \
              -v `pwd` :/data \
@@ -159,7 +159,7 @@ $ docker run --init -it --rm \
 Parse a dyld*shared_cache dylib *(same as ipsw macho cmd)\_
 
 ```bash
-$ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads | bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
+❯ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads | bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -245,13 +245,13 @@ Flags         = NoUndefs, DyldLink, TwoLevel, NoReexportedDylibs, AppExtensionSa
 Find all instances of a symbol's _(unslid)_ addresses in shared cache
 
 ```bash
-$ ipsw dyld symaddr dyld_shared_cache <SYMBOL_NAME>
+❯ ipsw dyld symaddr dyld_shared_cache <SYMBOL_NAME>
 ```
 
 Speed it up by supplying the dylib name
 
 ```bash
-$ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
+❯ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 ```
 
 **NOTE:** you don't have to supply the full image path
@@ -259,7 +259,7 @@ $ ipsw dyld symaddr --image JavaScriptCore dyld_shared_cache <SYMBOL_NAME>
 Dump ALL teh symbolz!!!
 
 ```bash
-$ ipsw dyld symaddr dyld_shared_cache
+❯ ipsw dyld symaddr dyld_shared_cache
 ```
 
 ### **dyld a2s**
@@ -267,7 +267,7 @@ $ ipsw dyld symaddr dyld_shared_cache
 Lookup what symbol is at a given _unslid_ or _slid_ address _(in hex)_
 
 ```bash
-$ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
+❯ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
 
    • Address location          dylib=/usr/lib/libobjc.A.dylib section=__TEXT.__text
 
@@ -277,7 +277,7 @@ $ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
 This will also create a cached version of the lookup hash table so the next time you lookup it will be much faster
 
 ```bash
-$ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
+❯ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
    • parsing public symbols...
    • parsing private symbols...
 0x190a7221c: _xmlCtxtGetLastError
@@ -285,7 +285,7 @@ $ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
 ```
 
 ```bash
-$ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
+❯ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
 0x190a7221c: _xmlCtxtGetLastError
 2.12s user 0.51s system 109% cpu "2.407 total"
 ```
@@ -297,25 +297,25 @@ $ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
 Dump all the classes
 
 ```bash
-$ ipsw dyld objc --class dyld_shared_cache
+❯ ipsw dyld objc --class dyld_shared_cache
 ```
 
 Dump all the protocols
 
 ```bash
-$ ipsw dyld objc --proto dyld_shared_cache
+❯ ipsw dyld objc --proto dyld_shared_cache
 ```
 
 Dump all the selectors
 
 ```bash
-$ ipsw dyld objc --sel dyld_shared_cache
+❯ ipsw dyld objc --sel dyld_shared_cache
 ```
 
 Dump all the imp-caches
 
 ```bash
-$ ipsw dyld objc --imp-cache dyld_shared_cache
+❯ ipsw dyld objc --imp-cache dyld_shared_cache
 ```
 
 ### **dyld objc class**
@@ -323,7 +323,7 @@ $ ipsw dyld objc --imp-cache dyld_shared_cache
 Lookup a class's address
 
 ```bash
-$ ipsw dyld objc class dyld_shared_cache release
+❯ ipsw dyld objc class dyld_shared_cache release
 
 0x1b92c85a8: release
 ```
@@ -331,7 +331,7 @@ $ ipsw dyld objc class dyld_shared_cache release
 Or get all the classes for an image
 
 ```bash
-$ ipsw dyld objc class --image libobjc.A.dylib dyld_shared_cache
+❯ ipsw dyld objc class --image libobjc.A.dylib dyld_shared_cache
 ```
 
 ### **dyld objc proto**
@@ -339,7 +339,7 @@ $ ipsw dyld objc class --image libobjc.A.dylib dyld_shared_cache
 Lookup a protocol's address
 
 ```bash
-$ ipsw dyld objc proto dyld_shared_cache release
+❯ ipsw dyld objc proto dyld_shared_cache release
 
 0x1b92c85a8: release
 ```
@@ -347,7 +347,7 @@ $ ipsw dyld objc proto dyld_shared_cache release
 Or get all the protocols for an image
 
 ```bash
-$ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
+❯ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
 ```
 
 ### **dyld objc sel**
@@ -355,7 +355,7 @@ $ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
 Lookup a selector's address
 
 ```bash
-$ ipsw dyld objc sel dyld_shared_cache release
+❯ ipsw dyld objc sel dyld_shared_cache release
 
 0x1b92c85a8: release
 ```
@@ -363,7 +363,7 @@ $ ipsw dyld objc sel dyld_shared_cache release
 Or get all the selectors for an image
 
 ```bash
-$ ipsw dyld objc sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
+❯ ipsw dyld objc sel --image libobjc.A.dylib iPhone12,1_N104AP_18A5319i/dyld_shared_cache
 
 Objective-C Selectors:
 /usr/lib/libobjc.A.dylib
@@ -389,7 +389,7 @@ _(only on macOS and requires XCode to be installed)_
 Split up a _dyld_shared_cache_
 
 ```bash
-$ ipsw dyld split dyld_shared_cache .
+❯ ipsw dyld split dyld_shared_cache .
    • Splitting dyld_shared_cache
 
 0/1445
@@ -408,7 +408,7 @@ $ ipsw dyld split dyld_shared_cache .
 Extract WebKit version from _dyld_shared_cache_
 
 ```bash
-$ ipsw dyld webkit --rev dyld_shared_cache
+❯ ipsw dyld webkit --rev dyld_shared_cache
    • WebKit Version: 609.1.17.0.1 (svn rev 256416)
 ```
 
@@ -417,7 +417,7 @@ $ ipsw dyld webkit --rev dyld_shared_cache
 List dyld patch info
 
 ```bash
-$ ipsw dyld patches dyld_shared_cache | grep entries
+❯ ipsw dyld patches dyld_shared_cache | grep entries
    • [68 entries] /usr/lib/system/libsystem_c.dylib
    • [243 entries] /usr/lib/system/libdispatch.dylib
    • [13 entries] /usr/lib/system/libsystem_malloc.dylib
@@ -430,13 +430,13 @@ $ ipsw dyld patches dyld_shared_cache | grep entries
 ```
 
 ```bash
-$ ipsw dyld patches dyld_shared_cache -i libdyld.dylib
+❯ ipsw dyld patches dyld_shared_cache -i libdyld.dylib
 0x0028074C (63 patches)  _dlclose
 0x00280820 (399 patches) _dlopen
 ```
 
 ```bash
-$ ipsw dyld patches dyld_shared_cache -i libdyld.dylib -s _dlopen | head
+❯ ipsw dyld patches dyld_shared_cache -i libdyld.dylib -s _dlopen | head
    • _dlopen patch locations
 offset: 0x57b18898, addend: 0, diversity: 0x0000, key: IA, auth: true
 offset: 0x57b19170, addend: 0, diversity: 0x0000, key: IA, auth: true
@@ -455,7 +455,7 @@ offset: 0x57bb56a8, addend: 0, diversity: 0x0000, key: IA, auth: true
 Dump _dyld_shared_cache_ slide info
 
 ```bash
-$ ipsw dyld slide dyld_shared_cache_arm64e
+❯ ipsw dyld slide dyld_shared_cache_arm64e
 
 slide info version = 3
 page_size          = 4096
@@ -503,7 +503,7 @@ ipsw dyld a2o dyld_shared_cache 0x4C6C0000
 Disassemble a function in the _dyld_shared_cache_
 
 ```bash
-$ ipsw dyld disass dyld_shared_cache_arm64e --symbol _NSLog
+❯ ipsw dyld disass dyld_shared_cache_arm64e --symbol _NSLog
    • Found dyld_shared_cache companion symbol map file...
    • Locating symbol: _NSLog
    • Found symbol              dylib=/System/Library/Frameworks/Foundation.framework/Foundation
@@ -546,7 +546,7 @@ _NSLog:
 List all dylibs that import/load a given dylib in the _dyld_shared_cache_
 
 ```bash
-$ ipsw dyld imports dyld_shared_cache JavaScriptCore
+❯ ipsw dyld imports dyld_shared_cache JavaScriptCore
 
 JavaScriptCore Imported By:
 ===========================
@@ -595,7 +595,7 @@ ipsw dyld symaddr dyld_shared_cache_arm64e _NSLog
 ```
 
 ```bash
-$ ipsw dyld xref dyld_shared_cache 0x1817e73e4
+❯ ipsw dyld xref dyld_shared_cache 0x1817e73e4
    • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation sym=_NSLog
 
 XREFS (304)
@@ -616,12 +616,12 @@ XREFS (304)
 Generate a `.tbd` file for a dylib
 
 ```bash
-$ ipsw dyld tbd dyld_shared_cache CoreSymbolication
+❯ ipsw dyld tbd dyld_shared_cache CoreSymbolication
    • Created CoreSymbolication.tbd
 ```
 
 ```bash
-$ cat CoreSymbolication.tbd
+❯ cat CoreSymbolication.tbd
 ---
 archs:           [ arm64e ]
 platform:        ios
