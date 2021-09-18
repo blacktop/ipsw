@@ -239,7 +239,7 @@
        <span class="m">99</span>  01-09-2007 09:41   Firmware/038-44337-066.dmg.root_hash
     <span class="m">49173</span>  01-09-2007 09:41   Firmware/038-44337-066.dmg.trustcache
 </code></pre></div><p>The <strong>BIG</strong> one <em>(4.7G)</em> is the <em>file system</em> (aka the one that has the <em>dyld_shared_cache</em>).</p>
-<p>The other two are the <code>arm64eCustomerRamDisk</code> and the <code>arm64eUpdateRamDisk</code>, however, you cannot mount them as they are actually <strong>Img4</strong> files. 😕</p>
+<p>The other two are the <code>arm64eCustomerRamDisk</code> and the <code>arm64eUpdateRamDisk</code>, however, you cannot mount them as they are actually <strong>im4p</strong> files. 😕</p>
 <p>You can now extract the Img4 payloads with the following command:</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ unzip -p iPhone_4.7_14.0_18A5319i_Restore.ipsw 038-44087-104.dmg &gt; 038-44087-104.dmg
 $ ipsw img4 extract 038-44087-104.dmg

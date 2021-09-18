@@ -208,6 +208,7 @@
 <h1 class="title">macho</h1>
 <div class="content ">
   <ul>
+<li><a href="#macho---help"><strong>macho &ndash;help</strong></a></li>
 <li><a href="#macho--d"><strong>macho -d</strong></a></li>
 <li><a href="#macho--l"><strong>macho -l</strong></a></li>
 <li><a href="#macho---sig"><strong>macho &ndash;sig</strong></a></li>
@@ -215,7 +216,35 @@
 <li><a href="#macho---objc"><strong>macho &ndash;objc</strong></a></li>
 <li><a href="#macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></a></li>
 </ul>
-<h3 id="macho--d"><strong>macho -d</strong></h3>
+<h3 id="macho---help"><strong>macho &ndash;help</strong></h3>
+<p>Help for macho cmd</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho --help
+
+Parse a MachO file
+
+Usage:
+  ipsw macho &lt;macho_file&gt; <span class="o">[</span>flags<span class="o">]</span>
+
+Flags:
+  -a, --arch string             Which architecture to use <span class="k">for</span> fat/universal MachO
+  -e, --ent                     Print entitlements
+  -x, --extract-fileset-entry   Extract the fileset entry
+  -t, --fileset-entry string    Which fileset entry to analyze
+  -u, --fixups                  Print fixup chains
+  -d, --header                  Print the mach header
+  -h, --help                    <span class="nb">help</span> <span class="k">for</span> macho
+  -l, --loads                   Print the load commands
+  -o, --objc                    Print ObjC info
+  -r, --objc-refs               Print ObjC references
+  -s, --sig                     Print code signature
+  -f, --starts                  Print <span class="k">function</span> starts
+  -c, --strings                 Print cstrings
+  -n, --symbols                 Print symbols
+
+Global Flags:
+      --config string   config file <span class="o">(</span>default is <span class="nv">$HOME</span>/.ipsw.yaml<span class="o">)</span>
+  -V, --verbose         verbose output
+</code></pre></div><h3 id="macho--d"><strong>macho -d</strong></h3>
 <p>Similar to <code>otool -h</code></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">$ ipsw macho JavaScriptCore
 
