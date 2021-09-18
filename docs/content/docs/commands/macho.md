@@ -6,12 +6,46 @@ weight: 8
 summary: Parse a MachO file
 ---
 
+- [**macho --help**](#macho---help)
 - [**macho -d**](#macho--d)
 - [**macho -l**](#macho--l)
 - [**macho --sig**](#macho---sig)
 - [**macho --ent**](#macho---ent)
 - [**macho --objc**](#macho---objc)
 - [**macho --fileset-entry**](#macho---fileset-entry)
+
+### **macho --help**
+
+Help for macho cmd
+
+```bash
+❯ ipsw macho --help
+
+Parse a MachO file
+
+Usage:
+  ipsw macho <macho_file> [flags]
+
+Flags:
+  -a, --arch string             Which architecture to use for fat/universal MachO
+  -e, --ent                     Print entitlements
+  -x, --extract-fileset-entry   Extract the fileset entry
+  -t, --fileset-entry string    Which fileset entry to analyze
+  -u, --fixups                  Print fixup chains
+  -d, --header                  Print the mach header
+  -h, --help                    help for macho
+  -l, --loads                   Print the load commands
+  -o, --objc                    Print ObjC info
+  -r, --objc-refs               Print ObjC references
+  -s, --sig                     Print code signature
+  -f, --starts                  Print function starts
+  -c, --strings                 Print cstrings
+  -n, --symbols                 Print symbols
+
+Global Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -V, --verbose         verbose output
+```
 
 ### **macho -d**
 

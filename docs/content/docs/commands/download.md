@@ -5,6 +5,7 @@ weight: 5
 summary: Download and parse IPSW(s) from the internets.
 ---
 
+- [**download --help**](#download---help)
 - [**download**](#download)
 - [**download latest**](#download-latest)
 - [**download kernel**](#download-kernel)
@@ -18,6 +19,49 @@ summary: Download and parse IPSW(s) from the internets.
 ---
 
 > ⚠️ **NOTICE:** Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why.
+
+## **download --help**
+
+Help for download cmd
+
+```bash
+❯ ipsw download --help
+
+Download and parse IPSW(s) from the internets
+
+Usage:
+  ipsw download [options] [flags]
+  ipsw download [command]
+
+Available Commands:
+  beta        Download beta IPSWs from theiphonewiki.com
+  dev         Download IPSWs (and more) from https://developer.apple.com/download
+  kernel      Download just the kernelcache
+  latest      Download latest release version
+  macos       Download and parse macOS IPSWs
+  oss         Download opensource.apple.com file list for macOS version
+  ota         Download OTA betas
+  pattern     Download files that contain file name part
+
+Flags:
+      --black-list stringArray   iOS device black list
+  -b, --build string             iOS BuildID (i.e. 16F203)
+  -d, --device string            iOS Device (i.e. iPhone11,2)
+  -h, --help                     help for download
+      --insecure                 do not verify ssl certs
+      --proxy string             HTTP/HTTPS proxy
+  -_, --remove-commas            replace commas in IPSW filename with underscores
+  -s, --skip-all                 Always skip resumable IPSWs
+  -v, --version string           iOS Version (i.e. 12.3.1)
+      --white-list stringArray   iOS device white list
+  -y, --yes                      do not prompt user
+
+Global Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -V, --verbose         verbose output
+
+Use "ipsw download [command] --help" for more information about a command.
+```
 
 ## **download**
 

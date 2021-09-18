@@ -6,6 +6,7 @@ weight: 11
 summary: Parse dyld_shared_cache.
 ---
 
+- [**dyld --help**](#dyld---help)
 - [**dyld info**](#dyld-info)
 - [**dyld extract**](#dyld-extract)
 - [**dyld macho**](#dyld-macho)
@@ -27,6 +28,47 @@ summary: Parse dyld_shared_cache.
 - [**dyld tbd**](#dyld-tbd)
 
 ---
+
+### **dyld --help**
+
+Help for dyld cmd
+
+```bash
+❯ ipsw dyld --help
+
+Parse dyld_shared_cache
+
+Usage:
+  ipsw dyld [flags]
+  ipsw dyld [command]
+
+Available Commands:
+  a2o         Convert dyld_shared_cache address to offset
+  a2s         Lookup symbol at unslid address
+  disass      🚧 [WIP] Disassemble dyld_shared_cache symbol/vaddr in an image
+  extract     Extract dyld_shared_cache from DMG in IPSW
+  imports     List all dylibs that load a given dylib
+  info        Parse dyld_shared_cache
+  macho       Parse a dylib file
+  o2a         Convert dyld_shared_cache offset to address
+  objc        Dump Objective-C Optimization Info
+  patches     Dump dyld patch info
+  slide       Get slide info chained pointers
+  split       Extracts all the dyld_shared_cache libraries
+  symaddr     Lookup or dump symbol(s)
+  tbd         Generate a .tbd file for a dylib
+  webkit      Get WebKit version from a dyld_shared_cache
+  xref        🚧 [WIP] Find all cross references to an address
+
+Flags:
+  -h, --help   help for dyld
+
+Global Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -V, --verbose         verbose output
+
+Use "ipsw dyld [command] --help" for more information about a command.
+```
 
 ### **dyld info**
 
