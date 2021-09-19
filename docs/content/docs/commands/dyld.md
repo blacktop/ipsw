@@ -156,10 +156,10 @@ Extract _dyld_shared_cache_ from a previously downloaded _ipsw_
 
 ### **dyld macho**
 
-Parse a dyld*shared_cache dylib *(same as ipsw macho cmd)\_
+Parse a cached `dylib` MachO file
 
 ```bash
-❯ ipsw dyld macho dyld_shared_cache JavaScriptCore --objc --loads | bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
+❯ ipsw dyld macho dyld_shared_cache JavaScriptCore --loads --objc
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -240,6 +240,8 @@ Flags         = NoUndefs, DyldLink, TwoLevel, NoReexportedDylibs, AppExtensionSa
 <SNIP>
 ```
 
+> **NOTE:** Make the output look amazing by piping to `bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"`
+
 ### **dyld symaddr**
 
 Find all instances of a symbol's _(unslid)_ addresses in shared cache
@@ -274,7 +276,7 @@ Lookup what symbol is at a given _unslid_ or _slid_ address _(in hex)_
 0x19538e1e0: _objc_msgSend + 32
 ```
 
-This will also create a cached version of the lookup hash table so the next time you lookup it will be much faster
+> **NOTE:** This will also create a cached version of the lookup hash table (.a2s) so the next time you lookup it will be much faster
 
 ```bash
 ❯ time ipsw dyld a2s dyld_shared_cache 0x190a7221c
@@ -344,12 +346,6 @@ Lookup a protocol's address
 0x1b92c85a8: release
 ```
 
-Or get all the protocols for an image
-
-```bash
-❯ ipsw dyld objc proto --image libobjc.A.dylib dyld_shared_cache
-```
-
 ### **dyld objc sel**
 
 Lookup a selector's address
@@ -384,7 +380,7 @@ Objective-C Selectors:
 
 ### **dyld split**
 
-_(only on macOS and requires XCode to be installed)_
+> **NOTE:** Only works on macOS and requires XCode to be installed to the Applications folder
 
 Split up a _dyld_shared_cache_
 
@@ -540,6 +536,8 @@ _NSLog:
 0x1817e7440:  ; loc_1817e7440
 0x1817e7440:  64 52 fe 95       bl              ___stack_chk_fail
 ```
+
+> **NOTE:** Make the output look amazing by piping to `bat -l s --tabs 0 -p --theme Nord --wrap=never --pager "less -S"`
 
 ### **dyld imports**
 

@@ -31,6 +31,25 @@ type objcInfo struct {
 	CFStrings []objc.CFString
 }
 
+type ObjcClassheaderT struct {
+	ClsOffset int32
+	HiOffset  int32
+}
+
+type ClassHeaderV16T uint64
+
+func (h ClassHeaderV16T) IsDuplicate() bool {
+	return types.ExtractBits(uint64(h), 0, 1) == 1
+}
+
+// ObjectCacheOffset returns offset from the shared cache base
+func (h ClassHeaderV16T) ObjectCacheOffset() uint64 {
+	return types.ExtractBits(uint64(h), 1, 47)
+}
+func (h ClassHeaderV16T) DylibObjCIndex() uint16 {
+	return uint16(types.ExtractBits(uint64(h), 48, 16))
+}
+
 /*
  * objc_opt_t - dyld/include/objc-shared-cache.h
  *
@@ -54,6 +73,24 @@ type Optimization struct {
 
 func (o Optimization) isPointerAligned() bool {
 	return (binary.Size(o) % 8) == 0
+}
+
+func (o Optimization) GetClassOffset() int32 {
+	if o.Version >= 16 {
+		return o.LargeSharedCachesClassOffset
+	} else {
+		return o.UnusedClassOptOffset
+	}
+}
+
+func (o Optimization) GetProtocolOffset() int32 {
+	if o.Version >= 16 {
+		return o.LargeSharedCachesProtocolOffset
+	} else if o.Version >= 15 {
+		return o.UnusedProtocolOpt2Offset
+	} else {
+		return o.UnusedProtocolOptOffset
+	}
 }
 
 func (o Optimization) String() string {
@@ -132,7 +169,7 @@ func (f *File) getSelectorStringHash() (*StringHash, error) {
 		return nil, fmt.Errorf("selopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.SelectorOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.SelectorOptOffset), opt: opt}
 
 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
@@ -168,11 +205,11 @@ func (f *File) getClassStringHash() (*StringHash, error) {
 		return nil, err
 	}
 
-	if opt.UnusedClassOptOffset == 0 {
+	if opt.GetClassOffset() == 0 {
 		return nil, fmt.Errorf("clsopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedClassOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.GetClassOffset()), opt: opt}
 
 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
@@ -188,31 +225,11 @@ func (f *File) getProtocolStringHash() (*StringHash, error) {
 		return nil, err
 	}
 
-	if opt.UnusedProtocolOptOffset == 0 {
-		return nil, fmt.Errorf("unused_protocolopt_offset (old protocolopt_offset) is 0")
-	}
-
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedProtocolOptOffset)}
-
-	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
-		return nil, err
-	}
-
-	return &shash, nil
-}
-
-func (f *File) getProtocol2StringHash() (*StringHash, error) {
-
-	sec, opt, err := f.getOptimizations()
-	if err != nil {
-		return nil, err
-	}
-
-	if opt.UnusedProtocolOpt2Offset == 0 {
+	if opt.GetProtocolOffset() == 0 {
 		return nil, fmt.Errorf("protocolopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedProtocolOpt2Offset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.GetProtocolOffset()), opt: opt}
 
 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
@@ -428,10 +445,7 @@ func (f *File) GetClassAddress(class string) (uint64, error) {
 func (f *File) GetAllProtocols(print bool) (map[string]uint64, error) {
 	shash, err := f.getProtocolStringHash()
 	if err != nil {
-		shash, err = f.getProtocol2StringHash()
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed read selector objc_stringhash_t")
-		}
+		return nil, errors.Wrapf(err, "failed read selector objc_stringhash_t")
 	}
 
 	if print {
@@ -445,10 +459,7 @@ func (f *File) GetAllProtocols(print bool) (map[string]uint64, error) {
 func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
 	shash, err := f.getProtocolStringHash()
 	if err != nil {
-		shash, err = f.getProtocol2StringHash()
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed read selector objc_stringhash_t")
-		}
+		return 0, errors.Wrapf(err, "failed read selector objc_stringhash_t")
 	}
 
 	selIndex, err := shash.getIndex(protocol)
@@ -553,6 +564,11 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 	}
 
 	return nil
+}
+
+// ProtocolsForImage returns all of the Objective-C protocols for a given image
+func (f *File) ProtocolsForImage(imageNames ...string) error {
+	return fmt.Errorf("not yet implimented") // TODO: is this possible?
 }
 
 // SelectorsForImage returns all of the Objective-C selectors for a given image
@@ -728,8 +744,19 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 func (f *File) ImpCachesForImage(imageNames ...string) error {
 	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
 
+	var optOffsets objc.OptOffsets
+	// var optOffsets objc.OptOffsets2
 	var selectorStringVMAddrStart uint64
 	var selectorStringVMAddrEnd uint64
+
+	_, opt, err := f.getOptimizations()
+	if err != nil {
+		return err
+	}
+
+	if f.IsDyld4 || opt.Version >= 16 {
+		return fmt.Errorf("imp-cache dumping is NOT supported on macOS12/iOS15+ (yet)")
+	}
 
 	libObjC, err := f.getLibObjC()
 	if err != nil {
@@ -737,15 +764,17 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	}
 
 	if sec := libObjC.Section("__DATA_CONST", "__objc_scoffs"); sec != nil {
+		dat, err := sec.Data()
+		if err != nil {
+			return fmt.Errorf("failed to read data in %s.%s: %v", sec.Seg, sec.Name, err)
+		}
 
-		r := io.NewSectionReader(f.r[f.UUID], int64(sec.Offset), int64(sec.Size))
-
-		scoffs := make([]uint64, int(sec.Size/8))
-		if err := binary.Read(r, f.ByteOrder, &scoffs); err != nil {
+		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &optOffsets); err != nil {
 			return err
 		}
-		selectorStringVMAddrStart = f.SlideInfo[f.UUID].SlidePointer(scoffs[0])
-		selectorStringVMAddrEnd = f.SlideInfo[f.UUID].SlidePointer(scoffs[1])
+
+		selectorStringVMAddrStart = f.SlideInfo[f.UUID].SlidePointer(optOffsets.MethodNameStart)
+		selectorStringVMAddrEnd = f.SlideInfo[f.UUID].SlidePointer(optOffsets.MethodNameEnd)
 		// inlinedSelectorsVMAddrStart = scoffs[2]
 		// inlinedSelectorsVMAddrEnd = scoffs[3]
 	} else {
@@ -773,11 +802,16 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 
 		sec := m.Section("__DATA", "__objc_classrefs")
 		if sec != nil {
-			r := io.NewSectionReader(f.r[image.cuuid], int64(sec.Offset), int64(sec.Size))
+			dat, err := sec.Data()
+			if err != nil {
+				return fmt.Errorf("failed to read data in %s.%s: %v", sec.Seg, sec.Name, err)
+			}
+
 			classPtrs := make([]uint64, sec.Size/8)
-			if err := binary.Read(r, f.ByteOrder, &classPtrs); err != nil {
+			if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &classPtrs); err != nil {
 				return err
 			}
+
 			for idx, ptr := range classPtrs {
 				classPtrs[idx] = ptr & mask // TODO use chain fixups
 			}
@@ -806,22 +840,24 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 						return fmt.Errorf("failed to read preopt_cache_t: %v", err)
 					}
 
-					impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.CacheMask()+1)
+					impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.Capacity())
 					if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
 						return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
 					}
 
-					fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.CacheMask()+1)
+					fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.Capacity())
 
 					for _, bucket := range impCache.Entries {
-						if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
-							sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
-							if err != nil {
-								return err
-							}
-							fmt.Printf("  - %#09x: %s\n", c.ClassPtr.VMAdder-uint64(bucket.ImpOffset), sel)
-						} else {
+						if bucket.SelOffset == 0xFFFFFFFF {
 							fmt.Printf("  - %#09x:\n", 0)
+						} else {
+							if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
+								sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
+								if err != nil {
+									return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
+								}
+								fmt.Printf("  - %#09x: %s\n", c.ClassPtr.VMAdder-uint64(bucket.ImpOffset), sel)
+							} // TODO: handle the error case warn or crash?
 						}
 					}
 				} else {
@@ -1030,7 +1066,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
  * Base class for precomputed selector table and class table.
  */
 
-type stringHashT struct {
+type stringHash struct {
 	Capacity uint32
 	Occupied uint32
 	Shift    uint32
@@ -1041,37 +1077,145 @@ type stringHashT struct {
 	Scramble [256]uint32
 }
 
+type stringHashV16 struct {
+	Version  uint32
+	Capacity uint32
+	Occupied uint32
+	Shift    uint32
+	Mask     uint32
+	_        uint32 // was zero
+	Salt     uint64
+	Scramble [256]uint32
+}
+
 // StringHash struct
 type StringHash struct {
-	FileOffset int64
-	stringHashT
-	Tab        []byte  /* tab[mask+1] (always power-of-2) */
-	CheckBytes []byte  /* check byte for each string */
-	Offsets    []int32 /* offsets from &capacity to cstrings */
+	FileOffset       int64
+	shash            interface{}
+	Tab              []byte   /* tab[mask+1] (always power-of-2) */
+	CheckBytes       []byte   /* check byte for each string */
+	Offsets          []int32  /* offsets from &capacity to cstrings */
+	ClassOffsets     []uint64 /* offsets from &capacity to cstrings */
+	DuplicateCount   uint32
+	DuplicateOffsets []uint64
+
+	opt *Optimization
+}
+
+// Capacity returns the Capacity
+func (s *StringHash) Capacity() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Capacity
+	case stringHashV16:
+		return h.Capacity
+	}
+	return 0
+}
+
+// Occupied returns the Occupied
+func (s *StringHash) Occupied() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Occupied
+	case stringHashV16:
+		return h.Occupied
+	}
+	return 0
+}
+
+// Shift returns the Shift
+func (s *StringHash) Shift() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Shift
+	case stringHashV16:
+		return h.Shift
+	}
+	return 0
+}
+
+// Mask returns the Mask
+func (s *StringHash) Mask() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Mask
+	case stringHashV16:
+		return h.Mask
+	}
+	return 0
+}
+
+// Salt returns the Salt
+func (s *StringHash) Salt() uint64 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Salt
+	case stringHashV16:
+		return h.Salt
+	}
+	return 0
+}
+
+// Scramble returns the Scramble
+func (s *StringHash) Scramble() [256]uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Scramble
+	case stringHashV16:
+		return h.Scramble
+	}
+	return [256]uint32{0}
 }
 
 func (s *StringHash) Read(r *io.SectionReader) error {
+
 	r.Seek(int64(s.FileOffset), io.SeekStart)
-	if err := binary.Read(r, binary.LittleEndian, &s.stringHashT); err != nil {
-		return err
+
+	if s.opt.Version >= 16 {
+		var sh stringHashV16
+		if err := binary.Read(r, binary.LittleEndian, &sh); err != nil {
+			return fmt.Errorf("failed to read %T: %v", sh, err)
+		}
+		s.shash = sh
+	} else {
+		var sh stringHash
+		if err := binary.Read(r, binary.LittleEndian, &sh); err != nil {
+			return fmt.Errorf("failed to read %T: %v", sh, err)
+		}
+		s.shash = sh
 	}
 
 	// log.Debugf("Objective-C StringHash:\n%s", s)
 
-	s.Tab = make([]byte, s.Mask+1)
+	s.Tab = make([]byte, s.Mask()+1)
 	if err := binary.Read(r, binary.LittleEndian, &s.Tab); err != nil {
 		return err
 	}
 
-	s.CheckBytes = make([]byte, s.Capacity)
+	s.CheckBytes = make([]byte, s.Capacity())
 	if err := binary.Read(r, binary.LittleEndian, &s.CheckBytes); err != nil {
 		return err
 	}
 
-	s.Offsets = make([]int32, s.Capacity)
+	s.Offsets = make([]int32, s.Capacity())
 	if err := binary.Read(r, binary.LittleEndian, &s.Offsets); err != nil {
 		return err
 	}
+
+	// s.ClassOffsets = make([]uint64, s.Capacity())
+	// if err := binary.Read(r, binary.LittleEndian, &s.Offsets); err != nil {
+	// 	return err
+	// }
+
+	// if err := binary.Read(r, binary.LittleEndian, &s.DuplicateCount); err != nil {
+	// 	return err
+	// }
+
+	// s.DuplicateOffsets = make([]uint64, s.DuplicateCount)
+	// if err := binary.Read(r, binary.LittleEndian, &s.DuplicateOffsets); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -1085,11 +1229,11 @@ func (s StringHash) String() string {
 			"Mask       = %X\n"+
 			"Salt       = %016X\n",
 		s.FileOffset,
-		s.Capacity,
-		s.Occupied,
-		s.Shift,
-		s.Mask,
-		s.Salt)
+		s.Capacity(),
+		s.Occupied(),
+		s.Shift(),
+		s.Mask(),
+		s.Salt())
 }
 
 /*
@@ -1258,8 +1402,8 @@ func lookup8(k []byte, level uint64) uint64 {
 }
 
 func (s StringHash) hash(key []byte) uint32 {
-	val := lookup8(key, s.Salt)
-	index := (val >> uint64(s.Shift)) ^ uint64(s.Scramble[s.Tab[(val&uint64(s.Mask))]])
+	val := lookup8(key, s.Salt())
+	index := (val >> uint64(s.Shift())) ^ uint64(s.Scramble()[s.Tab[(val&uint64(s.Mask()))]])
 	return uint32(index)
 }
 
