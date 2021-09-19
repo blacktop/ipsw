@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -34,24 +33,21 @@ import (
 )
 
 func init() {
-	dyldObjcCmd.AddCommand(objcSelCmd)
+	dyldObjcCmd.AddCommand(objcProtoCmd)
 
-	objcSelCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	objcSelCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	objcProtoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
-// objcSelCmd represents the sel command
-var objcSelCmd = &cobra.Command{
-	Use:   "sel  [options] <dyld_shared_cache>",
-	Short: "Get ObjC selector info",
+// objcProtoCmd represents the proto command
+var objcProtoCmd = &cobra.Command{
+	Use:   "proto  [options] <dyld_shared_cache>",
+	Short: "Get ObjC proto info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-
-		imageName, _ := cmd.Flags().GetString("image")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -80,34 +76,15 @@ var objcSelCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(args) > 1 {
-			ptr, err := f.GetSelectorAddress(args[1])
+			ptr, err := f.GetProtocolAddress(args[1])
 			if err != nil {
 				return err
 			}
 			fmt.Printf("0x%x: %s\n", ptr, args[1])
 		} else {
-			if len(imageName) > 0 {
-				err = f.SelectorsForImage(imageName)
-				if err != nil {
-					return err
-				}
-
-				// sort by address
-				addrs := make([]uint64, 0, len(f.AddressToSymbol))
-				for a := range f.AddressToSymbol {
-					addrs = append(addrs, a)
-				}
-				sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
-
-				for _, addr := range addrs {
-					fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
-				}
-
-			} else {
-				_, err := f.GetAllSelectors(true)
-				if err != nil {
-					return err
-				}
+			_, err := f.GetAllProtocols(true)
+			if err != nil {
+				return err
 			}
 		}
 

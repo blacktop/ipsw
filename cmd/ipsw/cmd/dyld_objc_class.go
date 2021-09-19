@@ -34,16 +34,16 @@ import (
 )
 
 func init() {
-	dyldObjcCmd.AddCommand(objcSelCmd)
+	dyldObjcCmd.AddCommand(objcClassCmd)
 
-	objcSelCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	objcSelCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	objcClassCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	objcClassCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
-// objcSelCmd represents the sel command
-var objcSelCmd = &cobra.Command{
-	Use:   "sel  [options] <dyld_shared_cache>",
-	Short: "Get ObjC selector info",
+// objcClassCmd represents the class command
+var objcClassCmd = &cobra.Command{
+	Use:   "class  [options] <dyld_shared_cache>",
+	Short: "Get ObjC class info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -80,14 +80,14 @@ var objcSelCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(args) > 1 {
-			ptr, err := f.GetSelectorAddress(args[1])
+			ptr, err := f.GetClassAddress(args[1])
 			if err != nil {
 				return err
 			}
 			fmt.Printf("0x%x: %s\n", ptr, args[1])
 		} else {
 			if len(imageName) > 0 {
-				err = f.SelectorsForImage(imageName)
+				err = f.ClassesForImage(imageName)
 				if err != nil {
 					return err
 				}
@@ -104,7 +104,7 @@ var objcSelCmd = &cobra.Command{
 				}
 
 			} else {
-				_, err := f.GetAllSelectors(true)
+				_, err := f.GetAllClasses(true)
 				if err != nil {
 					return err
 				}
