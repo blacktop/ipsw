@@ -335,16 +335,20 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 	b64Str := parts[1]
 	b64Str = strings.ReplaceAll(b64Str, "-", "+")
 	b64Str = strings.ReplaceAll(b64Str, "_", "/")
-	addEq := len(b64Str) % 5
+	addEq := len(b64Str) % 3
 	b64Str += strings.Repeat("=", addEq)
 
 	// bas64 decode the results
 	b64data, err := base64.StdEncoding.DecodeString(b64Str)
 	if err != nil {
-		if idx, ok := err.(base64.CorruptInputError); ok {
-			return OtaAsset{}, fmt.Errorf("base64 corrupt input at %d in input (char %c): %v", idx, []rune(b64Str)[idx], err)
+		b64Str += "="
+		b64data, err = base64.StdEncoding.DecodeString(b64Str)
+		if err != nil {
+			if idx, ok := err.(base64.CorruptInputError); ok {
+				return OtaAsset{}, fmt.Errorf("base64 corrupt input at %d in input (char %c): %v", idx, []rune(b64Str)[idx], err)
+			}
+			return OtaAsset{}, err
 		}
-		return OtaAsset{}, err
 	}
 
 	res := ota{}
