@@ -245,10 +245,10 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --class ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
-      - name: Run dyld objc --imp-cache
-        if: matrix.platform == 'macos-latest'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --imp-cache ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+      # - name: Run dyld objc --imp-cache
+      #   if: matrix.platform == 'macos-latest'
+      #   run: |
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --imp-cache ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
       - name: Run dyld objc --proto
         if: matrix.platform == 'macos-latest'
         run: |
@@ -270,17 +270,17 @@ jobs:
       #
       # ENT CMD (macOS)
       #
-      # - name: Run ents
-      #   if: matrix.platform == 'macos-latest'
-      #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw ent ~/.ipsw/*.ipsw --ent platform-application
+      - name: Run ents
+        if: matrix.platform == 'macos-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw ent *.ipsw --ent platform-application
       #
       # INFO CMD (macOS)
       #
       - name: Run info
         if: matrix.platform == 'macos-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw info ~/.ipsw/*.ipsw
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw info *.ipsw
 
       # - name: Run ipsw update
       #   if: matrix.platform == 'macos-latest'
