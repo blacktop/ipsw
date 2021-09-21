@@ -335,8 +335,9 @@ func (o *Ota) GetOtaForDevice(device, hwmodel string) (OtaAsset, error) {
 	b64Str := parts[1]
 	b64Str = strings.ReplaceAll(b64Str, "-", "+")
 	b64Str = strings.ReplaceAll(b64Str, "_", "/")
-	addEq := len(b64Str) % 3
-	b64Str += strings.Repeat("=", addEq)
+	if i := len(b64Str) % 4; i != 0 {
+		b64Str += strings.Repeat("=", 4-i)
+	}
 
 	// bas64 decode the results
 	b64data, err := base64.StdEncoding.DecodeString(b64Str)
