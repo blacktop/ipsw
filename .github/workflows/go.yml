@@ -259,6 +259,7 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw dyld split ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e ~/.ipsw
+          echo "DONE!"
       #
       # MACHO CMD (macOS)
       #
