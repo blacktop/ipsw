@@ -37,7 +37,7 @@ jobs:
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-11'
         run: |
-          brew install lzfse
+          brew install lzfse tree
       # - name: Build Dependencies (Windows)
       #   if: matrix.platform == 'windows-latest'
       #   run: |
@@ -259,7 +259,7 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw dyld split ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e ~/.ipsw
-          echo "DONE!"
+          tree ~/.ipsw
       #
       # MACHO CMD (macOS)
       #
