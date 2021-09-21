@@ -274,20 +274,25 @@ jobs:
       - name: Run ents
         if: matrix.platform == 'macos-11'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw ent *.ipsw --ent platform-application
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw ent *.ipsw --ent platform-application
       #
       # INFO CMD (macOS)
       #
       - name: Run info
         if: matrix.platform == 'macos-11'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw info *.ipsw
-
-      # - name: Run ipsw update
-      #   if: matrix.platform == 'macos-11'
-      #   run: |
-      #     build/dist/ipsw update --platform windows_x86_64 -V
-      #     build/dist/ipsw update --detect
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw info *.ipsw
+      #
+      # UPDATE CMD (macOS)
+      #
+      - name: Run ipsw update
+        if: matrix.platform == 'macos-11'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --platform windows_x86_64 -V
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --detect
 
       - uses: actions/upload-artifact@v2
         with:
