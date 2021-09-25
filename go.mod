@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.7.1
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-macho v1.1.51
+	github.com/blacktop/go-macho v1.1.52
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -29,17 +29,17 @@ require (
 	github.com/therootcompany/xz v1.0.1
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
-	golang.org/x/net v0.0.0-20210917221730-978cfadd31cf
+	golang.org/x/net v0.0.0-20210924151903-3ad01bbaa167
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210921065528-437939a70204
+	golang.org/x/sys v0.0.0-20210925032602-92d5a993a665
 )
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
-	github.com/andybalholm/cascadia v1.3.0 // indirect
-	github.com/antchfx/htmlquery v1.2.3 // indirect
-	github.com/antchfx/xmlquery v1.3.6 // indirect
+	github.com/andybalholm/cascadia v1.3.1 // indirect
+	github.com/antchfx/htmlquery v1.2.4 // indirect
+	github.com/antchfx/xmlquery v1.3.7 // indirect
 	github.com/antchfx/xpath v1.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
