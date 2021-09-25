@@ -31,6 +31,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -46,6 +47,9 @@ func init() {
 	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	dyldMachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
+	// dyldMachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
+
+	dyldMachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
 
 	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -67,7 +71,9 @@ var dyldMachoCmd = &cobra.Command{
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
+		// dumpStubs, _ := cmd.Flags().GetBool("stubs")
 		dumpALL, _ := cmd.Flags().GetBool("all")
+		extractDylib, _ := cmd.Flags().GetBool("extract")
 
 		onlyFuncStarts := !showLoadCommands && !showObjC && showFuncStarts
 
@@ -125,6 +131,21 @@ var dyldMachoCmd = &cobra.Command{
 					if err != nil {
 						return err
 					}
+				}
+
+				if extractDylib {
+					var dcf *fixupchains.DyldChainedFixups
+					if m.HasFixups() {
+						dcf, err = m.DyldChainedFixups()
+						if err != nil {
+							return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
+						}
+					}
+					err = m.Export(filepath.Base(i.Name), dcf, m.GetBaseAddress())
+					if err != nil {
+						return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
+					}
+					log.Infof("Created %s", filepath.Base(i.Name))
 				}
 
 				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts {
@@ -314,6 +335,17 @@ var dyldMachoCmd = &cobra.Command{
 					}
 				}
 
+				// if dumpStubs {
+				// 	if err := f.AnalyzeImage(i); err != nil {
+				// 		return err
+				// 	}
+				// 	for stubAddr, addr := range i.Analysis.SymbolStubs {
+				// 		if symName, ok := f.AddressToSymbol[addr]; ok {
+				// 			fmt.Printf("%#x: %s\n", stubAddr, symName)
+				// 			// return nil
+				// 		}
+				// 	}
+				// }
 			}
 		} else {
 			log.Error("you must supply a dylib MachO to parse")
