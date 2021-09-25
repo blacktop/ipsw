@@ -58,7 +58,7 @@ type File struct {
 
 	Images cacheImages
 
-	SlideInfo       map[mtypes.UUID]slideInfo
+	SlideInfo       slideInfo
 	PatchInfo       CachePatchInfo
 	LocalSymInfo    localSymbolInfo
 	AcceleratorInfo CacheAcceleratorInfo
@@ -148,11 +148,11 @@ func Open(name string) (*File, error) {
 
 			ff.closers[uuid] = fsub
 
-			if ff.Headers[uuid].SubCachesUUID != ff.Headers[ff.UUID].SubCachesUUID {
-				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
-					ff.Headers[ff.UUID].SubCachesUUID,
-					ff.Headers[uuid].SubCachesUUID)
-			}
+			// if ff.Headers[uuid].SubCachesUUID != ff.Headers[ff.UUID].SubCachesUUID { FIXME: what IS this field actually?
+			// 	return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
+			// 		ff.Headers[ff.UUID].SubCachesUUID,
+			// 		ff.Headers[uuid].SubCachesUUID)
+			// }
 		}
 
 		if !ff.Headers[ff.UUID].SymbolsSubCacheUUID.IsNull() {
@@ -229,7 +229,6 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.Headers = make(map[mtypes.UUID]CacheHeader)
 	f.Mappings = make(map[mtypes.UUID]cacheMappings)
 	f.MappingsWithSlideInfo = make(map[mtypes.UUID]cacheMappingsWithSlideInfo)
-	f.SlideInfo = make(map[mtypes.UUID]slideInfo)
 	f.CodeSignatures = make(map[mtypes.UUID]codesignature)
 	f.r = make(map[mtypes.UUID]io.ReaderAt)
 	f.closers = make(map[mtypes.UUID]io.Closer)
@@ -589,7 +588,13 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 			return err
 		}
 
-		f.SlideInfo[uuid] = slideInfo
+		if f.SlideInfo != nil {
+			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
+				return fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
+			}
+		}
+
+		f.SlideInfo = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)
@@ -622,7 +627,13 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 			return err
 		}
 
-		f.SlideInfo[uuid] = slideInfo
+		if f.SlideInfo != nil {
+			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
+				return fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
+			}
+		}
+
+		f.SlideInfo = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)
@@ -703,7 +714,14 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 		if err := binary.Read(sr, binary.LittleEndian, &slideInfo); err != nil {
 			return err
 		}
-		f.SlideInfo[uuid] = slideInfo
+
+		if f.SlideInfo != nil {
+			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
+				return fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
+			}
+		}
+
+		f.SlideInfo = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)
@@ -774,7 +792,13 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 			return err
 		}
 
-		f.SlideInfo[uuid] = slideInfo
+		if f.SlideInfo != nil {
+			if f.SlideInfo.GetVersion() != slideInfo.GetVersion() {
+				return fmt.Errorf("found mixed slide info versions: %d and %d", f.SlideInfo.GetVersion(), slideInfo.GetVersion())
+			}
+		}
+
+		f.SlideInfo = slideInfo
 
 		if dump {
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)

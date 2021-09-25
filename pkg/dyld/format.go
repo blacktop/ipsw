@@ -198,7 +198,7 @@ func (f *File) String(verbose bool) string {
 	var slideVersion uint32
 
 	if f.SlideInfo != nil {
-		slideVersion = f.SlideInfo[f.UUID].GetVersion()
+		slideVersion = f.SlideInfo.GetVersion()
 	}
 
 	return fmt.Sprintf(
