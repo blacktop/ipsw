@@ -532,7 +532,7 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 			if err := binary.Read(rr, binary.LittleEndian, &header); err != nil {
 				return false, err
 			}
-			ioutil.WriteFile("ota_header", header, 0644)
+
 			ent, err = yaaDecodeHeader(bytes.NewReader(header))
 			if err != nil {
 				// dump header if in Verbose mode

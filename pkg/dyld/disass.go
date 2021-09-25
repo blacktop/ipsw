@@ -288,6 +288,10 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 		}
 	}
 
+	if !f.IsArm64() {
+		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
+	}
+
 	if !image.Analysis.State.IsStubsDone() && f.IsArm64() {
 		log.Debugf("parsing %s symbol stubs", image.Name)
 		if err := f.ParseSymbolStubs(image); err != nil {
@@ -368,6 +372,7 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 			if err != nil {
 				return err
 			}
+
 			r := io.NewSectionReader(f.r[uuid], int64(offset), int64(sec.Size))
 
 			for i := range arm64.Disassemble(r, arm64.Options{StartAddress: int64(sec.Addr)}) {
@@ -391,7 +396,7 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 						if err != nil {
 							return fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
 						}
-						image.Analysis.SymbolStubs[adrpAddr] = f.SlideInfo[uuid].SlidePointer(addr)
+						image.Analysis.SymbolStubs[adrpAddr] = f.SlideInfo.SlidePointer(addr)
 					}
 				} else if i.Instruction.Operation() == arm64.ARM64_BR && prevInst.Operation() == arm64.ARM64_ADD {
 					// add       	x16, x16, #0x828
@@ -429,33 +434,31 @@ func (f *File) ParseGOT(image *CacheImage) error {
 		if err != nil {
 			return fmt.Errorf("failed to get %s.%s section data: %v", authPtr.Seg, authPtr.Name, err)
 		}
-		r := bytes.NewReader(dat)
 
 		ptrs := make([]uint64, authPtr.Size/8)
-		if err := binary.Read(r, binary.LittleEndian, &ptrs); err != nil {
+		if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
 			return fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr ptrs; %v", err)
 		}
 
 		for idx, ptr := range ptrs {
-			image.Analysis.GotPointers[authPtr.Addr+uint64(idx*8)] = f.SlideInfo[f.UUID].SlidePointer(ptr) // TODO: should this be subcache specific
+			image.Analysis.GotPointers[authPtr.Addr+uint64(idx*8)] = f.SlideInfo.SlidePointer(ptr)
 		}
 	}
 
 	for _, sec := range m.Sections {
-		if sec.Flags.IsNonLazySymbolPointers() {
+		if sec.Flags.IsNonLazySymbolPointers() || sec.Flags.IsLazySymbolPointers() { // TODO: make sure this doesn't break things
 			dat, err := sec.Data()
 			if err != nil {
 				return fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
 			}
-			r := bytes.NewReader(dat)
 
 			ptrs := make([]uint64, sec.Size/8)
-			if err := binary.Read(r, binary.LittleEndian, &ptrs); err != nil {
+			if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
 				return fmt.Errorf("failed to read %s.%s NonLazySymbol pointers; %v", sec.Seg, sec.Name, err)
 			}
 
 			for idx, ptr := range ptrs {
-				image.Analysis.GotPointers[sec.Addr+uint64(idx*8)] = f.SlideInfo[f.UUID].SlidePointer(ptr) // TODO: should this be subcache specific
+				image.Analysis.GotPointers[sec.Addr+uint64(idx*8)] = f.SlideInfo.SlidePointer(ptr)
 			}
 		}
 	}

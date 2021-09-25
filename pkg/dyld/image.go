@@ -173,7 +173,7 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 		LinkEditDataReader: io.NewSectionReader(i, 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
-				return i.cache.SlideInfo[i.cuuid].SlidePointer(addr)
+				return i.cache.SlideInfo.SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
 				return i.GetOffset(address)
@@ -211,7 +211,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 		SectionReader: io.NewSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
-				return i.cache.SlideInfo[i.cuuid].SlidePointer(addr)
+				return i.cache.SlideInfo.SlidePointer(addr)
 			},
 			VMAddr2Offet: func(address uint64) (uint64, error) {
 				return i.GetOffset(address)
