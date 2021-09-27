@@ -114,35 +114,122 @@ type CacheImage struct {
 
 	Analysis analysis
 
-	cuuid types.UUID
 	cache *File // pointer back to the dyld cache that the image belongs to
+	cuuid types.UUID
+	CacheReader
+	m *macho.File
 }
 
-// ReadAt impliments the io.ReadAt interface requirement
-func (i *CacheImage) ReadAt(buf []byte, off int64) (n int, err error) {
-	m, err := i.GetPartialMacho()
+// NewCacheReader returns a CacheReader that reads from r
+// starting at offset off and stops with EOF after n bytes.
+// It also stubs out the MachoReader required SeekToAddr and ReadAtAddr
+func NewCacheReader(off int64, n int64, u types.UUID) CacheReader {
+	return CacheReader{off, off, off + n, u}
+}
+
+// CacheReader implements Read, Seek, and ReadAt on a section
+// of an underlying ReaderAt.
+type CacheReader struct {
+	base  int64
+	off   int64
+	limit int64
+	ruuid types.UUID
+}
+
+func (i *CacheImage) Read(p []byte) (n int, err error) {
+	if i.off >= i.limit {
+		return 0, io.EOF
+	}
+	if max := i.limit - i.off; int64(len(p)) > max {
+		p = p[0:max]
+	}
+	n, err = i.cache.r[i.ruuid].ReadAt(p, i.off)
+	i.off += int64(n)
+	return
+}
+
+func (i *CacheImage) Seek(offset int64, whence int) (int64, error) {
+	switch whence {
+	default:
+		return 0, fmt.Errorf("Seek: invalid whence")
+	case io.SeekStart:
+		offset += i.base
+	case io.SeekCurrent:
+		offset += i.off
+	case io.SeekEnd:
+		offset += i.limit
+	}
+	if offset < i.base {
+		return 0, fmt.Errorf("Seek: invalid offset")
+	}
+	i.off = offset
+	return offset - i.base, nil
+}
+
+func (i *CacheImage) ReadAt(p []byte, off int64) (n int, err error) {
+	var offset uint64
+	if i.m == nil {
+		i.m, err = i.GetPartialMacho()
+		if err != nil {
+			return -1, err
+		}
+	}
+	addr, err := i.m.GetVMAddress(uint64(off))
 	if err != nil {
 		return -1, err
 	}
-	le := m.Segment("__LINKEDIT")
-	if le == nil {
-		return -1, fmt.Errorf("failed to read at offset %#x: failed to find __LINKEDIT segment", off)
-	}
-	uuid, _, err := i.cache.GetOffset(le.Addr)
+	i.ruuid, offset, err = i.cache.GetOffset(addr)
 	if err != nil {
 		return -1, err
 	}
-	return i.cache.r[uuid].ReadAt(buf, off)
+	off = int64(offset)
+	if off < 0 || off >= i.limit-i.base {
+		return 0, io.EOF
+	}
+	off += i.base
+	if max := i.limit - off; int64(len(p)) > max {
+		p = p[0:max]
+		n, err = i.cache.r[i.ruuid].ReadAt(p, off)
+		if err == nil {
+			err = io.EOF
+		}
+		return n, err
+	}
+	// fmt.Printf("image.ReadAt: cache_uuid=%s, uuid=%s, off=%#x\n", i.cuuid, uuid, off)
+	return i.cache.r[i.ruuid].ReadAt(p, off)
+}
+
+func (i *CacheImage) SeekToAddr(addr uint64) error {
+	uuid, offset, err := i.cache.GetOffset(addr)
+	if err != nil {
+		return err
+	}
+	i.ruuid = uuid
+	i.Seek(int64(offset), io.SeekStart)
+	return nil
+}
+
+// ReadAtAddr reads data at a given virtual address
+func (i *CacheImage) ReadAtAddr(buf []byte, addr uint64) (int, error) {
+	uuid, off, err := i.cache.GetOffset(addr)
+	if err != nil {
+		return -1, err
+	}
+	i.ruuid = uuid
+	// fmt.Printf("image.ReadAt: cache_uuid=%s, uuid=%s, off=%#x\n", i.cuuid, uuid, off)
+	return i.cache.r[i.ruuid].ReadAt(buf, int64(off))
 }
 
 // GetOffset returns the offset for a given virtual address
 func (i *CacheImage) GetOffset(address uint64) (uint64, error) {
 	// u, o, e := i.cache.GetOffset(address)
-	// if e != nil {
-	// 	return 0, e
-	// }
+	u, _, e := i.cache.GetOffset(address)
+	if e != nil {
+		return 0, e
+	}
 	// fmt.Printf("prim_uuid=%s, cache_uuid=%s, uuid=%s, off=%#x\n", i.cache.UUID, i.cuuid, u, o)
-	return i.cache.GetOffsetForUUID(i.cuuid, address)
+	return i.cache.GetOffsetForUUID(u, address)
+	// return i.cache.GetOffsetForUUID(i.cuuid, address)
 }
 
 // GetVMAddress returns the virtual address for a given offset
@@ -167,10 +254,12 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 		rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
 	}
 
+	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
+
 	return macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
-		Offset:             int64(offset),
-		SectionReader:      io.NewSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
-		LinkEditDataReader: io.NewSectionReader(i, 0, 1<<63-1),
+		Offset:        int64(offset),
+		SectionReader: types.NewCustomSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
+		CacheReader:   i,
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
 				return i.cache.SlideInfo.SlidePointer(addr)
@@ -208,7 +297,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			types.LC_LOAD_WEAK_DYLIB,
 			types.LC_LOAD_UPWARD_DYLIB},
 		Offset:        int64(offset),
-		SectionReader: io.NewSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
+		SectionReader: types.NewCustomSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
 		VMAddrConverter: types.VMAddrConverter{
 			Converter: func(addr uint64) uint64 {
 				return i.cache.SlideInfo.SlidePointer(addr)
