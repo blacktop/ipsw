@@ -639,7 +639,7 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 			fmt.Printf("slide info version = %d\n", slideInfo.Version)
 			fmt.Printf("page_size          = %d\n", slideInfo.PageSize)
 			fmt.Printf("delta_mask         = %#016x\n", slideInfo.DeltaMask)
-			fmt.Printf("value_add          = %#016x\n", slideInfo.ValueAdd)
+			fmt.Printf("value_add          = %#x\n", slideInfo.ValueAdd)
 			fmt.Printf("page_starts_count  = %d\n", slideInfo.PageStartsCount)
 			fmt.Printf("page_extras_count  = %d\n", slideInfo.PageExtrasCount)
 

@@ -341,13 +341,13 @@ var machoCmd = &cobra.Command{
 					if protRefs, err := m.GetObjCProtoReferences(); err == nil {
 						fmt.Printf("\n@protocol refs\n")
 						for off, prot := range protRefs {
-							fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr.VMAdder, prot.Name)
+							fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr, prot.Name)
 						}
 					}
 					if clsRefs, err := m.GetObjCClassReferences(); err == nil {
 						fmt.Printf("\n@class refs\n")
 						for off, cls := range clsRefs {
-							fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr.VMAdder, cls.Name)
+							fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr, cls.Name)
 							// if Verbose {
 							// 	fmt.Println(cls.Verbose())
 							// } else {
@@ -358,7 +358,7 @@ var machoCmd = &cobra.Command{
 					if supRefs, err := m.GetObjCSuperReferences(); err == nil {
 						fmt.Printf("\n@super refs\n")
 						for off, sup := range supRefs {
-							fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr.VMAdder, sup.Name)
+							fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr, sup.Name)
 						}
 					}
 					if selRefs, err := m.GetObjCSelectorReferences(); err == nil {

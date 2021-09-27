@@ -712,10 +712,6 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 						ImpVMAddr: impVMAddr,
 						Name:      n,
 						Types:     t,
-						Pointer: types.FilePointer{
-							VMAdder: impVMAddr,
-							Offset:  uint64(method.ImpOffset),
-						},
 					})
 					if len(n) > 0 {
 						if sym, ok := f.AddressToSymbol[impVMAddr]; ok {
@@ -856,7 +852,7 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 								if err != nil {
 									return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
 								}
-								fmt.Printf("  - %#09x: %s\n", c.ClassPtr.VMAdder-uint64(bucket.ImpOffset), sel)
+								fmt.Printf("  - %#09x: %s\n", c.ClassPtr-uint64(bucket.ImpOffset), sel)
 							} // TODO: handle the error case warn or crash?
 						}
 					}
@@ -1044,10 +1040,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 		// Ivars:           ivars,
 		// Props:           props,
 		// Prots:           prots,
-		ClassPtr: types.FilePointer{
-			VMAdder: vmaddr,
-			Offset:  uint64(off),
-		},
+		ClassPtr:              vmaddr,
 		IsaVMAddr:             f.SlideInfo.SlidePointer(classPtr.IsaVMAddr),
 		SuperclassVMAddr:      f.SlideInfo.SlidePointer(classPtr.SuperclassVMAddr),
 		MethodCacheBuckets:    classPtr.MethodCacheBuckets,
