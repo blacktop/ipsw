@@ -283,7 +283,7 @@ var dyldMachoCmd = &cobra.Command{
 				if dumpStrings {
 					for _, sec := range m.Sections {
 
-						if sec.Flags.IsCstringLiterals() {
+						if sec.Flags.IsCstringLiterals() || strings.Contains(sec.Name, "cstring") {
 							dat, err := sec.Data()
 							if err != nil {
 								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)

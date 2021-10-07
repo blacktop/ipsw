@@ -150,7 +150,7 @@ func getKextInfos(m *macho.File) ([]KmodInfoT, error) {
 func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
 	for _, sec := range m.Sections {
 
-		if sec.Flags.IsCstringLiterals() {
+		if sec.Flags.IsCstringLiterals() || strings.Contains(sec.Name, "cstring") {
 			dat, err := sec.Data()
 			if err != nil {
 				return 0, fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
