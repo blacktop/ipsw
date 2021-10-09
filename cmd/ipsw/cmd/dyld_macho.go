@@ -50,6 +50,7 @@ func init() {
 	// dyldMachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
 
 	dyldMachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
+	// dyldMachoCmd.Flags().StringP("out", "", "", "🚧 Directory to extract the dylib")
 
 	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -141,11 +142,12 @@ var dyldMachoCmd = &cobra.Command{
 							return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
 						}
 					}
-					err = m.Export(filepath.Base(i.Name), dcf, m.GetBaseAddress())
+					err = m.Export(filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name)), dcf, m.GetBaseAddress())
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
 					}
-					log.Infof("Created %s", filepath.Base(i.Name))
+					log.Infof("Created %s", filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name)))
+					return nil
 				}
 
 				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts {
