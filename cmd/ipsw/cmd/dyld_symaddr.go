@@ -94,7 +94,20 @@ var symaddrCmd = &cobra.Command{
 					return err
 				}
 				if sym, err := f.FindExportedSymbolInImage(imageName, args[1]); err != nil {
-					log.Error(err.Error())
+					log.Error(fmt.Sprintf("%s: falling back to MachO symtab", err.Error()))
+					m, err := f.Image(imageName).GetMacho()
+					if err != nil {
+						return err
+					}
+					for _, sym := range m.Symtab.Syms {
+						if sym.Name == args[1] {
+							var sec string
+							if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+								sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+							}
+							fmt.Printf("%#016x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
+						}
+					}
 				} else {
 					if sym.Flags.ReExport() {
 						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
@@ -134,9 +147,24 @@ var symaddrCmd = &cobra.Command{
 				}
 
 				if sym, err := f.FindExportedSymbolInImage(image.Name, args[1]); err != nil {
-					if err != nil && !errors.Is(err, dyld.ErrSymbolNotInImage) {
-						// return fmt.Errorf("failed to find symbol in image: %v", err)
-						log.Errorf("failed to find symbol in image: %v", err)
+					if !errors.Is(err, dyld.ErrSymbolNotInImage) {
+						utils.Indent(log.Debug, 2)(fmt.Sprintf("%s: falling back to MachO symtab", err.Error()))
+						m, err := f.Image(image.Name).GetMacho()
+						if err != nil {
+							return err
+						}
+						for _, sym := range m.Symtab.Syms {
+							if sym.Name == args[1] {
+								var sec string
+								if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+									sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+								}
+								fmt.Printf("%#016x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
+								if !allMatches {
+									return nil
+								}
+							}
+						}
 					}
 				} else {
 					if sym.Flags.ReExport() {
