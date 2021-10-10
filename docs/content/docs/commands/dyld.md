@@ -717,3 +717,25 @@ Lookup those pointers in the cache
 
 <SNIP>
 ```
+
+Or write to a file for later post-processing
+
+```bash
+❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size 728 --output ./data.bin
+   • Wrote data to file ./data.bin
+```
+
+```bash
+❯ hexdump -C data.bin
+00000000  00 46 a8 d9 01 00 08 00  90 ba a8 d9 01 00 08 00  |.F..............|
+00000010  52 3b d8 d6 01 00 08 00  20 ba a8 d9 01 00 08 00  |R;...... .......|
+00000020  18 bc a8 d9 01 00 08 00  b0 bc a8 d9 01 00 08 00  |................|
+00000030  b8 bc a8 d9 01 00 08 00  c0 bc a8 d9 01 00 08 00  |................|
+00000040  a0 bc a8 d9 01 00 08 00  a8 bc a8 d9 01 00 08 00  |................|
+00000050  e8 bb a8 d9 01 00 08 00  88 bc a8 d9 01 00 08 00  |................|
+00000060  b0 bb a8 d9 01 00 08 00  b0 3d a8 d9 01 00 08 00  |.........=......|
+00000070  30 bb a8 d9 01 00 08 00  c8 3d a8 d9 01 00 08 00  |0........=......|
+00000080  c0 3d a8 d9 01 00 08 00  68 be a8 d9 01 00 08 00  |.=......h.......|
+00000090  70 be a8 d9 01 00 08 00  78 be a8 d9 01 00 08 00  |p.......x.......|
+<SNIP>
+```
