@@ -664,7 +664,7 @@ Print the MachO header for `CoreData` in a cache
         sz="0x000002d8" off=0x502c2428-0x502c2700 addr="0x1d22c2428"-0x1d22c2700            __DATA_CONST.__got               (NonLazySymbolPointers)
 ```
 
-Hexdump the section
+Hexdump the section `__DATA_CONST.__got`
 
 ```bash
 ❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size 728 # 0x2d8 in decimal
