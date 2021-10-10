@@ -26,6 +26,7 @@ summary: Parse dyld_shared_cache.
 - [**dyld imports**](#dyld-imports)
 - [**dyld xref**](#dyld-xref)
 - [**dyld tbd**](#dyld-tbd)
+- [**dyld dump**](#dyld-dump)
 
 ---
 
@@ -629,4 +630,90 @@ exports:
   - archs:           [ arm64e ]
     symbols:         [ _unmap_node, _thread_name_for_thread_port, <SNIP> ]
 ...
+```
+
+### **dyld dump**
+
+Dump _dyld_shared_cache_ data at given `offset`
+
+```bash
+❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428
+
+00000000  00 46 a8 d9 01 00 08 00  90 ba a8 d9 01 00 08 00  |.F..............|
+00000010  52 3b d8 d6 01 00 08 00  20 ba a8 d9 01 00 08 00  |R;...... .......|
+00000020  18 bc a8 d9 01 00 08 00  b0 bc a8 d9 01 00 08 00  |................|
+00000030  b8 bc a8 d9 01 00 08 00  c0 bc a8 d9 01 00 08 00  |................|
+00000040  a0 bc a8 d9 01 00 08 00  a8 bc a8 d9 01 00 08 00  |................|
+00000050  e8 bb a8 d9 01 00 08 00  88 bc a8 d9 01 00 08 00  |................|
+00000060  b0 bb a8 d9 01 00 08 00  b0 3d a8 d9 01 00 08 00  |.........=......|
+00000070  30 bb a8 d9 01 00 08 00  c8 3d a8 d9 01 00 08 00  |0........=......|
+00000080  c0 3d a8 d9 01 00 08 00  68 be a8 d9 01 00 08 00  |.=......h.......|
+00000090  70 be a8 d9 01 00 08 00  78 be a8 d9 01 00 08 00  |p.......x.......|
+000000a0  20 c9 a8 d9 01 00 08 00  e0 b9 a8 d9 01 00 08 00  | ...............|
+000000b0  e8 b9 a8 d9 01 00 08 00  f0 b9 a8 d9 01 00 08 00  |................|
+000000c0  e8 ba a8 d9 01 00 08 00  78 ba a8 d9 01 00 08 00  |........x.......|
+000000d0  b8 3d a8 d9 01 00 08 00  28 c9 a8 d9 01 00 08 00  |.=......(.......|
+000000e0  98 ba a8 d9 01 00 08 00  18 ba a8 d9 01 00 08 00  |................|
+000000f0  30 4d a8 d9 01 00 08 00  f0 4d a8 d9 01 00 08 00  |0M.......M......|
+```
+
+Print the MachO header for `CoreData` in a cache
+
+```bash
+❯ ipsw dyld macho dyld_shared_cache_arm64e CoreData | grep "__DATA_CONST.__got"
+        sz="0x000002d8" off=0x502c2428-0x502c2700 addr="0x1d22c2428"-0x1d22c2700            __DATA_CONST.__got               (NonLazySymbolPointers)
+```
+
+Hexdump the section
+
+```bash
+❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size 728 # 0x2d8 in decimal
+
+00000000  00 46 a8 d9 01 00 08 00  90 ba a8 d9 01 00 08 00  |.F..............|
+00000010  52 3b d8 d6 01 00 08 00  20 ba a8 d9 01 00 08 00  |R;...... .......|
+00000020  18 bc a8 d9 01 00 08 00  b0 bc a8 d9 01 00 08 00  |................|
+00000030  b8 bc a8 d9 01 00 08 00  c0 bc a8 d9 01 00 08 00  |................|
+00000040  a0 bc a8 d9 01 00 08 00  a8 bc a8 d9 01 00 08 00  |................|
+00000050  e8 bb a8 d9 01 00 08 00  88 bc a8 d9 01 00 08 00  |................|
+00000060  b0 bb a8 d9 01 00 08 00  b0 3d a8 d9 01 00 08 00  |.........=......|
+00000070  30 bb a8 d9 01 00 08 00  c8 3d a8 d9 01 00 08 00  |0........=......|
+<SNIP>
+```
+
+Or dump the section as a list of pointers
+
+```bash
+❯ ipsw dyld dump dyld_shared_cache_arm64e --size 728 --addr
+
+0x1d9a84600
+0x1d9a8ba90
+0x1d6d83b52
+0x1d9a8ba20
+0x1d9a8bc18
+0x1d9a8bcb0
+0x1d9a8bcb8
+0x1d9a8bcc0
+0x1d9a8bca0
+0x1d9a8bca8
+<SNIP>
+```
+
+Lookup those pointers in the cache
+
+```bash
+❯ ipsw dyld dump dyld_shared_cache_arm64e --size 728 --addr | xargs -I {} /bin/zsh -c 'ipsw dyld a2s dyld_shared_cache_arm64e {}'
+
+   • Address location          dylib=/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation section=__DATA_CONST.__const
+0x1d9a84600: _NSCalendarIdentifierGregorian
+
+   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation section=__DATA_CONST.__const
+0x1d9a8ba90: _NSCocoaErrorDomain
+
+   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation section=__DATA.__common
+0x1d6d83b52: _NSDeallocateZombies
+
+   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation section=__DATA_CONST.__const
+0x1d9a8ba20: _NSFilePathErrorKey
+
+<SNIP>
 ```
