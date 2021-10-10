@@ -22,10 +22,12 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -41,15 +43,17 @@ func init() {
 
 	dyldDumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
 	dyldDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
+
 	dyldDumpCmd.Flags().Uint64P("size", "s", 0, "Size of data in bytes")
 	dyldDumpCmd.Flags().Uint64P("count", "c", 0, "The number of total items to display")
+	dyldDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
 }
 
 // dyldDumpCmd represents the dump command
 var dyldDumpCmd = &cobra.Command{
-	Use:   "dump",
+	Use:   "dump [options] <dyld_shared_cache> <offset>",
 	Short: "Dump dyld_shared_cache data at given offset",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -61,6 +65,7 @@ var dyldDumpCmd = &cobra.Command{
 
 		asAddrs, _ := cmd.Flags().GetBool("addr")
 		asHex, _ := cmd.Flags().GetBool("hex")
+		outFile, _ := cmd.Flags().GetString("output")
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")
@@ -120,7 +125,12 @@ var dyldDumpCmd = &cobra.Command{
 			}
 
 			if asHex {
-				fmt.Println(hex.Dump(dat))
+				if len(outFile) > 0 {
+					ioutil.WriteFile(outFile, dat, 0755)
+					log.Infof("Wrote data to file %s", outFile)
+				} else {
+					fmt.Println(hex.Dump(dat))
+				}
 			} else if asAddrs {
 				if count == 0 {
 					count = size / uint64(binary.Size(uint64(0)))
@@ -129,8 +139,19 @@ var dyldDumpCmd = &cobra.Command{
 				if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, addrs); err != nil {
 					return err
 				}
-				for _, a := range addrs {
-					fmt.Printf("%#x\n", f.SlideInfo.SlidePointer(a))
+				if len(outFile) > 0 {
+					o, err := os.Create(outFile)
+					if err != nil {
+						return err
+					}
+					w := bufio.NewWriter(o)
+					for _, a := range addrs {
+						w.WriteString(fmt.Sprintf("%#x\n", f.SlideInfo.SlidePointer(a)))
+					}
+				} else {
+					for _, a := range addrs {
+						fmt.Printf("%#x\n", f.SlideInfo.SlidePointer(a))
+					}
 				}
 			}
 		}
