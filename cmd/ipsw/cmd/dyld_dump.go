@@ -41,18 +41,20 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldDumpCmd)
 
-	dyldDumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
-	dyldDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
-
+	// dyldDumpCmd.Flags().Uint64P("offset", "f", 0, "File offset")
+	// dyldDumpCmd.Flags().Uint64P("vaddr", "v", 0, "Virtual Address")
 	dyldDumpCmd.Flags().Uint64P("size", "s", 0, "Size of data in bytes")
 	dyldDumpCmd.Flags().Uint64P("count", "c", 0, "The number of total items to display")
+
+	dyldDumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
+	dyldDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
 	dyldDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
 }
 
 // dyldDumpCmd represents the dump command
 var dyldDumpCmd = &cobra.Command{
-	Use:   "dump [options] <dyld_shared_cache> <offset>",
-	Short: "Dump dyld_shared_cache data at given offset",
+	Use:   "dump [options] <dyld_shared_cache> <address>",
+	Short: "Dump dyld_shared_cache data at given virtual address",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 

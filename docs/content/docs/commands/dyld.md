@@ -634,7 +634,7 @@ exports:
 
 ### **dyld dump**
 
-Dump _dyld_shared_cache_ data at given `offset`
+Dump _dyld_shared_cache_ data at given `address`
 
 ```bash
 ❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428
