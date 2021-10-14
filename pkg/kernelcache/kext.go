@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-plist"
@@ -192,7 +193,7 @@ func KextList(kernel string) error {
 
 	kextStartAdddrs, err := getKextStartVMAddrs(m)
 	if err != nil {
-		return err
+		log.Debugf("failed to get kext start addresses: %v", err)
 	}
 
 	if infoSec := m.Section("__PRELINK_INFO", "__info"); infoSec != nil {
@@ -211,10 +212,10 @@ func KextList(kernel string) error {
 
 		fmt.Println("FOUND:", len(prelink.PrelinkInfoDictionary))
 		for _, bundle := range prelink.PrelinkInfoDictionary {
-			if !bundle.OSKernelResource {
+			if !bundle.OSKernelResource && len(kextStartAdddrs) > 0 {
 				fmt.Printf("%#x: %s (%s)\n", kextStartAdddrs[bundle.ModuleIndex]|tagPtrMask, bundle.ID, bundle.Version)
 			} else {
-				fmt.Printf("%#x: %s (%s)\n", 0, bundle.ID, bundle.Version)
+				fmt.Printf("%#x: %s (%s)\n", bundle.ExecutableLoadAddr, bundle.ID, bundle.Version)
 			}
 		}
 	}
