@@ -8,7 +8,7 @@ before:
     - go generate ./...
 builds:
   - main: ./cmd/ipsw
-    id: "darwin"
+    id: darwin
     binary: ipsw
     env:
       - CGO_ENABLED=1
@@ -30,7 +30,9 @@ builds:
       - amd64
       - arm64
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-    gobinary: "go1.17"
+universal_binaries:
+  - id: darwin
+    replace: false
 archives:
   - replacements:
       darwin: macOS
