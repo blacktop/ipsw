@@ -702,7 +702,7 @@ exports:
 <span class="m">00000070</span>  <span class="m">30</span> bb a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  c8 3d a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>0........<span class="o">=</span>......<span class="p">|</span>
 &lt;SNIP&gt;
 </code></pre></div><p>Or dump the section as a list of pointers</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e --size <span class="m">728</span> --addr
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size <span class="m">728</span> --addr
 
 0x1d9a84600
 0x1d9a8ba90
@@ -716,7 +716,7 @@ exports:
 0x1d9a8bca8
 &lt;SNIP&gt;
 </code></pre></div><p>Lookup those pointers in the cache</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e --size <span class="m">728</span> --addr <span class="p">|</span> xargs -I <span class="o">{}</span> /bin/zsh -c <span class="s1">&#39;ipsw dyld a2s dyld_shared_cache_arm64e {}&#39;</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size <span class="m">728</span> --addr <span class="p">|</span> xargs -I <span class="o">{}</span> /bin/zsh -c <span class="s1">&#39;ipsw dyld a2s dyld_shared_cache_arm64e {}&#39;</span>
 
    • Address location          <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation <span class="nv">section</span><span class="o">=</span>__DATA_CONST.__const
 0x1d9a84600: _NSCalendarIdentifierGregorian

@@ -243,16 +243,18 @@ Global Flags:
 Use <span class="s2">&#34;ipsw macho [command] --help&#34;</span> <span class="k">for</span> more information about a command.
 </code></pre></div><h3 id="macho-a2o"><strong>macho a2o</strong></h3>
 <p>Convert MachO address to offset</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho a2o kernelcache 0xfffffff0070b4000
+   • Offset                    <span class="nv">dec</span><span class="o">=</span><span class="m">720896</span> <span class="nv">hex</span><span class="o">=</span>0xb0000 <span class="nv">section</span><span class="o">=</span>__mod_init_func <span class="nv">segment</span><span class="o">=</span>__DATA_CONST
 </code></pre></div><h3 id="macho-o2a"><strong>macho o2a</strong></h3>
 <p>Convert MachO offset to address</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho o2a kernelcache 0x007dc000
+   • Address                   <span class="nv">dec</span><span class="o">=</span><span class="m">18446744005115772928</span> <span class="nv">hex</span><span class="o">=</span>0xfffffff0077e0000 <span class="nv">section</span><span class="o">=</span>__data <span class="nv">segment</span><span class="o">=</span>__DATA
 </code></pre></div><h3 id="macho-dump"><strong>macho dump</strong></h3>
 <p>First print the MachO header for <code>kernelcache</code></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info kernelcache <span class="p">|</span> grep __DATA_CONST.__mod_init_func
         <span class="nv">sz</span><span class="o">=</span>0x00000290 <span class="nv">off</span><span class="o">=</span>0x000b0000-0x000b0290 <span class="nv">addr</span><span class="o">=</span>0xfffffff0070b4000-0xfffffff0070b4290              __DATA_CONST.__mod_init_func     <span class="o">(</span>ModInitFuncPointers<span class="o">)</span>
 </code></pre></div><p>Hexdump the section <code>__DATA_CONST.__mod_init_func</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e 0xfffffff0070b4000 --size <span class="m">656</span> <span class="c1"># 0x290 in decimal</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump kernelcache 0xfffffff0070b4000 --size <span class="m">656</span> <span class="c1"># 0x290 in decimal</span>
 
 <span class="m">00000000</span>  <span class="m">34</span> ba <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  0c c2 <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>4.i.......i.....<span class="p">|</span>
 <span class="m">00000010</span>  <span class="m">98</span> e5 <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="m">18</span> <span class="nb">fc</span> <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..i.......i.....<span class="p">|</span>
