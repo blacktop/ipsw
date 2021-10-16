@@ -45,7 +45,7 @@ func init() {
 
 // dyldObjcCmd represents the objc command
 var dyldObjcCmd = &cobra.Command{
-	Use:   "objc [options] <dyld_shared_cache>",
+	Use:   "objc <dyld_shared_cache>",
 	Short: "Dump Objective-C Optimization Info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

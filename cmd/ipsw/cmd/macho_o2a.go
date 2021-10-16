@@ -22,38 +22,35 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/pkg/ctf"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
-	rootCmd.AddCommand(ctfdumpCmd)
+	machoCmd.AddCommand(machoO2aCmd)
 
-	ctfdumpCmd.Flags().BoolP("pretty", "", false, "Pretty print JSON")
-	ctfdumpCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	ctfdumpCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
-	ctfdumpCmd.MarkZshCompPositionalArgumentFile(1)
+	machoO2aCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
+	machoO2aCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
+	machoO2aCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
+	machoO2aCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
-// ctfdumpCmd represents the ctfdump command
-var ctfdumpCmd = &cobra.Command{
-	Use:   "ctfdump",
-	Short: "Dump CTF info",
-	Args:  cobra.MinimumNArgs(1),
+// machoO2aCmd represents the mo2a command
+var machoO2aCmd = &cobra.Command{
+	Use:   "o2a <macho> <offset>",
+	Short: "Convert MachO offset to address",
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var err error
 		var m *macho.File
 
 		if Verbose {
@@ -61,21 +58,26 @@ var ctfdumpCmd = &cobra.Command{
 		}
 
 		selectedArch, _ := cmd.Flags().GetString("arch")
-		outAsJSON, _ := cmd.Flags().GetBool("json")
-		prettyJSON, _ := cmd.Flags().GetBool("pretty")
+
+		inDec, _ := cmd.Flags().GetBool("dec")
+		inHex, _ := cmd.Flags().GetBool("hex")
+
+		if inDec && inHex {
+			return fmt.Errorf("you can only use --dec OR --hex")
+		}
+
+		offset, err := utils.ConvertStrToInt(args[1])
+		if err != nil {
+			return err
+		}
 
 		machoPath := filepath.Clean(args[0])
-
-		if _, err := os.Stat(machoPath); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", machoPath)
-		}
 
 		// first check for fat file
 		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {
 			return err
 		}
-
 		if err == macho.ErrNotFat {
 			m, err = macho.Open(machoPath)
 			if err != nil {
@@ -101,7 +103,6 @@ var ctfdumpCmd = &cobra.Command{
 				if !found {
 					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
 				}
-
 			} else {
 				choice := 0
 				prompt := &survey.Select{
@@ -113,60 +114,25 @@ var ctfdumpCmd = &cobra.Command{
 			}
 		}
 
-		c, err := ctf.Parse(m)
+		address, err := m.GetVMAddress(offset)
 		if err != nil {
-			return err
-		}
-
-		ids := make([]int, 0, len(c.Types))
-		for id := range c.Types {
-			ids = append(ids, id)
-		}
-		sort.Ints(ids)
-
-		if len(args) > 1 {
-			for _, id := range ids {
-				if c.Types[id].Name() == args[1] {
-					fmt.Println(c.Types[id])
-					break
-				}
-			}
-		} else { // DUMP
-			if outAsJSON {
-				var b []byte
-
-				if prettyJSON {
-					b, err = json.MarshalIndent(c, "", "    ")
-					if err != nil {
-						return fmt.Errorf("failed to marshal function as JSON: %v", err)
-					}
-				} else {
-					b, err = json.Marshal(c)
-					if err != nil {
-						return fmt.Errorf("failed to marshal function as JSON: %v", err)
-					}
-				}
-
-				cwd, _ := os.Getwd()
-				log.Infof("Creating %s", filepath.Join(cwd, "ctfdump.json"))
-				if err := ioutil.WriteFile("ctfdump.json", b, 0755); err != nil {
-					return err
-				}
+			log.Error(err.Error())
+		} else {
+			if inDec {
+				fmt.Printf("%d\n", address)
+			} else if inHex {
+				fmt.Printf("%#x\n", address)
 			} else {
-				fmt.Printf("- CTF Header -----------------------------------------------------------------\n\n")
-				fmt.Println(c.Header)
-				fmt.Printf("\n- Types ----------------------------------------------------------------------\n\n")
-				for _, id := range ids {
-					fmt.Println(c.Types[id].Dump())
+				sec := m.FindSectionForVMAddr(address)
+				if sec == nil {
+					return fmt.Errorf("failed to find a section containing address %#x", address)
 				}
-				fmt.Printf("\n- Data Objects ---------------------------------------------------------------\n\n")
-				for _, g := range c.Globals {
-					fmt.Println(g)
-				}
-				fmt.Printf("\n- Functions ------------------------------------------------------------------\n\n")
-				for _, f := range c.Functions {
-					fmt.Println(f)
-				}
+				log.WithFields(log.Fields{
+					"hex":     fmt.Sprintf("%#x", address),
+					"dec":     fmt.Sprintf("%d", address),
+					"segment": sec.Seg,
+					"section": sec.Name,
+				}).Info("Address")
 			}
 		}
 
