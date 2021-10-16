@@ -52,7 +52,7 @@ func init() {
 
 // disassCmd represents the disass command
 var dyldDisassCmd = &cobra.Command{
-	Use:   "disass [options] <dyld_shared_cache>",
+	Use:   "disass <dyld_shared_cache>",
 	Short: "🚧 [WIP] Disassemble dyld_shared_cache symbol/vaddr in an image",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

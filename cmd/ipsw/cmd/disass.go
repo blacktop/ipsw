@@ -335,7 +335,7 @@ func parseGOT(m *macho.File) error {
 
 // disCmd represents the dis command
 var disCmd = &cobra.Command{
-	Use:          "disass [options] <MACHO>",
+	Use:          "disass <MACHO>",
 	Short:        "🚧 [WIP] Disassemble ARM64 binaries at address or symbol",
 	Args:         cobra.MinimumNArgs(1),
 	SilenceUsage: true,

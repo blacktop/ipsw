@@ -29,9 +29,9 @@ require (
 	github.com/therootcompany/xz v1.0.1
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
-	golang.org/x/net v0.0.0-20211008194852-3b03d305991f
+	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211007075335-d3039528d8ac
+	golang.org/x/sys v0.0.0-20211015200801-69063c4bb744
 )
 
 require (
@@ -39,7 +39,7 @@ require (
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/antchfx/htmlquery v1.2.4 // indirect
-	github.com/antchfx/xmlquery v1.3.7 // indirect
+	github.com/antchfx/xmlquery v1.3.8 // indirect
 	github.com/antchfx/xpath v1.2.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect

@@ -44,7 +44,7 @@ func init() {
 
 // a2oCmd represents the a2o command
 var a2oCmd = &cobra.Command{
-	Use:   "a2o [options] <dyld_shared_cache> <vaddr>",
+	Use:   "a2o <dyld_shared_cache> <vaddr>",
 	Short: "Convert dyld_shared_cache address to offset",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

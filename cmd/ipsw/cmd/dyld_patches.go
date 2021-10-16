@@ -44,7 +44,7 @@ func init() {
 
 // patchesCmd represents the patches command
 var patchesCmd = &cobra.Command{
-	Use:   "patches [options] <dyld_shared_cache>",
+	Use:   "patches <dyld_shared_cache>",
 	Short: "Dump dyld patch info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
