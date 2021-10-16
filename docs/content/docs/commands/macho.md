@@ -7,14 +7,17 @@ summary: Parse a MachO file
 ---
 
 - [**macho --help**](#macho---help)
-- [**macho info --help**](#macho-info--help)
-- [**macho info -d**](#macho-info-d)
-- [**macho info -l**](#macho-info-l)
-- [**macho info --sig**](#macho-info--sig)
-- [**macho info --ent**](#macho-info--ent)
-- [**macho info --objc**](#macho-info--objc)
-- [**macho info --fixups**](#macho-info--fixups)
-- [**macho info --fileset-entry**](#macho-info--fileset-entry)
+- [**macho a2o**](#macho-a2o)
+- [**macho o2a**](#macho-o2a)
+- [**macho dump**](#macho-dump)
+- [**macho info --help**](#macho-info---help)
+- [**macho info -d**](#macho-info--d)
+- [**macho info -l**](#macho-info--l)
+- [**macho info --sig**](#macho-info---sig)
+- [**macho info --ent**](#macho-info---ent)
+- [**macho info --objc**](#macho-info---objc)
+- [**macho info --fixups**](#macho-info---fixups)
+- [**macho info --fileset-entry**](#macho-info---fileset-entry)
 
 ### **macho --help**
 
