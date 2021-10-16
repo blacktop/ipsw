@@ -480,7 +480,7 @@ page[    0]: start=0x0000
 Convert _dyld_shared_cache_ address to offset
 
 ```bash
-ipsw dyld a2o dyld_shared_cache 1D7B18000
+❯ ipsw dyld a2o dyld_shared_cache 1D7B18000
 
 0x053b18000
 ```
@@ -490,7 +490,7 @@ ipsw dyld a2o dyld_shared_cache 1D7B18000
 Convert _dyld_shared_cache_ offset to address
 
 ```bash
-ipsw dyld a2o dyld_shared_cache 0x4C6C0000
+❯ ipsw dyld a2o dyld_shared_cache 0x4C6C0000
 
 0x1ce6c0000
 ```
@@ -634,30 +634,7 @@ exports:
 
 ### **dyld dump**
 
-Dump _dyld_shared_cache_ data at given `address`
-
-```bash
-❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428
-
-00000000  00 46 a8 d9 01 00 08 00  90 ba a8 d9 01 00 08 00  |.F..............|
-00000010  52 3b d8 d6 01 00 08 00  20 ba a8 d9 01 00 08 00  |R;...... .......|
-00000020  18 bc a8 d9 01 00 08 00  b0 bc a8 d9 01 00 08 00  |................|
-00000030  b8 bc a8 d9 01 00 08 00  c0 bc a8 d9 01 00 08 00  |................|
-00000040  a0 bc a8 d9 01 00 08 00  a8 bc a8 d9 01 00 08 00  |................|
-00000050  e8 bb a8 d9 01 00 08 00  88 bc a8 d9 01 00 08 00  |................|
-00000060  b0 bb a8 d9 01 00 08 00  b0 3d a8 d9 01 00 08 00  |.........=......|
-00000070  30 bb a8 d9 01 00 08 00  c8 3d a8 d9 01 00 08 00  |0........=......|
-00000080  c0 3d a8 d9 01 00 08 00  68 be a8 d9 01 00 08 00  |.=......h.......|
-00000090  70 be a8 d9 01 00 08 00  78 be a8 d9 01 00 08 00  |p.......x.......|
-000000a0  20 c9 a8 d9 01 00 08 00  e0 b9 a8 d9 01 00 08 00  | ...............|
-000000b0  e8 b9 a8 d9 01 00 08 00  f0 b9 a8 d9 01 00 08 00  |................|
-000000c0  e8 ba a8 d9 01 00 08 00  78 ba a8 d9 01 00 08 00  |........x.......|
-000000d0  b8 3d a8 d9 01 00 08 00  28 c9 a8 d9 01 00 08 00  |.=......(.......|
-000000e0  98 ba a8 d9 01 00 08 00  18 ba a8 d9 01 00 08 00  |................|
-000000f0  30 4d a8 d9 01 00 08 00  f0 4d a8 d9 01 00 08 00  |0M.......M......|
-```
-
-Print the MachO header for `CoreData` in a cache
+First print the MachO header for `CoreData` in a cache
 
 ```bash
 ❯ ipsw dyld macho dyld_shared_cache_arm64e CoreData | grep "__DATA_CONST.__got"

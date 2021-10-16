@@ -267,7 +267,7 @@ jobs:
         if: matrix.platform == 'macos-11'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw macho ~/.ipsw/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw macho info ~/.ipsw/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
       #
       # ENT CMD (macOS)
       #

@@ -48,7 +48,7 @@ func init() {
 
 // decCmd represents the dec command
 var decImg4Cmd = &cobra.Command{
-	Use:   "dec [options] <img4>",
+	Use:   "dec <img4>",
 	Short: "Decrypt img4 payloads",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

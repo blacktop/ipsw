@@ -49,11 +49,12 @@ func init() {
 	dyldDumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
 	dyldDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
 	dyldDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
+	dyldDumpCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // dyldDumpCmd represents the dump command
 var dyldDumpCmd = &cobra.Command{
-	Use:   "dump [options] <dyld_shared_cache> <address>",
+	Use:   "dump <dyld_shared_cache> <address>",
 	Short: "Dump dyld_shared_cache data at given virtual address",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {

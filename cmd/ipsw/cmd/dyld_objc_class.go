@@ -42,7 +42,7 @@ func init() {
 
 // objcClassCmd represents the class command
 var objcClassCmd = &cobra.Command{
-	Use:   "class  [options] <dyld_shared_cache>",
+	Use:   "class  <dyld_shared_cache>",
 	Short: "Get ObjC class info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

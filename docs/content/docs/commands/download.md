@@ -30,7 +30,7 @@ Help for download cmd
 Download and parse IPSW(s) from the internets
 
 Usage:
-  ipsw download [options] [flags]
+  ipsw download [flags]
   ipsw download [command]
 
 Available Commands:

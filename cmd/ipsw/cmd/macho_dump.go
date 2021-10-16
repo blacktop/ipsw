@@ -22,38 +22,45 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
+	"bufio"
+	"bytes"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/pkg/ctf"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
-	rootCmd.AddCommand(ctfdumpCmd)
+	machoCmd.AddCommand(machoDumpCmd)
 
-	ctfdumpCmd.Flags().BoolP("pretty", "", false, "Pretty print JSON")
-	ctfdumpCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	ctfdumpCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
-	ctfdumpCmd.MarkZshCompPositionalArgumentFile(1)
+	machoDumpCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
+	machoDumpCmd.Flags().Uint64P("size", "s", 0, "Size of data in bytes")
+	machoDumpCmd.Flags().Uint64P("count", "c", 0, "The number of total items to display")
+
+	machoDumpCmd.Flags().BoolP("addr", "v", false, "Output as addresses/uint64s")
+	machoDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
+	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
+	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
-// ctfdumpCmd represents the ctfdump command
-var ctfdumpCmd = &cobra.Command{
-	Use:   "ctfdump",
-	Short: "Dump CTF info",
-	Args:  cobra.MinimumNArgs(1),
+// machoDumpCmd represents the mdump command
+var machoDumpCmd = &cobra.Command{
+	Use:   "dump <macho> <address>",
+	Short: "Dump MachO data at given virtual address",
+	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var err error
 		var m *macho.File
 
 		if Verbose {
@@ -61,21 +68,43 @@ var ctfdumpCmd = &cobra.Command{
 		}
 
 		selectedArch, _ := cmd.Flags().GetString("arch")
-		outAsJSON, _ := cmd.Flags().GetBool("json")
-		prettyJSON, _ := cmd.Flags().GetBool("pretty")
+
+		size, _ := cmd.Flags().GetUint64("size")
+		count, _ := cmd.Flags().GetUint64("count")
+
+		asAddrs, _ := cmd.Flags().GetBool("addr")
+		asHex, _ := cmd.Flags().GetBool("hex")
+		outFile, _ := cmd.Flags().GetString("output")
+
+		if size > 0 && count > 0 {
+			return fmt.Errorf("you can only use --size OR --count")
+		}
+
+		if asAddrs && asHex {
+			return fmt.Errorf("you can only use --addr OR --hex")
+		} else if !asAddrs && !asHex {
+			asHex = true
+			if size == 0 && count == 0 {
+				size = 0x100
+			}
+		}
+
+		addr, err := utils.ConvertStrToInt(args[1])
+		if err != nil {
+			return err
+		}
+
+		if asAddrs && size == 0 {
+			size = count * uint64(binary.Size(uint64(0)))
+		}
 
 		machoPath := filepath.Clean(args[0])
-
-		if _, err := os.Stat(machoPath); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", machoPath)
-		}
 
 		// first check for fat file
 		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {
 			return err
 		}
-
 		if err == macho.ErrNotFat {
 			m, err = macho.Open(machoPath)
 			if err != nil {
@@ -101,7 +130,6 @@ var ctfdumpCmd = &cobra.Command{
 				if !found {
 					return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
 				}
-
 			} else {
 				choice := 0
 				prompt := &survey.Select{
@@ -113,59 +141,43 @@ var ctfdumpCmd = &cobra.Command{
 			}
 		}
 
-		c, err := ctf.Parse(m)
+		off, err := m.GetOffset(addr)
 		if err != nil {
-			return err
-		}
-
-		ids := make([]int, 0, len(c.Types))
-		for id := range c.Types {
-			ids = append(ids, id)
-		}
-		sort.Ints(ids)
-
-		if len(args) > 1 {
-			for _, id := range ids {
-				if c.Types[id].Name() == args[1] {
-					fmt.Println(c.Types[id])
-					break
-				}
+			log.Error(err.Error())
+		} else {
+			dat := make([]byte, size)
+			if _, err := m.ReadAt(dat, int64(off)); err != nil {
+				return err
 			}
-		} else { // DUMP
-			if outAsJSON {
-				var b []byte
 
-				if prettyJSON {
-					b, err = json.MarshalIndent(c, "", "    ")
-					if err != nil {
-						return fmt.Errorf("failed to marshal function as JSON: %v", err)
-					}
+			if asHex {
+				if len(outFile) > 0 {
+					ioutil.WriteFile(outFile, dat, 0755)
+					log.Infof("Wrote data to file %s", outFile)
 				} else {
-					b, err = json.Marshal(c)
-					if err != nil {
-						return fmt.Errorf("failed to marshal function as JSON: %v", err)
-					}
+					fmt.Println(hex.Dump(dat))
 				}
-
-				cwd, _ := os.Getwd()
-				log.Infof("Creating %s", filepath.Join(cwd, "ctfdump.json"))
-				if err := ioutil.WriteFile("ctfdump.json", b, 0755); err != nil {
+			} else if asAddrs {
+				if count == 0 {
+					count = size / uint64(binary.Size(uint64(0)))
+				}
+				addrs := make([]uint64, count)
+				if err := binary.Read(bytes.NewReader(dat), m.ByteOrder, addrs); err != nil {
 					return err
 				}
-			} else {
-				fmt.Printf("- CTF Header -----------------------------------------------------------------\n\n")
-				fmt.Println(c.Header)
-				fmt.Printf("\n- Types ----------------------------------------------------------------------\n\n")
-				for _, id := range ids {
-					fmt.Println(c.Types[id].Dump())
-				}
-				fmt.Printf("\n- Data Objects ---------------------------------------------------------------\n\n")
-				for _, g := range c.Globals {
-					fmt.Println(g)
-				}
-				fmt.Printf("\n- Functions ------------------------------------------------------------------\n\n")
-				for _, f := range c.Functions {
-					fmt.Println(f)
+				if len(outFile) > 0 {
+					o, err := os.Create(outFile)
+					if err != nil {
+						return err
+					}
+					w := bufio.NewWriter(o)
+					for _, a := range addrs {
+						w.WriteString(fmt.Sprintf("%#x\n", a))
+					}
+				} else {
+					for _, a := range addrs {
+						fmt.Printf("%#x\n", a)
+					}
 				}
 			}
 		}

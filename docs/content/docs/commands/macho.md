@@ -7,25 +7,138 @@ summary: Parse a MachO file
 ---
 
 - [**macho --help**](#macho---help)
-- [**macho -d**](#macho--d)
-- [**macho -l**](#macho--l)
-- [**macho --sig**](#macho---sig)
-- [**macho --ent**](#macho---ent)
-- [**macho --objc**](#macho---objc)
-- [**macho --fixups**](#macho---fixups)
-- [**macho --fileset-entry**](#macho---fileset-entry)
+- [**macho info --help**](#macho-info--help)
+- [**macho info -d**](#macho-info-d)
+- [**macho info -l**](#macho-info-l)
+- [**macho info --sig**](#macho-info--sig)
+- [**macho info --ent**](#macho-info--ent)
+- [**macho info --objc**](#macho-info--objc)
+- [**macho info --fixups**](#macho-info--fixups)
+- [**macho info --fileset-entry**](#macho-info--fileset-entry)
 
 ### **macho --help**
+
+```bash
+❯ ipsw macho info --help
+
+Parse MachO
+
+Usage:
+  ipsw macho [flags]
+  ipsw macho [command]
+
+Available Commands:
+  a2o         Convert MachO address to offset
+  dump        Dump MachO data at given virtual address
+  info        Explore a MachO file
+  o2a         Convert MachO offset to address
+
+Flags:
+  -h, --help   help for macho
+
+Global Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -V, --verbose         verbose output
+
+Use "ipsw macho [command] --help" for more information about a command.
+```
+
+### **macho a2o**
+
+Convert MachO address to offset
+
+```bash
+
+```
+
+### **macho o2a**
+
+Convert MachO offset to address
+
+```bash
+
+```
+
+### **macho dump**
+
+First print the MachO header for `kernelcache`
+
+```bash
+❯ ipsw macho info kernelcache | grep __DATA_CONST.__mod_init_func
+        sz=0x00000290 off=0x000b0000-0x000b0290 addr=0xfffffff0070b4000-0xfffffff0070b4290              __DATA_CONST.__mod_init_func     (ModInitFuncPointers)
+```
+
+Hexdump the section `__DATA_CONST.__mod_init_func`
+
+```bash
+❯ ipsw dyld dump dyld_shared_cache_arm64e 0xfffffff0070b4000 --size 656 # 0x290 in decimal
+
+00000000  34 ba 69 07 f0 ff ff ff  0c c2 69 07 f0 ff ff ff  |4.i.......i.....|
+00000010  98 e5 69 07 f0 ff ff ff  18 fc 69 07 f0 ff ff ff  |..i.......i.....|
+00000020  b8 05 6a 07 f0 ff ff ff  b0 0d 6a 07 f0 ff ff ff  |..j.......j.....|
+00000030  08 19 6a 07 f0 ff ff ff  b4 2c 6a 07 f0 ff ff ff  |..j......,j.....|
+00000040  4c 4e 6a 07 f0 ff ff ff  50 58 6a 07 f0 ff ff ff  |LNj.....PXj.....|
+00000050  34 55 6b 07 f0 ff ff ff  30 0a 6c 07 f0 ff ff ff  |4Uk.....0.l.....|
+00000060  24 1d 6c 07 f0 ff ff ff  90 3a 6c 07 f0 ff ff ff  |$.l......:l.....|
+00000070  64 4f 6c 07 f0 ff ff ff  18 5e 6c 07 f0 ff ff ff  |dOl......^l.....|
+00000080  f4 71 6c 07 f0 ff ff ff  0c ed 6d 07 f0 ff ff ff  |.ql.......m.....|
+00000090  98 33 6e 07 f0 ff ff ff  10 56 6e 07 f0 ff ff ff  |.3n......Vn.....|
+000000a0  1c 64 6e 07 f0 ff ff ff  1c 70 6e 07 f0 ff ff ff  |.dn......pn.....|
+000000b0  14 7e 6e 07 f0 ff ff ff  30 98 6e 07 f0 ff ff ff  |.~n.....0.n.....|
+000000c0  c4 a3 6e 07 f0 ff ff ff  90 e2 6e 07 f0 ff ff ff  |..n.......n.....|
+000000d0  78 7b 6f 07 f0 ff ff ff  b4 94 70 07 f0 ff ff ff  |x{o.......p.....|
+000000e0  28 10 71 07 f0 ff ff ff  e4 07 72 07 f0 ff ff ff  |(.q.......r.....|
+000000f0  d4 0f 72 07 f0 ff ff ff  20 1b 72 07 f0 ff ff ff  |..r..... .r.....|
+<SNIP>
+```
+
+Or dump the section as a list of pointers
+
+```bash
+❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --addr --count 10
+
+0xfffffff00769ba34
+0xfffffff00769c20c
+0xfffffff00769e598
+0xfffffff00769fc18
+0xfffffff0076a05b8
+0xfffffff0076a0db0
+0xfffffff0076a1908
+0xfffffff0076a2cb4
+0xfffffff0076a4e4c
+0xfffffff0076a5850
+```
+
+Or write to a file for later post-processing
+
+```bash
+❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --size 656 --output ./data.bin
+   • Wrote data to file ./data.bin
+```
+
+```bash
+❯ hexdump -C data.bin
+00000000  34 ba 69 07 f0 ff ff ff  0c c2 69 07 f0 ff ff ff  |4.i.......i.....|
+00000010  98 e5 69 07 f0 ff ff ff  18 fc 69 07 f0 ff ff ff  |..i.......i.....|
+00000020  b8 05 6a 07 f0 ff ff ff  b0 0d 6a 07 f0 ff ff ff  |..j.......j.....|
+00000030  08 19 6a 07 f0 ff ff ff  b4 2c 6a 07 f0 ff ff ff  |..j......,j.....|
+00000040  4c 4e 6a 07 f0 ff ff ff  50 58 6a 07 f0 ff ff ff  |LNj.....PXj.....|
+00000050  34 55 6b 07 f0 ff ff ff  30 0a 6c 07 f0 ff ff ff  |4Uk.....0.l.....|
+00000060  24 1d 6c 07 f0 ff ff ff  90 3a 6c 07 f0 ff ff ff  |$.l......:l.....|
+<SNIP>
+```
+
+### **macho info --help**
 
 Help for macho cmd
 
 ```bash
-❯ ipsw macho --help
+❯ ipsw macho info --help
 
 Parse a MachO file
 
 Usage:
-  ipsw macho <macho_file> [flags]
+  ipsw macho info <macho> [flags]
 
 Flags:
   -a, --arch string             Which architecture to use for fat/universal MachO
@@ -48,12 +161,12 @@ Global Flags:
   -V, --verbose         verbose output
 ```
 
-### **macho -d**
+### **macho info -d**
 
 Similar to `otool -h`
 
 ```bash
-❯ ipsw macho JavaScriptCore
+❯ ipsw macho info JavaScriptCore
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -62,12 +175,12 @@ Commands      = 25 (Size: 4384)
 Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
 ```
 
-### **macho -l**
+### **macho info -l**
 
 Similar to `otool -h -l`
 
 ```bash
-❯ ipsw macho JavaScriptCore
+❯ ipsw macho info JavaScriptCore
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -139,12 +252,12 @@ Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, A
 24: LC_DATA_IN_CODE             offset=0x0102ba28-0x0102ba28, size=    0, entries=0
 ```
 
-### **macho --sig**
+### **macho info --sig**
 
 Similar to `jtool --sig`
 
 ```bash
-❯ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
+❯ ipsw macho info /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
 
 Code Directory (167849 bytes)
 	Version:     Scatter
@@ -173,12 +286,12 @@ CMS (RFC3852) signature:
         OU: Apple Certification Authority CN: Software Signing                           (2013-04-12 thru 2021-04-12)
 ```
 
-### **macho --ent**
+### **macho info --ent**
 
 Similar to `jtool --ent`
 
 ```bash
-❯ ipsw macho /usr/libexec/amfid --ent
+❯ ipsw macho info /usr/libexec/amfid --ent
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -195,14 +308,14 @@ Similar to `jtool --ent`
 </plist>
 ```
 
-### **macho --objc**
+### **macho info --objc**
 
 Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
 
 **NOTE:** Currently only supports _64-bit_ architechtures
 
 ```bash
-❯ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
+❯ ipsw macho info /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
 ```
 
 ```m
@@ -576,12 +689,12 @@ Objective-C
 0x00000032caf: isEqual:
 ```
 
-### **macho --fixups**
+### **macho info --fixups**
 
 Print fixup chains
 
 ```bash
-❯ ipsw macho /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
+❯ ipsw macho info /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
 
 __DATA_CONST.__auth_got
 0x100008000:  raw: 0xc009000000000000      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 000)       libSystem.B.dylib/___error
@@ -609,12 +722,12 @@ __DATA_CONST.__got
 <SNIP>
 ```
 
-### **macho --fileset-entry**
+### **macho info --fileset-entry**
 
 Analyze FileSet entry MachO
 
 ```bash
-❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
+❯ ipsw macho info Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 Magic         = 64-bit MachO
 Type          = Exec
@@ -633,7 +746,7 @@ Flags         = NoUndefs, PIE, DylibInCache
 Extract a fileset entry to disk
 
 ```bash
-❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry
+❯ ipsw macho info Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry
 
 Magic         = 64-bit MachO
 Type          = KextBundle
