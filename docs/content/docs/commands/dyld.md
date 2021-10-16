@@ -660,7 +660,7 @@ Hexdump the section `__DATA_CONST.__got`
 Or dump the section as a list of pointers
 
 ```bash
-❯ ipsw dyld dump dyld_shared_cache_arm64e --size 728 --addr
+❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size 728 --addr
 
 0x1d9a84600
 0x1d9a8ba90
@@ -678,7 +678,7 @@ Or dump the section as a list of pointers
 Lookup those pointers in the cache
 
 ```bash
-❯ ipsw dyld dump dyld_shared_cache_arm64e --size 728 --addr | xargs -I {} /bin/zsh -c 'ipsw dyld a2s dyld_shared_cache_arm64e {}'
+❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size 728 --addr | xargs -I {} /bin/zsh -c 'ipsw dyld a2s dyld_shared_cache_arm64e {}'
 
    • Address location          dylib=/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation section=__DATA_CONST.__const
 0x1d9a84600: _NSCalendarIdentifierGregorian

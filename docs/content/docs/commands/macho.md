@@ -48,7 +48,8 @@ Use "ipsw macho [command] --help" for more information about a command.
 Convert MachO address to offset
 
 ```bash
-
+❯ ipsw macho a2o kernelcache 0xfffffff0070b4000
+   • Offset                    dec=720896 hex=0xb0000 section=__mod_init_func segment=__DATA_CONST
 ```
 
 ### **macho o2a**
@@ -56,7 +57,8 @@ Convert MachO address to offset
 Convert MachO offset to address
 
 ```bash
-
+❯ ipsw macho o2a kernelcache 0x007dc000
+   • Address                   dec=18446744005115772928 hex=0xfffffff0077e0000 section=__data segment=__DATA
 ```
 
 ### **macho dump**
@@ -71,7 +73,7 @@ First print the MachO header for `kernelcache`
 Hexdump the section `__DATA_CONST.__mod_init_func`
 
 ```bash
-❯ ipsw dyld dump dyld_shared_cache_arm64e 0xfffffff0070b4000 --size 656 # 0x290 in decimal
+❯ ipsw dyld dump kernelcache 0xfffffff0070b4000 --size 656 # 0x290 in decimal
 
 00000000  34 ba 69 07 f0 ff ff ff  0c c2 69 07 f0 ff ff ff  |4.i.......i.....|
 00000010  98 e5 69 07 f0 ff ff ff  18 fc 69 07 f0 ff ff ff  |..i.......i.....|
