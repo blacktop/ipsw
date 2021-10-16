@@ -231,6 +231,7 @@
 <li><a href="#dyld-imports"><strong>dyld imports</strong></a></li>
 <li><a href="#dyld-xref"><strong>dyld xref</strong></a></li>
 <li><a href="#dyld-tbd"><strong>dyld tbd</strong></a></li>
+<li><a href="#dyld-dump"><strong>dyld dump</strong></a></li>
 </ul>
 <hr>
 <h3 id="dyld---help"><strong>dyld &ndash;help</strong></h3>
@@ -566,12 +567,12 @@ page<span class="o">[</span>    0<span class="o">]</span>: <span class="nv">star
 &lt;SNIP&gt;
 </code></pre></div><h3 id="dyld-a2o"><strong>dyld a2o</strong></h3>
 <p>Convert <em>dyld_shared_cache</em> address to offset</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld a2o dyld_shared_cache 1D7B18000
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2o dyld_shared_cache 1D7B18000
 
 0x053b18000
 </code></pre></div><h3 id="dyld-o2a"><strong>dyld o2a</strong></h3>
 <p>Convert <em>dyld_shared_cache</em> offset to address</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">ipsw dyld a2o dyld_shared_cache 0x4C6C0000
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2o dyld_shared_cache 0x4C6C0000
 
 0x1ce6c0000
 </code></pre></div><h3 id="dyld-disass"><strong>dyld disass</strong></h3>
@@ -684,6 +685,67 @@ exports:
   - archs:           <span class="o">[</span> arm64e <span class="o">]</span>
     symbols:         <span class="o">[</span> _unmap_node, _thread_name_for_thread_port, &lt;SNIP&gt; <span class="o">]</span>
 ...
+</code></pre></div><h3 id="dyld-dump"><strong>dyld dump</strong></h3>
+<p>First print the MachO header for <code>CoreData</code> in a cache</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld macho dyld_shared_cache_arm64e CoreData <span class="p">|</span> grep <span class="s2">&#34;__DATA_CONST.__got&#34;</span>
+        <span class="nv">sz</span><span class="o">=</span><span class="s2">&#34;0x000002d8&#34;</span> <span class="nv">off</span><span class="o">=</span>0x502c2428-0x502c2700 <span class="nv">addr</span><span class="o">=</span><span class="s2">&#34;0x1d22c2428&#34;</span>-0x1d22c2700            __DATA_CONST.__got               <span class="o">(</span>NonLazySymbolPointers<span class="o">)</span>
+</code></pre></div><p>Hexdump the section <code>__DATA_CONST.__got</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size <span class="m">728</span> <span class="c1"># 0x2d8 in decimal</span>
+
+<span class="m">00000000</span>  <span class="m">00</span> <span class="m">46</span> a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">90</span> ba a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>.F..............<span class="p">|</span>
+<span class="m">00000010</span>  <span class="m">52</span> 3b d8 d6 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">20</span> ba a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>R<span class="p">;</span>...... .......<span class="p">|</span>
+<span class="m">00000020</span>  <span class="m">18</span> bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  b0 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000030</span>  b8 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  c0 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000040</span>  a0 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  a8 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000050</span>  e8 bb a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">88</span> bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000060</span>  b0 bb a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  b0 3d a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>.........<span class="o">=</span>......<span class="p">|</span>
+<span class="m">00000070</span>  <span class="m">30</span> bb a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  c8 3d a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>0........<span class="o">=</span>......<span class="p">|</span>
+&lt;SNIP&gt;
+</code></pre></div><p>Or dump the section as a list of pointers</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e --size <span class="m">728</span> --addr
+
+0x1d9a84600
+0x1d9a8ba90
+0x1d6d83b52
+0x1d9a8ba20
+0x1d9a8bc18
+0x1d9a8bcb0
+0x1d9a8bcb8
+0x1d9a8bcc0
+0x1d9a8bca0
+0x1d9a8bca8
+&lt;SNIP&gt;
+</code></pre></div><p>Lookup those pointers in the cache</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e --size <span class="m">728</span> --addr <span class="p">|</span> xargs -I <span class="o">{}</span> /bin/zsh -c <span class="s1">&#39;ipsw dyld a2s dyld_shared_cache_arm64e {}&#39;</span>
+
+   • Address location          <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation <span class="nv">section</span><span class="o">=</span>__DATA_CONST.__const
+0x1d9a84600: _NSCalendarIdentifierGregorian
+
+   • Address location          <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/Foundation.framework/Foundation <span class="nv">section</span><span class="o">=</span>__DATA_CONST.__const
+0x1d9a8ba90: _NSCocoaErrorDomain
+
+   • Address location          <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/Foundation.framework/Foundation <span class="nv">section</span><span class="o">=</span>__DATA.__common
+0x1d6d83b52: _NSDeallocateZombies
+
+   • Address location          <span class="nv">dylib</span><span class="o">=</span>/System/Library/Frameworks/Foundation.framework/Foundation <span class="nv">section</span><span class="o">=</span>__DATA_CONST.__const
+0x1d9a8ba20: _NSFilePathErrorKey
+
+&lt;SNIP&gt;
+</code></pre></div><p>Or write to a file for later post-processing</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size <span class="m">728</span> --output ./data.bin
+   • Wrote data to file ./data.bin
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ hexdump -C data.bin
+<span class="m">00000000</span>  <span class="m">00</span> <span class="m">46</span> a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">90</span> ba a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>.F..............<span class="p">|</span>
+<span class="m">00000010</span>  <span class="m">52</span> 3b d8 d6 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">20</span> ba a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>R<span class="p">;</span>...... .......<span class="p">|</span>
+<span class="m">00000020</span>  <span class="m">18</span> bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  b0 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000030</span>  b8 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  c0 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000040</span>  a0 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  a8 bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000050</span>  e8 bb a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">88</span> bc a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>................<span class="p">|</span>
+<span class="m">00000060</span>  b0 bb a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  b0 3d a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>.........<span class="o">=</span>......<span class="p">|</span>
+<span class="m">00000070</span>  <span class="m">30</span> bb a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  c8 3d a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>0........<span class="o">=</span>......<span class="p">|</span>
+<span class="m">00000080</span>  c0 3d a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">68</span> be a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>.<span class="o">=</span>......h.......<span class="p">|</span>
+<span class="m">00000090</span>  <span class="m">70</span> be a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="m">78</span> be a8 d9 <span class="m">01</span> <span class="m">00</span> <span class="m">08</span> <span class="m">00</span>  <span class="p">|</span>p.......x.......<span class="p">|</span>
+&lt;SNIP&gt;
 </code></pre></div>
 </div>
 </div>

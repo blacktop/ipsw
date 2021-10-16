@@ -209,22 +209,101 @@
 <div class="content ">
   <ul>
 <li><a href="#macho---help"><strong>macho &ndash;help</strong></a></li>
-<li><a href="#macho--d"><strong>macho -d</strong></a></li>
-<li><a href="#macho--l"><strong>macho -l</strong></a></li>
-<li><a href="#macho---sig"><strong>macho &ndash;sig</strong></a></li>
-<li><a href="#macho---ent"><strong>macho &ndash;ent</strong></a></li>
-<li><a href="#macho---objc"><strong>macho &ndash;objc</strong></a></li>
-<li><a href="#macho---fixups"><strong>macho &ndash;fixups</strong></a></li>
-<li><a href="#macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></a></li>
+<li><a href="#macho-info--help"><strong>macho info &ndash;help</strong></a></li>
+<li><a href="#macho-info-d"><strong>macho info -d</strong></a></li>
+<li><a href="#macho-info-l"><strong>macho info -l</strong></a></li>
+<li><a href="#macho-info--sig"><strong>macho info &ndash;sig</strong></a></li>
+<li><a href="#macho-info--ent"><strong>macho info &ndash;ent</strong></a></li>
+<li><a href="#macho-info--objc"><strong>macho info &ndash;objc</strong></a></li>
+<li><a href="#macho-info--fixups"><strong>macho info &ndash;fixups</strong></a></li>
+<li><a href="#macho-info--fileset-entry"><strong>macho info &ndash;fileset-entry</strong></a></li>
 </ul>
 <h3 id="macho---help"><strong>macho &ndash;help</strong></h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info --help
+
+Parse MachO
+
+Usage:
+  ipsw macho <span class="o">[</span>flags<span class="o">]</span>
+  ipsw macho <span class="o">[</span>command<span class="o">]</span>
+
+Available Commands:
+  a2o         Convert MachO address to offset
+  dump        Dump MachO data at given virtual address
+  info        Explore a MachO file
+  o2a         Convert MachO offset to address
+
+Flags:
+  -h, --help   <span class="nb">help</span> <span class="k">for</span> macho
+
+Global Flags:
+      --config string   config file <span class="o">(</span>default is <span class="nv">$HOME</span>/.ipsw.yaml<span class="o">)</span>
+  -V, --verbose         verbose output
+
+Use <span class="s2">&#34;ipsw macho [command] --help&#34;</span> <span class="k">for</span> more information about a command.
+</code></pre></div><h3 id="macho-a2o"><strong>macho a2o</strong></h3>
+<p>Convert MachO address to offset</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">
+</code></pre></div><h3 id="macho-o2a"><strong>macho o2a</strong></h3>
+<p>Convert MachO offset to address</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">
+</code></pre></div><h3 id="macho-dump"><strong>macho dump</strong></h3>
+<p>First print the MachO header for <code>kernelcache</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info kernelcache <span class="p">|</span> grep __DATA_CONST.__mod_init_func
+        <span class="nv">sz</span><span class="o">=</span>0x00000290 <span class="nv">off</span><span class="o">=</span>0x000b0000-0x000b0290 <span class="nv">addr</span><span class="o">=</span>0xfffffff0070b4000-0xfffffff0070b4290              __DATA_CONST.__mod_init_func     <span class="o">(</span>ModInitFuncPointers<span class="o">)</span>
+</code></pre></div><p>Hexdump the section <code>__DATA_CONST.__mod_init_func</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld dump dyld_shared_cache_arm64e 0xfffffff0070b4000 --size <span class="m">656</span> <span class="c1"># 0x290 in decimal</span>
+
+<span class="m">00000000</span>  <span class="m">34</span> ba <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  0c c2 <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>4.i.......i.....<span class="p">|</span>
+<span class="m">00000010</span>  <span class="m">98</span> e5 <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="m">18</span> <span class="nb">fc</span> <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..i.......i.....<span class="p">|</span>
+<span class="m">00000020</span>  b8 <span class="m">05</span> 6a <span class="m">07</span> f0 ff ff ff  b0 0d 6a <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..j.......j.....<span class="p">|</span>
+<span class="m">00000030</span>  <span class="m">08</span> <span class="m">19</span> 6a <span class="m">07</span> f0 ff ff ff  b4 2c 6a <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..j......,j.....<span class="p">|</span>
+<span class="m">00000040</span>  4c 4e 6a <span class="m">07</span> f0 ff ff ff  <span class="m">50</span> <span class="m">58</span> 6a <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>LNj.....PXj.....<span class="p">|</span>
+<span class="m">00000050</span>  <span class="m">34</span> <span class="m">55</span> 6b <span class="m">07</span> f0 ff ff ff  <span class="m">30</span> 0a 6c <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>4Uk.....0.l.....<span class="p">|</span>
+<span class="m">00000060</span>  <span class="m">24</span> 1d 6c <span class="m">07</span> f0 ff ff ff  <span class="m">90</span> 3a 6c <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>$.l......:l.....<span class="p">|</span>
+<span class="m">00000070</span>  <span class="m">64</span> 4f 6c <span class="m">07</span> f0 ff ff ff  <span class="m">18</span> 5e 6c <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>dOl......^l.....<span class="p">|</span>
+<span class="m">00000080</span>  f4 <span class="m">71</span> 6c <span class="m">07</span> f0 ff ff ff  0c ed 6d <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>.ql.......m.....<span class="p">|</span>
+<span class="m">00000090</span>  <span class="m">98</span> <span class="m">33</span> 6e <span class="m">07</span> f0 ff ff ff  <span class="m">10</span> <span class="m">56</span> 6e <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>.3n......Vn.....<span class="p">|</span>
+000000a0  1c <span class="m">64</span> 6e <span class="m">07</span> f0 ff ff ff  1c <span class="m">70</span> 6e <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>.dn......pn.....<span class="p">|</span>
+000000b0  <span class="m">14</span> 7e 6e <span class="m">07</span> f0 ff ff ff  <span class="m">30</span> <span class="m">98</span> 6e <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>.~n.....0.n.....<span class="p">|</span>
+000000c0  c4 a3 6e <span class="m">07</span> f0 ff ff ff  <span class="m">90</span> e2 6e <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..n.......n.....<span class="p">|</span>
+000000d0  <span class="m">78</span> 7b 6f <span class="m">07</span> f0 ff ff ff  b4 <span class="m">94</span> <span class="m">70</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>x<span class="o">{</span>o.......p.....<span class="p">|</span>
+000000e0  <span class="m">28</span> <span class="m">10</span> <span class="m">71</span> <span class="m">07</span> f0 ff ff ff  e4 <span class="m">07</span> <span class="m">72</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span><span class="o">(</span>.q.......r.....<span class="p">|</span>
+000000f0  d4 0f <span class="m">72</span> <span class="m">07</span> f0 ff ff ff  <span class="m">20</span> 1b <span class="m">72</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..r..... .r.....<span class="p">|</span>
+&lt;SNIP&gt;
+</code></pre></div><p>Or dump the section as a list of pointers</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --addr --count <span class="m">10</span>
+
+0xfffffff00769ba34
+0xfffffff00769c20c
+0xfffffff00769e598
+0xfffffff00769fc18
+0xfffffff0076a05b8
+0xfffffff0076a0db0
+0xfffffff0076a1908
+0xfffffff0076a2cb4
+0xfffffff0076a4e4c
+0xfffffff0076a5850
+</code></pre></div><p>Or write to a file for later post-processing</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --size <span class="m">656</span> --output ./data.bin
+   • Wrote data to file ./data.bin
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ hexdump -C data.bin
+<span class="m">00000000</span>  <span class="m">34</span> ba <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  0c c2 <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>4.i.......i.....<span class="p">|</span>
+<span class="m">00000010</span>  <span class="m">98</span> e5 <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="m">18</span> <span class="nb">fc</span> <span class="m">69</span> <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..i.......i.....<span class="p">|</span>
+<span class="m">00000020</span>  b8 <span class="m">05</span> 6a <span class="m">07</span> f0 ff ff ff  b0 0d 6a <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..j.......j.....<span class="p">|</span>
+<span class="m">00000030</span>  <span class="m">08</span> <span class="m">19</span> 6a <span class="m">07</span> f0 ff ff ff  b4 2c 6a <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>..j......,j.....<span class="p">|</span>
+<span class="m">00000040</span>  4c 4e 6a <span class="m">07</span> f0 ff ff ff  <span class="m">50</span> <span class="m">58</span> 6a <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>LNj.....PXj.....<span class="p">|</span>
+<span class="m">00000050</span>  <span class="m">34</span> <span class="m">55</span> 6b <span class="m">07</span> f0 ff ff ff  <span class="m">30</span> 0a 6c <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>4Uk.....0.l.....<span class="p">|</span>
+<span class="m">00000060</span>  <span class="m">24</span> 1d 6c <span class="m">07</span> f0 ff ff ff  <span class="m">90</span> 3a 6c <span class="m">07</span> f0 ff ff ff  <span class="p">|</span>$.l......:l.....<span class="p">|</span>
+&lt;SNIP&gt;
+</code></pre></div><h3 id="macho-info---help"><strong>macho info &ndash;help</strong></h3>
 <p>Help for macho cmd</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho --help
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info --help
 
 Parse a MachO file
 
 Usage:
-  ipsw macho &lt;macho_file&gt; <span class="o">[</span>flags<span class="o">]</span>
+  ipsw macho info &lt;macho&gt; <span class="o">[</span>flags<span class="o">]</span>
 
 Flags:
   -a, --arch string             Which architecture to use <span class="k">for</span> fat/universal MachO
@@ -245,18 +324,18 @@ Flags:
 Global Flags:
       --config string   config file <span class="o">(</span>default is <span class="nv">$HOME</span>/.ipsw.yaml<span class="o">)</span>
   -V, --verbose         verbose output
-</code></pre></div><h3 id="macho--d"><strong>macho -d</strong></h3>
+</code></pre></div><h3 id="macho-info--d"><strong>macho info -d</strong></h3>
 <p>Similar to <code>otool -h</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho JavaScriptCore
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info JavaScriptCore
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
 <span class="nv">CPU</span>           <span class="o">=</span> AARCH64, ARM64e <span class="o">(</span>ARMv8.3<span class="o">)</span> caps: PAC00
 <span class="nv">Commands</span>      <span class="o">=</span> <span class="m">25</span> <span class="o">(</span>Size: 4384<span class="o">)</span>
 <span class="nv">Flags</span>         <span class="o">=</span> NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
-</code></pre></div><h3 id="macho--l"><strong>macho -l</strong></h3>
+</code></pre></div><h3 id="macho-info--l"><strong>macho info -l</strong></h3>
 <p>Similar to <code>otool -h -l</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho JavaScriptCore
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info JavaScriptCore
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Dylib
@@ -326,9 +405,9 @@ Global Flags:
 22: LC_LOAD_DYLIB               /usr/lib/libSystem.B.dylib <span class="o">(</span>1292.0.0<span class="o">)</span>
 23: LC_FUNCTION_STARTS          <span class="nv">offset</span><span class="o">=</span>0x01020ab0-0x0102ba28, <span class="nv">size</span><span class="o">=</span>44920, <span class="nv">count</span><span class="o">=</span><span class="m">26030</span>
 24: LC_DATA_IN_CODE             <span class="nv">offset</span><span class="o">=</span>0x0102ba28-0x0102ba28, <span class="nv">size</span><span class="o">=</span>    0, <span class="nv">entries</span><span class="o">=</span><span class="m">0</span>
-</code></pre></div><h3 id="macho---sig"><strong>macho &ndash;sig</strong></h3>
+</code></pre></div><h3 id="macho-info---sig"><strong>macho info &ndash;sig</strong></h3>
 <p>Similar to <code>jtool --sig</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
 
 Code Directory <span class="o">(</span><span class="m">167849</span> bytes<span class="o">)</span>
 	Version:     Scatter
@@ -355,9 +434,9 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         OU: Apple Certification Authority CN: Apple Code Signing Certification Authority <span class="o">(</span>2011-10-24 thru 2026-10-24<span class="o">)</span>
         OU: Apple Certification Authority CN: Apple Root CA                              <span class="o">(</span>2006-04-25 thru 2035-02-09<span class="o">)</span>
         OU: Apple Certification Authority CN: Software Signing                           <span class="o">(</span>2013-04-12 thru 2021-04-12<span class="o">)</span>
-</code></pre></div><h3 id="macho---ent"><strong>macho &ndash;ent</strong></h3>
+</code></pre></div><h3 id="macho-info---ent"><strong>macho info &ndash;ent</strong></h3>
 <p>Similar to <code>jtool --ent</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /usr/libexec/amfid --ent
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info /usr/libexec/amfid --ent
 &lt;?xml <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span> <span class="nv">encoding</span><span class="o">=</span><span class="s2">&#34;UTF-8&#34;</span>?&gt;
 &lt;!DOCTYPE plist PUBLIC <span class="s2">&#34;-//Apple//DTD PLIST 1.0//EN&#34;</span> <span class="s2">&#34;http://www.apple.com/DTDs/PropertyList-1.0.dtd&#34;</span>&gt;
 &lt;plist <span class="nv">version</span><span class="o">=</span><span class="s2">&#34;1.0&#34;</span>&gt;
@@ -372,10 +451,10 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         &lt;true/&gt;
 &lt;/dict&gt;
 &lt;/plist&gt;
-</code></pre></div><h3 id="macho---objc"><strong>macho &ndash;objc</strong></h3>
+</code></pre></div><h3 id="macho-info---objc"><strong>macho info &ndash;objc</strong></h3>
 <p>Similar to <code>objdump --macho --objc-meta-data</code> OR <code>dsdump --objc -vv</code></p>
 <p><strong>NOTE:</strong> Currently only supports <em>64-bit</em> architechtures</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info /usr/lib/libobjc.A.dylib --arch amd64 --objc <span class="p">|</span> bat -l m
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-m" data-lang="m"><span class="n">Objective</span><span class="o">-</span><span class="n">C</span>
 <span class="o">==========</span><span class="p">=</span>
 
@@ -744,9 +823,9 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
 <span class="mi">0</span><span class="n">x00000032ea3</span><span class="p">:</span> <span class="n">mutableCopy</span>
 <span class="mi">0</span><span class="n">x00000032bee</span><span class="p">:</span> <span class="n">resolveInstanceMethod</span><span class="p">:</span>
 <span class="mi">0</span><span class="n">x00000032caf</span><span class="p">:</span> <span class="n">isEqual</span><span class="p">:</span>
-</code></pre></div><h3 id="macho---fixups"><strong>macho &ndash;fixups</strong></h3>
+</code></pre></div><h3 id="macho-info---fixups"><strong>macho info &ndash;fixups</strong></h3>
 <p>Print fixup chains</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
 
 __DATA_CONST.__auth_got
 0x100008000:  raw: 0xc009000000000000      auth-bind24: <span class="o">(</span>next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 000<span class="o">)</span>       libSystem.B.dylib/___error
@@ -772,9 +851,9 @@ __DATA_CONST.__got
 0x100008240:  raw: 0x4008000000000048    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 072, addend: 0<span class="o">)</span>    libSystem.B.dylib/_optarg
 0x100008248:  raw: 0x4008000000000049    arm64e bind24: <span class="o">(</span>next: 001, ordinal: 073, addend: 0<span class="o">)</span>    libSystem.B.dylib/_optind
 &lt;SNIP&gt;
-</code></pre></div><h3 id="macho---fileset-entry"><strong>macho &ndash;fileset-entry</strong></h3>
+</code></pre></div><h3 id="macho-info---fileset-entry"><strong>macho info &ndash;fileset-entry</strong></h3>
 <p>Analyze FileSet entry MachO</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> Exec
@@ -789,7 +868,7 @@ __DATA_CONST.__got
         <span class="nv">sz</span><span class="o">=</span>0x000000f8 <span class="nv">off</span><span class="o">=</span>0x000c7f00-0x000c7ff8 <span class="nv">addr</span><span class="o">=</span>0xfffffe0007c0bf00-0xfffffe0007c0bff8              __TEXT.__eh_frame
 &lt;SNIP&gt;
 </code></pre></div><p>Extract a fileset entry to disk</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry <span class="s2">&#34;com.apple.security.sandbox&#34;</span> --extract-fileset-entry
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry <span class="s2">&#34;com.apple.security.sandbox&#34;</span> --extract-fileset-entry
 
 <span class="nv">Magic</span>         <span class="o">=</span> 64-bit MachO
 <span class="nv">Type</span>          <span class="o">=</span> KextBundle
