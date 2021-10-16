@@ -85,7 +85,13 @@ var machoDumpCmd = &cobra.Command{
 		} else if !asAddrs && !asHex {
 			asHex = true
 			if size == 0 && count == 0 {
-				size = 0x100
+				log.Info("Setting --size=256")
+				size = 256
+			}
+		} else if asAddrs && !asHex {
+			if size == 0 && count == 0 {
+				log.Info("Setting --count=20")
+				count = 20
 			}
 		}
 
@@ -158,9 +164,6 @@ var machoDumpCmd = &cobra.Command{
 					fmt.Println(hex.Dump(dat))
 				}
 			} else if asAddrs {
-				if count == 0 {
-					count = size / uint64(binary.Size(uint64(0)))
-				}
 				addrs := make([]uint64, count)
 				if err := binary.Read(bytes.NewReader(dat), m.ByteOrder, addrs); err != nil {
 					return err
