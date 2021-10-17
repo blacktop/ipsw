@@ -1,0 +1,2647 @@
+# bash completion for ipsw                                 -*- shell-script -*-
+
+__ipsw_debug()
+{
+    if [[ -n ${BASH_COMP_DEBUG_FILE} ]]; then
+        echo "$*" >> "${BASH_COMP_DEBUG_FILE}"
+    fi
+}
+
+# Homebrew on Macs have version 1.3 of bash-completion which doesn't include
+# _init_completion. This is a very minimal version of that function.
+__ipsw_init_completion()
+{
+    COMPREPLY=()
+    _get_comp_words_by_ref "$@" cur prev words cword
+}
+
+__ipsw_index_of_word()
+{
+    local w word=$1
+    shift
+    index=0
+    for w in "$@"; do
+        [[ $w = "$word" ]] && return
+        index=$((index+1))
+    done
+    index=-1
+}
+
+__ipsw_contains_word()
+{
+    local w word=$1; shift
+    for w in "$@"; do
+        [[ $w = "$word" ]] && return
+    done
+    return 1
+}
+
+__ipsw_handle_go_custom_completion()
+{
+    __ipsw_debug "${FUNCNAME[0]}: cur is ${cur}, words[*] is ${words[*]}, #words[@] is ${#words[@]}"
+
+    local shellCompDirectiveError=1
+    local shellCompDirectiveNoSpace=2
+    local shellCompDirectiveNoFileComp=4
+    local shellCompDirectiveFilterFileExt=8
+    local shellCompDirectiveFilterDirs=16
+
+    local out requestComp lastParam lastChar comp directive args
+
+    # Prepare the command to request completions for the program.
+    # Calling ${words[0]} instead of directly ipsw allows to handle aliases
+    args=("${words[@]:1}")
+    requestComp="${words[0]} __completeNoDesc ${args[*]}"
+
+    lastParam=${words[$((${#words[@]}-1))]}
+    lastChar=${lastParam:$((${#lastParam}-1)):1}
+    __ipsw_debug "${FUNCNAME[0]}: lastParam ${lastParam}, lastChar ${lastChar}"
+
+    if [ -z "${cur}" ] && [ "${lastChar}" != "=" ]; then
+        # If the last parameter is complete (there is a space following it)
+        # We add an extra empty parameter so we can indicate this to the go method.
+        __ipsw_debug "${FUNCNAME[0]}: Adding extra empty parameter"
+        requestComp="${requestComp} \"\""
+    fi
+
+    __ipsw_debug "${FUNCNAME[0]}: calling ${requestComp}"
+    # Use eval to handle any environment variables and such
+    out=$(eval "${requestComp}" 2>/dev/null)
+
+    # Extract the directive integer at the very end of the output following a colon (:)
+    directive=${out##*:}
+    # Remove the directive
+    out=${out%:*}
+    if [ "${directive}" = "${out}" ]; then
+        # There is not directive specified
+        directive=0
+    fi
+    __ipsw_debug "${FUNCNAME[0]}: the completion directive is: ${directive}"
+    __ipsw_debug "${FUNCNAME[0]}: the completions are: ${out[*]}"
+
+    if [ $((directive & shellCompDirectiveError)) -ne 0 ]; then
+        # Error code.  No completion.
+        __ipsw_debug "${FUNCNAME[0]}: received error from custom completion go code"
+        return
+    else
+        if [ $((directive & shellCompDirectiveNoSpace)) -ne 0 ]; then
+            if [[ $(type -t compopt) = "builtin" ]]; then
+                __ipsw_debug "${FUNCNAME[0]}: activating no space"
+                compopt -o nospace
+            fi
+        fi
+        if [ $((directive & shellCompDirectiveNoFileComp)) -ne 0 ]; then
+            if [[ $(type -t compopt) = "builtin" ]]; then
+                __ipsw_debug "${FUNCNAME[0]}: activating no file completion"
+                compopt +o default
+            fi
+        fi
+    fi
+
+    if [ $((directive & shellCompDirectiveFilterFileExt)) -ne 0 ]; then
+        # File extension filtering
+        local fullFilter filter filteringCmd
+        # Do not use quotes around the $out variable or else newline
+        # characters will be kept.
+        for filter in ${out[*]}; do
+            fullFilter+="$filter|"
+        done
+
+        filteringCmd="_filedir $fullFilter"
+        __ipsw_debug "File filtering command: $filteringCmd"
+        $filteringCmd
+    elif [ $((directive & shellCompDirectiveFilterDirs)) -ne 0 ]; then
+        # File completion for directories only
+        local subDir
+        # Use printf to strip any trailing newline
+        subdir=$(printf "%s" "${out[0]}")
+        if [ -n "$subdir" ]; then
+            __ipsw_debug "Listing directories in $subdir"
+            __ipsw_handle_subdirs_in_dir_flag "$subdir"
+        else
+            __ipsw_debug "Listing directories in ."
+            _filedir -d
+        fi
+    else
+        while IFS='' read -r comp; do
+            COMPREPLY+=("$comp")
+        done < <(compgen -W "${out[*]}" -- "$cur")
+    fi
+}
+
+__ipsw_handle_reply()
+{
+    __ipsw_debug "${FUNCNAME[0]}"
+    local comp
+    case $cur in
+        -*)
+            if [[ $(type -t compopt) = "builtin" ]]; then
+                compopt -o nospace
+            fi
+            local allflags
+            if [ ${#must_have_one_flag[@]} -ne 0 ]; then
+                allflags=("${must_have_one_flag[@]}")
+            else
+                allflags=("${flags[*]} ${two_word_flags[*]}")
+            fi
+            while IFS='' read -r comp; do
+                COMPREPLY+=("$comp")
+            done < <(compgen -W "${allflags[*]}" -- "$cur")
+            if [[ $(type -t compopt) = "builtin" ]]; then
+                [[ "${COMPREPLY[0]}" == *= ]] || compopt +o nospace
+            fi
+
+            # complete after --flag=abc
+            if [[ $cur == *=* ]]; then
+                if [[ $(type -t compopt) = "builtin" ]]; then
+                    compopt +o nospace
+                fi
+
+                local index flag
+                flag="${cur%=*}"
+                __ipsw_index_of_word "${flag}" "${flags_with_completion[@]}"
+                COMPREPLY=()
+                if [[ ${index} -ge 0 ]]; then
+                    PREFIX=""
+                    cur="${cur#*=}"
+                    ${flags_completion[${index}]}
+                    if [ -n "${ZSH_VERSION}" ]; then
+                        # zsh completion needs --flag= prefix
+                        eval "COMPREPLY=( \"\${COMPREPLY[@]/#/${flag}=}\" )"
+                    fi
+                fi
+            fi
+            return 0;
+            ;;
+    esac
+
+    # check if we are handling a flag with special work handling
+    local index
+    __ipsw_index_of_word "${prev}" "${flags_with_completion[@]}"
+    if [[ ${index} -ge 0 ]]; then
+        ${flags_completion[${index}]}
+        return
+    fi
+
+    # we are parsing a flag and don't have a special handler, no completion
+    if [[ ${cur} != "${words[cword]}" ]]; then
+        return
+    fi
+
+    local completions
+    completions=("${commands[@]}")
+    if [[ ${#must_have_one_noun[@]} -ne 0 ]]; then
+        completions+=("${must_have_one_noun[@]}")
+    elif [[ -n "${has_completion_function}" ]]; then
+        # if a go completion function is provided, defer to that function
+        __ipsw_handle_go_custom_completion
+    fi
+    if [[ ${#must_have_one_flag[@]} -ne 0 ]]; then
+        completions+=("${must_have_one_flag[@]}")
+    fi
+    while IFS='' read -r comp; do
+        COMPREPLY+=("$comp")
+    done < <(compgen -W "${completions[*]}" -- "$cur")
+
+    if [[ ${#COMPREPLY[@]} -eq 0 && ${#noun_aliases[@]} -gt 0 && ${#must_have_one_noun[@]} -ne 0 ]]; then
+        while IFS='' read -r comp; do
+            COMPREPLY+=("$comp")
+        done < <(compgen -W "${noun_aliases[*]}" -- "$cur")
+    fi
+
+    if [[ ${#COMPREPLY[@]} -eq 0 ]]; then
+		if declare -F __ipsw_custom_func >/dev/null; then
+			# try command name qualified custom func
+			__ipsw_custom_func
+		else
+			# otherwise fall back to unqualified for compatibility
+			declare -F __custom_func >/dev/null && __custom_func
+		fi
+    fi
+
+    # available in bash-completion >= 2, not always present on macOS
+    if declare -F __ltrim_colon_completions >/dev/null; then
+        __ltrim_colon_completions "$cur"
+    fi
+
+    # If there is only 1 completion and it is a flag with an = it will be completed
+    # but we don't want a space after the =
+    if [[ "${#COMPREPLY[@]}" -eq "1" ]] && [[ $(type -t compopt) = "builtin" ]] && [[ "${COMPREPLY[0]}" == --*= ]]; then
+       compopt -o nospace
+    fi
+}
+
+# The arguments should be in the form "ext1|ext2|extn"
+__ipsw_handle_filename_extension_flag()
+{
+    local ext="$1"
+    _filedir "@(${ext})"
+}
+
+__ipsw_handle_subdirs_in_dir_flag()
+{
+    local dir="$1"
+    pushd "${dir}" >/dev/null 2>&1 && _filedir -d && popd >/dev/null 2>&1 || return
+}
+
+__ipsw_handle_flag()
+{
+    __ipsw_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+
+    # if a command required a flag, and we found it, unset must_have_one_flag()
+    local flagname=${words[c]}
+    local flagvalue
+    # if the word contained an =
+    if [[ ${words[c]} == *"="* ]]; then
+        flagvalue=${flagname#*=} # take in as flagvalue after the =
+        flagname=${flagname%=*} # strip everything after the =
+        flagname="${flagname}=" # but put the = back
+    fi
+    __ipsw_debug "${FUNCNAME[0]}: looking for ${flagname}"
+    if __ipsw_contains_word "${flagname}" "${must_have_one_flag[@]}"; then
+        must_have_one_flag=()
+    fi
+
+    # if you set a flag which only applies to this command, don't show subcommands
+    if __ipsw_contains_word "${flagname}" "${local_nonpersistent_flags[@]}"; then
+      commands=()
+    fi
+
+    # keep flag value with flagname as flaghash
+    # flaghash variable is an associative array which is only supported in bash > 3.
+    if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+        if [ -n "${flagvalue}" ] ; then
+            flaghash[${flagname}]=${flagvalue}
+        elif [ -n "${words[ $((c+1)) ]}" ] ; then
+            flaghash[${flagname}]=${words[ $((c+1)) ]}
+        else
+            flaghash[${flagname}]="true" # pad "true" for bool flag
+        fi
+    fi
+
+    # skip the argument to a two word flag
+    if [[ ${words[c]} != *"="* ]] && __ipsw_contains_word "${words[c]}" "${two_word_flags[@]}"; then
+			  __ipsw_debug "${FUNCNAME[0]}: found a flag ${words[c]}, skip the next argument"
+        c=$((c+1))
+        # if we are looking for a flags value, don't show commands
+        if [[ $c -eq $cword ]]; then
+            commands=()
+        fi
+    fi
+
+    c=$((c+1))
+
+}
+
+__ipsw_handle_noun()
+{
+    __ipsw_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+
+    if __ipsw_contains_word "${words[c]}" "${must_have_one_noun[@]}"; then
+        must_have_one_noun=()
+    elif __ipsw_contains_word "${words[c]}" "${noun_aliases[@]}"; then
+        must_have_one_noun=()
+    fi
+
+    nouns+=("${words[c]}")
+    c=$((c+1))
+}
+
+__ipsw_handle_command()
+{
+    __ipsw_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+
+    local next_command
+    if [[ -n ${last_command} ]]; then
+        next_command="_${last_command}_${words[c]//:/__}"
+    else
+        if [[ $c -eq 0 ]]; then
+            next_command="_ipsw_root_command"
+        else
+            next_command="_${words[c]//:/__}"
+        fi
+    fi
+    c=$((c+1))
+    __ipsw_debug "${FUNCNAME[0]}: looking for ${next_command}"
+    declare -F "$next_command" >/dev/null && $next_command
+}
+
+__ipsw_handle_word()
+{
+    if [[ $c -ge $cword ]]; then
+        __ipsw_handle_reply
+        return
+    fi
+    __ipsw_debug "${FUNCNAME[0]}: c is $c words[c] is ${words[c]}"
+    if [[ "${words[c]}" == -* ]]; then
+        __ipsw_handle_flag
+    elif __ipsw_contains_word "${words[c]}" "${commands[@]}"; then
+        __ipsw_handle_command
+    elif [[ $c -eq 0 ]]; then
+        __ipsw_handle_command
+    elif __ipsw_contains_word "${words[c]}" "${command_aliases[@]}"; then
+        # aliashash variable is an associative array which is only supported in bash > 3.
+        if [[ -z "${BASH_VERSION}" || "${BASH_VERSINFO[0]}" -gt 3 ]]; then
+            words[c]=${aliashash[${words[c]}]}
+            __ipsw_handle_command
+        else
+            __ipsw_handle_noun
+        fi
+    else
+        __ipsw_handle_noun
+    fi
+    __ipsw_handle_word
+}
+
+_ipsw_ctfdump()
+{
+    last_command="ipsw_ctfdump"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--arch=")
+    two_word_flags+=("--arch")
+    two_word_flags+=("-a")
+    local_nonpersistent_flags+=("--arch")
+    local_nonpersistent_flags+=("--arch=")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--json")
+    flags+=("-j")
+    local_nonpersistent_flags+=("--json")
+    local_nonpersistent_flags+=("-j")
+    flags+=("--pretty")
+    local_nonpersistent_flags+=("--pretty")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_device-list()
+{
+    last_command="ipsw_device-list"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_disass()
+{
+    last_command="ipsw_disass"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--companion=")
+    two_word_flags+=("--companion")
+    two_word_flags+=("-c")
+    local_nonpersistent_flags+=("--companion")
+    local_nonpersistent_flags+=("--companion=")
+    local_nonpersistent_flags+=("-c")
+    flags+=("--demangle")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--demangle")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--instrs=")
+    two_word_flags+=("--instrs")
+    two_word_flags+=("-i")
+    flags+=("--symbol=")
+    two_word_flags+=("--symbol")
+    two_word_flags+=("-s")
+    local_nonpersistent_flags+=("--symbol")
+    local_nonpersistent_flags+=("--symbol=")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--vaddr=")
+    two_word_flags+=("--vaddr")
+    two_word_flags+=("-a")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_beta()
+{
+    last_command="ipsw_download_beta"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_dev()
+{
+    last_command="ipsw_download_dev"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--beta")
+    local_nonpersistent_flags+=("--beta")
+    flags+=("--more")
+    local_nonpersistent_flags+=("--more")
+    flags+=("--page=")
+    two_word_flags+=("--page")
+    two_word_flags+=("-p")
+    local_nonpersistent_flags+=("--page")
+    local_nonpersistent_flags+=("--page=")
+    local_nonpersistent_flags+=("-p")
+    flags+=("--release")
+    local_nonpersistent_flags+=("--release")
+    flags+=("--sms")
+    local_nonpersistent_flags+=("--sms")
+    flags+=("--watch=")
+    two_word_flags+=("--watch")
+    local_nonpersistent_flags+=("--watch")
+    local_nonpersistent_flags+=("--watch=")
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_kernel()
+{
+    last_command="ipsw_download_kernel"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--spec")
+    local_nonpersistent_flags+=("--spec")
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_latest()
+{
+    last_command="ipsw_download_latest"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--info")
+    flags+=("-i")
+    local_nonpersistent_flags+=("--info")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_macos()
+{
+    last_command="ipsw_download_macos"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--info")
+    flags+=("-i")
+    local_nonpersistent_flags+=("--info")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--installer")
+    local_nonpersistent_flags+=("--installer")
+    flags+=("--kernel")
+    flags+=("-k")
+    local_nonpersistent_flags+=("--kernel")
+    local_nonpersistent_flags+=("-k")
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_oss()
+{
+    last_command="ipsw_download_oss"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--all")
+    local_nonpersistent_flags+=("--all")
+    flags+=("--macos=")
+    two_word_flags+=("--macos")
+    two_word_flags+=("-m")
+    local_nonpersistent_flags+=("--macos")
+    local_nonpersistent_flags+=("--macos=")
+    local_nonpersistent_flags+=("-m")
+    flags+=("--product=")
+    two_word_flags+=("--product")
+    local_nonpersistent_flags+=("--product")
+    local_nonpersistent_flags+=("--product=")
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_flag+=("--macos=")
+    must_have_one_flag+=("-m")
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_ota()
+{
+    last_command="ipsw_download_ota"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--dyld")
+    local_nonpersistent_flags+=("--dyld")
+    flags+=("--kernel")
+    flags+=("-k")
+    local_nonpersistent_flags+=("--kernel")
+    local_nonpersistent_flags+=("-k")
+    flags+=("--macos")
+    flags+=("-m")
+    local_nonpersistent_flags+=("--macos")
+    local_nonpersistent_flags+=("-m")
+    flags+=("--model=")
+    two_word_flags+=("--model")
+    local_nonpersistent_flags+=("--model")
+    local_nonpersistent_flags+=("--model=")
+    flags+=("--release")
+    flags+=("-r")
+    local_nonpersistent_flags+=("--release")
+    local_nonpersistent_flags+=("-r")
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download_pattern()
+{
+    last_command="ipsw_download_pattern"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--verbose")
+    flags+=("-V")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_download()
+{
+    last_command="ipsw_download"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("beta")
+    commands+=("dev")
+    commands+=("kernel")
+    commands+=("latest")
+    commands+=("macos")
+    commands+=("oss")
+    commands+=("ota")
+    commands+=("pattern")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--black-list=")
+    two_word_flags+=("--black-list")
+    flags+=("--build=")
+    two_word_flags+=("--build")
+    two_word_flags+=("-b")
+    flags+=("--device=")
+    two_word_flags+=("--device")
+    two_word_flags+=("-d")
+    flags+=("--insecure")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remove-commas")
+    flags+=("-_")
+    flags+=("--skip-all")
+    flags+=("-s")
+    flags+=("--version=")
+    two_word_flags+=("--version")
+    two_word_flags+=("-v")
+    flags+=("--white-list=")
+    two_word_flags+=("--white-list")
+    flags+=("--yes")
+    flags+=("-y")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dtree()
+{
+    last_command="ipsw_dtree"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--insecure")
+    flags+=("--json")
+    flags+=("-j")
+    local_nonpersistent_flags+=("--json")
+    local_nonpersistent_flags+=("-j")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    flags+=("--remote")
+    flags+=("-r")
+    local_nonpersistent_flags+=("--remote")
+    local_nonpersistent_flags+=("-r")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_a2o()
+{
+    last_command="ipsw_dyld_a2o"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--dec")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--dec")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--hex")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--hex")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_a2s()
+{
+    last_command="ipsw_dyld_a2s"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--image")
+    flags+=("-i")
+    local_nonpersistent_flags+=("--image")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--mapping")
+    flags+=("-m")
+    local_nonpersistent_flags+=("--mapping")
+    local_nonpersistent_flags+=("-m")
+    flags+=("--slide=")
+    two_word_flags+=("--slide")
+    two_word_flags+=("-s")
+    local_nonpersistent_flags+=("--slide")
+    local_nonpersistent_flags+=("--slide=")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_disass()
+{
+    last_command="ipsw_dyld_disass"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--cache=")
+    two_word_flags+=("--cache")
+    local_nonpersistent_flags+=("--cache")
+    local_nonpersistent_flags+=("--cache=")
+    flags+=("--count=")
+    two_word_flags+=("--count")
+    two_word_flags+=("-c")
+    local_nonpersistent_flags+=("--count")
+    local_nonpersistent_flags+=("--count=")
+    local_nonpersistent_flags+=("-c")
+    flags+=("--demangle")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--demangle")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--image=")
+    two_word_flags+=("--image")
+    two_word_flags+=("-i")
+    local_nonpersistent_flags+=("--image")
+    local_nonpersistent_flags+=("--image=")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--symbol=")
+    two_word_flags+=("--symbol")
+    two_word_flags+=("-s")
+    local_nonpersistent_flags+=("--symbol")
+    local_nonpersistent_flags+=("--symbol=")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--vaddr=")
+    two_word_flags+=("--vaddr")
+    two_word_flags+=("-a")
+    local_nonpersistent_flags+=("--vaddr")
+    local_nonpersistent_flags+=("--vaddr=")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_dump()
+{
+    last_command="ipsw_dyld_dump"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--addr")
+    flags+=("-a")
+    local_nonpersistent_flags+=("--addr")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--count=")
+    two_word_flags+=("--count")
+    two_word_flags+=("-c")
+    local_nonpersistent_flags+=("--count")
+    local_nonpersistent_flags+=("--count=")
+    local_nonpersistent_flags+=("-c")
+    flags+=("--hex")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--hex")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    local_nonpersistent_flags+=("--output")
+    local_nonpersistent_flags+=("--output=")
+    local_nonpersistent_flags+=("-o")
+    flags+=("--size=")
+    two_word_flags+=("--size")
+    two_word_flags+=("-s")
+    local_nonpersistent_flags+=("--size")
+    local_nonpersistent_flags+=("--size=")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_extract()
+{
+    last_command="ipsw_dyld_extract"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_imports()
+{
+    last_command="ipsw_dyld_imports"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_info()
+{
+    last_command="ipsw_dyld_info"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--dylibs")
+    flags+=("-l")
+    local_nonpersistent_flags+=("--dylibs")
+    local_nonpersistent_flags+=("-l")
+    flags+=("--json")
+    flags+=("-j")
+    local_nonpersistent_flags+=("--json")
+    local_nonpersistent_flags+=("-j")
+    flags+=("--sig")
+    flags+=("-s")
+    local_nonpersistent_flags+=("--sig")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_macho()
+{
+    last_command="ipsw_dyld_macho"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--all")
+    flags+=("-a")
+    local_nonpersistent_flags+=("--all")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--extract")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--extract")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--loads")
+    flags+=("-l")
+    local_nonpersistent_flags+=("--loads")
+    local_nonpersistent_flags+=("-l")
+    flags+=("--objc")
+    flags+=("-o")
+    local_nonpersistent_flags+=("--objc")
+    local_nonpersistent_flags+=("-o")
+    flags+=("--objc-refs")
+    flags+=("-r")
+    local_nonpersistent_flags+=("--objc-refs")
+    local_nonpersistent_flags+=("-r")
+    flags+=("--starts")
+    flags+=("-f")
+    local_nonpersistent_flags+=("--starts")
+    local_nonpersistent_flags+=("-f")
+    flags+=("--strings")
+    flags+=("-s")
+    local_nonpersistent_flags+=("--strings")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--symbols")
+    flags+=("-n")
+    local_nonpersistent_flags+=("--symbols")
+    local_nonpersistent_flags+=("-n")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_o2a()
+{
+    last_command="ipsw_dyld_o2a"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--dec")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--dec")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--hex")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--hex")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_objc_class()
+{
+    last_command="ipsw_dyld_objc_class"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--image=")
+    two_word_flags+=("--image")
+    two_word_flags+=("-i")
+    local_nonpersistent_flags+=("--image")
+    local_nonpersistent_flags+=("--image=")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_objc_proto()
+{
+    last_command="ipsw_dyld_objc_proto"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_objc_sel()
+{
+    last_command="ipsw_dyld_objc_sel"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--image=")
+    two_word_flags+=("--image")
+    two_word_flags+=("-i")
+    local_nonpersistent_flags+=("--image")
+    local_nonpersistent_flags+=("--image=")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_objc()
+{
+    last_command="ipsw_dyld_objc"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("class")
+    commands+=("proto")
+    commands+=("sel")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--class")
+    flags+=("-c")
+    local_nonpersistent_flags+=("--class")
+    local_nonpersistent_flags+=("-c")
+    flags+=("--imp-cache")
+    flags+=("-i")
+    local_nonpersistent_flags+=("--imp-cache")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--proto")
+    flags+=("-p")
+    local_nonpersistent_flags+=("--proto")
+    local_nonpersistent_flags+=("-p")
+    flags+=("--sel")
+    flags+=("-s")
+    local_nonpersistent_flags+=("--sel")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_patches()
+{
+    last_command="ipsw_dyld_patches"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--image=")
+    two_word_flags+=("--image")
+    two_word_flags+=("-i")
+    local_nonpersistent_flags+=("--image")
+    local_nonpersistent_flags+=("--image=")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--sym=")
+    two_word_flags+=("--sym")
+    two_word_flags+=("-s")
+    local_nonpersistent_flags+=("--sym")
+    local_nonpersistent_flags+=("--sym=")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_slide()
+{
+    last_command="ipsw_dyld_slide"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--auth")
+    flags+=("-a")
+    local_nonpersistent_flags+=("--auth")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--cache=")
+    two_word_flags+=("--cache")
+    two_word_flags+=("-c")
+    local_nonpersistent_flags+=("--cache")
+    local_nonpersistent_flags+=("--cache=")
+    local_nonpersistent_flags+=("-c")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_split()
+{
+    last_command="ipsw_dyld_split"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--xcode=")
+    two_word_flags+=("--xcode")
+    two_word_flags+=("-x")
+    local_nonpersistent_flags+=("--xcode")
+    local_nonpersistent_flags+=("--xcode=")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_symaddr()
+{
+    last_command="ipsw_dyld_symaddr"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--all")
+    flags+=("-a")
+    local_nonpersistent_flags+=("--all")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--image=")
+    two_word_flags+=("--image")
+    two_word_flags+=("-i")
+    local_nonpersistent_flags+=("--image")
+    local_nonpersistent_flags+=("--image=")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_tbd()
+{
+    last_command="ipsw_dyld_tbd"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_webkit()
+{
+    last_command="ipsw_dyld_webkit"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--rev")
+    flags+=("-r")
+    local_nonpersistent_flags+=("--rev")
+    local_nonpersistent_flags+=("-r")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld_xref()
+{
+    last_command="ipsw_dyld_xref"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--image=")
+    two_word_flags+=("--image")
+    two_word_flags+=("-i")
+    local_nonpersistent_flags+=("--image")
+    local_nonpersistent_flags+=("--image=")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--imports")
+    local_nonpersistent_flags+=("--imports")
+    flags+=("--slide=")
+    two_word_flags+=("--slide")
+    two_word_flags+=("-s")
+    local_nonpersistent_flags+=("--slide")
+    local_nonpersistent_flags+=("--slide=")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_dyld()
+{
+    last_command="ipsw_dyld"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("a2o")
+    commands+=("a2s")
+    commands+=("disass")
+    commands+=("dump")
+    commands+=("extract")
+    commands+=("imports")
+    commands+=("info")
+    commands+=("macho")
+    commands+=("o2a")
+    commands+=("objc")
+    commands+=("patches")
+    commands+=("slide")
+    commands+=("split")
+    commands+=("symaddr")
+    commands+=("tbd")
+    commands+=("webkit")
+    commands+=("xref")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_ent()
+{
+    last_command="ipsw_ent"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--ent=")
+    two_word_flags+=("--ent")
+    two_word_flags+=("-e")
+    local_nonpersistent_flags+=("--ent")
+    local_nonpersistent_flags+=("--ent=")
+    local_nonpersistent_flags+=("-e")
+    flags+=("--file=")
+    two_word_flags+=("--file")
+    two_word_flags+=("-f")
+    local_nonpersistent_flags+=("--file")
+    local_nonpersistent_flags+=("--file=")
+    local_nonpersistent_flags+=("-f")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_extract()
+{
+    last_command="ipsw_extract"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--dmg")
+    flags+=("-f")
+    local_nonpersistent_flags+=("--dmg")
+    local_nonpersistent_flags+=("-f")
+    flags+=("--dtree")
+    flags+=("-t")
+    local_nonpersistent_flags+=("--dtree")
+    local_nonpersistent_flags+=("-t")
+    flags+=("--dyld")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--dyld")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--iboot")
+    flags+=("-i")
+    local_nonpersistent_flags+=("--iboot")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--insecure")
+    local_nonpersistent_flags+=("--insecure")
+    flags+=("--kernel")
+    flags+=("-k")
+    local_nonpersistent_flags+=("--kernel")
+    local_nonpersistent_flags+=("-k")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    local_nonpersistent_flags+=("--proxy")
+    local_nonpersistent_flags+=("--proxy=")
+    flags+=("--remote")
+    flags+=("-r")
+    local_nonpersistent_flags+=("--remote")
+    local_nonpersistent_flags+=("-r")
+    flags+=("--sep")
+    flags+=("-s")
+    local_nonpersistent_flags+=("--sep")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_help()
+{
+    last_command="ipsw_help"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    has_completion_function=1
+    noun_aliases=()
+}
+
+_ipsw_iboot()
+{
+    last_command="ipsw_iboot"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_img4_dec()
+{
+    last_command="ipsw_img4_dec"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--iv-key=")
+    two_word_flags+=("--iv-key")
+    two_word_flags+=("-k")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_img4_extract()
+{
+    last_command="ipsw_img4_extract"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_img4()
+{
+    last_command="ipsw_img4"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("dec")
+    commands+=("extract")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_info()
+{
+    last_command="ipsw_info"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--remote")
+    flags+=("-r")
+    local_nonpersistent_flags+=("--remote")
+    local_nonpersistent_flags+=("-r")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_kernel_dec()
+{
+    last_command="ipsw_kernel_dec"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_kernel_extract()
+{
+    last_command="ipsw_kernel_extract"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_kernel_kexts()
+{
+    last_command="ipsw_kernel_kexts"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_kernel_sbopts()
+{
+    last_command="ipsw_kernel_sbopts"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_kernel_symbolsets()
+{
+    last_command="ipsw_kernel_symbolsets"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_kernel()
+{
+    last_command="ipsw_kernel"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("dec")
+    commands+=("extract")
+    commands+=("kexts")
+    commands+=("sbopts")
+    commands+=("symbolsets")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_lipo()
+{
+    last_command="ipsw_lipo"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--arch=")
+    two_word_flags+=("--arch")
+    two_word_flags+=("-a")
+    local_nonpersistent_flags+=("--arch")
+    local_nonpersistent_flags+=("--arch=")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_macho_a2o()
+{
+    last_command="ipsw_macho_a2o"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--arch=")
+    two_word_flags+=("--arch")
+    two_word_flags+=("-a")
+    local_nonpersistent_flags+=("--arch")
+    local_nonpersistent_flags+=("--arch=")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--dec")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--dec")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--hex")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--hex")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_macho_dump()
+{
+    last_command="ipsw_macho_dump"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--addr")
+    flags+=("-v")
+    local_nonpersistent_flags+=("--addr")
+    local_nonpersistent_flags+=("-v")
+    flags+=("--arch=")
+    two_word_flags+=("--arch")
+    two_word_flags+=("-a")
+    local_nonpersistent_flags+=("--arch")
+    local_nonpersistent_flags+=("--arch=")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--count=")
+    two_word_flags+=("--count")
+    two_word_flags+=("-c")
+    local_nonpersistent_flags+=("--count")
+    local_nonpersistent_flags+=("--count=")
+    local_nonpersistent_flags+=("-c")
+    flags+=("--hex")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--hex")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--output=")
+    two_word_flags+=("--output")
+    two_word_flags+=("-o")
+    local_nonpersistent_flags+=("--output")
+    local_nonpersistent_flags+=("--output=")
+    local_nonpersistent_flags+=("-o")
+    flags+=("--size=")
+    two_word_flags+=("--size")
+    two_word_flags+=("-s")
+    local_nonpersistent_flags+=("--size")
+    local_nonpersistent_flags+=("--size=")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_macho_info()
+{
+    last_command="ipsw_macho_info"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--arch=")
+    two_word_flags+=("--arch")
+    two_word_flags+=("-a")
+    local_nonpersistent_flags+=("--arch")
+    local_nonpersistent_flags+=("--arch=")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--ent")
+    flags+=("-e")
+    local_nonpersistent_flags+=("--ent")
+    local_nonpersistent_flags+=("-e")
+    flags+=("--extract-fileset-entry")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--extract-fileset-entry")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--fileset-entry=")
+    two_word_flags+=("--fileset-entry")
+    two_word_flags+=("-t")
+    local_nonpersistent_flags+=("--fileset-entry")
+    local_nonpersistent_flags+=("--fileset-entry=")
+    local_nonpersistent_flags+=("-t")
+    flags+=("--fixups")
+    flags+=("-u")
+    local_nonpersistent_flags+=("--fixups")
+    local_nonpersistent_flags+=("-u")
+    flags+=("--header")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--header")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--loads")
+    flags+=("-l")
+    local_nonpersistent_flags+=("--loads")
+    local_nonpersistent_flags+=("-l")
+    flags+=("--objc")
+    flags+=("-o")
+    local_nonpersistent_flags+=("--objc")
+    local_nonpersistent_flags+=("-o")
+    flags+=("--objc-refs")
+    flags+=("-r")
+    local_nonpersistent_flags+=("--objc-refs")
+    local_nonpersistent_flags+=("-r")
+    flags+=("--sig")
+    flags+=("-s")
+    local_nonpersistent_flags+=("--sig")
+    local_nonpersistent_flags+=("-s")
+    flags+=("--starts")
+    flags+=("-f")
+    local_nonpersistent_flags+=("--starts")
+    local_nonpersistent_flags+=("-f")
+    flags+=("--strings")
+    flags+=("-c")
+    local_nonpersistent_flags+=("--strings")
+    local_nonpersistent_flags+=("-c")
+    flags+=("--symbols")
+    flags+=("-n")
+    local_nonpersistent_flags+=("--symbols")
+    local_nonpersistent_flags+=("-n")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_macho_o2a()
+{
+    last_command="ipsw_macho_o2a"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--arch=")
+    two_word_flags+=("--arch")
+    two_word_flags+=("-a")
+    local_nonpersistent_flags+=("--arch")
+    local_nonpersistent_flags+=("--arch=")
+    local_nonpersistent_flags+=("-a")
+    flags+=("--dec")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--dec")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--hex")
+    flags+=("-x")
+    local_nonpersistent_flags+=("--hex")
+    local_nonpersistent_flags+=("-x")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_macho()
+{
+    last_command="ipsw_macho"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("a2o")
+    commands+=("dump")
+    commands+=("info")
+    commands+=("o2a")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_ota()
+{
+    last_command="ipsw_ota"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--info")
+    flags+=("-i")
+    local_nonpersistent_flags+=("--info")
+    local_nonpersistent_flags+=("-i")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_sepfw()
+{
+    last_command="ipsw_sepfw"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_shsh()
+{
+    last_command="ipsw_shsh"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_symbolicate()
+{
+    last_command="ipsw_symbolicate"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--demangle")
+    flags+=("-d")
+    local_nonpersistent_flags+=("--demangle")
+    local_nonpersistent_flags+=("-d")
+    flags+=("--unslide")
+    flags+=("-u")
+    local_nonpersistent_flags+=("--unslide")
+    local_nonpersistent_flags+=("-u")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_update()
+{
+    last_command="ipsw_update"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--detect")
+    local_nonpersistent_flags+=("--detect")
+    flags+=("--insecure")
+    local_nonpersistent_flags+=("--insecure")
+    flags+=("--platform=")
+    two_word_flags+=("--platform")
+    two_word_flags+=("-p")
+    local_nonpersistent_flags+=("--platform")
+    local_nonpersistent_flags+=("--platform=")
+    local_nonpersistent_flags+=("-p")
+    flags+=("--proxy=")
+    two_word_flags+=("--proxy")
+    local_nonpersistent_flags+=("--proxy")
+    local_nonpersistent_flags+=("--proxy=")
+    flags+=("--replace")
+    local_nonpersistent_flags+=("--replace")
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_version()
+{
+    last_command="ipsw_version"
+
+    command_aliases=()
+
+    commands=()
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+_ipsw_root_command()
+{
+    last_command="ipsw"
+
+    command_aliases=()
+
+    commands=()
+    commands+=("ctfdump")
+    commands+=("device-list")
+    commands+=("disass")
+    commands+=("download")
+    commands+=("dtree")
+    commands+=("dyld")
+    commands+=("ent")
+    commands+=("extract")
+    commands+=("help")
+    commands+=("iboot")
+    commands+=("img4")
+    commands+=("info")
+    commands+=("kernel")
+    commands+=("lipo")
+    commands+=("macho")
+    commands+=("ota")
+    commands+=("sepfw")
+    commands+=("shsh")
+    commands+=("symbolicate")
+    commands+=("update")
+    commands+=("version")
+
+    flags=()
+    two_word_flags=()
+    local_nonpersistent_flags=()
+    flags_with_completion=()
+    flags_completion=()
+
+    flags+=("--config=")
+    two_word_flags+=("--config")
+    flags+=("--verbose")
+    flags+=("-V")
+
+    must_have_one_flag=()
+    must_have_one_noun=()
+    noun_aliases=()
+}
+
+__start_ipsw()
+{
+    local cur prev words cword split
+    declare -A flaghash 2>/dev/null || :
+    declare -A aliashash 2>/dev/null || :
+    if declare -F _init_completion >/dev/null 2>&1; then
+        _init_completion -s || return
+    else
+        __ipsw_init_completion -n "=" || return
+    fi
+
+    local c=0
+    local flags=()
+    local two_word_flags=()
+    local local_nonpersistent_flags=()
+    local flags_with_completion=()
+    local flags_completion=()
+    local commands=("ipsw")
+    local command_aliases=()
+    local must_have_one_flag=()
+    local must_have_one_noun=()
+    local has_completion_function
+    local last_command
+    local nouns=()
+    local noun_aliases=()
+
+    __ipsw_handle_word
+}
+
+if [[ $(type -t compopt) = "builtin" ]]; then
+    complete -o default -F __start_ipsw ipsw
+else
+    complete -o default -o nospace -F __start_ipsw ipsw
+fi
+
+# ex: ts=4 sw=4 et filetype=sh
