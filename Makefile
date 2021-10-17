@@ -24,6 +24,11 @@ dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
 	@goreleaser build --rm-dist --skip-validate --single-target
 
+.PHONY: snapshot
+snapshot: ## Run goreleaser snapshot
+	@echo " > Creating Snapshot ${NEXT_VERSION}"
+	@goreleaser --rm-dist --snapshot
+
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"

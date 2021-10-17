@@ -35,6 +35,7 @@ usr
 *.bu
 dist/
 test-caches/
+completions/
 *.txt
 *.prof
 *.download
