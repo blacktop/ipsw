@@ -6,6 +6,7 @@ before:
     - go mod download
     # you may remove this if you don't need go generate
     - go generate ./...
+    - ./hack/make/completions
 builds:
   - main: ./cmd/ipsw
     id: darwin
@@ -17,6 +18,9 @@ builds:
     goarch:
       - amd64
       - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
   - main: ./cmd/ipsw
     id: "others"
@@ -29,6 +33,9 @@ builds:
     goarch:
       - amd64
       - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 universal_binaries:
   - id: darwin
@@ -41,6 +48,10 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - completions/*
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
 brews:
   - tap:
       owner: blacktop
@@ -55,10 +66,17 @@ brews:
       bin.install "ipsw"
     test: |
       system "#{bin}/ipsw --version"
-      bash_completion.install "hack/completions/_bash" => "ipsw"
-      zsh_completion.install "hack/completions/_zsh" => "_ipsw"
-      fish_completion.install "hack/completions/_fish" => "ipsw.fish"
-
+      bash_completion.install "completions/_bash" => "ipsw"
+      zsh_completion.install "completions/_zsh" => "_ipsw"
+      fish_completion.install "completions/_fish" => "ipsw.fish"
+rigs:
+  - name: ipsw
+    rig:
+      owner: blacktop
+      name: fish-food
+    homepage: https://github.com/blacktop/ipsw
+    description: Download and parse IPSWs
+    license: MIT
 checksum:
   name_template: "checksums.txt"
 signs:
@@ -75,3 +93,8 @@ changelog:
       - "updates"
       - Merge pull request
       - Merge branch
+release:
+  footer: |
+    ## What to do next?
+    - Follow us on [Twitter](https://twitter.com/blacktop__);
+    - Read the [documentation](https://blacktop.github.io/ipsw/docs/).
