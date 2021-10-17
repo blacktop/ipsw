@@ -64,11 +64,11 @@ brews:
         type: optional
     install: |
       bin.install "ipsw"
-    test: |
-      system "#{bin}/ipsw --version"
       bash_completion.install "completions/_bash" => "ipsw"
       zsh_completion.install "completions/_zsh" => "_ipsw"
       fish_completion.install "completions/_fish" => "ipsw.fish"
+    test: |
+      system "#{bin}/ipsw --version"
 rigs:
   - name: ipsw
     rig:
