@@ -37,6 +37,7 @@ archives:
   - replacements:
       darwin: macOS
       amd64: x86_64
+      all: universal
     format_overrides:
       - goos: windows
         format: zip
@@ -48,11 +49,16 @@ brews:
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
     dependencies:
-      - bat
+      - name: bat
+        type: optional
     install: |
       bin.install "ipsw"
     test: |
       system "#{bin}/ipsw --version"
+      bash_completion.install "hack/completions/_bash" => "ipsw"
+      zsh_completion.install "hack/completions/_zsh" => "_ipsw"
+      fish_completion.install "hack/completions/_fish" => "ipsw.fish"
+
 checksum:
   name_template: "checksums.txt"
 signs:
