@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.7.1
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-macho v1.1.55
+	github.com/blacktop/go-macho v1.1.56
 	github.com/blacktop/go-plist v1.0.0
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
