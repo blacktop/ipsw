@@ -64,7 +64,7 @@ var splitCmd = &cobra.Command{
 		if len(args) > 1 {
 			outputPath, _ := filepath.Abs(filepath.Clean(args[1]))
 			if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-				return fmt.Errorf("path %s does not exist", dscPath)
+				return fmt.Errorf("path %s does not exist", outputPath)
 			}
 			log.Infof("Splitting dyld_shared_cache to %s\n", outputPath)
 			return dyld.Split(dscPath, outputPath, xcodePath)
