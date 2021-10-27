@@ -357,8 +357,7 @@ func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
 
 // Extract extracts DeviceTree(s) from ipsw
 func Extract(ipsw, destPath string) error {
-	log.Info("Extracting DeviceTree from IPSW")
-	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+	_, err := utils.Unzip(ipsw, destPath, func(f *zip.File) bool {
 		var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
 		if validDT.MatchString(f.Name) {
 			return true
