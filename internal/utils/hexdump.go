@@ -5,7 +5,11 @@ import (
 	"errors"
 	"io"
 	"strings"
+
+	"github.com/fatih/color"
 )
+
+// CREDIT: https://pkg.go.dev/encoding/hex (edited to add vaddr and color)
 
 // HexDump returns a string that contains a hex dump of the given data. The format
 // of the hex dump matches the output of `hexdump -C` on the command line.
@@ -72,10 +76,11 @@ func (h *dumper) Write(data []byte) (n int, err error) {
 			hex.Encode(h.buf[8:], h.buf[:8])
 			h.buf[24] = ' '
 			h.buf[25] = ' '
-			_, err = h.w.Write(h.buf[8:])
-			if err != nil {
-				return
-			}
+			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:]))
+			// _, err = h.w.Write(h.buf[8:])
+			// if err != nil {
+			// 	return
+			// }
 		}
 		hex.Encode(h.buf[:], data[i:i+1])
 		h.buf[2] = ' '
