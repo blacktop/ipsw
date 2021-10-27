@@ -138,6 +138,18 @@ var dyldDumpCmd = &cobra.Command{
 					ioutil.WriteFile(outFile, dat, 0755)
 					log.Infof("Wrote data to file %s", outFile)
 				} else {
+					if image, err := f.GetImageContainingVMAddr(addr); err == nil {
+						if m, err := image.GetMacho(); err == nil {
+							defer m.Close()
+							if c := m.FindSectionForVMAddr(addr); c != nil {
+								log.WithFields(log.Fields{
+									"dylib":   image.Name,
+									"section": fmt.Sprintf("%s.%s", c.Seg, c.Name),
+								}).Info("Address location")
+							}
+						}
+					}
+					// fmt.Println(utils.HexDump(dat, addr)) TODO: add virtual address to hexdump offset output
 					fmt.Println(hex.Dump(dat))
 				}
 			} else if asAddrs {
