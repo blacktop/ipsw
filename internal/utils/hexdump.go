@@ -36,7 +36,7 @@ func Dumper(w io.Writer, vaddr uint) io.WriteCloser {
 type dumper struct {
 	w          io.Writer
 	rightChars [18]byte
-	buf        [14]byte
+	buf        [26]byte
 	used       int  // number of bytes in the current line
 	n          uint // number of bytes, total
 	closed     bool
@@ -61,18 +61,18 @@ func (h *dumper) Write(data []byte) (n int, err error) {
 		if h.used == 0 {
 			// At the beginning of a line we print the current
 			// offset in hex.
-
-			// b := make([]byte, 8) TODO: finish this
-			// binary.LittleEndian.PutUint64(b, uint64(h.n))
-
-			h.buf[0] = byte(h.n >> 24)
-			h.buf[1] = byte(h.n >> 16)
-			h.buf[2] = byte(h.n >> 8)
-			h.buf[3] = byte(h.n)
-			hex.Encode(h.buf[4:], h.buf[:4])
-			h.buf[12] = ' '
-			h.buf[13] = ' '
-			_, err = h.w.Write(h.buf[4:])
+			h.buf[0] = byte(h.n >> 56)
+			h.buf[1] = byte(h.n >> 48)
+			h.buf[2] = byte(h.n >> 40)
+			h.buf[3] = byte(h.n >> 32)
+			h.buf[4] = byte(h.n >> 24)
+			h.buf[5] = byte(h.n >> 16)
+			h.buf[6] = byte(h.n >> 8)
+			h.buf[7] = byte(h.n)
+			hex.Encode(h.buf[8:], h.buf[:8])
+			h.buf[24] = ' '
+			h.buf[25] = ' '
+			_, err = h.w.Write(h.buf[8:])
 			if err != nil {
 				return
 			}

@@ -25,7 +25,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -148,9 +147,19 @@ var dyldDumpCmd = &cobra.Command{
 								}).Info("Address location")
 							}
 						}
+					} else {
+						mapping, err := f.GetMappingForVMAddress(addr)
+						if err != nil {
+							return err
+						}
+						log.WithFields(log.Fields{
+							"name": mapping.Name,
+							"off":  fmt.Sprintf("%#x", mapping.FileOffset),
+							"addr": fmt.Sprintf("%#x", mapping.Address),
+							"size": fmt.Sprintf("%#x", mapping.Size),
+						}).Info("Mapping")
 					}
-					// fmt.Println(utils.HexDump(dat, addr)) TODO: add virtual address to hexdump offset output
-					fmt.Println(hex.Dump(dat))
+					fmt.Println(utils.HexDump(dat, addr))
 				}
 			} else if asAddrs {
 				addrs := make([]uint64, count)

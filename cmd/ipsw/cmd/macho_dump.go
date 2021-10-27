@@ -25,7 +25,6 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -161,7 +160,12 @@ var machoDumpCmd = &cobra.Command{
 					ioutil.WriteFile(outFile, dat, 0755)
 					log.Infof("Wrote data to file %s", outFile)
 				} else {
-					fmt.Println(hex.Dump(dat))
+					if c := m.FindSectionForVMAddr(addr); c != nil {
+						log.WithFields(log.Fields{
+							"section": fmt.Sprintf("%s.%s", c.Seg, c.Name),
+						}).Info("Address location")
+					}
+					fmt.Println(utils.HexDump(dat, addr))
 				}
 			} else if asAddrs {
 				addrs := make([]uint64, count)
