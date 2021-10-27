@@ -239,6 +239,10 @@ func (i *CacheImage) GetVMAddress(offset uint64) (uint64, error) {
 
 // GetMacho parses dyld image as a MachO (slow)
 func (i *CacheImage) GetMacho() (*macho.File, error) {
+	if i.m != nil {
+		return i.m, nil
+	}
+
 	offset, err := i.GetOffset(i.LoadAddress)
 	if err != nil {
 		return nil, err
@@ -256,7 +260,7 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
 
-	return macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+	i.m, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		Offset:        int64(offset),
 		SectionReader: types.NewCustomSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
 		CacheReader:   i,
@@ -273,6 +277,11 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 		},
 		RelativeSelectorBase: rsBase,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return i.m, nil
 }
 
 // GetPartialMacho parses dyld image as a partial MachO (fast)

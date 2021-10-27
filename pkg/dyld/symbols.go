@@ -356,35 +356,53 @@ func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 
 // GetAllExportedSymbols prints out all the exported symbols
 func (f *File) GetAllExportedSymbols(dump bool) error {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	for _, image := range f.Images {
+		if !image.Analysis.State.IsExportsDone() {
+			syms, err := f.getExportTrieSymbols(image)
+			if err != nil {
+				if errors.Is(err, ErrNoExportTrieInMachO) {
+					m, err := f.Image(image.Name).GetMacho()
+					if err != nil {
+						return err
+					}
 
-		syms, err := f.getExportTrieSymbols(image)
-		if err != nil {
-			return err
-		}
-
-		m, err := image.GetPartialMacho()
-		if err != nil {
-			return err
-		}
-
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-		for _, sym := range syms {
-			if sym.Flags.ReExport() {
-				sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+					for _, sym := range m.Symtab.Syms {
+						// TODO: Handle ReExports
+						if dump {
+							fmt.Fprintf(w, "%s\n", sym.String(m))
+						} else {
+							f.AddressToSymbol[sym.Value] = sym.Name
+						}
+					}
+					w.Flush()
+				} else {
+					return err
+				}
 			} else {
-				sym.FoundInDylib = image.Name
-			}
+				m, err := image.GetPartialMacho()
+				if err != nil {
+					return err
+				}
 
-			if dump {
-				fmt.Fprintf(w, "%s\n", sym)
-				// fmt.Println(sym)
-			} else {
-				f.AddressToSymbol[sym.Address] = sym.Name
-				image.Analysis.State.SetExports(true)
+				for _, sym := range syms {
+					if sym.Flags.ReExport() {
+						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+					} else {
+						sym.FoundInDylib = image.Name
+					}
+
+					if dump {
+						fmt.Fprintf(w, "%s\n", sym)
+						// fmt.Println(sym)
+					} else {
+						f.AddressToSymbol[sym.Address] = sym.Name
+						image.Analysis.State.SetExports(true)
+					}
+				}
+				w.Flush()
 			}
 		}
-		w.Flush()
 	}
 
 	return nil
@@ -392,31 +410,45 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 
 // GetAllExportedSymbolsForImage prints out all the exported symbols for a given image
 func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error {
-
 	if !image.Analysis.State.IsExportsDone() {
 		syms, err := f.getExportTrieSymbols(image)
 		if err != nil {
-			return err
-		}
-
-		m, err := image.GetPartialMacho()
-		if err != nil {
-			return err
-		}
-
-		for _, sym := range syms {
-			if sym.Flags.ReExport() {
-				sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
-			}
-
-			if dump {
-				fmt.Println(sym)
+			if errors.Is(err, ErrNoExportTrieInMachO) {
+				m, err := f.Image(image.Name).GetMacho()
+				if err != nil {
+					return err
+				}
+				for _, sym := range m.Symtab.Syms {
+					// TODO: Handle ReExports
+					if dump {
+						fmt.Println(sym)
+					} else {
+						f.AddressToSymbol[sym.Value] = sym.Name
+					}
+				}
 			} else {
-				f.AddressToSymbol[sym.Address] = sym.Name
-				image.Analysis.State.SetExports(true)
+				return err
+			}
+		} else {
+			m, err := image.GetPartialMacho()
+			if err != nil {
+				return err
+			}
+
+			for _, sym := range syms {
+				if sym.Flags.ReExport() {
+					sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+				}
+
+				if dump {
+					fmt.Println(sym)
+				} else {
+					f.AddressToSymbol[sym.Address] = sym.Name
+				}
 			}
 		}
 
+		image.Analysis.State.SetExports(true)
 	}
 
 	return nil
