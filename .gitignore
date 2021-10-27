@@ -30,6 +30,7 @@ usr
 *.bin
 *.s
 .DS_Store
+*.dmg
 
 # Repo
 *.bu
