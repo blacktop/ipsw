@@ -229,6 +229,9 @@ var extractCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to parse ipsw info")
 				}
+
+				destPath = filepath.Join(destPath, i.GetFolder())
+
 				_, err = utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
 					if strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg()) {
 						return true
