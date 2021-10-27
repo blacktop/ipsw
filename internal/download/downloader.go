@@ -190,15 +190,14 @@ func (d *Download) Do() error {
 				}
 				req.Header.Add("User-Agent", utils.RandomAgent())
 
-				res, err := d.client.Do(req)
-				if err != nil {
-					log.Error("failed to lookup IP's geolocation")
+				if res, err := d.client.Do(req); err == nil {
+					defer res.Body.Close()
+					data := &geoQuery{}
+					json.NewDecoder(res.Body).Decode(data)
+					utils.Indent(log.Debug, 2)(fmt.Sprintf("URL resolved to: %s (%s - %s, %s. %s)", addr, data.Org, data.City, data.Region, data.Country))
+				} else {
+					log.Errorf("failed to lookup IP's geolocation: %v", err)
 				}
-				defer res.Body.Close()
-
-				data := &geoQuery{}
-				json.NewDecoder(res.Body).Decode(data)
-				utils.Indent(log.Debug, 2)(fmt.Sprintf("URL resolved to: %s (%s - %s, %s. %s)", addr, data.Org, data.City, data.Region, data.Country))
 			}
 		},
 	}
