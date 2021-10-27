@@ -281,9 +281,7 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 	}
 
 	if err := f.GetLocalSymbolsForImage(image); err != nil {
-		if errors.Is(err, ErrNoLocals) {
-			utils.Indent(log.Warn, 2)(err.Error())
-		} else if err != nil {
+		if !errors.Is(err, ErrNoLocals) {
 			return err
 		}
 	}
