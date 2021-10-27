@@ -199,6 +199,13 @@ var extractCmd = &cobra.Command{
 				return fmt.Errorf("file %s does not exist", ipswPath)
 			}
 
+			i, err := info.Parse(ipswPath)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse ipsw info")
+			}
+
+			destPath = filepath.Join(destPath, i.GetFolder())
+
 			if kernelFlag {
 				log.Info("Extracting kernelcaches")
 				err := kernelcache.Extract(ipswPath, destPath)
@@ -217,7 +224,7 @@ var extractCmd = &cobra.Command{
 
 			if deviceTreeFlag {
 				log.Info("Extracting DeviceTrees")
-				err := devicetree.Extract(ipswPath, destPath)
+				err = devicetree.Extract(ipswPath, destPath)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract DeviceTrees")
 				}
@@ -225,13 +232,6 @@ var extractCmd = &cobra.Command{
 
 			if dmgFlag {
 				log.Info("Extracting File System DMG")
-				i, err := info.Parse(ipswPath)
-				if err != nil {
-					return errors.Wrap(err, "failed to parse ipsw info")
-				}
-
-				destPath = filepath.Join(destPath, i.GetFolder())
-
 				_, err = utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
 					if strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg()) {
 						return true
@@ -246,7 +246,7 @@ var extractCmd = &cobra.Command{
 
 			if ibootFlag {
 				log.Info("Extracting iBoot")
-				_, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				_, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
 					var validIBoot = regexp.MustCompile(`.*iBoot.*im4p$`)
 					return validIBoot.MatchString(f.Name)
 				})
@@ -258,7 +258,7 @@ var extractCmd = &cobra.Command{
 
 			if sepFlag {
 				log.Info("Extracting sep-firmwares")
-				_, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				_, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
 					var validSEP = regexp.MustCompile(`.*sep-firmware.*im4p$`)
 					return validSEP.MatchString(f.Name)
 				})

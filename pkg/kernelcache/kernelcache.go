@@ -80,12 +80,10 @@ func Extract(ipsw, destPath string) error {
 		return errors.Wrap(err, "failed to parse ipsw info")
 	}
 
-	folder := filepath.Join(destPath, i.GetFolder())
-
 	for _, kcache := range kcaches {
 		fname := i.GetKernelCacheFileName(kcache)
 		// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(kcache, filepath.Ext(kcache)), strings.Join(i.GetDevicesForKernelCache(kcache), "_"))
-		fname = filepath.Join(folder, fname)
+		fname = filepath.Join(destPath, fname)
 
 		content, err := ioutil.ReadFile(kcache)
 		if err != nil {
@@ -102,7 +100,7 @@ func Extract(ipsw, destPath string) error {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
 
-		os.Mkdir(folder, os.ModePerm)
+		os.Mkdir(destPath, os.ModePerm)
 
 		err = ioutil.WriteFile(fname, dec, 0644)
 		if err != nil {

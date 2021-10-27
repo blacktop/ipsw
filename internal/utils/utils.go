@@ -10,7 +10,6 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -202,7 +201,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 			}
 		}()
 
-		path := filepath.Join(dest, f.Name)
+		path := filepath.Join(dest, filepath.Base(f.Name))
 
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(path, f.Mode())
@@ -218,7 +217,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 					panic(err)
 				}
 			}()
-
+			Indent(log.Info, 2)(fmt.Sprintf("Created %s", path))
 			_, err = io.Copy(f, rc)
 			if err != nil {
 				return err
@@ -229,7 +228,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 
 	for _, f := range r.File {
 		if filter(f) {
-			fNames = append(fNames, path.Base(f.Name))
+			fNames = append(fNames, filepath.Base(f.Name))
 			err := extractAndWriteFile(f)
 			if err != nil {
 				return nil, err
