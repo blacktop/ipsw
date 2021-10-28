@@ -7,4 +7,5 @@ for item in ${files[*]}; do
   printf "Minimizing JSON: %s\n" $item
   cp $item /tmp/$(basename -- $item)
   cat /tmp/$(basename -- $item) | jq -c > $item
+  rm /tmp/$(basename -- $item)
 done
