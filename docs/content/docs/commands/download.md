@@ -15,6 +15,7 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download macos**](#download-macos)
 - [**download dev**](#download-dev)
 - [**download oss**](#download-oss)
+- [**download rss**](#download-rss)
 
 ---
 
@@ -364,3 +365,55 @@ List all downloads
    }
 }
 ```
+
+## **download rss**
+
+> Read Releases - Apple Developer [RSS Feed](https://developer.apple.com/news/)
+
+```
+❯ ipsw download rss
+```
+
+```md
+# Releases - Apple Developer (https://developer.apple.com/news/)
+
+> Apple Developer News and Updates feed provided by Apple, Inc.
+
+---
+
+- Xcode 13.2 beta (13C5066c) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021e
+- iOS 15.2 beta (19C5026i) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021d
+- iPadOS 15.2 beta (19C5026i) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021c
+- watchOS 8.3 beta (19S5026e) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021b
+- tvOS 15.2 beta (19K5025g) <Wed, 27 Oct 2021 13:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021a
+- Xcode 13.1 (13A1030d) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021f
+- macOS Monterey (21A559) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021e
+- iOS 15.1 (19B74) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021d
+- iPadOS 15.1 (19B74 | 19B75) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021c
+- watchOS 8.1 (19R570) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021b
+- tvOS 15.1 (19J572) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021a
+- App Store Server API Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021g
+- App Store Server Notifications Version 2 <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021ef
+- Sandbox Testing Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021e
+- App Store Connect Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021d
+- App Store Connect API Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021c
+- macOS Monterey RC 2 (21A559) <Thu, 21 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021b
+- iOS 15.0.2 (19A404) <Mon, 11 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10112021c
+- watchOS 8.0.1 (19R354) <Mon, 11 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10112021a
+- App Store Connect 1.7.1 <Tue, 21 Sep 2021 12:00:00 PDT> https://developer.apple.com/news/releases/?id=09212021f
+- Xcode 13 (13A233) <Mon, 20 Sep 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=09202021e
+- tvOS 15 (19J346) <Mon, 20 Sep 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=09202021b
+- macOS Big Sur 11.6 (20G165) <Mon, 13 Sep 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=09132021d
+- TestFlight 3.2 beta <Tue, 24 Aug 2021 11:00:00 PDT> https://developer.apple.com/news/releases/?id=08242021a
+- TestFlight Submission Update <Tue, 17 Aug 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=08172021c
+- Transporter 1.2.2 <Thu, 03 Jun 2021 11:00:00 PDT> https://developer.apple.com/news/releases/?id=06032021a
+```
+
+Watch for 🆕 Releases
+
+```
+❯ ipsw download rss --watch
+   • Watching Releases - Apple Developer RSS Feed...
+```
+
+This will ping the RSS feed every 5 minutes and create a desktop notification if anything NEW shows up.
