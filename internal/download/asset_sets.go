@@ -14,7 +14,7 @@ import (
 
 const assetSetListURL = "https://gdmf.apple.com/v2/pmv"
 
-type asset struct {
+type AssetSet struct {
 	ProductVersion   string   `json:"ProductVersion,omitempty"`
 	PostingDate      string   `json:"PostingDate,omitempty"`
 	ExpirationDate   string   `json:"ExpirationDate,omitempty"`
@@ -22,21 +22,13 @@ type asset struct {
 }
 
 type AssetSets struct {
-	PublicAssetSets map[string][]asset `json:"PublicAssetSets,omitempty"`
-	AssetSets       map[string][]asset `json:"AssetSets,omitempty"`
+	PublicAssetSets map[string][]AssetSet `json:"PublicAssetSets,omitempty"`
+	AssetSets       map[string][]AssetSet `json:"AssetSets,omitempty"`
 }
 
-// Print dumps the AssetSets to string
-func (a *AssetSets) Print(typ string) string {
-	var out string
-	for _, asset := range a.PublicAssetSets[typ] {
-		out += fmt.Sprintf("%s - %s\n", asset.ProductVersion, asset.PostingDate)
-	}
-	return out
-}
-
-func (a *AssetSets) ForDevice(device string) []asset {
-	var assets []asset
+// ForDevice returns the assets for a given device
+func (a *AssetSets) ForDevice(device string) []AssetSet {
+	var assets []AssetSet
 	for _, as := range a.AssetSets {
 		for _, asset := range as {
 			if utils.StrSliceContains(asset.SupportedDevices, device) {
@@ -45,6 +37,16 @@ func (a *AssetSets) ForDevice(device string) []asset {
 		}
 	}
 	return assets
+}
+
+// GetDevicesForVersion returns the supported devices for a given OS version
+func (a *AssetSets) GetDevicesForVersion(version string, typ string) []string {
+	for _, asset := range a.AssetSets[typ] {
+		if asset.ProductVersion == version {
+			return asset.SupportedDevices
+		}
+	}
+	return nil
 }
 
 // Latest returns the newest released version
@@ -68,7 +70,7 @@ func (a *AssetSets) Latest(typ string) string {
 
 	sort.Sort(version.Collection(versions))
 
-	return versions[len(versions)-1].String()
+	return versions[len(versions)-1].Original()
 }
 
 // GetAssetSets queries and returns the asset sets

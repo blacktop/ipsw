@@ -41,12 +41,13 @@ import (
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
-	otaDLCmd.Flags().StringP("platform", "p", "ios", "Platform to download (ios, macos, watchos, tvos)")
+	otaDLCmd.Flags().StringP("platform", "p", "ios", "Platform to download (ios, macos, watchos, tvos, audioos)")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	otaDLCmd.Flags().Bool("beta", viper.GetBool("download.ota.beta"), "Download Beta OTAs")
 	otaDLCmd.Flags().Bool("dyld", viper.GetBool("download.ota.dyld"), "Extract dyld_shared_cache from remote OTA zip")
 	otaDLCmd.Flags().Bool("kernel", viper.GetBool("download.ota.kernel"), "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
+	otaDLCmd.Flags().String("info-type", "", "OS type to show OTAs for")
 }
 
 // otaDLCmd represents the ota download command
@@ -74,20 +75,26 @@ var otaDLCmd = &cobra.Command{
 		model, _ := cmd.Flags().GetString("model")
 		version, _ := cmd.Flags().GetString("version")
 		build, _ := cmd.Flags().GetString("build")
-		doDownload, _ := cmd.Flags().GetStringArray("white-list")
-		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
+		// doDownload, _ := cmd.Flags().GetStringArray("white-list")
+		// doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 		// flags
 		platform, _ := cmd.Flags().GetString("platform")
 		getBeta, _ := cmd.Flags().GetBool("beta")
 		remoteDyld, _ := cmd.Flags().GetBool("dyld")
 		remoteKernel, _ := cmd.Flags().GetBool("kernel")
 		otaInfo, _ := cmd.Flags().GetBool("info")
+		otaInfoType, _ := cmd.Flags().GetString("info-type")
 
+		// Query for asset sets
+		as, err := download.GetAssetSets(proxy, insecure)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+
+		/****************
+		 * GET OTA INFO *
+		 ****************/
 		if otaInfo {
-			as, err := download.GetAssetSets(proxy, insecure)
-			if err != nil {
-				log.Fatal(err.Error())
-			}
 			if len(device) > 0 {
 				log.WithField("device", device).Info("OTAs")
 				for _, asset := range as.ForDevice(device) {
@@ -97,9 +104,28 @@ var otaDLCmd = &cobra.Command{
 					}).Info, 2)(asset.ProductVersion)
 				}
 			} else {
-				as.Print("iOS")
+				if len(otaInfoType) == 0 {
+					prompt := &survey.Select{
+						Message: "Choose an OS type:",
+						Options: []string{"iOS", "macOS"},
+					}
+					survey.AskOne(prompt, &otaInfoType)
+				} else {
+					if !utils.StrSliceContains([]string{"iOS", "macOS"}, otaInfoType) {
+						log.Fatal("you must supply a valid --info-type flag: (iOS, macOS)")
+					}
+				}
+				log.WithField("type", otaInfoType).Info("OTAs")
+				if otaInfoType == "iOS" {
+					log.Warn("⚠️  This includes: iOS, iPadOS, watchOS, tvOS and audioOS (you can filter by adding the --device flag)")
+				}
+				for _, asset := range as.AssetSets[otaInfoType] {
+					utils.Indent(log.WithFields(log.Fields{
+						"posting_date":    asset.PostingDate,
+						"expiration_date": asset.ExpirationDate,
+					}).Info, 2)(asset.ProductVersion)
+				}
 			}
-
 			return nil
 		}
 
@@ -108,8 +134,8 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		if !utils.StrSliceContains(
-			[]string{"ios", "macos", "watchos", "tvos"}, strings.ToLower(platform)) {
-			log.Fatal("you must supply a valid --platform flag. Choices are: ios, macos, watchos and tvos")
+			[]string{"ios", "macos", "watchos", "tvos", "audioos"}, strings.ToLower(platform)) {
+			log.Fatal("you must supply a valid --platform flag. Choices are: ios, macos, watchos, tvos and audioos")
 		}
 
 		var destPath string
@@ -120,11 +146,11 @@ var otaDLCmd = &cobra.Command{
 		if len(version) > 0 {
 			ver, err = semver.NewVersion(version)
 			if err != nil {
-				log.Fatal("failed to get  version")
+				log.Fatal("failed to convert version into semver object")
 			}
 		}
 
-		otaXML, err := download.NewOTA(download.OtaConf{
+		otaXML, err := download.NewOTA(as, download.OtaConf{
 			Platform: strings.ToLower(platform),
 			Beta:     getBeta,
 			Device:   device,
@@ -138,20 +164,25 @@ var otaDLCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
 		}
 
-		var otas []download.OtaAsset
-		if len(device) > 0 {
-			o, err := otaXML.GetOtaForDevice(device, model)
-			if err != nil {
-				return fmt.Errorf("failed to get OTA asset for device %s: %v", device, err)
-			}
-			otas = append(otas, o)
-		} else {
-			log.Info("Querying Apple servers...")
-			otas = otaXML.FilterOtaAssets(doDownload, doNotDownload)
-			if len(otas) == 0 {
-				log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
-			}
+		otas, err := otaXML.GetPallasOTAs()
+		if err != nil {
+			return err
 		}
+		fmt.Println(otas)
+		// var otas []download.OtaAsset
+		// if len(device) > 0 {
+		// 	o, err := otaXML.GetOtaForDevice(device, model)
+		// 	if err != nil {
+		// 		return fmt.Errorf("failed to get OTA asset for device %s: %v", device, err)
+		// 	}
+		// 	otas = append(otas, o)
+		// } else {
+		// 	log.Info("Querying Apple servers...")
+		// 	otas = otaXML.FilterOtaAssets(doDownload, doNotDownload)
+		// 	if len(otas) == 0 {
+		// 		log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
+		// 	}
+		// }
 
 		log.Debug("URLs to Download:")
 		for _, o := range otas {
