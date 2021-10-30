@@ -87,15 +87,16 @@ type Ota struct {
 
 // OtaConf is an OTA download configuration
 type OtaConf struct {
-	Platform string
-	Beta     bool
-	Device   string
-	Model    string
-	Version  *version.Version
-	Build    string
-
-	Proxy    string
-	Insecure bool
+	Platform        string
+	Beta            bool
+	Device          string
+	Model           string
+	Version         *version.Version
+	Build           string
+	DeviceWhiteList []string
+	DeviceBlackList []string
+	Proxy           string
+	Insecure        bool
 }
 
 type pallasRequest struct {
@@ -223,11 +224,11 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 }
 
 // FilterOtaAssets returns a filtered list of OTA assets
-func (o *Ota) FilterOtaAssets(doDownload, doNotDownload []string) []OtaAsset {
+func (o *Ota) FilterOtaAssets() []OtaAsset {
 
 	var otas []OtaAsset
 	var filteredOtas []OtaAsset
-	var outOTAs []OtaAsset
+	// var outOTAs []OtaAsset
 
 	for _, ota := range uniqueOTAs(o.Assets) {
 		if len(o.Config.Device) > 0 {
@@ -239,17 +240,17 @@ func (o *Ota) FilterOtaAssets(doDownload, doNotDownload []string) []OtaAsset {
 		}
 	}
 
-	for _, o := range otas {
-		if len(doDownload) > 0 {
-			if utils.StrSliceContains(doDownload, o.SupportedDevices[0]) {
-				filteredOtas = append(filteredOtas, o)
+	for _, ota := range otas {
+		if len(o.Config.DeviceWhiteList) > 0 {
+			if utils.StrSliceContains(o.Config.DeviceWhiteList, ota.SupportedDevices[0]) {
+				filteredOtas = append(filteredOtas, ota)
 			}
-		} else if len(doNotDownload) > 0 {
-			if !utils.StrSliceContains(doNotDownload, o.SupportedDevices[0]) {
-				filteredOtas = append(filteredOtas, o)
+		} else if len(o.Config.DeviceBlackList) > 0 {
+			if !utils.StrSliceContains(o.Config.DeviceBlackList, ota.SupportedDevices[0]) {
+				filteredOtas = append(filteredOtas, ota)
 			}
 		} else {
-			filteredOtas = append(filteredOtas, o)
+			filteredOtas = append(filteredOtas, ota)
 		}
 	}
 
@@ -268,7 +269,8 @@ func (o *Ota) FilterOtaAssets(doDownload, doNotDownload []string) []OtaAsset {
 	// 	}
 	// }
 
-	return outOTAs
+	return filteredOtas
+	// return outOTAs
 }
 
 func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
@@ -589,7 +591,7 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != 200 {
-			log.Debugf("failed to connect to URL: got status %s", resp.Status)
+			// log.Debugf("failed to connect to URL: got status %s", resp.Status)
 			continue
 		}
 
@@ -662,14 +664,14 @@ func (o *Ota) filterOTADevices(otas []OtaAsset) []OtaAsset {
 	var filteredOtas []OtaAsset
 
 	for _, ota := range otas {
-		devices = append(devices, ota.SupportedDevices...)
+		devices = append(devices, ota.SupportedDeviceModels...)
 	}
 	devices = utils.Unique(devices)
 
 	for _, device := range devices {
 		var devOTA OtaAsset
 		for _, ota := range otas {
-			if utils.StrSliceContains(ota.SupportedDevices, device) {
+			if utils.StrSliceContains(ota.SupportedDeviceModels, device) {
 				if devOTA.SupportedDevices == nil {
 					devOTA = ota
 				} else {

@@ -43,11 +43,16 @@ func init() {
 
 	otaDLCmd.Flags().StringP("platform", "p", "ios", "Platform to download (ios, macos, watchos, tvos, audioos)")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
-	otaDLCmd.Flags().Bool("beta", viper.GetBool("download.ota.beta"), "Download Beta OTAs")
-	otaDLCmd.Flags().Bool("dyld", viper.GetBool("download.ota.dyld"), "Extract dyld_shared_cache from remote OTA zip")
-	otaDLCmd.Flags().Bool("kernel", viper.GetBool("download.ota.kernel"), "Extract kernelcache from remote OTA zip")
+	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
+	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
+	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache from remote OTA zip")
+	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
+	otaDLCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote OTA zip")
+	viper.BindPFlag("download.ota.kernel", otaDLCmd.Flags().Lookup("kernel"))
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
+	viper.BindPFlag("download.ota.info", otaDLCmd.Flags().Lookup("info"))
 	otaDLCmd.Flags().String("info-type", "", "OS type to show OTAs for")
+	viper.BindPFlag("download.ota.info-type", otaDLCmd.Flags().Lookup("info-type"))
 }
 
 // otaDLCmd represents the ota download command
@@ -64,26 +69,36 @@ var otaDLCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
+		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
+		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
+		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
+		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
+
 		// settings
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		confirm, _ := cmd.Flags().GetBool("yes")
-		skipAll, _ := cmd.Flags().GetBool("skip-all")
-		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
+		proxy := viper.GetString("download.proxy")
+		insecure := viper.GetBool("download.insecure")
+		confirm := viper.GetBool("download.confirm")
+		skipAll := viper.GetBool("download.skip-all")
+		removeCommas := viper.GetBool("download.remove-commas")
 		// filters
-		device, _ := cmd.Flags().GetString("device")
-		model, _ := cmd.Flags().GetString("model")
-		version, _ := cmd.Flags().GetString("version")
-		build, _ := cmd.Flags().GetString("build")
-		// doDownload, _ := cmd.Flags().GetStringArray("white-list")
-		// doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
+		device := viper.GetString("download.device")
+		model := viper.GetString("download.model")
+		version := viper.GetString("download.version")
+		build := viper.GetString("download.build")
+		doDownload := viper.GetStringSlice("download.white-list")
+		doNotDownload := viper.GetStringSlice("download.black-list")
 		// flags
-		platform, _ := cmd.Flags().GetString("platform")
-		getBeta, _ := cmd.Flags().GetBool("beta")
-		remoteDyld, _ := cmd.Flags().GetBool("dyld")
-		remoteKernel, _ := cmd.Flags().GetBool("kernel")
-		otaInfo, _ := cmd.Flags().GetBool("info")
-		otaInfoType, _ := cmd.Flags().GetString("info-type")
+		platform := viper.GetString("download.ota.platform")
+		getBeta := viper.GetBool("download.ota.beta")
+		remoteDyld := viper.GetBool("download.ota.dyld")
+		remoteKernel := viper.GetBool("download.ota.kernel")
+		otaInfo := viper.GetBool("download.ota.info")
+		otaInfoType := viper.GetString("download.ota.info-type")
 
 		// Query for asset sets
 		as, err := download.GetAssetSets(proxy, insecure)
@@ -129,9 +144,9 @@ var otaDLCmd = &cobra.Command{
 			return nil
 		}
 
-		if len(version) > 0 && len(build) > 0 {
-			log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
-		}
+		// if len(version) > 0 && len(build) > 0 {
+		// 	log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		// }
 
 		if !utils.StrSliceContains(
 			[]string{"ios", "macos", "watchos", "tvos", "audioos"}, strings.ToLower(platform)) {
@@ -151,32 +166,37 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		otaXML, err := download.NewOTA(as, download.OtaConf{
-			Platform: strings.ToLower(platform),
-			Beta:     getBeta,
-			Device:   device,
-			Model:    model,
-			Version:  ver,
-			Build:    build,
-			Proxy:    proxy,
-			Insecure: insecure,
+			Platform:        strings.ToLower(platform),
+			Beta:            getBeta,
+			Device:          device,
+			Model:           model,
+			Version:         ver,
+			Build:           build,
+			DeviceWhiteList: doDownload,
+			DeviceBlackList: doNotDownload,
+			Proxy:           proxy,
+			Insecure:        insecure,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
 		}
-
+		// otas := otaXML.FilterOtaAssets(doDownload, doNotDownload)
+		// if len(otas) == 0 {
+		// 	log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
+		// }
 		otas, err := otaXML.GetPallasOTAs()
 		if err != nil {
 			return err
 		}
-		for _, o := range otas {
-			log.WithFields(log.Fields{
-				"device":  strings.Join(o.SupportedDevices, " "),
-				"build":   o.Build,
-				"version": o.DocumentationID,
-				"url":     o.RelativePath,
-			}).Info("OTA")
-		}
-		return nil
+		// for _, o := range otas {
+		// 	log.WithFields(log.Fields{
+		// 		"device":  strings.Join(o.SupportedDevices, " "),
+		// 		"build":   o.Build,
+		// 		"version": o.OSVersion,
+		// 		// "url":     o.RelativePath,
+		// 	}).Info("OTA")
+		// }
+		// return nil
 		// var otas []download.OtaAsset
 		// if len(device) > 0 {
 		// 	o, err := otaXML.GetOtaForDevice(device, model)
