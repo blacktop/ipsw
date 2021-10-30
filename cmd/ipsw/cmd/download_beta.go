@@ -31,6 +31,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -48,14 +49,21 @@ var betaCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
+		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
+		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
+		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+
 		// settings
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		confirm, _ := cmd.Flags().GetBool("yes")
-		skipAll, _ := cmd.Flags().GetBool("skip-all")
-		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
+		proxy := viper.GetString("download.proxy")
+		insecure := viper.GetBool("download.insecure")
+		confirm := viper.GetBool("download.confirm")
+		skipAll := viper.GetBool("download.skip-all")
+		removeCommas := viper.GetBool("download.remove-commas")
 		// filters
-		device, _ := cmd.Flags().GetString("device")
+		device := viper.GetString("download.device")
 
 		ipsws, err := download.ScrapeURLs(args[0])
 		if err != nil {

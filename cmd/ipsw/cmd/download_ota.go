@@ -69,11 +69,13 @@ var otaDLCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
-		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
+		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
+		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
 		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
 		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
 		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
+		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
 		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
 		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
 		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
