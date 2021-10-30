@@ -182,7 +182,7 @@ var otaDLCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
 		}
-		// otas := otaXML.FilterOtaAssets(doDownload, doNotDownload)
+		// otas := otaXML.FilterOtaAssets(doDownload, doNotDownload) FIXME: integrate the white-list into the filter AND as a device list (if no device is given)
 		// if len(otas) == 0 {
 		// 	log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
 		// }
@@ -190,29 +190,18 @@ var otaDLCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		// for _, o := range otas {
-		// 	log.WithFields(log.Fields{
-		// 		"device":  strings.Join(o.SupportedDevices, " "),
-		// 		"build":   o.Build,
-		// 		"version": o.OSVersion,
-		// 		// "url":     o.RelativePath,
-		// 	}).Info("OTA")
-		// }
-		// return nil
-		// var otas []download.OtaAsset
-		// if len(device) > 0 {
-		// 	o, err := otaXML.GetOtaForDevice(device, model)
-		// 	if err != nil {
-		// 		return fmt.Errorf("failed to get OTA asset for device %s: %v", device, err)
-		// 	}
-		// 	otas = append(otas, o)
-		// } else {
-		// 	log.Info("Querying Apple servers...")
-		// 	otas = otaXML.FilterOtaAssets(doDownload, doNotDownload)
-		// 	if len(otas) == 0 {
-		// 		log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
-		// 	}
-		// }
+
+		if Verbose {
+			for _, o := range otas {
+				log.WithFields(log.Fields{
+					"device":  strings.Join(o.SupportedDevices, " "),
+					"build":   o.Build,
+					"version": o.OSVersion,
+					// "url":     o.RelativePath,
+				}).Info("OTA")
+			}
+			// return nil
+		}
 
 		log.Debug("URLs to Download:")
 		for _, o := range otas {

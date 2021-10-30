@@ -597,7 +597,7 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
-			log.Debugf("failed to read response body: %v", err)
+			log.Errorf("failed to read response body: %v", err)
 			continue
 		}
 
@@ -610,13 +610,13 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 		// bas64 decode the results
 		b64data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(b64Str)
 		if err != nil {
-			log.Debugf("failed to base64 decode pallas response: %v", err)
+			log.Errorf("failed to base64 decode pallas response: %v", err)
 			continue
 		}
 
 		res := ota{}
 		if err := json.Unmarshal(b64data, &res); err != nil {
-			log.Debugf("failed to unmarshall JSON: %v", err)
+			log.Errorf("failed to unmarshall JSON: %v", err)
 			continue
 		}
 

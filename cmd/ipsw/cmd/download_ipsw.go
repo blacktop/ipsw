@@ -36,6 +36,17 @@ import (
 
 func init() {
 	downloadCmd.AddCommand(ipswCmd)
+
+	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
+	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
+	ipswCmd.Flags().Bool("pattern", false, "Download remote files that contain file name part")
+	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
+	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
+	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
+	ipswCmd.Flags().Bool("latest", false, "Download latest IPSWs")
+	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
+	otaDLCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
+	viper.BindPFlag("download.ipsw.beta", otaDLCmd.Flags().Lookup("beta"))
 }
 
 // ipswCmd represents the ipsw command
