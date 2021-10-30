@@ -26,12 +26,12 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
-	github.com/therootcompany/xz v1.0.1
+	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/net v0.0.0-20211020060615-d418f374d309
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20211025201205-69cdffdb9359
+	golang.org/x/sys v0.0.0-20211029165221-6e7872819dc8
 )
 
 require github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1

@@ -49,23 +49,25 @@ var macosCmd = &cobra.Command{
 	Use:   "macos",
 	Short: "Download and parse macOS IPSWs",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var err error
+		var builds []download.Build
+		var filteredBuilds []download.Build
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		var err error
-		var builds []download.Build
-		var filteredBuilds []download.Build
-
+		// settings
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		confirm, _ := cmd.Flags().GetBool("yes")
 		skipAll, _ := cmd.Flags().GetBool("skip-all")
 		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
-
 		// filters
 		device, _ := cmd.Flags().GetString("device")
+		// model, _ := cmd.Flags().GetString("model")
+		// version, _ := cmd.Flags().GetString("version")
+		// build, _ := cmd.Flags().GetString("build")
 		doDownload, _ := cmd.Flags().GetStringArray("white-list")
 		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
 

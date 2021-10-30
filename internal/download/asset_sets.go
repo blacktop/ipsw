@@ -1,14 +1,18 @@
 package download
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sort"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
 )
+
+const assetSetListURL = "https://gdmf.apple.com/v2/pmv"
 
 type asset struct {
 	ProductVersion   string   `json:"ProductVersion,omitempty"`
@@ -20,6 +24,27 @@ type asset struct {
 type AssetSets struct {
 	PublicAssetSets map[string][]asset `json:"PublicAssetSets,omitempty"`
 	AssetSets       map[string][]asset `json:"AssetSets,omitempty"`
+}
+
+// Print dumps the AssetSets to string
+func (a *AssetSets) Print(typ string) string {
+	var out string
+	for _, asset := range a.PublicAssetSets[typ] {
+		out += fmt.Sprintf("%s - %s\n", asset.ProductVersion, asset.PostingDate)
+	}
+	return out
+}
+
+func (a *AssetSets) ForDevice(device string) []asset {
+	var assets []asset
+	for _, as := range a.AssetSets {
+		for _, asset := range as {
+			if utils.StrSliceContains(asset.SupportedDevices, device) {
+				assets = append(assets, asset)
+			}
+		}
+	}
+	return assets
 }
 
 // Latest returns the newest released version
@@ -47,21 +72,29 @@ func (a *AssetSets) Latest(typ string) string {
 }
 
 // GetAssetSets queries and returns the asset sets
-func GetAssetSets() (*AssetSets, error) {
-	assets := AssetSets{}
+func GetAssetSets(proxy string, insecure bool) (*AssetSets, error) {
+	var assets AssetSets
 
-	// &http.Client{
-	// 	Jar: jar,
-	// 	Transport: &http.Transport{
-	// 		Proxy:           GetProxy(config.Proxy),
-	// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
-	// 	},
-	// }
+	req, err := http.NewRequest("GET", assetSetListURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create http request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("User-Agent", utils.RandomAgent())
 
-	res, err := http.Get("https://gdmf.apple.com/v2/pmv")
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("api returned status: %s", res.Status)
 	}

@@ -89,13 +89,17 @@ var symaddrCmd = &cobra.Command{
 			 * Search for symbol inside dylib *
 			 **********************************/
 			if len(imageName) > 0 {
-				m, err := f.Image(imageName).GetPartialMacho()
+				i := f.Image(imageName)
+				if i == nil {
+					return fmt.Errorf("failed to find image %s in %s", imageName, dscPath)
+				}
+				m, err := i.GetPartialMacho()
 				if err != nil {
 					return err
 				}
 				if sym, err := f.FindExportedSymbolInImage(imageName, args[1]); err != nil {
 					log.Error(fmt.Sprintf("%s: falling back to MachO symtab", err.Error()))
-					m, err := f.Image(imageName).GetMacho()
+					m, err := i.GetMacho()
 					if err != nil {
 						return err
 					}
@@ -189,8 +193,12 @@ var symaddrCmd = &cobra.Command{
 			**************************/
 		} else if len(imageName) > 0 {
 			// Dump ALL private symbols for a dylib
+			i := f.Image(imageName)
+			if i == nil {
+				return fmt.Errorf("failed to find image %s in %s", imageName, dscPath)
+			}
 			log.Warn("parsing local symbols for image...")
-			if err := f.GetLocalSymbolsForImage(f.Image(imageName)); err != nil {
+			if err := f.GetLocalSymbolsForImage(i); err != nil {
 				if errors.Is(err, dyld.ErrNoLocals) {
 					utils.Indent(log.Warn, 2)(err.Error())
 				} else if err != nil {
@@ -198,12 +206,12 @@ var symaddrCmd = &cobra.Command{
 				}
 			}
 
-			m, err := f.Image(imageName).GetPartialMacho()
+			m, err := i.GetPartialMacho()
 			if err != nil {
 				return err
 			}
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-			for _, sym := range f.Image(imageName).LocalSymbols {
+			for _, sym := range i.LocalSymbols {
 				sym.Sections = m.Sections
 				fmt.Fprintf(w, "%s\n", sym)
 			}
@@ -211,11 +219,11 @@ var symaddrCmd = &cobra.Command{
 
 			// Dump ALL public symbols for a dylib
 			log.Warn("parsing exported symbols for image...")
-			if err := f.GetAllExportedSymbolsForImage(f.Image(imageName), true); err != nil {
+			if err := f.GetAllExportedSymbolsForImage(i, true); err != nil {
 				log.Error(err.Error())
 
 				log.Warn("falling back to MachO symtab")
-				m, err := f.Image(imageName).GetMacho()
+				m, err := i.GetMacho()
 				if err != nil {
 					return err
 				}

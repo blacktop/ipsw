@@ -48,12 +48,14 @@ var betaCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// settings
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
-		device, _ := cmd.Flags().GetString("device")
 		confirm, _ := cmd.Flags().GetBool("yes")
 		skipAll, _ := cmd.Flags().GetBool("skip-all")
 		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
+		// filters
+		device, _ := cmd.Flags().GetString("device")
 
 		ipsws, err := download.ScrapeURLs(args[0])
 		if err != nil {
