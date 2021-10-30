@@ -253,7 +253,7 @@ func (o *Ota) FilterOtaAssets(doDownload, doNotDownload []string) []OtaAsset {
 		}
 	}
 
-	filteredOtas = filterOTADevices(filteredOtas)
+	filteredOtas = o.filterOTADevices(filteredOtas)
 
 	deviceList := make(map[string]string)
 	for _, o := range filteredOtas {
@@ -419,23 +419,41 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ string) (reqs []pallasRequest, err error) {
 	if o.Config.Version != nil && len(o.Config.Device) == 0 {
 		var model string
-		for _, device := range o.as.GetDevicesForVersion(o.Config.Version.Original(), typ) {
+		devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
+		if len(devices) == 0 {
+			devices = o.as.GetDevicesForVersion(o.as.Latest(typ), typ)
+		}
+		for _, device := range devices {
 			model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
 			if err != nil {
-				return nil, err
+				// return nil, err
+				log.Debugf("failed to lookup model for device %s", device)
+				continue
 			}
-			reqs = append(reqs, pallasRequest{
-				ClientVersion:           clientVersion,
-				AssetType:               atype,
-				AssetAudience:           audienceID,
-				ProductType:             device,
-				HWModelStr:              model,
-				ProductVersion:          "0",
-				BuildVersion:            "0",
-				RequestedProductVersion: o.Config.Version.Original(),
-				Supervised:              true,
-				DelayRequested:          false,
-			})
+			if o.Config.Beta {
+				reqs = append(reqs, pallasRequest{
+					ClientVersion:  clientVersion,
+					AssetType:      atype,
+					AssetAudience:  audienceID,
+					ProductType:    device,
+					HWModelStr:     model,
+					ProductVersion: "0",
+					BuildVersion:   "0",
+				})
+			} else {
+				reqs = append(reqs, pallasRequest{
+					ClientVersion:           clientVersion,
+					AssetType:               atype,
+					AssetAudience:           audienceID,
+					ProductType:             device,
+					HWModelStr:              model,
+					ProductVersion:          "0",
+					BuildVersion:            "0",
+					RequestedProductVersion: o.Config.Version.Original(),
+					Supervised:              true,
+					DelayRequested:          false,
+				})
+			}
 		}
 	} else if o.Config.Version != nil && len(o.Config.Device) > 0 {
 		reqs = append(reqs, pallasRequest{
@@ -540,7 +558,7 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 
 	pallasReqs, err := o.buildPallasRequests()
 	if err != nil {
-		return nil, fmt.Errorf("failed to build the pallas requests")
+		return nil, fmt.Errorf("failed to build the pallas requests: %v", err)
 	}
 
 	for _, pallasReq := range pallasReqs {
@@ -608,7 +626,7 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 		oassets = append(oassets, res.Assets...)
 	}
 
-	return oassets, nil
+	return o.filterOTADevices(oassets), nil
 }
 
 func (o *Ota) lookupHWModel(device string) (string, error) {
@@ -630,17 +648,16 @@ func uniqueOTAs(otas []OtaAsset) []OtaAsset {
 	os := make([]OtaAsset, len(unique))
 	for _, elem := range otas {
 		if len(elem.BaseURL+elem.RelativePath) != 0 {
-			if !unique[elem.BaseURL] {
+			if !unique[elem.BaseURL+elem.RelativePath] {
 				os = append(os, elem)
 				unique[elem.BaseURL+elem.RelativePath] = true
 			}
 		}
 	}
-
 	return os
 }
 
-func filterOTADevices(otas []OtaAsset) []OtaAsset {
+func (o *Ota) filterOTADevices(otas []OtaAsset) []OtaAsset {
 	var devices []string
 	var filteredOtas []OtaAsset
 

@@ -168,7 +168,15 @@ var otaDLCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(otas)
+		for _, o := range otas {
+			log.WithFields(log.Fields{
+				"device":  strings.Join(o.SupportedDevices, " "),
+				"build":   o.Build,
+				"version": o.DocumentationID,
+				"url":     o.RelativePath,
+			}).Info("OTA")
+		}
+		return nil
 		// var otas []download.OtaAsset
 		// if len(device) > 0 {
 		// 	o, err := otaXML.GetOtaForDevice(device, model)
