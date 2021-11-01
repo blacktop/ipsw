@@ -73,6 +73,8 @@ var otaDLCmd = &cobra.Command{
 		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
 		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
 		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
+		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
 		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
 		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
 		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
@@ -86,6 +88,8 @@ var otaDLCmd = &cobra.Command{
 		insecure := viper.GetBool("download.insecure")
 		confirm := viper.GetBool("download.confirm")
 		skipAll := viper.GetBool("download.skip-all")
+		resumeAll := viper.GetBool("download.resume-all")
+		restartAll := viper.GetBool("download.restart-all")
 		removeCommas := viper.GetBool("download.remove-commas")
 		// filters
 		device := viper.GetString("download.device")
@@ -248,7 +252,7 @@ var otaDLCmd = &cobra.Command{
 					}
 				}
 			} else {
-				downloader := download.NewDownload(proxy, insecure, skipAll, Verbose)
+				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, Verbose)
 				for _, o := range otas {
 					url := o.BaseURL + o.RelativePath
 					destName := getDestName(url, removeCommas)
