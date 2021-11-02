@@ -188,6 +188,9 @@ func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymb
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	image := f.Image(imageName)
+	if image == nil {
+		return nil, fmt.Errorf("no image found matching %s", imageName)
+	}
 
 	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
 
@@ -250,6 +253,9 @@ func (f *File) GetLocalSymbol(symbolName string) *CacheLocalSymbol64 {
 // GetLocalSymbolInImage returns the local symbol that matches name in a given image
 func (f *File) GetLocalSymbolInImage(imageName, symbolName string) *CacheLocalSymbol64 {
 	image := f.Image(imageName)
+	if image == nil {
+		return nil
+	}
 	for _, sym := range image.LocalSymbols {
 		if sym.Name == symbolName {
 			return sym

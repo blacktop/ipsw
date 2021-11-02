@@ -160,10 +160,14 @@ var machoDumpCmd = &cobra.Command{
 					ioutil.WriteFile(outFile, dat, 0755)
 					log.Infof("Wrote data to file %s", outFile)
 				} else {
-					if c := m.FindSectionForVMAddr(addr); c != nil {
-						log.WithFields(log.Fields{
-							"section": fmt.Sprintf("%s.%s", c.Seg, c.Name),
-						}).Info("Address location")
+					if s := m.FindSegmentForVMAddr(addr); s != nil {
+						if s.Nsect > 0 {
+							if c := m.FindSectionForVMAddr(addr); c != nil {
+								log.WithFields(log.Fields{"section": fmt.Sprintf("%s.%s", c.Seg, c.Name)}).Info("Address location")
+							}
+						} else {
+							log.WithFields(log.Fields{"segment": s.Name}).Info("Address location")
+						}
 					}
 					fmt.Println(utils.HexDump(dat, addr))
 				}

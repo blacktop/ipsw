@@ -37,6 +37,8 @@ type Download struct {
 	resume       bool
 	canResume    bool
 	skipAll      bool
+	resumeAll    bool
+	restartAll   bool
 	verbose      bool
 
 	client *http.Client
@@ -60,13 +62,15 @@ type geoQuery struct {
 }
 
 // NewDownload creates a new downloader
-func NewDownload(proxy string, insecure, skipAll, verbose bool) *Download {
+func NewDownload(proxy string, insecure, skipAll, resumeAll, restartAll, verbose bool) *Download {
 	return &Download{
 		// URL:     url,
 		// Sha1:    sha1,
-		resume:  false,
-		skipAll: skipAll,
-		verbose: verbose,
+		resume:     false,
+		skipAll:    skipAll,
+		resumeAll:  resumeAll,
+		restartAll: restartAll,
+		verbose:    verbose,
 		client: &http.Client{
 			Transport: &http.Transport{
 				Proxy:           GetProxy(proxy),
@@ -143,31 +147,37 @@ func (d *Download) Do() error {
 
 			// don't try to download files being downloaded elsewhere
 			if d.skipAll {
+				d.resume = false
 				return nil
-			}
-
-			choice := ""
-			prompt := &survey.Select{
-				Message: fmt.Sprintf("Previous download of %s can be resumed:", d.DestName),
-				Options: []string{"resume", "skip", "skip all", "restart"},
-			}
-			survey.AskOne(prompt, &choice)
-
-			switch choice {
-			case "resume":
+			} else if d.resumeAll {
 				d.resume = true
-			case "restart":
+			} else if d.restartAll {
 				log.Infof("Downloading %s - RESTARTED", d.DestName+".download")
 				d.resume = false
-			case "skip":
-				log.Infof("%s - SKIPPED", d.DestName+".download")
-				d.resume = false
-				return nil
-			case "skip all":
-				log.Info("Skipping ALL active downloads (you are performing a distributed download)")
-				d.skipAll = true
-				d.resume = false
-				return nil
+			} else {
+				choice := ""
+				prompt := &survey.Select{
+					Message: fmt.Sprintf("Previous download of %s can be resumed:", d.DestName),
+					Options: []string{"resume", "skip", "skip all", "restart"},
+				}
+				survey.AskOne(prompt, &choice)
+
+				switch choice {
+				case "resume":
+					d.resume = true
+				case "restart":
+					log.Infof("Downloading %s - RESTARTED", d.DestName+".download")
+					d.resume = false
+				case "skip":
+					log.Infof("%s - SKIPPED", d.DestName+".download")
+					d.resume = false
+					return nil
+				case "skip all":
+					log.Info("Skipping ALL active downloads (you are performing a distributed download)")
+					d.skipAll = true
+					d.resume = false
+					return nil
+				}
 			}
 
 			if d.resume {

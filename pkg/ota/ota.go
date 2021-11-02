@@ -21,11 +21,10 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/bom"
 	"github.com/dustin/go-humanize"
-	"golang.org/x/sys/execabs"
 
 	"github.com/pkg/errors"
-	// "github.com/ulikunitz/xz"
-	"github.com/therootcompany/xz"
+	"github.com/ulikunitz/xz"
+	// "github.com/therootcompany/xz"
 )
 
 const (
@@ -125,30 +124,30 @@ func RemoteList(zr *zip.Reader) ([]os.FileInfo, error) {
 }
 
 // TODO: maybe remove this as exec-ing is kinda gross
-func NewXZReader(r io.Reader) (io.ReadCloser, error) {
-	if _, err := execabs.LookPath("xz"); err != nil {
-		xr, err := xz.NewReader(r, 0)
-		if err != nil {
-			return nil, err
-		}
-		return ioutil.NopCloser(xr), nil
-	}
+// func NewXZReader(r io.Reader) (io.ReadCloser, error) {
+// 	if _, err := execabs.LookPath("xz"); err != nil {
+// 		xr, err := xz.NewReader(r, 0)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		return ioutil.NopCloser(xr), nil
+// 	}
 
-	rpipe, wpipe := io.Pipe()
-	var errb bytes.Buffer
-	cmd := execabs.Command("xz", "--decompress", "--stdout")
-	cmd.Stdin = r
-	cmd.Stdout = wpipe
-	cmd.Stderr = &errb
-	go func() {
-		err := cmd.Run()
-		if err != nil && errb.Len() != 0 {
-			err = errors.New(strings.TrimRight(errb.String(), "\r\n"))
-		}
-		wpipe.CloseWithError(err)
-	}()
-	return rpipe, nil
-}
+// 	rpipe, wpipe := io.Pipe()
+// 	var errb bytes.Buffer
+// 	cmd := execabs.Command("xz", "--decompress", "--stdout")
+// 	cmd.Stdin = r
+// 	cmd.Stdout = wpipe
+// 	cmd.Stderr = &errb
+// 	go func() {
+// 		err := cmd.Run()
+// 		if err != nil && errb.Len() != 0 {
+// 			err = errors.New(strings.TrimRight(errb.String(), "\r\n"))
+// 		}
+// 		wpipe.CloseWithError(err)
+// 	}()
+// 	return rpipe, nil
+// }
 
 func parseBOM(zr *zip.Reader) ([]os.FileInfo, error) {
 	var validPostBOM = regexp.MustCompile(`post.bom$`)
@@ -491,13 +490,13 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 			return false, err
 		}
 
-		// xr, err := xz.NewReader(bytes.NewReader(xzChunkBuf))
+		xr, err := xz.NewReader(bytes.NewReader(xzChunkBuf))
 		// xr, err := xz.NewReader(bytes.NewReader(xzChunkBuf), 0)
-		xr, err := NewXZReader(bytes.NewReader(xzChunkBuf))
+		// xr, err := NewXZReader(bytes.NewReader(xzChunkBuf))
 		if err != nil {
 			return false, err
 		}
-		defer xr.Close()
+		// defer xr.Close()
 
 		io.Copy(xzBuf, xr)
 

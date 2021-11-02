@@ -298,9 +298,9 @@ func GetProductInfo() (ProductInfos, error) {
 	return prods, nil
 }
 
-func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll bool) error {
+func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll bool) error {
 
-	downloader := NewDownload(proxy, insecure, skipAll, true)
+	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, true)
 
 	folder := filepath.Join(workDir, i.Title)
 
