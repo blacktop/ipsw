@@ -57,8 +57,10 @@ func init() {
 
 // ipswCmd represents the ipsw command
 var ipswCmd = &cobra.Command{
-	Use:   "ipsw",
-	Short: "Download and parse IPSW(s) from the internets",
+	Use:          "ipsw",
+	Short:        "Download and parse IPSW(s) from the internets",
+	SilenceUsage: true,
+	Hidden:       true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
@@ -171,6 +173,7 @@ var ipswCmd = &cobra.Command{
 			if len(filteredBuilds) == 0 {
 				log.Fatal(fmt.Sprintf("no IPSWs match device(s) %s %s", device, strings.Join(doDownload, " ")))
 			}
+
 			// convert from itunes to ipsw
 			for _, b := range filteredBuilds {
 				ipsws = append(ipsws, download.IPSW{
@@ -179,7 +182,7 @@ var ipswCmd = &cobra.Command{
 					BuildID:    b.BuildID,
 					SHA1:       b.FirmwareSHA1,
 					URL:        b.URL,
-					// Signed:     false, // TODO: lookup
+					Signed:     true,
 				})
 			}
 		} else {
@@ -237,20 +240,12 @@ var ipswCmd = &cobra.Command{
 				for _, i := range ipsws {
 					destName := getDestName(i.URL, removeCommas)
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
-						if latest { // TODO: remove this once we are looking up signing status
-							log.WithFields(log.Fields{
-								"device":  i.Identifier,
-								"build":   i.BuildID,
-								"version": i.Version,
-							}).Info("Getting IPSW")
-						} else {
-							log.WithFields(log.Fields{
-								"device":  i.Identifier,
-								"build":   i.BuildID,
-								"version": i.Version,
-								"signed":  i.Signed,
-							}).Info("Getting IPSW")
-						}
+						log.WithFields(log.Fields{
+							"device":  i.Identifier,
+							"build":   i.BuildID,
+							"version": i.Version,
+							"signed":  i.Signed,
+						}).Info("Getting IPSW")
 
 						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, Verbose)
 						downloader.URL = i.URL
