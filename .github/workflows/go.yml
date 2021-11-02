@@ -161,7 +161,7 @@ jobs:
         if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download ipsw --latest --device iPhone12,1 --yes
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download ipsw --latest --device iPhone12,1 --confirm
       #
       # EXTRACT CMD (macOS)
       #
