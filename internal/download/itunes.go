@@ -29,11 +29,11 @@ type BuildNumber string
 
 // Build object
 type Build struct {
-	Identifier     string `json:"identifier,omitempty"`
-	BuildVersion   string `json:"build_version,omitempty"`
-	FirmwareURL    string `json:"firmware_url,omitempty"`
-	FirmwareSHA1   string `json:"firmware_sha1,omitempty"`
-	ProductVersion string `json:"product_version,omitempty"`
+	Identifier   string `json:"identifier,omitempty"`
+	BuildID      string `json:"build_version,omitempty"`
+	URL          string `json:"firmware_url,omitempty"`
+	FirmwareSHA1 string `json:"firmware_sha1,omitempty"`
+	Version      string `json:"product_version,omitempty"`
 }
 
 // IndividualBuild object
@@ -68,10 +68,10 @@ func UniqueBuilds(b []Build) []Build {
 	unique := make(map[string]bool, len(b))
 	bs := make([]Build, len(unique))
 	for _, elem := range b {
-		if len(elem.FirmwareURL) != 0 {
-			if !unique[elem.FirmwareURL] {
+		if len(elem.URL) != 0 {
+			if !unique[elem.URL] {
 				bs = append(bs, elem)
-				unique[elem.FirmwareURL] = true
+				unique[elem.URL] = true
 			}
 		}
 	}
@@ -90,11 +90,11 @@ func (vm *ITunesVersionMaster) GetBuilds() []Build {
 						continue
 					}
 					build := Build{
-						Identifier:     string(identifier),
-						BuildVersion:   string(build.Restore.BuildVersion),
-						FirmwareURL:    build.Restore.FirmwareURL,
-						FirmwareSHA1:   build.Restore.FirmwareSHA1,
-						ProductVersion: build.Restore.ProductVersion,
+						Identifier:   string(identifier),
+						BuildID:      string(build.Restore.BuildVersion),
+						URL:          build.Restore.FirmwareURL,
+						FirmwareSHA1: build.Restore.FirmwareSHA1,
+						Version:      build.Restore.ProductVersion,
 					}
 					b = append(b, build)
 				}
@@ -109,7 +109,7 @@ func (vm *ITunesVersionMaster) GetBuilds() []Build {
 func (vm *ITunesVersionMaster) GetBuildsForVersion(version string) []Build {
 	var builds []Build
 	for _, build := range vm.GetBuilds() {
-		if build.ProductVersion == version {
+		if build.Version == version {
 			builds = append(builds, build)
 		}
 	}
@@ -120,7 +120,7 @@ func (vm *ITunesVersionMaster) GetBuildsForVersion(version string) []Build {
 func (vm *ITunesVersionMaster) GetBuildsForBuildID(buildID string) []Build {
 	var builds []Build
 	for _, build := range vm.GetBuilds() {
-		if build.BuildVersion == buildID {
+		if build.BuildID == buildID {
 			builds = append(builds, build)
 		}
 	}
@@ -135,10 +135,10 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 	for _, build := range vm.GetBuilds() {
 		if len(device) > 0 {
 			if strings.EqualFold(device, build.Identifier) {
-				versionsRaw = append(versionsRaw, build.ProductVersion)
+				versionsRaw = append(versionsRaw, build.Version)
 			}
 		} else {
-			versionsRaw = append(versionsRaw, build.ProductVersion)
+			versionsRaw = append(versionsRaw, build.Version)
 		}
 
 	}
@@ -172,7 +172,7 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 	// }
 
 	for _, build := range vm.GetBuilds() {
-		if strings.EqualFold(build.ProductVersion, newestVersion.Original()) {
+		if strings.EqualFold(build.Version, newestVersion.Original()) {
 			if len(device) > 0 {
 				if strings.EqualFold(device, build.Identifier) {
 					builds = append(builds, build)
@@ -231,8 +231,8 @@ func (vm *ITunesVersionMaster) GetSoftwareURLs() ([]string, error) {
 func (vm *ITunesVersionMaster) GetSoftwareURLsForVersion(version string) ([]string, error) {
 	var urls []string
 	for _, build := range vm.GetBuilds() {
-		if build.ProductVersion == version {
-			urls = append(urls, build.FirmwareURL)
+		if build.Version == version {
+			urls = append(urls, build.URL)
 		}
 	}
 	return utils.Unique(urls), nil
@@ -244,7 +244,7 @@ func (vm *ITunesVersionMaster) GetLatestSoftwareURLs() ([]string, error) {
 	var versionsRaw []string
 
 	for _, build := range vm.GetBuilds() {
-		versionsRaw = append(versionsRaw, build.ProductVersion)
+		versionsRaw = append(versionsRaw, build.Version)
 	}
 
 	versions := make([]*version.Version, len(versionsRaw))
@@ -262,8 +262,8 @@ func (vm *ITunesVersionMaster) GetLatestSoftwareURLs() ([]string, error) {
 	newestVersion := versions[len(versions)-1]
 
 	for _, build := range vm.GetBuilds() {
-		if build.ProductVersion == newestVersion.String() {
-			urls = append(urls, build.FirmwareURL)
+		if build.Version == newestVersion.String() {
+			urls = append(urls, build.URL)
 		}
 	}
 
@@ -275,7 +275,7 @@ func (vm *ITunesVersionMaster) GetLatestVersion() (string, error) {
 	var versionsRaw []string
 
 	for _, build := range vm.GetBuilds() {
-		versionsRaw = append(versionsRaw, build.ProductVersion)
+		versionsRaw = append(versionsRaw, build.Version)
 	}
 
 	versions := make([]*version.Version, len(versionsRaw))
@@ -299,8 +299,8 @@ func (vm *ITunesVersionMaster) GetLatestVersion() (string, error) {
 func (vm *ITunesVersionMaster) GetSoftwareURLsForBuildID(buildID string) ([]string, error) {
 	var urls []string
 	for _, build := range vm.GetBuilds() {
-		if build.BuildVersion == buildID {
-			urls = append(urls, build.FirmwareURL)
+		if build.BuildID == buildID {
+			urls = append(urls, build.URL)
 		}
 	}
 	return utils.Unique(urls), nil
@@ -326,7 +326,7 @@ func NewiTunesVersionMaster() (*ITunesVersionMaster, error) {
 	return &vm, nil
 }
 
-// NewiTunesVersionMaster downloads and parses the itumes plist
+// NewMacOsXML downloads and parses the macOS IPSW plist
 func NewMacOsXML() (*ITunesVersionMaster, error) {
 	resp, err := http.Get(macOSIpswURL)
 	if err != nil {

@@ -1,16 +1,20 @@
 package download
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"sort"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
 )
 
-type asset struct {
+const assetSetListURL = "https://gdmf.apple.com/v2/pmv"
+
+type AssetSet struct {
 	ProductVersion   string   `json:"ProductVersion,omitempty"`
 	PostingDate      string   `json:"PostingDate,omitempty"`
 	ExpirationDate   string   `json:"ExpirationDate,omitempty"`
@@ -18,8 +22,31 @@ type asset struct {
 }
 
 type AssetSets struct {
-	PublicAssetSets map[string][]asset `json:"PublicAssetSets,omitempty"`
-	AssetSets       map[string][]asset `json:"AssetSets,omitempty"`
+	PublicAssetSets map[string][]AssetSet `json:"PublicAssetSets,omitempty"`
+	AssetSets       map[string][]AssetSet `json:"AssetSets,omitempty"`
+}
+
+// ForDevice returns the assets for a given device
+func (a *AssetSets) ForDevice(device string) []AssetSet {
+	var assets []AssetSet
+	for _, as := range a.AssetSets {
+		for _, asset := range as {
+			if utils.StrSliceContains(asset.SupportedDevices, device) {
+				assets = append(assets, asset)
+			}
+		}
+	}
+	return assets
+}
+
+// GetDevicesForVersion returns the supported devices for a given OS version
+func (a *AssetSets) GetDevicesForVersion(version string, typ string) []string {
+	for _, asset := range a.AssetSets[typ] {
+		if asset.ProductVersion == version {
+			return asset.SupportedDevices
+		}
+	}
+	return nil
 }
 
 // Latest returns the newest released version
@@ -43,25 +70,33 @@ func (a *AssetSets) Latest(typ string) string {
 
 	sort.Sort(version.Collection(versions))
 
-	return versions[len(versions)-1].String()
+	return versions[len(versions)-1].Original()
 }
 
 // GetAssetSets queries and returns the asset sets
-func GetAssetSets() (*AssetSets, error) {
-	assets := AssetSets{}
+func GetAssetSets(proxy string, insecure bool) (*AssetSets, error) {
+	var assets AssetSets
 
-	// &http.Client{
-	// 	Jar: jar,
-	// 	Transport: &http.Transport{
-	// 		Proxy:           GetProxy(config.Proxy),
-	// 		TLSClientConfig: &tls.Config{InsecureSkipVerify: config.Insecure},
-	// 	},
-	// }
+	req, err := http.NewRequest("GET", assetSetListURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create http request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("User-Agent", utils.RandomAgent())
 
-	res, err := http.Get("https://gdmf.apple.com/v2/pmv")
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("api returned status: %s", res.Status)
 	}

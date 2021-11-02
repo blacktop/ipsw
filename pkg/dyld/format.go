@@ -48,18 +48,20 @@ func (dch CacheHeader) String() string {
 	)
 }
 
-func (self CacheMappingInfo) String() string {
+func (m *CacheMapping) String() string {
 	return fmt.Sprintf(
-		"Address    = %016X\n"+
+		"Name       = %s\n"+
+			"Address    = %#x\n"+
 			"Size       = %s\n"+
-			"FileOffset = %X\n"+
+			"FileOffset = %#x\n"+
 			"MaxProt    = %s\n"+
 			"InitProt   = %s\n",
-		self.Address,
-		humanize.Bytes(self.Size),
-		self.FileOffset,
-		self.MaxProt.String(),
-		self.InitProt.String(),
+		m.Name,
+		m.Address,
+		humanize.Bytes(m.Size),
+		m.FileOffset,
+		m.MaxProt.String(),
+		m.InitProt.String(),
 	)
 }
 

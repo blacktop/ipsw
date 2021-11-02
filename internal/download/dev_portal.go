@@ -63,6 +63,8 @@ type DevConfig struct {
 	WatchList []string
 	// behavior config
 	SkipAll      bool
+	ResumeAll    bool
+	RestartAll   bool
 	RemoveCommas bool
 	PreferSMS    bool
 	PageSize     int
@@ -757,7 +759,7 @@ func (app *App) DownloadPrompt(downloadType string) error {
 func (app *App) Download(url string) error {
 
 	// proxy, insecure are null because we override the client below
-	downloader := NewDownload("", false, app.config.SkipAll, true)
+	downloader := NewDownload("", false, app.config.SkipAll, app.config.ResumeAll, app.config.RestartAll, true)
 	// use authenticated client
 	downloader.client = app.Client
 

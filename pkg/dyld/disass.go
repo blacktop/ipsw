@@ -183,6 +183,9 @@ func (f *File) FirstPassTriage(m *macho.File, fn *types.Function, r io.ReadSeeke
 func (f *File) ImageDependencies(imageName string) error {
 
 	image := f.Image(imageName)
+	if image == nil {
+		return fmt.Errorf("no image found matching %s", imageName)
+	}
 
 	m, err := image.GetPartialMacho()
 	if err != nil {

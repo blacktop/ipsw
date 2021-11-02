@@ -140,24 +140,25 @@ var dyldDumpCmd = &cobra.Command{
 					if image, err := f.GetImageContainingVMAddr(addr); err == nil {
 						if m, err := image.GetMacho(); err == nil {
 							defer m.Close()
-							if c := m.FindSectionForVMAddr(addr); c != nil {
-								log.WithFields(log.Fields{
-									"dylib":   image.Name,
-									"section": fmt.Sprintf("%s.%s", c.Seg, c.Name),
-								}).Info("Address location")
+							if s := m.FindSegmentForVMAddr(addr); s != nil {
+								if s.Nsect > 0 {
+									if c := m.FindSectionForVMAddr(addr); c != nil {
+										log.WithFields(log.Fields{"dylib": image.Name, "section": fmt.Sprintf("%s.%s", c.Seg, c.Name)}).Info("Address location")
+									}
+								} else {
+									log.WithFields(log.Fields{"dylib": image.Name, "segment": s.Name}).Info("Address location")
+								}
 							}
 						}
 					} else {
-						mapping, err := f.GetMappingForVMAddress(addr)
-						if err != nil {
-							return err
+						if mapping, err := f.GetMappingForVMAddress(addr); err == nil {
+							log.WithFields(log.Fields{
+								"name": mapping.Name,
+								"off":  fmt.Sprintf("%#x", mapping.FileOffset),
+								"addr": fmt.Sprintf("%#x", mapping.Address),
+								"size": fmt.Sprintf("%#x", mapping.Size),
+							}).Info("Mapping")
 						}
-						log.WithFields(log.Fields{
-							"name": mapping.Name,
-							"off":  fmt.Sprintf("%#x", mapping.FileOffset),
-							"addr": fmt.Sprintf("%#x", mapping.Address),
-							"size": fmt.Sprintf("%#x", mapping.Size),
-						}).Info("Mapping")
 					}
 					fmt.Println(utils.HexDump(dat, addr))
 				}
