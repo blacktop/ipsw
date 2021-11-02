@@ -41,7 +41,7 @@ func init() {
 // macosCmd represents the macos command
 var macosCmd = &cobra.Command{
 	Use:   "macos",
-	Short: "Download and parse macOS IPSWs",
+	Short: "Download macOS installers",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {

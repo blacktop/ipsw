@@ -23,6 +23,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,7 +33,9 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -39,28 +43,30 @@ import (
 func init() {
 	downloadCmd.AddCommand(ipswCmd)
 
-	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
-	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
-	ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
-	viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
-	ipswCmd.Flags().Bool("pattern", false, "Download remote files that contain file name part")
-	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
-	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
-	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
 	ipswCmd.Flags().Bool("latest", false, "Download latest IPSWs")
-	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	ipswCmd.Flags().Bool("show-latest", false, "Show latest iOS version")
-	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
+	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
+	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
+	ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
+	ipswCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
 	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
+	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
+	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
+	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
+	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
+	viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
+	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
 }
 
 // ipswCmd represents the ipsw command
 var ipswCmd = &cobra.Command{
-	Use:          "ipsw",
-	Short:        "Download and parse IPSW(s) from the internets",
-	SilenceUsage: true,
-	Hidden:       true,
+	Use:           "ipsw",
+	Short:         "Download and parse IPSW(s) from the internets",
+	SilenceUsage:  false,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
@@ -103,26 +109,27 @@ var ipswCmd = &cobra.Command{
 		doDownload := viper.GetStringSlice("download.white-list")
 		doNotDownload := viper.GetStringSlice("download.black-list")
 		// flags
-		kernel := viper.GetBool("download.ipsw.kernel")
-		kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
-		// pattern := viper.GetBool("download.ipsw.pattern")
-		macos := viper.GetBool("download.ipsw.macos")
 		latest := viper.GetBool("download.ipsw.latest")
 		showLatest := viper.GetBool("download.ipsw.show-latest")
+		macos := viper.GetBool("download.ipsw.macos")
+		kernel := viper.GetBool("download.ipsw.kernel")
+		kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
+		pattern := viper.GetString("download.ipsw.pattern")
+		output := viper.GetString("download.ipsw.output")
 		// beta := viper.GetBool("download.ipsw.beta")
 
+		// verify args
+		if kernel && len(pattern) > 0 {
+			return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
+		}
+
 		var destPath string
-		if len(args) > 0 {
-			destPath = filepath.Clean(args[0])
+		if len(output) > 0 {
+			destPath = filepath.Clean(output)
 		}
 
 		if macos {
 			itunes, err = download.NewMacOsXML()
-			if err != nil {
-				return fmt.Errorf("failed to create itunes API: %v", err)
-			}
-		} else {
-			itunes, err = download.NewiTunesVersionMaster()
 			if err != nil {
 				return fmt.Errorf("failed to create itunes API: %v", err)
 			}
@@ -135,7 +142,7 @@ var ipswCmd = &cobra.Command{
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
 				}
 				fmt.Print(latestVersion)
-				// assets, err := download.GetAssetSets(proxy, insecure)
+				// assets, err := download.GetAssetSets(proxy, insecure) TODO: switch to this check (if IPSWs match eventually)
 				// if err != nil {
 				// 	return fmt.Errorf("failed to get latest iOS version: %v", err)
 				// }
@@ -151,6 +158,10 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if latest {
+			itunes, err = download.NewiTunesVersionMaster()
+			if err != nil {
+				return fmt.Errorf("failed to create itunes API: %v", err)
+			}
 			builds, err = itunes.GetLatestBuilds(device)
 			if err != nil {
 				return fmt.Errorf("failed to get the latest builds: %v", err)
@@ -227,13 +238,67 @@ var ipswCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
 					}
+					iinfo, err := info.ParseZipFiles(zr.File)
+					if err != nil {
+						return errors.Wrap(err, "failed to parse remote ipsw")
+					}
 					if kernelSpecFolders {
 						err = kernelcache.RemoteParse(zr, destPath)
 					} else {
-						err = kernelcache.RemoteParseV2(zr, filepath.Join(destPath, i.BuildID))
+						err = kernelcache.RemoteParseV2(zr, filepath.Join(destPath, iinfo.GetFolder()))
 					}
 					if err != nil {
 						return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+					}
+				}
+			} else if len(pattern) > 0 { // PATTERN MATCHING MODE
+				for _, i := range ipsws {
+					log.WithFields(log.Fields{
+						"device":  i.Identifier,
+						"build":   i.BuildID,
+						"version": i.Version,
+						"signed":  i.Signed,
+					}).Info("Parsing remote IPSW")
+
+					log.Infof("Downloading files that contain: %s", pattern)
+					zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+						Proxy:    proxy,
+						Insecure: insecure,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+					}
+					iinfo, err := info.ParseZipFiles(zr.File)
+					if err != nil {
+						return errors.Wrap(err, "failed to parse remote ipsw")
+					}
+					destPath = filepath.Join(destPath, iinfo.GetFolder())
+					os.Mkdir(destPath, os.ModePerm)
+					found := false
+					for _, f := range zr.File {
+						if strings.Contains(f.Name, pattern) {
+							found = true
+							fileName := filepath.Join(destPath, filepath.Base(f.Name))
+							if _, err := os.Stat(fileName); os.IsNotExist(err) {
+								data := make([]byte, f.UncompressedSize64)
+								rc, err := f.Open()
+								if err != nil {
+									return fmt.Errorf("failed to open file in zip: %v", err)
+								}
+								io.ReadFull(rc, data)
+								rc.Close()
+								utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
+								err = ioutil.WriteFile(fileName, data, 0644)
+								if err != nil {
+									return errors.Wrapf(err, "failed to write %s", f.Name)
+								}
+							} else {
+								log.Warnf("%s already exists", fileName)
+							}
+						}
+					}
+					if !found {
+						utils.Indent(log.Error, 2)(fmt.Sprintf("No files contain pattern %s", pattern))
 					}
 				}
 			} else { // NORMAL MODE

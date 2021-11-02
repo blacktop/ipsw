@@ -6,10 +6,11 @@ summary: Download and parse IPSW(s) from the internets.
 ---
 
 - [**download --help**](#download---help)
-- [**download**](#download)
-- [**download latest**](#download-latest)
-- [**download kernel**](#download-kernel)
-- [**download pattern**](#download-pattern)
+- [**download ipsw**](#download-ipsw)
+- [**download ipsw config**](#download-ipsw-config)
+- [**download ipsw --latest**](#download-ipsw---latest)
+- [**download ipsw --kernel**](#download-ipsw---kernel)
+- [**download ipsw --pattern**](#download-ipsw---pattern)
 - [**download beta**](#download-beta)
 - [**download ota**](#download-ota)
 - [**download macos**](#download-macos)
@@ -28,34 +29,35 @@ Help for download cmd
 ```bash
 ❯ ipsw download --help
 
-Download and parse IPSW(s) from the internets
+Download Apple Firmware files (and more)
 
 Usage:
   ipsw download [flags]
   ipsw download [command]
 
 Available Commands:
-  beta        Download beta IPSWs from theiphonewiki.com
   dev         Download IPSWs (and more) from https://developer.apple.com/download
-  kernel      Download just the kernelcache
-  latest      Download latest release version
-  macos       Download and parse macOS IPSWs
+  macos       Download macOS installers
   oss         Download opensource.apple.com file list for macOS version
-  ota         Download OTA betas
+  ota         Download OTAs
   pattern     Download files that contain file name part
+  rss         Read Releases - Apple Developer RSS Feed
 
 Flags:
       --black-list stringArray   iOS device black list
   -b, --build string             iOS BuildID (i.e. 16F203)
+  -y, --confirm                  do not prompt user for confirmation
   -d, --device string            iOS Device (i.e. iPhone11,2)
   -h, --help                     help for download
       --insecure                 do not verify ssl certs
+  -m, --model string             iOS Model (i.e. D321AP)
       --proxy string             HTTP/HTTPS proxy
   -_, --remove-commas            replace commas in IPSW filename with underscores
-  -s, --skip-all                 Always skip resumable IPSWs
+      --restart-all              always restart resumable IPSWs
+      --resume-all               always resume resumable IPSWs
+      --skip-all                 always skip resumable IPSWs
   -v, --version string           iOS Version (i.e. 12.3.1)
       --white-list stringArray   iOS device white list
-  -y, --yes                      do not prompt user
 
 Global Flags:
       --config string   config file (default is $HOME/.ipsw.yaml)
@@ -64,14 +66,14 @@ Global Flags:
 Use "ipsw download [command] --help" for more information about a command.
 ```
 
-## **download**
+## **download ipsw**
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
-- Download an ipsw and extract/decompress the kernelcache
+Download an ipsw and extract/decompress the kernelcache
 
 ```bash
-❯ ipsw download --device iPhone11,2 --build 16A366
+❯ ipsw download ipsw --device iPhone11,2 --build 16A366
 
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
@@ -79,24 +81,22 @@ Use "ipsw download [command] --help" for more information about a command.
 
 ❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 
-   • Extracting Kernelcache from IPSW
-      • Parsing Compressed Kernelcache
-         • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1
-      • Decompressing Kernelcache
+   • Extracting kernelcaches
+      • Created 16A366__iPhone11,2/kernelcache.release.iPhone11,2
 ```
 
-⚠️ notice that the kernelcache was extracted from the ipsw and decompressed 😈
+> ⚠️ notice that the kernelcache was extracted from the ipsw and decompressed 😈
 
 ```bash
-❯ file kernelcache.release.iphone11.decompressed
+❯ file 16A366__iPhone11,2/kernelcache.release.iPhone11,2
 
-kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
+16A366__iPhone11,2/kernelcache.release.iPhone11,2 "Mach-O 64-bit executable arm64"
 ```
 
-- Download all the iOS 12.0 ipsws
+Download ALL the iOS 12.0 ipsws
 
 ```bash
-❯ ipsw download --version 12.0
+❯ ipsw download ipsw --version 12.0
 
 ? You are about to download 17 ipsw files. Continue? Yes
    • Getting IPSW              build=16A366 device=iPhone11,4 signed=true version=12.0
@@ -107,28 +107,69 @@ kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
   ...
 ```
 
-- Download with a Proxy
-
-This will download and decompress the kernelcache for an **iPhone XS** running **iOS 12.1** behind a corporate proxy
+Debug speed issues
 
 ```bash
-❯ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --version 15.1 --device iPhone10,1 --verbose
+   • URLs to Download:
+      • https://updates.cdn-apple.com/2021FallFCS/fullrestores/071-64002/C820E7E5-0168-462E-923A-5C86E217D5B5/iPhone_4.7_P3_15.1_19B74_Restore.ipsw
+   • Getting IPSW              build=19B74 device=iPhone10,1 signed=true version=15.1
+      • Downloading               file=iPhone_4.7_P3_15.1_19B74_Restore.ipsw
+      • URL resolved to: 17.253.17.207 "(Apple Inc - Santa Clara, CA. United States)"
+	5.3 MiB / 5.3 GiB [----------------------------------------------------------| 1h18m2s ]  1.17 MiB/s
 ```
 
-- To disable cert verification
+> **NOTE:** The Apple CDN's IP has been geo-looked up and is in **Santa Clara**. You can Ctrl+C and try again for a closer CDN which will typically correlate with increased download speeds.
+
+Download with a Proxy
+
+> This will download and decompress the kernelcache for an **iPhone XS** running **iOS 12.1** behind a corporate proxy
 
 ```bash
-❯ ipsw download --insecure --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
 ```
 
-## **download latest**
+To disable SSL cert verification
+
+```bash
+❯ ipsw download ipsw --insecure --device iPhone11,2 --build 16B92
+```
+
+### download `ipsw` config
+
+You can also use a config file with `ipsw` so you don't have to use the flags
+
+```bash
+❯ cat ~/.ipsw.yml
+```
+
+```yaml
+download:
+  latest: true
+  confirm: true
+  white-list:
+    - iPod9,1
+    - iPhone14,2
+  resume-all: true
+  output: /SHARE/IPSWs
+```
+
+> This will download the `latest` IPSWs for _only_ the `iPod9,1` and the `iPhone14,2` without requesting user confirmation to download. It will also always try to `resume` previously interrupted downloads and will download everything to the `/SHARE/IPSWs` folder
+
+You can also use environment variables to set `ipsw` config
+
+```bash
+❯ IPSW_DOWNLOAD_DEVICE=iPhone14,2 ipsw download ipsw --latest
+```
+
+### **download ipsw --latest**
 
 > Queries the iTunes XML for latest version _(maybe run this as a cron job)_ 😉
 
-- Download all the latest ipsws
+Download all the latest ipsws
 
 ```bash
-❯ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
+❯ ipsw download ipsw -V --black-list AppleTV --black-list iPod7,1 --latest --confirm
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPhone6,2 version=12.4.1
@@ -136,7 +177,7 @@ This will download and decompress the kernelcache for an **iPhone XS** running *
   ...
 ```
 
-This will also generate a `checksums.txt.sha1` file that you can use to verify the downloads
+> This will also generate a `checksums.txt.sha1` file that you can use to verify the downloads
 
 ```bash
 ❯ sha1sum -c checksums.txt.sha1
@@ -146,12 +187,12 @@ iPadPro_9.7_13.2.3_17B111_Restore.ipsw: OK
 iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 ```
 
-⚠️ **NOTE:** you must do **one** device type/family per `--black-list` or `--white-list` flag
+> ⚠️ **NOTE:** you must do **one** device type/family per `--black-list` or `--white-list` flag
 
-- To grab _only_ the iPods
+To grab _only_ the iPods
 
 ```bash
-❯ ipsw download -V latest --yes --white-list ipod
+❯ ipsw download ipsw --white-list ipod --latest --confirm
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPod9,1 version=12.4.1
@@ -159,15 +200,15 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
   ...
 ```
 
-- To just output the latest iOS version
+To just output the latest iOS version
 
 ```bash
-❯ ipsw download latest --info
+❯ ipsw download ipsw --show-latest
 
-13.6.1
+15.1
 ```
 
-## **download kernel**
+### **download ipsw --kernel**
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
@@ -176,55 +217,47 @@ Only download and decompress the kernelcaches
 - Single kernelcache
 
 ```bash
-ipsw download kernel --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --device iPhone11,2 --build 16B92 --kernel
 ```
 
 - All of dem!!!
 
 ```bash
-❯ time ipsw download kernel --version 12.0.1
+❯ time ipsw download ipsw --version 15.1 --kernel -y
 
-"8.40s user 1.19s system 53% cpu 17.784 total"
+"112.29s user 13.86s system 28% cpu 7:16.35 total" (7m 17s)
 ```
 
-That's **14** decompressed kernelcaches in under **9 seconds** 😏
+That's **38** decompressed kernelcaches in under **8 minutess** 😏 I've seen much faster _(I miss gigabit internet soooo much)_ 😭
 
 ```bash
-❯ ls -1
-
-kernelcache.release.ipad4b.decompressed
-kernelcache.release.ipad5b.decompressed
-kernelcache.release.ipad6b.decompressed
-kernelcache.release.ipad6d.decompressed
-kernelcache.release.ipad6f.decompressed
-kernelcache.release.ipad7.decompressed
-kernelcache.release.iphone10b.decompressed
-kernelcache.release.iphone11.decompressed
-kernelcache.release.iphone11b.decompressed
-kernelcache.release.iphone7.decompressed
-kernelcache.release.iphone8b.decompressed
-kernelcache.release.iphone9.decompressed
-kernelcache.release.j42d.decompressed
-kernelcache.release.n102.decompressed
+❯ ls -1 19B74*/kernelcache*
+19B74__iPad11,1_2_3_4/kernelcache.release.ipad11
+19B74__iPad11,6_7/kernelcache.release.ipad11b
+19B74__iPad12,1_2/kernelcache.release.ipad12p
+19B74__iPad13,1_2/kernelcache.release.ipad13p
+19B74__iPad13,4_5_6_7_8_9_10_11/kernelcache.release.ipad13
+19B74__iPad14,1_2/kernelcache.release.ipad14p
+19B74__iPad5,1_2_3_4/kernelcache.release.ipad5
+<SNIP>
 ```
 
-## **download pattern**
+### **download ipsw --pattern**
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
 Only download files that match a given name/path
 
 ```bash
-❯ ipsw download -v 13.4 -d iPhone12,3 pattern iBoot
-```
+❯ ipsw download -d iPhone14,2 --latest --pattern iBoot
 
-```bash
-❯ ls iBoot*
-iBoot.d321.RELEASE.im4p        iBoot.d331p.RELEASE.im4p.plist
-iBoot.d321.RELEASE.im4p.plist  iBoot.d421.RELEASE.im4p
-iBoot.d331.RELEASE.im4p        iBoot.d421.RELEASE.im4p.plist
-iBoot.d331.RELEASE.im4p.plist  iBoot.d431.RELEASE.im4p
-iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
+   • Latest release found is: 15.1
+   • Parsing remote IPSW       build=19B74 device=iPhone14,2 signed=true version=15.1
+   • Downloading files that contain: iBoot
+      • Created 19B74__iPhone14,2/iBoot.d63.RELEASE.im4p
+      • Created 19B74__iPhone14,2/iBoot.d63.RELEASE.im4p.plist
+      • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p
+      • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p.plist
 ```
 
 ## **download beta**
@@ -237,12 +270,70 @@ Download BETA ipsws
 ❯ ipsw download beta 17C5046a
 ```
 
+> **NOTE:** This depends on the iphonewiki maintainers publishing the `beta` firmware download links
+
 ## **download ota**
 
-Download **iOS15.x developer beta** OTA _(over the air updates)_
+Check for availiable OTA download versions
 
 ```bash
-❯ ipsw download ota --device iPhone12,3
+❯ ipsw download ota --info
+
+? Choose an OS type: iOS
+   • OTAs                      type=iOS
+   • ⚠️  This includes: iOS, iPadOS, watchOS, tvOS and audioOS (you can filter by adding the --device flag)
+      • 15.1.1                    expiration_date=2022-01-30 posting_date=2021-11-01
+      • 14.8.1                    expiration_date=2022-01-30 posting_date=2021-10-26
+      • 8.1                       expiration_date=2022-01-30 posting_date=2021-10-25
+      • 15.1                      expiration_date=2022-01-30 posting_date=2021-10-25
+      • 14.8                      expiration_date=2022-01-30 posting_date=2021-10-14
+      • 15.0.2                    expiration_date=2022-01-30 posting_date=2021-10-11
+      • 5.3.9                     expiration_date=2022-01-23 posting_date=2021-10-11
+      • 8.0.1                     expiration_date=2022-01-23 posting_date=2021-10-11
+      • 15.0.1                    expiration_date=2022-01-09 posting_date=2021-10-01
+      • 12.5.5                    expiration_date=2022-01-30 posting_date=2021-09-23
+      • 15.0                      expiration_date=2022-01-23 posting_date=2021-09-20
+      • 8.0                       expiration_date=2022-01-09 posting_date=2021-09-20
+      • 15.0                      expiration_date=2021-12-30 posting_date=2021-09-20
+      • 7.6.2                     expiration_date=2022-01-30 posting_date=2021-09-13
+      • 14.8                      expiration_date=2022-01-30 posting_date=2021-09-13
+      • 5.3.9                     expiration_date=2022-01-30 posting_date=2021-07-29
+      • 6.3                       expiration_date=2022-01-30 posting_date=2021-07-29
+      • 7.6.1                     expiration_date=2021-12-12 posting_date=2021-07-29
+      • 12.5.4                    expiration_date=2022-01-30 posting_date=2021-07-26
+      • 14.7.1                    expiration_date=2022-01-30 posting_date=2021-07-26
+      • 14.7                      expiration_date=2021-12-19 posting_date=2021-07-19
+
+```
+
+Download the OTA `14.8.1` release for the `iPhone14,2` device
+
+```bash
+ipsw download ota --version 14.8.1 --device iPhone10,1
+
+? You are about to download 1 OTA files. Continue? Yes
+   • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
+	280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s ]  1.15 MiB/s
+```
+
+Download **iOS15.2 developer beta** OTA _(over the air updates)_
+
+```bash
+❯ ipsw download ota --device iPhone12,3 --beta
+
+? You are about to download 1 OTA files. Continue? Yes
+   • Getting OTA               build=19C5026i device=iPhone12,3 version=iOS152DevBeta1
+	495.3 MiB / 5.8 GiB [====>-----------------------------------------------------| 1h17m52s ]  1.17 MiB/s
+```
+
+Download the latest macOS `beta` OTA
+
+```bash
+❯ ipsw download ota --platform macos --beta --device Macmini9,1 --model J274AP
+
+? You are about to download 1 OTA files. Continue? Yes
+   • Getting OTA               build=21C5021h device= version=PreRelease
+	143.4 MiB / 775.7 MiB [==========>-----------------------------------------------| 8m51s ]  1.19 MiB/s
 ```
 
 Just download the _kernelcache_ and _dyld_shared_cache_
@@ -262,20 +353,11 @@ Just download the _kernelcache_ and _dyld_shared_cache_
 
 ## **download macos**
 
-Download and parse macOS IPSWs
+Download macOS installers
 
 ```bash
-❯ ipsw download macos --kernel
-   • Latest release found is: 11.2.3
-? You are about to download 1 ipsw files. Continue? Yes
-   • Getting Kernelcache       build=20D91 device=Macmini9,1 version=11.2.3
-   • Extracting remote kernelcache
-      • Writing ADP3,2_J273AAP_20D91/kernelcache.production
-      • Writing ADP3,1_J273AP_20D91/kernelcache.production
-      • Writing Macmini9,1_J274AP_20D91/kernelcache.production
-      • Writing MacBookPro17,1_J293AP_20D91/kernelcache.production
-      • Writing MacBookAir10,1_J313AP_20D91/kernelcache.production
-      • Writing iProd99,1_T485AP_20D91/kernelcache.production
+❯ ipsw download macos
+
 ```
 
 ## **download dev**

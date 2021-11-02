@@ -26,10 +26,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -107,26 +105,28 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 	doDownload := viper.GetStringSlice("download.white-list")
 	doNotDownload := viper.GetStringSlice("download.black-list")
 
+	// verify args
+	if len(version) == 0 && len(build) == 0 {
+		return nil, fmt.Errorf("you must also supply a --version OR a --build (or use --latest)")
+	}
 	if len(version) > 0 && len(build) > 0 {
-		log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		return nil, fmt.Errorf("you cannot supply a --version AND a --build (they are mutually exclusive)")
 	}
 
 	if len(version) > 0 {
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to query ipsw.me api")
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v")
 		}
-	} else if len(build) > 0 {
+	} else { // using build
 		version, err = download.GetVersion(build)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to query ipsw.me api")
+			return nil, fmt.Errorf("failed to query ipsw.me api for buildID => version: %v", err)
 		}
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to query ipsw.me api")
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v")
 		}
-	} else {
-		return nil, fmt.Errorf("you must also supply a --version OR a --build (or use download latest)")
 	}
 
 	for _, i := range ipsws {

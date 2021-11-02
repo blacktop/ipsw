@@ -100,3 +100,6 @@ release:
     ## What to do next?
     - Follow us on [Twitter](https://twitter.com/blacktop__);
     - Read the [documentation](https://blacktop.github.io/ipsw/docs/).
+announce:
+  twitter:
+    enabled: true
