@@ -501,7 +501,7 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 		})
 	}
 
-	return
+	return reqs, nil
 }
 
 func (o *Ota) buildPallasRequests() (reqs []pallasRequest, err error) {

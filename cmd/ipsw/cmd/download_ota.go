@@ -42,24 +42,27 @@ func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
 	otaDLCmd.Flags().StringP("platform", "p", "ios", "Platform to download (ios, macos, watchos, tvos, audioos)")
-	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
-	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
 	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache from remote OTA zip")
-	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
 	otaDLCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote OTA zip")
-	viper.BindPFlag("download.ota.kernel", otaDLCmd.Flags().Lookup("kernel"))
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
-	viper.BindPFlag("download.ota.info", otaDLCmd.Flags().Lookup("info"))
 	otaDLCmd.Flags().String("info-type", "", "OS type to show OTAs for")
+	otaDLCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
+	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
+	viper.BindPFlag("download.ota.kernel", otaDLCmd.Flags().Lookup("kernel"))
+	viper.BindPFlag("download.ota.info", otaDLCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.ota.info-type", otaDLCmd.Flags().Lookup("info-type"))
+	viper.BindPFlag("download.ota.output", otaDLCmd.Flags().Lookup("output"))
 }
 
 // otaDLCmd represents the ota download command
 var otaDLCmd = &cobra.Command{
-	Use:          "ota [options]",
-	Short:        "Download OTAs",
-	SilenceUsage: true,
+	Use:           "ota [options]",
+	Short:         "Download OTAs",
+	SilenceUsage:  false,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
@@ -105,6 +108,12 @@ var otaDLCmd = &cobra.Command{
 		remoteKernel := viper.GetBool("download.ota.kernel")
 		otaInfo := viper.GetBool("download.ota.info")
 		otaInfoType := viper.GetString("download.ota.info-type")
+		output := viper.GetString("download.ota.output")
+
+		// verify args
+		// if kernel && len(pattern) > 0 {
+		// 	return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
+		// }
 
 		// Query for asset sets
 		as, err := download.GetAssetSets(proxy, insecure)
@@ -160,8 +169,8 @@ var otaDLCmd = &cobra.Command{
 		}
 
 		var destPath string
-		if len(args) > 0 {
-			destPath = filepath.Clean(args[0])
+		if len(output) > 0 {
+			destPath = filepath.Clean(output)
 		}
 
 		if len(version) > 0 {
@@ -214,11 +223,14 @@ var otaDLCmd = &cobra.Command{
 
 		cont := true
 		if !confirm {
-			cont = false
-			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download %d OTA files. Continue?", len(otas)),
+			// if filtered to a single device skip the prompt
+			if len(otas) > 1 {
+				cont = false
+				prompt := &survey.Confirm{
+					Message: fmt.Sprintf("You are about to download %d OTA files. Continue?", len(otas)),
+				}
+				survey.AskOne(prompt, &cont)
 			}
-			survey.AskOne(prompt, &cont)
 		}
 
 		if cont {
@@ -261,6 +273,7 @@ var otaDLCmd = &cobra.Command{
 							"device":  strings.Join(o.SupportedDevices, " "),
 							"build":   o.Build,
 							"version": o.DocumentationID,
+							"product": o.ProductSystemName,
 						}).Info("Getting OTA")
 						// download file
 						downloader.URL = url
