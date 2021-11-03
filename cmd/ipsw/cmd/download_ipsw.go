@@ -133,6 +133,13 @@ var ipswCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to create itunes API: %v", err)
 			}
+		} else {
+			if !showLatest { // This is a dumb hack to prevent having to pull down the FULL XML if you just want to know the latest iOS version
+				itunes, err = download.NewiTunesVersionMaster()
+				if err != nil {
+					return fmt.Errorf("failed to create itunes API: %v", err)
+				}
+			}
 		}
 
 		if showLatest {
@@ -142,12 +149,17 @@ var ipswCmd = &cobra.Command{
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
 				}
 				fmt.Print(latestVersion)
-				// assets, err := download.GetAssetSets(proxy, insecure) TODO: switch to this check (if IPSWs match eventually)
+				// assets, err := download.GetAssetSets(proxy, insecure) // TODO: switch to this check (if IPSWs match eventually)
 				// if err != nil {
 				// 	return fmt.Errorf("failed to get latest iOS version: %v", err)
 				// }
 				// fmt.Print(assets.Latest("macOS"))
 			} else {
+				// latestVersion, err := itunes.GetLatestVersion()
+				// if err != nil {
+				// 	return fmt.Errorf("failed to get latest iOS version: %v", err)
+				// }
+				// fmt.Print(latestVersion)
 				assets, err := download.GetAssetSets(proxy, insecure)
 				if err != nil {
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
@@ -158,10 +170,6 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if latest {
-			itunes, err = download.NewiTunesVersionMaster()
-			if err != nil {
-				return fmt.Errorf("failed to create itunes API: %v", err)
-			}
 			builds, err = itunes.GetLatestBuilds(device)
 			if err != nil {
 				return fmt.Errorf("failed to get the latest builds: %v", err)
