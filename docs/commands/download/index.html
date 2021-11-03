@@ -287,7 +287,7 @@ Use <span class="s2">&#34;ipsw download [command] --help&#34;</span> <span class
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ file 16A366__iPhone11,2/kernelcache.release.iPhone11,2
 
 16A366__iPhone11,2/kernelcache.release.iPhone11,2 <span class="s2">&#34;Mach-O 64-bit executable arm64&#34;</span>
-</code></pre></div><p>Download ALL the iOS 12.0 ipsws</p>
+</code></pre></div><p>Download ALL the <strong>iOS</strong> <code>12.0</code> ipsws</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ipsw --version 12.0
 
 ? You are about to download <span class="m">17</span> ipsw files. Continue? Yes
@@ -297,12 +297,11 @@ Use <span class="s2">&#34;ipsw download [command] --help&#34;</span> <span class
    • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16A366 <span class="nv">device</span><span class="o">=</span>iPod7,1 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>12.0
     734.7 MiB / 2.6 GiB <span class="o">[===============</span>&gt;------------------------------------------<span class="p">|</span> 00:57 <span class="o">]</span> 44.84 MiB/s
   ...
-</code></pre></div><p>Download <strong>latest</strong> <code>macOS</code> ipsws</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ipsw --macos --latest -y
+</code></pre></div><p>Download the <strong>macOS</strong> <code>11.5</code> ipsw</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ipsw --macos --version 11.5
 
-   • Latest release found is: 11.6
-   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>20G165 <span class="nv">device</span><span class="o">=</span>Macmini9,1 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>11.6
-	288.6 MiB / 13.0 GiB <span class="o">[</span>&gt;---------------------------------------------------------<span class="p">|</span> 3h30m57s <span class="o">]</span>  1.03 MiB/s
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>20G71 <span class="nv">device</span><span class="o">=</span>Macmini9,1 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>11.5
+	16.0 MiB / 13.0 GiB <span class="o">[</span>----------------------------------------------------------<span class="p">|</span> 13h28m42s <span class="o">]</span>  280.66 KiB/s
   ...
 </code></pre></div><p>Debug speed issues</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ipsw --version 15.1 --device iPhone10,1 --verbose
@@ -366,6 +365,13 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
       • <span class="s2">&#34;Yo, ain&#39;t no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏&#34;</span>
    • Getting IPSW              <span class="nv">build</span><span class="o">=</span>16G77 <span class="nv">device</span><span class="o">=</span>iPod9,1 <span class="nv">version</span><span class="o">=</span>12.4.1
         363.0 MiB / 2.9 GiB <span class="o">[======</span>&gt;-----------------------------------------------<span class="p">|</span> 18:52 <span class="o">]</span> 49.18 MiB/s
+  ...
+</code></pre></div><p>Download <strong>latest</strong> <code>macOS</code> ipsws</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ipsw --macos --latest -y
+
+   • Latest release found is: 11.6
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>20G165 <span class="nv">device</span><span class="o">=</span>Macmini9,1 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>11.6
+	288.6 MiB / 13.0 GiB <span class="o">[</span>&gt;---------------------------------------------------------<span class="p">|</span> 3h30m57s <span class="o">]</span>  1.03 MiB/s
   ...
 </code></pre></div><p>To just output the latest iOS version</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ipsw --show-latest
