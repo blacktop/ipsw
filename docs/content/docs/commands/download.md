@@ -17,6 +17,7 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download dev**](#download-dev)
 - [**download oss**](#download-oss)
 - [**download rss**](#download-rss)
+- [**download tss**](#download-tss)
 
 ---
 
@@ -40,7 +41,6 @@ Available Commands:
   macos       Download macOS installers
   oss         Download opensource.apple.com file list for macOS version
   ota         Download OTAs
-  pattern     Download files that contain file name part
   rss         Read Releases - Apple Developer RSS Feed
 
 Flags:
@@ -228,7 +228,7 @@ Only download and decompress the kernelcaches
 "112.29s user 13.86s system 28% cpu 7:16.35 total" (7m 17s)
 ```
 
-That's **38** decompressed kernelcaches in under **8 minutess** 😏 I've seen much faster _(I miss gigabit internet soooo much)_ 😭
+That's **38** decompressed kernelcaches in under **8 minutess** and I've seen **much** faster _(I miss gigabit internet soooo much)_ 😭
 
 ```bash
 ❯ ls -1 19B74*/kernelcache*
@@ -353,11 +353,47 @@ Just download the _kernelcache_ and _dyld_shared_cache_
 
 ## **download macos**
 
-Download macOS installers
+List macOS installers
 
 ```bash
-❯ ipsw download macos
+❯ ipsw download macos --list
+```
 
+| TITLE                          | VERSION | BUILD    | POST DATE        |
+| ------------------------------ | ------- | -------- | ---------------- |
+| macOS Mojave                   | 10.14.5 | 18F2059  | 10Oct19 20:38:26 |
+| macOS Mojave                   | 10.14.6 | 18G103   | 10Oct19 20:51:08 |
+| macOS High Sierra              | 10.13.6 | 17G66    | 10Oct19 18:19:55 |
+| macOS Mojave                   | 10.14.4 | 18E2034  | 10Oct19 14:41:18 |
+| Install macOS High Sierra Beta | 10.13.5 | 17F66a   | 10Oct19 14:41:18 |
+| macOS Catalina                 | 10.15.3 | 19D2064  | 03Mar20 21:41:00 |
+| macOS Catalina                 | 10.15.4 | 19E2269  | 05May20 15:32:04 |
+| macOS Catalina                 | 10.15.5 | 19F2200  | 06Jun20 18:52:41 |
+| macOS Catalina                 | 10.15.6 | 19G2006  | 08Aug20 23:39:24 |
+| macOS Catalina                 | 10.15.6 | 19G2021  | 08Aug20 20:04:02 |
+| macOS Catalina                 | 10.15.7 | 19H2     | 09Sep20 17:09:31 |
+| macOS Catalina                 | 10.15.7 | 19H4     | 10Oct20 17:28:13 |
+| macOS Catalina                 | 10.15.7 | 19H15    | 11Nov20 17:48:09 |
+| macOS Big Sur                  | 11.5.1  | 20G80    | 07Jul21 17:10:10 |
+| macOS Big Sur                  | 11.5.2  | 20G95    | 08Aug21 18:28:53 |
+| macOS Big Sur                  | 11.6    | 20G165   | 09Sep21 18:52:42 |
+| macOS Big Sur                  | 11.6.1  | 20G224   | 10Oct21 17:17:27 |
+| macOS Monterey                 | 12.0.1  | 21A559   | 10Oct21 17:23:38 |
+| macOS Monterey beta            | 12.1    | 21C5021h | 10Oct21 17:04:37 |
+
+Download **macOS Monterey**
+
+```bash
+❯ ipsw download macos --build 21A559
+
+? You are about to download the macOS Monterey installer files. Continue? Yes
+   • Downloading packages
+   • Getting Package           destName=BuildManifest.plist size=1.9 MB
+	1.9 MiB / 1.9 MiB [==========================================================| ✅  ]  1.17 MiB/s
+   • Getting Package           destName=Info.plist size=5.1 kB
+	5.0 KiB / 5.0 KiB [==========================================================| ✅  ]  0.00 b/s
+   • Getting Package           destName=InstallAssistant.pkg size=12 GB
+	74.6 MiB / 11.3 GiB [----------------------------------------------------------| 1h4m28s ]  2.97 MiB/s
 ```
 
 ## **download dev**
@@ -499,3 +535,25 @@ Watch for 🆕 Releases
 ```
 
 This will ping the RSS feed every 5 minutes and create a desktop notification if anything NEW shows up.
+
+## **download tss**
+
+Download SHSH blobs from Apple
+
+```
+❯ ipsw download tss
+```
+
+> ⚠️ **NOTICE:** this is still a WIP _(however `signed` check does work)_
+
+Check the signing status of an **iOS** version
+
+```
+❯ ipsw download tss --signed 15.0.2
+   ⨯ 🔥  15.0.2 is NO LONGER being signed
+```
+
+```
+❯ ipsw download tss --signed 15.1
+   • ✅  15.1 is still being signed
+```
