@@ -42,6 +42,7 @@ Available Commands:
   oss         Download opensource.apple.com file list for macOS version
   ota         Download OTAs
   rss         Read Releases - Apple Developer RSS Feed
+  tss         🚧 Download SHSH Blobs
 
 Flags:
       --black-list stringArray   iOS device black list
