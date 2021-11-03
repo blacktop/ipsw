@@ -556,10 +556,10 @@ Check the signing status of an **iOS** version
 
 ```
 ❯ ipsw download tss --signed 15.0.2
-   ⨯ 🔥  15.0.2 is NO LONGER being signed
+   ⨯ 🔥 15.0.2 is NO LONGER being signed
 ```
 
 ```
 ❯ ipsw download tss --signed 15.1
-   • ✅  15.1 is still being signed
+   • ✅ 15.1 is still being signed
 ```
