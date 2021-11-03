@@ -95,7 +95,7 @@ Download an ipsw and extract/decompress the kernelcache
 16A366__iPhone11,2/kernelcache.release.iPhone11,2 "Mach-O 64-bit executable arm64"
 ```
 
-Download ALL the iOS 12.0 ipsws
+Download ALL the **iOS** `12.0` ipsws
 
 ```bash
 ❯ ipsw download ipsw --version 12.0
@@ -109,14 +109,13 @@ Download ALL the iOS 12.0 ipsws
   ...
 ```
 
-Download **latest** `macOS` ipsws
+Download the **macOS** `11.5` ipsw
 
 ```bash
-❯ ipsw download ipsw --macos --latest -y
+❯ ipsw download ipsw --macos --version 11.5
 
-   • Latest release found is: 11.6
-   • Getting IPSW              build=20G165 device=Macmini9,1 signed=true version=11.6
-	288.6 MiB / 13.0 GiB [>---------------------------------------------------------| 3h30m57s ]  1.03 MiB/s
+   • Getting IPSW              build=20G71 device=Macmini9,1 signed=true version=11.5
+	16.0 MiB / 13.0 GiB [----------------------------------------------------------| 13h28m42s ]  280.66 KiB/s
   ...
 ```
 
@@ -210,6 +209,17 @@ To grab _only_ the iPods
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPod9,1 version=12.4.1
         363.0 MiB / 2.9 GiB [======>-----------------------------------------------| 18:52 ] 49.18 MiB/s
+  ...
+```
+
+Download **latest** `macOS` ipsws
+
+```bash
+❯ ipsw download ipsw --macos --latest -y
+
+   • Latest release found is: 11.6
+   • Getting IPSW              build=20G165 device=Macmini9,1 signed=true version=11.6
+	288.6 MiB / 13.0 GiB [>---------------------------------------------------------| 3h30m57s ]  1.03 MiB/s
   ...
 ```
 
