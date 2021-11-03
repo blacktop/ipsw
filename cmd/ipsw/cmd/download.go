@@ -116,7 +116,7 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 	if len(version) > 0 {
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v")
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
 		}
 	} else { // using build
 		version, err = download.GetVersion(build)
@@ -125,7 +125,7 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 		}
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v")
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
 		}
 	}
 
