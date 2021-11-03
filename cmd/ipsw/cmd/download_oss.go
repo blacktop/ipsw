@@ -38,29 +38,45 @@ func init() {
 
 	ossCmd.Flags().StringP("macos", "m", viper.GetString("IPSW_OSS_MACOS_VERSION"), "macOS version to download")
 	ossCmd.MarkFlagRequired("macos")
-
-	ossCmd.Flags().BoolP("all", "", false, "Download all the files")
-	ossCmd.Flags().StringP("product", "", "", "macOS product to download (i.e. dyld)")
+	ossCmd.Flags().BoolP("all", "a", false, "Download all the files")
+	ossCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
+	viper.BindPFlag("download.oss.macos", ossCmd.Flags().Lookup("macos"))
+	viper.BindPFlag("download.oss.all", ossCmd.Flags().Lookup("all"))
+	viper.BindPFlag("download.oss.product", ossCmd.Flags().Lookup("product"))
 }
 
 // ossCmd represents the oss command
 var ossCmd = &cobra.Command{
-	Use:   "oss <macOS version>",
-	Short: "Download opensource.apple.com file list for macOS version",
-	// Args:  cobra.MinimumNArgs(1),
+	Use:           "oss <macOS version>",
+	Short:         "Download opensource.apple.com file list for macOS version",
+	SilenceUsage:  false,
+	SilenceErrors: true,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-
-		macOS, _ := cmd.Flags().GetString("macos")
-
-		downloadAll, _ := cmd.Flags().GetBool("all")
-		downloadProduct, _ := cmd.Flags().GetString("product")
+		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
+		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
+		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
+		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
+		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
+		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
+		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
+		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
+		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
+		// settings
+		proxy := viper.GetString("download.proxy")
+		insecure := viper.GetBool("download.insecure")
+		// flags
+		macOS := viper.GetString("download.oss.macos")
+		downloadAll := viper.GetBool("download.oss.all")
+		downloadProduct := viper.GetString("download.oss.product")
 
 		o, err := download.NewOSS(strings.Replace(macOS, ".", "", -1), proxy, insecure)
 		if err != nil {
@@ -74,7 +90,6 @@ var ossCmd = &cobra.Command{
 					utils.Indent(log.Error, 2)(err.Error())
 				}
 			}
-
 		} else if len(downloadProduct) > 0 {
 			for name, product := range o.Projects {
 				if strings.Contains(strings.ToLower(name), downloadProduct) {
@@ -84,7 +99,6 @@ var ossCmd = &cobra.Command{
 					}
 				}
 			}
-
 		} else {
 			if dat, err := json.MarshalIndent(o, "", "   "); err == nil {
 				fmt.Println(string(dat))
