@@ -59,9 +59,9 @@ var tssCmd = &cobra.Command{
 
 		if len(isSigned) > 0 {
 			if _, err := download.GetTSS(isSigned, proxy, insecure); err != nil {
-				log.Errorf("🔥  %s is NO LONGER being signed", isSigned)
+				log.Errorf("🔥 %s is NO LONGER being signed", isSigned)
 			} else {
-				log.Infof("✅  %s is still being signed", isSigned)
+				log.Infof("✅ %s is still being signed", isSigned)
 			}
 			return nil
 		}
