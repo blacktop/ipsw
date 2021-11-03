@@ -311,7 +311,7 @@ Check for availiable OTA _(over the air updates)_ download versions
 Download the OTA `14.8.1` release for the `iPhone14,2` device
 
 ```bash
-ipsw download ota --version 14.8.1 --device iPhone10,1
+❯ ipsw download ota --version 14.8.1 --device iPhone10,1
 
 ? You are about to download 1 OTA files. Continue? Yes
    • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
