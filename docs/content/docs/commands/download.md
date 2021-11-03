@@ -38,6 +38,7 @@ Usage:
 
 Available Commands:
   dev         Download IPSWs (and more) from https://developer.apple.com/download
+  ipsw        Download and parse IPSW(s) from the internets
   macos       Download macOS installers
   oss         Download opensource.apple.com file list for macOS version
   ota         Download OTAs
@@ -275,7 +276,7 @@ Download BETA ipsws
 
 ## **download ota**
 
-Check for availiable OTA download versions
+Check for availiable OTA _(over the air updates)_ download versions
 
 ```bash
 ❯ ipsw download ota --info
@@ -317,7 +318,7 @@ ipsw download ota --version 14.8.1 --device iPhone10,1
 	280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s ]  1.15 MiB/s
 ```
 
-Download **iOS15.2 developer beta** OTA _(over the air updates)_
+Download **iOS15.2 developer beta** OTA
 
 ```bash
 ❯ ipsw download ota --device iPhone12,3 --beta
@@ -351,6 +352,8 @@ Just download the _kernelcache_ and _dyld_shared_cache_
       • Kernelcache is LZFSE compressed
       • Writing "iPod9,1_N112AP_17F5054h/kernelcache.beta"
 ```
+
+You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` remotly out of a OTA... ARE YOU NOT ENTERTAINED?!?!!? 😎
 
 ## **download macos**
 
@@ -396,6 +399,8 @@ Download **macOS Monterey**
    • Getting Package           destName=InstallAssistant.pkg size=12 GB
 	74.6 MiB / 11.3 GiB [----------------------------------------------------------| 1h4m28s ]  2.97 MiB/s
 ```
+
+> ⚠️ **NOTE:** macOS sandboxes certain folders and prevents you from running some of the Apple utils required to build the FULL installers. _(try running in `/Users/Shared`)_
 
 ## **download dev**
 

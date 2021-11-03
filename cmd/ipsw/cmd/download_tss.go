@@ -40,7 +40,7 @@ func init() {
 // tssCmd represents the tss command
 var tssCmd = &cobra.Command{
 	Use:           "tss",
-	Short:         "🚧 Download SHSH Blobs 🚧",
+	Short:         "🚧 Download SHSH Blobs",
 	SilenceUsage:  false,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
