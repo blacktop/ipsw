@@ -114,6 +114,9 @@ var otaDLCmd = &cobra.Command{
 		// if kernel && len(pattern) > 0 {
 		// 	return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
 		// }
+		// if len(version) > 0 && len(build) > 0 {
+		// 	log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		// }
 
 		// Query for asset sets
 		as, err := download.GetAssetSets(proxy, insecure)
@@ -158,10 +161,6 @@ var otaDLCmd = &cobra.Command{
 			}
 			return nil
 		}
-
-		// if len(version) > 0 && len(build) > 0 {
-		// 	log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
-		// }
 
 		if !utils.StrSliceContains(
 			[]string{"ios", "macos", "watchos", "tvos", "audioos"}, strings.ToLower(platform)) {
@@ -238,8 +237,11 @@ var otaDLCmd = &cobra.Command{
 				for _, o := range otas {
 					log.WithFields(log.Fields{
 						"device":  strings.Join(o.SupportedDevices, " "),
+						"model":   strings.Join(o.SupportedDeviceModels, " "),
 						"build":   o.Build,
-						"version": o.DocumentationID,
+						"version": strings.TrimPrefix(o.OSVersion, "9.9."),
+						"type":    o.DocumentationID,
+						"product": o.ProductSystemName,
 					}).Info("Parsing remote OTA")
 					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
 						Proxy:    proxy,
@@ -250,7 +252,7 @@ var otaDLCmd = &cobra.Command{
 					}
 					if remoteDyld {
 						log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
-						err = ota.RemoteExtract(zr, "dyld_shared_cache_arm")
+						err = ota.RemoteExtract(zr, "dyld_shared_cache_arm", destPath)
 						if err != nil {
 							return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
 						}
@@ -266,13 +268,23 @@ var otaDLCmd = &cobra.Command{
 			} else {
 				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, Verbose)
 				for _, o := range otas {
+					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
+					os.MkdirAll(folder, os.ModePerm)
+					var devices string
+					if len(o.SupportedDevices) > 0 {
+						devices = strings.Join(o.SupportedDevices, "_")
+					} else {
+						devices = strings.Join(o.SupportedDeviceModels, "_")
+					}
 					url := o.BaseURL + o.RelativePath
-					destName := getDestName(url, removeCommas)
+					destName := filepath.Join(folder, fmt.Sprintf("%s_%s", devices, getDestName(url, removeCommas)))
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						log.WithFields(log.Fields{
 							"device":  strings.Join(o.SupportedDevices, " "),
+							"model":   strings.Join(o.SupportedDeviceModels, " "),
 							"build":   o.Build,
-							"version": o.DocumentationID,
+							"version": strings.TrimPrefix(o.OSVersion, "9.9."),
+							"type":    o.DocumentationID,
 							"product": o.ProductSystemName,
 						}).Info("Getting OTA")
 						// download file

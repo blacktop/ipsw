@@ -394,7 +394,7 @@ func getFolder(zr *zip.Reader) (string, error) {
 }
 
 // RemoteExtract extracts and decompresses remote OTA payload files
-func RemoteExtract(zr *zip.Reader, extractPattern string) error {
+func RemoteExtract(zr *zip.Reader, extractPattern, destPath string) error {
 
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
 
@@ -402,6 +402,7 @@ func RemoteExtract(zr *zip.Reader, extractPattern string) error {
 	if err != nil {
 		return err
 	}
+	folder = filepath.Join(destPath, folder)
 
 	sortFileBySize(zr.File)
 
