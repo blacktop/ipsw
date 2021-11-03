@@ -47,3 +47,4 @@ public
 
 *.unstripped
 *.bndb
+*.lock
