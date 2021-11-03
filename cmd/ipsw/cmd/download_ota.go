@@ -236,13 +236,11 @@ var otaDLCmd = &cobra.Command{
 			if remoteDyld || remoteKernel {
 				for _, o := range otas {
 					log.WithFields(log.Fields{
-						"device":  strings.Join(o.SupportedDevices, " "),
-						"model":   strings.Join(o.SupportedDeviceModels, " "),
-						"build":   o.Build,
-						"version": strings.TrimPrefix(o.OSVersion, "9.9."),
-						"type":    o.DocumentationID,
-						"product": o.ProductSystemName,
-					}).Info("Parsing remote OTA")
+						"device": strings.Join(o.SupportedDevices, " "),
+						"model":  strings.Join(o.SupportedDeviceModels, " "),
+						"build":  o.Build,
+						"type":   o.DocumentationID,
+					}).Info(fmt.Sprintf("Getting %s %s remote OTA", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
 					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
 						Proxy:    proxy,
 						Insecure: insecure,
@@ -280,13 +278,11 @@ var otaDLCmd = &cobra.Command{
 					destName := filepath.Join(folder, fmt.Sprintf("%s_%s", devices, getDestName(url, removeCommas)))
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						log.WithFields(log.Fields{
-							"device":  strings.Join(o.SupportedDevices, " "),
-							"model":   strings.Join(o.SupportedDeviceModels, " "),
-							"build":   o.Build,
-							"version": strings.TrimPrefix(o.OSVersion, "9.9."),
-							"type":    o.DocumentationID,
-							"product": o.ProductSystemName,
-						}).Info("Getting OTA")
+							"device": strings.Join(o.SupportedDevices, " "),
+							"model":  strings.Join(o.SupportedDeviceModels, " "),
+							"build":  o.Build,
+							"type":   o.DocumentationID,
+						}).Info(fmt.Sprintf("Getting %s %s OTA", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
 						// download file
 						downloader.URL = url
 						downloader.DestName = destName

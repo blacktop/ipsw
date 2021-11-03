@@ -12,6 +12,7 @@ build-deps: ## Install the build dependencies
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
+	$(GO_BIN) install golang.org/x/tools/...@latest
 	$(GO_BIN) get -u github.com/spf13/cobra/cobra
 	$(GO_BIN) get -u golang.org/x/tools/cmd/cover
 	$(GO_BIN) get -u github.com/caarlos0/svu
