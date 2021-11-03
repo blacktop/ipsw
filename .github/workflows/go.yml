@@ -146,6 +146,11 @@ jobs:
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download ipsw --kernel -v 14.6 -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho info */kernelcache*
+      - name: Run Extract Remote OTA Beta Kernelcache
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download ota --device iPhone12,3 --beta --kernel
+
       - name: Make cache folder
         if: matrix.platform == 'macos-11'
         run: mkdir ~/.ipsw
@@ -162,6 +167,26 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download ipsw --latest --device iPhone12,1 --confirm
+      - name: Run download pattern
+        if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download -d iPhone14,2 --latest --pattern iBoot --confirm
+      - name: Run download oss
+        if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download oss --macos 11.5
+      - name: Run download tss
+        if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download tss --signed 15.1
+      - name: Run download rss
+        if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download rss
       #
       # EXTRACT CMD (macOS)
       #
