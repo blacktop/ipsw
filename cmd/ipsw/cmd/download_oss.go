@@ -36,7 +36,7 @@ import (
 func init() {
 	downloadCmd.AddCommand(ossCmd)
 
-	ossCmd.Flags().StringP("macos", "m", viper.GetString("IPSW_OSS_MACOS_VERSION"), "macOS version to download")
+	ossCmd.Flags().String("macos", "", "macOS version to download")
 	ossCmd.MarkFlagRequired("macos")
 	ossCmd.Flags().BoolP("all", "a", false, "Download all the files")
 	ossCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
