@@ -114,6 +114,17 @@ func (i ProductInfo) String() string {
 
 type ProductInfos []ProductInfo
 
+// FilterByVersion filters out installers that do not match the given version
+func (infos ProductInfos) FilterByVersion(version string) ProductInfos {
+	var out ProductInfos
+	for _, i := range infos {
+		if version == i.Version {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 func (infos ProductInfos) String() string {
 	tableString := &strings.Builder{}
 
