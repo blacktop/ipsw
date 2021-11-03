@@ -442,12 +442,12 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
       • 14.7                      <span class="nv">expiration_date</span><span class="o">=</span>2021-12-19 <span class="nv">posting_date</span><span class="o">=</span>2021-07-19
 
 </code></pre></div><p>Download the OTA <code>14.8.1</code> release for the <code>iPhone14,2</code> device</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">ipsw download ota --version 14.8.1 --device iPhone10,1
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ota --version 14.8.1 --device iPhone10,1
 
 ? You are about to download <span class="m">1</span> OTA files. Continue? Yes
    • Getting OTA               <span class="nv">build</span><span class="o">=</span>18H107 <span class="nv">device</span><span class="o">=</span>iPhone10,1 <span class="nv">version</span><span class="o">=</span>iOS1481Short
 	280.0 MiB / 3.7 GiB <span class="o">[===</span>&gt;------------------------------------------------------<span class="p">|</span> 51m18s <span class="o">]</span>  1.15 MiB/s
-</code></pre></div><p>Download <strong>iOS15.2 developer beta</strong> OTA</p>
+</code></pre></div><p>Download iOS <code>15.2</code> developer <strong>beta</strong> OTA</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ota --device iPhone12,3 --beta
 
 ? You are about to download <span class="m">1</span> OTA files. Continue? Yes
@@ -470,7 +470,7 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
       • Decompressing Kernelcache
       • Kernelcache is LZFSE compressed
       • Writing <span class="s2">&#34;iPod9,1_N112AP_17F5054h/kernelcache.beta&#34;</span>
-</code></pre></div><p>You just plucked the <code>kernelcache</code> AND THE MUTHA FLIPPIN' <code>dyld_shared_cache</code> remotly out of a OTA&hellip; ARE YOU NOT ENTERTAINED?!?!!? 😎</p>
+</code></pre></div><p>You just plucked the <code>kernelcache</code> AND THE MUTHA FLIPPIN' <code>dyld_shared_cache</code> remotely out of a OTA&hellip; ARE YOU NOT ENTERTAINED?!?!!? 😎</p>
 <h2 id="download-macos"><strong>download macos</strong></h2>
 <p>List macOS installers</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download macos --list
