@@ -318,7 +318,7 @@ Download the OTA `14.8.1` release for the `iPhone14,2` device
 	280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s ]  1.15 MiB/s
 ```
 
-Download **iOS15.2 developer beta** OTA
+Download iOS `15.2` developer **beta** OTA
 
 ```bash
 ❯ ipsw download ota --device iPhone12,3 --beta
@@ -353,7 +353,7 @@ Just download the _kernelcache_ and _dyld_shared_cache_
       • Writing "iPod9,1_N112AP_17F5054h/kernelcache.beta"
 ```
 
-You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` remotly out of a OTA... ARE YOU NOT ENTERTAINED?!?!!? 😎
+You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` remotely out of a OTA... ARE YOU NOT ENTERTAINED?!?!!? 😎
 
 ## **download macos**
 
