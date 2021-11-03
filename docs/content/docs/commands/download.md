@@ -109,6 +109,17 @@ Download ALL the iOS 12.0 ipsws
   ...
 ```
 
+Download **latest** `macOS` ipsws
+
+```bash
+❯ ipsw download ipsw --macos --latest -y
+
+   • Latest release found is: 11.6
+   • Getting IPSW              build=20G165 device=Macmini9,1 signed=true version=11.6
+	288.6 MiB / 13.0 GiB [>---------------------------------------------------------| 3h30m57s ]  1.03 MiB/s
+  ...
+```
+
 Debug speed issues
 
 ```bash
