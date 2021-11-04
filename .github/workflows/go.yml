@@ -294,14 +294,14 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw macho info ~/.ipsw/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
-      #
-      # ENT CMD (macOS)
-      #
-      - name: Run ents
-        if: matrix.platform == 'macos-11'
-        run: |
-          export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw ent *.ipsw --ent platform-application
+      # #
+      # # ENT CMD (macOS)
+      # #
+      # - name: Run ents
+      #   if: matrix.platform == 'macos-11'
+      #   run: |
+      #     export PATH=$PWD/build/dist:$PATH
+      #     cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw ent *.ipsw --ent platform-application
       #
       # INFO CMD (macOS)
       #
