@@ -39,6 +39,7 @@ func init() {
 	rootCmd.AddCommand(otaCmd)
 
 	otaCmd.Flags().BoolP("info", "i", false, "Display OTA Info")
+	// otaCmd.Flags().BoolP("single", "s", false, "Stop after first match") TODO: impliment this
 	otaCmd.MarkZshCompPositionalArgumentFile(1, "*.zip")
 }
 
