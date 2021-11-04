@@ -13,9 +13,9 @@ build-deps: ## Install the build dependencies
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
 	$(GO_BIN) install golang.org/x/tools/...@latest
-	$(GO_BIN) get -u github.com/spf13/cobra/cobra
-	$(GO_BIN) get -u golang.org/x/tools/cmd/cover
-	$(GO_BIN) get -u github.com/caarlos0/svu
+	$(GO_BIN) get install github.com/spf13/cobra/cobra
+	$(GO_BIN) get install golang.org/x/tools/cmd/cover
+	$(GO_BIN) get install github.com/caarlos0/svu@v1.4.1
 
 .PHONY: setup
 setup: build-deps dev-deps ## Install all the build and dev dependencies
