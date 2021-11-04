@@ -54,9 +54,11 @@ See if `dyld` is in the OTA files
 #### Extract file(s) from OTA payloads
 
 ```bash
-❯ ipsw ota OTA.zip dyld_shared_cache
-   • Extracting dyld_shared_cache...
-      • Extracting -rwxr-xr-x uid=0, gid=80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e
+❯ ipsw ota test-caches/30f4510f7fa8e1ecfb8d137f6081a8691cfc28b5.zip '^System/Library/.*/dyld_shared_cache.*$'
+   • Extracting ^System/Library/.*/dyld_shared_cache.*$...
+      • Extracting -rwxr-xr-x   1.5 GB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e
+      • Extracting -rwxr-xr-x   787 MB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.1 to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e.1
+      • Extracting -rwxr-xr-x   480 MB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.symbols to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e.symbols
 ```
 
-**NOTE:** you can supply a pattern/substring to match
+**NOTE:** you can supply a regex to match *(see `re_format(7)`)*

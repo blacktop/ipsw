@@ -21,9 +21,11 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/bom"
 	"github.com/dustin/go-humanize"
+	"golang.org/x/sys/execabs"
 
 	"github.com/pkg/errors"
 	"github.com/ulikunitz/xz"
+	// "github.com/blacktop/xz"
 	// "github.com/therootcompany/xz"
 )
 
@@ -106,6 +108,12 @@ func sortFileBySize(files []*zip.File) {
 	})
 }
 
+func sortFileByNameAscend(files []*zip.File) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name < files[j].Name
+	})
+}
+
 // List lists the files in the ota payloads
 func List(otaZIP string) ([]os.FileInfo, error) {
 
@@ -123,31 +131,31 @@ func RemoteList(zr *zip.Reader) ([]os.FileInfo, error) {
 	return parseBOM(zr)
 }
 
-// TODO: maybe remove this as exec-ing is kinda gross
-// func NewXZReader(r io.Reader) (io.ReadCloser, error) {
-// 	if _, err := execabs.LookPath("xz"); err != nil {
-// 		xr, err := xz.NewReader(r, 0)
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		return ioutil.NopCloser(xr), nil
-// 	}
+// NewXZReader uses the xz command to extract the Apple Archives (xz streams) or falls back to the pure Golang xz decompression lib
+func NewXZReader(r io.Reader) (io.ReadCloser, error) {
+	if _, err := execabs.LookPath("xz"); err != nil {
+		xr, err := xz.NewReader(r)
+		if err != nil {
+			return nil, err
+		}
+		return ioutil.NopCloser(xr), nil
+	}
 
-// 	rpipe, wpipe := io.Pipe()
-// 	var errb bytes.Buffer
-// 	cmd := execabs.Command("xz", "--decompress", "--stdout")
-// 	cmd.Stdin = r
-// 	cmd.Stdout = wpipe
-// 	cmd.Stderr = &errb
-// 	go func() {
-// 		err := cmd.Run()
-// 		if err != nil && errb.Len() != 0 {
-// 			err = errors.New(strings.TrimRight(errb.String(), "\r\n"))
-// 		}
-// 		wpipe.CloseWithError(err)
-// 	}()
-// 	return rpipe, nil
-// }
+	rpipe, wpipe := io.Pipe()
+	var errb bytes.Buffer
+	cmd := execabs.Command("xz", "--decompress", "--stdout")
+	cmd.Stdin = r
+	cmd.Stdout = wpipe
+	cmd.Stderr = &errb
+	go func() {
+		err := cmd.Run()
+		if err != nil && errb.Len() != 0 {
+			err = errors.New(strings.TrimRight(errb.String(), "\r\n"))
+		}
+		wpipe.CloseWithError(err)
+	}()
+	return rpipe, nil
+}
 
 func parseBOM(zr *zip.Reader) ([]os.FileInfo, error) {
 	var validPostBOM = regexp.MustCompile(`post.bom$`)
@@ -404,25 +412,29 @@ func RemoteExtract(zr *zip.Reader, extractPattern, destPath string) error {
 	}
 	folder = filepath.Join(destPath, folder)
 
-	sortFileBySize(zr.File)
+	// sortFileBySize(zr.File)
+	sortFileByNameAscend(zr.File)
 
+	found := false
 	for _, f := range zr.File {
 		if validPayload.MatchString(f.Name) {
 			utils.Indent(log.WithFields(log.Fields{
 				"filename": f.Name,
 				"size":     humanize.Bytes(f.UncompressedSize64),
 			}).Debug, 2)("Processing OTA payload")
-			found, err := Parse(f, folder, extractPattern)
+			goteet, err := Parse(f, folder, extractPattern)
 			if err != nil {
 				log.Error(err.Error())
 			}
-			if found {
-				return nil
+			if goteet {
+				found = true
 			}
 		}
 	}
-
-	return fmt.Errorf("dyld_shared_cache not found")
+	if found {
+		return nil
+	}
+	return fmt.Errorf("%s not found", extractPattern)
 }
 
 func parsePayload(zr *zip.Reader, extractPattern string) error {
@@ -433,29 +445,87 @@ func parsePayload(zr *zip.Reader, extractPattern string) error {
 		return err
 	}
 
-	sortFileBySize(zr.File)
+	// sortFileBySize(zr.File)
+	sortFileByNameAscend(zr.File)
 
+	found := false
 	for _, f := range zr.File {
 		if validPayload.MatchString(f.Name) {
 			utils.Indent(log.WithFields(log.Fields{
 				"filename": f.Name,
 				"size":     humanize.Bytes(f.UncompressedSize64),
 			}).Debug, 2)("Processing OTA payload")
-			found, err := Parse(f, folder, extractPattern)
+			goteet, err := Parse(f, folder, extractPattern)
 			if err != nil {
 				log.Error(err.Error())
 			}
-			if found {
-				return nil
+			if goteet {
+				found = true
 			}
 		}
 	}
-
+	if found {
+		return nil
+	}
 	return fmt.Errorf("no files matched: %s", extractPattern)
 }
 
 // Parse parses a ota payload file inside the zip
 func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
+
+	if aaPath, err := execabs.LookPath("aa"); err == nil {
+		// make tmp folder
+		dir, err := ioutil.TempDir("", "ota_"+filepath.Base(payload.Name))
+		if err != nil {
+			return false, fmt.Errorf("failed to create tmp folder: %v", err)
+		}
+		defer os.RemoveAll(dir)
+
+		rc, err := payload.Open()
+		if err != nil {
+			return false, fmt.Errorf("failed to open file in zip %s: %v", payload.Name, err)
+		}
+		defer rc.Close()
+
+		var errb bytes.Buffer
+		cmd := execabs.Command(aaPath, "extract", "-d", dir, "-include-regex", extractPattern)
+		cmd.Stdin = rc
+		err = cmd.Run()
+		if err != nil && errb.Len() != 0 {
+			err = errors.New(strings.TrimRight(errb.String(), "\r\n"))
+			return false, err
+		}
+
+		// Is folder empty
+		ff, err := os.ReadDir(dir)
+		if err != nil {
+			return false, fmt.Errorf("failed to create tmp folder: %v", err)
+		}
+		if len(ff) == 0 {
+			return false, nil
+		}
+
+		err = filepath.Walk(dir, func(path string, f os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !f.IsDir() {
+				os.Mkdir(folder, os.ModePerm)
+				fname := filepath.Join(folder, filepath.Base(f.Name()))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s\t%s\t%s to %s", f.Mode(), humanize.Bytes(uint64(f.Size())), strings.TrimPrefix(path, dir), fname))
+				err = os.Rename(path, fname)
+				if err != nil {
+					return fmt.Errorf("failed to mv file %s to %s: %v", strings.TrimPrefix(path, dir), fname, err)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return false, fmt.Errorf("failed to read files in tmp folder: %v", err)
+		}
+
+		return true, nil
+	}
 
 	pData := make([]byte, payload.UncompressedSize64)
 
@@ -491,13 +561,13 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 			return false, err
 		}
 
-		xr, err := xz.NewReader(bytes.NewReader(xzChunkBuf))
+		// xr, err := xz.NewReader(bytes.NewReader(xzChunkBuf))
 		// xr, err := xz.NewReader(bytes.NewReader(xzChunkBuf), 0)
-		// xr, err := NewXZReader(bytes.NewReader(xzChunkBuf))
+		xr, err := NewXZReader(bytes.NewReader(xzChunkBuf))
 		if err != nil {
 			return false, err
 		}
-		// defer xr.Close()
+		defer xr.Close()
 
 		io.Copy(xzBuf, xr)
 
@@ -583,7 +653,8 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 		}
 
 		if len(extractPattern) > 0 {
-			if strings.Contains(strings.ToLower(string(ent.Path)), strings.ToLower(extractPattern)) {
+			match, _ := regexp.MatchString(extractPattern, ent.Path)
+			if match || strings.Contains(strings.ToLower(string(ent.Path)), strings.ToLower(extractPattern)) {
 				fileBytes := make([]byte, ent.Size)
 				if err := binary.Read(rr, binary.LittleEndian, &fileBytes); err != nil {
 					if err == io.EOF {

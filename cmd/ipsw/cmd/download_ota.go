@@ -250,7 +250,7 @@ var otaDLCmd = &cobra.Command{
 					}
 					if remoteDyld {
 						log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
-						err = ota.RemoteExtract(zr, "dyld_shared_cache_arm", destPath)
+						err = ota.RemoteExtract(zr, "^System/Library/.*/dyld_shared_cache.*$", destPath)
 						if err != nil {
 							return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
 						}
