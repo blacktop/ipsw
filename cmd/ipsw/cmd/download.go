@@ -37,6 +37,8 @@ type downloadFlags struct {
 	Insecure     bool
 	Confirm      bool
 	SkipAll      bool
+	ResumeAll    bool
+	RestartAll   bool
 	RemoveCommas bool
 
 	WhiteList []string
@@ -56,8 +58,8 @@ func init() {
 	downloadCmd.PersistentFlags().BoolVar(&dFlg.Insecure, "insecure", false, "do not verify ssl certs")
 	downloadCmd.PersistentFlags().BoolVarP(&dFlg.Confirm, "confirm", "y", false, "do not prompt user for confirmation")
 	downloadCmd.PersistentFlags().BoolVar(&dFlg.SkipAll, "skip-all", false, "always skip resumable IPSWs")
-	downloadCmd.PersistentFlags().BoolVar(&dFlg.SkipAll, "resume-all", false, "always resume resumable IPSWs")
-	downloadCmd.PersistentFlags().BoolVar(&dFlg.SkipAll, "restart-all", false, "always restart resumable IPSWs")
+	downloadCmd.PersistentFlags().BoolVar(&dFlg.ResumeAll, "resume-all", false, "always resume resumable IPSWs")
+	downloadCmd.PersistentFlags().BoolVar(&dFlg.RestartAll, "restart-all", false, "always restart resumable IPSWs")
 	downloadCmd.PersistentFlags().BoolVarP(&dFlg.RemoveCommas, "remove-commas", "_", false, "replace commas in IPSW filename with underscores")
 	viper.BindPFlag("download.proxy", downloadCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("download.insecure", downloadCmd.Flags().Lookup("insecure"))
@@ -91,6 +93,8 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 	viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
 	viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
 	viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
 	viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
 	viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
 	viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
