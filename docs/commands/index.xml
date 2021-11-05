@@ -44,15 +44,6 @@
     </item>
     
     <item>
-      <title>lipo</title>
-      <link>https://blacktop.github.io/ipsw/docs/commands/lipo/</link>
-      <pubDate>Mon, 12 Apr 2021 14:14:22 -0400</pubDate>
-      
-      <guid>https://blacktop.github.io/ipsw/docs/commands/lipo/</guid>
-      <description>Extract file from Universal/FAT MachO.</description>
-    </item>
-    
-    <item>
       <title>kernel</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/kernel/</link>
       <pubDate>Sun, 26 Jan 2020 09:17:30 -0500</pubDate>
@@ -149,15 +140,6 @@
       
       <guid>https://blacktop.github.io/ipsw/docs/commands/iboot/</guid>
       <description>Parse iboot files.</description>
-    </item>
-    
-    <item>
-      <title>ctfdump</title>
-      <link>https://blacktop.github.io/ipsw/docs/commands/ctfdump/</link>
-      <pubDate>Sun, 22 Aug 2021 23:34:02 -0600</pubDate>
-      
-      <guid>https://blacktop.github.io/ipsw/docs/commands/ctfdump/</guid>
-      <description>Dump CTF info.</description>
     </item>
     
     <item>

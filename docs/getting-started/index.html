@@ -131,10 +131,6 @@
     </li>
     
     <li class="">
-      <a href="https://blacktop.github.io/ipsw/docs/commands/lipo/">lipo</a>
-    </li>
-    
-    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
     </li>
     
@@ -179,10 +175,6 @@
     </li>
     
     <li class="">
-      <a href="https://blacktop.github.io/ipsw/docs/commands/ctfdump/">ctfdump</a>
-    </li>
-    
-    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/ent/">ent</a>
     </li>
     
@@ -216,8 +208,8 @@ Usage:
 
 Available Commands:
   device-list     List all iOS devices
-  disass          🚧 <span class="o">[</span>WIP<span class="o">]</span> Disassemble ARM binaries at address or symbol
-  download        Download and parse IPSW<span class="o">(</span>s<span class="o">)</span> from the internets
+  disass          🚧 <span class="o">[</span>WIP<span class="o">]</span> Disassemble ARM64 binaries at address or symbol
+  download        Download Apple Firmware files <span class="o">(</span>and more<span class="o">)</span>
   dtree           Parse DeviceTree
   dyld            Parse dyld_shared_cache
   ent             Search IPSW filesystem DMG <span class="k">for</span> MachOs with a given entitlement
@@ -227,8 +219,7 @@ Available Commands:
   img4            Parse Img4
   info            Display IPSW Info
   kernel          Parse kernelcache
-  lipo            Extract single MachO out of a universal/fat MachO
-  macho           Parse a MachO file
+  macho           Parse MachO
   ota             Extract file<span class="o">(</span>s<span class="o">)</span> from OTA
   sepfw           Dump MachOs
   shsh            Get shsh blobs from device
@@ -237,8 +228,9 @@ Available Commands:
   version         Print the version number of ipsw
 
 Flags:
-  -h, --help      <span class="nb">help</span> <span class="k">for</span> ipsw
-  -V, --verbose   verbose output
+      --config string   config file <span class="o">(</span>default is <span class="nv">$HOME</span>/.ipsw.yaml<span class="o">)</span>
+  -h, --help            <span class="nb">help</span> <span class="k">for</span> ipsw
+  -V, --verbose         verbose output
 
 Use <span class="s2">&#34;ipsw [command] --help&#34;</span> <span class="k">for</span> more information about a command.
 </code></pre></div>
