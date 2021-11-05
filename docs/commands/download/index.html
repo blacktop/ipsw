@@ -640,8 +640,11 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
    • Downloading               <span class="nv">file</span><span class="o">=</span>iPhone11,8,iPhone12,1_15.0_19A5307g_Restore.ipsw
 	6.1 GiB / 6.1 GiB <span class="o">[==========================================================</span><span class="p">|</span> ✅  <span class="o">]</span>  4.15 MiB/s
    &lt;SNIP&gt;
-</code></pre></div><p>Output downloadable items as JSON</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download dev --beta --json --output .
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> This will check every 5 minutes for new files and download them. (I&rsquo;ve seem apple expire the session and am not sure how to prevent it yet.)</p>
+</blockquote>
+<p>Output downloadable items as JSON</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download dev --beta --json --pretty --output .
 ? Please <span class="nb">type</span> your username: blacktop
 ? Please <span class="nb">type</span> your password: ***********************************
 ? Please <span class="nb">type</span> your verification code: ******
@@ -667,10 +670,7 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
             <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;ios&#34;</span>
         <span class="p">},</span>
 <span class="err">&lt;SNIP&gt;</span>
-</code></pre></div><blockquote>
-<p><strong>NOTE:</strong> This will check every 5 minutes for new files and download them. (I&rsquo;ve seem apple expire the session and am not sure how to prevent it yet.)</p>
-</blockquote>
-<h2 id="download-oss"><strong>download oss</strong></h2>
+</code></pre></div><h2 id="download-oss"><strong>download oss</strong></h2>
 <blockquote>
 <p>Download <a href="https://opensource.apple.com">opensource.apple.com</a> file for macOS version</p>
 </blockquote>
