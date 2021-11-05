@@ -453,15 +453,18 @@ Watch for 🆕 **beta** IPSWs
    <SNIP>
 ```
 
+> **NOTE:** This will check every 5 minutes for new files and download them. (I've seem apple expire the session and am not sure how to prevent it yet.)
+
 Output downloadable items as JSON
 
 ```bash
-❯ ipsw download dev --beta --json --output .
+❯ ipsw download dev --beta --json --pretty --output .
 ? Please type your username: blacktop
 ? Please type your password: ***********************************
 ? Please type your verification code: ******
    • Creating dev_portal_beta.json
 ```
+
 ```json
 {
     "Reality Converter beta 3": [
@@ -485,8 +488,6 @@ Output downloadable items as JSON
         },
 <SNIP>
 ```
-
-> **NOTE:** This will check every 5 minutes for new files and download them. (I've seem apple expire the session and am not sure how to prevent it yet.)
 
 ## **download oss**
 
