@@ -68,6 +68,7 @@ type DevConfig struct {
 	RemoveCommas bool
 	PreferSMS    bool
 	PageSize     int
+	Verbose      bool
 }
 
 // App is the app object
@@ -759,7 +760,14 @@ func (app *App) DownloadPrompt(downloadType string) error {
 func (app *App) Download(url string) error {
 
 	// proxy, insecure are null because we override the client below
-	downloader := NewDownload("", false, app.config.SkipAll, app.config.ResumeAll, app.config.RestartAll, true)
+	downloader := NewDownload(
+		app.config.Proxy,
+		app.config.Insecure,
+		app.config.SkipAll,
+		app.config.ResumeAll,
+		app.config.RestartAll,
+		app.config.Verbose,
+	)
 	// use authenticated client
 	downloader.client = app.Client
 
@@ -784,6 +792,34 @@ func (app *App) Download(url string) error {
 	}
 
 	return nil
+}
+
+func (app *App) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
+	isBeta := false
+	switch downloadType {
+	case "beta":
+		isBeta = true
+		fallthrough
+	case "release":
+		ipsws, err := app.getDevDownloads(isBeta)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get developer downloads: %v", err)
+		}
+		if pretty {
+			return json.MarshalIndent(ipsws, "", "    ")
+		}
+		return json.Marshal(ipsws)
+	case "more":
+		dloads, err := app.getDownloads()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
+		}
+		if pretty {
+			return json.MarshalIndent(dloads, "", "    ")
+		}
+		return json.Marshal(dloads)
+	}
+	return nil, fmt.Errorf("unsupported download type: %s", downloadType)
 }
 
 // getDownloads returns all the downloads in "More Downloads" - https://developer.apple.com/download/all/
