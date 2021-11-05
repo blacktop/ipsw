@@ -48,10 +48,9 @@ Usage:
   ipsw [command]
 
 Available Commands:
-  ctfdump         Dump CTF info
   device-list     List all iOS devices
   disass          🚧 [WIP] Disassemble ARM64 binaries at address or symbol
-  download        Download and parse IPSW(s) from the internets
+  download        Download Apple Firmware files (and more)
   dtree           Parse DeviceTree
   dyld            Parse dyld_shared_cache
   ent             Search IPSW filesystem DMG for MachOs with a given entitlement
@@ -61,8 +60,7 @@ Available Commands:
   img4            Parse Img4
   info            Display IPSW Info
   kernel          Parse kernelcache
-  lipo            Extract single MachO out of a universal/fat MachO
-  macho           Parse a MachO file
+  macho           Parse MachO
   ota             Extract file(s) from OTA
   sepfw           Dump MachOs
   shsh            Get shsh blobs from device

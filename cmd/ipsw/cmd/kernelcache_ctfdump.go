@@ -39,11 +39,14 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(ctfdumpCmd)
+	kernelcacheCmd.AddCommand(ctfdumpCmd)
 
+	ctfdumpCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	ctfdumpCmd.Flags().BoolP("pretty", "", false, "Pretty print JSON")
 	ctfdumpCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	ctfdumpCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
+	viper.BindPFlag("kernel.ctfdump.arch", ctfdumpCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("kernel.ctfdump.pretty", ctfdumpCmd.Flags().Lookup("pretty"))
+	viper.BindPFlag("kernel.ctfdump.json", ctfdumpCmd.Flags().Lookup("json"))
 	ctfdumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -60,9 +63,10 @@ var ctfdumpCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
-		outAsJSON, _ := cmd.Flags().GetBool("json")
-		prettyJSON, _ := cmd.Flags().GetBool("pretty")
+		// flags
+		selectedArch := viper.GetString("kernel.ctfdump.arch")
+		prettyJSON := viper.GetBool("kernel.ctfdump.pretty")
+		outAsJSON := viper.GetBool("kernel.ctfdump.json")
 
 		machoPath := filepath.Clean(args[0])
 

@@ -9,6 +9,7 @@ summary: Parse a MachO file
 - [**macho --help**](#macho---help)
 - [**macho a2o**](#macho-a2o)
 - [**macho o2a**](#macho-o2a)
+- [**macho lipo**](#macho-lipo)
 - [**macho dump**](#macho-dump)
 - [**macho info --help**](#macho-info---help)
 - [**macho info -d**](#macho-info--d)
@@ -34,6 +35,7 @@ Available Commands:
   a2o         Convert MachO address to offset
   dump        Dump MachO data at given virtual address
   info        Explore a MachO file
+  lipo        Extract single MachO out of a universal/fat MachO
   o2a         Convert MachO offset to address
 
 Flags:
@@ -63,6 +65,18 @@ Convert MachO offset to address
 ❯ ipsw macho o2a kernelcache 0x007dc000
    • Address                   dec=18446744005115772928 hex=0xfffffff0077e0000 section=__data segment=__DATA
 ```
+
+### **macho lipo**
+
+Extract file from Universal/FAT MachO
+
+```bash
+❯ ipsw macho lipo debugserver
+
+• Extracted ARM64e file as debugserver.arm64e
+```
+
+> **NOTE:** you can supply `--arch arm64e` instead of using the arch picker UI
 
 ### **macho dump**
 
