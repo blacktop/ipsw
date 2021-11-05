@@ -42,13 +42,18 @@ import (
 func init() {
 	machoCmd.AddCommand(machoDumpCmd)
 
-	machoDumpCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
+	machoDumpCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	machoDumpCmd.Flags().Uint64P("size", "s", 0, "Size of data in bytes")
 	machoDumpCmd.Flags().Uint64P("count", "c", 0, "The number of total items to display")
-
 	machoDumpCmd.Flags().BoolP("addr", "v", false, "Output as addresses/uint64s")
 	machoDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
 	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
+	viper.BindPFlag("macho.dump.arch", machoDumpCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("macho.dump.size", machoDumpCmd.Flags().Lookup("size"))
+	viper.BindPFlag("macho.dump.count", machoDumpCmd.Flags().Lookup("count"))
+	viper.BindPFlag("macho.dump.addr", machoDumpCmd.Flags().Lookup("addr"))
+	viper.BindPFlag("macho.dump.hex", machoDumpCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("macho.dump.output", machoDumpCmd.Flags().Lookup("output"))
 	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -66,14 +71,13 @@ var machoDumpCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
-
-		size, _ := cmd.Flags().GetUint64("size")
-		count, _ := cmd.Flags().GetUint64("count")
-
-		asAddrs, _ := cmd.Flags().GetBool("addr")
-		asHex, _ := cmd.Flags().GetBool("hex")
-		outFile, _ := cmd.Flags().GetString("output")
+		// flags
+		selectedArch := viper.GetString("macho.dump.arch")
+		size := viper.GetUint64("macho.dump.size")
+		count := viper.GetUint64("macho.dump.count")
+		asAddrs := viper.GetBool("macho.dump.addr")
+		asHex := viper.GetBool("macho.dump.hex")
+		outFile := viper.GetString("macho.dump.output")
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")
