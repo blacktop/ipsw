@@ -280,7 +280,7 @@ func (app *App) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
 	req.Header.Set("Scnt", app.config.SCNT)
 
-	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
+	req.Header.Add("User-Agent", "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8")
 }
 
 func (app *App) getITCServiceKey() error {
