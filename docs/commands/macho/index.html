@@ -131,10 +131,6 @@
     </li>
     
     <li class="">
-      <a href="https://blacktop.github.io/ipsw/docs/commands/lipo/">lipo</a>
-    </li>
-    
-    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/kernel/">kernel</a>
     </li>
     
@@ -179,10 +175,6 @@
     </li>
     
     <li class="">
-      <a href="https://blacktop.github.io/ipsw/docs/commands/ctfdump/">ctfdump</a>
-    </li>
-    
-    <li class="">
       <a href="https://blacktop.github.io/ipsw/docs/commands/ent/">ent</a>
     </li>
     
@@ -211,6 +203,7 @@
 <li><a href="#macho---help"><strong>macho &ndash;help</strong></a></li>
 <li><a href="#macho-a2o"><strong>macho a2o</strong></a></li>
 <li><a href="#macho-o2a"><strong>macho o2a</strong></a></li>
+<li><a href="#macho-lipo"><strong>macho lipo</strong></a></li>
 <li><a href="#macho-dump"><strong>macho dump</strong></a></li>
 <li><a href="#macho-info---help"><strong>macho info &ndash;help</strong></a></li>
 <li><a href="#macho-info--d"><strong>macho info -d</strong></a></li>
@@ -234,6 +227,7 @@ Available Commands:
   a2o         Convert MachO address to offset
   dump        Dump MachO data at given virtual address
   info        Explore a MachO file
+  lipo        Extract single MachO out of a universal/fat MachO
   o2a         Convert MachO offset to address
 
 Flags:
@@ -252,7 +246,15 @@ Use <span class="s2">&#34;ipsw macho [command] --help&#34;</span> <span class="k
 <p>Convert MachO offset to address</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho o2a kernelcache 0x007dc000
    • Address                   <span class="nv">dec</span><span class="o">=</span><span class="m">18446744005115772928</span> <span class="nv">hex</span><span class="o">=</span>0xfffffff0077e0000 <span class="nv">section</span><span class="o">=</span>__data <span class="nv">segment</span><span class="o">=</span>__DATA
-</code></pre></div><h3 id="macho-dump"><strong>macho dump</strong></h3>
+</code></pre></div><h3 id="macho-lipo"><strong>macho lipo</strong></h3>
+<p>Extract file from Universal/FAT MachO</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho lipo debugserver
+
+• Extracted ARM64e file as debugserver.arm64e
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> you can supply <code>--arch arm64e</code> instead of using the arch picker UI</p>
+</blockquote>
+<h3 id="macho-dump"><strong>macho dump</strong></h3>
 <p>First print the MachO header for <code>kernelcache</code></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info kernelcache <span class="p">|</span> grep __DATA_CONST.__mod_init_func
         <span class="nv">sz</span><span class="o">=</span>0x00000290 <span class="nv">off</span><span class="o">=</span>0x000b0000-0x000b0290 <span class="nv">addr</span><span class="o">=</span>0xfffffff0070b4000-0xfffffff0070b4290              __DATA_CONST.__mod_init_func     <span class="o">(</span>ModInitFuncPointers<span class="o">)</span>
