@@ -444,13 +444,46 @@ Download IPSWs (and more) from https://developer.apple.com/download
 Watch for 🆕 **beta** IPSWs
 
 ```bash
-ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
+❯ ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
 ? Please type your username: blacktop
 ? Please type your password: ***********************************
 ? Please type your verification code: ******
    • Downloading               file=iPhone11,8,iPhone12,1_15.0_19A5307g_Restore.ipsw
 	6.1 GiB / 6.1 GiB [==========================================================| ✅  ]  4.15 MiB/s
    <SNIP>
+```
+
+Output downloadable items as JSON
+
+```bash
+❯ ipsw download dev --beta --json --output .
+? Please type your username: blacktop
+? Please type your password: ***********************************
+? Please type your verification code: ******
+   • Creating dev_portal_beta.json
+```
+```json
+{
+    "Reality Converter beta 3": [
+        {
+            "url": "https://developer.apple.com/services-account/download?path=/Applications/Reality_Converter_beta_3/Reality_Converter_beta_3.dmg",
+            "type": "app"
+        }
+    ],
+    "Xcode 13.2 beta": [
+        {
+            "url": "https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_13.2_beta/Xcode_13.2_beta.xip",
+            "type": "app"
+        }
+    ],
+    "iOS 15.2 beta": [
+        {
+            "title": "iPhone 13",
+            "build": "19C5026i",
+            "url": "https://updates.cdn-apple.com/2021FallSeed/fullrestores/002-19786/01936A50-C316-4261-BA24-62EBAF5F1236/iPhone14,5_15.2_19C5026i_Restore.ipsw",
+            "type": "ios"
+        },
+<SNIP>
 ```
 
 > **NOTE:** This will check every 5 minutes for new files and download them. (I've seem apple expire the session and am not sure how to prevent it yet.)
