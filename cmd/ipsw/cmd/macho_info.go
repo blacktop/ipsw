@@ -44,7 +44,7 @@ import (
 func init() {
 	machoCmd.AddCommand(machoInfoCmd)
 
-	machoInfoCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
+	machoInfoCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	machoInfoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
 	machoInfoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
 	machoInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
@@ -55,9 +55,22 @@ func init() {
 	machoInfoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
 	machoInfoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	machoInfoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
-	machoInfoCmd.Flags().StringP("fileset-entry", "t", viper.GetString("IPSW_FILESET_ENTRY"), "Which fileset entry to analyze")
+	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
 	machoInfoCmd.MarkZshCompPositionalArgumentFile(1)
+	viper.BindPFlag("macho.info.arch", machoInfoCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("macho.info.header", machoInfoCmd.Flags().Lookup("header"))
+	viper.BindPFlag("macho.info.loads", machoInfoCmd.Flags().Lookup("loads"))
+	viper.BindPFlag("macho.info.sig", machoInfoCmd.Flags().Lookup("sig"))
+	viper.BindPFlag("macho.info.ent", machoInfoCmd.Flags().Lookup("ent"))
+	viper.BindPFlag("macho.info.objc", machoInfoCmd.Flags().Lookup("objc"))
+	viper.BindPFlag("macho.info.objc-refs", machoInfoCmd.Flags().Lookup("objc-refs"))
+	viper.BindPFlag("macho.info.symbols", machoInfoCmd.Flags().Lookup("symbols"))
+	viper.BindPFlag("macho.info.starts", machoInfoCmd.Flags().Lookup("starts"))
+	viper.BindPFlag("macho.info.strings", machoInfoCmd.Flags().Lookup("strings"))
+	viper.BindPFlag("macho.info.fixups", machoInfoCmd.Flags().Lookup("fixups"))
+	viper.BindPFlag("macho.info.fileset-entry", machoInfoCmd.Flags().Lookup("fileset-entry"))
+	viper.BindPFlag("macho.info.extract-fileset-entry", machoInfoCmd.Flags().Lookup("extract-fileset-entry"))
 }
 
 // machoInfoCmd represents the macho command
@@ -75,19 +88,20 @@ var machoInfoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
-		showHeader, _ := cmd.Flags().GetBool("header")
-		showLoadCommands, _ := cmd.Flags().GetBool("loads")
-		showSignature, _ := cmd.Flags().GetBool("sig")
-		showEntitlements, _ := cmd.Flags().GetBool("ent")
-		showObjC, _ := cmd.Flags().GetBool("objc")
-		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
-		showSymbols, _ := cmd.Flags().GetBool("symbols")
-		showFuncStarts, _ := cmd.Flags().GetBool("starts")
-		dumpStrings, _ := cmd.Flags().GetBool("strings")
-		showFixups, _ := cmd.Flags().GetBool("fixups")
-		filesetEntry, _ := cmd.Flags().GetString("fileset-entry")
-		extractfilesetEntry, _ := cmd.Flags().GetBool("extract-fileset-entry")
+		// flags
+		selectedArch := viper.GetString("macho.info.arch")
+		showHeader := viper.GetBool("macho.info.header")
+		showLoadCommands := viper.GetBool("macho.info.loads")
+		showSignature := viper.GetBool("macho.info.sig")
+		showEntitlements := viper.GetBool("macho.info.ent")
+		showObjC := viper.GetBool("macho.info.objc")
+		showObjcRefs := viper.GetBool("macho.info.objc-refs")
+		showSymbols := viper.GetBool("macho.info.symbols")
+		showFuncStarts := viper.GetBool("macho.info.starts")
+		dumpStrings := viper.GetBool("macho.info.strings")
+		showFixups := viper.GetBool("macho.info.fixups")
+		filesetEntry := viper.GetString("macho.info.fileset-entry")
+		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
 
 		if len(filesetEntry) == 0 && extractfilesetEntry {
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")

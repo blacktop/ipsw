@@ -36,9 +36,10 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(lipoCmd)
+	machoCmd.AddCommand(lipoCmd)
 
-	lipoCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
+	lipoCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
+	viper.BindPFlag("macho.lipo.arch", lipoCmd.Flags().Lookup("arch"))
 	lipoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -55,7 +56,8 @@ var lipoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
+		// flags
+		selectedArch := viper.GetString("macho.lipo.arch")
 
 		machoPath := filepath.Clean(args[0])
 

@@ -37,9 +37,12 @@ import (
 func init() {
 	machoCmd.AddCommand(machoO2aCmd)
 
-	machoO2aCmd.Flags().StringP("arch", "a", viper.GetString("IPSW_ARCH"), "Which architecture to use for fat/universal MachO")
+	machoO2aCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	machoO2aCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
 	machoO2aCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
+	viper.BindPFlag("macho.o2a.arch", machoO2aCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("macho.o2a.dec", machoO2aCmd.Flags().Lookup("dec"))
+	viper.BindPFlag("macho.o2a.hex", machoO2aCmd.Flags().Lookup("hex"))
 	machoO2aCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -57,10 +60,10 @@ var machoO2aCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		selectedArch, _ := cmd.Flags().GetString("arch")
-
-		inDec, _ := cmd.Flags().GetBool("dec")
-		inHex, _ := cmd.Flags().GetBool("hex")
+		// flags
+		selectedArch := viper.GetString("macho.o2a.arch")
+		inDec := viper.GetBool("macho.o2a.dec")
+		inHex := viper.GetBool("macho.o2a.hex")
 
 		if inDec && inHex {
 			return fmt.Errorf("you can only use --dec OR --hex")
