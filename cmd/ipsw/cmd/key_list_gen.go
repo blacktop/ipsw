@@ -48,8 +48,6 @@ var keyListGenCmd = &cobra.Command{
 			return err
 		}
 		return ioutil.WriteFile(filepath.Clean(args[0]), keysJSON, 0644)
-
-		return nil
 	},
 }
 

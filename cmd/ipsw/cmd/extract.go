@@ -233,10 +233,7 @@ var extractCmd = &cobra.Command{
 			if dmgFlag {
 				log.Info("Extracting File System DMG")
 				_, err = utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
-					if strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg()) {
-						return true
-					}
-					return false
+					return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
 				})
 				if err != nil {
 					return fmt.Errorf("failed extract %s from ipsw: %v", i.GetOsDmg(), err)
