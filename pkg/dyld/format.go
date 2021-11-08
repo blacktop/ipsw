@@ -264,20 +264,16 @@ func (f *File) getMaxSlide(uuid types.UUID) string {
 func (f *File) getSubCacheInfo() string {
 	var output string
 	if f.IsDyld4 {
-		if f.Headers[f.UUID].SubCachesUUID > 0 {
-			var symSCUUID string
-			if !f.Headers[f.UUID].SymbolsSubCacheUUID.IsNull() {
-				symSCUUID = fmt.Sprintf("Symbol Cache UUID = %s\n", f.Headers[f.UUID].SymbolsSubCacheUUID)
-			}
-			output = fmt.Sprintf(
-				"Num SubCaches     = %d\n"+
-					"SubCache Group ID = %#x\n"+
-					"%s",
-				f.Headers[f.UUID].NumSubCaches,
-				f.Headers[f.UUID].SubCachesUUID,
-				symSCUUID,
-			)
+		var symSCUUID string
+		if !f.Headers[f.UUID].SymbolsSubCacheUUID.IsNull() {
+			symSCUUID = fmt.Sprintf("Symbol Cache UUID = %s\n", f.Headers[f.UUID].SymbolsSubCacheUUID)
 		}
+		output = fmt.Sprintf(
+			"Num SubCaches     = %d\n"+
+				"%s",
+			f.Headers[f.UUID].NumSubCaches,
+			symSCUUID,
+		)
 	}
 	return output
 }

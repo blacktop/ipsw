@@ -139,7 +139,7 @@ type CacheHeader struct {
 	Unknown9                          uint32
 	NewFieldOffset                    uint64
 	NewFieldSize                      uint64
-	SubCachesUUID                     uint32
+	SubCachesInfoOffset               uint32
 	NumSubCaches                      uint32     // number of dyld_shared_cache .1,.2,.3 files
 	SymbolsSubCacheUUID               types.UUID // unique value for .symbols sub-cache
 	IsZero1                           uint64
@@ -588,6 +588,11 @@ func (p CachePatchableLocation) String() string {
 		pStr = fmt.Sprintf("offset: 0x%08x", p.CacheOffset())
 	}
 	return pStr
+}
+
+type SubCacheInfo struct {
+	UUID      types.UUID
+	TotalSize uint64
 }
 
 type CacheExportFlag int
