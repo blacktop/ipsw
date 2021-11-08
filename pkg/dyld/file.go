@@ -68,8 +68,9 @@ type File struct {
 
 	AddressToSymbol map[uint64]string
 
-	IsDyld4 bool
-	symUUID mtypes.UUID
+	IsDyld4      bool
+	SubCacheInfo []SubCacheInfo
+	symUUID      mtypes.UUID
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
@@ -148,11 +149,11 @@ func Open(name string) (*File, error) {
 
 			ff.closers[uuid] = fsub
 
-			// if ff.Headers[uuid].SubCachesUUID != ff.Headers[ff.UUID].SubCachesUUID { FIXME: what IS this field actually?
-			// 	return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
-			// 		ff.Headers[ff.UUID].SubCachesUUID,
-			// 		ff.Headers[uuid].SubCachesUUID)
-			// }
+			if ff.Headers[uuid].UUID != ff.SubCacheInfo[i-1].UUID {
+				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
+					ff.SubCacheInfo[i].UUID,
+					ff.Headers[uuid].UUID)
+			}
 		}
 
 		if !ff.Headers[ff.UUID].SymbolsSubCacheUUID.IsNull() {
@@ -289,7 +290,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	f.Headers[uuid] = hdr
 
 	// Read dyld mappings.
-	sr.Seek(int64(f.Headers[uuid].MappingOffset), os.SEEK_SET)
+	sr.Seek(int64(f.Headers[uuid].MappingOffset), io.SeekStart)
 
 	for i := uint32(0); i != f.Headers[uuid].MappingCount; i++ {
 		cmInfo := CacheMappingInfo{}
@@ -320,7 +321,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		}, false)
 	} else {
 		// Read NEW (in iOS 14) dyld mappings with slide info.
-		sr.Seek(int64(f.Headers[uuid].MappingWithSlideOffset), os.SEEK_SET)
+		sr.Seek(int64(f.Headers[uuid].MappingWithSlideOffset), io.SeekStart)
 		for i := uint32(0); i != f.Headers[uuid].MappingWithSlideCount; i++ {
 			cxmInfo := CacheMappingAndSlideInfo{}
 			if err := binary.Read(sr, f.ByteOrder, &cxmInfo); err != nil {
@@ -358,10 +359,10 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	var imagesCount uint32
 	if f.Headers[uuid].ImagesOffset > 0 {
 		imagesCount = f.Headers[uuid].ImagesCount
-		sr.Seek(int64(f.Headers[uuid].ImagesOffset), os.SEEK_SET)
+		sr.Seek(int64(f.Headers[uuid].ImagesOffset), io.SeekStart)
 	} else {
 		imagesCount = f.Headers[uuid].ImagesWithSubCachesCount
-		sr.Seek(int64(f.Headers[uuid].ImagesWithSubCachesOffset), os.SEEK_SET)
+		sr.Seek(int64(f.Headers[uuid].ImagesWithSubCachesOffset), io.SeekStart)
 	}
 
 	if len(f.Images) == 0 {
@@ -377,7 +378,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			})
 		}
 		for idx, image := range f.Images {
-			sr.Seek(int64(image.Info.PathFileOffset), os.SEEK_SET)
+			sr.Seek(int64(image.Info.PathFileOffset), io.SeekStart)
 			r := bufio.NewReader(sr)
 			if name, err := r.ReadString(byte(0)); err == nil {
 				f.Images[idx].Name = fmt.Sprintf("%s", bytes.Trim([]byte(name), "\x00"))
@@ -394,7 +395,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 
 	// Read dyld code signature.
-	sr.Seek(int64(f.Headers[uuid].CodeSignatureOffset), os.SEEK_SET)
+	sr.Seek(int64(f.Headers[uuid].CodeSignatureOffset), io.SeekStart)
 
 	cs := make([]byte, f.Headers[uuid].CodeSignatureSize)
 	if err := binary.Read(sr, f.ByteOrder, &cs); err != nil {
@@ -409,7 +410,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	// Read dyld local symbol entries.
 	if f.Headers[uuid].LocalSymbolsOffset != 0 {
-		sr.Seek(int64(f.Headers[uuid].LocalSymbolsOffset), os.SEEK_SET)
+		sr.Seek(int64(f.Headers[uuid].LocalSymbolsOffset), io.SeekStart)
 
 		if err := binary.Read(sr, f.ByteOrder, &f.LocalSymInfo.CacheLocalSymbolsInfo); err != nil {
 			return err
@@ -423,7 +424,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		f.LocalSymInfo.NListFileOffset = uint32(f.Headers[uuid].LocalSymbolsOffset) + f.LocalSymInfo.NlistOffset
 		f.LocalSymInfo.StringsFileOffset = uint32(f.Headers[uuid].LocalSymbolsOffset) + f.LocalSymInfo.StringsOffset
 
-		sr.Seek(int64(f.Headers[uuid].LocalSymbolsOffset+uint64(f.LocalSymInfo.EntriesOffset)), os.SEEK_SET)
+		sr.Seek(int64(f.Headers[uuid].LocalSymbolsOffset+uint64(f.LocalSymInfo.EntriesOffset)), io.SeekStart)
 
 		for i := 0; i < int(f.LocalSymInfo.EntriesCount); i++ {
 			// if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
@@ -460,7 +461,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	// Read dyld branch pool.
 	if f.Headers[uuid].BranchPoolsOffset != 0 {
-		sr.Seek(int64(f.Headers[uuid].BranchPoolsOffset), os.SEEK_SET)
+		sr.Seek(int64(f.Headers[uuid].BranchPoolsOffset), io.SeekStart)
 
 		var bPools []uint64
 		bpoolBytes := make([]byte, 8)
@@ -478,30 +479,30 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		for _, mapping := range f.Mappings[uuid] {
 			if mapping.Address <= f.Headers[uuid].AccelerateInfoAddr && f.Headers[uuid].AccelerateInfoAddr < mapping.Address+mapping.Size {
 				accelInfoPtr := int64(f.Headers[uuid].AccelerateInfoAddr - mapping.Address + mapping.FileOffset)
-				sr.Seek(accelInfoPtr, os.SEEK_SET)
+				sr.Seek(accelInfoPtr, io.SeekStart)
 				if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
 					return err
 				}
 				// Read dyld 16-bit array of sorted image indexes.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.BottomUpListOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.BottomUpListOffset), io.SeekStart)
 				bottomUpList := make([]uint16, f.AcceleratorInfo.ImageExtrasCount)
 				if err := binary.Read(sr, f.ByteOrder, &bottomUpList); err != nil {
 					return err
 				}
 				// Read dyld 16-bit array of dependencies.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), io.SeekStart)
 				depList := make([]uint16, f.AcceleratorInfo.DepListCount)
 				if err := binary.Read(sr, f.ByteOrder, &depList); err != nil {
 					return err
 				}
 				// Read dyld 16-bit array of re-exports.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), io.SeekStart)
 				reExportList := make([]uint16, f.AcceleratorInfo.ReExportCount)
 				if err := binary.Read(sr, f.ByteOrder, &reExportList); err != nil {
 					return err
 				}
 				// Read dyld image info extras.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ImagesExtrasOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ImagesExtrasOffset), io.SeekStart)
 				for i := uint32(0); i != f.AcceleratorInfo.ImageExtrasCount; i++ {
 					imgXtrInfo := CacheImageInfoExtra{}
 					if err := binary.Read(sr, f.ByteOrder, &imgXtrInfo); err != nil {
@@ -510,7 +511,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 					f.Images[i].CacheImageInfoExtra = imgXtrInfo
 				}
 				// Read dyld initializers list.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.InitializersOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.InitializersOffset), io.SeekStart)
 				for i := uint32(0); i != f.AcceleratorInfo.InitializersCount; i++ {
 					accelInit := CacheAcceleratorInitializer{}
 					if err := binary.Read(sr, f.ByteOrder, &accelInit); err != nil {
@@ -520,7 +521,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 					f.Images[accelInit.ImageIndex].Initializer = f.Mappings[uuid][0].Address + uint64(accelInit.FunctionOffset)
 				}
 				// Read dyld DOF sections list.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DofSectionsOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DofSectionsOffset), io.SeekStart)
 				for i := uint32(0); i != f.AcceleratorInfo.DofSectionsCount; i++ {
 					accelDOF := CacheAcceleratorDof{}
 					if err := binary.Read(sr, f.ByteOrder, &accelDOF); err != nil {
@@ -531,7 +532,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 					f.Images[accelDOF.ImageIndex].DOFSectionSize = accelDOF.SectionSize
 				}
 				// Read dyld offset to start of ss.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), io.SeekStart)
 				for i := uint32(0); i != f.AcceleratorInfo.RangeTableCount; i++ {
 					rEntry := CacheRangeEntry{}
 					if err := binary.Read(sr, f.ByteOrder, &rEntry); err != nil {
@@ -549,7 +550,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 					})
 				}
 				// Read dyld trie containing all dylib paths.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), os.SEEK_SET)
+				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), io.SeekStart)
 				dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
 				if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
 					return err
@@ -559,9 +560,17 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 
 	// Read dyld text_info entries.
-	sr.Seek(int64(f.Headers[uuid].ImagesTextOffset), os.SEEK_SET)
+	sr.Seek(int64(f.Headers[uuid].ImagesTextOffset), io.SeekStart)
 	for i := uint64(0); i != f.Headers[uuid].ImagesTextCount; i++ {
 		if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheImageTextInfo); err != nil {
+			return err
+		}
+	}
+
+	if f.Headers[uuid].NumSubCaches > 0 && f.Headers[uuid].SubCachesInfoOffset > 0 {
+		sr.Seek(int64(f.Headers[uuid].SubCachesInfoOffset), io.SeekStart)
+		f.SubCacheInfo = make([]SubCacheInfo, f.Headers[uuid].NumSubCaches)
+		if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
 			return err
 		}
 	}
@@ -573,13 +582,13 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo, dump bool) error {
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
-	sr.Seek(int64(mapping.SlideInfoOffset), os.SEEK_SET)
+	sr.Seek(int64(mapping.SlideInfoOffset), io.SeekStart)
 
 	slideInfoVersionData := make([]byte, 4)
 	sr.Read(slideInfoVersionData)
 	slideInfoVersion := binary.LittleEndian.Uint32(slideInfoVersionData)
 
-	sr.Seek(int64(mapping.SlideInfoOffset), os.SEEK_SET)
+	sr.Seek(int64(mapping.SlideInfoOffset), io.SeekStart)
 
 	switch slideInfoVersion {
 	case 1:
@@ -601,13 +610,13 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 			fmt.Printf("toc_count          = %d\n", slideInfo.TocCount)
 			fmt.Printf("data page count    = %d\n", mapping.Size/4096)
 
-			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.EntriesOffset)), os.SEEK_SET)
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.EntriesOffset)), io.SeekStart)
 			entries := make([]CacheSlideInfoEntry, int(slideInfo.EntriesCount))
 			if err := binary.Read(sr, binary.LittleEndian, &entries); err != nil {
 				return err
 			}
 
-			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.TocOffset)), os.SEEK_SET)
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.TocOffset)), io.SeekStart)
 			tocs := make([]uint16, int(slideInfo.TocCount))
 			if err := binary.Read(sr, binary.LittleEndian, &tocs); err != nil {
 				return err
@@ -651,7 +660,7 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 				return err
 			}
 
-			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), os.SEEK_SET)
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), io.SeekStart)
 			extras := make([]uint16, int(slideInfo.PageExtrasCount))
 			if err := binary.Read(sr, binary.LittleEndian, &extras); err != nil {
 				return err
@@ -665,7 +674,7 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 					pageOffset := uint32(startOffset)
 					delta := uint32(1)
 					for delta != 0 {
-						sr.Seek(int64(pageContent+uint64(pageOffset)), os.SEEK_SET)
+						sr.Seek(int64(pageContent+uint64(pageOffset)), io.SeekStart)
 						if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
 							return err
 						}
@@ -755,7 +764,7 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 				for {
 					rebaseLocation += delta
 
-					sr.Seek(int64(pageOffset+delta), os.SEEK_SET)
+					sr.Seek(int64(pageOffset+delta), io.SeekStart)
 					if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
 						return err
 					}
@@ -816,7 +825,7 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 				return err
 			}
 
-			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), os.SEEK_SET)
+			sr.Seek(int64(mapping.SlideInfoOffset+uint64(slideInfo.PageExtrasOffset)), io.SeekStart)
 			extras := make([]uint16, int(slideInfo.PageExtrasCount))
 			if err := binary.Read(sr, binary.LittleEndian, &extras); err != nil {
 				return err
@@ -829,7 +838,7 @@ func (f *File) ParseSlideInfo(uuid mtypes.UUID, mapping CacheMappingAndSlideInfo
 					pageOffset := uint32(startOffset)
 					delta := uint32(1)
 					for delta != 0 {
-						sr.Seek(int64(pageContent+uint64(pageOffset)), os.SEEK_SET)
+						sr.Seek(int64(pageContent+uint64(pageOffset)), io.SeekStart)
 						if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
 							return err
 						}
@@ -1022,7 +1031,7 @@ func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
 // 		if mapping.Address <= f.Headers[].AccelerateInfoAddr && f.AccelerateInfoAddr < mapping.Address+mapping.Size {
 // 			accelInfoPtr := int64(f.AccelerateInfoAddr - mapping.Address + mapping.FileOffset)
 // 			// Read dyld trie containing all dylib paths.
-// 			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), os.SEEK_SET)
+// 			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), io.SeekStart)
 // 			dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
 // 			if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
 // 				return 0, false, err
