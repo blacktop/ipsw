@@ -40,6 +40,8 @@ const (
 	loginURL      = "https://idmsa.apple.com/appleauth/auth/signin"
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
 	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
+
+	userAgent = "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8"
 )
 
 const (
@@ -280,7 +282,7 @@ func (app *App) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
 	req.Header.Set("Scnt", app.config.SCNT)
 
-	req.Header.Add("User-Agent", "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8")
+	req.Header.Add("User-Agent", userAgent)
 }
 
 func (app *App) getITCServiceKey() error {
@@ -328,7 +330,7 @@ func (app *App) signIn(username, password string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
-	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
+	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json, text/javascript")
 
 	response, err := app.Client.Do(req)
