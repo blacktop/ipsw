@@ -1,0 +1,104 @@
+//------------------------------------------------
+//--- 010 Editor v4.0 Binary Template
+//
+//      File: Inspector.bt
+//   Authors: SweetScape Software
+//   Version: 1.4
+//   Purpose: This template may be used 
+//            to customize the auto tab of the 
+//            Inspector with your own variables. 
+//            See the Inspector section of the 
+//            Options dialog for more information. 
+//  Category: Inspector
+//   History: 
+//   1.4   2021-11-10 blacktop:   Added UUID.
+//   1.4   2021-07-22 SweetScape: Added disasm opcodes.
+//   1.3   2020-06-05 SweetScape: Added Binary and GUID.
+//   1.2   2017-10-12 SweetScape: Added time64_t data type. Commented out Unicode. Updated header.
+//   1.1   SweetScape: Added hfloat data type.
+//   1.0   SweetScape: Initial release.
+//------------------------------------------------
+RequiresVersion( 12 );
+
+// Calculate the position for each variable,
+//  either at the beginning of the selection
+//  or at the current cursor position.
+local int64 pos;
+if( GetSelSize() > 0 )
+    pos = GetSelStart();
+else
+    pos = GetCursorPos();
+
+typedef ubyte Uuid[16]<read = UuidRead, format = hex>;
+
+// Define variables for the inspector
+FSeek( pos ); ubyte    _b8   <name="Binary",read=ReadBinary,write=WriteBinary>;
+FSeek( pos ); byte     _si8  <name="Signed Byte">;
+FSeek( pos ); ubyte    _ui8  <name="Unsigned Byte">;
+FSeek( pos ); short    _si16 <name="Signed Short">;
+FSeek( pos ); ushort   _ui16 <name="Unsigned Short">;
+FSeek( pos ); int      _si32 <name="Signed Int">;
+FSeek( pos ); uint     _ui32 <name="Unsigned Int">;
+FSeek( pos ); int64    _si64 <name="Signed Int64">;
+FSeek( pos ); uint64   _ui64 <name="Unsigned Int64">;
+FSeek( pos ); float    _f    <name="Float">;
+FSeek( pos ); double   _d    <name="Double">;
+FSeek( pos ); hfloat   _hf   <name="Half Float">;
+FSeek( pos ); char     _s [ReadStringLength(pos,256)]  <name="String">;  // limit to 256 characters
+//FSeek( pos ); wchar_t  _ws[ReadWStringLength(pos,256)] <name="Unicode">; // limit to 256 characters - uncomment to enable
+FSeek( pos ); DOSDATE  _dd   <name="DOS Date">;
+FSeek( pos ); DOSTIME  _dt   <name="DOS Time">;
+FSeek( pos ); FILETIME _ft   <name="FILETIME">;
+FSeek( pos ); OLETIME  _ot   <name="OLETIME">;
+FSeek( pos ); time_t   _tt   <name="time_t">;
+FSeek( pos ); time64_t _tt64 <name="time64_t">;
+FSeek( pos ); GUID     _guid <name="GUID">;
+FSeek( pos ); Uuid     _uuid<name = "UUID">;
+FSeek( pos ); Opcode   _opX32 <name="Opcode (X86-32)", disasm=DISASM_X86_32>;
+FSeek( pos ); Opcode   _opX64 <name="Opcode (X86-64)", disasm=DISASM_X86_64>;
+FSeek( pos ); Opcode   _opA32 <name="Opcode (ARM-32)", disasm=DISASM_ARM_32>;
+FSeek( pos ); Opcode   _opA64 <name="Opcode (ARM-64)", disasm=DISASM_ARM_64>;
+
+// Custom read and write functions
+string ReadBinary( ubyte b )             { return IntToBinaryStr(b); }
+void   WriteBinary( ubyte &b, string s ) { b = BinaryStrToInt(s); }
+string UuidRead(Uuid uuid)
+{
+    local string ret, tmp;
+    local int i;
+
+    for (i = 0; i < 4; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 4]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 6]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 2; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 8]);
+        ret += tmp;
+    }
+    ret += "-";
+
+    for (i = 0; i < 6; i++)
+    {
+        SPrintf(tmp, "%.2X", uuid[i + 10]);
+        ret += tmp;
+    }
+    return ret;
+}
