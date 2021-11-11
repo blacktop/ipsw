@@ -410,8 +410,8 @@ if (header.imagesOffset == 0 && header.unknown10Offset > 0)
 
 typedef struct
 {
-    Uuid uuid;                      // UUID of subcache
-    uint64 endOffset<format = hex>; // offset of the end of the cache (or total size of concatinated caches)
+    Uuid uuid;                           // UUID of subcache
+    uint64 cumulativeSize<format = hex>; // total size of caches read
 } subcache_info<bgcolor = cLtPurple>;
 
 if (header.subCacheInfoOffset > 0 && header.numSubCaches > 0)
