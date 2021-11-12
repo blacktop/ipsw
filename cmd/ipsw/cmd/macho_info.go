@@ -214,7 +214,7 @@ var machoInfoCmd = &cobra.Command{
 							teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
 						}
 						if cd.Header.ExecSegFlags > 0 {
-							execSegFlags = fmt.Sprintf(" (%s)\n", cd.Header.ExecSegFlags.String())
+							execSegFlags = fmt.Sprintf(" (%s)", cd.Header.ExecSegFlags.String())
 						}
 						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
 						fmt.Printf("\tVersion:     %s%s\n"+
