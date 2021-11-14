@@ -320,3 +320,17 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 		},
 	})
 }
+
+func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
+	var syms []macho.Symbol
+	for _, lsym := range i.LocalSymbols {
+		syms = append(syms, macho.Symbol{
+			Name:  lsym.Name,
+			Type:  lsym.Type,
+			Sect:  lsym.Sect,
+			Desc:  lsym.Desc,
+			Value: lsym.Value,
+		})
+	}
+	return syms
+}
