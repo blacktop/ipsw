@@ -142,7 +142,10 @@ var dyldMachoCmd = &cobra.Command{
 							return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
 						}
 					}
-					err = m.Export(filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name)), dcf, m.GetBaseAddress())
+					if err := f.GetLocalSymbolsForImage(i); err != nil {
+						return fmt.Errorf("failed to get local symbols for image %s: %v", i.Name, err)
+					}
+					err = m.Export(filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name)), dcf, m.GetBaseAddress(), i.GetLocalSymbols())
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
 					}

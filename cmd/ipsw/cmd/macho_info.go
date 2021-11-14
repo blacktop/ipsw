@@ -179,7 +179,7 @@ var machoInfoCmd = &cobra.Command{
 				}
 
 				if extractfilesetEntry {
-					err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry), dcf, baseAddress)
+					err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry), dcf, baseAddress, nil) // TODO: do I want to add any extra syms?
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
