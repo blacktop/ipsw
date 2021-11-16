@@ -81,6 +81,10 @@ var patchesCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if f.IsDyld4 {
+			return fmt.Errorf("this command does NOT support the NEW iOS15+ dyld_shared_caches yet")
+		}
+
 		if err := f.ParsePatchInfo(); err != nil {
 			return err
 		}
@@ -93,7 +97,7 @@ var patchesCmd = &cobra.Command{
 							if strings.EqualFold(strings.ToLower(patch.Name), strings.ToLower(symbolName)) {
 								log.Infof("%s patch locations", patch.Name)
 								for _, loc := range patch.PatchLocations {
-									fmt.Println(loc)
+									fmt.Println(loc.String(f.Headers[f.UUID].SharedRegionStart))
 								}
 							}
 						}

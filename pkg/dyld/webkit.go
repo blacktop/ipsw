@@ -52,7 +52,7 @@ func GetWebKitVersion(path string, getRev bool) (string, error) {
 			}
 			return fmt.Sprintf("%s (svn rev %s)", version, rev), nil
 		}
-		return fmt.Sprintf("%s", version), nil
+		return version, nil
 	}
 
 	return "", fmt.Errorf("unable to find WebKit version in file: %s", path)
