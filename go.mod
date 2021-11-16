@@ -28,7 +28,7 @@ require (
 	github.com/spf13/viper v1.9.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v5 v5.4.0
-	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa
+	golang.org/x/crypto v0.0.0-20211115234514-b4de73f9ece8
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	golang.org/x/sys v0.0.0-20211113001501-0c823b97ae02
 )

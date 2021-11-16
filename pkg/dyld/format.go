@@ -65,16 +65,16 @@ func (m *CacheMapping) String() string {
 	)
 }
 
-func (self CacheImageInfo) String() string {
+func (c CacheImageInfo) String() string {
 	return fmt.Sprintf(
 		"Address        = %016X\n"+
 			"ModTime        = %016X\n"+
 			"Inode          = %d\n"+
 			"PathFileOffset = %08X\n",
-		self.Address,
-		self.ModTime,
-		self.Inode,
-		self.PathFileOffset,
+		c.Address,
+		c.ModTime,
+		c.Inode,
+		c.PathFileOffset,
 	)
 }
 

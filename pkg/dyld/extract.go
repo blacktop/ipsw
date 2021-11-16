@@ -32,10 +32,7 @@ func Extract(ipsw, destPath string) error {
 	}
 
 	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		if strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg()) {
-			return true
-		}
-		return false
+		return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed extract dyld_shared_cache from ipsw")

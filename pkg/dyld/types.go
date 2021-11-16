@@ -199,6 +199,8 @@ type CacheMapping struct {
 type CacheMappingWithSlideInfo struct {
 	Name string `json:"name,omitempty"`
 	CacheMappingAndSlideInfo
+	SlideInfo slideInfo
+	Pages     []map[uint64]uint64
 }
 
 type CacheImageInfo struct {
@@ -209,8 +211,14 @@ type CacheImageInfo struct {
 	Pad            uint32
 }
 
+type Rebase struct {
+	Offset uint64
+	Target uint64
+}
+
 type slideInfo interface {
 	GetVersion() uint32
+	GetPageSize() uint32
 	SlidePointer(uint64) uint64
 }
 
@@ -230,6 +238,9 @@ type CacheSlideInfo struct {
 
 func (i CacheSlideInfo) GetVersion() uint32 {
 	return i.Version
+}
+func (i CacheSlideInfo) GetPageSize() uint32 {
+	return 0
 }
 func (i CacheSlideInfo) SlidePointer(ptr uint64) uint64 {
 	return ptr // TODO: finish this
@@ -254,6 +265,9 @@ type CacheSlideInfo2 struct {
 
 func (i CacheSlideInfo2) GetVersion() uint32 {
 	return i.Version
+}
+func (i CacheSlideInfo2) GetPageSize() uint32 {
+	return i.PageSize
 }
 func (i CacheSlideInfo2) SlidePointer(ptr uint64) uint64 {
 	if (ptr & ^i.DeltaMask) != 0 {
@@ -281,10 +295,13 @@ type CacheSlideInfo3 struct {
 func (i CacheSlideInfo3) GetVersion() uint32 {
 	return i.Version
 }
+func (i CacheSlideInfo3) GetPageSize() uint32 {
+	return i.PageSize
+}
 func (i CacheSlideInfo3) SlidePointer(ptr uint64) uint64 {
 	pointer := CacheSlidePointer3(ptr)
 	if pointer.Authenticated() {
-		return 0x180000000 + pointer.OffsetFromSharedCacheBase()
+		return i.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
 	}
 	return pointer.SignExtend51()
 }
@@ -399,6 +416,9 @@ type CacheSlideInfo4 struct {
 
 func (i CacheSlideInfo4) GetVersion() uint32 {
 	return i.Version
+}
+func (i CacheSlideInfo4) GetPageSize() uint32 {
+	return i.PageSize
 }
 func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
 	value := ptr & ^i.DeltaMask
@@ -548,6 +568,9 @@ type CachePatchableLocation uint64
 func (p CachePatchableLocation) CacheOffset() uint64 {
 	return types.ExtractBits(uint64(p), 0, 32)
 }
+func (p CachePatchableLocation) Address(cacheBase uint64) uint64 {
+	return p.CacheOffset() + cacheBase
+}
 func (p CachePatchableLocation) High7() uint64 {
 	return types.ExtractBits(uint64(p), 32, 7)
 }
@@ -567,32 +590,21 @@ func (p CachePatchableLocation) Discriminator() uint64 {
 	return types.ExtractBits(uint64(p), 48, 16)
 }
 
-func (p CachePatchableLocation) String() string {
-	var pStr string
-	if p.Authenticated() && p.UsesAddressDiversity() {
-		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, diversity: 0x%04x, key: %s, auth: %t",
-			p.CacheOffset(),
-			p.Addend(),
-			p.Discriminator(),
-			KeyName(uint64(p)),
-			p.Authenticated(),
-		)
-	} else if p.Authenticated() && !p.UsesAddressDiversity() {
-		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, key: %s, auth: %t",
-			p.CacheOffset(),
-			p.Addend(),
-			KeyName(uint64(p)),
-			p.Authenticated(),
-		)
-	} else {
-		pStr = fmt.Sprintf("offset: 0x%08x", p.CacheOffset())
+func (p CachePatchableLocation) String(cacheBase uint64) string {
+	pStr := fmt.Sprintf("addr: %#x", p.Address(cacheBase))
+	if p.UsesAddressDiversity() {
+		pStr += fmt.Sprintf(", diversity: %#04x", p.Discriminator())
 	}
+	if p.Addend() > 0 {
+		pStr += fmt.Sprintf(", addend: %#x", p.Addend())
+	}
+	pStr += fmt.Sprintf(", key: %s, auth: %t", KeyName(uint64(p)), p.Authenticated())
 	return pStr
 }
 
 type SubCacheInfo struct {
-	UUID      types.UUID
-	TotalSize uint64
+	UUID           types.UUID
+	CumulativeSize uint64
 }
 
 type CacheExportFlag int

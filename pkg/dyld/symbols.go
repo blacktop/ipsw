@@ -49,7 +49,7 @@ func (f *File) ParseLocalSyms() error {
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	stringPool := io.NewSectionReader(f.r[uuid], int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
-	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), io.SeekStart)
 
 	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
 		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
@@ -93,7 +93,7 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 		sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 		stringPool := io.NewSectionReader(sr, int64(f.LocalSymInfo.StringsFileOffset), int64(f.LocalSymInfo.StringsSize))
-		sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+		sr.Seek(int64(f.LocalSymInfo.NListFileOffset), io.SeekStart)
 
 		for idx := uint32(0); idx < f.LocalSymInfo.EntriesCount; idx++ {
 			// skip over other images
@@ -109,7 +109,7 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 					return err
 				}
 
-				stringPool.Seek(int64(nlist.Name), os.SEEK_SET)
+				stringPool.Seek(int64(nlist.Name), io.SeekStart)
 				s, err := bufio.NewReader(stringPool).ReadString('\x00')
 				if err != nil {
 					log.Error(errors.Wrapf(err, "failed to read string at: %d", f.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
@@ -146,12 +146,12 @@ func (f *File) FindLocalSymbol(symbol string) (*CacheLocalSymbol64, error) {
 
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
-	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), io.SeekStart)
 	stringPool := make([]byte, f.LocalSymInfo.StringsSize)
 	sr.ReadAt(stringPool, int64(f.LocalSymInfo.StringsFileOffset))
 	nlistName := bytes.Index(stringPool, []byte(symbol))
 
-	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), io.SeekStart)
 	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
 		for e := 0; e < int(f.Images[idx].NlistCount); e++ {
 			nlist := types.Nlist64{}
@@ -192,14 +192,14 @@ func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymb
 		return nil, fmt.Errorf("no image found matching %s", imageName)
 	}
 
-	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), os.SEEK_SET)
+	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), io.SeekStart)
 
 	stringPool := make([]byte, f.LocalSymInfo.StringsSize)
 	sr.ReadAt(stringPool, int64(f.LocalSymInfo.StringsFileOffset))
 
 	nlistName := bytes.Index(stringPool, []byte(symbol))
 
-	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), os.SEEK_SET)
+	sr.Seek(int64(f.LocalSymInfo.NListFileOffset), io.SeekStart)
 
 	for idx := 0; idx < int(f.LocalSymInfo.EntriesCount); idx++ {
 		// skip over other images
