@@ -212,8 +212,10 @@ type CacheImageInfo struct {
 }
 
 type Rebase struct {
-	Offset uint64
-	Target uint64
+	PageOffset      uint64
+	CacheFileOffset uint64
+	CacheVMAddress  uint64
+	Target          uint64
 }
 
 type slideInfo interface {
