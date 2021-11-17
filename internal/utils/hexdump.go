@@ -76,7 +76,7 @@ func (h *dumper) Write(data []byte) (n int, err error) {
 			hex.Encode(h.buf[8:], h.buf[:8])
 			h.buf[24] = ' '
 			h.buf[25] = ' '
-			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:23]))
+			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:24]))
 			_, err = h.w.Write(h.buf[24:])
 			if err != nil {
 				return
