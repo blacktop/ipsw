@@ -150,7 +150,7 @@ var a2sCmd = &cobra.Command{
 		// }
 
 		if showMapping {
-			mapping, err := f.GetMappingForVMAddress(unslidAddr)
+			_, mapping, err := f.GetMappingForVMAddress(unslidAddr)
 			if err != nil {
 				return err
 			}

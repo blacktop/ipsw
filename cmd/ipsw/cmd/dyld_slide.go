@@ -89,20 +89,20 @@ var slideCmd = &cobra.Command{
 
 		for uuid := range f.Mappings {
 			if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
-				f.ParseSlideInfo(uuid, dyld.CacheMappingAndSlideInfo{
-					Address:         f.Mappings[uuid][1].Address,
-					Size:            f.Mappings[uuid][1].Size,
-					FileOffset:      f.Mappings[uuid][1].FileOffset,
+				f.DumpSlideInfo(uuid, &dyld.CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: dyld.CacheMappingAndSlideInfo{
+					Address:         f.Mappings[uuid][1].Address,    // __DATA
+					Size:            f.Mappings[uuid][1].Size,       // __DATA
+					FileOffset:      f.Mappings[uuid][1].FileOffset, // __DATA
 					SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
 					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
-				}, false)
+				}, Name: "__DATA"})
 			} else {
 				for _, extMapping := range f.MappingsWithSlideInfo[uuid] {
 					if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
 						continue
 					}
 					if extMapping.SlideInfoSize > 0 {
-						f.ParseSlideInfo(uuid, extMapping.CacheMappingAndSlideInfo, true)
+						f.DumpSlideInfo(uuid, extMapping)
 					}
 				}
 			}

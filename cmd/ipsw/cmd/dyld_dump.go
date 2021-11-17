@@ -151,7 +151,7 @@ var dyldDumpCmd = &cobra.Command{
 							}
 						}
 					} else {
-						if mapping, err := f.GetMappingForVMAddress(addr); err == nil {
+						if _, mapping, err := f.GetMappingForVMAddress(addr); err == nil {
 							log.WithFields(log.Fields{
 								"name": mapping.Name,
 								"off":  fmt.Sprintf("%#x", mapping.FileOffset),

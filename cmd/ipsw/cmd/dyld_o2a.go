@@ -100,7 +100,7 @@ var o2aCmd = &cobra.Command{
 			} else if inHex {
 				fmt.Printf("%#x\n", address)
 			} else {
-				m, err := f.GetMappingForVMAddress(address)
+				_, m, err := f.GetMappingForVMAddress(address)
 				if err != nil {
 					return err
 				}

@@ -8,6 +8,12 @@ import (
 	"github.com/blacktop/go-macho/types"
 )
 
+func output(show bool, fmtStr string, args ...interface{}) {
+	if show {
+		fmt.Printf(fmtStr, args...)
+	}
+}
+
 // Is64bit returns if dyld is 64bit or not
 func (f *File) Is64bit() bool {
 	return strings.Contains(f.Headers[f.UUID].Magic.String(), "64")
@@ -72,15 +78,15 @@ func (f *File) GetMappingForOffsetForUUID(uuid types.UUID, offset uint64) (*Cach
 }
 
 // GetMappingForVMAddress returns the mapping containing a given virtual address
-func (f *File) GetMappingForVMAddress(address uint64) (*CacheMapping, error) {
-	for _, cacheMaps := range f.Mappings {
-		for _, mapping := range cacheMaps {
+func (f *File) GetMappingForVMAddress(address uint64) (types.UUID, *CacheMappingWithSlideInfo, error) {
+	for uuid := range f.MappingsWithSlideInfo {
+		for _, mapping := range f.MappingsWithSlideInfo[uuid] {
 			if mapping.Address <= address && address < mapping.Address+mapping.Size {
-				return mapping, nil
+				return uuid, mapping, nil
 			}
 		}
 	}
-	return nil, fmt.Errorf("address %#x not within any mapping's address range", address)
+	return types.UUID{}, nil, fmt.Errorf("address %#x not within any mapping's address range", address)
 }
 
 // ReadBytesForUUID returns bytes at a given offset for a given cache UUID
