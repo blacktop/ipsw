@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -31,6 +32,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -53,6 +55,56 @@ func init() {
 	// dyldMachoCmd.Flags().StringP("out", "", "", "🚧 Directory to extract the dylib")
 
 	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
+}
+
+func rebaseMachO(dsc *dyld.File, machoPath string) error {
+	f, err := os.OpenFile(machoPath, os.O_RDWR, 0755)
+	if err != nil {
+		return fmt.Errorf("failed to open exported MachO %s: %v", machoPath, err)
+	}
+	defer f.Close()
+
+	mm, err := macho.NewFile(f)
+	if err != nil {
+		return err
+	}
+
+	for _, seg := range mm.Segments() {
+		uuid, mapping, err := dsc.GetMappingForVMAddress(seg.Addr)
+		if err != nil {
+			return err
+		}
+
+		if mapping.SlideInfoOffset == 0 {
+			continue
+		}
+
+		startAddr := seg.Addr - mapping.Address
+		endAddr := ((seg.Addr + seg.Memsz) - mapping.Address) + uint64(dsc.SlideInfo.GetPageSize())
+
+		start := startAddr / uint64(dsc.SlideInfo.GetPageSize())
+		end := endAddr / uint64(dsc.SlideInfo.GetPageSize())
+
+		rebases, err := dsc.GetRebaseInfoForPages(uuid, mapping, start, end)
+		if err != nil {
+			return err
+		}
+
+		for _, rebase := range rebases {
+			off, err := mm.GetOffset(rebase.CacheVMAddress)
+			if err != nil {
+				continue
+			}
+			if _, err := f.Seek(int64(off), io.SeekStart); err != nil {
+				return fmt.Errorf("failed to seek in exported file to offset %#x from the start: %v", off, err)
+			}
+			if err := binary.Write(f, dsc.ByteOrder, rebase.Target); err != nil {
+				return fmt.Errorf("failed to write rebase address %#x: %v", rebase.Target, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // dyldMachoCmd represents the macho command
@@ -142,14 +194,22 @@ var dyldMachoCmd = &cobra.Command{
 							return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
 						}
 					}
+
 					if err := f.GetLocalSymbolsForImage(i); err != nil {
 						return fmt.Errorf("failed to get local symbols for image %s: %v", i.Name, err)
 					}
-					err = m.Export(filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name)), dcf, m.GetBaseAddress(), i.GetLocalSymbols())
+
+					fname := filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name))
+					err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbols())
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
 					}
-					log.Infof("Created %s", filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name)))
+
+					if err := rebaseMachO(f, fname); err != nil {
+						return fmt.Errorf("failed to rebase macho via cache slide info: %v", err)
+					}
+
+					log.Infof("Created %s", fname)
 					return nil
 				}
 
