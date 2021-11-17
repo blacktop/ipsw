@@ -340,7 +340,7 @@ var dyldMachoCmd = &cobra.Command{
 						w.Flush()
 					}
 					// Dedup these symbols (has repeats but also additional symbols??)
-					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
+					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && Verbose {
 						fmt.Printf("\nDyldExport SYMBOLS\n")
 						fmt.Println("------------------")
 						exports, err := m.DyldExports()

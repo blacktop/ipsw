@@ -259,22 +259,22 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 	}
 
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
-
-	i.m, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
-		Offset:        int64(offset),
-		SectionReader: types.NewCustomSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
-		CacheReader:   i,
-		VMAddrConverter: types.VMAddrConverter{
-			Converter: func(addr uint64) uint64 {
-				return i.cache.SlideInfo.SlidePointer(addr)
-			},
-			VMAddr2Offet: func(address uint64) (uint64, error) {
-				return i.GetOffset(address)
-			},
-			Offet2VMAddr: func(offset uint64) (uint64, error) {
-				return i.GetVMAddress(offset)
-			},
+	vma := types.VMAddrConverter{
+		Converter: func(addr uint64) uint64 {
+			return i.cache.SlideInfo.SlidePointer(addr)
 		},
+		VMAddr2Offet: func(address uint64) (uint64, error) {
+			return i.GetOffset(address)
+		},
+		Offet2VMAddr: func(offset uint64) (uint64, error) {
+			return i.GetVMAddress(offset)
+		},
+	}
+	i.m, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+		Offset:               int64(offset),
+		SectionReader:        types.NewCustomSectionReader(i.cache.r[i.cuuid], &vma, 0, 1<<63-1),
+		CacheReader:          i,
+		VMAddrConverter:      vma,
 		RelativeSelectorBase: rsBase,
 	})
 	if err != nil {
@@ -289,6 +289,17 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	offset, err := i.GetOffset(i.LoadAddress)
 	if err != nil {
 		return nil, err
+	}
+	vma := types.VMAddrConverter{
+		Converter: func(addr uint64) uint64 {
+			return i.cache.SlideInfo.SlidePointer(addr)
+		},
+		VMAddr2Offet: func(address uint64) (uint64, error) {
+			return i.GetOffset(address)
+		},
+		Offet2VMAddr: func(offset uint64) (uint64, error) {
+			return i.GetVMAddress(offset)
+		},
 	}
 	return macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		LoadFilter: []types.LoadCmd{
@@ -305,19 +316,9 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			types.LC_LOAD_DYLIB,
 			types.LC_LOAD_WEAK_DYLIB,
 			types.LC_LOAD_UPWARD_DYLIB},
-		Offset:        int64(offset),
-		SectionReader: types.NewCustomSectionReader(i.cache.r[i.cuuid], 0, 1<<63-1),
-		VMAddrConverter: types.VMAddrConverter{
-			Converter: func(addr uint64) uint64 {
-				return i.cache.SlideInfo.SlidePointer(addr)
-			},
-			VMAddr2Offet: func(address uint64) (uint64, error) {
-				return i.GetOffset(address)
-			},
-			Offet2VMAddr: func(offset uint64) (uint64, error) {
-				return i.GetVMAddress(offset)
-			},
-		},
+		Offset:          int64(offset),
+		SectionReader:   types.NewCustomSectionReader(i.cache.r[i.cuuid], &vma, 0, 1<<63-1),
+		VMAddrConverter: vma,
 	})
 }
 

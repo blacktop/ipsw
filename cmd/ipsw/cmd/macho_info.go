@@ -427,8 +427,8 @@ var machoInfoCmd = &cobra.Command{
 			}
 			w.Flush()
 			// Dedup these symbols (has repeats but also additional symbols??)
-			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
-				fmt.Println("DyldExport SYMBOLS")
+			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && Verbose {
+				fmt.Printf("\nDyldExport SYMBOLS\n")
 				fmt.Println("------------------")
 				exports, err := m.DyldExports()
 				if err != nil {
@@ -440,7 +440,7 @@ var machoInfoCmd = &cobra.Command{
 				w.Flush()
 			}
 			if cfstrs, err := m.GetCFStrings(); err == nil {
-				fmt.Println("CFStrings")
+				fmt.Printf("\nCFStrings\n")
 				fmt.Println("---------")
 				for _, cfstr := range cfstrs {
 					fmt.Printf("%#016x:  %#v\n", cfstr.Address, cfstr.Name)
