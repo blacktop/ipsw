@@ -376,7 +376,7 @@ func yaaDecodeHeader(r *bytes.Reader) (*Entry, error) {
 }
 
 // Extract extracts and decompresses OTA payload files
-func Extract(otaZIP, extractPattern string) error {
+func Extract(otaZIP, extractPattern, outputDir string) error {
 
 	zr, err := zip.OpenReader(otaZIP)
 	if err != nil {
@@ -384,7 +384,51 @@ func Extract(otaZIP, extractPattern string) error {
 	}
 	defer zr.Close()
 
-	return parsePayload(&zr.Reader, extractPattern)
+	if len(extractPattern) > 0 {
+		// iinfo, err := info.ParseZipFiles(zr.File)
+		// if err != nil {
+		// 	return errors.Wrap(err, "failed to parse remote ipsw")
+		// }
+
+		folder, err := getFolder(&zr.Reader)
+		if err != nil {
+			return fmt.Errorf("failed to get folder for OTA: %v", err)
+		}
+		outputDir = filepath.Join(outputDir, folder)
+		os.Mkdir(outputDir, os.ModePerm)
+
+		found := false
+		for _, f := range zr.File {
+			match, _ := regexp.MatchString(extractPattern, f.Name)
+			if match || strings.Contains(strings.ToLower(f.Name), strings.ToLower(extractPattern)) {
+				found = true
+				fileName := filepath.Join(outputDir, filepath.Base(f.Name))
+				if _, err := os.Stat(fileName); os.IsNotExist(err) {
+					data := make([]byte, f.UncompressedSize64)
+					rc, err := f.Open()
+					if err != nil {
+						return fmt.Errorf("failed to open file in zip: %v", err)
+					}
+					io.ReadFull(rc, data)
+					rc.Close()
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
+					err = ioutil.WriteFile(fileName, data, 0644)
+					if err != nil {
+						return errors.Wrapf(err, "failed to write %s", f.Name)
+					}
+				} else {
+					log.Warnf("%s already exists", fileName)
+				}
+			}
+		}
+		if found {
+			return nil
+		}
+
+		return parsePayload(&zr.Reader, extractPattern)
+	}
+
+	return fmt.Errorf("you must supply an extract regex pattern")
 }
 
 func getFolder(zr *zip.Reader) (string, error) {
