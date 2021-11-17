@@ -702,12 +702,11 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 			i += int(startPage)
 			pageAddress := mapping.Address + uint64(uint32(i)*slideInfo.PageSize)
 			pageOffset := mapping.FileOffset + uint64(uint32(i)*slideInfo.PageSize)
-			rebaseChain := func(pageContent uint64, startOffset uint16) error {
+			rebaseChain := func(pageContent uint64, startOffset uint32) error {
 				deltaShift := uint64(bits.TrailingZeros64(slideInfo.DeltaMask) - 2)
-				pageOffset := uint32(startOffset)
 				delta := uint32(1)
 				for delta != 0 {
-					sr.Seek(int64(pageContent+uint64(pageOffset)), io.SeekStart)
+					sr.Seek(int64(pageContent+uint64(startOffset)), io.SeekStart)
 					if err := binary.Read(sr, binary.LittleEndian, &pointer); err != nil {
 						return err
 					}
@@ -722,16 +721,16 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						} else {
 							symName = sym
 						}
-						fmt.Printf("    [% 5d + %#04x]: %#016x = %#016x, sym: %s\n", i, pageOffset, pointer, targetValue, symName)
+						fmt.Printf("    [% 5d + %#04x]: %#016x = %#016x, sym: %s\n", i, startOffset, pointer, targetValue, symName)
 					} else {
 						rebases = append(rebases, Rebase{
 							PageOffset:      uint64(uint32(i)*slideInfo.PageSize + delta),
-							CacheFileOffset: pageContent + uint64(pageOffset),
-							CacheVMAddress:  pageContent + uint64(pageAddress),
+							CacheFileOffset: uint64(startOffset) + pageOffset,
+							CacheVMAddress:  uint64(startOffset) + pageAddress,
 							Target:          targetValue,
 						})
 					}
-					pageOffset += delta
+					startOffset += delta
 				}
 				return nil
 			}
@@ -746,14 +745,14 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					aStart := extras[j]
 					output(dump, "start=%#04x ", aStart&0x3FFF)
 					pageStartOffset := (aStart & 0x3FFF) * 4
-					rebaseChain(pageOffset, pageStartOffset)
+					rebaseChain(pageOffset, uint32(pageStartOffset))
 					done = (extras[j] & DYLD_CACHE_SLIDE_PAGE_ATTR_END) != 0
 					j++
 				}
 				output(dump, "\n")
 			} else {
 				output(dump, "page[% 5d]: start=%#04X\n", i, starts[i])
-				rebaseChain(pageOffset, start*4)
+				rebaseChain(pageOffset, uint32(start*4))
 			}
 		}
 	case 3:

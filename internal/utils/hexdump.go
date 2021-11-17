@@ -76,11 +76,11 @@ func (h *dumper) Write(data []byte) (n int, err error) {
 			hex.Encode(h.buf[8:], h.buf[:8])
 			h.buf[24] = ' '
 			h.buf[25] = ' '
-			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:]))
-			// _, err = h.w.Write(h.buf[8:])
-			// if err != nil {
-			// 	return
-			// }
+			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:23]))
+			_, err = h.w.Write(h.buf[24:])
+			if err != nil {
+				return
+			}
 		}
 		hex.Encode(h.buf[:], data[i:i+1])
 		h.buf[2] = ' '
