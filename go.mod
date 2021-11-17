@@ -29,8 +29,8 @@ require (
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v5 v5.4.0
 	golang.org/x/crypto v0.0.0-20211115234514-b4de73f9ece8
-	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
-	golang.org/x/sys v0.0.0-20211113001501-0c823b97ae02
+	golang.org/x/net v0.0.0-20211116231205-47ca1ff31462
+	golang.org/x/sys v0.0.0-20211116061358-0a5406a5449c
 )
 
 require github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
