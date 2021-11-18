@@ -174,7 +174,7 @@ var dyldMachoCmd = &cobra.Command{
 			for _, i := range images {
 
 				if dumpALL {
-					fmt.Printf("IMAGE: %s\n\n", i.Name)
+					fmt.Printf("IMAGE: %s\n", i.Name)
 				}
 
 				m, err := i.GetMacho()
@@ -187,30 +187,37 @@ var dyldMachoCmd = &cobra.Command{
 				}
 
 				if extractDylib {
-					var dcf *fixupchains.DyldChainedFixups
-					if m.HasFixups() {
-						dcf, err = m.DyldChainedFixups()
-						if err != nil {
-							return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
+					fname := filepath.Join(filepath.Dir(dscPath), "extracted", filepath.Base(i.Name))
+					if !dumpALL {
+						fname = filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name))
+					}
+					if _, err := os.Stat(fname); os.IsNotExist(err) {
+						var dcf *fixupchains.DyldChainedFixups
+						if m.HasFixups() {
+							dcf, err = m.DyldChainedFixups()
+							if err != nil {
+								return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
+							}
 						}
-					}
 
-					if err := f.GetLocalSymbolsForImage(i); err != nil {
-						return fmt.Errorf("failed to get local symbols for image %s: %v", i.Name, err)
-					}
+						if err := f.GetLocalSymbolsForImage(i); err != nil {
+							return fmt.Errorf("failed to get local symbols for image %s: %v", i.Name, err)
+						}
 
-					fname := filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name))
-					err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbols())
-					if err != nil {
-						return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
-					}
+						err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbols())
+						if err != nil {
+							return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
+						}
 
-					if err := rebaseMachO(f, fname); err != nil {
-						return fmt.Errorf("failed to rebase macho via cache slide info: %v", err)
-					}
+						if err := rebaseMachO(f, fname); err != nil {
+							return fmt.Errorf("failed to rebase macho via cache slide info: %v", err)
+						}
 
-					log.Infof("Created %s", fname)
-					return nil
+						log.Infof("Created %s", fname)
+					} else {
+						log.Warnf("dylib already exists: %s", fname)
+					}
+					continue
 				}
 
 				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts {
