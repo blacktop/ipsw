@@ -40,6 +40,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
 
+	dyldDisassCmd.Flags().Uint64P("slide", "", 0, "dyld_shared_cache slide to remove from --vaddr")
 	dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
@@ -73,6 +74,7 @@ var dyldDisassCmd = &cobra.Command{
 		startVMAddr, _ := cmd.Flags().GetUint64("vaddr")
 		symbolName, _ := cmd.Flags().GetString("symbol")
 		cacheFile, _ := cmd.Flags().GetString("cache")
+		slide, _ := cmd.Flags().GetUint64("slide")
 
 		if len(symbolName) > 0 && startVMAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
@@ -141,6 +143,9 @@ var dyldDisassCmd = &cobra.Command{
 			}
 
 		} else { // startVMAddr > 0
+			if slide > 0 {
+				startVMAddr = startVMAddr - slide
+			}
 			symAddr = startVMAddr
 		}
 
@@ -283,6 +288,9 @@ var dyldDisassCmd = &cobra.Command{
 			}
 			if err := f.ClassesForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc classes")
+			}
+			if err := f.ProtocolsForImage(image.Name); err != nil {
+				return errors.Wrapf(err, "failed to parse objc protocols")
 			}
 		}
 
