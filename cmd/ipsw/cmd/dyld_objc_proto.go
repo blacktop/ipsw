@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -35,6 +36,7 @@ import (
 func init() {
 	dyldObjcCmd.AddCommand(objcProtoCmd)
 
+	objcProtoCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	objcProtoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -48,6 +50,8 @@ var objcProtoCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		imageName, _ := cmd.Flags().GetString("image")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -82,9 +86,28 @@ var objcProtoCmd = &cobra.Command{
 			}
 			fmt.Printf("0x%x: %s\n", ptr, args[1])
 		} else {
-			_, err := f.GetAllProtocols(true)
-			if err != nil {
-				return err
+			if len(imageName) > 0 {
+				err = f.ProtocolsForImage(imageName)
+				if err != nil {
+					return err
+				}
+
+				// sort by address
+				addrs := make([]uint64, 0, len(f.AddressToSymbol))
+				for a := range f.AddressToSymbol {
+					addrs = append(addrs, a)
+				}
+				sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
+
+				for _, addr := range addrs {
+					fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
+				}
+
+			} else {
+				_, err := f.GetAllProtocols(true)
+				if err != nil {
+					return err
+				}
 			}
 		}
 
