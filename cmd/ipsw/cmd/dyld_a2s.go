@@ -225,6 +225,9 @@ var a2sCmd = &cobra.Command{
 			if err := f.ClassesForImage(image.Name); err != nil {
 				return errors.Wrapf(err, "failed to parse objc classes")
 			}
+			if err := f.ProtocolsForImage(image.Name); err != nil {
+				return errors.Wrapf(err, "failed to parse objc protocols")
+			}
 		}
 
 		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {

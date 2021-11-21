@@ -160,6 +160,9 @@ var xrefCmd = &cobra.Command{
 				if err := f.ClassesForImage(img.Name); err != nil {
 					return errors.Wrapf(err, "failed to parse objc classes")
 				}
+				if err := f.ProtocolsForImage(img.Name); err != nil {
+					return errors.Wrapf(err, "failed to parse objc protocols")
+				}
 			}
 
 			for _, fn := range m.GetFunctions() {

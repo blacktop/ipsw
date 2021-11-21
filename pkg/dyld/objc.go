@@ -19,8 +19,9 @@ import (
 type optFlags uint32
 
 const (
-	isProduction              optFlags = (1 << 0) // never set in development cache
-	noMissingWeakSuperclasses optFlags = (1 << 1) // never set in development cache
+	isProduction              optFlags = (1 << 0)      // never set in development cache
+	noMissingWeakSuperclasses optFlags = (1 << 1)      // never set in development cache
+	mask                      uint64   = (1 << 40) - 1 // 40bit mask
 )
 
 // objcInfo is the dyld_shared_cache dylib objc object
@@ -28,6 +29,7 @@ type objcInfo struct {
 	Methods   []objc.Method
 	ClassRefs map[uint64]*objc.Class
 	SelRefs   map[uint64]*objc.Selector
+	ProtoRefs map[uint64]*objc.Protocol
 	CFStrings []objc.CFString
 }
 
@@ -507,7 +509,6 @@ func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
 
 // ClassesForImage returns all of the Objective-C classes for a given image
 func (f *File) ClassesForImage(imageNames ...string) error {
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
@@ -568,12 +569,38 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 
 // ProtocolsForImage returns all of the Objective-C protocols for a given image
 func (f *File) ProtocolsForImage(imageNames ...string) error {
-	return fmt.Errorf("not yet implimented") // TODO: is this possible?
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			images = append(images, f.Image(imageName))
+		}
+	} else {
+		images = f.Images
+	}
+
+	for _, image := range images {
+		m, err := image.GetPartialMacho()
+		if err != nil {
+			return fmt.Errorf("failed get image %s as MachO %v", image.Name, err)
+		}
+		image.ObjC.ProtoRefs, err = m.GetObjCProtoReferences()
+		if err != nil {
+			return fmt.Errorf("failed to get protocol references for image %s: %v", image.Name, err)
+		}
+		for k, v := range image.ObjC.ProtoRefs {
+			f.AddressToSymbol[v.Ptr] = v.Name
+			f.AddressToSymbol[k] = fmt.Sprintf("proto_%s", v.Name)
+		}
+		m.Close()
+	}
+
+	return nil
+
 }
 
 // SelectorsForImage returns all of the Objective-C selectors for a given image
 func (f *File) SelectorsForImage(imageNames ...string) error {
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
 	libobjc, err := f.getLibObjC()
@@ -777,7 +804,6 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 		return fmt.Errorf("unable to find __DATA_CONST.__objc_scoffs")
 	}
 
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
@@ -870,7 +896,6 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 
 // CFStringsForImage returns all of the Objective-C cfstrings for a given image
 func (f *File) CFStringsForImage(imageNames ...string) error {
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
