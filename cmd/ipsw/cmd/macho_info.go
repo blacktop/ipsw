@@ -37,6 +37,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	"github.com/fullsailor/pkcs7"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -309,10 +310,13 @@ var machoInfoCmd = &cobra.Command{
 			fmt.Println("===========")
 			if m.HasObjC() {
 				if info, err := m.GetObjCImageInfo(); err == nil {
-					// fmt.Println(m.GetObjCInfo())
 					fmt.Println(info.Flags)
+				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+					log.Error(err.Error())
 				}
-
+				if Verbose {
+					fmt.Println(m.GetObjCToc())
+				}
 				if protos, err := m.GetObjCProtocols(); err == nil {
 					for _, proto := range protos {
 						if Verbose {
@@ -321,6 +325,8 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Println(proto.String())
 						}
 					}
+				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+					log.Error(err.Error())
 				}
 				if classes, err := m.GetObjCClasses(); err == nil {
 					for _, class := range classes {
@@ -330,7 +336,7 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Println(class.String())
 						}
 					}
-				} else {
+				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 					log.Error(err.Error())
 				}
 				if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
@@ -341,6 +347,8 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Println(class.String())
 						}
 					}
+				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+					log.Error(err.Error())
 				}
 				if cats, err := m.GetObjCCategories(); err == nil {
 					for _, cat := range cats {
@@ -350,6 +358,8 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Println(cat.String())
 						}
 					}
+				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+					log.Error(err.Error())
 				}
 				if showObjcRefs {
 					if protRefs, err := m.GetObjCProtoReferences(); err == nil {
@@ -357,6 +367,8 @@ var machoInfoCmd = &cobra.Command{
 						for off, prot := range protRefs {
 							fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr, prot.Name)
 						}
+					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+						log.Error(err.Error())
 					}
 					if clsRefs, err := m.GetObjCClassReferences(); err == nil {
 						fmt.Printf("\n@class refs\n")
@@ -368,24 +380,32 @@ var machoInfoCmd = &cobra.Command{
 							// 	fmt.Println(cls.String())
 							// }
 						}
+					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+						log.Error(err.Error())
 					}
 					if supRefs, err := m.GetObjCSuperReferences(); err == nil {
 						fmt.Printf("\n@super refs\n")
 						for off, sup := range supRefs {
 							fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr, sup.Name)
 						}
+					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+						log.Error(err.Error())
 					}
 					if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
 						fmt.Printf("\n@selectors refs\n")
 						for off, sel := range selRefs {
 							fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
 						}
+					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+						log.Error(err.Error())
 					}
 					if methods, err := m.GetObjCMethodNames(); err == nil {
 						fmt.Printf("\n@methods\n")
 						for method, vmaddr := range methods {
 							fmt.Printf("0x%011x: %s\n", vmaddr, method)
 						}
+					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+						log.Error(err.Error())
 					}
 				}
 
