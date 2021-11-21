@@ -185,6 +185,7 @@ var dyldMachoCmd = &cobra.Command{
 						return err
 					}
 				}
+				defer m.Close()
 
 				if extractDylib {
 					fname := filepath.Join(filepath.Dir(dscPath), "extracted", filepath.Base(i.Name))
@@ -200,9 +201,7 @@ var dyldMachoCmd = &cobra.Command{
 							}
 						}
 
-						if err := f.GetLocalSymbolsForImage(i); err != nil {
-							return fmt.Errorf("failed to get local symbols for image %s: %v", i.Name, err)
-						}
+						f.GetLocalSymbolsForImage(i)
 
 						err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbols())
 						if err != nil {
@@ -229,10 +228,13 @@ var dyldMachoCmd = &cobra.Command{
 					fmt.Println("===========")
 					if m.HasObjC() {
 						if info, err := m.GetObjCImageInfo(); err == nil {
-							// fmt.Println(m.GetObjCInfo())
 							fmt.Println(info.Flags)
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
 						}
-
+						if Verbose {
+							fmt.Println(m.GetObjCToc())
+						}
 						if protos, err := m.GetObjCProtocols(); err == nil {
 							for _, proto := range protos {
 								if Verbose {
@@ -241,6 +243,8 @@ var dyldMachoCmd = &cobra.Command{
 									fmt.Println(proto.String())
 								}
 							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
 						}
 						if classes, err := m.GetObjCClasses(); err == nil {
 							for _, class := range classes {
@@ -261,6 +265,8 @@ var dyldMachoCmd = &cobra.Command{
 									fmt.Println(class.String())
 								}
 							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
 						}
 						if cats, err := m.GetObjCCategories(); err == nil {
 							for _, cat := range cats {
@@ -270,6 +276,8 @@ var dyldMachoCmd = &cobra.Command{
 									fmt.Println(cat.String())
 								}
 							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
 						}
 						if showObjcRefs {
 							if protRefs, err := m.GetObjCProtoReferences(); err == nil {
@@ -277,6 +285,8 @@ var dyldMachoCmd = &cobra.Command{
 								for off, prot := range protRefs {
 									fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr, prot.Name)
 								}
+							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+								log.Error(err.Error())
 							}
 							if clsRefs, err := m.GetObjCClassReferences(); err == nil {
 								fmt.Printf("\n@class refs\n")
@@ -288,24 +298,32 @@ var dyldMachoCmd = &cobra.Command{
 									// 	fmt.Println(cls.String())
 									// }
 								}
+							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+								log.Error(err.Error())
 							}
 							if supRefs, err := m.GetObjCSuperReferences(); err == nil {
 								fmt.Printf("\n@super refs\n")
 								for off, sup := range supRefs {
 									fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr, sup.Name)
 								}
+							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+								log.Error(err.Error())
 							}
 							if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
 								fmt.Printf("\n@selectors refs\n")
 								for off, sel := range selRefs {
 									fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
 								}
+							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+								log.Error(err.Error())
 							}
 							if methods, err := m.GetObjCMethodNames(); err == nil {
 								fmt.Printf("\n@methods\n")
 								for method, vmaddr := range methods {
 									fmt.Printf("0x%011x: %s\n", vmaddr, method)
 								}
+							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+								log.Error(err.Error())
 							}
 						}
 
