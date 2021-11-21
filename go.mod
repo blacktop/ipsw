@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-macho v1.1.65
+	github.com/blacktop/go-macho v1.1.70
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -28,9 +28,9 @@ require (
 	github.com/spf13/viper v1.9.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v5 v5.4.0
-	golang.org/x/crypto v0.0.0-20211115234514-b4de73f9ece8
-	golang.org/x/net v0.0.0-20211116231205-47ca1ff31462
-	golang.org/x/sys v0.0.0-20211116061358-0a5406a5449c
+	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4
+	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1
 )
 
 require github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
