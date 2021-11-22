@@ -163,6 +163,7 @@ var symaddrCmd = &cobra.Command{
 								if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 									sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
 								}
+								log.WithField("dylib", image.Name).Debug("Found")
 								fmt.Printf("%#016x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
 								if !allMatches {
 									return nil

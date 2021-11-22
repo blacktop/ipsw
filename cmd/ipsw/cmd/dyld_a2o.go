@@ -106,10 +106,10 @@ var a2oCmd = &cobra.Command{
 				}
 				if f.IsDyld4 {
 					log.WithFields(log.Fields{
-						"cache_uuid": uuid.String(),
-						"hex":        fmt.Sprintf("%#x", off),
-						"dec":        fmt.Sprintf("%d", off),
-						"mapping":    m.Name,
+						"uuid":    uuid.String(),
+						"hex":     fmt.Sprintf("%#x", off),
+						"dec":     fmt.Sprintf("%d", off),
+						"mapping": m.Name,
 					}).Info("Offset")
 				} else {
 					log.WithFields(log.Fields{
