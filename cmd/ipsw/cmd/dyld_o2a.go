@@ -91,24 +91,38 @@ var o2aCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		address, err := f.GetVMAddressForUUID(f.UUID, offset)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			if inDec {
-				fmt.Printf("%d\n", address)
-			} else if inHex {
-				fmt.Printf("%#x\n", address)
+		if f.IsDyld4 {
+			log.Warn("dyld4 cache detected (will search for offset in each subcache)")
+		}
+		for uuid := range f.MappingsWithSlideInfo {
+			address, err := f.GetVMAddressForUUID(uuid, offset)
+			if err != nil {
+				continue
 			} else {
-				_, m, err := f.GetMappingForVMAddress(address)
-				if err != nil {
-					return err
+				if inDec {
+					fmt.Printf("%d\n", address)
+				} else if inHex {
+					fmt.Printf("%#x\n", address)
+				} else {
+					_, m, err := f.GetMappingForVMAddress(address)
+					if err != nil {
+						return err
+					}
+					if f.IsDyld4 {
+						log.WithFields(log.Fields{
+							"uuid":    uuid.String(),
+							"hex":     fmt.Sprintf("%#x", address),
+							"dec":     fmt.Sprintf("%d", address),
+							"mapping": m.Name,
+						}).Info("Address")
+					} else {
+						log.WithFields(log.Fields{
+							"hex":     fmt.Sprintf("%#x", address),
+							"dec":     fmt.Sprintf("%d", address),
+							"mapping": m.Name,
+						}).Info("Address")
+					}
 				}
-				log.WithFields(log.Fields{
-					"hex":     fmt.Sprintf("%#x", address),
-					"dec":     fmt.Sprintf("%d", address),
-					"mapping": m.Name,
-				}).Info("Address")
 			}
 		}
 
