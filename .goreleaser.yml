@@ -97,9 +97,11 @@ changelog:
       - Merge branch
 release:
   footer: |
+    ### Summary
+    **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .Env.CUR_VERSION }}...{{ .Env.NEXT_VERSION }}
     ## What to do next?
-    - Follow us on [Twitter](https://twitter.com/blacktop__);
-    - Read the [documentation](https://blacktop.github.io/ipsw/docs/).
+    - Follow us on [Twitter](https://twitter.com/blacktop__)
+    - Read the [documentation](https://blacktop.github.io/ipsw/docs/)
 announce:
   twitter:
     enabled: true
