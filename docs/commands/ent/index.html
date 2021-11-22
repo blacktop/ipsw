@@ -286,7 +286,12 @@ platform-application /usr/libexec/swcd
 	&lt;/array&gt;
 &lt;/dict&gt;
 &lt;/plist&gt;
-</code></pre></div>
+</code></pre></div><p>Use a previously created entitlements database</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --ent platform-application --db /tmp/IPSW.entDB
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> When you run the <code>ipsw ent</code> command on an <strong>IPSW</strong> it will auto-create <strong>IPSW.entDB</strong> next to the <strong>IPSW</strong> file and it will try and use that if you run it again on the same <strong>IPSW</strong>.</p>
+</blockquote>
+
 </div>
 </div>
 
