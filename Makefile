@@ -23,7 +23,7 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@goreleaser build --rm-dist --skip-validate --single-target
+	@goreleaser build --rm-dist --snapshot --single-target
 
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot

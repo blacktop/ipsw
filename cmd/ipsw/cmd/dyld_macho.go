@@ -52,7 +52,7 @@ func init() {
 	// dyldMachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
 
 	dyldMachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
-	// dyldMachoCmd.Flags().StringP("out", "", "", "🚧 Directory to extract the dylib")
+	dyldMachoCmd.Flags().String("output", "", "Directory to extract the dylib(s)")
 
 	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -127,6 +127,7 @@ var dyldMachoCmd = &cobra.Command{
 		// dumpStubs, _ := cmd.Flags().GetBool("stubs")
 		dumpALL, _ := cmd.Flags().GetBool("all")
 		extractDylib, _ := cmd.Flags().GetBool("extract")
+		extractPath, _ := cmd.Flags().GetString("output")
 
 		onlyFuncStarts := !showLoadCommands && !showObjC && showFuncStarts
 
@@ -174,12 +175,15 @@ var dyldMachoCmd = &cobra.Command{
 			for _, i := range images {
 
 				if dumpALL {
-					fmt.Printf("IMAGE: %s\n", i.Name)
+					log.WithField("name", i.Name).Debug("Image")
 				}
 
 				m, err := i.GetMacho()
 				if err != nil {
 					log.Warnf("failed to parse full MachO for %s: %v", i.Name, err)
+					if extractDylib {
+						continue
+					}
 					m, err = i.GetPartialMacho()
 					if err != nil {
 						return err
@@ -188,9 +192,13 @@ var dyldMachoCmd = &cobra.Command{
 				defer m.Close()
 
 				if extractDylib {
-					fname := filepath.Join(filepath.Dir(dscPath), "extracted", filepath.Base(i.Name))
+					folder := filepath.Dir(dscPath) // default to folder of shared cache
+					if len(extractPath) > 0 {
+						folder = extractPath
+					}
+					fname := filepath.Join(folder, i.Name) // default to full dylib path
 					if !dumpALL {
-						fname = filepath.Join(filepath.Dir(dscPath), filepath.Base(i.Name))
+						fname = filepath.Join(folder, filepath.Base(i.Name))
 					}
 					if _, err := os.Stat(fname); os.IsNotExist(err) {
 						var dcf *fixupchains.DyldChainedFixups
