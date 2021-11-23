@@ -167,22 +167,17 @@ func (i *CacheImage) Seek(offset int64, whence int) (int64, error) {
 }
 
 func (i *CacheImage) ReadAt(p []byte, off int64) (n int, err error) {
-	var offset uint64
 	if i.m == nil {
 		i.m, err = i.GetPartialMacho()
 		if err != nil {
 			return -1, err
 		}
 	}
-	addr, err := i.m.GetVMAddress(uint64(off))
+	i.ruuid, _, err = i.cache.GetOffset(i.m.Segment("__LINKEDIT").Addr)
+	// i.ruuid, offset, err = i.cache.GetOffset(addr)
 	if err != nil {
 		return -1, err
 	}
-	i.ruuid, offset, err = i.cache.GetOffset(addr)
-	if err != nil {
-		return -1, err
-	}
-	off = int64(offset)
 	if off < 0 || off >= i.limit-i.base {
 		return 0, io.EOF
 	}
@@ -318,7 +313,9 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			types.LC_LOAD_UPWARD_DYLIB},
 		Offset:          int64(offset),
 		SectionReader:   types.NewCustomSectionReader(i.cache.r[i.cuuid], &vma, 0, 1<<63-1),
+		CacheReader:     i,
 		VMAddrConverter: vma,
+		// RelativeSelectorBase: rsBase,
 	})
 }
 

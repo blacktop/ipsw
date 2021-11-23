@@ -37,6 +37,8 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/vbauerster/mpb/v7"
+	"github.com/vbauerster/mpb/v7/decor"
 )
 
 func init() {
@@ -53,6 +55,7 @@ func init() {
 
 	dyldMachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
 	dyldMachoCmd.Flags().String("output", "", "Directory to extract the dylib(s)")
+	dyldMachoCmd.Flags().Bool("force", false, "Overwrite existing extracted dylib(s)")
 
 	dyldMachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -114,6 +117,8 @@ var dyldMachoCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var bar *mpb.Bar
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -128,6 +133,7 @@ var dyldMachoCmd = &cobra.Command{
 		dumpALL, _ := cmd.Flags().GetBool("all")
 		extractDylib, _ := cmd.Flags().GetBool("extract")
 		extractPath, _ := cmd.Flags().GetString("output")
+		forceExtract, _ := cmd.Flags().GetBool("force")
 
 		onlyFuncStarts := !showLoadCommands && !showObjC && showFuncStarts
 
@@ -163,6 +169,25 @@ var dyldMachoCmd = &cobra.Command{
 
 			if dumpALL {
 				images = f.Images
+				// initialize progress bar
+				p := mpb.New(mpb.WithWidth(80))
+				// adding a single bar, which will inherit container's width
+				bar = p.Add(int64(len(images)),
+					// progress bar filler with customized style
+					mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+					mpb.PrependDecorators(
+						decor.Name("     ", decor.WC{W: len("     ") + 1, C: decor.DidentRight}),
+						// replace ETA decorator with "done" message, OnComplete event
+						decor.OnComplete(
+							decor.AverageETA(decor.ET_STYLE_GO, decor.WC{W: 4}), "✅ ",
+						),
+					),
+					mpb.AppendDecorators(
+						decor.Percentage(),
+						// decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(len(images))/2048), "✅ "),
+						decor.Name(" ] "),
+					),
+				)
 			} else {
 				if img := f.Image(args[1]); img != nil {
 					images = append(images, img)
@@ -192,15 +217,17 @@ var dyldMachoCmd = &cobra.Command{
 				defer m.Close()
 
 				if extractDylib {
+
 					folder := filepath.Dir(dscPath) // default to folder of shared cache
 					if len(extractPath) > 0 {
 						folder = extractPath
 					}
-					fname := filepath.Join(folder, i.Name) // default to full dylib path
-					if !dumpALL {
-						fname = filepath.Join(folder, filepath.Base(i.Name))
+					fname := filepath.Join(folder, filepath.Base(i.Name)) // default to NOT full dylib path
+					if dumpALL {
+						fname = filepath.Join(folder, i.Name)
 					}
-					if _, err := os.Stat(fname); os.IsNotExist(err) {
+
+					if _, err := os.Stat(fname); os.IsNotExist(err) || forceExtract {
 						var dcf *fixupchains.DyldChainedFixups
 						if m.HasFixups() {
 							dcf, err = m.DyldChainedFixups()
@@ -219,10 +246,17 @@ var dyldMachoCmd = &cobra.Command{
 						if err := rebaseMachO(f, fname); err != nil {
 							return fmt.Errorf("failed to rebase macho via cache slide info: %v", err)
 						}
-
-						log.Infof("Created %s", fname)
+						if !dumpALL {
+							log.Infof("Created %s", fname)
+						} else {
+							bar.Increment()
+						}
 					} else {
-						log.Warnf("dylib already exists: %s", fname)
+						if !dumpALL {
+							log.Warnf("dylib already exists: %s", fname)
+						} else {
+							bar.Increment()
+						}
 					}
 					continue
 				}
