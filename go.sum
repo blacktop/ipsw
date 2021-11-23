@@ -88,8 +88,8 @@ github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kB
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
 github.com/blacktop/go-arm64 v0.6.18 h1:QzQaqkZ61nN9fP04Q0SrHv4e7Ln0hMTYgfR7hzxeUiE=
 github.com/blacktop/go-arm64 v0.6.18/go.mod h1:MadXPi/vTAx0FYNcQllHRMZrRRuwPfjzhr7d1UUWQc0=
-github.com/blacktop/go-macho v1.1.73 h1:4I1SwpdNUo3YpfCpNJ7ByW833luGYQMndj3dBGse91g=
-github.com/blacktop/go-macho v1.1.73/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
+github.com/blacktop/go-macho v1.1.74 h1:c7OTL/PHmDL+9DO0vT1dTP6cTzdzoXK6WYdMKf2GjM0=
+github.com/blacktop/go-macho v1.1.74/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
 github.com/blacktop/go-plist v1.0.1 h1:cbpYg6OYwSpJPLk8ObZW+norqxG5YInfPXRNcFw6n8I=
 github.com/blacktop/go-plist v1.0.1/go.mod h1:niIOeDMEBISbJ9w0PPuc67iLvLh7Ve0N1gAfxIRWSk4=
 github.com/blacktop/lzss v0.1.1 h1:ADOUgVH3hq2miBfaxhV1GgY97wNSv5fBiXRnUVe8QSg=
