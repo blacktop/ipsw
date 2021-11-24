@@ -34,7 +34,7 @@ require (
 	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1
 )
 
-replace github.com/blacktop/go-macho => ../go-macho
+// replace github.com/blacktop/go-macho => ../go-macho
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
