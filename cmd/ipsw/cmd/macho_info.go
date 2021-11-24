@@ -339,17 +339,6 @@ var machoInfoCmd = &cobra.Command{
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 					log.Error(err.Error())
 				}
-				if nlclasses, err := m.GetObjCPlusLoadClasses(); err == nil {
-					for _, class := range nlclasses {
-						if Verbose {
-							fmt.Println(class.Verbose())
-						} else {
-							fmt.Println(class.String())
-						}
-					}
-				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-					log.Error(err.Error())
-				}
 				if cats, err := m.GetObjCCategories(); err == nil {
 					for _, cat := range cats {
 						if Verbose {

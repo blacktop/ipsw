@@ -217,14 +217,13 @@ func (i *CacheImage) ReadAtAddr(buf []byte, addr uint64) (int, error) {
 
 // GetOffset returns the offset for a given virtual address
 func (i *CacheImage) GetOffset(address uint64) (uint64, error) {
-	// u, o, e := i.cache.GetOffset(address)
-	u, _, e := i.cache.GetOffset(address)
-	if e != nil {
-		return 0, e
+	u, o, err := i.cache.GetOffset(address)
+	if err != nil {
+		return 0, err
 	}
+	i.ruuid = u
 	// fmt.Printf("prim_uuid=%s, cache_uuid=%s, uuid=%s, off=%#x\n", i.cache.UUID, i.cuuid, u, o)
-	return i.cache.GetOffsetForUUID(u, address)
-	// return i.cache.GetOffsetForUUID(i.cuuid, address)
+	return o, nil
 }
 
 // GetVMAddress returns the virtual address for a given offset

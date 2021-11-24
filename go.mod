@@ -8,13 +8,14 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-macho v1.1.74
+	github.com/blacktop/go-macho v1.1.75
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.13.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
+	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/hashicorp/go-version v1.3.0
 	github.com/hinshun/vt10x v0.0.0-20180809195222-d55458df857c // indirect
@@ -33,7 +34,7 @@ require (
 	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1
 )
 
-require github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
+replace github.com/blacktop/go-macho => ../go-macho
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
