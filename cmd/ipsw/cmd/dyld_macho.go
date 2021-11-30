@@ -51,7 +51,7 @@ func init() {
 	dyldMachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	dyldMachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
-	// dyldMachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
+	dyldMachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
 
 	dyldMachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
 	dyldMachoCmd.Flags().String("output", "", "Directory to extract the dylib(s)")
@@ -129,7 +129,7 @@ var dyldMachoCmd = &cobra.Command{
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
-		// dumpStubs, _ := cmd.Flags().GetBool("stubs")
+		dumpStubs, _ := cmd.Flags().GetBool("stubs")
 		dumpALL, _ := cmd.Flags().GetBool("all")
 		extractDylib, _ := cmd.Flags().GetBool("extract")
 		extractPath, _ := cmd.Flags().GetString("output")
@@ -237,6 +237,14 @@ var dyldMachoCmd = &cobra.Command{
 						}
 
 						f.GetLocalSymbolsForImage(i)
+
+						// cc, err := m.GetObjCClasses()
+						// if err != nil {
+						// 	return err
+						// }
+						// for _, c := range cc {
+						// 	fmt.Println(c)
+						// }
 
 						err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbols())
 						if err != nil {
@@ -456,17 +464,18 @@ var dyldMachoCmd = &cobra.Command{
 					}
 				}
 
-				// if dumpStubs {
-				// 	if err := f.AnalyzeImage(i); err != nil {
-				// 		return err
-				// 	}
-				// 	for stubAddr, addr := range i.Analysis.SymbolStubs {
-				// 		if symName, ok := f.AddressToSymbol[addr]; ok {
-				// 			fmt.Printf("%#x: %s\n", stubAddr, symName)
-				// 			// return nil
-				// 		}
-				// 	}
-				// }
+				if dumpStubs {
+					fmt.Printf("\nStubs\n")
+					fmt.Println("-----")
+					if err := f.AnalyzeImage(i); err != nil {
+						return err
+					}
+					for stubAddr, addr := range i.Analysis.SymbolStubs {
+						if symName, ok := f.AddressToSymbol[addr]; ok {
+							fmt.Printf("%#x => %#x: %s\n", stubAddr, addr, symName)
+						}
+					}
+				}
 			}
 		} else {
 			log.Error("you must supply a dylib MachO to parse")
