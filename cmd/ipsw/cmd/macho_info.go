@@ -431,7 +431,7 @@ var machoInfoCmd = &cobra.Command{
 				if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 					sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
 				}
-				fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+				fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 				// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 			}
 			w.Flush()
@@ -444,7 +444,7 @@ var machoInfoCmd = &cobra.Command{
 					return err
 				}
 				for _, export := range exports {
-					fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
+					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
 				}
 				w.Flush()
 			}
@@ -452,7 +452,7 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Printf("\nCFStrings\n")
 				fmt.Println("---------")
 				for _, cfstr := range cfstrs {
-					fmt.Printf("%#016x:  %#v\n", cfstr.Address, cfstr.Name)
+					fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
 				}
 			}
 		}
