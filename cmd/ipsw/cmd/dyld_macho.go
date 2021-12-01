@@ -135,7 +135,8 @@ var dyldMachoCmd = &cobra.Command{
 		extractPath, _ := cmd.Flags().GetString("output")
 		forceExtract, _ := cmd.Flags().GetBool("force")
 
-		onlyFuncStarts := !showLoadCommands && !showObjC && showFuncStarts
+		onlyFuncStarts := !showLoadCommands && !showObjC && !dumpStubs && showFuncStarts
+		onlyStubs := !showLoadCommands && !showObjC && !showFuncStarts && dumpStubs
 
 		dscPath := filepath.Clean(args[0])
 
@@ -269,7 +270,7 @@ var dyldMachoCmd = &cobra.Command{
 					continue
 				}
 
-				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts {
+				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs {
 					fmt.Println(m.FileTOC.String())
 				}
 
@@ -398,7 +399,7 @@ var dyldMachoCmd = &cobra.Command{
 							if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 								sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
 							}
-							fmt.Fprintf(w, "%#016x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+							fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 							// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 						}
 						w.Flush()
@@ -425,7 +426,7 @@ var dyldMachoCmd = &cobra.Command{
 						fmt.Printf("\nCFStrings\n")
 						fmt.Println("---------")
 						for _, cfstr := range cfstrs {
-							fmt.Printf("%#016x:  %#v\n", cfstr.Address, cfstr.Name)
+							fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
 						}
 					}
 				}
@@ -465,8 +466,10 @@ var dyldMachoCmd = &cobra.Command{
 				}
 
 				if dumpStubs {
-					fmt.Printf("\nStubs\n")
-					fmt.Println("-----")
+					if !onlyStubs {
+						fmt.Printf("\nStubs\n")
+						fmt.Println("=====")
+					}
 					if err := f.AnalyzeImage(i); err != nil {
 						return err
 					}

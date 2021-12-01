@@ -24,11 +24,12 @@ type patchableExport struct {
 type astate struct {
 	mu sync.Mutex
 
-	Deps     bool
-	Got      bool
-	Stubs    bool
-	Exports  bool
-	Privates bool
+	Deps        bool
+	Got         bool
+	Stubs       bool
+	StubHelpers bool
+	Exports     bool
+	Privates    bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -52,6 +53,17 @@ func (a *astate) IsGotDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Got
+}
+func (a *astate) SetStubHelpers(done bool) {
+	a.mu.Lock()
+	a.StubHelpers = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsStubHelpersDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.StubHelpers
 }
 func (a *astate) SetStubs(done bool) {
 	a.mu.Lock()
