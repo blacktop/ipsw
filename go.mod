@@ -30,8 +30,8 @@ require (
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v7 v7.1.5
 	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
-	golang.org/x/net v0.0.0-20211118161319-6a13c67c3ce4
-	golang.org/x/sys v0.0.0-20211117180635-dee7805ff2e1
+	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9
+	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
@@ -57,7 +57,7 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
-	github.com/mattn/go-colorable v0.1.11 // indirect
+	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
@@ -77,6 +77,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
-	gopkg.in/ini.v1 v1.64.0 // indirect
+	gopkg.in/ini.v1 v1.66.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
