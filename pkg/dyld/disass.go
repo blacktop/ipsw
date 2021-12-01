@@ -17,6 +17,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+var ErrMachOSectionNotFound = errors.New("missing required MachO section")
+
 type dylibArray []*CacheImage
 
 func (arr dylibArray) contains(img *CacheImage) bool {
@@ -293,29 +295,11 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
 	}
 
-	if !image.Analysis.State.IsStubsDone() && f.IsArm64() {
-		log.Debugf("parsing %s symbol stubs", image.Name)
-		if err := f.ParseSymbolStubs(image); err != nil {
-			return err
-		}
-
-		for stub, target := range image.Analysis.SymbolStubs {
-			if symName, ok := f.AddressToSymbol[target]; ok {
-				f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
-			} else {
-				img, err := f.GetImageContainingTextAddr(target)
-				if err != nil {
-					return err
-				}
-				if err := f.AnalyzeImage(img); err != nil {
-					return err
-				}
-				if symName, ok := f.AddressToSymbol[target]; ok {
-					f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
-				} else {
-					f.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
-					log.Errorf("no sym found for __stub: %#x; found in %s", stub, img.Name)
-				}
+	if !image.Analysis.State.IsStubHelpersDone() && f.IsArm64() {
+		log.Debugf("parsing %s symbol stub helpers", image.Name)
+		if err := f.ParseSymbolStubHelpers(image); err != nil {
+			if !errors.Is(err, ErrMachOSectionNotFound) {
+				return err
 			}
 		}
 	}
@@ -336,8 +320,12 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 					}
 					if symName, ok := f.AddressToSymbol[target]; ok {
 						f.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+					} else if laptr, ok := image.Analysis.GotPointers[target]; ok {
+						if symName, ok := f.AddressToSymbol[laptr]; ok {
+							f.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+						}
 					} else {
-						// log.Errorf("no sym found for __got: %#x; found in %s", entry, img.Name)
+						utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x in %s", entry, target, img.Name))
 						f.AddressToSymbol[entry] = fmt.Sprintf("__got_%x ; %s", target, filepath.Base(img.Name))
 					}
 				} else {
@@ -348,7 +336,83 @@ func (f *File) AnalyzeImage(image *CacheImage) error {
 		}
 	}
 
+	if !image.Analysis.State.IsStubsDone() && f.IsArm64() {
+		log.Debugf("parsing %s symbol stubs", image.Name)
+		if err := f.ParseSymbolStubs(image); err != nil {
+			return err
+		}
+
+		for stub, target := range image.Analysis.SymbolStubs {
+			if symName, ok := f.AddressToSymbol[target]; ok {
+				f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+			} else {
+				img, err := f.GetImageContainingTextAddr(target)
+				if err != nil {
+					return err
+				}
+				if err := f.AnalyzeImage(img); err != nil {
+					return err
+				}
+				if symName, ok := f.AddressToSymbol[target]; ok {
+					f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+				} else if laptr, ok := image.Analysis.GotPointers[target]; ok {
+					if symName, ok := f.AddressToSymbol[laptr]; ok {
+						f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+					}
+				} else {
+					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
+					f.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
+				}
+			}
+		}
+	}
+
 	return nil
+}
+
+// ParseSymbolStubHelpers parse symbol stub helpers in MachO
+func (f *File) ParseSymbolStubHelpers(image *CacheImage) error {
+
+	m, err := image.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", image.Name, err)
+	}
+	defer m.Close()
+
+	if sec := m.Section("__TEXT", "__stub_helper"); sec != nil {
+		dat, err := sec.Data()
+		if err != nil {
+			return err
+		}
+
+		stubHelperFnStart := sec.Addr
+		for i := range arm64.Disassemble(bytes.NewReader(dat), arm64.Options{StartAddress: int64(sec.Addr)}) {
+			if i.Error != nil {
+				continue
+			}
+			if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
+				if i.Instruction.Operation() == arm64.ARM64_BR {
+					stubHelperFnStart = i.Instruction.Address() + 4
+					continue
+				}
+				if operands := i.Instruction.Operands(); operands != nil {
+					for _, operand := range operands {
+						if operand.OpClass == arm64.LABEL {
+							if symName, ok := f.AddressToSymbol[operand.Immediate]; ok {
+								f.AddressToSymbol[stubHelperFnStart] = fmt.Sprintf("__stub_helper.%s", symName)
+							}
+						}
+					}
+				}
+			}
+		}
+
+		image.Analysis.State.SetStubHelpers(true)
+
+		return nil
+	}
+
+	return fmt.Errorf("dylib does NOT contain __TEXT.__stub_helper section: %w", ErrMachOSectionNotFound)
 }
 
 // ParseSymbolStubs parse symbol stubs in MachO
@@ -386,6 +450,22 @@ func (f *File) ParseSymbolStubs(image *CacheImage) error {
 						if adrpRegister == i.Instruction.Operands()[0].Reg[0] {
 							adrpImm += i.Instruction.Operands()[2].Immediate
 							adrpAddr = prevInst.Address()
+						}
+					}
+				} else if i.Instruction.Operation() == arm64.ARM64_LDR && prevInst.Operation() == arm64.ARM64_ADRP {
+					if i.Instruction.Operands() != nil && prevInst.Operands() != nil {
+						// adrp	x16, #0x1e3be9000
+						adrpRegister := prevInst.Operands()[0].Reg[0] // x16
+						adrpImm = prevInst.Operands()[1].Immediate    // #0x1e3be9000
+						// ldr	x16, [x16, #0x560]
+						if adrpRegister == i.Instruction.Operands()[0].Reg[0] {
+							adrpImm += i.Instruction.Operands()[1].Immediate
+							adrpAddr = prevInst.Address()
+							addr, err := f.ReadPointerAtAddress(adrpImm)
+							if err != nil {
+								return fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
+							}
+							image.Analysis.SymbolStubs[adrpAddr] = f.SlideInfo.SlidePointer(addr)
 						}
 					}
 				} else if i.Instruction.Operation() == arm64.ARM64_LDR && prevInst.Operation() == arm64.ARM64_ADD {
