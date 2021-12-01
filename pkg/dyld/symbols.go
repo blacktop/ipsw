@@ -424,14 +424,20 @@ func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error
 				if err != nil {
 					return err
 				}
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 				for _, sym := range m.Symtab.Syms {
 					// TODO: Handle ReExports
 					if dump {
-						fmt.Println(sym)
+						var sec string
+						if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+							sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+						}
+						fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
 					} else {
 						f.AddressToSymbol[sym.Value] = sym.Name
 					}
 				}
+				w.Flush()
 			} else {
 				return err
 			}

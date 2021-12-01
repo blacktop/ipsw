@@ -586,7 +586,9 @@ func (f *File) ProtocolsForImage(imageNames ...string) error {
 		}
 		image.ObjC.ProtoRefs, err = m.GetObjCProtoReferences()
 		if err != nil {
-			return fmt.Errorf("failed to get protocol references for image %s: %v", image.Name, err)
+			if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+				return fmt.Errorf("failed to get protocol references for image %s: %v", image.Name, err)
+			}
 		}
 		for k, v := range image.ObjC.ProtoRefs {
 			f.AddressToSymbol[v.Ptr] = v.Name

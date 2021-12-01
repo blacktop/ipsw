@@ -481,12 +481,12 @@ func (s CacheLocalSymbol64) String() string {
 	var found string
 	var sec string
 	if len(s.FoundInDylib) > 0 {
-		found = fmt.Sprintf(", %s", s.FoundInDylib)
+		found = fmt.Sprintf("\t%s", s.FoundInDylib)
 	}
 	if s.Sect > 0 && s.Sections != nil {
 		sec = fmt.Sprintf("%s.%s", s.Sections[s.Sect-1].Seg, s.Sections[s.Sect-1].Name)
 	}
-	return fmt.Sprintf("%#016x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
+	return fmt.Sprintf("%#09x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
 }
 
 type CacheImageInfoExtra struct {
