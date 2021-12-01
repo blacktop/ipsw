@@ -149,7 +149,7 @@ jobs:
 
       - name: Make cache folder
         if: matrix.platform == 'macos-11'
-        run: mkdir ~/.ipsw
+        run: mkdir -p ~/.ipsw
       #
       # DOWNLOAD CMD (macOS)
       #
