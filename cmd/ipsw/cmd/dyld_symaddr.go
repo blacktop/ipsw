@@ -187,6 +187,7 @@ var symaddrCmd = &cobra.Command{
 						for _, bind := range binds {
 							if bind.Name == args[1] {
 								fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name, image.Name)
+
 								if !allMatches {
 									w.Flush()
 									return nil
@@ -241,35 +242,11 @@ var symaddrCmd = &cobra.Command{
 				fmt.Fprintf(w, "%s\n", sym)
 			}
 			w.Flush()
-			binds, err := m.GetBindInfo()
-			if err != nil {
-				return err
-			}
-			for _, bind := range binds {
-				fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
-			}
-			w.Flush()
 
 			// Dump ALL public symbols for a dylib
 			log.Warn("parsing exported symbols for image...")
 			if err := f.GetAllExportedSymbolsForImage(i, true); err != nil {
-				log.Error(err.Error())
-
-				log.Warn("falling back to MachO symtab")
-				m, err := i.GetMacho()
-				if err != nil {
-					return err
-				}
-
-				var sec string
-				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
-				for _, sym := range m.Symtab.Syms {
-					if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-						sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
-					}
-					fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
-				}
-				w.Flush()
+				log.Errorf("failed to get all exported symbols for image %s: %v", imageName, err)
 			}
 
 			return nil
@@ -299,19 +276,6 @@ var symaddrCmd = &cobra.Command{
 			for _, sym := range image.LocalSymbols {
 				sym.Sections = m.Sections
 				fmt.Fprintf(w, "%s\n", sym)
-			}
-			binds, err := m.GetBindInfo()
-			if err != nil {
-				return err
-			}
-			for _, bind := range binds {
-				if bind.Name == args[1] {
-					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name, image.Name)
-					if !allMatches {
-						w.Flush()
-						return nil
-					}
-				}
 			}
 			w.Flush()
 		}
