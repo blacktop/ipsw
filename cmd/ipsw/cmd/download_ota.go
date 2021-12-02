@@ -248,18 +248,18 @@ var otaDLCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to open remote zip to OTA: %v", err)
 					}
-					if remoteDyld {
-						log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
-						err = ota.RemoteExtract(zr, "^System/Library/.*/dyld_shared_cache.*$", destPath)
-						if err != nil {
-							return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
-						}
-					}
 					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
 						err = kernelcache.RemoteParse(zr, destPath)
 						if err != nil {
 							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
+						}
+					}
+					if remoteDyld {
+						log.Info("Extracting remote dyld_shared_cache (can be a bit CPU intensive)")
+						err = ota.RemoteExtract(zr, "^System/Library/.*/dyld_shared_cache.*$", destPath)
+						if err != nil {
+							return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
 						}
 					}
 				}
