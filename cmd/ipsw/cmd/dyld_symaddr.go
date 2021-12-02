@@ -55,7 +55,6 @@ var symaddrCmd = &cobra.Command{
 		}
 
 		imageName, _ := cmd.Flags().GetString("image")
-		// cacheFile, _ := cmd.Flags().GetString("cache")
 		allMatches, _ := cmd.Flags().GetBool("all")
 
 		dscPath := filepath.Clean(args[0])
@@ -143,32 +142,33 @@ var symaddrCmd = &cobra.Command{
 			}
 			log.Warn("searching in exported symbols...")
 			for _, image := range f.Images {
-				// utils.Indent(log.Debug, 2)("searching " + image.Name)
+				// utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				m, err := f.Image(image.Name).GetPartialMacho()
 				if err != nil {
 					return err
 				}
 
+				// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 				if sym, err := f.FindExportedSymbolInImage(image.Name, args[1]); err != nil {
 					if !errors.Is(err, dyld.ErrSymbolNotInImage) {
 						m, err := f.Image(image.Name).GetMacho()
 						if err != nil {
 							return err
 						}
-						w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 						for _, sym := range m.Symtab.Syms {
 							if sym.Name == args[1] {
 								var sec string
 								if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 									sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
 								}
-								fmt.Fprintf(w, "%#09x:\t(%s)\t%s\t%s\n", sym.Value, sym.Type.String(sec), sym.Name, image.Name)
+								fmt.Printf("%#09x:\t(%s)\t%s\t%s\n", sym.Value, sym.Type.String(sec), sym.Name, image.Name)
+
 								if !allMatches {
+									// w.Flush()
 									return nil
 								}
 							}
 						}
-						w.Flush()
 					}
 				} else {
 					if sym.Flags.ReExport() {
@@ -178,12 +178,13 @@ var symaddrCmd = &cobra.Command{
 							sym.Address = rexpSym.Address
 						}
 					}
-					fmt.Println(sym)
+					fmt.Printf("%s\t%s\n", sym, image.Name)
 
 					if !allMatches {
 						return nil
 					}
 				}
+				// w.Flush()
 			}
 
 			return nil
