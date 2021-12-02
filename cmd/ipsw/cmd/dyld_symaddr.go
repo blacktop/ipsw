@@ -45,9 +45,11 @@ func init() {
 
 // symaddrCmd represents the symaddr command
 var symaddrCmd = &cobra.Command{
-	Use:   "symaddr <dyld_shared_cache>",
-	Short: "Lookup or dump symbol(s)",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "symaddr <dyld_shared_cache>",
+	Short:         "Lookup or dump symbol(s)",
+	SilenceUsage:  false,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -110,6 +112,15 @@ var symaddrCmd = &cobra.Command{
 							fmt.Printf("%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
 						}
 					}
+					binds, err := m.GetBindInfo()
+					if err != nil {
+						return err
+					}
+					for _, bind := range binds {
+						if bind.Name == args[1] {
+							fmt.Printf("%#09x:\t(%s.%s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Name)
+						}
+					}
 				} else {
 					if sym.Flags.ReExport() {
 						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
@@ -148,7 +159,7 @@ var symaddrCmd = &cobra.Command{
 					return err
 				}
 
-				// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 				if sym, err := f.FindExportedSymbolInImage(image.Name, args[1]); err != nil {
 					if !errors.Is(err, dyld.ErrSymbolNotInImage) {
 						m, err := f.Image(image.Name).GetMacho()
@@ -161,10 +172,23 @@ var symaddrCmd = &cobra.Command{
 								if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 									sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
 								}
-								fmt.Printf("%#09x:\t(%s)\t%s\t%s\n", sym.Value, sym.Type.String(sec), sym.Name, image.Name)
+								fmt.Fprintf(w, "%#09x:\t(%s)\t%s\t%s\n", sym.Value, sym.Type.String(sec), sym.Name, image.Name)
 
 								if !allMatches {
-									// w.Flush()
+									w.Flush()
+									return nil
+								}
+							}
+						}
+						binds, err := m.GetBindInfo()
+						if err != nil {
+							return err
+						}
+						for _, bind := range binds {
+							if bind.Name == args[1] {
+								fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name, image.Name)
+								if !allMatches {
+									w.Flush()
 									return nil
 								}
 							}
@@ -178,13 +202,13 @@ var symaddrCmd = &cobra.Command{
 							sym.Address = rexpSym.Address
 						}
 					}
-					fmt.Printf("%s\t%s\n", sym, image.Name)
+					fmt.Fprintf(w, "%s\t%s\n", sym, image.Name)
 
 					if !allMatches {
 						return nil
 					}
 				}
-				// w.Flush()
+				w.Flush()
 			}
 
 			return nil
@@ -215,6 +239,14 @@ var symaddrCmd = &cobra.Command{
 			for _, sym := range i.LocalSymbols {
 				sym.Sections = m.Sections
 				fmt.Fprintf(w, "%s\n", sym)
+			}
+			w.Flush()
+			binds, err := m.GetBindInfo()
+			if err != nil {
+				return err
+			}
+			for _, bind := range binds {
+				fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
 			}
 			w.Flush()
 
@@ -267,6 +299,19 @@ var symaddrCmd = &cobra.Command{
 			for _, sym := range image.LocalSymbols {
 				sym.Sections = m.Sections
 				fmt.Fprintf(w, "%s\n", sym)
+			}
+			binds, err := m.GetBindInfo()
+			if err != nil {
+				return err
+			}
+			for _, bind := range binds {
+				if bind.Name == args[1] {
+					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name, image.Name)
+					if !allMatches {
+						w.Flush()
+						return nil
+					}
+				}
 			}
 			w.Flush()
 		}
