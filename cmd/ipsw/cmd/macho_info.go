@@ -435,10 +435,18 @@ var machoInfoCmd = &cobra.Command{
 				// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 			}
 			w.Flush()
+			if binds, err := m.GetBindInfo(); err == nil {
+				fmt.Printf("\nDyld Binds\n")
+				fmt.Println("----------")
+				for _, bind := range binds {
+					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+				}
+				w.Flush()
+			}
 			// Dedup these symbols (has repeats but also additional symbols??)
 			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && Verbose {
-				fmt.Printf("\nDyldExport SYMBOLS\n")
-				fmt.Println("------------------")
+				fmt.Printf("\nDyld Exports\n")
+				fmt.Println("------------")
 				exports, err := m.DyldExports()
 				if err != nil {
 					return err
@@ -447,13 +455,6 @@ var machoInfoCmd = &cobra.Command{
 					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
 				}
 				w.Flush()
-			}
-			if cfstrs, err := m.GetCFStrings(); err == nil {
-				fmt.Printf("\nCFStrings\n")
-				fmt.Println("---------")
-				for _, cfstr := range cfstrs {
-					fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
-				}
 			}
 		}
 
@@ -511,7 +512,6 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			for _, sec := range m.Sections {
-
 				if sec.Flags.IsCstringLiterals() {
 					dat, err := sec.Data()
 					if err != nil {
@@ -537,6 +537,13 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Printf("%#x: %#v\n", pos, strings.Trim(s, "\x00"))
 						}
 					}
+				}
+			}
+			if cfstrs, err := m.GetCFStrings(); err == nil {
+				fmt.Printf("\nCFStrings\n")
+				fmt.Println("---------")
+				for _, cfstr := range cfstrs {
+					fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
 				}
 			}
 		}
