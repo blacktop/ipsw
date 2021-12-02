@@ -382,6 +382,19 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 						}
 					}
 					w.Flush()
+
+					binds, err := m.GetBindInfo()
+					if err != nil {
+						return err
+					}
+					for _, bind := range binds {
+						if dump {
+							fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+						} else {
+							f.AddressToSymbol[bind.Start+bind.Offset] = bind.Name
+						}
+					}
+					w.Flush()
 				} else {
 					return err
 				}
@@ -437,6 +450,7 @@ func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error
 						f.AddressToSymbol[sym.Value] = sym.Name
 					}
 				}
+				w.Flush()
 				binds, err := m.GetBindInfo()
 				if err != nil {
 					return err
