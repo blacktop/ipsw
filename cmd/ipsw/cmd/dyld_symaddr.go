@@ -112,13 +112,11 @@ var symaddrCmd = &cobra.Command{
 							fmt.Printf("%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
 						}
 					}
-					binds, err := m.GetBindInfo()
-					if err != nil {
-						return err
-					}
-					for _, bind := range binds {
-						if bind.Name == args[1] {
-							fmt.Printf("%#09x:\t(%s.%s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Name)
+					if binds, err := m.GetBindInfo(); err == nil {
+						for _, bind := range binds {
+							if bind.Name == args[1] {
+								fmt.Printf("%#09x:\t(%s.%s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Name)
+							}
 						}
 					}
 				} else {
@@ -180,17 +178,15 @@ var symaddrCmd = &cobra.Command{
 								}
 							}
 						}
-						binds, err := m.GetBindInfo()
-						if err != nil {
-							return err
-						}
-						for _, bind := range binds {
-							if bind.Name == args[1] {
-								fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name, image.Name)
+						if binds, err := m.GetBindInfo(); err == nil {
+							for _, bind := range binds {
+								if bind.Name == args[1] {
+									fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name, image.Name)
 
-								if !allMatches {
-									w.Flush()
-									return nil
+									if !allMatches {
+										w.Flush()
+										return nil
+									}
 								}
 							}
 						}
