@@ -426,7 +426,7 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			var sec string
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, sym := range m.Symtab.Syms {
 				if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 					sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
