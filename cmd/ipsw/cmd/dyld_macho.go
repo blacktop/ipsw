@@ -390,7 +390,7 @@ var dyldMachoCmd = &cobra.Command{
 				}
 
 				if dumpSymbols {
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.Debug)
+					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 					if m.Symtab != nil {
 						fmt.Println("SYMBOLS")
 						fmt.Println("=======")
