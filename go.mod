@@ -28,7 +28,7 @@ require (
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/viper v1.9.0
 	github.com/ulikunitz/xz v0.5.10
-	github.com/vbauerster/mpb/v7 v7.1.5
+	github.com/vbauerster/mpb/v7 v7.2.0
 	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
 	golang.org/x/net v0.0.0-20211201190559-0a0e4e1bb54c
 	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881
