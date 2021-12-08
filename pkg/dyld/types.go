@@ -1,6 +1,7 @@
 package dyld
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/bits"
 	"strings"
@@ -212,10 +213,11 @@ type CacheImageInfo struct {
 }
 
 type Rebase struct {
-	PageOffset      uint64
-	CacheFileOffset uint64
-	CacheVMAddress  uint64
-	Target          uint64
+	CacheFileOffset uint64      `json:"cache_file_offset,omitempty"`
+	CacheVMAddress  uint64      `json:"cache_vm_address,omitempty"`
+	Target          uint64      `json:"target,omitempty"`
+	Pointer         interface{} `json:"pointer,omitempty"`
+	Symbol          string      `json:"symbol,omitempty"`
 }
 
 type slideInfo interface {
@@ -286,11 +288,11 @@ const (
 )
 
 type CacheSlideInfo3 struct {
-	Version         uint32 // currently 3
-	PageSize        uint32 // currently 4096 (may also be 16384)
-	PageStartsCount uint32
+	Version         uint32 `json:"slide_version,omitempty"` // currently 3
+	PageSize        uint32 `json:"page_size,omitempty"`     // currently 4096 (may also be 16384)
+	PageStartsCount uint32 `json:"page_starts_count,omitempty"`
 	_               uint32 // padding for 64bit alignment
-	AuthValueAdd    uint64
+	AuthValueAdd    uint64 `json:"auth_value_add,omitempty"`
 	// PageStarts      []uint16 /* len() = page_starts_count */
 }
 
@@ -401,6 +403,34 @@ func (p CacheSlidePointer3) String() string {
 		)
 	}
 	return fmt.Sprintf("value: %#x, next: %02x", p.Value(), p.OffsetToNextPointer())
+}
+
+func (p CacheSlidePointer3) MarshalJSON() ([]byte, error) {
+	if p.Authenticated() {
+		return json.Marshal(&struct {
+			Value               uint64 `json:"value"`
+			OffsetToNextPointer uint64 `json:"next"`
+			DiversityData       uint64 `json:"diversity"`
+			HasAddressDiversity bool   `json:"addr_div"`
+			KeyName             string `json:"key"`
+			Authenticated       bool   `json:"authenticated"`
+		}{
+			Value:               p.Value(),
+			OffsetToNextPointer: p.OffsetToNextPointer(),
+			DiversityData:       p.DiversityData(),
+			HasAddressDiversity: p.HasAddressDiversity(),
+			KeyName:             KeyName(uint64(p)),
+			Authenticated:       p.Authenticated(),
+		})
+	} else {
+		return json.Marshal(&struct {
+			Value               uint64 `json:"value"`
+			OffsetToNextPointer uint64 `json:"next"`
+		}{
+			Value:               p.Value(),
+			OffsetToNextPointer: p.OffsetToNextPointer(),
+		})
+	}
 }
 
 type CacheSlideInfo4 struct {

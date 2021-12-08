@@ -40,12 +40,12 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
 
-	dyldDisassCmd.Flags().Uint64P("slide", "", 0, "dyld_shared_cache slide to remove from --vaddr")
+	dyldDisassCmd.Flags().Uint64("slide", 0, "dyld_shared_cache slide to remove from --vaddr")
 	dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
-	dyldDisassCmd.Flags().StringP("cache", "", "", "Path to addr to sym cache file (speeds up analysis)")
+	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")

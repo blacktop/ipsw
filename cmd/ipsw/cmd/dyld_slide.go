@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,6 +36,7 @@ import (
 func init() {
 	dyldCmd.AddCommand(slideCmd)
 	slideCmd.Flags().BoolP("auth", "a", false, "Print only slide info for mappings with auth flags")
+	slideCmd.Flags().Bool("json", false, "Output as JSON")
 	slideCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	slideCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -51,7 +53,10 @@ var slideCmd = &cobra.Command{
 		}
 
 		printAuthSlideInfo, _ := cmd.Flags().GetBool("auth")
+		dumpJSON, _ := cmd.Flags().GetBool("json")
 		cacheFile, _ := cmd.Flags().GetString("cache")
+
+		enc := json.NewEncoder(os.Stdout)
 
 		dscPath := filepath.Clean(args[0])
 
@@ -89,20 +94,37 @@ var slideCmd = &cobra.Command{
 
 		for uuid := range f.Mappings {
 			if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
-				f.DumpSlideInfo(uuid, &dyld.CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: dyld.CacheMappingAndSlideInfo{
+				mapping := &dyld.CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: dyld.CacheMappingAndSlideInfo{
 					Address:         f.Mappings[uuid][1].Address,    // __DATA
 					Size:            f.Mappings[uuid][1].Size,       // __DATA
 					FileOffset:      f.Mappings[uuid][1].FileOffset, // __DATA
 					SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
 					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
-				}, Name: "__DATA"})
+				}, Name: "__DATA"}
+				if dumpJSON {
+					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
+					if err != nil {
+						return err
+					}
+					enc.Encode(rebases)
+				} else {
+					f.DumpSlideInfo(uuid, mapping)
+				}
 			} else {
 				for _, extMapping := range f.MappingsWithSlideInfo[uuid] {
 					if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
 						continue
 					}
 					if extMapping.SlideInfoSize > 0 {
-						f.DumpSlideInfo(uuid, extMapping)
+						if dumpJSON {
+							rebases, err := f.GetRebaseInfoForPages(uuid, extMapping, 0, 0)
+							if err != nil {
+								return err
+							}
+							enc.Encode(rebases)
+						} else {
+							f.DumpSlideInfo(uuid, extMapping)
+						}
 					}
 				}
 			}
