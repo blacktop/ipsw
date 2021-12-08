@@ -723,11 +723,18 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						}
 						fmt.Printf("    [% 5d + %#04x]: %#016x = %#016x, sym: %s\n", i, startOffset, pointer, targetValue, symName)
 					} else {
+						sym, ok := f.AddressToSymbol[targetValue]
+						if !ok {
+							symName = ""
+						} else {
+							symName = sym
+						}
 						rebases = append(rebases, Rebase{
-							PageOffset:      uint64(uint32(i)*slideInfo.PageSize + delta),
 							CacheFileOffset: uint64(startOffset) + pageOffset,
 							CacheVMAddress:  uint64(startOffset) + pageAddress,
 							Target:          targetValue,
+							Pointer:         pointer,
+							Symbol:          symName,
 						})
 					}
 					startOffset += delta
@@ -831,11 +838,18 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 					}
 					fmt.Printf("    [% 5d + 0x%05X] (off: %#x @ vaddr: %#x; raw: %#x => target: %#x) %s, sym: %s\n", i, (uint64)(rebaseLocation-pageOffset), rebaseLocation, rebaseAddr, pointer.Raw(), targetValue, pointer, symName)
 				} else {
+					sym, ok := f.AddressToSymbol[targetValue]
+					if !ok {
+						symName = ""
+					} else {
+						symName = sym
+					}
 					rebases = append(rebases, Rebase{
-						PageOffset:      uint64(uint32(i)*slideInfo.PageSize) + delta,
 						CacheFileOffset: rebaseLocation,
 						CacheVMAddress:  rebaseAddr,
 						Target:          targetValue,
+						Pointer:         pointer,
+						Symbol:          symName,
 					})
 				}
 
@@ -916,11 +930,18 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 						}
 						fmt.Printf("    [% 5d + %#04x]: %#08x = %#08x, sym: %s\n", i, pageOffset, pointer, targetValue, symName)
 					} else {
+						sym, ok := f.AddressToSymbol[targetValue]
+						if !ok {
+							symName = ""
+						} else {
+							symName = sym
+						}
 						rebases = append(rebases, Rebase{
-							PageOffset:      uint64(uint32(i)*slideInfo.PageSize + delta),
 							CacheFileOffset: pageContent + uint64(pageOffset),
 							CacheVMAddress:  pageContent + uint64(pageAddress),
 							Target:          targetValue,
+							Pointer:         pointer,
+							Symbol:          symName,
 						})
 					}
 					pageOffset += delta
