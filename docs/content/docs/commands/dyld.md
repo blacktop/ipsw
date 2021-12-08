@@ -12,6 +12,7 @@ summary: Parse dyld_shared_cache.
 - [**dyld macho**](#dyld-macho)
 - [**dyld symaddr**](#dyld-symaddr)
 - [**dyld a2s**](#dyld-a2s)
+- [**dyld a2f**](#dyld-a2f)
 - [**dyld objc**](#dyld-objc)
   - [**dyld objc class**](#dyld-objc-class)
   - [**dyld objc proto**](#dyld-objc-proto)
@@ -293,6 +294,32 @@ Lookup what symbol is at a given _unslid_ or _slid_ address _(in hex)_
 2.12s user 0.51s system 109% cpu "2.407 total"
 ```
 
+### **dyld a2f**
+
+Lookup what function *(if any)* contains a given _unslid_ or _slid_ address
+
+```bash
+❯ ipsw dyld a2f dyld_shared_cache_arm64e 0x1800980ac
+
+0x1800980ac: _dlsym (start: 0x1800980ac, end: 0x1800980e0)
+```
+
+It can also take a file of pointers *(one per line)* as input *(and will output results as JSON)*
+
+```bash
+❯ ipsw dyld a2f dyld_shared_cache_arm64e --in ptrs.txt | jq 'select(.name != null) | select(.name | contains("dlsym"))'
+```
+
+```json
+{
+  "addr": 6443073708,
+  "start": 6443073708,
+  "end": 6443073760,
+  "size": 52,
+  "name": "_dlsym"
+}
+```
+
 ### **dyld objc**
 
 #### Dump ObjC addresses
@@ -472,6 +499,29 @@ page[    0]: start=0x0000
     [    0 + 0x01C8] (0x1d1e48060 @ offset 0x4fe48060 => 0x1800a0958) value: 0x1800a0958, next: 04, sym: ?
     [    0 + 0x0248] (0x1d1e48080 @ offset 0x4fe48080 => 0x1800a0958) value: 0x1800a0958, next: 04, sym: ?
     [    0 + 0x02E8] (0x1d1e480a0 @ offset 0x4fe480a0 => 0x1800a0958) value: 0x1800a0958, next: 04, sym: ?
+<SNIP>
+```
+
+Dump slide info as JSON
+
+```bash
+❯ ipsw dyld slide dyld_shared_cache_arm64e --json | jq '.[] | select(.pointer.authenticated == true and .pointer.key == "DA")'
+```
+
+```json
+{
+  "cache_file_offset": 1446288864,
+  "cache_vm_address": 7955848672,
+  "target": 7955848672,
+  "pointer": {
+    "value": 1524890997136864,
+    "next": 1,
+    "diversity": 27361,
+    "addr_div": true,
+    "key": "DA",
+    "authenticated": true
+  }
+}
 <SNIP>
 ```
 
