@@ -124,6 +124,10 @@ var dyldDisassCmd = &cobra.Command{
 					return err
 				}
 			} else {
+				image = f.Image(imageName)
+				if image == nil {
+					return fmt.Errorf("failed to find image %s in %s", imageName, dscPath)
+				}
 				utils.Indent(log.Warn, 2)("parsing public symbols...")
 				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
 					log.Error("failed to parse exported symbols")

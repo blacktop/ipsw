@@ -30,8 +30,8 @@ require (
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v7 v7.2.0
 	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e
-	golang.org/x/net v0.0.0-20211201190559-0a0e4e1bb54c
-	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881
+	golang.org/x/net v0.0.0-20211208012354-db4efeb81f4b
+	golang.org/x/sys v0.0.0-20211205182925-97ca703d548d
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
@@ -77,6 +77,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
-	gopkg.in/ini.v1 v1.66.0 // indirect
+	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
