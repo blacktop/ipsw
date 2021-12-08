@@ -206,6 +206,7 @@
 <li><a href="#dyld-macho"><strong>dyld macho</strong></a></li>
 <li><a href="#dyld-symaddr"><strong>dyld symaddr</strong></a></li>
 <li><a href="#dyld-a2s"><strong>dyld a2s</strong></a></li>
+<li><a href="#dyld-a2f"><strong>dyld a2f</strong></a></li>
 <li><a href="#dyld-objc"><strong>dyld objc</strong></a>
 <ul>
 <li><a href="#dyld-objc-class"><strong>dyld objc class</strong></a></li>
@@ -441,6 +442,20 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ <span class="nb">time</span> ipsw dyld a2s dyld_shared_cache 0x190a7221c
 0x190a7221c: _xmlCtxtGetLastError
 2.12s user 0.51s system 109% cpu <span class="s2">&#34;2.407 total&#34;</span>
+</code></pre></div><h3 id="dyld-a2f"><strong>dyld a2f</strong></h3>
+<p>Lookup what function <em>(if any)</em> contains a given <em>unslid</em> or <em>slid</em> address</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2f dyld_shared_cache_arm64e 0x1800980ac
+
+0x1800980ac: _dlsym <span class="o">(</span>start: 0x1800980ac, end: 0x1800980e0<span class="o">)</span>
+</code></pre></div><p>It can also take a file of pointers <em>(one per line)</em> as input <em>(and will output results as JSON)</em></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2f dyld_shared_cache_arm64e --in ptrs.txt <span class="p">|</span> jq <span class="s1">&#39;select(.name != null) | select(.name | contains(&#34;dlsym&#34;))&#39;</span>
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+  <span class="nt">&#34;addr&#34;</span><span class="p">:</span> <span class="mi">6443073708</span><span class="p">,</span>
+  <span class="nt">&#34;start&#34;</span><span class="p">:</span> <span class="mi">6443073708</span><span class="p">,</span>
+  <span class="nt">&#34;end&#34;</span><span class="p">:</span> <span class="mi">6443073760</span><span class="p">,</span>
+  <span class="nt">&#34;size&#34;</span><span class="p">:</span> <span class="mi">52</span><span class="p">,</span>
+  <span class="nt">&#34;name&#34;</span><span class="p">:</span> <span class="s2">&#34;_dlsym&#34;</span>
+<span class="p">}</span>
 </code></pre></div><h3 id="dyld-objc"><strong>dyld objc</strong></h3>
 <h4 id="dump-objc-addresses">Dump ObjC addresses</h4>
 <p>Dump all the classes</p>
@@ -557,6 +572,22 @@ page<span class="o">[</span>    0<span class="o">]</span>: <span class="nv">star
     <span class="o">[</span>    <span class="m">0</span> + 0x0248<span class="o">]</span> <span class="o">(</span>0x1d1e48080 @ offset <span class="nv">0x4fe48080</span> <span class="o">=</span>&gt; 0x1800a0958<span class="o">)</span> value: 0x1800a0958, next: 04, sym: ?
     <span class="o">[</span>    <span class="m">0</span> + 0x02E8<span class="o">]</span> <span class="o">(</span>0x1d1e480a0 @ offset <span class="nv">0x4fe480a0</span> <span class="o">=</span>&gt; 0x1800a0958<span class="o">)</span> value: 0x1800a0958, next: 04, sym: ?
 &lt;SNIP&gt;
+</code></pre></div><p>Dump slide info as JSON</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld slide dyld_shared_cache_arm64e --json <span class="p">|</span> jq <span class="s1">&#39;.[] | select(.pointer.authenticated == true and .pointer.key == &#34;DA&#34;)&#39;</span>
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
+  <span class="nt">&#34;cache_file_offset&#34;</span><span class="p">:</span> <span class="mi">1446288864</span><span class="p">,</span>
+  <span class="nt">&#34;cache_vm_address&#34;</span><span class="p">:</span> <span class="mi">7955848672</span><span class="p">,</span>
+  <span class="nt">&#34;target&#34;</span><span class="p">:</span> <span class="mi">7955848672</span><span class="p">,</span>
+  <span class="nt">&#34;pointer&#34;</span><span class="p">:</span> <span class="p">{</span>
+    <span class="nt">&#34;value&#34;</span><span class="p">:</span> <span class="mi">1524890997136864</span><span class="p">,</span>
+    <span class="nt">&#34;next&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="nt">&#34;diversity&#34;</span><span class="p">:</span> <span class="mi">27361</span><span class="p">,</span>
+    <span class="nt">&#34;addr_div&#34;</span><span class="p">:</span> <span class="kc">true</span><span class="p">,</span>
+    <span class="nt">&#34;key&#34;</span><span class="p">:</span> <span class="s2">&#34;DA&#34;</span><span class="p">,</span>
+    <span class="nt">&#34;authenticated&#34;</span><span class="p">:</span> <span class="kc">true</span>
+  <span class="p">}</span>
+<span class="p">}</span>
+<span class="err">&lt;SNIP&gt;</span>
 </code></pre></div><h3 id="dyld-a2o"><strong>dyld a2o</strong></h3>
 <p>Convert <em>dyld_shared_cache</em> address to offset</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2o dyld_shared_cache 1D7B18000
