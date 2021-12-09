@@ -40,8 +40,16 @@ func init() {
 	a2fCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	a2fCmd.Flags().StringP("in", "i", "", "Path to file containing list of addresses to lookup")
 	a2fCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
-	a2fCmd.Flags().Bool("json", false, "Output as JSON")
+	// a2fCmd.Flags().Bool("json", false, "Output as JSON")
 	a2fCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
+type Func struct {
+	Addr  uint64 `json:"addr,omitempty"`
+	Start uint64 `json:"start,omitempty"`
+	End   uint64 `json:"end,omitempty"`
+	Size  uint64 `json:"size,omitempty"`
+	Name  string `json:"name,omitempty"`
 }
 
 // a2fCmd represents the a2f command
@@ -88,6 +96,8 @@ var a2fCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(ptrFile) > 0 {
+			var fs []Func
+
 			pfile, err := os.Open(ptrFile)
 			if err != nil {
 				return err
@@ -131,13 +141,7 @@ var a2fCmd = &cobra.Command{
 					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						fn.Name = symName
 					}
-					enc.Encode(struct {
-						Addr  uint64 `json:"addr,omitempty"`
-						Start uint64 `json:"start,omitempty"`
-						End   uint64 `json:"end,omitempty"`
-						Size  uint64 `json:"size,omitempty"`
-						Name  string `json:"name,omitempty"`
-					}{
+					fs = append(fs, Func{
 						Addr:  unslidAddr,
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,
@@ -146,6 +150,8 @@ var a2fCmd = &cobra.Command{
 					})
 				}
 			}
+
+			enc.Encode(fs)
 
 			if err := scanner.Err(); err != nil {
 				return err
