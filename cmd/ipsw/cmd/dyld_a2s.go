@@ -58,6 +58,8 @@ var a2sCmd = &cobra.Command{
 		showImage, _ := cmd.Flags().GetBool("image")
 		showMapping, _ := cmd.Flags().GetBool("mapping")
 
+		secondAttempt := false
+
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
 			return err
@@ -148,7 +150,7 @@ var a2sCmd = &cobra.Command{
 		// 	gzr.Close()
 		// 	a2sFile.Close()
 		// }
-
+	retry:
 		if showMapping {
 			_, mapping, err := f.GetMappingForVMAddress(unslidAddr)
 			if err != nil {
@@ -231,26 +233,55 @@ var a2sCmd = &cobra.Command{
 		}
 
 		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+			if secondAttempt {
+				symName = "_ptr." + symName
+			}
 			fmt.Printf("\n%#x: %s\n", addr, symName)
 			return nil
 		}
 
 		if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
 			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+				if secondAttempt {
+					symName = "_ptr." + symName
+				}
 				fmt.Printf("\n%#x: %s + %d\n", addr, symName, unslidAddr-fn.StartAddr)
 				return nil
 			}
-			fmt.Printf("\n%#x: func_%x\n", addr, addr)
+			if secondAttempt {
+				fmt.Printf("\n%#x: _ptr.func_%x\n", addr, addr)
+			} else {
+				fmt.Printf("\n%#x: func_%x\n", addr, addr)
+			}
+
 			return nil
 		}
 
 		if cstr, err := f.IsCString(m, unslidAddr); err == nil {
-			fmt.Printf("\n%#x: %#v\n", addr, cstr)
+			if secondAttempt {
+				fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
+			} else {
+				fmt.Printf("\n%#x: %#v\n", addr, cstr)
+			}
 			return nil
 		}
 
-		log.Error("no symbol found")
+		if secondAttempt {
+			log.Error("no symbol found")
+			return nil
+		}
 
-		return nil
+		ptr, err := f.ReadPointerAtAddress(unslidAddr)
+		if err != nil {
+			return err
+		}
+
+		utils.Indent(log.Error, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", unslidAddr, f.SlideInfo.SlidePointer(ptr)))
+
+		unslidAddr = f.SlideInfo.SlidePointer(ptr)
+
+		secondAttempt = true
+
+		goto retry
 	},
 }
