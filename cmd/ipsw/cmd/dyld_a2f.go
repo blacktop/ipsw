@@ -39,8 +39,8 @@ func init() {
 	dyldCmd.AddCommand(a2fCmd)
 	a2fCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	a2fCmd.Flags().StringP("in", "i", "", "Path to file containing list of addresses to lookup")
+	a2fCmd.Flags().StringP("out", "o", "", "Path to output JSON file")
 	a2fCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
-	// a2fCmd.Flags().Bool("json", false, "Output as JSON")
 	a2fCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -67,6 +67,7 @@ var a2fCmd = &cobra.Command{
 
 		slide, _ := cmd.Flags().GetUint64("slide")
 		ptrFile, _ := cmd.Flags().GetString("in")
+		jsonFile, _ := cmd.Flags().GetString("out")
 		cacheFile, _ := cmd.Flags().GetString("cache")
 
 		dscPath := filepath.Clean(args[0])
@@ -97,6 +98,9 @@ var a2fCmd = &cobra.Command{
 
 		if len(ptrFile) > 0 {
 			var fs []Func
+			var enc *json.Encoder
+
+			imap := make(map[*dyld.CacheImage][]uint64)
 
 			pfile, err := os.Open(ptrFile)
 			if err != nil {
@@ -104,17 +108,9 @@ var a2fCmd = &cobra.Command{
 			}
 			defer pfile.Close()
 
-			enc := json.NewEncoder(os.Stdout)
-
-			if len(cacheFile) == 0 {
-				cacheFile = dscPath + ".a2s"
-			}
-			if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
-				return err
-			}
-
 			scanner := bufio.NewScanner(pfile)
 
+			log.Infof("Parsing functions for pointers in %s", ptrFile)
 			for scanner.Scan() {
 				addr, err := utils.ConvertStrToInt(scanner.Text())
 				if err != nil {
@@ -131,31 +127,58 @@ var a2fCmd = &cobra.Command{
 					return err
 				}
 
-				m, err := image.GetMacho()
+				imap[image] = append(imap[image], unslidAddr)
+			}
+
+			if err := scanner.Err(); err != nil {
+				return err
+			}
+
+			if len(jsonFile) > 0 {
+				jFile, err := os.Create(jsonFile)
+				if err != nil {
+					return err
+				}
+				defer jFile.Close()
+				enc = json.NewEncoder(jFile)
+			} else {
+				enc = json.NewEncoder(os.Stdout)
+			}
+
+			if len(cacheFile) == 0 {
+				cacheFile = dscPath + ".a2s"
+			}
+			if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+				return err
+			}
+
+			for img, ptrs := range imap {
+				m, err := img.GetMacho()
 				if err != nil {
 					return err
 				}
 				defer m.Close()
 
-				if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
-					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-						fn.Name = symName
+				for _, ptr := range ptrs {
+					if fn, err := m.GetFunctionForVMAddr(ptr); err == nil {
+						if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+							fn.Name = symName
+						}
+						fs = append(fs, Func{
+							Addr:  ptr,
+							Start: fn.StartAddr,
+							End:   fn.EndAddr,
+							Size:  fn.EndAddr - fn.StartAddr,
+							Name:  fn.Name,
+						})
 					}
-					fs = append(fs, Func{
-						Addr:  unslidAddr,
-						Start: fn.StartAddr,
-						End:   fn.EndAddr,
-						Size:  fn.EndAddr - fn.StartAddr,
-						Name:  fn.Name,
-					})
 				}
 			}
 
-			enc.Encode(fs)
-
-			if err := scanner.Err(); err != nil {
+			if err := enc.Encode(fs); err != nil {
 				return err
 			}
+
 		} else {
 			if len(args) < 2 {
 				return fmt.Errorf("you must supply an virtual address")
