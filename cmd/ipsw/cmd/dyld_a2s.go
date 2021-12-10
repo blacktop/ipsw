@@ -241,19 +241,22 @@ var a2sCmd = &cobra.Command{
 		}
 
 		if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
+			delta := ""
+			if unslidAddr-fn.StartAddr != 0 {
+				delta = fmt.Sprintf(" + %d", unslidAddr-fn.StartAddr)
+			}
 			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 				if secondAttempt {
 					symName = "_ptr." + symName
 				}
-				fmt.Printf("\n%#x: %s + %d\n", addr, symName, unslidAddr-fn.StartAddr)
-				return nil
-			}
-			if secondAttempt {
-				fmt.Printf("\n%#x: _ptr.func_%x\n", addr, addr)
+				fmt.Printf("\n%#x: %s%s\n", addr, symName, delta)
 			} else {
-				fmt.Printf("\n%#x: func_%x\n", addr, addr)
+				if secondAttempt {
+					fmt.Printf("\n%#x: _ptr.func_%x%s\n", addr, fn.StartAddr, delta)
+					return nil
+				}
+				fmt.Printf("\n%#x: func_%x%s\n", addr, fn.StartAddr, delta)
 			}
-
 			return nil
 		}
 
