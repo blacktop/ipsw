@@ -129,7 +129,8 @@ type CacheImage struct {
 	cache *File // pointer back to the dyld cache that the image belongs to
 	cuuid types.UUID
 	CacheReader
-	m *macho.File
+	m  *macho.File
+	pm *macho.File // partial macho
 }
 
 // NewCacheReader returns a CacheReader that reads from r
@@ -292,6 +293,9 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 
 // GetPartialMacho parses dyld image as a partial MachO (fast)
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
+	if i.pm != nil {
+		return i.pm, nil
+	}
 	offset, err := i.GetOffset(i.LoadAddress)
 	if err != nil {
 		return nil, err
@@ -307,7 +311,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			return i.GetVMAddress(offset)
 		},
 	}
-	return macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+	i.pm, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		LoadFilter: []types.LoadCmd{
 			types.LC_SEGMENT_64,
 			types.LC_DYLD_INFO,
@@ -328,6 +332,11 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 		VMAddrConverter: vma,
 		// RelativeSelectorBase: rsBase,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return i.pm, nil
 }
 
 func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
