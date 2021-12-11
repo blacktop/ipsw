@@ -448,7 +448,8 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
 
 0x1800980ac: _dlsym <span class="o">(</span>start: 0x1800980ac, end: 0x1800980e0<span class="o">)</span>
 </code></pre></div><p>It can also take a file of pointers <em>(one per line)</em> as input <em>(and will output results as JSON)</em></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2f dyld_shared_cache_arm64e --in ptrs.txt <span class="p">|</span> jq <span class="s1">&#39;select(.name != null) | select(.name | contains(&#34;dlsym&#34;))&#39;</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2f dyld_shared_cache_arm64e --in ptrs.txt <span class="se">\
+</span><span class="se"></span>   <span class="p">|</span> jq <span class="s1">&#39;.[] | select(.name != null) | select(.name | contains(&#34;dlsym&#34;))&#39;</span>
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
   <span class="nt">&#34;addr&#34;</span><span class="p">:</span> <span class="mi">6443073708</span><span class="p">,</span>
   <span class="nt">&#34;start&#34;</span><span class="p">:</span> <span class="mi">6443073708</span><span class="p">,</span>
@@ -573,7 +574,8 @@ page<span class="o">[</span>    0<span class="o">]</span>: <span class="nv">star
     <span class="o">[</span>    <span class="m">0</span> + 0x02E8<span class="o">]</span> <span class="o">(</span>0x1d1e480a0 @ offset <span class="nv">0x4fe480a0</span> <span class="o">=</span>&gt; 0x1800a0958<span class="o">)</span> value: 0x1800a0958, next: 04, sym: ?
 &lt;SNIP&gt;
 </code></pre></div><p>Dump slide info as JSON</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld slide dyld_shared_cache_arm64e --json <span class="p">|</span> jq <span class="s1">&#39;.[] | select(.pointer.authenticated == true and .pointer.key == &#34;DA&#34;)&#39;</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld slide dyld_shared_cache_arm64e --json <span class="se">\
+</span><span class="se"></span>   <span class="p">|</span> jq <span class="s1">&#39;.[] | select(.pointer.authenticated == true and .pointer.key == &#34;DA&#34;)&#39;</span>
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
   <span class="nt">&#34;cache_file_offset&#34;</span><span class="p">:</span> <span class="mi">1446288864</span><span class="p">,</span>
   <span class="nt">&#34;cache_vm_address&#34;</span><span class="p">:</span> <span class="mi">7955848672</span><span class="p">,</span>
