@@ -317,7 +317,8 @@ It can also take a file of pointers *(one per line)* as input *(and will output 
   "start": 6443073708,
   "end": 6443073760,
   "size": 52,
-  "name": "_dlsym"
+  "name": "_dlsym",
+  "image": "libdyld.dylib"
 }
 ```
 
