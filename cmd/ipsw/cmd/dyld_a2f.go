@@ -50,6 +50,7 @@ type Func struct {
 	End   uint64 `json:"end,omitempty"`
 	Size  uint64 `json:"size,omitempty"`
 	Name  string `json:"name,omitempty"`
+	Image string `json:"image,omitempty"`
 }
 
 // a2fCmd represents the a2f command
@@ -170,6 +171,7 @@ var a2fCmd = &cobra.Command{
 							End:   fn.EndAddr,
 							Size:  fn.EndAddr - fn.StartAddr,
 							Name:  fn.Name,
+							Image: filepath.Base(img.Name),
 						})
 					}
 				}
