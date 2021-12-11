@@ -307,7 +307,8 @@ Lookup what function *(if any)* contains a given _unslid_ or _slid_ address
 It can also take a file of pointers *(one per line)* as input *(and will output results as JSON)*
 
 ```bash
-❯ ipsw dyld a2f dyld_shared_cache_arm64e --in ptrs.txt | jq 'select(.name != null) | select(.name | contains("dlsym"))'
+❯ ipsw dyld a2f dyld_shared_cache_arm64e --in ptrs.txt \
+   | jq '.[] | select(.name != null) | select(.name | contains("dlsym"))'
 ```
 
 ```json
@@ -505,7 +506,8 @@ page[    0]: start=0x0000
 Dump slide info as JSON
 
 ```bash
-❯ ipsw dyld slide dyld_shared_cache_arm64e --json | jq '.[] | select(.pointer.authenticated == true and .pointer.key == "DA")'
+❯ ipsw dyld slide dyld_shared_cache_arm64e --json \
+   | jq '.[] | select(.pointer.authenticated == true and .pointer.key == "DA")'
 ```
 
 ```json
