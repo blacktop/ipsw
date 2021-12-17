@@ -3,10 +3,14 @@ package dyld
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"sync"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/pkg/errors"
 )
 
 type rangeEntry struct {
@@ -351,4 +355,96 @@ func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
 		})
 	}
 	return syms
+}
+
+// Analyze analyzes an image by parsing it's symbols, stubs and GOT
+func (i *CacheImage) Analyze() error {
+
+	if err := i.cache.GetAllExportedSymbolsForImage(i, false); err != nil {
+		log.Errorf("failed to parse exported symbols for %s", i.Name)
+	}
+
+	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
+		if !errors.Is(err, ErrNoLocals) {
+			return err
+		}
+	}
+
+	if !i.cache.IsArm64() {
+		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
+	}
+
+	if !i.Analysis.State.IsStubHelpersDone() && i.cache.IsArm64() {
+		log.Debugf("parsing %s symbol stub helpers", i.Name)
+		if err := i.cache.ParseSymbolStubHelpers(i); err != nil {
+			if !errors.Is(err, ErrMachOSectionNotFound) {
+				return err
+			}
+		}
+	}
+
+	if !i.Analysis.State.IsGotDone() && i.cache.IsArm64() {
+		log.Debugf("parsing %s global offset table", i.Name)
+		if err := i.cache.ParseGOT(i); err != nil {
+			return err
+		}
+
+		for entry, target := range i.Analysis.GotPointers {
+			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+				i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+			} else {
+				if img, err := i.cache.GetImageContainingTextAddr(target); err == nil {
+					if err := img.Analyze(); err != nil {
+						return err
+					}
+					if symName, ok := i.cache.AddressToSymbol[target]; ok {
+						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+					} else if laptr, ok := i.Analysis.GotPointers[target]; ok {
+						if symName, ok := i.cache.AddressToSymbol[laptr]; ok {
+							i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+						}
+					} else {
+						utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x in %s", entry, target, img.Name))
+						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got_%x ; %s", target, filepath.Base(img.Name))
+					}
+				} else {
+					i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got_%x", target)
+				}
+
+			}
+		}
+	}
+
+	if !i.Analysis.State.IsStubsDone() && i.cache.IsArm64() {
+		log.Debugf("parsing %s symbol stubs", i.Name)
+		if err := i.cache.ParseSymbolStubs(i); err != nil {
+			return err
+		}
+
+		for stub, target := range i.Analysis.SymbolStubs {
+			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+				i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+			} else {
+				img, err := i.cache.GetImageContainingTextAddr(target)
+				if err != nil {
+					return err
+				}
+				if err := img.Analyze(); err != nil {
+					return err
+				}
+				if symName, ok := i.cache.AddressToSymbol[target]; ok {
+					i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+				} else if laptr, ok := i.Analysis.GotPointers[target]; ok {
+					if symName, ok := i.cache.AddressToSymbol[laptr]; ok {
+						i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+					}
+				} else {
+					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
+					i.cache.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
+				}
+			}
+		}
+	}
+
+	return nil
 }

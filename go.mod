@@ -7,8 +7,8 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20211003183012-e1a7c020ce25 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
-	github.com/blacktop/go-arm64 v0.6.18
-	github.com/blacktop/go-macho v1.1.79
+	github.com/blacktop/arm64-cgo v1.0.44
+	github.com/blacktop/go-macho v1.1.80
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -26,7 +26,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.2.1
-	github.com/spf13/viper v1.9.0
+	github.com/spf13/viper v1.10.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v7 v7.2.0
 	golang.org/x/crypto v0.0.0-20211209193657-4570a0811e8b
@@ -35,6 +35,9 @@ require (
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
+// replace github.com/blacktop/arm64-cgo => ../arm64-cgo
+
+require github.com/blacktop/go-arm64 v0.6.18
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
@@ -63,13 +66,10 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mitchellh/mapstructure v1.4.3 // indirect
-	github.com/neelance/astrewrite v0.0.0-20160511093645-99348263ae86 // indirect
-	github.com/neelance/sourcemap v0.0.0-20200213170602-2833bce08e4c // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
-	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
 	github.com/spf13/afero v1.6.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
@@ -77,10 +77,8 @@ require (
 	github.com/subosito/gotenv v1.2.0 // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	golang.org/x/tools v0.1.8 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect

@@ -28,7 +28,6 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -136,7 +135,7 @@ var xrefCmd = &cobra.Command{
 		for _, img := range images {
 			xrefs := make(map[uint64]string)
 
-			if err := f.AnalyzeImage(img); err != nil {
+			if err := img.Analyze(); err != nil {
 				return fmt.Errorf("failed to analyze image: %s; %v", img.Name, err)
 			}
 
@@ -176,7 +175,7 @@ var xrefCmd = &cobra.Command{
 					return err
 				}
 
-				triage, err := f.FirstPassTriage(m, &fn, bytes.NewReader(data), arm64.Options{StartAddress: int64(fn.StartAddr)}, false)
+				triage, err := FirstPassTriage(f, &fn, bytes.NewReader(data), false)
 				if err != nil {
 					return err
 				}

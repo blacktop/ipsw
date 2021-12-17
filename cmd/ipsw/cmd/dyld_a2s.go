@@ -204,7 +204,7 @@ var a2sCmd = &cobra.Command{
 		}
 
 		// Load all symbols
-		if err := f.AnalyzeImage(image); err != nil {
+		if err := image.Analyze(); err != nil {
 			return err
 		}
 
@@ -260,7 +260,7 @@ var a2sCmd = &cobra.Command{
 			return nil
 		}
 
-		if cstr, err := f.IsCString(m, unslidAddr); err == nil {
+		if cstr, ok := m.IsCString(unslidAddr); ok {
 			if secondAttempt {
 				fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
 			} else {
