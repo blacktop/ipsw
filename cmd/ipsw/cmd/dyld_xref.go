@@ -148,20 +148,8 @@ var xrefCmd = &cobra.Command{
 
 			if m.HasObjC() {
 				log.Debug("Parsing ObjC runtime structures...")
-				if err := f.CFStringsForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc cfstrings")
-				}
-				if err := f.MethodsForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc methods")
-				}
-				if err := f.SelectorsForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc selectors")
-				}
-				if err := f.ClassesForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc classes")
-				}
-				if err := f.ProtocolsForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc protocols")
+				if err := f.ParseObjcForImage(img.Name); err != nil {
+					return fmt.Errorf("failed to parse objc data for image %s: %v", img.Name, err)
 				}
 			}
 

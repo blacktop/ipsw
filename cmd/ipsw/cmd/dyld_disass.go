@@ -278,25 +278,8 @@ var dyldDisassCmd = &cobra.Command{
 
 		if m.HasObjC() {
 			log.Info("Parsing ObjC runtime structures...")
-			if err := f.CFStringsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc cfstrings")
-			}
-			if err := f.MethodsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc methods")
-			}
-			if strings.Contains(image.Name, "libobjc.A.dylib") {
-				_, err = f.GetAllSelectors(false)
-			} else {
-				err = f.SelectorsForImage(image.Name)
-			}
-			if err != nil {
-				return errors.Wrapf(err, "failed to parse objc selectors")
-			}
-			if err := f.ClassesForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc classes")
-			}
-			if err := f.ProtocolsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc protocols")
+			if err := f.ParseObjcForImage(image.Name); err != nil {
+				return fmt.Errorf("failed to parse objc data for image %s: %v", image.Name, err)
 			}
 		}
 

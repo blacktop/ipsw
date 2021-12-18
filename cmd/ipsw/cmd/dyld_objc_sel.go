@@ -87,9 +87,8 @@ var objcSelCmd = &cobra.Command{
 			fmt.Printf("0x%x: %s\n", ptr, args[1])
 		} else {
 			if len(imageName) > 0 {
-				err = f.SelectorsForImage(imageName)
-				if err != nil {
-					return err
+				if err := f.SelectorsForImage(imageName); err != nil {
+					return fmt.Errorf("failed to parse objc selectors for image %s: %v", imageName, err)
 				}
 
 				// sort by address
@@ -104,8 +103,7 @@ var objcSelCmd = &cobra.Command{
 				}
 
 			} else {
-				_, err := f.GetAllSelectors(true)
-				if err != nil {
+				if _, err := f.GetAllSelectors(true); err != nil {
 					return err
 				}
 			}
