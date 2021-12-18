@@ -29,7 +29,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -81,7 +80,7 @@ var a2sCmd = &cobra.Command{
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			symlinkPath, err := os.Readlink(dscPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+				return fmt.Errorf("failed to read symlink %s", dscPath)
 			}
 			// TODO: this seems like it would break
 			linkParent := filepath.Dir(dscPath)
@@ -208,27 +207,10 @@ var a2sCmd = &cobra.Command{
 			return err
 		}
 
-		// TODO: add objc methods in the -[Class sel:] form
 		if m.HasObjC() {
 			log.Debug("Parsing ObjC runtime structures...")
-			if err := f.CFStringsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc cfstrings")
-			}
-			if err := f.MethodsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc methods")
-			}
-			// if strings.Contains(image.Name, "libobjc.A.dylib") { // TODO: should I put this back in?
-			// 	_, err = f.GetAllSelectors(false)
-			// } else {
-			if err := f.SelectorsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc selectors")
-			}
-			// }
-			if err := f.ClassesForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc classes")
-			}
-			if err := f.ProtocolsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc protocols")
+			if err := f.ParseObjcForImage(image.Name); err != nil {
+				return fmt.Errorf("failed to parse objc data for image %s: %v", image.Name, err)
 			}
 		}
 
