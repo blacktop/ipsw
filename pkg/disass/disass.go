@@ -14,12 +14,13 @@ import (
 )
 
 type Disass interface {
-	ParseGOT() error
-	ParseObjC() error
-	ParseStubs() error
-	ParseHelpers() error
-	FindSymbol(uint64, bool) (string, bool)
+	// ParseGOT() error
+	// ParseObjC() error
+	// ParseStubs() error
+	// ParseHelpers() error
+	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
+	isMiddle() bool
 	demangle() bool
 	quite() bool
 	asJSON() bool
@@ -108,8 +109,17 @@ func (o opName) String() string {
 	}
 }
 
+type Config struct {
+	Data          []byte
+	StartAddress  uint64
+	SymbolAddress uint64
+	Middle        bool
+	AsJSON        bool
+	Demangle      bool
+	Quite         bool
+}
+
 func Disassemble(d Disass) {
-	var isMiddle bool
 	var symAddr uint64
 	var instructions []disassemble.Instruction
 
@@ -120,7 +130,7 @@ func Disassemble(d Disass) {
 
 	r := bytes.NewReader(d.data())
 
-	if name, ok := d.FindSymbol(d.startAddr(), d.demangle()); ok && !d.asJSON() {
+	if name, ok := d.FindSymbol(d.startAddr()); ok && !d.asJSON() {
 		fmt.Printf("%s:\n", name)
 	} else {
 		fmt.Printf("sub_%x:\n", d.startAddr())
@@ -135,15 +145,7 @@ func Disassemble(d Disass) {
 			break
 		}
 
-		if d.asJSON() {
-			instruction, err := disassemble.Decompose(symAddr, instrValue, &results)
-			if err != nil {
-				log.Error(err.Error())
-				continue // TODO: should we still capture this in the JSON?
-			}
-
-			instructions = append(instructions, *instruction)
-		} else {
+		if !d.asJSON() {
 			instruction, err := disassemble.Decompose(symAddr, instrValue, &results)
 			if err != nil {
 				if instrValue == 0xfeedfacf {
@@ -215,16 +217,16 @@ func Disassemble(d Disass) {
 						}
 					}
 				} else if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
-					if name, ok := d.FindSymbol(uint64(instruction.Operands[0].Immediate), d.demangle()); ok {
+					if name, ok := d.FindSymbol(uint64(instruction.Operands[0].Immediate)); ok {
 						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, name)
 					}
 				} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
-					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate), d.demangle()); ok {
+					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
 						instrStr += fmt.Sprintf(" ; %s", name)
 					}
 				} else if instruction.Operation == disassemble.ARM64_ADR {
 					adrImm := instruction.Operands[1].Immediate
-					if name, ok := d.FindSymbol(uint64(adrImm), d.demangle()); ok {
+					if name, ok := d.FindSymbol(uint64(adrImm)); ok {
 						instrStr += fmt.Sprintf(" ; %s", name)
 					} else if cstr, err := d.GetCString(adrImm); err == nil {
 						if utils.IsASCII(cstr) {
@@ -243,7 +245,7 @@ func Disassemble(d Disass) {
 					} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
 						adrpImm += instruction.Operands[2].Immediate
 					}
-					if name, ok := d.FindSymbol(uint64(adrpImm), d.demangle()); ok {
+					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
 						instrStr += fmt.Sprintf(" ; %s", name)
 					} else if cstr, err := d.GetCString(adrpImm); err == nil {
 						if utils.IsASCII(cstr) {
@@ -257,13 +259,20 @@ func Disassemble(d Disass) {
 				}
 			}
 
-			if isMiddle && d.startAddr() == symAddr {
+			if d.isMiddle() && d.startAddr() == symAddr {
 				fmt.Printf("👉%08x:  %s\t%s\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
 			} else {
 				fmt.Printf("%#08x:  %s\t%s\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
 			}
 
 			prevInstr = instruction
+		} else { // output as JSON
+			instruction, err := disassemble.Decompose(symAddr, instrValue, &results)
+			if err != nil {
+				log.Error(err.Error())
+				continue // TODO: should we still capture this in the JSON?
+			}
+			instructions = append(instructions, *instruction)
 		}
 
 		symAddr += uint64(binary.Size(uint32(0)))

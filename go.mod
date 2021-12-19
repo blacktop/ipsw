@@ -37,8 +37,6 @@ require (
 // replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 
-require github.com/blacktop/go-arm64 v0.6.18
-
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect

@@ -101,8 +101,6 @@ github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kB
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
 github.com/blacktop/arm64-cgo v1.0.44 h1:19PmRIx5I7uBrdl/jV5IlQnFNZhyJdsmuUxkjleVQz4=
 github.com/blacktop/arm64-cgo v1.0.44/go.mod h1:zdVJfILLCC5spSHBiYitzVxxIKZPR/7prvtkeb6g520=
-github.com/blacktop/go-arm64 v0.6.18 h1:QzQaqkZ61nN9fP04Q0SrHv4e7Ln0hMTYgfR7hzxeUiE=
-github.com/blacktop/go-arm64 v0.6.18/go.mod h1:MadXPi/vTAx0FYNcQllHRMZrRRuwPfjzhr7d1UUWQc0=
 github.com/blacktop/go-macho v1.1.79/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
 github.com/blacktop/go-macho v1.1.81 h1:xg7FoqQLYSXseba7p2saX0fm00mhKLWHxBTJ+/oRhy0=
 github.com/blacktop/go-macho v1.1.81/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=

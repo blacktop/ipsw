@@ -29,6 +29,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -163,13 +164,13 @@ var xrefCmd = &cobra.Command{
 					return err
 				}
 
-				triage, err := FirstPassTriage(f, &fn, bytes.NewReader(data), false)
+				triage, err := disass.FirstPassTriage(f, &fn, bytes.NewReader(data), false)
 				if err != nil {
 					return err
 				}
 
 				if ok, loc := triage.Contains(unslidAddr); ok {
-					if sym := f.FindSymbol(fn.StartAddr, false); len(sym) > 0 {
+					if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
 					} else {
 						xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)

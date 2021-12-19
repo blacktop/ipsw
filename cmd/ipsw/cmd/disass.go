@@ -360,6 +360,7 @@ var disCmd = &cobra.Command{
 		var isMiddle bool
 		var symAddr uint64
 		var startAddr uint64
+		var startVMAddr uint64
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)

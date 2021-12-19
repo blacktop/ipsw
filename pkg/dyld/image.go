@@ -1,17 +1,22 @@
 package dyld
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"path/filepath"
 	"sync"
 
 	"github.com/apex/log"
+	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
+
+var ErrMachOSectionNotFound = errors.New("MachO missing required section")
 
 type rangeEntry struct {
 	StartAddr  uint64
@@ -376,7 +381,7 @@ func (i *CacheImage) Analyze() error {
 
 	if !i.Analysis.State.IsStubHelpersDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s symbol stub helpers", i.Name)
-		if err := i.cache.ParseSymbolStubHelpers(i); err != nil {
+		if err := i.ParseHelpers(); err != nil {
 			if !errors.Is(err, ErrMachOSectionNotFound) {
 				return err
 			}
@@ -385,7 +390,7 @@ func (i *CacheImage) Analyze() error {
 
 	if !i.Analysis.State.IsGotDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s global offset table", i.Name)
-		if err := i.cache.ParseGOT(i); err != nil {
+		if err := i.ParseGOT(); err != nil {
 			return err
 		}
 
@@ -417,7 +422,7 @@ func (i *CacheImage) Analyze() error {
 
 	if !i.Analysis.State.IsStubsDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s symbol stubs", i.Name)
-		if err := i.cache.ParseSymbolStubs(i); err != nil {
+		if err := i.ParseStubs(); err != nil {
 			return err
 		}
 
@@ -447,4 +452,215 @@ func (i *CacheImage) Analyze() error {
 	}
 
 	return nil
+}
+
+// ParseGOT parse global offset table in MachO
+func (i *CacheImage) ParseGOT() error {
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
+	}
+	defer m.Close()
+
+	i.Analysis.GotPointers = make(map[uint64]uint64)
+
+	if authPtr := m.Section("__AUTH_CONST", "__auth_ptr"); authPtr != nil {
+		dat, err := authPtr.Data()
+		if err != nil {
+			return fmt.Errorf("failed to get %s.%s section data: %v", authPtr.Seg, authPtr.Name, err)
+		}
+
+		ptrs := make([]uint64, authPtr.Size/8)
+		if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
+			return fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr ptrs; %v", err)
+		}
+
+		for idx, ptr := range ptrs {
+			i.Analysis.GotPointers[authPtr.Addr+uint64(idx*8)] = i.cache.SlideInfo.SlidePointer(ptr)
+		}
+	}
+
+	for _, sec := range m.Sections {
+		if sec.Flags.IsNonLazySymbolPointers() || sec.Flags.IsLazySymbolPointers() { // TODO: make sure this doesn't break things
+			dat, err := sec.Data()
+			if err != nil {
+				return fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+			}
+
+			ptrs := make([]uint64, sec.Size/8)
+			if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
+				return fmt.Errorf("failed to read %s.%s NonLazySymbol pointers; %v", sec.Seg, sec.Name, err)
+			}
+
+			for idx, ptr := range ptrs {
+				i.Analysis.GotPointers[sec.Addr+uint64(idx*8)] = i.cache.SlideInfo.SlidePointer(ptr)
+			}
+		}
+	}
+
+	i.Analysis.State.SetGot(true)
+
+	return nil
+}
+
+// ParseStubs parse symbol stubs in MachO
+func (i *CacheImage) ParseStubs() error {
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
+	}
+	defer m.Close()
+
+	i.Analysis.SymbolStubs = make(map[uint64]uint64)
+
+	for _, sec := range m.Sections {
+		if sec.Flags.IsSymbolStubs() {
+			var adrpImm uint64
+			var adrpAddr uint64
+			var instrValue uint32
+			var results [1024]byte
+			var prevInst *disassemble.Instruction
+
+			dat, err := sec.Data()
+			if err != nil {
+				return err
+			}
+
+			r := bytes.NewReader(dat)
+
+			startAddr := sec.Addr
+
+			for {
+				err = binary.Read(r, binary.LittleEndian, &instrValue)
+
+				if err == io.EOF {
+					break
+				}
+
+				instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+				if err != nil {
+					fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+					break
+				}
+
+				if instruction.Operation == disassemble.ARM64_ADD && prevInst.Operation == disassemble.ARM64_ADRP {
+					if instruction.Operands != nil && prevInst.Operands != nil {
+						// adrp      	x17, #0x1e3be9000
+						adrpRegister := prevInst.Operands[0].Registers[0] // x17
+						adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+						// add       	x17, x17, #0x1c0
+						if adrpRegister == instruction.Operands[0].Registers[0] {
+							adrpImm += instruction.Operands[2].Immediate
+							adrpAddr = prevInst.Address
+						}
+					}
+				} else if instruction.Operation == disassemble.ARM64_LDR && prevInst.Operation == disassemble.ARM64_ADRP {
+					if instruction.Operands != nil && prevInst.Operands != nil {
+						// adrp	x16, #0x1e3be9000
+						adrpRegister := prevInst.Operands[0].Registers[0] // x16
+						adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+						// ldr	x16, [x16, #0x560]
+						if adrpRegister == instruction.Operands[0].Registers[0] {
+							adrpImm += instruction.Operands[1].Immediate
+							adrpAddr = prevInst.Address
+							addr, err := i.cache.ReadPointerAtAddress(adrpImm)
+							if err != nil {
+								return fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
+							}
+							i.Analysis.SymbolStubs[adrpAddr] = i.cache.SlideInfo.SlidePointer(addr)
+						}
+					}
+				} else if instruction.Operation == disassemble.ARM64_LDR && prevInst.Operation == disassemble.ARM64_ADD {
+					// add       	x17, x17, #0x1c0
+					addRegister := prevInst.Operands[0].Registers[0] // x17
+					// ldr       	x16, [x17]
+					if addRegister == instruction.Operands[1].Registers[0] {
+						addr, err := i.cache.ReadPointerAtAddress(adrpImm)
+						if err != nil {
+							return fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
+						}
+						i.Analysis.SymbolStubs[adrpAddr] = i.cache.SlideInfo.SlidePointer(addr)
+					}
+				} else if instruction.Operation == disassemble.ARM64_BR && prevInst.Operation == disassemble.ARM64_ADD {
+					// add       	x16, x16, #0x828
+					addRegister := prevInst.Operands[0].Registers[0] // x16
+					// br        	x16
+					if addRegister == instruction.Operands[0].Registers[0] {
+						i.Analysis.SymbolStubs[adrpAddr] = adrpImm
+					}
+				}
+
+				prevInst = instruction
+				startAddr += uint64(binary.Size(uint32(0)))
+			}
+		}
+	}
+
+	i.Analysis.State.SetStubs(true)
+
+	return nil
+}
+
+// ParseHelpers parse symbol stub helpers in MachO
+func (i *CacheImage) ParseHelpers() error {
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
+	}
+	defer m.Close()
+
+	if sec := m.Section("__TEXT", "__stub_helper"); sec != nil {
+		var instrValue uint32
+		var results [1024]byte
+
+		dat, err := sec.Data()
+		if err != nil {
+			return err
+		}
+
+		r := bytes.NewReader(dat)
+
+		startAddr := sec.Addr
+		stubHelperFnStart := sec.Addr
+
+		for {
+			err = binary.Read(r, binary.LittleEndian, &instrValue)
+
+			if err == io.EOF {
+				break
+			}
+
+			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+			if err != nil {
+				fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+				break
+			}
+
+			if instruction.Encoding == disassemble.ENC_BR_64_BRANCH_REG { // check if branch location is a function
+				if instruction.Operation == disassemble.ARM64_BR {
+					stubHelperFnStart = instruction.Address + 4
+					continue
+				}
+				if operands := instruction.Operands; operands != nil {
+					for _, operand := range operands {
+						if operand.Class == disassemble.LABEL {
+							if symName, ok := i.cache.AddressToSymbol[operand.Immediate]; ok {
+								i.cache.AddressToSymbol[stubHelperFnStart] = fmt.Sprintf("__stub_helper.%s", symName)
+							}
+						}
+					}
+				}
+			}
+
+			startAddr += uint64(binary.Size(uint32(0)))
+		}
+
+		i.Analysis.State.SetStubHelpers(true)
+
+		return nil
+	}
+
+	return fmt.Errorf("dylib does NOT contain __TEXT.__stub_helper section: %w", ErrMachOSectionNotFound)
 }
