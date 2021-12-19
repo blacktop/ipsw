@@ -149,9 +149,10 @@ var symbolicateCmd = &cobra.Command{
 
 			// Symbolicate the crashing thread's backtrace
 			for idx, bt := range crashLog.Threads[crashLog.CrashedThread].BackTrace {
-				image := f.Image(filepath.Base(bt.Image.Name))
-				if image != nil {
-					log.Errorf("image %s not found in %s", bt.Image.Name, dscPath)
+				image, err := f.Image(bt.Image.Name)
+				if err != nil {
+					log.Errorf(err.Error())
+					crashLog.Threads[crashLog.CrashedThread].BackTrace[idx].Symbol = "?"
 					continue
 				}
 				// calculate slide

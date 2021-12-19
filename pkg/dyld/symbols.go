@@ -187,9 +187,9 @@ func (f *File) FindLocalSymbolInImage(symbol, imageName string) (*CacheLocalSymb
 
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
-	image := f.Image(imageName)
-	if image == nil {
-		return nil, fmt.Errorf("no image found matching %s", imageName)
+	image, err := f.Image(imageName)
+	if err != nil {
+		return nil, err
 	}
 
 	sr.Seek(int64(uint32(f.Headers[uuid].LocalSymbolsOffset)+f.LocalSymInfo.EntriesOffset), io.SeekStart)
@@ -252,8 +252,8 @@ func (f *File) GetLocalSymbol(symbolName string) *CacheLocalSymbol64 {
 
 // GetLocalSymbolInImage returns the local symbol that matches name in a given image
 func (f *File) GetLocalSymbolInImage(imageName, symbolName string) *CacheLocalSymbol64 {
-	image := f.Image(imageName)
-	if image == nil {
+	image, err := f.Image(imageName)
+	if err != nil {
 		return nil
 	}
 	for _, sym := range image.LocalSymbols {
@@ -368,7 +368,7 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 			syms, err := f.getExportTrieSymbols(image)
 			if err != nil {
 				if errors.Is(err, ErrNoExportTrieInMachO) {
-					m, err := f.Image(image.Name).GetMacho()
+					m, err := image.GetMacho()
 					if err != nil {
 						return err
 					}
@@ -432,7 +432,7 @@ func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error
 		syms, err := f.getExportTrieSymbols(image)
 		if err != nil {
 			if errors.Is(err, ErrNoExportTrieInMachO) {
-				m, err := f.Image(image.Name).GetMacho()
+				m, err := image.GetMacho()
 				if err != nil {
 					return err
 				}
@@ -605,9 +605,9 @@ func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieEntry, error) {
 
 func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trie.TrieEntry, error) {
 
-	image := f.Image(imagePath)
-	if image == nil {
-		return nil, fmt.Errorf("cache does not contain image %s", imagePath)
+	image, err := f.Image(imagePath)
+	if err != nil {
+		return nil, err
 	}
 
 	syms, err := f.getExportTrieSymbols(image)

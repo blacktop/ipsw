@@ -106,9 +106,9 @@ var xrefCmd = &cobra.Command{
 		var srcImage *dyld.CacheImage
 		var images []*dyld.CacheImage
 		if len(imageName) > 0 {
-			srcImage = f.Image(imageName)
-			if srcImage == nil {
-				return fmt.Errorf("no image found matching %s", imageName)
+			srcImage, err = f.Image(imageName)
+			if err != nil {
+				return fmt.Errorf("image not in %s: %v", dscPath, err)
 			}
 			images = append(images, srcImage)
 		} else {

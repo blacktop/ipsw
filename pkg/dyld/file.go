@@ -1069,21 +1069,21 @@ func (f *File) ParsePatchInfo() error {
 }
 
 // Image returns the Image with the given name, or nil if no such image exists.
-func (f *File) Image(name string) *CacheImage {
+func (f *File) Image(name string) (*CacheImage, error) {
 	// fast path
 	if idx, err := f.GetDylibIndex(name); err == nil {
-		return f.Images[idx]
+		return f.Images[idx], nil
 	}
 	// slow path
 	for _, i := range f.Images {
 		if strings.EqualFold(strings.ToLower(i.Name), strings.ToLower(name)) {
-			return i
+			return i, nil
 		}
 		if strings.EqualFold(strings.ToLower(filepath.Base(i.Name)), strings.ToLower(name)) {
-			return i
+			return i, nil
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("image %s not found in cache", name)
 }
 
 // GetImageContainingTextAddr returns a dylib whose __TEXT segment contains a given virtual address
