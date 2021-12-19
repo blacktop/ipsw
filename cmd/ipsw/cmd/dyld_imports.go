@@ -77,23 +77,23 @@ var importsCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if argImage := f.Image(args[1]); argImage != nil {
-			title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(argImage.Name))
-			fmt.Printf(title)
-			fmt.Println(strings.Repeat("=", len(title)-1))
-			for _, image := range f.Images {
-				m, err := image.GetPartialMacho()
-				if err != nil {
-					return err
-				}
-				if utils.StrSliceContains(m.ImportedLibraries(), argImage.Name) {
-					fmt.Println(image.Name)
-				}
-				m.Close()
-			}
+		image, err := f.Image(args[1])
+		if err != nil {
+			return fmt.Errorf("image not in %s: %v", dscPath, err)
+		}
 
-		} else {
-			log.Errorf("no image found matching %s", args[1])
+		title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(image.Name))
+		fmt.Printf(title)
+		fmt.Println(strings.Repeat("=", len(title)-1))
+		for _, image := range f.Images {
+			m, err := image.GetPartialMacho()
+			if err != nil {
+				return err
+			}
+			if utils.StrSliceContains(m.ImportedLibraries(), image.Name) {
+				fmt.Println(image.Name)
+			}
+			m.Close()
 		}
 
 		return nil

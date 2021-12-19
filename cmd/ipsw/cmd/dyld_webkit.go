@@ -83,12 +83,12 @@ var webkitCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		img := f.Image("WebKit")
-		if img == nil {
-			return fmt.Errorf("%s does not contain /System/Library/Frameworks/WebKit.framework/WebKit", dscPath)
+		image, err := f.Image("WebKit")
+		if err != nil {
+			return fmt.Errorf("image not in %s: %v", dscPath, err)
 		}
 
-		m, err := f.Image("WebKit").GetPartialMacho()
+		m, err := image.GetPartialMacho()
 		if err != nil {
 			return err
 		}

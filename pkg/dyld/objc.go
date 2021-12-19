@@ -124,7 +124,10 @@ func (o Optimization) String() string {
 }
 
 func (f *File) getLibObjC() (*macho.File, error) {
-	image := f.Image("/usr/lib/libobjc.A.dylib")
+	image, err := f.Image("/usr/lib/libobjc.A.dylib")
+	if err != nil {
+		return nil, err
+	}
 
 	m, err := image.GetPartialMacho()
 	if err != nil {
@@ -513,7 +516,11 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -573,7 +580,11 @@ func (f *File) ProtocolsForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -608,7 +619,11 @@ func (f *File) SelectorsForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -673,7 +688,11 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -798,7 +817,11 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -890,7 +913,11 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -1073,7 +1100,11 @@ func (f *File) ParseObjcForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
