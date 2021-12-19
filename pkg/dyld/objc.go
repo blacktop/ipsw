@@ -124,7 +124,10 @@ func (o Optimization) String() string {
 }
 
 func (f *File) getLibObjC() (*macho.File, error) {
-	image := f.Image("/usr/lib/libobjc.A.dylib")
+	image, err := f.Image("/usr/lib/libobjc.A.dylib")
+	if err != nil {
+		return nil, err
+	}
 
 	m, err := image.GetPartialMacho()
 	if err != nil {
@@ -268,7 +271,7 @@ func (f *File) dumpOffsets(offsets []int32, fileOffset int64) {
 			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
+				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
 			}
 			addr, _ := f.GetVMAddressForUUID(f.UUID, uint64(int32(fileOffset)+ptr))
 			fmt.Printf("    0x%x: %s\n", addr, strings.Trim(s, "\x00"))
@@ -360,7 +363,7 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
+				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
 			}
 			addr, _ := f.GetVMAddressForUUID(f.UUID, uint64(int32(fileOffset)+ptr))
 			objcMap[strings.Trim(s, "\x00")] = addr
@@ -379,7 +382,7 @@ func (f *File) GetAllSelectors(print bool) (map[string]uint64, error) {
 
 	shash, err := f.getSelectorStringHash()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed read selector objc_stringhash_t")
+		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	if print {
@@ -393,12 +396,12 @@ func (f *File) GetAllSelectors(print bool) (map[string]uint64, error) {
 func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 	shash, err := f.getSelectorStringHash()
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get selector objc_stringhash_t for %s", selector)
+		return 0, fmt.Errorf("failed get selector objc_stringhash_t for %s: %v", selector, err)
 	}
 
 	selIndex, err := shash.getIndex(selector)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get selector address for %s", selector)
+		return 0, fmt.Errorf("failed get selector address for %s", selector)
 	}
 
 	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
@@ -413,7 +416,7 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 func (f *File) GetAllClasses(print bool) (map[string]uint64, error) {
 	shash, err := f.getClassStringHash()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed read class objc_stringhash_t")
+		return nil, fmt.Errorf("failed read class objc_stringhash_t")
 	}
 
 	if print {
@@ -427,12 +430,12 @@ func (f *File) GetAllClasses(print bool) (map[string]uint64, error) {
 func (f *File) GetClassAddress(class string) (uint64, error) {
 	shash, err := f.getClassStringHash()
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed read class objc_stringhash_t for %s", class)
+		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	selIndex, err := shash.getIndex(class)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get class address for %s", class)
+		return 0, fmt.Errorf("failed get class address for %s: %v", class, err)
 	}
 
 	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
@@ -447,7 +450,7 @@ func (f *File) GetClassAddress(class string) (uint64, error) {
 func (f *File) GetAllProtocols(print bool) (map[string]uint64, error) {
 	shash, err := f.getProtocolStringHash()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed read selector objc_stringhash_t")
+		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	if print {
@@ -461,12 +464,12 @@ func (f *File) GetAllProtocols(print bool) (map[string]uint64, error) {
 func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
 	shash, err := f.getProtocolStringHash()
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed read selector objc_stringhash_t")
+		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	selIndex, err := shash.getIndex(protocol)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get protocol address for %s", protocol)
+		return 0, fmt.Errorf("failed get protocol address for %s: %v", protocol, err)
 	}
 
 	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
@@ -513,7 +516,11 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -523,7 +530,7 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 		// fmt.Println(image.Name)
 		m, err := image.GetPartialMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
 		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
@@ -573,7 +580,11 @@ func (f *File) ProtocolsForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -603,16 +614,16 @@ func (f *File) ProtocolsForImage(imageNames ...string) error {
 
 // SelectorsForImage returns all of the Objective-C selectors for a given image
 func (f *File) SelectorsForImage(imageNames ...string) error {
+	var ptr uint64
 	var images []*CacheImage
-
-	libobjc, err := f.getLibObjC()
-	if err != nil {
-		return err
-	}
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -621,57 +632,49 @@ func (f *File) SelectorsForImage(imageNames ...string) error {
 	for _, image := range images {
 		m, err := image.GetPartialMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
+		defer m.Close()
 
 		image.ObjC.SelRefs = make(map[uint64]*objc.Selector)
 
 		sec := m.Section("__DATA", "__objc_selrefs")
 		if sec != nil {
 			r := io.NewSectionReader(f.r[f.UUID], int64(sec.Offset), int64(sec.Size))
+
 			selectorPtrs := make([]uint64, sec.Size/8)
 			if err := binary.Read(r, f.ByteOrder, &selectorPtrs); err != nil {
 				return err
 			}
-			for idx, ptr := range selectorPtrs {
-				selectorPtrs[idx] = ptr & mask // TODO use chain fixups
-			}
 
-			objcRoSeg := libobjc.Segment("__OBJC_RO")
-			if objcRoSeg == nil {
-				fmt.Println("  - No selectors.")
-				return fmt.Errorf("segment __OBJC_RO does not exist")
-			}
+			for idx, sel := range selectorPtrs {
+				ptr = sec.Addr + uint64(idx*8)
+				sel = f.SlideInfo.SlidePointer(sel)
 
-			sr := io.NewSectionReader(f.r[f.UUID], int64(objcRoSeg.Offset), int64(objcRoSeg.Filesz))
-
-			for idx, ptr := range selectorPtrs {
-				sr.Seek(int64(ptr-objcRoSeg.Addr), io.SeekStart)
-
-				s, err := bufio.NewReader(sr).ReadString('\x00')
+				name, err := f.GetCString(sel)
 				if err != nil {
-					log.Error(errors.Wrapf(err, "failed to read selector name at: %d", ptr-objcRoSeg.Addr).Error())
+					return fmt.Errorf("failed to read selector name cstring: %v", err)
 				}
 
 				image.ObjC.SelRefs[ptr] = &objc.Selector{
-					VMAddr: ptr - objcRoSeg.Addr,
-					Name:   strings.Trim(s, "\x00"),
+					VMAddr: sel,
+					Name:   name,
 				}
 
 				if len(image.ObjC.SelRefs[ptr].Name) > 0 {
-					f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("sel_%s", image.ObjC.SelRefs[ptr].Name)
-					if sym, ok := f.AddressToSymbol[ptr]; ok {
+					f.AddressToSymbol[ptr] = fmt.Sprintf("sel_%s", image.ObjC.SelRefs[ptr].Name)
+					if sym, ok := f.AddressToSymbol[sel]; ok {
 						if len(sym) < len(image.ObjC.SelRefs[ptr].Name) {
-							f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
+							f.AddressToSymbol[sel] = image.ObjC.SelRefs[ptr].Name
 						}
 					} else {
-						f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
+						f.AddressToSymbol[sel] = image.ObjC.SelRefs[ptr].Name
 					}
 				}
 			}
+		} else {
+			return fmt.Errorf("image %s does not contain __DATA.__objc_selrefs section", image.Name)
 		}
-
-		m.Close()
 	}
 
 	return nil
@@ -685,7 +688,11 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -694,7 +701,7 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 	for _, image := range images {
 		m, err := image.GetPartialMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
 		if sec := m.Section("__TEXT", "__objc_methlist"); sec != nil {
@@ -810,7 +817,11 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -819,7 +830,7 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	for _, image := range images {
 		m, err := image.GetPartialMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
 		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
@@ -902,7 +913,11 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
@@ -911,7 +926,7 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 	for _, image := range images {
 		m, err := image.GetPartialMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
 		for _, s := range m.Segments() {
@@ -1077,6 +1092,50 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 		IsSwiftStable:         (classPtr.DataVMAddrAndFastFlags&objc.FAST_IS_SWIFT_STABLE == 1),
 		ReadOnlyData:          info,
 	}, nil
+}
+
+func (f *File) ParseObjcForImage(imageNames ...string) error {
+
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
+		}
+	} else {
+		images = f.Images
+	}
+
+	for _, image := range images {
+		if err := f.CFStringsForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc cfstrings for image %s: %v", image.Name, err)
+		}
+		// TODO: add objc methods in the -[Class sel:] form
+		if err := f.MethodsForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc methods for image %s: %v", image.Name, err)
+		}
+		if strings.Contains(image.Name, "libobjc.A.dylib") {
+			if _, err := f.GetAllSelectors(false); err != nil {
+				return fmt.Errorf("failed to parse objc all selectors: %v", err)
+			}
+		} else {
+			if err := f.SelectorsForImage(image.Name); err != nil {
+				return fmt.Errorf("failed to parse objc selectors for image %s: %v", image.Name, err)
+			}
+		}
+		if err := f.ClassesForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc classes for image %s: %v", image.Name, err)
+		}
+		if err := f.ProtocolsForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc protocols for image %s: %v", image.Name, err)
+		}
+	}
+
+	return nil
 }
 
 /*

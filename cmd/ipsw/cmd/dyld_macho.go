@@ -190,12 +190,11 @@ var dyldMachoCmd = &cobra.Command{
 					),
 				)
 			} else {
-				if img := f.Image(args[1]); img != nil {
-					images = append(images, img)
-				} else {
-					log.Errorf("dylib %s not found in %s", args[1], dscPath)
-					return nil
+				image, err := f.Image(args[1])
+				if err != nil {
+					return fmt.Errorf("image not in %s: %v", dscPath, err)
 				}
+				images = append(images, image)
 			}
 
 			for _, i := range images {

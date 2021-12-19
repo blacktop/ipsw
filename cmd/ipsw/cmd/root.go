@@ -71,6 +71,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
 
 // initConfig reads in config file and ENV variables if set.

@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
@@ -78,7 +77,7 @@ var symbolicateCmd = &cobra.Command{
 			if fileInfo.Mode()&os.ModeSymlink != 0 {
 				symlinkPath, err := os.Readlink(dscPath)
 				if err != nil {
-					return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+					return fmt.Errorf("failed to read symlink %s: %v", dscPath, err)
 				}
 				// TODO: this seems like it would break
 				linkParent := filepath.Dir(dscPath)
@@ -150,10 +149,16 @@ var symbolicateCmd = &cobra.Command{
 
 			// Symbolicate the crashing thread's backtrace
 			for idx, bt := range crashLog.Threads[crashLog.CrashedThread].BackTrace {
+				image, err := f.Image(bt.Image.Name)
+				if err != nil {
+					log.Errorf(err.Error())
+					crashLog.Threads[crashLog.CrashedThread].BackTrace[idx].Symbol = "?"
+					continue
+				}
 				// calculate slide
-				image := f.Image(bt.Image.Name)
 				bt.Image.Slide = bt.Image.Start - image.CacheImageTextInfo.LoadAddress
 				unslidAddr := bt.Address - bt.Image.Slide
+
 				m, err := image.GetMacho()
 				if err != nil {
 					return err
@@ -180,25 +185,8 @@ var symbolicateCmd = &cobra.Command{
 				}
 
 				if m.HasObjC() {
-					err = f.CFStringsForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc cfstrings")
-					}
-					err = f.MethodsForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc methods")
-					}
-					if strings.Contains(image.Name, "libobjc.A.dylib") {
-						_, err = f.GetAllSelectors(false)
-					} else {
-						err = f.SelectorsForImage(image.Name)
-					}
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc selectors")
-					}
-					err = f.ClassesForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc classes")
+					if err := f.ParseObjcForImage(image.Name); err != nil {
+						return fmt.Errorf("failed to parse objc data for image %s: %v", image.Name, err)
 					}
 				}
 

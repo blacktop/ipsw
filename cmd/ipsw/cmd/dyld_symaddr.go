@@ -90,9 +90,9 @@ var symaddrCmd = &cobra.Command{
 			 * Search for symbol inside dylib *
 			 **********************************/
 			if len(imageName) > 0 {
-				i := f.Image(imageName)
-				if i == nil {
-					return fmt.Errorf("failed to find image %s in %s", imageName, dscPath)
+				i, err := f.Image(imageName)
+				if err != nil {
+					return fmt.Errorf("image not in %s: %v", dscPath, err)
 				}
 				m, err := i.GetPartialMacho()
 				if err != nil {
@@ -152,7 +152,7 @@ var symaddrCmd = &cobra.Command{
 			log.Warn("searching in exported symbols...")
 			for _, image := range f.Images {
 				// utils.Indent(log.Debug, 2)("Searching " + image.Name)
-				m, err := f.Image(image.Name).GetPartialMacho()
+				m, err := image.GetPartialMacho()
 				if err != nil {
 					return err
 				}
@@ -160,7 +160,7 @@ var symaddrCmd = &cobra.Command{
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 				if sym, err := f.FindExportedSymbolInImage(image.Name, args[1]); err != nil {
 					if !errors.Is(err, dyld.ErrSymbolNotInImage) {
-						m, err := f.Image(image.Name).GetMacho()
+						m, err := image.GetMacho()
 						if err != nil {
 							return err
 						}
@@ -215,9 +215,9 @@ var symaddrCmd = &cobra.Command{
 			**************************/
 		} else if len(imageName) > 0 {
 			// Dump ALL private symbols for a dylib
-			i := f.Image(imageName)
-			if i == nil {
-				return fmt.Errorf("failed to find image %s in %s", imageName, dscPath)
+			i, err := f.Image(imageName)
+			if err != nil {
+				return fmt.Errorf("image not in %s: %v", dscPath, err)
 			}
 			log.Warn("parsing local symbols for image...")
 			if err := f.GetLocalSymbolsForImage(i); err != nil {

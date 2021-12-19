@@ -217,9 +217,9 @@ func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details 
 // ImageDependencies recursively returns all the image's loaded dylibs and those dylibs' loaded dylibs etc
 func (f *File) ImageDependencies(imageName string) error {
 
-	image := f.Image(imageName)
-	if image == nil {
-		return fmt.Errorf("no image found matching %s", imageName)
+	image, err := f.Image(imageName)
+	if err != nil {
+		return err
 	}
 
 	m, err := image.GetPartialMacho()
@@ -266,7 +266,11 @@ func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shouldDemang
 func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, error) {
 	if len(imageName) > 0 {
 		if sym, _ := f.FindExportedSymbolInImage(imageName, symbol); sym != nil {
-			return sym.Address, f.Image(imageName), nil
+			if image, err := f.Image(imageName); err != nil {
+				return sym.Address, image, err
+			} else {
+				return sym.Address, image, nil
+			}
 		}
 	} else {
 		// Search ALL dylibs for the symbol

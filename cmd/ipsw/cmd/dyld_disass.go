@@ -132,9 +132,9 @@ var dyldDisassCmd = &cobra.Command{
 					return err
 				}
 			} else {
-				image = f.Image(imageName)
-				if image == nil {
-					return fmt.Errorf("failed to find image %s in %s", imageName, dscPath)
+				image, err = f.Image(imageName)
+				if err != nil {
+					return fmt.Errorf("image not in %s: %v", dscPath, err)
 				}
 				utils.Indent(log.Warn, 2)("parsing public symbols...")
 				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
@@ -286,25 +286,8 @@ var dyldDisassCmd = &cobra.Command{
 
 		if m.HasObjC() {
 			log.Info("Parsing ObjC runtime structures...")
-			if err := f.CFStringsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc cfstrings")
-			}
-			if err := f.MethodsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc methods")
-			}
-			if strings.Contains(image.Name, "libobjc.A.dylib") {
-				_, err = f.GetAllSelectors(false)
-			} else {
-				err = f.SelectorsForImage(image.Name)
-			}
-			if err != nil {
-				return errors.Wrapf(err, "failed to parse objc selectors")
-			}
-			if err := f.ClassesForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc classes")
-			}
-			if err := f.ProtocolsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc protocols")
+			if err := f.ParseObjcForImage(image.Name); err != nil {
+				return fmt.Errorf("failed to parse objc data for image %s: %v", image.Name, err)
 			}
 		}
 
