@@ -138,6 +138,7 @@ func (d *DyldDisass) Triage() error {
 	// 	fmt.Println()
 	// }
 	// fmt.Println("DONE")
+
 	// extract all immediates
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
@@ -157,8 +158,6 @@ func (d *DyldDisass) Triage() error {
 					d.tr.addresses[instruction.Address] = uint64(op.Immediate)
 				}
 			}
-			// } else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
-			// 	d.tr.addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
 			(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
 			adrpRegister := prevInstr.Operands[0].Registers[0]
@@ -311,95 +310,3 @@ func (d DyldDisass) FindSymbol(addr uint64) (string, bool) {
 func (d DyldDisass) GetCString(addr uint64) (string, error) {
 	return d.f.GetCString(addr)
 }
-
-// AnalyzeImage analyzes an image by parsing it's symbols, stubs and GOT
-// func (f *File) AnalyzeImage(image *CacheImage) error {
-
-// 	if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
-// 		log.Errorf("failed to parse exported symbols for %s", image.Name)
-// 	}
-
-// 	if err := f.GetLocalSymbolsForImage(image); err != nil {
-// 		if !errors.Is(err, ErrNoLocals) {
-// 			return err
-// 		}
-// 	}
-
-// 	if !f.IsArm64() {
-// 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
-// 	}
-
-// 	if !image.Analysis.State.IsStubHelpersDone() && f.IsArm64() {
-// 		log.Debugf("parsing %s symbol stub helpers", image.Name)
-// 		if err := f.ParseSymbolStubHelpers(image); err != nil {
-// 			if !errors.Is(err, ErrMachOSectionNotFound) {
-// 				return err
-// 			}
-// 		}
-// 	}
-
-// 	if !image.Analysis.State.IsGotDone() && f.IsArm64() {
-// 		log.Debugf("parsing %s global offset table", image.Name)
-// 		if err := f.ParseGOT(image); err != nil {
-// 			return err
-// 		}
-
-// 		for entry, target := range image.Analysis.GotPointers {
-// 			if symName, ok := f.AddressToSymbol[target]; ok {
-// 				f.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
-// 			} else {
-// 				if img, err := f.GetImageContainingTextAddr(target); err == nil {
-// 					if err := f.AnalyzeImage(img); err != nil {
-// 						return err
-// 					}
-// 					if symName, ok := f.AddressToSymbol[target]; ok {
-// 						f.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
-// 					} else if laptr, ok := image.Analysis.GotPointers[target]; ok {
-// 						if symName, ok := f.AddressToSymbol[laptr]; ok {
-// 							f.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
-// 						}
-// 					} else {
-// 						utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x in %s", entry, target, img.Name))
-// 						f.AddressToSymbol[entry] = fmt.Sprintf("__got_%x ; %s", target, filepath.Base(img.Name))
-// 					}
-// 				} else {
-// 					f.AddressToSymbol[entry] = fmt.Sprintf("__got_%x", target)
-// 				}
-
-// 			}
-// 		}
-// 	}
-
-// 	if !image.Analysis.State.IsStubsDone() && f.IsArm64() {
-// 		log.Debugf("parsing %s symbol stubs", image.Name)
-// 		if err := f.ParseSymbolStubs(image); err != nil {
-// 			return err
-// 		}
-
-// 		for stub, target := range image.Analysis.SymbolStubs {
-// 			if symName, ok := f.AddressToSymbol[target]; ok {
-// 				f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
-// 			} else {
-// 				img, err := f.GetImageContainingTextAddr(target)
-// 				if err != nil {
-// 					return err
-// 				}
-// 				if err := f.AnalyzeImage(img); err != nil {
-// 					return err
-// 				}
-// 				if symName, ok := f.AddressToSymbol[target]; ok {
-// 					f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
-// 				} else if laptr, ok := image.Analysis.GotPointers[target]; ok {
-// 					if symName, ok := f.AddressToSymbol[laptr]; ok {
-// 						f.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
-// 					}
-// 				} else {
-// 					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
-// 					f.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	return nil
-// }
