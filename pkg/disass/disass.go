@@ -19,6 +19,7 @@ type Disass interface {
 	// ParseStubs() error
 	// ParseHelpers() error
 	Triage() error
+	IsBranchLocation(uint64) bool
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
 	isMiddle() bool
@@ -200,6 +201,9 @@ func Disassemble(d Disass) {
 			instrStr = instruction.String()
 
 			if !d.quite() {
+				if d.IsBranchLocation(instruction.Address) {
+					fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
+				}
 				if instruction.Operation == disassemble.ARM64_MRS || instruction.Operation == disassemble.ARM64_MSR {
 					var ops []string
 					replaced := false

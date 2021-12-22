@@ -99,8 +99,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
-github.com/blacktop/arm64-cgo v1.0.48 h1:4+biNa3pFAd8uv5hFxR8DncMlA9FfSE5MKYbNb/Vn1w=
-github.com/blacktop/arm64-cgo v1.0.48/go.mod h1:kMdWu1vT+ETQu6zsmixVQiMHSH+HW/WH0rDJ4QXOduQ=
+github.com/blacktop/arm64-cgo v1.0.49 h1:uGLirHBm6k2cE9kaf+JZNdc5IO9AB/sd42E2OsFUpwc=
+github.com/blacktop/arm64-cgo v1.0.49/go.mod h1:kMdWu1vT+ETQu6zsmixVQiMHSH+HW/WH0rDJ4QXOduQ=
 github.com/blacktop/go-macho v1.1.81 h1:xg7FoqQLYSXseba7p2saX0fm00mhKLWHxBTJ+/oRhy0=
 github.com/blacktop/go-macho v1.1.81/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
 github.com/blacktop/go-plist v1.0.1 h1:cbpYg6OYwSpJPLk8ObZW+norqxG5YInfPXRNcFw6n8I=

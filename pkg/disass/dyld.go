@@ -69,7 +69,7 @@ type Triage struct {
 	Details   map[uint64]addrDetails
 	function  *types.Function
 	addresses map[uint64]uint64
-	locations []uint64
+	locations map[uint64][]uint64
 }
 
 func (d DyldDisass) Dylibs() []*dyld.CacheImage {
@@ -96,11 +96,9 @@ func (d DyldDisass) HasLoc(location uint64) (bool, uint64) {
 }
 
 // IsLocation returns if given address is a local branch location within the disassembled function
-func (d DyldDisass) IsBranchLocation(addr uint64) bool {
-	for _, loc := range d.tr.locations {
-		if addr == loc {
-			return true
-		}
+func (d DyldDisass) IsBranchLocation(imm uint64) bool {
+	if _, ok := d.tr.locations[imm]; ok {
+		return true
 	}
 	return false
 }
@@ -123,10 +121,23 @@ func (d *DyldDisass) Triage() error {
 
 	d.tr = &Triage{
 		addresses: make(map[uint64]uint64),
+		locations: make(map[uint64][]uint64),
 	}
 	startAddr := d.startAddr()
 	r := bytes.NewReader(d.data())
 
+	// instructions, err := disassemble.GetInstructions(d.startAddr(), d.data())
+	// if err != nil {
+	// 	return err
+	// }
+
+	// for _, block := range instructions.Blocks() {
+	// 	for _, i := range block {
+	// 		fmt.Printf("%#08x:  %s\t%s\n", uint64(i.Address), disassemble.GetOpCodeByteString(i.Raw), i)
+	// 	}
+	// 	fmt.Println()
+	// }
+	// fmt.Println("DONE")
 	// extract all immediates
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
@@ -140,10 +151,14 @@ func (d *DyldDisass) Triage() error {
 			continue
 		}
 
-		if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
-			d.tr.addresses[instruction.Address] = uint64(instruction.Operands[0].Immediate)
-		} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
-			d.tr.addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
+		if strings.Contains(instruction.Encoding.String(), "branch") {
+			for _, op := range instruction.Operands {
+				if op.Class == disassemble.LABEL {
+					d.tr.addresses[instruction.Address] = uint64(op.Immediate)
+				}
+			}
+			// } else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
+			// 	d.tr.addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
 			(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
 			adrpRegister := prevInstr.Operands[0].Registers[0]
@@ -197,8 +212,8 @@ func (d *DyldDisass) Triage() error {
 	if !d.quite() {
 		d.tr.Details = make(map[uint64]addrDetails)
 
-		for _, addr := range d.tr.addresses {
-			image, err := d.f.GetImageContainingVMAddr(addr)
+		for addr, imm := range d.tr.addresses {
+			image, err := d.f.GetImageContainingVMAddr(imm)
 			if err != nil {
 				return err
 			}
@@ -207,7 +222,7 @@ func (d *DyldDisass) Triage() error {
 				d.tr.dylibs = append(d.tr.dylibs, image)
 			}
 
-			m, err := image.GetPartialMacho()
+			m, err := image.GetMacho()
 			if err != nil {
 				return err
 			}
@@ -215,14 +230,14 @@ func (d *DyldDisass) Triage() error {
 
 			if fn, err := m.GetFunctionForVMAddr(d.startAddr()); err == nil {
 				d.tr.function = &fn
-				if d.tr.function.StartAddr <= addr && addr < d.tr.function.EndAddr {
-					d.tr.locations = append(d.tr.locations, addr)
+				if d.tr.function.StartAddr <= imm && imm < d.tr.function.EndAddr {
+					d.tr.locations[imm] = append(d.tr.locations[imm], addr)
 					continue
 				}
 			}
 
-			if c := m.FindSectionForVMAddr(addr); c != nil {
-				d.tr.Details[addr] = addrDetails{
+			if c := m.FindSectionForVMAddr(imm); c != nil {
+				d.tr.Details[imm] = addrDetails{
 					Image:   filepath.Base(image.Name),
 					Segment: c.Seg,
 					Section: c.Name,
