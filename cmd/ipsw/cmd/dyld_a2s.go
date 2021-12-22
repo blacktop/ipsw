@@ -44,9 +44,11 @@ func init() {
 
 // a2sCmd represents the a2s command
 var a2sCmd = &cobra.Command{
-	Use:   "a2s <dyld_shared_cache> <vaddr>",
-	Short: "Lookup symbol at unslid address",
-	Args:  cobra.MinimumNArgs(2),
+	Use:           "a2s <dyld_shared_cache> <vaddr>",
+	Short:         "Lookup symbol at unslid address",
+	SilenceUsage:  false,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {

@@ -117,7 +117,7 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 
 				f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
 				f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
-					Name:    strings.Trim(s, "\x00"),
+					Name:    f.AddressToSymbol[nlist.Value],
 					Nlist64: nlist,
 				})
 			}

@@ -18,6 +18,7 @@ type Disass interface {
 	// ParseObjC() error
 	// ParseStubs() error
 	// ParseHelpers() error
+	Triage() error
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
 	isMiddle() bool
@@ -110,33 +111,33 @@ func (o opName) String() string {
 }
 
 type Config struct {
-	Data          []byte
-	StartAddress  uint64
-	SymbolAddress uint64
-	Middle        bool
-	AsJSON        bool
-	Demangle      bool
-	Quite         bool
+	Image        string
+	Data         []byte
+	StartAddress uint64
+	Middle       bool
+	AsJSON       bool
+	Demangle     bool
+	Quite        bool
 }
 
 func Disassemble(d Disass) {
-	var symAddr uint64
-	var instructions []disassemble.Instruction
-
 	var instrStr string
 	var instrValue uint32
 	var results [1024]byte
 	var prevInstr *disassemble.Instruction
+	var instructions []disassemble.Instruction
 
 	r := bytes.NewReader(d.data())
 
-	if name, ok := d.FindSymbol(d.startAddr()); ok && !d.asJSON() {
-		fmt.Printf("%s:\n", name)
-	} else {
-		fmt.Printf("sub_%x:\n", d.startAddr())
+	if !d.asJSON() {
+		if name, ok := d.FindSymbol(d.startAddr()); ok && !d.asJSON() {
+			fmt.Printf("%s:\n", name)
+		} else {
+			fmt.Printf("sub_%x:\n", d.startAddr())
+		}
 	}
 
-	symAddr = d.startAddr()
+	startAddr := d.startAddr()
 
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
@@ -146,22 +147,22 @@ func Disassemble(d Disass) {
 		}
 
 		if !d.asJSON() {
-			instruction, err := disassemble.Decompose(symAddr, instrValue, &results)
+			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 			if err != nil {
 				if instrValue == 0xfeedfacf {
-					fmt.Printf("%#08x:  %s\t.long\t%#x ; (possible embedded MachO)\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
+					fmt.Printf("%#08x:  %s\t.long\t%#x ; (possible embedded MachO)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
 					break
 				} else if instrValue == 0x201420 {
-					fmt.Printf("%#08x:  %s\tgenter\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue))
+					fmt.Printf("%#08x:  %s\tgenter\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
 					continue
 				} else if instrValue == 0x00201400 {
-					fmt.Printf("%#08x:  %s\tgexit\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue))
+					fmt.Printf("%#08x:  %s\tgexit\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
 					continue
 				} else if instrValue == 0xe7ffdefe || instrValue == 0xe7ffdeff {
-					fmt.Printf("%#08x:  %s\ttrap\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue))
+					fmt.Printf("%#08x:  %s\ttrap\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
 					continue
 				} else if instrValue > 0xffff0000 {
-					fmt.Printf("%#08x:  %s\t.long\t%#x ; (probably a jump-table)\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
+					fmt.Printf("%#08x:  %s\t.long\t%#x ; (probably a jump-table)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
 					break
 				} else if prevInstr != nil && strings.Contains(prevInstr.Operation.String(), "braa") {
 					break
@@ -170,29 +171,29 @@ func Disassemble(d Disass) {
 					m := (instrValue >> 5) & 0x1F
 					if m == 17 {
 						if instrValue&0x1F == 0 {
-							fmt.Printf("%#08x:  %s\tamxset\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue))
+							fmt.Printf("%#08x:  %s\tamxset\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
 						} else {
-							fmt.Printf("%#08x:  %s\tamxclr\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue))
+							fmt.Printf("%#08x:  %s\tamxclr\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
 						}
 					} else {
-						fmt.Printf("%#08x:  %s\t%s\t%s\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), opName(m), Xr.String())
+						fmt.Printf("%#08x:  %s\t%s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), opName(m), Xr.String())
 					}
 					continue
 				} else if instrValue>>21 == 1 {
-					fmt.Printf("%#08x:  %s\t.long\t%#x ; (possible unknown Apple instruction)\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
+					fmt.Printf("%#08x:  %s\t.long\t%#x ; (possible unknown Apple instruction)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
 					continue
-				} else if cstr, err := d.GetCString(symAddr); err == nil {
+				} else if cstr, err := d.GetCString(startAddr); err == nil {
 					if utils.IsASCII(cstr) {
 						if len(cstr) > 200 {
-							fmt.Printf("%#08x:  %s\tDCB\t%#v\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), cstr[:200])
+							fmt.Printf("%#08x:  %s\tDCB\t%#v\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), cstr[:200])
 							break
 						} else if len(cstr) > 1 {
-							fmt.Printf("%#08x:  %s\tDCB\t%#v\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), cstr)
+							fmt.Printf("%#08x:  %s\tDCB\t%#v\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), cstr)
 							break
 						}
 					}
 				}
-				fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+				fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
 				break
 			}
 
@@ -237,10 +238,15 @@ func Disassemble(d Disass) {
 							}
 						}
 					}
-				} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) && (instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
+				} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
+					(instruction.Operation == disassemble.ARM64_ADD ||
+						instruction.Operation == disassemble.ARM64_LDR ||
+						instruction.Operation == disassemble.ARM64_LDRB) {
 					adrpRegister := prevInstr.Operands[0].Registers[0]
 					adrpImm := prevInstr.Operands[1].Immediate
 					if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
+						adrpImm += instruction.Operands[1].Immediate
+					} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
 						adrpImm += instruction.Operands[1].Immediate
 					} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
 						adrpImm += instruction.Operands[2].Immediate
@@ -257,17 +263,21 @@ func Disassemble(d Disass) {
 						}
 					}
 				}
+
+				if instruction.Encoding == disassemble.ENC_LDR_B_LDST_IMMPRE {
+					fmt.Println(instrStr)
+				}
 			}
 
-			if d.isMiddle() && d.startAddr() == symAddr {
-				fmt.Printf("👉%08x:  %s\t%s\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+			if d.isMiddle() && d.startAddr() == startAddr {
+				fmt.Printf("👉%08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
 			} else {
-				fmt.Printf("%#08x:  %s\t%s\n", uint64(symAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+				fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
 			}
 
 			prevInstr = instruction
 		} else { // output as JSON
-			instruction, err := disassemble.Decompose(symAddr, instrValue, &results)
+			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 			if err != nil {
 				log.Error(err.Error())
 				continue // TODO: should we still capture this in the JSON?
@@ -275,7 +285,7 @@ func Disassemble(d Disass) {
 			instructions = append(instructions, *instruction)
 		}
 
-		symAddr += uint64(binary.Size(uint32(0)))
+		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
 	if d.asJSON() {

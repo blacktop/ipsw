@@ -1,6 +1,7 @@
 package disass
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -13,26 +14,10 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
-type dylibArray []*dyld.CacheImage
-
-func (arr dylibArray) contains(img *dyld.CacheImage) bool {
-	for _, i := range arr {
-		if i == img {
-			return true
-		}
-	}
-	return false
-}
-
-type addrDetails struct {
-	Image   string
-	Segment string
-	Section string
-}
-
 type DyldDisass struct {
 	f   *dyld.File
 	cfg *Config
+	tr  *Triage
 }
 
 func NewDyldDisass(f *dyld.File, cfg *Config) *DyldDisass {
@@ -58,21 +43,42 @@ func (d DyldDisass) startAddr() uint64 {
 	return d.cfg.StartAddress
 }
 
+type dylibArray []*dyld.CacheImage
+
+func (arr dylibArray) contains(img *dyld.CacheImage) bool {
+	for _, i := range arr {
+		if i == img {
+			return true
+		}
+	}
+	return false
+}
+
+type addrDetails struct {
+	Image   string
+	Segment string
+	Section string
+}
+
 func (d addrDetails) String() string {
 	return fmt.Sprintf("%s/%s.%s", d.Image, d.Segment, d.Section)
 }
 
 type Triage struct {
-	Dylibs    dylibArray
+	dylibs    dylibArray
 	Details   map[uint64]addrDetails
 	function  *types.Function
 	addresses map[uint64]uint64
 	locations []uint64
 }
 
+func (d DyldDisass) Dylibs() []*dyld.CacheImage {
+	return d.tr.dylibs
+}
+
 // Contains returns true if Triage immediates contains a given address and will return the instruction address
-func (t *Triage) Contains(address uint64) (bool, uint64) {
-	for loc, addr := range t.addresses {
+func (d DyldDisass) Contains(address uint64) (bool, uint64) {
+	for loc, addr := range d.tr.addresses {
 		if addr == address {
 			return true, loc
 		}
@@ -80,8 +86,8 @@ func (t *Triage) Contains(address uint64) (bool, uint64) {
 	return false, 0
 }
 
-func (t *Triage) HasLoc(location uint64) (bool, uint64) {
-	for loc, addr := range t.addresses {
+func (d DyldDisass) HasLoc(location uint64) (bool, uint64) {
+	for loc, addr := range d.tr.addresses {
 		if loc == location {
 			return true, addr
 		}
@@ -90,8 +96,8 @@ func (t *Triage) HasLoc(location uint64) (bool, uint64) {
 }
 
 // IsLocation returns if given address is a local branch location within the disassembled function
-func (t *Triage) IsBranchLocation(addr uint64) bool {
-	for _, loc := range t.locations {
+func (d DyldDisass) IsBranchLocation(addr uint64) bool {
+	for _, loc := range d.tr.locations {
 		if addr == loc {
 			return true
 		}
@@ -100,8 +106,8 @@ func (t *Triage) IsBranchLocation(addr uint64) bool {
 }
 
 // IsData returns if given address is a data variable address referenced in the disassembled function
-func (t *Triage) IsData(addr uint64) bool {
-	if detail, ok := t.Details[addr]; ok {
+func (d DyldDisass) IsData(addr uint64) bool {
+	if detail, ok := d.tr.Details[addr]; ok {
 		if strings.Contains(strings.ToLower(detail.Segment), "data") {
 			return true
 		}
@@ -109,16 +115,17 @@ func (t *Triage) IsData(addr uint64) bool {
 	return false
 }
 
-// FirstPassTriage walks a function and analyzes all immediates
-func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details bool) (*Triage, error) {
-	var triage Triage
+// Triage walks a function and analyzes all immediates
+func (d *DyldDisass) Triage() error {
 	var instrValue uint32
 	var results [1024]byte
 	var prevInstr *disassemble.Instruction
 
-	triage.function = fn
-	triage.addresses = make(map[uint64]uint64)
-	startAddr := fn.StartAddr
+	d.tr = &Triage{
+		addresses: make(map[uint64]uint64),
+	}
+	startAddr := d.startAddr()
+	r := bytes.NewReader(d.data())
 
 	// extract all immediates
 	for {
@@ -134,11 +141,9 @@ func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details 
 		}
 
 		if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
-			triage.addresses[instruction.Address] = uint64(instruction.Operands[0].Immediate)
+			d.tr.addresses[instruction.Address] = uint64(instruction.Operands[0].Immediate)
 		} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
-			triage.addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
-		} else if instruction.Operation == disassemble.ARM64_ADR || instruction.Operation == disassemble.ARM64_LDR {
-			triage.addresses[instruction.Address] = instruction.Operands[1].Immediate
+			d.tr.addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
 			(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
 			adrpRegister := prevInstr.Operands[0].Registers[0]
@@ -148,7 +153,7 @@ func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details 
 			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[2].Immediate
 			}
-			triage.addresses[instruction.Address] = adrpImm
+			d.tr.addresses[instruction.Address] = adrpImm
 		}
 
 		// lookup adrp/ldr or add address as a cstring or symbol name
@@ -161,14 +166,14 @@ func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details 
 		// 		} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
 		// 			adrpImm += operands[2].Immediate
 		// 		}
-		// 		triage.addresses[i.Instruction.Address()] = adrpImm
+		// 		d.tr.addresses[i.Instruction.Address()] = adrpImm
 		// 	}
 
 		// } else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
 		// 	if operands := i.Instruction.Operands(); operands != nil {
 		// 		for _, operand := range operands {
 		// 			if operand.OpClass == arm64.LABEL {
-		// 				triage.addresses[i.Instruction.Address()] = operand.Immediate
+		// 				d.tr.addresses[i.Instruction.Address()] = operand.Immediate
 		// 			}
 		// 		}
 		// 	}
@@ -178,7 +183,7 @@ func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details 
 		// 		if operands := i.Instruction.Operands(); operands != nil {
 		// 			for _, operand := range operands {
 		// 				if operand.OpClass == arm64.LABEL {
-		// 					triage.addresses[i.Instruction.Address()] = operand.Immediate
+		// 					d.tr.addresses[i.Instruction.Address()] = operand.Immediate
 		// 				}
 		// 			}
 		// 		}
@@ -189,34 +194,35 @@ func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details 
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
-	if details {
-		triage.Details = make(map[uint64]addrDetails)
+	if !d.quite() {
+		d.tr.Details = make(map[uint64]addrDetails)
 
-		for _, addr := range triage.addresses {
-			image, err := f.GetImageContainingVMAddr(addr)
+		for _, addr := range d.tr.addresses {
+			image, err := d.f.GetImageContainingVMAddr(addr)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
-			if !triage.Dylibs.contains(image) {
-				triage.Dylibs = append(triage.Dylibs, image)
-			}
-
-			if triage.function != nil {
-				if triage.function.StartAddr <= addr && addr < triage.function.EndAddr {
-					triage.locations = append(triage.locations, addr)
-					continue
-				}
+			if !d.tr.dylibs.contains(image) {
+				d.tr.dylibs = append(d.tr.dylibs, image)
 			}
 
 			m, err := image.GetPartialMacho()
 			if err != nil {
-				return nil, err
+				return err
 			}
 			defer m.Close()
 
+			if fn, err := m.GetFunctionForVMAddr(d.startAddr()); err == nil {
+				d.tr.function = &fn
+				if d.tr.function.StartAddr <= addr && addr < d.tr.function.EndAddr {
+					d.tr.locations = append(d.tr.locations, addr)
+					continue
+				}
+			}
+
 			if c := m.FindSectionForVMAddr(addr); c != nil {
-				triage.Details[addr] = addrDetails{
+				d.tr.Details[addr] = addrDetails{
 					Image:   filepath.Base(image.Name),
 					Segment: c.Seg,
 					Section: c.Name,
@@ -225,7 +231,7 @@ func FirstPassTriage(f *dyld.File, fn *types.Function, r io.ReadSeeker, details 
 		}
 	}
 
-	return &triage, nil
+	return nil
 }
 
 // ImageDependencies recursively returns all the image's loaded dylibs and those dylibs' loaded dylibs etc

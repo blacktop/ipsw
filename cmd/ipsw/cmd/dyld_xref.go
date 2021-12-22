@@ -22,7 +22,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -164,12 +163,17 @@ var xrefCmd = &cobra.Command{
 					return err
 				}
 
-				triage, err := disass.FirstPassTriage(f, &fn, bytes.NewReader(data), false)
-				if err != nil {
-					return err
+				engine := disass.NewDyldDisass(f, &disass.Config{
+					Data:         data,
+					StartAddress: fn.StartAddr,
+					Quite:        true,
+				})
+
+				if err := engine.Triage(); err != nil {
+					return fmt.Errorf("first pass triage failed: %v", err)
 				}
 
-				if ok, loc := triage.Contains(unslidAddr); ok {
+				if ok, loc := engine.Contains(unslidAddr); ok {
 					if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
 					} else {

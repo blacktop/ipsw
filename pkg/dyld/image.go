@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/apex/log"
@@ -33,12 +34,12 @@ type patchableExport struct {
 type astate struct {
 	mu sync.Mutex
 
-	Deps        bool
-	Got         bool
-	Stubs       bool
-	StubHelpers bool
-	Exports     bool
-	Privates    bool
+	Deps     bool
+	Got      bool
+	Stubs    bool
+	Helpers  bool
+	Exports  bool
+	Privates bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -63,16 +64,16 @@ func (a *astate) IsGotDone() bool {
 	defer a.mu.Unlock()
 	return a.Got
 }
-func (a *astate) SetStubHelpers(done bool) {
+func (a *astate) SetHelpers(done bool) {
 	a.mu.Lock()
-	a.StubHelpers = done
+	a.Helpers = done
 	a.mu.Unlock()
 }
 
-func (a *astate) IsStubHelpersDone() bool {
+func (a *astate) IsHelpersDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.StubHelpers
+	return a.Helpers
 }
 func (a *astate) SetStubs(done bool) {
 	a.mu.Lock()
@@ -113,6 +114,7 @@ type analysis struct {
 	Dependencies []string
 	GotPointers  map[uint64]uint64
 	SymbolStubs  map[uint64]uint64
+	Helpers      map[uint64]uint64
 }
 
 // CacheImage represents a dyld dylib image.
@@ -379,11 +381,19 @@ func (i *CacheImage) Analyze() error {
 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
 	}
 
-	if !i.Analysis.State.IsStubHelpersDone() && i.cache.IsArm64() {
+	if !i.Analysis.State.IsHelpersDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s symbol stub helpers", i.Name)
 		if err := i.ParseHelpers(); err != nil {
 			if !errors.Is(err, ErrMachOSectionNotFound) {
 				return err
+			}
+		}
+
+		for start, target := range i.Analysis.Helpers {
+			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+				i.cache.AddressToSymbol[start] = fmt.Sprintf("__stub_helper.%s", symName)
+			} else {
+				i.cache.AddressToSymbol[start] = fmt.Sprintf("__stub_helper.%x", target)
 			}
 		}
 	}
@@ -428,7 +438,11 @@ func (i *CacheImage) Analyze() error {
 
 		for stub, target := range i.Analysis.SymbolStubs {
 			if symName, ok := i.cache.AddressToSymbol[target]; ok {
-				i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+				if !strings.HasPrefix(symName, "j_") {
+					i.cache.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
+				} else {
+					i.cache.AddressToSymbol[stub] = symName
+				}
 			} else {
 				img, err := i.cache.GetImageContainingTextAddr(target)
 				if err != nil {
@@ -438,11 +452,10 @@ func (i *CacheImage) Analyze() error {
 					return err
 				}
 				if symName, ok := i.cache.AddressToSymbol[target]; ok {
-					i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
-				} else if laptr, ok := i.Analysis.GotPointers[target]; ok {
-					if symName, ok := i.cache.AddressToSymbol[laptr]; ok {
-						i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+					if strings.Contains(symName, "_os_unfair_lock_lock_with_options") {
+						fmt.Println("WHOA!")
 					}
+					i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
 				} else {
 					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
 					i.cache.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
@@ -541,11 +554,12 @@ func (i *CacheImage) ParseStubs() error {
 
 				instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 				if err != nil {
-					fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
-					break
+					startAddr += uint64(binary.Size(uint32(0)))
+					continue
 				}
 
-				if instruction.Operation == disassemble.ARM64_ADD && prevInst.Operation == disassemble.ARM64_ADRP {
+				if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+					instruction.Operation == disassemble.ARM64_ADD {
 					if instruction.Operands != nil && prevInst.Operands != nil {
 						// adrp      	x17, #0x1e3be9000
 						adrpRegister := prevInst.Operands[0].Registers[0] // x17
@@ -556,7 +570,8 @@ func (i *CacheImage) ParseStubs() error {
 							adrpAddr = prevInst.Address
 						}
 					}
-				} else if instruction.Operation == disassemble.ARM64_LDR && prevInst.Operation == disassemble.ARM64_ADRP {
+				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+					instruction.Operation == disassemble.ARM64_LDR {
 					if instruction.Operands != nil && prevInst.Operands != nil {
 						// adrp	x16, #0x1e3be9000
 						adrpRegister := prevInst.Operands[0].Registers[0] // x16
@@ -572,7 +587,8 @@ func (i *CacheImage) ParseStubs() error {
 							i.Analysis.SymbolStubs[adrpAddr] = i.cache.SlideInfo.SlidePointer(addr)
 						}
 					}
-				} else if instruction.Operation == disassemble.ARM64_LDR && prevInst.Operation == disassemble.ARM64_ADD {
+				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
+					instruction.Operation == disassemble.ARM64_LDR {
 					// add       	x17, x17, #0x1c0
 					addRegister := prevInst.Operands[0].Registers[0] // x17
 					// ldr       	x16, [x17]
@@ -583,7 +599,8 @@ func (i *CacheImage) ParseStubs() error {
 						}
 						i.Analysis.SymbolStubs[adrpAddr] = i.cache.SlideInfo.SlidePointer(addr)
 					}
-				} else if instruction.Operation == disassemble.ARM64_BR && prevInst.Operation == disassemble.ARM64_ADD {
+				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
+					instruction.Operation == disassemble.ARM64_BR {
 					// add       	x16, x16, #0x828
 					addRegister := prevInst.Operands[0].Registers[0] // x16
 					// br        	x16
@@ -611,6 +628,8 @@ func (i *CacheImage) ParseHelpers() error {
 	}
 	defer m.Close()
 
+	i.Analysis.Helpers = make(map[uint64]uint64)
+
 	if sec := m.Section("__TEXT", "__stub_helper"); sec != nil {
 		var instrValue uint32
 		var results [1024]byte
@@ -634,30 +653,25 @@ func (i *CacheImage) ParseHelpers() error {
 
 			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 			if err != nil {
-				fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
-				break
+				startAddr += uint64(binary.Size(uint32(0)))
+				continue
 			}
 
 			if instruction.Encoding == disassemble.ENC_BR_64_BRANCH_REG { // check if branch location is a function
-				if instruction.Operation == disassemble.ARM64_BR {
-					stubHelperFnStart = instruction.Address + 4
-					continue
-				}
-				if operands := instruction.Operands; operands != nil {
-					for _, operand := range operands {
-						if operand.Class == disassemble.LABEL {
-							if symName, ok := i.cache.AddressToSymbol[operand.Immediate]; ok {
-								i.cache.AddressToSymbol[stubHelperFnStart] = fmt.Sprintf("__stub_helper.%s", symName)
-							}
-						}
-					}
-				}
+				startAddr += uint64(binary.Size(uint32(0)))
+				stubHelperFnStart = startAddr
+				// fmt.Printf("%#08x:  %s\t%s\n", instruction.Address, disassemble.GetOpCodeByteString(instrValue), instruction)
+				// fmt.Println()
+				continue
 			}
-
+			if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM {
+				i.Analysis.Helpers[stubHelperFnStart] = instruction.Operands[0].Immediate
+			}
+			// fmt.Printf("%#08x:  %s\t%s\n", instruction.Address, disassemble.GetOpCodeByteString(instrValue), instruction)
 			startAddr += uint64(binary.Size(uint32(0)))
 		}
 
-		i.Analysis.State.SetStubHelpers(true)
+		i.Analysis.State.SetHelpers(true)
 
 		return nil
 	}

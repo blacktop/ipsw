@@ -7,7 +7,7 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20211003183012-e1a7c020ce25 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
-	github.com/blacktop/arm64-cgo v1.0.44
+	github.com/blacktop/arm64-cgo v1.0.48
 	github.com/blacktop/go-macho v1.1.81
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
@@ -51,7 +51,7 @@ require (
 	github.com/godbus/dbus/v5 v5.0.6 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/gopherjs/gopherjs v0.0.0-20211216084454-9ae78a3fa6dd // indirect
+	github.com/gopherjs/gopherjs v0.0.0-20211219123610-ec9572f70e60 // indirect
 	github.com/gopherjs/gopherwasm v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect

@@ -99,9 +99,8 @@ github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+Ce
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=
 github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kBD4zp0CCIs=
 github.com/bketelsen/crypt v0.0.4/go.mod h1:aI6NrJ0pMGgvZKL1iVgXLnfIFJtfV+bKCoqOes/6LfM=
-github.com/blacktop/arm64-cgo v1.0.44 h1:19PmRIx5I7uBrdl/jV5IlQnFNZhyJdsmuUxkjleVQz4=
-github.com/blacktop/arm64-cgo v1.0.44/go.mod h1:zdVJfILLCC5spSHBiYitzVxxIKZPR/7prvtkeb6g520=
-github.com/blacktop/go-macho v1.1.79/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
+github.com/blacktop/arm64-cgo v1.0.48 h1:4+biNa3pFAd8uv5hFxR8DncMlA9FfSE5MKYbNb/Vn1w=
+github.com/blacktop/arm64-cgo v1.0.48/go.mod h1:kMdWu1vT+ETQu6zsmixVQiMHSH+HW/WH0rDJ4QXOduQ=
 github.com/blacktop/go-macho v1.1.81 h1:xg7FoqQLYSXseba7p2saX0fm00mhKLWHxBTJ+/oRhy0=
 github.com/blacktop/go-macho v1.1.81/go.mod h1:7Dj52AvN6Hof0+LNBHC3VQHbdDBnLM5kBrKBYbk6/3g=
 github.com/blacktop/go-plist v1.0.1 h1:cbpYg6OYwSpJPLk8ObZW+norqxG5YInfPXRNcFw6n8I=
@@ -274,8 +273,8 @@ github.com/googleapis/gax-go/v2 v2.1.0/go.mod h1:Q3nei7sK6ybPYH7twZdmQpAd1MKb7pf
 github.com/googleapis/gax-go/v2 v2.1.1/go.mod h1:hddJymUZASv3XPyGkUpKj8pPO47Rmb0eJc8R6ouapiM=
 github.com/gopherjs/gopherjs v0.0.0-20180825215210-0210a2f0f73c/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/gopherjs/gopherjs v0.0.0-20181017120253-0766667cb4d1/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
-github.com/gopherjs/gopherjs v0.0.0-20211216084454-9ae78a3fa6dd h1:xiZTXK/7AoVjQEyjKWAHPSDAH4Y9U0fM2szaYjx1Hvw=
-github.com/gopherjs/gopherjs v0.0.0-20211216084454-9ae78a3fa6dd/go.mod h1:cz9oNYuRUWGdHmLF2IodMLkAhcPtXeULvcBNagUrxTI=
+github.com/gopherjs/gopherjs v0.0.0-20211219123610-ec9572f70e60 h1:btMZK5oA0NpSAOOE7zRfq2UEuPC9apJ2UBackURyaTU=
+github.com/gopherjs/gopherjs v0.0.0-20211219123610-ec9572f70e60/go.mod h1:cz9oNYuRUWGdHmLF2IodMLkAhcPtXeULvcBNagUrxTI=
 github.com/gopherjs/gopherwasm v1.1.0 h1:fA2uLoctU5+T3OhOn2vYP0DVT6pxc7xhTlBB1paATqQ=
 github.com/gopherjs/gopherwasm v1.1.0/go.mod h1:SkZ8z7CWBz5VXbhJel8TxCmAcsQqzgWGR/8nMhyhZSI=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=

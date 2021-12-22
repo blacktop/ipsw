@@ -22,13 +22,11 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -64,10 +62,7 @@ var dyldDisassCmd = &cobra.Command{
 
 		var data []byte
 		var isMiddle bool
-		var symAddr uint64
-		var startAddr uint64
 		var image *dyld.CacheImage
-		var dFunc *types.Function
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -75,7 +70,7 @@ var dyldDisassCmd = &cobra.Command{
 
 		imageName, _ := cmd.Flags().GetString("image")
 		instructions, _ := cmd.Flags().GetUint64("count")
-		startVMAddr, _ := cmd.Flags().GetUint64("vaddr")
+		startAddr, _ := cmd.Flags().GetUint64("vaddr")
 		symbolName, _ := cmd.Flags().GetString("symbol")
 		cacheFile, _ := cmd.Flags().GetString("cache")
 		slide, _ := cmd.Flags().GetUint64("slide")
@@ -83,9 +78,9 @@ var dyldDisassCmd = &cobra.Command{
 		// allFuncs, _ := cmd.Flags().GetBool("all")
 		quiet, _ := cmd.Flags().GetBool("quiet")
 
-		if len(symbolName) > 0 && startVMAddr != 0 {
+		if len(symbolName) > 0 && startAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
-		} else if len(symbolName) == 0 && startVMAddr == 0 {
+		} else if len(symbolName) == 0 && startAddr == 0 {
 			return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
 		}
 
@@ -148,22 +143,19 @@ var dyldDisassCmd = &cobra.Command{
 			}
 
 			log.Info("Locating symbol: " + symbolName)
-			symAddr, image, err = f.GetSymbolAddress(symbolName, imageName)
+			startAddr, image, err = f.GetSymbolAddress(symbolName, imageName)
 			if err != nil {
 				return err
 			}
 
-		} else { // startVMAddr > 0
+		} else { // startAddr > 0
 			if slide > 0 {
-				startVMAddr = startVMAddr - slide
+				startAddr = startAddr - slide
 			}
-			symAddr = startVMAddr
 		}
 
-		startAddr = symAddr
-
 		if image == nil {
-			image, err = f.GetImageContainingTextAddr(symAddr)
+			image, err = f.GetImageContainingTextAddr(startAddr)
 			if err != nil {
 				return err
 			}
@@ -176,40 +168,6 @@ var dyldDisassCmd = &cobra.Command{
 			return err
 		}
 		defer m.Close()
-
-		/*
-		 * Read in data to disassemble
-		 */
-		if instructions > 0 {
-			uuid, off, err := f.GetOffset(symAddr)
-			if err != nil {
-				return err
-			}
-			data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
-			if err != nil {
-				return err
-			}
-		} else {
-			if fn, err := m.GetFunctionForVMAddr(symAddr); err == nil {
-				dFunc = &fn
-				uuid, soff, err := f.GetOffset(fn.StartAddr)
-				if err != nil {
-					return err
-				}
-				data, err = f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
-				if err != nil {
-					return err
-				}
-				if symAddr != fn.StartAddr {
-					isMiddle = true
-					startAddr = fn.StartAddr
-				}
-			}
-		}
-
-		if data == nil {
-			log.Fatal("failed to disassemble")
-		}
 
 		/*
 		 * Load symbols from the target sym/addr's image
@@ -235,20 +193,6 @@ var dyldDisassCmd = &cobra.Command{
 					return err
 				}
 			}
-		}
-
-		//***********************
-		//* First pass ANALYSIS *
-		//***********************
-		triage, err := disass.FirstPassTriage(f, dFunc, bytes.NewReader(data), true)
-		if err == nil {
-			for _, img := range triage.Dylibs {
-				if err := img.Analyze(); err != nil {
-					return err
-				}
-			}
-		} else {
-			log.Errorf("first pass triage failed: %v", err)
 		}
 
 		/*
@@ -292,19 +236,65 @@ var dyldDisassCmd = &cobra.Command{
 			return err
 		}
 
+		/*
+		 * Read in data to disassemble
+		 */
+		if instructions > 0 {
+			uuid, off, err := f.GetOffset(startAddr)
+			if err != nil {
+				return err
+			}
+			data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
+			if err != nil {
+				return err
+			}
+		} else {
+			if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
+				uuid, soff, err := f.GetOffset(fn.StartAddr)
+				if err != nil {
+					return err
+				}
+				data, err = f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+				if err != nil {
+					return err
+				}
+				if startAddr != fn.StartAddr {
+					isMiddle = true
+					startAddr = fn.StartAddr
+				}
+			}
+		}
+
+		if data == nil {
+			log.Fatal("failed to disassemble")
+		}
+
 		//***************
 		//* DISASSEMBLE *
 		//***************
+		engine := disass.NewDyldDisass(f, &disass.Config{
+			Image:        image.Name,
+			Data:         data,
+			StartAddress: startAddr,
+			Middle:       isMiddle,
+			AsJSON:       asJSON,
+			Demangle:     demangleFlag,
+			Quite:        quiet,
+		})
 
-		disass.Disassemble(*disass.NewDyldDisass(f, &disass.Config{
-			Data:          data,
-			StartAddress:  startAddr,
-			SymbolAddress: symAddr,
-			Middle:        isMiddle,
-			AsJSON:        asJSON,
-			Demangle:      demangleFlag,
-			Quite:         quiet,
-		}))
+		//***********************
+		//* First pass ANALYSIS *
+		//***********************
+		if err := engine.Triage(); err != nil {
+			return fmt.Errorf("first pass triage failed: %v", err)
+		}
+		for _, img := range engine.Dylibs() {
+			if err := img.Analyze(); err != nil {
+				return err
+			}
+		}
+
+		disass.Disassemble(engine)
 
 		// var instrStr string
 		// var instrValue uint32
