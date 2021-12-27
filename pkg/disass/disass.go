@@ -18,7 +18,8 @@ import (
 type Disass interface {
 	Triage() error
 	IsFunctionStart(uint64) (bool, string)
-	IsBranchLocation(uint64) bool
+	IsLocation(uint64) bool
+	IsBranchLocation(uint64) (bool, uint64)
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
 	// getters
@@ -218,7 +219,7 @@ func Disassemble(d Disass) {
 					}
 				}
 
-				if d.IsBranchLocation(instruction.Address) {
+				if d.IsLocation(instruction.Address) {
 					fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
 				}
 
@@ -249,13 +250,30 @@ func Disassemble(d Disass) {
 							instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, strings.Join(ops, ", "))
 						}
 					}
+				} else if ok, loc := d.IsBranchLocation(instruction.Address); ok {
+					opStr := strings.TrimPrefix(instrStr, fmt.Sprintf("%s\t", instruction.Operation))
+					for _, operand := range instruction.Operands {
+						if operand.Class == disassemble.LABEL {
+							if name, ok := d.FindSymbol(uint64(operand.Immediate)); ok {
+								opStr = name
+							} else {
+								direction := ""
+								delta := int(loc) - int(instruction.Address)
+								if delta > 0 {
+									direction = fmt.Sprintf(" ; ⤵ %#x", delta)
+								} else if delta == 0 {
+									direction = " ; ∞ loop"
+								} else {
+									direction = fmt.Sprintf(" ; ⤴ %#x", delta)
+								}
+								opStr = strings.Replace(opStr, fmt.Sprintf("%#x", loc), fmt.Sprintf("loc_%x%s", loc, direction), 1)
+							}
+						}
+					}
+					instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, opStr)
 				} else if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[0].Immediate)); ok {
 						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, name)
-					}
-				} else if strings.Contains(instruction.Encoding.String(), "branch") {
-					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
-						instrStr += fmt.Sprintf(" ; %s", name)
 					}
 				} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {

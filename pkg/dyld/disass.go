@@ -75,11 +75,23 @@ func (d DyldDisass) HasLoc(location uint64) (bool, uint64) {
 }
 
 // IsLocation returns if given address is a local branch location within the disassembled function
-func (d DyldDisass) IsBranchLocation(imm uint64) bool {
+func (d DyldDisass) IsLocation(imm uint64) bool {
 	if _, ok := d.tr.Locations[imm]; ok {
 		return true
 	}
 	return false
+}
+
+// IsBranchLocation returns if given address is branch to a location instruction
+func (d DyldDisass) IsBranchLocation(addr uint64) (bool, uint64) {
+	for loc, addrs := range d.tr.Locations {
+		for _, a := range addrs {
+			if a == addr {
+				return true, loc
+			}
+		}
+	}
+	return false, 0
 }
 
 // IsData returns if given address is a data variable address referenced in the disassembled function

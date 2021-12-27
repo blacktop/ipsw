@@ -136,11 +136,23 @@ func (d MachoDisass) IsFunctionStart(addr uint64) (bool, string) {
 }
 
 // IsLocation returns if given address is a local branch location within the disassembled function
-func (d MachoDisass) IsBranchLocation(imm uint64) bool {
+func (d MachoDisass) IsLocation(imm uint64) bool {
 	if _, ok := d.tr.Locations[imm]; ok {
 		return true
 	}
 	return false
+}
+
+// IsBranchLocation returns if given address is branch to a location instruction
+func (d MachoDisass) IsBranchLocation(addr uint64) (bool, uint64) {
+	for loc, addrs := range d.tr.Locations {
+		for _, a := range addrs {
+			if a == addr {
+				return true, loc
+			}
+		}
+	}
+	return false, 0
 }
 
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
@@ -159,6 +171,10 @@ func (d MachoDisass) GetCString(addr uint64) (string, error) {
 }
 
 func (d MachoDisass) Analyze() error {
+
+	for _, fn := range d.f.GetFunctions() {
+		d.a2s[fn.StartAddr] = fmt.Sprintf("sub_%x", fn.StartAddr)
+	}
 
 	for _, sym := range d.f.Symtab.Syms {
 		d.a2s[sym.Value] = sym.Name

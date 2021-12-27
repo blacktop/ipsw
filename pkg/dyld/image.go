@@ -36,6 +36,7 @@ type astate struct {
 	Helpers  bool
 	Exports  bool
 	Privates bool
+	Starts   bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -43,66 +44,77 @@ func (a *astate) SetDeps(done bool) {
 	a.Deps = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsDepsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Deps
 }
+
 func (a *astate) SetGot(done bool) {
 	a.mu.Lock()
 	a.Got = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsGotDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Got
 }
+
 func (a *astate) SetHelpers(done bool) {
 	a.mu.Lock()
 	a.Helpers = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsHelpersDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Helpers
 }
+
 func (a *astate) SetStubs(done bool) {
 	a.mu.Lock()
 	a.Stubs = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsStubsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Stubs
 }
+
 func (a *astate) SetExports(done bool) {
 	a.mu.Lock()
 	a.Exports = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsExportsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Exports
 }
+
 func (a *astate) SetPrivates(done bool) {
 	a.mu.Lock()
 	a.Privates = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsPrivatesDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Privates
+}
+
+func (a *astate) SetStarts(done bool) {
+	a.mu.Lock()
+	a.Starts = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsStartsDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Starts
 }
 
 type analysis struct {
@@ -367,6 +379,10 @@ func (i *CacheImage) Analyze() error {
 		log.Errorf("failed to parse exported symbols for %s", i.Name)
 	}
 
+	if !i.Analysis.State.IsStartsDone() {
+		i.ParseStarts()
+	}
+
 	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
 		if !errors.Is(err, ErrNoLocals) {
 			return err
@@ -458,6 +474,18 @@ func (i *CacheImage) Analyze() error {
 	}
 
 	return nil
+}
+
+// ParseGOT parse global offset table in MachO
+func (i *CacheImage) ParseStarts() {
+	if i.m != nil {
+		for _, fn := range i.m.GetFunctions() {
+			if _, ok := i.cache.AddressToSymbol[fn.StartAddr]; !ok {
+				i.cache.AddressToSymbol[fn.StartAddr] = fmt.Sprintf("sub_%x", fn.StartAddr)
+			}
+		}
+	}
+	i.Analysis.State.SetStarts(true)
 }
 
 // ParseGOT parse global offset table in MachO
