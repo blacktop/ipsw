@@ -163,7 +163,7 @@ var xrefCmd = &cobra.Command{
 					return err
 				}
 
-				engine := disass.NewDyldDisass(f, &disass.Config{
+				engine := dyld.NewDyldDisass(f, &disass.Config{
 					Data:         data,
 					StartAddress: fn.StartAddr,
 					Quite:        true,

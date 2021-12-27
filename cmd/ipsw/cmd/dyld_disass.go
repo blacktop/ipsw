@@ -38,13 +38,12 @@ func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
 
 	dyldDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	dyldDisassCmd.Flags().BoolP("all", "", false, "Disassemble all functions")
 	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	dyldDisassCmd.Flags().Uint64("slide", 0, "dyld_shared_cache slide to remove from --vaddr")
 	dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
-	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
+	dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
@@ -75,7 +74,7 @@ var dyldDisassCmd = &cobra.Command{
 		cacheFile, _ := cmd.Flags().GetString("cache")
 		slide, _ := cmd.Flags().GetUint64("slide")
 		asJSON, _ := cmd.Flags().GetBool("json")
-		// allFuncs, _ := cmd.Flags().GetBool("all")
+		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 		quiet, _ := cmd.Flags().GetBool("quiet")
 
 		if len(symbolName) > 0 && startAddr != 0 {
@@ -172,14 +171,6 @@ var dyldDisassCmd = &cobra.Command{
 		/*
 		 * Load symbols from the target sym/addr's image
 		 */
-		// if f.LocalSymbolsOffset == 0 {
-		// 	utils.Indent(log.Warn, 2)("parsing symbol table...")
-		// 	for _, sym := range m.Symtab.Syms {
-		// 		if sym.Value != 0 {
-		// 			f.AddressToSymbol[sym.Value] = sym.Name
-		// 		}
-		// 	}
-		// }
 		if len(symbolName) == 0 {
 			utils.Indent(log.Warn, 2)("parsing public symbols...")
 			if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
@@ -264,15 +255,11 @@ var dyldDisassCmd = &cobra.Command{
 				}
 			}
 		}
-
 		if data == nil {
 			log.Fatal("failed to disassemble")
 		}
 
-		//***************
-		//* DISASSEMBLE *
-		//***************
-		engine := disass.NewDyldDisass(f, &disass.Config{
+		engine := dyld.NewDyldDisass(f, &disass.Config{
 			Image:        image.Name,
 			Data:         data,
 			StartAddress: startAddr,
@@ -294,131 +281,10 @@ var dyldDisassCmd = &cobra.Command{
 			}
 		}
 
+		//***************
+		//* DISASSEMBLE *
+		//***************
 		disass.Disassemble(engine)
-
-		// var instrStr string
-		// var instrValue uint32
-		// var results [1024]byte
-		// var prevInstr *disassemble.Instruction
-
-		// r := bytes.NewReader(data)
-
-		// for {
-		// 	err = binary.Read(r, binary.LittleEndian, &instrValue)
-
-		// 	if err == io.EOF {
-		// 		break
-		// 	}
-
-		// 	instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		// 	if err != nil {
-		// 		fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
-		// 		break
-		// 	}
-
-		// 	instrStr = instruction.String()
-
-		// 	// check for start of a new function
-		// 	if yes, fname := f.IsFunctionStart(m.GetFunctions(), instruction.Address, demangleFlag); yes {
-		// 		if len(fname) > 0 {
-		// 			fmt.Printf("\n%s:\n", fname)
-		// 		} else {
-		// 			fmt.Printf("\nfunc_%x:\n", instruction.Address)
-		// 		}
-		// 	}
-
-		// 	// if ok, imm := triage.HasLoc(instruction.Address); ok {
-		// 	// 	if detail, ok := triage.Details[imm]; ok {
-		// 	// 		if triage.IsData(imm) {
-		// 	// 			opStr += fmt.Sprintf(" ; %s", detail)
-		// 	// 		} else {
-		// 	// 			opStr += fmt.Sprintf(" ; %s", detail)
-		// 	// 		}
-		// 	// 	}
-		// 	// }
-
-		// 	if !quiet {
-		// 		if triage.IsBranchLocation(instruction.Address) {
-		// 			fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
-		// 		}
-
-		// 		if instruction.Operation == disassemble.ARM64_MRS || instruction.Operation == disassemble.ARM64_MSR {
-		// 			var ops []string
-		// 			replaced := false
-		// 			for _, op := range instruction.Operands {
-		// 				if op.Class == disassemble.REG {
-		// 					ops = append(ops, op.Registers[0].String())
-		// 				} else if op.Class == disassemble.IMPLEMENTATION_SPECIFIC {
-		// 					sysRegFix := op.ImplSpec.GetSysReg().String()
-		// 					if len(sysRegFix) > 0 {
-		// 						ops = append(ops, sysRegFix)
-		// 						replaced = true
-		// 					}
-		// 				}
-		// 				if replaced {
-		// 					instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, strings.Join(ops, ", "))
-		// 				}
-		// 			}
-		// 		}
-
-		// 		if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
-		// 			if name, ok := f.AddressToSymbol[uint64(instruction.Operands[0].Immediate)]; ok {
-		// 				instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, name)
-		// 			}
-		// 		}
-
-		// 		if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
-		// 			if name, ok := f.AddressToSymbol[uint64(instruction.Operands[1].Immediate)]; ok {
-		// 				instrStr += fmt.Sprintf(" ; %s", name)
-		// 			}
-		// 		}
-
-		// 		if instruction.Operation == disassemble.ARM64_ADR {
-		// 			adrImm := instruction.Operands[1].Immediate
-		// 			if name, ok := f.AddressToSymbol[uint64(adrImm)]; ok {
-		// 				instrStr += fmt.Sprintf(" ; %s", name)
-		// 			} else if cstr, err := m.GetCString(adrImm); err == nil {
-		// 				if utils.IsASCII(cstr) {
-		// 					if len(cstr) > 200 {
-		// 						instrStr += fmt.Sprintf(" ; %#v...", cstr[:200])
-		// 					} else if len(cstr) > 1 {
-		// 						instrStr += fmt.Sprintf(" ; %#v", cstr)
-		// 					}
-		// 				}
-		// 			}
-		// 		}
-
-		// 		if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) && (instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
-		// 			adrpRegister := prevInstr.Operands[0].Registers[0]
-		// 			adrpImm := prevInstr.Operands[1].Immediate
-		// 			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
-		// 				adrpImm += instruction.Operands[1].Immediate
-		// 			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
-		// 				adrpImm += instruction.Operands[2].Immediate
-		// 			}
-		// 			if name, ok := f.AddressToSymbol[uint64(adrpImm)]; ok {
-		// 				instrStr += fmt.Sprintf(" ; %s", name)
-		// 			} else if cstr, err := m.GetCString(adrpImm); err == nil {
-		// 				if utils.IsASCII(cstr) {
-		// 					if len(cstr) > 200 {
-		// 						instrStr += fmt.Sprintf(" ; %#v...", cstr[:200])
-		// 					} else if len(cstr) > 1 {
-		// 						instrStr += fmt.Sprintf(" ; %#v", cstr)
-		// 					}
-		// 				}
-		// 			}
-		// 		}
-		// 	}
-
-		// 	if isMiddle && startVMAddr == symAddr {
-		// 		fmt.Printf("👉%08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
-		// 	} else {
-		// 		fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
-		// 	}
-
-		// 	prevInstr = instruction
-		// 	startAddr += uint64(binary.Size(uint32(0)))
-		// }
 
 		return nil
 	},

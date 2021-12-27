@@ -10,24 +10,23 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
 type Disass interface {
-	// ParseGOT() error
-	// ParseObjC() error
-	// ParseStubs() error
-	// ParseHelpers() error
 	Triage() error
 	IsBranchLocation(uint64) bool
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
-	isMiddle() bool
-	demangle() bool
-	quite() bool
-	asJSON() bool
-	data() []byte
-	startAddr() uint64
+	// getters
+	IsMiddle() bool
+	Demangle() bool
+	Quite() bool
+	AsJSON() bool
+	Data() []byte
+	StartAddr() uint64
 }
 
 type opName uint32
@@ -120,6 +119,22 @@ type Config struct {
 	Demangle     bool
 	Quite        bool
 }
+type AddrDetails struct {
+	Image   string
+	Segment string
+	Section string
+}
+
+func (d AddrDetails) String() string {
+	return fmt.Sprintf("%s/%s.%s", d.Image, d.Segment, d.Section)
+}
+
+type Triage struct {
+	Details   map[uint64]AddrDetails
+	Function  *types.Function
+	Addresses map[uint64]uint64
+	Locations map[uint64][]uint64
+}
 
 func Disassemble(d Disass) {
 	var instrStr string
@@ -128,17 +143,17 @@ func Disassemble(d Disass) {
 	var prevInstr *disassemble.Instruction
 	var instructions []disassemble.Instruction
 
-	r := bytes.NewReader(d.data())
+	r := bytes.NewReader(d.Data())
 
-	if !d.asJSON() {
-		if name, ok := d.FindSymbol(d.startAddr()); ok && !d.asJSON() {
+	if !d.AsJSON() {
+		if name, ok := d.FindSymbol(d.StartAddr()); ok && !d.AsJSON() {
 			fmt.Printf("%s:\n", name)
 		} else {
-			fmt.Printf("sub_%x:\n", d.startAddr())
+			fmt.Printf("sub_%x:\n", d.StartAddr())
 		}
 	}
 
-	startAddr := d.startAddr()
+	startAddr := d.StartAddr()
 
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
@@ -147,7 +162,7 @@ func Disassemble(d Disass) {
 			break
 		}
 
-		if !d.asJSON() {
+		if !d.AsJSON() {
 			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 			if err != nil {
 				if instrValue == 0xfeedfacf {
@@ -200,7 +215,7 @@ func Disassemble(d Disass) {
 
 			instrStr = instruction.String()
 
-			if !d.quite() {
+			if !d.Quite() {
 				if d.IsBranchLocation(instruction.Address) {
 					fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
 				}
@@ -224,6 +239,10 @@ func Disassemble(d Disass) {
 				} else if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[0].Immediate)); ok {
 						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, name)
+					}
+				} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
+					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
+						instrStr += fmt.Sprintf(" ; %s", name)
 					}
 				} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
@@ -273,7 +292,7 @@ func Disassemble(d Disass) {
 				}
 			}
 
-			if d.isMiddle() && d.startAddr() == startAddr {
+			if d.IsMiddle() && d.StartAddr() == startAddr {
 				fmt.Printf("👉%08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
 			} else {
 				fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
@@ -292,9 +311,194 @@ func Disassemble(d Disass) {
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
-	if d.asJSON() {
+	if d.AsJSON() {
 		if dat, err := json.MarshalIndent(instructions, "", "   "); err == nil {
 			fmt.Println(string(dat))
 		}
 	}
+}
+
+func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
+
+	gots := make(map[uint64]uint64)
+
+	if authPtr := m.Section("__AUTH_CONST", "__auth_ptr"); authPtr != nil {
+		dat, err := authPtr.Data()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get %s.%s section data: %v", authPtr.Seg, authPtr.Name, err)
+		}
+
+		ptrs := make([]uint64, authPtr.Size/8)
+		if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
+			return nil, fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr ptrs; %v", err)
+		}
+
+		for idx, ptr := range ptrs {
+			gots[authPtr.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
+		}
+	}
+
+	for _, sec := range m.Sections {
+		if sec.Flags.IsNonLazySymbolPointers() || sec.Flags.IsLazySymbolPointers() { // TODO: make sure this doesn't break things
+			dat, err := sec.Data()
+			if err != nil {
+				return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+			}
+
+			ptrs := make([]uint64, sec.Size/8)
+			if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &ptrs); err != nil {
+				return nil, fmt.Errorf("failed to read %s.%s NonLazySymbol pointers; %v", sec.Seg, sec.Name, err)
+			}
+
+			for idx, ptr := range ptrs {
+				gots[sec.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
+			}
+		}
+	}
+
+	return gots, nil
+}
+
+func ParseStubsASM(m *macho.File) (map[uint64]uint64, error) {
+
+	stubs := make(map[uint64]uint64)
+
+	for _, sec := range m.Sections {
+		if sec.Flags.IsSymbolStubs() {
+			var adrpImm uint64
+			var adrpAddr uint64
+			var instrValue uint32
+			var results [1024]byte
+			var prevInst *disassemble.Instruction
+
+			dat, err := sec.Data()
+			if err != nil {
+				return nil, err
+			}
+
+			r := bytes.NewReader(dat)
+
+			startAddr := sec.Addr
+
+			for {
+				err = binary.Read(r, binary.LittleEndian, &instrValue)
+
+				if err == io.EOF {
+					break
+				}
+
+				instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+				if err != nil {
+					startAddr += uint64(binary.Size(uint32(0)))
+					continue
+				}
+
+				if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+					instruction.Operation == disassemble.ARM64_ADD {
+					if instruction.Operands != nil && prevInst.Operands != nil {
+						// adrp      	x17, #0x1e3be9000
+						adrpRegister := prevInst.Operands[0].Registers[0] // x17
+						adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+						// add       	x17, x17, #0x1c0
+						if adrpRegister == instruction.Operands[0].Registers[0] {
+							adrpImm += instruction.Operands[2].Immediate
+							adrpAddr = prevInst.Address
+						}
+					}
+				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+					instruction.Operation == disassemble.ARM64_LDR {
+					if instruction.Operands != nil && prevInst.Operands != nil {
+						// adrp	x16, #0x1e3be9000
+						adrpRegister := prevInst.Operands[0].Registers[0] // x16
+						adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+						// ldr	x16, [x16, #0x560]
+						if adrpRegister == instruction.Operands[0].Registers[0] {
+							adrpImm += instruction.Operands[1].Immediate
+							adrpAddr = prevInst.Address
+							addr, err := m.GetPointerAtAddress(adrpImm)
+							if err != nil {
+								return nil, fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
+							}
+							stubs[adrpAddr] = addr
+						}
+					}
+				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
+					instruction.Operation == disassemble.ARM64_LDR {
+					// add       	x17, x17, #0x1c0
+					addRegister := prevInst.Operands[0].Registers[0] // x17
+					// ldr       	x16, [x17]
+					if addRegister == instruction.Operands[1].Registers[0] {
+						addr, err := m.GetPointerAtAddress(adrpImm)
+						if err != nil {
+							return nil, fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
+						}
+						stubs[adrpAddr] = addr
+					}
+				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
+					instruction.Operation == disassemble.ARM64_BR {
+					// add       	x16, x16, #0x828
+					addRegister := prevInst.Operands[0].Registers[0] // x16
+					// br        	x16
+					if addRegister == instruction.Operands[0].Registers[0] {
+						stubs[adrpAddr] = m.SlidePointer(adrpImm)
+					}
+				}
+
+				prevInst = instruction
+				startAddr += uint64(binary.Size(uint32(0)))
+			}
+		}
+	}
+
+	return stubs, nil
+}
+
+func ParseHelpersASM(m *macho.File) (map[uint64]uint64, error) {
+	var instrValue uint32
+	var results [1024]byte
+
+	helpers := make(map[uint64]uint64)
+
+	if sec := m.Section("__TEXT", "__stub_helper"); sec != nil {
+		dat, err := sec.Data()
+		if err != nil {
+			return nil, err
+		}
+
+		startAddr := sec.Addr
+		stubHelperFnStart := startAddr
+
+		r := bytes.NewReader(dat)
+
+		for {
+			err := binary.Read(r, binary.LittleEndian, &instrValue)
+
+			if err == io.EOF {
+				break
+			}
+
+			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+			if err != nil {
+				startAddr += uint64(binary.Size(uint32(0)))
+				continue
+			}
+
+			if instruction.Encoding == disassemble.ENC_BR_64_BRANCH_REG { // check if branch location is a function
+				startAddr += uint64(binary.Size(uint32(0)))
+				stubHelperFnStart = startAddr
+				// fmt.Printf("%#08x:  %s\t%s\n", instruction.Address, disassemble.GetOpCodeByteString(instrValue), instruction)
+				// fmt.Println()
+				continue
+			}
+			if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM {
+				helpers[stubHelperFnStart] = instruction.Operands[0].Immediate
+			}
+			// fmt.Printf("%#08x:  %s\t%s\n", instruction.Address, disassemble.GetOpCodeByteString(instrValue), instruction)
+			startAddr += uint64(binary.Size(uint32(0)))
+		}
+
+		return helpers, nil
+	}
+
+	return nil, fmt.Errorf("dylib does NOT contain __TEXT.__stub_helper section: %w", macho.ErrMachOSectionNotFound)
 }

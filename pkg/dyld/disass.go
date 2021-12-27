@@ -1,52 +1,53 @@
-package disass
+package dyld
 
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
 
 	"github.com/blacktop/arm64-cgo/disassemble"
-	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/demangle"
-	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/disass"
 )
 
 type DyldDisass struct {
-	f   *dyld.File
-	cfg *Config
-	tr  *Triage
+	f      *File
+	cfg    *disass.Config
+	tr     *disass.Triage
+	dylibs []*CacheImage
 }
 
-func NewDyldDisass(f *dyld.File, cfg *Config) *DyldDisass {
+func NewDyldDisass(f *File, cfg *disass.Config) *DyldDisass {
 	return &DyldDisass{f: f, cfg: cfg}
 }
 
-func (d DyldDisass) isMiddle() bool {
+func (d DyldDisass) IsMiddle() bool {
 	return d.cfg.Middle
 }
-func (d DyldDisass) demangle() bool {
+func (d DyldDisass) Demangle() bool {
 	return d.cfg.Demangle
 }
-func (d DyldDisass) quite() bool {
+func (d DyldDisass) Quite() bool {
 	return d.cfg.Quite
 }
-func (d DyldDisass) asJSON() bool {
+func (d DyldDisass) AsJSON() bool {
 	return d.cfg.AsJSON
 }
-func (d DyldDisass) data() []byte {
+func (d DyldDisass) Data() []byte {
 	return d.cfg.Data
 }
-func (d DyldDisass) startAddr() uint64 {
+func (d DyldDisass) StartAddr() uint64 {
 	return d.cfg.StartAddress
 }
 
-type dylibArray []*dyld.CacheImage
+func (d DyldDisass) Dylibs() []*CacheImage {
+	return d.dylibs
+}
 
-func (arr dylibArray) contains(img *dyld.CacheImage) bool {
-	for _, i := range arr {
+func (d DyldDisass) hasDep(img *CacheImage) bool {
+	for _, i := range d.dylibs {
 		if i == img {
 			return true
 		}
@@ -54,31 +55,9 @@ func (arr dylibArray) contains(img *dyld.CacheImage) bool {
 	return false
 }
 
-type addrDetails struct {
-	Image   string
-	Segment string
-	Section string
-}
-
-func (d addrDetails) String() string {
-	return fmt.Sprintf("%s/%s.%s", d.Image, d.Segment, d.Section)
-}
-
-type Triage struct {
-	dylibs    dylibArray
-	Details   map[uint64]addrDetails
-	function  *types.Function
-	addresses map[uint64]uint64
-	locations map[uint64][]uint64
-}
-
-func (d DyldDisass) Dylibs() []*dyld.CacheImage {
-	return d.tr.dylibs
-}
-
 // Contains returns true if Triage immediates contains a given address and will return the instruction address
 func (d DyldDisass) Contains(address uint64) (bool, uint64) {
-	for loc, addr := range d.tr.addresses {
+	for loc, addr := range d.tr.Addresses {
 		if addr == address {
 			return true, loc
 		}
@@ -87,7 +66,7 @@ func (d DyldDisass) Contains(address uint64) (bool, uint64) {
 }
 
 func (d DyldDisass) HasLoc(location uint64) (bool, uint64) {
-	for loc, addr := range d.tr.addresses {
+	for loc, addr := range d.tr.Addresses {
 		if loc == location {
 			return true, addr
 		}
@@ -97,7 +76,7 @@ func (d DyldDisass) HasLoc(location uint64) (bool, uint64) {
 
 // IsLocation returns if given address is a local branch location within the disassembled function
 func (d DyldDisass) IsBranchLocation(imm uint64) bool {
-	if _, ok := d.tr.locations[imm]; ok {
+	if _, ok := d.tr.Locations[imm]; ok {
 		return true
 	}
 	return false
@@ -119,12 +98,12 @@ func (d *DyldDisass) Triage() error {
 	var results [1024]byte
 	var prevInstr *disassemble.Instruction
 
-	d.tr = &Triage{
-		addresses: make(map[uint64]uint64),
-		locations: make(map[uint64][]uint64),
+	d.tr = &disass.Triage{
+		Addresses: make(map[uint64]uint64),
+		Locations: make(map[uint64][]uint64),
 	}
-	startAddr := d.startAddr()
-	r := bytes.NewReader(d.data())
+	startAddr := d.StartAddr()
+	r := bytes.NewReader(d.Data())
 
 	// instructions, err := disassemble.GetInstructions(d.startAddr(), d.data())
 	// if err != nil {
@@ -152,12 +131,14 @@ func (d *DyldDisass) Triage() error {
 			continue
 		}
 
-		if strings.Contains(instruction.Encoding.String(), "branch") {
+		if strings.Contains(instruction.Encoding.String(), "branch") { // TODO: this could be slow?
 			for _, op := range instruction.Operands {
 				if op.Class == disassemble.LABEL {
-					d.tr.addresses[instruction.Address] = uint64(op.Immediate)
+					d.tr.Addresses[instruction.Address] = uint64(op.Immediate)
 				}
 			}
+		} else if strings.Contains(instruction.Encoding.String(), "loadlit") { // TODO: this could be slow?
+			d.tr.Addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
 			(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
 			adrpRegister := prevInstr.Operands[0].Registers[0]
@@ -167,7 +148,7 @@ func (d *DyldDisass) Triage() error {
 			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[2].Immediate
 			}
-			d.tr.addresses[instruction.Address] = adrpImm
+			d.tr.Addresses[instruction.Address] = adrpImm
 		}
 
 		// lookup adrp/ldr or add address as a cstring or symbol name
@@ -208,17 +189,17 @@ func (d *DyldDisass) Triage() error {
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
-	if !d.quite() {
-		d.tr.Details = make(map[uint64]addrDetails)
+	if !d.Quite() {
+		d.tr.Details = make(map[uint64]disass.AddrDetails)
 
-		for addr, imm := range d.tr.addresses {
+		for addr, imm := range d.tr.Addresses {
 			image, err := d.f.GetImageContainingVMAddr(imm)
 			if err != nil {
 				return err
 			}
 
-			if !d.tr.dylibs.contains(image) {
-				d.tr.dylibs = append(d.tr.dylibs, image)
+			if !d.hasDep(image) {
+				d.dylibs = append(d.dylibs, image)
 			}
 
 			m, err := image.GetMacho()
@@ -227,16 +208,16 @@ func (d *DyldDisass) Triage() error {
 			}
 			defer m.Close()
 
-			if fn, err := m.GetFunctionForVMAddr(d.startAddr()); err == nil {
-				d.tr.function = &fn
-				if d.tr.function.StartAddr <= imm && imm < d.tr.function.EndAddr {
-					d.tr.locations[imm] = append(d.tr.locations[imm], addr)
+			if fn, err := m.GetFunctionForVMAddr(d.StartAddr()); err == nil {
+				d.tr.Function = &fn
+				if d.tr.Function.StartAddr <= imm && imm < d.tr.Function.EndAddr {
+					d.tr.Locations[imm] = append(d.tr.Locations[imm], addr)
 					continue
 				}
 			}
 
 			if c := m.FindSectionForVMAddr(imm); c != nil {
-				d.tr.Details[imm] = addrDetails{
+				d.tr.Details[imm] = disass.AddrDetails{
 					Image:   filepath.Base(image.Name),
 					Segment: c.Seg,
 					Section: c.Name,

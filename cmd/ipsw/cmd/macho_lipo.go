@@ -39,7 +39,9 @@ func init() {
 	machoCmd.AddCommand(lipoCmd)
 
 	lipoCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
+	lipoCmd.Flags().String("output", "", "Directory to extract the MachO")
 	viper.BindPFlag("macho.lipo.arch", lipoCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("macho.lipo.output", lipoCmd.Flags().Lookup("output"))
 	lipoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -58,6 +60,7 @@ var lipoCmd = &cobra.Command{
 
 		// flags
 		selectedArch := viper.GetString("macho.lipo.arch")
+		extractPath := viper.GetString("macho.lipo.output")
 
 		machoPath := filepath.Clean(args[0])
 
@@ -117,11 +120,16 @@ var lipoCmd = &cobra.Command{
 				return fmt.Errorf("failed to read data in file at %#x: %v", farch.Offset, err)
 			}
 
-			outFile := fmt.Sprintf("%s.%s", args[0], strings.ToLower(farch.SubCPU.String(farch.CPU)))
-			if err := ioutil.WriteFile(outFile, dat, 0755); err != nil {
+			outFile := fmt.Sprintf("%s.%s", machoPath, strings.ToLower(farch.SubCPU.String(farch.CPU)))
+			folder := filepath.Dir(outFile) // default to folder of shared cache
+			if len(extractPath) > 0 {
+				folder = extractPath
+			}
+			fname := filepath.Join(folder, filepath.Base(outFile)) // default to NOT full dylib path
+			if err := ioutil.WriteFile(fname, dat, 0755); err != nil {
 				return fmt.Errorf("failed to create file %s: %v", outFile, err)
 			}
-			log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), outFile)
+			log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), fname)
 		}
 
 		return nil
