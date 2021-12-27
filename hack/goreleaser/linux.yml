@@ -1,0 +1,37 @@
+# This is an example .goreleaser.yml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+
+builds:
+  - main: ./cmd/ipsw
+    id: amd64
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+  - main: ./cmd/ipsw
+    id: arm64
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
+      - arm64
+
+archives:
+  - replacements:
+      amd64: x86_64
+    name_template: "ipsw_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - completions/*
+
+checksum:
+  name_template: 'checksums.linux.txt'

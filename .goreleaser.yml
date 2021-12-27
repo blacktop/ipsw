@@ -7,7 +7,7 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
     - ./hack/make/completions
-    - ./hack/make/mini
+    - ./hack/make/json_mini
 builds:
   - main: ./cmd/ipsw
     id: darwin
@@ -23,21 +23,21 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - main: ./cmd/ipsw
-    id: "others"
-    binary: ipsw
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  # - main: ./cmd/ipsw
+  #   id: "others"
+  #   binary: ipsw
+  #   env:
+  #     - CGO_ENABLED=0
+  #   goos:
+  #     - linux
+  #     - windows
+  #   goarch:
+  #     - amd64
+  #     - arm64
+  #   mod_timestamp: "{{ .CommitTimestamp }}"
+  #   flags:
+  #     - -trimpath
+  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 universal_binaries:
   - id: darwin
     replace: false
@@ -79,7 +79,7 @@ rigs:
     description: Download and parse IPSWs
     license: MIT
 checksum:
-  name_template: "checksums.txt"
+  name_template: "checksums.darwin.txt"
 signs:
   - artifacts: checksum
 changelog:

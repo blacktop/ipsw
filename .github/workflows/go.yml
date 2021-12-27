@@ -1,6 +1,13 @@
 name: Go
-on: [push, pull_request]
-
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - v1.*.*
+  pull_request:
+    branches:
+      - main
 jobs:
   build:
     strategy:
@@ -9,16 +16,17 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Set up Go 1.17.1
-        uses: actions/setup-go@v2.1.4
-        with:
-          go-version: 1.17.1
-        id: go
-
-      - name: Check out code into the Go module directory
+      -
+        name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+      -
+        name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
       - name: Set output
         id: vars
         run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
@@ -34,21 +42,11 @@ jobs:
           cd build
           cmake ..
           sudo make install
+
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-11'
         run: |
           brew install lzfse tree
-      # - name: Build Dependencies (Windows)
-      #   if: matrix.platform == 'windows-latest'
-      #   run: |
-      #     git clone https://github.com/lzfse/lzfse.git
-      #     cd lzfse
-      #     mkdir build
-      #     cd build
-      #     cmake -G "Visual Studio 16 2019" ..
-      #     cmake --build . --config Debug
-      #     cd Debug
-      #     dlltool --def D:\a\ipsw\ipsw\hack\windows\lzfse.def --dllname lzfse.dll --output-lib lzfse.a
 
       #
       # CACHE
@@ -324,3 +322,59 @@ jobs:
         with:
           name: Releases
           path: build/dist/
+  goreleaser:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      -
+        name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+      -
+        name: Build Dependencies (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update && sudo apt-get install gcc-aarch64-linux-gnu
+      -
+        if: matrix.platform == 'ubuntu-latest'
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --rm-dist -f hack/goreleaser/linux.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      -
+        if: matrix.platform == 'windows-latest'
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v2
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --rm-dist -f hack/goreleaser/windows.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      -
+        if: matrix.platform == 'ubuntu-latest'
+        name: Upload assets
+        uses: actions/upload-artifact@v2
+        with:
+          name: disass_linux
+          path: dist/*
+      -
+        if: matrix.platform == 'windows-latest'
+        name: Upload assets
+        uses: actions/upload-artifact@v2
+        with:
+          name: disass_windows
+          path: dist/*
