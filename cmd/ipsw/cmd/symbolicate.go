@@ -40,7 +40,7 @@ func init() {
 	rootCmd.AddCommand(symbolicateCmd)
 
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
-	symbolicateCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
+	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 }
 
@@ -58,6 +58,7 @@ var symbolicateCmd = &cobra.Command{
 		}
 
 		unslide, _ := cmd.Flags().GetBool("unslide")
+		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 
 		crashLog, err := crashlog.Open(args[0])
 		if err != nil {

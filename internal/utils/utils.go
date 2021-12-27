@@ -316,11 +316,8 @@ func GrepStrings(data []byte, searchStr string) []string {
 
 // IsASCII checks if given string is ascii
 func IsASCII(s string) bool {
-	if len(s) < 1 {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		if s[i] > unicode.MaxASCII {
+	for _, r := range s {
+		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
 			return false
 		}
 	}

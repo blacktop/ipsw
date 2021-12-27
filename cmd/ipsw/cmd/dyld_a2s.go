@@ -44,9 +44,11 @@ func init() {
 
 // a2sCmd represents the a2s command
 var a2sCmd = &cobra.Command{
-	Use:   "a2s <dyld_shared_cache> <vaddr>",
-	Short: "Lookup symbol at unslid address",
-	Args:  cobra.MinimumNArgs(2),
+	Use:           "a2s <dyld_shared_cache> <vaddr>",
+	Short:         "Lookup symbol at unslid address",
+	SilenceUsage:  false,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -203,7 +205,7 @@ var a2sCmd = &cobra.Command{
 		}
 
 		// Load all symbols
-		if err := f.AnalyzeImage(image); err != nil {
+		if err := image.Analyze(); err != nil {
 			return err
 		}
 
@@ -242,7 +244,7 @@ var a2sCmd = &cobra.Command{
 			return nil
 		}
 
-		if cstr, err := f.IsCString(m, unslidAddr); err == nil {
+		if cstr, ok := m.IsCString(unslidAddr); ok {
 			if secondAttempt {
 				fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
 			} else {

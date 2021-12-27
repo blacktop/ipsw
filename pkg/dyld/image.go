@@ -3,10 +3,16 @@ package dyld
 import (
 	"fmt"
 	"io"
+	"path/filepath"
+	"strings"
 	"sync"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/pkg/errors"
 )
 
 type rangeEntry struct {
@@ -24,12 +30,13 @@ type patchableExport struct {
 type astate struct {
 	mu sync.Mutex
 
-	Deps        bool
-	Got         bool
-	Stubs       bool
-	StubHelpers bool
-	Exports     bool
-	Privates    bool
+	Deps     bool
+	Got      bool
+	Stubs    bool
+	Helpers  bool
+	Exports  bool
+	Privates bool
+	Starts   bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -37,66 +44,77 @@ func (a *astate) SetDeps(done bool) {
 	a.Deps = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsDepsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Deps
 }
+
 func (a *astate) SetGot(done bool) {
 	a.mu.Lock()
 	a.Got = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsGotDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Got
 }
-func (a *astate) SetStubHelpers(done bool) {
+
+func (a *astate) SetHelpers(done bool) {
 	a.mu.Lock()
-	a.StubHelpers = done
+	a.Helpers = done
 	a.mu.Unlock()
 }
-
-func (a *astate) IsStubHelpersDone() bool {
+func (a *astate) IsHelpersDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	return a.StubHelpers
+	return a.Helpers
 }
+
 func (a *astate) SetStubs(done bool) {
 	a.mu.Lock()
 	a.Stubs = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsStubsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Stubs
 }
+
 func (a *astate) SetExports(done bool) {
 	a.mu.Lock()
 	a.Exports = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsExportsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Exports
 }
+
 func (a *astate) SetPrivates(done bool) {
 	a.mu.Lock()
 	a.Privates = done
 	a.mu.Unlock()
 }
-
 func (a *astate) IsPrivatesDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Privates
+}
+
+func (a *astate) SetStarts(done bool) {
+	a.mu.Lock()
+	a.Starts = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsStartsDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Starts
 }
 
 type analysis struct {
@@ -104,6 +122,7 @@ type analysis struct {
 	Dependencies []string
 	GotPointers  map[uint64]uint64
 	SymbolStubs  map[uint64]uint64
+	Helpers      map[uint64]uint64
 }
 
 // CacheImage represents a dyld dylib image.
@@ -351,4 +370,175 @@ func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
 		})
 	}
 	return syms
+}
+
+// Analyze analyzes an image by parsing it's symbols, stubs and GOT
+func (i *CacheImage) Analyze() error {
+
+	if err := i.cache.GetAllExportedSymbolsForImage(i, false); err != nil {
+		log.Errorf("failed to parse exported symbols for %s", i.Name)
+	}
+
+	if !i.Analysis.State.IsStartsDone() {
+		i.ParseStarts()
+	}
+
+	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
+		if !errors.Is(err, ErrNoLocals) {
+			return err
+		}
+	}
+
+	if !i.cache.IsArm64() {
+		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
+	}
+
+	if !i.Analysis.State.IsHelpersDone() && i.cache.IsArm64() {
+		log.Debugf("parsing %s symbol stub helpers", i.Name)
+		if err := i.ParseHelpers(); err != nil {
+			if !errors.Is(err, macho.ErrMachOSectionNotFound) {
+				return err
+			}
+		}
+
+		for start, target := range i.Analysis.Helpers {
+			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+				i.cache.AddressToSymbol[start] = fmt.Sprintf("__stub_helper.%s", symName)
+			} else {
+				i.cache.AddressToSymbol[start] = fmt.Sprintf("__stub_helper.%x", target)
+			}
+		}
+	}
+
+	if !i.Analysis.State.IsGotDone() && i.cache.IsArm64() {
+		log.Debugf("parsing %s global offset table", i.Name)
+		if err := i.ParseGOT(); err != nil {
+			return err
+		}
+
+		for entry, target := range i.Analysis.GotPointers {
+			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+				i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+			} else {
+				if img, err := i.cache.GetImageContainingTextAddr(target); err == nil {
+					if err := img.Analyze(); err != nil {
+						return err
+					}
+					if symName, ok := i.cache.AddressToSymbol[target]; ok {
+						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+					} else if laptr, ok := i.Analysis.GotPointers[target]; ok {
+						if symName, ok := i.cache.AddressToSymbol[laptr]; ok {
+							i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
+						}
+					} else {
+						utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for GOT entry %#x => %#x in %s", entry, target, img.Name))
+						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got_%x ; %s", target, filepath.Base(img.Name))
+					}
+				} else {
+					i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got_%x", target)
+				}
+
+			}
+		}
+	}
+
+	if !i.Analysis.State.IsStubsDone() && i.cache.IsArm64() {
+		log.Debugf("parsing %s symbol stubs", i.Name)
+		if err := i.ParseStubs(); err != nil {
+			return err
+		}
+
+		for stub, target := range i.Analysis.SymbolStubs {
+			if symName, ok := i.cache.AddressToSymbol[target]; ok {
+				if !strings.HasPrefix(symName, "j_") {
+					i.cache.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
+				} else {
+					i.cache.AddressToSymbol[stub] = symName
+				}
+			} else {
+				img, err := i.cache.GetImageContainingTextAddr(target)
+				if err != nil {
+					return err
+				}
+				if err := img.Analyze(); err != nil {
+					return err
+				}
+				if symName, ok := i.cache.AddressToSymbol[target]; ok {
+					i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
+				} else {
+					utils.Indent(log.Debug, 2)(fmt.Sprintf("no sym found for stub %#x => %#x in %s", stub, target, img.Name))
+					i.cache.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// ParseGOT parse global offset table in MachO
+func (i *CacheImage) ParseStarts() {
+	if i.m != nil {
+		for _, fn := range i.m.GetFunctions() {
+			if _, ok := i.cache.AddressToSymbol[fn.StartAddr]; !ok {
+				i.cache.AddressToSymbol[fn.StartAddr] = fmt.Sprintf("sub_%x", fn.StartAddr)
+			}
+		}
+	}
+	i.Analysis.State.SetStarts(true)
+}
+
+// ParseGOT parse global offset table in MachO
+func (i *CacheImage) ParseGOT() error {
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
+	}
+	defer m.Close()
+
+	i.Analysis.GotPointers, err = disass.ParseGotPtrs(m)
+	if err != nil {
+		return err
+	}
+
+	i.Analysis.State.SetGot(true)
+
+	return nil
+}
+
+// ParseStubs parse symbol stubs in MachO
+func (i *CacheImage) ParseStubs() error {
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
+	}
+
+	i.Analysis.SymbolStubs, err = disass.ParseStubsASM(m)
+	if err != nil {
+		return err
+	}
+
+	i.Analysis.State.SetStubs(true)
+
+	return nil
+}
+
+// ParseHelpers parse symbol stub helpers in MachO
+func (i *CacheImage) ParseHelpers() error {
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
+	}
+
+	i.Analysis.Helpers, err = disass.ParseHelpersASM(m)
+	if err != nil {
+		return err
+	}
+
+	i.Analysis.State.SetHelpers(true)
+
+	return nil
 }

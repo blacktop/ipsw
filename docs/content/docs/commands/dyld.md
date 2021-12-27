@@ -47,7 +47,7 @@ Usage:
 Available Commands:
   a2o         Convert dyld_shared_cache address to offset
   a2s         Lookup symbol at unslid address
-  disass      🚧 [WIP] Disassemble dyld_shared_cache symbol/vaddr in an image
+  disass      Disassemble dyld_shared_cache symbol/vaddr in an image
   extract     Extract dyld_shared_cache from DMG in IPSW
   imports     List all dylibs that load a given dylib
   info        Parse dyld_shared_cache
@@ -296,7 +296,7 @@ Lookup what symbol is at a given _unslid_ or _slid_ address _(in hex)_
 
 ### **dyld a2f**
 
-Lookup what function *(if any)* contains a given _unslid_ or _slid_ address
+Lookup what function _(if any)_ contains a given _unslid_ or _slid_ address
 
 ```bash
 ❯ ipsw dyld a2f dyld_shared_cache_arm64e 0x1800980ac
@@ -304,7 +304,7 @@ Lookup what function *(if any)* contains a given _unslid_ or _slid_ address
 0x1800980ac: _dlsym (start: 0x1800980ac, end: 0x1800980e0)
 ```
 
-It can also take a file of pointers *(one per line)* as input *(and will output results as JSON)*
+It can also take a file of pointers _(one per line)_ as input _(and will output results as JSON)_
 
 ```bash
 ❯ ipsw dyld a2f dyld_shared_cache_arm64e --in ptrs.txt \

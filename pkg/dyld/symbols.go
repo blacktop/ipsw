@@ -117,7 +117,7 @@ func (f *File) GetLocalSymbolsForImage(image *CacheImage) error {
 
 				f.AddressToSymbol[nlist.Value] = strings.Trim(s, "\x00")
 				f.Images[idx].LocalSymbols = append(f.Images[idx].LocalSymbols, &CacheLocalSymbol64{
-					Name:    strings.Trim(s, "\x00"),
+					Name:    f.AddressToSymbol[nlist.Value],
 					Nlist64: nlist,
 				})
 			}
@@ -622,6 +622,35 @@ func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trie.Tr
 	}
 
 	return nil, fmt.Errorf("failed to find in image %s: %w", imagePath, ErrSymbolNotInImage)
+}
+
+// GetSymbolAddress returns the virtual address and possibly the dylib containing a given symbol
+func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, error) {
+	if len(imageName) > 0 {
+		if sym, _ := f.FindExportedSymbolInImage(imageName, symbol); sym != nil {
+			if image, err := f.Image(imageName); err != nil {
+				return sym.Address, image, err
+			} else {
+				return sym.Address, image, nil
+			}
+		}
+	} else {
+		// Search ALL dylibs for the symbol
+		for _, image := range f.Images {
+			if sym, _ := f.FindExportedSymbolInImage(image.Name, symbol); sym != nil {
+				return sym.Address, image, nil
+			}
+		}
+	}
+
+	// Search addr2sym map
+	for addr, sym := range f.AddressToSymbol {
+		if strings.EqualFold(sym, symbol) {
+			return addr, nil, nil
+		}
+	}
+
+	return 0, nil, fmt.Errorf("failed to find symbol %s", symbol)
 }
 
 // GetExportedSymbolAddress returns the address of an images exported symbol
