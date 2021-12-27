@@ -95,13 +95,13 @@ func (d DyldDisass) IsBranchLocation(addr uint64) (bool, uint64) {
 }
 
 // IsData returns if given address is a data variable address referenced in the disassembled function
-func (d DyldDisass) IsData(addr uint64) bool {
+func (d DyldDisass) IsData(addr uint64) (bool, *disass.AddrDetails) {
 	if detail, ok := d.tr.Details[addr]; ok {
 		if strings.Contains(strings.ToLower(detail.Segment), "data") {
-			return true
+			return true, &detail
 		}
 	}
-	return false
+	return false, nil
 }
 
 // Triage walks a function and analyzes all immediates
@@ -220,7 +220,7 @@ func (d *DyldDisass) Triage() error {
 			}
 			defer m.Close()
 
-			if fn, err := m.GetFunctionForVMAddr(d.StartAddr()); err == nil {
+			if fn, err := m.GetFunctionForVMAddr(addr); err == nil {
 				d.tr.Function = &fn
 				if d.tr.Function.StartAddr <= imm && imm < d.tr.Function.EndAddr {
 					d.tr.Locations[imm] = append(d.tr.Locations[imm], addr)

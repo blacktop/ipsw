@@ -99,7 +99,7 @@ func (d *MachoDisass) Triage() error {
 		d.tr.Details = make(map[uint64]AddrDetails)
 
 		for addr, imm := range d.tr.Addresses {
-			if fn, err := d.f.GetFunctionForVMAddr(d.StartAddr()); err == nil {
+			if fn, err := d.f.GetFunctionForVMAddr(addr); err == nil {
 				d.tr.Function = &fn
 				if d.tr.Function.StartAddr <= imm && imm < d.tr.Function.EndAddr {
 					d.tr.Locations[imm] = append(d.tr.Locations[imm], addr)
@@ -153,6 +153,16 @@ func (d MachoDisass) IsBranchLocation(addr uint64) (bool, uint64) {
 		}
 	}
 	return false, 0
+}
+
+// IsData returns if given address is a data variable address referenced in the disassembled function
+func (d MachoDisass) IsData(addr uint64) (bool, *AddrDetails) {
+	if detail, ok := d.tr.Details[addr]; ok {
+		if strings.Contains(strings.ToLower(detail.Segment), "data") {
+			return true, &detail
+		}
+	}
+	return false, nil
 }
 
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address

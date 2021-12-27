@@ -20,6 +20,7 @@ type Disass interface {
 	IsFunctionStart(uint64) (bool, string)
 	IsLocation(uint64) bool
 	IsBranchLocation(uint64) (bool, uint64)
+	IsData(uint64) (bool, *AddrDetails)
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
 	// getters
@@ -284,18 +285,23 @@ func Disassemble(d Disass) {
 						instrStr += fmt.Sprintf(" ; %s", name)
 					}
 				} else if instruction.Operation == disassemble.ARM64_ADR {
-					adrImm := instruction.Operands[1].Immediate
-					if name, ok := d.FindSymbol(uint64(adrImm)); ok {
-						instrStr += fmt.Sprintf(" ; %s", name)
-					} else if cstr, err := d.GetCString(adrImm); err == nil {
-						if utils.IsASCII(cstr) {
-							if len(cstr) > 200 {
-								instrStr += fmt.Sprintf(" ; %#v...", cstr[:200])
-							} else if len(cstr) > 1 {
-								instrStr += fmt.Sprintf(" ; %#v", cstr)
+					opStr := strings.TrimPrefix(instrStr, fmt.Sprintf("%s\t", instruction.Operation))
+					for _, operand := range instruction.Operands {
+						if operand.Class == disassemble.LABEL {
+							if name, ok := d.FindSymbol(uint64(operand.Immediate)); ok {
+								opStr = strings.Replace(opStr, fmt.Sprintf("%#x", operand.Immediate), name, 1)
+							} else if cstr, err := d.GetCString(uint64(operand.Immediate)); err == nil {
+								if utils.IsASCII(cstr) {
+									if len(cstr) > 200 {
+										instrStr += fmt.Sprintf(" ; %#v...", cstr[:200])
+									} else if len(cstr) > 1 {
+										instrStr += fmt.Sprintf(" ; %#v", cstr)
+									}
+								}
 							}
 						}
 					}
+					instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, opStr)
 				} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
 					(instruction.Operation == disassemble.ARM64_ADD ||
 						instruction.Operation == disassemble.ARM64_LDR ||
@@ -311,6 +317,8 @@ func Disassemble(d Disass) {
 					}
 					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
 						instrStr += fmt.Sprintf(" ; %s", name)
+					} else if ok, detail := d.IsData(adrpImm); ok {
+						instrStr += fmt.Sprintf(" ; dat_%x (%s)", adrpImm, detail)
 					} else if cstr, err := d.GetCString(adrpImm); err == nil {
 						if utils.IsASCII(cstr) {
 							if len(cstr) > 200 {
