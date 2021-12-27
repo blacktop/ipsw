@@ -6,7 +6,7 @@ FROM golang:1.17.5 as builder
 COPY . /go/src/github.com/blacktop/ipsw
 WORKDIR /go/src/github.com/blacktop/ipsw
 
-RUN CGO_ENABLED=0 go build \
+RUN CGO_ENABLED=1 go build \
     -o /bin/ipsw \
     -ldflags "-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(cat VERSION)" \
     -ldflags "-X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" \
