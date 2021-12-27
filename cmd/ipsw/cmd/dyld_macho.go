@@ -478,7 +478,7 @@ var dyldMachoCmd = &cobra.Command{
 						fmt.Printf("\nStubs\n")
 						fmt.Println("=====")
 					}
-					if err := f.AnalyzeImage(i); err != nil {
+					if err := i.Analyze(); err != nil {
 						return err
 					}
 					for stubAddr, addr := range i.Analysis.SymbolStubs {

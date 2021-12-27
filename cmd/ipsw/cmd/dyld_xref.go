@@ -22,14 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -136,7 +135,7 @@ var xrefCmd = &cobra.Command{
 		for _, img := range images {
 			xrefs := make(map[uint64]string)
 
-			if err := f.AnalyzeImage(img); err != nil {
+			if err := img.Analyze(); err != nil {
 				return fmt.Errorf("failed to analyze image: %s; %v", img.Name, err)
 			}
 
@@ -164,13 +163,18 @@ var xrefCmd = &cobra.Command{
 					return err
 				}
 
-				triage, err := f.FirstPassTriage(m, &fn, bytes.NewReader(data), arm64.Options{StartAddress: int64(fn.StartAddr)}, false)
-				if err != nil {
-					return err
+				engine := dyld.NewDyldDisass(f, &disass.Config{
+					Data:         data,
+					StartAddress: fn.StartAddr,
+					Quite:        true,
+				})
+
+				if err := engine.Triage(); err != nil {
+					return fmt.Errorf("first pass triage failed: %v", err)
 				}
 
-				if ok, loc := triage.Contains(unslidAddr); ok {
-					if sym := f.FindSymbol(fn.StartAddr, false); len(sym) > 0 {
+				if ok, loc := engine.Contains(unslidAddr); ok {
+					if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
 					} else {
 						xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)

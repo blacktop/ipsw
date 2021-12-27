@@ -207,7 +207,7 @@ var a2fCmd = &cobra.Command{
 			defer m.Close()
 
 			// Load all symbols
-			if err := f.AnalyzeImage(image); err != nil {
+			if err := image.Analyze(); err != nil {
 				return err
 			}
 

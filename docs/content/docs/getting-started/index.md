@@ -16,7 +16,6 @@ Usage:
 
 Available Commands:
   device-list     List all iOS devices
-  disass          🚧 [WIP] Disassemble ARM64 binaries at address or symbol
   download        Download Apple Firmware files (and more)
   dtree           Parse DeviceTree
   dyld            Parse dyld_shared_cache

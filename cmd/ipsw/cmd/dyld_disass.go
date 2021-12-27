@@ -22,16 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-arm64"
-	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -40,11 +37,13 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
 
+	dyldDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	dyldDisassCmd.Flags().Uint64("slide", 0, "dyld_shared_cache slide to remove from --vaddr")
 	dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
-	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
+	dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
@@ -54,7 +53,7 @@ func init() {
 // disassCmd represents the disass command
 var dyldDisassCmd = &cobra.Command{
 	Use:           "disass <dyld_shared_cache>",
-	Short:         "🚧 [WIP] Disassemble dyld_shared_cache symbol/vaddr in an image",
+	Short:         "Disassemble dyld_shared_cache symbol/vaddr in an image",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  false,
 	SilenceErrors: true,
@@ -62,10 +61,7 @@ var dyldDisassCmd = &cobra.Command{
 
 		var data []byte
 		var isMiddle bool
-		var symAddr uint64
-		var startAddr uint64
 		var image *dyld.CacheImage
-		var dFunc *types.Function
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -73,14 +69,17 @@ var dyldDisassCmd = &cobra.Command{
 
 		imageName, _ := cmd.Flags().GetString("image")
 		instructions, _ := cmd.Flags().GetUint64("count")
-		startVMAddr, _ := cmd.Flags().GetUint64("vaddr")
+		startAddr, _ := cmd.Flags().GetUint64("vaddr")
 		symbolName, _ := cmd.Flags().GetString("symbol")
 		cacheFile, _ := cmd.Flags().GetString("cache")
 		slide, _ := cmd.Flags().GetUint64("slide")
+		asJSON, _ := cmd.Flags().GetBool("json")
+		demangleFlag, _ := cmd.Flags().GetBool("demangle")
+		quiet, _ := cmd.Flags().GetBool("quiet")
 
-		if len(symbolName) > 0 && startVMAddr != 0 {
+		if len(symbolName) > 0 && startAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
-		} else if len(symbolName) == 0 && startVMAddr == 0 {
+		} else if len(symbolName) == 0 && startAddr == 0 {
 			return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
 		}
 
@@ -143,22 +142,19 @@ var dyldDisassCmd = &cobra.Command{
 			}
 
 			log.Info("Locating symbol: " + symbolName)
-			symAddr, image, err = f.GetSymbolAddress(symbolName, imageName)
+			startAddr, image, err = f.GetSymbolAddress(symbolName, imageName)
 			if err != nil {
 				return err
 			}
 
-		} else { // startVMAddr > 0
+		} else { // startAddr > 0
 			if slide > 0 {
-				startVMAddr = startVMAddr - slide
+				startAddr = startAddr - slide
 			}
-			symAddr = startVMAddr
 		}
 
-		startAddr = symAddr
-
 		if image == nil {
-			image, err = f.GetImageContainingTextAddr(symAddr)
+			image, err = f.GetImageContainingTextAddr(startAddr)
 			if err != nil {
 				return err
 			}
@@ -173,50 +169,8 @@ var dyldDisassCmd = &cobra.Command{
 		defer m.Close()
 
 		/*
-		 * Read in data to disassemble
-		 */
-		if instructions > 0 {
-			uuid, off, err := f.GetOffset(symAddr)
-			if err != nil {
-				return err
-			}
-			data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
-			if err != nil {
-				return err
-			}
-		} else {
-			if fn, err := m.GetFunctionForVMAddr(symAddr); err == nil {
-				dFunc = &fn
-				uuid, soff, err := f.GetOffset(fn.StartAddr)
-				if err != nil {
-					return err
-				}
-				data, err = f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
-				if err != nil {
-					return err
-				}
-				if symAddr != fn.StartAddr {
-					isMiddle = true
-					startAddr = fn.StartAddr
-				}
-			}
-		}
-
-		if data == nil {
-			log.Fatal("failed to disassemble")
-		}
-
-		/*
 		 * Load symbols from the target sym/addr's image
 		 */
-		// if f.LocalSymbolsOffset == 0 {
-		// 	utils.Indent(log.Warn, 2)("parsing symbol table...")
-		// 	for _, sym := range m.Symtab.Syms {
-		// 		if sym.Value != 0 {
-		// 			f.AddressToSymbol[sym.Value] = sym.Name
-		// 		}
-		// 	}
-		// }
 		if len(symbolName) == 0 {
 			utils.Indent(log.Warn, 2)("parsing public symbols...")
 			if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
@@ -230,20 +184,6 @@ var dyldDisassCmd = &cobra.Command{
 					return err
 				}
 			}
-		}
-
-		//***********************
-		//* First pass ANALYSIS *
-		//***********************
-		triage, err := f.FirstPassTriage(m, dFunc, bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}, true)
-		if err == nil {
-			for _, img := range triage.Dylibs {
-				if err := f.AnalyzeImage(img); err != nil {
-					return err
-				}
-			}
-		} else {
-			log.Errorf("first pass triage failed: %v", err)
 		}
 
 		/*
@@ -283,130 +223,68 @@ var dyldDisassCmd = &cobra.Command{
 			}
 		}
 
-		if err := f.AnalyzeImage(image); err != nil {
+		if err := image.Analyze(); err != nil {
 			return err
+		}
+
+		/*
+		 * Read in data to disassemble
+		 */
+		if instructions > 0 {
+			uuid, off, err := f.GetOffset(startAddr)
+			if err != nil {
+				return err
+			}
+			data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
+			if err != nil {
+				return err
+			}
+		} else {
+			if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
+				uuid, soff, err := f.GetOffset(fn.StartAddr)
+				if err != nil {
+					return err
+				}
+				data, err = f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+				if err != nil {
+					return err
+				}
+				if startAddr != fn.StartAddr {
+					isMiddle = true
+					startAddr = fn.StartAddr
+				}
+			}
+		}
+		if data == nil {
+			log.Fatal("failed to disassemble")
+		}
+
+		engine := dyld.NewDyldDisass(f, &disass.Config{
+			Image:        image.Name,
+			Data:         data,
+			StartAddress: startAddr,
+			Middle:       isMiddle,
+			AsJSON:       asJSON,
+			Demangle:     demangleFlag,
+			Quite:        quiet,
+		})
+
+		//***********************
+		//* First pass ANALYSIS *
+		//***********************
+		if err := engine.Triage(); err != nil {
+			return fmt.Errorf("first pass triage failed: %v", err)
+		}
+		for _, img := range engine.Dylibs() {
+			if err := img.Analyze(); err != nil {
+				return err
+			}
 		}
 
 		//***************
 		//* DISASSEMBLE *
 		//***************
-
-		var prevInstruction arm64.Instruction
-
-		for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}) {
-
-			if i.Error != nil {
-				fmt.Println(i.StrRepr)
-				continue
-			}
-
-			opStr := i.Instruction.OpStr()
-
-			// check for start of a new function
-			if yes, fname := f.IsFunctionStart(m.GetFunctions(), i.Instruction.Address(), demangleFlag); yes {
-				if len(fname) > 0 {
-					fmt.Printf("\n%s:\n", fname)
-				} else {
-					fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
-				}
-			}
-
-			if triage.IsBranchLocation(i.Instruction.Address()) {
-				fmt.Printf("%#08x:  ; loc_%x\n", i.Instruction.Address(), i.Instruction.Address())
-			}
-
-			// if ok, imm := triage.HasLoc(i.Instruction.Address()); ok {
-			// 	if detail, ok := triage.Details[imm]; ok {
-			// 		if triage.IsData(imm) {
-			// 			opStr += fmt.Sprintf(" ; %s", detail)
-			// 		} else {
-			// 			opStr += fmt.Sprintf(" ; %s", detail)
-			// 		}
-			// 	}
-			// }
-
-			// lookup adrp/ldr or add address as a cstring or symbol name
-			operation := i.Instruction.Operation().String()
-			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
-				operands := i.Instruction.Operands()
-				if operands != nil && prevInstruction.Operands() != nil {
-					adrpRegister := prevInstruction.Operands()[0].Reg[0]
-					adrpImm := prevInstruction.Operands()[1].Immediate
-					if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
-						adrpImm += operands[1].Immediate
-					} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
-						adrpImm += operands[2].Immediate
-					}
-					// markup disassemble with label comment
-					symName := f.FindSymbol(adrpImm, demangleFlag)
-					if len(symName) > 0 {
-						opStr += fmt.Sprintf(" ; %s", symName)
-					} else {
-						cstr, err := f.IsCString(m, adrpImm)
-						if err == nil {
-							if len(cstr) > 200 {
-								opStr += fmt.Sprintf(" ; %#v...", cstr[:200])
-							} else {
-								opStr += fmt.Sprintf(" ; %#v", cstr)
-							}
-						}
-					}
-				}
-
-			} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
-				if operands := i.Instruction.Operands(); operands != nil {
-					for _, operand := range operands {
-						if operand.OpClass == arm64.LABEL {
-							symName := f.FindSymbol(operand.Immediate, demangleFlag)
-							if len(symName) > 0 {
-								opStr = fmt.Sprintf("\t%s", symName)
-							} else {
-								if dFunc != nil {
-									if operand.Immediate >= dFunc.StartAddr && operand.Immediate < dFunc.EndAddr {
-										direction := ""
-										delta := int(operand.Immediate) - int(i.Instruction.Address())
-										if delta > 0 {
-											direction = fmt.Sprintf(" ; ⤵ %#x", delta)
-										} else if delta == 0 {
-											direction = " ; ∞ loop"
-										} else {
-											direction = fmt.Sprintf(" ; ⤴ %#x", delta)
-										}
-										opStr = strings.Replace(opStr, fmt.Sprintf("#%#x", operand.Immediate), fmt.Sprintf("loc_%x%s", operand.Immediate, direction), 1)
-									}
-								}
-							}
-						}
-					}
-				}
-
-			} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
-				operation := i.Instruction.Operation()
-				if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
-					operands := i.Instruction.Operands()
-					if operands[1].OpClass == arm64.LABEL {
-						symName := f.FindSymbol(operands[1].Immediate, demangleFlag)
-						if len(symName) > 0 {
-							opStr += fmt.Sprintf(" ; %s", symName)
-						} else {
-							if dFunc != nil {
-								if operands[1].Immediate >= dFunc.StartAddr && operands[1].Immediate < dFunc.EndAddr {
-									opStr = fmt.Sprintf("\tloc_%x", operands[1].Immediate)
-								}
-							}
-						}
-					}
-				}
-			}
-
-			if isMiddle && i.Instruction.Address() == symAddr {
-				fmt.Printf("👉%08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
-			} else {
-				fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
-			}
-
-			prevInstruction = *i.Instruction
-		}
+		disass.Disassemble(engine)
 
 		return nil
 	},

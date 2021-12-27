@@ -1,0 +1,43 @@
+# This is an example .goreleaser.yml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod tidy
+
+builds:
+  - main: ./cmd/disass
+    binary: disass
+    env:
+      - CGO_ENABLED=1
+      - SDKROOT=/Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.1.sdk # needed for Github Action CI/CD
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - replacements:
+      darwin: macOS
+      amd64: x86_64
+    name_template: "disass_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: 'checksums.darwin.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^bumping"
+      - "^Update"
+      - "reorg"
+      - "updates"
+      - Merge pull request
+      - Merge branch
