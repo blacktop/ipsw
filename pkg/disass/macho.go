@@ -119,6 +119,22 @@ func (d *MachoDisass) Triage() error {
 	return nil
 }
 
+// IsFunctionStart checks if address is at a function start and returns symbol name
+func (d MachoDisass) IsFunctionStart(addr uint64) (bool, string) {
+	for _, fn := range d.f.GetFunctions() {
+		if addr == fn.StartAddr {
+			if symName, ok := d.a2s[addr]; ok {
+				if d.Demangle() {
+					return ok, demangle.Do(symName, false, false)
+				}
+				return ok, symName
+			}
+			return true, ""
+		}
+	}
+	return false, ""
+}
+
 // IsLocation returns if given address is a local branch location within the disassembled function
 func (d MachoDisass) IsBranchLocation(imm uint64) bool {
 	if _, ok := d.tr.Locations[imm]; ok {

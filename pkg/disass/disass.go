@@ -17,6 +17,7 @@ import (
 
 type Disass interface {
 	Triage() error
+	IsFunctionStart(uint64) (bool, string)
 	IsBranchLocation(uint64) bool
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
@@ -145,14 +146,6 @@ func Disassemble(d Disass) {
 
 	r := bytes.NewReader(d.Data())
 
-	if !d.AsJSON() {
-		if name, ok := d.FindSymbol(d.StartAddr()); ok && !d.AsJSON() {
-			fmt.Printf("%s:\n", name)
-		} else {
-			fmt.Printf("sub_%x:\n", d.StartAddr())
-		}
-	}
-
 	startAddr := d.StartAddr()
 
 	for {
@@ -216,9 +209,29 @@ func Disassemble(d Disass) {
 			instrStr = instruction.String()
 
 			if !d.Quite() {
+				// check for start of a new function
+				if ok, fname := d.IsFunctionStart(instruction.Address); ok {
+					if len(fname) > 0 {
+						fmt.Printf("\n%s:\n", fname)
+					} else {
+						fmt.Printf("\nsub_%x:\n", instruction.Address)
+					}
+				}
+
 				if d.IsBranchLocation(instruction.Address) {
 					fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
 				}
+
+				// if ok, imm := triage.HasLoc(i.Instruction.Address()); ok {
+				// 	if detail, ok := triage.Details[imm]; ok {
+				// 		if triage.IsData(imm) {
+				// 			opStr += fmt.Sprintf(" ; %s", detail)
+				// 		} else {
+				// 			opStr += fmt.Sprintf(" ; %s", detail)
+				// 		}
+				// 	}
+				// }
+
 				if instruction.Operation == disassemble.ARM64_MRS || instruction.Operation == disassemble.ARM64_MSR {
 					var ops []string
 					replaced := false
@@ -239,6 +252,10 @@ func Disassemble(d Disass) {
 				} else if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[0].Immediate)); ok {
 						instrStr = fmt.Sprintf("%s\t%s", instruction.Operation, name)
+					}
+				} else if strings.Contains(instruction.Encoding.String(), "branch") {
+					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
+						instrStr += fmt.Sprintf(" ; %s", name)
 					}
 				} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {

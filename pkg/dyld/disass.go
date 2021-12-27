@@ -262,20 +262,28 @@ func (d *DyldDisass) Triage() error {
 // }
 
 // IsFunctionStart checks if address is at a function start and returns symbol name
-// func (f *File) IsFunctionStart(funcs []types.Function, addr uint64, shouldDemangle bool) (bool, string) {
-// 	for _, fn := range funcs {
-// 		if addr == fn.StartAddr {
-// 			if symName, ok := f.AddressToSymbol[addr]; ok {
-// 				if shouldDemangle {
-// 					return ok, demangle.Do(symName, false, false)
-// 				}
-// 				return ok, symName
-// 			}
-// 			return true, ""
-// 		}
-// 	}
-// 	return false, ""
-// }
+func (d DyldDisass) IsFunctionStart(addr uint64) (bool, string) {
+	image, err := d.f.Image(d.cfg.Image)
+	if err != nil {
+		return false, err.Error()
+	}
+	m, err := image.GetMacho()
+	if err != nil {
+		return false, err.Error()
+	}
+	for _, fn := range m.GetFunctions() {
+		if addr == fn.StartAddr {
+			if symName, ok := d.f.AddressToSymbol[addr]; ok {
+				if d.Demangle() {
+					return ok, demangle.Do(symName, false, false)
+				}
+				return ok, symName
+			}
+			return true, ""
+		}
+	}
+	return false, ""
+}
 
 // FindSymbol returns symbol from the addr2symbol map for a given virtual address
 func (d DyldDisass) FindSymbol(addr uint64) (string, bool) {
