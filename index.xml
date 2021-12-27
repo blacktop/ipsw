@@ -98,15 +98,6 @@
     </item>
     
     <item>
-      <title>disass</title>
-      <link>https://blacktop.github.io/ipsw/docs/commands/disassemble/</link>
-      <pubDate>Sun, 26 Jan 2020 09:15:48 -0500</pubDate>
-      
-      <guid>https://blacktop.github.io/ipsw/docs/commands/disassemble/</guid>
-      <description>Disassemble ARMv8.5 binaries.</description>
-    </item>
-    
-    <item>
       <title>device-list</title>
       <link>https://blacktop.github.io/ipsw/docs/commands/device-list/</link>
       <pubDate>Sun, 26 Jan 2020 11:31:22 -0500</pubDate>
