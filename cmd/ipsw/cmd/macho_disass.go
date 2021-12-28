@@ -25,6 +25,7 @@ import (
 	"encoding/gob"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
@@ -57,6 +58,7 @@ var machoDisassCmd = &cobra.Command{
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var m *macho.File
 		var isMiddle bool
 		var symbolMap map[uint64]string
 
@@ -83,9 +85,24 @@ var machoDisassCmd = &cobra.Command{
 			// return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
 		}
 
-		m, err := macho.Open(args[0])
-		if err != nil {
-			return errors.Wrapf(err, "%s appears to not be a valid MachO", args[0])
+		machoPath := filepath.Clean(args[0])
+
+		fat, err := macho.OpenFat(machoPath)
+		if err != nil && err != macho.ErrNotFat {
+			log.Fatal(err.Error())
+		}
+		if err == macho.ErrNotFat {
+			m, err = macho.Open(machoPath)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+		} else {
+			for _, arch := range fat.Arches {
+				if strings.Contains(strings.ToLower(arch.SubCPU.String(arch.CPU)), "arm64") {
+					m = arch.File
+					break
+				}
+			}
 		}
 
 		if !strings.Contains(strings.ToLower(m.FileHeader.SubCPU.String(m.CPU)), "arm64") {
