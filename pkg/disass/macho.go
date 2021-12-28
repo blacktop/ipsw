@@ -24,8 +24,8 @@ type MachoDisass struct {
 	sinfo map[uint64]uint64
 }
 
-func NewMachoDisass(f *macho.File, a2s map[uint64]string, cfg *Config) *MachoDisass {
-	return &MachoDisass{f: f, a2s: a2s, cfg: cfg}
+func NewMachoDisass(f *macho.File, a2s *map[uint64]string, cfg *Config) *MachoDisass {
+	return &MachoDisass{f: f, a2s: *a2s, cfg: cfg}
 }
 
 func (d MachoDisass) IsMiddle() bool {
@@ -82,13 +82,20 @@ func (d *MachoDisass) Triage() error {
 		} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
 			d.tr.Addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
-			(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
+			(instruction.Operation == disassemble.ARM64_ADD ||
+				instruction.Operation == disassemble.ARM64_LDR ||
+				instruction.Operation == disassemble.ARM64_LDRB ||
+				instruction.Operation == disassemble.ARM64_LDRSW) {
 			adrpRegister := prevInstr.Operands[0].Registers[0]
 			adrpImm := prevInstr.Operands[1].Immediate
 			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
 			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[2].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
 			}
 			d.tr.Addresses[instruction.Address] = adrpImm
 		}
@@ -292,6 +299,12 @@ func (d *MachoDisass) parseObjC() error {
 		}
 		if classRefs, err := d.f.GetObjCClassReferences(); err == nil {
 			for off, class := range classRefs {
+				d.a2s[off] = fmt.Sprintf("class_%s", class.Name)
+				d.a2s[d.f.GetBaseAddress()+class.ClassPtr] = class.Name
+			}
+		}
+		if superRefs, err := d.f.GetObjCSuperReferences(); err == nil {
+			for off, class := range superRefs {
 				d.a2s[off] = fmt.Sprintf("class_%s", class.Name)
 				d.a2s[d.f.GetBaseAddress()+class.ClassPtr] = class.Name
 			}
