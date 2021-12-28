@@ -253,6 +253,17 @@ var dyldDisassCmd = &cobra.Command{
 					isMiddle = true
 					startAddr = fn.StartAddr
 				}
+			} else {
+				log.Warnf("disassembling 100 instructions at %#x", startAddr)
+				instructions = 100
+				uuid, off, err := f.GetOffset(startAddr)
+				if err != nil {
+					return err
+				}
+				data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		if data == nil {
