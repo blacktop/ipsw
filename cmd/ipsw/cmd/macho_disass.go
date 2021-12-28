@@ -45,6 +45,7 @@ func init() {
 	machoDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	// machoDisassCmd.Flags().StringP("input", "i", "", "Input function JSON file")
 	machoDisassCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -72,10 +73,14 @@ var machoDisassCmd = &cobra.Command{
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 		quiet, _ := cmd.Flags().GetBool("quiet")
 
+		// funcFile, _ := cmd.Flags().GetString("input")
+		allFuncs := false
+
 		if len(symbolName) > 0 && startAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
 		} else if len(symbolName) == 0 && startAddr == 0 {
-			return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
+			allFuncs = true
+			// return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
 		}
 
 		m, err := macho.Open(args[0])
@@ -86,17 +91,6 @@ var machoDisassCmd = &cobra.Command{
 		if !strings.Contains(strings.ToLower(m.FileHeader.SubCPU.String(m.CPU)), "arm64") {
 			log.Errorf("can only disassemble arm64 binaries")
 			return nil
-		}
-
-		if len(symbolName) > 0 {
-			startAddr, err = m.FindSymbolAddress(symbolName)
-			if err != nil {
-				return err
-			}
-		} else { // startAddr > 0
-			if slide > 0 {
-				startAddr = startAddr - slide
-			}
 		}
 
 		if len(cacheFile) > 0 {
@@ -113,61 +107,118 @@ var machoDisassCmd = &cobra.Command{
 			symbolMap = make(map[uint64]string)
 		}
 
-		/*
-		 * Read in data to disassemble
-		 */
-		var data []byte
-		if instructions > 0 {
-			off, err := m.GetOffset(startAddr)
-			if err != nil {
-				return err
-			}
-			data = make([]byte, instructions*4)
-			if _, err := m.ReadAt(data, int64(off)); err != nil {
-				return err
+		if allFuncs {
+			for _, fn := range m.GetFunctions() {
+				data, err := m.GetFunctionData(fn)
+				if err != nil {
+					log.Errorf("failed to get data for function: %v", err)
+					continue
+				}
+
+				engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+					Data:         data,
+					StartAddress: fn.StartAddr,
+					Middle:       false,
+					AsJSON:       asJSON,
+					Demangle:     demangleFlag,
+					Quite:        quiet,
+				})
+
+				//***********************
+				//* First pass ANALYSIS *
+				//***********************
+				if err := engine.Triage(); err != nil {
+					return fmt.Errorf("first pass triage failed: %v", err)
+				}
+				if len(symbolMap) == 0 {
+					if err := engine.Analyze(); err != nil {
+						return fmt.Errorf("MachO analysis failed: %v", err)
+					}
+				}
+				//***************
+				//* DISASSEMBLE *
+				//***************
+				disass.Disassemble(engine)
 			}
 		} else {
-			if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
-				soff, err := m.GetOffset(fn.StartAddr)
+			if len(symbolName) > 0 {
+				startAddr, err = m.FindSymbolAddress(symbolName)
 				if err != nil {
 					return err
 				}
-				data = make([]byte, uint64(fn.EndAddr-fn.StartAddr))
-				if _, err := m.ReadAt(data, int64(soff)); err != nil {
-					return err
-				}
-				if startAddr != fn.StartAddr {
-					isMiddle = true
-					startAddr = fn.StartAddr
+			} else { // startAddr > 0
+				if slide > 0 {
+					startAddr = startAddr - slide
 				}
 			}
-		}
-		if data == nil {
-			log.Fatal("failed to disassemble")
-		}
 
-		engine := disass.NewMachoDisass(m, symbolMap, &disass.Config{
-			Data:         data,
-			StartAddress: startAddr,
-			Middle:       isMiddle,
-			AsJSON:       asJSON,
-			Demangle:     demangleFlag,
-			Quite:        quiet,
-		})
+			/*
+			 * Read in data to disassemble
+			 */
+			var data []byte
+			if instructions > 0 {
+				off, err := m.GetOffset(startAddr)
+				if err != nil {
+					return err
+				}
+				data = make([]byte, instructions*4)
+				if _, err := m.ReadAt(data, int64(off)); err != nil {
+					return err
+				}
+			} else {
+				if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
+					soff, err := m.GetOffset(fn.StartAddr)
+					if err != nil {
+						return err
+					}
+					data = make([]byte, uint64(fn.EndAddr-fn.StartAddr))
+					if _, err := m.ReadAt(data, int64(soff)); err != nil {
+						return err
+					}
+					if startAddr != fn.StartAddr {
+						isMiddle = true
+						startAddr = fn.StartAddr
+					}
+				} else {
+					log.Warnf("disassembling 100 instructions at %#x", startAddr)
+					instructions = 100
+					off, err := m.GetOffset(startAddr)
+					if err != nil {
+						return err
+					}
+					data = make([]byte, instructions*4)
+					if _, err := m.ReadAt(data, int64(off)); err != nil {
+						return err
+					}
+				}
+			}
+			if data == nil {
+				log.Fatal("failed to disassemble")
+			}
 
-		//***********************
-		//* First pass ANALYSIS *
-		//***********************
-		if err := engine.Triage(); err != nil {
-			return fmt.Errorf("first pass triage failed: %v", err)
+			engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+				Data:         data,
+				StartAddress: startAddr,
+				Middle:       isMiddle,
+				AsJSON:       asJSON,
+				Demangle:     demangleFlag,
+				Quite:        quiet,
+			})
+
+			//***********************
+			//* First pass ANALYSIS *
+			//***********************
+			if err := engine.Triage(); err != nil {
+				return fmt.Errorf("first pass triage failed: %v", err)
+			}
+			if err := engine.Analyze(); err != nil {
+				return fmt.Errorf("MachO analysis failed: %v", err)
+			}
+			//***************
+			//* DISASSEMBLE *
+			//***************
+			disass.Disassemble(engine)
 		}
-		if err := engine.Analyze(); err != nil {
-			return fmt.Errorf("MachO analysis failed: %v", err)
-		}
-		//***************
-		//* DISASSEMBLE *
-		//***************
-		disass.Disassemble(engine)
 
 		return nil
 	},
