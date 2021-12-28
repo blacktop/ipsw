@@ -152,13 +152,20 @@ func (d *DyldDisass) Triage() error {
 		} else if strings.Contains(instruction.Encoding.String(), "loadlit") { // TODO: this could be slow?
 			d.tr.Addresses[instruction.Address] = uint64(instruction.Operands[1].Immediate)
 		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
-			(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
+			(instruction.Operation == disassemble.ARM64_ADD ||
+				instruction.Operation == disassemble.ARM64_LDR ||
+				instruction.Operation == disassemble.ARM64_LDRB ||
+				instruction.Operation == disassemble.ARM64_LDRSW) {
 			adrpRegister := prevInstr.Operands[0].Registers[0]
 			adrpImm := prevInstr.Operands[1].Immediate
 			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[1].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
 			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
 				adrpImm += instruction.Operands[2].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
 			}
 			d.tr.Addresses[instruction.Address] = adrpImm
 		}
