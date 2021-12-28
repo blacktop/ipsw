@@ -148,8 +148,9 @@ type CacheImage struct {
 	cache *File // pointer back to the dyld cache that the image belongs to
 	cuuid types.UUID
 	CacheReader
-	m  *macho.File
-	pm *macho.File // partial macho
+	m     *macho.File
+	pm    *macho.File // partial macho
+	sinfo map[uint64]uint64
 }
 
 // NewCacheReader returns a CacheReader that reads from r
@@ -393,6 +394,10 @@ func (i *CacheImage) Analyze() error {
 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
 	}
 
+	if err := i.ParseSlideInfo(); err != nil {
+		return err
+	}
+
 	if !i.Analysis.State.IsHelpersDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s symbol stub helpers", i.Name)
 		if err := i.ParseHelpers(); err != nil {
@@ -402,6 +407,9 @@ func (i *CacheImage) Analyze() error {
 		}
 
 		for start, target := range i.Analysis.Helpers {
+			if slide, ok := i.sinfo[start]; ok {
+				target = slide
+			}
 			if symName, ok := i.cache.AddressToSymbol[target]; ok {
 				i.cache.AddressToSymbol[start] = fmt.Sprintf("__stub_helper.%s", symName)
 			} else {
@@ -417,10 +425,13 @@ func (i *CacheImage) Analyze() error {
 		}
 
 		for entry, target := range i.Analysis.GotPointers {
+			if slide, ok := i.sinfo[entry]; ok {
+				target = slide
+			}
 			if symName, ok := i.cache.AddressToSymbol[target]; ok {
 				i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
 			} else {
-				if img, err := i.cache.GetImageContainingTextAddr(target); err == nil {
+				if img, err := i.cache.GetImageContainingVMAddr(target); err == nil {
 					if err := img.Analyze(); err != nil {
 						return err
 					}
@@ -437,7 +448,6 @@ func (i *CacheImage) Analyze() error {
 				} else {
 					i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got_%x", target)
 				}
-
 			}
 		}
 	}
@@ -449,6 +459,9 @@ func (i *CacheImage) Analyze() error {
 		}
 
 		for stub, target := range i.Analysis.SymbolStubs {
+			if slide, ok := i.sinfo[stub]; ok {
+				target = slide
+			}
 			if symName, ok := i.cache.AddressToSymbol[target]; ok {
 				if !strings.HasPrefix(symName, "j_") {
 					i.cache.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
@@ -456,7 +469,7 @@ func (i *CacheImage) Analyze() error {
 					i.cache.AddressToSymbol[stub] = symName
 				}
 			} else {
-				img, err := i.cache.GetImageContainingTextAddr(target)
+				img, err := i.cache.GetImageContainingVMAddr(target)
 				if err != nil {
 					return err
 				}
@@ -470,6 +483,44 @@ func (i *CacheImage) Analyze() error {
 					i.cache.AddressToSymbol[stub] = fmt.Sprintf("__stub_%x ; %s", target, filepath.Base(img.Name))
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+func (i *CacheImage) ParseSlideInfo() error {
+
+	i.sinfo = make(map[uint64]uint64)
+
+	m, err := i.GetPartialMacho()
+	if err != nil {
+		return err
+	}
+
+	for _, seg := range m.Segments() {
+		uuid, mapping, err := i.cache.GetMappingForVMAddress(seg.Addr)
+		if err != nil {
+			return err
+		}
+
+		if mapping.SlideInfoOffset == 0 {
+			continue
+		}
+
+		startAddr := seg.Addr - mapping.Address
+		endAddr := ((seg.Addr + seg.Memsz) - mapping.Address) + uint64(i.cache.SlideInfo.GetPageSize())
+
+		start := startAddr / uint64(i.cache.SlideInfo.GetPageSize())
+		end := endAddr / uint64(i.cache.SlideInfo.GetPageSize())
+
+		rs, err := i.cache.GetRebaseInfoForPages(uuid, mapping, start, end)
+		if err != nil {
+			return err
+		}
+
+		for _, r := range rs {
+			i.sinfo[r.CacheVMAddress] = r.Target
 		}
 	}
 

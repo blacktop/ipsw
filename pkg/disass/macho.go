@@ -10,16 +10,18 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
 
 type MachoDisass struct {
-	f   *macho.File
-	cfg *Config
-	tr  *Triage
-	a2s map[uint64]string
+	f     *macho.File
+	cfg   *Config
+	tr    *Triage
+	a2s   map[uint64]string
+	sinfo map[uint64]uint64
 }
 
 func NewMachoDisass(f *macho.File, a2s map[uint64]string, cfg *Config) *MachoDisass {
@@ -198,6 +200,10 @@ func (d MachoDisass) Analyze() error {
 		return fmt.Errorf("failed to parse objc runtime: %v", err)
 	}
 
+	if err := d.parseRebaseInfo(); err != nil {
+		return fmt.Errorf("failed to parse slide info: %v", err)
+	}
+
 	if err := d.parseHelpers(); err != nil {
 		if !errors.Is(err, macho.ErrMachOSectionNotFound) {
 			return fmt.Errorf("failed to parse stubs helpers: %v", err)
@@ -210,6 +216,57 @@ func (d MachoDisass) Analyze() error {
 
 	if err := d.parseStubs(); err != nil {
 		return fmt.Errorf("failed to parse symbol stubs: %v", err)
+	}
+
+	return nil
+}
+
+func (d *MachoDisass) parseRebaseInfo() error {
+	d.sinfo = make(map[uint64]uint64)
+
+	if d.f.HasFixups() {
+		dcf, err := d.f.DyldChainedFixups()
+		if err != nil {
+			return fmt.Errorf("failed to parse fixups: %v", err)
+		}
+		for _, start := range dcf.Starts {
+			if start.PageStarts != nil {
+				// var sec *macho.Section
+				// var lastSec *macho.Section
+				for _, fixup := range start.Fixups {
+					addr, err := d.f.GetVMAddress(fixup.Offset())
+					if err != nil {
+						continue
+					}
+					switch fx := fixup.(type) {
+					case fixupchains.Bind:
+						// var addend string
+						// addr := uint64(fx.Offset()) + d.f.GetBaseAddress()
+						// if fullAddend := dcf.Imports[fx.Ordinal()].Addend() + fx.Addend(); fullAddend > 0 {
+						// 	addend = fmt.Sprintf(" + %#x", fullAddend)
+						// 	addr += fullAddend
+						// }
+						// sec = d.f.FindSectionForVMAddr(addr)
+						// lib := d.f.LibraryOrdinalName(dcf.Imports[fx.Ordinal()].LibOrdinal())
+						// if sec != nil && sec != lastSec {
+						// 	fmt.Printf("%s.%s\n", sec.Seg, sec.Name)
+						// }
+						// fmt.Printf("%s\t%s/%s%s\n", fixupchains.Bind(fx).String(d.f.GetBaseAddress()), lib, fx.Name(), addend)
+					case fixupchains.Rebase:
+						d.sinfo[addr] = uint64(fx.Target()) + d.f.GetBaseAddress()
+					}
+					// lastSec = sec
+				}
+			}
+		}
+	} else {
+		rbs, err := d.f.GetRebaseInfo()
+		if err != nil {
+			return err
+		}
+		for _, r := range rbs {
+			d.sinfo[r.Start+r.Offset] = r.Value
+		}
 	}
 
 	return nil
@@ -285,6 +342,9 @@ func (d *MachoDisass) parseGOT() error {
 	}
 
 	for entry, target := range gots {
+		if slide, ok := d.sinfo[entry]; ok {
+			target = slide
+		}
 		if symName, ok := d.a2s[target]; ok {
 			d.a2s[entry] = fmt.Sprintf("__got.%s", symName)
 		} else if laptr, ok := gots[target]; ok {
@@ -307,6 +367,9 @@ func (d *MachoDisass) parseStubs() error {
 	}
 
 	for stub, target := range stubs {
+		if slide, ok := d.sinfo[stub]; ok {
+			target = slide
+		}
 		if symName, ok := d.a2s[target]; ok {
 			if !strings.HasPrefix(symName, "j_") {
 				d.a2s[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
@@ -333,6 +396,9 @@ func (d *MachoDisass) parseHelpers() error {
 	}
 
 	for start, target := range helpers {
+		if slide, ok := d.sinfo[start]; ok {
+			target = slide
+		}
 		if symName, ok := d.a2s[target]; ok {
 			d.a2s[start] = fmt.Sprintf("__stub_helper.%s", symName)
 		} else {
