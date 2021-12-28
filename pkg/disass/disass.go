@@ -129,7 +129,10 @@ type AddrDetails struct {
 }
 
 func (d AddrDetails) String() string {
-	return fmt.Sprintf("%s/%s.%s", d.Image, d.Segment, d.Section)
+	if len(d.Image) > 0 {
+		return fmt.Sprintf("%s/%s.%s", d.Image, d.Segment, d.Section)
+	}
+	return fmt.Sprintf("%s.%s", d.Segment, d.Section)
 }
 
 type Triage struct {
@@ -377,7 +380,8 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 		}
 
 		for idx, ptr := range ptrs {
-			gots[authPtr.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
+			// gots[authPtr.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
+			gots[authPtr.Addr+uint64(idx*8)] = ptr
 		}
 	}
 
@@ -394,7 +398,8 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 			}
 
 			for idx, ptr := range ptrs {
-				gots[sec.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
+				// gots[sec.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
+				gots[sec.Addr+uint64(idx*8)] = ptr
 			}
 		}
 	}
@@ -483,7 +488,8 @@ func ParseStubsASM(m *macho.File) (map[uint64]uint64, error) {
 					addRegister := prevInst.Operands[0].Registers[0] // x16
 					// br        	x16
 					if addRegister == instruction.Operands[0].Registers[0] {
-						stubs[adrpAddr] = m.SlidePointer(adrpImm)
+						// stubs[adrpAddr] = m.SlidePointer(adrpImm)
+						stubs[adrpAddr] = adrpImm
 					}
 				}
 
