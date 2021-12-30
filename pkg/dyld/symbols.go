@@ -3,7 +3,6 @@ package dyld
 import (
 	"bufio"
 	"bytes"
-	"compress/gzip"
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
@@ -508,8 +507,12 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 			return err
 		}
 
-		err = f.SaveAddrToSymMap(cacheFile)
-		if err != nil {
+		log.Info("parsing objc symbols...")
+		if err := f.ParseAllObjc(); err != nil {
+			return err
+		}
+
+		if err := f.SaveAddrToSymMap(cacheFile); err != nil {
 			return err
 		}
 
@@ -520,16 +523,18 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if err != nil {
 		return err
 	}
-	gzr, err := gzip.NewReader(a2sFile)
-	if err != nil {
-		return fmt.Errorf("failed to create gzip reader: %v", err)
-	}
+	log.Infof("Loading symbol cache file...")
+	// gzr, err := gzip.NewReader(a2sFile)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to create gzip reader: %v", err)
+	// }
 	// Decoding the serialized data
-	err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+	// err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
+	err = gob.NewDecoder(a2sFile).Decode(&f.AddressToSymbol)
 	if err != nil {
 		return err
 	}
-	gzr.Close()
+	// gzr.Close()
 	a2sFile.Close()
 
 	return nil
@@ -572,10 +577,11 @@ func (f *File) SaveAddrToSymMap(dest string) error {
 		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
 	}
 
-	gzw := gzip.NewWriter(of)
-	defer gzw.Close()
+	// gzw := gzip.NewWriter(of)
+	// defer gzw.Close()
 
-	_, err = buff.WriteTo(gzw)
+	// _, err = buff.WriteTo(gzw)
+	_, err = buff.WriteTo(of)
 	if err != nil {
 		return fmt.Errorf("failed to write addr2sym map to gzip file: %v", err)
 	}
@@ -635,18 +641,22 @@ func (f *File) GetSymbolAddress(symbol, imageName string) (uint64, *CacheImage, 
 			}
 		}
 	} else {
-		// Search ALL dylibs for the symbol
-		for _, image := range f.Images {
-			if sym, _ := f.FindExportedSymbolInImage(image.Name, symbol); sym != nil {
-				return sym.Address, image, nil
-			}
-		}
-	}
+		// // Search ALL dylibs for the symbol
+		// for _, image := range f.Images {
+		// 	if sym, _ := f.FindExportedSymbolInImage(image.Name, symbol); sym != nil {
+		// 		return sym.Address, image, nil
+		// 	}
+		// }
 
-	// Search addr2sym map
-	for addr, sym := range f.AddressToSymbol {
-		if strings.EqualFold(sym, symbol) {
-			return addr, nil, nil
+		// Search addr2sym map
+		for addr, sym := range f.AddressToSymbol {
+			if strings.EqualFold(sym, symbol) {
+				image, err := f.GetImageContainingVMAddr(addr)
+				if err != nil {
+					return 0, nil, fmt.Errorf("found symbol in local symbols, but address not in cache: %v", err)
+				}
+				return addr, image, nil
+			}
 		}
 	}
 
