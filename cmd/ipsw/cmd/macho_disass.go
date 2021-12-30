@@ -40,7 +40,7 @@ func init() {
 
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
-	machoDisassCmd.Flags().Uint64("slide", 0, "MachO slide to remove from --vaddr")
+	// machoDisassCmd.Flags().Uint64("slide", 0, "MachO slide to remove from --vaddr")
 	machoDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	machoDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	machoDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
@@ -59,7 +59,7 @@ var machoDisassCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File
-		var isMiddle bool
+		var middleAddr uint64
 		var symbolMap map[uint64]string
 
 		if Verbose {
@@ -70,7 +70,7 @@ var machoDisassCmd = &cobra.Command{
 		startAddr, _ := cmd.Flags().GetUint64("vaddr")
 		symbolName, _ := cmd.Flags().GetString("symbol")
 		cacheFile, _ := cmd.Flags().GetString("cache")
-		slide, _ := cmd.Flags().GetUint64("slide")
+		// slide, _ := cmd.Flags().GetUint64("slide")
 		asJSON, _ := cmd.Flags().GetBool("json")
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 		quiet, _ := cmd.Flags().GetBool("quiet")
@@ -135,7 +135,7 @@ var machoDisassCmd = &cobra.Command{
 				engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
 					Data:         data,
 					StartAddress: fn.StartAddr,
-					Middle:       false,
+					Middle:       0,
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
@@ -164,9 +164,9 @@ var machoDisassCmd = &cobra.Command{
 					return err
 				}
 			} else { // startAddr > 0
-				if slide > 0 {
-					startAddr = startAddr - slide
-				}
+				// if slide > 0 {
+				// 	startAddr = startAddr - slide
+				// }
 			}
 
 			/*
@@ -193,7 +193,7 @@ var machoDisassCmd = &cobra.Command{
 						return err
 					}
 					if startAddr != fn.StartAddr {
-						isMiddle = true
+						middleAddr = startAddr
 						startAddr = fn.StartAddr
 					}
 				} else {
@@ -216,7 +216,7 @@ var machoDisassCmd = &cobra.Command{
 			engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
 				Data:         data,
 				StartAddress: startAddr,
-				Middle:       isMiddle,
+				Middle:       middleAddr,
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,

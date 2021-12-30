@@ -24,12 +24,12 @@ type Disass interface {
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
 	// getters
-	IsMiddle() bool
 	Demangle() bool
 	Quite() bool
 	AsJSON() bool
 	Data() []byte
 	StartAddr() uint64
+	Middle() uint64
 }
 
 type opName uint32
@@ -117,7 +117,7 @@ type Config struct {
 	Image        string
 	Data         []byte
 	StartAddress uint64
-	Middle       bool
+	Middle       uint64
 	AsJSON       bool
 	Demangle     bool
 	Quite        bool
@@ -341,7 +341,7 @@ func Disassemble(d Disass) {
 				}
 			}
 
-			if d.IsMiddle() && d.StartAddr() == startAddr {
+			if d.Middle() != 0 && d.Middle() == startAddr {
 				fmt.Printf("👉%08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
 			} else {
 				fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
