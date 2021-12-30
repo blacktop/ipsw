@@ -104,7 +104,7 @@ var objcProtoCmd = &cobra.Command{
 				}
 
 			} else {
-				_, err := f.GetAllProtocols(true)
+				_, err := f.GetAllObjCProtocols(true)
 				if err != nil {
 					return err
 				}
