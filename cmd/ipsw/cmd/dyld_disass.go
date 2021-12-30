@@ -122,7 +122,7 @@ var dyldDisassCmd = &cobra.Command{
 			return nil
 		}
 
-		if !quiet {
+		if !quiet || len(symbolName) > 0 {
 			if len(cacheFile) == 0 {
 				cacheFile = dscPath + ".a2s"
 			}
