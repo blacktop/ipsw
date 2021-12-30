@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/disass"
@@ -23,9 +24,6 @@ func NewDyldDisass(f *File, cfg *disass.Config) *DyldDisass {
 	return &DyldDisass{f: f, cfg: cfg}
 }
 
-func (d DyldDisass) IsMiddle() bool {
-	return d.cfg.Middle
-}
 func (d DyldDisass) Demangle() bool {
 	return d.cfg.Demangle
 }
@@ -40,6 +38,9 @@ func (d DyldDisass) Data() []byte {
 }
 func (d DyldDisass) StartAddr() uint64 {
 	return d.cfg.StartAddress
+}
+func (d DyldDisass) Middle() uint64 {
+	return d.cfg.Middle
 }
 
 func (d DyldDisass) Dylibs() []*CacheImage {
@@ -214,7 +215,9 @@ func (d *DyldDisass) Triage() error {
 		for addr, imm := range d.tr.Addresses {
 			image, err := d.f.GetImageContainingVMAddr(imm)
 			if err != nil {
-				return err
+				log.Error(err.Error())
+				continue
+				// return err
 			}
 
 			if !d.hasDep(image) {

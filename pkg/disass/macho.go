@@ -28,9 +28,6 @@ func NewMachoDisass(f *macho.File, a2s *map[uint64]string, cfg *Config) *MachoDi
 	return &MachoDisass{f: f, a2s: *a2s, cfg: cfg}
 }
 
-func (d MachoDisass) IsMiddle() bool {
-	return d.cfg.Middle
-}
 func (d MachoDisass) Demangle() bool {
 	return d.cfg.Demangle
 }
@@ -45,6 +42,9 @@ func (d MachoDisass) Data() []byte {
 }
 func (d MachoDisass) StartAddr() uint64 {
 	return d.cfg.StartAddress
+}
+func (d MachoDisass) Middle() uint64 {
+	return d.cfg.Middle
 }
 
 // Triage walks a function and analyzes all immediates
