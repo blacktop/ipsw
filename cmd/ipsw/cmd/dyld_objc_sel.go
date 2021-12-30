@@ -103,7 +103,7 @@ var objcSelCmd = &cobra.Command{
 				}
 
 			} else {
-				if _, err := f.GetAllSelectors(true); err != nil {
+				if _, err := f.GetAllObjCSelectors(true); err != nil {
 					return err
 				}
 			}

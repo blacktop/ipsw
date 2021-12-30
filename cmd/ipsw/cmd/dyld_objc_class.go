@@ -104,7 +104,7 @@ var objcClassCmd = &cobra.Command{
 				}
 
 			} else {
-				_, err := f.GetAllClasses(true)
+				_, err := f.GetAllObjCClasses(true)
 				if err != nil {
 					return err
 				}

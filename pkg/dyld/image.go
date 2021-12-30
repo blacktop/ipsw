@@ -37,6 +37,7 @@ type astate struct {
 	Exports  bool
 	Privates bool
 	Starts   bool
+	ObjC     bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -115,6 +116,18 @@ func (a *astate) IsStartsDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.Starts
+}
+
+func (a *astate) SetObjC(done bool) {
+	a.mu.Lock()
+	a.ObjC = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsObjcDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.ObjC
 }
 
 type analysis struct {
@@ -390,6 +403,10 @@ func (i *CacheImage) Analyze() error {
 		}
 	}
 
+	if err := i.ParseObjC(); err != nil {
+		return fmt.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err)
+	}
+
 	if !i.cache.IsArm64() {
 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
 	}
@@ -527,7 +544,7 @@ func (i *CacheImage) ParseSlideInfo() error {
 	return nil
 }
 
-// ParseGOT parse global offset table in MachO
+// ParseStarts parse function starts in MachO
 func (i *CacheImage) ParseStarts() {
 	if i.m != nil {
 		for _, fn := range i.m.GetFunctions() {
@@ -537,6 +554,36 @@ func (i *CacheImage) ParseStarts() {
 		}
 	}
 	i.Analysis.State.SetStarts(true)
+}
+
+// ParseObjC parse ObjC runtime for MachO image
+func (i *CacheImage) ParseObjC() error {
+	if !i.Analysis.State.IsObjcDone() {
+		if err := i.cache.CFStringsForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc cfstrings for image %s: %v", filepath.Base(i.Name), err)
+		}
+		// TODO: add objc methods in the -[Class sel:] form
+		if err := i.cache.MethodsForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(i.Name), err)
+		}
+		if strings.Contains(i.Name, "libobjc.A.dylib") {
+			if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
+				return fmt.Errorf("failed to parse objc all selectors: %v", err)
+			}
+		} else {
+			if err := i.cache.SelectorsForImage(i.Name); err != nil {
+				return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
+			}
+		}
+		if err := i.cache.ClassesForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc classes for image %s: %v", filepath.Base(i.Name), err)
+		}
+		if err := i.cache.ProtocolsForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc protocols for image %s: %v", filepath.Base(i.Name), err)
+		}
+		i.Analysis.State.SetObjC(true)
+	}
+	return nil
 }
 
 // ParseGOT parse global offset table in MachO

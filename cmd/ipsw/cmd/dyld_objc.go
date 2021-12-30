@@ -86,21 +86,21 @@ var dyldObjcCmd = &cobra.Command{
 		defer f.Close()
 
 		if printClasses {
-			_, err := f.GetAllClasses(true)
+			_, err := f.GetAllObjCClasses(true)
 			if err != nil {
 				return err
 			}
 		}
 
 		if printSelectors {
-			_, err := f.GetAllSelectors(true)
+			_, err := f.GetAllObjCSelectors(true)
 			if err != nil {
 				return err
 			}
 		}
 
 		if printProtocols {
-			_, err := f.GetAllProtocols(true)
+			_, err := f.GetAllObjCProtocols(true)
 			if err != nil {
 				return err
 			}
