@@ -100,6 +100,7 @@ changelog:
       - "^test:"
       - "^bumping"
       - "^Update"
+      - "^Delete"
       - "reorg"
       - "updates"
       - Merge pull request
