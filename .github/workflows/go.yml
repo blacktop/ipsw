@@ -51,43 +51,43 @@ jobs:
       #
       # CACHE
       #
-      - name: Cache Downloaded IPSWs
-        id: cache-ipsws
-        if: matrix.platform == 'macos-11'
-        uses: actions/cache@v2
-        with:
-          path: ~/.ipsw
-          key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
-      - name: Cache go.mod (macOS)
-        if: matrix.platform == 'macos-11'
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/Library/Caches/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Cache go.mod (Linux)
-        if: matrix.platform == 'ubuntu-latest'
-        uses: actions/cache@v2
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      - name: Cache go.mod (Windows)
-        if: matrix.platform == 'windows-latest'
-        uses: actions/cache@v2
-        with:
-          path: |
-            %LocalAppData%\go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
+      # - name: Cache Downloaded IPSWs
+      #   id: cache-ipsws
+      #   if: matrix.platform == 'macos-11'
+      #   uses: actions/cache@v2
+      #   with:
+      #     path: ~/.ipsw
+      #     key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
+      # - name: Cache go.mod (macOS)
+      #   if: matrix.platform == 'macos-11'
+      #   uses: actions/cache@v2
+      #   with:
+      #     path: |
+      #       ~/Library/Caches/go-build
+      #       ~/go/pkg/mod
+      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-go-
+      # - name: Cache go.mod (Linux)
+      #   if: matrix.platform == 'ubuntu-latest'
+      #   uses: actions/cache@v2
+      #   with:
+      #     path: |
+      #       ~/.cache/go-build
+      #       ~/go/pkg/mod
+      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-go-
+      # - name: Cache go.mod (Windows)
+      #   if: matrix.platform == 'windows-latest'
+      #   uses: actions/cache@v2
+      #   with:
+      #     path: |
+      #       %LocalAppData%\go-build
+      #       ~/go/pkg/mod
+      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-go-
 
       - name: Get dependencies
         run: |
