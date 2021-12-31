@@ -39,16 +39,16 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
 
-	dyldDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	// dyldDisassCmd.Flags().Uint64("slide", 0, "dyld_shared_cache slide to remove from --vaddr")
 	dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
+	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	dyldDisassCmd.Flags().String("input", "", "Input function JSON file")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	dyldDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
-	dyldDisassCmd.Flags().String("input", "", "Input function JSON file")
-	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
 
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -84,7 +84,7 @@ var dyldDisassCmd = &cobra.Command{
 		if len(symbolName) > 0 && startAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
 		} else if len(funcFile) > 0 && (len(symbolName) > 0 || startAddr != 0 || len(imageName) > 0) {
-			return fmt.Errorf("you can NOT combine the --input flag with other filter flats (--symbol|--vaddr|--image)")
+			return fmt.Errorf("you can NOT combine the --input flag with other filter flags (--symbol|--vaddr|--image)")
 		} else if len(symbolName) == 0 && startAddr == 0 {
 			if len(imageName) == 0 && len(funcFile) == 0 {
 				return fmt.Errorf("if you don't supply a --image or --input flag you MUST supply a --symbol OR --vaddr to disassemble")
@@ -206,10 +206,12 @@ var dyldDisassCmd = &cobra.Command{
 							}
 						}
 					} else {
-						if idx == 0 {
-							fmt.Printf("sub_%x:\n", fn.StartAddr)
-						} else {
-							fmt.Printf("\nsub_%x:\n", fn.StartAddr)
+						if !asJSON {
+							if idx == 0 {
+								fmt.Printf("sub_%x:\n", fn.StartAddr)
+							} else {
+								fmt.Printf("\nsub_%x:\n", fn.StartAddr)
+							}
 						}
 					}
 
@@ -301,10 +303,12 @@ var dyldDisassCmd = &cobra.Command{
 						}
 					}
 				} else {
-					if len(fn.Name) > 0 {
-						fmt.Printf("\n%s:\n", fn.Name)
-					} else {
-						fmt.Printf("\nsub_%x:\n", fn.Start)
+					if !asJSON {
+						if len(fn.Name) > 0 {
+							fmt.Printf("\n%s:\n", fn.Name)
+						} else {
+							fmt.Printf("\nsub_%x:\n", fn.Start)
+						}
 					}
 				}
 
@@ -400,10 +404,12 @@ var dyldDisassCmd = &cobra.Command{
 					}
 				}
 			} else {
-				if len(symbolName) > 0 {
-					fmt.Printf("%s:\n", symbolName)
-				} else {
-					fmt.Printf("sub_%x:\n", startAddr)
+				if !asJSON {
+					if len(symbolName) > 0 {
+						fmt.Printf("%s:\n", symbolName)
+					} else {
+						fmt.Printf("sub_%x:\n", startAddr)
+					}
 				}
 			}
 
