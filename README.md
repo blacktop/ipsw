@@ -25,11 +25,8 @@
 - kernelcache parser
 - img4 parser/decrypter
 - device-tree parser
-- ARM v8.5-a disassember
+- ARM v9-a disassember
 - research tool
-- otool wannabe
-- objdump wannabe
-- jtool wannabe
 
 ## Install
 
