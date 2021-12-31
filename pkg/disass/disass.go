@@ -8,7 +8,6 @@ import (
 	"io"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
@@ -208,7 +207,7 @@ func Disassemble(d Disass) {
 					}
 				}
 				fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
-				break
+				continue
 			}
 
 			instrStr = instruction.String()
@@ -216,11 +215,7 @@ func Disassemble(d Disass) {
 			if !d.Quite() {
 				// check for start of a new function
 				if ok, fname := d.IsFunctionStart(instruction.Address); ok {
-					if len(fname) > 0 {
-						fmt.Printf("\n%s:\n", fname)
-					} else {
-						fmt.Printf("\nsub_%x:\n", instruction.Address)
-					}
+					fmt.Printf("\n%s:\n", fname)
 				}
 
 				if d.IsLocation(instruction.Address) {
@@ -351,8 +346,16 @@ func Disassemble(d Disass) {
 		} else { // output as JSON
 			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 			if err != nil {
-				log.Error(err.Error())
-				continue // TODO: should we still capture this in the JSON?
+				instructions = append(instructions, disassemble.Instruction{
+					Address:     startAddr,
+					Raw:         instrValue,
+					Encoding:    0,
+					Operation:   0,
+					Operands:    nil,
+					SetFlags:    false,
+					Disassembly: fmt.Sprintf(".long\t%#x ; (%s)\n", instrValue, err.Error()),
+				})
+				continue
 			}
 			instructions = append(instructions, *instruction)
 		}
@@ -361,8 +364,26 @@ func Disassemble(d Disass) {
 	}
 
 	if d.AsJSON() {
-		if dat, err := json.MarshalIndent(instructions, "", "   "); err == nil {
-			fmt.Println(string(dat))
+		var curFunc string
+		funcsJSON := make(map[string][]disassemble.Instruction)
+		for _, inst := range instructions {
+			if ok, fname := d.IsFunctionStart(inst.Address); ok {
+				curFunc = fname
+				funcsJSON[curFunc] = append(funcsJSON[curFunc], inst)
+			} else {
+				if len(curFunc) > 0 {
+					funcsJSON[curFunc] = append(funcsJSON[curFunc], inst)
+				}
+			}
+		}
+		if len(funcsJSON) > 0 {
+			if dat, err := json.Marshal(funcsJSON); err == nil {
+				fmt.Println(string(dat))
+			}
+		} else {
+			if dat, err := json.Marshal(instructions); err == nil {
+				fmt.Println(string(dat))
+			}
 		}
 	}
 }

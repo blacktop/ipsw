@@ -138,7 +138,7 @@ func (d MachoDisass) IsFunctionStart(addr uint64) (bool, string) {
 				}
 				return ok, symName
 			}
-			return true, ""
+			return true, fmt.Sprintf("sub_%x", addr)
 		}
 	}
 	return false, ""
