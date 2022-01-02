@@ -29,7 +29,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -38,6 +41,10 @@ import (
 
 func init() {
 	rootCmd.AddCommand(emuCmd)
+
+	emuCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
+	emuCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
+
 	emuCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -46,7 +53,7 @@ func diss(startAddr uint64, data []byte) {
 	var results [1024]byte
 
 	r := bytes.NewReader(data)
-	fmt.Println("[DISASSEMBLY]")
+	// fmt.Println("[DISASSEMBLY]")
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
 
@@ -56,10 +63,14 @@ func diss(startAddr uint64, data []byte) {
 
 		instruction, err := disassemble.Disassemble(startAddr, instrValue, &results)
 		if err != nil {
-			fmt.Printf("%#08x:  %s\t.long\t%#-18x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+			// fmt.Printf("%#08x:  %s\t.long\t%#-18x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+			log.Errorf("%#08x:  %s\t.long\t%#-18x ; (%s)", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
 		}
-
-		fmt.Printf("%#08x:  %s\t%s\n",
+		// fmt.Printf("%#08x:  %s\t%s\n",
+		// 	uint64(startAddr),
+		// 	disassemble.GetOpCodeByteString(instrValue),
+		// 	instruction)
+		log.Infof("%#08x:  %s\t%s",
 			uint64(startAddr),
 			disassemble.GetOpCodeByteString(instrValue),
 			instruction)
@@ -68,152 +79,103 @@ func diss(startAddr uint64, data []byte) {
 	}
 }
 
-type Regs map[string]uint64
+// var regs = []int{
+// 	// ARM64 registers
+// uc.ARM64_REG_X0,
+// uc.ARM64_REG_X1,
+// uc.ARM64_REG_X2,
+// uc.ARM64_REG_X3,
+// uc.ARM64_REG_X4,
+// uc.ARM64_REG_X5,
+// uc.ARM64_REG_X6,
+// uc.ARM64_REG_X7,
+// uc.ARM64_REG_X8,
+// uc.ARM64_REG_X9,
+// uc.ARM64_REG_X10,
+// uc.ARM64_REG_X11,
+// uc.ARM64_REG_X12,
+// uc.ARM64_REG_X13,
+// uc.ARM64_REG_X14,
+// uc.ARM64_REG_X15,
+// uc.ARM64_REG_X16,
+// uc.ARM64_REG_X17,
+// uc.ARM64_REG_X18,
+// uc.ARM64_REG_X19,
+// uc.ARM64_REG_X20,
+// uc.ARM64_REG_X21,
+// uc.ARM64_REG_X22,
+// uc.ARM64_REG_X23,
+// uc.ARM64_REG_X24,
+// uc.ARM64_REG_X25,
+// uc.ARM64_REG_X26,
+// uc.ARM64_REG_X27,
+// uc.ARM64_REG_X28,
+// 	uc.ARM64_REG_X29, // ARM64_REG_FP
+// 	uc.ARM64_REG_X30, // ARM64_REG_LR
+// 	uc.ARM64_REG_NZCV,
+// 	uc.ARM64_REG_SP,
+// 	uc.ARM64_REG_WSP,
+// 	uc.ARM64_REG_WZR,
+// 	uc.ARM64_REG_XZR,
+// 	// pseudo registers
+// 	uc.ARM64_REG_PC,
+// 	uc.ARM64_REG_CPACR_EL1,
+// 	// thread registers
+// 	uc.ARM64_REG_TPIDR_EL0,
+// 	uc.ARM64_REG_TPIDRRO_EL0,
+// 	uc.ARM64_REG_TPIDR_EL1,
+// 	uc.ARM64_REG_PSTATE,
+// 	// exception link registers
+// 	uc.ARM64_REG_ELR_EL0,
+// 	uc.ARM64_REG_ELR_EL1,
+// 	uc.ARM64_REG_ELR_EL2,
+// 	uc.ARM64_REG_ELR_EL3,
+// 	// stack pointers registers
+// 	uc.ARM64_REG_SP_EL0,
+// 	uc.ARM64_REG_SP_EL1,
+// 	uc.ARM64_REG_SP_EL2,
+// 	uc.ARM64_REG_SP_EL3,
+// 	// other CP15 registers
+// 	uc.ARM64_REG_TTBR0_EL1,
+// 	uc.ARM64_REG_TTBR1_EL1,
+// 	uc.ARM64_REG_ESR_EL0,
+// 	uc.ARM64_REG_ESR_EL1,
+// 	uc.ARM64_REG_ESR_EL2,
+// 	uc.ARM64_REG_ESR_EL3,
+// 	uc.ARM64_REG_FAR_EL0,
+// 	uc.ARM64_REG_FAR_EL1,
+// 	uc.ARM64_REG_FAR_EL2,
+// 	uc.ARM64_REG_FAR_EL3,
+// 	uc.ARM64_REG_PAR_EL1,
+// 	uc.ARM64_REG_MAIR_EL1,
+// 	uc.ARM64_REG_VBAR_EL0,
+// 	uc.ARM64_REG_VBAR_EL1,
+// 	uc.ARM64_REG_VBAR_EL2,
+// 	uc.ARM64_REG_VBAR_EL3,
+// }
 
-func getState(mu uc.Unicorn) (Regs, error) {
-	var err error
-	regs := make(Regs)
-	regs["x0"], err = mu.RegRead(uc.ARM64_REG_X0)
+type registers map[int]uint64
+
+func getState(mu uc.Unicorn) (registers, error) {
+	rs := make(map[int]uint64)
+
+	regs := make([]int, uc.ARM64_REG_ENDING-uc.ARM64_REG_INVALID+1)
+	for i := range regs {
+		regs[i] = uc.ARM64_REG_INVALID + i
+
+	}
+	vals, err := mu.RegReadBatch(regs)
 	if err != nil {
 		return nil, err
 	}
-	regs["x1"], err = mu.RegRead(uc.ARM64_REG_X1)
-	if err != nil {
-		return nil, err
-	}
-	regs["x2"], err = mu.RegRead(uc.ARM64_REG_X2)
-	if err != nil {
-		return nil, err
-	}
-	regs["x3"], err = mu.RegRead(uc.ARM64_REG_X3)
-	if err != nil {
-		return nil, err
-	}
-	regs["x4"], err = mu.RegRead(uc.ARM64_REG_X4)
-	if err != nil {
-		return nil, err
-	}
-	regs["x5"], err = mu.RegRead(uc.ARM64_REG_X5)
-	if err != nil {
-		return nil, err
-	}
-	regs["x6"], err = mu.RegRead(uc.ARM64_REG_X6)
-	if err != nil {
-		return nil, err
-	}
-	regs["x7"], err = mu.RegRead(uc.ARM64_REG_X7)
-	if err != nil {
-		return nil, err
-	}
-	regs["x8"], err = mu.RegRead(uc.ARM64_REG_X8)
-	if err != nil {
-		return nil, err
-	}
-	regs["x9"], err = mu.RegRead(uc.ARM64_REG_X9)
-	if err != nil {
-		return nil, err
-	}
-	regs["x10"], err = mu.RegRead(uc.ARM64_REG_X10)
-	if err != nil {
-		return nil, err
-	}
-	regs["x11"], err = mu.RegRead(uc.ARM64_REG_X11)
-	if err != nil {
-		return nil, err
-	}
-	regs["x12"], err = mu.RegRead(uc.ARM64_REG_X12)
-	if err != nil {
-		return nil, err
-	}
-	regs["x13"], err = mu.RegRead(uc.ARM64_REG_X13)
-	if err != nil {
-		return nil, err
-	}
-	regs["x14"], err = mu.RegRead(uc.ARM64_REG_X14)
-	if err != nil {
-		return nil, err
-	}
-	regs["x15"], err = mu.RegRead(uc.ARM64_REG_X15)
-	if err != nil {
-		return nil, err
-	}
-	regs["x16"], err = mu.RegRead(uc.ARM64_REG_X16)
-	if err != nil {
-		return nil, err
-	}
-	regs["x17"], err = mu.RegRead(uc.ARM64_REG_X17)
-	if err != nil {
-		return nil, err
-	}
-	regs["x18"], err = mu.RegRead(uc.ARM64_REG_X18)
-	if err != nil {
-		return nil, err
-	}
-	regs["x19"], err = mu.RegRead(uc.ARM64_REG_X19)
-	if err != nil {
-		return nil, err
-	}
-	regs["x20"], err = mu.RegRead(uc.ARM64_REG_X20)
-	if err != nil {
-		return nil, err
-	}
-	regs["x21"], err = mu.RegRead(uc.ARM64_REG_X21)
-	if err != nil {
-		return nil, err
-	}
-	regs["x22"], err = mu.RegRead(uc.ARM64_REG_X22)
-	if err != nil {
-		return nil, err
-	}
-	regs["x23"], err = mu.RegRead(uc.ARM64_REG_X23)
-	if err != nil {
-		return nil, err
-	}
-	regs["x24"], err = mu.RegRead(uc.ARM64_REG_X24)
-	if err != nil {
-		return nil, err
-	}
-	regs["x25"], err = mu.RegRead(uc.ARM64_REG_X25)
-	if err != nil {
-		return nil, err
-	}
-	regs["x26"], err = mu.RegRead(uc.ARM64_REG_X26)
-	if err != nil {
-		return nil, err
-	}
-	regs["x27"], err = mu.RegRead(uc.ARM64_REG_X27)
-	if err != nil {
-		return nil, err
-	}
-	regs["x28"], err = mu.RegRead(uc.ARM64_REG_X28)
-	if err != nil {
-		return nil, err
-	}
-	regs["fp"], err = mu.RegRead(uc.ARM64_REG_FP)
-	if err != nil {
-		return nil, err
-	}
-	regs["lr"], err = mu.RegRead(uc.ARM64_REG_LR)
-	if err != nil {
-		return nil, err
-	}
-	regs["sp"], err = mu.RegRead(uc.ARM64_REG_SP)
-	if err != nil {
-		return nil, err
-	}
-	regs["pc"], err = mu.RegRead(uc.ARM64_REG_PC)
-	if err != nil {
-		return nil, err
-	}
-	regs["cpsr"], err = mu.RegRead(uc.ARM_REG_CPSR)
-	if err != nil {
-		return nil, err
+	for idx, val := range vals {
+		rs[regs[idx]] = val
 	}
 
-	return regs, nil
+	return rs, nil
 }
 
-func (r Regs) String() string {
+func (r registers) String() string {
 	return fmt.Sprintf(
 		"[REGISTERS]\n"+
 			" x0: %#-18x  x1: %#-18x  x2: %#-18x  x3: %#-18x\n"+
@@ -225,15 +187,15 @@ func (r Regs) String() string {
 			"x24: %#-18x x25: %#-18x x26: %#-18x x27: %#-18x\n"+
 			"x28: %#-18x x29: %#-18x x30: %#-18x\n"+
 			" pc: %#-18x  sp: %#-18x cpsr: 0x%08x",
-		r["x0"], r["x1"], r["x2"], r["x3"],
-		r["x4"], r["x5"], r["x6"], r["x7"],
-		r["x8"], r["x9"], r["x10"], r["x11"],
-		r["x12"], r["x13"], r["x14"], r["x15"],
-		r["x16"], r["x17"], r["x18"], r["x19"],
-		r["x20"], r["x21"], r["x22"], r["x23"],
-		r["x24"], r["x25"], r["x26"], r["x27"],
-		r["x28"], r["fp"], r["lr"],
-		r["pc"], r["sp"], r["cpsr"],
+		r[uc.ARM64_REG_X0], r[uc.ARM64_REG_X1], r[uc.ARM64_REG_X2], r[uc.ARM64_REG_X3],
+		r[uc.ARM64_REG_X4], r[uc.ARM64_REG_X5], r[uc.ARM64_REG_X6], r[uc.ARM64_REG_X7],
+		r[uc.ARM64_REG_X8], r[uc.ARM64_REG_X9], r[uc.ARM64_REG_X10], r[uc.ARM64_REG_X11],
+		r[uc.ARM64_REG_X12], r[uc.ARM64_REG_X13], r[uc.ARM64_REG_X14], r[uc.ARM64_REG_X15],
+		r[uc.ARM64_REG_X16], r[uc.ARM64_REG_X17], r[uc.ARM64_REG_X18], r[uc.ARM64_REG_X19],
+		r[uc.ARM64_REG_X20], r[uc.ARM64_REG_X21], r[uc.ARM64_REG_X22], r[uc.ARM64_REG_X23],
+		r[uc.ARM64_REG_X24], r[uc.ARM64_REG_X25], r[uc.ARM64_REG_X26], r[uc.ARM64_REG_X27],
+		r[uc.ARM64_REG_X28], r[uc.ARM64_REG_FP], r[uc.ARM64_REG_LR],
+		r[uc.ARM64_REG_PC], r[uc.ARM64_REG_SP], r[uc.ARM64_REG_PSTATE],
 	)
 }
 
@@ -245,18 +207,112 @@ func alignDown(addr uint64) uint64 {
 func getCode() []byte {
 	var code []byte
 	a := make([]byte, 4)
+
 	instructions := []uint32{
-		3492604664, // adrp    x24, 0x1da0ba000
-		2432795416, // add     x24, x24, #0x60 ; ___CFRuntimeClassTables
-		3535798329, // mov     x25, #0x100000000
-		2992668666, // mov     x26, #0xffffffff00000000
+		3492604664,
+		2432795416,
+		3535798329,
+		2992668666,
 	}
+
 	for _, i := range instructions {
 		binary.LittleEndian.PutUint32(a, i)
 		code = append(code, a...)
 	}
 
 	return code
+}
+
+type pstate uint32
+
+func (p pstate) N() bool {
+	return types.ExtractBits(uint64(p), 31, 1) != 0
+}
+func (p pstate) Z() bool {
+	return types.ExtractBits(uint64(p), 30, 1) != 0
+}
+func (p pstate) C() bool {
+	return types.ExtractBits(uint64(p), 29, 1) != 0
+}
+func (p pstate) V() bool {
+	return types.ExtractBits(uint64(p), 28, 1) != 0
+}
+func (p pstate) D() bool {
+	return types.ExtractBits(uint64(p), 27, 1) != 0
+}
+func (p pstate) A() bool {
+	return types.ExtractBits(uint64(p), 26, 1) != 0
+}
+func (p pstate) I() bool {
+	return types.ExtractBits(uint64(p), 25, 1) != 0
+}
+func (p pstate) F() bool {
+	return types.ExtractBits(uint64(p), 24, 1) != 0
+}
+func (p pstate) PAN() bool {
+	return types.ExtractBits(uint64(p), 23, 1) != 0
+}
+func (p pstate) UAO() bool {
+	return types.ExtractBits(uint64(p), 22, 1) != 0
+}
+func (p pstate) DIT() bool {
+	return types.ExtractBits(uint64(p), 21, 1) != 0
+}
+func (p pstate) TCO() bool {
+	return types.ExtractBits(uint64(p), 20, 1) != 0
+}
+func (p pstate) BType() uint64 {
+	return types.ExtractBits(uint64(p), 19, 2)
+}
+func (p pstate) SS() bool {
+	return types.ExtractBits(uint64(p), 17, 1) != 0
+}
+func (p pstate) IL() bool {
+	return types.ExtractBits(uint64(p), 16, 1) != 0
+}
+func (p pstate) EL() uint64 {
+	return types.ExtractBits(uint64(p), 15, 2)
+}
+func (p pstate) NRW() bool {
+	return types.ExtractBits(uint64(p), 13, 1) != 0
+}
+func (p pstate) SP() bool {
+	return types.ExtractBits(uint64(p), 12, 1) != 0
+}
+func (p pstate) Q() bool {
+	return types.ExtractBits(uint64(p), 11, 1) != 0
+}
+func (p pstate) GE() bool {
+	return types.ExtractBits(uint64(p), 10, 4) != 0
+}
+func (p pstate) SSBS() bool {
+	return types.ExtractBits(uint64(p), 9, 1) != 0
+}
+func (p pstate) IT() bool {
+	return types.ExtractBits(uint64(p), 1, 8) != 0
+}
+func (p pstate) J() bool {
+	return types.ExtractBits(uint64(p), 0, 1) != 0
+}
+func (p pstate) T() bool {
+	return types.ExtractBits(uint64(p), 0, 1) != 0
+}
+func (p pstate) E() bool {
+	return types.ExtractBits(uint64(p), 0, 1) != 0
+}
+func (p pstate) M() bool {
+	return types.ExtractBits(uint64(p), 0, 1) != 0
+}
+
+func (p pstate) String() string {
+	return fmt.Sprintf(
+		" N: %t, Z: %t, C: %t, V: %t, D: %t, A: %t, I: %t, F: %t\n"+
+			" PAN: %t, UAO: %t, DIT: %t, TCO: %t, BType: %d, SS: %t, IL: %t\n"+
+			" EL: %d, 32bit: %t, SP: %t\n",
+		p.N(), p.Z(), p.C(), p.V(), p.D(), p.A(), p.I(), p.F(),
+		p.PAN(), p.UAO(), p.DIT(), p.TCO(), p.BType(), p.SS(), p.IL(),
+		p.EL(), p.NRW(), p.SP(),
+	)
 }
 
 // emuCmd represents the emu command
@@ -267,6 +323,13 @@ var emuCmd = &cobra.Command{
 	SilenceErrors: true,
 	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+
+		instructions, _ := cmd.Flags().GetUint64("count")
+		startAddr, _ := cmd.Flags().GetUint64("vaddr")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -299,74 +362,166 @@ var emuCmd = &cobra.Command{
 		if _, err := mu.HookAdd(uc.HOOK_MEM_READ|uc.HOOK_MEM_WRITE, func(mu uc.Unicorn, access int, addr64 uint64, size int, value int64) {
 			switch access {
 			case uc.MEM_READ:
-				fmt.Printf("[MEM_READ] addr: %#x, size: %d, value: %#x\n", addr64, size, value)
+				// fmt.Printf("[MEM_READ] addr: %#x, size: %d, value: %#x\n", addr64, size, value)
+				utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr64), "size": size, "value": value}).Debug, 2)("MEM_READ")
 			case uc.MEM_WRITE:
-				fmt.Printf("[MEM_WRITE] addr: %#x, size: %d, value: %#x\n", addr64, size, value)
+				// fmt.Printf("[MEM_WRITE] addr: %#x, size: %d, value: %#x\n", addr64, size, value)
+				utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr64), "size": size, "value": value}).Debug, 2)("MEM_WRITE")
 			}
 		}, 1, 0); err != nil {
-			panic(err)
+			return fmt.Errorf("failed to register r/w hook: %v", err)
 		}
-		invalid := uc.HOOK_MEM_READ_INVALID | uc.HOOK_MEM_WRITE_INVALID | uc.HOOK_MEM_FETCH_INVALID
-		if _, err := mu.HookAdd(invalid, func(mu uc.Unicorn, access int, addr uint64, size int, value int64) bool {
-			switch access {
-			case uc.MEM_WRITE_UNMAPPED:
-				fmt.Printf("[MEM_WRITE_UNMAPPED]")
-			case uc.MEM_WRITE_PROT:
-				fmt.Printf("[MEM_WRITE_PROT]")
-			case uc.MEM_READ_UNMAPPED:
-				fmt.Printf("[MEM_READ_UNMAPPED]")
-				uuid, off, err := f.GetOffset(addr)
-				if err != nil {
-					panic(err)
+		if _, err := mu.HookAdd(uc.HOOK_MEM_READ_INVALID|uc.HOOK_MEM_WRITE_INVALID|uc.HOOK_MEM_FETCH_INVALID,
+			func(mu uc.Unicorn, access int, addr uint64, size int, value int64) bool {
+				switch access {
+				case uc.MEM_WRITE_UNMAPPED:
+					fmt.Printf("[MEM_WRITE_UNMAPPED]")
+				case uc.MEM_WRITE_PROT:
+					fmt.Printf("[MEM_WRITE_PROT]")
+				case uc.MEM_READ_UNMAPPED:
+					fmt.Printf("[MEM_READ_UNMAPPED]")
+					uuid, off, err := f.GetOffset(f.SlideInfo.SlidePointer(addr))
+					if err != nil {
+						log.Errorf(err.Error())
+						return false
+					}
+					dat, err := f.ReadBytesForUUID(uuid, int64(off), 0x1000)
+					if err != nil {
+						log.Errorf(err.Error())
+						return false
+					}
+					if err := mu.MemMap(alignDown(addr), 0x2000); err != nil {
+						log.Errorf("failed to memmap at %#x: %v", addr, err)
+						return false
+					}
+					if err := mu.MemWrite(addr, dat); err != nil {
+						log.Errorf("failed to mem write at %#x: %v", addr, err)
+						return false
+					}
+					return true
+				case uc.MEM_READ_PROT:
+					fmt.Printf("[MEM_READ_PROT]")
+				case uc.MEM_FETCH_UNMAPPED:
+					fmt.Printf("[MEM_FETCH_UNMAPPED]")
+				case uc.MEM_FETCH_PROT:
+					fmt.Printf("[MEM_FETCH_PROT]")
+				default:
+					fmt.Printf("unknown memory error: %d", access)
 				}
-				dat, err := f.ReadBytesForUUID(uuid, int64(off), 0x1000)
-				if err != nil {
-					panic(err)
-				}
-				if err := mu.MemMap(alignDown(addr), 0x2000); err != nil {
-					panic(err)
-				}
-				if err := mu.MemWrite(addr, dat); err != nil {
-					panic(err)
-				}
-				return true
-			case uc.MEM_READ_PROT:
-				fmt.Printf("[MEM_READ_PROT]")
-			case uc.MEM_FETCH_UNMAPPED:
-				fmt.Printf("[MEM_FETCH_UNMAPPED]")
-			case uc.MEM_FETCH_PROT:
-				fmt.Printf("[MEM_FETCH_PROT]")
-			default:
-				fmt.Printf("unknown memory error: %d", access)
+				fmt.Printf(" @ %#x, size=%d, value: %#x\n", addr, size, value)
+				return false
+			}, 1, 0); err != nil {
+			return fmt.Errorf("failed to register mem invalid read/write/fetch hook: %v", err)
+		}
+		mu.HookAdd(uc.HOOK_BLOCK, func(mu uc.Unicorn, addr uint64, size uint32) {
+			log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr), "size": size}).Debug("BLOCK")
+		}, 1, 0)
+		mu.HookAdd(uc.HOOK_CODE, func(mu uc.Unicorn, addr uint64, size uint32) {
+			// utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr), "size": size}).Debug, 2)("CODE")
+			uuid, soff, err := f.GetOffset(addr)
+			if err != nil {
+				log.Errorf(err.Error())
+				return
 			}
-			fmt.Printf(" @ %#x, size=%d, value: %#x\n", addr, size, value)
-			return false
+			code, err := f.ReadBytesForUUID(uuid, int64(soff), uint64(size))
+			if err != nil {
+				log.Errorf(err.Error())
+				return
+			}
+			diss(addr, code)
+			if Verbose {
+				regs, err := getState(mu)
+				if err != nil {
+					log.Errorf(err.Error())
+					return
+				}
+				fmt.Println(regs)
+				fmt.Println(pstate(regs[uc.ARM64_REG_PSTATE]))
+			}
+		}, 1, 0)
+		if _, err := mu.HookAdd(uc.HOOK_INTR, func(mu uc.Unicorn, intno uint32) {
+			fmt.Printf("[HOOK_INTR] intno: %d\n", intno)
+			regs, err := getState(mu)
+			if err != nil {
+				log.Errorf(err.Error())
+				return
+			}
+			fmt.Println(regs)
+			fmt.Println(pstate(regs[uc.ARM64_REG_PSTATE]))
+			log.Fatal("UNHANDLED INTERRUPT")
 		}, 1, 0); err != nil {
-			panic(err)
+			return fmt.Errorf("failed to register interrupt hook: %v", err)
 		}
 
-		startAddr := uint64(0x18035c834)
-
-		code := getCode()
-
-		diss(startAddr, code)
-
-		if err := mu.MemMap(alignDown(startAddr), 0x2000); err != nil {
-			panic(err)
-		}
-		if err := mu.MemWrite(startAddr, code); err != nil {
-			panic(err)
-		}
-		if err := mu.Start(startAddr, startAddr+uint64(len(code))); err != nil {
-			panic(err)
-		}
-
-		regs, err := getState(mu)
+		image, err := f.GetImageContainingVMAddr(startAddr)
 		if err != nil {
 			return err
 		}
 
+		m, err := image.GetMacho()
+		if err != nil {
+			return err
+		}
+		defer m.Close()
+
+		var code []byte
+		if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
+			uuid, soff, err := f.GetOffset(fn.StartAddr)
+			if err != nil {
+				return err
+			}
+			code, err = f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+			if err != nil {
+				return err
+			}
+			if err := mu.MemMap(alignDown(fn.StartAddr), 0x2000); err != nil {
+				return fmt.Errorf("failed to memmap at %#x: %v", fn.StartAddr, err)
+			}
+			if err := mu.MemWrite(fn.StartAddr, code); err != nil {
+				return fmt.Errorf("failed to write mem at %#x: %v", fn.StartAddr, err)
+			}
+			// diss(fn.StartAddr, code)
+		} else {
+			log.Warnf("emulating %d instructions at %#x", instructions, startAddr)
+			uuid, off, err := f.GetOffset(startAddr)
+			if err != nil {
+				return err
+			}
+			code, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
+			if err != nil {
+				return err
+			}
+			if err := mu.MemMap(alignDown(startAddr), 0x2000); err != nil {
+				return fmt.Errorf("failed to memmap at %#x: %v", startAddr, err)
+			}
+			if err := mu.MemWrite(startAddr, code); err != nil {
+				return fmt.Errorf("failed to write mem at %#x: %v", startAddr, err)
+			}
+			// diss(startAddr, code)
+		}
+
+		// initialize stack to 2MBs
+		if err := mu.MemMap(0, 0x200000); err != nil {
+			return fmt.Errorf("failed to memmap stack at %#x: %v", 0, err)
+		}
+		if err := mu.RegWrite(uc.ARM64_REG_SP, 0x200000); err != nil {
+			return fmt.Errorf("failed to set SP register to %#x: %v", 0x200000, err)
+		}
+
+		//***********
+		//* EMULATE *
+		//***********
+		if err := mu.Start(startAddr, startAddr+(instructions*4)); err != nil {
+			return fmt.Errorf("failed to emulate: %v", err)
+		}
+
+		regs, err := getState(mu)
+		if err != nil {
+			return fmt.Errorf("failed to register state: %v", err)
+		}
 		fmt.Println(regs)
+
+		log.Info("Emulation Complete ✅")
 
 		return nil
 	},
