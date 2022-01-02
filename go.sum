@@ -529,6 +529,8 @@ github.com/tj/go-spin v1.1.0/go.mod h1:Mg1mzmePZm4dva8Qz60H2lHwmJ2loum4VIrLgVnKw
 github.com/tv42/httpunix v0.0.0-20150427012821-b75d8614f926/go.mod h1:9ESjWnEqriFuLhtthL60Sar/7RFoluCcXsuvEwTV5KM=
 github.com/ulikunitz/xz v0.5.10 h1:t92gobL9l3HE202wg3rlk19F6X+JOxl9BBrCCMYEYd8=
 github.com/ulikunitz/xz v0.5.10/go.mod h1:nbz6k7qbPmH4IRqmfOplQw/tblSgqTqBwxkY0oWt/14=
+github.com/unicorn-engine/unicorn v0.0.0-20211213004032-63a445cbba18 h1:Oyttf7ECPDsUZn+YUgcxbU/Tv71DjYZk6xWF3AiXIJ4=
+github.com/unicorn-engine/unicorn v0.0.0-20211213004032-63a445cbba18/go.mod h1:vm0xtY46O4X0t1J6Ob+syPhvL38XAAidXGXmTSlcMZM=
 github.com/vbauerster/mpb/v7 v7.3.0 h1:WwRtHHT26gjVln0yJypDEEpTWyX9sk4QcUxM6tQjdEc=
 github.com/vbauerster/mpb/v7 v7.3.0/go.mod h1:KERDXx9bfuStUwTH2FbsrJhJhVu1q+xmjjoCZMZrin4=
 github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

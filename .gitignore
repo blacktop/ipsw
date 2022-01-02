@@ -48,3 +48,6 @@ public
 *.unstripped
 *.bndb
 *.lock
+
+# Unicorn EMU
+unicorn2/

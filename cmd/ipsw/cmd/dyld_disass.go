@@ -50,7 +50,7 @@ func init() {
 	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
-	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	dyldDisassCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // disassCmd represents the disass command

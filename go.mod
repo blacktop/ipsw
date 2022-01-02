@@ -28,6 +28,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	github.com/ulikunitz/xz v0.5.10
+	github.com/unicorn-engine/unicorn v0.0.0-20211213004032-63a445cbba18
 	github.com/vbauerster/mpb/v7 v7.3.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
@@ -36,6 +37,8 @@ require (
 
 // replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
+
+replace github.com/unicorn-engine/unicorn => ./unicorn2
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect
