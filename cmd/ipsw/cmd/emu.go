@@ -46,6 +46,21 @@ const (
 	STACK_SIZE = 0x00800000
 )
 
+type branchType uint8
+
+const (
+	DIRCALL   branchType = iota // Direct Branch with link
+	INDCALL                     // Indirect Branch with link
+	ERET                        // Exception return (indirect)
+	DBGEXIT                     // Exit from Debug state
+	RET                         // Indirect branch with function return hint
+	DIR                         // Direct branch
+	INDIR                       // Indirect branch
+	EXCEPTION                   // Exception entry
+	RESET                       // Reset
+	UNKNOWN                     // Other
+)
+
 // disassembly colors
 var colorOp = color.New(color.Bold).SprintfFunc()
 var colorRegs = color.New(color.Bold, color.FgHiBlue).SprintFunc()
@@ -298,8 +313,8 @@ func (p pstate) DIT() bool {
 func (p pstate) TCO() bool {
 	return types.ExtractBits(uint64(p), 20, 1) != 0
 }
-func (p pstate) BType() uint64 {
-	return types.ExtractBits(uint64(p), 19, 2)
+func (p pstate) BType() branchType {
+	return branchType(types.ExtractBits(uint64(p), 19, 2))
 }
 func (p pstate) SS() bool {
 	return types.ExtractBits(uint64(p), 17, 1) != 0
