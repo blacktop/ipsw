@@ -38,6 +38,7 @@ type astate struct {
 	Privates bool
 	Starts   bool
 	ObjC     bool
+	Slide    bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -128,6 +129,18 @@ func (a *astate) IsObjcDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.ObjC
+}
+
+func (a *astate) SetSlideInfo(done bool) {
+	a.mu.Lock()
+	a.Slide = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsSlideInfoDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Slide
 }
 
 type analysis struct {
@@ -541,7 +554,18 @@ func (i *CacheImage) ParseSlideInfo() error {
 		}
 	}
 
+	i.Analysis.State.SetSlideInfo(true)
+
 	return nil
+}
+
+func (i *CacheImage) GetSlideInfo() (map[uint64]uint64, error) {
+	if !i.Analysis.State.IsSlideInfoDone() {
+		if err := i.ParseSlideInfo(); err != nil {
+			return nil, err
+		}
+	}
+	return i.sinfo, nil
 }
 
 // ParseStarts parse function starts in MachO
