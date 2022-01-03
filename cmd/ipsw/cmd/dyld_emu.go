@@ -100,19 +100,10 @@ var dyldEmuCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
-			uuid, soff, err := f.GetOffset(fn.StartAddr)
-			if err != nil {
-				return err
-			}
-			code, err := f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
-			if err != nil {
-				return err
-			}
-			if err := mu.SetCode(fn.StartAddr, instructions, code); err != nil {
-				return fmt.Errorf("failed to set emulation code: %v", err)
-			}
-		} else {
+		/*
+		* Read in data to disassemble
+		 */
+		if instructions > 0 {
 			log.Warnf("emulating %d instructions at %#x", instructions, startAddr)
 			uuid, off, err := f.GetOffset(startAddr)
 			if err != nil {
@@ -124,6 +115,20 @@ var dyldEmuCmd = &cobra.Command{
 			}
 			if err := mu.SetCode(startAddr, instructions, code); err != nil {
 				return fmt.Errorf("failed to set emulation code: %v", err)
+			}
+		} else {
+			if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
+				uuid, soff, err := f.GetOffset(fn.StartAddr)
+				if err != nil {
+					return err
+				}
+				code, err := f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+				if err != nil {
+					return err
+				}
+				if err := mu.SetCode(fn.StartAddr, fn.EndAddr-fn.StartAddr, code); err != nil {
+					return fmt.Errorf("failed to set emulation code: %v", err)
+				}
 			}
 		}
 

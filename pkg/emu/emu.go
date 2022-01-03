@@ -92,8 +92,8 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new unicorn instance: %v", err)
 	}
-	if err := e.mu.SetCPUModel(uc.CPU_AARCH64_A72); err != nil {
-		return nil, fmt.Errorf("failed to set cpu model to CPU_AARCH64_A72:%v", err)
+	if err := e.mu.SetCPUModel(uc.CPU_AARCH64_MAX); err != nil {
+		return nil, fmt.Errorf("failed to set cpu model to CPU_AARCH64_MAX:%v", err)
 	}
 
 	return e, nil
@@ -157,12 +157,10 @@ func (e *Emulation) SetupHooks() error {
 		switch access {
 		case uc.MEM_READ:
 			fmt.Print(colorHook("[MEM_READ]"))
-			ptr, err := e.cache.ReadPointerAtAddress(addr64)
-			if err != nil {
-				log.Errorf(err.Error())
-			}
-			if ptr != e.cache.SlideInfo.SlidePointer(ptr) { // FIXME: this could fail when reading NON-pointers (we should use slide-info)
-				e.PutPointer(addr64, e.cache.SlideInfo.SlidePointer(ptr), 8)
+			if ptr, err := e.cache.ReadPointerAtAddress(addr64); err == nil {
+				if ptr != e.cache.SlideInfo.SlidePointer(ptr) { // FIXME: this could fail when reading NON-pointers (we should use slide-info)
+					e.PutPointer(addr64, e.cache.SlideInfo.SlidePointer(ptr), 8)
+				}
 			}
 			if addr64 == e.stack_chk_guard { // repair stack guard if it's been overwritten for some reason
 				if err := e.PutPointer(e.stack_chk_guard, STACK_GUARD, 8); err != nil {
@@ -300,12 +298,9 @@ func (e *Emulation) SetupHooks() error {
 		intrPrintf("[INTERRUPT] %s\n", interrupt(intno))
 		switch interrupt(intno) {
 		case EXCP_UDEFINED:
-
+			log.Fatal("UNHANDLED INTERRUPT")
+			e.DumpMemRegions()
 		}
-
-		e.DumpMemRegions()
-
-		log.Fatal("UNHANDLED INTERRUPT")
 	}, 1, 0); err != nil {
 		return fmt.Errorf("failed to register interrupt hook: %v", err)
 	}
