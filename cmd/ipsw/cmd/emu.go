@@ -28,16 +28,34 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
 )
+
+const (
+	STACK_BASE = 0x60000000
+	STACK_SIZE = 0x00800000
+)
+
+// disassembly colors
+var colorOp = color.New(color.Bold).SprintfFunc()
+var colorRegs = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorImm = color.New(color.Bold, color.FgMagenta).SprintFunc()
+var colorAddr = color.New(color.Bold, color.FgMagenta).SprintfFunc()
+var colorOpCodes = color.New(color.Faint, color.FgHiWhite).SprintFunc()
+
+var colorHook = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+var colorDetails = color.New(color.Italic, color.Faint, color.FgWhite).SprintfFunc()
+var intrPrintf = color.New(color.Italic, color.Bold, color.FgHiYellow).PrintfFunc()
 
 func init() {
 	rootCmd.AddCommand(emuCmd)
@@ -48,12 +66,26 @@ func init() {
 	emuCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
+func colorOperands(operands string) string {
+	if len(operands) > 0 {
+		immMatch := regexp.MustCompile(`#?-?0x[0-9a-z]+`)
+		operands = immMatch.ReplaceAllStringFunc(operands, func(s string) string {
+			return colorImm(s)
+		})
+		regMatch := regexp.MustCompile(`\W([wxvbhsdqzp][0-9]{1,2}|(c|s)psr(_c)?|pc|sl|sb|fp|ip|sp|lr|fpsid|fpscr|fpexc)`)
+		operands = regMatch.ReplaceAllStringFunc(operands, func(s string) string {
+			return string(s[0]) + colorRegs(s[1:])
+		})
+	}
+	return operands
+}
+
 func diss(startAddr uint64, data []byte) {
 	var instrValue uint32
 	var results [1024]byte
 
 	r := bytes.NewReader(data)
-	// fmt.Println("[DISASSEMBLY]")
+
 	for {
 		err := binary.Read(r, binary.LittleEndian, &instrValue)
 
@@ -61,19 +93,24 @@ func diss(startAddr uint64, data []byte) {
 			break
 		}
 
-		instruction, err := disassemble.Disassemble(startAddr, instrValue, &results)
+		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 		if err != nil {
-			// fmt.Printf("%#08x:  %s\t.long\t%#-18x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
-			log.Errorf("%#08x:  %s\t.long\t%#-18x ; (%s)", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+			fmt.Printf("%s:  %s\t%s\t%#-18x ; (%s)\n",
+				colorAddr("%#08x", uint64(startAddr)),
+				colorOp("%-7s", ".long"),
+				colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
+				instrValue,
+				err.Error())
 		}
-		// fmt.Printf("%#08x:  %s\t%s\n",
-		// 	uint64(startAddr),
-		// 	disassemble.GetOpCodeByteString(instrValue),
-		// 	instruction)
-		log.Infof("%#08x:  %s\t%s",
-			uint64(startAddr),
-			disassemble.GetOpCodeByteString(instrValue),
-			instruction)
+
+		opStr := strings.TrimSpace(strings.TrimPrefix(instruction.String(), instruction.Operation.String()))
+
+		fmt.Printf("%s:  %s   %s %s\n",
+			colorAddr("%#08x", uint64(startAddr)),
+			colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
+			colorOp("%-7s", instruction.Operation),
+			colorOperands(" "+opStr),
+		)
 
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
@@ -176,27 +213,27 @@ func getState(mu uc.Unicorn) (registers, error) {
 }
 
 func (r registers) String() string {
-	return fmt.Sprintf(
-		"[REGISTERS]\n"+
-			" x0: %#-18x  x1: %#-18x  x2: %#-18x  x3: %#-18x\n"+
-			" x4: %#-18x  x5: %#-18x  x6: %#-18x  x7: %#-18x\n"+
-			" x8: %#-18x  x9: %#-18x x10: %#-18x x11: %#-18x\n"+
-			"x12: %#-18x x13: %#-18x x14: %#-18x x15: %#-18x\n"+
-			"x16: %#-18x x17: %#-18x x18: %#-18x x19: %#-18x\n"+
-			"x20: %#-18x x21: %#-18x x22: %#-18x x23: %#-18x\n"+
-			"x24: %#-18x x25: %#-18x x26: %#-18x x27: %#-18x\n"+
-			"x28: %#-18x x29: %#-18x x30: %#-18x\n"+
-			" pc: %#-18x  sp: %#-18x cpsr: 0x%08x",
-		r[uc.ARM64_REG_X0], r[uc.ARM64_REG_X1], r[uc.ARM64_REG_X2], r[uc.ARM64_REG_X3],
-		r[uc.ARM64_REG_X4], r[uc.ARM64_REG_X5], r[uc.ARM64_REG_X6], r[uc.ARM64_REG_X7],
-		r[uc.ARM64_REG_X8], r[uc.ARM64_REG_X9], r[uc.ARM64_REG_X10], r[uc.ARM64_REG_X11],
-		r[uc.ARM64_REG_X12], r[uc.ARM64_REG_X13], r[uc.ARM64_REG_X14], r[uc.ARM64_REG_X15],
-		r[uc.ARM64_REG_X16], r[uc.ARM64_REG_X17], r[uc.ARM64_REG_X18], r[uc.ARM64_REG_X19],
-		r[uc.ARM64_REG_X20], r[uc.ARM64_REG_X21], r[uc.ARM64_REG_X22], r[uc.ARM64_REG_X23],
-		r[uc.ARM64_REG_X24], r[uc.ARM64_REG_X25], r[uc.ARM64_REG_X26], r[uc.ARM64_REG_X27],
-		r[uc.ARM64_REG_X28], r[uc.ARM64_REG_FP], r[uc.ARM64_REG_LR],
-		r[uc.ARM64_REG_PC], r[uc.ARM64_REG_SP], r[uc.ARM64_REG_PSTATE],
-	)
+	return fmt.Sprintf(colorHook("[REGISTERS]\n") +
+		colorDetails(
+			"     x0: %#-18x  x1: %#-18x  x2: %#-18x  x3: %#-18x\n"+
+				"     x4: %#-18x  x5: %#-18x  x6: %#-18x  x7: %#-18x\n"+
+				"     x8: %#-18x  x9: %#-18x x10: %#-18x x11: %#-18x\n"+
+				"    x12: %#-18x x13: %#-18x x14: %#-18x x15: %#-18x\n"+
+				"    x16: %#-18x x17: %#-18x x18: %#-18x x19: %#-18x\n"+
+				"    x20: %#-18x x21: %#-18x x22: %#-18x x23: %#-18x\n"+
+				"    x24: %#-18x x25: %#-18x x26: %#-18x x27: %#-18x\n"+
+				"    x28: %#-18x  fp: %#-18x  lr: %#-18x\n"+
+				"     pc: %#-18x  sp: %#-18x cpsr: 0x%08x %s",
+			r[uc.ARM64_REG_X0], r[uc.ARM64_REG_X1], r[uc.ARM64_REG_X2], r[uc.ARM64_REG_X3],
+			r[uc.ARM64_REG_X4], r[uc.ARM64_REG_X5], r[uc.ARM64_REG_X6], r[uc.ARM64_REG_X7],
+			r[uc.ARM64_REG_X8], r[uc.ARM64_REG_X9], r[uc.ARM64_REG_X10], r[uc.ARM64_REG_X11],
+			r[uc.ARM64_REG_X12], r[uc.ARM64_REG_X13], r[uc.ARM64_REG_X14], r[uc.ARM64_REG_X15],
+			r[uc.ARM64_REG_X16], r[uc.ARM64_REG_X17], r[uc.ARM64_REG_X18], r[uc.ARM64_REG_X19],
+			r[uc.ARM64_REG_X20], r[uc.ARM64_REG_X21], r[uc.ARM64_REG_X22], r[uc.ARM64_REG_X23],
+			r[uc.ARM64_REG_X24], r[uc.ARM64_REG_X25], r[uc.ARM64_REG_X26], r[uc.ARM64_REG_X27],
+			r[uc.ARM64_REG_X28], r[uc.ARM64_REG_FP], r[uc.ARM64_REG_LR],
+			r[uc.ARM64_REG_PC], r[uc.ARM64_REG_SP], r[uc.ARM64_REG_PSTATE], pstate(r[uc.ARM64_REG_PSTATE]),
+		))
 }
 
 func alignDown(addr uint64) uint64 {
@@ -305,15 +342,44 @@ func (p pstate) M() bool {
 }
 
 func (p pstate) String() string {
-	return fmt.Sprintf(
-		" N: %t, Z: %t, C: %t, V: %t, D: %t, A: %t, I: %t, F: %t\n"+
-			" PAN: %t, UAO: %t, DIT: %t, TCO: %t, BType: %d, SS: %t, IL: %t\n"+
-			" EL: %d, 32bit: %t, SP: %t\n",
-		p.N(), p.Z(), p.C(), p.V(), p.D(), p.A(), p.I(), p.F(),
-		p.PAN(), p.UAO(), p.DIT(), p.TCO(), p.BType(), p.SS(), p.IL(),
-		p.EL(), p.NRW(), p.SP(),
-	)
+	var flags []string
+	if p.N() {
+		flags = append(flags, "N")
+	}
+	if p.Z() {
+		flags = append(flags, "Z")
+	}
+	if p.C() {
+		flags = append(flags, "C")
+	}
+	if p.V() {
+		flags = append(flags, "V")
+	}
+	if p.D() {
+		flags = append(flags, "D")
+	}
+	if p.A() {
+		flags = append(flags, "A")
+	}
+	if p.I() {
+		flags = append(flags, "I")
+	}
+	if p.F() {
+		flags = append(flags, "F")
+	}
+	return colorDetails("[%s]", strings.Join(flags, " "))
 }
+
+// func (p pstate) String() string {
+// 	return actionColor(
+// 		" N: %t, Z: %t, C: %t, V: %t, D: %t, A: %t, I: %t, F: %t\n"+
+// 			" PAN: %t, UAO: %t, DIT: %t, TCO: %t, BType: %d, SS: %t, IL: %t\n"+
+// 			" EL: %d, 32bit: %t, SP: %t",
+// 		p.N(), p.Z(), p.C(), p.V(), p.D(), p.A(), p.I(), p.F(),
+// 		p.PAN(), p.UAO(), p.DIT(), p.TCO(), p.BType(), p.SS(), p.IL(),
+// 		p.EL(), p.NRW(), p.SP(),
+// 	)
+// }
 
 // emuCmd represents the emu command
 var emuCmd = &cobra.Command{
@@ -362,11 +428,11 @@ var emuCmd = &cobra.Command{
 		if _, err := mu.HookAdd(uc.HOOK_MEM_READ|uc.HOOK_MEM_WRITE, func(mu uc.Unicorn, access int, addr64 uint64, size int, value int64) {
 			switch access {
 			case uc.MEM_READ:
-				// fmt.Printf("[MEM_READ] addr: %#x, size: %d, value: %#x\n", addr64, size, value)
-				utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr64), "size": size, "value": value}).Debug, 2)("MEM_READ")
+				fmt.Print(colorHook("[MEM_READ]" + colorDetails(" addr: %#x, size: %d, value: %#x\n", addr64, size, value)))
+				// utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr64), "size": size, "value": value}).Debug, 2)("MEM_READ")
 			case uc.MEM_WRITE:
-				// fmt.Printf("[MEM_WRITE] addr: %#x, size: %d, value: %#x\n", addr64, size, value)
-				utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr64), "size": size, "value": value}).Debug, 2)("MEM_WRITE")
+				fmt.Print(colorHook("[MEM_WRITE]" + colorDetails(" addr: %#x, size: %d, value: %#x\n", addr64, size, value)))
+				// utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr64), "size": size, "value": value}).Debug, 2)("MEM_WRITE")
 			}
 		}, 1, 0); err != nil {
 			return fmt.Errorf("failed to register r/w hook: %v", err)
@@ -375,11 +441,11 @@ var emuCmd = &cobra.Command{
 			func(mu uc.Unicorn, access int, addr uint64, size int, value int64) bool {
 				switch access {
 				case uc.MEM_WRITE_UNMAPPED:
-					fmt.Printf("[MEM_WRITE_UNMAPPED]")
+					fmt.Print(colorHook("[MEM_WRITE_UNMAPPED]"))
 				case uc.MEM_WRITE_PROT:
-					fmt.Printf("[MEM_WRITE_PROT]")
+					fmt.Print(colorHook("[MEM_WRITE_PROT]"))
 				case uc.MEM_READ_UNMAPPED:
-					fmt.Printf("[MEM_READ_UNMAPPED]")
+					fmt.Print(colorHook("[MEM_READ_UNMAPPED]"))
 					uuid, off, err := f.GetOffset(f.SlideInfo.SlidePointer(addr))
 					if err != nil {
 						log.Errorf(err.Error())
@@ -400,23 +466,26 @@ var emuCmd = &cobra.Command{
 					}
 					return true
 				case uc.MEM_READ_PROT:
-					fmt.Printf("[MEM_READ_PROT]")
+					fmt.Print(colorHook("[MEM_READ_PROT]"))
 				case uc.MEM_FETCH_UNMAPPED:
-					fmt.Printf("[MEM_FETCH_UNMAPPED]")
+					fmt.Print(colorHook("[MEM_FETCH_UNMAPPED]"))
 				case uc.MEM_FETCH_PROT:
-					fmt.Printf("[MEM_FETCH_PROT]")
+					fmt.Print(colorHook("[MEM_FETCH_PROT]"))
 				default:
-					fmt.Printf("unknown memory error: %d", access)
+					fmt.Print(colorDetails("unknown memory error: %d\n", access))
 				}
-				fmt.Printf(" @ %#x, size=%d, value: %#x\n", addr, size, value)
+				fmt.Print(colorDetails(" @ %#x, size=%d, value: %#x\n", addr, size, value))
 				return false
 			}, 1, 0); err != nil {
 			return fmt.Errorf("failed to register mem invalid read/write/fetch hook: %v", err)
 		}
-		mu.HookAdd(uc.HOOK_BLOCK, func(mu uc.Unicorn, addr uint64, size uint32) {
-			log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr), "size": size}).Debug("BLOCK")
-		}, 1, 0)
-		mu.HookAdd(uc.HOOK_CODE, func(mu uc.Unicorn, addr uint64, size uint32) {
+		if _, err := mu.HookAdd(uc.HOOK_BLOCK, func(mu uc.Unicorn, addr uint64, size uint32) {
+			// metaPrintf("\n[BLOCK] addr: %#x, size: %d\n", addr, size)
+			fmt.Println()
+		}, 1, 0); err != nil {
+			return fmt.Errorf("failed to register mem invalid read/write/fetch hook: %v", err)
+		}
+		if _, err := mu.HookAdd(uc.HOOK_CODE, func(mu uc.Unicorn, addr uint64, size uint32) {
 			// utils.Indent(log.WithFields(log.Fields{"addr": fmt.Sprintf("%#x", addr), "size": size}).Debug, 2)("CODE")
 			uuid, soff, err := f.GetOffset(addr)
 			if err != nil {
@@ -428,7 +497,6 @@ var emuCmd = &cobra.Command{
 				log.Errorf(err.Error())
 				return
 			}
-			diss(addr, code)
 			if Verbose {
 				regs, err := getState(mu)
 				if err != nil {
@@ -436,18 +504,13 @@ var emuCmd = &cobra.Command{
 					return
 				}
 				fmt.Println(regs)
-				fmt.Println(pstate(regs[uc.ARM64_REG_PSTATE]))
 			}
-		}, 1, 0)
+			diss(addr, code)
+		}, 1, 0); err != nil {
+			return fmt.Errorf("failed to register mem invalid read/write/fetch hook: %v", err)
+		}
 		if _, err := mu.HookAdd(uc.HOOK_INTR, func(mu uc.Unicorn, intno uint32) {
-			fmt.Printf("[HOOK_INTR] intno: %d\n", intno)
-			regs, err := getState(mu)
-			if err != nil {
-				log.Errorf(err.Error())
-				return
-			}
-			fmt.Println(regs)
-			fmt.Println(pstate(regs[uc.ARM64_REG_PSTATE]))
+			intrPrintf("[HOOK_INTR] intno: %d\n", intno)
 			log.Fatal("UNHANDLED INTERRUPT")
 		}, 1, 0); err != nil {
 			return fmt.Errorf("failed to register interrupt hook: %v", err)
