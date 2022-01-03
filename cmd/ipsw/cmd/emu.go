@@ -469,6 +469,25 @@ var emuCmd = &cobra.Command{
 					fmt.Print(colorHook("[MEM_READ_PROT]"))
 				case uc.MEM_FETCH_UNMAPPED:
 					fmt.Print(colorHook("[MEM_FETCH_UNMAPPED]"))
+					uuid, off, err := f.GetOffset(f.SlideInfo.SlidePointer(addr))
+					if err != nil {
+						log.Errorf(err.Error())
+						return false
+					}
+					dat, err := f.ReadBytesForUUID(uuid, int64(off), 0x1000)
+					if err != nil {
+						log.Errorf(err.Error())
+						return false
+					}
+					if err := mu.MemMap(alignDown(addr), 0x2000); err != nil {
+						log.Errorf("failed to memmap at %#x: %v", addr, err)
+						return false
+					}
+					if err := mu.MemWrite(addr, dat); err != nil {
+						log.Errorf("failed to mem write at %#x: %v", addr, err)
+						return false
+					}
+					return true
 				case uc.MEM_FETCH_PROT:
 					fmt.Print(colorHook("[MEM_FETCH_PROT]"))
 				default:
@@ -564,11 +583,11 @@ var emuCmd = &cobra.Command{
 		}
 
 		// initialize stack to 2MBs
-		if err := mu.MemMap(0, 0x200000); err != nil {
-			return fmt.Errorf("failed to memmap stack at %#x: %v", 0, err)
+		if err := mu.MemMap(STACK_BASE, STACK_SIZE); err != nil {
+			return fmt.Errorf("failed to memmap stack at %#x: %v", STACK_BASE, err)
 		}
-		if err := mu.RegWrite(uc.ARM64_REG_SP, 0x200000); err != nil {
-			return fmt.Errorf("failed to set SP register to %#x: %v", 0x200000, err)
+		if err := mu.RegWrite(uc.ARM64_REG_SP, STACK_BASE+STACK_SIZE); err != nil {
+			return fmt.Errorf("failed to set SP register to %#x: %v", STACK_BASE+STACK_SIZE, err)
 		}
 
 		//***********
