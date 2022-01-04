@@ -48,6 +48,7 @@ func init() {
 	dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	dyldDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
+	dyldDisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	dyldDisassCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
@@ -79,6 +80,7 @@ var dyldDisassCmd = &cobra.Command{
 		asJSON, _ := cmd.Flags().GetBool("json")
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 		quiet, _ := cmd.Flags().GetBool("quiet")
+		color, _ := cmd.Flags().GetBool("color")
 		funcFile, _ := cmd.Flags().GetString("input")
 
 		if len(symbolName) > 0 && startAddr != 0 {
@@ -188,6 +190,7 @@ var dyldDisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
+						Color:        color,
 					})
 
 					if !quiet {
@@ -281,6 +284,7 @@ var dyldDisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
+					Color:        color,
 				})
 
 				if !quiet {
@@ -386,6 +390,7 @@ var dyldDisassCmd = &cobra.Command{
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,
+				Color:        color,
 			})
 
 			if !quiet {

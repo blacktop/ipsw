@@ -564,34 +564,34 @@ Disassemble a function in the _dyld_shared_cache_
 
 ```s
 _NSLog:
-0x1817e73e4:  7f 23 03 d5       pacibsp
-0x1817e73e8:  ff 83 00 d1       sub             sp, sp, #0x20
-0x1817e73ec:  fd 7b 01 a9       stp             x29, x30, [sp, #0x10]
-0x1817e73f0:  fd 43 00 91       add             x29, sp, #0x10
-0x1817e73f4:  a8 5a 2a b0       adrp            x8, #0x1d633c000
-0x1817e73f8:  08 25 40 f9       ldr             x8, [x8, #0x48] ; __got.___stack_chk_guard
-0x1817e73fc:  08 01 40 f9       ldr             x8, [x8]
-0x1817e7400:  e8 07 00 f9       str             x8, [sp, #0x8]
-0x1817e7404:  a8 43 00 91       add             x8, x29, #0x10
-0x1817e7408:  e8 03 00 f9       str             x8, [sp]
-0x1817e740c:  e2 03 1e aa       mov             x2, x30
-0x1817e7410:  e2 43 c1 da       xpaci           x2
-0x1817e7414:  a1 43 00 91       add             x1, x29, #0x10
-0x1817e7418:  cf ff ff 97       bl              __NSLogv
-0x1817e741c:  e8 07 40 f9       ldr             x8, [sp, #0x8]
-0x1817e7420:  a9 5a 2a b0       adrp            x9, #0x1d633c000
-0x1817e7424:  29 25 40 f9       ldr             x9, [x9, #0x48] ; __got.___stack_chk_guard
-0x1817e7428:  29 01 40 f9       ldr             x9, [x9]
-0x1817e742c:  3f 01 08 eb       cmp             x9, x8
-0x1817e7430:  81 00 00 54       b.ne            loc_1817e7440 ; ⤵ 0x10
-0x1817e7434:  fd 7b 41 a9       ldp             x29, x30, [sp, #0x10]
-0x1817e7438:  ff 83 00 91       add             sp, sp, #0x20
-0x1817e743c:  ff 0f 5f d6       retab
-0x1817e7440:  ; loc_1817e7440
-0x1817e7440:  64 52 fe 95       bl              ___stack_chk_fail
+0x181bac214:  7f 23 03 d5	pacibsp
+0x181bac218:  ff 83 00 d1	sub	sp, sp, #0x20
+0x181bac21c:  fd 7b 01 a9	stp	x29, x30, [sp, #0x10]
+0x181bac220:  fd 43 00 91	add	x29, sp, #0x10
+0x181bac224:  28 e9 2b f0	adrp	x8, 0x1d98d3000
+0x181bac228:  08 45 41 f9	ldr	x8, [x8, #0x288] ; __got.___stack_chk_guard
+0x181bac22c:  08 01 40 f9	ldr	x8, [x8]
+0x181bac230:  e8 07 00 f9	str	x8, [sp, #0x8]
+0x181bac234:  a8 43 00 91	add	x8, x29, #0x10
+0x181bac238:  e8 03 00 f9	str	x8, [sp]
+0x181bac23c:  e2 03 1e aa	mov	x2, x30
+0x181bac240:  e2 43 c1 da	xpaci	x2
+0x181bac244:  a1 43 00 91	add	x1, x29, #0x10
+0x181bac248:  2a 22 00 94	bl	__NSLogv
+0x181bac24c:  e8 07 40 f9	ldr	x8, [sp, #0x8]
+0x181bac250:  29 e9 2b f0	adrp	x9, 0x1d98d3000
+0x181bac254:  29 45 41 f9	ldr	x9, [x9, #0x288] ; __got.___stack_chk_guard
+0x181bac258:  29 01 40 f9	ldr	x9, [x9]
+0x181bac25c:  3f 01 08 eb	cmp	x9, x8
+0x181bac260:  81 00 00 54	b.ne	loc_181bac270 ; ⤵ 0x10
+0x181bac264:  fd 7b 41 a9	ldp	x29, x30, [sp, #0x10]
+0x181bac268:  ff 83 00 91	add	sp, sp, #0x20
+0x181bac26c:  ff 0f 5f d6	retab
+0x181bac270:  ; loc_181bac270
+0x181bac270:  3e 85 93 97	bl	j____stack_chk_fail
 ```
 
-> **NOTE:** Make the output look amazing by piping to `bat -l s --tabs 0 -p --theme Nord --wrap=never --pager "less -S"`
+> **NOTE:** Make the output look amazing by adding the `--color` flag 🌈
 
 ### **dyld imports**
 
