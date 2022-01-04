@@ -301,6 +301,10 @@ func (e *Emulation) SetupHooks() error {
 		fmt.Printf(colorHook("[INTERRUPT]") + colorInterrupt(" %s\n", interrupt(intno)))
 		switch interrupt(intno) {
 		case EXCP_UNDEFINED_INSTRUCTION:
+			if err := e.GetState(); err != nil {
+				log.Errorf("failed to register state: %v", err)
+			}
+			fmt.Println(e.regs)
 			e.DumpMemRegions()
 			log.Fatal("UNHANDLED INTERRUPT")
 		}

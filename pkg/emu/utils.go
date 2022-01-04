@@ -62,9 +62,9 @@ func (e *Emulation) DumpMemRegions() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("[Memory Regions]")
+	fmt.Println(colorHook("[Memory Regions]"))
 	for _, mr := range memRegs {
-		fmt.Printf("    begin: %#09x, end: %#09x, prot: %d, size: %#x\n", mr.Begin, mr.End, mr.Prot, mr.End-mr.Begin+1)
+		fmt.Printf(colorDetails("    begin: %#09x, end: %#09x, prot: %d, size: %#x\n", mr.Begin, mr.End, mr.Prot, mr.End-mr.Begin+1))
 	}
 	return nil
 }
