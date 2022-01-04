@@ -25,6 +25,7 @@ type Disass interface {
 	// getters
 	Demangle() bool
 	Quite() bool
+	Color() bool
 	AsJSON() bool
 	Data() []byte
 	StartAddr() uint64
@@ -120,6 +121,7 @@ type Config struct {
 	AsJSON       bool
 	Demangle     bool
 	Quite        bool
+	Color        bool
 }
 type AddrDetails struct {
 	Image   string
@@ -162,51 +164,71 @@ func Disassemble(d Disass) {
 		if !d.AsJSON() {
 			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 			if err != nil {
+				var op string
+				var oprs string
+				var comment string
 				if instrValue == 0xfeedfacf {
-					fmt.Printf("%#08x:  %s\t.long\t%#x ; (possible embedded MachO)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
-					break
+					op = ".long"
+					oprs = fmt.Sprintf("%#x", instrValue)
+					comment = " ; (possible embedded MachO)"
 				} else if instrValue == 0x201420 {
-					fmt.Printf("%#08x:  %s\tgenter\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
-					continue
+					op = "genter"
 				} else if instrValue == 0x00201400 {
-					fmt.Printf("%#08x:  %s\tgexit\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
-					continue
+					op = "gexit"
 				} else if instrValue == 0xe7ffdefe || instrValue == 0xe7ffdeff {
-					fmt.Printf("%#08x:  %s\ttrap\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
-					continue
+					op = "trap"
 				} else if instrValue > 0xffff0000 {
-					fmt.Printf("%#08x:  %s\t.long\t%#x ; (probably a jump-table)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
-					break
+					op = ".long"
+					oprs = fmt.Sprintf("%#x", instrValue)
+					comment = " ; (probably a jump-table)"
 				} else if prevInstr != nil && strings.Contains(prevInstr.Operation.String(), "braa") {
-					break
+					break // TODO: why did I do this again?
 				} else if (instrValue & 0xfffffC00) == 0x00201000 {
 					Xr := disassemble.Register((instrValue & 0x1F) + 34)
 					m := (instrValue >> 5) & 0x1F
 					if m == 17 {
 						if instrValue&0x1F == 0 {
-							fmt.Printf("%#08x:  %s\tamxset\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
+							op = "amxset"
 						} else {
-							fmt.Printf("%#08x:  %s\tamxclr\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue))
+							op = "amxclr"
 						}
 					} else {
-						fmt.Printf("%#08x:  %s\t%s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), opName(m), Xr.String())
+						op = opName(m).String()
+						oprs = Xr.String()
 					}
-					continue
 				} else if instrValue>>21 == 1 {
-					fmt.Printf("%#08x:  %s\t.long\t%#x ; (possible unknown Apple instruction)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue)
-					continue
+					op = ".long"
+					oprs = fmt.Sprintf("%#x", instrValue)
+					comment = " ; (possible unknown Apple instruction)"
 				} else if cstr, err := d.GetCString(startAddr); err == nil {
+					op = "DCB"
 					if utils.IsASCII(cstr) {
 						if len(cstr) > 200 {
-							fmt.Printf("%#08x:  %s\tDCB\t%#v\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), cstr[:200])
-							break
+							comment = fmt.Sprintf("%#v", cstr[:200])
 						} else if len(cstr) > 1 {
-							fmt.Printf("%#08x:  %s\tDCB\t%#v\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), cstr)
-							break
+							comment = fmt.Sprintf("%#v", cstr)
 						}
 					}
+					// TODO: should I advance startAddr past the end of the cstring ?
+					// Otherwise it'll try and disass the rest of the string (that we already printed)
+				} else {
+					op = ".long"
+					oprs = fmt.Sprintf("%#x", instrValue)
+					comment = fmt.Sprintf(" ; (%s)", err.Error())
 				}
-				fmt.Printf("%#08x:  %s\t.long\t%#x ; (%s)\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrValue, err.Error())
+
+				if d.Color() {
+					fmt.Printf("%s:  %s   %s %s%s\n",
+						colorAddr("%#08x", uint64(startAddr)),
+						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
+						colorOp("%-7s", op),
+						colorOperands(" "+oprs),
+						colorComment(comment),
+					)
+				} else {
+					fmt.Printf("%#08x:  %s   %s\t%s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), op, oprs, comment)
+				}
+
 				continue
 			}
 
@@ -215,11 +237,19 @@ func Disassemble(d Disass) {
 			if !d.Quite() {
 				// check for start of a new function
 				if ok, fname := d.IsFunctionStart(instruction.Address); ok {
-					fmt.Printf("\n%s:\n", fname)
+					if d.Color() {
+						fmt.Print(colorOp("\n%s:\n", fname))
+					} else {
+						fmt.Printf("\n%s:\n", fname)
+					}
 				}
 
 				if d.IsLocation(instruction.Address) {
-					fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
+					if d.Color() {
+						fmt.Printf("%s:  %s\n", colorAddr("%#08x", instruction.Address), colorLocation("loc_%x", instruction.Address))
+					} else {
+						fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
+					}
 				}
 
 				// if ok, imm := triage.HasLoc(i.Instruction.Address()); ok {
@@ -261,7 +291,7 @@ func Disassemble(d Disass) {
 								if delta > 0 {
 									direction = fmt.Sprintf(" ; ⤵ %#x", delta)
 								} else if delta == 0 {
-									direction = " ; ∞ loop"
+									direction = " ; ∞ loop" // TODO: I should break these out into a comment var like in errors (might speed up colorization)
 								} else {
 									direction = fmt.Sprintf(" ; ⤴ %#x", delta)
 								}
@@ -337,14 +367,29 @@ func Disassemble(d Disass) {
 			}
 
 			if d.Middle() != 0 && d.Middle() == startAddr {
-				fmt.Printf("👉%08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+				if d.Color() {
+					opStr := strings.TrimSpace(strings.TrimPrefix(instrStr, instruction.Operation.String()))
+					printCurLine("=>%08x:  %s   %-7s %s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction.Operation, opStr)
+				} else {
+					fmt.Printf("=>%08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+				}
 			} else {
-				fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+				if d.Color() {
+					opStr := strings.TrimSpace(strings.TrimPrefix(instrStr, instruction.Operation.String()))
+					fmt.Printf("%s:  %s   %s %s\n",
+						colorAddr("%#08x", uint64(startAddr)),
+						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
+						colorOp("%-7s", instruction.Operation),
+						colorOperands(" "+opStr),
+					)
+				} else {
+					fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+				}
 			}
 
 			prevInstr = instruction
 		} else { // output as JSON
-			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+			instruction, err := disassemble.Decompose(startAddr, instrValue, &results) // TODO: it would probably be valuable to add a "comment" field and capture the analysis above for JSON peeps
 			if err != nil {
 				instructions = append(instructions, disassemble.Instruction{
 					Address:     startAddr,
@@ -353,7 +398,7 @@ func Disassemble(d Disass) {
 					Operation:   0,
 					Operands:    nil,
 					SetFlags:    false,
-					Disassembly: fmt.Sprintf(".long\t%#x ; (%s)\n", instrValue, err.Error()),
+					Disassembly: fmt.Sprintf(".long\t%#x ; (%s)\n", instrValue, err.Error()), // TODO: same with error enhancements above
 				})
 				continue
 			}

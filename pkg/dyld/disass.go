@@ -31,6 +31,9 @@ func (d DyldDisass) Demangle() bool {
 func (d DyldDisass) Quite() bool {
 	return d.cfg.Quite
 }
+func (d DyldDisass) Color() bool {
+	return d.cfg.Color
+}
 func (d DyldDisass) AsJSON() bool {
 	return d.cfg.AsJSON
 }
