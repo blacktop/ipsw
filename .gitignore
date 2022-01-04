@@ -41,6 +41,7 @@ completions/
 *.prof
 *.download
 checksums.txt.sha1
+unicorn2/
 
 # Docs
 public

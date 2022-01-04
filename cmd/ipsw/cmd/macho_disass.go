@@ -40,6 +40,7 @@ func init() {
 
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
+	machoDisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	// machoDisassCmd.Flags().Uint64("slide", 0, "MachO slide to remove from --vaddr")
 	machoDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	machoDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
@@ -74,6 +75,7 @@ var machoDisassCmd = &cobra.Command{
 		asJSON, _ := cmd.Flags().GetBool("json")
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 		quiet, _ := cmd.Flags().GetBool("quiet")
+		color, _ := cmd.Flags().GetBool("color")
 
 		// funcFile, _ := cmd.Flags().GetString("input")
 		allFuncs := false
@@ -139,6 +141,7 @@ var machoDisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
+					Color:        color,
 				})
 
 				//***********************
@@ -220,6 +223,7 @@ var machoDisassCmd = &cobra.Command{
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,
+				Color:        color,
 			})
 
 			//***********************

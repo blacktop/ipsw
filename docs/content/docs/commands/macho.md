@@ -849,11 +849,10 @@ You can also dissassemble a function by name
 ❯ ipsw disass --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore
 ```
 
-Make it pretty 💄🐷 using [bat](https://github.com/sharkdp/bat)
+Make it pretty 💄🐷 using `--color` flag
 
 ```bash
-❯ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed \
-   | bat -l s --tabs 0 -p --theme Nord --wrap=never --pager "less -S"
+❯ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed --color
 ```
 
 ```s
@@ -885,5 +884,5 @@ func_fffffff007b44034:
 Demangle C++ names
 
 ```bash
-❯ ipsw disass --demangle --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore | bat -p -l s --tabs 0
+❯ ipsw disass --demangle --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore --color
 ```

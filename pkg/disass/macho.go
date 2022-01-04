@@ -34,6 +34,9 @@ func (d MachoDisass) Demangle() bool {
 func (d MachoDisass) Quite() bool {
 	return d.cfg.Quite
 }
+func (d MachoDisass) Color() bool {
+	return d.cfg.Color
+}
 func (d MachoDisass) AsJSON() bool {
 	return d.cfg.AsJSON
 }
