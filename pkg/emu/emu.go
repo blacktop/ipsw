@@ -36,27 +36,27 @@ const (
 type interrupt uint32
 
 const (
-	EXCP_UDEFINED       interrupt = 1 /* undefined instruction */
-	EXCP_SOFTWARE_INTR  interrupt = 2 /* software interrupt */
-	EXCP_PREFETCH_ABORT interrupt = 3
-	EXCP_DATA_ABORT     interrupt = 4
-	EXCP_IRQ            interrupt = 5
-	EXCP_FIQ            interrupt = 6
-	EXCP_BKPT           interrupt = 7
-	EXCP_EXCEPTION_EXIT interrupt = 8  /* Return from v7M exception.  */
-	EXCP_KERNEL_TRAP    interrupt = 9  /* Jumped to kernel code page.  */
-	EXCP_HVC            interrupt = 11 /* HyperVisor Call */
-	EXCP_HYP_TRAP       interrupt = 12
-	EXCP_SMC            interrupt = 13 /* Secure Monitor Call */
-	EXCP_VIRQ           interrupt = 14
-	EXCP_VFIQ           interrupt = 15
-	EXCP_SEMIHOST       interrupt = 16 /* semihosting call */
-	EXCP_NOCP           interrupt = 17 /* v7M NOCP UsageFault */
-	EXCP_INVSTATE       interrupt = 18 /* v7M INVSTATE UsageFault */
-	EXCP_STKOF          interrupt = 19 /* v8M STKOF UsageFault */
-	EXCP_LAZYFP         interrupt = 20 /* v7M fault during lazy FP stacking */
-	EXCP_LSERR          interrupt = 21 /* v8M LSERR SecureFault */
-	EXCP_UNALIGNED      interrupt = 22 /* v7M UNALIGNED UsageFault */
+	EXCP_UNDEFINED_INSTRUCTION interrupt = 1 /* undefined instruction */
+	EXCP_SOFTWARE_INTRPT       interrupt = 2 /* software interrupt */
+	EXCP_PREFETCH_ABORT        interrupt = 3
+	EXCP_DATA_ABORT            interrupt = 4
+	EXCP_IRQ                   interrupt = 5
+	EXCP_FIQ                   interrupt = 6
+	EXCP_BKPT                  interrupt = 7
+	EXCP_EXCEPTION_EXIT        interrupt = 8  /* Return from v7M exception.  */
+	EXCP_KERNEL_TRAP           interrupt = 9  /* Jumped to kernel code page.  */
+	EXCP_HVC                   interrupt = 11 /* HyperVisor Call */
+	EXCP_HYP_TRAP              interrupt = 12
+	EXCP_SMC                   interrupt = 13 /* Secure Monitor Call */
+	EXCP_VIRQ                  interrupt = 14
+	EXCP_VFIQ                  interrupt = 15
+	EXCP_SEMIHOST              interrupt = 16 /* semihosting call */
+	EXCP_NOCP                  interrupt = 17 /* v7M NOCP UsageFault */
+	EXCP_INVSTATE              interrupt = 18 /* v7M INVSTATE UsageFault */
+	EXCP_STKOF                 interrupt = 19 /* v8M STKOF UsageFault */
+	EXCP_LAZYFP                interrupt = 20 /* v7M fault during lazy FP stacking */
+	EXCP_LSERR                 interrupt = 21 /* v8M LSERR SecureFault */
+	EXCP_UNALIGNED             interrupt = 22 /* v7M UNALIGNED UsageFault */
 )
 
 // Config is a emulation configuration object
@@ -249,7 +249,7 @@ func (e *Emulation) SetupHooks() error {
 			case uc.MEM_FETCH_PROT:
 				fmt.Print(colorHook("[MEM_FETCH_PROT]"))
 			default:
-				fmt.Print(colorHook("[MEM_INVALID]") + colorDetails(" unknown memory error: %d\n", access))
+				fmt.Printf(colorHook("[MEM_INVALID]") + colorDetails(" unknown memory error: %d\n", access))
 			}
 			fmt.Print(colorDetails(" @ %#x, size=%d, value: %#x\n", addr, size, value))
 			return false
@@ -260,8 +260,11 @@ func (e *Emulation) SetupHooks() error {
 	//* HOOK_BLOCK *
 	//**************
 	if _, err := e.mu.HookAdd(uc.HOOK_BLOCK, func(mu uc.Unicorn, addr uint64, size uint32) {
-		// metaPrintf("\n[BLOCK] addr: %#x, size: %d\n", addr, size)
-		fmt.Println()
+		if e.conf.Verbose {
+			fmt.Printf(colorHook("[BLOCK]") + colorDetails(" addr: %#x, size: %d\n", addr, size))
+		} else {
+			fmt.Println()
+		}
 	}, 1, 0); err != nil {
 		return fmt.Errorf("failed to register block hook: %v", err)
 	}
@@ -295,11 +298,11 @@ func (e *Emulation) SetupHooks() error {
 	//* HOOK_INTR *
 	//*************
 	if _, err := e.mu.HookAdd(uc.HOOK_INTR, func(mu uc.Unicorn, intno uint32) {
-		intrPrintf("[INTERRUPT] %s\n", interrupt(intno))
+		fmt.Printf(colorHook("[INTERRUPT]") + colorInterrupt(" %s\n", interrupt(intno)))
 		switch interrupt(intno) {
-		case EXCP_UDEFINED:
-			log.Fatal("UNHANDLED INTERRUPT")
+		case EXCP_UNDEFINED_INSTRUCTION:
 			e.DumpMemRegions()
+			log.Fatal("UNHANDLED INTERRUPT")
 		}
 	}, 1, 0); err != nil {
 		return fmt.Errorf("failed to register interrupt hook: %v", err)

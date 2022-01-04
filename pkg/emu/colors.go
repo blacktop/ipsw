@@ -10,6 +10,6 @@ var colorAddr = color.New(color.Bold, color.FgMagenta).SprintfFunc()
 var colorOpCodes = color.New(color.Faint, color.FgHiWhite).SprintFunc()
 
 // hook colors
-var intrPrintf = color.New(color.Italic, color.Bold, color.FgHiYellow).PrintfFunc()
 var colorHook = color.New(color.Faint, color.FgHiBlue).SprintFunc()
 var colorDetails = color.New(color.Italic, color.Faint, color.FgWhite).SprintfFunc()
+var colorInterrupt = color.New(color.Italic, color.Bold, color.FgHiYellow).SprintfFunc()

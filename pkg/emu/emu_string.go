@@ -8,8 +8,8 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
-	_ = x[EXCP_UDEFINED-1]
-	_ = x[EXCP_SOFTWARE_INTR-2]
+	_ = x[EXCP_UNDEFINED_INSTRUCTION-1]
+	_ = x[EXCP_SOFTWARE_INTRPT-2]
 	_ = x[EXCP_PREFETCH_ABORT-3]
 	_ = x[EXCP_DATA_ABORT-4]
 	_ = x[EXCP_IRQ-5]
@@ -32,12 +32,12 @@ func _() {
 }
 
 const (
-	_interrupt_name_0 = "EXCP_UDEFINEDEXCP_SOFTWARE_INTREXCP_PREFETCH_ABORTEXCP_DATA_ABORTEXCP_IRQEXCP_FIQEXCP_BKPTEXCP_EXCEPTION_EXITEXCP_KERNEL_TRAP"
+	_interrupt_name_0 = "EXCP_UNDEFINED_INSTRUCTIONEXCP_SOFTWARE_INTRPTEXCP_PREFETCH_ABORTEXCP_DATA_ABORTEXCP_IRQEXCP_FIQEXCP_BKPTEXCP_EXCEPTION_EXITEXCP_KERNEL_TRAP"
 	_interrupt_name_1 = "EXCP_HVCEXCP_HYP_TRAPEXCP_SMCEXCP_VIRQEXCP_VFIQEXCP_SEMIHOSTEXCP_NOCPEXCP_INVSTATEEXCP_STKOFEXCP_LAZYFPEXCP_LSERREXCP_UNALIGNED"
 )
 
 var (
-	_interrupt_index_0 = [...]uint8{0, 13, 31, 50, 65, 73, 81, 90, 109, 125}
+	_interrupt_index_0 = [...]uint8{0, 26, 46, 65, 80, 88, 96, 105, 124, 140}
 	_interrupt_index_1 = [...]uint8{0, 8, 21, 29, 38, 47, 60, 69, 82, 92, 103, 113, 127}
 )
 
