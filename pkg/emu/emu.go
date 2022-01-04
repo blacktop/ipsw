@@ -93,7 +93,7 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 		return nil, fmt.Errorf("failed to create new unicorn instance: %v", err)
 	}
 	if err := e.mu.SetCPUModel(uc.CPU_AARCH64_MAX); err != nil {
-		return nil, fmt.Errorf("failed to set cpu model to CPU_AARCH64_MAX:%v", err)
+		return nil, fmt.Errorf("failed to set cpu model to CPU_AARCH64_MAX: %v", err)
 	}
 
 	return e, nil
@@ -306,6 +306,8 @@ func (e *Emulation) SetupHooks() error {
 			}
 			fmt.Println(e.regs)
 			e.DumpMemRegions()
+			fmt.Printf(colorHook("[STACK]\n"))
+			e.DumpMem(STACK_DATA, 0x20)
 			log.Fatal("UNHANDLED INTERRUPT")
 		}
 	}, 1, 0); err != nil {

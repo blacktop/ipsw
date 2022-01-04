@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
 )
 
@@ -54,6 +55,15 @@ func Align(addr, size uint64, growl ...bool) (uint64, uint64) {
 		size = (size + to - 1) & mask
 	}
 	return addr, size
+}
+
+func (e *Emulation) DumpMem(addr uint64, size uint64) error {
+	dat, err := e.mu.MemRead(addr, size)
+	if err != nil {
+		return err
+	}
+	fmt.Println(utils.HexDump(dat, addr))
+	return nil
 }
 
 // DumpMemRegions prints emulation memory regions
