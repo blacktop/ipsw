@@ -400,6 +400,16 @@ func (r Registers) Changed() string {
 	)
 }
 
+func (r Registers) AllChanged() string {
+	var out string
+	for _, val := range r {
+		if val.DidChange {
+			out += fmt.Sprintf("%s\n", val)
+		}
+	}
+	return out
+}
+
 type pstate uint32
 
 // NZCV

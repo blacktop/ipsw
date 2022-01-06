@@ -110,6 +110,9 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 	if err := e.mu.RegWrite(uc.ARM64_REG_PSTATE, 0); err != nil {
 		return nil, fmt.Errorf("failed to init PSTATE register: %v", err)
 	}
+	if err := e.mu.RegWrite(uc.ARM64_REG_TPIDRRO_EL0, STACK_DATA); err != nil {
+		return nil, fmt.Errorf("failed to init tpidrro_el0 register: %v", err)
+	}
 
 	return e, nil
 }
@@ -302,11 +305,12 @@ func (e *Emulation) SetupHooks() error {
 			log.Errorf(err.Error())
 			return
 		}
+		if err := e.GetState(); err != nil {
+			log.Errorf("failed to register state: %v", err)
+		}
 		if e.conf.Verbose {
-			if err := e.GetState(); err != nil {
-				log.Errorf("failed to register state: %v", err)
-			}
 			fmt.Println(e.regs.Changed())
+			fmt.Println(e.regs.AllChanged())
 		}
 		// disassemble code
 		diss(addr, code)
@@ -325,10 +329,10 @@ func (e *Emulation) SetupHooks() error {
 			}
 			fmt.Println(e.regs.Changed())
 			e.DumpMemRegions()
-			fmt.Printf(colorHook("[STACK_DATA]\n"))
-			e.DumpMem(STACK_DATA, 0x20)
 			fmt.Printf(colorHook("[STACK]\n"))
-			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value-0x50, 0x100)
+			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value-0x50, 0x50)
+			fmt.Printf(colorHook("SP>\n"))
+			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value, min((STACK_BASE+STACK_SIZE)-e.regs[uc.ARM64_REG_SP].Value, 0x50))
 			// cont := false
 			// prompt := &survey.Confirm{
 			// 	Message: "Continue?",
@@ -369,7 +373,12 @@ func (e *Emulation) SetCode(start uint64, count uint64, code []byte) error {
 // Start starts the unicorn emulation engine
 func (e *Emulation) Start() error {
 	if err := e.mu.Start(e.startAddr, e.startAddr+(e.count*4)); err != nil {
+		fmt.Println(e.regs.Changed())
 		e.DumpMemRegions()
+		fmt.Printf(colorHook("[STACK]\n"))
+		e.DumpMem(e.regs[uc.ARM64_REG_SP].Value-0x50, 0x50)
+		fmt.Printf(colorHook("SP>\n"))
+		e.DumpMem(e.regs[uc.ARM64_REG_SP].Value, min((STACK_BASE+STACK_SIZE)-e.regs[uc.ARM64_REG_SP].Value, 0x50))
 		return fmt.Errorf("failed to emulate: %v", err)
 	}
 	if err := e.GetState(); err != nil {

@@ -79,6 +79,13 @@ func (e *Emulation) DumpMemRegions() error {
 	return nil
 }
 
+func min(a, b uint64) uint64 {
+	if a > b {
+		return b
+	}
+	return a
+}
+
 func getCode() []byte {
 	var code []byte
 	a := make([]byte, 4)
