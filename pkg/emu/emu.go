@@ -97,7 +97,7 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 	e := &Emulation{
 		cache: cache,
 		conf:  conf,
-		regs:  make(map[int]uint64),
+		regs:  InitRegisters(),
 	}
 
 	e.mu, err = uc.NewUnicorn(uc.ARCH_ARM64, uc.MODE_ARM)
@@ -106,6 +106,9 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 	}
 	if err := e.mu.SetCPUModel(uc.CPU_AARCH64_MAX); err != nil {
 		return nil, fmt.Errorf("failed to set cpu model to CPU_AARCH64_MAX: %v", err)
+	}
+	if err := e.mu.RegWrite(uc.ARM64_REG_PSTATE, 0); err != nil {
+		return nil, fmt.Errorf("failed to init PSTATE register: %v", err)
 	}
 
 	return e, nil
@@ -303,7 +306,7 @@ func (e *Emulation) SetupHooks() error {
 			if err := e.GetState(); err != nil {
 				log.Errorf("failed to register state: %v", err)
 			}
-			fmt.Println(e.regs)
+			fmt.Println(e.regs.Changed())
 		}
 		// disassemble code
 		diss(addr, code)
@@ -320,10 +323,12 @@ func (e *Emulation) SetupHooks() error {
 			if err := e.GetState(); err != nil {
 				log.Errorf("failed to register state: %v", err)
 			}
-			fmt.Println(e.regs)
+			fmt.Println(e.regs.Changed())
 			e.DumpMemRegions()
-			fmt.Printf(colorHook("[STACK]\n"))
+			fmt.Printf(colorHook("[STACK_DATA]\n"))
 			e.DumpMem(STACK_DATA, 0x20)
+			fmt.Printf(colorHook("[STACK]\n"))
+			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value-0x50, 0x100)
 			// cont := false
 			// prompt := &survey.Confirm{
 			// 	Message: "Continue?",

@@ -62,7 +62,7 @@ func (e *Emulation) DumpMem(addr uint64, size uint64) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(utils.HexDump(dat, addr))
+	fmt.Print(utils.HexDump(dat, addr))
 	return nil
 }
 
@@ -72,7 +72,7 @@ func (e *Emulation) DumpMemRegions() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(colorHook("[Memory Regions]"))
+	fmt.Println(colorHook("[MEM_REGIONS]"))
 	for _, mr := range memRegs {
 		fmt.Printf(colorDetails("    begin: %#09x, end: %#09x, prot: %d, size: %#x\n", mr.Begin, mr.End, mr.Prot, mr.End-mr.Begin+1))
 	}
