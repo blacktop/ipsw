@@ -243,9 +243,6 @@ func (p pstate) String() string {
 	if p.BType() > 0 {
 		flags = append(flags, p.BType().String())
 	}
-	if p.BType() > 0 {
-		flags = append(flags, p.BType().String())
-	}
 	flags = append(flags, p.M().String())
 	return colorDetails("[%s]", strings.Join(flags, " "))
 }
