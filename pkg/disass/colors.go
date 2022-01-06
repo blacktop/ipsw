@@ -26,7 +26,7 @@ func colorOperands(operands string) string {
 		operands = immMatch.ReplaceAllStringFunc(operands, func(s string) string {
 			return colorImm(s)
 		})
-		locMatch := regexp.MustCompile(`loc_[0-9a-z]+`)
+		locMatch := regexp.MustCompile(`\sloc_[0-9a-z]+`)
 		operands = locMatch.ReplaceAllStringFunc(operands, func(s string) string {
 			return colorLocation(s)
 		})
