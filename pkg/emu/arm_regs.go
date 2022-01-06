@@ -130,6 +130,7 @@ func (r Registers) String() string {
 
 type pstate uint32
 
+// NZCV
 func (p pstate) N() bool {
 	return types.ExtractBits(uint64(p), 31, 1) != 0
 }
@@ -142,70 +143,74 @@ func (p pstate) C() bool {
 func (p pstate) V() bool {
 	return types.ExtractBits(uint64(p), 28, 1) != 0
 }
+
+// DAIF
 func (p pstate) D() bool {
-	return types.ExtractBits(uint64(p), 27, 1) != 0
-}
-func (p pstate) A() bool {
-	return types.ExtractBits(uint64(p), 26, 1) != 0
-}
-func (p pstate) I() bool {
-	return types.ExtractBits(uint64(p), 25, 1) != 0
-}
-func (p pstate) F() bool {
-	return types.ExtractBits(uint64(p), 24, 1) != 0
-}
-func (p pstate) PAN() bool {
-	return types.ExtractBits(uint64(p), 23, 1) != 0
-}
-func (p pstate) UAO() bool {
-	return types.ExtractBits(uint64(p), 22, 1) != 0
-}
-func (p pstate) DIT() bool {
-	return types.ExtractBits(uint64(p), 21, 1) != 0
-}
-func (p pstate) TCO() bool {
-	return types.ExtractBits(uint64(p), 20, 1) != 0
-}
-func (p pstate) BType() branchType {
-	return branchType(types.ExtractBits(uint64(p), 19, 2))
-}
-func (p pstate) SS() bool {
-	return types.ExtractBits(uint64(p), 17, 1) != 0
-}
-func (p pstate) IL() bool {
-	return types.ExtractBits(uint64(p), 16, 1) != 0
-}
-func (p pstate) EL() uint64 {
-	return types.ExtractBits(uint64(p), 15, 2)
-}
-func (p pstate) NRW() bool {
-	return types.ExtractBits(uint64(p), 13, 1) != 0
-}
-func (p pstate) SP() bool {
-	return types.ExtractBits(uint64(p), 12, 1) != 0
-}
-func (p pstate) Q() bool {
-	return types.ExtractBits(uint64(p), 11, 1) != 0
-}
-func (p pstate) GE() bool {
-	return types.ExtractBits(uint64(p), 10, 4) != 0
-}
-func (p pstate) SSBS() bool {
 	return types.ExtractBits(uint64(p), 9, 1) != 0
 }
-func (p pstate) IT() bool {
-	return types.ExtractBits(uint64(p), 1, 8) != 0
+func (p pstate) A() bool {
+	return types.ExtractBits(uint64(p), 8, 1) != 0
 }
-func (p pstate) J() bool {
-	return types.ExtractBits(uint64(p), 0, 1) != 0
+func (p pstate) I() bool {
+	return types.ExtractBits(uint64(p), 7, 1) != 0
 }
-func (p pstate) T() bool {
-	return types.ExtractBits(uint64(p), 0, 1) != 0
+func (p pstate) F() bool {
+	return types.ExtractBits(uint64(p), 6, 1) != 0
 }
-func (p pstate) E() bool {
-	return types.ExtractBits(uint64(p), 0, 1) != 0
+
+// func (p pstate) PAN() bool {
+// 	return types.ExtractBits(uint64(p), 23, 1) != 0
+// }
+// func (p pstate) UAO() bool {
+// 	return types.ExtractBits(uint64(p), 22, 1) != 0
+// }
+// func (p pstate) DIT() bool {
+// 	return types.ExtractBits(uint64(p), 21, 1) != 0
+// }
+// func (p pstate) TCO() bool {
+// 	return types.ExtractBits(uint64(p), 20, 1) != 0
+// }
+func (p pstate) BType() branchType {
+	return branchType(types.ExtractBits(uint64(p), 10, 2))
 }
-func (p pstate) M() bool {
+func (p pstate) SS() bool {
+	return types.ExtractBits(uint64(p), 21, 1) != 0
+}
+func (p pstate) IL() bool {
+	return types.ExtractBits(uint64(p), 20, 1) != 0
+}
+
+// func (p pstate) EL() uint64 {
+// 	return types.ExtractBits(uint64(p), 15, 2)
+// }
+// func (p pstate) Q() bool {
+// 	return types.ExtractBits(uint64(p), 11, 1) != 0
+// }
+// func (p pstate) GE() bool {
+// 	return types.ExtractBits(uint64(p), 10, 4) != 0
+// }
+// func (p pstate) SSBS() bool {
+// 	return types.ExtractBits(uint64(p), 9, 1) != 0
+// }
+// func (p pstate) IT() bool {
+// 	return types.ExtractBits(uint64(p), 1, 8) != 0
+// }
+// func (p pstate) J() bool {
+// 	return types.ExtractBits(uint64(p), 0, 1) != 0
+// }
+// func (p pstate) T() bool {
+// 	return types.ExtractBits(uint64(p), 0, 1) != 0
+// }
+// func (p pstate) E() bool {
+// 	return types.ExtractBits(uint64(p), 0, 1) != 0
+// }
+func (p pstate) NRW() bool {
+	return types.ExtractBits(uint64(p), 5, 1) != 0
+}
+func (p pstate) M() pstateMode {
+	return pstateMode(types.ExtractBits(uint64(p), 0, 4))
+}
+func (p pstate) SP() bool {
 	return types.ExtractBits(uint64(p), 0, 1) != 0
 }
 
@@ -235,6 +240,13 @@ func (p pstate) String() string {
 	if p.F() {
 		flags = append(flags, "F")
 	}
+	if p.BType() > 0 {
+		flags = append(flags, p.BType().String())
+	}
+	if p.BType() > 0 {
+		flags = append(flags, p.BType().String())
+	}
+	flags = append(flags, p.M().String())
 	return colorDetails("[%s]", strings.Join(flags, " "))
 }
 

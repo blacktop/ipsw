@@ -1,6 +1,6 @@
 package emu
 
-//go:generate stringer -type=interrupt,branchType -output emu_string.go
+//go:generate stringer -type=interrupt,branchType,pstateMode -output emu_string.go
 
 import (
 	"fmt"
@@ -21,16 +21,28 @@ const (
 type branchType uint8
 
 const (
-	DIRCALL   branchType = iota // Direct Branch with link
-	INDCALL                     // Indirect Branch with link
-	ERET                        // Exception return (indirect)
-	DBGEXIT                     // Exit from Debug state
-	RET                         // Indirect branch with function return hint
-	DIR                         // Direct branch
-	INDIR                       // Indirect branch
-	EXCEPTION                   // Exception entry
-	RESET                       // Reset
-	UNKNOWN                     // Other
+	DIRCALL   branchType = iota + 1 // Direct Branch with link
+	INDCALL                         // Indirect Branch with link
+	ERET                            // Exception return (indirect)
+	DBGEXIT                         // Exit from Debug state
+	RET                             // Indirect branch with function return hint
+	DIR                             // Direct branch
+	INDIR                           // Indirect branch
+	EXCEPTION                       // Exception entry
+	RESET                           // Reset
+	UNKNOWN                         // Other
+)
+
+type pstateMode uint8
+
+const (
+	EL3h pstateMode = 13
+	EL3t pstateMode = 12
+	EL2h pstateMode = 9
+	EL2t pstateMode = 8
+	EL1h pstateMode = 5
+	EL1t pstateMode = 4
+	EL0t pstateMode = 0
 )
 
 type interrupt uint32
@@ -97,6 +109,10 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 	}
 
 	return e, nil
+}
+
+func (e *Emulation) Close() error {
+	return e.mu.Close()
 }
 
 // InitStack initialize stack to 8MBs
@@ -308,7 +324,18 @@ func (e *Emulation) SetupHooks() error {
 			e.DumpMemRegions()
 			fmt.Printf(colorHook("[STACK]\n"))
 			e.DumpMem(STACK_DATA, 0x20)
+			// cont := false
+			// prompt := &survey.Confirm{
+			// 	Message: "Continue?",
+			// }
+			// survey.AskOne(prompt, &cont)
+			// if cont {
+			// 	if pc, err := e.mu.RegRead(uc.ARM64_REG_PC); err == nil {
+			// 		e.mu.RegWrite(uc.ARM64_REG_PC, pc+4)
+			// 	}
+			// } else {
 			log.Fatal("UNHANDLED INTERRUPT")
+			// }
 		}
 	}, 1, 0); err != nil {
 		return fmt.Errorf("failed to register interrupt hook: %v", err)

@@ -85,9 +85,11 @@ var dyldEmuCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		mu, err := emu.NewEmulation(f, &emu.Config{
-			Verbose: Verbose,
-		})
+		mu, err := emu.NewEmulation(f, &emu.Config{Verbose: Verbose})
+		if err != nil {
+			return err
+		}
+		defer mu.Close()
 
 		image, err := f.GetImageContainingVMAddr(startAddr)
 		if err != nil {
@@ -101,7 +103,7 @@ var dyldEmuCmd = &cobra.Command{
 		defer m.Close()
 
 		/*
-		* Read in data to disassemble
+		 * Read in data to disassemble
 		 */
 		if instructions > 0 {
 			log.Warnf("emulating %d instructions at %#x", instructions, startAddr)

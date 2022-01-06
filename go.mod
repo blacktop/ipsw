@@ -28,7 +28,7 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	github.com/ulikunitz/xz v0.5.10
-	github.com/unicorn-engine/unicorn v0.0.0-20211230000510-085ee07c73bf
+	github.com/unicorn-engine/unicorn v0.0.0-20220105210059-c671efe79899
 	github.com/vbauerster/mpb/v7 v7.3.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f
