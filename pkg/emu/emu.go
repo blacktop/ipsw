@@ -11,6 +11,13 @@ import (
 )
 
 const (
+	stack_address      = 0x7ffcf0000000
+	stack_size         = 0x19a00000
+	vmmap_trap_address = 0x4000000f4000
+	mmap_address       = 0x7ffbf0100000
+	heap_address       = 0x500000000
+	heap_size          = 0x5000000
+
 	STACK_BASE   = 0x60000000
 	STACK_GUARD  = STACK_BASE + 0x1000
 	STACK_DATA   = STACK_GUARD + 0x1000
@@ -113,7 +120,14 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 	if err := e.mu.RegWrite(uc.ARM64_REG_TPIDRRO_EL0, STACK_DATA); err != nil {
 		return nil, fmt.Errorf("failed to init tpidrro_el0 register: %v", err)
 	}
-
+	// enable vfp
+	cpacrEL1, err := e.mu.RegRead(uc.ARM64_REG_CPACR_EL1)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read cpacr_el1 register: %v", err)
+	}
+	if err := e.mu.RegWrite(uc.ARM64_REG_CPACR_EL1, cpacrEL1|0x300000); err != nil {
+		return nil, fmt.Errorf("failed to enable vfp: %v", err)
+	}
 	return e, nil
 }
 
