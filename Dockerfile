@@ -1,7 +1,7 @@
 ####################################################
 # GOLANG BUILDER
 ####################################################
-FROM golang:1.17.5 as builder
+FROM golang:1.17.6 as builder
 
 COPY . /go/src/github.com/blacktop/ipsw
 WORKDIR /go/src/github.com/blacktop/ipsw
