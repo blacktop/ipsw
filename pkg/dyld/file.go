@@ -2,7 +2,6 @@ package dyld
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -14,7 +13,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
-	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
@@ -62,6 +60,7 @@ type File struct {
 	PatchInfo       CachePatchInfo
 	LocalSymInfo    localSymbolInfo
 	AcceleratorInfo CacheAcceleratorInfo
+	ImageArray      map[uint64]*CImage
 
 	BranchPools    []uint64
 	CodeSignatures map[mtypes.UUID]codesignature
@@ -234,6 +233,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.r = make(map[mtypes.UUID]io.ReaderAt)
 	f.closers = make(map[mtypes.UUID]io.Closer)
 	f.AddressToSymbol = make(map[uint64]string, 7000000)
+	f.ImageArray = make(map[uint64]*CImage)
 
 	// Read and decode dyld magic
 	var ident [16]byte
@@ -574,6 +574,27 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		f.SubCacheInfo = make([]SubCacheInfo, f.Headers[uuid].NumSubCaches)
 		if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
 			return err
+		}
+	}
+
+	// Read dyld image array info
+	if f.Headers[uuid].DylibsImageArrayAddr > 0 || f.Headers[uuid].DylibsImageArrayWithSubCachesAddr > 0 {
+		if err := f.GetDylibsImageArray(); err != nil {
+			return fmt.Errorf("failed to parse dylibs image array: %v", err)
+		}
+	}
+
+	// Read other image array info
+	if f.Headers[uuid].OtherImageArrayAddr > 0 {
+		if err := f.GetOtherImageArray(); err != nil {
+			return fmt.Errorf("failed to parse dylibs image array: %v", err)
+		}
+	}
+
+	// Read program closure image array info
+	if f.Headers[uuid].ProgClosuresTrieAddr > 0 || f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr > 0 {
+		if err := f.GetProgClosureImageArray(); err != nil {
+			return fmt.Errorf("failed to parse program closure image array: %v", err)
 		}
 	}
 
@@ -1137,100 +1158,3 @@ func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
 // 	}
 // 	return int(imageIndex), true, nil
 // }
-
-// GetDylibIndex returns the index of a given dylib
-func (f *File) GetDylibIndex(path string) (uint64, error) {
-	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
-
-	if f.Headers[f.UUID].DylibsTrieAddr == 0 {
-		return 0, fmt.Errorf("cache does not contain dylibs trie info")
-	}
-
-	off, err := f.GetOffsetForUUID(f.UUID, f.Headers[f.UUID].DylibsTrieAddr)
-	if err != nil {
-		return 0, err
-	}
-
-	sr.Seek(int64(off), io.SeekStart)
-
-	dylibTrie := make([]byte, f.Headers[f.UUID].DylibsTrieSize)
-	if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
-		return 0, err
-	}
-
-	imageNode, err := trie.WalkTrie(dylibTrie, path)
-	if err != nil {
-		return 0, fmt.Errorf("dylib not found in dylibs trie")
-	}
-
-	imageIndex, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(dylibTrie[imageNode:]))
-	if err != nil {
-		return 0, fmt.Errorf("failed to read ULEB at image node in dyblibs trie")
-	}
-
-	return imageIndex, nil
-}
-
-// FindDlopenOtherImage returns the dlopen OtherImage for a given path
-func (f *File) FindDlopenOtherImage(path string) (uint64, error) {
-	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
-
-	if f.Headers[f.UUID].OtherTrieAddr == 0 {
-		return 0, fmt.Errorf("cache does not contain dlopen other image trie info")
-	}
-
-	offset, err := f.GetOffsetForUUID(f.UUID, f.Headers[f.UUID].OtherTrieAddr)
-	if err != nil {
-		return 0, err
-	}
-
-	sr.Seek(int64(offset), io.SeekStart)
-
-	otherTrie := make([]byte, f.Headers[f.UUID].OtherTrieSize)
-	if err := binary.Read(sr, f.ByteOrder, &otherTrie); err != nil {
-		return 0, err
-	}
-
-	imageNode, err := trie.WalkTrie(otherTrie, path)
-	if err != nil {
-		return 0, err
-	}
-
-	imageNum, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(otherTrie[imageNode:]))
-	if err != nil {
-		return 0, err
-	}
-
-	return imageNum, nil
-}
-
-// FindClosure returns the closure pointer for a given path
-func (f *File) FindClosure(executablePath string) (uint64, error) {
-	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
-
-	if f.Headers[f.UUID].ProgClosuresTrieAddr == 0 {
-		return 0, fmt.Errorf("cache does not contain prog closures trie info")
-	}
-
-	offset, err := f.GetOffsetForUUID(f.UUID, f.Headers[f.UUID].ProgClosuresTrieAddr)
-	if err != nil {
-		return 0, err
-	}
-
-	sr.Seek(int64(offset), io.SeekStart)
-
-	progClosuresTrie := make([]byte, f.Headers[f.UUID].ProgClosuresTrieSize)
-	if err := binary.Read(sr, f.ByteOrder, &progClosuresTrie); err != nil {
-		return 0, err
-	}
-	imageNode, err := trie.WalkTrie(progClosuresTrie, executablePath)
-	if err != nil {
-		return 0, err
-	}
-	closureOffset, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(progClosuresTrie[imageNode:]))
-	if err != nil {
-		return 0, err
-	}
-
-	return f.Headers[f.UUID].ProgClosuresAddr + closureOffset, nil
-}

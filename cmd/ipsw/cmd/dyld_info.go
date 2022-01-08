@@ -41,6 +41,8 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldInfoCmd)
 
+	dyldInfoCmd.Flags().BoolP("closures", "c", false, "Dump program launch closures")
+	dyldInfoCmd.Flags().BoolP("dlopen", "d", false, "Dump all dylibs and bundles with dlopen closures")
 	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
 	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
@@ -80,6 +82,8 @@ var dyldInfoCmd = &cobra.Command{
 
 		// showHeader, _ := cmd.Flags().GetBool("header")
 		showDylibs, _ := cmd.Flags().GetBool("dylibs")
+		showClosures, _ := cmd.Flags().GetBool("closures")
+		showDlopenOthers, _ := cmd.Flags().GetBool("dlopen")
 		showSignature, _ := cmd.Flags().GetBool("sig")
 
 		outAsJSON, _ := cmd.Flags().GetBool("json")
@@ -295,6 +299,64 @@ var dyldInfoCmd = &cobra.Command{
 				}
 			}
 			w.Flush()
+		}
+
+		if showClosures {
+			pcs, err := f.GetProgClosuresOffsets()
+			if err != nil {
+				return err
+			}
+			var pclosureAddr uint64
+			if f.Headers[f.UUID].ProgClosuresTrieAddr != 0 {
+				pclosureAddr = f.Headers[f.UUID].ProgClosuresAddr
+			} else {
+				pclosureAddr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
+			}
+			fmt.Println("Prog Closures")
+			fmt.Println("=============")
+			for _, pc := range pcs {
+				fmt.Printf("%#x\t%s\n", pclosureAddr+uint64(pc.Flags), pc.Name)
+			}
+
+			// oimgs, err := f.GetOtherImageArray()
+			// if err != nil {
+			// 	return err
+			// }
+
+			// myIDX, _ := f.GetDlopenOtherImageIndex("/Applications/DiagnosticsService.app/PlugIns/Diagnostic-8290-EFD.appex/Frameworks/DiagnosticsSupport.framework/DiagnosticsSupport")
+			// fmt.Printf("DiagnosticsSupportimage index: %d\n", myIDX)
+			// // fmt.Println(oimgs[myIDX])
+			// fmt.Println("OtherImages")
+			// fmt.Println("===========")
+			// for _, oimg := range oimgs {
+			// 	// if oimg.Name == "/Applications/DiagnosticsService.app/PlugIns/Diagnostic-8290-EFD.appex/Frameworks/DiagnosticsSupport.framework/DiagnosticsSupport" {
+			// 	// 	fmt.Println(oimg)
+			// 	// }
+			// 	fmt.Println(oimg.Name)
+			// 	fmt.Println(oimg.Flags)
+			// 	for _, seg := range oimg.DiskSegments {
+			// 		fmt.Println(seg)
+			// 	}
+			// 	for _, bind := range oimg.Binds {
+			// 		fmt.Println(bind)
+			// 	}
+			// 	for _, rb := range oimg.Rebases {
+			// 		fmt.Println(rb)
+			// 	}
+			// }
+		}
+
+		if showDlopenOthers {
+			oo, err := f.GetDlopenOtherImages()
+			if err != nil {
+				return err
+			}
+			oaddr := f.Headers[f.UUID].OtherImageArrayAddr
+			fmt.Println("dlopen(s)")
+			fmt.Println("=========")
+			for _, o := range oo {
+				fmt.Printf("%#x\t%s\n", oaddr+uint64(o.Flags), o.Name)
+			}
 		}
 
 		return nil
