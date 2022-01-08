@@ -84,12 +84,12 @@ var dyldImageCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				ci := f.ImageArray[idx]
+				ci := f.ImageArray[uint32(idx)]
 				fmt.Println(ci)
 				return nil
 			} else {
 				if idx, err := f.GetDlopenOtherImageIndex(imgName); err == nil {
-					ci := f.ImageArray[idx]
+					ci := f.ImageArray[uint32(idx)]
 					fmt.Println(ci)
 					return nil
 				} else {

@@ -96,6 +96,21 @@ type CImage struct {
 	ImageOverride         uint32
 }
 
+type LaunchClosure struct {
+	Flags        lcFlags
+	Images       []*CImage
+	DyldUUID     types.UUID
+	LibSystemNum uint32
+	LibDyldEntry resolvedSymbolTarget
+	TopImage     uint32
+	MainEntry    resolvedSymbolTarget
+	StartEntry   resolvedSymbolTarget
+	ProgVars     uint32
+}
+
+func (i CImage) GetID() uint32 {
+	return uint32(i.Flags.ImageNum())
+}
 func (i CImage) PageSize() uint32 {
 	if i.Flags.Has16KbPages() {
 		return 0x4000
@@ -141,18 +156,21 @@ func (i CImage) String() string {
 			terms += fmt.Sprintf("\t%#x\n", t)
 		}
 	}
+	var cdhash string
+	if len(i.CDHash) > 0 {
+		cdhash = fmt.Sprintf("CDHash: %s\n", cdhash)
+	}
 	return fmt.Sprintf(
 		"ID:     %d\n"+
 			"Name:   %s\n"+
 			"UUID:   %s\n"+
 			"Flags:  %s\n"+
-			"CDHash: %s\n"+
-			"%s%s%s%s%s",
+			"%s%s%s%s%s%s",
 		i.ID,
 		i.Name,
 		i.UUID,
 		i.Flags,
-		i.CDHash,
+		cdhash,
 		mappings,
 		cacheSegs,
 		diskSegs,
@@ -184,6 +202,8 @@ func (d cacheSegmentType) String() string {
 	return fmt.Sprintf("offset: %#08x, size: %#08x, perms: %s", d.CacheOffset(), d.Size(), types.VmProtection(d.Permissions()))
 }
 
+const ReadOnlyDataPermissions = 2
+
 type diskSegmentType uint64
 
 func (d diskSegmentType) FilePageCount() uint32 {
@@ -199,10 +219,14 @@ func (d diskSegmentType) PaddingNotSeg() bool {
 	return uint32(types.ExtractBits(uint64(d), 63, 1)) != 0
 }
 func (d diskSegmentType) String() string {
+	perms := types.VmProtection(d.Permissions()).String()
+	if d.Permissions() == ReadOnlyDataPermissions {
+		perms = "-w-"
+	}
 	return fmt.Sprintf("file_pages: %d, vm_pages: %d, perms: %s, noncontig_segs : %t",
 		d.FilePageCount(),
 		d.VMPageCount(),
-		types.VmProtection(d.Permissions()),
+		perms,
 		d.PaddingNotSeg())
 }
 
@@ -484,6 +508,28 @@ func (f lcFlags) UsedInterposing() bool {
 }
 func (f lcFlags) Padding() uint32 {
 	return uint32(types.ExtractBits(uint64(f), 0, 16))
+}
+func (f lcFlags) String() string {
+	var flags []string
+	if f.UsedAtPaths() {
+		flags = append(flags, "@paths")
+	}
+	if !f.UsedFallbackPaths() {
+		flags = append(flags, "fallback_paths")
+	}
+	if f.HasInsertedLibraries() {
+		flags = append(flags, "inserted_libs")
+	}
+	if f.HasProgVars() {
+		flags = append(flags, "prog_vars")
+	}
+	if f.UsedInterposing() {
+		flags = append(flags, "interposing")
+	}
+	return fmt.Sprintf("initial_image_count: %d, flags: [%s]",
+		f.InitImageCount(),
+		strings.Join(flags, "|"),
+	)
 }
 
 type cFlags uint64
@@ -767,7 +813,7 @@ func (f *File) GetProgClosureImageArray() error {
 		return err
 	}
 
-	return f.parseClosureImageArray(bytes.NewReader(imageArrayData))
+	return f.parseClosureContainers(bytes.NewReader(imageArrayData))
 }
 
 // GetDylibsImageArray returns the dylibs image array
@@ -801,7 +847,7 @@ func (f *File) GetDylibsImageArray() error {
 		return err
 	}
 
-	return f.parseClosureImageArray(bytes.NewReader(imageArrayData))
+	return f.parseClosureContainers(bytes.NewReader(imageArrayData))
 }
 
 // GetDylibIndex returns the index of a given dylib
@@ -864,11 +910,10 @@ func (f *File) GetOtherImageArray() error {
 		return err
 	}
 
-	return f.parseClosureImageArray(bytes.NewReader(imageArrayData))
+	return f.parseClosureContainers(bytes.NewReader(imageArrayData))
 }
 
-func (f *File) parseClosureImageArray(r *bytes.Reader) error {
-	var iarray ImageArray
+func (f *File) parseClosureContainers(r *bytes.Reader) error {
 	var container typedBytes
 
 	for {
@@ -877,29 +922,27 @@ func (f *File) parseClosureImageArray(r *bytes.Reader) error {
 		if err == io.EOF {
 			break
 		}
-
 		if err != nil {
 			return err
 		}
 
 		switch container.Type() {
 		case launchClosure: // contains TypedBytes of closure attributes including imageArray
-			log.Debug(container.String())
-			continue
+			r.Seek(-int64(sizeOfTypeBytes), io.SeekCurrent)
+			if err := f.parseLaunchClosure(io.NewSectionReader(r, int64(sizeOfTypeBytes), int64(container.PayloadLength()+sizeOfTypeBytes))); err != nil {
+				return fmt.Errorf("failed to parse launch closure: %v", err)
+			}
+			r.Seek(int64(container.PayloadLength()+sizeOfTypeBytes), io.SeekCurrent)
 		case imageArray: // sizeof(ImageArray) + sizeof(uint32_t)*count + size of all images
-			iarray.T = container
-			if err := binary.Read(r, binary.LittleEndian, &iarray.FrstImageNum); err != nil {
-				return err
+			r.Seek(-int64(sizeOfTypeBytes*2), io.SeekCurrent)
+			cimages, err := f.parseClosureImageArray(io.NewSectionReader(r, 0, int64(container.PayloadLength()+sizeOfTypeBytes)))
+			if err != nil {
+				return fmt.Errorf("failed to parse closure image array: %v", err)
 			}
-			if err := binary.Read(r, binary.LittleEndian, &iarray.CR); err != nil {
-				return err
+			for _, cimg := range cimages {
+				f.ImageArray[cimg.ID] = cimg
 			}
-			log.Debug(iarray.String())
-			iarray.Offsets = make([]uint32, iarray.CR.Count())
-			if err := binary.Read(r, binary.LittleEndian, &iarray.Offsets); err != nil {
-				return err
-
-			}
+			r.Seek(int64(container.PayloadLength()+sizeOfTypeBytes), io.SeekCurrent)
 		case image: // contains TypedBytes of image attributes
 			panic("not implimented")
 		case dlopenClosure: // contains TypedBytes of closure attributes including imageArray
@@ -907,35 +950,131 @@ func (f *File) parseClosureImageArray(r *bytes.Reader) error {
 		default:
 			return fmt.Errorf("got unexpected cointainer type %s", container.Type())
 		}
-
-		for _, off := range iarray.Offsets {
-			var itype typedBytes
-			if err := binary.Read(r, binary.LittleEndian, &itype); err != nil {
-				return err
-			}
-
-			if itype.Type() != image {
-				log.Debug(itype.String())
-				return fmt.Errorf("got unexpected type %s expected image", itype.Type())
-			}
-
-			r := io.NewSectionReader(
-				r,
-				int64(off+(sizeOfTypeBytes*2)),
-				int64(itype.PayloadLength()),
-			)
-
-			ci, err := parseClosureImage(r)
-			if err != nil {
-				return fmt.Errorf("failed to parse image for %s", itype)
-			}
-
-			f.ImageArray[uint64(ci.ID)] = ci
-			fmt.Println(ci)
-		}
 	}
 
 	return nil
+}
+
+func (f *File) parseLaunchClosure(r *io.SectionReader) error {
+	lc := &LaunchClosure{}
+
+	var tbytes typedBytes
+	for {
+		err := binary.Read(r, binary.LittleEndian, &tbytes)
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+
+		log.Debug(tbytes.String())
+
+		switch tbytes.Type() {
+		case imageArray:
+			cimages, err := f.parseClosureImageArray(io.NewSectionReader(r, 0, int64(tbytes.PayloadLength()+sizeOfTypeBytes)))
+			if err != nil {
+				return fmt.Errorf("failed to parse closure image array: %v", err)
+			}
+			lc.Images = append(lc.Images, cimages...)
+		case closureFlags: // sizeof(Closure::Flags)
+			if err := binary.Read(r, binary.LittleEndian, &lc.Flags); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		case dyldCacheUUID: // 16
+			if err := binary.Read(r, binary.LittleEndian, &lc.DyldUUID); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		case missingFiles:
+			panic("not implimented")
+		case envVar: // "DYLD_BLAH=stuff"
+			panic("not implimented")
+		case topImage: // sizeof(ImageNum)
+			if err := binary.Read(r, binary.LittleEndian, &lc.TopImage); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		case libDyldEntry: // sizeof(ResolvedSymbolTarget)
+			if err := binary.Read(r, binary.LittleEndian, &lc.LibDyldEntry); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		case libSystemNum: // sizeof(ImageNum)
+			if err := binary.Read(r, binary.LittleEndian, &lc.LibSystemNum); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		case mainEntry: // sizeof(ResolvedSymbolTarget)
+			if err := binary.Read(r, binary.LittleEndian, &lc.MainEntry); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		case startEntry: // sizeof(ResolvedSymbolTarget)     // used by programs built with crt1.o
+			if err := binary.Read(r, binary.LittleEndian, &lc.StartEntry); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		case cacheOverrides: // sizeof(PatchEntry) * count       // used if process uses interposing or roots (cached dylib overrides)
+			panic("not implimented")
+		case interposeTuples: // sizeof(InterposingTuple) * count
+			panic("not implimented")
+		case existingFiles: // uint64_t + (SkippedFiles * count)
+			panic("not implimented")
+		case selectorTable: // uint32_t + (sizeof(ObjCSelectorImage) * count) + hashTable size
+			panic("not implimented")
+		case classTable: // (3 * uint32_t) + (sizeof(ObjCClassImage) * count) + classHashTable size + protocolHashTable size
+			// panic("not implimented")
+		case warning: // len = uint32_t + length path + 1 use one entry per warning
+			panic("not implimented")
+		case duplicateClassesTable: // duplicateClassesHashTable
+			panic("not implimented")
+		case progVars: // sizeof(uint32_t)
+			panic("not implimented")
+			if err := binary.Read(r, binary.LittleEndian, &lc.ProgVars); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+		}
+		r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
+	}
+
+	f.Closures = append(f.Closures, lc)
+
+	return nil
+}
+
+func (f *File) parseClosureImageArray(r *io.SectionReader) ([]*CImage, error) {
+	var cimages []*CImage
+	var iarray ImageArray
+
+	if err := binary.Read(r, binary.LittleEndian, &iarray.imageArrayType); err != nil {
+		return nil, err
+	}
+
+	iarray.Offsets = make([]uint32, iarray.CR.Count())
+	if err := binary.Read(r, binary.LittleEndian, &iarray.Offsets); err != nil {
+		return nil, err
+	}
+
+	for _, off := range iarray.Offsets {
+		var itype typedBytes
+		if err := binary.Read(r, binary.LittleEndian, &itype); err != nil {
+			return nil, err
+		}
+
+		if itype.Type() != image {
+			log.Debug(itype.String())
+			return nil, fmt.Errorf("got unexpected type %s expected image", itype.Type())
+		}
+
+		log.Debug(itype.String())
+
+		ci, err := parseClosureImage(io.NewSectionReader(r, int64((sizeOfTypeBytes*2)+off), int64(itype.PayloadLength())))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %s: %v", itype, err)
+		}
+
+		cimages = append(cimages, ci)
+
+		r.Seek(int64(itype.PayloadLength()), io.SeekCurrent)
+	}
+
+	return cimages, nil
 }
 
 func parseClosureImage(r *io.SectionReader) (*CImage, error) {
@@ -957,21 +1096,21 @@ func parseClosureImage(r *io.SectionReader) (*CImage, error) {
 		switch tbytes.Type() {
 		case imageFlags:
 			if err := binary.Read(r, binary.LittleEndian, &ci.Flags); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
-			ci.ID = uint32(ci.Flags.ImageNum())
+			ci.ID = ci.GetID()
 		case pathWithHash:
 			if err := binary.Read(r, binary.LittleEndian, &ci.Hash); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 			dat := make([]byte, tbytes.PayloadLength()-uint32(binary.Size(uint32(0))))
 			if err := binary.Read(r, binary.LittleEndian, &dat); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 			ci.Name = strings.Trim(string(dat), "\x00")
 		case fileInodeAndTime:
 			if err := binary.Read(r, binary.LittleEndian, &ci.FileInfo); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case cdHash:
 			if tbytes.PayloadLength() != 20 {
@@ -979,168 +1118,134 @@ func parseClosureImage(r *io.SectionReader) (*CImage, error) {
 			}
 			ci.CDHash = make([]byte, tbytes.PayloadLength())
 			if err := binary.Read(r, binary.LittleEndian, &ci.CDHash); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case uuid:
 			if err := binary.Read(r, binary.LittleEndian, &ci.UUID); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case mappingInfo:
 			if err := binary.Read(r, binary.LittleEndian, &ci.MappingInfo); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case diskSegment:
 			ci.DiskSegments = make([]diskSegmentType, tbytes.PayloadLength()/uint32(binary.Size(diskSegmentType(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.DiskSegments); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case cacheSegment:
 			ci.CacheSegments = make([]cacheSegmentType, tbytes.PayloadLength()/uint32(binary.Size(cacheSegmentType(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.CacheSegments); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case dependents:
 			ci.Dependents = make([]linkedImage, tbytes.PayloadLength()/uint32(binary.Size(linkedImage(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.Dependents); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case initOffsets:
 			ci.InitializerOffsets = make([]uint32, tbytes.PayloadLength()/uint32(binary.Size(uint32(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.InitializerOffsets); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case dofOffsets:
 			ci.DofOffsets = make([]uint32, tbytes.PayloadLength()/uint32(binary.Size(uint32(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.DofOffsets); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case codeSignLoc:
 			if err := binary.Read(r, binary.LittleEndian, &ci.CodeSignatureLocation); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case farPlayLoc:
 			if err := binary.Read(r, binary.LittleEndian, &ci.FarPlayLocation); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case rebaseFixups:
 			ci.Rebases = make([]rebasePatternType, tbytes.PayloadLength()/uint32(binary.Size(rebasePatternType(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.Rebases); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case bindFixups:
 			ci.Binds = make([]BindPattern, tbytes.PayloadLength()/uint32(binary.Size(BindPattern{})))
 			if err := binary.Read(r, binary.LittleEndian, &ci.Binds); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case cachePatchInfo:
 			return nil, fmt.Errorf("found deprecated type %s", tbytes.Type())
 		case textFixups:
 			ci.TextFixups = make([]TextFixupPattern, tbytes.PayloadLength()/uint32(binary.Size(TextFixupPattern{})))
 			if err := binary.Read(r, binary.LittleEndian, &ci.TextFixups); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case imageOverride:
 			if err := binary.Read(r, binary.LittleEndian, &ci.ImageOverride); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case initBefores:
 			ci.InitOrder = make([]uint32, tbytes.PayloadLength()/uint32(binary.Size(uint32(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.InitOrder); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case initsSection:
 			ci.InitializerSections = make([]initializerSectionRangeType, tbytes.PayloadLength()/uint32(binary.Size(initializerSectionRangeType{})))
 			if err := binary.Read(r, binary.LittleEndian, &ci.InitializerSections); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case chainedFixupsTargets:
 			ci.ChainedFixupsTargets = make([]resolvedSymbolTarget, tbytes.PayloadLength()/uint32(binary.Size(resolvedSymbolTarget(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.ChainedFixupsTargets); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case termOffsets:
 			ci.TerminatorOffsets = make([]uint32, tbytes.PayloadLength()/uint32(binary.Size(uint32(0))))
 			if err := binary.Read(r, binary.LittleEndian, &ci.TerminatorOffsets); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case chainedStartsOffset:
 			if err := binary.Read(r, binary.LittleEndian, &ci.ChainedStartsOffset); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case objcFixups:
 			contentSize := int(tbytes.PayloadLength())
 			if err := binary.Read(r, binary.LittleEndian, &ci.ObjcFixups.objcFixupsType); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 			contentSize -= binary.Size(objcFixupsType{})
 			if ci.ObjcFixups.ProtocolFixupCount > 0 {
 				ci.ObjcFixups.ProtocolISAFixups = make([]protocolISAFixup, ci.ObjcFixups.ProtocolFixupCount)
 				if err := binary.Read(r, binary.LittleEndian, &ci.ObjcFixups.ProtocolISAFixups); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 				}
 				contentSize -= binary.Size(ci.ObjcFixups.ProtocolISAFixups)
 			}
 			if ci.ObjcFixups.SelRefFixupCount > 0 {
 				ci.ObjcFixups.SelRefFixups = make([]SelectorReferenceFixup, ci.ObjcFixups.SelRefFixupCount)
 				if err := binary.Read(r, binary.LittleEndian, &ci.ObjcFixups.SelRefFixups); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 				}
 				contentSize -= binary.Size(ci.ObjcFixups.SelRefFixups)
 			}
 			if contentSize > 0 {
 				if err := binary.Read(r, binary.LittleEndian, &ci.ObjcFixups.StableSwiftFixupCount); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 				}
 				if err := binary.Read(r, binary.LittleEndian, &ci.ObjcFixups.MethodListFixupCount); err != nil {
-					return nil, err
+					return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 				}
 				if ci.ObjcFixups.StableSwiftFixupCount > 0 {
 					ci.ObjcFixups.ClassStableSwiftFixups = make([]classStableSwiftFixup, ci.ObjcFixups.StableSwiftFixupCount)
 					if err := binary.Read(r, binary.LittleEndian, &ci.ObjcFixups.ClassStableSwiftFixups); err != nil {
-						return nil, err
+						return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 					}
 				}
 				if ci.ObjcFixups.MethodListFixupCount > 0 {
 					ci.ObjcFixups.MethodListFixups = make([]methodListFixup, ci.ObjcFixups.MethodListFixupCount)
 					if err := binary.Read(r, binary.LittleEndian, &ci.ObjcFixups.MethodListFixups); err != nil {
-						return nil, err
+						return nil, fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 					}
 				}
 			}
-		case closureFlags: // sizeof(Closure::Flags)
-			panic("not implimented")
-		case dyldCacheUUID: // 16
-			panic("not implimented")
-		case missingFiles:
-			panic("not implimented")
-		case envVar: // "DYLD_BLAH=stuff"
-			panic("not implimented")
-		case topImage: // sizeof(ImageNum)
-			panic("not implimented")
-		case libDyldEntry: // sizeof(ResolvedSymbolTarget)
-			panic("not implimented")
-		case libSystemNum: // sizeof(ImageNum)
-			panic("not implimented")
-		case mainEntry: // sizeof(ResolvedSymbolTarget)
-			panic("not implimented")
-		case startEntry: // sizeof(ResolvedSymbolTarget)     // used by programs built with crt1.o
-			panic("not implimented")
-		case cacheOverrides: // sizeof(PatchEntry) * count       // used if process uses interposing or roots (cached dylib overrides)
-			panic("not implimented")
-		case interposeTuples: // sizeof(InterposingTuple) * count
-			panic("not implimented")
-		case existingFiles: // uint64_t + (SkippedFiles * count)
-			panic("not implimented")
-		case selectorTable: // uint32_t + (sizeof(ObjCSelectorImage) * count) + hashTable size
-			panic("not implimented")
-		case classTable: // (3 * uint32_t) + (sizeof(ObjCClassImage) * count) + classHashTable size + protocolHashTable size
-			panic("not implimented")
-		case warning: // len = uint32_t + length path + 1 use one entry per warning
-			panic("not implimented")
-		case duplicateClassesTable: // duplicateClassesHashTable
-			panic("not implimented")
-		case progVars: // sizeof(uint32_t)
-			panic("not implimented")
 		default:
 			return nil, fmt.Errorf("found unsupported type %s", tbytes.Type())
 		}

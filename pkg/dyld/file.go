@@ -60,7 +60,8 @@ type File struct {
 	PatchInfo       CachePatchInfo
 	LocalSymInfo    localSymbolInfo
 	AcceleratorInfo CacheAcceleratorInfo
-	ImageArray      map[uint64]*CImage
+	ImageArray      map[uint32]*CImage
+	Closures        []*LaunchClosure
 
 	BranchPools    []uint64
 	CodeSignatures map[mtypes.UUID]codesignature
@@ -233,7 +234,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.r = make(map[mtypes.UUID]io.ReaderAt)
 	f.closers = make(map[mtypes.UUID]io.Closer)
 	f.AddressToSymbol = make(map[uint64]string, 7000000)
-	f.ImageArray = make(map[uint64]*CImage)
+	f.ImageArray = make(map[uint32]*CImage)
 
 	// Read and decode dyld magic
 	var ident [16]byte
