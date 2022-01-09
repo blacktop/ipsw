@@ -136,7 +136,7 @@ Images
 You can also dump the `launch closures`
 
 ```bash
-❯ ipsw dyld info -l -s dyld_shared_cache | head -n35
+❯ ipsw dyld info dyld_shared_cache --closures
 
 Prog Closure Offsets
 ====================
