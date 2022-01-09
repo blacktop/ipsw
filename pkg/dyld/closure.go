@@ -241,13 +241,17 @@ func (i CImage) String(d *File, verbose bool) string {
 	if len(i.CDHash) > 0 {
 		cdhash = fmt.Sprintf("CDHash:            %s\n", i.CDHash)
 	}
+	var id string
+	if i.ID != FirstLaunchClosureImageNum {
+		id = fmt.Sprintf("ID:                %d\n", i.ID)
+	}
 	return fmt.Sprintf(
-		"ID:                %d\n"+
+		"%s"+
 			"Name:              %s\n"+
 			"Flags:             %s\n"+
 			"UUID:              %s\n"+
 			"%s%s%s%s%s%s%s%s%s",
-		i.ID,
+		id,
 		i.Name,
 		i.Flags,
 		i.UUID,
@@ -745,7 +749,7 @@ func (f cFlags) String() string {
 		flags = append(flags, "terms")
 	}
 	if f.HasReadOnlyData() {
-		flags = append(flags, "readonly")
+		flags = append(flags, "readonly_data")
 	}
 	if f.HasChainedFixups() {
 		flags = append(flags, "fixups")
@@ -762,9 +766,12 @@ func (f cFlags) String() string {
 	if f.HasOverrideImageNum() {
 		flags = append(flags, "override_img_no")
 	}
-	return fmt.Sprintf("img_no: %d, max_load: %d, flags: [%s]",
-		f.ImageNum(),
-		f.MaxLoadCount(),
+	var max string
+	if f.MaxLoadCount() > 0 {
+		max = fmt.Sprintf("max_load: %d, ", f.MaxLoadCount())
+	}
+	return fmt.Sprintf("%s%s",
+		max,
 		strings.Join(flags, "|"),
 	)
 }
