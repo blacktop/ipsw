@@ -324,7 +324,7 @@ func (e *Emulation) SetupHooks() error {
 		}
 		if e.conf.Verbose {
 			fmt.Println(e.regs.Changed())
-			fmt.Println(e.regs.AllChanged())
+			// fmt.Println(e.regs.AllChanged())
 		}
 		// disassemble code
 		diss(addr, code)

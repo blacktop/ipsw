@@ -4,12 +4,25 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"regexp"
 	"strings"
 
 	"github.com/fatih/color"
 )
 
 // CREDIT: https://pkg.go.dev/encoding/hex (edited to add vaddr and color)
+
+var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+
+func colorZeros(dump string) string {
+	if len(dump) > 0 {
+		dubzerosMatch := regexp.MustCompile(`\s(00\s)+|\.`)
+		dump = dubzerosMatch.ReplaceAllStringFunc(dump, func(s string) string {
+			return colorFaint(s)
+		})
+	}
+	return dump
+}
 
 // HexDump returns a string that contains a hex dump of the given data. The format
 // of the hex dump matches the output of `hexdump -C` on the command line.
@@ -27,7 +40,7 @@ func HexDump(data []byte, vaddr uint64) string {
 	dumper := Dumper(&buf, uint(vaddr))
 	dumper.Write(data)
 	dumper.Close()
-	return buf.String()
+	return colorZeros(buf.String())
 }
 
 // Dumper returns a WriteCloser that writes a hex dump of all written data to
@@ -40,7 +53,7 @@ func Dumper(w io.Writer, vaddr uint) io.WriteCloser {
 type dumper struct {
 	w          io.Writer
 	rightChars [18]byte
-	buf        [26]byte
+	buf        [27]byte
 	used       int  // number of bytes in the current line
 	n          uint // number of bytes, total
 	closed     bool
@@ -74,10 +87,11 @@ func (h *dumper) Write(data []byte) (n int, err error) {
 			h.buf[6] = byte(h.n >> 8)
 			h.buf[7] = byte(h.n)
 			hex.Encode(h.buf[8:], h.buf[:8])
-			h.buf[24] = ' '
+			h.buf[24] = ':'
 			h.buf[25] = ' '
-			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:24]))
-			_, err = h.w.Write(h.buf[24:])
+			h.buf[26] = ' '
+			color.New(color.Italic, color.Faint).Fprint(h.w, string(h.buf[8:25]))
+			_, err = h.w.Write(h.buf[25:])
 			if err != nil {
 				return
 			}

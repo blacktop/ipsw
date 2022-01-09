@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
 )
@@ -74,7 +75,12 @@ func (e *Emulation) DumpMemRegions() error {
 	}
 	fmt.Println(colorHook("[MEM_REGIONS]"))
 	for _, mr := range memRegs {
-		fmt.Printf(colorDetails("    begin: %#09x, end: %#09x, prot: %d, size: %#x\n", mr.Begin, mr.End, mr.Prot, mr.End-mr.Begin+1))
+		fmt.Printf(
+			colorHook("    begin: ") + colorDetails("%#09x", mr.Begin) +
+				colorHook(", end: ") + colorDetails("%#09x", mr.End) +
+				colorHook(", prot: ") + colorDetails("%s", types.VmProtection(mr.Prot)) +
+				colorHook(", size: ") + colorDetails("%#x\n", mr.End-mr.Begin+1),
+		)
 	}
 	return nil
 }

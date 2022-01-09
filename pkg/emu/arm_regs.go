@@ -24,9 +24,9 @@ func (r register) GetName() string {
 
 func (r register) String() string {
 	if r.DidChange && (r.Name != "pc") {
-		return fmt.Sprintf("%s: %s", colorHook(r.GetName()), colorChanged("%#-19x", r.Value))
+		return fmt.Sprintf("%s %s", colorHook(r.GetName()+":"), colorChanged("%#-19x", r.Value))
 	} else {
-		return fmt.Sprintf("%s: %s", colorHook(r.GetName()), colorDetails("%#-19x", r.Value))
+		return fmt.Sprintf("%s %s", colorHook(r.GetName()+":"), colorDetails("%#-19x", r.Value))
 	}
 }
 
