@@ -72,9 +72,11 @@ type dyldInfo struct {
 
 // infoCmd represents the info command
 var dyldInfoCmd = &cobra.Command{
-	Use:   "info <dyld_shared_cache>",
-	Short: "Parse dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "info <dyld_shared_cache>",
+	Short:         "Parse dyld_shared_cache",
+	SilenceUsage:  false,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)

@@ -11,6 +11,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 //go:generate stringer -type=closureType,linkKind -output closure_string.go
@@ -97,15 +98,19 @@ type CImage struct {
 }
 
 type LaunchClosure struct {
-	Flags        lcFlags
-	Images       []*CImage
-	DyldUUID     types.UUID
-	LibSystemNum uint32
-	LibDyldEntry resolvedSymbolTarget
-	TopImage     uint32
-	MainEntry    resolvedSymbolTarget
-	StartEntry   resolvedSymbolTarget
-	ProgVars     uint32
+	Flags           lcFlags
+	Images          []*CImage
+	DyldUUID        types.UUID
+	LibSystemNum    uint32
+	LibDyldEntry    resolvedSymbolTarget
+	TopImage        uint32
+	MainEntry       resolvedSymbolTarget
+	StartEntry      resolvedSymbolTarget
+	ProgVars        uint32
+	Warnings        []warningType
+	DyldCacheFixups []PatchEntry
+	MissingFiles    []string
+	EnvVars         []string
 }
 
 func (i CImage) GetID() uint32 {
@@ -702,6 +707,27 @@ type fileInfoType struct {
 	ModTime uint64
 }
 
+type warningType struct {
+	Type    uint32
+	Message []byte
+}
+
+type PatchEntry struct {
+	OverriddenDylibInCache uint32
+	ExportCacheOffset      uint32
+	Replacement            resolvedSymbolTarget
+}
+
+type duplicateClassesHashTable struct {
+	//     uint32_t capacity;
+	// uint32_t occupied;
+	// uint32_t shift;
+	// uint32_t mask;
+	// StringTarget sentinelTarget;
+	// uint32_t roundedTabSize;
+	// uint64_t salt;
+}
+
 // GetProgClosuresOffsets returns the closure trie data
 // NOTE: this doesn't auto add the ProgClosuresAddr (and probably should)
 func (f *File) GetProgClosuresOffsets() ([]trie.TrieEntry, error) {
@@ -928,25 +954,35 @@ func (f *File) parseClosureContainers(r *bytes.Reader) error {
 
 		switch container.Type() {
 		case launchClosure: // contains TypedBytes of closure attributes including imageArray
-			r.Seek(-int64(sizeOfTypeBytes), io.SeekCurrent)
-			if err := f.parseLaunchClosure(io.NewSectionReader(r, int64(sizeOfTypeBytes), int64(container.PayloadLength()+sizeOfTypeBytes))); err != nil {
+			dat := make([]byte, container.PayloadLength())
+			if _, err := r.Read(dat); err != nil {
+				return fmt.Errorf("failed to read launchClosure data: %v", err)
+			}
+			if err := f.parseLaunchClosure(bytes.NewReader(dat)); err != nil {
 				return fmt.Errorf("failed to parse launch closure: %v", err)
 			}
-			r.Seek(int64(container.PayloadLength()+sizeOfTypeBytes), io.SeekCurrent)
 		case imageArray: // sizeof(ImageArray) + sizeof(uint32_t)*count + size of all images
-			r.Seek(-int64(sizeOfTypeBytes*2), io.SeekCurrent)
-			cimages, err := f.parseClosureImageArray(io.NewSectionReader(r, 0, int64(container.PayloadLength()+sizeOfTypeBytes)))
+			if _, err := r.Seek(-int64(sizeOfTypeBytes), io.SeekCurrent); err != nil {
+				return fmt.Errorf("failed to rewind the reader: %v", err)
+			}
+			dat := make([]byte, container.PayloadLength()+sizeOfTypeBytes)
+			if _, err := r.Read(dat); err != nil {
+				return fmt.Errorf("failed to read imageArray data: %v", err)
+			}
+			cimages, err := f.parseClosureImageArray(bytes.NewReader(dat))
 			if err != nil {
 				return fmt.Errorf("failed to parse closure image array: %v", err)
 			}
-			for _, cimg := range cimages {
+			for idx, cimg := range cimages {
+				if _, ok := f.ImageArray[cimg.ID]; ok {
+					return fmt.Errorf("image array map already contains image ID %d at index %d", cimg.ID, idx)
+				}
 				f.ImageArray[cimg.ID] = cimg
 			}
-			r.Seek(int64(container.PayloadLength()+sizeOfTypeBytes), io.SeekCurrent)
 		case image: // contains TypedBytes of image attributes
-			panic("not implimented")
+			panic("closure container image not implimented")
 		case dlopenClosure: // contains TypedBytes of closure attributes including imageArray
-			panic("not implimented")
+			panic("closure container dlopenClosure not implimented")
 		default:
 			return fmt.Errorf("got unexpected cointainer type %s", container.Type())
 		}
@@ -955,7 +991,7 @@ func (f *File) parseClosureContainers(r *bytes.Reader) error {
 	return nil
 }
 
-func (f *File) parseLaunchClosure(r *io.SectionReader) error {
+func (f *File) parseLaunchClosure(r *bytes.Reader) error {
 	lc := &LaunchClosure{}
 
 	var tbytes typedBytes
@@ -969,11 +1005,16 @@ func (f *File) parseLaunchClosure(r *io.SectionReader) error {
 			return err
 		}
 
-		log.Debug(tbytes.String())
-
 		switch tbytes.Type() {
 		case imageArray:
-			cimages, err := f.parseClosureImageArray(io.NewSectionReader(r, 0, int64(tbytes.PayloadLength()+sizeOfTypeBytes)))
+			if _, err := r.Seek(-int64(sizeOfTypeBytes), io.SeekCurrent); err != nil {
+				return fmt.Errorf("failed to rewind the reader: %v", err)
+			}
+			dat := make([]byte, tbytes.PayloadLength()+sizeOfTypeBytes)
+			if _, err := r.Read(dat); err != nil {
+				return fmt.Errorf("failed to read imageArray data: %v", err)
+			}
+			cimages, err := f.parseClosureImageArray(bytes.NewReader(dat))
 			if err != nil {
 				return fmt.Errorf("failed to parse closure image array: %v", err)
 			}
@@ -987,9 +1028,34 @@ func (f *File) parseLaunchClosure(r *io.SectionReader) error {
 				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case missingFiles:
-			panic("not implimented")
+			if tbytes.PayloadLength() > 0 {
+				dat := make([]byte, tbytes.PayloadLength())
+				if _, err := r.Read(dat); err != nil {
+					return fmt.Errorf("failed to parse %s: failed to read missingFiles data: %v", tbytes.Type(), err)
+				}
+				sr := bytes.NewBuffer(dat)
+				for {
+					s, err := sr.ReadString('\x00')
+					if err == io.EOF {
+						break
+					}
+					if err != nil {
+						return fmt.Errorf("failed to read string: %v", err)
+					}
+					s = strings.Trim(s, "\x00")
+					if len(s) > 0 {
+						lc.MissingFiles = append(lc.MissingFiles, s)
+					}
+				}
+			}
 		case envVar: // "DYLD_BLAH=stuff"
-			panic("not implimented")
+			if tbytes.PayloadLength() > 0 {
+				dat := make([]byte, tbytes.PayloadLength())
+				if _, err := r.Read(dat); err != nil {
+					return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+				}
+				lc.EnvVars = append(lc.EnvVars, string(dat))
+			}
 		case topImage: // sizeof(ImageNum)
 			if err := binary.Read(r, binary.LittleEndian, &lc.TopImage); err != nil {
 				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
@@ -1011,26 +1077,49 @@ func (f *File) parseLaunchClosure(r *io.SectionReader) error {
 				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
 		case cacheOverrides: // sizeof(PatchEntry) * count       // used if process uses interposing or roots (cached dylib overrides)
-			panic("not implimented")
+			lc.DyldCacheFixups = make([]PatchEntry, tbytes.PayloadLength()/uint32(binary.Size(PatchEntry{})))
+			if err := binary.Read(r, binary.LittleEndian, &lc.DyldCacheFixups); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
 		case interposeTuples: // sizeof(InterposingTuple) * count
-			panic("not implimented")
+			panic("launch closure type interposeTuples not implimented")
 		case existingFiles: // uint64_t + (SkippedFiles * count)
-			panic("not implimented")
+			panic("launch closure type existingFiles not implimented")
 		case selectorTable: // uint32_t + (sizeof(ObjCSelectorImage) * count) + hashTable size
-			panic("not implimented")
+			// panic("not implimented")
+			utils.Indent(log.Info, 2)("selectorTable - Skipping")
+			r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
 		case classTable: // (3 * uint32_t) + (sizeof(ObjCClassImage) * count) + classHashTable size + protocolHashTable size
 			// panic("not implimented")
+			utils.Indent(log.Info, 2)("classTable - Skipping")
+			r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
 		case warning: // len = uint32_t + length path + 1 use one entry per warning
-			panic("not implimented")
+			var warn warningType
+			if err := binary.Read(r, binary.LittleEndian, &warn.Type); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+			warn.Message = make([]byte, tbytes.PayloadLength()-uint32(binary.Size(warn.Type)))
+			if err := binary.Read(r, binary.LittleEndian, &warn.Message); err != nil {
+				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			}
+			lc.Warnings = append(lc.Warnings, warn)
 		case duplicateClassesTable: // duplicateClassesHashTable
-			panic("not implimented")
+			// var s stringHash
+			// if err := binary.Read(r, binary.LittleEndian, &s); err != nil {
+			// 	return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
+			// }
+			// fmt.Printf("delta: %#x\n", tbytes.PayloadLength()-uint32(binary.Size(s)))
+			// fmt.Println(s)
+			// panic("not implimented")
+			utils.Indent(log.Info, 2)("duplicateClassesTable - Skipping")
+			r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
 		case progVars: // sizeof(uint32_t)
-			panic("not implimented")
 			if err := binary.Read(r, binary.LittleEndian, &lc.ProgVars); err != nil {
 				return fmt.Errorf("failed to parse %s: %v", tbytes.Type(), err)
 			}
+		default:
+			return fmt.Errorf("found unsupported launch closure type %s", tbytes.Type())
 		}
-		r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
 	}
 
 	f.Closures = append(f.Closures, lc)
@@ -1038,9 +1127,10 @@ func (f *File) parseLaunchClosure(r *io.SectionReader) error {
 	return nil
 }
 
-func (f *File) parseClosureImageArray(r *io.SectionReader) ([]*CImage, error) {
-	var cimages []*CImage
+func (f *File) parseClosureImageArray(r *bytes.Reader) ([]*CImage, error) {
+	var itype typedBytes
 	var iarray ImageArray
+	var cimages []*CImage
 
 	if err := binary.Read(r, binary.LittleEndian, &iarray.imageArrayType); err != nil {
 		return nil, err
@@ -1051,33 +1141,34 @@ func (f *File) parseClosureImageArray(r *io.SectionReader) ([]*CImage, error) {
 		return nil, err
 	}
 
-	for _, off := range iarray.Offsets {
-		var itype typedBytes
+	for i := uint32(0); i < iarray.CR.Count(); i++ {
 		if err := binary.Read(r, binary.LittleEndian, &itype); err != nil {
 			return nil, err
 		}
 
 		if itype.Type() != image {
-			log.Debug(itype.String())
 			return nil, fmt.Errorf("got unexpected type %s expected image", itype.Type())
 		}
 
-		log.Debug(itype.String())
+		dat := make([]byte, itype.PayloadLength())
+		if _, err := r.Read(dat); err != nil {
+			return nil, fmt.Errorf("failed to read image data: %v", err)
+		}
 
-		ci, err := parseClosureImage(io.NewSectionReader(r, int64((sizeOfTypeBytes*2)+off), int64(itype.PayloadLength())))
+		ci, err := parseClosureImage(bytes.NewReader(dat))
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse %s: %v", itype, err)
 		}
 
-		cimages = append(cimages, ci)
-
-		r.Seek(int64(itype.PayloadLength()), io.SeekCurrent)
+		if ci.ID != 0 { // TODO: why do these zeroed out images exist?
+			cimages = append(cimages, ci)
+		}
 	}
 
 	return cimages, nil
 }
 
-func parseClosureImage(r *io.SectionReader) (*CImage, error) {
+func parseClosureImage(r *bytes.Reader) (*CImage, error) {
 	var tbytes typedBytes
 
 	ci := &CImage{}
