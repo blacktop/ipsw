@@ -8,6 +8,7 @@ summary: Parse dyld_shared_cache.
 
 - [**dyld --help**](#dyld---help)
 - [**dyld info**](#dyld-info)
+- [**dyld image**](#dyld-image)
 - [**dyld extract**](#dyld-extract)
 - [**dyld macho**](#dyld-macho)
 - [**dyld symaddr**](#dyld-symaddr)
@@ -131,6 +132,97 @@ Images
 ```
 
 **NOTE:** We added the `-s` or `--sig` flag to also parse the _CodeDirectory_.
+
+You can also dump the `launch closures`
+
+```bash
+❯ ipsw dyld info dyld_shared_cache --closures
+
+Prog Closure Offsets
+====================
+0x1f1ec10f4     /usr/sbin/wifid
+0x1f1ebfe54     /usr/sbin/syslogd
+0x1f1ebda8c     /usr/sbin/spindump
+0x1f1ebad54     /usr/sbin/scutil
+0x1f1eb8d30     /usr/sbin/pppd
+0x1f1eb7de0     /usr/sbin/otctl
+0x1f1eb7818     /usr/sbin/nvram
+0x1f1eb6ab4     /usr/sbin/mediaserverd
+0x1f1eb24b8     /usr/sbin/mDNSResponder
+0x1f1eb612c     /usr/sbin/mDNSResponderHelper
+0x1f1eb197c     /usr/sbin/ipconfig
+0x1f1eb1240     /usr/sbin/hdik
+0x1f1eb02d8     /usr/sbin/fairplayd.H2
+0x1f1eaf770     /usr/sbin/ckksctl
+<SNIP>
+```
+
+You can also dump the `dlopen image/bundle(s)`
+
+```bash
+❯ ipsw dyld info dyld_shared_cache --dlopen
+
+dlopen(s) Image/Bundle IDs
+==========================
+5004: /usr/lib/xpc/support.bundle/support
+5003: /usr/lib/libobjc-trampolines.dylib
+5002: /usr/lib/libffi-trampolines.dylib
+5001: /usr/lib/libCoreKE.dylib
+5000: /System/Library/VoiceServices/PlugIns/Base.vsplugin/Base
+4999: /System/Library/VideoProcessors/CCPortrait.bundle/CCPortrait
+4998: /System/Library/UserNotifications/Bundles/com.apple.tailspin.notifications.bundle/com.apple.tailspin.notifications
+4997: /System/Library/UserNotifications/Bundles/com.apple.studentd.notifications.bundle/com.apple.studentd.notifications
+4996: /System/Library/UserNotifications/Bundles/com.apple.reminders.bundle/com.apple.reminders
+4995: /System/Library/UserNotifications/Bundles/com.apple.iCloud.FollowUp.bundle/com.apple.iCloud.FollowUp
+4994: /System/Library/UserNotifications/Bundles/com.apple.donotdisturb.bundle/com.apple.donotdisturb
+<SNIP>
+```
+
+### **dyld image**
+
+To dump info from `dylibsImageArray`, `otherImageArray` or `progClosures`
+
+```bash
+❯ ipsw dyld image dyld_shared_cache_arm64 CoreFoundation -V
+```
+
+```
+ID:                4
+Name:              /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+Flags:             objc|plus_loads|dylib|in_cache
+UUID:              5BBDEA97-01D2-30D8-8123-43118E96A409
+Cache Segments:
+	offset: 0x00354000, size: 0x003ad000, perms: r-x
+	offset: 0x53130af0, size: 0x0021c370, perms: rw-
+	offset: 0x5334ce60, size: 0x00008530, perms: rw-
+	offset: 0x529ea080, size: 0x00007d88, perms: rw-
+	offset: 0x65d94000, size: 0x00093000, perms: r--
+	offset: 0x661a4000, size: 0x001a8000, perms: r--
+
+Dependents:
+	reExport) /usr/lib/libobjc.dylib
+	regular ) /usr/lib/libicucore.dylib
+	regular ) /usr/lib/librpcsvc.dylib
+
+Init Order:
+	/usr/lib/system/libsystem_blocks.dylib
+	/usr/lib/system/libdispatch.dylib
+	/usr/lib/system/libxpc.dylib
+	/usr/lib/system/libsystem_trace.dylib
+	/usr/lib/librpcsvc.dylib
+	/usr/lib/libc++.dylib
+	/usr/lib/libobjc.dylib
+	/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+
+Initializers:
+	0x9de90
+
+DOF Offsets:
+	0x3a63a0
+	0x3a6d04
+```
+
+> **NOTE:** This currently doesn't _yet_ work on macOS12+/iOS15+ caches
 
 ### **dyld extract**
 

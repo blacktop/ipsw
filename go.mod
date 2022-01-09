@@ -31,7 +31,7 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20220105210059-c671efe79899
 	github.com/vbauerster/mpb/v7 v7.3.0
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3
-	golang.org/x/net v0.0.0-20220105145211-5b0dc2dfae98
+	golang.org/x/net v0.0.0-20220107192237-5cfca573fb4d
 	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
 )
 

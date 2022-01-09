@@ -41,6 +41,8 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldInfoCmd)
 
+	dyldInfoCmd.Flags().BoolP("closures", "c", false, "Dump program launch closures")
+	dyldInfoCmd.Flags().BoolP("dlopen", "d", false, "Dump all dylibs and bundles with dlopen closures")
 	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
 	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
@@ -70,9 +72,11 @@ type dyldInfo struct {
 
 // infoCmd represents the info command
 var dyldInfoCmd = &cobra.Command{
-	Use:   "info <dyld_shared_cache>",
-	Short: "Parse dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "info <dyld_shared_cache>",
+	Short:         "Parse dyld_shared_cache",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -80,6 +84,8 @@ var dyldInfoCmd = &cobra.Command{
 
 		// showHeader, _ := cmd.Flags().GetBool("header")
 		showDylibs, _ := cmd.Flags().GetBool("dylibs")
+		showClosures, _ := cmd.Flags().GetBool("closures")
+		showDlopenOthers, _ := cmd.Flags().GetBool("dlopen")
 		showSignature, _ := cmd.Flags().GetBool("sig")
 
 		outAsJSON, _ := cmd.Flags().GetBool("json")
@@ -295,6 +301,36 @@ var dyldInfoCmd = &cobra.Command{
 				}
 			}
 			w.Flush()
+		}
+
+		if showClosures {
+			fmt.Println("Prog Closure Offsets")
+			fmt.Println("====================")
+			var pclosureAddr uint64
+			if f.Headers[f.UUID].ProgClosuresTrieAddr != 0 {
+				pclosureAddr = f.Headers[f.UUID].ProgClosuresAddr
+			} else {
+				pclosureAddr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
+			}
+			pcs, err := f.GetProgClosuresOffsets()
+			if err != nil {
+				return err
+			}
+			for _, pc := range pcs {
+				fmt.Printf("%#x\t%s\n", pclosureAddr+uint64(pc.Flags), pc.Name)
+			}
+		}
+
+		if showDlopenOthers {
+			fmt.Println("dlopen(s) Image/Bundle IDs")
+			fmt.Println("==========================")
+			oo, err := f.GetDlopenOtherImages()
+			if err != nil {
+				return err
+			}
+			for _, o := range oo {
+				fmt.Printf("%4d: %s\n", o.Flags, o.Name)
+			}
 		}
 
 		return nil
