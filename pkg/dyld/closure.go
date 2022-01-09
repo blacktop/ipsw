@@ -149,7 +149,7 @@ func (i CImage) String(d *File, verbose bool) string {
 	}
 	var cacheSegs string
 	if len(i.CacheSegments) > 0 {
-		cacheSegs = "CacheSegments:\n"
+		cacheSegs = "Cache Segments:\n"
 		for _, cs := range i.CacheSegments {
 			cacheSegs += fmt.Sprintf("\t%s\n", cs)
 		}
@@ -214,6 +214,7 @@ func (i CImage) String(d *File, verbose bool) string {
 	}
 	var inits string
 	var terms string
+	var dofoff string
 	if verbose {
 		if len(i.InitializerOffsets) > 0 {
 			inits = "\nInitializers:\n"
@@ -225,6 +226,12 @@ func (i CImage) String(d *File, verbose bool) string {
 			terms = "\nTerminators:\n"
 			for _, t := range i.TerminatorOffsets {
 				terms += fmt.Sprintf("\t%#x\n", t)
+			}
+		}
+		if len(i.DofOffsets) > 0 {
+			dofoff = "\nDOF Offsets:\n"
+			for _, do := range i.DofOffsets {
+				dofoff += fmt.Sprintf("\t%#x\n", do)
 			}
 		}
 	}
@@ -250,7 +257,7 @@ func (i CImage) String(d *File, verbose bool) string {
 			"Name:              %s\n"+
 			"Flags:             %s\n"+
 			"UUID:              %s\n"+
-			"%s%s%s%s%s%s%s%s%s",
+			"%s%s%s%s%s%s%s%s%s%s",
 		id,
 		i.Name,
 		i.Flags,
@@ -264,6 +271,7 @@ func (i CImage) String(d *File, verbose bool) string {
 		initOrder,
 		inits,
 		terms,
+		dofoff,
 	)
 }
 
