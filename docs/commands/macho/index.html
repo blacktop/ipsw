@@ -938,9 +938,8 @@ __DATA_CONST.__got
 <span class="kc">...</span>
 </code></pre></div><p>You can also dissassemble a function by name</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw disass --symbol &lt;SYMBOL_NAME&gt; --instrs <span class="m">200</span> JavaScriptCore
-</code></pre></div><p>Make it pretty 💄🐷 using <a href="https://github.com/sharkdp/bat">bat</a></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed <span class="se">\
-</span><span class="se"></span>   <span class="p">|</span> bat -l s --tabs <span class="m">0</span> -p --theme Nord --wrap<span class="o">=</span>never --pager <span class="s2">&#34;less -S&#34;</span>
+</code></pre></div><p>Make it pretty 💄🐷 using <code>--color</code> flag</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed --color
 </code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-s" data-lang="s"><span class="n">func_fffffff007b44000</span><span class="o">:</span>
 <span class="mh">0xfffffff007b44000</span><span class="o">:</span>  <span class="m">5</span><span class="n">f</span> <span class="m">24</span> <span class="m">03</span> <span class="n">d5</span>        <span class="n">bti</span>             <span class="n">c</span>
 <span class="mh">0xfffffff007b44004</span><span class="o">:</span>  <span class="m">01</span> <span class="m">00</span> <span class="m">00</span> <span class="m">14</span>        <span class="n">b</span>               <span class="c1">#0xfffffff007b44008</span>
@@ -965,7 +964,7 @@ __DATA_CONST.__got
 <span class="mh">0xfffffff007b44040</span><span class="o">:</span>  <span class="m">80</span> <span class="n">ed</span> <span class="n">ff</span> <span class="n">f2</span>        <span class="n">movk</span>            <span class="n">x0</span><span class="p">,</span> <span class="c1">#0xff6c, lsl #0x30</span>
 <span class="mh">0xfffffff007b44044</span><span class="o">:</span>  <span class="n">c0</span> <span class="m">03</span> <span class="m">5</span><span class="n">f</span> <span class="n">d6</span>        <span class="n">ret</span>
 </code></pre></div><p>Demangle C++ names</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw disass --demangle --symbol &lt;SYMBOL_NAME&gt; --instrs <span class="m">200</span> JavaScriptCore <span class="p">|</span> bat -p -l s --tabs <span class="m">0</span>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw disass --demangle --symbol &lt;SYMBOL_NAME&gt; --instrs <span class="m">200</span> JavaScriptCore --color
 </code></pre></div>
 </div>
 </div>
