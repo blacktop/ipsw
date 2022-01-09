@@ -592,12 +592,12 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		}
 	}
 
-	// Read program closure image array info
-	if f.Headers[uuid].ProgClosuresTrieAddr > 0 || f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr > 0 {
-		if err := f.GetProgClosureImageArray(); err != nil {
-			return fmt.Errorf("failed to parse program closure image array: %v", err)
-		}
-	}
+	// // Read program closure image array info
+	// if f.Headers[uuid].ProgClosuresTrieAddr > 0 || f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr > 0 {
+	// 	if err := f.GetProgClosureImageArray(); err != nil {
+	// 		return fmt.Errorf("failed to parse program closure image array: %v", err)
+	// 	}
+	// }
 
 	return nil
 }
