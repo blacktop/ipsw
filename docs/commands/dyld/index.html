@@ -315,7 +315,7 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
    4: 0x180093000 /usr/lib/system/libsystem_c.dylib                                                               <span class="o">(</span>1431.0.0<span class="o">)</span>
 </code></pre></div><p><strong>NOTE:</strong> We added the <code>-s</code> or <code>--sig</code> flag to also parse the <em>CodeDirectory</em>.</p>
 <p>You can also dump the <code>launch closures</code></p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld info -l -s dyld_shared_cache <span class="p">|</span> head -n35
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld info dyld_shared_cache --closures
 
 Prog Closure <span class="nv">Offsets</span>
 <span class="o">====================</span>
