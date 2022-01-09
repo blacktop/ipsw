@@ -198,6 +198,7 @@
   <ul>
 <li><a href="#dyld---help"><strong>dyld &ndash;help</strong></a></li>
 <li><a href="#dyld-info"><strong>dyld info</strong></a></li>
+<li><a href="#dyld-image"><strong>dyld image</strong></a></li>
 <li><a href="#dyld-extract"><strong>dyld extract</strong></a></li>
 <li><a href="#dyld-macho"><strong>dyld macho</strong></a></li>
 <li><a href="#dyld-symaddr"><strong>dyld symaddr</strong></a></li>
@@ -313,6 +314,82 @@ Requirement Set <span class="o">(</span><span class="m">12</span> bytes<span cla
    3: 0x180091000 /usr/lib/system/libsystem_blocks.dylib                                                          <span class="o">(</span>76.0.0<span class="o">)</span>
    4: 0x180093000 /usr/lib/system/libsystem_c.dylib                                                               <span class="o">(</span>1431.0.0<span class="o">)</span>
 </code></pre></div><p><strong>NOTE:</strong> We added the <code>-s</code> or <code>--sig</code> flag to also parse the <em>CodeDirectory</em>.</p>
+<p>You can also dump the <code>launch closures</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld info -l -s dyld_shared_cache <span class="p">|</span> head -n35
+
+Prog Closure <span class="nv">Offsets</span>
+<span class="o">====================</span>
+0x1f1ec10f4     /usr/sbin/wifid
+0x1f1ebfe54     /usr/sbin/syslogd
+0x1f1ebda8c     /usr/sbin/spindump
+0x1f1ebad54     /usr/sbin/scutil
+0x1f1eb8d30     /usr/sbin/pppd
+0x1f1eb7de0     /usr/sbin/otctl
+0x1f1eb7818     /usr/sbin/nvram
+0x1f1eb6ab4     /usr/sbin/mediaserverd
+0x1f1eb24b8     /usr/sbin/mDNSResponder
+0x1f1eb612c     /usr/sbin/mDNSResponderHelper
+0x1f1eb197c     /usr/sbin/ipconfig
+0x1f1eb1240     /usr/sbin/hdik
+0x1f1eb02d8     /usr/sbin/fairplayd.H2
+0x1f1eaf770     /usr/sbin/ckksctl
+&lt;SNIP&gt;
+</code></pre></div><p>You can also dump the <code>dlopen image/bundle(s)</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld info dyld_shared_cache --dlopen
+
+dlopen<span class="o">(</span>s<span class="o">)</span> Image/Bundle <span class="nv">IDs</span>
+<span class="o">==========================</span>
+5004: /usr/lib/xpc/support.bundle/support
+5003: /usr/lib/libobjc-trampolines.dylib
+5002: /usr/lib/libffi-trampolines.dylib
+5001: /usr/lib/libCoreKE.dylib
+5000: /System/Library/VoiceServices/PlugIns/Base.vsplugin/Base
+4999: /System/Library/VideoProcessors/CCPortrait.bundle/CCPortrait
+4998: /System/Library/UserNotifications/Bundles/com.apple.tailspin.notifications.bundle/com.apple.tailspin.notifications
+4997: /System/Library/UserNotifications/Bundles/com.apple.studentd.notifications.bundle/com.apple.studentd.notifications
+4996: /System/Library/UserNotifications/Bundles/com.apple.reminders.bundle/com.apple.reminders
+4995: /System/Library/UserNotifications/Bundles/com.apple.iCloud.FollowUp.bundle/com.apple.iCloud.FollowUp
+4994: /System/Library/UserNotifications/Bundles/com.apple.donotdisturb.bundle/com.apple.donotdisturb
+&lt;SNIP&gt;
+</code></pre></div><h3 id="dyld-image"><strong>dyld image</strong></h3>
+<p>To can dump info from <code>dylibsImageArray</code>, <code>otherImageArray</code> or <code>progClosures</code></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld image dyld_shared_cache_arm64 CoreFoundation -V
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">ID:                4
+Name:              /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+Flags:             objc|plus_loads|dylib|in_cache
+UUID:              5BBDEA97-01D2-30D8-8123-43118E96A409
+Cache Segments:
+	offset: 0x00354000, size: 0x003ad000, perms: r-x
+	offset: 0x53130af0, size: 0x0021c370, perms: rw-
+	offset: 0x5334ce60, size: 0x00008530, perms: rw-
+	offset: 0x529ea080, size: 0x00007d88, perms: rw-
+	offset: 0x65d94000, size: 0x00093000, perms: r--
+	offset: 0x661a4000, size: 0x001a8000, perms: r--
+
+Dependents:
+	reExport) /usr/lib/libobjc.dylib
+	regular ) /usr/lib/libicucore.dylib
+	regular ) /usr/lib/librpcsvc.dylib
+
+Init Order:
+	/usr/lib/system/libsystem_blocks.dylib
+	/usr/lib/system/libdispatch.dylib
+	/usr/lib/system/libxpc.dylib
+	/usr/lib/system/libsystem_trace.dylib
+	/usr/lib/librpcsvc.dylib
+	/usr/lib/libc++.dylib
+	/usr/lib/libobjc.dylib
+	/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+
+Initializers:
+	0x9de90
+
+DOF Offsets:
+	0x3a63a0
+	0x3a6d04
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> This currently doesn&rsquo;t <em>yet</em> work on macOS12+/iOS15+ caches</p>
+</blockquote>
 <h3 id="dyld-extract"><strong>dyld extract</strong></h3>
 <p>Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></p>
 <ul>
@@ -608,33 +685,33 @@ page<span class="o">[</span>    0<span class="o">]</span>: <span class="nv">star
 <p><strong>NOTE:</strong> You can speed up symbol lookups by supplying the <code>--image</code> flag or you can use the <code>--vaddr</code> flag</p>
 </blockquote>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-s" data-lang="s"><span class="n">_NSLog</span><span class="o">:</span>
-<span class="mh">0x1817e73e4</span><span class="o">:</span>  <span class="m">7</span><span class="n">f</span> <span class="m">23</span> <span class="m">03</span> <span class="n">d5</span>       <span class="n">pacibsp</span>
-<span class="mh">0x1817e73e8</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">83</span> <span class="m">00</span> <span class="n">d1</span>       <span class="n">sub</span>             <span class="n">sp</span><span class="p">,</span> <span class="n">sp</span><span class="p">,</span> <span class="c1">#0x20</span>
-<span class="mh">0x1817e73ec</span><span class="o">:</span>  <span class="n">fd</span> <span class="m">7</span><span class="n">b</span> <span class="m">01</span> <span class="n">a9</span>       <span class="n">stp</span>             <span class="n">x29</span><span class="p">,</span> <span class="n">x30</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x10]</span>
-<span class="mh">0x1817e73f0</span><span class="o">:</span>  <span class="n">fd</span> <span class="m">43</span> <span class="m">00</span> <span class="m">91</span>       <span class="n">add</span>             <span class="n">x29</span><span class="p">,</span> <span class="n">sp</span><span class="p">,</span> <span class="c1">#0x10</span>
-<span class="mh">0x1817e73f4</span><span class="o">:</span>  <span class="n">a8</span> <span class="m">5</span><span class="n">a</span> <span class="m">2</span><span class="n">a</span> <span class="n">b0</span>       <span class="n">adrp</span>            <span class="n">x8</span><span class="p">,</span> <span class="c1">#0x1d633c000</span>
-<span class="mh">0x1817e73f8</span><span class="o">:</span>  <span class="m">08</span> <span class="m">25</span> <span class="m">40</span> <span class="n">f9</span>       <span class="n">ldr</span>             <span class="n">x8</span><span class="p">,</span> <span class="n">[x8</span><span class="p">,</span> <span class="c1">#0x48] ; __got.___stack_chk_guard</span>
-<span class="mh">0x1817e73fc</span><span class="o">:</span>  <span class="m">08</span> <span class="m">01</span> <span class="m">40</span> <span class="n">f9</span>       <span class="n">ldr</span>             <span class="n">x8</span><span class="p">,</span> <span class="n">[x8]</span>
-<span class="mh">0x1817e7400</span><span class="o">:</span>  <span class="n">e8</span> <span class="m">07</span> <span class="m">00</span> <span class="n">f9</span>       <span class="n">str</span>             <span class="n">x8</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x8]</span>
-<span class="mh">0x1817e7404</span><span class="o">:</span>  <span class="n">a8</span> <span class="m">43</span> <span class="m">00</span> <span class="m">91</span>       <span class="n">add</span>             <span class="n">x8</span><span class="p">,</span> <span class="n">x29</span><span class="p">,</span> <span class="c1">#0x10</span>
-<span class="mh">0x1817e7408</span><span class="o">:</span>  <span class="n">e8</span> <span class="m">03</span> <span class="m">00</span> <span class="n">f9</span>       <span class="n">str</span>             <span class="n">x8</span><span class="p">,</span> <span class="n">[sp]</span>
-<span class="mh">0x1817e740c</span><span class="o">:</span>  <span class="n">e2</span> <span class="m">03</span> <span class="m">1</span><span class="n">e</span> <span class="n">aa</span>       <span class="n">mov</span>             <span class="n">x2</span><span class="p">,</span> <span class="n">x30</span>
-<span class="mh">0x1817e7410</span><span class="o">:</span>  <span class="n">e2</span> <span class="m">43</span> <span class="n">c1</span> <span class="n">da</span>       <span class="n">xpaci</span>           <span class="n">x2</span>
-<span class="mh">0x1817e7414</span><span class="o">:</span>  <span class="n">a1</span> <span class="m">43</span> <span class="m">00</span> <span class="m">91</span>       <span class="n">add</span>             <span class="n">x1</span><span class="p">,</span> <span class="n">x29</span><span class="p">,</span> <span class="c1">#0x10</span>
-<span class="mh">0x1817e7418</span><span class="o">:</span>  <span class="n">cf</span> <span class="n">ff</span> <span class="n">ff</span> <span class="m">97</span>       <span class="n">bl</span>              <span class="n">__NSLogv</span>
-<span class="mh">0x1817e741c</span><span class="o">:</span>  <span class="n">e8</span> <span class="m">07</span> <span class="m">40</span> <span class="n">f9</span>       <span class="n">ldr</span>             <span class="n">x8</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x8]</span>
-<span class="mh">0x1817e7420</span><span class="o">:</span>  <span class="n">a9</span> <span class="m">5</span><span class="n">a</span> <span class="m">2</span><span class="n">a</span> <span class="n">b0</span>       <span class="n">adrp</span>            <span class="n">x9</span><span class="p">,</span> <span class="c1">#0x1d633c000</span>
-<span class="mh">0x1817e7424</span><span class="o">:</span>  <span class="m">29</span> <span class="m">25</span> <span class="m">40</span> <span class="n">f9</span>       <span class="n">ldr</span>             <span class="n">x9</span><span class="p">,</span> <span class="n">[x9</span><span class="p">,</span> <span class="c1">#0x48] ; __got.___stack_chk_guard</span>
-<span class="mh">0x1817e7428</span><span class="o">:</span>  <span class="m">29</span> <span class="m">01</span> <span class="m">40</span> <span class="n">f9</span>       <span class="n">ldr</span>             <span class="n">x9</span><span class="p">,</span> <span class="n">[x9]</span>
-<span class="mh">0x1817e742c</span><span class="o">:</span>  <span class="m">3</span><span class="n">f</span> <span class="m">01</span> <span class="m">08</span> <span class="n">eb</span>       <span class="n">cmp</span>             <span class="n">x9</span><span class="p">,</span> <span class="n">x8</span>
-<span class="mh">0x1817e7430</span><span class="o">:</span>  <span class="m">81</span> <span class="m">00</span> <span class="m">00</span> <span class="m">54</span>       <span class="n">b.ne</span>            <span class="n">loc_1817e7440</span> <span class="p">;</span> ⤵ <span class="mh">0x10</span>
-<span class="mh">0x1817e7434</span><span class="o">:</span>  <span class="n">fd</span> <span class="m">7</span><span class="n">b</span> <span class="m">41</span> <span class="n">a9</span>       <span class="n">ldp</span>             <span class="n">x29</span><span class="p">,</span> <span class="n">x30</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x10]</span>
-<span class="mh">0x1817e7438</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">83</span> <span class="m">00</span> <span class="m">91</span>       <span class="n">add</span>             <span class="n">sp</span><span class="p">,</span> <span class="n">sp</span><span class="p">,</span> <span class="c1">#0x20</span>
-<span class="mh">0x1817e743c</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">0</span><span class="n">f</span> <span class="m">5</span><span class="n">f</span> <span class="n">d6</span>       <span class="n">retab</span>
-<span class="mh">0x1817e7440</span><span class="o">:</span>  <span class="p">;</span> <span class="n">loc_1817e7440</span>
-<span class="mh">0x1817e7440</span><span class="o">:</span>  <span class="m">64</span> <span class="m">52</span> <span class="n">fe</span> <span class="m">95</span>       <span class="n">bl</span>              <span class="n">___stack_chk_fail</span>
+<span class="mh">0x181bac214</span><span class="o">:</span>  <span class="m">7</span><span class="n">f</span> <span class="m">23</span> <span class="m">03</span> <span class="n">d5</span>	<span class="n">pacibsp</span>
+<span class="mh">0x181bac218</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">83</span> <span class="m">00</span> <span class="n">d1</span>	<span class="n">sub</span>	<span class="n">sp</span><span class="p">,</span> <span class="n">sp</span><span class="p">,</span> <span class="c1">#0x20</span>
+<span class="mh">0x181bac21c</span><span class="o">:</span>  <span class="n">fd</span> <span class="m">7</span><span class="n">b</span> <span class="m">01</span> <span class="n">a9</span>	<span class="n">stp</span>	<span class="n">x29</span><span class="p">,</span> <span class="n">x30</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x10]</span>
+<span class="mh">0x181bac220</span><span class="o">:</span>  <span class="n">fd</span> <span class="m">43</span> <span class="m">00</span> <span class="m">91</span>	<span class="n">add</span>	<span class="n">x29</span><span class="p">,</span> <span class="n">sp</span><span class="p">,</span> <span class="c1">#0x10</span>
+<span class="mh">0x181bac224</span><span class="o">:</span>  <span class="m">28</span> <span class="n">e9</span> <span class="m">2</span><span class="n">b</span> <span class="n">f0</span>	<span class="n">adrp</span>	<span class="n">x8</span><span class="p">,</span> <span class="mh">0x1d98d3000</span>
+<span class="mh">0x181bac228</span><span class="o">:</span>  <span class="m">08</span> <span class="m">45</span> <span class="m">41</span> <span class="n">f9</span>	<span class="n">ldr</span>	<span class="n">x8</span><span class="p">,</span> <span class="n">[x8</span><span class="p">,</span> <span class="c1">#0x288] ; __got.___stack_chk_guard</span>
+<span class="mh">0x181bac22c</span><span class="o">:</span>  <span class="m">08</span> <span class="m">01</span> <span class="m">40</span> <span class="n">f9</span>	<span class="n">ldr</span>	<span class="n">x8</span><span class="p">,</span> <span class="n">[x8]</span>
+<span class="mh">0x181bac230</span><span class="o">:</span>  <span class="n">e8</span> <span class="m">07</span> <span class="m">00</span> <span class="n">f9</span>	<span class="n">str</span>	<span class="n">x8</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x8]</span>
+<span class="mh">0x181bac234</span><span class="o">:</span>  <span class="n">a8</span> <span class="m">43</span> <span class="m">00</span> <span class="m">91</span>	<span class="n">add</span>	<span class="n">x8</span><span class="p">,</span> <span class="n">x29</span><span class="p">,</span> <span class="c1">#0x10</span>
+<span class="mh">0x181bac238</span><span class="o">:</span>  <span class="n">e8</span> <span class="m">03</span> <span class="m">00</span> <span class="n">f9</span>	<span class="n">str</span>	<span class="n">x8</span><span class="p">,</span> <span class="n">[sp]</span>
+<span class="mh">0x181bac23c</span><span class="o">:</span>  <span class="n">e2</span> <span class="m">03</span> <span class="m">1</span><span class="n">e</span> <span class="n">aa</span>	<span class="n">mov</span>	<span class="n">x2</span><span class="p">,</span> <span class="n">x30</span>
+<span class="mh">0x181bac240</span><span class="o">:</span>  <span class="n">e2</span> <span class="m">43</span> <span class="n">c1</span> <span class="n">da</span>	<span class="n">xpaci</span>	<span class="n">x2</span>
+<span class="mh">0x181bac244</span><span class="o">:</span>  <span class="n">a1</span> <span class="m">43</span> <span class="m">00</span> <span class="m">91</span>	<span class="n">add</span>	<span class="n">x1</span><span class="p">,</span> <span class="n">x29</span><span class="p">,</span> <span class="c1">#0x10</span>
+<span class="mh">0x181bac248</span><span class="o">:</span>  <span class="m">2</span><span class="n">a</span> <span class="m">22</span> <span class="m">00</span> <span class="m">94</span>	<span class="n">bl</span>	<span class="n">__NSLogv</span>
+<span class="mh">0x181bac24c</span><span class="o">:</span>  <span class="n">e8</span> <span class="m">07</span> <span class="m">40</span> <span class="n">f9</span>	<span class="n">ldr</span>	<span class="n">x8</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x8]</span>
+<span class="mh">0x181bac250</span><span class="o">:</span>  <span class="m">29</span> <span class="n">e9</span> <span class="m">2</span><span class="n">b</span> <span class="n">f0</span>	<span class="n">adrp</span>	<span class="n">x9</span><span class="p">,</span> <span class="mh">0x1d98d3000</span>
+<span class="mh">0x181bac254</span><span class="o">:</span>  <span class="m">29</span> <span class="m">45</span> <span class="m">41</span> <span class="n">f9</span>	<span class="n">ldr</span>	<span class="n">x9</span><span class="p">,</span> <span class="n">[x9</span><span class="p">,</span> <span class="c1">#0x288] ; __got.___stack_chk_guard</span>
+<span class="mh">0x181bac258</span><span class="o">:</span>  <span class="m">29</span> <span class="m">01</span> <span class="m">40</span> <span class="n">f9</span>	<span class="n">ldr</span>	<span class="n">x9</span><span class="p">,</span> <span class="n">[x9]</span>
+<span class="mh">0x181bac25c</span><span class="o">:</span>  <span class="m">3</span><span class="n">f</span> <span class="m">01</span> <span class="m">08</span> <span class="n">eb</span>	<span class="n">cmp</span>	<span class="n">x9</span><span class="p">,</span> <span class="n">x8</span>
+<span class="mh">0x181bac260</span><span class="o">:</span>  <span class="m">81</span> <span class="m">00</span> <span class="m">00</span> <span class="m">54</span>	<span class="n">b.ne</span>	<span class="n">loc_181bac270</span> <span class="p">;</span> ⤵ <span class="mh">0x10</span>
+<span class="mh">0x181bac264</span><span class="o">:</span>  <span class="n">fd</span> <span class="m">7</span><span class="n">b</span> <span class="m">41</span> <span class="n">a9</span>	<span class="n">ldp</span>	<span class="n">x29</span><span class="p">,</span> <span class="n">x30</span><span class="p">,</span> <span class="n">[sp</span><span class="p">,</span> <span class="c1">#0x10]</span>
+<span class="mh">0x181bac268</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">83</span> <span class="m">00</span> <span class="m">91</span>	<span class="n">add</span>	<span class="n">sp</span><span class="p">,</span> <span class="n">sp</span><span class="p">,</span> <span class="c1">#0x20</span>
+<span class="mh">0x181bac26c</span><span class="o">:</span>  <span class="n">ff</span> <span class="m">0</span><span class="n">f</span> <span class="m">5</span><span class="n">f</span> <span class="n">d6</span>	<span class="n">retab</span>
+<span class="mh">0x181bac270</span><span class="o">:</span>  <span class="p">;</span> <span class="n">loc_181bac270</span>
+<span class="mh">0x181bac270</span><span class="o">:</span>  <span class="m">3</span><span class="n">e</span> <span class="m">85</span> <span class="m">93</span> <span class="m">97</span>	<span class="n">bl</span>	<span class="n">j____stack_chk_fail</span>
 </code></pre></div><blockquote>
-<p><strong>NOTE:</strong> Make the output look amazing by piping to <code>bat -l s --tabs 0 -p --theme Nord --wrap=never --pager &quot;less -S&quot;</code></p>
+<p><strong>NOTE:</strong> Make the output look amazing by adding the <code>--color</code> flag 🌈</p>
 </blockquote>
 <h3 id="dyld-imports"><strong>dyld imports</strong></h3>
 <p>List all dylibs that import/load a given dylib in the <em>dyld_shared_cache</em></p>
