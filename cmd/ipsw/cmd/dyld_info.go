@@ -314,38 +314,11 @@ var dyldInfoCmd = &cobra.Command{
 			} else {
 				pclosureAddr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
 			}
-			fmt.Println("Prog Closures")
-			fmt.Println("=============")
+			fmt.Println("Prog Closure Offsets")
+			fmt.Println("====================")
 			for _, pc := range pcs {
 				fmt.Printf("%#x\t%s\n", pclosureAddr+uint64(pc.Flags), pc.Name)
 			}
-
-			// oimgs, err := f.GetOtherImageArray()
-			// if err != nil {
-			// 	return err
-			// }
-
-			// myIDX, _ := f.GetDlopenOtherImageIndex("/Applications/DiagnosticsService.app/PlugIns/Diagnostic-8290-EFD.appex/Frameworks/DiagnosticsSupport.framework/DiagnosticsSupport")
-			// fmt.Printf("DiagnosticsSupportimage index: %d\n", myIDX)
-			// // fmt.Println(oimgs[myIDX])
-			// fmt.Println("OtherImages")
-			// fmt.Println("===========")
-			// for _, oimg := range oimgs {
-			// 	// if oimg.Name == "/Applications/DiagnosticsService.app/PlugIns/Diagnostic-8290-EFD.appex/Frameworks/DiagnosticsSupport.framework/DiagnosticsSupport" {
-			// 	// 	fmt.Println(oimg)
-			// 	// }
-			// 	fmt.Println(oimg.Name)
-			// 	fmt.Println(oimg.Flags)
-			// 	for _, seg := range oimg.DiskSegments {
-			// 		fmt.Println(seg)
-			// 	}
-			// 	for _, bind := range oimg.Binds {
-			// 		fmt.Println(bind)
-			// 	}
-			// 	for _, rb := range oimg.Rebases {
-			// 		fmt.Println(rb)
-			// 	}
-			// }
 		}
 
 		if showDlopenOthers {
@@ -353,11 +326,10 @@ var dyldInfoCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			oaddr := f.Headers[f.UUID].OtherImageArrayAddr
-			fmt.Println("dlopen(s)")
-			fmt.Println("=========")
+			fmt.Println("dlopen(s) Image/Bundle IDs")
+			fmt.Println("==========================")
 			for _, o := range oo {
-				fmt.Printf("%#x\t%s\n", oaddr+uint64(o.Flags), o.Name)
+				fmt.Printf("%4d: %s\n", o.Flags, o.Name)
 			}
 		}
 
