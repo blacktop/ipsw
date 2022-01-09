@@ -77,6 +77,10 @@ var dyldImageCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if err := f.ParseImageArrays(); err != nil {
+			return fmt.Errorf("failed parsing image arrays: %v", err)
+		}
+
 		if len(args) > 1 {
 			imgName := args[1]
 			if image, err := f.Image(imgName); err == nil {

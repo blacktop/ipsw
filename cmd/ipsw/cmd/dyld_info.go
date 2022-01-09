@@ -303,6 +303,12 @@ var dyldInfoCmd = &cobra.Command{
 			w.Flush()
 		}
 
+		if showClosures || showDlopenOthers {
+			if err := f.ParseImageArrays(); err != nil {
+				return fmt.Errorf("failed parsing image arrays: %v", err)
+			}
+		}
+
 		if showClosures {
 			pcs, err := f.GetProgClosuresOffsets()
 			if err != nil {

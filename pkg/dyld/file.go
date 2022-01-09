@@ -578,24 +578,28 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		}
 	}
 
+	return nil
+}
+
+func (f *File) ParseImageArrays() error {
 	// Read dyld image array info
-	if f.Headers[uuid].DylibsImageArrayAddr > 0 || f.Headers[uuid].DylibsImageArrayWithSubCachesAddr > 0 {
+	if f.Headers[f.UUID].DylibsImageArrayAddr > 0 || f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr > 0 {
 		if err := f.GetDylibsImageArray(); err != nil {
 			return fmt.Errorf("failed to parse dylibs image array: %v", err)
 		}
 	}
 
 	// Read other image array info
-	if f.Headers[uuid].OtherImageArrayAddr > 0 {
-		if err := f.GetOtherImageArray(); err != nil {
-			return fmt.Errorf("failed to parse dylibs image array: %v", err)
+	if f.Headers[f.UUID].OtherImageArrayAddr > 0 {
+		if err := f.GetDlopenOtherImageArray(); err != nil {
+			return fmt.Errorf("failed to parse other image array: %v", err)
 		}
 	}
 
 	// Read program closure image array info
-	if f.Headers[uuid].ProgClosuresTrieAddr > 0 || f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr > 0 {
+	if f.Headers[f.UUID].ProgClosuresTrieAddr > 0 || f.Headers[f.UUID].ProgClosuresTrieWithSubCachesAddr > 0 {
 		if err := f.GetProgClosureImageArray(); err != nil {
-			return fmt.Errorf("failed to parse program closure image array: %v", err)
+			return fmt.Errorf("failed to parse program launch closures: %v", err)
 		}
 	}
 
