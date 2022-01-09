@@ -322,18 +322,6 @@ var dyldDisassCmd = &cobra.Command{
 				disass.Disassemble(engine)
 			}
 		} else {
-
-			image, err = f.GetImageContainingVMAddr(startAddr)
-			if err != nil {
-				return err
-			}
-
-			m, err := image.GetMacho()
-			if err != nil {
-				return err
-			}
-			defer m.Close()
-
 			/*
 			* Read in data to disassemble
 			 */
@@ -347,6 +335,16 @@ var dyldDisassCmd = &cobra.Command{
 					return err
 				}
 			} else {
+				image, err = f.GetImageContainingVMAddr(startAddr)
+				if err != nil {
+					return err
+				}
+
+				m, err := image.GetMacho()
+				if err != nil {
+					return err
+				}
+				defer m.Close()
 				if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
 					uuid, soff, err := f.GetOffset(fn.StartAddr)
 					if err != nil {
@@ -381,9 +379,12 @@ var dyldDisassCmd = &cobra.Command{
 			// if slide > 0 {
 			// 	startAddr = startAddr - slide
 			// }
-
+			var imageName string
+			if image != nil {
+				imageName = image.Name
+			}
 			engine := dyld.NewDyldDisass(f, &disass.Config{
-				Image:        image.Name,
+				Image:        imageName,
 				Data:         data,
 				StartAddress: startAddr,
 				Middle:       middleAddr,
