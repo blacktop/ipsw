@@ -180,7 +180,7 @@ dlopen(s) Image/Bundle IDs
 
 ### **dyld image**
 
-To can dump info from `dylibsImageArray`, `otherImageArray` or `progClosures`
+To dump info from `dylibsImageArray`, `otherImageArray` or `progClosures`
 
 ```bash
 ❯ ipsw dyld image dyld_shared_cache_arm64 CoreFoundation -V
