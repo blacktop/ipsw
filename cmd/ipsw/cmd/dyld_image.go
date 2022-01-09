@@ -43,7 +43,7 @@ var dyldImageCmd = &cobra.Command{
 	Use:           "image <dyld_shared_cache> <IMAGE>",
 	Short:         "Dump image array info",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

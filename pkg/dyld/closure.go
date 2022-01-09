@@ -909,14 +909,20 @@ func (f *File) GetProgClosureAddress(executablePath string) (uint64, error) {
 func (f *File) GetProgClosureImageArray() error {
 	var addr uint64
 	var size uint64
-
+	// if f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr > 0 {
+	// 	return fmt.Errorf("ipsw cannot parse dylibs image array info for macOS12+/iOS15+ yet 😔")
+	// }
+	// return fmt.Errorf("cache does not contain dylibs image array info")
 	if f.Headers[f.UUID].ProgClosuresAddr == 0 {
-		if f.Headers[f.UUID].ProgClosuresWithSubCachesAddr == 0 {
-			return fmt.Errorf("cache does not contain prog closures image array info")
-		} else {
-			addr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
-			size = f.Headers[f.UUID].ProgClosuresWithSubCachesSize
+		// if f.Headers[f.UUID].ProgClosuresWithSubCachesAddr == 0 {
+		if f.Headers[f.UUID].ProgClosuresWithSubCachesAddr > 0 {
+			return fmt.Errorf("ipsw cannot parse prog launch closure info for macOS12+/iOS15+ yet 😔")
 		}
+		return fmt.Errorf("cache does not contain prog launch closure info")
+		// } else {
+		// 	addr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
+		// 	size = f.Headers[f.UUID].ProgClosuresWithSubCachesSize
+		// }
 	} else {
 		addr = f.Headers[f.UUID].ProgClosuresAddr
 		size = f.Headers[f.UUID].ProgClosuresSize
@@ -945,12 +951,14 @@ func (f *File) GetDylibsImageArray() error {
 	var size uint64
 
 	if f.Headers[f.UUID].DylibsImageArrayAddr == 0 {
-		if f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr == 0 {
-			return fmt.Errorf("cache does not contain dylibs image array info")
-		} else {
-			addr = f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr
-			size = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr - f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr
+		if f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr > 0 {
+			return fmt.Errorf("ipsw cannot parse dylibs image array info for macOS12+/iOS15+ yet 😔")
 		}
+		return fmt.Errorf("cache does not contain dylibs image array info")
+		// } else {
+		// 	addr = f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr
+		// 	size = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr - f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr
+		// }
 	} else {
 		addr = f.Headers[f.UUID].DylibsImageArrayAddr
 		size = f.Headers[f.UUID].DylibsImageArraySize
@@ -971,6 +979,29 @@ func (f *File) GetDylibsImageArray() error {
 	}
 
 	return f.parseClosureContainers(bytes.NewReader(imageArrayData))
+}
+
+func (f *File) GetDylibsImageArrayIDs() ([]trie.TrieEntry, error) {
+
+	if f.Headers[f.UUID].DylibsTrieAddr == 0 {
+		return nil, fmt.Errorf("cache does not contain dylibs trie info")
+	}
+
+	uuid, off, err := f.GetOffset(f.Headers[f.UUID].DylibsTrieAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
+	sr.Seek(int64(off), io.SeekStart)
+
+	dylibTrie := make([]byte, f.Headers[f.UUID].DylibsTrieSize)
+	if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
+		return nil, err
+	}
+
+	return trie.ParseTrie(dylibTrie, 0)
 }
 
 // GetDylibIndex returns the index of a given dylib

@@ -74,7 +74,7 @@ type dyldInfo struct {
 var dyldInfoCmd = &cobra.Command{
 	Use:           "info <dyld_shared_cache>",
 	Short:         "Parse dyld_shared_cache",
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -303,37 +303,31 @@ var dyldInfoCmd = &cobra.Command{
 			w.Flush()
 		}
 
-		if showClosures || showDlopenOthers {
-			if err := f.ParseImageArrays(); err != nil {
-				return fmt.Errorf("failed parsing image arrays: %v", err)
-			}
-		}
-
 		if showClosures {
-			pcs, err := f.GetProgClosuresOffsets()
-			if err != nil {
-				return err
-			}
+			fmt.Println("Prog Closure Offsets")
+			fmt.Println("====================")
 			var pclosureAddr uint64
 			if f.Headers[f.UUID].ProgClosuresTrieAddr != 0 {
 				pclosureAddr = f.Headers[f.UUID].ProgClosuresAddr
 			} else {
 				pclosureAddr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
 			}
-			fmt.Println("Prog Closure Offsets")
-			fmt.Println("====================")
+			pcs, err := f.GetProgClosuresOffsets()
+			if err != nil {
+				return err
+			}
 			for _, pc := range pcs {
 				fmt.Printf("%#x\t%s\n", pclosureAddr+uint64(pc.Flags), pc.Name)
 			}
 		}
 
 		if showDlopenOthers {
+			fmt.Println("dlopen(s) Image/Bundle IDs")
+			fmt.Println("==========================")
 			oo, err := f.GetDlopenOtherImages()
 			if err != nil {
 				return err
 			}
-			fmt.Println("dlopen(s) Image/Bundle IDs")
-			fmt.Println("==========================")
 			for _, o := range oo {
 				fmt.Printf("%4d: %s\n", o.Flags, o.Name)
 			}
