@@ -85,18 +85,20 @@ var dyldImageCmd = &cobra.Command{
 					return err
 				}
 				ci := f.ImageArray[uint32(idx)]
-				fmt.Println(ci)
+				fmt.Println(ci.String(f, Verbose))
 				return nil
 			} else {
 				if idx, err := f.GetDlopenOtherImageIndex(imgName); err == nil {
 					ci := f.ImageArray[uint32(idx)]
-					fmt.Println(ci)
+					fmt.Println(ci.String(f, Verbose))
 					return nil
 				} else {
-					for _, img := range f.ImageArray {
-						if img.Name == imgName {
-							fmt.Println(img)
-							return nil
+					for _, clos := range f.Closures {
+						for _, img := range clos.Images {
+							if img.Name == imgName {
+								fmt.Println(img.String(f, Verbose))
+								return nil
+							}
 						}
 					}
 				}

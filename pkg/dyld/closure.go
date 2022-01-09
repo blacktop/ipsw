@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/olekukonko/tablewriter"
 )
 
 //go:generate stringer -type=closureType,linkKind -output closure_string.go
@@ -69,6 +70,15 @@ const (
 	progVars              closureType = 49 // sizeof(uint32_t)
 )
 
+const (
+	FirstDyldCacheImageNum     = 0x00000001
+	LastDyldCacheImageNum      = 0x00000FFF
+	FirstOtherOSImageNum       = 0x00001001
+	LastOtherOSImageNum        = 0x00001FFF
+	FirstLaunchClosureImageNum = 0x00002000
+	MissingWeakLinkedImage     = 0x0FFFFFFF
+)
+
 type CImage struct {
 	ID                    uint32
 	Name                  string
@@ -123,14 +133,18 @@ func (i CImage) PageSize() uint32 {
 	return 0x1000
 }
 
-func (i CImage) String() string {
+func (i CImage) String(d *File, verbose bool) string {
 	var mappings string
-	if i.MappingInfo.TotalVmPages > 0 || i.MappingInfo.SliceOffsetIn4K > 0 {
+	if i.MappingInfo.TotalVmPages > 0 {
+		var slice string
+		if i.MappingInfo.SliceOffsetIn4K > 0 {
+			slice = fmt.Sprintf("Slice Offset:      %#x\n", i.MappingInfo.SliceOffsetIn4K*0x1000)
+		}
 		mappings = fmt.Sprintf(
-			"VM Size To Map:       %#x\n"+
-				"Slice Offset In File: %#x\n",
+			"Total VM Size:     %#x\n"+
+				"%s",
 			i.MappingInfo.TotalVmPages*i.PageSize(),
-			i.MappingInfo.SliceOffsetIn4K*0x1000,
+			slice,
 		)
 	}
 	var cacheSegs string
@@ -142,43 +156,108 @@ func (i CImage) String() string {
 	}
 	var diskSegs string
 	if len(i.DiskSegments) > 0 {
-		diskSegs = "DiskSegments:\n"
+		diskSegs = "\nMappings:\n"
+		tableString := &strings.Builder{}
+
+		mdata := [][]string{}
+		prevFOff := uint32(0)
 		for _, ds := range i.DiskSegments {
-			diskSegs += fmt.Sprintf("\t%s\n", ds)
+			mdata = append(mdata, []string{
+				fmt.Sprintf("%#08x", prevFOff),
+				fmt.Sprintf("%#08x", ds.FilePageCount()*i.PageSize()),
+				fmt.Sprintf("%#08x", ds.VMPageCount()*i.PageSize()),
+				ds.PermString(),
+			})
+			prevFOff += ds.FilePageCount() * i.PageSize()
+		}
+		table := tablewriter.NewWriter(tableString)
+		table.SetHeader([]string{"File Offset", "File Size", "VM Size", "Prot"})
+		table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+		table.SetCenterSeparator("|")
+		table.AppendBulk(mdata)
+		table.SetAlignment(tablewriter.ALIGN_LEFT)
+		table.Render()
+
+		diskSegs += tableString.String()
+	}
+	var initOrder string
+	if len(i.InitOrder) > 0 {
+		initOrder = "\nInit Order:\n"
+		for _, io := range i.InitOrder {
+			if val, ok := d.ImageArray[io]; ok {
+				initOrder += fmt.Sprintf("\t%s\n", val.Name)
+			} else {
+				if io == FirstLaunchClosureImageNum {
+					initOrder += fmt.Sprintf("\t%s\n", i.Name)
+				} else {
+					log.Errorf("no image found for ID %d", i)
+				}
+			}
+		}
+	}
+	var deps string
+	if len(i.Dependents) > 0 {
+		deps = "\nDependents:\n"
+		for _, dp := range i.Dependents {
+			if val, ok := d.ImageArray[dp.ImgNum()]; ok {
+				deps += fmt.Sprintf("\t%-8s) %s\n", dp.Link(), val.Name)
+			} else {
+				if dp.ImgNum() == FirstLaunchClosureImageNum {
+					deps += fmt.Sprintf("\t%-8s) %s\n", dp.Link(), i.Name)
+				} else if dp.ImgNum() == MissingWeakLinkedImage && dp.Link() == weak {
+					continue
+				} else {
+					log.Errorf("no image found for ID %d", dp.ImgNum())
+				}
+			}
 		}
 	}
 	var inits string
-	if len(i.InitializerOffsets) > 0 {
-		inits = "Initializers:\n"
-		for _, i := range i.InitializerOffsets {
-			inits += fmt.Sprintf("\t%#x\n", i)
+	var terms string
+	if verbose {
+		if len(i.InitializerOffsets) > 0 {
+			inits = "\nInitializers:\n"
+			for _, i := range i.InitializerOffsets {
+				inits += fmt.Sprintf("\t%#x\n", i)
+			}
+		}
+		if len(i.TerminatorOffsets) > 0 {
+			terms = "\nTerminators:\n"
+			for _, t := range i.TerminatorOffsets {
+				terms += fmt.Sprintf("\t%#x\n", t)
+			}
 		}
 	}
-	var terms string
-	if len(i.TerminatorOffsets) > 0 {
-		terms = "Terminators:\n"
-		for _, t := range i.TerminatorOffsets {
-			terms += fmt.Sprintf("\t%#x\n", t)
-		}
+	var cslocation string
+	if i.CodeSignatureLocation.FileSize > 0 {
+		cslocation = fmt.Sprintf(
+			"Code Signature:    offset: 0x%08x-0x%08x, size: %5d\n",
+			i.CodeSignatureLocation.FileOffset,
+			i.CodeSignatureLocation.FileOffset+i.CodeSignatureLocation.FileSize,
+			i.CodeSignatureLocation.FileSize,
+		)
 	}
 	var cdhash string
 	if len(i.CDHash) > 0 {
-		cdhash = fmt.Sprintf("CDHash: %s\n", cdhash)
+		cdhash = fmt.Sprintf("CDHash:            %s\n", i.CDHash)
 	}
 	return fmt.Sprintf(
-		"ID:     %d\n"+
-			"Name:   %s\n"+
-			"UUID:   %s\n"+
-			"Flags:  %s\n"+
-			"%s%s%s%s%s%s",
+		"ID:                %d\n"+
+			"Name:              %s\n"+
+			"Flags:             %s\n"+
+			"UUID:              %s\n"+
+			"%s%s%s%s%s%s%s%s%s",
 		i.ID,
 		i.Name,
-		i.UUID,
 		i.Flags,
+		i.UUID,
 		cdhash,
+		cslocation,
 		mappings,
 		cacheSegs,
 		diskSegs,
+		deps,
+		initOrder,
 		inits,
 		terms,
 	)
@@ -220,18 +299,22 @@ func (d diskSegmentType) VMPageCount() uint32 {
 func (d diskSegmentType) Permissions() uint32 {
 	return uint32(types.ExtractBits(uint64(d), 60, 3))
 }
-func (d diskSegmentType) PaddingNotSeg() bool {
-	return uint32(types.ExtractBits(uint64(d), 63, 1)) != 0
-}
-func (d diskSegmentType) String() string {
+func (d diskSegmentType) PermString() string {
 	perms := types.VmProtection(d.Permissions()).String()
 	if d.Permissions() == ReadOnlyDataPermissions {
 		perms = "-w-"
 	}
+	return perms
+}
+func (d diskSegmentType) PaddingNotSeg() bool {
+	return uint32(types.ExtractBits(uint64(d), 63, 1)) != 0
+}
+func (d diskSegmentType) String() string {
+
 	return fmt.Sprintf("file_pages: %d, vm_pages: %d, perms: %s, noncontig_segs : %t",
 		d.FilePageCount(),
 		d.VMPageCount(),
-		perms,
+		d.PermString(),
 		d.PaddingNotSeg())
 }
 
@@ -1087,11 +1170,11 @@ func (f *File) parseLaunchClosure(r *bytes.Reader) error {
 			panic("launch closure type existingFiles not implimented")
 		case selectorTable: // uint32_t + (sizeof(ObjCSelectorImage) * count) + hashTable size
 			// panic("not implimented")
-			utils.Indent(log.Info, 2)("selectorTable - Skipping")
+			utils.Indent(log.Debug, 2)("selectorTable - Skipping")
 			r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
 		case classTable: // (3 * uint32_t) + (sizeof(ObjCClassImage) * count) + classHashTable size + protocolHashTable size
 			// panic("not implimented")
-			utils.Indent(log.Info, 2)("classTable - Skipping")
+			utils.Indent(log.Debug, 2)("classTable - Skipping")
 			r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
 		case warning: // len = uint32_t + length path + 1 use one entry per warning
 			var warn warningType
@@ -1111,7 +1194,7 @@ func (f *File) parseLaunchClosure(r *bytes.Reader) error {
 			// fmt.Printf("delta: %#x\n", tbytes.PayloadLength()-uint32(binary.Size(s)))
 			// fmt.Println(s)
 			// panic("not implimented")
-			utils.Indent(log.Info, 2)("duplicateClassesTable - Skipping")
+			utils.Indent(log.Debug, 2)("duplicateClassesTable - Skipping")
 			r.Seek(int64(tbytes.PayloadLength()), io.SeekCurrent)
 		case progVars: // sizeof(uint32_t)
 			if err := binary.Read(r, binary.LittleEndian, &lc.ProgVars); err != nil {
