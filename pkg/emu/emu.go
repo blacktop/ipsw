@@ -341,9 +341,11 @@ func (e *Emulation) SetupHooks() error {
 			if err := e.GetState(); err != nil {
 				log.Errorf("failed to register state: %v", err)
 			}
+			fmt.Printf(colorHook("[REGISTERS]\n"))
 			fmt.Println(e.regs.Changed())
+			fmt.Printf(colorHook("\n[MEM_REGIONS]\n"))
 			e.DumpMemRegions()
-			fmt.Printf(colorHook("[STACK]\n"))
+			fmt.Printf(colorHook("\n[STACK]\n"))
 			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value-0x50, 0x50)
 			fmt.Printf(colorHook("SP>\n"))
 			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value, min((STACK_BASE+STACK_SIZE)-e.regs[uc.ARM64_REG_SP].Value, 0x50))
@@ -387,9 +389,11 @@ func (e *Emulation) SetCode(start uint64, count uint64, code []byte) error {
 // Start starts the unicorn emulation engine
 func (e *Emulation) Start() error {
 	if err := e.mu.Start(e.startAddr, e.startAddr+(e.count*4)); err != nil {
+		fmt.Printf(colorHook("[REGISTERS]\n"))
 		fmt.Println(e.regs.Changed())
+		fmt.Printf(colorHook("\n[MEM_REGIONS]\n"))
 		e.DumpMemRegions()
-		fmt.Printf(colorHook("[STACK]\n"))
+		fmt.Printf(colorHook("\n[STACK]\n"))
 		e.DumpMem(e.regs[uc.ARM64_REG_SP].Value-0x50, 0x50)
 		fmt.Printf(colorHook("SP>\n"))
 		e.DumpMem(e.regs[uc.ARM64_REG_SP].Value, min((STACK_BASE+STACK_SIZE)-e.regs[uc.ARM64_REG_SP].Value, 0x50))

@@ -32,6 +32,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -80,8 +81,12 @@ var dyldDisassCmd = &cobra.Command{
 		asJSON, _ := cmd.Flags().GetBool("json")
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 		quiet, _ := cmd.Flags().GetBool("quiet")
-		color, _ := cmd.Flags().GetBool("color")
+		forceColor, _ := cmd.Flags().GetBool("color")
 		funcFile, _ := cmd.Flags().GetString("input")
+
+		if forceColor {
+			color.NoColor = false
+		}
 
 		if len(symbolName) > 0 && startAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
@@ -190,7 +195,7 @@ var dyldDisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
-						Color:        color,
+						Color:        forceColor,
 					})
 
 					if !quiet {
@@ -284,7 +289,7 @@ var dyldDisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
-					Color:        color,
+					Color:        forceColor,
 				})
 
 				if !quiet {
@@ -391,7 +396,7 @@ var dyldDisassCmd = &cobra.Command{
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,
-				Color:        color,
+				Color:        forceColor,
 			})
 
 			if !quiet {

@@ -33,8 +33,10 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -48,6 +50,14 @@ func init() {
 	dyldDumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
 	dyldDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
 	dyldDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
+	dyldDumpCmd.Flags().Bool("color", false, "Force color (for piping to less etc)")
+	viper.BindPFlag("dyld.dump.arch", dyldDumpCmd.Flags().Lookup("arch"))
+	viper.BindPFlag("dyld.dump.size", dyldDumpCmd.Flags().Lookup("size"))
+	viper.BindPFlag("dyld.dump.count", dyldDumpCmd.Flags().Lookup("count"))
+	viper.BindPFlag("dyld.dump.addr", dyldDumpCmd.Flags().Lookup("addr"))
+	viper.BindPFlag("dyld.dump.hex", dyldDumpCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("dyld.dump.output", dyldDumpCmd.Flags().Lookup("output"))
+	viper.BindPFlag("dyld.dump.color", dyldDumpCmd.Flags().Lookup("color"))
 	dyldDumpCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -62,12 +72,16 @@ var dyldDumpCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		size, _ := cmd.Flags().GetUint64("size")
-		count, _ := cmd.Flags().GetUint64("count")
+		size := viper.GetUint64("dyld.dump.size")
+		count := viper.GetUint64("dyld.dump.count")
+		asAddrs := viper.GetBool("dyld.dump.addr")
+		asHex := viper.GetBool("dyld.dump.hex")
+		outFile := viper.GetString("dyld.dump.output")
+		forceColor := viper.GetBool("dyld.dump.color")
 
-		asAddrs, _ := cmd.Flags().GetBool("addr")
-		asHex, _ := cmd.Flags().GetBool("hex")
-		outFile, _ := cmd.Flags().GetString("output")
+		if forceColor {
+			color.NoColor = false
+		}
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")

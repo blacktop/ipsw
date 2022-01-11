@@ -35,6 +35,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -48,12 +49,14 @@ func init() {
 	machoDumpCmd.Flags().BoolP("addr", "v", false, "Output as addresses/uint64s")
 	machoDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
 	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
+	machoDumpCmd.Flags().Bool("color", false, "Force color (for piping to less etc)")
 	viper.BindPFlag("macho.dump.arch", machoDumpCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.dump.size", machoDumpCmd.Flags().Lookup("size"))
 	viper.BindPFlag("macho.dump.count", machoDumpCmd.Flags().Lookup("count"))
 	viper.BindPFlag("macho.dump.addr", machoDumpCmd.Flags().Lookup("addr"))
 	viper.BindPFlag("macho.dump.hex", machoDumpCmd.Flags().Lookup("hex"))
 	viper.BindPFlag("macho.dump.output", machoDumpCmd.Flags().Lookup("output"))
+	viper.BindPFlag("macho.dump.color", machoDumpCmd.Flags().Lookup("color"))
 	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -78,6 +81,11 @@ var machoDumpCmd = &cobra.Command{
 		asAddrs := viper.GetBool("macho.dump.addr")
 		asHex := viper.GetBool("macho.dump.hex")
 		outFile := viper.GetString("macho.dump.output")
+		forceColor := viper.GetBool("macho.dump.color")
+
+		if forceColor {
+			color.NoColor = false
+		}
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")

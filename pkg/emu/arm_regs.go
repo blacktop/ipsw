@@ -378,16 +378,16 @@ func (r Registers) String() string {
 }
 
 func (r Registers) Changed() string {
-	return fmt.Sprintf(colorHook("[REGISTERS]\n")+
+	return fmt.Sprintf(
 		"     %s  %s  %s  %s\n"+
-		"     %s  %s  %s  %s\n"+
-		"     %s  %s %s %s\n"+
-		"    %s %s %s %s\n"+
-		"    %s %s %s %s\n"+
-		"    %s %s %s %s\n"+
-		"    %s %s %s %s\n"+
-		"    %s  %s  %s\n"+
-		"     %s  %s %s %s",
+			"     %s  %s  %s  %s\n"+
+			"     %s  %s %s %s\n"+
+			"    %s %s %s %s\n"+
+			"    %s %s %s %s\n"+
+			"    %s %s %s %s\n"+
+			"    %s %s %s %s\n"+
+			"    %s  %s  %s\n"+
+			"     %s  %s %s %s",
 		r[uc.ARM64_REG_X0], r[uc.ARM64_REG_X1], r[uc.ARM64_REG_X2], r[uc.ARM64_REG_X3],
 		r[uc.ARM64_REG_X4], r[uc.ARM64_REG_X5], r[uc.ARM64_REG_X6], r[uc.ARM64_REG_X7],
 		r[uc.ARM64_REG_X8], r[uc.ARM64_REG_X9], r[uc.ARM64_REG_X10], r[uc.ARM64_REG_X11],

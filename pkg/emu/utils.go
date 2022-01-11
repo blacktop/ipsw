@@ -73,7 +73,6 @@ func (e *Emulation) DumpMemRegions() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(colorHook("[MEM_REGIONS]"))
 	for _, mr := range memRegs {
 		fmt.Printf(
 			colorHook("    begin: ") + colorDetails("%#09x", mr.Begin) +
