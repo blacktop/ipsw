@@ -28,6 +28,7 @@ var ErrNoExportTrieInCache = errors.New("dyld shared cache does NOT contain expo
 
 // ErrNoExportTrieInMachO is the error for a shared cache that has no LocalSymbolsOffset
 var ErrNoExportTrieInMachO = errors.New("dylib does NOT contain export trie info")
+var ErrSymbolNotInExportTrie = errors.New("dylib does NOT contain symbolin export trie info")
 var ErrSymbolNotInImage = errors.New("dylib does NOT contain symbol")
 
 // ParseLocalSyms parses dyld's private symbols
@@ -392,19 +393,19 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 						}
 						w.Flush()
 					}
-
+					image.Analysis.State.SetExports(true)
 				} else {
 					return err
 				}
 			} else {
-				m, err := image.GetPartialMacho()
+				m, err := image.GetMacho()
 				if err != nil {
 					return err
 				}
 
 				for _, sym := range syms {
 					if sym.Flags.ReExport() {
-						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+						sym.FoundInDylib = m.LibraryOrdinalName(int(sym.Other - 1))
 					} else {
 						sym.FoundInDylib = image.Name
 					}
@@ -414,9 +415,17 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 						// fmt.Println(sym)
 					} else {
 						f.AddressToSymbol[sym.Address] = sym.Name
-						image.Analysis.State.SetExports(true)
 					}
 				}
+				for _, sym := range m.Symtab.Syms {
+					f.AddressToSymbol[sym.Value] = sym.Name
+				}
+				if binds, err := m.GetBindInfo(); err == nil {
+					for _, bind := range binds {
+						f.AddressToSymbol[bind.Start+bind.Offset] = bind.Name
+					}
+				}
+				image.Analysis.State.SetExports(true)
 				w.Flush()
 			}
 		}
@@ -627,7 +636,7 @@ func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trie.Tr
 		}
 	}
 
-	return nil, fmt.Errorf("failed to find in image %s: %w", imagePath, ErrSymbolNotInImage)
+	return nil, fmt.Errorf("failed to find in image %s export trie: %w", imagePath, ErrSymbolNotInExportTrie)
 }
 
 // GetSymbolAddress returns the virtual address and possibly the dylib containing a given symbol
