@@ -38,6 +38,7 @@ type astate struct {
 	Privates bool
 	Starts   bool
 	ObjC     bool
+	Slide    bool
 }
 
 func (a *astate) SetDeps(done bool) {
@@ -128,6 +129,18 @@ func (a *astate) IsObjcDone() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.ObjC
+}
+
+func (a *astate) SetSlideInfo(done bool) {
+	a.mu.Lock()
+	a.Slide = done
+	a.mu.Unlock()
+}
+
+func (a *astate) IsSlideInfoDone() bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.Slide
 }
 
 type analysis struct {
@@ -389,12 +402,12 @@ func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
 // Analyze analyzes an image by parsing it's symbols, stubs and GOT
 func (i *CacheImage) Analyze() error {
 
-	if !i.Analysis.State.IsStartsDone() {
-		i.ParseStarts()
-	}
-
 	if err := i.cache.GetAllExportedSymbolsForImage(i, false); err != nil {
 		log.Errorf("failed to parse exported symbols for %s", i.Name)
+	}
+
+	if !i.Analysis.State.IsStartsDone() {
+		i.ParseStarts()
 	}
 
 	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
@@ -411,8 +424,10 @@ func (i *CacheImage) Analyze() error {
 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
 	}
 
-	if err := i.ParseSlideInfo(); err != nil {
-		return err
+	if !i.Analysis.State.IsSlideInfoDone() {
+		if err := i.ParseSlideInfo(); err != nil {
+			return err
+		}
 	}
 
 	if !i.Analysis.State.IsHelpersDone() && i.cache.IsArm64() {
@@ -541,7 +556,18 @@ func (i *CacheImage) ParseSlideInfo() error {
 		}
 	}
 
+	i.Analysis.State.SetSlideInfo(true)
+
 	return nil
+}
+
+func (i *CacheImage) GetSlideInfo() (map[uint64]uint64, error) {
+	if !i.Analysis.State.IsSlideInfoDone() {
+		if err := i.ParseSlideInfo(); err != nil {
+			return nil, err
+		}
+	}
+	return i.sinfo, nil
 }
 
 // ParseStarts parse function starts in MachO
