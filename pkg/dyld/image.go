@@ -389,12 +389,12 @@ func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
 // Analyze analyzes an image by parsing it's symbols, stubs and GOT
 func (i *CacheImage) Analyze() error {
 
-	if err := i.cache.GetAllExportedSymbolsForImage(i, false); err != nil {
-		log.Errorf("failed to parse exported symbols for %s", i.Name)
-	}
-
 	if !i.Analysis.State.IsStartsDone() {
 		i.ParseStarts()
+	}
+
+	if err := i.cache.GetAllExportedSymbolsForImage(i, false); err != nil {
+		log.Errorf("failed to parse exported symbols for %s", i.Name)
 	}
 
 	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
