@@ -134,12 +134,12 @@ var symaddrCmd = &cobra.Command{
 					}
 				}
 
-				if sym, _ := f.FindLocalSymbolInImage(args[1], imageName); sym != nil {
-					sym.Sections = m.Sections
-					fmt.Println(sym)
-				}
+				// if sym, _ := f.FindLocalSymbolInImage(args[1], imageName); sym != nil {
+				// 	sym.Sections = m.Sections
+				// 	fmt.Println(sym)
+				// }
 
-				return nil
+				// return nil
 			}
 
 			/**********************************
@@ -147,23 +147,31 @@ var symaddrCmd = &cobra.Command{
 			 **********************************/
 			log.Warn("searching in local symbols...")
 			if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
+				if len(lSym.FoundInDylib) > 0 {
+					image, err := f.Image(lSym.FoundInDylib)
+					if err != nil {
+						return err
+					}
+					lSym.Macho, err = image.GetPartialMacho()
+					if err != nil {
+						return err
+					}
+				}
 				fmt.Println(lSym)
+				if !allMatches {
+					return nil
+				}
 			}
 			log.Warn("searching in exported symbols...")
 			for _, image := range f.Images {
-				// utils.Indent(log.Debug, 2)("Searching " + image.Name)
-				m, err := image.GetPartialMacho()
+				utils.Indent(log.Debug, 2)("Searching " + image.Name)
+				m, err := image.GetMacho()
 				if err != nil {
 					return err
 				}
-
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 				if sym, err := f.FindExportedSymbolInImage(image.Name, args[1]); err != nil {
-					if !errors.Is(err, dyld.ErrSymbolNotInImage) {
-						m, err := image.GetMacho()
-						if err != nil {
-							return err
-						}
+					if errors.Is(err, dyld.ErrSymbolNotInExportTrie) {
 						for _, sym := range m.Symtab.Syms {
 							if sym.Name == args[1] {
 								var sec string
@@ -234,7 +242,7 @@ var symaddrCmd = &cobra.Command{
 			}
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, sym := range i.LocalSymbols {
-				sym.Sections = m.Sections
+				sym.Macho = m
 				fmt.Fprintf(w, "%s\n", sym)
 			}
 			w.Flush()
@@ -252,9 +260,9 @@ var symaddrCmd = &cobra.Command{
 		* Dump ALL symbols*
 		*******************/
 		log.Warn("parsing exported symbols...")
-		if err = f.GetAllExportedSymbols(true); err != nil {
-			log.Errorf("failed to get all exported symbols: %v", err)
-		}
+		// if err = f.GetAllExportedSymbols(true); err != nil {
+		// 	log.Errorf("failed to get all exported symbols: %v", err)
+		// }
 
 		log.Warn("parsing local symbols (slow)...")
 		if err = f.ParseLocalSyms(); err != nil {
@@ -270,7 +278,7 @@ var symaddrCmd = &cobra.Command{
 			}
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, sym := range image.LocalSymbols {
-				sym.Sections = m.Sections
+				sym.Macho = m
 				fmt.Fprintf(w, "%s\n", sym)
 			}
 			w.Flush()
