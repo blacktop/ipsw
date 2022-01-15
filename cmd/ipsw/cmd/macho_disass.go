@@ -34,28 +34,39 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	machoCmd.AddCommand(machoDisassCmd)
-
-	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
-	machoDisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	// machoDisassCmd.Flags().Uint64("slide", 0, "MachO slide to remove from --vaddr")
 	machoDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	machoDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	machoDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
-	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
+	machoDisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	// machoDisassCmd.Flags().StringP("input", "i", "", "Input function JSON file")
+	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+
+	viper.BindPFlag("macho.disass.symbol", machoDisassCmd.Flags().Lookup("symbol"))
+	viper.BindPFlag("macho.disass.vaddr", machoDisassCmd.Flags().Lookup("vaddr"))
+	viper.BindPFlag("macho.disass.count", machoDisassCmd.Flags().Lookup("count"))
+	viper.BindPFlag("macho.disass.demangle", machoDisassCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
+	viper.BindPFlag("macho.disass.quiet", machoDisassCmd.Flags().Lookup("quiet"))
+	viper.BindPFlag("macho.disass.color", machoDisassCmd.Flags().Lookup("color"))
+	// viper.BindPFlag("macho.disass.input", machoDisassCmd.Flags().Lookup("input"))
+	viper.BindPFlag("macho.disass.cache", machoDisassCmd.Flags().Lookup("cache"))
+
 	machoDisassCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // machoDisassCmd represents the dis command
 var machoDisassCmd = &cobra.Command{
 	Use:          "disass <MACHO>",
-	Short:        "Disassemble ARM64 binaries at address or symbol",
+	Short:        "Disassemble ARM64 MachO at symbol/vaddr",
 	Args:         cobra.MinimumNArgs(1),
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -68,15 +79,18 @@ var machoDisassCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		instructions, _ := cmd.Flags().GetUint64("count")
-		startAddr, _ := cmd.Flags().GetUint64("vaddr")
-		symbolName, _ := cmd.Flags().GetString("symbol")
-		cacheFile, _ := cmd.Flags().GetString("cache")
-		// slide, _ := cmd.Flags().GetUint64("slide")
-		asJSON, _ := cmd.Flags().GetBool("json")
-		demangleFlag, _ := cmd.Flags().GetBool("demangle")
-		quiet, _ := cmd.Flags().GetBool("quiet")
-		forceColor, _ := cmd.Flags().GetBool("color")
+		// flags
+		symbolName := viper.GetString("macho.disass.symbol")
+		startAddr := viper.GetUint64("macho.disass.vaddr")
+		instructions := viper.GetUint64("macho.disass.count")
+
+		demangleFlag := viper.GetBool("macho.disass.demangle")
+		asJSON := viper.GetBool("macho.disass.json")
+		quiet := viper.GetBool("macho.disass.quiet")
+		forceColor := viper.GetBool("macho.disass.color")
+
+		// funcFile := viper.GetString("macho.disass.input")
+		cacheFile := viper.GetString("macho.disass.cache")
 
 		if forceColor {
 			color.NoColor = false

@@ -35,22 +35,33 @@ import (
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
-
 	// dyldDisassCmd.Flags().Uint64("slide", 0, "dyld_shared_cache slide to remove from --vaddr")
 	dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	dyldDisassCmd.Flags().String("input", "", "Input function JSON file")
 	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	dyldDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	dyldDisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
+	dyldDisassCmd.Flags().String("input", "", "Input function JSON file")
 	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+
+	viper.BindPFlag("dyld.disass.symbol", dyldDisassCmd.Flags().Lookup("symbol"))
+	viper.BindPFlag("dyld.disass.vaddr", dyldDisassCmd.Flags().Lookup("vaddr"))
+	viper.BindPFlag("dyld.disass.image", dyldDisassCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.disass.count", dyldDisassCmd.Flags().Lookup("count"))
+	viper.BindPFlag("dyld.disass.demangle", dyldDisassCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("dyld.disass.json", dyldDisassCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dyld.disass.quiet", dyldDisassCmd.Flags().Lookup("quiet"))
+	viper.BindPFlag("dyld.disass.color", dyldDisassCmd.Flags().Lookup("color"))
+	viper.BindPFlag("dyld.disass.input", dyldDisassCmd.Flags().Lookup("input"))
+	viper.BindPFlag("dyld.disass.cache", dyldDisassCmd.Flags().Lookup("cache"))
 
 	dyldDisassCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -58,7 +69,7 @@ func init() {
 // disassCmd represents the disass command
 var dyldDisassCmd = &cobra.Command{
 	Use:           "disass <dyld_shared_cache>",
-	Short:         "Disassemble dyld_shared_cache symbol/vaddr in an image",
+	Short:         "Disassemble dyld_shared_cache at symbol/vaddr",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  false,
 	SilenceErrors: true,
@@ -72,17 +83,19 @@ var dyldDisassCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		imageName, _ := cmd.Flags().GetString("image")
-		instructions, _ := cmd.Flags().GetUint64("count")
-		startAddr, _ := cmd.Flags().GetUint64("vaddr")
-		symbolName, _ := cmd.Flags().GetString("symbol")
-		cacheFile, _ := cmd.Flags().GetString("cache")
-		// slide, _ := cmd.Flags().GetUint64("slide")
-		asJSON, _ := cmd.Flags().GetBool("json")
-		demangleFlag, _ := cmd.Flags().GetBool("demangle")
-		quiet, _ := cmd.Flags().GetBool("quiet")
-		forceColor, _ := cmd.Flags().GetBool("color")
-		funcFile, _ := cmd.Flags().GetString("input")
+		// flags
+		symbolName := viper.GetString("dyld.disass.symbol")
+		startAddr := viper.GetUint64("dyld.disass.vaddr")
+		imageName := viper.GetString("dyld.disass.image")
+		instructions := viper.GetUint64("dyld.disass.count")
+
+		demangleFlag := viper.GetBool("dyld.disass.demangle")
+		asJSON := viper.GetBool("dyld.disass.json")
+		quiet := viper.GetBool("dyld.disass.quiet")
+		forceColor := viper.GetBool("dyld.disass.color")
+
+		funcFile := viper.GetString("dyld.disass.input")
+		cacheFile := viper.GetString("dyld.disass.cache")
 
 		if forceColor {
 			color.NoColor = false
@@ -344,7 +357,6 @@ var dyldDisassCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-
 				m, err := image.GetMacho()
 				if err != nil {
 					return err

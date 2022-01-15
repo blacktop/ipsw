@@ -424,8 +424,10 @@ func (i *CacheImage) Analyze() error {
 		utils.Indent(log.Warn, 2)("image analysis of stubs and GOT only works on arm64 architectures")
 	}
 
-	if err := i.ParseSlideInfo(); err != nil {
-		return err
+	if !i.Analysis.State.IsSlideInfoDone() {
+		if err := i.ParseSlideInfo(); err != nil {
+			return err
+		}
 	}
 
 	if !i.Analysis.State.IsHelpersDone() && i.cache.IsArm64() {
