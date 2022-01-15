@@ -503,18 +503,21 @@ type CacheLocalSymbol64 struct {
 	types.Nlist64
 	Name         string
 	FoundInDylib string
-	Sections     []*macho.Section
+	Macho        *macho.File
 }
 
 func (s CacheLocalSymbol64) String() string {
-	// ord := s.Nlist64.Desc.GetLibraryOrdinal() // TODO: how to handle ord ?
-	var found string
 	var sec string
+	var found string
 	if len(s.FoundInDylib) > 0 {
 		found = fmt.Sprintf("\t%s", s.FoundInDylib)
+
 	}
-	if s.Sect > 0 && s.Sections != nil {
-		sec = fmt.Sprintf("%s.%s", s.Sections[s.Sect-1].Seg, s.Sections[s.Sect-1].Name)
+	// if s.Nlist64.Desc.GetLibraryOrdinal() != 0 { // TODO: I haven't seen this trigger in the iPhone14,2_D63AP_19D5026g/dyld_shared_cache_arm64e I tested
+	// 	return fmt.Sprintf("%#09x:\t(%s|%s)\t%s%s", s.Value, s.Type.String(sec), s.Macho.LibraryOrdinalName(int(s.Nlist64.Desc.GetLibraryOrdinal())), s.Name, found)
+	// }
+	if s.Sect > 0 && s.Macho.Sections != nil {
+		sec = fmt.Sprintf("%s.%s", s.Macho.Sections[s.Sect-1].Seg, s.Macho.Sections[s.Sect-1].Name)
 	}
 	return fmt.Sprintf("%#09x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
 }
