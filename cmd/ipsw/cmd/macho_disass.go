@@ -31,6 +31,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -75,7 +76,11 @@ var machoDisassCmd = &cobra.Command{
 		asJSON, _ := cmd.Flags().GetBool("json")
 		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 		quiet, _ := cmd.Flags().GetBool("quiet")
-		color, _ := cmd.Flags().GetBool("color")
+		forceColor, _ := cmd.Flags().GetBool("color")
+
+		if forceColor {
+			color.NoColor = false
+		}
 
 		// funcFile, _ := cmd.Flags().GetString("input")
 		allFuncs := false
@@ -141,7 +146,7 @@ var machoDisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
-					Color:        color,
+					Color:        forceColor,
 				})
 
 				//***********************
@@ -223,7 +228,7 @@ var machoDisassCmd = &cobra.Command{
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,
-				Color:        color,
+				Color:        forceColor,
 			})
 
 			//***********************
