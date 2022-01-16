@@ -79,7 +79,7 @@ var betaCmd = &cobra.Command{
 		var filteredURLS []string
 		for url, ipsw := range ipsws {
 			if len(device) > 0 {
-				if utils.StrSliceContains(ipsw.Devices, device) {
+				if utils.StrSliceHas(ipsw.Devices, device) {
 					filteredURLS = append(filteredURLS, url)
 				}
 			} else {

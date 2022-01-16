@@ -281,7 +281,7 @@ func (i *Info) GetDevicesForKernelCache(kc string) []string {
 	var devices []string
 
 	for bconf, kcache := range i.Plists.BuildManifest.GetKernelCaches() {
-		if utils.StrSliceContains(kcache, kc) {
+		if utils.StrSliceHas(kcache, kc) {
 			for _, dtree := range i.DeviceTrees {
 				dt, _ := dtree.Summary()
 				if strings.ToLower(bconf) == strings.ToLower(dt.BoardConfig) {

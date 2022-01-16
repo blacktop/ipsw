@@ -140,11 +140,11 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 			}
 		} else {
 			if len(doDownload) > 0 {
-				if utils.StrSliceContains(doDownload, i.Identifier) {
+				if utils.StrSliceHas(doDownload, i.Identifier) {
 					filteredIPSWs = append(filteredIPSWs, i)
 				}
 			} else if len(doNotDownload) > 0 {
-				if !utils.StrSliceContains(doNotDownload, i.Identifier) {
+				if !utils.StrSliceHas(doNotDownload, i.Identifier) {
 					filteredIPSWs = append(filteredIPSWs, i)
 				}
 			} else {

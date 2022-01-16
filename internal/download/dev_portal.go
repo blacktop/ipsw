@@ -654,7 +654,7 @@ func (app *App) Watch() error {
 		}
 
 		for version := range ipsws {
-			if utils.StrSliceContains(app.config.WatchList, version) {
+			if utils.StrSliceHas(app.config.WatchList, version) {
 				for _, ipsw := range ipsws[version] {
 					if err := app.Download(ipsw.URL); err != nil {
 						log.Error(err.Error())

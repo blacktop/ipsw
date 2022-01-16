@@ -177,11 +177,11 @@ var ipswCmd = &cobra.Command{
 
 			for _, v := range builds {
 				if len(doDownload) > 0 {
-					if utils.StrSliceContains(doDownload, v.Identifier) {
+					if utils.StrSliceHas(doDownload, v.Identifier) {
 						filteredBuilds = append(filteredBuilds, v)
 					}
 				} else if len(doNotDownload) > 0 {
-					if !utils.StrSliceContains(doNotDownload, v.Identifier) {
+					if !utils.StrSliceHas(doNotDownload, v.Identifier) {
 						filteredBuilds = append(filteredBuilds, v)
 					}
 				} else {

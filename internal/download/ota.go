@@ -232,7 +232,7 @@ func (o *Ota) FilterOtaAssets() []OtaAsset {
 
 	for _, ota := range uniqueOTAs(o.Assets) {
 		if len(o.Config.Device) > 0 {
-			if utils.StrSliceContains(ota.SupportedDevices, o.Config.Device) {
+			if utils.StrSliceHas(ota.SupportedDevices, o.Config.Device) {
 				otas = append(otas, ota)
 			}
 		} else {
@@ -242,11 +242,11 @@ func (o *Ota) FilterOtaAssets() []OtaAsset {
 
 	for _, ota := range otas {
 		if len(o.Config.DeviceWhiteList) > 0 {
-			if utils.StrSliceContains(o.Config.DeviceWhiteList, ota.SupportedDevices[0]) {
+			if utils.StrSliceHas(o.Config.DeviceWhiteList, ota.SupportedDevices[0]) {
 				filteredOtas = append(filteredOtas, ota)
 			}
 		} else if len(o.Config.DeviceBlackList) > 0 {
-			if !utils.StrSliceContains(o.Config.DeviceBlackList, ota.SupportedDevices[0]) {
+			if !utils.StrSliceHas(o.Config.DeviceBlackList, ota.SupportedDevices[0]) {
 				filteredOtas = append(filteredOtas, ota)
 			}
 		} else {
@@ -633,7 +633,7 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 
 func (o *Ota) lookupHWModel(device string) (string, error) {
 	for _, ota := range o.Assets {
-		if utils.StrSliceContains(ota.SupportedDevices, device) {
+		if utils.StrSliceHas(ota.SupportedDevices, device) {
 			if len(ota.SupportedDeviceModels) > 1 {
 				return "0", fmt.Errorf("found more than one hw model for device %s", device)
 			} else if len(ota.SupportedDeviceModels) == 0 {
@@ -671,7 +671,7 @@ func (o *Ota) filterOTADevices(otas []OtaAsset) []OtaAsset {
 	for _, device := range devices {
 		var devOTA OtaAsset
 		for _, ota := range otas {
-			if utils.StrSliceContains(ota.SupportedDeviceModels, device) {
+			if utils.StrSliceHas(ota.SupportedDeviceModels, device) {
 				if devOTA.SupportedDevices == nil {
 					devOTA = ota
 				} else {

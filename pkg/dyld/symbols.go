@@ -31,6 +31,12 @@ var ErrNoExportTrieInMachO = errors.New("dylib does NOT contain export trie info
 var ErrSymbolNotInExportTrie = errors.New("dylib does NOT contain symbolin export trie info")
 var ErrSymbolNotInImage = errors.New("dylib does NOT contain symbol")
 
+type Symbol struct {
+	Name    string `json:"name,omitempty"`
+	Image   string `json:"image,omitempty"`
+	Address uint64 `json:"address,omitempty"`
+}
+
 // ParseLocalSyms parses dyld's private symbols
 func (f *File) ParseLocalSyms() error {
 
@@ -311,7 +317,7 @@ func (f *File) GetCStringAtOffsetForUUID(uuid types.UUID, offset uint64) (string
 	return "", fmt.Errorf("string not found at offset 0x%x", offset)
 }
 
-func (f *File) getExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
+func (f *File) GetExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 	var eTrieAddr, eTrieSize uint64
 
 	if i.CacheImageInfoExtra.ExportsTrieAddr > 0 {
@@ -365,7 +371,7 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	for _, image := range f.Images {
 		if !image.Analysis.State.IsExportsDone() {
-			syms, err := f.getExportTrieSymbols(image)
+			syms, err := f.GetExportTrieSymbols(image)
 			if err != nil {
 				if errors.Is(err, ErrNoExportTrieInMachO) {
 					m, err := image.GetMacho()
@@ -437,7 +443,7 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 // GetAllExportedSymbolsForImage prints out all the exported symbols for a given image
 func (f *File) GetAllExportedSymbolsForImage(image *CacheImage, dump bool) error {
 	if !image.Analysis.State.IsExportsDone() {
-		syms, err := f.getExportTrieSymbols(image)
+		syms, err := f.GetExportTrieSymbols(image)
 		if err != nil {
 			if errors.Is(err, ErrNoExportTrieInMachO) {
 				m, err := image.GetMacho()
@@ -603,7 +609,7 @@ func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieEntry, error) {
 	for _, image := range f.Images {
 		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
 			log.Debugf("Scanning Image: %s", image.Name)
-			syms, err := f.getExportTrieSymbols(image)
+			syms, err := f.GetExportTrieSymbols(image)
 			if err != nil {
 				return nil, err
 			}
@@ -625,7 +631,7 @@ func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trie.Tr
 		return nil, err
 	}
 
-	syms, err := f.getExportTrieSymbols(image)
+	syms, err := f.GetExportTrieSymbols(image)
 	if err != nil {
 		return nil, err
 	}
