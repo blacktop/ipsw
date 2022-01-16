@@ -497,6 +497,31 @@ DOF Offsets:
 </code></pre></div><p><strong>NOTE:</strong> you don&rsquo;t have to supply the full image path</p>
 <p>Dump ALL teh symbolz!!!</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld symaddr dyld_shared_cache
+</code></pre></div><p>Read in a JSON symbol lookup file</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ jq . sym_lookup.json
+<span class="o">[</span>
+  <span class="o">{</span>
+    <span class="s2">&#34;name&#34;</span>: <span class="s2">&#34;__platform_memmove&#34;</span>,
+    <span class="s2">&#34;image&#34;</span>: <span class="s2">&#34;libsystem_platform.dylib&#34;</span>
+  <span class="o">}</span>,
+  <span class="o">{</span>
+    <span class="s2">&#34;name&#34;</span>: <span class="s2">&#34;_memcpy&#34;</span>,
+    <span class="s2">&#34;image&#34;</span>: <span class="s2">&#34;libsystem_c.dylib&#34;</span>
+  <span class="o">}</span>
+<span class="o">]</span>
+</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld symaddr dyld_shared_cache --in sym_lookup.json <span class="p">|</span> jq .
+<span class="o">[</span>
+  <span class="o">{</span>
+    <span class="s2">&#34;name&#34;</span>: <span class="s2">&#34;__platform_memmove&#34;</span>,
+    <span class="s2">&#34;image&#34;</span>: <span class="s2">&#34;/usr/lib/system/libsystem_platform.dylib&#34;</span>,
+    <span class="s2">&#34;address&#34;</span>: <span class="m">8351373904</span>
+  <span class="o">}</span>,
+  <span class="o">{</span>
+    <span class="s2">&#34;name&#34;</span>: <span class="s2">&#34;_memcpy&#34;</span>,
+    <span class="s2">&#34;image&#34;</span>: <span class="s2">&#34;/usr/lib/system/libsystem_c.dylib&#34;</span>,
+    <span class="s2">&#34;address&#34;</span>: <span class="m">8351373904</span>
+  <span class="o">}</span>
+<span class="o">]</span>
 </code></pre></div><h3 id="dyld-a2s"><strong>dyld a2s</strong></h3>
 <p>Lookup what symbol is at a given <em>unslid</em> or <em>slid</em> address <em>(in hex)</em></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dyld a2s dyld_shared_cache_arm64e --slide 0x27010000 0x00000001bc39e1e0
