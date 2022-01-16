@@ -357,6 +357,9 @@ var dyldDisassCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+				if err := image.Analyze(); err != nil {
+					return err
+				}
 				m, err := image.GetMacho()
 				if err != nil {
 					return err
@@ -415,9 +418,6 @@ var dyldDisassCmd = &cobra.Command{
 				//***********************
 				//* First pass ANALYSIS *
 				//***********************
-				if err := image.Analyze(); err != nil {
-					return err
-				}
 				if err := engine.Triage(); err != nil {
 					return fmt.Errorf("first pass triage failed: %v", err)
 				}
