@@ -112,6 +112,26 @@ func StrSliceContains(slice []string, item string) bool {
 	return false
 }
 
+// StrSliceHas returns true if string slice has an exact given string
+func StrSliceHas(slice []string, item string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(strings.ToLower(item), strings.ToLower(s)) {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveStrFromSlice removes a single string from a string slice
+func RemoveStrFromSlice(s []string, r string) []string {
+	for i, v := range s {
+		if v == r {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
+}
+
 // Uint64SliceContains returns true if uint64 slice contains given uint64
 func Uint64SliceContains(slice []uint64, item uint64) bool {
 	for _, s := range slice {

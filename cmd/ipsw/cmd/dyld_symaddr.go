@@ -22,7 +22,9 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
@@ -39,6 +41,8 @@ func init() {
 
 	symaddrCmd.Flags().BoolP("all", "a", false, "Find all symbol matches")
 	symaddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	symaddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
+	symaddrCmd.Flags().String("out", "", "Path to output JSON file")
 	// symaddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -57,6 +61,8 @@ var symaddrCmd = &cobra.Command{
 		}
 
 		imageName, _ := cmd.Flags().GetString("image")
+		symbolFile, _ := cmd.Flags().GetString("in")
+		jsonFile, _ := cmd.Flags().GetString("out")
 		allMatches, _ := cmd.Flags().GetBool("all")
 
 		dscPath := filepath.Clean(args[0])
@@ -85,63 +91,260 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(args) > 1 {
-			/**********************************
-			 * Search for symbol inside dylib *
-			 **********************************/
+		if len(symbolFile) > 0 {
+			/******************************************
+			 * Search for symbols in JSON lookup file *
+			 ******************************************/
+			var slin []dyld.Symbol
+			var slout []dyld.Symbol
+			var enc *json.Encoder
+			symbolFile = filepath.Clean(symbolFile)
+			sdata, _ := ioutil.ReadFile(symbolFile)
+
+			if err := json.Unmarshal(sdata, &slin); err != nil {
+				return fmt.Errorf("failed to parse symbol lookup JSON file %s: %v", symbolFile, err)
+			}
+
+			// group syms by image
+			symages := make(map[string][]string)
+			for _, s := range slin {
+				if len(s.Image) > 0 {
+					image, err := f.Image(s.Image)
+					if err != nil {
+						return err
+					}
+					symages[image.Name] = append(symages[image.Name], s.Name)
+				} else {
+					symages["unknown"] = append(symages["unknown"], s.Name)
+				}
+			}
+
+			if _, uhoh := symages["unknown"]; uhoh {
+				log.Warn("you should supply 'image' fields for each symbol to GREATLY increase speed")
+			}
+
+			for imageName, symNames := range symages {
+				if imageName == "unknown" {
+					for _, sname := range symNames {
+						if lSym, _ := f.FindLocalSymbol(sname); lSym != nil {
+							i, err := f.GetImageContainingVMAddr(lSym.Value)
+							if err != nil {
+								return err
+							}
+							slout = append(slout, dyld.Symbol{
+								Name:    sname,
+								Address: lSym.Value,
+								Image:   i.Name,
+							})
+						} else {
+							for _, image := range f.Images {
+								if sym, err := f.FindExportedSymbolInImage(image.Name, sname); err != nil {
+									if errors.Is(err, dyld.ErrSymbolNotInExportTrie) {
+										m, err := image.GetMacho()
+										if err != nil {
+											return err
+										}
+										for _, sym := range m.Symtab.Syms {
+											if sym.Name == sname && sym.Value != 0 {
+												slout = append(slout, dyld.Symbol{
+													Name:    sname,
+													Address: sym.Value,
+													Image:   image.Name,
+												})
+												goto found
+											}
+										}
+										if binds, err := m.GetBindInfo(); err == nil {
+											for _, bind := range binds {
+												if bind.Name == sname {
+													slout = append(slout, dyld.Symbol{
+														Name:    sname,
+														Address: bind.Start + bind.Offset,
+														Image:   image.Name,
+													})
+													goto found
+												}
+											}
+										}
+									}
+								} else {
+									if sym.Flags.ReExport() {
+										m, err := image.GetPartialMacho()
+										if err != nil {
+											return err
+										}
+										sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+										// lookup re-exported symbol
+										if rexpSym, err := f.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); err != nil {
+											if errors.Is(err, dyld.ErrSymbolNotInExportTrie) {
+												m, err := image.GetMacho()
+												if err != nil {
+													return err
+												}
+												for _, s := range m.Symtab.Syms {
+													if s.Name == sym.ReExport && s.Value != 0 {
+														slout = append(slout, dyld.Symbol{
+															Name:    sname,
+															Address: s.Value,
+															Image:   image.Name,
+														})
+														goto found
+													}
+												}
+												if binds, err := m.GetBindInfo(); err == nil {
+													for _, bind := range binds {
+														if bind.Name == sym.ReExport {
+															slout = append(slout, dyld.Symbol{
+																Name:    sname,
+																Address: bind.Start + bind.Offset,
+																Image:   image.Name,
+															})
+															goto found
+														}
+													}
+												}
+											} else {
+												return err
+											}
+										} else {
+											slout = append(slout, dyld.Symbol{
+												Name:    sname,
+												Address: rexpSym.Address,
+												Image:   sym.FoundInDylib,
+											})
+										}
+									} else {
+										slout = append(slout, dyld.Symbol{
+											Name:    sname,
+											Address: sym.Address,
+											Image:   image.Name,
+										})
+									}
+									goto found
+								}
+							}
+						found:
+						}
+					}
+				} else {
+					image, err := f.Image(imageName)
+					if err != nil {
+						return err
+					}
+					isyms, err := image.GetSymbols(symNames)
+					if err != nil {
+						return err
+					}
+					slout = append(slout, isyms...)
+				}
+			}
+
+			if len(jsonFile) > 0 {
+				jFile, err := os.Create(jsonFile)
+				if err != nil {
+					return err
+				}
+				defer jFile.Close()
+				enc = json.NewEncoder(jFile)
+			} else {
+				enc = json.NewEncoder(os.Stdout)
+			}
+
+			if err := enc.Encode(slout); err != nil {
+				return err
+			}
+
+			return nil
+		} else if len(args) > 1 {
 			if len(imageName) > 0 {
+				/**********************************
+				 * Search for symbol inside dylib *
+				 **********************************/
 				i, err := f.Image(imageName)
 				if err != nil {
 					return fmt.Errorf("image not in %s: %v", dscPath, err)
 				}
-				m, err := i.GetPartialMacho()
-				if err != nil {
-					return err
-				}
 				if sym, err := f.FindExportedSymbolInImage(imageName, args[1]); err != nil {
-					m, err := i.GetMacho()
-					if err != nil {
+					if errors.Is(err, dyld.ErrNoExportTrieInMachO) {
+						m, err := i.GetMacho()
+						if err != nil {
+							return err
+						}
+						for _, sym := range m.Symtab.Syms {
+							if sym.Name == args[1] {
+								var sec string
+								if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+									sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+								}
+								fmt.Printf("%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
+								if !allMatches {
+									return nil
+								}
+							}
+						}
+						if binds, err := m.GetBindInfo(); err == nil {
+							for _, bind := range binds {
+								if bind.Name == args[1] {
+									fmt.Printf("%#09x:\t(%s.%s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Name)
+									if !allMatches {
+										return nil
+									}
+								}
+							}
+						}
+					} else {
 						return err
-					}
-					for _, sym := range m.Symtab.Syms {
-						if sym.Name == args[1] {
-							var sec string
-							if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-								sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
-							}
-							fmt.Printf("%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
-						}
-					}
-					if binds, err := m.GetBindInfo(); err == nil {
-						for _, bind := range binds {
-							if bind.Name == args[1] {
-								fmt.Printf("%#09x:\t(%s.%s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Name)
-							}
-						}
 					}
 				} else {
 					if sym.Flags.ReExport() {
+						m, err := i.GetPartialMacho()
+						if err != nil {
+							return err
+						}
 						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
 						// lookup re-exported symbol
-						if rexpSym, _ := f.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); rexpSym != nil {
+						if rexpSym, err := f.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); err != nil {
+							if errors.Is(err, dyld.ErrNoExportTrieInMachO) {
+								image, err := f.Image(sym.FoundInDylib)
+								if err != nil {
+									return err
+								}
+								m, err = image.GetMacho()
+								if err != nil {
+									return err
+								}
+								for _, s := range m.Symtab.Syms {
+									if s.Name == sym.ReExport {
+										sym.Address = s.Value
+										fmt.Println(sym)
+										if !allMatches {
+											return nil
+										}
+									}
+								}
+							} else {
+								return err
+							}
+						} else {
 							sym.Address = rexpSym.Address
+							fmt.Println(sym)
+							if !allMatches {
+								return nil
+							}
 						}
-					}
-					fmt.Println(sym)
-
-					if !allMatches {
-						return nil
 					}
 				}
 
-				// if sym, _ := f.FindLocalSymbolInImage(args[1], imageName); sym != nil {
-				// 	sym.Sections = m.Sections
-				// 	fmt.Println(sym)
-				// }
+				if sym, _ := f.FindLocalSymbolInImage(args[1], imageName); sym != nil {
+					sym.Macho, err = i.GetPartialMacho()
+					if err != nil {
+						return err
+					}
+					fmt.Println(sym)
+				}
 
-				// return nil
+				return nil
 			}
-
 			/**********************************
 			 * Search ALL dylibs for a symbol *
 			 **********************************/
@@ -203,26 +406,47 @@ var symaddrCmd = &cobra.Command{
 					if sym.Flags.ReExport() {
 						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
 						// lookup re-exported symbol
-						if rexpSym, _ := f.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); rexpSym != nil {
+						if rexpSym, err := f.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); err != nil {
+							if errors.Is(err, dyld.ErrNoExportTrieInMachO) {
+								image, err := f.Image(sym.FoundInDylib)
+								if err != nil {
+									return err
+								}
+								m, err = image.GetMacho()
+								if err != nil {
+									return err
+								}
+								for _, s := range m.Symtab.Syms {
+									if s.Name == sym.ReExport {
+										sym.Address = s.Value
+										fmt.Fprintf(w, "%s\t%s\n", sym, image.Name)
+										if !allMatches {
+											w.Flush()
+											return nil
+										}
+									}
+								}
+							} else {
+								return err
+							}
+						} else {
 							sym.Address = rexpSym.Address
+							fmt.Fprintf(w, "%s\t%s\n", sym, image.Name)
+							if !allMatches {
+								w.Flush()
+								return nil
+							}
 						}
-					}
-					fmt.Fprintf(w, "%s\t%s\n", sym, image.Name)
-
-					if !allMatches {
-						return nil
 					}
 				}
 				w.Flush()
 			}
 
 			return nil
-
+		} else if len(imageName) > 0 {
 			/*************************
 			* Dump all dylib symbols *
 			**************************/
-		} else if len(imageName) > 0 {
-			// Dump ALL private symbols for a dylib
 			i, err := f.Image(imageName)
 			if err != nil {
 				return fmt.Errorf("image not in %s: %v", dscPath, err)
@@ -240,6 +464,7 @@ var symaddrCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, sym := range i.LocalSymbols {
 				sym.Macho = m
@@ -260,9 +485,9 @@ var symaddrCmd = &cobra.Command{
 		* Dump ALL symbols*
 		*******************/
 		log.Warn("parsing exported symbols...")
-		// if err = f.GetAllExportedSymbols(true); err != nil {
-		// 	log.Errorf("failed to get all exported symbols: %v", err)
-		// }
+		if err = f.GetAllExportedSymbols(true); err != nil {
+			log.Errorf("failed to get all exported symbols: %v", err)
+		}
 
 		log.Warn("parsing local symbols (slow)...")
 		if err = f.ParseLocalSyms(); err != nil {

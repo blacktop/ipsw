@@ -31,7 +31,7 @@ func (a *AssetSets) ForDevice(device string) []AssetSet {
 	var assets []AssetSet
 	for _, as := range a.AssetSets {
 		for _, asset := range as {
-			if utils.StrSliceContains(asset.SupportedDevices, device) {
+			if utils.StrSliceHas(asset.SupportedDevices, device) {
 				assets = append(assets, asset)
 			}
 		}

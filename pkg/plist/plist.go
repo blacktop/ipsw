@@ -153,7 +153,7 @@ func (p *Plists) GetKernelType(name string) string {
 func (b *BuildManifest) GetKernelCaches() map[string][]string {
 	kernelCaches := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceContains(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path) {
+		if !utils.StrSliceHas(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path) {
 			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path)
 		}
 	}
@@ -163,22 +163,22 @@ func (b *BuildManifest) GetKernelCaches() map[string][]string {
 func (b *BuildManifest) GetBootLoaders() map[string][]string {
 	bootLoaders := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path) {
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path) {
 			if len(bID.Manifest["iBEC"].Info.Path) > 0 {
 				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path)
 			}
 		}
-		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
 			if len(bID.Manifest["iBoot"].Info.Path) > 0 {
 				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path)
 			}
 		}
-		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
 			if len(bID.Manifest["iBSS"].Info.Path) > 0 {
 				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path)
 			}
 		}
-		if !utils.StrSliceContains(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
 			if len(bID.Manifest["LLB"].Info.Path) > 0 {
 				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path)
 			}

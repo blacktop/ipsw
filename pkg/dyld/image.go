@@ -666,3 +666,129 @@ func (i *CacheImage) ParseHelpers() error {
 
 	return nil
 }
+
+func (i *CacheImage) GetSymbols(syms []string) ([]Symbol, error) {
+	var symbols []Symbol
+
+	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
+		if !errors.Is(err, ErrNoLocals) {
+			return nil, err
+		}
+	}
+
+	for _, sym := range i.LocalSymbols {
+		if utils.StrSliceHas(syms, sym.Name) {
+			symbols = append(symbols, Symbol{
+				Name:    sym.Name,
+				Address: sym.Value,
+				Image:   i.Name,
+			})
+			syms = utils.RemoveStrFromSlice(syms, sym.Name)
+			if len(syms) == 0 {
+				return symbols, nil
+			}
+		}
+	}
+
+	expSyms, err := i.cache.GetExportTrieSymbols(i)
+	if err != nil {
+		if !errors.Is(err, ErrNoExportTrieInMachO) {
+			return nil, err
+		}
+	}
+
+	for _, sym := range expSyms {
+		if utils.StrSliceHas(syms, sym.Name) {
+			if sym.Flags.ReExport() {
+				m, err := i.GetPartialMacho()
+				if err != nil {
+					return nil, err
+				}
+				sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+				// lookup re-exported symbol
+				if rexpSym, err := i.cache.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); err != nil {
+					if errors.Is(err, ErrNoExportTrieInMachO) {
+						image, err := i.cache.Image(sym.FoundInDylib)
+						if err != nil {
+							return nil, err
+						}
+						m, err = image.GetMacho()
+						if err != nil {
+							return nil, err
+						}
+						for _, s := range m.Symtab.Syms {
+							if s.Name == sym.ReExport {
+								symbols = append(symbols, Symbol{
+									Name:    sym.Name,
+									Address: s.Value,
+									Image:   i.Name,
+								})
+								syms = utils.RemoveStrFromSlice(syms, sym.Name)
+								if len(syms) == 0 {
+									return symbols, nil
+								}
+							}
+						}
+					} else {
+						return nil, err
+					}
+				} else {
+					symbols = append(symbols, Symbol{
+						Name:    sym.Name,
+						Address: rexpSym.Address,
+						Image:   i.Name,
+					})
+					syms = utils.RemoveStrFromSlice(syms, sym.Name)
+					if len(syms) == 0 {
+						return symbols, nil
+					}
+				}
+			} else {
+				symbols = append(symbols, Symbol{
+					Name:    sym.Name,
+					Address: sym.Address,
+					Image:   i.Name,
+				})
+				syms = utils.RemoveStrFromSlice(syms, sym.Name)
+				if len(syms) == 0 {
+					return symbols, nil
+				}
+			}
+		}
+	}
+
+	m, err := i.GetMacho()
+	if err != nil {
+		return nil, err
+	}
+	for _, sym := range m.Symtab.Syms {
+		if utils.StrSliceHas(syms, sym.Name) {
+			symbols = append(symbols, Symbol{
+				Name:    sym.Name,
+				Address: sym.Value,
+				Image:   i.Name,
+			})
+			syms = utils.RemoveStrFromSlice(syms, sym.Name)
+			if len(syms) == 0 {
+				return symbols, nil
+			}
+		}
+	}
+	if binds, err := m.GetBindInfo(); err == nil {
+		for _, bind := range binds {
+			if utils.StrSliceHas(syms, bind.Name) {
+				symbols = append(symbols, Symbol{
+					Name:    bind.Name,
+					Address: bind.Start + bind.Offset,
+					Image:   i.Name,
+				})
+				syms = utils.RemoveStrFromSlice(syms, bind.Name)
+				if len(syms) == 0 {
+					return symbols, nil
+				}
+			}
+		}
+	}
+
+	return symbols, nil
+}
