@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
@@ -42,13 +43,18 @@ var decCmd = &cobra.Command{
 	Short: "Decompress a kernelcache",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
+
+		kcpath := filepath.Clean(args[0])
+
+		if _, err := os.Stat(kcpath); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exist", kcpath)
 		}
+
 		log.Info("Decompressing kernelcache")
-		return kernelcache.Decompress(args[0])
+		return kernelcache.Decompress(kcpath)
 	},
 }
