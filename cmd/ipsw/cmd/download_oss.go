@@ -70,6 +70,7 @@ var ossCmd = &cobra.Command{
 		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
 		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
 		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
+
 		// settings
 		proxy := viper.GetString("download.proxy")
 		insecure := viper.GetBool("download.insecure")
