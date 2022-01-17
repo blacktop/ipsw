@@ -685,7 +685,7 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 		image.ObjC.Methods, err = m.GetObjCMethodList()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get objc methods for %s: %v", image.Name, err)
 		}
 
 		for _, meth := range image.ObjC.Methods {
@@ -706,8 +706,6 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 // ImpCachesForImage dumps all of the Objective-C imp caches for a given image
 func (f *File) ImpCachesForImage(imageNames ...string) error {
-	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
-
 	var optOffsets objc.OptOffsets
 	// var optOffsets objc.OptOffsets2
 	var selectorStringVMAddrStart uint64
@@ -728,9 +726,14 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	}
 
 	if sec := libObjC.Section("__DATA_CONST", "__objc_scoffs"); sec != nil {
-		dat, err := sec.Data()
+		uuid, off, err := f.GetOffset(sec.Addr)
 		if err != nil {
-			return fmt.Errorf("failed to read data in %s.%s: %v", sec.Seg, sec.Name, err)
+			return fmt.Errorf("failed to convert vmaddr: %v", err)
+		}
+
+		dat := make([]byte, sec.Size)
+		if _, err := f.r[uuid].ReadAt(dat, int64(off)); err != nil {
+			return fmt.Errorf("failed to read %s.%s data: %v", sec.Seg, sec.Name, err)
 		}
 
 		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &optOffsets); err != nil {
@@ -760,76 +763,55 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	}
 
 	for _, image := range images {
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
 			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
-		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
+		image.ObjC.ClassRefs, err = m.GetObjCClassReferences()
+		if err != nil {
+			return err
+		}
 
-		sec := m.Section("__DATA", "__objc_classrefs")
-		if sec != nil {
-			dat, err := sec.Data()
-			if err != nil {
-				return fmt.Errorf("failed to read data in %s.%s: %v", sec.Seg, sec.Name, err)
-			}
+		for _, c := range image.ObjC.ClassRefs {
 
-			classPtrs := make([]uint64, sec.Size/8)
-			if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &classPtrs); err != nil {
-				return err
-			}
-
-			for idx, ptr := range classPtrs {
-				classPtrs[idx] = ptr & mask // TODO use chain fixups
-			}
-
-			for _, ptr := range classPtrs {
-
-				if ptr == 0 {
-					continue // TODO: why does this happen?
-				}
-
-				c, err := f.GetObjCClass(ptr)
+			if f.SlideInfo.SlidePointer(c.MethodCacheProperties) > 0 {
+				uuid, off, err := f.GetOffset(c.MethodCacheProperties)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to convert vmaddr: %v", err)
 				}
 
-				if f.SlideInfo.SlidePointer(c.MethodCacheProperties) > 0 {
-					off, err := image.GetOffset(f.SlideInfo.SlidePointer(c.MethodCacheProperties))
-					if err != nil {
-						return fmt.Errorf("failed to convert vmaddr: %v", err)
-					}
+				sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
-					sr.Seek(int64(off), io.SeekStart)
+				sr.Seek(int64(off), io.SeekStart)
 
-					var impCache objc.ImpCache
-					if err := binary.Read(sr, f.ByteOrder, &impCache.PreoptCacheT); err != nil {
-						return fmt.Errorf("failed to read preopt_cache_t: %v", err)
-					}
-
-					impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.Capacity())
-					if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
-						return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
-					}
-
-					fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.Capacity())
-
-					for _, bucket := range impCache.Entries {
-						if bucket.SelOffset == 0xFFFFFFFF {
-							fmt.Printf("  - %#09x:\n", 0)
-						} else {
-							if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
-								sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
-								if err != nil {
-									return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
-								}
-								fmt.Printf("  - %#09x: %s\n", c.ClassPtr-uint64(bucket.ImpOffset), sel)
-							} // TODO: handle the error case warn or crash?
-						}
-					}
-				} else {
-					fmt.Printf("%s: empty\n", c.Name)
+				var impCache objc.ImpCache
+				if err := binary.Read(sr, f.ByteOrder, &impCache.PreoptCacheT); err != nil {
+					return fmt.Errorf("failed to read preopt_cache_t: %v", err)
 				}
+
+				impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.Capacity())
+				if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
+					return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
+				}
+
+				fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.Capacity())
+
+				for _, bucket := range impCache.Entries {
+					if bucket.SelOffset == 0xFFFFFFFF {
+						fmt.Printf("  - %#09x:\n", 0)
+					} else {
+						if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
+							sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
+							if err != nil {
+								return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
+							}
+							fmt.Printf("  - %#09x: %s\n", c.ClassPtr-uint64(bucket.ImpOffset), sel)
+						} // TODO: handle the error case warn or crash?
+					}
+				}
+			} else {
+				fmt.Printf("%s: empty\n", c.Name)
 			}
 		}
 
@@ -856,44 +838,19 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 	}
 
 	for _, image := range images {
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
 			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
-		for _, s := range m.Segments() {
-			if sec := m.Section(s.Name, "__cfstring"); sec != nil {
-				dat, err := sec.Data()
-				if err != nil {
-					return fmt.Errorf("failed to read %s.%s data: %v", sec.Seg, sec.Name, err)
-				}
+		image.ObjC.CFStrings, err = m.GetCFStrings()
+		if err != nil {
+			return err
+		}
 
-				image.ObjC.CFStrings = make([]objc.CFString, int(sec.Size)/binary.Size(objc.CFString64T{}))
-				cfStrTypes := make([]objc.CFString64T, int(sec.Size)/binary.Size(objc.CFString64T{}))
-				if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &cfStrTypes); err != nil {
-					return fmt.Errorf("failed to read %T structs: %v", cfStrTypes, err)
-				}
-
-				for idx, cfstr := range cfStrTypes {
-					cfstr.IsaVMAddr = f.SlideInfo.SlidePointer(cfstr.IsaVMAddr)
-					cfstr.Data = f.SlideInfo.SlidePointer(cfstr.Data)
-					image.ObjC.CFStrings[idx].CFString64T = &cfstr
-					if cfstr.Data == 0 {
-						return fmt.Errorf("unhandled cstring parse case where data is 0") // TODO: finish this
-					}
-					image.ObjC.CFStrings[idx].Name, err = f.GetCString(cfstr.Data)
-					if err != nil {
-						return fmt.Errorf("failed to read cstring: %v", err)
-					}
-					image.ObjC.CFStrings[idx].Address = sec.Addr + uint64(idx*binary.Size(objc.CFString64T{}))
-					if err != nil {
-						return fmt.Errorf("failed to calulate cfstring vmaddr: %v", err)
-					}
-					if len(image.ObjC.CFStrings[idx].Name) > 0 {
-						f.AddressToSymbol[image.ObjC.CFStrings[idx].Address] = image.ObjC.CFStrings[idx].Name // TODO: check the mem consumption
-						// fmt.Printf("    %#x: %#v\n", cfstrings[idx].Address, cfstrings[idx].Name)
-					}
-				}
+		for _, cfstr := range image.ObjC.CFStrings {
+			if len(cfstr.Name) > 0 {
+				f.AddressToSymbol[cfstr.Address] = cfstr.Name
 			}
 		}
 	}

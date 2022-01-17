@@ -57,6 +57,22 @@ func (f *File) IsAddressInCache(uuid types.UUID, address uint64) bool {
 	return false
 }
 
+// GetVMAddress returns a map of uuids to virtual address for a given offset
+func (f *File) GetVMAddress(offset uint64) (map[types.UUID]uint64, error) {
+	uuid2addr := make(map[types.UUID]uint64)
+	for uuid, cacheMaps := range f.Mappings {
+		for _, mapping := range cacheMaps {
+			if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
+				uuid2addr[uuid] = (offset - mapping.FileOffset) + mapping.Address
+			}
+		}
+	}
+	if len(uuid2addr) == 0 {
+		return nil, fmt.Errorf("offset %#x not within any mappings file offset range", offset)
+	}
+	return uuid2addr, nil
+}
+
 // GetVMAddressForUUID returns the virtual address for a given offset for a given cache UUID
 func (f *File) GetVMAddressForUUID(uuid types.UUID, offset uint64) (uint64, error) {
 	for _, mapping := range f.Mappings[uuid] {

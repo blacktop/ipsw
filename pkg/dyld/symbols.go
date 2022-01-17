@@ -388,7 +388,6 @@ func (f *File) GetAllExportedSymbols(dump bool) error {
 						}
 					}
 					w.Flush()
-
 					if binds, err := m.GetBindInfo(); err == nil {
 						for _, bind := range binds {
 							if dump {
