@@ -29,7 +29,6 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
@@ -170,21 +169,6 @@ var dyldDisassCmd = &cobra.Command{
 				image, err = f.Image(imageName)
 				if err != nil {
 					return fmt.Errorf("image not in %s: %v", dscPath, err)
-				}
-				/*
-				 * Load symbols from the target sym/addr's image
-				 */
-				utils.Indent(log.Warn, 2)(fmt.Sprintf("parsing public symbols for image %s...", filepath.Base(image.Name)))
-				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
-					log.Errorf("failed to parse exported symbols for image %s: %v", filepath.Base(image.Name), err)
-				}
-				utils.Indent(log.Warn, 2)(fmt.Sprintf("parsing private symbols for image %s...", filepath.Base(image.Name)))
-				if err := f.GetLocalSymbolsForImage(image); err != nil {
-					if errors.Is(err, dyld.ErrNoLocals) {
-						utils.Indent(log.Warn, 2)(err.Error())
-					} else if err != nil {
-						return err
-					}
 				}
 
 				m, err := image.GetMacho()
