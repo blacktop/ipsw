@@ -236,7 +236,7 @@ var dyldMachoCmd = &cobra.Command{
 							}
 						}
 
-						f.GetLocalSymbolsForImage(i)
+						i.ParseLocalSymbols()
 
 						// cc, err := m.GetObjCClasses()
 						// if err != nil {

@@ -1,11 +1,15 @@
 package dyld
 
 import (
+	"bufio"
+	"encoding/binary"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -402,7 +406,7 @@ func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
 // Analyze analyzes an image by parsing it's symbols, stubs and GOT
 func (i *CacheImage) Analyze() error {
 
-	if err := i.cache.GetAllExportedSymbolsForImage(i, false); err != nil {
+	if err := i.ParseExportedSymbols(false); err != nil {
 		log.Errorf("failed to parse exported symbols for %s", i.Name)
 	}
 
@@ -410,7 +414,7 @@ func (i *CacheImage) Analyze() error {
 		i.ParseStarts()
 	}
 
-	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
+	if err := i.ParseLocalSymbols(); err != nil {
 		if !errors.Is(err, ErrNoLocals) {
 			return err
 		}
@@ -667,10 +671,200 @@ func (i *CacheImage) ParseHelpers() error {
 	return nil
 }
 
+func (i *CacheImage) ParseLocalSymbols() error {
+
+	if !i.Analysis.State.IsPrivatesDone() {
+
+		var uuid types.UUID
+
+		if i.cache.IsDyld4 {
+			uuid = i.cache.symUUID
+		} else {
+			uuid = i.cache.UUID
+		}
+
+		if i.cache.Headers[uuid].LocalSymbolsOffset == 0 {
+			i.Analysis.State.SetPrivates(true) // TODO: does this have any bad side-effects ?
+			return fmt.Errorf("failed to parse local syms for image %s: %w", filepath.Base(i.Name), ErrNoLocals)
+		}
+
+		sr := io.NewSectionReader(i.cache.r[uuid], 0, 1<<63-1)
+
+		stringPool := io.NewSectionReader(sr, int64(i.cache.LocalSymInfo.StringsFileOffset), int64(i.cache.LocalSymInfo.StringsSize))
+		sr.Seek(int64(i.cache.LocalSymInfo.NListFileOffset), io.SeekStart)
+
+		for idx := uint32(0); idx < i.cache.LocalSymInfo.EntriesCount; idx++ {
+			// skip over other images
+			if idx != i.Index {
+				sr.Seek(int64(int(i.cache.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), os.SEEK_CUR)
+				continue
+			}
+
+			for e := 0; e < int(i.cache.Images[idx].NlistCount); e++ {
+
+				nlist := types.Nlist64{}
+				if err := binary.Read(sr, i.cache.ByteOrder, &nlist); err != nil {
+					return err
+				}
+
+				stringPool.Seek(int64(nlist.Name), io.SeekStart)
+				s, err := bufio.NewReader(stringPool).ReadString('\x00')
+				if err != nil {
+					log.Error(errors.Wrapf(err, "failed to read string at: %d", i.cache.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
+				}
+				s = strings.Trim(s, "\x00")
+				i.cache.AddressToSymbol[nlist.Value] = s
+				i.cache.Images[idx].LocalSymbols = append(i.cache.Images[idx].LocalSymbols, &CacheLocalSymbol64{
+					Name:    s,
+					Nlist64: nlist,
+				})
+			}
+
+			i.Analysis.State.SetPrivates(true)
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// GetAllExportedSymbolsForImage prints out all the exported symbols for a given image
+func (i *CacheImage) ParseExportedSymbols(dump bool) error {
+	if !i.Analysis.State.IsExportsDone() {
+		syms, err := i.cache.GetExportTrieSymbols(i)
+		if err != nil {
+			if errors.Is(err, ErrNoExportTrieInMachO) {
+				m, err := i.GetMacho()
+				if err != nil {
+					return err
+				}
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				for _, sym := range m.Symtab.Syms {
+					// TODO: Handle ReExports
+					if dump {
+						var sec string
+						if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+							sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+						}
+						fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
+					} else {
+						i.cache.AddressToSymbol[sym.Value] = sym.Name
+					}
+				}
+				w.Flush()
+				// LC_DYLD_INFO binds
+				if binds, err := m.GetBindInfo(); err == nil {
+					for _, bind := range binds {
+						if dump {
+							fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+						} else {
+							i.cache.AddressToSymbol[bind.Start+bind.Offset] = bind.Name
+						}
+					}
+					w.Flush()
+				}
+			} else {
+				return err
+			}
+		} else {
+			m, err := i.GetPartialMacho()
+			if err != nil {
+				return err
+			}
+
+			for _, sym := range syms {
+				if sym.Flags.ReExport() {
+					sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+				}
+
+				if dump {
+					fmt.Println(sym)
+				} else {
+					i.cache.AddressToSymbol[sym.Address] = sym.Name
+				}
+			}
+		}
+
+		i.Analysis.State.SetExports(true)
+	}
+
+	return nil
+}
+
+func (i *CacheImage) FindLocalSymbol(name string) *CacheLocalSymbol64 {
+	i.ParseLocalSymbols()
+
+	for _, sym := range i.LocalSymbols {
+		if sym.Name == name {
+			return sym
+		}
+	}
+	return nil
+}
+
+func (i *CacheImage) FindExportedSymbol(name string) (*Symbol, error) {
+
+	if syms, err := i.cache.GetExportTrieSymbols(i); err == nil {
+		for _, sym := range syms {
+			if sym.Name == name {
+				if sym.Flags.ReExport() {
+					m, err := i.GetPartialMacho()
+					if err != nil {
+						return nil, err
+					}
+					// get re-export from dylib
+					sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+					reimg, err := i.cache.Image(sym.FoundInDylib)
+					if err != nil {
+						return nil, err
+					}
+					// get re-export symbol
+					return reimg.FindExportedSymbol(sym.ReExport)
+				}
+
+				return &Symbol{
+					Name:    sym.Name,
+					Image:   i.Name,
+					Address: sym.Address,
+				}, nil
+			}
+		}
+	}
+
+	m, err := i.GetMacho()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, sym := range m.Symtab.Syms {
+		if sym.Name == name && sym.Value != 0 {
+			return &Symbol{
+				Name:    sym.Name,
+				Address: sym.Value,
+				Image:   i.Name,
+			}, nil
+		}
+	}
+
+	if binds, err := m.GetBindInfo(); err == nil {
+		for _, bind := range binds {
+			if bind.Name == name {
+				return &Symbol{
+					Name:    bind.Name,
+					Address: bind.Start + bind.Offset,
+					Image:   i.Name,
+				}, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("symbol %s not found in image %s", name, filepath.Base(i.Name))
+}
+
 func (i *CacheImage) GetSymbols(syms []string) ([]Symbol, error) {
 	var symbols []Symbol
 
-	if err := i.cache.GetLocalSymbolsForImage(i); err != nil {
+	if err := i.ParseLocalSymbols(); err != nil {
 		if !errors.Is(err, ErrNoLocals) {
 			return nil, err
 		}
