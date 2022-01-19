@@ -70,7 +70,7 @@ var dyldDisassCmd = &cobra.Command{
 	Use:           "disass <dyld_shared_cache>",
 	Short:         "Disassemble dyld_shared_cache at symbol/vaddr",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -225,6 +225,8 @@ var dyldDisassCmd = &cobra.Command{
 					//***************
 					disass.Disassemble(engine)
 				}
+
+				return nil
 			}
 		}
 
