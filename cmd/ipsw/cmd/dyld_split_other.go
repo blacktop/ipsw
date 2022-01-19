@@ -1,4 +1,4 @@
-//go:build !(darwin && cgo)
+//go:build !darwin
 
 package cmd
 
@@ -119,7 +119,7 @@ var splitCmd = &cobra.Command{
 
 				if _, err := os.Stat(fname); os.IsNotExist(err) || forceExtract {
 
-					f.GetLocalSymbolsForImage(i)
+					i.ParseLocalSymbols()
 
 					if err := m.Export(fname, nil, m.GetBaseAddress(), i.GetLocalSymbols()); err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
