@@ -206,7 +206,7 @@ func (f *File) GetCStringAtOffsetForUUID(uuid types.UUID, offset uint64) (string
 	return "", fmt.Errorf("string not found at offset 0x%x", offset)
 }
 
-func (f *File) GetExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
+func (f *File) GetExportTrieSymbols(i *CacheImage) ([]trie.TrieExport, error) {
 	var eTrieAddr, eTrieSize uint64
 
 	if i.CacheImageInfoExtra.ExportsTrieAddr > 0 {
@@ -247,7 +247,7 @@ func (f *File) GetExportTrieSymbols(i *CacheImage) ([]trie.TrieEntry, error) {
 		return nil, fmt.Errorf("failed to read export trie data: %v", err)
 	}
 
-	syms, err := trie.ParseTrie(exportTrie, i.LoadAddress)
+	syms, err := trie.ParseTrieExports(bytes.NewReader(exportTrie), i.LoadAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get export trie symbols for image %s: %v", filepath.Base(i.Name), err)
 	}
@@ -429,7 +429,7 @@ func (f *File) SaveAddrToSymMap(dest string) error {
 	return nil
 }
 
-func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieEntry, error) {
+func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieExport, error) {
 
 	for _, image := range f.Images {
 		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
@@ -449,7 +449,7 @@ func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieEntry, error) {
 	return nil, fmt.Errorf("symbol was not found in exports")
 }
 
-func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trie.TrieEntry, error) {
+func (f *File) FindExportedSymbolInImage(imagePath, symbolName string) (*trie.TrieExport, error) {
 
 	image, err := f.Image(imagePath)
 	if err != nil {

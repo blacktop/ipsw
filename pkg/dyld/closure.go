@@ -827,7 +827,7 @@ type duplicateClassesHashTable struct {
 
 // GetProgClosuresOffsets returns the closure trie data
 // NOTE: this doesn't auto add the ProgClosuresAddr (and probably should)
-func (f *File) GetProgClosuresOffsets() ([]trie.TrieEntry, error) {
+func (f *File) GetProgClosuresOffsets() ([]trie.Node, error) {
 	var addr uint64
 	var size uint64
 
@@ -857,7 +857,23 @@ func (f *File) GetProgClosuresOffsets() ([]trie.TrieEntry, error) {
 		return nil, err
 	}
 
-	return trie.ParseTrie(progClosuresTrie, 0)
+	r := bytes.NewReader(progClosuresTrie)
+
+	nodes, err := trie.ParseTrie(r)
+	if err != nil {
+		return nil, err
+	}
+
+	for idx, node := range nodes {
+		r.Seek(int64(node.Offset), io.SeekStart)
+		off, err := trie.ReadUleb128(r)
+		if err != nil {
+			return nil, err
+		}
+		nodes[idx].Offset = off
+	}
+
+	return nodes, nil
 }
 
 // GetProgClosureAddress returns the closure pointer for a given path
@@ -892,12 +908,13 @@ func (f *File) GetProgClosureAddress(executablePath string) (uint64, error) {
 		return 0, err
 	}
 
-	imageNode, err := trie.WalkTrie(progClosuresTrie, executablePath)
-	if err != nil {
+	r := bytes.NewReader(progClosuresTrie)
+
+	if _, err = trie.WalkTrie(r, executablePath); err != nil {
 		return 0, err
 	}
 
-	closureOffset, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(progClosuresTrie[imageNode:]))
+	closureOffset, err := trie.ReadUleb128(r)
 	if err != nil {
 		return 0, err
 	}
@@ -981,7 +998,7 @@ func (f *File) GetDylibsImageArray() error {
 	return f.parseClosureContainers(bytes.NewReader(imageArrayData))
 }
 
-func (f *File) GetDylibsImageArrayIDs() ([]trie.TrieEntry, error) {
+func (f *File) GetDylibsImageArrayIDs() ([]trie.Node, error) {
 
 	if f.Headers[f.UUID].DylibsTrieAddr == 0 {
 		return nil, fmt.Errorf("cache does not contain dylibs trie info")
@@ -1001,7 +1018,7 @@ func (f *File) GetDylibsImageArrayIDs() ([]trie.TrieEntry, error) {
 		return nil, err
 	}
 
-	return trie.ParseTrie(dylibTrie, 0)
+	return trie.ParseTrie(bytes.NewReader(dylibTrie))
 }
 
 // GetDylibIndex returns the index of a given dylib
@@ -1025,7 +1042,7 @@ func (f *File) GetDylibIndex(path string) (uint64, error) {
 		return 0, err
 	}
 
-	imageNode, err := trie.WalkTrie(dylibTrie, path)
+	imageNode, err := trie.WalkTrie(bytes.NewReader(dylibTrie), path)
 	if err != nil {
 		return 0, fmt.Errorf("dylib not found in dylibs trie")
 	}
@@ -1068,7 +1085,7 @@ func (f *File) GetDlopenOtherImageArray() error {
 }
 
 // GetDlopenOtherImages returns the dlopen other images trie data
-func (f *File) GetDlopenOtherImages() ([]trie.TrieEntry, error) {
+func (f *File) GetDlopenOtherImages() ([]trie.Node, error) {
 
 	if f.Headers[f.UUID].OtherTrieAddr == 0 {
 		return nil, fmt.Errorf("cache does not contain dlopen other image trie info")
@@ -1088,7 +1105,23 @@ func (f *File) GetDlopenOtherImages() ([]trie.TrieEntry, error) {
 		return nil, err
 	}
 
-	return trie.ParseTrie(otherTrie, 0)
+	r := bytes.NewReader(otherTrie)
+
+	nodes, err := trie.ParseTrie(r)
+	if err != nil {
+		return nil, err
+	}
+
+	for idx, node := range nodes {
+		r.Seek(int64(node.Offset), io.SeekStart)
+		index, err := trie.ReadUleb128(r)
+		if err != nil {
+			return nil, err
+		}
+		nodes[idx].Offset = index
+	}
+
+	return nodes, err
 }
 
 // GetDlopenOtherImageIndex returns the dlopen other image index for a given path
@@ -1111,12 +1144,13 @@ func (f *File) GetDlopenOtherImageIndex(path string) (uint64, error) {
 		return 0, err
 	}
 
-	imageNode, err := trie.WalkTrie(otherTrie, path)
-	if err != nil {
+	r := bytes.NewReader(otherTrie)
+
+	if _, err = trie.WalkTrie(r, path); err != nil {
 		return 0, fmt.Errorf("failed to walk dlopen other image trie data: %v", err)
 	}
 
-	imageNum, _, err := trie.ReadUleb128FromBuffer(bytes.NewBuffer(otherTrie[imageNode:]))
+	imageNum, err := trie.ReadUleb128(r)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read ULEB at image node in dlopen other image trie: %v", err)
 	}
