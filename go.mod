@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.51
-	github.com/blacktop/go-macho v1.1.84
+	github.com/blacktop/go-macho v1.1.86
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -18,7 +18,7 @@ require (
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/hashicorp/go-version v1.4.0
-	github.com/hinshun/vt10x v0.0.0-20220115061537-4526f461cf66 // indirect
+	github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec // indirect
 	github.com/jinzhu/gorm v1.9.16
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect

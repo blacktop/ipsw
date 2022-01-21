@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/bits"
+	"sort"
 	"strings"
 
 	"github.com/blacktop/go-macho"
@@ -520,6 +521,16 @@ func (s CacheLocalSymbol64) String() string {
 		sec = fmt.Sprintf("%s.%s", s.Macho.Sections[s.Sect-1].Seg, s.Macho.Sections[s.Sect-1].Name)
 	}
 	return fmt.Sprintf("%#09x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
+}
+
+type Locals []*CacheLocalSymbol64
+
+func (l Locals) Search(name string) (*CacheLocalSymbol64, error) {
+	i := sort.Search(len(l), func(i int) bool { return l[i].Name >= name })
+	if i < len(l) && l[i].Name == name {
+		return l[i], nil
+	}
+	return nil, fmt.Errorf("%s not found in local symbols", name)
 }
 
 type CacheImageInfoExtra struct {
