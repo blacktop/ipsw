@@ -394,20 +394,6 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 	return i.pm, nil
 }
 
-func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
-	var syms []macho.Symbol
-	for _, lsym := range i.LocalSymbols {
-		syms = append(syms, macho.Symbol{
-			Name:  lsym.Name,
-			Type:  lsym.Type,
-			Sect:  lsym.Sect,
-			Desc:  lsym.Desc,
-			Value: lsym.Value,
-		})
-	}
-	return syms
-}
-
 // Analyze analyzes an image by parsing it's symbols, stubs and GOT
 func (i *CacheImage) Analyze() error {
 
@@ -771,6 +757,21 @@ func (i *CacheImage) GetLocalSymbol(name string) (*CacheLocalSymbol64, error) {
 	return nil, fmt.Errorf("local symbol %s not found in image %s", name, filepath.Base(i.Name))
 }
 
+// GetLocalSymbolsAsMachoSymbols converts all the dylibs private symbols into MachO symtab public symbols
+func (i *CacheImage) GetLocalSymbolsAsMachoSymbols() []macho.Symbol {
+	var syms []macho.Symbol
+	for _, lsym := range i.LocalSymbols {
+		syms = append(syms, macho.Symbol{
+			Name:  lsym.Name,
+			Type:  lsym.Type,
+			Sect:  lsym.Sect,
+			Desc:  lsym.Desc,
+			Value: lsym.Value,
+		})
+	}
+	return syms
+}
+
 // ParsePublicSymbols parses and caches, with the option to dump, all the exports, symtab and dyld_info symbols in the image/dylib
 func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 
@@ -803,6 +804,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 						Name:    sym.Name,
 						Address: sym.Address,
 						Type:    sym.Type(),
+						Kind:    EXPORT,
 					})
 				}
 			}
@@ -830,6 +832,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 					Name:    sym.Name,
 					Address: sym.Value,
 					Type:    sym.Type.String(sec),
+					Kind:    SYMTAB,
 				})
 			}
 		}
@@ -845,6 +848,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 						Name:    bind.Name,
 						Address: bind.Start + bind.Offset,
 						Type:    fmt.Sprintf("%s|%s", bind.Kind, bind.Dylib),
+						Kind:    BIND,
 					})
 				}
 			}
@@ -865,6 +869,15 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 						return err
 					}
 					export.FoundInDylib = m.ImportedLibraries()[export.Other-1]
+					if len(export.ReExport) > 0 {
+						reimg, err := i.cache.Image(export.FoundInDylib)
+						if err != nil {
+							return err
+						}
+						if resym, err := reimg.GetPublicSymbol(export.ReExport); err == nil {
+							export.Address = resym.Address
+						}
+					}
 				}
 				if dump {
 					fmt.Fprintf(w, "%s\n", export)
@@ -874,6 +887,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 						Name:    export.Name,
 						Address: export.Address,
 						Type:    export.Type(),
+						Kind:    EXPORT,
 					})
 				}
 			}
@@ -965,6 +979,7 @@ func (i *CacheImage) GetSymbol(name string) (*Symbol, error) {
 			Address: lsym.Value,
 			Type:    lsym.Type.String(sec),
 			Image:   i.Name,
+			Kind:    LOCAL,
 		}, nil
 	}
 	// check public symbols

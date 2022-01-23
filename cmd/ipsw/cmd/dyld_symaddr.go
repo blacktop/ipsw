@@ -27,11 +27,11 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -40,9 +40,11 @@ func init() {
 	dyldCmd.AddCommand(symaddrCmd)
 
 	symaddrCmd.Flags().BoolP("all", "a", false, "Find all symbol matches")
+	symaddrCmd.Flags().BoolP("binds", "b", false, "Also search LC_DYLD_INFO binds")
 	symaddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	symaddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
 	symaddrCmd.Flags().String("out", "", "Path to output JSON file")
+	symaddrCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	// symaddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -64,6 +66,12 @@ var symaddrCmd = &cobra.Command{
 		symbolFile, _ := cmd.Flags().GetString("in")
 		jsonFile, _ := cmd.Flags().GetString("out")
 		allMatches, _ := cmd.Flags().GetBool("all")
+		showBinds, _ := cmd.Flags().GetBool("binds")
+		forceColor, _ := cmd.Flags().GetBool("color")
+
+		if forceColor {
+			color.NoColor = false
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -183,7 +191,7 @@ var symaddrCmd = &cobra.Command{
 				}
 
 				if lsym, err := i.GetSymbol(args[1]); err == nil {
-					fmt.Println(lsym)
+					fmt.Println(lsym.String(forceColor))
 				}
 				// if lsym, err := i.GetLocalSymbol(args[1]); err == nil {
 				// 	fmt.Println(lsym)
@@ -200,19 +208,16 @@ var symaddrCmd = &cobra.Command{
 			/**********************************
 			 * Search ALL dylibs for a symbol *
 			 **********************************/
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, image := range f.Images {
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				if sym, err := image.GetSymbol(args[1]); err == nil {
-					if sym.Address > 0 || allMatches {
-						fmt.Fprintf(w, "%s\n", sym)
+					if (sym.Address > 0 || allMatches) && (sym.Kind != dyld.BIND || showBinds) {
+						fmt.Println(sym.String(forceColor))
 						if !allMatches {
-							w.Flush()
 							return nil
 						}
 					}
 				}
-				w.Flush()
 			}
 			return nil
 		} else if len(imageName) > 0 {
