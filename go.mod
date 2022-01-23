@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.51
-	github.com/blacktop/go-macho v1.1.86
+	github.com/blacktop/go-macho v1.1.87
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -28,9 +28,9 @@ require (
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.10.1
 	github.com/ulikunitz/xz v0.5.10
-	github.com/vbauerster/mpb/v7 v7.3.1
+	github.com/vbauerster/mpb/v7 v7.3.2
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
-	golang.org/x/net v0.0.0-20220114011407-0dd24b26b47d
+	golang.org/x/net v0.0.0-20220121210141-e204ce36a2ba
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 )
 
@@ -78,6 +78,6 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
-	gopkg.in/ini.v1 v1.66.2 // indirect
+	gopkg.in/ini.v1 v1.66.3 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

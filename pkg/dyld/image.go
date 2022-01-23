@@ -2,17 +2,20 @@ package dyld
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
@@ -157,20 +160,22 @@ type analysis struct {
 
 // CacheImage represents a dyld dylib image.
 type CacheImage struct {
-	Name         string
-	Index        uint32
-	Info         CacheImageInfo
-	LocalSymbols []*CacheLocalSymbol64
-	Mappings     *cacheMappingsWithSlideInfo
+	Name     string
+	Index    uint32
+	Info     CacheImageInfo
+	Mappings *cacheMappingsWithSlideInfo
 	CacheLocalSymbolsEntry
 	CacheImageInfoExtra
 	CacheImageTextInfo
-	Initializer      uint64
-	DOFSectionAddr   uint64
-	DOFSectionSize   uint32
+	Initializer    uint64
+	DOFSectionAddr uint64
+	DOFSectionSize uint32
+
 	SlideInfo        slideInfo
 	RangeEntries     []rangeEntry
 	PatchableExports []patchableExport
+	LocalSymbols     []*CacheLocalSymbol64
+	PublicSymbols    []*Symbol
 	ObjC             objcInfo
 
 	Analysis analysis
@@ -406,7 +411,7 @@ func (i *CacheImage) GetLocalSymbols() []macho.Symbol {
 // Analyze analyzes an image by parsing it's symbols, stubs and GOT
 func (i *CacheImage) Analyze() error {
 
-	if err := i.ParseExportedSymbols(false); err != nil {
+	if err := i.ParsePublicSymbols(false); err != nil {
 		log.Errorf("failed to parse exported symbols for %s", i.Name)
 	}
 
@@ -414,7 +419,7 @@ func (i *CacheImage) Analyze() error {
 		i.ParseStarts()
 	}
 
-	if err := i.ParseLocalSymbols(); err != nil {
+	if err := i.ParseLocalSymbols(false); err != nil {
 		if !errors.Is(err, ErrNoLocals) {
 			return err
 		}
@@ -525,6 +530,7 @@ func (i *CacheImage) Analyze() error {
 	return nil
 }
 
+// ParseSlideInfo parse the shared_cache slide info corresponding to the MachO
 func (i *CacheImage) ParseSlideInfo() error {
 
 	i.sinfo = make(map[uint64]uint64)
@@ -565,6 +571,7 @@ func (i *CacheImage) ParseSlideInfo() error {
 	return nil
 }
 
+// GetSlideInfo returns a slide info map for the image
 func (i *CacheImage) GetSlideInfo() (map[uint64]uint64, error) {
 	if !i.Analysis.State.IsSlideInfoDone() {
 		if err := i.ParseSlideInfo(); err != nil {
@@ -671,7 +678,8 @@ func (i *CacheImage) ParseHelpers() error {
 	return nil
 }
 
-func (i *CacheImage) ParseLocalSymbols() error {
+// ParseLocalSymbols parses and caches, with the option to dump, all the local/private symbols for an image
+func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 
 	if !i.Analysis.State.IsPrivatesDone() {
 
@@ -693,6 +701,8 @@ func (i *CacheImage) ParseLocalSymbols() error {
 		stringPool := io.NewSectionReader(sr, int64(i.cache.LocalSymInfo.StringsFileOffset), int64(i.cache.LocalSymInfo.StringsSize))
 		sr.Seek(int64(i.cache.LocalSymInfo.NListFileOffset), io.SeekStart)
 
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
 		for idx := uint32(0); idx < i.cache.LocalSymInfo.EntriesCount; idx++ {
 			// skip over other images
 			if idx != i.Index {
@@ -701,26 +711,47 @@ func (i *CacheImage) ParseLocalSymbols() error {
 			}
 
 			for e := 0; e < int(i.cache.Images[idx].NlistCount); e++ {
-
 				nlist := types.Nlist64{}
 				if err := binary.Read(sr, i.cache.ByteOrder, &nlist); err != nil {
 					return err
 				}
 
 				stringPool.Seek(int64(nlist.Name), io.SeekStart)
+
 				s, err := bufio.NewReader(stringPool).ReadString('\x00')
 				if err != nil {
 					log.Error(errors.Wrapf(err, "failed to read string at: %d", i.cache.LocalSymInfo.StringsFileOffset+nlist.Name).Error())
 				}
+
 				s = strings.Trim(s, "\x00")
 				i.cache.AddressToSymbol[nlist.Value] = s
 				i.cache.Images[idx].LocalSymbols = append(i.cache.Images[idx].LocalSymbols, &CacheLocalSymbol64{
-					Name:    s,
-					Nlist64: nlist,
+					Name:         s,
+					Nlist64:      nlist,
+					FoundInDylib: i.Name,
 				})
+
+				if dump {
+					m, err := i.GetPartialMacho()
+					if err != nil {
+						return err
+					}
+					fmt.Fprintf(w, "%s\n", &CacheLocalSymbol64{
+						Name:    s,
+						Nlist64: nlist,
+						Macho:   m,
+					})
+				}
 			}
 
+			w.Flush()
+
+			sort.Slice(i.LocalSymbols, func(j, k int) bool {
+				return i.LocalSymbols[j].Name <= i.LocalSymbols[k].Name
+			})
+
 			i.Analysis.State.SetPrivates(true)
+
 			return nil
 		}
 	}
@@ -728,62 +759,130 @@ func (i *CacheImage) ParseLocalSymbols() error {
 	return nil
 }
 
-// GetAllExportedSymbolsForImage prints out all the exported symbols for a given image
-func (i *CacheImage) ParseExportedSymbols(dump bool) error {
-	if !i.Analysis.State.IsExportsDone() {
-		syms, err := i.cache.GetExportTrieSymbols(i)
-		if err != nil {
-			if errors.Is(err, ErrNoExportTrieInMachO) {
-				m, err := i.GetMacho()
-				if err != nil {
-					return err
-				}
-				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-				for _, sym := range m.Symtab.Syms {
-					// TODO: Handle ReExports
-					if dump {
-						var sec string
-						if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-							sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
-						}
-						fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
-					} else {
-						i.cache.AddressToSymbol[sym.Value] = sym.Name
-					}
-				}
-				w.Flush()
-				// LC_DYLD_INFO binds
-				if binds, err := m.GetBindInfo(); err == nil {
-					for _, bind := range binds {
-						if dump {
-							fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
-						} else {
-							i.cache.AddressToSymbol[bind.Start+bind.Offset] = bind.Name
-						}
-					}
-					w.Flush()
-				}
-			} else {
-				return err
-			}
-		} else {
-			m, err := i.GetPartialMacho()
-			if err != nil {
-				return err
-			}
+// GetLocalSymbol returns the local symbol matching the given name
+func (i *CacheImage) GetLocalSymbol(name string) (*CacheLocalSymbol64, error) {
+	i.ParseLocalSymbols(false)
 
+	idx := sort.Search(len(i.LocalSymbols), func(idx int) bool { return i.LocalSymbols[idx].Name >= name })
+	if idx < len(i.LocalSymbols) && i.LocalSymbols[idx].Name == name {
+		return i.LocalSymbols[idx], nil
+	}
+
+	return nil, fmt.Errorf("local symbol %s not found in image %s", name, filepath.Base(i.Name))
+}
+
+// ParsePublicSymbols parses and caches, with the option to dump, all the exports, symtab and dyld_info symbols in the image/dylib
+func (i *CacheImage) ParsePublicSymbols(dump bool) error {
+
+	if !i.Analysis.State.IsExportsDone() {
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		// try to parse exports from the cache's export trie or the dylib's LC_DYLD_EXPORTS_TRIE
+		if syms, err := i.cache.GetExportTrieSymbols(i); err == nil {
 			for _, sym := range syms {
 				if sym.Flags.ReExport() {
+					m, err := i.GetPartialMacho()
+					if err != nil {
+						return err
+					}
 					sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
+					if len(sym.ReExport) > 0 {
+						reimg, err := i.cache.Image(sym.FoundInDylib)
+						if err != nil {
+							return err
+						}
+						if resym, err := reimg.GetPublicSymbol(sym.ReExport); err == nil {
+							sym.Address = resym.Address
+						}
+					}
 				}
-
 				if dump {
-					fmt.Println(sym)
+					fmt.Fprintf(w, "%s\n", sym)
 				} else {
 					i.cache.AddressToSymbol[sym.Address] = sym.Name
+					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
+						Name:    sym.Name,
+						Address: sym.Address,
+						Type:    sym.Type(),
+					})
 				}
 			}
+			w.Flush()
 		}
+		// try to parse the dylib's symbol table
+		m, err := i.GetMacho()
+		if err != nil {
+			return err
+		}
+		for _, sym := range m.Symtab.Syms {
+			if sym.Name == "<redacted>" {
+				continue
+			}
+			// TODO: Handle ReExports
+			var sec string
+			if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+				sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+			}
+			if dump {
+				fmt.Fprintf(w, "%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
+			} else {
+				i.cache.AddressToSymbol[sym.Value] = sym.Name
+				i.PublicSymbols = append(i.PublicSymbols, &Symbol{
+					Name:    sym.Name,
+					Address: sym.Value,
+					Type:    sym.Type.String(sec),
+				})
+			}
+		}
+		w.Flush()
+		// try to parse LC_DYLD_INFO binds
+		if binds, err := m.GetBindInfo(); err == nil {
+			for _, bind := range binds {
+				if dump {
+					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+				} else {
+					i.cache.AddressToSymbol[bind.Start+bind.Offset] = bind.Name
+					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
+						Name:    bind.Name,
+						Address: bind.Start + bind.Offset,
+						Type:    fmt.Sprintf("%s|%s", bind.Kind, bind.Dylib),
+					})
+				}
+			}
+			w.Flush()
+		}
+		// try to parse LC_DYLD_INFO rebases TODO: this is slide info and not sym info
+		// if rebases, err := m.GetRebaseInfo(); err == nil {
+		// 	for _, rebase := range rebases {
+		// 		rebase.
+		// 	}
+		// }
+		// try to parse LC_DYLD_INFO exports TODO: is this redundant???
+		if exports, err := m.GetExports(); err == nil {
+			for _, export := range exports {
+				if export.Flags.ReExport() {
+					m, err := i.GetPartialMacho()
+					if err != nil {
+						return err
+					}
+					export.FoundInDylib = m.ImportedLibraries()[export.Other-1]
+				}
+				if dump {
+					fmt.Fprintf(w, "%s\n", export)
+				} else {
+					i.cache.AddressToSymbol[export.Address] = export.Name
+					i.PublicSymbols = append(i.PublicSymbols, &Symbol{
+						Name:    export.Name,
+						Address: export.Address,
+						Type:    export.Type(),
+					})
+				}
+			}
+			w.Flush()
+		}
+
+		sort.Slice(i.PublicSymbols, func(j, k int) bool {
+			return i.PublicSymbols[j].Name <= i.PublicSymbols[k].Name
+		})
 
 		i.Analysis.State.SetExports(true)
 	}
@@ -791,198 +890,88 @@ func (i *CacheImage) ParseExportedSymbols(dump bool) error {
 	return nil
 }
 
-func (i *CacheImage) FindLocalSymbol(name string) *CacheLocalSymbol64 {
-	i.ParseLocalSymbols()
+//  returns the public symbol matching the given name
+func (i *CacheImage) GetPublicSymbol(name string) (*Symbol, error) {
+	i.ParsePublicSymbols(false)
 
-	for _, sym := range i.LocalSymbols {
-		if sym.Name == name {
-			return sym
-		}
+	idx := sort.Search(len(i.PublicSymbols), func(idx int) bool { return i.PublicSymbols[idx].Name >= name })
+	if idx < len(i.PublicSymbols) && i.PublicSymbols[idx].Name == name {
+		return i.PublicSymbols[idx], nil
 	}
-	return nil
+
+	return nil, fmt.Errorf("public symbol %s not found in image %s", name, filepath.Base(i.Name))
 }
 
-func (i *CacheImage) FindExportedSymbol(name string) (*Symbol, error) {
+// GetExport returns the trie export symbol matching the given name
+func (i *CacheImage) GetExport(symbol string) (*trie.TrieExport, error) {
+	var eTrieAddr, eTrieSize uint64
 
-	if syms, err := i.cache.GetExportTrieSymbols(i); err == nil {
-		for _, sym := range syms {
-			if sym.Name == name {
-				if sym.Flags.ReExport() {
-					m, err := i.GetPartialMacho()
-					if err != nil {
-						return nil, err
-					}
-					// get re-export from dylib
-					sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
-					reimg, err := i.cache.Image(sym.FoundInDylib)
-					if err != nil {
-						return nil, err
-					}
-					// get re-export symbol
-					return reimg.FindExportedSymbol(sym.ReExport)
-				}
-
-				return &Symbol{
-					Name:    sym.Name,
-					Image:   i.Name,
-					Address: sym.Address,
-				}, nil
-			}
+	if i.CacheImageInfoExtra.ExportsTrieAddr > 0 {
+		eTrieAddr = i.CacheImageInfoExtra.ExportsTrieAddr
+		eTrieSize = uint64(i.CacheImageInfoExtra.ExportsTrieSize)
+	} else {
+		m, err := i.GetMacho()
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse MachO for image %s: %v", filepath.Base(i.Name), err)
+		}
+		if m.DyldExportsTrie() != nil {
+			return m.GetDyldExport(symbol)
+		} else if m.DyldInfo() != nil {
+			eTrieAddr, _ = i.GetVMAddress(uint64(m.DyldInfo().ExportOff))
+			eTrieSize = uint64(m.DyldInfo().ExportSize)
+		} else {
+			return nil, fmt.Errorf("failed to get export trie data for image %s: %w", filepath.Base(i.Name), ErrNoExportTrieInMachO)
 		}
 	}
 
-	m, err := i.GetMacho()
+	uuid, eTrieOffset, err := i.cache.GetOffset(eTrieAddr)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get offset of export trie addr")
+	}
+
+	sr := io.NewSectionReader(i.cache.r[uuid], 0, 1<<63-1)
+
+	if _, err := sr.Seek(int64(eTrieOffset), io.SeekStart); err != nil {
+		return nil, fmt.Errorf("failed to seek to export trie offset in cache: %v", err)
+	}
+
+	exportTrie := make([]byte, eTrieSize)
+	if err := binary.Read(sr, i.cache.ByteOrder, &exportTrie); err != nil {
+		return nil, fmt.Errorf("failed to read export trie data: %v", err)
+	}
+
+	r := bytes.NewReader(exportTrie)
+
+	if _, err = trie.WalkTrie(r, symbol); err != nil {
 		return nil, err
 	}
-
-	for _, sym := range m.Symtab.Syms {
-		if sym.Name == name && sym.Value != 0 {
-			return &Symbol{
-				Name:    sym.Name,
-				Address: sym.Value,
-				Image:   i.Name,
-			}, nil
-		}
-	}
-
-	if binds, err := m.GetBindInfo(); err == nil {
-		for _, bind := range binds {
-			if bind.Name == name {
-				return &Symbol{
-					Name:    bind.Name,
-					Address: bind.Start + bind.Offset,
-					Image:   i.Name,
-				}, nil
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("symbol %s not found in image %s", name, filepath.Base(i.Name))
+	return trie.ReadExport(r, symbol, i.LoadAddress)
 }
 
-func (i *CacheImage) GetSymbols(syms []string) ([]Symbol, error) {
-	var symbols []Symbol
-
-	if err := i.ParseLocalSymbols(); err != nil {
-		if !errors.Is(err, ErrNoLocals) {
+// GetSymbol retuns a Symbol private or public matching a given name
+func (i *CacheImage) GetSymbol(name string) (*Symbol, error) {
+	// check local symbols
+	if lsym, err := i.GetLocalSymbol(name); err == nil {
+		m, err := i.GetPartialMacho()
+		if err != nil {
 			return nil, err
 		}
-	}
-
-	for _, sym := range i.LocalSymbols {
-		if utils.StrSliceHas(syms, sym.Name) {
-			symbols = append(symbols, Symbol{
-				Name:    sym.Name,
-				Address: sym.Value,
-				Image:   i.Name,
-			})
-			syms = utils.RemoveStrFromSlice(syms, sym.Name)
-			if len(syms) == 0 {
-				return symbols, nil
-			}
+		var sec string
+		if lsym.Sect > 0 && int(lsym.Sect) <= len(m.Sections) {
+			sec = fmt.Sprintf("%s.%s", m.Sections[lsym.Sect-1].Seg, m.Sections[lsym.Sect-1].Name)
 		}
+		return &Symbol{
+			Name:    lsym.Name,
+			Address: lsym.Value,
+			Type:    lsym.Type.String(sec),
+			Image:   i.Name,
+		}, nil
 	}
-
-	expSyms, err := i.cache.GetExportTrieSymbols(i)
-	if err != nil {
-		if !errors.Is(err, ErrNoExportTrieInMachO) {
-			return nil, err
-		}
-	}
-
-	for _, sym := range expSyms {
-		if utils.StrSliceHas(syms, sym.Name) {
-			if sym.Flags.ReExport() {
-				m, err := i.GetPartialMacho()
-				if err != nil {
-					return nil, err
-				}
-				sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
-				// lookup re-exported symbol
-				if rexpSym, err := i.cache.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); err != nil {
-					if errors.Is(err, ErrNoExportTrieInMachO) {
-						image, err := i.cache.Image(sym.FoundInDylib)
-						if err != nil {
-							return nil, err
-						}
-						m, err = image.GetMacho()
-						if err != nil {
-							return nil, err
-						}
-						for _, s := range m.Symtab.Syms {
-							if s.Name == sym.ReExport {
-								symbols = append(symbols, Symbol{
-									Name:    sym.Name,
-									Address: s.Value,
-									Image:   i.Name,
-								})
-								syms = utils.RemoveStrFromSlice(syms, sym.Name)
-								if len(syms) == 0 {
-									return symbols, nil
-								}
-							}
-						}
-					} else {
-						return nil, err
-					}
-				} else {
-					symbols = append(symbols, Symbol{
-						Name:    sym.Name,
-						Address: rexpSym.Address,
-						Image:   i.Name,
-					})
-					syms = utils.RemoveStrFromSlice(syms, sym.Name)
-					if len(syms) == 0 {
-						return symbols, nil
-					}
-				}
-			} else {
-				symbols = append(symbols, Symbol{
-					Name:    sym.Name,
-					Address: sym.Address,
-					Image:   i.Name,
-				})
-				syms = utils.RemoveStrFromSlice(syms, sym.Name)
-				if len(syms) == 0 {
-					return symbols, nil
-				}
-			}
-		}
-	}
-
-	m, err := i.GetMacho()
-	if err != nil {
+	// check public symbols
+	if sym, err := i.GetPublicSymbol(name); err == nil {
+		sym.Image = i.Name
+		return sym, nil
+	} else {
 		return nil, err
 	}
-	for _, sym := range m.Symtab.Syms {
-		if utils.StrSliceHas(syms, sym.Name) {
-			symbols = append(symbols, Symbol{
-				Name:    sym.Name,
-				Address: sym.Value,
-				Image:   i.Name,
-			})
-			syms = utils.RemoveStrFromSlice(syms, sym.Name)
-			if len(syms) == 0 {
-				return symbols, nil
-			}
-		}
-	}
-	if binds, err := m.GetBindInfo(); err == nil {
-		for _, bind := range binds {
-			if utils.StrSliceHas(syms, bind.Name) {
-				symbols = append(symbols, Symbol{
-					Name:    bind.Name,
-					Address: bind.Start + bind.Offset,
-					Image:   i.Name,
-				})
-				syms = utils.RemoveStrFromSlice(syms, bind.Name)
-				if len(syms) == 0 {
-					return symbols, nil
-				}
-			}
-		}
-	}
-
-	return symbols, nil
 }
