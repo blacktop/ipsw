@@ -358,6 +358,38 @@ Dump ALL teh symbolz!!!
 ❯ ipsw dyld symaddr dyld_shared_cache
 ```
 
+Read in a JSON symbol lookup file
+
+```bash
+❯ jq . sym_lookup.json
+[
+  {
+    "name": "__platform_memmove",
+    "image": "libsystem_platform.dylib"
+  },
+  {
+    "name": "_memcpy",
+    "image": "libsystem_c.dylib"
+  }
+]
+```
+
+```bash
+❯ ipsw dyld symaddr dyld_shared_cache --in sym_lookup.json | jq .
+[
+  {
+    "name": "__platform_memmove",
+    "image": "/usr/lib/system/libsystem_platform.dylib",
+    "address": 8351373904
+  },
+  {
+    "name": "_memcpy",
+    "image": "/usr/lib/system/libsystem_c.dylib",
+    "address": 8351373904
+  }
+]
+```
+
 ### **dyld a2s**
 
 Lookup what symbol is at a given _unslid_ or _slid_ address _(in hex)_

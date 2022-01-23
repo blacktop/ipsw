@@ -22,14 +22,16 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -38,7 +40,11 @@ func init() {
 	dyldCmd.AddCommand(symaddrCmd)
 
 	symaddrCmd.Flags().BoolP("all", "a", false, "Find all symbol matches")
+	symaddrCmd.Flags().BoolP("binds", "b", false, "Also search LC_DYLD_INFO binds")
 	symaddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	symaddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
+	symaddrCmd.Flags().String("out", "", "Path to output JSON file")
+	symaddrCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	// symaddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -57,7 +63,15 @@ var symaddrCmd = &cobra.Command{
 		}
 
 		imageName, _ := cmd.Flags().GetString("image")
+		symbolFile, _ := cmd.Flags().GetString("in")
+		jsonFile, _ := cmd.Flags().GetString("out")
 		allMatches, _ := cmd.Flags().GetBool("all")
+		showBinds, _ := cmd.Flags().GetBool("binds")
+		forceColor, _ := cmd.Flags().GetBool("color")
+
+		if forceColor {
+			color.NoColor = false
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -85,203 +99,163 @@ var symaddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if len(args) > 1 {
-			/**********************************
-			 * Search for symbol inside dylib *
-			 **********************************/
+		if len(symbolFile) > 0 {
+			/******************************************
+			 * Search for symbols in JSON lookup file *
+			 ******************************************/
+			var enc *json.Encoder
+			var slin []dyld.Symbol
+			var slout []dyld.Symbol
+
+			symbolFile = filepath.Clean(symbolFile)
+			sdata, _ := ioutil.ReadFile(symbolFile)
+
+			if err := json.Unmarshal(sdata, &slin); err != nil {
+				return fmt.Errorf("failed to parse symbol lookup JSON file %s: %v", symbolFile, err)
+			}
+
+			// group syms by image
+			symages := make(map[string][]string)
+			for _, s := range slin {
+				if len(s.Image) > 0 {
+					image, err := f.Image(s.Image)
+					if err != nil {
+						return err
+					}
+					symages[image.Name] = append(symages[image.Name], s.Name)
+				} else {
+					symages["unknown"] = append(symages["unknown"], s.Name)
+				}
+			}
+
+			if _, uhoh := symages["unknown"]; uhoh {
+				log.Warn("you should supply 'image' fields for each symbol to GREATLY increase speed")
+			}
+
+			for imageName, symNames := range symages {
+				if imageName == "unknown" {
+					for _, sname := range symNames {
+						found := false
+						for _, image := range f.Images {
+							if sym, err := image.GetSymbol(sname); err == nil {
+								if sym.Address > 0 {
+									slout = append(slout, *sym)
+									found = true
+									break
+								}
+							}
+						}
+						if !found {
+							log.Errorf("failed to find address for symbol %s", sname)
+						}
+					}
+				} else {
+					image, err := f.Image(imageName)
+					if err != nil {
+						return err
+					}
+					for _, name := range symNames {
+						if sym, err := image.GetSymbol(name); err == nil {
+							slout = append(slout, *sym)
+						} else {
+							log.Errorf("failed to find address for symbol %s in image %s", name, filepath.Base(image.Name))
+						}
+					}
+				}
+			}
+
+			if len(jsonFile) > 0 {
+				jFile, err := os.Create(jsonFile)
+				if err != nil {
+					return err
+				}
+				defer jFile.Close()
+				enc = json.NewEncoder(jFile)
+			} else {
+				enc = json.NewEncoder(os.Stdout)
+			}
+
+			if err := enc.Encode(slout); err != nil {
+				return err
+			}
+
+			return nil
+		} else if len(args) > 1 {
 			if len(imageName) > 0 {
+				/**********************************
+				 * Search for symbol inside dylib *
+				 **********************************/
 				i, err := f.Image(imageName)
 				if err != nil {
 					return fmt.Errorf("image not in %s: %v", dscPath, err)
 				}
-				m, err := i.GetPartialMacho()
-				if err != nil {
-					return err
-				}
-				if sym, err := f.FindExportedSymbolInImage(imageName, args[1]); err != nil {
-					m, err := i.GetMacho()
-					if err != nil {
-						return err
-					}
-					for _, sym := range m.Symtab.Syms {
-						if sym.Name == args[1] {
-							var sec string
-							if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-								sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
-							}
-							fmt.Printf("%#09x:\t(%s)\t%s\n", sym.Value, sym.Type.String(sec), sym.Name)
-						}
-					}
-					if binds, err := m.GetBindInfo(); err == nil {
-						for _, bind := range binds {
-							if bind.Name == args[1] {
-								fmt.Printf("%#09x:\t(%s.%s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Name)
-							}
-						}
-					}
-				} else {
-					if sym.Flags.ReExport() {
-						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
-						// lookup re-exported symbol
-						if rexpSym, _ := f.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); rexpSym != nil {
-							sym.Address = rexpSym.Address
-						}
-					}
-					fmt.Println(sym)
 
-					if !allMatches {
-						return nil
-					}
+				if lsym, err := i.GetSymbol(args[1]); err == nil {
+					fmt.Println(lsym.String(forceColor))
 				}
-
-				// if sym, _ := f.FindLocalSymbolInImage(args[1], imageName); sym != nil {
-				// 	sym.Sections = m.Sections
-				// 	fmt.Println(sym)
+				// if lsym, err := i.GetLocalSymbol(args[1]); err == nil {
+				// 	fmt.Println(lsym)
+				// }
+				// if lsym, err := i.GetPublicSymbol(args[1]); err == nil {
+				// 	fmt.Println(lsym)
+				// }
+				// if export, err := i.GetExport(args[1]); err == nil {
+				// 	fmt.Println(export)
 				// }
 
-				// return nil
+				return nil
 			}
-
 			/**********************************
 			 * Search ALL dylibs for a symbol *
 			 **********************************/
-			log.Warn("searching in local symbols...")
-			if lSym, _ := f.FindLocalSymbol(args[1]); lSym != nil {
-				if len(lSym.FoundInDylib) > 0 {
-					image, err := f.Image(lSym.FoundInDylib)
-					if err != nil {
-						return err
-					}
-					lSym.Macho, err = image.GetPartialMacho()
-					if err != nil {
-						return err
-					}
-				}
-				fmt.Println(lSym)
-				if !allMatches {
-					return nil
-				}
-			}
-			log.Warn("searching in exported symbols...")
 			for _, image := range f.Images {
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
-				m, err := image.GetMacho()
-				if err != nil {
-					return err
-				}
-				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-				if sym, err := f.FindExportedSymbolInImage(image.Name, args[1]); err != nil {
-					if errors.Is(err, dyld.ErrSymbolNotInExportTrie) {
-						for _, sym := range m.Symtab.Syms {
-							if sym.Name == args[1] {
-								var sec string
-								if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-									sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
-								}
-								fmt.Fprintf(w, "%#09x:\t(%s)\t%s\t%s\n", sym.Value, sym.Type.String(sec), sym.Name, image.Name)
-
-								if !allMatches {
-									w.Flush()
-									return nil
-								}
-							}
+				if sym, err := image.GetSymbol(args[1]); err == nil {
+					if (sym.Address > 0 || allMatches) && (sym.Kind != dyld.BIND || showBinds) {
+						fmt.Println(sym.String(forceColor))
+						if !allMatches {
+							return nil
 						}
-						if binds, err := m.GetBindInfo(); err == nil {
-							for _, bind := range binds {
-								if bind.Name == args[1] {
-									fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name, image.Name)
-
-									if !allMatches {
-										w.Flush()
-										return nil
-									}
-								}
-							}
-						}
-					}
-				} else {
-					if sym.Flags.ReExport() {
-						sym.FoundInDylib = m.ImportedLibraries()[sym.Other-1]
-						// lookup re-exported symbol
-						if rexpSym, _ := f.FindExportedSymbolInImage(sym.FoundInDylib, sym.ReExport); rexpSym != nil {
-							sym.Address = rexpSym.Address
-						}
-					}
-					fmt.Fprintf(w, "%s\t%s\n", sym, image.Name)
-
-					if !allMatches {
-						return nil
 					}
 				}
-				w.Flush()
 			}
-
 			return nil
-
+		} else if len(imageName) > 0 {
 			/*************************
 			* Dump all dylib symbols *
 			**************************/
-		} else if len(imageName) > 0 {
-			// Dump ALL private symbols for a dylib
 			i, err := f.Image(imageName)
 			if err != nil {
 				return fmt.Errorf("image not in %s: %v", dscPath, err)
 			}
-			log.Warn("parsing local symbols for image...")
-			if err := f.GetLocalSymbolsForImage(i); err != nil {
+
+			log.Warn("parsing private symbols for image...")
+			if err := i.ParseLocalSymbols(true); err != nil {
 				if errors.Is(err, dyld.ErrNoLocals) {
 					utils.Indent(log.Warn, 2)(err.Error())
 				} else if err != nil {
-					return err
+					log.Errorf("failed parse private symbols for image %s: %v", i.Name, err)
 				}
 			}
 
-			m, err := i.GetPartialMacho()
-			if err != nil {
-				return err
-			}
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-			for _, sym := range i.LocalSymbols {
-				sym.Macho = m
-				fmt.Fprintf(w, "%s\n", sym)
-			}
-			w.Flush()
-
-			// Dump ALL public symbols for a dylib
-			log.Warn("parsing exported symbols for image...")
-			if err := f.GetAllExportedSymbolsForImage(i, true); err != nil {
-				log.Errorf("failed to get all exported symbols for image %s: %v", imageName, err)
+			log.Warn("parsing public symbols for image...")
+			if err := i.ParsePublicSymbols(true); err != nil {
+				log.Errorf("failed to parse public symbols for image %s: %v", i.Name, err)
 			}
 
 			return nil
 		}
-
 		/******************
 		* Dump ALL symbols*
 		*******************/
-		log.Warn("parsing exported symbols...")
-		// if err = f.GetAllExportedSymbols(true); err != nil {
-		// 	log.Errorf("failed to get all exported symbols: %v", err)
-		// }
-
-		log.Warn("parsing local symbols (slow)...")
-		if err = f.ParseLocalSyms(); err != nil {
-			log.Errorf("failed to parse private symbols", err)
-			return nil
+		log.Warn("parsing public symbols...")
+		if err = f.ParsePublicSymbols(true); err != nil {
+			log.Errorf("failed to get all public symbols: %v", err)
 		}
 
-		for _, image := range f.Images {
-			fmt.Printf("\n%s\n", image.Name)
-			m, err := image.GetPartialMacho()
-			if err != nil {
-				return err
-			}
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-			for _, sym := range image.LocalSymbols {
-				sym.Macho = m
-				fmt.Fprintf(w, "%s\n", sym)
-			}
-			w.Flush()
+		log.Warn("parsing private symbols...")
+		if err = f.ParseLocalSyms(true); err != nil {
+			log.Errorf("failed to parse private symbols: %v", err)
 		}
 
 		return nil

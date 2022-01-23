@@ -236,7 +236,7 @@ var dyldMachoCmd = &cobra.Command{
 							}
 						}
 
-						f.GetLocalSymbolsForImage(i)
+						i.ParseLocalSymbols(false)
 
 						// cc, err := m.GetObjCClasses()
 						// if err != nil {
@@ -246,7 +246,7 @@ var dyldMachoCmd = &cobra.Command{
 						// 	fmt.Println(c)
 						// }
 
-						err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbols())
+						err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbolsAsMachoSymbols())
 						if err != nil {
 							return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
 						}
@@ -422,7 +422,11 @@ var dyldMachoCmd = &cobra.Command{
 						for _, export := range exports {
 							if export.Flags.ReExport() {
 								export.FoundInDylib = m.ImportedLibraries()[export.Other-1]
-								if rexpSym, err := f.FindExportedSymbolInImage(export.FoundInDylib, export.ReExport); err == nil {
+								reimg, err := f.Image(export.FoundInDylib)
+								if err != nil {
+									return err
+								}
+								if rexpSym, err := reimg.GetExport(export.ReExport); err == nil {
 									export.Address = rexpSym.Address
 								}
 							}

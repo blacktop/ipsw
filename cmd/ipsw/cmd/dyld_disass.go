@@ -29,7 +29,6 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fatih/color"
@@ -71,7 +70,7 @@ var dyldDisassCmd = &cobra.Command{
 	Use:           "disass <dyld_shared_cache>",
 	Short:         "Disassemble dyld_shared_cache at symbol/vaddr",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -151,15 +150,23 @@ var dyldDisassCmd = &cobra.Command{
 			}
 		}
 
+		if len(imageName) > 0 {
+			image, err = f.Image(imageName)
+			if err != nil {
+				return err
+			}
+		}
+
 		if len(symbolName) > 0 {
 			log.Info("Locating symbol: " + symbolName)
 			if len(imageName) > 0 {
-				startAddr, image, err = f.GetSymbolAddress(symbolName, imageName)
+				sym, err := image.GetSymbol(symbolName)
 				if err != nil {
 					return err
 				}
+				startAddr = sym.Address
 			} else {
-				startAddr, image, err = f.GetSymbolAddress(symbolName, "")
+				startAddr, image, err = f.GetSymbolAddress(symbolName)
 				if err != nil {
 					return err
 				}
@@ -167,26 +174,6 @@ var dyldDisassCmd = &cobra.Command{
 			log.Infof("Found symbol in %s", filepath.Base(image.Name))
 		} else {
 			if len(imageName) > 0 { // ALL funcs in an image
-				image, err = f.Image(imageName)
-				if err != nil {
-					return fmt.Errorf("image not in %s: %v", dscPath, err)
-				}
-				/*
-				 * Load symbols from the target sym/addr's image
-				 */
-				utils.Indent(log.Warn, 2)(fmt.Sprintf("parsing public symbols for image %s...", filepath.Base(image.Name)))
-				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
-					log.Errorf("failed to parse exported symbols for image %s: %v", filepath.Base(image.Name), err)
-				}
-				utils.Indent(log.Warn, 2)(fmt.Sprintf("parsing private symbols for image %s...", filepath.Base(image.Name)))
-				if err := f.GetLocalSymbolsForImage(image); err != nil {
-					if errors.Is(err, dyld.ErrNoLocals) {
-						utils.Indent(log.Warn, 2)(err.Error())
-					} else if err != nil {
-						return err
-					}
-				}
-
 				m, err := image.GetMacho()
 				if err != nil {
 					return err
@@ -241,6 +228,8 @@ var dyldDisassCmd = &cobra.Command{
 					//***************
 					disass.Disassemble(engine)
 				}
+
+				return nil
 			}
 		}
 
@@ -357,6 +346,9 @@ var dyldDisassCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+				if err := image.Analyze(); err != nil {
+					return err
+				}
 				m, err := image.GetMacho()
 				if err != nil {
 					return err
@@ -415,9 +407,6 @@ var dyldDisassCmd = &cobra.Command{
 				//***********************
 				//* First pass ANALYSIS *
 				//***********************
-				if err := image.Analyze(); err != nil {
-					return err
-				}
 				if err := engine.Triage(); err != nil {
 					return fmt.Errorf("first pass triage failed: %v", err)
 				}

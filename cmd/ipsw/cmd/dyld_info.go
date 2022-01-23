@@ -317,7 +317,7 @@ var dyldInfoCmd = &cobra.Command{
 				return err
 			}
 			for _, pc := range pcs {
-				fmt.Printf("%#x\t%s\n", pclosureAddr+uint64(pc.Flags), pc.Name)
+				fmt.Printf("%#x\t%s\n", pclosureAddr+pc.Offset, string(pc.Data))
 			}
 		}
 
@@ -329,7 +329,7 @@ var dyldInfoCmd = &cobra.Command{
 				return err
 			}
 			for _, o := range oo {
-				fmt.Printf("%4d: %s\n", o.Flags, o.Name)
+				fmt.Printf("%4d: %s\n", o.Offset, string(o.Data))
 			}
 		}
 

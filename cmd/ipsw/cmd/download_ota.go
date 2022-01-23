@@ -144,7 +144,7 @@ var otaDLCmd = &cobra.Command{
 					}
 					survey.AskOne(prompt, &otaInfoType)
 				} else {
-					if !utils.StrSliceContains([]string{"iOS", "macOS"}, otaInfoType) {
+					if !utils.StrSliceHas([]string{"iOS", "macOS"}, otaInfoType) {
 						log.Fatal("you must supply a valid --info-type flag: (iOS, macOS)")
 					}
 				}
@@ -162,7 +162,7 @@ var otaDLCmd = &cobra.Command{
 			return nil
 		}
 
-		if !utils.StrSliceContains(
+		if !utils.StrSliceHas(
 			[]string{"ios", "macos", "watchos", "tvos", "audioos"}, strings.ToLower(platform)) {
 			log.Fatal("you must supply a valid --platform flag. Choices are: ios, macos, watchos, tvos and audioos")
 		}

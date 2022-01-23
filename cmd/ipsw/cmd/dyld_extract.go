@@ -1,3 +1,5 @@
+//go:build !windows
+
 /*
 Copyright © 2019 blacktop
 
@@ -25,10 +27,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/spf13/cobra"
 )
 
@@ -47,18 +49,24 @@ var extractDyldCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		var destPath string
+
 		ipswPath := filepath.Clean(args[0])
+
+		var destPath string
 		if len(args) > 1 {
 			destPath = filepath.Clean(args[1])
 		}
+
 		if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", ipswPath)
 		}
 
-		if runtime.GOOS == "windows" {
-			log.Fatal("dyld_shared_cache extraction does not work on Windows :(")
+		i, err := info.Parse(ipswPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse ipsw info: %v", err)
 		}
+
+		destPath = filepath.Join(destPath, i.GetFolder())
 
 		log.Info("Extracting dyld_shared_cache")
 		return dyld.Extract(ipswPath, destPath)

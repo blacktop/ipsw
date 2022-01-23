@@ -73,7 +73,7 @@ var rssCmd = &cobra.Command{
 				}
 
 				for _, item := range rss.Channel.Items {
-					if !utils.StrSliceContains(releases, fmt.Sprintf("%s - %s", item.Title, item.PubDate)) {
+					if !utils.StrSliceHas(releases, fmt.Sprintf("%s - %s", item.Title, item.PubDate)) {
 
 						releases = append(releases, fmt.Sprintf("%s - %s", item.Title, item.PubDate))
 

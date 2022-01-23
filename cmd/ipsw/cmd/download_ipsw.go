@@ -47,7 +47,7 @@ func init() {
 	ipswCmd.Flags().Bool("show-latest", false, "Show latest iOS version")
 	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
-	ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
+	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
 	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
@@ -55,7 +55,7 @@ func init() {
 	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
 	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
-	viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
+	// viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
@@ -113,7 +113,7 @@ var ipswCmd = &cobra.Command{
 		showLatest := viper.GetBool("download.ipsw.show-latest")
 		macos := viper.GetBool("download.ipsw.macos")
 		kernel := viper.GetBool("download.ipsw.kernel")
-		kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
+		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		pattern := viper.GetString("download.ipsw.pattern")
 		output := viper.GetString("download.ipsw.output")
 		// beta := viper.GetBool("download.ipsw.beta")
@@ -177,11 +177,11 @@ var ipswCmd = &cobra.Command{
 
 			for _, v := range builds {
 				if len(doDownload) > 0 {
-					if utils.StrSliceContains(doDownload, v.Identifier) {
+					if utils.StrSliceHas(doDownload, v.Identifier) {
 						filteredBuilds = append(filteredBuilds, v)
 					}
 				} else if len(doNotDownload) > 0 {
-					if !utils.StrSliceContains(doNotDownload, v.Identifier) {
+					if !utils.StrSliceHas(doNotDownload, v.Identifier) {
 						filteredBuilds = append(filteredBuilds, v)
 					}
 				} else {
@@ -246,16 +246,7 @@ var ipswCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
 					}
-					iinfo, err := info.ParseZipFiles(zr.File)
-					if err != nil {
-						return errors.Wrap(err, "failed to parse remote ipsw")
-					}
-					if kernelSpecFolders {
-						err = kernelcache.RemoteParse(zr, destPath)
-					} else {
-						err = kernelcache.RemoteParseV2(zr, filepath.Join(destPath, iinfo.GetFolder()))
-					}
-					if err != nil {
+					if err := kernelcache.RemoteParse(zr, destPath); err != nil {
 						return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
 					}
 				}

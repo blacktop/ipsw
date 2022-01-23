@@ -90,7 +90,7 @@ var importsCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if utils.StrSliceContains(m.ImportedLibraries(), image.Name) {
+			if utils.StrSliceHas(m.ImportedLibraries(), image.Name) {
 				fmt.Println(image.Name)
 			}
 			m.Close()

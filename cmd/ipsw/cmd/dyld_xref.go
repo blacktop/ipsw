@@ -125,7 +125,7 @@ var xrefCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				if utils.StrSliceContains(m.ImportedLibraries(), srcImage.Name) {
+				if utils.StrSliceHas(m.ImportedLibraries(), srcImage.Name) {
 					images = append(images, i)
 				}
 				m.Close()

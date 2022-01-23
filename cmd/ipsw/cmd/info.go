@@ -43,8 +43,7 @@ func init() {
 var infoCmd = &cobra.Command{
 	Use:   "info <IPSW>",
 	Short: "Display IPSW Info",
-	// Long:  longDesc,
-	Args: cobra.MinimumNArgs(1),
+	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)

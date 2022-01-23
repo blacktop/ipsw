@@ -174,7 +174,7 @@ func Open(name string) (*File, error) {
 				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid, ff.Headers[ff.UUID].SymbolsSubCacheUUID)
 			}
 
-			ff.symUUID = uuid // FIXME: what if there IS no .symbols like on M1 macOS
+			ff.symUUID = uuid
 
 			ff.parseCache(fsym, uuid)
 

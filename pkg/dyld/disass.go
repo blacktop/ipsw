@@ -275,7 +275,7 @@ func (d *DyldDisass) Triage() error {
 // 	}
 
 // 	for _, imp := range imports {
-// 		if !utils.StrSliceContains(image.Analysis.Dependencies, imp) {
+// 		if !utils.StrSliceHas(image.Analysis.Dependencies, imp) {
 // 			image.Analysis.Dependencies = append(image.Analysis.Dependencies, imp)
 // 			if err := f.ImageDependencies(imp); err != nil {
 // 				return err
