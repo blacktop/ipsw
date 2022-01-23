@@ -5,11 +5,15 @@ import (
 	"crypto/sha1"
 	"crypto/tls"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"os"
+	"strings"
+	"syscall"
 	"time"
 
 	// "github.com/gofrs/flock"
@@ -17,8 +21,8 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
-	"github.com/vbauerster/mpb/v5"
-	"github.com/vbauerster/mpb/v5/decor"
+	"github.com/vbauerster/mpb/v7"
+	"github.com/vbauerster/mpb/v7/decor"
 	"golang.org/x/net/http/httpproxy"
 )
 
@@ -33,21 +37,46 @@ type Download struct {
 	resume       bool
 	canResume    bool
 	skipAll      bool
+	resumeAll    bool
+	restartAll   bool
+	verbose      bool
 
 	client *http.Client
 }
 
+type geoQuery struct {
+	Query       string `json:"query,omitempty"`
+	Status      string `json:"status,omitempty"`
+	Country     string `json:"country,omitempty"`
+	CountryCode string `json:"country_code,omitempty"`
+	Region      string `json:"region,omitempty"`
+	RegionName  string `json:"region_name,omitempty"`
+	City        string `json:"city,omitempty"`
+	Zip         string `json:"zip,omitempty"`
+	Lat         string `json:"lat,omitempty"`
+	Lon         string `json:"lon,omitempty"`
+	Timezone    string `json:"timezone,omitempty"`
+	Isp         string `json:"isp,omitempty"`
+	Org         string `json:"org,omitempty"`
+	As          string `json:"as,omitempty"`
+}
+
 // NewDownload creates a new downloader
-func NewDownload(proxy string, insecure, skipAll bool) *Download {
+func NewDownload(proxy string, insecure, skipAll, resumeAll, restartAll, verbose bool) *Download {
 	return &Download{
 		// URL:     url,
 		// Sha1:    sha1,
-		resume:  false,
-		skipAll: skipAll,
+		resume:     false,
+		skipAll:    skipAll,
+		resumeAll:  resumeAll,
+		restartAll: restartAll,
+		verbose:    verbose,
 		client: &http.Client{
 			Transport: &http.Transport{
 				Proxy:           GetProxy(proxy),
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+				// MaxConnsPerHost:   50,
+				ForceAttemptHTTP2: true,
 			},
 		},
 	}
@@ -118,31 +147,37 @@ func (d *Download) Do() error {
 
 			// don't try to download files being downloaded elsewhere
 			if d.skipAll {
+				d.resume = false
 				return nil
-			}
-
-			choice := ""
-			prompt := &survey.Select{
-				Message: fmt.Sprintf("Previous download of %s can be resumed:", d.DestName),
-				Options: []string{"resume", "skip", "skip all", "restart"},
-			}
-			survey.AskOne(prompt, &choice)
-
-			switch choice {
-			case "resume":
+			} else if d.resumeAll {
 				d.resume = true
-			case "restart":
+			} else if d.restartAll {
 				log.Infof("Downloading %s - RESTARTED", d.DestName+".download")
 				d.resume = false
-			case "skip":
-				log.Infof("%s - SKIPPED", d.DestName+".download")
-				d.resume = false
-				return nil
-			case "skip all":
-				log.Info("Skipping ALL active downloads (you are performing a distributed download)")
-				d.skipAll = true
-				d.resume = false
-				return nil
+			} else {
+				choice := ""
+				prompt := &survey.Select{
+					Message: fmt.Sprintf("Previous download of %s can be resumed:", d.DestName),
+					Options: []string{"resume", "skip", "skip all", "restart"},
+				}
+				survey.AskOne(prompt, &choice)
+
+				switch choice {
+				case "resume":
+					d.resume = true
+				case "restart":
+					log.Infof("Downloading %s - RESTARTED", d.DestName+".download")
+					d.resume = false
+				case "skip":
+					log.Infof("%s - SKIPPED", d.DestName+".download")
+					d.resume = false
+					return nil
+				case "skip all":
+					log.Info("Skipping ALL active downloads (you are performing a distributed download)")
+					d.skipAll = true
+					d.resume = false
+					return nil
+				}
 			}
 
 			if d.resume {
@@ -154,10 +189,39 @@ func (d *Download) Do() error {
 		}
 	}
 
+	trace := &httptrace.ClientTrace{
+		GotConn: func(connInfo httptrace.GotConnInfo) {
+			if d.verbose {
+				addr := strings.Split(connInfo.Conn.RemoteAddr().String(), ":")[0]
+
+				req, err := http.NewRequest("GET", fmt.Sprintf("http://ip-api.com/json/%s", addr), nil)
+				if err != nil {
+					log.Error("failed to create http GET request")
+				}
+				req.Header.Add("User-Agent", utils.RandomAgent())
+
+				if res, err := d.client.Do(req); err == nil {
+					defer res.Body.Close()
+					data := &geoQuery{}
+					json.NewDecoder(res.Body).Decode(data)
+					utils.Indent(log.Debug, 2)(fmt.Sprintf("URL resolved to: %s (%s - %s, %s. %s)", addr, data.Org, data.City, data.Region, data.Country))
+				} else {
+					log.Errorf("failed to lookup IP's geolocation: %v", err)
+				}
+			}
+		},
+	}
+	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
+
 	utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Downloading")
 	resp, err := d.client.Do(req)
 	if err != nil {
-		return err
+		if errors.Is(err, syscall.ECONNRESET) {
+			utils.Indent(log.Error, 2)(fmt.Sprintf("CONNECTION RESET: %v", err))
+			utils.Indent(log.Warn, 3)("trying again...")
+			return d.Do()
+		}
+		return fmt.Errorf("failed to download file: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -198,7 +262,8 @@ func (d *Download) Do() error {
 		mpb.WithRefreshRate(180*time.Millisecond),
 	)
 
-	bar := p.AddBar(d.size, mpb.BarStyle("[=>-|"),
+	bar := p.Add(d.size,
+		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
 		mpb.PrependDecorators(
 			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
 		),

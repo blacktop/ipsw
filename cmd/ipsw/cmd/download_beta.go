@@ -31,6 +31,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -39,21 +40,36 @@ func init() {
 
 // betaCmd represents the beta command
 var betaCmd = &cobra.Command{
-	Use:   "beta [build-id]",
-	Short: "Download beta IPSWs from theiphonewiki.com",
-	Args:  cobra.MinimumNArgs(1),
+	Use:          "beta [build-id]",
+	Short:        "Download beta IPSWs from theiphonewiki.com",
+	Args:         cobra.MinimumNArgs(1),
+	SilenceUsage: true,
+	Hidden:       true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		device, _ := cmd.Flags().GetString("device")
-		confirm, _ := cmd.Flags().GetBool("yes")
-		skipAll, _ := cmd.Flags().GetBool("skip-all")
-		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
+		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
+		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
+		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
+		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
+		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
+		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+
+		// settings
+		proxy := viper.GetString("download.proxy")
+		insecure := viper.GetBool("download.insecure")
+		confirm := viper.GetBool("download.confirm")
+		skipAll := viper.GetBool("download.skip-all")
+		resumeAll := viper.GetBool("download.resume-all")
+		restartAll := viper.GetBool("download.restart-all")
+		removeCommas := viper.GetBool("download.remove-commas")
+		// filters
+		device := viper.GetString("download.device")
 
 		ipsws, err := download.ScrapeURLs(args[0])
 		if err != nil {
@@ -63,7 +79,7 @@ var betaCmd = &cobra.Command{
 		var filteredURLS []string
 		for url, ipsw := range ipsws {
 			if len(device) > 0 {
-				if utils.StrSliceContains(ipsw.Devices, device) {
+				if utils.StrSliceHas(ipsw.Devices, device) {
 					filteredURLS = append(filteredURLS, url)
 				}
 			} else {
@@ -91,7 +107,7 @@ var betaCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := download.NewDownload(proxy, insecure, skipAll)
+			downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, Verbose)
 			for _, url := range filteredURLS {
 				destName := getDestName(url, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {

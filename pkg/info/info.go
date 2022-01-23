@@ -20,8 +20,21 @@ var (
 	//go:embed data/procs.json
 	procsData []byte
 	//go:embed data/firmware_keys.json
-	keysJsonData []byte
+	keysJSONData []byte
+	//go:embed data/t8030_ap_keys.json
+	t8030APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/2b8c2d6d37da5a04a222469987fcfa2b - A13 Bionic
+	//go:embed data/t8101_ap_keys.json
+	t8101APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/fd627adebaa4120269754cd613e81877 - A14 Bionic
 )
+
+type apKey struct {
+	Device   string
+	Build    string
+	Type     string
+	Filename string
+	KBag     string
+	Key      string
+}
 
 // Info in the info object
 type Info struct {
@@ -67,12 +80,41 @@ func getProcessor(cpuid string) processors {
 func getFirmwareKeys(device, build string) map[string]string {
 	var keys map[string]map[string]map[string]string
 
-	err := json.Unmarshal(keysJsonData, &keys)
+	err := json.Unmarshal(keysJSONData, &keys)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	return keys[device][build]
+}
+
+func getApFirmwareKey(device, build, filename string) (string, string, error) {
+	var a13Keys []apKey
+	var a14Keys []apKey
+
+	err := json.Unmarshal(t8030APKeysJSONData, &a13Keys)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, key := range a13Keys {
+		if key.Device == device && key.Build == build && key.Filename == filename {
+			return key.KBag, key.Key, nil
+		}
+	}
+
+	err = json.Unmarshal(t8101APKeysJSONData, &a14Keys)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, key := range a14Keys {
+		if key.Device == device && key.Build == build && key.Filename == filename {
+			return key.KBag, key.Key, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("failed to find key for device: %s, build: %s, filename: %s", device, build, filename)
 }
 
 func (i *Info) String() string {
@@ -92,6 +134,7 @@ func (i *Info) String() string {
 		}
 	}
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
+	bls := i.Plists.BuildManifest.GetBootLoaders()
 	iStr += fmt.Sprintf("\nDevices\n")
 	iStr += fmt.Sprintf("-------\n")
 	for _, dtree := range i.DeviceTrees {
@@ -112,7 +155,9 @@ func (i *Info) String() string {
 		}
 		iStr += fmt.Sprintf("\n%s\n", prodName)
 		iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
-		iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
+		if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
+			iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
+		}
 		if i.Plists.Restore != nil {
 			for _, device := range i.Plists.Restore.DeviceMap {
 				if strings.ToLower(device.BoardConfig) == strings.ToLower(dt.BoardConfig) {
@@ -121,9 +166,24 @@ func (i *Info) String() string {
 				}
 			}
 		}
+		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
+			iStr += fmt.Sprintf("   - BootLoaders\n")
+			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
+				if _, key, err := getApFirmwareKey(dt.Model, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
+					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
+				} else {
+					iStr += fmt.Sprintf("       * %s 🔑 -> %s\n", filepath.Base(bl), key)
+				}
+			}
+		}
 	}
 
 	return iStr
+}
+
+// GetOsDmg returns the name of the OS dmg
+func (i *Info) GetOsDmg() string {
+	return i.Plists.BuildIdentities[0].Manifest["OS"].Info.Path
 }
 
 // GetFolder returns a folder name for all the devices included in an IPSW
@@ -209,8 +269,11 @@ func (i *Info) GetKernelCacheFolders(kc string) []string {
 
 // GetKernelCacheFileName returns a short new kernelcache name including all the supported devices
 func (i *Info) GetKernelCacheFileName(kc string) string {
-	devList := getAbbreviatedDevList(i.GetDevicesForKernelCache(kc))
-	return fmt.Sprintf("%s.%s", strings.TrimSuffix(kc, filepath.Ext(kc)), devList)
+	devList := getAbbreviatedDevList(i.GetDevicesForKernelCache(filepath.Base(kc)))
+	if len(devList) == 0 {
+		return filepath.Base(kc)
+	}
+	return fmt.Sprintf("%s.%s", strings.TrimSuffix(filepath.Base(kc), filepath.Ext(kc)), devList)
 }
 
 // GetDevicesForKernelCache returns a sorted array of devices that support the kernelcache
@@ -218,7 +281,7 @@ func (i *Info) GetDevicesForKernelCache(kc string) []string {
 	var devices []string
 
 	for bconf, kcache := range i.Plists.BuildManifest.GetKernelCaches() {
-		if utils.StrSliceContains(kcache, kc) {
+		if utils.StrSliceHas(kcache, kc) {
 			for _, dtree := range i.DeviceTrees {
 				dt, _ := dtree.Summary()
 				if strings.ToLower(bconf) == strings.ToLower(dt.BoardConfig) {

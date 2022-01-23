@@ -9,7 +9,7 @@ summary: Parse OTA zip files.
 #### Show OTA Info
 
 ```bash
-$ ipsw ota --info OTA.zip
+❯ ipsw ota --info OTA.zip
 
 [OTA Info]
 ==========
@@ -28,7 +28,7 @@ iPhone SE (2nd generation))
 #### List files in OTA
 
 ```bash
-$ ipsw ota OTA.zip | head
+❯ ipsw ota OTA.zip | head
    • Listing files...
 -rw-r--r-- 2020-02-15T02:24:26-05:00 0 B    .Trashes
 ---------- 2020-02-15T02:20:25-05:00 0 B    .file
@@ -45,7 +45,7 @@ $ ipsw ota OTA.zip | head
 See if `dyld` is in the OTA files
 
 ```bash
-$ ipsw ota OTA.zip | grep dyld
+❯ ipsw ota OTA.zip | grep dyld
    • Listing files...
 -rwxr-xr-x 2020-02-15T02:22:01-05:00 1.7 GB System/Library/Caches/com.apple."dyld/dyld"_shared_cache_arm64e
 -rwxr-xr-x 2020-02-15T02:24:08-05:00 721 kB usr/lib/"dyld"
@@ -54,9 +54,11 @@ $ ipsw ota OTA.zip | grep dyld
 #### Extract file(s) from OTA payloads
 
 ```bash
-$ ipsw ota OTA.zip dyld_shared_cache
-   • Extracting dyld_shared_cache...
-      • Extracting -rwxr-xr-x uid=0, gid=80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e
+❯ ipsw ota test-caches/30f4510f7fa8e1ecfb8d137f6081a8691cfc28b5.zip '^System/Library/.*/dyld_shared_cache.*$'
+   • Extracting ^System/Library/.*/dyld_shared_cache.*$...
+      • Extracting -rwxr-xr-x   1.5 GB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e
+      • Extracting -rwxr-xr-x   787 MB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.1 to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e.1
+      • Extracting -rwxr-xr-x   480 MB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.symbols to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e.symbols
 ```
 
-**NOTE:** you can supply a pattern/substring to match
+**NOTE:** you can supply a regex to match *(see `re_format(7)`)*

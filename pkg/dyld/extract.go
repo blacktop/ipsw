@@ -26,13 +26,13 @@ func unmount(device string) error {
 // Extract extracts dyld_shared_cache from ipsw
 func Extract(ipsw, destPath string) error {
 
+	i, err := info.Parse(ipsw)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse ipsw info")
+	}
+
 	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		if strings.EqualFold(filepath.Ext(f.Name), ".dmg") {
-			if f.UncompressedSize64 > 1024*1024*1024 {
-				return true
-			}
-		}
-		return false
+		return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
 	})
 	if err != nil {
 		return errors.Wrap(err, "failed extract dyld_shared_cache from ipsw")
@@ -41,22 +41,15 @@ func Extract(ipsw, destPath string) error {
 	if len(dmgs) == 1 {
 		defer os.Remove(dmgs[0])
 
-		i, err := info.Parse(ipsw)
-		if err != nil {
-			return errors.Wrap(err, "failed to parse ipsw info")
-		}
-
-		folder := filepath.Join(destPath, i.GetFolder())
-
 		var searchStr, searchStrMacOS, mountPoint string
 		if runtime.GOOS == "darwin" {
 			searchStr = "System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64*"
 			searchStrMacOS = "System/Library/dyld/dyld_shared_cache_arm64*"
-			os.MkdirAll(folder, os.ModePerm)
+			os.MkdirAll(destPath, os.ModePerm)
 			mountPoint = "/tmp/ios"
 		} else if runtime.GOOS == "linux" {
 			searchStr = "root/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64*"
-			os.MkdirAll(filepath.Join("/data", folder), os.ModePerm)
+			os.MkdirAll(filepath.Join("/data", destPath), os.ModePerm)
 			mountPoint = "/mnt"
 		}
 
@@ -81,8 +74,8 @@ func Extract(ipsw, destPath string) error {
 			}
 		}
 		for _, match := range matches {
-			dyldDest := filepath.Join(folder, filepath.Base(match))
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s to %s", match, dyldDest))
+			dyldDest := filepath.Join(destPath, filepath.Base(match))
+			utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting %s to %s", match, dyldDest))
 			err = utils.Cp(match, dyldDest)
 			if err != nil {
 				return err

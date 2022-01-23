@@ -41,6 +41,8 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldInfoCmd)
 
+	dyldInfoCmd.Flags().BoolP("closures", "c", false, "Dump program launch closures")
+	dyldInfoCmd.Flags().BoolP("dlopen", "d", false, "Dump all dylibs and bundles with dlopen closures")
 	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
 	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
@@ -56,23 +58,25 @@ type dylib struct {
 }
 
 type dyldInfo struct {
-	Magic           string                           `json:"magic,omitempty"`
-	UUID            string                           `json:"uuid,omitempty"`
-	Platform        string                           `json:"platform,omitempty"`
-	MaxSlide        int                              `json:"max_slide,omitempty"`
-	NumSubCaches    int                              `json:"num_sub_caches,omitempty"`
-	SubCacheGroupID int                              `json:"sub_cache_group_id,omitempty"`
-	SymSubCacheUUID string                           `json:"sym_sub_cache_uuid,omitempty"`
-	Mappings        []dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
-	CodeSignature   types.CodeSignature              `json:"code_signature,omitempty"`
-	Dylibs          []dylib                          `json:"dylibs,omitempty"`
+	Magic           string                                      `json:"magic,omitempty"`
+	UUID            string                                      `json:"uuid,omitempty"`
+	Platform        string                                      `json:"platform,omitempty"`
+	MaxSlide        int                                         `json:"max_slide,omitempty"`
+	NumSubCaches    int                                         `json:"num_sub_caches,omitempty"`
+	SubCacheGroupID int                                         `json:"sub_cache_group_id,omitempty"`
+	SymSubCacheUUID string                                      `json:"sym_sub_cache_uuid,omitempty"`
+	Mappings        map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
+	CodeSignature   map[string]types.CodeSignature              `json:"code_signature,omitempty"`
+	Dylibs          []dylib                                     `json:"dylibs,omitempty"`
 }
 
 // infoCmd represents the info command
 var dyldInfoCmd = &cobra.Command{
-	Use:   "info [options] <dyld_shared_cache>",
-	Short: "Parse dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "info <dyld_shared_cache>",
+	Short:         "Parse dyld_shared_cache",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -80,6 +84,8 @@ var dyldInfoCmd = &cobra.Command{
 
 		// showHeader, _ := cmd.Flags().GetBool("header")
 		showDylibs, _ := cmd.Flags().GetBool("dylibs")
+		showClosures, _ := cmd.Flags().GetBool("closures")
+		showDlopenOthers, _ := cmd.Flags().GetBool("dlopen")
 		showSignature, _ := cmd.Flags().GetBool("sig")
 
 		outAsJSON, _ := cmd.Flags().GetBool("json")
@@ -104,22 +110,6 @@ var dyldInfoCmd = &cobra.Command{
 			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
 
-		// if header.ImagesOffset == 0 && header.ImagesCount == 0 {
-		// 	if header.SymbolsSubCacheUUID != [16]byte{0} {
-		// 		header, err = dyld.ReadHeader(dscPath + ".symbols")
-		// 		if err != nil {
-		// 			return err
-		// 		}
-		// 	}
-		// 	for i := 1; i <= int(header.NumSubCaches); i++ {
-		// 		header, err = dyld.ReadHeader(fmt.Sprintf("%s.%d", dscPath, i))
-		// 		if err != nil {
-		// 			return err
-		// 		}
-
-		// 	}
-		// }
-
 		// TODO: check for
 		// if ( dylibInfo->isAlias )
 		//   	printf("[alias] %s\n", dylibInfo->path);
@@ -132,30 +122,39 @@ var dyldInfoCmd = &cobra.Command{
 
 		if outAsJSON {
 			dinfo := dyldInfo{
-				Magic:    string(f.Magic[:]),
+				Magic:    f.Headers[f.UUID].Magic.String(),
 				UUID:     f.UUID.String(),
-				Platform: f.Platform.String(),
-				MaxSlide: int(f.MaxSlide),
+				Platform: f.Headers[f.UUID].Platform.String(),
+				MaxSlide: int(f.Headers[f.UUID].MaxSlide),
 			}
 
-			for _, mapping := range f.MappingsWithSlideInfo {
-				dinfo.Mappings = append(dinfo.Mappings, *mapping)
+			dinfo.Mappings = make(map[string][]dyld.CacheMappingWithSlideInfo)
+
+			for u, mp := range f.MappingsWithSlideInfo {
+				for _, m := range mp {
+					dinfo.Mappings[u.String()] = append(dinfo.Mappings[u.String()], *m)
+				}
 			}
+
+			dinfo.CodeSignature = make(map[string]types.CodeSignature)
 
 			if showSignature {
-				dinfo.CodeSignature = *f.CodeSignature
+				for u, cs := range f.CodeSignatures {
+					dinfo.CodeSignature[u.String()] = *cs
+				}
 			}
 
 			if showDylibs {
 				for idx, img := range f.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
-						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+						continue
+						// return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
 					dinfo.Dylibs = append(dinfo.Dylibs, dylib{
 						Index:       idx + 1,
 						Name:        img.Name,
-						Version:     m.DylibID().CurrentVersion,
+						Version:     m.SourceVersion().Version,
 						UUID:        m.UUID().String(),
 						LoadAddress: img.Info.Address,
 					})
@@ -179,144 +178,86 @@ var dyldInfoCmd = &cobra.Command{
 		if showSignature {
 			fmt.Println("Code Signature")
 			fmt.Println("==============")
-			if f.CodeSignature != nil {
-				cds := f.CodeSignature.CodeDirectories
-				if len(cds) > 0 {
-					for _, cd := range cds {
-						var teamID string
-						if len(cd.TeamID) > 0 {
-							teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
-						}
-						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
-						fmt.Printf("\tVersion:     %s\n"+
-							"\tFlags:       %s\n"+
-							"\tCodeLimit:   0x%x\n"+
-							"\tIdentifier:  %s (@0x%x)\n"+
-							"%s"+
-							"\tCDHash:      %s (computed)\n"+
-							"\t# of hashes: %d code (%d pages) + %d special\n"+
-							"\tHashes @%d size: %d Type: %s\n",
-							cd.Header.Version,
-							cd.Header.Flags,
-							cd.Header.CodeLimit,
-							cd.ID,
-							cd.Header.IdentOffset,
-							teamID,
-							cd.CDHash,
-							cd.Header.NCodeSlots,
-							int(math.Pow(2, float64(cd.Header.PageSize))),
-							cd.Header.NSpecialSlots,
-							cd.Header.HashOffset,
-							cd.Header.HashSize,
-							cd.Header.HashType)
-						if Verbose {
-							for _, sslot := range cd.SpecialSlots {
-								fmt.Printf("\t\t%s\n", sslot.Desc)
+			if f.CodeSignatures != nil {
+				for u, cs := range f.CodeSignatures {
+					if f.IsDyld4 {
+						fmt.Printf("\n> SubCache %s\n\n", u)
+					}
+					cds := cs.CodeDirectories
+					if len(cds) > 0 {
+						for _, cd := range cds {
+							var teamID string
+							if len(cd.TeamID) > 0 {
+								teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
 							}
-							for _, cslot := range cd.CodeSlots {
-								fmt.Printf("\t\t%s\n", cslot.Desc)
-							}
-						}
-					}
-				}
-				reqs := f.CodeSignature.Requirements
-				if len(reqs) > 0 {
-					fmt.Printf("Requirement Set (%d bytes) with %d requirement\n",
-						reqs[0].Length, // TODO: fix this (needs to be length - sizeof(header))
-						len(reqs))
-					for idx, req := range reqs {
-						fmt.Printf("\t%d: %s (@%d, %d bytes): %s\n",
-							idx,
-							req.Type,
-							req.Offset,
-							req.Length,
-							req.Detail)
-					}
-				}
-				if len(f.CodeSignature.CMSSignature) > 0 {
-					fmt.Println("CMS (RFC3852) signature:")
-					p7, err := pkcs7.Parse(f.CodeSignature.CMSSignature)
-					if err != nil {
-						return err
-					}
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-					for _, cert := range p7.Certificates {
-						var ou string
-						if cert.Issuer.Organization != nil {
-							ou = cert.Issuer.Organization[0]
-						}
-						if cert.Issuer.OrganizationalUnit != nil {
-							ou = cert.Issuer.OrganizationalUnit[0]
-						}
-						fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
-							ou,
-							cert.Subject.CommonName,
-							cert.NotBefore.Format("2006-01-02"),
-							cert.NotAfter.Format("2006-01-02"))
-					}
-					w.Flush()
-				}
-				if f.GetSubCacheCodeSignatures() != nil {
-					fmt.Println()
-					fmt.Println("SubCache Code Signature(s)")
-					fmt.Println("--------------------------")
-					for uuid, cs := range f.GetSubCacheCodeSignatures() {
-						cds := cs.CodeDirectories
-						if len(cds) > 0 {
-							for _, cd := range cds {
-								var teamID string
-								if len(cd.TeamID) > 0 {
-									teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
+							fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
+							fmt.Printf("\tVersion:     %s\n"+
+								"\tFlags:       %s\n"+
+								"\tCodeLimit:   0x%x\n"+
+								"\tIdentifier:  %s (@0x%x)\n"+
+								"%s"+
+								"\tCDHash:      %s (computed)\n"+
+								"\t# of hashes: %d code (%d pages) + %d special\n"+
+								"\tHashes @%d size: %d Type: %s\n",
+								cd.Header.Version,
+								cd.Header.Flags,
+								cd.Header.CodeLimit,
+								cd.ID,
+								cd.Header.IdentOffset,
+								teamID,
+								cd.CDHash,
+								cd.Header.NCodeSlots,
+								int(math.Pow(2, float64(cd.Header.PageSize))),
+								cd.Header.NSpecialSlots,
+								cd.Header.HashOffset,
+								cd.Header.HashSize,
+								cd.Header.HashType)
+							if Verbose {
+								for _, sslot := range cd.SpecialSlots {
+									fmt.Printf("\t\t%s\n", sslot.Desc)
 								}
-								fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
-								fmt.Printf("\tVersion:     %s\n"+
-									"\tFlags:       %s\n"+
-									"\tCodeLimit:   0x%x\n"+
-									"\tIdentifier:  %s (@0x%x)\n"+
-									"\tUUID:        %s\n"+
-									"%s"+
-									"\tCDHash:      %s (computed)\n"+
-									"\t# of hashes: %d code (%d pages) + %d special\n"+
-									"\tHashes @%d size: %d Type: %s\n",
-									cd.Header.Version,
-									cd.Header.Flags,
-									cd.Header.CodeLimit,
-									cd.ID,
-									cd.Header.IdentOffset,
-									uuid,
-									teamID,
-									cd.CDHash,
-									cd.Header.NCodeSlots,
-									int(math.Pow(2, float64(cd.Header.PageSize))),
-									cd.Header.NSpecialSlots,
-									cd.Header.HashOffset,
-									cd.Header.HashSize,
-									cd.Header.HashType)
-								if Verbose {
-									for _, sslot := range cd.SpecialSlots {
-										fmt.Printf("\t\t%s\n", sslot.Desc)
-									}
-									for _, cslot := range cd.CodeSlots {
-										fmt.Printf("\t\t%s\n", cslot.Desc)
-									}
+								for _, cslot := range cd.CodeSlots {
+									fmt.Printf("\t\t%s\n", cslot.Desc)
 								}
 							}
 						}
-						reqs := f.CodeSignature.Requirements
-						if len(reqs) > 0 {
-							fmt.Printf("Requirement Set (%d bytes) with %d requirement\n",
-								reqs[0].Length, // TODO: fix this (needs to be length - sizeof(header))
-								len(reqs))
-							for idx, req := range reqs {
-								fmt.Printf("\t%d: %s (@%d, %d bytes): %s\n",
-									idx,
-									req.Type,
-									req.Offset,
-									req.Length,
-									req.Detail)
-							}
+					}
+					reqs := cs.Requirements
+					if len(reqs) > 0 {
+						fmt.Printf("Requirement Set (%d bytes) with %d requirement\n",
+							reqs[0].Length, // TODO: fix this (needs to be length - sizeof(header))
+							len(reqs))
+						for idx, req := range reqs {
+							fmt.Printf("\t%d: %s (@%d, %d bytes): %s\n",
+								idx,
+								req.Type,
+								req.Offset,
+								req.Length,
+								req.Detail)
 						}
-						fmt.Println()
+					}
+					if len(cs.CMSSignature) > 0 {
+						fmt.Println("CMS (RFC3852) signature:")
+						p7, err := pkcs7.Parse(cs.CMSSignature)
+						if err != nil {
+							return err
+						}
+						w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+						for _, cert := range p7.Certificates {
+							var ou string
+							if cert.Issuer.Organization != nil {
+								ou = cert.Issuer.Organization[0]
+							}
+							if cert.Issuer.OrganizationalUnit != nil {
+								ou = cert.Issuer.OrganizationalUnit[0]
+							}
+							fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
+								ou,
+								cert.Subject.CommonName,
+								cert.NotBefore.Format("01Jan06 15:04:05"),
+								cert.NotAfter.Format("01Jan06 15:04:05"))
+						}
+						w.Flush()
 					}
 				}
 			} else {
@@ -328,8 +269,9 @@ var dyldInfoCmd = &cobra.Command{
 		if showDylibs {
 			fmt.Println("Images")
 			fmt.Println("======")
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 			for idx, img := range f.Images {
-				if f.FormatVersion.IsDylibsExpectedOnDisk() {
+				if f.Headers[f.UUID].FormatVersion.IsDylibsExpectedOnDisk() {
 					m, err := macho.Open(img.Name)
 					if err != nil {
 						if serr, ok := err.(*macho.FormatError); !ok {
@@ -339,11 +281,11 @@ var dyldInfoCmd = &cobra.Command{
 						if err != nil {
 							return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
 						}
-						fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, fat.Arches[0].DylibID().CurrentVersion, img.Name)
+						fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].SourceVersion().Version, img.Name)
 						fat.Close()
 						continue
 					}
-					fmt.Printf("%4d:  %#0X  (%s)  %s\n", idx+1, img.Info.Address, m.DylibID().CurrentVersion, img.Name)
+					fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, m.SourceVersion().Version, img.Name)
 					m.Close()
 				} else {
 					m, err := img.GetPartialMacho()
@@ -351,12 +293,43 @@ var dyldInfoCmd = &cobra.Command{
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
 					if Verbose {
-						fmt.Printf("%4d:  %#0X  %s  (%s) uuid: %s\n", idx+1, img.Info.Address, img.Name, m.DylibID().CurrentVersion, m.UUID())
+						fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), m.SourceVersion().Version, img.Name)
 					} else {
-						fmt.Printf("%4d:  %s  (%s)\n", idx+1, img.Name, m.DylibID().CurrentVersion)
+						fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, m.DylibID().CurrentVersion, img.Name)
 					}
 					m.Close()
 				}
+			}
+			w.Flush()
+		}
+
+		if showClosures {
+			fmt.Println("Prog Closure Offsets")
+			fmt.Println("====================")
+			var pclosureAddr uint64
+			if f.Headers[f.UUID].ProgClosuresTrieAddr != 0 {
+				pclosureAddr = f.Headers[f.UUID].ProgClosuresAddr
+			} else {
+				pclosureAddr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
+			}
+			pcs, err := f.GetProgClosuresOffsets()
+			if err != nil {
+				return err
+			}
+			for _, pc := range pcs {
+				fmt.Printf("%#x\t%s\n", pclosureAddr+pc.Offset, string(pc.Data))
+			}
+		}
+
+		if showDlopenOthers {
+			fmt.Println("dlopen(s) Image/Bundle IDs")
+			fmt.Println("==========================")
+			oo, err := f.GetDlopenOtherImages()
+			if err != nil {
+				return err
+			}
+			for _, o := range oo {
+				fmt.Printf("%4d: %s\n", o.Offset, string(o.Data))
 			}
 		}
 

@@ -76,26 +76,26 @@ var tbdCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if image := f.Image(args[1]); image != nil {
-			t, err := tbd.NewTBD(f, image)
-			if err != nil {
-				return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
-			}
+		image, err := f.Image(args[1])
+		if err != nil {
+			return fmt.Errorf("image not in %s: %v", dscPath, err)
+		}
+		t, err := tbd.NewTBD(f, image)
+		if err != nil {
+			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
+		}
 
-			outTBD, err := t.Generate()
-			if err != nil {
-				return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
-			}
+		outTBD, err := t.Generate()
+		if err != nil {
+			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
+		}
 
-			tbdFile := filepath.Base(t.Path)
+		tbdFile := filepath.Base(t.Path)
 
-			log.Info("Created " + tbdFile + ".tbd")
-			err = ioutil.WriteFile(tbdFile+".tbd", []byte(outTBD), 0644)
-			if err != nil {
-				return fmt.Errorf("failed to write tbd file %s: %v", tbdFile+".tbd", err)
-			}
-		} else {
-			log.Errorf("%s is not a dylib in %s", args[1], dscPath)
+		log.Info("Created " + tbdFile + ".tbd")
+		err = ioutil.WriteFile(tbdFile+".tbd", []byte(outTBD), 0644)
+		if err != nil {
+			return fmt.Errorf("failed to write tbd file %s: %v", tbdFile+".tbd", err)
 		}
 
 		return nil

@@ -1,3 +1,4 @@
+//go:build darwin && cgo
 // +build darwin,cgo
 
 package dyld
@@ -24,12 +25,18 @@ import "C"
 
 import (
 	"fmt"
+	"path/filepath"
 	"unsafe"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
+
+var xcodePaths = []string{
+	"/Applications/Xcode-beta.app",
+	"/Applications/Xcode.app",
+}
 
 // LibHandle represents an open handle to a library
 type LibHandle struct {
@@ -83,26 +90,16 @@ func (l *LibHandle) Close() error {
 }
 
 // Split extracts all the dyld_shared_cache libraries
-func Split(dyldSharedCachePath, destinationPath, operatingSystem string) error {
+func Split(dyldSharedCachePath, destinationPath, xcodePath string) error {
 
 	var bundles []string
 
-	switch operatingSystem {
-	case "iPhoneOS":
-		bundles = []string{
-			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
-			"/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle",
-		}
-	case "AppleTVOS":
-		bundles = []string{
-			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
-			"/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform/usr/lib/dsc_extractor.bundle",
-		}
-	case "WatchOS":
-		bundles = []string{
-			"/Applications/Xcode-beta.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
-			"/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/usr/lib/dsc_extractor.bundle",
-		}
+	if len(xcodePath) > 0 {
+		xcodePaths = append([]string{xcodePath}, xcodePaths...)
+	}
+
+	for _, xpath := range xcodePaths {
+		bundles = append(bundles, filepath.Join(xpath, "Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle"))
 	}
 
 	dscExtractor, err := GetHandle(bundles)

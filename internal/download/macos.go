@@ -109,10 +109,21 @@ func (i ProductInfo) String() string {
 		i.Title,
 		i.Version,
 		i.Build,
-		i.PostDate.Format("2006-01-02"))
+		i.PostDate.Format("01Jan06 15:04:05"))
 }
 
 type ProductInfos []ProductInfo
+
+// FilterByVersion filters out installers that do not match the given version
+func (infos ProductInfos) FilterByVersion(version string) ProductInfos {
+	var out ProductInfos
+	for _, i := range infos {
+		if version == i.Version {
+			out = append(out, i)
+		}
+	}
+	return out
+}
 
 func (infos ProductInfos) String() string {
 	tableString := &strings.Builder{}
@@ -123,7 +134,7 @@ func (infos ProductInfos) String() string {
 			pinfo.Title,
 			pinfo.Version,
 			pinfo.Build,
-			pinfo.PostDate.Format("2006-01-02"),
+			pinfo.PostDate.Format("01Jan06 15:04:05"),
 		})
 	}
 	table := tablewriter.NewWriter(tableString)
@@ -298,9 +309,9 @@ func GetProductInfo() (ProductInfos, error) {
 	return prods, nil
 }
 
-func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll bool) error {
+func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll bool) error {
 
-	downloader := NewDownload(proxy, insecure, skipAll)
+	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, true)
 
 	folder := filepath.Join(workDir, i.Title)
 

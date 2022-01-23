@@ -9,31 +9,30 @@ summary: Update ipsw.
 ### Update `ipsw`
 
 ```bash
-$ ipsw update
-
+❯ ipsw update
 ```
 
 If you are already up to date
 
 ```
-$ ipsw update
+❯ ipsw update
    • you already have the latest version
 ```
 
 Grab an update for your platform
 
 ```
-$ ipsw update --detect
+❯ ipsw update --detect
 ```
 
 Grab an update for another platform
 
 ```
-$ ipsw update --platform windows_x86_64
+❯ ipsw update --platform windows_x86_64
 ```
 
 Grab an update for your platform and overwrite the current one
 
 ```
-$ ipsw update --detect --replace
+❯ ipsw update --detect --replace
 ```

@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -35,14 +36,15 @@ import (
 func init() {
 	dyldCmd.AddCommand(slideCmd)
 	slideCmd.Flags().BoolP("auth", "a", false, "Print only slide info for mappings with auth flags")
+	slideCmd.Flags().Bool("json", false, "Output as JSON")
 	slideCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	slideCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // slideCmd represents the slide command
 var slideCmd = &cobra.Command{
-	Use:   "slide [options] <dyld_shared_cache>",
-	Short: "Get slide info chained pointers",
+	Use:   "slide <dyld_shared_cache>",
+	Short: "Dump slide info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -51,7 +53,10 @@ var slideCmd = &cobra.Command{
 		}
 
 		printAuthSlideInfo, _ := cmd.Flags().GetBool("auth")
+		dumpJSON, _ := cmd.Flags().GetBool("json")
 		cacheFile, _ := cmd.Flags().GetString("cache")
+
+		enc := json.NewEncoder(os.Stdout)
 
 		dscPath := filepath.Clean(args[0])
 
@@ -87,21 +92,40 @@ var slideCmd = &cobra.Command{
 			return err
 		}
 
-		if f.SlideInfoOffsetUnused > 0 {
-			f.ParseSlideInfo(dyld.CacheMappingAndSlideInfo{
-				Address:         f.Mappings[1].Address,
-				Size:            f.Mappings[1].Size,
-				FileOffset:      f.Mappings[1].FileOffset,
-				SlideInfoOffset: f.SlideInfoOffsetUnused,
-				SlideInfoSize:   f.SlideInfoSizeUnused,
-			}, false)
-		} else {
-			for _, extMapping := range f.MappingsWithSlideInfo {
-				if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
-					continue
+		for uuid := range f.Mappings {
+			if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
+				mapping := &dyld.CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: dyld.CacheMappingAndSlideInfo{
+					Address:         f.Mappings[uuid][1].Address,    // __DATA
+					Size:            f.Mappings[uuid][1].Size,       // __DATA
+					FileOffset:      f.Mappings[uuid][1].FileOffset, // __DATA
+					SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
+					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
+				}, Name: "__DATA"}
+				if dumpJSON {
+					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
+					if err != nil {
+						return err
+					}
+					enc.Encode(rebases)
+				} else {
+					f.DumpSlideInfo(uuid, mapping)
 				}
-				if extMapping.SlideInfoSize > 0 {
-					f.ParseSlideInfo(extMapping.CacheMappingAndSlideInfo, true)
+			} else {
+				for _, extMapping := range f.MappingsWithSlideInfo[uuid] {
+					if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
+						continue
+					}
+					if extMapping.SlideInfoSize > 0 {
+						if dumpJSON {
+							rebases, err := f.GetRebaseInfoForPages(uuid, extMapping, 0, 0)
+							if err != nil {
+								return err
+							}
+							enc.Encode(rebases)
+						} else {
+							f.DumpSlideInfo(uuid, extMapping)
+						}
+					}
 				}
 			}
 		}

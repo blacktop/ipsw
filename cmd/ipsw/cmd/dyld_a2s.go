@@ -29,7 +29,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -45,9 +44,11 @@ func init() {
 
 // a2sCmd represents the a2s command
 var a2sCmd = &cobra.Command{
-	Use:   "a2s [options] <dyld_shared_cache> <vaddr>",
-	Short: "Lookup symbol at unslid address",
-	Args:  cobra.MinimumNArgs(2),
+	Use:           "a2s <dyld_shared_cache> <vaddr>",
+	Short:         "Lookup symbol at unslid address",
+	SilenceUsage:  false,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -57,6 +58,8 @@ var a2sCmd = &cobra.Command{
 		slide, _ := cmd.Flags().GetUint64("slide")
 		showImage, _ := cmd.Flags().GetBool("image")
 		showMapping, _ := cmd.Flags().GetBool("mapping")
+
+		secondAttempt := false
 
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
@@ -79,7 +82,7 @@ var a2sCmd = &cobra.Command{
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			symlinkPath, err := os.Readlink(dscPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+				return fmt.Errorf("failed to read symlink %s", dscPath)
 			}
 			// TODO: this seems like it would break
 			linkParent := filepath.Dir(dscPath)
@@ -148,21 +151,15 @@ var a2sCmd = &cobra.Command{
 		// 	gzr.Close()
 		// 	a2sFile.Close()
 		// }
-
-		foundMapping := false
-		for _, mapping := range f.MappingsWithSlideInfo {
-			if mapping.Address <= unslidAddr && unslidAddr < mapping.Address+mapping.Size {
-				foundMapping = true
-				if showMapping {
-					fmt.Printf("\nMAPPING\n")
-					fmt.Printf("=======\n\n")
-					fmt.Println(mapping.String())
-				}
-				break
+	retry:
+		if showMapping {
+			_, mapping, err := f.GetMappingForVMAddress(unslidAddr)
+			if err != nil {
+				return err
 			}
-		}
-		if !foundMapping {
-			return fmt.Errorf("no mapping contains address %#x", unslidAddr)
+			fmt.Printf("\nMAPPING\n")
+			fmt.Printf("=======\n\n")
+			fmt.Println(mapping.String())
 		}
 
 		image, err := f.GetImageContainingVMAddr(unslidAddr)
@@ -208,52 +205,70 @@ var a2sCmd = &cobra.Command{
 		}
 
 		// Load all symbols
-		if err := f.AnalyzeImage(image); err != nil {
+		if err := image.Analyze(); err != nil {
 			return err
 		}
 
-		// TODO: add objc methods in the -[Class sel:] form
 		if m.HasObjC() {
 			log.Debug("Parsing ObjC runtime structures...")
-			if err := f.CFStringsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc cfstrings")
-			}
-			if err := f.MethodsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc methods")
-			}
-			// if strings.Contains(image.Name, "libobjc.A.dylib") { // TODO: should I put this back in?
-			// 	_, err = f.GetAllSelectors(false)
-			// } else {
-			if err := f.SelectorsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc selectors")
-			}
-			// }
-			if err := f.ClassesForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc classes")
+			if err := f.ParseObjcForImage(image.Name); err != nil {
+				return fmt.Errorf("failed to parse objc data for image %s: %v", image.Name, err)
 			}
 		}
 
 		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+			if secondAttempt {
+				symName = "_ptr." + symName
+			}
 			fmt.Printf("\n%#x: %s\n", addr, symName)
 			return nil
 		}
 
 		if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
-			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-				fmt.Printf("\n%#x: %s + %d\n", addr, symName, unslidAddr-fn.StartAddr)
-				return nil
+			delta := ""
+			if unslidAddr-fn.StartAddr != 0 {
+				delta = fmt.Sprintf(" + %d", unslidAddr-fn.StartAddr)
 			}
-			fmt.Printf("\n%#x: func_%x\n", addr, addr)
+			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+				if secondAttempt {
+					symName = "_ptr." + symName
+				}
+				fmt.Printf("\n%#x: %s%s\n", addr, symName, delta)
+			} else {
+				if secondAttempt {
+					fmt.Printf("\n%#x: _ptr.func_%x%s\n", addr, fn.StartAddr, delta)
+					return nil
+				}
+				fmt.Printf("\n%#x: func_%x%s\n", addr, fn.StartAddr, delta)
+			}
 			return nil
 		}
 
-		if cstr, err := f.IsCString(m, unslidAddr); err == nil {
-			fmt.Printf("\n%#x: %#v\n", addr, cstr)
+		if cstr, ok := m.IsCString(unslidAddr); ok {
+			if secondAttempt {
+				fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
+			} else {
+				fmt.Printf("\n%#x: %#v\n", addr, cstr)
+			}
 			return nil
 		}
 
-		log.Error("no symbol found")
+		if secondAttempt {
+			log.Error("no symbol found")
+			return nil
+		}
 
-		return nil
+		ptr, err := f.ReadPointerAtAddress(unslidAddr)
+		if err != nil {
+			return err
+		}
+
+		utils.Indent(log.Error, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", unslidAddr, f.SlideInfo.SlidePointer(ptr)))
+
+		unslidAddr = f.SlideInfo.SlidePointer(ptr)
+
+		secondAttempt = true
+
+		goto retry
 	},
 }

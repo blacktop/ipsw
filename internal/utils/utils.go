@@ -10,7 +10,6 @@ import (
 	"io"
 	"math/rand"
 	"os"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -113,6 +112,26 @@ func StrSliceContains(slice []string, item string) bool {
 	return false
 }
 
+// StrSliceHas returns true if string slice has an exact given string
+func StrSliceHas(slice []string, item string) bool {
+	for _, s := range slice {
+		if strings.EqualFold(strings.ToLower(item), strings.ToLower(s)) {
+			return true
+		}
+	}
+	return false
+}
+
+// RemoveStrFromSlice removes a single string from a string slice
+func RemoveStrFromSlice(s []string, r string) []string {
+	for i, v := range s {
+		if v == r {
+			return append(s[:i], s[i+1:]...)
+		}
+	}
+	return s
+}
+
 // Uint64SliceContains returns true if uint64 slice contains given uint64
 func Uint64SliceContains(slice []uint64, item uint64) bool {
 	for _, s := range slice {
@@ -202,14 +221,14 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 			}
 		}()
 
-		path := filepath.Join(dest, f.Name)
+		path := filepath.Join(dest, filepath.Base(f.Name))
 
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(path, f.Mode())
 		} else {
 			// TODO: add the ability to preserve folder structure if user wants
 			// os.MkdirAll(filepath.Dir(path), f.Mode())
-			f, err := os.OpenFile(filepath.Base(path), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
+			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				return err
 			}
@@ -218,7 +237,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 					panic(err)
 				}
 			}()
-
+			Indent(log.Info, 2)(fmt.Sprintf("Created %s", path))
 			_, err = io.Copy(f, rc)
 			if err != nil {
 				return err
@@ -229,7 +248,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 
 	for _, f := range r.File {
 		if filter(f) {
-			fNames = append(fNames, path.Base(f.Name))
+			fNames = append(fNames, filepath.Base(f.Name))
 			err := extractAndWriteFile(f)
 			if err != nil {
 				return nil, err
@@ -317,11 +336,8 @@ func GrepStrings(data []byte, searchStr string) []string {
 
 // IsASCII checks if given string is ascii
 func IsASCII(s string) bool {
-	if len(s) < 1 {
-		return false
-	}
-	for i := 0; i < len(s); i++ {
-		if s[i] > unicode.MaxASCII {
+	for _, r := range s {
+		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
 			return false
 		}
 	}

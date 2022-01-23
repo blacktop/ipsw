@@ -6,19 +6,188 @@ weight: 8
 summary: Parse a MachO file
 ---
 
-- [**macho -d**](#macho--d)
-- [**macho -l**](#macho--l)
-- [**macho --sig**](#macho---sig)
-- [**macho --ent**](#macho---ent)
-- [**macho --objc**](#macho---objc)
-- [**macho --fileset-entry**](#macho---fileset-entry)
+- [**macho --help**](#macho---help)
+- [**macho a2o**](#macho-a2o)
+- [**macho o2a**](#macho-o2a)
+- [**macho lipo**](#macho-lipo)
+- [**macho dump**](#macho-dump)
+- [**macho info --help**](#macho-info---help)
+- [**macho info -d**](#macho-info--d)
+- [**macho info -l**](#macho-info--l)
+- [**macho info --sig**](#macho-info---sig)
+- [**macho info --ent**](#macho-info---ent)
+- [**macho info --objc**](#macho-info---objc)
+- [**macho info --fixups**](#macho-info---fixups)
+- [**macho info --fileset-entry**](#macho-info---fileset-entry)
+- [**macho disass**](#macho-disass)
 
-### **macho -d**
+### **macho --help**
+
+```bash
+❯ ipsw macho info --help
+
+Parse MachO
+
+Usage:
+  ipsw macho [flags]
+  ipsw macho [command]
+
+Available Commands:
+  a2o         Convert MachO address to offset
+  disass      Disassemble ARM64 binaries at address or symbol
+  dump        Dump MachO data at given virtual address
+  info        Explore a MachO file
+  lipo        Extract single MachO out of a universal/fat MachO
+  o2a         Convert MachO offset to address
+
+Flags:
+  -h, --help   help for macho
+
+Global Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -V, --verbose         verbose output
+
+Use "ipsw macho [command] --help" for more information about a command.
+```
+
+### **macho a2o**
+
+Convert MachO address to offset
+
+```bash
+❯ ipsw macho a2o kernelcache 0xfffffff0070b4000
+   • Offset                    dec=720896 hex=0xb0000 section=__mod_init_func segment=__DATA_CONST
+```
+
+### **macho o2a**
+
+Convert MachO offset to address
+
+```bash
+❯ ipsw macho o2a kernelcache 0x007dc000
+   • Address                   dec=18446744005115772928 hex=0xfffffff0077e0000 section=__data segment=__DATA
+```
+
+### **macho lipo**
+
+Extract file from Universal/FAT MachO
+
+```bash
+❯ ipsw macho lipo debugserver
+
+• Extracted ARM64e file as debugserver.arm64e
+```
+
+> **NOTE:** you can supply `--arch arm64e` instead of using the arch picker UI
+
+### **macho dump**
+
+First print the MachO header for `kernelcache`
+
+```bash
+❯ ipsw macho info kernelcache | grep __DATA_CONST.__mod_init_func
+        sz=0x00000290 off=0x000b0000-0x000b0290 addr=0xfffffff0070b4000-0xfffffff0070b4290              __DATA_CONST.__mod_init_func     (ModInitFuncPointers)
+```
+
+Hexdump the section `__DATA_CONST.__mod_init_func`
+
+```bash
+❯ ipsw dyld dump kernelcache 0xfffffff0070b4000 --size 656 # 0x290 in decimal
+
+00000000  34 ba 69 07 f0 ff ff ff  0c c2 69 07 f0 ff ff ff  |4.i.......i.....|
+00000010  98 e5 69 07 f0 ff ff ff  18 fc 69 07 f0 ff ff ff  |..i.......i.....|
+00000020  b8 05 6a 07 f0 ff ff ff  b0 0d 6a 07 f0 ff ff ff  |..j.......j.....|
+00000030  08 19 6a 07 f0 ff ff ff  b4 2c 6a 07 f0 ff ff ff  |..j......,j.....|
+00000040  4c 4e 6a 07 f0 ff ff ff  50 58 6a 07 f0 ff ff ff  |LNj.....PXj.....|
+00000050  34 55 6b 07 f0 ff ff ff  30 0a 6c 07 f0 ff ff ff  |4Uk.....0.l.....|
+00000060  24 1d 6c 07 f0 ff ff ff  90 3a 6c 07 f0 ff ff ff  |$.l......:l.....|
+00000070  64 4f 6c 07 f0 ff ff ff  18 5e 6c 07 f0 ff ff ff  |dOl......^l.....|
+00000080  f4 71 6c 07 f0 ff ff ff  0c ed 6d 07 f0 ff ff ff  |.ql.......m.....|
+00000090  98 33 6e 07 f0 ff ff ff  10 56 6e 07 f0 ff ff ff  |.3n......Vn.....|
+000000a0  1c 64 6e 07 f0 ff ff ff  1c 70 6e 07 f0 ff ff ff  |.dn......pn.....|
+000000b0  14 7e 6e 07 f0 ff ff ff  30 98 6e 07 f0 ff ff ff  |.~n.....0.n.....|
+000000c0  c4 a3 6e 07 f0 ff ff ff  90 e2 6e 07 f0 ff ff ff  |..n.......n.....|
+000000d0  78 7b 6f 07 f0 ff ff ff  b4 94 70 07 f0 ff ff ff  |x{o.......p.....|
+000000e0  28 10 71 07 f0 ff ff ff  e4 07 72 07 f0 ff ff ff  |(.q.......r.....|
+000000f0  d4 0f 72 07 f0 ff ff ff  20 1b 72 07 f0 ff ff ff  |..r..... .r.....|
+<SNIP>
+```
+
+Or dump the section as a list of pointers
+
+```bash
+❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --addr --count 10
+
+0xfffffff00769ba34
+0xfffffff00769c20c
+0xfffffff00769e598
+0xfffffff00769fc18
+0xfffffff0076a05b8
+0xfffffff0076a0db0
+0xfffffff0076a1908
+0xfffffff0076a2cb4
+0xfffffff0076a4e4c
+0xfffffff0076a5850
+```
+
+Or write to a file for later post-processing
+
+```bash
+❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --size 656 --output ./data.bin
+   • Wrote data to file ./data.bin
+```
+
+```bash
+❯ hexdump -C data.bin
+00000000  34 ba 69 07 f0 ff ff ff  0c c2 69 07 f0 ff ff ff  |4.i.......i.....|
+00000010  98 e5 69 07 f0 ff ff ff  18 fc 69 07 f0 ff ff ff  |..i.......i.....|
+00000020  b8 05 6a 07 f0 ff ff ff  b0 0d 6a 07 f0 ff ff ff  |..j.......j.....|
+00000030  08 19 6a 07 f0 ff ff ff  b4 2c 6a 07 f0 ff ff ff  |..j......,j.....|
+00000040  4c 4e 6a 07 f0 ff ff ff  50 58 6a 07 f0 ff ff ff  |LNj.....PXj.....|
+00000050  34 55 6b 07 f0 ff ff ff  30 0a 6c 07 f0 ff ff ff  |4Uk.....0.l.....|
+00000060  24 1d 6c 07 f0 ff ff ff  90 3a 6c 07 f0 ff ff ff  |$.l......:l.....|
+<SNIP>
+```
+
+### **macho info --help**
+
+Help for macho cmd
+
+```bash
+❯ ipsw macho info --help
+
+Parse a MachO file
+
+Usage:
+  ipsw macho info <macho> [flags]
+
+Flags:
+  -a, --arch string             Which architecture to use for fat/universal MachO
+  -e, --ent                     Print entitlements
+  -x, --extract-fileset-entry   Extract the fileset entry
+  -t, --fileset-entry string    Which fileset entry to analyze
+  -u, --fixups                  Print fixup chains
+  -d, --header                  Print the mach header
+  -h, --help                    help for macho
+  -l, --loads                   Print the load commands
+  -o, --objc                    Print ObjC info
+  -r, --objc-refs               Print ObjC references
+  -s, --sig                     Print code signature
+  -f, --starts                  Print function starts
+  -c, --strings                 Print cstrings
+  -n, --symbols                 Print symbols
+
+Global Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -V, --verbose         verbose output
+```
+
+### **macho info -d**
 
 Similar to `otool -h`
 
 ```bash
-$ ipsw macho JavaScriptCore
+❯ ipsw macho info JavaScriptCore
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -27,12 +196,12 @@ Commands      = 25 (Size: 4384)
 Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, AppExtensionSafe
 ```
 
-### **macho -l**
+### **macho info -l**
 
 Similar to `otool -h -l`
 
 ```bash
-$ ipsw macho JavaScriptCore
+❯ ipsw macho info JavaScriptCore
 
 Magic         = 64-bit MachO
 Type          = Dylib
@@ -104,12 +273,12 @@ Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, A
 24: LC_DATA_IN_CODE             offset=0x0102ba28-0x0102ba28, size=    0, entries=0
 ```
 
-### **macho --sig**
+### **macho info --sig**
 
 Similar to `jtool --sig`
 
 ```bash
-$ ipsw macho /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
+❯ ipsw macho info /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
 
 Code Directory (167849 bytes)
 	Version:     Scatter
@@ -138,12 +307,12 @@ CMS (RFC3852) signature:
         OU: Apple Certification Authority CN: Software Signing                           (2013-04-12 thru 2021-04-12)
 ```
 
-### **macho --ent**
+### **macho info --ent**
 
 Similar to `jtool --ent`
 
 ```bash
-$ ipsw macho /usr/libexec/amfid --ent
+❯ ipsw macho info /usr/libexec/amfid --ent
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -160,14 +329,14 @@ $ ipsw macho /usr/libexec/amfid --ent
 </plist>
 ```
 
-### **macho --objc**
+### **macho info --objc**
 
 Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
 
 **NOTE:** Currently only supports _64-bit_ architechtures
 
 ```bash
-$ ipsw macho /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
+❯ ipsw macho info /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
 ```
 
 ```m
@@ -541,12 +710,45 @@ Objective-C
 0x00000032caf: isEqual:
 ```
 
-### **macho --fileset-entry**
+### **macho info --fixups**
+
+Print fixup chains
+
+```bash
+❯ ipsw macho info /Volumes/Sky19A344.N104N841OS/bin/ps --fixups
+
+__DATA_CONST.__auth_got
+0x100008000:  raw: 0xc009000000000000      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 000)       libSystem.B.dylib/___error
+0x100008008:  raw: 0xc009000000000001      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 001)       libSystem.B.dylib/___stack_chk_fail
+0x100008010:  raw: 0xc009000000000002      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 002)       libSystem.B.dylib/___strlcat_chk
+0x100008018:  raw: 0xc009000000000003      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 003)       libSystem.B.dylib/___strlcpy_chk
+0x100008020:  raw: 0xc009000000000004      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 004)       libSystem.B.dylib/_access
+0x100008028:  raw: 0xc009000000000005      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 005)       libSystem.B.dylib/_asprintf
+0x100008030:  raw: 0xc009000000000006      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 006)       libSystem.B.dylib/_atoi
+0x100008038:  raw: 0xc009000000000007      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 007)       libSystem.B.dylib/_bsearch
+0x100008040:  raw: 0xc009000000000008      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 008)       libSystem.B.dylib/_calloc
+0x100008048:  raw: 0xc009000000000009      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 009)       libSystem.B.dylib/_compat_mode
+0x100008050:  raw: 0xc00900000000000a      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 010)       libSystem.B.dylib/_devname
+0x100008058:  raw: 0xc00900000000000b      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 011)       libSystem.B.dylib/_err
+0x100008060:  raw: 0xc00900000000000c      auth-bind24: (next: 001, key: IA, addrDiv: 1, diversity: 0x0000, ordinal: 012)       libSystem.B.dylib/_errx
+<SNIP>
+__DATA_CONST.__got
+0x100008218:  raw: 0x4008000000000043    arm64e bind24: (next: 001, ordinal: 067, addend: 0)    libSystem.B.dylib/__DefaultRuneLocale
+0x100008220:  raw: 0x4008000000000044    arm64e bind24: (next: 001, ordinal: 068, addend: 0)    libSystem.B.dylib/___stack_chk_guard
+0x100008228:  raw: 0x4008000000000045    arm64e bind24: (next: 001, ordinal: 069, addend: 0)    libSystem.B.dylib/___stderrp
+0x100008230:  raw: 0x4008000000000046    arm64e bind24: (next: 001, ordinal: 070, addend: 0)    libSystem.B.dylib/___stdoutp
+0x100008238:  raw: 0x4008000000000047    arm64e bind24: (next: 001, ordinal: 071, addend: 0)    libSystem.B.dylib/_mach_task_self_
+0x100008240:  raw: 0x4008000000000048    arm64e bind24: (next: 001, ordinal: 072, addend: 0)    libSystem.B.dylib/_optarg
+0x100008248:  raw: 0x4008000000000049    arm64e bind24: (next: 001, ordinal: 073, addend: 0)    libSystem.B.dylib/_optind
+<SNIP>
+```
+
+### **macho info --fileset-entry**
 
 Analyze FileSet entry MachO
 
 ```bash
-$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
+❯ ipsw macho info Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry kernel
 
 Magic         = 64-bit MachO
 Type          = Exec
@@ -565,7 +767,7 @@ Flags         = NoUndefs, PIE, DylibInCache
 Extract a fileset entry to disk
 
 ```bash
-$ ipsw macho Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry
+❯ ipsw macho info Macmini9,1_J274AP_20E232/kernelcache.production --fileset-entry "com.apple.security.sandbox" --extract-fileset-entry
 
 Magic         = 64-bit MachO
 Type          = KextBundle
@@ -603,8 +805,84 @@ Flags         = NoUndefs, DyldLink, TwoLevel, DylibInCache
 ```
 
 ```bash
-$ ll
+❯ ll
 
 -rwxr-xr-x  1 blacktop    15M May  9 22:08 com.apple.security.sandbox
 -rw-r--r--  1 blacktop    96M Apr 29 21:56 kernelcache.production
+```
+
+### **macho disass**
+
+Disassemble ARMv9 binaries
+
+```bash
+❯ ipsw disass --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
+```
+
+```s
+0xfffffff007b7c05c:	pacibsp
+0xfffffff007b7c060:	stp		x24, x23, [sp, #-0x40]!
+0xfffffff007b7c064:	stp		x22, x21, [sp, #0x10]
+0xfffffff007b7c068:	stp		x20, x19, [sp, #0x20]
+0xfffffff007b7c06c:	stp		x29, x30, [sp, #0x30]
+0xfffffff007b7c070:	mov		x19, x3
+0xfffffff007b7c074:	mov		x20, x2
+0xfffffff007b7c078:	mov		x21, x1
+0xfffffff007b7c07c:	mov		x22, x0
+0xfffffff007b7c080:	sub		x23, x5, x4
+0xfffffff007b7c084:	mov		x0, x23
+0xfffffff007b7c088:	bl		#0xfffffff007b7c044
+0xfffffff007b7c08c:	mov		w8, #0x2f
+0xfffffff007b7c090:	sub		x8, x8, x22
+0xfffffff007b7c094:	add		x8, x8, x21
+0xfffffff007b7c098:	orr		x9, xzr, #0xaaaaaaaaaaaaaaaa
+0xfffffff007b7c09c:	movk		x9, #0xaaab
+0xfffffff007b7c0a0:	umulh		x9, x8, x9
+0xfffffff007b7c0a4:	lsr		x9, x9, #5
+0xfffffff007b7c0a8:	orr		w10, wzr, #0x30
+...
+```
+
+You can also dissassemble a function by name
+
+```bash
+❯ ipsw disass --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore
+```
+
+Make it pretty 💄🐷 using `--color` flag
+
+```bash
+❯ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed --color
+```
+
+```s
+func_fffffff007b44000:
+0xfffffff007b44000:  5f 24 03 d5        bti             c
+0xfffffff007b44004:  01 00 00 14        b               #0xfffffff007b44008
+
+func_fffffff007b44008:
+0xfffffff007b44008:  3f 05 40 f1        cmp             x9, #0x1, lsl #0xc
+0xfffffff007b4400c:  ea 03 00 91        mov             x10, sp
+0xfffffff007b44010:  c3 00 00 54        b.cc            #0xfffffff007b44028
+0xfffffff007b44014:  4a 05 40 d1        sub             x10, x10, #0x1, lsl #0xc
+0xfffffff007b44018:  5f 01 40 f9        ldr             xzr, [x10]
+0xfffffff007b4401c:  29 05 40 d1        sub             x9, x9, #0x1, lsl #0xc
+0xfffffff007b44020:  3f 05 40 f1        cmp             x9, #0x1, lsl #0xc
+0xfffffff007b44024:  88 ff ff 54        b.hi            #0xfffffff007b44014
+0xfffffff007b44028:  4a 01 09 cb        sub             x10, x10, x9
+0xfffffff007b4402c:  5f 01 40 f9        ldr             xzr, [x10]
+0xfffffff007b44030:  c0 03 5f d6        ret
+
+func_fffffff007b44034:
+0xfffffff007b44034:  20 50 8e d2        mov             x0, #0x7281
+0xfffffff007b44038:  c0 ec ad f2        movk            x0, #0x6f66, lsl #0x10
+0xfffffff007b4403c:  40 0e ce f2        movk            x0, #0x7072, lsl #0x20
+0xfffffff007b44040:  80 ed ff f2        movk            x0, #0xff6c, lsl #0x30
+0xfffffff007b44044:  c0 03 5f d6        ret
+```
+
+Demangle C++ names
+
+```bash
+❯ ipsw disass --demangle --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore --color
 ```
