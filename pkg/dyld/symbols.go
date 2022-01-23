@@ -16,6 +16,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 )
 
@@ -30,15 +31,62 @@ var ErrNoExportTrieInMachO = errors.New("dylib does NOT contain export trie info
 var ErrSymbolNotInExportTrie = errors.New("dylib does NOT contain symbolin export trie info")
 var ErrSymbolNotInImage = errors.New("dylib does NOT contain symbol")
 
+type symKind uint8
+
+const (
+	LOCAL symKind = iota
+	PUBLIC
+	EXPORT
+	SYMTAB
+	BIND
+)
+
+func (k symKind) String() string {
+	switch k {
+	case LOCAL:
+		return "local"
+	case PUBLIC:
+		return "public"
+	case EXPORT:
+		return "export"
+	case SYMTAB:
+		return "symtab"
+	case BIND:
+		return "bind"
+	default:
+		return "unknown"
+	}
+}
+
 type Symbol struct {
 	Name    string `json:"name,omitempty"`
 	Image   string `json:"image,omitempty"`
 	Type    string `json:"type,omitempty"`
 	Address uint64 `json:"address,omitempty"`
+	Kind    symKind
 }
 
-func (s Symbol) String() string {
-	return fmt.Sprintf("%#09x:\t(%s)\t%s\t%s", s.Address, s.Type, s.Name, s.Image)
+var symAddrColor = color.New(color.Bold, color.FgMagenta).SprintfFunc()
+var symTypeColor = color.New(color.FgCyan).SprintfFunc()
+var symNameColor = color.New(color.Bold).SprintFunc()
+var symImageColor = color.New(color.Faint, color.FgHiWhite).SprintfFunc()
+
+func (s Symbol) String(color bool) string {
+	if color {
+		if s.Address > 0 {
+			return fmt.Sprintf("%s:\t%s\t%s\t%s",
+				symAddrColor("%#09x", s.Address),
+				symTypeColor("(%s|%s)", s.Kind, s.Type),
+				symNameColor(s.Name),
+				symImageColor(filepath.Base(s.Image)))
+		}
+		return fmt.Sprintf("%s:\t%s\t%s\t%s",
+			symImageColor("%#09x", s.Address),
+			symTypeColor("(%s|%s)", s.Kind, s.Type),
+			symNameColor(s.Name),
+			symImageColor(filepath.Base(s.Image)))
+	}
+	return fmt.Sprintf("%#09x:\t(%s|%s)\t%s\t%s", s.Address, s.Kind, s.Type, s.Name, filepath.Base(s.Image))
 }
 
 // ParseLocalSyms parses dyld's private symbols
@@ -195,6 +243,7 @@ func (f *File) GetSymbol(name string) (*Symbol, error) {
 				Address: lsym.Value,
 				Type:    lsym.Type.String(sec),
 				Image:   image.Name,
+				Kind:    LOCAL,
 			}, nil
 		}
 		if sym, err := image.GetPublicSymbol(name); err != nil {
