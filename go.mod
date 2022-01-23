@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.2
 	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0
-	github.com/apex/log v1.9.0x
+	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.51
 	github.com/blacktop/go-macho v1.1.87
 	github.com/blacktop/go-plist v1.0.1
@@ -29,7 +29,7 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/ulikunitz/xz v0.5.10
 	github.com/unicorn-engine/unicorn v0.0.0-20220105210059-c671efe79899
-	github.com/vbauerster/mpb/v7 v7.3.1
+	github.com/vbauerster/mpb/v7 v7.3.2
 	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 	golang.org/x/net v0.0.0-20220121210141-e204ce36a2ba
 	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
