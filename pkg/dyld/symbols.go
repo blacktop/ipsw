@@ -59,11 +59,11 @@ func (k symKind) String() string {
 }
 
 type Symbol struct {
-	Name    string `json:"name,omitempty"`
-	Image   string `json:"image,omitempty"`
-	Type    string `json:"type,omitempty"`
-	Address uint64 `json:"address,omitempty"`
-	Kind    symKind
+	Name    string  `json:"name,omitempty"`
+	Image   string  `json:"image,omitempty"`
+	Type    string  `json:"type,omitempty"`
+	Address uint64  `json:"address,omitempty"`
+	Kind    symKind `json:"-"`
 }
 
 var symAddrColor = color.New(color.Bold, color.FgMagenta).SprintfFunc()
