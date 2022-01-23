@@ -121,7 +121,7 @@ var splitCmd = &cobra.Command{
 
 					i.ParseLocalSymbols(false)
 
-					if err := m.Export(fname, nil, m.GetBaseAddress(), i.GetLocalSymbols()); err != nil {
+					if err := m.Export(fname, nil, m.GetBaseAddress(), i.GetLocalSymbolsAsMachoSymbols()); err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
 					}
 
