@@ -150,15 +150,23 @@ var dyldDisassCmd = &cobra.Command{
 			}
 		}
 
+		if len(imageName) > 0 {
+			image, err = f.Image(imageName)
+			if err != nil {
+				return err
+			}
+		}
+
 		if len(symbolName) > 0 {
 			log.Info("Locating symbol: " + symbolName)
 			if len(imageName) > 0 {
-				startAddr, image, err = f.GetSymbolAddress(symbolName, imageName)
+				sym, err := image.GetSymbol(symbolName)
 				if err != nil {
 					return err
 				}
+				startAddr = sym.Address
 			} else {
-				startAddr, image, err = f.GetSymbolAddress(symbolName, "")
+				startAddr, image, err = f.GetSymbolAddress(symbolName)
 				if err != nil {
 					return err
 				}
@@ -166,11 +174,6 @@ var dyldDisassCmd = &cobra.Command{
 			log.Infof("Found symbol in %s", filepath.Base(image.Name))
 		} else {
 			if len(imageName) > 0 { // ALL funcs in an image
-				image, err = f.Image(imageName)
-				if err != nil {
-					return fmt.Errorf("image not in %s: %v", dscPath, err)
-				}
-
 				m, err := image.GetMacho()
 				if err != nil {
 					return err
