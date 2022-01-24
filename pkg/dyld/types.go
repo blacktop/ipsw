@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/bits"
+	"path/filepath"
 	"strings"
 
 	"github.com/blacktop/go-macho"
@@ -506,19 +507,27 @@ type CacheLocalSymbol64 struct {
 	Macho        *macho.File
 }
 
-func (s CacheLocalSymbol64) String() string {
+func (s CacheLocalSymbol64) String(color bool) string {
 	var sec string
 	var found string
+	if s.Macho != nil {
+		if s.Sect > 0 && s.Macho.Sections != nil {
+			sec = fmt.Sprintf("%s.%s", s.Macho.Sections[s.Sect-1].Seg, s.Macho.Sections[s.Sect-1].Name)
+		}
+	}
 	if len(s.FoundInDylib) > 0 {
-		found = fmt.Sprintf("\t%s", s.FoundInDylib)
-
+		found = fmt.Sprintf("\t%s", filepath.Base(s.FoundInDylib))
+	}
+	if color {
+		return fmt.Sprintf("%s:\t%s\t%s\t%s",
+			symAddrColor("%#09x", s.Value),
+			symTypeColor("(%s)", s.Type.String(sec)),
+			symNameColor(s.Name),
+			symImageColor(found))
 	}
 	// if s.Nlist64.Desc.GetLibraryOrdinal() != 0 { // TODO: I haven't seen this trigger in the iPhone14,2_D63AP_19D5026g/dyld_shared_cache_arm64e I tested
 	// 	return fmt.Sprintf("%#09x:\t(%s|%s)\t%s%s", s.Value, s.Type.String(sec), s.Macho.LibraryOrdinalName(int(s.Nlist64.Desc.GetLibraryOrdinal())), s.Name, found)
 	// }
-	if s.Sect > 0 && s.Macho.Sections != nil {
-		sec = fmt.Sprintf("%s.%s", s.Macho.Sections[s.Sect-1].Seg, s.Macho.Sections[s.Sect-1].Name)
-	}
 	return fmt.Sprintf("%#09x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
 }
 
