@@ -63,6 +63,7 @@ type Symbol struct {
 	Image   string  `json:"image,omitempty"`
 	Type    string  `json:"type,omitempty"`
 	Address uint64  `json:"address,omitempty"`
+	Regex   string  `json:"regex,omitempty"`
 	Kind    symKind `json:"-"`
 }
 

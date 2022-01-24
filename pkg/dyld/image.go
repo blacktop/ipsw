@@ -722,11 +722,11 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					if err != nil {
 						return err
 					}
-					fmt.Fprintf(w, "%s\n", &CacheLocalSymbol64{
+					fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
 						Name:    s,
 						Nlist64: nlist,
 						Macho:   m,
-					})
+					}.String(true))
 				}
 			}
 
