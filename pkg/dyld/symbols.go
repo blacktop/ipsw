@@ -218,8 +218,10 @@ func (f *File) GetSymbolAddress(name string) (uint64, *CacheImage, error) {
 		if lsym, err := image.GetLocalSymbol(name); err == nil {
 			return lsym.Value, image, nil
 		}
-		if sym, err := image.GetPublicSymbol(name); err != nil {
-			return sym.Address, image, nil
+		if sym, err := image.GetPublicSymbol(name); err == nil {
+			if sym.Address > 0 {
+				return sym.Address, image, nil
+			}
 		}
 	}
 
@@ -279,10 +281,8 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
 		log.Info("parsing public symbols...")
 		if err := f.ParsePublicSymbols(false); err != nil {
-			// return err
 			utils.Indent(log.Warn, 2)(fmt.Sprintf("failed to parse all exported symbols: %v", err))
 		}
-
 		log.Info("parsing private symbols...")
 		if err = f.ParseLocalSyms(false); err != nil {
 			if errors.Is(err, ErrNoLocals) {
@@ -290,11 +290,6 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 			} else {
 				return err
 			}
-		}
-
-		log.Info("parsing objc symbols...")
-		if err := f.ParseAllObjc(); err != nil {
-			return err
 		}
 
 		if err := f.SaveAddrToSymMap(cacheFile); err != nil {

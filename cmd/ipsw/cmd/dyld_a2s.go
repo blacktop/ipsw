@@ -209,13 +209,6 @@ var a2sCmd = &cobra.Command{
 			return err
 		}
 
-		if m.HasObjC() {
-			log.Debug("Parsing ObjC runtime structures...")
-			if err := f.ParseObjcForImage(image.Name); err != nil {
-				return fmt.Errorf("failed to parse objc data for image %s: %v", image.Name, err)
-			}
-		}
-
 		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 			if secondAttempt {
 				symName = "_ptr." + symName
