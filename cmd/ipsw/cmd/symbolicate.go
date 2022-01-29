@@ -25,14 +25,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/crashlog"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +38,8 @@ func init() {
 	rootCmd.AddCommand(symbolicateCmd)
 
 	symbolicateCmd.Flags().BoolP("unslide", "u", false, "Unslide the crashlog for easier static analysis")
-	symbolicateCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
+	symbolicateCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	// symbolicateCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	symbolicateCmd.MarkZshCompPositionalArgumentFile(2, "dyld_shared_cache*")
 }
 
@@ -48,7 +47,7 @@ func init() {
 
 // symbolicateCmd represents the symbolicate command
 var symbolicateCmd = &cobra.Command{
-	Use:   "symbolicate [options] <crashlog> <dyld_shared_cache>",
+	Use:   "symbolicate <crashlog> <dyld_shared_cache>",
 	Short: "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -58,6 +57,8 @@ var symbolicateCmd = &cobra.Command{
 		}
 
 		unslide, _ := cmd.Flags().GetBool("unslide")
+		// cacheFile, _ := cmd.Flags().GetString("cache")
+		demangleFlag, _ := cmd.Flags().GetBool("demangle")
 
 		crashLog, err := crashlog.Open(args[0])
 		if err != nil {
@@ -77,7 +78,7 @@ var symbolicateCmd = &cobra.Command{
 			if fileInfo.Mode()&os.ModeSymlink != 0 {
 				symlinkPath, err := os.Readlink(dscPath)
 				if err != nil {
-					return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+					return fmt.Errorf("failed to read symlink %s: %v", dscPath, err)
 				}
 				// TODO: this seems like it would break
 				linkParent := filepath.Dir(dscPath)
@@ -92,67 +93,25 @@ var symbolicateCmd = &cobra.Command{
 			}
 			defer f.Close()
 
-			// Load all symbols
-			// if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-			// 	log.Info("Generating dyld_shared_cache companion symbol map file...")
-
-			// 	// utils.Indent(log.Warn, 2)("parsing public symbols...")
-			// 	// err = f.GetAllExportedSymbols(false)
-			// 	// if err != nil {
-			// 	// 	return err
-			// 	// }
-			// 	utils.Indent(log.Warn, 2)("parsing private symbols...")
-			// 	err = f.ParseLocalSyms()
-			// 	if err != nil {
-			// 		utils.Indent(log.Warn, 2)(err.Error())
-			// 		utils.Indent(log.Warn, 2)("parsing patch exports...")
-			// 		for _, img := range f.Images {
-			// 			for _, patch := range img.PatchableExports {
-			// 				addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
-			// 				if err != nil {
-			// 					return err
-			// 				}
-			// 				f.AddressToSymbol[addr] = patch.Name
-			// 			}
-			// 		}
-			// 	}
-			// 	// cache all sels
-			// f.GetAllSelectors(false)
-			// f.GetAllClasses(false)
-			// f.GetAllProtocols(false)
-			// 	// save lookup map to disk to speed up subsequent requests
-			// 	err = f.SaveAddrToSymMap(dscPath + ".a2s")
-			// 	if err != nil {
-			// 		return err
-			// 	}
-
-			// } else {
-			// 	log.Info("Found dyld_shared_cache companion symbol map file...")
-			// 	a2sFile, err := os.Open(dscPath + ".a2s")
-			// 	if err != nil {
-			// 		return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
-			// 	}
-
-			// 	gzr, err := gzip.NewReader(a2sFile)
-			// 	if err != nil {
-			// 		return fmt.Errorf("failed to create gzip reader: %v", err)
-			// 	}
-
-			// 	// Decoding the serialized data
-			// 	err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
-			// 	if err != nil {
-			// 		return fmt.Errorf("failed to decode addr2sym map; %v", err)
-			// 	}
-			// 	gzr.Close()
-			// 	a2sFile.Close()
+			// if len(cacheFile) == 0 {
+			// 	cacheFile = dscPath + ".a2s"
+			// }
+			// if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+			// 	return err
 			// }
 
 			// Symbolicate the crashing thread's backtrace
 			for idx, bt := range crashLog.Threads[crashLog.CrashedThread].BackTrace {
+				image, err := f.Image(bt.Image.Name)
+				if err != nil {
+					log.Errorf(err.Error())
+					crashLog.Threads[crashLog.CrashedThread].BackTrace[idx].Symbol = "?"
+					continue
+				}
 				// calculate slide
-				image := f.Image(bt.Image.Name)
 				bt.Image.Slide = bt.Image.Start - image.CacheImageTextInfo.LoadAddress
 				unslidAddr := bt.Address - bt.Image.Slide
+
 				m, err := image.GetMacho()
 				if err != nil {
 					return err
@@ -178,49 +137,17 @@ var symbolicateCmd = &cobra.Command{
 					}
 				}
 
-				if m.HasObjC() {
-					err = f.CFStringsForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc cfstrings")
-					}
-					err = f.MethodsForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc methods")
-					}
-					if strings.Contains(image.Name, "libobjc.A.dylib") {
-						_, err = f.GetAllSelectors(false)
-					} else {
-						err = f.SelectorsForImage(image.Name)
-					}
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc selectors")
-					}
-					err = f.ClassesForImage(image.Name)
-					if err != nil {
-						return errors.Wrapf(err, "failed to parse objc classes")
-					}
+				if err := image.Analyze(); err != nil {
+					return fmt.Errorf("failed to analyze image %s; %v", image.Name, err)
 				}
 
 				for _, patch := range image.PatchableExports {
-					addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
+					addr, err := image.GetVMAddress(uint64(patch.OffsetOfImpl))
 					if err != nil {
 						return err
 					}
 					f.AddressToSymbol[addr] = patch.Name
 				}
-
-				// Load all symbol
-				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
-					log.Error("failed to parse exported symbols")
-				}
-
-				if err := f.GetLocalSymbolsForImage(image); err != nil {
-					log.Error("failed to parse local symbols")
-				}
-
-				// if err := f.AnalyzeImage(image); err != nil {
-				// 	return fmt.Errorf("failed to analyze image %s; %v", image.Name, err)
-				// }
 
 				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 					if demangleFlag {

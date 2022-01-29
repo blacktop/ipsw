@@ -2,6 +2,7 @@ package dyld
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -18,16 +19,38 @@ import (
 type optFlags uint32
 
 const (
-	isProduction              optFlags = (1 << 0) // never set in development cache
-	noMissingWeakSuperclasses optFlags = (1 << 1) // never set in development cache
+	isProduction              optFlags = (1 << 0)      // never set in development cache
+	noMissingWeakSuperclasses optFlags = (1 << 1)      // never set in development cache
+	mask                      uint64   = (1 << 40) - 1 // 40bit mask
 )
 
 // objcInfo is the dyld_shared_cache dylib objc object
 type objcInfo struct {
 	Methods   []objc.Method
 	ClassRefs map[uint64]*objc.Class
+	SuperRefs map[uint64]*objc.Class
 	SelRefs   map[uint64]*objc.Selector
+	ProtoRefs map[uint64]*objc.Protocol
 	CFStrings []objc.CFString
+}
+
+type ObjcClassheaderT struct {
+	ClsOffset int32
+	HiOffset  int32
+}
+
+type ClassHeaderV16T uint64
+
+func (h ClassHeaderV16T) IsDuplicate() bool {
+	return types.ExtractBits(uint64(h), 0, 1) == 1
+}
+
+// ObjectCacheOffset returns offset from the shared cache base
+func (h ClassHeaderV16T) ObjectCacheOffset() uint64 {
+	return types.ExtractBits(uint64(h), 1, 47)
+}
+func (h ClassHeaderV16T) DylibObjCIndex() uint16 {
+	return uint16(types.ExtractBits(uint64(h), 48, 16))
 }
 
 /*
@@ -38,44 +61,74 @@ type objcInfo struct {
 
 // Optimization structure
 type Optimization struct {
-	Version                 uint32
-	Flags                   optFlags
-	SelectorOptOffset       int32
-	HeaderOptRoOffset       int32
-	ClassOptOffset          int32
-	UnusedProtocolOptOffset int32
-	HeaderOptRwOffset       int32
-	ProtocolOptOffset       int32
+	Version                                      uint32
+	Flags                                        optFlags
+	SelectorOptOffset                            int32
+	HeaderOptRoOffset                            int32
+	UnusedClassOptOffset                         int32
+	UnusedProtocolOptOffset                      int32
+	HeaderoptRwOffset                            int32
+	UnusedProtocolOpt2Offset                     int32
+	LargeSharedCachesClassOffset                 int32
+	LargeSharedCachesProtocolOffset              int32
+	RelativeMethodSelectorBaseAddressCacheOffset uint64
 }
 
 func (o Optimization) isPointerAligned() bool {
 	return (binary.Size(o) % 8) == 0
 }
 
+func (o Optimization) GetClassOffset() int32 {
+	if o.Version >= 16 {
+		return o.LargeSharedCachesClassOffset
+	} else {
+		return o.UnusedClassOptOffset
+	}
+}
+
+func (o Optimization) GetProtocolOffset() int32 {
+	if o.Version >= 16 {
+		return o.LargeSharedCachesProtocolOffset
+	} else if o.Version >= 15 {
+		return o.UnusedProtocolOpt2Offset
+	} else {
+		return o.UnusedProtocolOptOffset
+	}
+}
+
 func (o Optimization) String() string {
 	return fmt.Sprintf(
-		"Version                 = %d\n"+
-			"Flags                   = %d\n"+
-			"SelectorOptOffset       = %016X\n"+
-			"HeaderOptRoOffset       = %016X\n"+
-			"ClassOptOffset          = %016X\n"+
-			"UnusedProtocolOptOffset = %016X\n"+
-			"HeaderOptRwOffset       = %016X\n"+
-			"ProtocolOptOffset       = %016X\n"+
-			"isPointerAligned        = %t\n",
+		"Version                                      = %d\n"+
+			"Flags                                        = %d\n"+
+			"SelectorOptOffset                            = %#x\n"+
+			"HeaderOptRoOffset                            = %#x\n"+
+			"ClassOptOffset                               = %#x\n"+
+			"ProtocolOptOffset                            = %#x\n"+
+			"HeaderOptRwOffset                            = %#x\n"+
+			"ProtocolOpt2Offset                           = %#x\n"+
+			"LargeSharedCachesClassOffset                 = %#x\n"+
+			"LargeSharedCachesProtocolOffset              = %#x\n"+
+			"RelativeMethodSelectorBaseAddressCacheOffset = %#x\n"+
+			"isPointerAligned                             = %t\n",
 		o.Version,
 		o.Flags,
 		o.SelectorOptOffset,
 		o.HeaderOptRoOffset,
-		o.ClassOptOffset,
+		o.UnusedClassOptOffset,
 		o.UnusedProtocolOptOffset,
-		o.HeaderOptRwOffset,
-		o.ProtocolOptOffset,
+		o.HeaderoptRwOffset,
+		o.UnusedProtocolOpt2Offset,
+		o.LargeSharedCachesClassOffset,
+		o.LargeSharedCachesProtocolOffset,
+		o.RelativeMethodSelectorBaseAddressCacheOffset,
 		o.isPointerAligned())
 }
 
 func (f *File) getLibObjC() (*macho.File, error) {
-	image := f.Image("/usr/lib/libobjc.A.dylib")
+	image, err := f.Image("/usr/lib/libobjc.A.dylib")
+	if err != nil {
+		return nil, err
+	}
 
 	m, err := image.GetPartialMacho()
 	if err != nil {
@@ -93,16 +146,18 @@ func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
 	}
 
 	if s := libObjC.Section("__TEXT", "__objc_opt_ro"); s != nil {
-		r := io.NewSectionReader(f.r, int64(s.Offset), int64(s.Size))
-
+		dat, err := s.Data()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to read __TEXT.__objc_opt_ro data")
+		}
 		opt := Optimization{}
-		if err := binary.Read(r, f.ByteOrder, &opt); err != nil {
+		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &opt); err != nil {
 			return nil, nil, err
 		}
-		if opt.Version != 15 {
-			return nil, nil, fmt.Errorf("objc optimization version should be 15, but found %d", opt.Version)
+		if opt.Version > 16 {
+			return nil, nil, fmt.Errorf("objc optimization version should be 16 or less, but found %d", opt.Version)
 		}
-
+		// log.Debugf("Objective-C Optimizations:\n%s", opt)
 		return s, &opt, nil
 	}
 
@@ -120,9 +175,9 @@ func (f *File) getSelectorStringHash() (*StringHash, error) {
 		return nil, fmt.Errorf("selopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.SelectorOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.SelectorOptOffset), opt: opt}
 
-	if err = shash.Read(io.NewSectionReader(f.r, 0, 1<<63-1)); err != nil {
+	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +197,7 @@ func (f *File) getSelectorStringHash() (*StringHash, error) {
 
 // 	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.HeaderOptRoOffset)}
 
-// 	if err = shash.Read(io.NewSectionReader(f.r, 0, 1<<63-1)); err != nil {
+// 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 // 		return nil, err
 // 	}
 
@@ -156,13 +211,13 @@ func (f *File) getClassStringHash() (*StringHash, error) {
 		return nil, err
 	}
 
-	if opt.ClassOptOffset == 0 {
+	if opt.GetClassOffset() == 0 {
 		return nil, fmt.Errorf("clsopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.ClassOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.GetClassOffset()), opt: opt}
 
-	if err = shash.Read(io.NewSectionReader(f.r, 0, 1<<63-1)); err != nil {
+	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
 	}
 
@@ -176,33 +231,13 @@ func (f *File) getProtocolStringHash() (*StringHash, error) {
 		return nil, err
 	}
 
-	if opt.UnusedProtocolOptOffset == 0 {
-		return nil, fmt.Errorf("unused_protocolopt_offset (old protocolopt_offset) is 0")
-	}
-
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.UnusedProtocolOptOffset)}
-
-	if err = shash.Read(io.NewSectionReader(f.r, 0, 1<<63-1)); err != nil {
-		return nil, err
-	}
-
-	return &shash, nil
-}
-
-func (f *File) getProtocol2StringHash() (*StringHash, error) {
-
-	sec, opt, err := f.getOptimizations()
-	if err != nil {
-		return nil, err
-	}
-
-	if opt.ProtocolOptOffset == 0 {
+	if opt.GetProtocolOffset() == 0 {
 		return nil, fmt.Errorf("protocolopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.ProtocolOptOffset)}
+	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.GetProtocolOffset()), opt: opt}
 
-	if err = shash.Read(io.NewSectionReader(f.r, 0, 1<<63-1)); err != nil {
+	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 		return nil, err
 	}
 
@@ -222,7 +257,7 @@ func (f *File) getProtocol2StringHash() (*StringHash, error) {
 
 // 	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.HeaderOptRwOffset)}
 
-// 	if err = shash.Read(io.NewSectionReader(f.r, 0, 1<<63-1)); err != nil {
+// 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
 // 		return nil, err
 // 	}
 
@@ -231,15 +266,15 @@ func (f *File) getProtocol2StringHash() (*StringHash, error) {
 
 func (f *File) dumpOffsets(offsets []int32, fileOffset int64) {
 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
 	for _, ptr := range offsets {
 		if ptr != 0 {
 			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
+				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
 			}
-			addr, _ := f.GetVMAddress(uint64(int32(fileOffset) + ptr))
+			addr, _ := f.GetVMAddressForUUID(f.UUID, uint64(int32(fileOffset)+ptr))
 			fmt.Printf("    0x%x: %s\n", addr, strings.Trim(s, "\x00"))
 		}
 
@@ -288,7 +323,7 @@ type header_info_rw struct {
 
 // func (f *File) dumpHeaderROOffsets(offsets []int32, fileOffset int64) {
 // 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
-// 	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+// 	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
 // 	for _, ptr := range offsets {
 // 		if ptr != 0 {
 // 			// sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
@@ -312,7 +347,7 @@ type header_info_rw struct {
 // 				log.Errorf("failed to read objc_headeropt_ro_t: %v", err)
 // 			}
 
-// 			addr, _ := f.GetVMAddress(uint64(int32(fileOffset) + ptr))
+// 			addr, _ := f.GetVMAddressForUUID(f.UUID,uint64(int32(fileOffset) + ptr))
 // 			fmt.Printf("    0x%x: %#v\n", addr, opt)
 // 		}
 
@@ -323,15 +358,15 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 	objcMap := make(map[string]uint64)
 
 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
+	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
 	for _, ptr := range offsets {
 		if ptr != 0 {
 			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Error(errors.Wrapf(err, "failed to read selector name at: %d", int32(fileOffset)+ptr).Error())
+				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
 			}
-			addr, _ := f.GetVMAddress(uint64(int32(fileOffset) + ptr))
+			addr, _ := f.GetVMAddressForUUID(f.UUID, uint64(int32(fileOffset)+ptr))
 			objcMap[strings.Trim(s, "\x00")] = addr
 
 			f.AddressToSymbol[addr] = strings.Trim(s, "\x00")
@@ -344,11 +379,11 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 // GetAllSelectors is a dumb brute force way to get all the ObjC selector/class etc address
 // by just dumping all the strings in the __OBJC_RO segment
 // returns: map[sym]addr
-func (f *File) GetAllSelectors(print bool) (map[string]uint64, error) {
+func (f *File) GetAllObjCSelectors(print bool) (map[string]uint64, error) {
 
 	shash, err := f.getSelectorStringHash()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed read selector objc_stringhash_t")
+		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	if print {
@@ -362,15 +397,15 @@ func (f *File) GetAllSelectors(print bool) (map[string]uint64, error) {
 func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 	shash, err := f.getSelectorStringHash()
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get selector objc_stringhash_t for %s", selector)
+		return 0, fmt.Errorf("failed get selector objc_stringhash_t for %s: %v", selector, err)
 	}
 
 	selIndex, err := shash.getIndex(selector)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get selector address for %s", selector)
+		return 0, fmt.Errorf("failed get selector address for %s", selector)
 	}
 
-	ptr, err := f.GetVMAddress(uint64(shash.FileOffset + int64(shash.Offsets[selIndex])))
+	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
 	if err != nil {
 		return 0, fmt.Errorf("failed get selector address for %s: %w", selector, err)
 	}
@@ -379,10 +414,10 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 }
 
 // GetAllClasses dumps the classes from the optimized string hash
-func (f *File) GetAllClasses(print bool) (map[string]uint64, error) {
+func (f *File) GetAllObjCClasses(print bool) (map[string]uint64, error) {
 	shash, err := f.getClassStringHash()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed read class objc_stringhash_t")
+		return nil, fmt.Errorf("failed read class objc_stringhash_t")
 	}
 
 	if print {
@@ -396,15 +431,15 @@ func (f *File) GetAllClasses(print bool) (map[string]uint64, error) {
 func (f *File) GetClassAddress(class string) (uint64, error) {
 	shash, err := f.getClassStringHash()
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed read class objc_stringhash_t for %s", class)
+		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	selIndex, err := shash.getIndex(class)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get class address for %s", class)
+		return 0, fmt.Errorf("failed get class address for %s: %v", class, err)
 	}
 
-	ptr, err := f.GetVMAddress(uint64(shash.FileOffset + int64(shash.Offsets[selIndex])))
+	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
 	if err != nil {
 		return 0, fmt.Errorf("failed get class address for %s: %w", class, err)
 	}
@@ -413,13 +448,10 @@ func (f *File) GetClassAddress(class string) (uint64, error) {
 }
 
 // GetAllProtocols dumps the protols from the optimized string hash
-func (f *File) GetAllProtocols(print bool) (map[string]uint64, error) {
+func (f *File) GetAllObjCProtocols(print bool) (map[string]uint64, error) {
 	shash, err := f.getProtocolStringHash()
 	if err != nil {
-		shash, err = f.getProtocol2StringHash()
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed read selector objc_stringhash_t")
-		}
+		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	if print {
@@ -433,18 +465,15 @@ func (f *File) GetAllProtocols(print bool) (map[string]uint64, error) {
 func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
 	shash, err := f.getProtocolStringHash()
 	if err != nil {
-		shash, err = f.getProtocol2StringHash()
-		if err != nil {
-			return 0, errors.Wrapf(err, "failed read selector objc_stringhash_t")
-		}
+		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	selIndex, err := shash.getIndex(protocol)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed get protocol address for %s", protocol)
+		return 0, fmt.Errorf("failed get protocol address for %s: %v", protocol, err)
 	}
 
-	ptr, err := f.GetVMAddress(uint64(shash.FileOffset + int64(shash.Offsets[selIndex])))
+	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
 	if err != nil {
 		return 0, fmt.Errorf("failed get protocol address for %s: %w", protocol, err)
 	}
@@ -484,60 +513,97 @@ func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
 
 // ClassesForImage returns all of the Objective-C classes for a given image
 func (f *File) ClassesForImage(imageNames ...string) error {
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
 	}
-	// fmt.Println("Objective-C Classes:")
+
 	for _, image := range images {
-		// fmt.Println(image.Name)
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
-		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
-		for _, secName := range []string{"__objc_classrefs", "__objc_superrefs"} {
-			sec := m.Section("__DATA", secName)
-			if sec != nil {
-				r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
-				classPtrs := make([]uint64, sec.Size/8)
-				if err := binary.Read(r, f.ByteOrder, &classPtrs); err != nil {
-					return err
-				}
-				for idx, ptr := range classPtrs {
-					classPtrs[idx] = ptr & mask // TODO use chain fixups
-				}
+		image.ObjC.ClassRefs, err = m.GetObjCClassReferences()
+		if err != nil {
+			return err
+		}
 
-				for idx, ptr := range classPtrs {
-					c, err := f.GetObjCClass(ptr)
-					if err != nil {
-						return err
+		for ptr, class := range image.ObjC.ClassRefs {
+			if len(class.Name) > 0 {
+				f.AddressToSymbol[class.ClassPtr] = fmt.Sprintf("class_%s", class.Name)
+				if sym, ok := f.AddressToSymbol[ptr]; ok {
+					if len(sym) < len(class.Name) {
+						f.AddressToSymbol[ptr] = class.Name
 					}
-
-					image.ObjC.ClassRefs[ptr] = c
-
-					if len(image.ObjC.ClassRefs[ptr].Name) > 0 {
-						f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("class_%s", image.ObjC.ClassRefs[ptr].Name)
-						if sym, ok := f.AddressToSymbol[ptr]; ok {
-							if len(sym) < len(image.ObjC.ClassRefs[ptr].Name) {
-								f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
-							}
-						} else {
-							f.AddressToSymbol[ptr] = image.ObjC.ClassRefs[ptr].Name
-						}
-					}
+				} else {
+					f.AddressToSymbol[ptr] = class.Name
 				}
 			}
 		}
 
-		m.Close()
+		image.ObjC.SuperRefs, err = m.GetObjCSuperReferences()
+		if err != nil {
+			return err
+		}
+
+		for ptr, class := range image.ObjC.SuperRefs {
+			if len(class.Name) > 0 {
+				f.AddressToSymbol[class.ClassPtr] = fmt.Sprintf("class_%s", class.Name)
+				if sym, ok := f.AddressToSymbol[ptr]; ok {
+					if len(sym) < len(class.Name) {
+						f.AddressToSymbol[ptr] = class.Name
+					}
+				} else {
+					f.AddressToSymbol[ptr] = class.Name
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// ProtocolsForImage returns all of the Objective-C protocols for a given image
+func (f *File) ProtocolsForImage(imageNames ...string) error {
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
+		}
+	} else {
+		images = f.Images
+	}
+
+	for _, image := range images {
+		m, err := image.GetPartialMacho()
+		if err != nil {
+			return fmt.Errorf("failed get image %s as MachO %v", image.Name, err)
+		}
+		image.ObjC.ProtoRefs, err = m.GetObjCProtoReferences()
+		if err != nil {
+			if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+				return fmt.Errorf("failed to get protocol references for image %s: %v", image.Name, err)
+			}
+		}
+		for k, v := range image.ObjC.ProtoRefs {
+			f.AddressToSymbol[v.Ptr] = v.Name
+			f.AddressToSymbol[k] = fmt.Sprintf("proto_%s", v.Name)
+		}
 	}
 
 	return nil
@@ -545,168 +611,94 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 
 // SelectorsForImage returns all of the Objective-C selectors for a given image
 func (f *File) SelectorsForImage(imageNames ...string) error {
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
-	var images []*CacheImage
 
-	libobjc, err := f.getLibObjC()
-	if err != nil {
-		return err
-	}
+	var images []*CacheImage
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
 	}
 
 	for _, image := range images {
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
+		}
+		defer m.Close()
+
+		image.ObjC.SelRefs, err = m.GetObjCSelectorReferences()
+		if err != nil {
+			return err
 		}
 
-		image.ObjC.SelRefs = make(map[uint64]*objc.Selector)
-
-		sec := m.Section("__DATA", "__objc_selrefs")
-		if sec != nil {
-			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
-			selectorPtrs := make([]uint64, sec.Size/8)
-			if err := binary.Read(r, f.ByteOrder, &selectorPtrs); err != nil {
-				return err
-			}
-			for idx, ptr := range selectorPtrs {
-				selectorPtrs[idx] = ptr & mask // TODO use chain fixups
-			}
-
-			objcRoSeg := libobjc.Segment("__OBJC_RO")
-			if objcRoSeg == nil {
-				fmt.Println("  - No selectors.")
-				return fmt.Errorf("segment __OBJC_RO does not exist")
-			}
-
-			sr := io.NewSectionReader(f.r, int64(objcRoSeg.Offset), int64(objcRoSeg.Filesz))
-
-			for idx, ptr := range selectorPtrs {
-				sr.Seek(int64(ptr-objcRoSeg.Addr), io.SeekStart)
-
-				s, err := bufio.NewReader(sr).ReadString('\x00')
-				if err != nil {
-					log.Error(errors.Wrapf(err, "failed to read selector name at: %d", ptr-objcRoSeg.Addr).Error())
-				}
-
-				image.ObjC.SelRefs[ptr] = &objc.Selector{
-					VMAddr: ptr - objcRoSeg.Addr,
-					Name:   strings.Trim(s, "\x00"),
-				}
-
-				if len(image.ObjC.SelRefs[ptr].Name) > 0 {
-					f.AddressToSymbol[sec.Addr+uint64(idx*8)] = fmt.Sprintf("sel_%s", image.ObjC.SelRefs[ptr].Name)
-					if sym, ok := f.AddressToSymbol[ptr]; ok {
-						if len(sym) < len(image.ObjC.SelRefs[ptr].Name) {
-							f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
-						}
-					} else {
-						f.AddressToSymbol[ptr] = image.ObjC.SelRefs[ptr].Name
+		for ptr, sel := range image.ObjC.SelRefs {
+			if len(sel.Name) > 0 {
+				f.AddressToSymbol[ptr] = fmt.Sprintf("sel_%s", sel.Name)
+				if sym, ok := f.AddressToSymbol[sel.VMAddr]; ok {
+					if len(sym) < len(sel.Name) {
+						f.AddressToSymbol[sel.VMAddr] = sel.Name
 					}
+				} else {
+					f.AddressToSymbol[sel.VMAddr] = sel.Name
 				}
 			}
 		}
-
-		m.Close()
 	}
 
 	return nil
+}
+
+// GetAllObjcMethods parses all the ObjC method lists in the cache dylibs
+func (f *File) GetAllObjcMethods() error {
+	return f.MethodsForImage()
 }
 
 // MethodsForImage returns all of the Objective-C methods for a given image
 func (f *File) MethodsForImage(imageNames ...string) error {
 
 	var images []*CacheImage
-	var methodList objc.MethodList
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
 	}
 
 	for _, image := range images {
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
-		if sec := m.Section("__TEXT", "__objc_methlist"); sec != nil {
-			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
-			for {
-				err := binary.Read(r, f.ByteOrder, &methodList)
+		image.ObjC.Methods, err = m.GetObjCMethodList()
+		if err != nil {
+			return fmt.Errorf("failed to get objc methods for %s: %v", image.Name, err)
+		}
 
-				currOffset, _ := r.Seek(0, io.SeekCurrent)
-				currOffset += int64(sec.Offset)
-				// currOffset += int64(sec.Offset) + int64(binary.Size(objc.MethodList{}))
-
-				if err == io.EOF {
-					break
-				}
-
-				if err != nil {
-					return fmt.Errorf("failed to read method_list_t: %v", err)
-				}
-
-				methods := make([]objc.MethodSmallT, methodList.Count)
-				if err := binary.Read(r, f.ByteOrder, &methods); err != nil {
-					return fmt.Errorf("failed to read method_t(s) (small): %v", err)
-				}
-
-				for _, method := range methods {
-					n, err := f.GetCStringAtOffset(uint64(method.NameOffset) + uint64(currOffset))
-					if err != nil {
-						return fmt.Errorf("failed to read cstring: %v", err)
+		for _, meth := range image.ObjC.Methods {
+			if len(meth.Name) > 0 {
+				if sym, ok := f.AddressToSymbol[meth.ImpVMAddr]; ok {
+					if len(sym) < len(meth.Name) {
+						f.AddressToSymbol[meth.ImpVMAddr] = meth.Name
 					}
-
-					t, err := f.GetCStringAtOffset(uint64(method.TypesOffset) + uint64(currOffset+4))
-					if err != nil {
-						return fmt.Errorf("failed to read cstring: %v", err)
-					}
-
-					impVMAddr, err := f.GetVMAddress(uint64(method.ImpOffset) + uint64(currOffset+8))
-					if err != nil {
-						return fmt.Errorf("failed to convert offset 0x%x to vmaddr; %v", method.ImpOffset, err)
-					}
-
-					currOffset += int64(methodList.EntSize())
-
-					image.ObjC.Methods = append(image.ObjC.Methods, objc.Method{
-						ImpVMAddr: impVMAddr,
-						Name:      n,
-						Types:     t,
-						Pointer: types.FilePointer{
-							VMAdder: impVMAddr,
-							Offset:  uint64(method.ImpOffset),
-						},
-					})
-					if len(n) > 0 {
-						if sym, ok := f.AddressToSymbol[impVMAddr]; ok {
-							if len(sym) < len(n) {
-								f.AddressToSymbol[impVMAddr] = n
-							}
-						} else {
-							f.AddressToSymbol[impVMAddr] = n
-						}
-					}
+				} else {
+					f.AddressToSymbol[meth.ImpVMAddr] = meth.Name
 				}
-
-				curr, _ := r.Seek(0, io.SeekCurrent)
-				align := types.RoundUp(uint64(curr), 8)
-				r.Seek(int64(align), io.SeekStart)
 			}
 		}
-
-		m.Close()
 	}
 
 	return nil
@@ -714,10 +706,19 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 // ImpCachesForImage dumps all of the Objective-C imp caches for a given image
 func (f *File) ImpCachesForImage(imageNames ...string) error {
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
+	var optOffsets objc.OptOffsets
+	// var optOffsets objc.OptOffsets2
 	var selectorStringVMAddrStart uint64
 	var selectorStringVMAddrEnd uint64
+
+	_, opt, err := f.getOptimizations()
+	if err != nil {
+		return err
+	}
+
+	if f.IsDyld4 || opt.Version >= 16 {
+		return fmt.Errorf("imp-cache dumping is NOT supported on macOS12/iOS15+ (yet)")
+	}
 
 	libObjC, err := f.getLibObjC()
 	if err != nil {
@@ -725,91 +726,92 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	}
 
 	if sec := libObjC.Section("__DATA_CONST", "__objc_scoffs"); sec != nil {
+		uuid, off, err := f.GetOffset(sec.Addr)
+		if err != nil {
+			return fmt.Errorf("failed to convert vmaddr: %v", err)
+		}
 
-		r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
+		dat := make([]byte, sec.Size)
+		if _, err := f.r[uuid].ReadAt(dat, int64(off)); err != nil {
+			return fmt.Errorf("failed to read %s.%s data: %v", sec.Seg, sec.Name, err)
+		}
 
-		scoffs := make([]uint64, int(sec.Size/8))
-		if err := binary.Read(r, f.ByteOrder, &scoffs); err != nil {
+		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &optOffsets); err != nil {
 			return err
 		}
-		selectorStringVMAddrStart = f.SlideInfo.SlidePointer(scoffs[0])
-		selectorStringVMAddrEnd = f.SlideInfo.SlidePointer(scoffs[1])
+
+		selectorStringVMAddrStart = f.SlideInfo.SlidePointer(optOffsets.MethodNameStart)
+		selectorStringVMAddrEnd = f.SlideInfo.SlidePointer(optOffsets.MethodNameEnd)
 		// inlinedSelectorsVMAddrStart = scoffs[2]
 		// inlinedSelectorsVMAddrEnd = scoffs[3]
 	} else {
 		return fmt.Errorf("unable to find __DATA_CONST.__objc_scoffs")
 	}
 
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
 	}
 
 	for _, image := range images {
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
-		image.ObjC.ClassRefs = make(map[uint64]*objc.Class)
+		image.ObjC.ClassRefs, err = m.GetObjCClassReferences()
+		if err != nil {
+			return err
+		}
 
-		sec := m.Section("__DATA", "__objc_classrefs")
-		if sec != nil {
-			r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
-			classPtrs := make([]uint64, sec.Size/8)
-			if err := binary.Read(r, f.ByteOrder, &classPtrs); err != nil {
-				return err
-			}
-			for idx, ptr := range classPtrs {
-				classPtrs[idx] = ptr & mask // TODO use chain fixups
-			}
+		for _, c := range image.ObjC.ClassRefs {
 
-			for _, ptr := range classPtrs {
-				c, err := f.GetObjCClass(ptr)
+			if f.SlideInfo.SlidePointer(c.MethodCacheProperties) > 0 {
+				uuid, off, err := f.GetOffset(c.MethodCacheProperties)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to convert vmaddr: %v", err)
 				}
 
-				if f.SlideInfo.SlidePointer(c.MethodCacheProperties) > 0 {
-					off, err := f.GetOffset(f.SlideInfo.SlidePointer(c.MethodCacheProperties))
-					if err != nil {
-						return fmt.Errorf("failed to convert vmaddr: %v", err)
-					}
+				sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
-					sr.Seek(int64(off), io.SeekStart)
+				sr.Seek(int64(off), io.SeekStart)
 
-					var impCache objc.ImpCache
-					if err := binary.Read(sr, f.ByteOrder, &impCache.PreoptCacheT); err != nil {
-						return fmt.Errorf("failed to read preopt_cache_t: %v", err)
-					}
+				var impCache objc.ImpCache
+				if err := binary.Read(sr, f.ByteOrder, &impCache.PreoptCacheT); err != nil {
+					return fmt.Errorf("failed to read preopt_cache_t: %v", err)
+				}
 
-					impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.CacheMask()+1)
-					if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
-						return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
-					}
+				impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.Capacity())
+				if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
+					return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
+				}
 
-					fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.CacheMask()+1)
+				fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.Capacity())
 
-					for _, bucket := range impCache.Entries {
+				for _, bucket := range impCache.Entries {
+					if bucket.SelOffset == 0xFFFFFFFF {
+						fmt.Printf("  - %#09x:\n", 0)
+					} else {
 						if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
 							sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
 							if err != nil {
-								return err
+								return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
 							}
-							fmt.Printf("  - %#09x: %s\n", c.ClassPtr.VMAdder-uint64(bucket.ImpOffset), sel)
-						} else {
-							fmt.Printf("  - %#09x:\n", 0)
-						}
+							fmt.Printf("  - %#09x: %s\n", c.ClassPtr-uint64(bucket.ImpOffset), sel)
+						} // TODO: handle the error case warn or crash?
 					}
-				} else {
-					fmt.Printf("%s: empty\n", c.Name)
 				}
+			} else {
+				fmt.Printf("%s: empty\n", c.Name)
 			}
 		}
 
@@ -821,58 +823,36 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 
 // CFStringsForImage returns all of the Objective-C cfstrings for a given image
 func (f *File) CFStringsForImage(imageNames ...string) error {
-	var mask uint64 = (1 << 40) - 1 // 40bit mask
 	var images []*CacheImage
 
 	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
 		for _, imageName := range imageNames {
-			images = append(images, f.Image(imageName))
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
 		}
 	} else {
 		images = f.Images
 	}
 
 	for _, image := range images {
-		m, err := image.GetPartialMacho()
+		m, err := image.GetMacho()
 		if err != nil {
-			return errors.Wrapf(err, "failed get image %s as MachO", image.Name)
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
-		for _, s := range m.Segments() {
-			if sec := m.Section(s.Name, "__cfstring"); sec != nil {
-				r := io.NewSectionReader(f.r, int64(sec.Offset), int64(sec.Size))
-				image.ObjC.CFStrings = make([]objc.CFString, int(sec.Size)/binary.Size(objc.CFString64T{}))
-				cfStrTypes := make([]objc.CFString64T, int(sec.Size)/binary.Size(objc.CFString64T{}))
+		image.ObjC.CFStrings, err = m.GetCFStrings()
+		if err != nil {
+			return err
+		}
 
-				if err := binary.Read(r, f.ByteOrder, &cfStrTypes); err != nil {
-					return fmt.Errorf("failed to read cfstring64_t structs: %v", err)
-				}
-
-				for idx, cfstr := range cfStrTypes {
-					image.ObjC.CFStrings[idx].CFString64T = &cfstr
-					if cfstr.Data == 0 {
-						return fmt.Errorf("unhandled cstring parse case where data is 0")
-					}
-
-					image.ObjC.CFStrings[idx].Name, err = f.GetCString(cfstr.Data & mask) // TODO use chain fixups
-					if err != nil {
-						return fmt.Errorf("failed to read cstring: %v", err)
-					}
-
-					image.ObjC.CFStrings[idx].Address = sec.Addr + uint64(idx*binary.Size(objc.CFString64T{}))
-					if err != nil {
-						return fmt.Errorf("failed to calulate cfstring vmaddr: %v", err)
-					}
-
-					if len(image.ObjC.CFStrings[idx].Name) > 0 {
-						f.AddressToSymbol[image.ObjC.CFStrings[idx].Address] = image.ObjC.CFStrings[idx].Name // TODO: check the mem consumption
-						// fmt.Printf("    %#x: %#v\n", cfstrings[idx].Address, cfstrings[idx].Name)
-					}
-				}
+		for _, cfstr := range image.ObjC.CFStrings {
+			if len(cfstr.Name) > 0 {
+				f.AddressToSymbol[cfstr.Address] = cfstr.Name
 			}
 		}
-
-		m.Close()
 	}
 
 	return nil
@@ -882,12 +862,11 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 	var classPtr objc.SwiftClassMetadata64
 
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
-	off, err := f.GetOffset(vmaddr)
+	uuid, off, err := f.GetOffset(vmaddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
 	}
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	sr.Seek(int64(off), io.SeekStart)
 	if err := binary.Read(sr, f.ByteOrder, &classPtr); err != nil {
@@ -901,7 +880,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 
 	var info objc.ClassRO64
 
-	off, err = f.GetOffset(f.SlideInfo.SlidePointer(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
+	off, err = f.GetOffsetForUUID(uuid, f.SlideInfo.SlidePointer(classPtr.DataVMAddrAndFastFlags)&objc.FAST_DATA_MASK64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
 	}
@@ -992,10 +971,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 		// Ivars:           ivars,
 		// Props:           props,
 		// Prots:           prots,
-		ClassPtr: types.FilePointer{
-			VMAdder: vmaddr,
-			Offset:  uint64(off),
-		},
+		ClassPtr:              vmaddr,
 		IsaVMAddr:             f.SlideInfo.SlidePointer(classPtr.IsaVMAddr),
 		SuperclassVMAddr:      f.SlideInfo.SlidePointer(classPtr.SuperclassVMAddr),
 		MethodCacheBuckets:    classPtr.MethodCacheBuckets,
@@ -1007,6 +983,67 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 	}, nil
 }
 
+// ParseAllObjc parses all the ObjC data in the cache and loads it into the symbol table
+func (f *File) ParseAllObjc() error {
+	if _, err := f.GetAllObjCClasses(false); err != nil {
+		return err
+	}
+	if err := f.GetAllObjcMethods(); err != nil {
+		return err
+	}
+	if _, err := f.GetAllObjCSelectors(false); err != nil {
+		return err
+	}
+	if _, err := f.GetAllObjCProtocols(false); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (f *File) ParseObjcForImage(imageNames ...string) error {
+
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
+		}
+	} else {
+		images = f.Images
+	}
+
+	for _, image := range images {
+		if err := f.CFStringsForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc cfstrings for image %s: %v", image.Name, err)
+		}
+		// TODO: add objc methods in the -[Class sel:] form
+		if err := f.MethodsForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc methods for image %s: %v", image.Name, err)
+		}
+		if strings.Contains(image.Name, "libobjc.A.dylib") {
+			if _, err := f.GetAllObjCSelectors(false); err != nil {
+				return fmt.Errorf("failed to parse objc all selectors: %v", err)
+			}
+		} else {
+			if err := f.SelectorsForImage(image.Name); err != nil {
+				return fmt.Errorf("failed to parse objc selectors for image %s: %v", image.Name, err)
+			}
+		}
+		if err := f.ClassesForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc classes for image %s: %v", image.Name, err)
+		}
+		if err := f.ProtocolsForImage(image.Name); err != nil {
+			return fmt.Errorf("failed to parse objc protocols for image %s: %v", image.Name, err)
+		}
+	}
+
+	return nil
+}
+
 /*
  * objc_stringhash_t - dyld/include/objc-shared-cache.h
  *
@@ -1014,7 +1051,7 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
  * Base class for precomputed selector table and class table.
  */
 
-type stringHashT struct {
+type stringHash struct {
 	Capacity uint32
 	Occupied uint32
 	Shift    uint32
@@ -1025,37 +1062,145 @@ type stringHashT struct {
 	Scramble [256]uint32
 }
 
+type stringHashV16 struct {
+	Version  uint32
+	Capacity uint32
+	Occupied uint32
+	Shift    uint32
+	Mask     uint32
+	_        uint32 // was zero
+	Salt     uint64
+	Scramble [256]uint32
+}
+
 // StringHash struct
 type StringHash struct {
-	FileOffset int64
-	stringHashT
-	Tab        []byte  /* tab[mask+1] (always power-of-2) */
-	CheckBytes []byte  /* check byte for each string */
-	Offsets    []int32 /* offsets from &capacity to cstrings */
+	FileOffset       int64
+	shash            interface{}
+	Tab              []byte   /* tab[mask+1] (always power-of-2) */
+	CheckBytes       []byte   /* check byte for each string */
+	Offsets          []int32  /* offsets from &capacity to cstrings */
+	ClassOffsets     []uint64 /* offsets from &capacity to cstrings */
+	DuplicateCount   uint32
+	DuplicateOffsets []uint64
+
+	opt *Optimization
+}
+
+// Capacity returns the Capacity
+func (s *StringHash) Capacity() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Capacity
+	case stringHashV16:
+		return h.Capacity
+	}
+	return 0
+}
+
+// Occupied returns the Occupied
+func (s *StringHash) Occupied() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Occupied
+	case stringHashV16:
+		return h.Occupied
+	}
+	return 0
+}
+
+// Shift returns the Shift
+func (s *StringHash) Shift() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Shift
+	case stringHashV16:
+		return h.Shift
+	}
+	return 0
+}
+
+// Mask returns the Mask
+func (s *StringHash) Mask() uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Mask
+	case stringHashV16:
+		return h.Mask
+	}
+	return 0
+}
+
+// Salt returns the Salt
+func (s *StringHash) Salt() uint64 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Salt
+	case stringHashV16:
+		return h.Salt
+	}
+	return 0
+}
+
+// Scramble returns the Scramble
+func (s *StringHash) Scramble() [256]uint32 {
+	switch h := s.shash.(type) {
+	case stringHash:
+		return h.Scramble
+	case stringHashV16:
+		return h.Scramble
+	}
+	return [256]uint32{0}
 }
 
 func (s *StringHash) Read(r *io.SectionReader) error {
+
 	r.Seek(int64(s.FileOffset), io.SeekStart)
-	if err := binary.Read(r, binary.LittleEndian, &s.stringHashT); err != nil {
-		return err
+
+	if s.opt.Version >= 16 {
+		var sh stringHashV16
+		if err := binary.Read(r, binary.LittleEndian, &sh); err != nil {
+			return fmt.Errorf("failed to read %T: %v", sh, err)
+		}
+		s.shash = sh
+	} else {
+		var sh stringHash
+		if err := binary.Read(r, binary.LittleEndian, &sh); err != nil {
+			return fmt.Errorf("failed to read %T: %v", sh, err)
+		}
+		s.shash = sh
 	}
 
 	// log.Debugf("Objective-C StringHash:\n%s", s)
 
-	s.Tab = make([]byte, s.Mask+1)
+	s.Tab = make([]byte, s.Mask()+1)
 	if err := binary.Read(r, binary.LittleEndian, &s.Tab); err != nil {
 		return err
 	}
 
-	s.CheckBytes = make([]byte, s.Capacity)
+	s.CheckBytes = make([]byte, s.Capacity())
 	if err := binary.Read(r, binary.LittleEndian, &s.CheckBytes); err != nil {
 		return err
 	}
 
-	s.Offsets = make([]int32, s.Capacity)
+	s.Offsets = make([]int32, s.Capacity())
 	if err := binary.Read(r, binary.LittleEndian, &s.Offsets); err != nil {
 		return err
 	}
+
+	// s.ClassOffsets = make([]uint64, s.Capacity())
+	// if err := binary.Read(r, binary.LittleEndian, &s.Offsets); err != nil {
+	// 	return err
+	// }
+
+	// if err := binary.Read(r, binary.LittleEndian, &s.DuplicateCount); err != nil {
+	// 	return err
+	// }
+
+	// s.DuplicateOffsets = make([]uint64, s.DuplicateCount)
+	// if err := binary.Read(r, binary.LittleEndian, &s.DuplicateOffsets); err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -1069,11 +1214,11 @@ func (s StringHash) String() string {
 			"Mask       = %X\n"+
 			"Salt       = %016X\n",
 		s.FileOffset,
-		s.Capacity,
-		s.Occupied,
-		s.Shift,
-		s.Mask,
-		s.Salt)
+		s.Capacity(),
+		s.Occupied(),
+		s.Shift(),
+		s.Mask(),
+		s.Salt())
 }
 
 /*
@@ -1242,8 +1387,8 @@ func lookup8(k []byte, level uint64) uint64 {
 }
 
 func (s StringHash) hash(key []byte) uint32 {
-	val := lookup8(key, s.Salt)
-	index := (val >> uint64(s.Shift)) ^ uint64(s.Scramble[s.Tab[(val&uint64(s.Mask))]])
+	val := lookup8(key, s.Salt())
+	index := (val >> uint64(s.Shift())) ^ uint64(s.Scramble()[s.Tab[(val&uint64(s.Mask()))]])
 	return uint32(index)
 }
 

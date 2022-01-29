@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"unicode/utf8"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -36,6 +37,11 @@ func init() {
 	dyldCmd.AddCommand(webkitCmd)
 	webkitCmd.Flags().BoolP("rev", "r", false, "Lookup svn rev on trac.webkit.org")
 	webkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
+func trimFirstRune(s string) string {
+	_, i := utf8.DecodeRuneInString(s)
+	return s[i:]
 }
 
 // webkitCmd represents the webkit command
@@ -70,13 +76,36 @@ var webkitCmd = &cobra.Command{
 
 			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
-		version, err := dyld.GetWebKitVersion(dscPath, getRev)
+
+		f, err := dyld.Open(dscPath)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+
+		image, err := f.Image("WebKit")
+		if err != nil {
+			return fmt.Errorf("image not in %s: %v", dscPath, err)
+		}
+
+		m, err := image.GetPartialMacho()
 		if err != nil {
 			return err
 		}
 
-		log.Infof("WebKit Version: %s", version)
+		version := trimFirstRune(m.SourceVersion().Version)
 
+		if getRev {
+			log.Info("Querying https://trac.webkit.org...")
+			rev, err := dyld.ScrapeWebKitTRAC(version)
+			if err != nil {
+				return err
+			}
+			log.Infof("%s (svn rev %s)", version, rev)
+			return nil
+		}
+
+		log.Infof("WebKit Version: %s", version)
 		return nil
 	},
 }

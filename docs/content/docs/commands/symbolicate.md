@@ -11,7 +11,7 @@ summary: Symbolicate crashlogs.
 It will detect the `dyld_shared_cache` needed to symbolicate the crashlog
 
 ```
-$ ipsw symbolicate solitaire-2021-02-23-185510.ips
+❯ ipsw symbolicate solitaire-2021-02-23-185510.ips
 
    ⨯ please supply a dyld_shared_cache for iPhone12,1 running 14.5 (18E5154f)
 ```
@@ -19,7 +19,7 @@ $ ipsw symbolicate solitaire-2021-02-23-185510.ips
 You can [download](./download.md) current `beta` shared caches like so
 
 ```bash
-$ ipsw download ota --device iPhone12,1 --dyld
+❯ ipsw download ota --device iPhone12,1 --beta --dyld
 ? You are about to download 1 OTA files. Continue? Yes
    • Parsing remote OTA        build=18E5154f device=iPhone12,1 iPhone11,8 version=iOS145DevBeta2
    • Extracting remote dyld_shared_cache (can be a bit CPU intensive)
@@ -27,7 +27,7 @@ $ ipsw download ota --device iPhone12,1 --dyld
 ```
 
 ```
-$ ipsw symbolicate solitaire-2021-02-23-185510.ips dyld_shared_cache_arm64e
+❯ ipsw symbolicate solitaire-2021-02-23-185510.ips dyld_shared_cache_arm64e
 
 Process:             solitaire [12345]
 Hardware Model:      iPhone12,1

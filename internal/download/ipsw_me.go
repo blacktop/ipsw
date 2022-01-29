@@ -179,5 +179,36 @@ func GetVersion(buildID string) (string, error) {
 	return "", fmt.Errorf("build did not a version")
 }
 
+// GetBuildID returns the BuildID for a given version and identifier
+func GetBuildID(version, identifier string) (string, error) {
+	var ipsws []IPSW
+
+	res, err := http.Get(ipswMeAPI + "ipsw/" + version)
+	if err != nil {
+		return "", err
+	}
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("api returned status: %s", res.Status)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return "", err
+	}
+	res.Body.Close()
+
+	err = json.Unmarshal(body, &ipsws)
+	if err != nil {
+		return "", err
+	}
+
+	for _, i := range ipsws {
+		if i.Identifier == identifier {
+			return i.BuildID, nil
+		}
+	}
+	return "", fmt.Errorf("no build found for version %s and device %s", version, identifier)
+}
+
 // https://api.ipsw.me/v4/releases
 // func GetReleases() []Release {}

@@ -44,7 +44,7 @@ func init() {
 
 // a2oCmd represents the a2o command
 var a2oCmd = &cobra.Command{
-	Use:   "a2o [options] <dyld_shared_cache> <vaddr>",
+	Use:   "a2o <dyld_shared_cache> <vaddr>",
 	Short: "Convert dyld_shared_cache address to offset",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -91,7 +91,7 @@ var a2oCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		off, err := f.GetOffset(addr)
+		uuid, off, err := f.GetOffset(addr)
 		if err != nil {
 			log.Error(err.Error())
 		} else {
@@ -100,15 +100,24 @@ var a2oCmd = &cobra.Command{
 			} else if inHex {
 				fmt.Printf("%#x\n", off)
 			} else {
-				m, err := f.GetMappingForOffset(off)
+				m, err := f.GetMappingForOffsetForUUID(uuid, off)
 				if err != nil {
 					return err
 				}
-				log.WithFields(log.Fields{
-					"hex":     fmt.Sprintf("%#x", off),
-					"dec":     fmt.Sprintf("%d", off),
-					"mapping": m.Name,
-				}).Info("Offset")
+				if f.IsDyld4 {
+					log.WithFields(log.Fields{
+						"uuid":    uuid.String(),
+						"hex":     fmt.Sprintf("%#x", off),
+						"dec":     fmt.Sprintf("%d", off),
+						"mapping": m.Name,
+					}).Info("Offset")
+				} else {
+					log.WithFields(log.Fields{
+						"hex":     fmt.Sprintf("%#x", off),
+						"dec":     fmt.Sprintf("%d", off),
+						"mapping": m.Name,
+					}).Info("Offset")
+				}
 			}
 		}
 

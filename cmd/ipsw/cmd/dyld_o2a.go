@@ -44,7 +44,7 @@ func init() {
 
 // o2aCmd represents the o2a command
 var o2aCmd = &cobra.Command{
-	Use:   "o2a [options] <dyld_shared_cache> <offset>",
+	Use:   "o2a <dyld_shared_cache> <offset>",
 	Short: "Convert dyld_shared_cache offset to address",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -91,24 +91,38 @@ var o2aCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		address, err := f.GetVMAddress(offset)
-		if err != nil {
-			log.Error(err.Error())
-		} else {
-			if inDec {
-				fmt.Printf("%d\n", address)
-			} else if inHex {
-				fmt.Printf("%#x\n", address)
+		if f.IsDyld4 {
+			log.Warn("dyld4 cache detected (will search for offset in each subcache)")
+		}
+		for uuid := range f.MappingsWithSlideInfo {
+			address, err := f.GetVMAddressForUUID(uuid, offset)
+			if err != nil {
+				continue
 			} else {
-				m, err := f.GetMappingForVMAddress(address)
-				if err != nil {
-					return err
+				if inDec {
+					fmt.Printf("%d\n", address)
+				} else if inHex {
+					fmt.Printf("%#x\n", address)
+				} else {
+					_, m, err := f.GetMappingForVMAddress(address)
+					if err != nil {
+						return err
+					}
+					if f.IsDyld4 {
+						log.WithFields(log.Fields{
+							"uuid":    uuid.String(),
+							"hex":     fmt.Sprintf("%#x", address),
+							"dec":     fmt.Sprintf("%d", address),
+							"mapping": m.Name,
+						}).Info("Address")
+					} else {
+						log.WithFields(log.Fields{
+							"hex":     fmt.Sprintf("%#x", address),
+							"dec":     fmt.Sprintf("%d", address),
+							"mapping": m.Name,
+						}).Info("Address")
+					}
 				}
-				log.WithFields(log.Fields{
-					"hex":     fmt.Sprintf("%#x", address),
-					"dec":     fmt.Sprintf("%d", address),
-					"mapping": m.Name,
-				}).Info("Address")
 			}
 		}
 

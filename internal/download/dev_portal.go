@@ -27,6 +27,7 @@ import (
 		- https://github.com/picklepete/pyicloud
 		- https://github.com/michaljirman/fmidevice
 		- https://github.com/majd/ipatool
+		- https://jpmens.net/2021/04/18/storing-passwords-in-macos-keychain/
 */
 
 const (
@@ -39,6 +40,8 @@ const (
 	loginURL      = "https://idmsa.apple.com/appleauth/auth/signin"
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
 	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
+
+	userAgent = "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8"
 )
 
 const (
@@ -62,9 +65,12 @@ type DevConfig struct {
 	WatchList []string
 	// behavior config
 	SkipAll      bool
+	ResumeAll    bool
+	RestartAll   bool
 	RemoveCommas bool
 	PreferSMS    bool
 	PageSize     int
+	Verbose      bool
 }
 
 // App is the app object
@@ -276,7 +282,7 @@ func (app *App) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
 	req.Header.Set("Scnt", app.config.SCNT)
 
-	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
+	req.Header.Add("User-Agent", userAgent)
 }
 
 func (app *App) getITCServiceKey() error {
@@ -324,7 +330,7 @@ func (app *App) signIn(username, password string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
-	req.Header.Add("User-Agent", "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8")
+	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json, text/javascript")
 
 	response, err := app.Client.Do(req)
@@ -648,7 +654,7 @@ func (app *App) Watch() error {
 		}
 
 		for version := range ipsws {
-			if utils.StrSliceContains(app.config.WatchList, version) {
+			if utils.StrSliceHas(app.config.WatchList, version) {
 				for _, ipsw := range ipsws[version] {
 					if err := app.Download(ipsw.URL); err != nil {
 						log.Error(err.Error())
@@ -661,14 +667,14 @@ func (app *App) Watch() error {
 
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
 func (app *App) DownloadPrompt(downloadType string) error {
-	isRelease := true
+	isBeta := false
 
 	switch downloadType {
 	case "beta":
-		isRelease = false
+		isBeta = true
 		fallthrough
 	case "release":
-		ipsws, err := app.getDevDownloads(isRelease)
+		ipsws, err := app.getDevDownloads(isBeta)
 		if err != nil {
 			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 		}
@@ -756,7 +762,14 @@ func (app *App) DownloadPrompt(downloadType string) error {
 func (app *App) Download(url string) error {
 
 	// proxy, insecure are null because we override the client below
-	downloader := NewDownload("", false, app.config.SkipAll)
+	downloader := NewDownload(
+		app.config.Proxy,
+		app.config.Insecure,
+		app.config.SkipAll,
+		app.config.ResumeAll,
+		app.config.RestartAll,
+		app.config.Verbose,
+	)
 	// use authenticated client
 	downloader.client = app.Client
 
@@ -781,6 +794,34 @@ func (app *App) Download(url string) error {
 	}
 
 	return nil
+}
+
+func (app *App) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
+	isBeta := false
+	switch downloadType {
+	case "beta":
+		isBeta = true
+		fallthrough
+	case "release":
+		ipsws, err := app.getDevDownloads(isBeta)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get developer downloads: %v", err)
+		}
+		if pretty {
+			return json.MarshalIndent(ipsws, "", "    ")
+		}
+		return json.Marshal(ipsws)
+	case "more":
+		dloads, err := app.getDownloads()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
+		}
+		if pretty {
+			return json.MarshalIndent(dloads, "", "    ")
+		}
+		return json.Marshal(dloads)
+	}
+	return nil, fmt.Errorf("unsupported download type: %s", downloadType)
 }
 
 // getDownloads returns all the downloads in "More Downloads" - https://developer.apple.com/download/all/

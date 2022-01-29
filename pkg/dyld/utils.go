@@ -1,27 +1,45 @@
 package dyld
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"strings"
+
+	"github.com/blacktop/go-macho/types"
 )
+
+func output(show bool, fmtStr string, args ...interface{}) {
+	if show {
+		fmt.Printf(fmtStr, args...)
+	}
+}
 
 // Is64bit returns if dyld is 64bit or not
 func (f *File) Is64bit() bool {
-	return strings.Contains(string(f.Magic[:16]), "64")
+	return strings.Contains(f.Headers[f.UUID].Magic.String(), "64")
 }
 
 // IsArm64 returns if dyld is arm64 or not (meaning I can disassemble it)
 func (f *File) IsArm64() bool {
-	return strings.Contains(string(f.Magic[:16]), "arm64")
+	return strings.Contains(f.Headers[f.UUID].Magic.String(), "arm64")
 }
 
-// GetOffset returns the offset for a given virtual address
-func (f *File) GetOffset(address uint64) (uint64, error) {
-	for _, mapping := range f.Mappings {
+// GetOffset returns the offset for a given virtual address and the cache's UUID that contains it
+func (f *File) GetOffset(address uint64) (types.UUID, uint64, error) {
+	for uuid, cacheMaps := range f.Mappings {
+		for _, mapping := range cacheMaps {
+			if mapping.Address <= address && address < mapping.Address+mapping.Size {
+				return uuid, (address - mapping.Address) + mapping.FileOffset, nil
+			}
+		}
+	}
+	var badUUID types.UUID // will create a NULL uuid
+	return badUUID, 0, fmt.Errorf("address %#x not within any mappings address range", address)
+}
+
+// GetOffsetForUUID returns the offset for a given virtual address for a given cache UUID
+func (f *File) GetOffsetForUUID(uuid types.UUID, address uint64) (uint64, error) {
+	for _, mapping := range f.Mappings[uuid] {
 		if mapping.Address <= address && address < mapping.Address+mapping.Size {
 			return (address - mapping.Address) + mapping.FileOffset, nil
 		}
@@ -29,9 +47,35 @@ func (f *File) GetOffset(address uint64) (uint64, error) {
 	return 0, fmt.Errorf("address %#x not within any mappings address range", address)
 }
 
-// GetVMAddress returns the virtual address for a given offset
-func (f *File) GetVMAddress(offset uint64) (uint64, error) {
-	for _, mapping := range f.Mappings {
+// IsAddressInCache returns if the virtual address is in the cache's mappings
+func (f *File) IsAddressInCache(uuid types.UUID, address uint64) bool {
+	for _, mapping := range f.Mappings[uuid] {
+		if mapping.Address <= address && address < mapping.Address+mapping.Size {
+			return true
+		}
+	}
+	return false
+}
+
+// GetVMAddress returns a map of uuids to virtual address for a given offset
+func (f *File) GetVMAddress(offset uint64) (map[types.UUID]uint64, error) {
+	uuid2addr := make(map[types.UUID]uint64)
+	for uuid, cacheMaps := range f.Mappings {
+		for _, mapping := range cacheMaps {
+			if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
+				uuid2addr[uuid] = (offset - mapping.FileOffset) + mapping.Address
+			}
+		}
+	}
+	if len(uuid2addr) == 0 {
+		return nil, fmt.Errorf("offset %#x not within any mappings file offset range", offset)
+	}
+	return uuid2addr, nil
+}
+
+// GetVMAddressForUUID returns the virtual address for a given offset for a given cache UUID
+func (f *File) GetVMAddressForUUID(uuid types.UUID, offset uint64) (uint64, error) {
+	for _, mapping := range f.Mappings[uuid] {
 		if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
 			return (offset - mapping.FileOffset) + mapping.Address, nil
 		}
@@ -39,9 +83,9 @@ func (f *File) GetVMAddress(offset uint64) (uint64, error) {
 	return 0, fmt.Errorf("offset %#x not within any mappings file offset range", offset)
 }
 
-// GetMappingForOffset returns the mapping containing a given file offset
-func (f *File) GetMappingForOffset(offset uint64) (*CacheMapping, error) {
-	for _, mapping := range f.Mappings {
+// GetMappingForOffsetForUUID returns the mapping containing a given file offset for a given cache UUID
+func (f *File) GetMappingForOffsetForUUID(uuid types.UUID, offset uint64) (*CacheMapping, error) {
+	for _, mapping := range f.Mappings[uuid] {
 		if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
 			return mapping, nil
 		}
@@ -50,63 +94,40 @@ func (f *File) GetMappingForOffset(offset uint64) (*CacheMapping, error) {
 }
 
 // GetMappingForVMAddress returns the mapping containing a given virtual address
-func (f *File) GetMappingForVMAddress(address uint64) (*CacheMapping, error) {
-	for _, mapping := range f.Mappings {
-		if mapping.Address <= address && address < mapping.Address+mapping.Size {
-			return mapping, nil
+func (f *File) GetMappingForVMAddress(address uint64) (types.UUID, *CacheMappingWithSlideInfo, error) {
+	for uuid := range f.MappingsWithSlideInfo {
+		for _, mapping := range f.MappingsWithSlideInfo[uuid] {
+			if mapping.Address <= address && address < mapping.Address+mapping.Size {
+				return uuid, mapping, nil
+			}
 		}
 	}
-	return nil, fmt.Errorf("address %#x not within any mappings address range", address)
+	return types.UUID{}, nil, fmt.Errorf("address %#x not within any mapping's address range", address)
 }
 
-// ReadBytes returns bytes at a given offset
-func (f *File) ReadBytes(offset int64, size uint64) ([]byte, error) {
+// ReadBytesForUUID returns bytes at a given offset for a given cache UUID
+func (f *File) ReadBytesForUUID(uuid types.UUID, offset int64, size uint64) ([]byte, error) {
 	data := make([]byte, size)
-	if _, err := f.r.ReadAt(data, offset); err != nil {
+	if _, err := f.r[uuid].ReadAt(data, offset); err != nil {
 		return nil, fmt.Errorf("failed to read bytes at offset %#x: %v", offset, err)
 	}
 	return data, nil
 }
 
-// ReadPointer returns bytes at a given offset
-func (f *File) ReadPointer(offset uint64) (uint64, error) {
+// ReadPointerForUUID returns pointer at a given offset for a given cache UUID
+func (f *File) ReadPointerForUUID(uuid types.UUID, offset uint64) (uint64, error) {
 	u64 := make([]byte, 8)
-	if _, err := f.r.ReadAt(u64, int64(offset)); err != nil {
+	if _, err := f.r[uuid].ReadAt(u64, int64(offset)); err != nil {
 		return 0, fmt.Errorf("failed to read pointer at offset %#x: %v", offset, err)
 	}
 	return binary.LittleEndian.Uint64(u64), nil
 }
 
-// ReadPointerAtAddress returns bytes at a given offset
-func (f *File) ReadPointerAtAddress(addr uint64) (uint64, error) {
-	offset, err := f.GetOffset(addr)
+// ReadPointerAtAddress returns pointer at a given virtual address
+func (f *File) ReadPointerAtAddress(address uint64) (uint64, error) {
+	uuid, offset, err := f.GetOffset(address)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get offset: %v", err)
+		return 0, fmt.Errorf("failed to get offset for address %#x: %v", address, err)
 	}
-	return f.ReadPointer(offset)
-}
-
-// AppendData appends data to the dyld.File's io.ReaderAt backing data store
-func (f *File) AppendData(r *io.SectionReader, offset uint64) error {
-	sr := io.NewSectionReader(f.r, 0, 1<<63-1)
-
-	newData, err := ioutil.ReadAll(r)
-	if err != nil {
-		return err
-	}
-
-	data, err := ioutil.ReadAll(sr)
-	if err != nil {
-		return err
-	}
-
-	// log.WithFields(log.Fields{
-	// 	"data_size": fmt.Sprintf("%#x", len(data)),
-	// 	"new_size":  fmt.Sprintf("%#x", len(newData)),
-	// 	"offset":    fmt.Sprintf("%#x", offset),
-	// }).Debug("Appending data to dyld_shared_cache")
-	data = append(data[:offset], newData...)
-	f.r = bytes.NewReader(data)
-
-	return nil
+	return f.ReadPointerForUUID(uuid, offset)
 }

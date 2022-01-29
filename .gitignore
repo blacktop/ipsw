@@ -30,18 +30,22 @@ usr
 *.bin
 *.s
 .DS_Store
+*.dmg
 
 # Repo
 *.bu
 dist/
 test-caches/
+completions/
 *.txt
 *.prof
 *.download
 checksums.txt.sha1
+unicorn2/
 
 # Docs
 public
 
 *.unstripped
 *.bndb
+*.lock

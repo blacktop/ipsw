@@ -45,6 +45,7 @@ func init() {
 	rootCmd.AddCommand(entCmd)
 
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
+	entCmd.Flags().String("db", "", "Path to entitlement database to use")
 	entCmd.Flags().StringP("file", "f", "", "Output entitlements for file")
 }
 
@@ -52,7 +53,7 @@ type Entitlements map[string]interface{}
 
 // entCmd represents the ent command
 var entCmd = &cobra.Command{
-	Use:          "ent",
+	Use:          "ent <IPSW>",
 	Short:        "Search IPSW filesystem DMG for MachOs with a given entitlement",
 	Args:         cobra.MinimumNArgs(1),
 	SilenceUsage: true,
@@ -65,6 +66,7 @@ var entCmd = &cobra.Command{
 		}
 
 		entitlement, _ := cmd.Flags().GetString("ent")
+		entDBPath, _ := cmd.Flags().GetString("db")
 		searchFile, _ := cmd.Flags().GetString("file")
 
 		if len(entitlement) == 0 && len(searchFile) == 0 {
@@ -76,7 +78,9 @@ var entCmd = &cobra.Command{
 		}
 
 		ipswPath := filepath.Clean(args[0])
-		entDBPath := strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
+		if len(entDBPath) > 0 {
+			entDBPath = strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
+		}
 
 		if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
 			i, err := info.Parse(ipswPath)

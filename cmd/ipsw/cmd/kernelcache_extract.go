@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 )
@@ -47,18 +48,25 @@ var kerExtractCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		kcPath := filepath.Clean(args[0])
+		ipswPath := filepath.Clean(args[0])
 
 		var destPath string
 		if len(args) > 1 {
 			destPath = filepath.Clean(args[1])
 		}
 
-		if _, err := os.Stat(kcPath); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", kcPath)
+		if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exist", ipswPath)
 		}
 
+		i, err := info.Parse(ipswPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse ipsw info: %v", err)
+		}
+
+		destPath = filepath.Join(destPath, i.GetFolder())
+
 		log.Info("Extracting kernelcaches")
-		return kernelcache.Extract(kcPath, destPath)
+		return kernelcache.Extract(ipswPath, destPath)
 	},
 }

@@ -113,7 +113,7 @@ typedef struct
     uint32 unknown9;
     uint64 unknown10Offset;
     uint64 unknown10Size;
-    uint32 subCacheUUID;
+    uint32 subCacheInfoOffset;
     uint32 numSubCaches;     // number of dyld_shared_cache .1,.2,.3 files
     Uuid symbolSubCacheUUID; // unique value for .symbols sub-cache
     uint64 zero1;
@@ -406,6 +406,18 @@ if (header.imagesOffset == 0 && header.unknown10Offset > 0)
     new_sub_struct new_sub2;
     FSeek(new.offset3);
     new_sub_struct new_sub3;
+}
+
+typedef struct
+{
+    Uuid uuid;                           // UUID of subcache
+    uint64 cumulativeSize<format = hex>; // total size of caches read
+} subcache_info<bgcolor = cLtPurple>;
+
+if (header.subCacheInfoOffset > 0 && header.numSubCaches > 0)
+{
+    FSeek(header.subCacheInfoOffset);
+    subcache_info info[header.numSubCaches];
 }
 
 // FSeek(header.codeSignatureOffset);

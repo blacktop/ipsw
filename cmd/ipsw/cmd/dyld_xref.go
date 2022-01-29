@@ -22,14 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-arm64"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -47,7 +46,7 @@ func init() {
 
 // xrefCmd represents the xref command
 var xrefCmd = &cobra.Command{
-	Use:   "xref [options] <dyld_shared_cache> <vaddr>",
+	Use:   "xref <dyld_shared_cache> <vaddr>",
 	Short: "🚧 [WIP] Find all cross references to an address",
 	Args:  cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -106,9 +105,9 @@ var xrefCmd = &cobra.Command{
 		var srcImage *dyld.CacheImage
 		var images []*dyld.CacheImage
 		if len(imageName) > 0 {
-			srcImage = f.Image(imageName)
-			if srcImage == nil {
-				return fmt.Errorf("no image found matching %s", imageName)
+			srcImage, err = f.Image(imageName)
+			if err != nil {
+				return fmt.Errorf("image not in %s: %v", dscPath, err)
 			}
 			images = append(images, srcImage)
 		} else {
@@ -126,7 +125,7 @@ var xrefCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				if utils.StrSliceContains(m.ImportedLibraries(), srcImage.Name) {
+				if utils.StrSliceHas(m.ImportedLibraries(), srcImage.Name) {
 					images = append(images, i)
 				}
 				m.Close()
@@ -136,7 +135,7 @@ var xrefCmd = &cobra.Command{
 		for _, img := range images {
 			xrefs := make(map[uint64]string)
 
-			if err := f.AnalyzeImage(img); err != nil {
+			if err := img.Analyze(); err != nil {
 				return fmt.Errorf("failed to analyze image: %s; %v", img.Name, err)
 			}
 
@@ -148,38 +147,34 @@ var xrefCmd = &cobra.Command{
 
 			if m.HasObjC() {
 				log.Debug("Parsing ObjC runtime structures...")
-				if err := f.CFStringsForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc cfstrings")
-				}
-				if err := f.MethodsForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc methods")
-				}
-				if err := f.SelectorsForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc selectors")
-				}
-				if err := f.ClassesForImage(img.Name); err != nil {
-					return errors.Wrapf(err, "failed to parse objc classes")
+				if err := f.ParseObjcForImage(img.Name); err != nil {
+					return fmt.Errorf("failed to parse objc data for image %s: %v", img.Name, err)
 				}
 			}
 
 			for _, fn := range m.GetFunctions() {
-				soff, err := f.GetOffset(fn.StartAddr)
+				uuid, soff, err := f.GetOffset(fn.StartAddr)
 				if err != nil {
 					return err
 				}
 
-				data, err := f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+				data, err := f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
 				if err != nil {
 					return err
 				}
 
-				triage, err := f.FirstPassTriage(m, &fn, bytes.NewReader(data), arm64.Options{StartAddress: int64(fn.StartAddr)}, false)
-				if err != nil {
-					return err
+				engine := dyld.NewDyldDisass(f, &disass.Config{
+					Data:         data,
+					StartAddress: fn.StartAddr,
+					Quite:        true,
+				})
+
+				if err := engine.Triage(); err != nil {
+					return fmt.Errorf("first pass triage failed: %v", err)
 				}
 
-				if ok, loc := triage.Contains(unslidAddr); ok {
-					if sym := f.FindSymbol(fn.StartAddr, false); len(sym) > 0 {
+				if ok, loc := engine.Contains(unslidAddr); ok {
+					if sym, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						xrefs[loc] = fmt.Sprintf("%s + %d", sym, loc-fn.StartAddr)
 					} else {
 						xrefs[loc] = fmt.Sprintf("func_%x + %d", fn.StartAddr, loc-fn.StartAddr)

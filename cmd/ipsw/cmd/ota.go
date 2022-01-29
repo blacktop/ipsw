@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/tabwriter"
 	"time"
 
@@ -33,12 +34,16 @@ import (
 	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	rootCmd.AddCommand(otaCmd)
 
 	otaCmd.Flags().BoolP("info", "i", false, "Display OTA Info")
+	// otaCmd.Flags().BoolP("single", "s", false, "Stop after first match") TODO: impliment this
+	otaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
+	viper.BindPFlag("ota.output", otaCmd.Flags().Lookup("output"))
 	otaCmd.MarkZshCompPositionalArgumentFile(1, "*.zip")
 }
 
@@ -53,14 +58,17 @@ var otaCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
+		otaPath := filepath.Clean(args[0])
+
+		if _, err := os.Stat(otaPath); os.IsNotExist(err) {
+			return fmt.Errorf("file %s does not exist", otaPath)
 		}
 
 		showInfo, _ := cmd.Flags().GetBool("info")
+		output := viper.GetString("ota.output")
 
 		if showInfo {
-			pIPSW, err := info.Parse(args[0])
+			pIPSW, err := info.Parse(otaPath)
 			if err != nil {
 				return errors.Wrap(err, "failed to extract and parse IPSW info")
 			}
@@ -73,11 +81,11 @@ var otaCmd = &cobra.Command{
 
 		if len(args) > 1 {
 			log.Infof("Extracting %s...", args[1])
-			return ota.Extract(args[0], args[1])
+			return ota.Extract(otaPath, args[1], output)
 		}
 
 		log.Info("Listing files...")
-		files, err := ota.List(args[0])
+		files, err := ota.List(otaPath)
 		if err != nil {
 			return err
 		}

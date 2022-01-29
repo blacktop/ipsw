@@ -33,9 +33,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func init() {
+	dyldObjcCmd.AddCommand(objcSelCmd)
+
+	objcSelCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	objcSelCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
 // objcSelCmd represents the sel command
 var objcSelCmd = &cobra.Command{
-	Use:   "sel  [options] <dyld_shared_cache>",
+	Use:   "sel  <dyld_shared_cache>",
 	Short: "Get ObjC selector info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -80,9 +87,8 @@ var objcSelCmd = &cobra.Command{
 			fmt.Printf("0x%x: %s\n", ptr, args[1])
 		} else {
 			if len(imageName) > 0 {
-				err = f.SelectorsForImage(imageName)
-				if err != nil {
-					return err
+				if err := f.SelectorsForImage(imageName); err != nil {
+					return fmt.Errorf("failed to parse objc selectors for image %s: %v", imageName, err)
 				}
 
 				// sort by address
@@ -97,8 +103,7 @@ var objcSelCmd = &cobra.Command{
 				}
 
 			} else {
-				_, err := f.GetAllSelectors(true)
-				if err != nil {
+				if _, err := f.GetAllObjCSelectors(true); err != nil {
 					return err
 				}
 			}
@@ -106,11 +111,4 @@ var objcSelCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-func init() {
-	dyldObjcCmd.AddCommand(objcSelCmd)
-
-	objcSelCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	objcSelCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }

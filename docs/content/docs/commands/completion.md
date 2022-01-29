@@ -25,6 +25,6 @@ Pick a folder in your `$fpath` to write the completion to.
 ⚠️ **NOTE:** I'm using `/usr/local/share/zsh-completions`
 
 ```bash
-$ ipsw completion zsh > /usr/local/share/zsh-completions/_ipsw
-$ rm -f ~/.zcompdump; compinit
+❯ ipsw completion zsh > /usr/local/share/zsh-completions/_ipsw
+❯ rm -f ~/.zcompdump; compinit
 ```

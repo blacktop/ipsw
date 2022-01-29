@@ -272,7 +272,7 @@ var sepCmd = &cobra.Command{
 				"uuid":   hdr.KernelUUID,
 				"offset": fmt.Sprintf("%#x", hdr.KernelTextOffset),
 			}).Info, 2)("Dumping kernel")
-			if err := m.Export(fname, nil, 0); err != nil {
+			if err := m.Export(fname, nil, 0, nil); err != nil {
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
 			if Verbose {
@@ -289,7 +289,7 @@ var sepCmd = &cobra.Command{
 				"uuid":   hdr.InitUUID,
 				"offset": fmt.Sprintf("%#x", hdr.InitTextOffset),
 			}).Info, 2)(fmt.Sprintf("Dumping %s", strings.TrimSpace(string(hdr.InitName[:]))))
-			if err := m.Export(fname, nil, 0); err != nil {
+			if err := m.Export(fname, nil, 0, nil); err != nil {
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
 			if Verbose {
@@ -308,7 +308,7 @@ var sepCmd = &cobra.Command{
 					"uuid":   app.UUID,
 					"offset": fmt.Sprintf("%#x-%#x", app.TextOffset, app.TextOffset+app.TextSize),
 				}).Info, 2)(fmt.Sprintf("Dumping %s", strings.TrimSpace(string(app.Name[:]))))
-				if err := m.Export(fname, nil, 0); err != nil {
+				if err := m.Export(fname, nil, 0, nil); err != nil {
 					return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 				}
 				if Verbose {

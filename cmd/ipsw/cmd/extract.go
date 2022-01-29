@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -53,6 +54,7 @@ func init() {
 	extractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	extractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache")
 	extractCmd.Flags().BoolP("dtree", "t", false, "Extract DeviceTree")
+	extractCmd.Flags().BoolP("dmg", "f", false, "Extract File System DMG")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
 
@@ -78,6 +80,7 @@ var extractCmd = &cobra.Command{
 		kernelFlag, _ := cmd.Flags().GetBool("kernel")
 		dyldFlag, _ := cmd.Flags().GetBool("dyld")
 		deviceTreeFlag, _ := cmd.Flags().GetBool("dtree")
+		dmgFlag, _ := cmd.Flags().GetBool("dmg")
 		ibootFlag, _ := cmd.Flags().GetBool("iboot")
 		sepFlag, _ := cmd.Flags().GetBool("sep")
 		remote, _ := cmd.Flags().GetBool("remote")
@@ -112,6 +115,10 @@ var extractCmd = &cobra.Command{
 			})
 			if err != nil {
 				return errors.Wrap(err, "failed to download kernelcaches from remote ipsw")
+			}
+
+			if dmgFlag {
+				log.Error("unable to extract File System DMG remotely (let the author know if this is something you want)")
 			}
 
 			if kernelFlag {
@@ -192,6 +199,13 @@ var extractCmd = &cobra.Command{
 				return fmt.Errorf("file %s does not exist", ipswPath)
 			}
 
+			i, err := info.Parse(ipswPath)
+			if err != nil {
+				return errors.Wrap(err, "failed to parse ipsw info")
+			}
+
+			destPath = filepath.Join(destPath, i.GetFolder())
+
 			if kernelFlag {
 				log.Info("Extracting kernelcaches")
 				err := kernelcache.Extract(ipswPath, destPath)
@@ -210,15 +224,26 @@ var extractCmd = &cobra.Command{
 
 			if deviceTreeFlag {
 				log.Info("Extracting DeviceTrees")
-				err := devicetree.Extract(ipswPath, destPath)
+				err = devicetree.Extract(ipswPath, destPath)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract DeviceTrees")
 				}
 			}
 
+			if dmgFlag {
+				log.Info("Extracting File System DMG")
+				_, err = utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
+					return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
+				})
+				if err != nil {
+					return fmt.Errorf("failed extract %s from ipsw: %v", i.GetOsDmg(), err)
+				}
+				log.Infof("Created %s", filepath.Join(destPath, i.GetOsDmg()))
+			}
+
 			if ibootFlag {
 				log.Info("Extracting iBoot")
-				_, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				_, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
 					var validIBoot = regexp.MustCompile(`.*iBoot.*im4p$`)
 					return validIBoot.MatchString(f.Name)
 				})
@@ -230,7 +255,7 @@ var extractCmd = &cobra.Command{
 
 			if sepFlag {
 				log.Info("Extracting sep-firmwares")
-				_, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				_, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
 					var validSEP = regexp.MustCompile(`.*sep-firmware.*im4p$`)
 					return validSEP.MatchString(f.Name)
 				})

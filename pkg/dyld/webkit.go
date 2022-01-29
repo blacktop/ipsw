@@ -46,19 +46,19 @@ func GetWebKitVersion(path string, getRev bool) (string, error) {
 		version := strings.TrimPrefix(match, "WebKit2-")[1:]
 		if getRev {
 			log.Info("Querying https://trac.webkit.org...")
-			rev, err := scrapeWebKitTRAC(version)
+			rev, err := ScrapeWebKitTRAC(version)
 			if err != nil {
 				return "", err
 			}
 			return fmt.Sprintf("%s (svn rev %s)", version, rev), nil
 		}
-		return fmt.Sprintf("%s", version), nil
+		return version, nil
 	}
 
 	return "", fmt.Errorf("unable to find WebKit version in file: %s", path)
 }
 
-func scrapeWebKitTRAC(version string) (string, error) {
+func ScrapeWebKitTRAC(version string) (string, error) {
 
 	var changeset string
 

@@ -22,7 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -36,55 +39,89 @@ import (
 func init() {
 	downloadCmd.AddCommand(devCmd)
 
-	devCmd.Flags().StringArrayP("watch", "", []string{viper.GetString("IPSW_DEV_PORTAL_WATCH_LIST")}, "dev portal type to watch")
-
-	devCmd.Flags().BoolP("release", "", false, "Download 'Release' OSs/Apps")
-	devCmd.Flags().BoolP("beta", "", false, "Download 'Beta' OSs/Apps")
-	devCmd.Flags().BoolP("more", "", false, "Download 'More' OSs/Apps")
-
+	devCmd.Flags().StringArray("watch", []string{}, "dev portal type to watch")
+	devCmd.Flags().Bool("release", false, "Download 'Release' OSs/Apps")
+	devCmd.Flags().Bool("beta", false, "Download 'Beta' OSs/Apps")
+	devCmd.Flags().Bool("more", false, "Download 'More' OSs/Apps")
 	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
-
-	devCmd.Flags().BoolP("sms", "", false, "Prefer SMS Two-factor authentication")
+	devCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
+	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
+	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
+	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
+	viper.BindPFlag("download.dev.release", devCmd.Flags().Lookup("release"))
+	viper.BindPFlag("download.dev.beta", devCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.dev.more", devCmd.Flags().Lookup("more"))
+	viper.BindPFlag("download.dev.page", devCmd.Flags().Lookup("page"))
+	viper.BindPFlag("download.dev.sms", devCmd.Flags().Lookup("sms"))
+	viper.BindPFlag("download.dev.json", devCmd.Flags().Lookup("json"))
+	viper.BindPFlag("download.dev.pretty", devCmd.Flags().Lookup("pretty"))
+	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
 }
 
 // devCmd represents the dev command
 var devCmd = &cobra.Command{
-	Use:   "dev",
-	Short: "Download IPSWs (and more) from https://developer.apple.com/download",
-	Run: func(cmd *cobra.Command, args []string) {
+	Use:           "dev",
+	Short:         "Download IPSWs (and more) from https://developer.apple.com/download",
+	SilenceUsage:  false,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		skipAll, _ := cmd.Flags().GetBool("skip-all")
-		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
+		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
+		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
+		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
+		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
+		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
+		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
+		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
+		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
+		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 
-		release, _ := cmd.Flags().GetBool("release")
-		beta, _ := cmd.Flags().GetBool("beta")
-		more, _ := cmd.Flags().GetBool("more")
-		watchList, _ := cmd.Flags().GetStringArray("watch")
-		pageSize, _ := cmd.Flags().GetInt("page")
-
-		sms, _ := cmd.Flags().GetBool("sms")
+		// settings
+		proxy := viper.GetString("download.proxy")
+		insecure := viper.GetBool("download.insecure")
+		// confirm := viper.GetBool("download.confirm")
+		skipAll := viper.GetBool("download.skip-all")
+		resumeAll := viper.GetBool("download.resume-all")
+		restartAll := viper.GetBool("download.restart-all")
+		removeCommas := viper.GetBool("download.remove-commas")
+		// flags
+		watchList := viper.GetStringSlice("download.dev.watch")
+		release := viper.GetBool("download.dev.release")
+		beta := viper.GetBool("download.dev.beta")
+		more := viper.GetBool("download.dev.more")
+		pageSize := viper.GetInt("download.dev.page")
+		sms := viper.GetBool("download.dev.sms")
+		asJSON := viper.GetBool("download.dev.json")
+		prettyJSON := viper.GetBool("download.dev.pretty")
+		output := viper.GetString("download.dev.output")
 
 		app := download.NewDevPortal(&download.DevConfig{
 			Proxy:        proxy,
 			Insecure:     insecure,
 			SkipAll:      skipAll,
+			ResumeAll:    resumeAll,
+			RestartAll:   restartAll,
 			RemoveCommas: removeCommas,
 			PreferSMS:    sms,
 			PageSize:     pageSize,
 			Beta:         beta,
 			WatchList:    watchList,
+			Verbose:      Verbose,
 		})
 
-		username := os.Getenv("IPSW_DEV_USERNAME")
-		password := os.Getenv("IPSW_DEV_PASSWORD")
+		username := viper.GetString("download.dev.username")
+		password := viper.GetString("download.dev.password")
 
-		if len(viper.GetString("session_id")) == 0 {
+		if len(viper.GetString("download.dev.session_id")) == 0 {
 			// get username
 			if len(username) == 0 {
 				prompt := &survey.Input{
@@ -95,7 +132,7 @@ var devCmd = &cobra.Command{
 						log.Warn("Exiting...")
 						os.Exit(0)
 					}
-					log.Fatal(err.Error())
+					return err
 				}
 			}
 			// get password
@@ -108,18 +145,18 @@ var devCmd = &cobra.Command{
 						log.Warn("Exiting...")
 						os.Exit(0)
 					}
-					log.Fatal(err.Error())
+					return err
 				}
 			}
 		}
 
 		if err := app.Login(username, password); err != nil {
-			log.Fatal(err.Error())
+			return err
 		}
 
 		if len(watchList) > 0 {
 			if err := app.Watch(); err != nil {
-				log.Fatal(err.Error())
+				return err
 			}
 		}
 
@@ -141,13 +178,30 @@ var devCmd = &cobra.Command{
 					log.Warn("Exiting...")
 					os.Exit(0)
 				}
-				log.Fatal(err.Error())
+				return err
 			}
 
 		}
 
-		if err := app.DownloadPrompt(dlType); err != nil {
-			log.Fatal(err.Error())
+		if asJSON {
+			if dat, err := app.GetDownloadsAsJSON(dlType, prettyJSON); err != nil {
+				return err
+			} else {
+				if len(output) > 0 {
+					fpath := filepath.Join(output, fmt.Sprintf("dev_portal_%s.json", dlType))
+					log.Infof("Creating %s", fpath)
+					if err := ioutil.WriteFile(fpath, dat, 0755); err != nil {
+						return err
+					}
+				} else {
+					fmt.Println(string(dat))
+				}
+			}
+		} else {
+			if err := app.DownloadPrompt(dlType); err != nil {
+				return err
+			}
 		}
+		return nil
 	},
 }

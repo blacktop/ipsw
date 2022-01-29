@@ -5,53 +5,100 @@ weight: 5
 summary: Download and parse IPSW(s) from the internets.
 ---
 
-- [**download**](#download)
-- [**download latest**](#download-latest)
-- [**download kernel**](#download-kernel)
-- [**download pattern**](#download-pattern)
+- [**download --help**](#download---help)
+- [**download ipsw**](#download-ipsw)
+- [**download ipsw config**](#download-ipsw-config)
+- [**download ipsw --latest**](#download-ipsw---latest)
+- [**download ipsw --kernel**](#download-ipsw---kernel)
+- [**download ipsw --pattern**](#download-ipsw---pattern)
 - [**download beta**](#download-beta)
 - [**download ota**](#download-ota)
 - [**download macos**](#download-macos)
 - [**download dev**](#download-dev)
 - [**download oss**](#download-oss)
+- [**download rss**](#download-rss)
+- [**download tss**](#download-tss)
 
 ---
 
 > ⚠️ **NOTICE:** Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why.
 
-## **download**
+## **download --help**
+
+Help for download cmd
+
+```bash
+❯ ipsw download --help
+
+Download Apple Firmware files (and more)
+
+Usage:
+  ipsw download [flags]
+  ipsw download [command]
+
+Available Commands:
+  dev         Download IPSWs (and more) from https://developer.apple.com/download
+  ipsw        Download and parse IPSW(s) from the internets
+  macos       Download macOS installers
+  oss         Download opensource.apple.com file list for macOS version
+  ota         Download OTAs
+  rss         Read Releases - Apple Developer RSS Feed
+  tss         🚧 Download SHSH Blobs
+
+Flags:
+      --black-list stringArray   iOS device black list
+  -b, --build string             iOS BuildID (i.e. 16F203)
+  -y, --confirm                  do not prompt user for confirmation
+  -d, --device string            iOS Device (i.e. iPhone11,2)
+  -h, --help                     help for download
+      --insecure                 do not verify ssl certs
+  -m, --model string             iOS Model (i.e. D321AP)
+      --proxy string             HTTP/HTTPS proxy
+  -_, --remove-commas            replace commas in IPSW filename with underscores
+      --restart-all              always restart resumable IPSWs
+      --resume-all               always resume resumable IPSWs
+      --skip-all                 always skip resumable IPSWs
+  -v, --version string           iOS Version (i.e. 12.3.1)
+      --white-list stringArray   iOS device white list
+
+Global Flags:
+      --config string   config file (default is $HOME/.ipsw.yaml)
+  -V, --verbose         verbose output
+
+Use "ipsw download [command] --help" for more information about a command.
+```
+
+## **download ipsw**
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
-- Download an ipsw and extract/decompress the kernelcache
+Download an ipsw and extract/decompress the kernelcache
 
 ```bash
-$ ipsw download --device iPhone11,2 --build 16A366
+❯ ipsw download ipsw --device iPhone11,2 --build 16A366
 
    • Getting IPSW              build=16A366 device=iPhone11,2 signed=true version=12.0
       3.4 GiB / 3.4 GiB [==========================================================| 00:00 ] 79.08 MiB/s
       • verifying sha1sum...
 
-$ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
 
-   • Extracting Kernelcache from IPSW
-      • Parsing Compressed Kernelcache
-         • compressed size: 17842843, uncompressed: 35727352. unknown: 0x3f9543fd, unknown 1: 0x1
-      • Decompressing Kernelcache
+   • Extracting kernelcaches
+      • Created 16A366__iPhone11,2/kernelcache.release.iPhone11,2
 ```
 
-⚠️ notice that the kernelcache was extracted from the ipsw and decompressed 😈
+> ⚠️ notice that the kernelcache was extracted from the ipsw and decompressed 😈
 
 ```bash
-$ file kernelcache.release.iphone11.decompressed
+❯ file 16A366__iPhone11,2/kernelcache.release.iPhone11,2
 
-kernelcache.release.iphone11.decompressed: "Mach-O 64-bit executable arm64"
+16A366__iPhone11,2/kernelcache.release.iPhone11,2 "Mach-O 64-bit executable arm64"
 ```
 
-- Download all the iOS 12.0 ipsws
+Download ALL the **iOS** `12.0` ipsws
 
 ```bash
-$ ipsw download --version 12.0
+❯ ipsw download ipsw --version 12.0
 
 ? You are about to download 17 ipsw files. Continue? Yes
    • Getting IPSW              build=16A366 device=iPhone11,4 signed=true version=12.0
@@ -62,28 +109,79 @@ $ ipsw download --version 12.0
   ...
 ```
 
-- Download with a Proxy
-
-This will download and decompress the kernelcache for an **iPhone XS** running **iOS 12.1** behind a corporate proxy
+Download the **macOS** `11.5` ipsw
 
 ```bash
-$ ipsw download --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --macos --version 11.5
+
+   • Getting IPSW              build=20G71 device=Macmini9,1 signed=true version=11.5
+	16.0 MiB / 13.0 GiB [----------------------------------------------------------| 13h28m42s ]  280.66 KiB/s
+  ...
 ```
 
-- To disable cert verification
+Debug speed issues
 
 ```bash
-$ ipsw download --insecure --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --version 15.1 --device iPhone10,1 --verbose
+   • URLs to Download:
+      • https://updates.cdn-apple.com/2021FallFCS/fullrestores/071-64002/C820E7E5-0168-462E-923A-5C86E217D5B5/iPhone_4.7_P3_15.1_19B74_Restore.ipsw
+   • Getting IPSW              build=19B74 device=iPhone10,1 signed=true version=15.1
+      • Downloading               file=iPhone_4.7_P3_15.1_19B74_Restore.ipsw
+      • URL resolved to: 17.253.17.207 "(Apple Inc - Santa Clara, CA. United States)"
+	5.3 MiB / 5.3 GiB [----------------------------------------------------------| 1h18m2s ]  1.17 MiB/s
 ```
 
-## **download latest**
+> **NOTE:** The Apple CDN's IP has been geo-looked up and is in **Santa Clara**. You can Ctrl+C and try again for a closer CDN which will typically correlate with increased download speeds.
+
+Download with a Proxy
+
+> This will download and decompress the kernelcache for an **iPhone XS** running **iOS 12.1** behind a corporate proxy
+
+```bash
+❯ ipsw download ipsw --proxy http://proxy.org:[PORT] --device iPhone11,2 --build 16B92
+```
+
+To disable SSL cert verification
+
+```bash
+❯ ipsw download ipsw --insecure --device iPhone11,2 --build 16B92
+```
+
+### download `ipsw` config
+
+You can also use a config file with `ipsw` so you don't have to use the flags
+
+```bash
+❯ cat ~/.ipsw.yml
+```
+
+```yaml
+download:
+  latest: true
+  confirm: true
+  white-list:
+    - iPod9,1
+    - iPhone14,2
+  resume-all: true
+  output: /SHARE/IPSWs
+```
+
+> This will download the `latest` IPSWs for _only_ the `iPod9,1` and the `iPhone14,2` without requesting user confirmation to download. It will also always try to `resume` previously interrupted downloads and will download everything to the `/SHARE/IPSWs` folder
+
+You can also use environment variables to set `ipsw` config
+
+```bash
+❯ IPSW_DOWNLOAD_DEVICE=iPhone14,2 ipsw download ipsw --latest
+```
+
+### **download ipsw --latest**
 
 > Queries the iTunes XML for latest version _(maybe run this as a cron job)_ 😉
 
-- Download all the latest ipsws
+Download all the latest ipsws
 
 ```bash
-$ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
+❯ ipsw download ipsw -V --black-list AppleTV --black-list iPod7,1 --latest --confirm
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPhone6,2 version=12.4.1
@@ -91,22 +189,22 @@ $ ipsw download -V latest --yes --black-list AppleTV --black-list iPod7,1
   ...
 ```
 
-This will also generate a `checksums.txt.sha1` file that you can use to verify the downloads
+> This will also generate a `checksums.txt.sha1` file that you can use to verify the downloads
 
 ```bash
-$ sha1sum -c checksums.txt.sha1
+❯ sha1sum -c checksums.txt.sha1
 
 iPad_64bit_TouchID_13.2.3_17B111_Restore.ipsw: OK
 iPadPro_9.7_13.2.3_17B111_Restore.ipsw: OK
 iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 ```
 
-⚠️ **NOTE:** you must do **one** device type/family per `--black-list` or `--white-list` flag
+> ⚠️ **NOTE:** you must do **one** device type/family per `--black-list` or `--white-list` flag
 
-- To grab _only_ the iPods
+To grab _only_ the iPods
 
 ```bash
-$ ipsw download -V latest --yes --white-list ipod
+❯ ipsw download ipsw --white-list ipod --latest --confirm
    • Latest iOS release found is: "12.4.1"
       • "Yo, ain't no one jailbreaking this shizz NOT even Ian Beer my dude!!!! 😏"
    • Getting IPSW              build=16G77 device=iPod9,1 version=12.4.1
@@ -114,15 +212,26 @@ $ ipsw download -V latest --yes --white-list ipod
   ...
 ```
 
-- To just output the latest iOS version
+Download **latest** `macOS` ipsws
 
 ```bash
-$ ipsw download latest --info
+❯ ipsw download ipsw --macos --latest -y
 
-13.6.1
+   • Latest release found is: 11.6
+   • Getting IPSW              build=20G165 device=Macmini9,1 signed=true version=11.6
+	288.6 MiB / 13.0 GiB [>---------------------------------------------------------| 3h30m57s ]  1.03 MiB/s
+  ...
 ```
 
-## **download kernel**
+To just output the latest iOS version
+
+```bash
+❯ ipsw download ipsw --show-latest
+
+15.1
+```
+
+### **download ipsw --kernel**
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
@@ -131,55 +240,47 @@ Only download and decompress the kernelcaches
 - Single kernelcache
 
 ```bash
-ipsw download kernel --device iPhone11,2 --build 16B92
+❯ ipsw download ipsw --device iPhone11,2 --build 16B92 --kernel
 ```
 
 - All of dem!!!
 
 ```bash
-$ time ipsw download kernel --version 12.0.1
+❯ time ipsw download ipsw --version 15.1 --kernel -y
 
-"8.40s user 1.19s system 53% cpu 17.784 total"
+"112.29s user 13.86s system 28% cpu 7:16.35 total" (7m 17s)
 ```
 
-That's **14** decompressed kernelcaches in under **9 seconds** 😏
+That's **38** decompressed kernelcaches in under **8 minutess** and I've seen **much** faster _(I miss gigabit internet soooo much)_ 😭
 
 ```bash
-$ ls -1
-
-kernelcache.release.ipad4b.decompressed
-kernelcache.release.ipad5b.decompressed
-kernelcache.release.ipad6b.decompressed
-kernelcache.release.ipad6d.decompressed
-kernelcache.release.ipad6f.decompressed
-kernelcache.release.ipad7.decompressed
-kernelcache.release.iphone10b.decompressed
-kernelcache.release.iphone11.decompressed
-kernelcache.release.iphone11b.decompressed
-kernelcache.release.iphone7.decompressed
-kernelcache.release.iphone8b.decompressed
-kernelcache.release.iphone9.decompressed
-kernelcache.release.j42d.decompressed
-kernelcache.release.n102.decompressed
+❯ ls -1 19B74*/kernelcache*
+19B74__iPad11,1_2_3_4/kernelcache.release.ipad11
+19B74__iPad11,6_7/kernelcache.release.ipad11b
+19B74__iPad12,1_2/kernelcache.release.ipad12p
+19B74__iPad13,1_2/kernelcache.release.ipad13p
+19B74__iPad13,4_5_6_7_8_9_10_11/kernelcache.release.ipad13
+19B74__iPad14,1_2/kernelcache.release.ipad14p
+19B74__iPad5,1_2_3_4/kernelcache.release.ipad5
+<SNIP>
 ```
 
-## **download pattern**
+### **download ipsw --pattern**
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
 Only download files that match a given name/path
 
 ```bash
-$ ipsw download -v 13.4 -d iPhone12,3 pattern iBoot
-```
+❯ ipsw download -d iPhone14,2 --latest --pattern iBoot
 
-```bash
-$ ls iBoot*
-iBoot.d321.RELEASE.im4p        iBoot.d331p.RELEASE.im4p.plist
-iBoot.d321.RELEASE.im4p.plist  iBoot.d421.RELEASE.im4p
-iBoot.d331.RELEASE.im4p        iBoot.d421.RELEASE.im4p.plist
-iBoot.d331.RELEASE.im4p.plist  iBoot.d431.RELEASE.im4p
-iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
+   • Latest release found is: 15.1
+   • Parsing remote IPSW       build=19B74 device=iPhone14,2 signed=true version=15.1
+   • Downloading files that contain: iBoot
+      • Created 19B74__iPhone14,2/iBoot.d63.RELEASE.im4p
+      • Created 19B74__iPhone14,2/iBoot.d63.RELEASE.im4p.plist
+      • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p
+      • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p.plist
 ```
 
 ## **download beta**
@@ -189,23 +290,81 @@ iBoot.d331p.RELEASE.im4p       iBoot.d431.RELEASE.im4p.plist
 Download BETA ipsws
 
 ```bash
-$ ipsw download beta 17C5046a
+❯ ipsw download beta 17C5046a
 ```
+
+> **NOTE:** This depends on the iphonewiki maintainers publishing the `beta` firmware download links
 
 ## **download ota**
 
-Download **iOS14.x developer beta** OTA _(over the air updates)_
+Check for availiable OTA _(over the air updates)_ download versions
 
 ```bash
-$ ipsw download ota --device iPhone12,3
+❯ ipsw download ota --info
+
+? Choose an OS type: iOS
+   • OTAs                      type=iOS
+   • ⚠️  This includes: iOS, iPadOS, watchOS, tvOS and audioOS (you can filter by adding the --device flag)
+      • 15.1.1                    expiration_date=2022-01-30 posting_date=2021-11-01
+      • 14.8.1                    expiration_date=2022-01-30 posting_date=2021-10-26
+      • 8.1                       expiration_date=2022-01-30 posting_date=2021-10-25
+      • 15.1                      expiration_date=2022-01-30 posting_date=2021-10-25
+      • 14.8                      expiration_date=2022-01-30 posting_date=2021-10-14
+      • 15.0.2                    expiration_date=2022-01-30 posting_date=2021-10-11
+      • 5.3.9                     expiration_date=2022-01-23 posting_date=2021-10-11
+      • 8.0.1                     expiration_date=2022-01-23 posting_date=2021-10-11
+      • 15.0.1                    expiration_date=2022-01-09 posting_date=2021-10-01
+      • 12.5.5                    expiration_date=2022-01-30 posting_date=2021-09-23
+      • 15.0                      expiration_date=2022-01-23 posting_date=2021-09-20
+      • 8.0                       expiration_date=2022-01-09 posting_date=2021-09-20
+      • 15.0                      expiration_date=2021-12-30 posting_date=2021-09-20
+      • 7.6.2                     expiration_date=2022-01-30 posting_date=2021-09-13
+      • 14.8                      expiration_date=2022-01-30 posting_date=2021-09-13
+      • 5.3.9                     expiration_date=2022-01-30 posting_date=2021-07-29
+      • 6.3                       expiration_date=2022-01-30 posting_date=2021-07-29
+      • 7.6.1                     expiration_date=2021-12-12 posting_date=2021-07-29
+      • 12.5.4                    expiration_date=2022-01-30 posting_date=2021-07-26
+      • 14.7.1                    expiration_date=2022-01-30 posting_date=2021-07-26
+      • 14.7                      expiration_date=2021-12-19 posting_date=2021-07-19
+
+```
+
+Download the OTA `14.8.1` release for the `iPhone14,2` device
+
+```bash
+❯ ipsw download ota --version 14.8.1 --device iPhone10,1
+
+? You are about to download 1 OTA files. Continue? Yes
+   • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
+	280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s ]  1.15 MiB/s
+```
+
+Download iOS `15.2` developer **beta** OTA
+
+```bash
+❯ ipsw download ota --device iPhone12,3 --beta
+
+? You are about to download 1 OTA files. Continue? Yes
+   • Getting OTA               build=19C5026i device=iPhone12,3 version=iOS152DevBeta1
+	495.3 MiB / 5.8 GiB [====>-----------------------------------------------------| 1h17m52s ]  1.17 MiB/s
+```
+
+Download the latest macOS `beta` OTA
+
+```bash
+❯ ipsw download ota --platform macos --beta --device Macmini9,1 --model J274AP
+
+? You are about to download 1 OTA files. Continue? Yes
+   • Getting OTA               build=21C5021h device= version=PreRelease
+	143.4 MiB / 775.7 MiB [==========>-----------------------------------------------| 8m51s ]  1.19 MiB/s
 ```
 
 Just download the _kernelcache_ and _dyld_shared_cache_
 
 ```bash
-$ ipsw download ota --device iPod9,1 --kernel --dyld
-? You are about to download 1 ipsw files. Continue? Yes
-   • Parsing remote OTA        build=17F5054h device=iPod9,1 version=iOS135DevBeta3
+❯ ipsw download ota --device iPod9,1 --kernel --dyld
+? You are about to download 1 OTA files. Continue? Yes
+   • Parsing remote OTA        build=19A344 device=iPod9,1 version=iOS15Long
    • Extracting remote dyld_shared_cache (can be a bit CPU intensive)
       • Extracting -rwxr-xr-x uid=0, gid=80, 1.7 GB, System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64 to "iPod9,1_N112AP_17F5054h/dyld_shared_cache_arm64"
    • Extracting remote kernelcache
@@ -215,23 +374,54 @@ $ ipsw download ota --device iPod9,1 --kernel --dyld
       • Writing "iPod9,1_N112AP_17F5054h/kernelcache.beta"
 ```
 
+You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` remotely out of a OTA... ARE YOU NOT ENTERTAINED?!?!!? 😎
+
 ## **download macos**
 
-Download and parse macOS IPSWs
+List macOS installers
 
 ```bash
-$ ipsw download macos --kernel
-   • Latest release found is: 11.2.3
-? You are about to download 1 ipsw files. Continue? Yes
-   • Getting Kernelcache       build=20D91 device=Macmini9,1 version=11.2.3
-   • Extracting remote kernelcache
-      • Writing ADP3,2_J273AAP_20D91/kernelcache.production
-      • Writing ADP3,1_J273AP_20D91/kernelcache.production
-      • Writing Macmini9,1_J274AP_20D91/kernelcache.production
-      • Writing MacBookPro17,1_J293AP_20D91/kernelcache.production
-      • Writing MacBookAir10,1_J313AP_20D91/kernelcache.production
-      • Writing iProd99,1_T485AP_20D91/kernelcache.production
+❯ ipsw download macos --list
 ```
+
+| TITLE                          | VERSION | BUILD    | POST DATE        |
+| ------------------------------ | ------- | -------- | ---------------- |
+| macOS Mojave                   | 10.14.5 | 18F2059  | 10Oct19 20:38:26 |
+| macOS Mojave                   | 10.14.6 | 18G103   | 10Oct19 20:51:08 |
+| macOS High Sierra              | 10.13.6 | 17G66    | 10Oct19 18:19:55 |
+| macOS Mojave                   | 10.14.4 | 18E2034  | 10Oct19 14:41:18 |
+| Install macOS High Sierra Beta | 10.13.5 | 17F66a   | 10Oct19 14:41:18 |
+| macOS Catalina                 | 10.15.3 | 19D2064  | 03Mar20 21:41:00 |
+| macOS Catalina                 | 10.15.4 | 19E2269  | 05May20 15:32:04 |
+| macOS Catalina                 | 10.15.5 | 19F2200  | 06Jun20 18:52:41 |
+| macOS Catalina                 | 10.15.6 | 19G2006  | 08Aug20 23:39:24 |
+| macOS Catalina                 | 10.15.6 | 19G2021  | 08Aug20 20:04:02 |
+| macOS Catalina                 | 10.15.7 | 19H2     | 09Sep20 17:09:31 |
+| macOS Catalina                 | 10.15.7 | 19H4     | 10Oct20 17:28:13 |
+| macOS Catalina                 | 10.15.7 | 19H15    | 11Nov20 17:48:09 |
+| macOS Big Sur                  | 11.5.1  | 20G80    | 07Jul21 17:10:10 |
+| macOS Big Sur                  | 11.5.2  | 20G95    | 08Aug21 18:28:53 |
+| macOS Big Sur                  | 11.6    | 20G165   | 09Sep21 18:52:42 |
+| macOS Big Sur                  | 11.6.1  | 20G224   | 10Oct21 17:17:27 |
+| macOS Monterey                 | 12.0.1  | 21A559   | 10Oct21 17:23:38 |
+| macOS Monterey beta            | 12.1    | 21C5021h | 10Oct21 17:04:37 |
+
+Download **macOS Monterey**
+
+```bash
+❯ ipsw download macos --build 21A559
+
+? You are about to download the macOS Monterey installer files. Continue? Yes
+   • Downloading packages
+   • Getting Package           destName=BuildManifest.plist size=1.9 MB
+	1.9 MiB / 1.9 MiB [==========================================================| ✅  ]  1.17 MiB/s
+   • Getting Package           destName=Info.plist size=5.1 kB
+	5.0 KiB / 5.0 KiB [==========================================================| ✅  ]  0.00 b/s
+   • Getting Package           destName=InstallAssistant.pkg size=12 GB
+	74.6 MiB / 11.3 GiB [----------------------------------------------------------| 1h4m28s ]  2.97 MiB/s
+```
+
+> ⚠️ **NOTE:** macOS sandboxes certain folders and prevents you from running some of the Apple utils required to build the FULL installers. _(try running in `/Users/Shared`)_
 
 ## **download dev**
 
@@ -254,7 +444,7 @@ Download IPSWs (and more) from https://developer.apple.com/download
 Watch for 🆕 **beta** IPSWs
 
 ```bash
-ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
+❯ ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
 ? Please type your username: blacktop
 ? Please type your password: ***********************************
 ? Please type your verification code: ******
@@ -263,7 +453,41 @@ ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
    <SNIP>
 ```
 
-> **NOTE:** This will check every 5 minutes for new files and download them.
+> **NOTE:** This will check every 5 minutes for new files and download them. (I've seem apple expire the session and am not sure how to prevent it yet.)
+
+Output downloadable items as JSON
+
+```bash
+❯ ipsw download dev --beta --json --pretty --output .
+? Please type your username: blacktop
+? Please type your password: ***********************************
+? Please type your verification code: ******
+   • Creating dev_portal_beta.json
+```
+
+```json
+{
+    "Reality Converter beta 3": [
+        {
+            "url": "https://developer.apple.com/services-account/download?path=/Applications/Reality_Converter_beta_3/Reality_Converter_beta_3.dmg",
+            "type": "app"
+        }
+    ],
+    "Xcode 13.2 beta": [
+        {
+            "url": "https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_13.2_beta/Xcode_13.2_beta.xip",
+            "type": "app"
+        }
+    ],
+    "iOS 15.2 beta": [
+        {
+            "title": "iPhone 13",
+            "build": "19C5026i",
+            "url": "https://updates.cdn-apple.com/2021FallSeed/fullrestores/002-19786/01936A50-C316-4261-BA24-62EBAF5F1236/iPhone14,5_15.2_19C5026i_Restore.ipsw",
+            "type": "ios"
+        },
+<SNIP>
+```
 
 ## **download oss**
 
@@ -319,4 +543,78 @@ List all downloads
       }
    }
 }
+```
+
+## **download rss**
+
+> Read Releases - Apple Developer [RSS Feed](https://developer.apple.com/news/)
+
+```
+❯ ipsw download rss
+```
+
+```md
+# Releases - Apple Developer (https://developer.apple.com/news/)
+
+> Apple Developer News and Updates feed provided by Apple, Inc.
+
+---
+
+- Xcode 13.2 beta (13C5066c) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021e
+- iOS 15.2 beta (19C5026i) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021d
+- iPadOS 15.2 beta (19C5026i) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021c
+- watchOS 8.3 beta (19S5026e) <Wed, 27 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021b
+- tvOS 15.2 beta (19K5025g) <Wed, 27 Oct 2021 13:00:00 PDT> https://developer.apple.com/news/releases/?id=10272021a
+- Xcode 13.1 (13A1030d) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021f
+- macOS Monterey (21A559) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021e
+- iOS 15.1 (19B74) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021d
+- iPadOS 15.1 (19B74 | 19B75) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021c
+- watchOS 8.1 (19R570) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021b
+- tvOS 15.1 (19J572) <Mon, 25 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10252021a
+- App Store Server API Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021g
+- App Store Server Notifications Version 2 <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021ef
+- Sandbox Testing Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021e
+- App Store Connect Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021d
+- App Store Connect API Update <Thu, 21 Oct 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021c
+- macOS Monterey RC 2 (21A559) <Thu, 21 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10212021b
+- iOS 15.0.2 (19A404) <Mon, 11 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10112021c
+- watchOS 8.0.1 (19R354) <Mon, 11 Oct 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=10112021a
+- App Store Connect 1.7.1 <Tue, 21 Sep 2021 12:00:00 PDT> https://developer.apple.com/news/releases/?id=09212021f
+- Xcode 13 (13A233) <Mon, 20 Sep 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=09202021e
+- tvOS 15 (19J346) <Mon, 20 Sep 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=09202021b
+- macOS Big Sur 11.6 (20G165) <Mon, 13 Sep 2021 10:00:00 PDT> https://developer.apple.com/news/releases/?id=09132021d
+- TestFlight 3.2 beta <Tue, 24 Aug 2021 11:00:00 PDT> https://developer.apple.com/news/releases/?id=08242021a
+- TestFlight Submission Update <Tue, 17 Aug 2021 16:00:00 PDT> https://developer.apple.com/news/releases/?id=08172021c
+- Transporter 1.2.2 <Thu, 03 Jun 2021 11:00:00 PDT> https://developer.apple.com/news/releases/?id=06032021a
+```
+
+Watch for 🆕 Releases
+
+```
+❯ ipsw download rss --watch
+   • Watching Releases - Apple Developer RSS Feed...
+```
+
+This will ping the RSS feed every 5 minutes and create a desktop notification if anything NEW shows up.
+
+## **download tss**
+
+Download SHSH blobs from Apple
+
+```
+❯ ipsw download tss
+```
+
+> ⚠️ **NOTICE:** this is still a WIP _(however `signed` check does work)_
+
+Check the signing status of an **iOS** version
+
+```
+❯ ipsw download tss --signed 15.0.2
+   ⨯ 🔥 15.0.2 is NO LONGER being signed
+```
+
+```
+❯ ipsw download tss --signed 15.1
+   • ✅ 15.1 is still being signed
 ```
