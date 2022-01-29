@@ -230,13 +230,13 @@ var updateCmd = &cobra.Command{
 			}
 		}
 
-		downloader := download.NewDownload(proxy, insecure, false)
+		downloader := download.NewDownload(proxy, insecure, false, false, false, Verbose)
 		fname := strings.Replace(path.Base(asset.DownloadURL), ",", "_", -1)
 		fname = filepath.Join(destPath, fname)
 		if _, err := os.Stat(fname); os.IsNotExist(err) {
 			log.WithFields(log.Fields{
 				"version":        latestRelease.Tag,
-				"published_at":   latestRelease.PublishedAt.Format("2006-01-02"),
+				"published_at":   latestRelease.PublishedAt.Format("01Jan06 15:04:05"),
 				"size":           humanize.Bytes(uint64(asset.Size)),
 				"download_count": asset.DownloadCount,
 			}).Info("Getting Update")

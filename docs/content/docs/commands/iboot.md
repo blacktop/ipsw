@@ -9,7 +9,7 @@ summary: Parse iboot files.
 ### Dump embedded firmwares
 
 ```bash
-$ ipsw iboot iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
+❯ ipsw iboot iPhone12,3_D421AP_17E255/iBoot.d421.RELEASE.im4p.dec
       • Dumping AppleSMCFirmware-1631.102.1.d42_whitney.REL.bin
       • Dumping AppleSMCFirmware-1631.102.1.d42_avus.REL.bin
       • Dumping AppleStorageProcessorANS2-717.100.112~98.bin

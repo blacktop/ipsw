@@ -22,64 +22,92 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
-	"compress/gzip"
-	"encoding/gob"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-arm64"
-	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	dyldCmd.AddCommand(dyldDisassCmd)
-
+	// dyldDisassCmd.Flags().Uint64("slide", 0, "dyld_shared_cache slide to remove from --vaddr")
 	dyldDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	dyldDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
-	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
-	dyldDisassCmd.Flags().BoolVarP(&demangleFlag, "demangle", "d", false, "Demangle symbol names")
-	// dyldDisassCmd.Flags().StringP("sym-file", "s", "", "Companion symbol map file")
 	dyldDisassCmd.Flags().StringP("image", "i", "", "dylib image to search")
+	dyldDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
+	dyldDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
+	dyldDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	dyldDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
+	dyldDisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
+	dyldDisassCmd.Flags().String("input", "", "Input function JSON file")
+	dyldDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
-	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	viper.BindPFlag("dyld.disass.symbol", dyldDisassCmd.Flags().Lookup("symbol"))
+	viper.BindPFlag("dyld.disass.vaddr", dyldDisassCmd.Flags().Lookup("vaddr"))
+	viper.BindPFlag("dyld.disass.image", dyldDisassCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.disass.count", dyldDisassCmd.Flags().Lookup("count"))
+	viper.BindPFlag("dyld.disass.demangle", dyldDisassCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("dyld.disass.json", dyldDisassCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dyld.disass.quiet", dyldDisassCmd.Flags().Lookup("quiet"))
+	viper.BindPFlag("dyld.disass.color", dyldDisassCmd.Flags().Lookup("color"))
+	viper.BindPFlag("dyld.disass.input", dyldDisassCmd.Flags().Lookup("input"))
+	viper.BindPFlag("dyld.disass.cache", dyldDisassCmd.Flags().Lookup("cache"))
+
+	dyldDisassCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // disassCmd represents the disass command
 var dyldDisassCmd = &cobra.Command{
-	Use:   "disass [options] <dyld_shared_cache>",
-	Short: "🚧 [WIP] Disassemble dyld_shared_cache symbol/vaddr in an image",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "disass <dyld_shared_cache>",
+	Short:         "Disassemble dyld_shared_cache at symbol/vaddr",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var data []byte
-		var isMiddle bool
-		var symAddr uint64
-		var startAddr uint64
+		var middleAddr uint64
 		var image *dyld.CacheImage
-		var dFunc *types.Function
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		imageName, _ := cmd.Flags().GetString("image")
-		instructions, _ := cmd.Flags().GetUint64("count")
-		startVMAddr, _ := cmd.Flags().GetUint64("vaddr")
-		symbolName, _ := cmd.Flags().GetString("symbol")
-		// doDemangle, _ := cmd.Flags().GetBool("demangle")
+		// flags
+		symbolName := viper.GetString("dyld.disass.symbol")
+		startAddr := viper.GetUint64("dyld.disass.vaddr")
+		imageName := viper.GetString("dyld.disass.image")
+		instructions := viper.GetUint64("dyld.disass.count")
 
-		if len(symbolName) > 0 && startVMAddr != 0 {
+		demangleFlag := viper.GetBool("dyld.disass.demangle")
+		asJSON := viper.GetBool("dyld.disass.json")
+		quiet := viper.GetBool("dyld.disass.quiet")
+		forceColor := viper.GetBool("dyld.disass.color")
+
+		funcFile := viper.GetString("dyld.disass.input")
+		cacheFile := viper.GetString("dyld.disass.cache")
+
+		if forceColor {
+			color.NoColor = false
+		}
+
+		if len(symbolName) > 0 && startAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
-		} else if len(symbolName) == 0 && startVMAddr == 0 {
-			return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
+		} else if len(funcFile) > 0 && (len(symbolName) > 0 || startAddr != 0 || len(imageName) > 0) {
+			return fmt.Errorf("you can NOT combine the --input flag with other filter flags (--symbol|--vaddr|--image)")
+		} else if len(symbolName) == 0 && startAddr == 0 {
+			if len(imageName) == 0 && len(funcFile) == 0 {
+				return fmt.Errorf("if you don't supply a --image or --input flag you MUST supply a --symbol OR --vaddr to disassemble")
+			}
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -113,165 +141,96 @@ var dyldDisassCmd = &cobra.Command{
 			return nil
 		}
 
-		if len(symbolName) > 0 {
-			if len(imageName) == 0 {
-				// Load all symbols
-				if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-					log.Info("Generating dyld_shared_cache companion symbol map file...")
+		if !quiet || len(symbolName) > 0 {
+			if len(cacheFile) == 0 {
+				cacheFile = dscPath + ".a2s"
+			}
+			if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+				return err
+			}
+		}
 
-					utils.Indent(log.Warn, 2)("parsing public symbols...")
-					err = f.GetAllExportedSymbols(false)
+		if len(imageName) > 0 {
+			image, err = f.Image(imageName)
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(symbolName) > 0 {
+			log.Info("Locating symbol: " + symbolName)
+			if len(imageName) > 0 {
+				sym, err := image.GetSymbol(symbolName)
+				if err != nil {
+					return err
+				}
+				startAddr = sym.Address
+			} else {
+				startAddr, image, err = f.GetSymbolAddress(symbolName)
+				if err != nil {
+					return err
+				}
+			}
+			log.Infof("Found symbol in %s", filepath.Base(image.Name))
+		} else {
+			if len(imageName) > 0 { // ALL funcs in an image
+				m, err := image.GetMacho()
+				if err != nil {
+					return err
+				}
+				defer m.Close()
+
+				for idx, fn := range m.GetFunctions() {
+					data, err := m.GetFunctionData(fn)
 					if err != nil {
-						return err
+						log.Errorf("failed to get data for function: %v", err)
+						continue
 					}
-					utils.Indent(log.Warn, 2)("parsing private symbols...")
-					err = f.ParseLocalSyms()
-					if err != nil {
-						utils.Indent(log.Warn, 2)(err.Error())
-						utils.Indent(log.Warn, 2)("parsing patch exports...")
-						for _, img := range f.Images {
-							for _, patch := range img.PatchableExports {
-								addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
-								if err != nil {
-									return err
-								}
-								f.AddressToSymbol[addr] = patch.Name
+
+					engine := dyld.NewDyldDisass(f, &disass.Config{
+						Image:        image.Name,
+						Data:         data,
+						StartAddress: fn.StartAddr,
+						Middle:       0,
+						AsJSON:       asJSON,
+						Demangle:     demangleFlag,
+						Quite:        quiet,
+						Color:        forceColor,
+					})
+
+					if !quiet {
+						//***********************
+						//* First pass ANALYSIS *
+						//***********************
+						if err := image.Analyze(); err != nil {
+							return err
+						}
+						if err := engine.Triage(); err != nil {
+							return fmt.Errorf("first pass triage failed: %v", err)
+						}
+						for _, img := range engine.Dylibs() {
+							if err := img.Analyze(); err != nil {
+								return err
+							}
+						}
+					} else {
+						if !asJSON {
+							if idx == 0 {
+								fmt.Printf("sub_%x:\n", fn.StartAddr)
+							} else {
+								fmt.Printf("\nsub_%x:\n", fn.StartAddr)
 							}
 						}
 					}
 
-					// save lookup map to disk to speed up subsequent requests
-					err = f.SaveAddrToSymMap(dscPath + ".a2s")
-					if err != nil {
-						return err
-					}
-
-				} else {
-					log.Info("Found dyld_shared_cache companion symbol map file...")
-					a2sFile, err := os.Open(dscPath + ".a2s")
-					if err != nil {
-						return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
-					}
-
-					gzr, err := gzip.NewReader(a2sFile)
-					if err != nil {
-						return fmt.Errorf("failed to create gzip reader: %v", err)
-					}
-
-					// Decoding the serialized data
-					err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
-					if err != nil {
-						return fmt.Errorf("failed to decode addr2sym map; %v", err)
-					}
-					gzr.Close()
-					a2sFile.Close()
+					//***************
+					//* DISASSEMBLE *
+					//***************
+					disass.Disassemble(engine)
 				}
-			} else {
-				utils.Indent(log.Warn, 2)("parsing public symbols...")
-				if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
-					log.Error("failed to parse exported symbols")
-				}
-				utils.Indent(log.Warn, 2)("parsing private symbols...")
-				if err := f.GetLocalSymbolsForImage(image); err != nil {
-					log.Error("failed to parse local symbols")
-				}
+
+				return nil
 			}
-
-			log.Info("Locating symbol: " + symbolName)
-			symAddr, image, err = f.GetSymbolAddress(symbolName, imageName)
-			if err != nil {
-				return err
-			}
-
-		} else { // startVMAddr > 0
-			symAddr = startVMAddr
-		}
-
-		startAddr = symAddr
-
-		if image == nil {
-			image, err = f.GetImageContainingTextAddr(symAddr)
-			if err != nil {
-				return err
-			}
-		}
-
-		log.WithFields(log.Fields{"dylib": image.Name}).Info("Found symbol")
-
-		m, err := image.GetMacho()
-		if err != nil {
-			return err
-		}
-		defer m.Close()
-
-		/*
-		 * Read in data to disassemble
-		 */
-		if instructions > 0 {
-			off, err := f.GetOffset(symAddr)
-			if err != nil {
-				return err
-			}
-			data, err = f.ReadBytes(int64(off), instructions*4)
-			if err != nil {
-				return err
-			}
-		} else {
-			if fn, err := m.GetFunctionForVMAddr(symAddr); err == nil {
-				dFunc = &fn
-				soff, err := f.GetOffset(fn.StartAddr)
-				if err != nil {
-					return err
-				}
-				data, err = f.ReadBytes(int64(soff), uint64(fn.EndAddr-fn.StartAddr))
-				if err != nil {
-					return err
-				}
-				if symAddr != fn.StartAddr {
-					isMiddle = true
-					startAddr = fn.StartAddr
-				}
-			}
-		}
-
-		if data == nil {
-			log.Fatal("failed to disassemble")
-		}
-
-		/*
-		 * Load symbols from the target sym/addr's image
-		 */
-		// if f.LocalSymbolsOffset == 0 {
-		// 	utils.Indent(log.Warn, 2)("parsing symbol table...")
-		// 	for _, sym := range m.Symtab.Syms {
-		// 		if sym.Value != 0 {
-		// 			f.AddressToSymbol[sym.Value] = sym.Name
-		// 		}
-		// 	}
-		// }
-		if len(symbolName) == 0 {
-			utils.Indent(log.Warn, 2)("parsing public symbols...")
-			if err := f.GetAllExportedSymbolsForImage(image, false); err != nil {
-				log.Error("failed to parse exported symbols")
-			}
-			utils.Indent(log.Warn, 2)("parsing private symbols...")
-			if err := f.GetLocalSymbolsForImage(image); err != nil {
-				log.Error("failed to parse local symbols")
-			}
-		}
-
-		//***********************
-		//* First pass ANALYSIS *
-		//***********************
-		triage, err := f.FirstPassTriage(m, dFunc, bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}, true)
-		if err == nil {
-			for _, img := range triage.Dylibs {
-				if err := f.AnalyzeImage(img); err != nil {
-					return err
-				}
-			}
-		} else {
-			log.Errorf("first pass triage failed: %v", err)
 		}
 
 		/*
@@ -304,150 +263,172 @@ var dyldDisassCmd = &cobra.Command{
 		// 	}
 		// }
 
-		if m.HasObjC() {
-			log.Info("Parsing ObjC runtime structures...")
-			if err := f.CFStringsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc cfstrings")
-			}
-			if err := f.MethodsForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc methods")
-			}
-			if strings.Contains(image.Name, "libobjc.A.dylib") {
-				_, err = f.GetAllSelectors(false)
-			} else {
-				err = f.SelectorsForImage(image.Name)
-			}
-			if err != nil {
-				return errors.Wrapf(err, "failed to parse objc selectors")
-			}
-			if err := f.ClassesForImage(image.Name); err != nil {
-				return errors.Wrapf(err, "failed to parse objc classes")
-			}
-		}
+		if len(funcFile) > 0 {
+			funcFile = filepath.Clean(funcFile)
+			fdata, _ := ioutil.ReadFile(funcFile)
 
-		if err := f.AnalyzeImage(image); err != nil {
-			return err
-		}
-
-		//***************
-		//* DISASSEMBLE *
-		//***************
-
-		var prevInstruction arm64.Instruction
-
-		for i := range arm64.Disassemble(bytes.NewReader(data), arm64.Options{StartAddress: int64(startAddr)}) {
-
-			if i.Error != nil {
-				fmt.Println(i.StrRepr)
-				continue
+			var funcs []Func
+			if err := json.Unmarshal(fdata, &funcs); err != nil {
+				return fmt.Errorf("failed to parse function JSON file %s: %v", funcFile, err)
 			}
 
-			opStr := i.Instruction.OpStr()
+			for _, fn := range funcs {
+				uuid, off, err := f.GetOffset(fn.Start)
+				if err != nil {
+					return err
+				}
 
-			// check for start of a new function
-			if yes, fname := f.IsFunctionStart(m.GetFunctions(), i.Instruction.Address(), demangleFlag); yes {
-				if len(fname) > 0 {
-					fmt.Printf("\n%s:\n", fname)
+				data, err := f.ReadBytesForUUID(uuid, int64(off), fn.Size)
+				if err != nil {
+					return err
+				}
+
+				engine := dyld.NewDyldDisass(f, &disass.Config{
+					Image:        fn.Image,
+					Data:         data,
+					StartAddress: fn.Start,
+					Middle:       0,
+					AsJSON:       asJSON,
+					Demangle:     demangleFlag,
+					Quite:        quiet,
+					Color:        forceColor,
+				})
+
+				if !quiet {
+					//***********************
+					//* First pass ANALYSIS *
+					//***********************
+					image, err = f.Image(fn.Image)
+					if err != nil {
+						return err
+					}
+					if err := image.Analyze(); err != nil {
+						return err
+					}
+					if err := engine.Triage(); err != nil {
+						return fmt.Errorf("first pass triage failed: %v", err)
+					}
+					for _, img := range engine.Dylibs() {
+						if err := img.Analyze(); err != nil {
+							return err
+						}
+					}
 				} else {
-					fmt.Printf("\nfunc_%x:\n", i.Instruction.Address())
-				}
-			}
-
-			if triage.IsBranchLocation(i.Instruction.Address()) {
-				fmt.Printf("%#08x:  ; loc_%x\n", i.Instruction.Address(), i.Instruction.Address())
-			}
-
-			// if ok, imm := triage.HasLoc(i.Instruction.Address()); ok {
-			// 	if detail, ok := triage.Details[imm]; ok {
-			// 		if triage.IsData(imm) {
-			// 			opStr += fmt.Sprintf(" ; %s", detail)
-			// 		} else {
-			// 			opStr += fmt.Sprintf(" ; %s", detail)
-			// 		}
-			// 	}
-			// }
-
-			// lookup adrp/ldr or add address as a cstring or symbol name
-			operation := i.Instruction.Operation().String()
-			if (operation == "ldr" || operation == "add") && prevInstruction.Operation().String() == "adrp" {
-				operands := i.Instruction.Operands()
-				if operands != nil && prevInstruction.Operands() != nil {
-					adrpRegister := prevInstruction.Operands()[0].Reg[0]
-					adrpImm := prevInstruction.Operands()[1].Immediate
-					if operation == "ldr" && adrpRegister == operands[1].Reg[0] {
-						adrpImm += operands[1].Immediate
-					} else if operation == "add" && adrpRegister == operands[1].Reg[0] {
-						adrpImm += operands[2].Immediate
-					}
-					// markup disassemble with label comment
-					symName := f.FindSymbol(adrpImm, demangleFlag)
-					if len(symName) > 0 {
-						opStr += fmt.Sprintf(" ; %s", symName)
-					} else {
-						cstr, err := f.IsCString(m, adrpImm)
-						if err == nil {
-							if len(cstr) > 200 {
-								opStr += fmt.Sprintf(" ; %#v...", cstr[:200])
-							} else {
-								opStr += fmt.Sprintf(" ; %#v", cstr)
-							}
-						}
-					}
-				}
-
-			} else if i.Instruction.Group() == arm64.GROUP_BRANCH_EXCEPTION_SYSTEM { // check if branch location is a function
-				if operands := i.Instruction.Operands(); operands != nil {
-					for _, operand := range operands {
-						if operand.OpClass == arm64.LABEL {
-							symName := f.FindSymbol(operand.Immediate, demangleFlag)
-							if len(symName) > 0 {
-								opStr = fmt.Sprintf("\t%s", symName)
-							} else {
-								if dFunc != nil {
-									if operand.Immediate >= dFunc.StartAddr && operand.Immediate < dFunc.EndAddr {
-										direction := ""
-										delta := int(operand.Immediate) - int(i.Instruction.Address())
-										if delta > 0 {
-											direction = fmt.Sprintf(" ; ⤵ %#x", delta)
-										} else if delta == 0 {
-											direction = " ; ∞ loop"
-										} else {
-											direction = fmt.Sprintf(" ; ⤴ %#x", delta)
-										}
-										opStr = strings.Replace(opStr, fmt.Sprintf("#%#x", operand.Immediate), fmt.Sprintf("loc_%x%s", operand.Immediate, direction), 1)
-									}
-								}
-							}
-						}
-					}
-				}
-
-			} else if i.Instruction.Group() == arm64.GROUP_DATA_PROCESSING_IMM || i.Instruction.Group() == arm64.GROUP_LOAD_STORE {
-				operation := i.Instruction.Operation()
-				if operation == arm64.ARM64_LDR || operation == arm64.ARM64_ADR {
-					operands := i.Instruction.Operands()
-					if operands[1].OpClass == arm64.LABEL {
-						symName := f.FindSymbol(operands[1].Immediate, demangleFlag)
-						if len(symName) > 0 {
-							opStr += fmt.Sprintf(" ; %s", symName)
+					if !asJSON {
+						if len(fn.Name) > 0 {
+							fmt.Printf("\n%s:\n", fn.Name)
 						} else {
-							if dFunc != nil {
-								if operands[1].Immediate >= dFunc.StartAddr && operands[1].Immediate < dFunc.EndAddr {
-									opStr = fmt.Sprintf("\tloc_%x", operands[1].Immediate)
-								}
-							}
+							fmt.Printf("\nsub_%x:\n", fn.Start)
 						}
+					}
+				}
+
+				//***************
+				//* DISASSEMBLE *
+				//***************
+				disass.Disassemble(engine)
+			}
+		} else {
+			/*
+			* Read in data to disassemble
+			 */
+			if instructions > 0 {
+				uuid, off, err := f.GetOffset(startAddr)
+				if err != nil {
+					return err
+				}
+				data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
+				if err != nil {
+					return err
+				}
+			} else {
+				image, err = f.GetImageContainingVMAddr(startAddr)
+				if err != nil {
+					return err
+				}
+				if err := image.Analyze(); err != nil {
+					return err
+				}
+				m, err := image.GetMacho()
+				if err != nil {
+					return err
+				}
+				defer m.Close()
+				if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
+					uuid, soff, err := f.GetOffset(fn.StartAddr)
+					if err != nil {
+						return err
+					}
+					data, err = f.ReadBytesForUUID(uuid, int64(soff), uint64(fn.EndAddr-fn.StartAddr))
+					if err != nil {
+						return err
+					}
+					if startAddr != fn.StartAddr {
+						middleAddr = startAddr
+						startAddr = fn.StartAddr
+					}
+				} else {
+					log.Warnf("disassembling 100 instructions at %#x", startAddr)
+					instructions = 100
+					uuid, off, err := f.GetOffset(startAddr)
+					if err != nil {
+						return err
+					}
+					data, err = f.ReadBytesForUUID(uuid, int64(off), instructions*4)
+					if err != nil {
+						return err
+					}
+				}
+			}
+			if data == nil {
+				log.Fatal("failed to disassemble")
+			}
+
+			// // Apply slide
+			// if slide > 0 {
+			// 	startAddr = startAddr - slide
+			// }
+			var imageName string
+			if image != nil {
+				imageName = image.Name
+			}
+			engine := dyld.NewDyldDisass(f, &disass.Config{
+				Image:        imageName,
+				Data:         data,
+				StartAddress: startAddr,
+				Middle:       middleAddr,
+				AsJSON:       asJSON,
+				Demangle:     demangleFlag,
+				Quite:        quiet,
+				Color:        forceColor,
+			})
+
+			if !quiet {
+				//***********************
+				//* First pass ANALYSIS *
+				//***********************
+				if err := engine.Triage(); err != nil {
+					return fmt.Errorf("first pass triage failed: %v", err)
+				}
+				for _, img := range engine.Dylibs() {
+					if err := img.Analyze(); err != nil {
+						return err
+					}
+				}
+			} else {
+				if !asJSON {
+					if len(symbolName) > 0 {
+						fmt.Printf("%s:\n", symbolName)
+					} else {
+						fmt.Printf("sub_%x:\n", startAddr)
 					}
 				}
 			}
 
-			if isMiddle && i.Instruction.Address() == symAddr {
-				fmt.Printf("👉%08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
-			} else {
-				fmt.Printf("%#08x:  %s\t%-10v%s\n", i.Instruction.Address(), i.Instruction.OpCodes(), i.Instruction.Operation(), opStr)
-			}
-
-			prevInstruction = *i.Instruction
+			//***************
+			//* DISASSEMBLE *
+			//***************
+			disass.Disassemble(engine)
 		}
 
 		return nil

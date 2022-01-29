@@ -24,181 +24,137 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	downloadCmd.AddCommand(macosCmd)
 
-	macosCmd.Flags().BoolP("info", "i", false, "Show latest macOS version")
-	macosCmd.Flags().BoolP("installer", "", false, "Show latest macOS installers")
-	// macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
-	macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote IPSW")
+	macosCmd.Flags().BoolP("list", "l", false, "Show latest macOS installers")
+	macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
+	// macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote installer")
+	viper.BindPFlag("download.macos.list", macosCmd.Flags().Lookup("list"))
+	viper.BindPFlag("download.macos.work-dir", macosCmd.Flags().Lookup("work-dir"))
+	// viper.BindPFlag("download.macos.kernel", macosCmd.Flags().Lookup("kernel"))
 }
 
 // macosCmd represents the macos command
 var macosCmd = &cobra.Command{
-	Use:   "macos",
-	Short: "Download and parse macOS IPSWs",
+	Use:           "macos",
+	Short:         "Download macOS installers",
+	SilenceUsage:  false,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		var err error
-		var builds []download.Build
-		var filteredBuilds []download.Build
+		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
+		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
+		viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
+		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
+		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
+		// viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
+		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
+		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
+		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		confirm, _ := cmd.Flags().GetBool("yes")
-		skipAll, _ := cmd.Flags().GetBool("skip-all")
-		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
+		cmd.Flags().Lookup("remove-commas").Hidden = true
 
+		// settings
+		proxy := viper.GetString("download.proxy")
+		insecure := viper.GetBool("download.insecure")
+		confirm := viper.GetBool("download.confirm")
+		skipAll := viper.GetBool("download.skip-all")
+		resumeAll := viper.GetBool("download.resume-all")
+		restartAll := viper.GetBool("download.restart-all")
 		// filters
-		device, _ := cmd.Flags().GetString("device")
-		doDownload, _ := cmd.Flags().GetStringArray("white-list")
-		doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
+		version := viper.GetString("download.version")
+		build := viper.GetString("download.build")
+		// flags
+		showInstallers := viper.GetBool("download.macos.list")
+		workDir := viper.GetString("download.macos.work-dir")
+		// remoteKernel := viper.GetString("download.macos.kernel")
 
-		iosInfo, _ := cmd.Flags().GetBool("info")
-		showInstallers, _ := cmd.Flags().GetBool("installer")
-		// workDir, _ := cmd.Flags().GetString("work-dir")
-		remoteKernel, _ := cmd.Flags().GetBool("kernel")
+		// verify args
+		if len(version) > 0 && len(build) > 0 {
+			return fmt.Errorf("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		}
 
-		var destPath string
-		if len(args) > 0 {
-			destPath = filepath.Clean(args[0])
+		prods, err := download.GetProductInfo()
+		if err != nil {
+			return err
 		}
 
 		if showInstallers {
-			if prods, err := download.GetProductInfo(); err != nil {
-				log.Error(err.Error())
-			} else {
-				fmt.Println(prods)
-				// for _, prod := range prods {
-				// 	// if prod.ProductID == "071-14766" {
-				// 	if prod.ProductID == "001-68446" {
-				// 		if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll); err != nil {
-				// 			log.Error(err.Error())
-				// 		}
-				// 	}
-				// }
-			}
+			fmt.Println(prods)
 			return nil
 		}
 
-		macOS, err := download.NewMacOsXML()
-		if err != nil {
-			return errors.Wrap(err, "failed to create itunes API")
+		if len(version) > 0 {
+			prods = prods.FilterByVersion(version)
 		}
 
-		if iosInfo {
-			latestVersion, err := macOS.GetLatestVersion()
-			if err != nil {
-				return errors.Wrap(err, "failed to get latest iOS version")
+		var prodList []string
+		for _, p := range prods {
+			prodList = append(prodList, fmt.Sprintf("%-35s%-8s - %-8s - %s", p.Title, p.Version, p.Build, p.PostDate.Format("01Jan06 15:04:05")))
+		}
+
+		if len(prodList) == 0 {
+			return fmt.Errorf("no installers found for given options")
+		}
+
+		var prod download.ProductInfo
+		if len(prodList) > 1 && len(build) == 0 {
+			choice := 0
+			prompt := &survey.Select{
+				Message:  "Choose an installer:",
+				Options:  prodList,
+				PageSize: 20,
 			}
-			fmt.Print(latestVersion)
-			return nil
-		}
-
-		builds, err = macOS.GetLatestBuilds(device)
-		if err != nil {
-			return errors.Wrap(err, "failed to get the latest builds")
-		}
-
-		for _, v := range builds {
-			if len(doDownload) > 0 {
-				if utils.StrSliceContains(doDownload, v.Identifier) {
-					filteredBuilds = append(filteredBuilds, v)
+			if err := survey.AskOne(prompt, &choice); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
 				}
-			} else if len(doNotDownload) > 0 {
-				if !utils.StrSliceContains(doNotDownload, v.Identifier) {
-					filteredBuilds = append(filteredBuilds, v)
-				}
-			} else {
-				filteredBuilds = append(filteredBuilds, v)
+				log.Fatal(err.Error())
 			}
-		}
-
-		if len(filteredBuilds) == 0 {
-			log.Fatal(fmt.Sprintf("no IPSWs match device %s %s", device, doDownload))
-		}
-
-		log.Debug("URLs to Download:")
-		for _, b := range filteredBuilds {
-			utils.Indent(log.Debug, 1)(b.FirmwareURL)
+			prod = prods[choice]
+		} else {
+			for _, p := range prods {
+				if version == p.Version || build == p.Build {
+					prod = p
+				}
+			}
 		}
 
 		cont := true
 		if !confirm {
-			cont = false
 			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredBuilds)),
+				Message: fmt.Sprintf("You are about to download the %s installer files. Continue?", prod.Title),
 			}
-			survey.AskOne(prompt, &cont)
+			if err := survey.AskOne(prompt, &cont); err != nil {
+				if err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				log.Fatal(err.Error())
+			}
 		}
-
 		if cont {
-			if remoteKernel {
-				for _, build := range filteredBuilds {
-					log.WithFields(log.Fields{
-						"device":  build.Identifier,
-						"build":   build.BuildVersion,
-						"version": build.ProductVersion,
-					}).Info("Getting Kernelcache")
-					zr, err := download.NewRemoteZipReader(build.FirmwareURL, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
-					if err != nil {
-						return errors.Wrap(err, "failed to open remote zip to OTA")
-					}
-					log.Info("Extracting remote kernelcache")
-					err = kernelcache.RemoteParse(zr, destPath)
-					if err != nil {
-						return errors.Wrap(err, "failed to download kernelcache from remote ota")
-					}
-				}
-			} else {
-				downloader := download.NewDownload(proxy, insecure, skipAll)
-				for _, build := range filteredBuilds {
-					destName := getDestName(build.FirmwareURL, removeCommas)
-					if _, err := os.Stat(destName); os.IsNotExist(err) {
-						log.WithFields(log.Fields{
-							"device":  build.Identifier,
-							"build":   build.BuildVersion,
-							"version": build.ProductVersion,
-						}).Info("Getting IPSW")
-						// download file
-						downloader.URL = build.FirmwareURL
-						downloader.Sha1 = build.FirmwareSHA1
-						downloader.DestName = destName
-						err = downloader.Do()
-						if err != nil {
-							return errors.Wrap(err, "failed to download file")
-						}
-						// append sha1 and filename to checksums file
-						f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-						if err != nil {
-							return errors.Wrap(err, "failed to open checksums.txt.sha1")
-						}
-						defer f.Close()
-						if _, err = f.WriteString(build.FirmwareSHA1 + "  " + destName + "\n"); err != nil {
-							return errors.Wrap(err, "failed to write to checksums.txt.sha1")
-						}
-					} else {
-						log.Warnf("ipsw already exists: %s", destName)
-					}
-				}
+			if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll, resumeAll, restartAll); err != nil {
+				return err
 			}
 		}
 

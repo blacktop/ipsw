@@ -13,7 +13,6 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -136,15 +135,6 @@ func (dtree *DeviceTree) GetModel() (string, error) {
 	return "", fmt.Errorf("failed to get model")
 }
 
-func isASCIIPrintable(s string) bool {
-	for _, r := range s {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return false
-		}
-	}
-	return true
-}
-
 func findDeviceTreesInList(list []string) []string {
 	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
 	dTrees := []string{}
@@ -160,7 +150,7 @@ func parseValue(value []byte) interface{} {
 	// remove trailing NULLs
 	value = bytes.TrimRight(value[:], "\x00")
 	// value is a string
-	if isASCIIPrintable(string(value)) {
+	if utils.IsASCII(string(value)) {
 		return string(value)
 	}
 	parts := bytes.Split(value, []byte("\x00"))
@@ -169,7 +159,7 @@ func parseValue(value []byte) interface{} {
 		var values []string
 		for _, part := range parts {
 			if len(string(part)) > 0 {
-				if isASCIIPrintable(string(part)) {
+				if utils.IsASCII(string(part)) {
 					values = append(values, string(part))
 				} // else {
 				// 	values = append(values, base64.StdEncoding.EncodeToString(value))
@@ -357,8 +347,7 @@ func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
 
 // Extract extracts DeviceTree(s) from ipsw
 func Extract(ipsw, destPath string) error {
-	log.Info("Extracting DeviceTree from IPSW")
-	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+	_, err := utils.Unzip(ipsw, destPath, func(f *zip.File) bool {
 		var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
 		if validDT.MatchString(f.Name) {
 			return true

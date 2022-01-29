@@ -31,26 +31,35 @@ type BuildManifest struct {
 }
 
 type buildIdentity struct {
-	ApBoardID               string
-	ApChipID                string
-	ApSecurityDomain        string
-	BbChipID                string
-	Info                    buildIdentityInfo
-	Manifest                map[string]buildIdentityManifestType
-	ProductMarketingVersion string
+	ApBoardID                     string
+	ApChipID                      string
+	ApSecurityDomain              string
+	BbActivationManifestKeyHash   []byte
+	BbChipID                      string
+	BbFDRSecurityKeyHash          []byte
+	BbProvisioningManifestKeyHash []byte
+	Info                          buildIdentityInfo
+	Manifest                      map[string]buildIdentityManifestType
+	PearlCertificationRootPub     []byte
+	ProductMarketingVersion       string
+	SEChipID                      string `plist:"SE,ChipID,omitempty"`
+	SavageChipID                  string `plist:"Savage,ChipID,omitempty"`
+	SavagePatchEpoch              string `plist:"Savage,PatchEpoch,omitempty"`
+	UniqueBuildID                 []byte
 }
 
 type buildIdentityInfo struct {
 	BuildNumber            string
-	BuildTrain             string
+	CodeName               string `plist:"BuildTrain,omitempty"`
 	DeviceClass            string
 	FDRSupport             bool
 	MinimumSystemPartition int
 	MobileDeviceMinVersion string
 	OSVarContentSize       int
 	RestoreBehavior        string
+	SystemPartitionPadding map[string]int
 	Variant                string
-	VariantContents        variantContents
+	VariantContents        map[string]string
 }
 
 type variantContents struct {
@@ -67,9 +76,10 @@ type variantContents struct {
 }
 
 type buildIdentityManifestType struct {
-	Digest  []byte
-	Info    buildIdentityManifestInfo
-	Trusted bool
+	Digest      []byte
+	BuildString string `plist:"BuildString,omitempty"`
+	Info        buildIdentityManifestInfo
+	Trusted     bool
 }
 type buildIdentityManifestInfo struct {
 	IsFTAB            bool
@@ -122,8 +132,8 @@ type restoreDeviceMap struct {
 }
 
 func (p *Plists) GetOSType() string {
-	if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents.OS) > 0 {
-		return p.BuildManifest.BuildIdentities[0].Info.VariantContents.OS
+	if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]) > 0 {
+		return p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]
 	}
 	if p.OTAInfo != nil {
 		return p.OTAInfo.MobileAssetProperties.ReleaseType
@@ -134,7 +144,7 @@ func (p *Plists) GetOSType() string {
 func (p *Plists) GetKernelType(name string) string {
 	for _, bID := range p.BuildManifest.BuildIdentities {
 		if strings.EqualFold(bID.Manifest["KernelCache"].Info.Path, name) {
-			return bID.Info.VariantContents.InstalledKernelCache
+			return bID.Info.VariantContents["InstalledKernelCache"]
 		}
 	}
 	return p.OTAInfo.MobileAssetProperties.ReleaseType
@@ -143,11 +153,38 @@ func (p *Plists) GetKernelType(name string) string {
 func (b *BuildManifest) GetKernelCaches() map[string][]string {
 	kernelCaches := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceContains(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path) {
+		if !utils.StrSliceHas(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path) {
 			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path)
 		}
 	}
 	return kernelCaches
+}
+
+func (b *BuildManifest) GetBootLoaders() map[string][]string {
+	bootLoaders := make(map[string][]string, len(b.BuildIdentities))
+	for _, bID := range b.BuildIdentities {
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path) {
+			if len(bID.Manifest["iBEC"].Info.Path) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path)
+			}
+		}
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
+			if len(bID.Manifest["iBoot"].Info.Path) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path)
+			}
+		}
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
+			if len(bID.Manifest["iBSS"].Info.Path) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path)
+			}
+		}
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
+			if len(bID.Manifest["LLB"].Info.Path) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path)
+			}
+		}
+	}
+	return bootLoaders
 }
 
 func (i *Plists) String() string {

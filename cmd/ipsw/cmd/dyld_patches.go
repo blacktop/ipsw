@@ -44,7 +44,7 @@ func init() {
 
 // patchesCmd represents the patches command
 var patchesCmd = &cobra.Command{
-	Use:   "patches [options] <dyld_shared_cache>",
+	Use:   "patches <dyld_shared_cache>",
 	Short: "Dump dyld patch info",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -81,33 +81,38 @@ var patchesCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if f.IsDyld4 {
+			return fmt.Errorf("this command does NOT support the NEW iOS15+ dyld_shared_caches yet")
+		}
+
 		if err := f.ParsePatchInfo(); err != nil {
 			return err
 		}
 
 		if len(imageName) > 0 {
-			if img := f.Image(imageName); img != nil {
-				if img.PatchableExports != nil {
-					if len(symbolName) > 0 {
-						for _, patch := range img.PatchableExports {
-							if strings.EqualFold(strings.ToLower(patch.Name), strings.ToLower(symbolName)) {
-								log.Infof("%s patch locations", patch.Name)
-								for _, loc := range patch.PatchLocations {
-									fmt.Println(loc)
-								}
+			image, err := f.Image(imageName)
+			if err != nil {
+				return fmt.Errorf("image not in %s: %v", dscPath, err)
+			}
+			if image.PatchableExports != nil {
+				if len(symbolName) > 0 {
+					for _, patch := range image.PatchableExports {
+						if strings.EqualFold(strings.ToLower(patch.Name), strings.ToLower(symbolName)) {
+							log.Infof("%s patch locations", patch.Name)
+							for _, loc := range patch.PatchLocations {
+								fmt.Println(loc.String(f.Headers[f.UUID].SharedRegionStart))
 							}
 						}
-					} else {
-						w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-						for _, patch := range img.PatchableExports {
-							fmt.Fprintf(w, "0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
-						}
-						w.Flush()
 					}
-
 				} else {
-					log.Warn("Image had no patch entries")
+					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+					for _, patch := range image.PatchableExports {
+						fmt.Fprintf(w, "0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+					}
+					w.Flush()
 				}
+			} else {
+				log.Warn("Image had no patch entries")
 			}
 		} else {
 			for _, img := range f.Images {

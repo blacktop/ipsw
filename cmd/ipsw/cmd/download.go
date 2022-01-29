@@ -1,59 +1,86 @@
+/*
+Copyright © 2021 blacktop
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+*/
 package cmd
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strings"
 
-	"github.com/AlecAivazis/survey/v2"
-	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+type downloadFlags struct {
+	Proxy        string
+	Insecure     bool
+	Confirm      bool
+	SkipAll      bool
+	ResumeAll    bool
+	RestartAll   bool
+	RemoveCommas bool
+
+	WhiteList []string
+	BlackList []string
+	Device    string
+	Model     string
+	Version   string
+	Build     string
+}
+
+var dFlg downloadFlags
+
 func init() {
 	rootCmd.AddCommand(downloadCmd)
-
 	// Persistent Flags which will work for this command and all subcommands
-	downloadCmd.PersistentFlags().String("proxy", "", "HTTP/HTTPS proxy")
-	downloadCmd.PersistentFlags().Bool("insecure", false, "do not verify ssl certs")
+	downloadCmd.PersistentFlags().StringVar(&dFlg.Proxy, "proxy", "", "HTTP/HTTPS proxy")
+	downloadCmd.PersistentFlags().BoolVar(&dFlg.Insecure, "insecure", false, "do not verify ssl certs")
+	downloadCmd.PersistentFlags().BoolVarP(&dFlg.Confirm, "confirm", "y", false, "do not prompt user for confirmation")
+	downloadCmd.PersistentFlags().BoolVar(&dFlg.SkipAll, "skip-all", false, "always skip resumable IPSWs")
+	downloadCmd.PersistentFlags().BoolVar(&dFlg.ResumeAll, "resume-all", false, "always resume resumable IPSWs")
+	downloadCmd.PersistentFlags().BoolVar(&dFlg.RestartAll, "restart-all", false, "always restart resumable IPSWs")
+	downloadCmd.PersistentFlags().BoolVarP(&dFlg.RemoveCommas, "remove-commas", "_", false, "replace commas in IPSW filename with underscores")
+	viper.BindPFlag("download.proxy", downloadCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.insecure", downloadCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.confirm", downloadCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.skip-all", downloadCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.resume-all", downloadCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.restart-all", downloadCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.remove-commas", downloadCmd.Flags().Lookup("remove-commas"))
 	// Filters
-	downloadCmd.PersistentFlags().StringArrayP("black-list", "", []string{viper.GetString("IPSW_DEVICE_BLACKLIST")}, "iOS device black list")
-	downloadCmd.PersistentFlags().StringArrayP("white-list", "", []string{viper.GetString("IPSW_DEVICE_WHITELIST")}, "iOS device white list")
-	downloadCmd.PersistentFlags().BoolP("yes", "y", false, "do not prompt user")
-	downloadCmd.PersistentFlags().BoolP("skip-all", "s", false, "Always skip resumable IPSWs")
-	downloadCmd.PersistentFlags().BoolP("remove-commas", "_", false, "replace commas in IPSW filename with underscores")
-	downloadCmd.PersistentFlags().StringP("version", "v", viper.GetString("IPSW_VERSION"), "iOS Version (i.e. 12.3.1)")
-	downloadCmd.PersistentFlags().StringP("device", "d", viper.GetString("IPSW_DEVICE"), "iOS Device (i.e. iPhone11,2)")
-	downloadCmd.PersistentFlags().StringP("build", "b", viper.GetString("IPSW_BUILD"), "iOS BuildID (i.e. 16F203)")
-}
-
-// LookupByURL searchs for a ipsw in an array by a download URL
-func LookupByURL(ipsws []download.IPSW, dlURL string) (download.IPSW, error) {
-	for _, i := range ipsws {
-		if strings.EqualFold(dlURL, i.URL) {
-			return i, nil
-		}
-	}
-	return download.IPSW{}, fmt.Errorf("unable to find %s in ipsws", dlURL)
-}
-
-func checkCanIJailbreak(version string) {
-	jbs, _ := download.GetJailbreaks()
-	if iCan, index, err := jbs.CanIBreak(version); err != nil {
-		log.Error(err.Error())
-	} else {
-		if iCan {
-			log.WithField("url", jbs.Jailbreaks[index].URL).Warnf("Yo, this shiz is jail breakable via %s B!!!!", jbs.Jailbreaks[index].Name)
-			utils.Indent(log.Warn, 2)(jbs.Jailbreaks[index].Caveats)
-		} else {
-			log.Warnf("Yo, ain't no one jailbreaking this shizz NOT even %s my dude!!!!", download.GetRandomResearcher())
-		}
-	}
+	downloadCmd.PersistentFlags().StringArrayVar(&dFlg.WhiteList, "white-list", []string{}, "iOS device white list")
+	downloadCmd.PersistentFlags().StringArrayVar(&dFlg.BlackList, "black-list", []string{}, "iOS device black list")
+	downloadCmd.PersistentFlags().StringVarP(&dFlg.Device, "device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	downloadCmd.PersistentFlags().StringVarP(&dFlg.Model, "model", "m", "", "iOS Model (i.e. D321AP)")
+	downloadCmd.PersistentFlags().StringVarP(&dFlg.Version, "version", "v", "", "iOS Version (i.e. 12.3.1)")
+	downloadCmd.PersistentFlags().StringVarP(&dFlg.Build, "build", "b", "", "iOS BuildID (i.e. 16F203)")
+	viper.BindPFlag("download.white-list", downloadCmd.Flags().Lookup("white-list"))
+	viper.BindPFlag("download.black-list", downloadCmd.Flags().Lookup("black-list"))
+	viper.BindPFlag("download.device", downloadCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.model", downloadCmd.Flags().Lookup("model"))
+	viper.BindPFlag("download.version", downloadCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.build", downloadCmd.Flags().Lookup("build"))
 }
 
 func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
@@ -62,33 +89,48 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 	var ipsws []download.IPSW
 	var filteredIPSWs []download.IPSW
 
-	// filters
-	version, _ := cmd.Flags().GetString("version")
-	device, _ := cmd.Flags().GetString("device")
-	doDownload, _ := cmd.Flags().GetStringArray("white-list")
-	doNotDownload, _ := cmd.Flags().GetStringArray("black-list")
-	build, _ := cmd.Flags().GetString("build")
+	viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
+	viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
+	viper.BindPFlag("download.confirm", cmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+	viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
+	viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 
+	// filters
+	device := viper.GetString("download.device")
+	// model := viper.GetString("download.model")
+	version := viper.GetString("download.version")
+	build := viper.GetString("download.build")
+	doDownload := viper.GetStringSlice("download.white-list")
+	doNotDownload := viper.GetStringSlice("download.black-list")
+
+	// verify args
+	if len(version) == 0 && len(build) == 0 {
+		return nil, fmt.Errorf("you must also supply a --version OR a --build (or use --latest)")
+	}
 	if len(version) > 0 && len(build) > 0 {
-		log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		return nil, fmt.Errorf("you cannot supply a --version AND a --build (they are mutually exclusive)")
 	}
 
 	if len(version) > 0 {
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to query ipsw.me api")
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
 		}
-	} else if len(build) > 0 {
+	} else { // using build
 		version, err = download.GetVersion(build)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to query ipsw.me api")
+			return nil, fmt.Errorf("failed to query ipsw.me api for buildID => version: %v", err)
 		}
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to query ipsw.me api")
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
 		}
-	} else {
-		return nil, fmt.Errorf("you must also supply a --version OR a --build (or use download latest)")
 	}
 
 	for _, i := range ipsws {
@@ -98,11 +140,11 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 			}
 		} else {
 			if len(doDownload) > 0 {
-				if utils.StrSliceContains(doDownload, i.Identifier) {
+				if utils.StrSliceHas(doDownload, i.Identifier) {
 					filteredIPSWs = append(filteredIPSWs, i)
 				}
 			} else if len(doNotDownload) > 0 {
-				if !utils.StrSliceContains(doNotDownload, i.Identifier) {
+				if !utils.StrSliceHas(doNotDownload, i.Identifier) {
 					filteredIPSWs = append(filteredIPSWs, i)
 				}
 			} else {
@@ -130,89 +172,18 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 }
 
 func getDestName(url string, removeCommas bool) string {
-	var destName string
 	if removeCommas {
-		destName = strings.Replace(path.Base(url), ",", "_", -1)
-	} else {
-		destName = path.Base(url)
+		return strings.Replace(path.Base(url), ",", "_", -1)
 	}
-	return destName
+	return path.Base(url)
 }
 
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
-	Use:   "download [options]",
-	Short: "Download and parse IPSW(s) from the internets",
-	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if Verbose {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		confirm, _ := cmd.Flags().GetBool("yes")
-		skipAll, _ := cmd.Flags().GetBool("skip-all")
-		removeCommas, _ := cmd.Flags().GetBool("remove-commas")
-
-		ipsws, err := filterIPSWs(cmd)
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-
-		log.Debug("URLs to Download:")
-		for _, i := range ipsws {
-			utils.Indent(log.Debug, 2)(i.URL)
-		}
-
-		cont := true
-		if !confirm {
-			// if filtered to a single device skip the prompt
-			if len(ipsws) > 1 {
-				cont = false
-				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(ipsws)),
-				}
-				survey.AskOne(prompt, &cont)
-			}
-		}
-
-		if cont {
-			for _, i := range ipsws {
-				destName := getDestName(i.URL, removeCommas)
-				if _, err := os.Stat(destName); os.IsNotExist(err) {
-					log.WithFields(log.Fields{
-						"device":  i.Identifier,
-						"build":   i.BuildID,
-						"version": i.Version,
-						"signed":  i.Signed,
-					}).Info("Getting IPSW")
-
-					downloader := download.NewDownload(proxy, insecure, skipAll)
-					downloader.URL = i.URL
-					downloader.Sha1 = i.SHA1
-					downloader.DestName = destName
-
-					err = downloader.Do()
-					if err != nil {
-						return errors.Wrap(err, "failed to download file")
-					}
-
-					// append sha1 and filename to checksums file
-					f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-					if err != nil {
-						return errors.Wrap(err, "failed to open checksums.txt.sha1")
-					}
-					defer f.Close()
-
-					if _, err = f.WriteString(i.SHA1 + "  " + destName + "\n"); err != nil {
-						return errors.Wrap(err, "failed to write to checksums.txt.sha1")
-					}
-				} else {
-					log.Warnf("ipsw already exists: %s", destName)
-				}
-			}
-		}
-		return nil
+	Use:   "download",
+	Short: "Download Apple Firmware files (and more)",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
 	},
 }

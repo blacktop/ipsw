@@ -1,10 +1,13 @@
 package dyld
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/bits"
+	"path/filepath"
 	"strings"
 
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 )
 
@@ -72,8 +75,14 @@ func (m maxSlide) String() string {
 	return fmt.Sprintf("0x%08X (ASLR entropy: %d-bits)", uint64(m), m.EntropyBits())
 }
 
+type magic [16]byte
+
+func (m magic) String() string {
+	return strings.Trim(string(m[:]), "\x00")
+}
+
 type CacheHeader struct {
-	Magic                     [16]byte       // e.g. "dyld_v0    i386"
+	Magic                     magic          // e.g. "dyld_v0    i386"
 	MappingOffset             uint32         // file offset to first dyld_cache_mapping_info
 	MappingCount              uint32         // number of dyld_cache_mapping_info entries
 	ImagesOffset              uint32         // file offset to first dyld_cache_image_info
@@ -132,7 +141,7 @@ type CacheHeader struct {
 	Unknown9                          uint32
 	NewFieldOffset                    uint64
 	NewFieldSize                      uint64
-	SubCachesUUID                     uint32
+	SubCachesInfoOffset               uint32
 	NumSubCaches                      uint32     // number of dyld_shared_cache .1,.2,.3 files
 	SymbolsSubCacheUUID               types.UUID // unique value for .symbols sub-cache
 	IsZero1                           uint64
@@ -192,6 +201,8 @@ type CacheMapping struct {
 type CacheMappingWithSlideInfo struct {
 	Name string `json:"name,omitempty"`
 	CacheMappingAndSlideInfo
+	SlideInfo slideInfo
+	Pages     []map[uint64]uint64
 }
 
 type CacheImageInfo struct {
@@ -202,8 +213,17 @@ type CacheImageInfo struct {
 	Pad            uint32
 }
 
+type Rebase struct {
+	CacheFileOffset uint64      `json:"cache_file_offset,omitempty"`
+	CacheVMAddress  uint64      `json:"cache_vm_address,omitempty"`
+	Target          uint64      `json:"target,omitempty"`
+	Pointer         interface{} `json:"pointer,omitempty"`
+	Symbol          string      `json:"symbol,omitempty"`
+}
+
 type slideInfo interface {
 	GetVersion() uint32
+	GetPageSize() uint32
 	SlidePointer(uint64) uint64
 }
 
@@ -223,6 +243,9 @@ type CacheSlideInfo struct {
 
 func (i CacheSlideInfo) GetVersion() uint32 {
 	return i.Version
+}
+func (i CacheSlideInfo) GetPageSize() uint32 {
+	return 0
 }
 func (i CacheSlideInfo) SlidePointer(ptr uint64) uint64 {
 	return ptr // TODO: finish this
@@ -248,6 +271,9 @@ type CacheSlideInfo2 struct {
 func (i CacheSlideInfo2) GetVersion() uint32 {
 	return i.Version
 }
+func (i CacheSlideInfo2) GetPageSize() uint32 {
+	return i.PageSize
+}
 func (i CacheSlideInfo2) SlidePointer(ptr uint64) uint64 {
 	if (ptr & ^i.DeltaMask) != 0 {
 		return (ptr & ^i.DeltaMask) + i.ValueAdd
@@ -263,21 +289,24 @@ const (
 )
 
 type CacheSlideInfo3 struct {
-	Version         uint32 // currently 3
-	PageSize        uint32 // currently 4096 (may also be 16384)
-	PageStartsCount uint32
+	Version         uint32 `json:"slide_version,omitempty"` // currently 3
+	PageSize        uint32 `json:"page_size,omitempty"`     // currently 4096 (may also be 16384)
+	PageStartsCount uint32 `json:"page_starts_count,omitempty"`
 	_               uint32 // padding for 64bit alignment
-	AuthValueAdd    uint64
+	AuthValueAdd    uint64 `json:"auth_value_add,omitempty"`
 	// PageStarts      []uint16 /* len() = page_starts_count */
 }
 
 func (i CacheSlideInfo3) GetVersion() uint32 {
 	return i.Version
 }
+func (i CacheSlideInfo3) GetPageSize() uint32 {
+	return i.PageSize
+}
 func (i CacheSlideInfo3) SlidePointer(ptr uint64) uint64 {
 	pointer := CacheSlidePointer3(ptr)
 	if pointer.Authenticated() {
-		return 0x180000000 + pointer.OffsetFromSharedCacheBase()
+		return i.AuthValueAdd + pointer.OffsetFromSharedCacheBase()
 	}
 	return pointer.SignExtend51()
 }
@@ -377,6 +406,34 @@ func (p CacheSlidePointer3) String() string {
 	return fmt.Sprintf("value: %#x, next: %02x", p.Value(), p.OffsetToNextPointer())
 }
 
+func (p CacheSlidePointer3) MarshalJSON() ([]byte, error) {
+	if p.Authenticated() {
+		return json.Marshal(&struct {
+			Value               uint64 `json:"value"`
+			OffsetToNextPointer uint64 `json:"next"`
+			DiversityData       uint64 `json:"diversity"`
+			HasAddressDiversity bool   `json:"addr_div"`
+			KeyName             string `json:"key"`
+			Authenticated       bool   `json:"authenticated"`
+		}{
+			Value:               p.Value(),
+			OffsetToNextPointer: p.OffsetToNextPointer(),
+			DiversityData:       p.DiversityData(),
+			HasAddressDiversity: p.HasAddressDiversity(),
+			KeyName:             KeyName(uint64(p)),
+			Authenticated:       p.Authenticated(),
+		})
+	} else {
+		return json.Marshal(&struct {
+			Value               uint64 `json:"value"`
+			OffsetToNextPointer uint64 `json:"next"`
+		}{
+			Value:               p.Value(),
+			OffsetToNextPointer: p.OffsetToNextPointer(),
+		})
+	}
+}
+
 type CacheSlideInfo4 struct {
 	Version          uint32 // currently 4
 	PageSize         uint32 // currently 4096 (may also be 16384)
@@ -392,6 +449,9 @@ type CacheSlideInfo4 struct {
 
 func (i CacheSlideInfo4) GetVersion() uint32 {
 	return i.Version
+}
+func (i CacheSlideInfo4) GetPageSize() uint32 {
+	return i.PageSize
 }
 func (i CacheSlideInfo4) SlidePointer(ptr uint64) uint64 {
 	value := ptr & ^i.DeltaMask
@@ -444,13 +504,31 @@ type CacheLocalSymbol64 struct {
 	types.Nlist64
 	Name         string
 	FoundInDylib string
+	Macho        *macho.File
 }
 
-func (ls CacheLocalSymbol64) String() string {
-	if len(ls.FoundInDylib) > 0 {
-		return fmt.Sprintf("0x%8x: %s, %s", ls.Value, ls.Name, ls.FoundInDylib)
+func (s CacheLocalSymbol64) String(color bool) string {
+	var sec string
+	var found string
+	if s.Macho != nil {
+		if s.Sect > 0 && s.Macho.Sections != nil {
+			sec = fmt.Sprintf("%s.%s", s.Macho.Sections[s.Sect-1].Seg, s.Macho.Sections[s.Sect-1].Name)
+		}
 	}
-	return fmt.Sprintf("0x%8x: %s", ls.Value, ls.Name)
+	if len(s.FoundInDylib) > 0 {
+		found = fmt.Sprintf("\t%s", filepath.Base(s.FoundInDylib))
+	}
+	if color {
+		return fmt.Sprintf("%s:\t%s\t%s\t%s",
+			symAddrColor("%#09x", s.Value),
+			symTypeColor("(%s)", s.Type.String(sec)),
+			symNameColor(s.Name),
+			symImageColor(found))
+	}
+	// if s.Nlist64.Desc.GetLibraryOrdinal() != 0 { // TODO: I haven't seen this trigger in the iPhone14,2_D63AP_19D5026g/dyld_shared_cache_arm64e I tested
+	// 	return fmt.Sprintf("%#09x:\t(%s|%s)\t%s%s", s.Value, s.Type.String(sec), s.Macho.LibraryOrdinalName(int(s.Nlist64.Desc.GetLibraryOrdinal())), s.Name, found)
+	// }
+	return fmt.Sprintf("%#09x:\t(%s)\t%s%s", s.Value, s.Type.String(sec), s.Name, found)
 }
 
 type CacheImageInfoExtra struct {
@@ -534,6 +612,9 @@ type CachePatchableLocation uint64
 func (p CachePatchableLocation) CacheOffset() uint64 {
 	return types.ExtractBits(uint64(p), 0, 32)
 }
+func (p CachePatchableLocation) Address(cacheBase uint64) uint64 {
+	return p.CacheOffset() + cacheBase
+}
 func (p CachePatchableLocation) High7() uint64 {
 	return types.ExtractBits(uint64(p), 32, 7)
 }
@@ -553,27 +634,21 @@ func (p CachePatchableLocation) Discriminator() uint64 {
 	return types.ExtractBits(uint64(p), 48, 16)
 }
 
-func (p CachePatchableLocation) String() string {
-	var pStr string
-	if p.Authenticated() && p.UsesAddressDiversity() {
-		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, diversity: 0x%04x, key: %s, auth: %t",
-			p.CacheOffset(),
-			p.Addend(),
-			p.Discriminator(),
-			KeyName(uint64(p)),
-			p.Authenticated(),
-		)
-	} else if p.Authenticated() && !p.UsesAddressDiversity() {
-		pStr = fmt.Sprintf("offset: 0x%08x, addend: %x, key: %s, auth: %t",
-			p.CacheOffset(),
-			p.Addend(),
-			KeyName(uint64(p)),
-			p.Authenticated(),
-		)
-	} else {
-		pStr = fmt.Sprintf("offset: 0x%08x", p.CacheOffset())
+func (p CachePatchableLocation) String(cacheBase uint64) string {
+	pStr := fmt.Sprintf("addr: %#x", p.Address(cacheBase))
+	if p.UsesAddressDiversity() {
+		pStr += fmt.Sprintf(", diversity: %#04x", p.Discriminator())
 	}
+	if p.Addend() > 0 {
+		pStr += fmt.Sprintf(", addend: %#x", p.Addend())
+	}
+	pStr += fmt.Sprintf(", key: %s, auth: %t", KeyName(uint64(p)), p.Authenticated())
 	return pStr
+}
+
+type SubCacheInfo struct {
+	UUID           types.UUID
+	CumulativeSize uint64
 }
 
 type CacheExportFlag int
@@ -608,17 +683,19 @@ func (f CacheExportFlag) StubAndResolver() bool {
 }
 func (f CacheExportFlag) String() string {
 	var fStr string
-	if f.Regular() {
-		fStr += "Regular "
+	if f.Regular() && !f.ReExport() {
+		fStr += "Regular"
 		if f.StubAndResolver() {
-			fStr += "(Has Resolver Function)"
+			fStr += "|Has Resolver Function"
 		} else if f.WeakDefinition() {
-			fStr += "(Weak Definition)"
+			fStr += "|Weak Definition"
 		}
 	} else if f.ThreadLocal() {
 		fStr += "Thread Local"
 	} else if f.Absolute() {
 		fStr += "Absolute"
+	} else if f.ReExport() {
+		fStr += "ReExport"
 	}
 	return strings.TrimSpace(fStr)
 }

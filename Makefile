@@ -12,9 +12,10 @@ build-deps: ## Install the build dependencies
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
-	$(GO_BIN) get -u github.com/spf13/cobra/cobra
-	$(GO_BIN) get -u golang.org/x/tools/cmd/cover
-	$(GO_BIN) get -u github.com/caarlos0/svu
+	$(GO_BIN) install golang.org/x/tools/...@latest
+	$(GO_BIN) install github.com/spf13/cobra/cobra
+	$(GO_BIN) get -d golang.org/x/tools/cmd/cover
+	$(GO_BIN) get -d github.com/caarlos0/svu@v1.4.1
 
 .PHONY: setup
 setup: build-deps dev-deps ## Install all the build and dev dependencies
@@ -22,13 +23,18 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@goreleaser build --rm-dist --skip-validate --single-target
+	@goreleaser build --rm-dist --snapshot --single-target
+
+.PHONY: snapshot
+snapshot: ## Run goreleaser snapshot
+	@echo " > Creating Snapshot ${NEXT_VERSION}"
+	@goreleaser --rm-dist --snapshot
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@goreleaser --rm-dist
+	@CUR_VERSION=${CUR_VERSION} NEXT_VERSION=${NEXT_VERSION} goreleaser --rm-dist
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release

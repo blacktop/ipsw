@@ -45,9 +45,11 @@ func init() {
 
 // dyldObjcCmd represents the objc command
 var dyldObjcCmd = &cobra.Command{
-	Use:   "objc [options] <dyld_shared_cache>",
-	Short: "Dump Objective-C Optimization Info",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "objc <dyld_shared_cache>",
+	Short:         "Dump Objective-C Optimization Info",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -86,21 +88,21 @@ var dyldObjcCmd = &cobra.Command{
 		defer f.Close()
 
 		if printClasses {
-			_, err := f.GetAllClasses(true)
+			_, err := f.GetAllObjCClasses(true)
 			if err != nil {
 				return err
 			}
 		}
 
 		if printSelectors {
-			_, err := f.GetAllSelectors(true)
+			_, err := f.GetAllObjCSelectors(true)
 			if err != nil {
 				return err
 			}
 		}
 
 		if printProtocols {
-			_, err := f.GetAllProtocols(true)
+			_, err := f.GetAllObjCProtocols(true)
 			if err != nil {
 				return err
 			}

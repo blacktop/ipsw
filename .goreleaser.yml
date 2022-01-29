@@ -6,9 +6,11 @@ before:
     - go mod download
     # you may remove this if you don't need go generate
     - go generate ./...
+    - ./hack/make/completions
+    - ./hack/make/json_mini
 builds:
   - main: ./cmd/ipsw
-    id: "darwin"
+    id: darwin
     binary: ipsw
     env:
       - CGO_ENABLED=1
@@ -17,27 +19,40 @@ builds:
     goarch:
       - amd64
       - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - main: ./cmd/ipsw
-    id: "others"
-    binary: ipsw
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - linux
-      - windows
-    goarch:
-      - amd64
-      - arm64
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-    gobinary: "go1.17"
+  # - main: ./cmd/ipsw
+  #   id: "others"
+  #   binary: ipsw
+  #   env:
+  #     - CGO_ENABLED=0
+  #   goos:
+  #     - linux
+  #     - windows
+  #   goarch:
+  #     - amd64
+  #     - arm64
+  #   mod_timestamp: "{{ .CommitTimestamp }}"
+  #   flags:
+  #     - -trimpath
+  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+universal_binaries:
+  - id: darwin
+    replace: false
 archives:
   - replacements:
       darwin: macOS
       amd64: x86_64
+      all: universal
     format_overrides:
       - goos: windows
         format: zip
+    files:
+      - completions/*
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
 brews:
   - tap:
       owner: blacktop
@@ -46,24 +61,61 @@ brews:
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
     dependencies:
-      - bat
+      - name: bat
+        type: optional
     install: |
       bin.install "ipsw"
+      bash_completion.install "completions/_bash" => "ipsw"
+      zsh_completion.install "completions/_zsh" => "_ipsw"
+      fish_completion.install "completions/_fish" => "ipsw.fish"
     test: |
       system "#{bin}/ipsw --version"
+rigs:
+  - name: ipsw
+    rig:
+      owner: blacktop
+      name: fish-food
+    homepage: https://github.com/blacktop/ipsw
+    description: Download and parse IPSWs
+    license: MIT
 checksum:
-  name_template: "checksums.txt"
+  name_template: "checksums.darwin.txt"
 signs:
   - artifacts: checksum
 changelog:
   sort: asc
+  use: github
+  groups:
+    - title: "New Features"
+      regexp: "^.*feat[(\\w)]*:+.*$"
+      order: 0
+    - title: "Bug fixes"
+      regexp: "^.*fix[(\\w)]*:+.*$"
+      order: 10
+    - title: Other work
+      order: 999
   filters:
     exclude:
       - "^docs:"
       - "^test:"
       - "^bumping"
       - "^Update"
+      - "^Delete"
       - "reorg"
       - "updates"
       - Merge pull request
+      - Merge remote-tracking branch
       - Merge branch
+release:
+  footer: |
+    ### Summary
+    **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .PreviousTag }}...{{ .Tag }}
+    ## What to do next?
+    - Follow us on [Twitter](https://twitter.com/blacktop__)
+    - Read the [documentation](https://blacktop.github.io/ipsw/docs/)
+announce:
+  skip: "{{gt .Patch 0}}"
+
+  twitter:
+    enabled: true
+    message_template: "ipsw {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
