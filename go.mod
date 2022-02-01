@@ -7,7 +7,7 @@ require (
 	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
-	github.com/blacktop/arm64-cgo v1.0.51
+	github.com/blacktop/arm64-cgo v1.0.52
 	github.com/blacktop/go-macho v1.1.88
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
@@ -18,7 +18,7 @@ require (
 	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/hashicorp/go-version v1.4.0
-	github.com/hinshun/vt10x v0.0.0-20220119200601-820417d04eec // indirect
+	github.com/hinshun/vt10x v0.0.0-20220127042424-3ca73d0126d7 // indirect
 	github.com/jinzhu/gorm v1.9.16
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
@@ -29,9 +29,9 @@ require (
 	github.com/spf13/viper v1.10.1
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v7 v7.3.2
-	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
-	golang.org/x/net v0.0.0-20220121210141-e204ce36a2ba
-	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
+	golang.org/x/crypto v0.0.0-20220131195533-30dcbda58838
+	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
+	golang.org/x/sys v0.0.0-20220128215802-99c3d69c2c27
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
