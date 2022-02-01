@@ -397,7 +397,7 @@ func Disassemble(d Disass) {
 					Encoding:    0,
 					Operation:   0,
 					Operands:    nil,
-					SetFlags:    false,
+					SetFlags:    0,
 					Disassembly: fmt.Sprintf(".long\t%#x ; (%s)\n", instrValue, err.Error()), // TODO: same with error enhancements above
 				})
 				continue
