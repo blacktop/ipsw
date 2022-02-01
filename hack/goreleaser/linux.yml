@@ -15,6 +15,10 @@ builds:
       - linux
     goarch:
       - amd64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}      
   - main: ./cmd/ipsw
     id: arm64
     binary: ipsw
@@ -25,7 +29,11 @@ builds:
       - linux
     goarch:
       - arm64
-
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    
 archives:
   - replacements:
       amd64: x86_64
