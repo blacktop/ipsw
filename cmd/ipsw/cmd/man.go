@@ -30,30 +30,25 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type manCmd struct {
-	cmd *cobra.Command
+// manCmd represents the man command
+var manCmd = &cobra.Command{
+	Use:                   "man",
+	Short:                 "Generates ipsw's command line manpages",
+	SilenceUsage:          true,
+	DisableFlagsInUseLine: true,
+	Hidden:                true,
+	Args:                  cobra.NoArgs,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		manPage, err := mcobra.NewManPageFromCobra(1, rootCmd.Root())
+		if err != nil {
+			return err
+		}
+
+		_, err = fmt.Fprint(os.Stdout, manPage.Build(roff.NewDocument()))
+		return err
+	},
 }
 
-func newManCmd() *manCmd {
-	root := &manCmd{}
-	cmd := &cobra.Command{
-		Use:                   "man",
-		Short:                 "Generates GoReleaser's command line manpages",
-		SilenceUsage:          true,
-		DisableFlagsInUseLine: true,
-		Hidden:                true,
-		Args:                  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			manPage, err := mcobra.NewManPageFromCobra(1, root.cmd.Root())
-			if err != nil {
-				return err
-			}
-
-			_, err = fmt.Fprint(os.Stdout, manPage.Build(roff.NewDocument()))
-			return err
-		},
-	}
-
-	root.cmd = cmd
-	return root
+func init() {
+	rootCmd.AddCommand(manCmd)
 }
