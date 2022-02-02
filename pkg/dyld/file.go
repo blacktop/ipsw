@@ -243,7 +243,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	}
 	// Verify magic
 	if !utils.StrSliceContains(knownMagic, string(ident[:16])) {
-		return nil, &FormatError{0, "invalid magic number", nil}
+		return nil, &FormatError{0, "invalid dyld_shared_cache magic", string(ident[:16])}
 	}
 
 	f.ByteOrder = binary.LittleEndian
@@ -278,7 +278,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 	// Verify magic
 	if !utils.StrSliceContains(knownMagic, string(ident[:16])) {
-		return &FormatError{0, "invalid magic number", nil}
+		return &FormatError{0, "invalid dyld_shared_cache magic", string(ident[:16])}
 	}
 
 	f.r[uuid] = r

@@ -105,7 +105,7 @@ func Pad(length int) string {
 // StrSliceContains returns true if string slice contains given string
 func StrSliceContains(slice []string, item string) bool {
 	for _, s := range slice {
-		if strings.Contains(strings.ToLower(item), strings.ToLower(s)) {
+		if strings.Contains(strings.ToLower(s), strings.ToLower(item)) {
 			return true
 		}
 	}
@@ -120,6 +120,37 @@ func StrSliceHas(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// FilterStrSlice removes all the strings that do NOT contain the filter from a string slice
+func FilterStrSlice(slice []string, filter string) []string {
+	var filtered []string
+	for _, s := range slice {
+		if strings.Contains(strings.ToLower(s), strings.ToLower(filter)) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// FilterStrFromSlice removes all the strings that contain the filter from a string slice
+func FilterStrFromSlice(slice []string, filter string) []string {
+	var filtered []string
+	for _, s := range slice {
+		if !strings.Contains(strings.ToLower(s), strings.ToLower(filter)) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// TrimPrefixStrSlice trims the prefix from all strings in string slice
+func TrimPrefixStrSlice(slice []string, prefix string) []string {
+	var trimmed []string
+	for _, s := range slice {
+		trimmed = append(trimmed, strings.TrimPrefix(s, prefix))
+	}
+	return trimmed
 }
 
 // RemoveStrFromSlice removes a single string from a string slice
