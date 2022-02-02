@@ -242,7 +242,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		return nil, err
 	}
 	// Verify magic
-	if !utils.StrSliceContains(knownMagic, string(ident[:16])) {
+	if !utils.StrSliceHas(knownMagic, strings.Trim(string(ident[:16]), "\x00")) {
 		return nil, &FormatError{0, "invalid dyld_shared_cache magic", string(ident[:16])}
 	}
 
@@ -277,7 +277,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		return err
 	}
 	// Verify magic
-	if !utils.StrSliceContains(knownMagic, string(ident[:16])) {
+	if !utils.StrSliceHas(knownMagic, strings.Trim(string(ident[:16]), "\x00")) {
 		return &FormatError{0, "invalid dyld_shared_cache magic", string(ident[:16])}
 	}
 
