@@ -7,6 +7,7 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
     - ./hack/make/completions
+    - ./hack/make/manpages
     - ./hack/make/json_mini
 builds:
   - main: ./cmd/ipsw
@@ -50,7 +51,10 @@ archives:
       - goos: windows
         format: zip
     files:
+      - README.md
+      - LICENSE    
       - completions/*
+      - manpages/*
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 brews:
@@ -60,6 +64,7 @@ brews:
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "Download and parse ipsw(s)"
+    license: MIT    
     dependencies:
       - name: bat
         type: optional
@@ -68,6 +73,7 @@ brews:
       bash_completion.install "completions/_bash" => "ipsw"
       zsh_completion.install "completions/_zsh" => "_ipsw"
       fish_completion.install "completions/_fish" => "ipsw.fish"
+      man1.install "manpages/ipsw.1.gz"
     test: |
       system "#{bin}/ipsw --version"
 rigs:

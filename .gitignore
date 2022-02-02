@@ -37,6 +37,7 @@ usr
 dist/
 test-caches/
 completions/
+manpages/
 *.txt
 *.prof
 *.download

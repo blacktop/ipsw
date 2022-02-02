@@ -23,6 +23,8 @@ require (
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/muesli/mango-cobra v0.0.0-20220201014606-122d08dcc447
+	github.com/muesli/roff v0.1.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.3.0
@@ -63,6 +65,8 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mitchellh/mapstructure v1.4.3 // indirect
+	github.com/muesli/mango v0.0.0-20220201014152-f7df5a1c5b4b // indirect
+	github.com/muesli/mango-pflag v0.0.0-20220201014449-d694870c5590 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
