@@ -58,6 +58,8 @@ func init() {
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
 
+	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
+
 	extractCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
 }
 
@@ -68,9 +70,11 @@ func isURL(str string) bool {
 
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
-	Use:   "extract <IPSW | URL> <DEST>",
-	Short: "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "extract <IPSW | URL> <DEST>",
+	Short:         "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -84,6 +88,18 @@ var extractCmd = &cobra.Command{
 		ibootFlag, _ := cmd.Flags().GetBool("iboot")
 		sepFlag, _ := cmd.Flags().GetBool("sep")
 		remote, _ := cmd.Flags().GetBool("remote")
+		dyldArches, _ := cmd.Flags().GetStringArray("dyld-arch")
+
+		if len(dyldArches) > 0 && !dyldFlag {
+			return errors.New("--dyld-arch or -a can only be used with --dyld or -d")
+		}
+		if len(dyldArches) > 0 {
+			for _, arch := range dyldArches {
+				if !utils.StrSliceHas([]string{"arm64", "arm64e", "x86_64", "x86_64h"}, arch) {
+					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
+				}
+			}
+		}
 
 		var destPath string
 		if len(args) > 1 {
@@ -216,7 +232,7 @@ var extractCmd = &cobra.Command{
 
 			if dyldFlag {
 				log.Info("Extracting dyld_shared_cache")
-				err := dyld.Extract(ipswPath, destPath)
+				err := dyld.Extract(ipswPath, destPath, dyldArches)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract dyld_shared_cache")
 				}
