@@ -40,6 +40,7 @@ type extractConfig struct {
 	MountPoint  string
 	Prefix      string
 	Glob        string
+	IsMacOS     bool
 }
 
 func unmount(device string) error {
@@ -77,6 +78,7 @@ func Extract(ipsw, destPath string, arches []string) error {
 		if utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") {
 			config.CacheFolder = macOSCacheFolder
 			config.CacheRegex = macOSCacheRegex
+			config.IsMacOS = true
 		} else {
 			config.CacheFolder = iOSCacheFolder
 			config.CacheRegex = iOSCacheRegex
@@ -105,33 +107,35 @@ func Extract(ipsw, destPath string, arches []string) error {
 			return err
 		}
 
-		if len(arches) == 0 {
-			prompt := &survey.MultiSelect{
-				Message:  "Which files would you like to extract:",
-				Options:  utils.TrimPrefixStrSlice(matches, config.Prefix),
-				PageSize: 15,
-			}
-			if err := survey.AskOne(prompt, &matches); err != nil {
-				if err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					return nil
+		if config.IsMacOS {
+			if len(arches) == 0 {
+				prompt := &survey.MultiSelect{
+					Message:  "Which files would you like to extract:",
+					Options:  utils.TrimPrefixStrSlice(matches, config.Prefix),
+					PageSize: 15,
 				}
-				return err
-			}
-		} else {
-			var filtered []string
-			for _, arch := range arches {
-				r := regexp.MustCompile(fmt.Sprintf("%s%s%s", config.CacheRegex, arch, regexEnding))
-				for _, match := range matches {
-					if r.MatchString(match) {
-						filtered = append(filtered, match)
+				if err := survey.AskOne(prompt, &matches); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						return nil
+					}
+					return err
+				}
+			} else {
+				var filtered []string
+				for _, arch := range arches {
+					r := regexp.MustCompile(fmt.Sprintf("%s%s%s", config.CacheRegex, arch, regexEnding))
+					for _, match := range matches {
+						if r.MatchString(match) {
+							filtered = append(filtered, match)
+						}
 					}
 				}
+				if len(filtered) == 0 {
+					return fmt.Errorf("no dyld_shared_cache files found matching the specified archs: %v", arches)
+				}
+				matches = filtered
 			}
-			if len(filtered) == 0 {
-				return fmt.Errorf("no dyld_shared_cache files found matching the specified archs: %v", arches)
-			}
-			matches = filtered
 		}
 
 		if len(matches) == 0 {
