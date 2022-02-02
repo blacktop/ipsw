@@ -82,4 +82,4 @@ Big shout out to Jonathan Levin's amazing books and his legendary `jtool`
 
 ## License
 
-MIT Copyright (c) 2018-2021 **blacktop**
+MIT Copyright (c) 2018-2022 **blacktop**
