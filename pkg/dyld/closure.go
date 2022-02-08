@@ -832,11 +832,11 @@ func (f *File) GetProgClosuresOffsets() ([]trie.Node, error) {
 	var size uint64
 
 	if f.Headers[f.UUID].ProgClosuresTrieAddr == 0 {
-		if f.Headers[f.UUID].ProgClosuresTrieWithSubCachesAddr == 0 {
+		if f.Headers[f.UUID].ProgramTrieAddr == 0 {
 			return nil, fmt.Errorf("cache does not contain prog closures trie info")
 		} else {
-			addr = f.Headers[f.UUID].ProgClosuresTrieWithSubCachesAddr
-			size = uint64(f.Headers[f.UUID].ProgClosuresTrieWithSubCachesSize)
+			addr = f.Headers[f.UUID].ProgramTrieAddr
+			size = uint64(f.Headers[f.UUID].ProgramTrieSize)
 		}
 	} else {
 		addr = f.Headers[f.UUID].ProgClosuresTrieAddr
@@ -883,11 +883,11 @@ func (f *File) GetProgClosureAddress(executablePath string) (uint64, error) {
 	var size uint64
 
 	if f.Headers[f.UUID].ProgClosuresTrieAddr == 0 {
-		if f.Headers[f.UUID].ProgClosuresTrieWithSubCachesAddr == 0 {
+		if f.Headers[f.UUID].ProgramTrieAddr == 0 {
 			return 0, fmt.Errorf("cache does not contain prog closures trie info")
 		} else {
-			addr = f.Headers[f.UUID].ProgClosuresTrieWithSubCachesAddr
-			size = uint64(f.Headers[f.UUID].ProgClosuresTrieWithSubCachesSize)
+			addr = f.Headers[f.UUID].ProgramTrieAddr
+			size = uint64(f.Headers[f.UUID].ProgramTrieSize)
 		}
 	} else {
 		addr = f.Headers[f.UUID].ProgClosuresTrieAddr
@@ -926,19 +926,19 @@ func (f *File) GetProgClosureAddress(executablePath string) (uint64, error) {
 func (f *File) GetProgClosureImageArray() error {
 	var addr uint64
 	var size uint64
-	// if f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr > 0 {
+	// if f.Headers[f.UUID].DylibsPblSetAddr > 0 {
 	// 	return fmt.Errorf("ipsw cannot parse dylibs image array info for macOS12+/iOS15+ yet 😔")
 	// }
 	// return fmt.Errorf("cache does not contain dylibs image array info")
 	if f.Headers[f.UUID].ProgClosuresAddr == 0 {
-		// if f.Headers[f.UUID].ProgClosuresWithSubCachesAddr == 0 {
-		if f.Headers[f.UUID].ProgClosuresWithSubCachesAddr > 0 {
+		// if f.Headers[f.UUID].ProgramsPblSetPoolAddr == 0 {
+		if f.Headers[f.UUID].ProgramsPblSetPoolAddr > 0 {
 			return fmt.Errorf("ipsw cannot parse prog launch closure info for macOS12+/iOS15+ yet 😔")
 		}
 		return fmt.Errorf("cache does not contain prog launch closure info")
 		// } else {
-		// 	addr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
-		// 	size = f.Headers[f.UUID].ProgClosuresWithSubCachesSize
+		// 	addr = f.Headers[f.UUID].ProgramsPblSetPoolAddr
+		// 	size = f.Headers[f.UUID].ProgramsPblSetPoolSize
 		// }
 	} else {
 		addr = f.Headers[f.UUID].ProgClosuresAddr
@@ -968,13 +968,13 @@ func (f *File) GetDylibsImageArray() error {
 	var size uint64
 
 	if f.Headers[f.UUID].DylibsImageArrayAddr == 0 {
-		if f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr > 0 {
+		if f.Headers[f.UUID].DylibsPblSetAddr > 0 {
 			return fmt.Errorf("ipsw cannot parse dylibs image array info for macOS12+/iOS15+ yet 😔")
 		}
 		return fmt.Errorf("cache does not contain dylibs image array info")
 		// } else {
-		// 	addr = f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr
-		// 	size = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr - f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr
+		// 	addr = f.Headers[f.UUID].DylibsPblSetAddr
+		// 	size = f.Headers[f.UUID].ProgramsPblSetPoolAddr - f.Headers[f.UUID].DylibsPblSetAddr
 		// }
 	} else {
 		addr = f.Headers[f.UUID].DylibsImageArrayAddr

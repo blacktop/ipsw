@@ -71,8 +71,12 @@ func (m maxSlide) EntropyBits() int {
 	return 32 - bits.LeadingZeros32(uint32(m.PossibleSlideValues()-1))
 }
 
+func (m maxSlide) Size() uint64 {
+	return uint64(m >> 20)
+}
+
 func (m maxSlide) String() string {
-	return fmt.Sprintf("0x%08X (ASLR entropy: %d-bits)", uint64(m), m.EntropyBits())
+	return fmt.Sprintf("0x%08X (ASLR entropy: %d-bits, %dMB)", uint64(m), m.EntropyBits(), m.Size())
 }
 
 type magic [16]byte
@@ -85,8 +89,8 @@ type CacheHeader struct {
 	Magic                     magic          // e.g. "dyld_v0    i386"
 	MappingOffset             uint32         // file offset to first dyld_cache_mapping_info
 	MappingCount              uint32         // number of dyld_cache_mapping_info entries
-	ImagesOffset              uint32         // file offset to first dyld_cache_image_info
-	ImagesCount               uint32         // number of dyld_cache_image_info entries
+	ImagesOffsetOld           uint32         // UNUSED: moved to imagesOffset to prevent older dsc_extarctors from crashing
+	ImagesCountOld            uint32         // UNUSED: moved to imagesCount to prevent older dsc_extarctors from crashing
 	DyldBaseAddress           uint64         // base address of dyld when cache was built
 	CodeSignatureOffset       uint64         // file offset of code signature blob
 	CodeSignatureSize         uint64         // size of code signature blob (zero means to end of file)
@@ -117,39 +121,40 @@ type CacheHeader struct {
 	   locallyBuiltCache      : 1,  // 0 for B&I built cache, 1 for locally built cache
 	   builtFromChainedFixups : 1,  // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
 	   padding                : 20; // TBD */
-	SharedRegionStart                 uint64   // base load address of cache if not slid
-	SharedRegionSize                  uint64   // overall size of region cache can be mapped into
-	MaxSlide                          maxSlide // runtime slide of cache can be between zero and this value
-	DylibsImageArrayAddr              uint64   // (unslid) address of ImageArray for dylibs in this cache
-	DylibsImageArraySize              uint64   // size of ImageArray for dylibs in this cache
-	DylibsTrieAddr                    uint64   // (unslid) address of trie of indexes of all cached dylibs
-	DylibsTrieSize                    uint64   // size of trie of cached dylib paths
-	OtherImageArrayAddr               uint64   // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
-	OtherImageArraySize               uint64   // size of ImageArray for dylibs and bundles with dlopen closures
-	OtherTrieAddr                     uint64   // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
-	OtherTrieSize                     uint64   // size of trie of dylibs and bundles with dlopen closures
-	MappingWithSlideOffset            uint32   // file offset to first dyld_cache_mapping_and_slide_info
-	MappingWithSlideCount             uint32   // number of dyld_cache_mapping_and_slide_info entries
-	DataMappingStartAddr              uint64   // (unslid) address of the __DATA mapping of the first sub cache (w/ no ext .1,.2 etc)
-	DylibsImageArrayWithSubCachesAddr uint64   // NOTICE: no Size, but you can calculate by progClosuresWithSubCachesAddr - dylibsImageArrayWithSubCachesAddr
-	ProgClosuresWithSubCachesAddr     uint64
-	ProgClosuresWithSubCachesSize     uint64
-	ProgClosuresTrieWithSubCachesAddr uint64
-	ProgClosuresTrieWithSubCachesSize uint32
-	Dyld4FormatVersion                formatVersion
-	Unknown8                          uint32
-	Unknown9                          uint32
-	NewFieldOffset                    uint64
-	NewFieldSize                      uint64
-	SubCachesInfoOffset               uint32
-	NumSubCaches                      uint32     // number of dyld_shared_cache .1,.2,.3 files
-	SymbolsSubCacheUUID               types.UUID // unique value for .symbols sub-cache
-	IsZero1                           uint64
-	IsZero2                           uint64
-	IsZero3                           uint64
-	IsZero4                           uint64
-	ImagesWithSubCachesOffset         uint32 // file offset to first dyld_cache_image_info
-	ImagesWithSubCachesCount          uint32 // number of dyld_cache_image_info entries
+	SharedRegionStart      uint64   // base load address of cache if not slid
+	SharedRegionSize       uint64   // overall size of region cache can be mapped into
+	MaxSlide               maxSlide // runtime slide of cache can be between zero and this value
+	DylibsImageArrayAddr   uint64   // (unslid) address of ImageArray for dylibs in this cache
+	DylibsImageArraySize   uint64   // size of ImageArray for dylibs in this cache
+	DylibsTrieAddr         uint64   // (unslid) address of trie of indexes of all cached dylibs
+	DylibsTrieSize         uint64   // size of trie of cached dylib paths
+	OtherImageArrayAddr    uint64   // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
+	OtherImageArraySize    uint64   // size of ImageArray for dylibs and bundles with dlopen closures
+	OtherTrieAddr          uint64   // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
+	OtherTrieSize          uint64   // size of trie of dylibs and bundles with dlopen closures
+	MappingWithSlideOffset uint32   // file offset to first dyld_cache_mapping_and_slide_info
+	MappingWithSlideCount  uint32   // number of dyld_cache_mapping_and_slide_info entries
+	/* NEW dyld4 fields */
+	DylibsPblStateArrayAddrUnused uint64         // unused
+	DylibsPblSetAddr              uint64         // (unslid) address of PrebuiltLoaderSet of all cached dylibs
+	ProgramsPblSetPoolAddr        uint64         // (unslid) address of pool of PrebuiltLoaderSet for each program
+	ProgramsPblSetPoolSize        uint64         // size of pool of PrebuiltLoaderSet for each program
+	ProgramTrieAddr               uint64         // (unslid) address of trie mapping program path to PrebuiltLoaderSet
+	ProgramTrieSize               uint32         //
+	OsVersion                     types.Version  // OS Version of dylibs in this cache for the main platform
+	AltPlatform                   types.Platform // e.g. iOSMac on macOS
+	AltOsVersion                  types.Version  // e.g. 14.0 for iOSMac
+	SwiftOptsOffset               uint64         // file offset to Swift optimizations header
+	SwiftOptsSize                 uint64         // size of Swift optimizations header
+	SubCacheArrayOffset           uint32         // file offset to first dyld_subcache_entry
+	SubCacheArrayCount            uint32         // number of subCache entries
+	SymbolFileUUID                types.UUID     // unique value for the shared cache file containing unmapped local symbols
+	RosettaReadOnlyAddr           uint64         // (unslid) address of the start of where Rosetta can add read-only/executable data
+	RosettaReadOnlySize           uint64         // maximum size of the Rosetta read-only/executable region
+	RosettaReadWriteAddr          uint64         // (unslid) address of the start of where Rosetta can add read-write data
+	RosettaReadWriteSize          uint64         // maximum size of the Rosetta read-write region
+	ImagesOffset                  uint32         // file offset to first dyld_cache_image_info
+	ImagesCount                   uint32         // number of dyld_cache_image_info entries
 }
 
 type CacheMappingInfo struct {
