@@ -319,7 +319,7 @@ var gitCmd = &cobra.Command{
 	SilenceUsage:  false,
 	SilenceErrors: false,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
+		var err error
 		var repos GithubRepos
 
 		if Verbose {
@@ -336,7 +336,7 @@ var gitCmd = &cobra.Command{
 		downloadProduct := viper.GetString("download.git.product")
 
 		if len(downloadProduct) == 0 {
-			repos, err := queryAppleGithubRepos(proxy, insecure)
+			repos, err = queryAppleGithubRepos(proxy, insecure)
 			if err != nil {
 				return err
 			}
