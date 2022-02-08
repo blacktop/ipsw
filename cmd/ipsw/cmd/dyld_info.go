@@ -58,16 +58,16 @@ type dylib struct {
 }
 
 type dyldInfo struct {
-	Magic           string                                      `json:"magic,omitempty"`
-	UUID            string                                      `json:"uuid,omitempty"`
-	Platform        string                                      `json:"platform,omitempty"`
-	MaxSlide        int                                         `json:"max_slide,omitempty"`
-	NumSubCaches    int                                         `json:"num_sub_caches,omitempty"`
-	SubCacheGroupID int                                         `json:"sub_cache_group_id,omitempty"`
-	SymSubCacheUUID string                                      `json:"sym_sub_cache_uuid,omitempty"`
-	Mappings        map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
-	CodeSignature   map[string]types.CodeSignature              `json:"code_signature,omitempty"`
-	Dylibs          []dylib                                     `json:"dylibs,omitempty"`
+	Magic              string                                      `json:"magic,omitempty"`
+	UUID               string                                      `json:"uuid,omitempty"`
+	Platform           string                                      `json:"platform,omitempty"`
+	MaxSlide           int                                         `json:"max_slide,omitempty"`
+	SubCacheArrayCount int                                         `json:"num_sub_caches,omitempty"`
+	SubCacheGroupID    int                                         `json:"sub_cache_group_id,omitempty"`
+	SymSubCacheUUID    string                                      `json:"sym_sub_cache_uuid,omitempty"`
+	Mappings           map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
+	CodeSignature      map[string]types.CodeSignature              `json:"code_signature,omitempty"`
+	Dylibs             []dylib                                     `json:"dylibs,omitempty"`
 }
 
 // infoCmd represents the info command
@@ -310,7 +310,7 @@ var dyldInfoCmd = &cobra.Command{
 			if f.Headers[f.UUID].ProgClosuresTrieAddr != 0 {
 				pclosureAddr = f.Headers[f.UUID].ProgClosuresAddr
 			} else {
-				pclosureAddr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
+				pclosureAddr = f.Headers[f.UUID].ProgramsPblSetPoolAddr
 			}
 			pcs, err := f.GetProgClosuresOffsets()
 			if err != nil {

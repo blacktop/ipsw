@@ -33,8 +33,8 @@ func (dch CacheHeader) String() string {
 		bytes.Trim(magicBytes, "\x00"),
 		dch.MappingOffset,
 		dch.MappingCount,
-		dch.ImagesOffset,
-		dch.ImagesCount,
+		dch.ImagesOffsetOld,
+		dch.ImagesCountOld,
 		dch.DyldBaseAddress,
 		dch.CodeSignatureOffset,
 		dch.CodeSignatureSize,
@@ -265,13 +265,13 @@ func (f *File) getSubCacheInfo() string {
 	var output string
 	if f.IsDyld4 {
 		var symSCUUID string
-		if !f.Headers[f.UUID].SymbolsSubCacheUUID.IsNull() {
-			symSCUUID = fmt.Sprintf("Symbol Cache UUID = %s\n", f.Headers[f.UUID].SymbolsSubCacheUUID)
+		if !f.Headers[f.UUID].SymbolFileUUID.IsNull() {
+			symSCUUID = fmt.Sprintf("Symbol Cache UUID = %s\n", f.Headers[f.UUID].SymbolFileUUID)
 		}
 		output = fmt.Sprintf(
 			"Num SubCaches     = %d\n"+
 				"%s",
-			f.Headers[f.UUID].NumSubCaches,
+			f.Headers[f.UUID].SubCacheArrayCount,
 			symSCUUID,
 		)
 	}
@@ -308,16 +308,16 @@ func (f *File) getCodeSignature(uuid types.UUID) string {
 
 func (f *File) getImagesTextInfo(uuid types.UUID) string {
 	var output string
-	imagesCount := f.Headers[uuid].ImagesCount
-	imageHumanSize := int(f.Headers[uuid].ImagesCount) * binary.Size(CacheImageInfo{}) / 1024
-	imagesOffset := int(f.Headers[uuid].ImagesOffset)
+	imagesCount := f.Headers[uuid].ImagesCountOld
+	imageHumanSize := int(f.Headers[uuid].ImagesCountOld) * binary.Size(CacheImageInfo{}) / 1024
+	imagesOffset := int(f.Headers[uuid].ImagesOffsetOld)
 	imagesSize := int(imagesCount) * binary.Size(CacheImageInfo{})
 
-	if f.Headers[uuid].ImagesOffset == 0 && f.Headers[uuid].ImagesCount == 0 {
-		imagesCount = f.Headers[uuid].ImagesWithSubCachesCount
-		imageHumanSize = int(f.Headers[uuid].ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{}) / 1024
-		imagesOffset = int(f.Headers[uuid].ImagesWithSubCachesOffset)
-		imagesSize = int(f.Headers[uuid].ImagesWithSubCachesCount) * binary.Size(CacheImageInfo{})
+	if f.Headers[uuid].ImagesOffsetOld == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+		imagesCount = f.Headers[uuid].ImagesCount
+		imageHumanSize = int(f.Headers[uuid].ImagesCount) * binary.Size(CacheImageInfo{}) / 1024
+		imagesOffset = int(f.Headers[uuid].ImagesOffset)
+		imagesSize = int(f.Headers[uuid].ImagesCount) * binary.Size(CacheImageInfo{})
 	}
 
 	if imagesCount > 0 || imagesOffset > 0 || imagesSize > 0 {
@@ -378,11 +378,11 @@ func (f *File) getProgClosures(uuid types.UUID) string {
 			f.Headers[uuid].ProgClosuresSize/(1024*1024),
 			f.Headers[uuid].ProgClosuresAddr,
 			f.Headers[uuid].ProgClosuresAddr+f.Headers[uuid].ProgClosuresSize)
-	} else if f.Headers[uuid].ProgClosuresWithSubCachesAddr > 0 {
+	} else if f.Headers[uuid].ProgramsPblSetPoolAddr > 0 {
 		output = fmt.Sprintf("Closures:                       %3dMB, address: 0x%09X -> 0x%09X\n",
-			f.Headers[uuid].ProgClosuresWithSubCachesSize/(1024*1024),
-			f.Headers[uuid].ProgClosuresWithSubCachesAddr,
-			f.Headers[uuid].ProgClosuresWithSubCachesAddr+f.Headers[uuid].ProgClosuresWithSubCachesSize)
+			f.Headers[uuid].ProgramsPblSetPoolSize/(1024*1024),
+			f.Headers[uuid].ProgramsPblSetPoolAddr,
+			f.Headers[uuid].ProgramsPblSetPoolAddr+f.Headers[uuid].ProgramsPblSetPoolSize)
 	}
 	return output
 }
@@ -394,11 +394,11 @@ func (f *File) getProgClosuresTrie(uuid types.UUID) string {
 			f.Headers[uuid].ProgClosuresTrieSize/1024,
 			f.Headers[uuid].ProgClosuresTrieAddr,
 			f.Headers[uuid].ProgClosuresTrieAddr+f.Headers[uuid].ProgClosuresTrieSize)
-	} else if f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr > 0 {
+	} else if f.Headers[uuid].ProgramTrieAddr > 0 {
 		output = fmt.Sprintf("Closures Trie:                  %3dKB, address: 0x%09X -> 0x%09X\n",
-			f.Headers[uuid].ProgClosuresTrieWithSubCachesSize/1024,
-			f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr,
-			f.Headers[uuid].ProgClosuresTrieWithSubCachesAddr+uint64(f.Headers[uuid].ProgClosuresTrieWithSubCachesSize))
+			f.Headers[uuid].ProgramTrieSize/1024,
+			f.Headers[uuid].ProgramTrieAddr,
+			f.Headers[uuid].ProgramTrieAddr+uint64(f.Headers[uuid].ProgramTrieSize))
 	}
 	return output
 }

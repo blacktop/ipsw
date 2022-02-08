@@ -127,11 +127,11 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 
-	if ff.Headers[ff.UUID].ImagesOffset == 0 && ff.Headers[ff.UUID].ImagesCount == 0 {
+	if ff.Headers[ff.UUID].ImagesOffsetOld == 0 && ff.Headers[ff.UUID].ImagesCountOld == 0 {
 
 		ff.IsDyld4 = true // NEW iOS15 dyld4 style caches
 
-		for i := 1; i <= int(ff.Headers[ff.UUID].NumSubCaches); i++ {
+		for i := 1; i <= int(ff.Headers[ff.UUID].SubCacheArrayCount); i++ {
 			log.WithFields(log.Fields{
 				"cache": fmt.Sprintf("%s.%d", name, i),
 			}).Debug("Parsing SubCache")
@@ -156,7 +156,7 @@ func Open(name string) (*File, error) {
 			}
 		}
 
-		if !ff.Headers[ff.UUID].SymbolsSubCacheUUID.IsNull() {
+		if !ff.Headers[ff.UUID].SymbolFileUUID.IsNull() {
 			log.WithFields(log.Fields{
 				"cache": name + ".symbols",
 			}).Debug("Parsing SubCache")
@@ -170,8 +170,8 @@ func Open(name string) (*File, error) {
 				return nil, err
 			}
 
-			if uuid != ff.Headers[ff.UUID].SymbolsSubCacheUUID {
-				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid, ff.Headers[ff.UUID].SymbolsSubCacheUUID)
+			if uuid != ff.Headers[ff.UUID].SymbolFileUUID {
+				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid, ff.Headers[ff.UUID].SymbolFileUUID)
 			}
 
 			ff.symUUID = uuid
@@ -360,12 +360,12 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	// Read dyld images.
 	var imagesCount uint32
-	if f.Headers[uuid].ImagesOffset > 0 {
+	if f.Headers[uuid].ImagesOffsetOld > 0 {
+		imagesCount = f.Headers[uuid].ImagesCountOld
+		sr.Seek(int64(f.Headers[uuid].ImagesOffsetOld), io.SeekStart)
+	} else {
 		imagesCount = f.Headers[uuid].ImagesCount
 		sr.Seek(int64(f.Headers[uuid].ImagesOffset), io.SeekStart)
-	} else {
-		imagesCount = f.Headers[uuid].ImagesWithSubCachesCount
-		sr.Seek(int64(f.Headers[uuid].ImagesWithSubCachesOffset), io.SeekStart)
 	}
 
 	if len(f.Images) == 0 {
@@ -434,7 +434,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			// 	return nil, err
 			// }
 			var localSymEntry CacheLocalSymbolsEntry
-			if f.Headers[uuid].ImagesOffset == 0 && f.Headers[uuid].ImagesCount == 0 { // NEW iOS15 dyld4 style caches
+			if f.Headers[uuid].ImagesOffsetOld == 0 && f.Headers[uuid].ImagesCountOld == 0 { // NEW iOS15 dyld4 style caches
 				if err := binary.Read(sr, f.ByteOrder, &localSymEntry); err != nil {
 					return err
 				}
@@ -570,9 +570,9 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		}
 	}
 
-	if f.Headers[uuid].NumSubCaches > 0 && f.Headers[uuid].SubCachesInfoOffset > 0 {
-		sr.Seek(int64(f.Headers[uuid].SubCachesInfoOffset), io.SeekStart)
-		f.SubCacheInfo = make([]SubCacheInfo, f.Headers[uuid].NumSubCaches)
+	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset > 0 {
+		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
+		f.SubCacheInfo = make([]SubCacheInfo, f.Headers[uuid].SubCacheArrayCount)
 		if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
 			return err
 		}
@@ -583,7 +583,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 func (f *File) ParseImageArrays() error {
 	// Read dyld image array info
-	if f.Headers[f.UUID].DylibsImageArrayAddr > 0 || f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr > 0 {
+	if f.Headers[f.UUID].DylibsImageArrayAddr > 0 || f.Headers[f.UUID].DylibsPblSetAddr > 0 {
 		if err := f.GetDylibsImageArray(); err != nil {
 			return fmt.Errorf("failed to parse dylibs image array: %v", err)
 		}
@@ -597,7 +597,7 @@ func (f *File) ParseImageArrays() error {
 	}
 
 	// Read program closure image array info
-	if f.Headers[f.UUID].ProgClosuresTrieAddr > 0 || f.Headers[f.UUID].ProgClosuresTrieWithSubCachesAddr > 0 {
+	if f.Headers[f.UUID].ProgClosuresTrieAddr > 0 || f.Headers[f.UUID].ProgramTrieAddr > 0 {
 		if err := f.GetProgClosureImageArray(); err != nil {
 			return fmt.Errorf("failed to parse program launch closures: %v", err)
 		}

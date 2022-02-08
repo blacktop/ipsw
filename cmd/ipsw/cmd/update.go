@@ -63,6 +63,7 @@ type githubRelease struct {
 	ID          int            `json:"id,omitempty"`
 	URL         string         `json:"url,omitempty"`
 	HtmlURL     string         `json:"html_url,omitempty"`
+	TarballURL  string         `json:"tarball_url,omitempty"`
 	Tag         string         `json:"tag_name,omitempty"`
 	CreatedAt   time.Time      `json:"created_at,omitempty"`
 	PublishedAt time.Time      `json:"published_at,omitempty"`
