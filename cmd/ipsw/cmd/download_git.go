@@ -336,6 +336,7 @@ var gitCmd = &cobra.Command{
 		downloadProduct := viper.GetString("download.git.product")
 
 		if len(downloadProduct) == 0 {
+			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
 			repos, err = queryAppleGithubRepos(proxy, insecure)
 			if err != nil {
 				return err
@@ -369,6 +370,9 @@ var gitCmd = &cobra.Command{
 			destName += ".tar.gz"
 
 			if _, err := os.Stat(destName); os.IsNotExist(err) {
+				log.WithFields(log.Fields{
+					"file": destName,
+				}).Info("Downloading")
 				// download file
 				downloader := download.NewDownload(proxy, insecure, false, false, false, false)
 				downloader.URL = latestTag.TarURL
