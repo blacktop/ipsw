@@ -16,6 +16,7 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download macos**](#download-macos)
 - [**download dev**](#download-dev)
 - [**download oss**](#download-oss)
+- [**download git**](#download-git)
 - [**download rss**](#download-rss)
 - [**download tss**](#download-tss)
 
@@ -543,6 +544,22 @@ List all downloads
       }
    }
 }
+```
+
+## **download git**
+
+> Download [apple-oss-distributions](https://github.com/apple-oss-distributions) tarballs
+
+Download all latest
+
+```
+❯ ipsw download git
+```
+
+Download single product
+
+```
+❯ ipsw download git --product dyld
 ```
 
 ## **download rss**
