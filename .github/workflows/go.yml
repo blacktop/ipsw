@@ -226,10 +226,10 @@ jobs:
         if: matrix.platform == 'macos-11'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
-      - name: Run dyld symaddr (ALL)
-        if: matrix.platform == 'macos-11'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
+      # - name: Run dyld symaddr (ALL)
+      #   if: matrix.platform == 'macos-11'
+      #   run: |
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
 
       - name: Run dyld macho
         if: matrix.platform == 'macos-11'
