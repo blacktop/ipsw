@@ -42,22 +42,21 @@ import (
 func init() {
 	dyldCmd.AddCommand(dyldDumpCmd)
 
-	// dyldDumpCmd.Flags().Uint64P("offset", "f", 0, "File offset")
-	// dyldDumpCmd.Flags().Uint64P("vaddr", "v", 0, "Virtual Address")
 	dyldDumpCmd.Flags().Uint64P("size", "s", 0, "Size of data in bytes")
 	dyldDumpCmd.Flags().Uint64P("count", "c", 0, "The number of total items to display")
-
 	dyldDumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
-	dyldDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
+	dyldDumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
 	dyldDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
 	dyldDumpCmd.Flags().Bool("color", false, "Force color (for piping to less etc)")
+
 	viper.BindPFlag("dyld.dump.arch", dyldDumpCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("dyld.dump.size", dyldDumpCmd.Flags().Lookup("size"))
 	viper.BindPFlag("dyld.dump.count", dyldDumpCmd.Flags().Lookup("count"))
 	viper.BindPFlag("dyld.dump.addr", dyldDumpCmd.Flags().Lookup("addr"))
-	viper.BindPFlag("dyld.dump.hex", dyldDumpCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("dyld.dump.bytes", dyldDumpCmd.Flags().Lookup("bytes"))
 	viper.BindPFlag("dyld.dump.output", dyldDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("dyld.dump.color", dyldDumpCmd.Flags().Lookup("color"))
+
 	dyldDumpCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -72,33 +71,29 @@ var dyldDumpCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
 		size := viper.GetUint64("dyld.dump.size")
 		count := viper.GetUint64("dyld.dump.count")
 		asAddrs := viper.GetBool("dyld.dump.addr")
-		asHex := viper.GetBool("dyld.dump.hex")
+		asBytes := viper.GetBool("dyld.dump.bytes")
 		outFile := viper.GetString("dyld.dump.output")
 		forceColor := viper.GetBool("dyld.dump.color")
 
-		if forceColor {
-			color.NoColor = false
-		}
+		color.NoColor = forceColor
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")
 		}
 
-		if asAddrs && asHex {
-			return fmt.Errorf("you can only use --addr OR --hex")
-		} else if !asAddrs && !asHex {
-			asHex = true
-			if size == 0 && count == 0 {
-				log.Info("Setting --size=256")
-				size = 256
-			}
-		} else if asAddrs && !asHex {
+		if asAddrs {
 			if size == 0 && count == 0 {
 				log.Info("Setting --count=20")
 				count = 20
+			}
+		} else {
+			if size == 0 && count == 0 {
+				log.Info("Setting --size=256")
+				size = 256
 			}
 		}
 
@@ -146,7 +141,30 @@ var dyldDumpCmd = &cobra.Command{
 				return err
 			}
 
-			if asHex {
+			if asAddrs {
+				addrs := make([]uint64, count)
+				if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, addrs); err != nil {
+					return err
+				}
+				if len(outFile) > 0 {
+					o, err := os.Create(outFile)
+					if err != nil {
+						return err
+					}
+					w := bufio.NewWriter(o)
+					for _, a := range addrs {
+						w.WriteString(fmt.Sprintf("%#x\n", f.SlideInfo.SlidePointer(a)))
+					}
+				} else {
+					for _, a := range addrs {
+						fmt.Printf("%#x\n", f.SlideInfo.SlidePointer(a))
+					}
+				}
+			} else if asBytes {
+				if _, err := os.Stdout.Write(dat); err != nil {
+					return fmt.Errorf("failed to write bytes to stdout: %s", err)
+				}
+			} else {
 				if len(outFile) > 0 {
 					ioutil.WriteFile(outFile, dat, 0755)
 					log.Infof("Wrote data to file %s", outFile)
@@ -175,25 +193,6 @@ var dyldDumpCmd = &cobra.Command{
 						}
 					}
 					fmt.Println(utils.HexDump(dat, addr))
-				}
-			} else if asAddrs {
-				addrs := make([]uint64, count)
-				if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, addrs); err != nil {
-					return err
-				}
-				if len(outFile) > 0 {
-					o, err := os.Create(outFile)
-					if err != nil {
-						return err
-					}
-					w := bufio.NewWriter(o)
-					for _, a := range addrs {
-						w.WriteString(fmt.Sprintf("%#x\n", f.SlideInfo.SlidePointer(a)))
-					}
-				} else {
-					for _, a := range addrs {
-						fmt.Printf("%#x\n", f.SlideInfo.SlidePointer(a))
-					}
 				}
 			}
 		}
