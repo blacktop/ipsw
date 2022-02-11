@@ -38,8 +38,7 @@ builds:
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 
 archives:
-  - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-    replacements:
+  - replacements:
       amd64: x86_64
     files:
       - README.md
@@ -51,8 +50,7 @@ checksum:
   name_template: 'checksums.linux.txt'
 
 nfpms:
-  - file_name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-    id: packages
+  - id: packages
     homepage:  https://github.com/blacktop/ipsw
     description: |-
       iOS/macOS Research Swiss Army Knife.
@@ -82,6 +80,8 @@ nfpms:
         dst: /usr/share/doc/ipsw/copyright
         file_info:
           mode: 0644
+    replacements:
+      amd64: x86_64          
     formats:
     - apk
     - deb
