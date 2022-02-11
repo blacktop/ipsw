@@ -79,19 +79,26 @@ var dyldDumpCmd = &cobra.Command{
 		outFile := viper.GetString("dyld.dump.output")
 		forceColor := viper.GetBool("dyld.dump.color")
 
-		color.NoColor = forceColor
+		color.NoColor = !forceColor
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")
+		} else if asAddrs && asBytes {
+			return fmt.Errorf("you can only use --addr OR --bytes")
+		} else if asAddrs && size > 0 {
+			return fmt.Errorf("you can only use --addr with --count")
+		} else if asBytes && count > 0 {
+			return fmt.Errorf("you can only use --bytes with --size")
 		}
 
 		if asAddrs {
-			if size == 0 && count == 0 {
+			if count == 0 {
 				log.Info("Setting --count=20")
 				count = 20
 			}
+			size = count * uint64(binary.Size(uint64(0)))
 		} else {
-			if size == 0 && count == 0 {
+			if size == 0 {
 				log.Info("Setting --size=256")
 				size = 256
 			}
@@ -100,10 +107,6 @@ var dyldDumpCmd = &cobra.Command{
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
 			return err
-		}
-
-		if asAddrs && size == 0 {
-			size = count * uint64(binary.Size(uint64(0)))
 		}
 
 		dscPath := filepath.Clean(args[0])
