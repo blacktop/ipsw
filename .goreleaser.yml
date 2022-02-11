@@ -43,8 +43,7 @@ universal_binaries:
   - id: darwin
     replace: false
 archives:
-  - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-    replacements:
+  - replacements:
       darwin: macOS
       amd64: x86_64
       all: universal
