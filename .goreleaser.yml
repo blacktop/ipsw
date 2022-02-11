@@ -43,7 +43,8 @@ universal_binaries:
   - id: darwin
     replace: false
 archives:
-  - replacements:
+  - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    replacements:
       darwin: macOS
       amd64: x86_64
       all: universal
@@ -52,7 +53,7 @@ archives:
         format: zip
     files:
       - README.md
-      - LICENSE    
+      - LICENSE
       - completions/*
       - manpages/*
 snapshot:
@@ -63,8 +64,8 @@ brews:
       name: homebrew-tap
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
-    description: "Download and parse ipsw(s)"
-    license: MIT    
+    description: "iOS/macOS Research Swiss Army Knife"
+    license: MIT
     dependencies:
       - name: bat
         type: optional
@@ -82,12 +83,14 @@ rigs:
       owner: blacktop
       name: fish-food
     homepage: https://github.com/blacktop/ipsw
-    description: Download and parse IPSWs
+    description: iOS/macOS Research Swiss Army Knife
     license: MIT
 checksum:
   name_template: "checksums.darwin.txt"
 signs:
   - artifacts: checksum
+sboms:
+  - artifacts: archive
 changelog:
   sort: asc
   use: github

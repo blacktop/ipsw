@@ -18,7 +18,7 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}      
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
   - main: ./cmd/ipsw
     id: arm64
     binary: ipsw
@@ -33,13 +33,66 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-    
+
 archives:
   - replacements:
       amd64: x86_64
     name_template: "ipsw_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
+      - README.md
+      - LICENSE
       - completions/*
+      - manpages/*
 
 checksum:
   name_template: 'checksums.linux.txt'
+
+nfpms:
+  - file_name_template: '{{ .ConventionalFileName }}'
+    id: packages
+    homepage:  https://github.com/blacktop/ipsw
+    description: |-
+      iOS/macOS Research Swiss Army Knife.
+    maintainer: Blacktop <https://github.com/blacktop>
+    license: MIT
+    vendor: Blacktop
+    bindir: /usr/bin
+    section: utils
+    contents:
+      - src: ./completions/_bash
+        dst: /usr/share/bash-completion/completions/ipsw
+        file_info:
+          mode: 0644
+      - src: ./completions/_fish
+        dst: /usr/share/fish/completions/ipsw.fish
+        file_info:
+          mode: 0644
+      - src: ./completions/_zsh
+        dst:  /usr/share/zsh/vendor-completions/_ipsw
+        file_info:
+          mode: 0644
+      - src: ./manpages/ipsw.1.gz
+        dst: /usr/share/man/man1/ipsw.1.gz
+        file_info:
+          mode: 0644
+      - src: ./LICENSE.md
+        dst: /usr/share/doc/ipsw/copyright
+        file_info:
+          mode: 0644
+    formats:
+    - apk
+    - deb
+    - rpm
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
+        - changelog-file-missing-in-native-package
+
+snapcrafts:
+  - name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    summary: iOS/macOS Research Swiss Army Knife.
+    description: |
+      iOS/macOS Research Swiss Army Knife.
+    grade: stable
+    confinement: classic
+    publish: true
