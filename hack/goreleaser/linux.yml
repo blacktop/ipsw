@@ -40,7 +40,7 @@ builds:
 archives:
   - replacements:
       amd64: x86_64
-    name_template: "ipsw_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     files:
       - README.md
       - LICENSE
@@ -51,7 +51,7 @@ checksum:
   name_template: 'checksums.linux.txt'
 
 nfpms:
-  - file_name_template: '{{ .ConventionalFileName }}'
+  - file_name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     id: packages
     homepage:  https://github.com/blacktop/ipsw
     description: |-
