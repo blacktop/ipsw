@@ -38,10 +38,10 @@ archives:
 checksum:
   name_template: 'checksums.win.txt'
 
-scoop:
-  bucket:
-    owner: blacktop
-    name: scoop-bucket
-  homepage:  https://github.com/blacktop/ipsw
-  description: iOS/macOS Research Swiss Army Knife
-  license: MIT
+# scoop:
+#   bucket:
+#     owner: blacktop
+#     name: scoop-bucket
+#   homepage:  https://github.com/blacktop/ipsw
+#   description: iOS/macOS Research Swiss Army Knife
+#   license: MIT
