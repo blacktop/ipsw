@@ -23,17 +23,15 @@ builds:
 archives:
   - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      386: i386
+      darwin: macOS
       amd64: x86_64
+      all: universal
     format_overrides:
-    - goos: windows
-      format: zip
+      - goos: windows
+        format: zip
     files:
       - README.md
-      - LICENSE.md
+      - LICENSE
       - completions/*
       - manpages/*
 
