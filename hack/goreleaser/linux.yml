@@ -7,7 +7,6 @@ before:
     # you may remove this if you don't need go generate
     - ./hack/make/completions
     - ./hack/make/manpages
-    - ./hack/make/json_mini
     
 builds:
   - main: ./cmd/ipsw
