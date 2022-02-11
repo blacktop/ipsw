@@ -3,8 +3,13 @@
 before:
   hooks:
     # You may remove this if you don't use go modules.
-    - go mod tidy
-
+    - go mod download
+    # you may remove this if you don't need go generate
+    - go generate ./...
+    - ./hack/make/completions
+    - ./hack/make/manpages
+    - ./hack/make/json_mini
+    
 builds:
   - main: ./cmd/ipsw
     id: amd64
