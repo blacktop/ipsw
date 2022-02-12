@@ -30,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -38,6 +39,12 @@ func init() {
 	a2sCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	a2sCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
 	a2sCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
+	a2sCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+
+	viper.BindPFlag("dyld.a2s.slide", a2sCmd.Flags().Lookup("slide"))
+	viper.BindPFlag("dyld.a2s.image", a2sCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.a2s.mapping", a2sCmd.Flags().Lookup("mapping"))
+	viper.BindPFlag("dyld.a2s.cache", a2sCmd.Flags().Lookup("cache"))
 
 	a2sCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -55,9 +62,11 @@ var a2sCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		slide, _ := cmd.Flags().GetUint64("slide")
-		showImage, _ := cmd.Flags().GetBool("image")
-		showMapping, _ := cmd.Flags().GetBool("mapping")
+		// flags
+		slide := viper.GetUint64("dyld.a2s.slide")
+		showImage := viper.GetBool("dyld.a2s.image")
+		showMapping := viper.GetBool("dyld.a2s.mapping")
+		// cacheFile := viper.GetString("dyld.a2s.cache")
 
 		secondAttempt := false
 
@@ -97,60 +106,13 @@ var a2sCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		// Load all symbols
-		// if _, err := os.Stat(dscPath + ".a2s"); os.IsNotExist(err) {
-		// 	log.Info("Generating dyld_shared_cache companion symbol map file...")
-
-		// 	// utils.Indent(log.Warn, 2)("parsing public symbols...")
-		// 	// err = f.GetAllExportedSymbols(false)
-		// 	// if err != nil {
-		// 	// 	return err
-		// 	// }
-		// 	utils.Indent(log.Warn, 2)("parsing private symbols...")
-		// 	err = f.ParseLocalSyms()
-		// 	if err != nil {
-		// 		utils.Indent(log.Warn, 2)(err.Error())
-		// 		utils.Indent(log.Warn, 2)("parsing patch exports...")
-		// 		for _, img := range f.Images {
-		// 			for _, patch := range img.PatchableExports {
-		// 				addr, err := f.GetVMAddress(uint64(patch.OffsetOfImpl))
-		// 				if err != nil {
-		// 					return err
-		// 				}
-		// 				f.AddressToSymbol[addr] = patch.Name
-		// 			}
-		// 		}
-		// 	}
-		// 	// cache all sels
-		// 	f.GetAllSelectors(false)
-		// 	f.GetAllClasses(false)
-		// 	f.GetAllProtocols(false)
-		// 	// save lookup map to disk to speed up subsequent requests
-		// 	err = f.SaveAddrToSymMap(dscPath + ".a2s")
-		// 	if err != nil {
-		// 		return err
-		// 	}
-
-		// } else {
-		// 	log.Info("Found dyld_shared_cache companion symbol map file...")
-		// 	a2sFile, err := os.Open(dscPath + ".a2s")
-		// 	if err != nil {
-		// 		return fmt.Errorf("failed to open companion file %s; %v", dscPath+".a2s", err)
-		// 	}
-
-		// 	gzr, err := gzip.NewReader(a2sFile)
-		// 	if err != nil {
-		// 		return fmt.Errorf("failed to create gzip reader: %v", err)
-		// 	}
-
-		// 	// Decoding the serialized data
-		// 	err = gob.NewDecoder(gzr).Decode(&f.AddressToSymbol)
-		// 	if err != nil {
-		// 		return fmt.Errorf("failed to decode addr2sym map; %v", err)
-		// 	}
-		// 	gzr.Close()
-		// 	a2sFile.Close()
+		// if len(cacheFile) == 0 {
+		// 	cacheFile = dscPath + ".a2s"
 		// }
+		// if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+		// 	return err
+		// }
+
 	retry:
 		if showMapping {
 			_, mapping, err := f.GetMappingForVMAddress(unslidAddr)
