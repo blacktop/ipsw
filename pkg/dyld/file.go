@@ -15,7 +15,6 @@ import (
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
 )
 
 // Known good magic
@@ -56,12 +55,12 @@ type File struct {
 
 	Images cacheImages
 
-	SlideInfo       slideInfo
-	PatchInfo       CachePatchInfo
-	LocalSymInfo    localSymbolInfo
-	AcceleratorInfo CacheAcceleratorInfo
-	ImageArray      map[uint32]*CImage
-	Closures        []*LaunchClosure
+	SlideInfo        slideInfo
+	PatchInfoVersion uint32
+	LocalSymInfo     localSymbolInfo
+	AcceleratorInfo  CacheAcceleratorInfo
+	ImageArray       map[uint32]*CImage
+	Closures         []*LaunchClosure
 
 	BranchPools    []uint64
 	CodeSignatures map[mtypes.UUID]codesignature
@@ -433,13 +432,13 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			// if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
 			// 	return nil, err
 			// }
-			var localSymEntry CacheLocalSymbolsEntry
+			var localSymEntry CacheLocalSymbolsEntry64
 			if f.Headers[uuid].ImagesOffsetOld == 0 && f.Headers[uuid].ImagesCountOld == 0 { // NEW iOS15 dyld4 style caches
 				if err := binary.Read(sr, f.ByteOrder, &localSymEntry); err != nil {
 					return err
 				}
 			} else {
-				var preDyld4LSEntry preDyld4cacheLocalSymbolsEntry
+				var preDyld4LSEntry CacheLocalSymbolsEntry
 				if err := binary.Read(sr, f.ByteOrder, &preDyld4LSEntry); err != nil {
 					return err
 				}
@@ -449,13 +448,13 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			}
 
 			if len(f.Images) > i {
-				f.Images[i].CacheLocalSymbolsEntry = localSymEntry
+				f.Images[i].CacheLocalSymbolsEntry64 = localSymEntry
 			} else {
 				f.Images = append(f.Images, &CacheImage{
 					Index: uint32(i),
 					// Info:      iinfo,
-					cache:                  f,
-					CacheLocalSymbolsEntry: localSymEntry,
+					cache:                    f,
+					CacheLocalSymbolsEntry64: localSymEntry,
 				})
 			}
 			// f.Images[i].ReaderAt = io.NewSectionReader(r, int64(f.Images[i].DylibOffset), 1<<63-1)
@@ -1002,96 +1001,250 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 	return rebases, nil
 }
 
-// ParsePatchInfo parses dyld patch info
-func (f *File) ParsePatchInfo() error {
-	if f.Headers[f.UUID].PatchInfoAddr > 0 {
-		// Read dyld patch_info entries.
-		uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr + 8)
-		if err != nil {
-			return err
-		}
-
-		sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-
-		sr.Seek(int64(patchInfoOffset), io.SeekStart)
-		if err := binary.Read(sr, f.ByteOrder, &f.PatchInfo); err != nil {
-			return err
-		}
-
-		// Read all the other patch_info structs
-		uuid, patchTableArrayOffset, err := f.GetOffset(f.PatchInfo.PatchTableArrayAddr)
-		if err != nil {
-			return err
-		}
-
-		sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
-		imagePatches := make([]CacheImagePatches, f.PatchInfo.PatchTableArrayCount)
-		if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
-			return err
-		}
-
-		uuid, patchExportNamesOffset, err := f.GetOffset(f.PatchInfo.PatchExportNamesAddr)
-		if err != nil {
-			return err
-		}
-
-		exportNames := io.NewSectionReader(f.r[uuid], int64(patchExportNamesOffset), int64(f.PatchInfo.PatchExportNamesSize))
-
-		uuid, patchExportArrayOffset, err := f.GetOffset(f.PatchInfo.PatchExportArrayAddr)
-		if err != nil {
-			return err
-		}
-
-		sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
-		patchExports := make([]CachePatchableExport, f.PatchInfo.PatchExportArrayCount)
-		if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
-			return err
-		}
-
-		uuid, patchLocationArrayOffset, err := f.GetOffset(f.PatchInfo.PatchLocationArrayAddr)
-		if err != nil {
-			return err
-		}
-
-		sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
-		patchableLocations := make([]CachePatchableLocation, f.PatchInfo.PatchLocationArrayCount)
-		if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
-			return err
-		}
-
-		// Add patchabled export info to images
-		for i, iPatch := range imagePatches {
-			if iPatch.PatchExportsCount > 0 {
-				for exportIndex := uint32(0); exportIndex != iPatch.PatchExportsCount; exportIndex++ {
-					patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
-					var exportName string
-					if uint64(patchExport.ExportNameOffset) < f.PatchInfo.PatchExportNamesSize {
-						exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
-						s, err := bufio.NewReader(exportNames).ReadString('\x00')
-						if err != nil {
-							return errors.Wrapf(err, "failed to read string at: %x", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset)
-						}
-						exportName = strings.Trim(s, "\x00")
-					} else {
-						exportName = ""
-					}
-					plocs := make([]CachePatchableLocation, patchExport.PatchLocationsCount)
-					for locationIndex := uint32(0); locationIndex != patchExport.PatchLocationsCount; locationIndex++ {
-						plocs[locationIndex] = patchableLocations[patchExport.PatchLocationsStartIndex+locationIndex]
-					}
-					f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, patchableExport{
-						Name:           exportName,
-						OffsetOfImpl:   patchExport.CacheOffsetOfImpl,
-						PatchLocations: plocs,
-					})
-				}
-			}
-		}
-
-		return nil
+func (f *File) patchInfoVersion() (uint32, error) {
+	if f.Headers[f.UUID].SwiftOptsOffset == 0 {
+		return 1, nil
 	}
 
+	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get patch info v2 offset: %v", err)
+	}
+
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchInfoOffset), io.SeekStart)
+
+	var pinfo CachePatchInfoV2
+	if err := binary.Read(sr, f.ByteOrder, &pinfo); err != nil {
+		return 0, fmt.Errorf("failed to read patch info v2: %v", err)
+	}
+
+	return pinfo.TableVersion, nil
+}
+
+// ParsePatchInfo parses dyld patch info
+func (f *File) ParsePatchInfo() error {
+	var err error
+	if f.Headers[f.UUID].PatchInfoAddr > 0 {
+		f.PatchInfoVersion, err = f.patchInfoVersion()
+		if err != nil {
+			return fmt.Errorf("failed to get patch info version: %v", err)
+		}
+		switch f.PatchInfoVersion {
+		case 1:
+			if err := f.parsePatchInfoV1(); err != nil {
+				return fmt.Errorf("failed to parse patch info v1: %v", err)
+			}
+		case 2:
+			if err := f.parsePatchInfoV2(); err != nil {
+				return fmt.Errorf("failed to parse patch info v2: %v", err)
+			}
+		default:
+			return fmt.Errorf("unsupported patch info version: %d", f.PatchInfoVersion)
+		}
+		return nil
+	}
 	return fmt.Errorf("cache does NOT contain patch info")
+}
+
+func (f *File) parsePatchInfoV1() error {
+	// Read dyld patch_info entries.
+	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr + 8)
+	if err != nil {
+		return fmt.Errorf("failed to get patch info v1 offset: %v", err)
+	}
+
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
+	sr.Seek(int64(patchInfoOffset), io.SeekStart)
+
+	var patchInfo CachePatchInfoV1
+	if err := binary.Read(sr, f.ByteOrder, &patchInfo); err != nil {
+		return fmt.Errorf("failed to read patch info v1: %v", err)
+	}
+
+	// Read all the other patch_info structs
+	uuid, patchTableArrayOffset, err := f.GetOffset(patchInfo.PatchTableArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch table v1 array offset: %v", err)
+	}
+
+	sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
+
+	imagePatches := make([]CacheImagePatchesV1, patchInfo.PatchTableArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
+		return fmt.Errorf("failed to read patch table v1 array: %v", err)
+	}
+
+	uuid, patchExportNamesOffset, err := f.GetOffset(patchInfo.PatchExportNamesAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch export v1 names offset: %v", err)
+	}
+
+	exportNames := io.NewSectionReader(f.r[uuid], int64(patchExportNamesOffset), int64(patchInfo.PatchExportNamesSize))
+
+	uuid, patchExportArrayOffset, err := f.GetOffset(patchInfo.PatchExportArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch export v1 array offset: %v", err)
+	}
+
+	sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
+
+	patchExports := make([]CachePatchableExportV1, patchInfo.PatchExportArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
+		return fmt.Errorf("failed to read patch export v1 array: %v", err)
+	}
+
+	uuid, patchLocationArrayOffset, err := f.GetOffset(patchInfo.PatchLocationArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch location v1 array offset: %v", err)
+	}
+
+	sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
+	patchableLocations := make([]CachePatchableLocationV1, patchInfo.PatchLocationArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
+		return fmt.Errorf("failed to read patch location v1 array: %v", err)
+	}
+
+	// Add patchabled export info to images
+	for i, iPatch := range imagePatches {
+		if iPatch.PatchExportsCount > 0 {
+			for exportIndex := uint32(0); exportIndex != iPatch.PatchExportsCount; exportIndex++ {
+				patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
+				var exportName string
+				if uint64(patchExport.ExportNameOffset) < patchInfo.PatchExportNamesSize {
+					exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
+					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					if err != nil {
+						return fmt.Errorf("failed to read patch info v1 export string at %x: %v", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset, err)
+					}
+					exportName = strings.Trim(s, "\x00")
+				} else {
+					exportName = ""
+				}
+				plocs := make([]CachePatchableLocationV1, patchExport.PatchLocationsCount)
+				for locationIndex := uint32(0); locationIndex != patchExport.PatchLocationsCount; locationIndex++ {
+					plocs[locationIndex] = patchableLocations[patchExport.PatchLocationsStartIndex+locationIndex]
+				}
+				f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, PatchableExport{
+					Name:           exportName,
+					OffsetOfImpl:   patchExport.CacheOffsetOfImpl,
+					PatchLocations: plocs,
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (f *File) parsePatchInfoV2() error {
+
+	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch info v1 offset: %v", err)
+	}
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchInfoOffset), io.SeekStart)
+	var patchInfo CachePatchInfoV2
+	if err := binary.Read(sr, f.ByteOrder, &patchInfo); err != nil {
+		return fmt.Errorf("failed to read patch info v2: %v", err)
+	}
+	// patchArray
+	uuid, patchTableArrayOffset, err := f.GetOffset(patchInfo.TableArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch table v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
+	patchArray := make([]CacheImagePatchesV2, patchInfo.TableArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchArray); err != nil {
+		return fmt.Errorf("failed to read patch table v2 array: %v", err)
+	}
+	// imageExports
+	uuid, patchImageExportsOffset, err := f.GetOffset(patchInfo.ImageExportsArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch image exports v2 offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchImageExportsOffset), io.SeekStart)
+	imageExports := make([]CacheImageExportV2, patchInfo.ImageExportsArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &imageExports); err != nil {
+		return fmt.Errorf("failed to read patch image exports v2 array: %v", err)
+	}
+	// clientArray
+	uuid, patchClientsArrayOffset, err := f.GetOffset(patchInfo.ClientsArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch clients v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchClientsArrayOffset), io.SeekStart)
+	clientArray := make([]CacheImageClientsV2, patchInfo.ClientsArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &clientArray); err != nil {
+		return fmt.Errorf("failed to read patch clients v2 array: %v", err)
+	}
+	// clientExports
+	uuid, patchClientExportsArrayOffset, err := f.GetOffset(patchInfo.ClientExportsArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch client exports v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchClientExportsArrayOffset), io.SeekStart)
+	clientExports := make([]CachePatchableExportV2, patchInfo.ClientExportsArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &clientExports); err != nil {
+		return fmt.Errorf("failed to read patch client exports v2 array: %v", err)
+	}
+	// patchLocations
+	uuid, patchLocationArrayOffset, err := f.GetOffset(patchInfo.LocationArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch location v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
+	patchLocations := make([]CachePatchableLocationV2, patchInfo.LocationArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchLocations); err != nil {
+		return fmt.Errorf("failed to read patch location v2 array: %v", err)
+	}
+	// exportNames
+	uuid, patchExportNamesOffset, err := f.GetOffset(patchInfo.ExportNamesAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch export v2 names offset: %v", err)
+	}
+	exportNames := io.NewSectionReader(f.r[uuid], int64(patchExportNamesOffset), int64(patchInfo.ExportNamesSize))
+
+	// Add patchabled export info to images
+	for i, patch := range patchArray {
+		for clientIndex := uint32(0); clientIndex < patch.ClientsCount; clientIndex++ {
+			client := clientArray[patch.ClientsStartIndex+clientIndex]
+			for exportIndex := uint32(0); exportIndex != client.PatchExportsCount; exportIndex++ {
+				clientExport := clientExports[client.PatchExportsStartIndex+exportIndex]
+				imageExport := imageExports[clientExport.ImageExportIndex]
+				var exportName string
+				if uint64(imageExport.ExportNameOffset) < patchInfo.ExportNamesSize {
+					exportNames.Seek(int64(imageExport.ExportNameOffset), io.SeekStart)
+					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					if err != nil {
+						return fmt.Errorf("failed to read patch info v1 export string at %x: %v", uint32(patchExportNamesOffset)+imageExport.ExportNameOffset, err)
+					}
+					exportName = strings.Trim(s, "\x00")
+				} else {
+					exportName = ""
+				}
+				plocs := make([]CachePatchableLocationV2, clientExport.PatchLocationsCount)
+				for locationIndex := uint32(0); locationIndex != clientExport.PatchLocationsCount; locationIndex++ {
+					plocs[locationIndex] = patchLocations[clientExport.PatchLocationsStartIndex+locationIndex]
+				}
+				f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, PatchableExport{
+					Name:             exportName,
+					ClientIndex:      client.ClientDylibIndex,
+					OffsetOfImpl:     imageExport.DylibOffsetOfImpl,
+					PatchLocationsV2: plocs,
+				})
+			}
+		}
+	}
+
+	return nil
 }
 
 // Image returns the Image with the given name, or nil if no such image exists.

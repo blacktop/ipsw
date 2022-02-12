@@ -29,6 +29,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -81,10 +82,6 @@ var patchesCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if f.IsDyld4 {
-			return fmt.Errorf("this command does NOT support the NEW iOS15+ dyld_shared_caches yet")
-		}
-
 		if err := f.ParsePatchInfo(); err != nil {
 			return err
 		}
@@ -96,31 +93,86 @@ var patchesCmd = &cobra.Command{
 			}
 			if image.PatchableExports != nil {
 				if len(symbolName) > 0 {
-					for _, patch := range image.PatchableExports {
-						if strings.EqualFold(strings.ToLower(patch.Name), strings.ToLower(symbolName)) {
-							log.Infof("%s patch locations", patch.Name)
-							for _, loc := range patch.PatchLocations {
-								fmt.Println(loc.String(f.Headers[f.UUID].SharedRegionStart))
+					if f.PatchInfoVersion == 1 {
+						for _, patch := range image.PatchableExports {
+							if strings.EqualFold(strings.ToLower(patch.Name), strings.ToLower(symbolName)) {
+								log.Infof("%s patch locations", patch.Name)
+								for _, loc := range patch.PatchLocations {
+									fmt.Println(loc.String(f.Headers[f.UUID].SharedRegionStart))
+								}
 							}
+						}
+					} else {
+						exp2uses := make(map[string][]dyld.PatchableExport)
+						for _, patch := range image.PatchableExports {
+							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
+						}
+						if patches, ok := exp2uses[symbolName]; ok {
+							log.Infof("%#x: %s patch locations", image.LoadAddress+uint64(patches[0].OffsetOfImpl), symbolName)
+							for _, patch := range patches {
+								for _, loc := range patch.PatchLocationsV2 {
+									fmt.Printf("%s\t%s\n",
+										loc.String(f.Images[patch.ClientIndex].LoadAddress),
+										f.Images[patch.ClientIndex].Name)
+								}
+							}
+						} else {
+							log.Infof("%s patch locations", symbolName)
+							utils.Indent(log.Error, 2)("no patches found")
 						}
 					}
 				} else {
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-					for _, patch := range image.PatchableExports {
-						fmt.Fprintf(w, "0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+					if f.PatchInfoVersion == 1 {
+						for _, patch := range image.PatchableExports {
+							fmt.Fprintf(w, "0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+						}
+					} else {
+						exp2uses := make(map[string][]dyld.PatchableExport)
+						for _, patch := range image.PatchableExports {
+							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
+						}
+						for name, patches := range exp2uses {
+							log.WithFields(log.Fields{"export": fmt.Sprintf("%#x", image.LoadAddress+uint64(patches[0].OffsetOfImpl))}).Info(name)
+							for _, patch := range patches {
+								for _, loc := range patch.PatchLocationsV2 {
+									fmt.Fprintf(w, "%s\t%s\n",
+										loc.String(f.Images[patch.ClientIndex].LoadAddress),
+										f.Images[patch.ClientIndex].Name)
+								}
+							}
+							w.Flush()
+						}
 					}
 					w.Flush()
 				}
 			} else {
-				log.Warn("Image had no patch entries")
+				log.Warnf("image %s had no patch entries", filepath.Base(image.Name))
 			}
 		} else {
-			for _, img := range f.Images {
-				if img.PatchableExports != nil {
-					log.Infof("[%d entries] %s", len(img.PatchableExports), img.Name)
+			for _, image := range f.Images {
+				if image.PatchableExports != nil {
+					log.Infof("[%d entries] %s", len(image.PatchableExports), image.Name)
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-					for _, patch := range img.PatchableExports {
-						fmt.Printf("0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+					if f.PatchInfoVersion == 1 {
+						for _, patch := range image.PatchableExports {
+							fmt.Printf("0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+						}
+					} else {
+						exp2uses := make(map[string][]dyld.PatchableExport)
+						for _, patch := range image.PatchableExports {
+							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
+						}
+						for name, patches := range exp2uses {
+							log.WithFields(log.Fields{"export": fmt.Sprintf("%#x", image.LoadAddress+uint64(patches[0].OffsetOfImpl))}).Info(name)
+							for _, patch := range patches {
+								for _, loc := range patch.PatchLocationsV2 {
+									fmt.Fprintf(w, "%s\t%s\n",
+										loc.String(f.Images[patch.ClientIndex].LoadAddress),
+										f.Images[patch.ClientIndex].Name)
+								}
+							}
+						}
 					}
 					w.Flush()
 				}

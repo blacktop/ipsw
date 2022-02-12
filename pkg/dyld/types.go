@@ -489,13 +489,13 @@ type CacheLocalSymbolsInfo struct {
 }
 
 type CacheLocalSymbolsEntry struct {
-	DylibOffset     uint64 // offset in cache file of start of dylib
+	DylibOffset     uint32 // offset in cache file of start of dylib
 	NlistStartIndex uint32 // start index of locals for this dylib
 	NlistCount      uint32 // number of local symbols for this dylib
 }
 
-type preDyld4cacheLocalSymbolsEntry struct {
-	DylibOffset     uint32 // offset in cache file of start of dylib
+type CacheLocalSymbolsEntry64 struct {
+	DylibOffset     uint64 // offset in cache file of start of dylib
 	NlistStartIndex uint32 // start index of locals for this dylib
 	NlistCount      uint32 // number of local symbols for this dylib
 }
@@ -589,7 +589,7 @@ type CacheImageTextInfo struct {
 	PathOffset      uint32 // offset from start of cache file
 }
 
-type CachePatchInfo struct {
+type CachePatchInfoV1 struct {
 	PatchTableArrayAddr     uint64 // (unslid) address of array for dyld_cache_image_patches for each image
 	PatchTableArrayCount    uint64 // count of patch table entries
 	PatchExportArrayAddr    uint64 // (unslid) address of array for patch exports for each image
@@ -600,46 +600,48 @@ type CachePatchInfo struct {
 	PatchExportNamesSize    uint64 // size of string blob of export names for patches
 }
 
-type CacheImagePatches struct {
+type CacheImagePatchesV1 struct {
 	PatchExportsStartIndex uint32
 	PatchExportsCount      uint32
 }
 
-type CachePatchableExport struct {
+type CachePatchableExportV1 struct {
 	CacheOffsetOfImpl        uint32
 	PatchLocationsStartIndex uint32
 	PatchLocationsCount      uint32
 	ExportNameOffset         uint32
 }
 
-type CachePatchableLocation uint64
+type CachePatchableLocationV1 uint64
 
-func (p CachePatchableLocation) CacheOffset() uint64 {
+func (p CachePatchableLocationV1) CacheOffset() uint64 {
 	return types.ExtractBits(uint64(p), 0, 32)
 }
-func (p CachePatchableLocation) Address(cacheBase uint64) uint64 {
+func (p CachePatchableLocationV1) Address(cacheBase uint64) uint64 {
 	return p.CacheOffset() + cacheBase
 }
-func (p CachePatchableLocation) High7() uint64 {
+func (p CachePatchableLocationV1) High7() uint64 {
 	return types.ExtractBits(uint64(p), 32, 7)
 }
-func (p CachePatchableLocation) Addend() uint64 {
-	return types.ExtractBits(uint64(p), 39, 5) // 0..31
+func (p CachePatchableLocationV1) Addend() uint64 {
+	signedAddend := int64(types.ExtractBits(uint64(p), 39, 5)) // 0..31
+	signedAddend = (signedAddend << 52) >> 52
+	return uint64(signedAddend)
 }
-func (p CachePatchableLocation) Authenticated() bool {
+func (p CachePatchableLocationV1) Authenticated() bool {
 	return types.ExtractBits(uint64(p), 44, 1) != 0
 }
-func (p CachePatchableLocation) UsesAddressDiversity() bool {
+func (p CachePatchableLocationV1) UsesAddressDiversity() bool {
 	return types.ExtractBits(uint64(p), 45, 1) != 0
 }
-func (p CachePatchableLocation) Key() uint64 {
+func (p CachePatchableLocationV1) Key() uint64 {
 	return types.ExtractBits(uint64(p), 46, 2)
 }
-func (p CachePatchableLocation) Discriminator() uint64 {
+func (p CachePatchableLocationV1) Discriminator() uint64 {
 	return types.ExtractBits(uint64(p), 48, 16)
 }
 
-func (p CachePatchableLocation) String(cacheBase uint64) string {
+func (p CachePatchableLocationV1) String(cacheBase uint64) string {
 	pStr := fmt.Sprintf("addr: %#x", p.Address(cacheBase))
 	if p.UsesAddressDiversity() {
 		pStr += fmt.Sprintf(", diversity: %#04x", p.Discriminator())
@@ -649,6 +651,89 @@ func (p CachePatchableLocation) String(cacheBase uint64) string {
 	}
 	pStr += fmt.Sprintf(", key: %s, auth: %t", KeyName(uint64(p)), p.Authenticated())
 	return pStr
+}
+
+type CachePatchInfoV2 struct {
+	TableVersion            uint32 // == 2
+	LocationVersion         uint32 // == 0 for now
+	TableArrayAddr          uint64 // (unslid) address of array for dyld_cache_image_patches_v2 for each image
+	TableArrayCount         uint64 // count of patch table entries
+	ImageExportsArrayAddr   uint64 // (unslid) address of array for dyld_cache_image_export_v2 for each image
+	ImageExportsArrayCount  uint64 // count of patch table entries
+	ClientsArrayAddr        uint64 // (unslid) address of array for dyld_cache_image_clients_v2 for each image
+	ClientsArrayCount       uint64 // count of patch clients entries
+	ClientExportsArrayAddr  uint64 // (unslid) address of array for patch exports for each client image
+	ClientExportsArrayCount uint64 // count of patch exports entries
+	LocationArrayAddr       uint64 // (unslid) address of array for patch locations for each patch
+	LocationArrayCount      uint64 // count of patch location entries
+	ExportNamesAddr         uint64 // blob of strings of export names for patches
+	ExportNamesSize         uint64 // size of string blob of export names for patches
+}
+
+type CacheImagePatchesV2 struct {
+	ClientsStartIndex uint32
+	ClientsCount      uint32
+	ExportsStartIndex uint32 // Points to dyld_cache_image_export_v2[]
+	ExportsCount      uint32
+}
+
+type CacheImageExportV2 struct {
+	DylibOffsetOfImpl uint32 // Offset from the dylib we used to find a dyld_cache_image_patches_v2
+	ExportNameOffset  uint32
+}
+
+type CacheImageClientsV2 struct {
+	ClientDylibIndex       uint32
+	PatchExportsStartIndex uint32 // Points to dyld_cache_patchable_export_v2[]
+	PatchExportsCount      uint32
+}
+
+type CachePatchableExportV2 struct {
+	ImageExportIndex         uint32 // Points to dyld_cache_image_export_v2
+	PatchLocationsStartIndex uint32 // Points to dyld_cache_patchable_location_v2[]
+	PatchLocationsCount      uint32
+}
+
+type CachePatchableLocationV2 struct {
+	DylibOffsetOfUse uint32 // Offset from the dylib we used to get a dyld_cache_image_clients_v2
+	Location         patchableLocationV2
+}
+
+func (p CachePatchableLocationV2) String(preferredLoadAddress uint64) string {
+	pStr := fmt.Sprintf("addr: %#x", preferredLoadAddress+uint64(p.DylibOffsetOfUse))
+	if p.Location.UsesAddressDiversity() {
+		pStr += fmt.Sprintf(", diversity: %#04x", p.Location.Discriminator())
+	}
+	if p.Location.Addend() > 0 {
+		pStr += fmt.Sprintf(", addend: %#x", p.Location.Addend())
+	}
+	if p.Location.Authenticated() {
+		pStr += fmt.Sprintf(", key: %s, auth: %t", KeyName(uint64(p.Location.Key())), p.Location.Authenticated())
+	}
+	return pStr
+}
+
+type patchableLocationV2 uint32
+
+func (p patchableLocationV2) High7() uint32 {
+	return uint32(types.ExtractBits(uint64(p), 0, 7))
+}
+func (p patchableLocationV2) Addend() uint64 {
+	signedAddend := int64(types.ExtractBits(uint64(p), 7, 5)) // 0..31
+	signedAddend = (signedAddend << 52) >> 52
+	return uint64(signedAddend)
+}
+func (p patchableLocationV2) Authenticated() bool {
+	return uint32(types.ExtractBits(uint64(p), 12, 1)) != 0
+}
+func (p patchableLocationV2) UsesAddressDiversity() bool {
+	return uint32(types.ExtractBits(uint64(p), 13, 1)) != 0
+}
+func (p patchableLocationV2) Key() uint32 {
+	return uint32(types.ExtractBits(uint64(p), 14, 2))
+}
+func (p patchableLocationV2) Discriminator() uint32 {
+	return uint32(types.ExtractBits(uint64(p), 16, 16))
 }
 
 type SubCacheInfo struct {
