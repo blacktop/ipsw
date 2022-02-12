@@ -28,10 +28,12 @@ type rangeEntry struct {
 	Size       uint32
 }
 
-type patchableExport struct {
-	Name           string
-	OffsetOfImpl   uint32
-	PatchLocations []CachePatchableLocation
+type PatchableExport struct {
+	Name             string
+	OffsetOfImpl     uint32
+	ClientIndex      uint32
+	PatchLocations   []CachePatchableLocationV1
+	PatchLocationsV2 []CachePatchableLocationV2
 }
 
 type astate struct {
@@ -164,7 +166,7 @@ type CacheImage struct {
 	Index    uint32
 	Info     CacheImageInfo
 	Mappings *cacheMappingsWithSlideInfo
-	CacheLocalSymbolsEntry
+	CacheLocalSymbolsEntry64
 	CacheImageInfoExtra
 	CacheImageTextInfo
 	Initializer    uint64
@@ -173,7 +175,7 @@ type CacheImage struct {
 
 	SlideInfo        slideInfo
 	RangeEntries     []rangeEntry
-	PatchableExports []patchableExport
+	PatchableExports []PatchableExport
 	LocalSymbols     []*CacheLocalSymbol64
 	PublicSymbols    []*Symbol
 	ObjC             objcInfo
@@ -407,7 +409,7 @@ func (i *CacheImage) Analyze() error {
 
 	if err := i.ParseLocalSymbols(false); err != nil {
 		if !errors.Is(err, ErrNoLocals) {
-			return err
+			return fmt.Errorf("failed to parse local symbols for %s: %w", i.Name, err)
 		}
 	}
 
@@ -421,7 +423,7 @@ func (i *CacheImage) Analyze() error {
 
 	if !i.Analysis.State.IsSlideInfoDone() {
 		if err := i.ParseSlideInfo(); err != nil {
-			return err
+			return fmt.Errorf("failed to parse slide info for %s: %w", i.Name, err)
 		}
 	}
 
@@ -429,7 +431,7 @@ func (i *CacheImage) Analyze() error {
 		log.Debugf("parsing %s symbol stub helpers", i.Name)
 		if err := i.ParseHelpers(); err != nil {
 			if !errors.Is(err, macho.ErrMachOSectionNotFound) {
-				return err
+				return fmt.Errorf("failed to parse stub helpers for %s: %w", i.Name, err)
 			}
 		}
 
@@ -448,7 +450,7 @@ func (i *CacheImage) Analyze() error {
 	if !i.Analysis.State.IsGotDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s global offset table", i.Name)
 		if err := i.ParseGOT(); err != nil {
-			return err
+			return fmt.Errorf("failed to parse GOT for %s: %w", i.Name, err)
 		}
 
 		for entry, target := range i.Analysis.GotPointers {
@@ -460,7 +462,7 @@ func (i *CacheImage) Analyze() error {
 			} else {
 				if img, err := i.cache.GetImageContainingVMAddr(target); err == nil {
 					if err := img.Analyze(); err != nil {
-						return err
+						return fmt.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 					}
 					if symName, ok := i.cache.AddressToSymbol[target]; ok {
 						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
@@ -482,7 +484,7 @@ func (i *CacheImage) Analyze() error {
 	if !i.Analysis.State.IsStubsDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s symbol stubs", i.Name)
 		if err := i.ParseStubs(); err != nil {
-			return err
+			return fmt.Errorf("failed to parse stubs for %s: %w", i.Name, err)
 		}
 
 		for stub, target := range i.Analysis.SymbolStubs {
@@ -498,10 +500,10 @@ func (i *CacheImage) Analyze() error {
 			} else {
 				img, err := i.cache.GetImageContainingVMAddr(target)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to find image containing stub target %#x: %w", target, err)
 				}
 				if err := img.Analyze(); err != nil {
-					return err
+					return fmt.Errorf("failed to lookup symbol stub target %#x: failed to analyze image %s: %w", target, img.Name, err)
 				}
 				if symName, ok := i.cache.AddressToSymbol[target]; ok {
 					i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
