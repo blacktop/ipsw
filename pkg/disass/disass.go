@@ -488,9 +488,14 @@ func ParseStubsASM(m *macho.File) (map[uint64]uint64, error) {
 			var results [1024]byte
 			var prevInst *disassemble.Instruction
 
-			dat, err := sec.Data()
+			off, err := m.GetOffset(sec.Addr)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get offset for %s.%s vmaddr: %v", sec.Seg, sec.Name, err)
+			}
+
+			dat := make([]byte, sec.Size)
+			if _, err := m.ReadAt(dat, int64(off)); err != nil {
+				return nil, fmt.Errorf("failed to read %s.%s data: %v", sec.Seg, sec.Name, err)
 			}
 
 			r := bytes.NewReader(dat)
@@ -521,6 +526,7 @@ func ParseStubsASM(m *macho.File) (map[uint64]uint64, error) {
 							adrpImm += instruction.Operands[2].Immediate
 							adrpAddr = prevInst.Address
 						}
+						stubs[adrpAddr] = adrpImm
 					}
 				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
 					instruction.Operation == disassemble.ARM64_LDR {
