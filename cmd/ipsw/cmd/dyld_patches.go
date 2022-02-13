@@ -108,10 +108,10 @@ var patchesCmd = &cobra.Command{
 							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
 						}
 						if patches, ok := exp2uses[symbolName]; ok {
-							log.Infof("%#x: %s patch locations", image.LoadAddress+uint64(patches[0].OffsetOfImpl), symbolName)
+							fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].OffsetOfImpl), symbolName)
 							for _, patch := range patches {
 								for _, loc := range patch.PatchLocationsV2 {
-									fmt.Printf("%s\t%s\n",
+									fmt.Printf("    %s\t%s\n",
 										loc.String(f.Images[patch.ClientIndex].LoadAddress),
 										f.Images[patch.ClientIndex].Name)
 								}
@@ -125,18 +125,19 @@ var patchesCmd = &cobra.Command{
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 					if f.PatchInfoVersion == 1 {
 						for _, patch := range image.PatchableExports {
-							fmt.Fprintf(w, "0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+							fmt.Fprintf(w, "%#x\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
 						}
+						w.Flush()
 					} else {
 						exp2uses := make(map[string][]dyld.PatchableExport)
 						for _, patch := range image.PatchableExports {
 							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
 						}
 						for name, patches := range exp2uses {
-							log.WithFields(log.Fields{"export": fmt.Sprintf("%#x", image.LoadAddress+uint64(patches[0].OffsetOfImpl))}).Info(name)
+							fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].OffsetOfImpl), name)
 							for _, patch := range patches {
 								for _, loc := range patch.PatchLocationsV2 {
-									fmt.Fprintf(w, "%s\t%s\n",
+									fmt.Fprintf(w, "    %s\t%s\n",
 										loc.String(f.Images[patch.ClientIndex].LoadAddress),
 										f.Images[patch.ClientIndex].Name)
 								}
@@ -144,7 +145,6 @@ var patchesCmd = &cobra.Command{
 							w.Flush()
 						}
 					}
-					w.Flush()
 				}
 			} else {
 				log.Warnf("image %s had no patch entries", filepath.Base(image.Name))
@@ -152,29 +152,29 @@ var patchesCmd = &cobra.Command{
 		} else {
 			for _, image := range f.Images {
 				if image.PatchableExports != nil {
-					log.Infof("[%d entries] %s", len(image.PatchableExports), image.Name)
+					fmt.Printf("[%d entries] %s\n", len(image.PatchableExports), image.Name)
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
 					if f.PatchInfoVersion == 1 {
 						for _, patch := range image.PatchableExports {
-							fmt.Printf("0x%08X\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+							fmt.Fprintf(w, "%#x\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
 						}
+						w.Flush()
 					} else {
 						exp2uses := make(map[string][]dyld.PatchableExport)
 						for _, patch := range image.PatchableExports {
 							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
 						}
 						for name, patches := range exp2uses {
-							log.WithFields(log.Fields{"export": fmt.Sprintf("%#x", image.LoadAddress+uint64(patches[0].OffsetOfImpl))}).Info(name)
+							fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].OffsetOfImpl), name)
 							for _, patch := range patches {
 								for _, loc := range patch.PatchLocationsV2 {
-									fmt.Fprintf(w, "%s\t%s\n",
-										loc.String(f.Images[patch.ClientIndex].LoadAddress),
-										f.Images[patch.ClientIndex].Name)
+									fmt.Fprintf(w, "    %s\t%s\n", loc.String(f.Images[patch.ClientIndex].LoadAddress), f.Images[patch.ClientIndex].Name)
 								}
+								w.Flush()
 							}
 						}
 					}
-					w.Flush()
+
 				}
 			}
 		}
