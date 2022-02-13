@@ -50,3 +50,4 @@ public
 *.unstripped
 *.bndb
 *.lock
+ipsw
