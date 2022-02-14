@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -35,14 +36,14 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(betaCmd)
+	downloadCmd.AddCommand(wikiCmd)
 }
 
-// betaCmd represents the beta command
-var betaCmd = &cobra.Command{
-	Use:          "beta [build-id]",
+// wikiCmd represents the wiki command
+var wikiCmd = &cobra.Command{
+	Use:          "wiki",
 	Short:        "Download beta IPSWs from theiphonewiki.com",
-	Args:         cobra.MinimumNArgs(1),
+	Args:         cobra.NoArgs,
 	SilenceUsage: true,
 	Hidden:       true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -59,6 +60,8 @@ var betaCmd = &cobra.Command{
 		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
 		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
 		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 
 		// settings
 		proxy := viper.GetString("download.proxy")
@@ -70,40 +73,35 @@ var betaCmd = &cobra.Command{
 		removeCommas := viper.GetBool("download.remove-commas")
 		// filters
 		device := viper.GetString("download.device")
+		version := viper.GetString("download.version")
+		build := viper.GetString("download.build")
 
-		ipsws, err := download.ScrapeURLs(args[0])
+		ipsws, err := download.ScrapeIPSWs()
 		if err != nil {
 			return errors.Wrap(err, "failed querying theiphonewiki.com")
 		}
 
-		var filteredURLS []string
-		for url, ipsw := range ipsws {
-			if len(device) > 0 {
-				if utils.StrSliceHas(ipsw.Devices, device) {
-					filteredURLS = append(filteredURLS, url)
-				}
-			} else {
-				filteredURLS = append(filteredURLS, url)
-			}
-		}
-
+		filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
 		if len(filteredURLS) == 0 {
-			log.Errorf("no ipsws match device %s", device)
+			log.Errorf("no ipsws match %s", strings.Join([]string{device, version, build}, ", "))
 			return nil
 		}
 
-		log.Debug("URLs to Download:")
+		log.Debug("URLs to download:")
 		for _, url := range filteredURLS {
 			utils.Indent(log.Debug, 2)(url)
 		}
 
 		cont := true
 		if !confirm {
-			cont = false
-			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredURLS)),
+			// if filtered to a single device skip the prompt
+			if len(filteredURLS) > 1 {
+				cont = false
+				prompt := &survey.Confirm{
+					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredURLS)),
+				}
+				survey.AskOne(prompt, &cont)
 			}
-			survey.AskOne(prompt, &cont)
 		}
 
 		if cont {
@@ -111,11 +109,8 @@ var betaCmd = &cobra.Command{
 			for _, url := range filteredURLS {
 				destName := getDestName(url, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
-					log.WithFields(log.Fields{
-						"devices": ipsws[url].Devices,
-						"build":   ipsws[url].BuildID,
-						"version": ipsws[url].Version,
-					}).Info("Getting IPSW")
+					d, v, b := download.ParseIpswURLString(url)
+					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Getting IPSW")
 					// download file
 					downloader.URL = url
 					downloader.DestName = destName
