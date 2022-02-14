@@ -46,6 +46,7 @@ func init() {
 	ipswCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	ipswCmd.Flags().Bool("show-latest", false, "Show latest iOS version")
 	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
+	ipswCmd.Flags().Bool("ibridge", false, "Download iBridge IPSWs")
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
@@ -54,6 +55,7 @@ func init() {
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
+	viper.BindPFlag("download.ipsw.ibridge", ipswCmd.Flags().Lookup("ibridge"))
 	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
 	// viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
@@ -112,6 +114,7 @@ var ipswCmd = &cobra.Command{
 		latest := viper.GetBool("download.ipsw.latest")
 		showLatest := viper.GetBool("download.ipsw.show-latest")
 		macos := viper.GetBool("download.ipsw.macos")
+		ibridge := viper.GetBool("download.ipsw.ibridge")
 		kernel := viper.GetBool("download.ipsw.kernel")
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		pattern := viper.GetString("download.ipsw.pattern")
@@ -133,6 +136,11 @@ var ipswCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to create itunes API: %v", err)
 			}
+		} else if ibridge {
+			itunes, err = download.NewIBridgeXML()
+			if err != nil {
+				return fmt.Errorf("failed to create itunes API: %v", err)
+			}
 		} else {
 			if !showLatest { // This is a dumb hack to prevent having to pull down the FULL XML if you just want to know the latest iOS version
 				itunes, err = download.NewiTunesVersionMaster()
@@ -143,7 +151,7 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if showLatest {
-			if macos {
+			if macos || ibridge {
 				latestVersion, err := itunes.GetLatestVersion()
 				if err != nil {
 					return fmt.Errorf("failed to get latest iOS version: %v", err)

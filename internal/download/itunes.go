@@ -345,3 +345,23 @@ func NewMacOsXML() (*ITunesVersionMaster, error) {
 
 	return &vm, nil
 }
+
+// NewIBridgeXML downloads and parses the iBridge IPSW plist
+func NewIBridgeXML() (*ITunesVersionMaster, error) {
+	resp, err := http.Get(iBridgeOSURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create http client")
+	}
+
+	document, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read plist")
+	}
+
+	vm := ITunesVersionMaster{}
+
+	dec := plist.NewDecoder(bytes.NewReader(document))
+	dec.Decode(&vm)
+
+	return &vm, nil
+}
