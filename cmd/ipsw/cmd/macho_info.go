@@ -25,6 +25,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -58,7 +59,9 @@ func init() {
 	machoInfoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
 	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
-	machoInfoCmd.MarkZshCompPositionalArgumentFile(1)
+	machoInfoCmd.Flags().Bool("dump-cert", false, "Dump the certificate")
+	machoInfoCmd.Flags().String("output", "", "Directory to extract files to")
+
 	viper.BindPFlag("macho.info.arch", machoInfoCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.info.header", machoInfoCmd.Flags().Lookup("header"))
 	viper.BindPFlag("macho.info.loads", machoInfoCmd.Flags().Lookup("loads"))
@@ -72,6 +75,10 @@ func init() {
 	viper.BindPFlag("macho.info.fixups", machoInfoCmd.Flags().Lookup("fixups"))
 	viper.BindPFlag("macho.info.fileset-entry", machoInfoCmd.Flags().Lookup("fileset-entry"))
 	viper.BindPFlag("macho.info.extract-fileset-entry", machoInfoCmd.Flags().Lookup("extract-fileset-entry"))
+	viper.BindPFlag("macho.info.dump-cert", machoInfoCmd.Flags().Lookup("dump-cert"))
+	viper.BindPFlag("macho.info.output", machoInfoCmd.Flags().Lookup("output"))
+
+	machoInfoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // machoInfoCmd represents the macho command
@@ -103,6 +110,8 @@ var machoInfoCmd = &cobra.Command{
 		showFixups := viper.GetBool("macho.info.fixups")
 		filesetEntry := viper.GetString("macho.info.fileset-entry")
 		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
+		dumpCert := viper.GetBool("macho.info.dump-cert")
+		extractPath := viper.GetString("macho.info.output")
 
 		if len(filesetEntry) == 0 && extractfilesetEntry {
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
@@ -162,6 +171,27 @@ var machoInfoCmd = &cobra.Command{
 			}
 		}
 
+		folder := filepath.Dir(machoPath) // default to folder of macho file
+		if len(extractPath) > 0 {
+			folder = extractPath
+		}
+
+		if dumpCert {
+			if cs := m.CodeSignature(); cs != nil {
+				if len(m.CodeSignature().CMSSignature) > 0 {
+					if err := ioutil.WriteFile(filepath.Join(folder, filepath.Base(machoPath)+".pem"), m.CodeSignature().CMSSignature, 0644); err != nil {
+						return fmt.Errorf("failed to extract code-signature.pem: %v", err)
+					}
+					log.Infof("Created %s", filepath.Join(folder, filepath.Base(machoPath)+".pem"))
+				} else {
+					return fmt.Errorf("no CMS signature found")
+				}
+				return nil
+			} else {
+				return fmt.Errorf("no code signature found")
+			}
+		}
+
 		// Fileset MachO type
 		if len(filesetEntry) > 0 {
 			if m.FileTOC.FileHeader.Type == types.FileSet {
@@ -180,11 +210,11 @@ var machoInfoCmd = &cobra.Command{
 				}
 
 				if extractfilesetEntry {
-					err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry), dcf, baseAddress, nil) // TODO: do I want to add any extra syms?
+					err = m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil) // TODO: do I want to add any extra syms?
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
-					log.Infof("Created %s", filepath.Join(filepath.Dir(machoPath), filesetEntry))
+					log.Infof("Created %s", filepath.Join(folder, filesetEntry))
 				}
 
 			} else {
