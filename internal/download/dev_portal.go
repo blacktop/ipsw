@@ -355,6 +355,7 @@ func (app *App) signIn(username, password string) error {
 			return err
 		}
 
+		phoneID := 1
 		codeType := "phone"
 
 		// SMS was sent automatically
@@ -379,7 +380,8 @@ func (app *App) signIn(username, password string) error {
 				}
 				return err
 			}
-			if err := app.requestCode(app.authOptions.TrustedPhoneNumbers[phoneNumber].ID); err != nil {
+			phoneID = app.authOptions.TrustedPhoneNumbers[phoneNumber].ID
+			if err := app.requestCode(phoneID); err != nil {
 				return err
 			}
 
@@ -423,7 +425,7 @@ func (app *App) signIn(username, password string) error {
 			}
 		}
 
-		if err := app.verifyCode(codeType, code); err != nil {
+		if err := app.verifyCode(codeType, code, phoneID); err != nil {
 			return err
 		}
 
@@ -525,13 +527,13 @@ func (app *App) requestCode(phoneID int) error {
 	return nil
 }
 
-func (app *App) verifyCode(codeType, code string) error {
+func (app *App) verifyCode(codeType, code string, phoneID int) error {
 	buf := new(bytes.Buffer)
 
 	if codeType == "phone" {
 		json.NewEncoder(buf).Encode(&phone{
 			Number: phoneNumber{
-				ID: 1,
+				ID: phoneID,
 			},
 			Mode: "sms",
 			SecurityCode: scode{
