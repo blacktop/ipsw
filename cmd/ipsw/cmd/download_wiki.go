@@ -30,7 +30,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -78,7 +77,7 @@ var wikiCmd = &cobra.Command{
 
 		ipsws, err := download.ScrapeIPSWs()
 		if err != nil {
-			return errors.Wrap(err, "failed querying theiphonewiki.com")
+			return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 		}
 
 		filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
@@ -117,7 +116,7 @@ var wikiCmd = &cobra.Command{
 
 					err = downloader.Do()
 					if err != nil {
-						return errors.Wrap(err, "failed to download file")
+						return fmt.Errorf("failed to download IPSW: %v", err)
 					}
 				} else {
 					log.Warnf("ipsw already exists: %s", destName)
