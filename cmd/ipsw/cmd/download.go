@@ -110,26 +110,31 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 	doNotDownload := viper.GetStringSlice("download.black-list")
 
 	// verify args
-	if len(version) == 0 && len(build) == 0 {
-		return nil, fmt.Errorf("you must also supply a --version OR a --build (or use --latest)")
+	if len(device) == 0 && len(version) == 0 && len(build) == 0 {
+		return nil, fmt.Errorf("you must also supply a --device || --version || --build (or use --latest)")
 	}
 	if len(version) > 0 && len(build) > 0 {
-		return nil, fmt.Errorf("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		return nil, fmt.Errorf("you cannot supply --version AND --build (they are mutually exclusive)")
 	}
 
 	if len(version) > 0 {
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
 		}
-	} else { // using build
+	} else if len(build) > 0 {
 		version, err = download.GetVersion(build)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for buildID => version: %v", err)
+			return nil, fmt.Errorf("failed to query ipsw.me api for buildID %s => version: %v", build, err)
 		}
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
+		}
+	} else if len(device) > 0 {
+		ipsws, err = download.GetDeviceIPSWs(device)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query ipsw.me api for device %s: %v", device, err)
 		}
 	}
 
