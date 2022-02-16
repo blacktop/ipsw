@@ -1002,24 +1002,24 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 }
 
 func (f *File) patchInfoVersion() (uint32, error) {
-	if f.Headers[f.UUID].SwiftOptsOffset == 0 {
-		return 1, nil
+	if f.IsDyld4 {
+		uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get patch info v2 offset: %v", err)
+		}
+
+		sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+		sr.Seek(int64(patchInfoOffset), io.SeekStart)
+
+		var pinfo CachePatchInfoV2
+		if err := binary.Read(sr, f.ByteOrder, &pinfo); err != nil {
+			return 0, fmt.Errorf("failed to read patch info v2: %v", err)
+		}
+
+		return pinfo.TableVersion, nil
 	}
 
-	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
-	if err != nil {
-		return 0, fmt.Errorf("failed to get patch info v2 offset: %v", err)
-	}
-
-	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-	sr.Seek(int64(patchInfoOffset), io.SeekStart)
-
-	var pinfo CachePatchInfoV2
-	if err := binary.Read(sr, f.ByteOrder, &pinfo); err != nil {
-		return 0, fmt.Errorf("failed to read patch info v2: %v", err)
-	}
-
-	return pinfo.TableVersion, nil
+	return 1, nil
 }
 
 // ParsePatchInfo parses dyld patch info
@@ -1049,7 +1049,7 @@ func (f *File) ParsePatchInfo() error {
 
 func (f *File) parsePatchInfoV1() error {
 	// Read dyld patch_info entries.
-	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr + 8)
+	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
 	if err != nil {
 		return fmt.Errorf("failed to get patch info v1 offset: %v", err)
 	}
