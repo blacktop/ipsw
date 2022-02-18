@@ -252,7 +252,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 			}
 		}()
 
-		path := filepath.Join(dest, filepath.Base(f.Name))
+		path := filepath.Join(dest, filepath.Base(filepath.Clean(f.Name)))
 
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(path, f.Mode())
@@ -279,7 +279,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 
 	for _, f := range r.File {
 		if filter(f) {
-			fNames = append(fNames, filepath.Base(f.Name))
+			fNames = append(fNames, filepath.Base(filepath.Clean(f.Name)))
 			err := extractAndWriteFile(f)
 			if err != nil {
 				return nil, err

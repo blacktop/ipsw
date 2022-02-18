@@ -402,7 +402,7 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 			match, _ := regexp.MatchString(extractPattern, f.Name)
 			if match || strings.Contains(strings.ToLower(f.Name), strings.ToLower(extractPattern)) {
 				found = true
-				fileName := filepath.Join(outputDir, filepath.Base(f.Name))
+				fileName := filepath.Join(outputDir, filepath.Base(filepath.Clean(f.Name)))
 				if _, err := os.Stat(fileName); os.IsNotExist(err) {
 					data := make([]byte, f.UncompressedSize64)
 					rc, err := f.Open()
@@ -549,7 +549,7 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, error) {
 			}
 			if !f.IsDir() {
 				os.Mkdir(folder, os.ModePerm)
-				fname := filepath.Join(folder, filepath.Base(f.Name()))
+				fname := filepath.Join(folder, filepath.Base(filepath.Clean(f.Name())))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s\t%s\t%s to %s", f.Mode(), humanize.Bytes(uint64(f.Size())), strings.TrimPrefix(path, dir), fname))
 				err = os.Rename(path, fname)
 				if err != nil {
