@@ -15,10 +15,10 @@ import (
 
 const (
 	iphoneWikiURL                  = "www.theiphonewiki.com"
-	iphoneWikiOtaUrlRegex          = "https://www.theiphonewiki.com/wiki/OTA_Updates/(.+)$"
-	iphoneWikiBetaOtaUrlRegex      = "https://www.theiphonewiki.com/wiki/Beta_OTA_Updates/(.+)$"
-	iphoneWikiFirmwareUrlRegex     = "https://www.theiphonewiki.com/wiki/Firmware/(.+)$"
-	iphoneWikiBetaFirmwareUrlRegex = "https://www.theiphonewiki.com/wiki/Beta_Firmware/(.+)$"
+	iphoneWikiOtaUrlRegex          = "^https://www\\.theiphonewiki\\.com/wiki/OTA_Updates/(.+)$"
+	iphoneWikiBetaOtaUrlRegex      = "^https://www\\.theiphonewiki\\.com/wiki/Beta_OTA_Updates/(.+)$"
+	iphoneWikiFirmwareUrlRegex     = "^https://www\\.theiphonewiki\\.com/wiki/Firmware/(.+)$"
+	iphoneWikiBetaFirmwareUrlRegex = "^https://www\\.theiphonewiki\\.com/wiki/Beta_Firmware/(.+)$"
 )
 
 var devices = []string{"iPad", "iPad_Air", "iPad_Pro", "iPad_mini", "iPhone", "iPod_touch", "Apple_Watch", "Mac", "HomePod"}

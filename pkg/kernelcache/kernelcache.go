@@ -224,7 +224,7 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 		if strings.Contains(f.Name, "kernelcache.") {
 			fname := i.GetKernelCacheFileName(f.Name)
 			// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(f.Name, filepath.Ext(f.Name)), strings.Join(i.GetDevicesForKernelCache(f.Name), "_"))
-			fname = filepath.Join(destPath, fname)
+			fname = filepath.Join(destPath, filepath.Clean(fname))
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				kdata := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()

@@ -285,7 +285,7 @@ var ipswCmd = &cobra.Command{
 					for _, f := range zr.File {
 						if strings.Contains(f.Name, pattern) {
 							found = true
-							fileName := filepath.Join(destPath, filepath.Base(f.Name))
+							fileName := filepath.Join(destPath, filepath.Base(filepath.Clean(f.Name)))
 							if _, err := os.Stat(fileName); os.IsNotExist(err) {
 								data := make([]byte, f.UncompressedSize64)
 								rc, err := f.Open()
