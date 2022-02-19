@@ -15,6 +15,7 @@ summary: Parse a MachO file
 - [**macho info -d**](#macho-info--d)
 - [**macho info -l**](#macho-info--l)
 - [**macho info --sig**](#macho-info---sig)
+- [**macho info --dump-cert**](#macho-info---dump-cert)
 - [**macho info --ent**](#macho-info---ent)
 - [**macho info --objc**](#macho-info---objc)
 - [**macho info --fixups**](#macho-info---fixups)
@@ -305,6 +306,44 @@ CMS (RFC3852) signature:
         OU: Apple Certification Authority CN: Apple Code Signing Certification Authority (2011-10-24 thru 2026-10-24)
         OU: Apple Certification Authority CN: Apple Root CA                              (2006-04-25 thru 2035-02-09)
         OU: Apple Certification Authority CN: Software Signing                           (2013-04-12 thru 2021-04-12)
+```
+
+> **NOTE:** If you supply the `-V` flag, the output will be VERY similar to that of `openssl`
+
+### **macho info --dump-cert**
+
+Dump certificate chain from the code signature
+
+```bash
+❯ ipsw macho info /Applications/1Password\ 7.app/Contents/MacOS/1Password\ 7 --dump-cert --output /tmp
+   • Created /tmp/1Password 7.pem
+```
+
+To view the certificate chain, use the following command
+
+```bash
+❯ openssl crl2pkcs7 -nocrl -certfile /tmp/1Password\ 7.pem | openssl pkcs7  -print_certs -text | head -n20
+
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number: 1763908746353189132 (0x187aa9a8c296210c)
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: C=US, O=Apple Inc., OU=Apple Certification Authority, CN=Apple Root CA
+        Validity
+            Not Before: Feb  1 22:12:15 2012 GMT
+            Not After : Feb  1 22:12:15 2027 GMT
+        Subject: CN=Developer ID Certification Authority, OU=Apple Certification Authority, O=Apple Inc., C=US
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:89:76:4f:06:5b:9a:41:ee:a5:23:2b:02:a3:5f:
+                    d7:73:3f:c0:35:b0:8b:84:0a:3f:06:24:7f:a7:95:
+                    3f:eb:4f:0e:93:af:b4:0e:d0:c8:3e:e5:6d:18:b3:
+                    1f:e8:89:47:bf:d7:09:08:e4:ff:56:98:29:15:e7:
+                    94:9d:b9:35:a3:0a:cd:b4:c0:e1:e2:60:f4:ca:ec:
+                    29:78:45:69:69:60:6b:5f:8a:92:fc:9e:23:e6:3a:
 ```
 
 ### **macho info --ent**
