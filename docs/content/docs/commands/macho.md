@@ -279,7 +279,7 @@ Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, A
 Similar to `jtool --sig`
 
 ```bash
-❯ ipsw macho info /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig -V
+❯ ipsw macho info /System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --sig
 
 Code Directory (167849 bytes)
 	Version:     Scatter
