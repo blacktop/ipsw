@@ -23,9 +23,11 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/rsa"
+	"encoding/asn1"
+	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -37,10 +39,26 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+var (
+	SubjectKeyId             asn1.ObjectIdentifier = []int{2, 5, 29, 14}
+	KeyUsage                 asn1.ObjectIdentifier = []int{2, 5, 29, 15}
+	ExtendedKeyUsage         asn1.ObjectIdentifier = []int{2, 5, 29, 37}
+	AuthorityKeyId           asn1.ObjectIdentifier = []int{2, 5, 29, 35}
+	BasicConstraints         asn1.ObjectIdentifier = []int{2, 5, 29, 19}
+	SubjectAltName           asn1.ObjectIdentifier = []int{2, 5, 29, 17}
+	CertificatePolicies      asn1.ObjectIdentifier = []int{2, 5, 29, 32}
+	NameConstraints          asn1.ObjectIdentifier = []int{2, 5, 29, 30}
+	CRLDistributionPoints    asn1.ObjectIdentifier = []int{2, 5, 29, 31}
+	AuthorityInfoAccess      asn1.ObjectIdentifier = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
+	CRLNumber                asn1.ObjectIdentifier = []int{2, 5, 29, 20}
+	AppleSoftwareSigningLeaf asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 22}
 )
 
 func init() {
@@ -179,16 +197,35 @@ var machoInfoCmd = &cobra.Command{
 		if dumpCert {
 			if cs := m.CodeSignature(); cs != nil {
 				if len(m.CodeSignature().CMSSignature) > 0 {
-					if err := ioutil.WriteFile(filepath.Join(folder, filepath.Base(machoPath)+".pem"), m.CodeSignature().CMSSignature, 0644); err != nil {
-						return fmt.Errorf("failed to extract code-signature.pem: %v", err)
+					// parse cert
+					p7, err := pkcs7.Parse(m.CodeSignature().CMSSignature)
+					if err != nil {
+						return fmt.Errorf("failed to parse pkcs7: %v", err)
 					}
-					log.Infof("Created %s", filepath.Join(folder, filepath.Base(machoPath)+".pem"))
+					// create output file
+					outPEM := filepath.Join(folder, filepath.Base(filepath.Clean(machoPath))+".pem")
+					f, err := os.Create(outPEM)
+					if err != nil {
+						return fmt.Errorf("failed to create pem file %s: %v", outPEM, err)
+					}
+					defer f.Close()
+					// write certs to file
+					for _, cert := range p7.Certificates {
+						publicKeyBlock := pem.Block{
+							Type:  "CERTIFICATE",
+							Bytes: cert.Raw,
+						}
+						if _, err := f.WriteString(string(pem.EncodeToMemory(&publicKeyBlock))); err != nil {
+							return fmt.Errorf("failed to write pem file: %v", err)
+						}
+					}
+					log.Infof("Created %s", outPEM)
 				} else {
 					return fmt.Errorf("no CMS signature found")
 				}
 				return nil
 			} else {
-				return fmt.Errorf("no code signature found")
+				return fmt.Errorf("no LC_CODE_SIGNATURE found")
 			}
 		}
 
@@ -302,18 +339,74 @@ var machoInfoCmd = &cobra.Command{
 					}
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 					for _, cert := range p7.Certificates {
-						var ou string
-						if cert.Issuer.Organization != nil {
-							ou = cert.Issuer.Organization[0]
+						if Verbose {
+							fmt.Fprintf(w, "Certificate:\n")
+							fmt.Fprintf(w, "\tData:\n")
+							fmt.Fprintf(w, "\t\tVersion: %d (%#x)\n", cert.Version, cert.Version)
+							fmt.Fprintf(w, "\t\tSerial Number: %d (%#x)\n", cert.SerialNumber, cert.SerialNumber)
+							fmt.Fprintf(w, "\t\tIssuer: %s\n", cert.Issuer.String())
+							fmt.Fprintf(w, "\t\tValidity:\n")
+							fmt.Fprintf(w, "\t\t\tNot Before: %s\n", cert.NotBefore.Format("Jan 2 15:04:05 2006 MST"))
+							fmt.Fprintf(w, "\t\t\tNot After:  %s\n", cert.NotAfter.Format("Jan 2 15:04:05 2006 MST"))
+							fmt.Fprintf(w, "\t\tSubject: %s\n", cert.Subject.String())
+							fmt.Fprintf(w, "\t\tSubject Public Key Info:\n")
+							fmt.Fprintf(w, "\t\t\tPublic Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
+							fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", cert.PublicKey.(*rsa.PublicKey).Size())
+							fmt.Fprintf(w, "\t\t\t\tModulus: \n%s", utils.HexDump(cert.PublicKey.(*rsa.PublicKey).N.Bytes(), 0))
+							fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", cert.PublicKey.(*rsa.PublicKey).E, cert.PublicKey.(*rsa.PublicKey).E)
+							fmt.Fprintf(w, "\tExtensions:\n")
+							for _, ext := range cert.Extensions {
+								if ext.Id.Equal(SubjectKeyId) {
+									fmt.Fprintf(w, "\t\tSubject Key ID: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(KeyUsage) {
+									fmt.Fprintf(w, "\t\tKey Usage: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(ExtendedKeyUsage) {
+									fmt.Fprintf(w, "\t\tExtended Key Usage: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(AuthorityKeyId) {
+									fmt.Fprintf(w, "\t\tAuthority Key ID: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(BasicConstraints) {
+									fmt.Fprintf(w, "\t\tBasic Constraints: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(SubjectAltName) {
+									fmt.Fprintf(w, "\t\tSubject Alt Name: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(CertificatePolicies) {
+									fmt.Fprintf(w, "\t\tCertificate Policies: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(NameConstraints) {
+									fmt.Fprintf(w, "\t\tName Constraints: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(CRLDistributionPoints) {
+									fmt.Fprintf(w, "\t\tCRL Distribution Points: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(AuthorityInfoAccess) {
+									fmt.Fprintf(w, "\t\tAuthority Info Access: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(CRLNumber) {
+									fmt.Fprintf(w, "\t\tCRL Number: \n%s", utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(AppleSoftwareSigningLeaf) {
+									fmt.Fprintf(w, "\t\tApple Software Signing Leaf: \n%s", utils.HexDump(ext.Value, 0))
+								} else {
+									fmt.Fprintf(w, "\t\t%s: %s\n", ext.Id.String(), utils.HexDump(ext.Value, 0))
+								}
+							}
+							fmt.Fprintf(w, "\tSignature Algorithm: %s\n", cert.SignatureAlgorithm)
+							fmt.Fprintf(w, "\tSignature: \n%s\n", utils.HexDump(cert.Signature, 0))
+							publicKeyBlock := pem.Block{
+								Type:  "CERTIFICATE",
+								Bytes: cert.Raw,
+							}
+							publicKeyPem := string(pem.EncodeToMemory(&publicKeyBlock))
+							fmt.Fprintf(w, "%s\n", publicKeyPem)
+						} else {
+							var ou string
+							if cert.Issuer.Organization != nil {
+								ou = cert.Issuer.Organization[0]
+							}
+							if cert.Issuer.OrganizationalUnit != nil {
+								ou = cert.Issuer.OrganizationalUnit[0]
+							}
+							fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
+								ou,
+								cert.Subject.CommonName,
+								cert.NotBefore.Format("01Jan06 15:04:05"),
+								cert.NotAfter.Format("01Jan06 15:04:05"))
 						}
-						if cert.Issuer.OrganizationalUnit != nil {
-							ou = cert.Issuer.OrganizationalUnit[0]
-						}
-						fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
-							ou,
-							cert.Subject.CommonName,
-							cert.NotBefore.Format("01Jan06 15:04:05"),
-							cert.NotAfter.Format("01Jan06 15:04:05"))
+
 					}
 					w.Flush()
 				}
