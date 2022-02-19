@@ -336,7 +336,7 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Fprintf(w, "\t\tSubject: %s\n", cert.Subject.String())
 							fmt.Fprintf(w, "\t\tSubject Public Key Info:\n")
 							fmt.Fprintf(w, "\t\t\tPublic Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
-							fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", cert.PublicKey.(*rsa.PublicKey).Size())
+							fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", cert.PublicKey.(*rsa.PublicKey).Size()*8) // convert bytes to bits
 							fmt.Fprintf(w, "\t\t\t\tModulus: \n%s\n", certs.ReprData(cert.PublicKey.(*rsa.PublicKey).N.Bytes(), 5, 14))
 							fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", cert.PublicKey.(*rsa.PublicKey).E, cert.PublicKey.(*rsa.PublicKey).E)
 							fmt.Fprintf(w, "\tX509v3 Extensions:\n")
@@ -382,13 +382,15 @@ var machoInfoCmd = &cobra.Command{
 								} else if ext.Id.Equal(certs.OIDCRLDistributionPoints) {
 									fmt.Fprintf(w, "\t\tCRL Distribution Points: %s\n\t\t\t%s\n", critical, strings.Join(cert.CRLDistributionPoints, ", "))
 								} else if ext.Id.Equal(certs.OIDAuthorityInfoAccess) {
-									fmt.Fprintf(w, "\t\tAuthority Info Access: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+									var auths []string
+									for _, a := range cert.OCSPServer {
+										auths = append(auths, fmt.Sprintf("\t\t\tOCSP: %s", a))
+									}
+									fmt.Fprintf(w, "\t\tAuthority Info Access: %s\n%s\n", critical, strings.Join(auths, "\n"))
 								} else if ext.Id.Equal(certs.OIDCRLNumber) {
 									fmt.Fprintf(w, "\t\tCRL Number: %s\n%s", critical, utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(certs.OIDAppleSoftwareSigningLeaf) {
-									fmt.Fprintf(w, "\t\tApple Software Signing Leaf: %s\n%s", critical, utils.HexDump(ext.Value, 0))
 								} else {
-									fmt.Fprintf(w, "\t\t%s: %s\n%s\n", ext.Id.String(), critical, utils.HexDump(ext.Value, 0))
+									fmt.Fprintf(w, "\t\t%s: %s\n%s\n", certs.LookupOID(ext.Id), critical, utils.HexDump(ext.Value, 0))
 								}
 							}
 							fmt.Fprintf(w, "\tSignature (algorithm - %s): \n%s\n", cert.SignatureAlgorithm, certs.ReprData(cert.Signature, 2, 18))
