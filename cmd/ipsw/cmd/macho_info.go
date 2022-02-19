@@ -397,7 +397,7 @@ var machoInfoCmd = &cobra.Command{
 								Bytes: cert.Raw,
 							}
 							publicKeyPem := string(pem.EncodeToMemory(&publicKeyBlock))
-							fmt.Fprintf(w, "%s\n", publicKeyPem)
+							fmt.Fprintf(w, "\n%s\n", publicKeyPem)
 						} else {
 							var ou string
 							if cert.Issuer.Organization != nil {
