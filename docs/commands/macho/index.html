@@ -205,6 +205,7 @@
 <li><a href="#macho-info--d"><strong>macho info -d</strong></a></li>
 <li><a href="#macho-info--l"><strong>macho info -l</strong></a></li>
 <li><a href="#macho-info---sig"><strong>macho info &ndash;sig</strong></a></li>
+<li><a href="#macho-info---dump-cert"><strong>macho info &ndash;dump-cert</strong></a></li>
 <li><a href="#macho-info---ent"><strong>macho info &ndash;ent</strong></a></li>
 <li><a href="#macho-info---objc"><strong>macho info &ndash;objc</strong></a></li>
 <li><a href="#macho-info---fixups"><strong>macho info &ndash;fixups</strong></a></li>
@@ -439,6 +440,36 @@ CMS <span class="o">(</span>RFC3852<span class="o">)</span> signature:
         OU: Apple Certification Authority CN: Apple Code Signing Certification Authority <span class="o">(</span>2011-10-24 thru 2026-10-24<span class="o">)</span>
         OU: Apple Certification Authority CN: Apple Root CA                              <span class="o">(</span>2006-04-25 thru 2035-02-09<span class="o">)</span>
         OU: Apple Certification Authority CN: Software Signing                           <span class="o">(</span>2013-04-12 thru 2021-04-12<span class="o">)</span>
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> If you supply the <code>-V</code> flag, the output will be VERY similar to that of <code>openssl</code></p>
+</blockquote>
+<h3 id="macho-info---dump-cert"><strong>macho info &ndash;dump-cert</strong></h3>
+<p>Dump certificate chain from the code signature</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info /Applications/1Password<span class="se">\ </span>7.app/Contents/MacOS/1Password<span class="se">\ </span><span class="m">7</span> --dump-cert --output /tmp
+   • Created /tmp/1Password 7.pem
+</code></pre></div><p>To view the certificate chain, use the following command</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ openssl crl2pkcs7 -nocrl -certfile /tmp/1Password<span class="se">\ </span>7.pem <span class="p">|</span> openssl pkcs7  -print_certs -text <span class="p">|</span> head -n20
+
+Certificate:
+    Data:
+        Version: <span class="m">3</span> <span class="o">(</span>0x2<span class="o">)</span>
+        Serial Number: <span class="m">1763908746353189132</span> <span class="o">(</span>0x187aa9a8c296210c<span class="o">)</span>
+    Signature Algorithm: sha256WithRSAEncryption
+        Issuer: <span class="nv">C</span><span class="o">=</span>US, <span class="nv">O</span><span class="o">=</span>Apple Inc., <span class="nv">OU</span><span class="o">=</span>Apple Certification Authority, <span class="nv">CN</span><span class="o">=</span>Apple Root CA
+        Validity
+            Not Before: Feb  <span class="m">1</span> 22:12:15 <span class="m">2012</span> GMT
+            Not After : Feb  <span class="m">1</span> 22:12:15 <span class="m">2027</span> GMT
+        Subject: <span class="nv">CN</span><span class="o">=</span>Developer ID Certification Authority, <span class="nv">OU</span><span class="o">=</span>Apple Certification Authority, <span class="nv">O</span><span class="o">=</span>Apple Inc., <span class="nv">C</span><span class="o">=</span>US
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: <span class="o">(</span><span class="m">2048</span> bit<span class="o">)</span>
+                Modulus:
+                    00:89:76:4f:06:5b:9a:41:ee:a5:23:2b:02:a3:5f:
+                    d7:73:3f:c0:35:b0:8b:84:0a:3f:06:24:7f:a7:95:
+                    3f:eb:4f:0e:93:af:b4:0e:d0:c8:3e:e5:6d:18:b3:
+                    1f:e8:89:47:bf:d7:09:08:e4:ff:56:98:29:15:e7:
+                    94:9d:b9:35:a3:0a:cd:b4:c0:e1:e2:60:f4:ca:ec:
+                    29:78:45:69:69:60:6b:5f:8a:92:fc:9e:23:e6:3a:
 </code></pre></div><h3 id="macho-info---ent"><strong>macho info &ndash;ent</strong></h3>
 <p>Similar to <code>jtool --ent</code></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw macho info /usr/libexec/amfid --ent
