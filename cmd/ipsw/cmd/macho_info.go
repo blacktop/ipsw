@@ -24,7 +24,6 @@ package cmd
 import (
 	"bytes"
 	"crypto/rsa"
-	"encoding/asn1"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -39,26 +38,12 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/certs"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-)
-
-var (
-	SubjectKeyId             asn1.ObjectIdentifier = []int{2, 5, 29, 14}
-	KeyUsage                 asn1.ObjectIdentifier = []int{2, 5, 29, 15}
-	ExtendedKeyUsage         asn1.ObjectIdentifier = []int{2, 5, 29, 37}
-	AuthorityKeyId           asn1.ObjectIdentifier = []int{2, 5, 29, 35}
-	BasicConstraints         asn1.ObjectIdentifier = []int{2, 5, 29, 19}
-	SubjectAltName           asn1.ObjectIdentifier = []int{2, 5, 29, 17}
-	CertificatePolicies      asn1.ObjectIdentifier = []int{2, 5, 29, 32}
-	NameConstraints          asn1.ObjectIdentifier = []int{2, 5, 29, 30}
-	CRLDistributionPoints    asn1.ObjectIdentifier = []int{2, 5, 29, 31}
-	AuthorityInfoAccess      asn1.ObjectIdentifier = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
-	CRLNumber                asn1.ObjectIdentifier = []int{2, 5, 29, 20}
-	AppleSoftwareSigningLeaf asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 22}
 )
 
 func init() {
@@ -352,40 +337,61 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Fprintf(w, "\t\tSubject Public Key Info:\n")
 							fmt.Fprintf(w, "\t\t\tPublic Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
 							fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", cert.PublicKey.(*rsa.PublicKey).Size())
-							fmt.Fprintf(w, "\t\t\t\tModulus: \n%s", utils.HexDump(cert.PublicKey.(*rsa.PublicKey).N.Bytes(), 0))
+							fmt.Fprintf(w, "\t\t\t\tModulus: \n%s\n", certs.ReprData(cert.PublicKey.(*rsa.PublicKey).N.Bytes(), 5, 14))
 							fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", cert.PublicKey.(*rsa.PublicKey).E, cert.PublicKey.(*rsa.PublicKey).E)
-							fmt.Fprintf(w, "\tExtensions:\n")
+							fmt.Fprintf(w, "\tX509v3 Extensions:\n")
 							for _, ext := range cert.Extensions {
-								if ext.Id.Equal(SubjectKeyId) {
-									fmt.Fprintf(w, "\t\tSubject Key ID: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(KeyUsage) {
-									fmt.Fprintf(w, "\t\tKey Usage: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(ExtendedKeyUsage) {
-									fmt.Fprintf(w, "\t\tExtended Key Usage: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(AuthorityKeyId) {
-									fmt.Fprintf(w, "\t\tAuthority Key ID: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(BasicConstraints) {
-									fmt.Fprintf(w, "\t\tBasic Constraints: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(SubjectAltName) {
-									fmt.Fprintf(w, "\t\tSubject Alt Name: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(CertificatePolicies) {
-									fmt.Fprintf(w, "\t\tCertificate Policies: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(NameConstraints) {
-									fmt.Fprintf(w, "\t\tName Constraints: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(CRLDistributionPoints) {
-									fmt.Fprintf(w, "\t\tCRL Distribution Points: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(AuthorityInfoAccess) {
-									fmt.Fprintf(w, "\t\tAuthority Info Access: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(CRLNumber) {
-									fmt.Fprintf(w, "\t\tCRL Number: \n%s", utils.HexDump(ext.Value, 0))
-								} else if ext.Id.Equal(AppleSoftwareSigningLeaf) {
-									fmt.Fprintf(w, "\t\tApple Software Signing Leaf: \n%s", utils.HexDump(ext.Value, 0))
+								critical := ""
+								if ext.Critical {
+									critical = " (critical)"
+								}
+								if ext.Id.Equal(certs.OIDSubjectKeyId) {
+									fmt.Fprintf(w, "\t\tSubject Key ID: %s\n\t\t\t%s\n", critical, certs.ReprData(cert.SubjectKeyId, 0, len(cert.SubjectKeyId)+1))
+								} else if ext.Id.Equal(certs.OIDKeyUsage) {
+									fmt.Fprintf(w, "\t\tKey Usage: %s\n\t\t\t%s\n", critical, certs.KeyUsage(cert.KeyUsage).String())
+								} else if ext.Id.Equal(certs.OIDExtendedKeyUsage) {
+									var exu []string
+									for _, e := range cert.ExtKeyUsage {
+										exu = append(exu, certs.ExtKeyUsage(e).String())
+									}
+									fmt.Fprintf(w, "\t\tExtended Key Usage: %s\n\t\t\t%s\n", critical, strings.Join(exu, ", "))
+								} else if ext.Id.Equal(certs.OIDAuthorityKeyId) {
+									fmt.Fprintf(w, "\t\tAuthority Key ID: %s\n\t\t\tkeyid:%s\n", critical, certs.ReprData(cert.AuthorityKeyId, 0, len(cert.AuthorityKeyId)+1))
+								} else if ext.Id.Equal(certs.OIDBasicConstraints) {
+									var bconst string
+									if cert.IsCA {
+										bconst += "CA:TRUE"
+									} else {
+										bconst += "CA:FALSE"
+									}
+									fmt.Fprintf(w, "\t\tBasic Constraints: %s\n\t\t\t%s\n", critical, bconst)
+								} else if ext.Id.Equal(certs.OIDSubjectAltName) {
+									fmt.Fprintf(w, "\t\tSubject Alt Name: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(certs.OIDCertificatePolicies) {
+									var policies []string
+									for _, p := range cert.PolicyIdentifiers {
+										if p.Equal(certs.OIDAppleCertificatePolicy) {
+											policies = append(policies, "\t\t\tApple Certificate Policy")
+										} else {
+											policies = append(policies, fmt.Sprintf("\t\t\tUnknown (%s)", p.String()))
+										}
+									}
+									fmt.Fprintf(w, "\t\tCertificate Policies: %s\n%s\n", critical, strings.Join(policies, "\n"))
+								} else if ext.Id.Equal(certs.OIDNameConstraints) {
+									fmt.Fprintf(w, "\t\tName Constraints: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(certs.OIDCRLDistributionPoints) {
+									fmt.Fprintf(w, "\t\tCRL Distribution Points: %s\n\t\t\t%s\n", critical, strings.Join(cert.CRLDistributionPoints, ", "))
+								} else if ext.Id.Equal(certs.OIDAuthorityInfoAccess) {
+									fmt.Fprintf(w, "\t\tAuthority Info Access: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(certs.OIDCRLNumber) {
+									fmt.Fprintf(w, "\t\tCRL Number: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(certs.OIDAppleSoftwareSigningLeaf) {
+									fmt.Fprintf(w, "\t\tApple Software Signing Leaf: %s\n%s", critical, utils.HexDump(ext.Value, 0))
 								} else {
-									fmt.Fprintf(w, "\t\t%s: %s\n", ext.Id.String(), utils.HexDump(ext.Value, 0))
+									fmt.Fprintf(w, "\t\t%s: %s\n%s\n", ext.Id.String(), critical, utils.HexDump(ext.Value, 0))
 								}
 							}
-							fmt.Fprintf(w, "\tSignature Algorithm: %s\n", cert.SignatureAlgorithm)
-							fmt.Fprintf(w, "\tSignature: \n%s\n", utils.HexDump(cert.Signature, 0))
+							fmt.Fprintf(w, "\tSignature (algorithm - %s): \n%s\n", cert.SignatureAlgorithm, certs.ReprData(cert.Signature, 2, 18))
 							publicKeyBlock := pem.Block{
 								Type:  "CERTIFICATE",
 								Bytes: cert.Raw,
