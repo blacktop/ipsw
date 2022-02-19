@@ -21,9 +21,112 @@ var (
 )
 
 var (
-	OIDAppleCertificatePolicy   asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 5, 1}
-	OIDAppleSoftwareSigningLeaf asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 22}
+	OIDAppleCertificatePolicy asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 5, 1}
+	// LeafCertificate
+	OIDIosDeveloperLeaf                    asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 2}
+	OIDIosAppStoreApplicationLeaf          asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 3}
+	OIDIosDistributionLeaf                 asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 4}
+	OIDIosAppStoreVpnApplicationLeaf       asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 6}
+	OID3rdPartyMacDeveloperApplicationLeaf asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 7}
+	OID3rdPartyMacDeveloperInstallerLeaf   asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 8}
+	OIDMacAppStoreApplicationLeaf          asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 9}
+	OIDMacAppStoreInstallerLeaf            asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 10}
+	OIDMacAppStoreReceiptLeaf              asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 11}
+	OIDMacOsDevelopmentLeaf                asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 12}
+	OIDDeveloperIdApplicationLeaf          asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 13}
+	OIDDeveloperIdInstallerLeaf            asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 14}
+	OIDDeveloperIdKernelExtensionLeaf      asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 18}
+	OIDTestFlightLeaf                      asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 25, 1}
+	OIDInternalReleaseLeaf                 asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 25, 2}
+	OIDDeveloperIdTicketLeaf               asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 30}
+	OIDAppleSoftwareSigningLeaf            asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 22}
+	OIDDeveloperIDDate                     asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 1, 33}
+	// Intermediate CA
+	OIDWorldwideDeveloperRelationsWdrIntermediateCA asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 2, 1}
+	OIDDeveloperIdIntermediateCA                    asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 2, 6}
+	//
+	OIDCodeSigningEKU                   asn1.ObjectIdentifier = []int{1, 3, 6, 1, 5, 5, 7, 3, 3}
+	OIDSafariDeveloperEKU               asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 4, 8}
+	OID3rdPartyMacDeveloperInstallerEKU asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 4, 9}
+	OIDDeveloperIDInstallerEKU          asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 4, 13}
+	// APSWAuthCapabilities
+	OIDGeneralCapabilities asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 59, 1}
+	OIDAirPlayCapabilities asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 59, 2}
+	OIDHomeKitCapabilities asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 59, 3}
+	// AuthVersion
+	OIDAuthVersion3  asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 36}    // v3 Capabilities Extension
+	OIDAuthVersionSW asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 59, 1} // SW Auth General Capabilities Extension
+	OIDAuthVersion4  asn1.ObjectIdentifier = []int{1, 2, 840, 113635, 100, 6, 71, 1} // v4 Properties extension
 )
+
+func LookupOID(oid asn1.ObjectIdentifier) string {
+	switch {
+	case oid.Equal(OIDAppleCertificatePolicy):
+		return "Apple Certificate Policy"
+	case oid.Equal(OIDIosDeveloperLeaf):
+		return "iOS Developer (Leaf)"
+	case oid.Equal(OIDIosAppStoreApplicationLeaf):
+		return "iOS AppStore Application (Leaf)"
+	case oid.Equal(OIDIosDistributionLeaf):
+		return "iOS Distribution (Leaf)"
+	case oid.Equal(OIDIosAppStoreVpnApplicationLeaf):
+		return "iOS AppStore VPN Application (Leaf)"
+	case oid.Equal(OID3rdPartyMacDeveloperApplicationLeaf):
+		return "3rd Party Mac Developer Application (Leaf)"
+	case oid.Equal(OID3rdPartyMacDeveloperInstallerLeaf):
+		return "3rd Party Mac Developer Installer (Leaf)"
+	case oid.Equal(OIDMacAppStoreApplicationLeaf):
+		return "Mac AppStore Application (Leaf)"
+	case oid.Equal(OIDMacAppStoreInstallerLeaf):
+		return "Mac AppStore Installer (Leaf)"
+	case oid.Equal(OIDMacAppStoreReceiptLeaf):
+		return "Mac AppStore Receipt (Leaf)"
+	case oid.Equal(OIDMacOsDevelopmentLeaf):
+		return "macOS Development (Leaf)"
+	case oid.Equal(OIDDeveloperIdApplicationLeaf):
+		return "Developer ID Application (Leaf)"
+	case oid.Equal(OIDDeveloperIdInstallerLeaf):
+		return "Developer ID Installer (Leaf)"
+	case oid.Equal(OIDDeveloperIdKernelExtensionLeaf):
+		return "Developer ID Kernel Extension (Leaf)"
+	case oid.Equal(OIDTestFlightLeaf):
+		return "TestFlight (Leaf)"
+	case oid.Equal(OIDInternalReleaseLeaf):
+		return "Internal Release (Leaf)"
+	case oid.Equal(OIDDeveloperIdTicketLeaf):
+		return "Developer ID Ticket (Leaf)"
+	case oid.Equal(OIDAppleSoftwareSigningLeaf):
+		return "Apple Software Signing (Leaf)"
+	case oid.Equal(OIDDeveloperIDDate):
+		return "Developer ID Date"
+	case oid.Equal(OIDWorldwideDeveloperRelationsWdrIntermediateCA):
+		return "Worldwide Developer Relations Wdr Intermediate CA"
+	case oid.Equal(OIDDeveloperIdIntermediateCA):
+		return "Developer ID Intermediate CA"
+	case oid.Equal(OIDCodeSigningEKU):
+		return "CodeSigning EKU"
+	case oid.Equal(OIDSafariDeveloperEKU):
+		return "Safari Developer EKU"
+	case oid.Equal(OID3rdPartyMacDeveloperInstallerEKU):
+		return "3rd Party Mac Developer Installer EKU"
+	case oid.Equal(OIDDeveloperIDInstallerEKU):
+		return "Developer ID Installer EKU"
+	case oid.Equal(OIDGeneralCapabilities):
+		return "General Capabilities"
+	case oid.Equal(OIDAirPlayCapabilities):
+		return "AirPlay Capabilities"
+	case oid.Equal(OIDHomeKitCapabilities):
+		return "HomeKit Capabilities"
+	case oid.Equal(OIDAuthVersion3):
+		return "Auth Version3 "
+	case oid.Equal(OIDAuthVersionSW):
+		return "Auth Version SW"
+	case oid.Equal(OIDAuthVersion4):
+		return "Auth Version 4"
+	default:
+		return oid.String()
+	}
+}
 
 type KeyUsage int
 
