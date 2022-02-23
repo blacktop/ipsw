@@ -38,9 +38,13 @@ func init() {
 
 	macosCmd.Flags().BoolP("list", "l", false, "Show latest macOS installers")
 	macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
+	macosCmd.Flags().Bool("ignore", false, "Do NOT verify pkg digests")
+	macosCmd.Flags().BoolP("assistant", "a", false, "Only download the InstallAssistant.pkg")
 	// macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote installer")
 	viper.BindPFlag("download.macos.list", macosCmd.Flags().Lookup("list"))
 	viper.BindPFlag("download.macos.work-dir", macosCmd.Flags().Lookup("work-dir"))
+	viper.BindPFlag("download.macos.ignore", macosCmd.Flags().Lookup("ignore"))
+	viper.BindPFlag("download.macos.assistant", macosCmd.Flags().Lookup("assistant"))
 	// viper.BindPFlag("download.macos.kernel", macosCmd.Flags().Lookup("kernel"))
 }
 
@@ -85,6 +89,8 @@ var macosCmd = &cobra.Command{
 		// flags
 		showInstallers := viper.GetBool("download.macos.list")
 		workDir := viper.GetString("download.macos.work-dir")
+		ignoreSha1 := viper.GetBool("download.macos.ignore")
+		assistantOnly := viper.GetBool("download.macos.assistant")
 		// remoteKernel := viper.GetString("download.macos.kernel")
 
 		// verify args
@@ -153,7 +159,7 @@ var macosCmd = &cobra.Command{
 			}
 		}
 		if cont {
-			if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll, resumeAll, restartAll); err != nil {
+			if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll, resumeAll, restartAll, ignoreSha1, assistantOnly); err != nil {
 				return err
 			}
 		}

@@ -104,7 +104,7 @@ var wikiCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, Verbose)
+			downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
 			for _, url := range filteredURLS {
 				destName := getDestName(url, removeCommas)
 				if _, err := os.Stat(destName); os.IsNotExist(err) {
