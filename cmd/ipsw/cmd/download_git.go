@@ -98,10 +98,10 @@ type githubTag struct {
 type GithubTags []githubTag
 
 type githubTar struct {
-	Name   string
-	Tag    string
-	TarURL string
-	ZipURL string
+	Name   string `json:"name,omitempty"`
+	Tag    string `json:"tag,omitempty"`
+	TarURL string `json:"tar_url,omitempty"`
+	ZipURL string `json:"zip_url,omitempty"`
 }
 
 func queryAppleGithubRepo(prod, proxy string, insecure bool, api string) (*githubRepo, error) {
