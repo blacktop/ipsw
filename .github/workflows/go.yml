@@ -246,10 +246,10 @@ jobs:
       #   run: |
       #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --auth
 
-      # - name: Run dyld patches TODO: fix this
-      #   if: matrix.platform == 'macos-11'
-      #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+      - name: Run dyld patches
+        if: matrix.platform == 'macos-11'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
 
       - name: Run dyld imports
         if: matrix.platform == 'macos-11'
