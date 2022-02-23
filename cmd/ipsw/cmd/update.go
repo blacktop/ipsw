@@ -81,11 +81,12 @@ func init() {
 	updateCmd.Flags().Bool("detect", false, "detect my platform")
 	updateCmd.Flags().Bool("replace", false, "overwrite current ipsw")
 	// updateCmd.Flags().BoolP("yes", "y", false, "do not prompt user")
+	updateCmd.Flags().StringP("api", "a", "", "Github API Token (incase you get rate limited)")
 
 	updateCmd.Flags().StringP("platform", "p", "", "ipsw platform binary to update")
 }
 
-func queryGithub(proxy string, insecure bool) (GithubReleases, error) {
+func queryGithub(proxy string, insecure bool, api string) (GithubReleases, error) {
 
 	var releases GithubReleases
 
@@ -94,6 +95,9 @@ func queryGithub(proxy string, insecure bool) (GithubReleases, error) {
 		return nil, fmt.Errorf("cannot create http request: %v", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -141,6 +145,7 @@ var updateCmd = &cobra.Command{
 
 		platform, _ := cmd.Flags().GetString("platform")
 		detectPlatform, _ := cmd.Flags().GetBool("detect")
+		apiToken, _ := cmd.Flags().GetString("api")
 
 		if detectPlatform {
 			os := runtime.GOOS
@@ -171,7 +176,17 @@ var updateCmd = &cobra.Command{
 			destPath = filepath.Clean(args[0])
 		}
 
-		releases, err := queryGithub(proxy, insecure)
+		if len(apiToken) == 0 {
+			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
+				apiToken = val
+			} else {
+				if val, ok := os.LookupEnv("GITHUB_API_TOKEN"); ok {
+					apiToken = val
+				}
+			}
+		}
+
+		releases, err := queryGithub(proxy, insecure, apiToken)
 		if err != nil {
 			return err
 		}

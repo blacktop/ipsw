@@ -29,6 +29,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -43,7 +44,11 @@ func init() {
 	downloadCmd.AddCommand(gitCmd)
 
 	gitCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
+	gitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	viper.BindPFlag("download.git.product", gitCmd.Flags().Lookup("product"))
+	viper.BindPFlag("download.git.output", gitCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.git.api", gitCmd.Flags().Lookup("api"))
 }
 
 const githubApiURL = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
@@ -90,13 +95,16 @@ type githubTag struct {
 
 type GithubTags []githubTag
 
-func queryAppleGithubRepo(prod, proxy string, insecure bool) (*githubRepo, error) {
+func queryAppleGithubRepo(prod, proxy string, insecure bool, api string) (*githubRepo, error) {
 	var repo githubRepo
 	req, err := http.NewRequest("GET", "https://api.github.com/repos/apple-oss-distributions/"+prod, nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create http request: %v", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -127,7 +135,7 @@ func queryAppleGithubRepo(prod, proxy string, insecure bool) (*githubRepo, error
 	return &repo, nil
 }
 
-func queryAppleGithubRepos(proxy string, insecure bool) (GithubRepos, error) {
+func queryAppleGithubRepos(proxy string, insecure bool, api string) (GithubRepos, error) {
 	var resp *http.Response
 	var page GithubRepos
 	var repos GithubRepos
@@ -137,6 +145,9 @@ func queryAppleGithubRepos(proxy string, insecure bool) (GithubRepos, error) {
 		return nil, fmt.Errorf("cannot create http request: %v", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -273,7 +284,7 @@ func populatePageValues(r *http.Response) pageInfo {
 	return pinfo
 }
 
-func queryAppleGithubTags(url, proxy string, insecure bool) (GithubTags, error) {
+func queryAppleGithubTags(url, proxy string, insecure bool, api string) (GithubTags, error) {
 
 	var tags GithubTags
 
@@ -282,6 +293,9 @@ func queryAppleGithubTags(url, proxy string, insecure bool) (GithubTags, error) 
 		return nil, fmt.Errorf("cannot create http request: %v", err)
 	}
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -334,10 +348,22 @@ var gitCmd = &cobra.Command{
 		insecure := viper.GetBool("download.insecure")
 		// flags
 		downloadProduct := viper.GetString("download.git.product")
+		outputFolder := viper.GetString("download.git.output")
+		apiToken := viper.GetString("download.git.api")
+
+		if len(apiToken) == 0 {
+			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
+				apiToken = val
+			} else {
+				if val, ok := os.LookupEnv("GITHUB_API_TOKEN"); ok {
+					apiToken = val
+				}
+			}
+		}
 
 		if len(downloadProduct) == 0 {
 			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
-			repos, err = queryAppleGithubRepos(proxy, insecure)
+			repos, err = queryAppleGithubRepos(proxy, insecure, apiToken)
 			if err != nil {
 				return err
 			}
@@ -346,7 +372,7 @@ var gitCmd = &cobra.Command{
 				return fmt.Errorf("no repos found")
 			}
 		} else {
-			repo, err := queryAppleGithubRepo(downloadProduct, proxy, insecure)
+			repo, err := queryAppleGithubRepo(downloadProduct, proxy, insecure, apiToken)
 			if err != nil {
 				return err
 			}
@@ -354,7 +380,7 @@ var gitCmd = &cobra.Command{
 		}
 
 		for _, repo := range repos {
-			tags, err := queryAppleGithubTags(strings.TrimSuffix(repo.TagsURL, "{/id}"), proxy, insecure)
+			tags, err := queryAppleGithubTags(strings.TrimSuffix(repo.TagsURL, "{/id}"), proxy, insecure, apiToken)
 			if err != nil {
 				return err
 			}
@@ -366,8 +392,10 @@ var gitCmd = &cobra.Command{
 
 			latestTag := tags[0]
 
-			destName := getDestName(latestTag.TarURL, false)
-			destName += ".tar.gz"
+			tarURL := fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.tar.gz", repo.Name, latestTag.Name)
+
+			destName := getDestName(tarURL, false)
+			destName = filepath.Join(outputFolder, destName)
 
 			if _, err := os.Stat(destName); os.IsNotExist(err) {
 				log.WithFields(log.Fields{
@@ -375,7 +403,7 @@ var gitCmd = &cobra.Command{
 				}).Info("Downloading")
 				// download file
 				downloader := download.NewDownload(proxy, insecure, false, false, false, false)
-				downloader.URL = latestTag.TarURL
+				downloader.URL = tarURL
 				downloader.DestName = destName
 
 				err = downloader.Do()
