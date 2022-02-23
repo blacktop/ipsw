@@ -46,9 +46,11 @@ func init() {
 	gitCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
 	gitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
+	gitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	viper.BindPFlag("download.git.product", gitCmd.Flags().Lookup("product"))
 	viper.BindPFlag("download.git.output", gitCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.git.api", gitCmd.Flags().Lookup("api"))
+	viper.BindPFlag("download.git.json", gitCmd.Flags().Lookup("json"))
 }
 
 const githubApiURL = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
@@ -94,6 +96,13 @@ type githubTag struct {
 }
 
 type GithubTags []githubTag
+
+type githubTar struct {
+	Name   string
+	Tag    string
+	TarURL string
+	ZipURL string
+}
 
 func queryAppleGithubRepo(prod, proxy string, insecure bool, api string) (*githubRepo, error) {
 	var repo githubRepo
@@ -335,6 +344,7 @@ var gitCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var err error
 		var repos GithubRepos
+		var tarJSON []githubTar
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -350,6 +360,7 @@ var gitCmd = &cobra.Command{
 		downloadProduct := viper.GetString("download.git.product")
 		outputFolder := viper.GetString("download.git.output")
 		apiToken := viper.GetString("download.git.api")
+		asJSON := viper.GetBool("download.git.json")
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
@@ -393,25 +404,54 @@ var gitCmd = &cobra.Command{
 			latestTag := tags[0]
 
 			tarURL := fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.tar.gz", repo.Name, latestTag.Name)
+			zipURL := fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.zip", repo.Name, latestTag.Name)
 
-			destName := getDestName(tarURL, false)
-			destName = filepath.Join(outputFolder, destName)
-
-			if _, err := os.Stat(destName); os.IsNotExist(err) {
+			if asJSON {
 				log.WithFields(log.Fields{
-					"file": destName,
-				}).Info("Downloading")
-				// download file
-				downloader := download.NewDownload(proxy, insecure, false, false, false, false, false)
-				downloader.URL = tarURL
-				downloader.DestName = destName
+					"tag": latestTag.Name,
+				}).Info("Adding to JSON")
+				tarJSON = append(tarJSON, githubTar{
+					Name:   repo.Name,
+					Tag:    latestTag.Name,
+					TarURL: tarURL,
+					ZipURL: zipURL,
+				})
+			} else {
+				destName := getDestName(tarURL, false)
+				destName = filepath.Join(outputFolder, destName)
 
-				err = downloader.Do()
-				if err != nil {
-					return fmt.Errorf("failed to download file: %v", err)
+				if _, err := os.Stat(destName); os.IsNotExist(err) {
+					log.WithFields(log.Fields{
+						"file": destName,
+					}).Info("Downloading")
+					// download file
+					downloader := download.NewDownload(proxy, insecure, false, false, false, false, false)
+					downloader.URL = tarURL
+					downloader.DestName = destName
+
+					err = downloader.Do()
+					if err != nil {
+						return fmt.Errorf("failed to download file: %v", err)
+					}
+				} else {
+					log.Warnf("file already exists: %s", destName)
+				}
+			}
+		}
+
+		if asJSON {
+			dat, err := json.MarshalIndent(tarJSON, "", "    ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal JSON: %v", err)
+			}
+			if len(outputFolder) > 0 {
+				fpath := filepath.Join(outputFolder, "apple_github_links.json")
+				log.Infof("Creating %s", fpath)
+				if err := ioutil.WriteFile(fpath, dat, 0755); err != nil {
+					return err
 				}
 			} else {
-				log.Warnf("file already exists: %s", destName)
+				fmt.Println(string(dat))
 			}
 		}
 
