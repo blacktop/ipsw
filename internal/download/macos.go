@@ -30,8 +30,8 @@ const (
 	sucatalogs17      = "https://swscan.apple.com/content/catalogs/others/index-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs18      = "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs19      = "https://swscan.apple.com/content/catalogs/others/index-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
-	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-11-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
-	sucatalogs21      = "https://swscan.apple.com/content/catalogs/others/index-12seed-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs21      = "https://swscan.apple.com/content/catalogs/others/index-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 )
 
 type seedCatalog struct {
@@ -309,17 +309,20 @@ func GetProductInfo() (ProductInfos, error) {
 	return prods, nil
 }
 
-func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll bool) error {
+func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll, ignoreSha1, assistantOnly bool) error {
 
-	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, true)
+	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, ignoreSha1, true)
 
-	folder := filepath.Join(workDir, i.Title)
+	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", i.ProductID, i.Version, i.Build))
 
 	os.MkdirAll(folder, os.ModePerm)
 
 	log.Info("Downloading packages")
 	for _, pkg := range i.Product.Packages {
 		if len(pkg.URL) > 0 {
+			if assistantOnly && !strings.HasSuffix(pkg.URL, "InstallAssistant.pkg") {
+				continue
+			}
 			destName := getDestName(pkg.URL, false)
 			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
 				log.WithFields(log.Fields{
@@ -340,6 +343,9 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 			}
 
 		} else if len(pkg.MetadataURL) > 0 {
+			if assistantOnly && !strings.HasSuffix(pkg.MetadataURL, "InstallAssistant.pkg") {
+				continue
+			}
 			destName := getDestName(pkg.MetadataURL, false)
 			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
 				log.WithFields(log.Fields{
@@ -360,6 +366,10 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
 			}
 		}
+	}
+
+	if assistantOnly {
+		return nil
 	}
 
 	volumeName := fmt.Sprintf("Install_macOS_%s-%s", i.Version, i.Build)

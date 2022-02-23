@@ -246,7 +246,7 @@ var updateCmd = &cobra.Command{
 			}
 		}
 
-		downloader := download.NewDownload(proxy, insecure, false, false, false, Verbose)
+		downloader := download.NewDownload(proxy, insecure, false, false, false, false, Verbose)
 		fname := strings.Replace(path.Base(asset.DownloadURL), ",", "_", -1)
 		fname = filepath.Join(destPath, fname)
 		if _, err := os.Stat(fname); os.IsNotExist(err) {

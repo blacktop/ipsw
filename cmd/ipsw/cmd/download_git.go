@@ -402,7 +402,7 @@ var gitCmd = &cobra.Command{
 					"file": destName,
 				}).Info("Downloading")
 				// download file
-				downloader := download.NewDownload(proxy, insecure, false, false, false, false)
+				downloader := download.NewDownload(proxy, insecure, false, false, false, false, false)
 				downloader.URL = tarURL
 				downloader.DestName = destName
 

@@ -264,7 +264,7 @@ var otaDLCmd = &cobra.Command{
 					}
 				}
 			} else {
-				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, Verbose)
+				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
 				for _, o := range otas {
 					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
 					os.MkdirAll(folder, os.ModePerm)

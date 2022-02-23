@@ -770,6 +770,7 @@ func (app *App) Download(url string) error {
 		app.config.SkipAll,
 		app.config.ResumeAll,
 		app.config.RestartAll,
+		false,
 		app.config.Verbose,
 	)
 	// use authenticated client
