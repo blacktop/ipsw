@@ -315,8 +315,8 @@ jobs:
         if: matrix.platform == 'macos-11'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --platform windows_x86_64 -V
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --detect
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --platform windows_x86_64 -V --api ${{ secrets.GITHUB_TOKEN }}
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --detect --api ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/upload-artifact@v2
         with:
