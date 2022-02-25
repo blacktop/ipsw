@@ -716,6 +716,18 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw download git
 </code></pre></div><p>Download single product</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw download git --product dyld
+</code></pre></div><p>Supply API token <em>(to prevent rate limiting)</em></p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw download git --api GITHUB_TOKEN
+</code></pre></div><blockquote>
+<p><em>NOTE:</em> <code>ipsw</code> will also check for env vars <code>GITHUB_TOKEN</code>, <code>GITHUB_API_TOKEN</code> or <code>IPSW_DOWNLOAD_GIT_API</code></p>
+</blockquote>
+<p>Download repo archive links as JSON</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw download git --json --output /tmp/git
+   • Querying github.com/orgs/apple-oss-distributions for repositories...
+   • Adding to JSON            tag=dyld-940
+   • Adding to JSON            tag=notify-45.3
+   • Adding to JSON            tag=DiskArbitration-366.0.2
+   • Adding to JSON            tag=pam_modules-188
 </code></pre></div><h2 id="download-rss"><strong>download rss</strong></h2>
 <blockquote>
 <p>Read Releases - Apple Developer <a href="https://developer.apple.com/news/">RSS Feed</a></p>
