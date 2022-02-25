@@ -109,6 +109,7 @@ changelog:
       - "^bumping"
       - "^Update"
       - "^Delete"
+      - "^Working"      
       - "reorg"
       - "updates"
       - Merge pull request
