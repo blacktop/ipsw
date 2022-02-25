@@ -562,6 +562,25 @@ Download single product
 ❯ ipsw download git --product dyld
 ```
 
+Supply API token _(to prevent rate limiting)_
+
+```
+❯ ipsw download git --api GITHUB_TOKEN
+```
+
+> _NOTE:_ `ipsw` will also check for env vars `GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `IPSW_DOWNLOAD_GIT_API`
+
+Download repo archive links as JSON
+
+```
+❯ ipsw download git --json --output /tmp/git
+   • Querying github.com/orgs/apple-oss-distributions for repositories...
+   • Adding to JSON            tag=dyld-940
+   • Adding to JSON            tag=notify-45.3
+   • Adding to JSON            tag=DiskArbitration-366.0.2
+   • Adding to JSON            tag=pam_modules-188
+```
+
 ## **download rss**
 
 > Read Releases - Apple Developer [RSS Feed](https://developer.apple.com/news/)
