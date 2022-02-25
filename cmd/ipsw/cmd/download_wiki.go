@@ -23,28 +23,40 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
 	downloadCmd.AddCommand(wikiCmd)
+	wikiCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
+	wikiCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
+	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
+	viper.BindPFlag("download.wiki.pattern", wikiCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("download.wiki.output", wikiCmd.Flags().Lookup("output"))
 }
 
 // wikiCmd represents the wiki command
 var wikiCmd = &cobra.Command{
-	Use:          "wiki",
-	Short:        "Download beta IPSWs from theiphonewiki.com",
-	Args:         cobra.NoArgs,
-	SilenceUsage: true,
-	Hidden:       true,
+	Use:           "wiki",
+	Short:         "Download beta IPSWs from theiphonewiki.com",
+	Args:          cobra.NoArgs,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -74,6 +86,20 @@ var wikiCmd = &cobra.Command{
 		device := viper.GetString("download.device")
 		version := viper.GetString("download.version")
 		build := viper.GetString("download.build")
+		// flags
+		kernel := viper.GetBool("download.wiki.kernel")
+		pattern := viper.GetString("download.wiki.pattern")
+		output := viper.GetString("download.wiki.output")
+
+		// verify args
+		if kernel && len(pattern) > 0 {
+			return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
+		}
+
+		var destPath string
+		if len(output) > 0 {
+			destPath = filepath.Clean(output)
+		}
 
 		ipsws, err := download.ScrapeIPSWs()
 		if err != nil {
@@ -93,8 +119,7 @@ var wikiCmd = &cobra.Command{
 
 		cont := true
 		if !confirm {
-			// if filtered to a single device skip the prompt
-			if len(filteredURLS) > 1 {
+			if len(filteredURLS) > 1 { // if filtered to a single device skip the prompt
 				cont = false
 				prompt := &survey.Confirm{
 					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredURLS)),
@@ -104,22 +129,85 @@ var wikiCmd = &cobra.Command{
 		}
 
 		if cont {
-			downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
-			for _, url := range filteredURLS {
-				destName := getDestName(url, removeCommas)
-				if _, err := os.Stat(destName); os.IsNotExist(err) {
+			if kernel { // REMOTE KERNEL MODE
+				for _, url := range filteredURLS {
 					d, v, b := download.ParseIpswURLString(url)
-					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Getting IPSW")
-					// download file
-					downloader.URL = url
-					downloader.DestName = destName
-
-					err = downloader.Do()
+					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
+					log.Info("Extracting remote kernelcache")
+					zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
+						Proxy:    proxy,
+						Insecure: insecure,
+					})
 					if err != nil {
-						return fmt.Errorf("failed to download IPSW: %v", err)
+						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
 					}
-				} else {
-					log.Warnf("ipsw already exists: %s", destName)
+					if err := kernelcache.RemoteParse(zr, destPath); err != nil {
+						return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+					}
+				}
+			} else if len(pattern) > 0 { // PATTERN MATCHING MODE
+				for _, url := range filteredURLS {
+					d, v, b := download.ParseIpswURLString(url)
+					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
+					log.Infof("Downloading files that contain: %s", pattern)
+					zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
+						Proxy:    proxy,
+						Insecure: insecure,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+					}
+					iinfo, err := info.ParseZipFiles(zr.File)
+					if err != nil {
+						return errors.Wrap(err, "failed to parse remote ipsw")
+					}
+					destPath = filepath.Join(destPath, iinfo.GetFolder())
+					os.Mkdir(destPath, os.ModePerm)
+					found := false
+					for _, f := range zr.File {
+						if strings.Contains(f.Name, pattern) {
+							found = true
+							fileName := filepath.Join(destPath, filepath.Base(filepath.Clean(f.Name)))
+							if _, err := os.Stat(fileName); os.IsNotExist(err) {
+								data := make([]byte, f.UncompressedSize64)
+								rc, err := f.Open()
+								if err != nil {
+									return fmt.Errorf("failed to open file in zip: %v", err)
+								}
+								io.ReadFull(rc, data)
+								rc.Close()
+								utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
+								err = ioutil.WriteFile(fileName, data, 0644)
+								if err != nil {
+									return errors.Wrapf(err, "failed to write %s", f.Name)
+								}
+							} else {
+								log.Warnf("%s already exists", fileName)
+							}
+						}
+					}
+					if !found {
+						utils.Indent(log.Error, 2)(fmt.Sprintf("No files contain pattern %s", pattern))
+					}
+				}
+			} else { // NORMAL MODE
+				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
+				for _, url := range filteredURLS {
+					fname := filepath.Join(destPath, getDestName(url, removeCommas))
+					if _, err := os.Stat(fname); os.IsNotExist(err) {
+						d, v, b := download.ParseIpswURLString(url)
+						log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Getting IPSW")
+						// download file
+						downloader.URL = url
+						downloader.DestName = fname
+
+						err = downloader.Do()
+						if err != nil {
+							return fmt.Errorf("failed to download IPSW: %v", err)
+						}
+					} else {
+						log.Warnf("ipsw already exists: %s", fname)
+					}
 				}
 			}
 		}
