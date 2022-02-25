@@ -202,7 +202,8 @@
 <li><a href="#download-ipsw---latest"><strong>download ipsw &ndash;latest</strong></a></li>
 <li><a href="#download-ipsw---kernel"><strong>download ipsw &ndash;kernel</strong></a></li>
 <li><a href="#download-ipsw---pattern"><strong>download ipsw &ndash;pattern</strong></a></li>
-<li><a href="#download-beta"><strong>download beta</strong></a></li>
+<li><a href="#download-ipsw---ibridge"><strong>download ipsw &ndash;ibridge</strong></a></li>
+<li><a href="#download-wiki"><strong>download wiki</strong></a></li>
 <li><a href="#download-ota"><strong>download ota</strong></a></li>
 <li><a href="#download-macos"><strong>download macos</strong></a></li>
 <li><a href="#download-dev"><strong>download dev</strong></a></li>
@@ -405,14 +406,24 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
       • Created 19B74__iPhone14,2/iBoot.d63.RELEASE.im4p.plist
       • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p
       • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p.plist
-</code></pre></div><h2 id="download-beta"><strong>download beta</strong></h2>
+</code></pre></div><h3 id="download-ipsw---ibridge"><strong>download ipsw &ndash;ibridge</strong></h3>
+<p>Download iBridge firmwares</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download ipsw --ibridge --latest
+   • Latest release found is: 6.2
+   • Getting IPSW              <span class="nv">build</span><span class="o">=</span>19P744 <span class="nv">device</span><span class="o">=</span>iBridge2,7 <span class="nv">signed</span><span class="o">=</span><span class="nb">true</span> <span class="nv">version</span><span class="o">=</span>6.2
+	50.6 MiB / 577.2 MiB <span class="o">[====</span>&gt;-----------------------------------------------------<span class="p">|</span> 7m20s <span class="o">]</span>  1.20 MiB/s
+</code></pre></div><h2 id="download-wiki"><strong>download wiki</strong></h2>
 <blockquote>
 <p>This is done by scraping <a href="https://theiphonewiki.com">theiphonewiki.com</a>.</p>
 </blockquote>
-<p>Download BETA ipsws</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download beta 17C5046a
+<p>Download IPSWs from The iPhone Wiki</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download wiki --device Watch6,9 --kernel
+? You are about to download <span class="m">4</span> ipsw files. Continue? Yes
+   • Parsing remote IPSW       <span class="nv">build</span><span class="o">=</span>19R346 <span class="nv">devices</span><span class="o">=</span>Watch6,9 <span class="nv">version</span><span class="o">=</span>8.0
+   • Extracting remote kernelcache
+      • Writing 19R346__Watch6,9/kernelcache.release.Watch6,9
 </code></pre></div><blockquote>
-<p><strong>NOTE:</strong> This depends on the iphonewiki maintainers publishing the <code>beta</code> firmware download links</p>
+<p><strong>NOTE:</strong> This depends on the iphonewiki maintainers publishing the IPSW firmware download links.</p>
 </blockquote>
 <h2 id="download-ota"><strong>download ota</strong></h2>
 <p>Check for availiable OTA <em>(over the air updates)</em> download versions</p>
