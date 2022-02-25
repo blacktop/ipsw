@@ -445,6 +445,7 @@ var gitCmd = &cobra.Command{
 				return fmt.Errorf("failed to marshal JSON: %v", err)
 			}
 			if len(outputFolder) > 0 {
+				os.MkdirAll(outputFolder, os.ModePerm)
 				fpath := filepath.Join(outputFolder, "apple_github_links.json")
 				log.Infof("Creating %s", fpath)
 				if err := ioutil.WriteFile(fpath, dat, 0755); err != nil {

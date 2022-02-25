@@ -11,7 +11,8 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download ipsw --latest**](#download-ipsw---latest)
 - [**download ipsw --kernel**](#download-ipsw---kernel)
 - [**download ipsw --pattern**](#download-ipsw---pattern)
-- [**download beta**](#download-beta)
+- [**download ipsw --ibridge**](#download-ipsw---ibridge)
+- [**download wiki**](#download-wiki)
 - [**download ota**](#download-ota)
 - [**download macos**](#download-macos)
 - [**download dev**](#download-dev)
@@ -284,17 +285,32 @@ Only download files that match a given name/path
       • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p.plist
 ```
 
-## **download beta**
+### **download ipsw --ibridge**
+
+Download iBridge firmwares
+
+```bash
+❯ ipsw download ipsw --ibridge --latest
+   • Latest release found is: 6.2
+   • Getting IPSW              build=19P744 device=iBridge2,7 signed=true version=6.2
+	50.6 MiB / 577.2 MiB [====>-----------------------------------------------------| 7m20s ]  1.20 MiB/s
+```
+
+## **download wiki**
 
 > This is done by scraping [theiphonewiki.com](https://theiphonewiki.com).
 
-Download BETA ipsws
+Download IPSWs from The iPhone Wiki
 
 ```bash
-❯ ipsw download beta 17C5046a
+❯ ipsw download wiki --device Watch6,9 --kernel
+? You are about to download 4 ipsw files. Continue? Yes
+   • Parsing remote IPSW       build=19R346 devices=Watch6,9 version=8.0
+   • Extracting remote kernelcache
+      • Writing 19R346__Watch6,9/kernelcache.release.Watch6,9
 ```
 
-> **NOTE:** This depends on the iphonewiki maintainers publishing the `beta` firmware download links
+> **NOTE:** This depends on the iphonewiki maintainers publishing the IPSW firmware download links.
 
 ## **download ota**
 
