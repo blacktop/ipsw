@@ -395,7 +395,7 @@ You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` re
 
 ## **download macos**
 
-List macOS installers
+#### List macOS installers
 
 ```bash
 ❯ ipsw download macos --list
@@ -423,7 +423,7 @@ List macOS installers
 | macOS Monterey                 | 12.0.1  | 21A559   | 10Oct21 17:23:38 |
 | macOS Monterey beta            | 12.1    | 21C5021h | 10Oct21 17:04:37 |
 
-Download **macOS Monterey**
+#### Download **macOS Monterey**
 
 ```bash
 ❯ ipsw download macos --build 21A559
@@ -439,6 +439,28 @@ Download **macOS Monterey**
 ```
 
 > ⚠️ **NOTE:** macOS sandboxes certain folders and prevents you from running some of the Apple utils required to build the FULL installers. _(try running in `/Users/Shared`)_
+
+#### To ignore digest verification errors
+
+```bash
+❯ ipsw download macos --ignore
+```
+
+> **NOTE:** This is probably a bad idea, but I've noticed some of the recent installer parts have bad sha1 digests listed in the sucatalogs
+
+#### To _ONLY_ download the `InstallAssistant.pkg` file _(which includes the install App as well)_
+
+```bash
+❯ ipsw download macos --assistant
+```
+
+#### To download the latest installer(s)
+
+```bash
+❯ ipsw download macos --latest
+```
+
+> **NOTE** This will find the latest installer and then also download any other installers released on the same day.
 
 ## **download dev**
 
@@ -584,7 +606,7 @@ Supply API token _(to prevent rate limiting)_
 ❯ ipsw download git --api GITHUB_TOKEN
 ```
 
-> _NOTE:_ `ipsw` will also check for env vars `GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `IPSW_DOWNLOAD_GIT_API`
+> **NOTE:** `ipsw` will also check for env vars `GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `IPSW_DOWNLOAD_GIT_API`
 
 Download repo archive links as JSON
 

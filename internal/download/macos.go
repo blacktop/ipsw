@@ -109,7 +109,7 @@ func (i ProductInfo) String() string {
 		i.Title,
 		i.Version,
 		i.Build,
-		i.PostDate.Format("01Jan06 15:04:05"))
+		i.PostDate.Format("02Jan2006 15:04:05"))
 }
 
 type ProductInfos []ProductInfo
@@ -125,16 +125,38 @@ func (infos ProductInfos) FilterByVersion(version string) ProductInfos {
 	return out
 }
 
+func (infos ProductInfos) FilterByBuild(build string) ProductInfos {
+	var out ProductInfos
+	for _, i := range infos {
+		if build == i.Build {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+func (infos ProductInfos) GetLatest() ProductInfos {
+	var out ProductInfos
+	lastDate := infos[len(infos)-1].PostDate
+	for _, i := range infos {
+		if i.PostDate.YearDay() == lastDate.YearDay() {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 func (infos ProductInfos) String() string {
 	tableString := &strings.Builder{}
-
+	zone, _ := time.Now().Zone()
+	location, _ := time.LoadLocation(zone)
 	pdata := [][]string{}
 	for _, pinfo := range infos {
 		pdata = append(pdata, []string{
 			pinfo.Title,
 			pinfo.Version,
 			pinfo.Build,
-			pinfo.PostDate.Format("01Jan06 15:04:05"),
+			pinfo.PostDate.In(location).Format("02Jan2006 15:04:05"),
 		})
 	}
 	table := tablewriter.NewWriter(tableString)
@@ -313,7 +335,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 
 	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, ignoreSha1, true)
 
-	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", i.ProductID, i.Version, i.Build))
+	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))
 
 	os.MkdirAll(folder, os.ModePerm)
 
