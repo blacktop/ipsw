@@ -485,7 +485,7 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
       • Writing <span class="s2">&#34;iPod9,1_N112AP_17F5054h/kernelcache.beta&#34;</span>
 </code></pre></div><p>You just plucked the <code>kernelcache</code> AND THE MUTHA FLIPPIN' <code>dyld_shared_cache</code> remotely out of a OTA&hellip; ARE YOU NOT ENTERTAINED?!?!!? 😎</p>
 <h2 id="download-macos"><strong>download macos</strong></h2>
-<p>List macOS installers</p>
+<h4 id="list-macos-installers">List macOS installers</h4>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download macos --list
 </code></pre></div><table>
 <thead>
@@ -613,7 +613,7 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 </tr>
 </tbody>
 </table>
-<p>Download <strong>macOS Monterey</strong></p>
+<h4 id="download-macos-monterey">Download <strong>macOS Monterey</strong></h4>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download macos --build 21A559
 
 ? You are about to download the macOS Monterey installer files. Continue? Yes
@@ -626,6 +626,18 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 	74.6 MiB / 11.3 GiB <span class="o">[</span>----------------------------------------------------------<span class="p">|</span> 1h4m28s <span class="o">]</span>  2.97 MiB/s
 </code></pre></div><blockquote>
 <p>⚠️ <strong>NOTE:</strong> macOS sandboxes certain folders and prevents you from running some of the Apple utils required to build the FULL installers. <em>(try running in <code>/Users/Shared</code>)</em></p>
+</blockquote>
+<h4 id="to-ignore-digest-verification-errors">To ignore digest verification errors</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download macos --ignore
+</code></pre></div><blockquote>
+<p><strong>NOTE:</strong> This is probably a bad idea, but I&rsquo;ve noticed some of the recent installer parts have bad sha1 digests listed in the sucatalogs</p>
+</blockquote>
+<h4 id="to-_only_-download-the-installassistantpkg-file-_which-includes-the-install-app-as-well_">To <em>ONLY</em> download the <code>InstallAssistant.pkg</code> file <em>(which includes the install App as well)</em></h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download macos --assistant
+</code></pre></div><h4 id="to-download-the-latest-installers">To download the latest installer(s)</h4>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download macos --latest
+</code></pre></div><blockquote>
+<p><strong>NOTE</strong> This will find the latest installer and then also download any other installers released on the same day.</p>
 </blockquote>
 <h2 id="download-dev"><strong>download dev</strong></h2>
 <p>Download IPSWs (and more) from <a href="https://developer.apple.com/download">https://developer.apple.com/download</a></p>
@@ -730,7 +742,7 @@ iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 </code></pre></div><p>Supply API token <em>(to prevent rate limiting)</em></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw download git --api GITHUB_TOKEN
 </code></pre></div><blockquote>
-<p><em>NOTE:</em> <code>ipsw</code> will also check for env vars <code>GITHUB_TOKEN</code>, <code>GITHUB_API_TOKEN</code> or <code>IPSW_DOWNLOAD_GIT_API</code></p>
+<p><strong>NOTE:</strong> <code>ipsw</code> will also check for env vars <code>GITHUB_TOKEN</code>, <code>GITHUB_API_TOKEN</code> or <code>IPSW_DOWNLOAD_GIT_API</code></p>
 </blockquote>
 <p>Download repo archive links as JSON</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback">❯ ipsw download git --json --output /tmp/git
