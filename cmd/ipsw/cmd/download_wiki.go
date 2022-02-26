@@ -53,7 +53,7 @@ func init() {
 // wikiCmd represents the wiki command
 var wikiCmd = &cobra.Command{
 	Use:           "wiki",
-	Short:         "Download beta IPSWs from theiphonewiki.com",
+	Short:         "Download old(er) IPSWs from theiphonewiki.com",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
