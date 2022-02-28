@@ -215,7 +215,7 @@ func (d *Download) Do() error {
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 
-	utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Downloading")
+	// utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Downloading") TODO: should I remove this?
 	resp, err := d.client.Do(req)
 	if err != nil {
 		if errors.Is(err, syscall.ECONNRESET) {

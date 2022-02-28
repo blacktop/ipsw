@@ -23,17 +23,12 @@ package cmd
 
 import (
 	"archive/zip"
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -43,35 +38,6 @@ import (
 	"github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 )
-
-type releaseAsset struct {
-	ID            int       `json:"id,omitempty"`
-	Name          string    `json:"name,omitempty"`
-	URL           string    `json:"url,omitempty"`
-	DownloadURL   string    `json:"browser_download_url,omitempty"`
-	Size          int       `json:"size,omitempty"`
-	DownloadCount int       `json:"download_count,omitempty"`
-	CreatedAt     time.Time `json:"created_at,omitempty"`
-	UpdatedAt     time.Time `json:"updated_at,omitempty"`
-}
-
-func (a releaseAsset) String() string {
-	return a.Name
-}
-
-type githubRelease struct {
-	ID          int            `json:"id,omitempty"`
-	URL         string         `json:"url,omitempty"`
-	HtmlURL     string         `json:"html_url,omitempty"`
-	TarballURL  string         `json:"tarball_url,omitempty"`
-	Tag         string         `json:"tag_name,omitempty"`
-	CreatedAt   time.Time      `json:"created_at,omitempty"`
-	PublishedAt time.Time      `json:"published_at,omitempty"`
-	Assets      []releaseAsset `json:"assets,omitempty"`
-	Body        string         `json:"body,omitempty"`
-}
-
-type GithubReleases []githubRelease
 
 func init() {
 	rootCmd.AddCommand(updateCmd)
@@ -84,48 +50,6 @@ func init() {
 	updateCmd.Flags().StringP("api", "a", "", "Github API Token (incase you get rate limited)")
 
 	updateCmd.Flags().StringP("platform", "p", "", "ipsw platform binary to update")
-}
-
-func queryGithub(proxy string, insecure bool, api string) (GithubReleases, error) {
-
-	var releases GithubReleases
-
-	req, err := http.NewRequest("GET", "https://api.github.com/repos/blacktop/ipsw/releases", nil)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create http request: %v", err)
-	}
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	if len(api) > 0 {
-		req.Header.Add("Authorization", "token "+api)
-	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           download.GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		},
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("client failed to perform request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
-	}
-
-	document, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
-	}
-
-	if err := json.Unmarshal(document, &releases); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal the github api JSON: %v", err)
-	}
-
-	return releases, nil
 }
 
 // updateCmd represents the update command
@@ -186,7 +110,7 @@ var updateCmd = &cobra.Command{
 			}
 		}
 
-		releases, err := queryGithub(proxy, insecure, apiToken)
+		releases, err := download.GetGithubIPSWReleases(proxy, insecure, apiToken)
 		if err != nil {
 			return err
 		}
@@ -213,7 +137,7 @@ var updateCmd = &cobra.Command{
 			}
 		}
 
-		var asset releaseAsset
+		var asset download.GithubReleaseAsset
 		var assetFiles []string
 
 		for _, a := range latestRelease.Assets {
