@@ -1,0 +1,34 @@
+name: "AppleMETA"
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    # The branches below must be a subset of the branches above
+    branches: [ master ]
+  schedule:
+    - cron: '00 01,13 * * *'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: Setup Go
+      uses: actions/setup-go@v2
+    - name: Run build
+      run: make build
+    - name: Run download git --json
+      run: ./ipsw download git --json --api ${{ secrets.GITHUB_TOKEN }} --output /tmp/tag_links.json
+    - name: Switch branch
+      run: git checkout apple_meta
+    - name: Move JSON
+      run: mv /tmp/tag_links.json github/tag_links.json
+    - name: Commit JSON
+      run: |
+        git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git config --local user.name "github-actions[bot]"
+        git commit -am "AppleMETA refresh"
+        git push
