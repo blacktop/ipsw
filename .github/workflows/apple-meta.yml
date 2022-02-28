@@ -25,7 +25,7 @@ jobs:
         make setup
         make build
     - name: Run download git --json
-      run: ./ipsw download git --json --api ${{ secrets.GITHUB_TOKEN }} --output /tmp/tag_links.json
+      run: ./ipsw download git --json --api ${{ secrets.GITHUB_TOKEN }} --output /tmp
     - name: Switch branch
       run: |
         git stash
