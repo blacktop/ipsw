@@ -27,7 +27,9 @@ jobs:
     - name: Run download git --json
       run: ./ipsw download git --json --api ${{ secrets.GITHUB_TOKEN }} --output /tmp/tag_links.json
     - name: Switch branch
-      run: git checkout apple_meta
+      run: |
+        git stash
+        git checkout apple_meta
     - name: Move JSON
       run: mv /tmp/tag_links.json github/tag_links.json
     - name: Commit JSON
