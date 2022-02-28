@@ -31,7 +31,11 @@ jobs:
         git stash
         git checkout apple_meta
     - name: Move JSON
-      run: mv /tmp/tag_links.json github/tag_links.json
+      run: |
+        ls -lah /tmp
+        ls -lah github
+        ls -lah
+        mv /tmp/tag_links.json github/tag_links.json
     - name: Commit JSON
       run: |
         git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
