@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -32,12 +33,17 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/gen2brain/beeep"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	downloadCmd.AddCommand(rssCmd)
 
 	rssCmd.Flags().BoolP("watch", "w", false, "Watch for NEW releases")
+	rssCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+
+	viper.BindPFlag("download.rss.watch", rssCmd.Flags().Lookup("watch"))
+	viper.BindPFlag("download.rss.json", rssCmd.Flags().Lookup("json"))
 }
 
 // rssCmd represents the rss command
@@ -51,7 +57,9 @@ var rssCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		watch, _ := cmd.Flags().GetBool("watch")
+		// flags
+		watch := viper.GetBool("download.rss.watch")
+		asJSON := viper.GetBool("download.rss.json")
 
 		rss, err := download.GetRSS()
 		if err != nil {
@@ -85,14 +93,26 @@ var rssCmd = &cobra.Command{
 			}
 		}
 
-		// Dump the Feed
-		fmt.Printf("# %s (%s)\n\n", rss.Channel.Title, rss.Channel.Link)
-		fmt.Printf("> %s  \n\n---\n\n", rss.Channel.Desc)
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-		for _, item := range rss.Channel.Items {
-			fmt.Fprintf(w, "- %s\t<%s>\t%s  \n", item.Title, item.PubDate, item.Link)
+		if asJSON {
+			rssJSON, err := json.Marshal(rss)
+			if err != nil {
+				log.Fatal(err.Error())
+			}
+			fmt.Println(string(rssJSON))
+		} else {
+			// Dump the Feed
+			fmt.Printf("# %s (%s)\n\n", rss.Channel.Title, rss.Channel.Link)
+			fmt.Printf("> %s  \n\n---\n\n", rss.Channel.Desc)
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+			for _, item := range rss.Channel.Items {
+				date, err := item.PubDate.GetDate()
+				if err != nil {
+					log.Fatal(err.Error())
+				}
+				fmt.Fprintf(w, "- %s\t<%s>\t%s  \n", item.Title, date.Format("Mon, 02Jan2006 15:04:05"), item.Link)
+			}
+			w.Flush()
+			fmt.Println()
 		}
-		w.Flush()
-		fmt.Println()
 	},
 }
