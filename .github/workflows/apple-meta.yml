@@ -32,7 +32,7 @@ jobs:
         git checkout apple_meta
     - name: Commit JSON
       run: |
-        go get github.com/josephburnett/jd
+        go install github.com/josephburnett/jd@v1.5.1
         jd -set /tmp/tag_links.json github/tag_links.json      
         mv /tmp/tag_links.json github/tag_links.json
         git --no-pager diff github/tag_links.json
