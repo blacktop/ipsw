@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-const rssURL = "http://developer.apple.com/news/releases/rss/releases.rss"
+const rssURL = "https://developer.apple.com/news/releases/rss/releases.rss"
 
 type RssContent struct {
 	Data string `xml:",chardata" json:"data,omitempty"`
@@ -66,6 +66,10 @@ func GetRSS() (*Rss, error) {
 		return nil, fmt.Errorf("failed to GET RSS URL: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("RSS feed returned status: %s", resp.Status)
+	}
 
 	rss := Rss{}
 
