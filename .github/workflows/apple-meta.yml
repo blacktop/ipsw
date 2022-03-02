@@ -32,6 +32,8 @@ jobs:
         git checkout apple_meta
     - name: Commit JSON
       run: |
+        go get github.com/josephburnett/jd
+        jd -set /tmp/tag_links.json github/tag_links.json      
         mv /tmp/tag_links.json github/tag_links.json
         git --no-pager diff github/tag_links.json
         git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
