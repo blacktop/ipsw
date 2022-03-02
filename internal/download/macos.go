@@ -2,7 +2,6 @@ package download
 
 import (
 	"bytes"
-	"compress/gzip"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -19,6 +18,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/dustin/go-humanize"
+	gzip "github.com/klauspost/pgzip"
 	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
 )
