@@ -24,7 +24,6 @@ package cmd
 import (
 	"archive/zip"
 	"bytes"
-	"compress/gzip"
 	"encoding/gob"
 	"fmt"
 	"os"
@@ -38,6 +37,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
+	gzip "github.com/klauspost/pgzip"
 	"github.com/spf13/cobra"
 )
 
