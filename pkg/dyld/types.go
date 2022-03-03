@@ -11,6 +11,17 @@ import (
 	"github.com/blacktop/go-macho/types"
 )
 
+const (
+	MacOSCacheFolder     = "System/Library/dyld/"
+	IPhoneCacheFolder    = "System/Library/Caches/com.apple.dyld/"
+	DriverKitCacheFolder = "System/DriverKit/System/Library/dyld/"
+
+	MacOSCacheRegex     = `^System\/Library\/dyld\/dyld_shared_cache_`
+	IPhoneCacheRegex    = `^System\/Library\/Caches\/com\.apple\.dyld\/dyld_shared_cache_`
+	DriverKitCacheRegex = `^System\/DriverKit\/System\/Library\/dyld\/dyld_shared_cache_`
+	CacheRegexEnding    = `(\..*)?$`
+)
+
 type formatVersion uint32
 
 const (
@@ -85,6 +96,7 @@ func (m magic) String() string {
 	return strings.Trim(string(m[:]), "\x00")
 }
 
+// CacheHeader is the header for a dyld_shared_cache file (struct dyld_cache_header)
 type CacheHeader struct {
 	Magic                     magic          // e.g. "dyld_v0    i386"
 	MappingOffset             uint32         // file offset to first dyld_cache_mapping_info

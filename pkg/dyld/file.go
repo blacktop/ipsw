@@ -203,21 +203,25 @@ func (f *File) Close() error {
 	return nil
 }
 
-// ReadHeader opens a given cache and returns the dyld_shared_cache header
-// func parseSubCache(name string) error {
-// 	var header CacheHeader
+// ReadHeader opens a given cache and returns the dyld_cache_header
+func ReadHeader(name string) (*CacheHeader, error) {
+	var header CacheHeader
 
-// 	cache, err := os.Open(path)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	log.WithFields(log.Fields{
+		"cache": name,
+	}).Debug("Parsing Cache Header")
 
-// 	if err := binary.Read(cache, binary.LittleEndian, &header); err != nil {
-// 		return nil, err
-// 	}
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
 
-// 	return &header, nil
-// }
+	if err := binary.Read(f, binary.LittleEndian, &header); err != nil {
+		return nil, err
+	}
+
+	return &header, nil
+}
 
 // NewFile creates a new File for accessing a dyld binary in an underlying reader.
 // The dyld binary is expected to start at position 0 in the ReaderAt.

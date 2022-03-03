@@ -17,23 +17,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	macOSCacheFolder     = "System/Library/dyld/"
-	iOSCacheFolder       = "System/Library/Caches/com.apple.dyld/"
-	driverKitCacheFolder = "System/DriverKit/System/Library/dyld/"
-
-	iOSCacheRegex   = `System\/Library\/Caches\/com\.apple\.dyld\/dyld_shared_cache_`
-	macOSCacheRegex = `System\/Library\/dyld\/dyld_shared_cache_`
-	regexEnding     = `(\..*)?$`
-)
-
-const (
-	CACHE_ARM64  = "arm64"
-	CACHE_ARM64E = "arm64e"
-	CACHE_INTEL  = "x86_64"
-	CACHE_INTELH = "x86_64h"
-)
-
 type extractConfig struct {
 	CacheFolder string
 	CacheRegex  string
@@ -76,12 +59,12 @@ func Extract(ipsw, destPath string, arches []string) error {
 
 		var config extractConfig
 		if utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") {
-			config.CacheFolder = macOSCacheFolder
-			config.CacheRegex = macOSCacheRegex
+			config.CacheFolder = MacOSCacheFolder
+			config.CacheRegex = MacOSCacheRegex
 			config.IsMacOS = true
 		} else {
-			config.CacheFolder = iOSCacheFolder
-			config.CacheRegex = iOSCacheRegex
+			config.CacheFolder = IPhoneCacheFolder
+			config.CacheRegex = IPhoneCacheRegex
 		}
 
 		if runtime.GOOS == "darwin" {
@@ -123,14 +106,13 @@ func Extract(ipsw, destPath string, arches []string) error {
 				}
 			} else {
 				var filtered []string
-				for _, arch := range arches {
-					r := regexp.MustCompile(fmt.Sprintf("%s%s%s", config.CacheRegex, arch, regexEnding))
-					for _, match := range matches {
-						if r.MatchString(match) {
-							filtered = append(filtered, match)
-						}
+				r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", config.CacheRegex, strings.Join(arches, "|"), CacheRegexEnding))
+				for _, match := range matches {
+					if r.MatchString(match) {
+						filtered = append(filtered, match)
 					}
 				}
+
 				if len(filtered) == 0 {
 					return fmt.Errorf("no dyld_shared_cache files found matching the specified archs: %v", arches)
 				}

@@ -232,8 +232,8 @@ func (i *Plists) String() string {
 	return iStr
 }
 
-// parseBuildManifest parses the BuildManifest.plist
-func parseBuildManifest(data []byte) (*BuildManifest, error) {
+// ParseBuildManifest parses the BuildManifest.plist
+func ParseBuildManifest(data []byte) (*BuildManifest, error) {
 	bm := &BuildManifest{}
 
 	decoder := plist.NewDecoder(bytes.NewReader(data))
@@ -326,7 +326,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 				}
 				io.ReadFull(rc, pData)
 				rc.Close()
-				ipsw.BuildManifest, err = parseBuildManifest(pData)
+				ipsw.BuildManifest, err = ParseBuildManifest(pData)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to parse BuildManifest.plist")
 				}
