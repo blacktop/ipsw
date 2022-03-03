@@ -45,10 +45,10 @@ import (
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
-	otaDLCmd.Flags().StringP("platform", "p", "ios", "Platform to download (ios, watchos, tvos, audioos || macos, recovery)")
+	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
-	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache from remote OTA zip")
-	otaDLCmd.Flags().StringArrayP("dyld-arch", "a", []string{"arm64e"}, "dyld_shared_cache architecture to remote extract")
+	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
+	otaDLCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	otaDLCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().String("pattern", "", "Download remote files that match regex")
@@ -124,14 +124,8 @@ var otaDLCmd = &cobra.Command{
 		output := viper.GetString("download.ota.output")
 
 		// verify args
-		// if kernel && len(pattern) > 0 {
-		// 	return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
-		// }
-		// if len(version) > 0 && len(build) > 0 {
-		// 	log.Fatal("you cannot supply a --version AND a --build (they are mutually exclusive)")
-		// }
 		if len(dyldArches) > 0 && !remoteDyld {
-			return errors.New("--dyld-arch or -a can only be used with --dyld or -d")
+			return errors.New("--dyld-arch || -a can only be used with --dyld || -d")
 		}
 		if len(dyldArches) > 0 {
 			for _, arch := range dyldArches {
@@ -139,6 +133,9 @@ var otaDLCmd = &cobra.Command{
 					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
 				}
 			}
+		}
+		if len(platform) == 0 || !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos"}, platform) {
+			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos || macos, recovery")
 		}
 		if len(version) == 0 {
 			version = "0"
@@ -189,11 +186,6 @@ var otaDLCmd = &cobra.Command{
 				}
 			}
 			return nil
-		}
-
-		if !utils.StrSliceHas(
-			[]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos"}, strings.ToLower(platform)) {
-			log.Fatal("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos || macos, recovery")
 		}
 
 		var destPath string

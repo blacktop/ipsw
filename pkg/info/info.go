@@ -135,8 +135,8 @@ func (i *Info) String() string {
 	}
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
 	bls := i.Plists.BuildManifest.GetBootLoaders()
-	iStr += fmt.Sprintf("\nDevices\n")
-	iStr += fmt.Sprintf("-------\n")
+	iStr += "\nDevices\n"
+	iStr += "-------\n"
 	for _, dtree := range i.DeviceTrees {
 		dt, _ := dtree.Summary()
 		prodName := dt.ProductName

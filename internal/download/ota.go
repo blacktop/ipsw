@@ -356,7 +356,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
 				}
 				switch segs[0] { // MAJOR
-				case 0:
+				case 0: // empty version
 					return []assetAudienceID{iOS15DeveloperBeta}, nil
 				case 11:
 					return []assetAudienceID{iOS11Beta}, nil
@@ -371,8 +371,6 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				default:
 					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x, 13.x, 14.x or 15.x)", o.Config.Version)
 				}
-			} else {
-				return []assetAudienceID{iOS15DeveloperBeta}, nil
 			}
 		} else {
 			return []assetAudienceID{iOSRelease, iOS14SecurityUpdates}, nil
@@ -385,6 +383,8 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
 				}
 				switch segs[0] { // MAJOR
+				case 0: // empty version
+					return []assetAudienceID{watchOS8Beta}, nil
 				case 4:
 					return []assetAudienceID{watchOS4Beta}, nil
 				case 5:
@@ -398,8 +398,6 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				default:
 					return nil, fmt.Errorf("invalid version %s (must be 4.x, 5.x, 6.x, 7.x or 8.x)", o.Config.Version)
 				}
-			} else {
-				return []assetAudienceID{watchOS8Beta}, nil
 			}
 		} else {
 			return []assetAudienceID{watchOSRelease}, nil
@@ -412,6 +410,8 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
 				}
 				switch segs[0] { // MAJOR
+				case 0: // empty version
+					return []assetAudienceID{tvOS15Beta}, nil
 				case 11:
 					return []assetAudienceID{tvOS11Beta}, nil
 				case 12:
@@ -425,8 +425,6 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				default:
 					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x, 13.x, 14.x or 15.x)", o.Config.Version)
 				}
-			} else {
-				return []assetAudienceID{tvOS15Beta}, nil
 			}
 		} else {
 			return []assetAudienceID{tvOSRelease}, nil
@@ -439,6 +437,8 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
 				}
 				switch segs[0] { // MAJOR
+				case 0: // empty version
+					return []assetAudienceID{audioOS15Beta}, nil
 				case 14:
 					return []assetAudienceID{audioOS14Beta}, nil
 				case 15:
@@ -446,12 +446,12 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				default:
 					return nil, fmt.Errorf("invalid version %s (must be 14.x or 15.x)", o.Config.Version)
 				}
-			} else {
-				return []assetAudienceID{audioOS15Beta}, nil
 			}
 		} else {
 			return []assetAudienceID{audioOSRelease}, nil
 		}
+	case "recovery":
+		fallthrough
 	case "macos":
 		if o.Config.Beta {
 			if o.Config.Version != nil {
@@ -469,8 +469,6 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				default:
 					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x)", o.Config.Version)
 				}
-			} else {
-				return []assetAudienceID{macOS12DeveloperBeta, macOS12CustomerBeta, macOS12PublicBeta}, nil
 			}
 		} else {
 			return []assetAudienceID{macOSRelease}, nil
@@ -500,28 +498,40 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 	}
 	if len(o.Config.Device) > 0 {
 		req.ProductType = o.Config.Device
-	} else {
-		var model string
-		devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
-		if len(devices) == 0 {
-			devices = o.as.GetDevicesForVersion(o.as.Latest(typ), typ)
-		}
-		for _, device := range devices {
-			model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
+		if len(o.Config.Model) == 0 {
+			model, err := o.lookupHWModel(o.Config.Device) // TODO: replace w/ internal DB
 			if err != nil {
-				// return nil, err
-				log.Debugf("failed to lookup model for device %s", device)
-				continue
+				return nil, err
 			}
-			req.ProductType = device
 			req.HWModelStr = model
-			reqNEW := req
-			reqs = append(reqs, reqNEW)
+		} else {
+			req.HWModelStr = o.Config.Model
 		}
-	}
-
-	if len(o.Config.Model) > 0 {
+	} else if len(o.Config.Model) > 0 {
 		req.HWModelStr = o.Config.Model
+	} else {
+		// var model string
+		// devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
+		// if len(devices) == 0 {
+		// 	req.RequestedProductVersion = o.as.Latest(typ, o.Config.Platform)
+		// 	req.Supervised = true
+		// 	req.DelayRequested = false
+		// 	devices = o.as.GetDevicesForVersion(req.RequestedProductVersion, typ)
+		// }
+		// for _, device := range devices {
+		// 	req.ProductType = device
+		// 	model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
+		// 	if err != nil {
+		// 		// return nil, err
+		// 		log.Debugf("failed to lookup model for device %s", device)
+		// 		// continue
+		// 	} else {
+		// 		req.HWModelStr = model
+		// 	}
+		// 	reqNEW := req
+		// 	reqs = append(reqs, reqNEW)
+		// }
+		// return reqs, nil
 	}
 
 	reqs = append(reqs, req)
@@ -619,15 +629,6 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 
 func (o *Ota) buildPallasRequests() (reqs []pallasRequest, err error) {
 
-	if len(o.Config.Device) > 0 {
-		if len(o.Config.Model) == 0 {
-			o.Config.Model, err = o.lookupHWModel(o.Config.Device) // TODO: replace w/ internal DB
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	assetTypes, err := o.getRequestAssetTypes()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get asset types for requests: %v", err)
@@ -653,6 +654,8 @@ func (o *Ota) buildPallasRequests() (reqs []pallasRequest, err error) {
 					return nil, fmt.Errorf("failed to get %s pallas requests: %v", o.Config.Platform, err)
 				}
 				reqs = append(reqs, rr...)
+			case "recovery":
+				fallthrough
 			case "macos":
 				rr, err := o.getRequests(atype, audienceID, "macOS")
 				if err != nil {
@@ -758,8 +761,10 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 		}
 	}
 
+	oassets = uniqueOTAs(oassets)
+
 	for _, oa := range oassets {
-		fmt.Println(oa.String())
+		log.Debug(oa.String())
 	}
 
 	return o.filterOTADevices(oassets), nil
@@ -776,7 +781,7 @@ func (o *Ota) lookupHWModel(device string) (string, error) {
 			return ota.SupportedDeviceModels[0], nil
 		}
 	}
-	return "0", fmt.Errorf("failed to find device %s in list of OTAs (please supply a --model)", device)
+	return "0", fmt.Errorf("failed to find model for device %s in list of OTAs (please supply a --model)", device)
 }
 
 func uniqueOTAs(otas []OtaAsset) []OtaAsset {
