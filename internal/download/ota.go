@@ -6,14 +6,20 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
+	info "github.com/blacktop/ipsw/pkg/plist"
+	"github.com/dustin/go-humanize"
 	"github.com/hashicorp/go-version"
+	"github.com/ulikunitz/xz"
 )
 
 const (
@@ -23,7 +29,7 @@ const (
 	iOS13OtaDevBetaURL  = "https://mesu.apple.com/assets/iOS13DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 	iOS13OtaPublicURL   = "https://mesu.apple.com/assets/iOS13PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 	otaPublicWatchOSURL = "https://mesu.apple.com/assets/watch/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
-	// depricated URLs
+	// Deprecated: URLs
 	iOS14OtaDevBetaURL = "https://mesu.apple.com/assets/iOS14DeveloperSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 	iOS14OtaPublicURL  = "https://mesu.apple.com/assets/iOS14PublicSeed/com_apple_MobileAsset_SoftwareUpdate/com_apple_MobileAsset_SoftwareUpdate.xml"
 )
@@ -33,8 +39,8 @@ type assetType string
 const (
 	softwareUpdate assetType = "com.apple.MobileAsset.SoftwareUpdate"
 	// For macOS devices
-	macSoftwareUpdate assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
-	sfrSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
+	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
+	recoveryOsSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
 )
 
 type assetAudienceID string
@@ -110,6 +116,8 @@ type pallasRequest struct {
 	RequestedProductVersion string          `json:"RequestedProductVersion,omitempty"`
 	Supervised              bool            `json:"Supervised,omitempty"`
 	DelayRequested          bool            `json:"DelayRequested,omitempty"`
+	CompatibilityVersion    int             `json:"CompatibilityVersion,omitempty"`
+	ReleaseType             string          `json:"ReleaseType,omitempty"`
 }
 
 type ota struct {
@@ -132,52 +140,98 @@ type transformations struct {
 	Measurement string `json:"_Measurement"`
 }
 
-// OtaAsset is an OTA asset object
-type OtaAsset struct {
-	ActualMinimumSystemPartition          int            `json:"ActualMinimumSystemPartition" plist:"ActualMinimumSystemPartition,omitempty"`
-	AutoUpdate                            bool           `json:"AutoUpdate" plist:"AutoUpdate,omitempty"`
-	AssetType                             string         `json:"AssetType" plist:"AssetType,omitempty"`
-	Build                                 string         `json:"Build" plist:"Build,omitempty"`
-	InstallationSize                      string         `json:"InstallationSize" plist:"InstallationSize,omitempty"`
-	InstallationSizeSnapshot              string         `json:"InstallationSize-Snapshot" plist:"InstallationSize-Snapshot,omitempty"`
-	MinimumSystemPartition                int            `json:"MinimumSystemPartition" plist:"MinimumSystemPartition,omitempty"`
-	OSVersion                             string         `json:"OSVersion" plist:"OSVersion,omitempty"`
-	PrerequisiteBuild                     string         `json:"PrerequisiteBuild" plist:"PrerequisiteBuild,omitempty"`
-	PrerequisiteOSVersion                 string         `json:"PrerequisiteOSVersion" plist:"PrerequisiteOSVersion,omitempty"`
-	RSEPDigest                            []byte         `json:"RSEPDigest" plist:"RSEPDigest,omitempty"`
-	Ramp                                  bool           `json:"Ramp" plist:"Ramp,omitempty"`
-	RescueMinimumSystemPartition          int            `json:"RescueMinimumSystemPartition" plist:"RescueMinimumSystemPartition,omitempty"`
-	SEPDigest                             []byte         `json:"SEPDigest" plist:"SEPDigest,omitempty"`
-	ConvReqd                              bool           `json:"SUConvReqd" plist:"SUConvReqd,omitempty"`
-	DocumentationID                       string         `json:"SUDocumentationID" plist:"SUDocumentationID,omitempty"`
-	ReleaseType                           string         `plist:"ReleaseType"`
-	InstallTonightEnabled                 bool           `json:"SUInstallTonightEnabled" plist:"SUInstallTonightEnabled,omitempty"`
-	MultiPassEnabled                      bool           `json:"SUMultiPassEnabled" plist:"SUMultiPassEnabled,omitempty"`
-	ProductSystemName                     string         `json:"SUProductSystemName" plist:"SUProductSystemName,omitempty"`
-	Publisher                             string         `json:"SUPublisher" plist:"SUPublisher,omitempty"`
-	SupportedDeviceModels                 []string       `json:"SupportedDeviceModels" plist:"SupportedDeviceModels,omitempty"`
-	SupportedDevices                      []string       `json:"SupportedDevices" plist:"SupportedDevices,omitempty"`
-	SystemPartitionPadding                map[string]int `json:"SystemPartitionPadding" plist:"SystemPartitionPadding,omitempty"`
-	SystemVolumeSealingOverhead           int            `json:"SystemVolumeSealingOverhead" plist:"SystemVolumeSealingOverhead,omitempty"`
-	AssetReceipt                          assetReceipt   `json:"_AssetReceipt" plist:"_AssetReceipt,omitempty"`
-	CompressionAlgorithm                  string         `json:"_CompressionAlgorithm" plist:"_CompressionAlgorithm,omitempty"`
-	DownloadSize                          int            `json:"_DownloadSize" plist:"_DownloadSize,omitempty"`
-	EventRecordingServiceURL              string         `json:"_EventRecordingServiceURL" plist:"_EventRecordingServiceURL,omitempty"`
-	IsZipStreamable                       bool           `json:"_IsZipStreamable" plist:"_IsZipStreamable,omitempty"`
-	Hash                                  []byte         `json:"_Measurement" plist:"_Measurement,omitempty"`
-	HashAlgorithm                         string         `json:"_MeasurementAlgorithm" plist:"_MeasurementAlgorithm,omitempty"`
-	UnarchivedSize                        int            `json:"_UnarchivedSize" plist:"_UnarchivedSize,omitempty"`
-	AssetDefaultGarbageCollectionBehavior string         `json:"__AssetDefaultGarbageCollectionBehavior" plist:"__AssetDefaultGarbageCollectionBehavior,omitempty"`
-	BaseURL                               string         `json:"__BaseURL" plist:"__BaseURL,omitempty"`
-	CanUseLocalCacheServer                bool           `json:"__CanUseLocalCacheServer" plist:"__CanUseLocalCacheServer,omitempty"`
-	HideInstallAlert                      bool           `json:"__HideInstallAlert" plist:"__HideInstallAlert,omitempty"`
-	QueuingServiceURL                     string         `json:"__QueuingServiceURL" plist:"__QueuingServiceURL,omitempty"`
-	RelativePath                          string         `json:"__RelativePath" plist:"__RelativePath,omitempty"`
+type bridgeVersionInfo struct {
+	BridgeBuildGroup          string `json:"BridgeBuildGroup,omitempty"`
+	BridgeProductBuildVersion string `json:"BridgeProductBuildVersion,omitempty"`
+	BridgeVersion             string `json:"BridgeVersion,omitempty"`
+	CatalogURL                string `json:"CatalogURL,omitempty"`
+	IsSeed                    string `json:"IsSeed,omitempty"`
+	SEPEpoch                  struct {
+		Major int `json:"Major,omitempty"`
+		Minor int `json:"Minor,omitempty"`
+	} `json:"SEPEpoch,omitempty"`
+}
+
+type restoreVersionInfo struct {
+	IsSeed             bool   `json:"IsSeed,omitempty"`
+	RestoreBuildGroup  string `json:"RestoreBuildGroup,omitempty"`
+	RestoreLongVersion string `json:"RestoreLongVersion,omitempty"`
+	RestoreVersion     string `json:"RestoreVersion,omitempty"`
 }
 
 type assetReceipt struct {
 	AssetReceipt   string `json:"AssetReceipt"`
 	AssetSignature string `json:"AssetSignature"`
+}
+
+// OtaAsset is an OTA asset object
+type OtaAsset struct {
+	ActualMinimumSystemPartition          int                `json:"ActualMinimumSystemPartition" plist:"ActualMinimumSystemPartition,omitempty"`
+	AutoUpdate                            bool               `json:"AutoUpdate" plist:"AutoUpdate,omitempty"`
+	AssetType                             string             `json:"AssetType" plist:"AssetType,omitempty"`
+	BridgeVersionInfo                     bridgeVersionInfo  `json:"BridgeVersionInfo,omitempty" plist:"BridgeVersionInfo,omitempty"`
+	Build                                 string             `json:"Build" plist:"Build,omitempty"`
+	DataTemplateSize                      int                `json:"DataTemplateSize" plist:"DataTemplateSize,omitempty"`
+	InstallationSize                      string             `json:"InstallationSize" plist:"InstallationSize,omitempty"`
+	InstallationSizeSnapshot              string             `json:"InstallationSize-Snapshot" plist:"InstallationSize-Snapshot,omitempty"`
+	MinimumSystemPartition                int                `json:"MinimumSystemPartition" plist:"MinimumSystemPartition,omitempty"`
+	OSVersion                             string             `json:"OSVersion" plist:"OSVersion,omitempty"`
+	PreflightBuildManifest                []byte             `json:"PreflightBuildManifest" plist:"PreflightBuildManifest,omitempty"`
+	PreflightGlobalSignatures             []byte             `json:"PreflightGlobalSignatures" plist:"PreflightGlobalSignatures,omitempty"`
+	RestoreVersion                        string             `json:"RestoreVersion,omitempty" plist:"RestoreVersion,omitempty"`
+	RestoreVersionInfo                    restoreVersionInfo `json:"RestoreVersionInfo,omitempty" plist:"RestoreVersionInfo,omitempty"`
+	PrerequisiteBuild                     string             `json:"PrerequisiteBuild" plist:"PrerequisiteBuild,omitempty"`
+	PrerequisiteOSVersion                 string             `json:"PrerequisiteOSVersion" plist:"PrerequisiteOSVersion,omitempty"`
+	RSEPDigest                            []byte             `json:"RSEPDigest" plist:"RSEPDigest,omitempty"`
+	Ramp                                  bool               `json:"Ramp" plist:"Ramp,omitempty"`
+	RescueMinimumSystemPartition          int                `json:"RescueMinimumSystemPartition" plist:"RescueMinimumSystemPartition,omitempty"`
+	SEPDigest                             []byte             `json:"SEPDigest" plist:"SEPDigest,omitempty"`
+	ConvReqd                              bool               `json:"SUConvReqd" plist:"SUConvReqd,omitempty"`
+	DocumentationID                       string             `json:"SUDocumentationID" plist:"SUDocumentationID,omitempty"`
+	ReleaseType                           string             `json:"ReleaseType" plist:"ReleaseType,omitempty"`
+	InstallTonightEnabled                 bool               `json:"SUInstallTonightEnabled" plist:"SUInstallTonightEnabled,omitempty"`
+	MultiPassEnabled                      bool               `json:"SUMultiPassEnabled" plist:"SUMultiPassEnabled,omitempty"`
+	ProductSystemName                     string             `json:"SUProductSystemName" plist:"SUProductSystemName,omitempty"`
+	Publisher                             string             `json:"SUPublisher" plist:"SUPublisher,omitempty"`
+	SupportedDeviceModels                 []string           `json:"SupportedDeviceModels" plist:"SupportedDeviceModels,omitempty"`
+	SupportedDevices                      []string           `json:"SupportedDevices" plist:"SupportedDevices,omitempty"`
+	SystemPartitionPadding                map[string]int     `json:"SystemPartitionPadding" plist:"SystemPartitionPadding,omitempty"`
+	SystemVolumeSealingOverhead           int                `json:"SystemVolumeSealingOverhead" plist:"SystemVolumeSealingOverhead,omitempty"`
+	TargetUpdateBridgeVersion             string             `json:"TargetUpdateBridgeVersion" plist:"TargetUpdateBridgeVersion,omitempty"`
+	AssetReceipt                          assetReceipt       `json:"_AssetReceipt" plist:"_AssetReceipt,omitempty"`
+	CompressionAlgorithm                  string             `json:"_CompressionAlgorithm" plist:"_CompressionAlgorithm,omitempty"`
+	DownloadSize                          int                `json:"_DownloadSize" plist:"_DownloadSize,omitempty"`
+	EventRecordingServiceURL              string             `json:"_EventRecordingServiceURL" plist:"_EventRecordingServiceURL,omitempty"`
+	IsZipStreamable                       bool               `json:"_IsZipStreamable" plist:"_IsZipStreamable,omitempty"`
+	MasteredVersion                       string             `json:"_MasteredVersion" plist:"_MasteredVersion,omitempty"`
+	Hash                                  []byte             `json:"_Measurement" plist:"_Measurement,omitempty"`
+	HashAlgorithm                         string             `json:"_MeasurementAlgorithm" plist:"_MeasurementAlgorithm,omitempty"`
+	UnarchivedSize                        int                `json:"_UnarchivedSize" plist:"_UnarchivedSize,omitempty"`
+	AssetDefaultGarbageCollectionBehavior string             `json:"__AssetDefaultGarbageCollectionBehavior" plist:"__AssetDefaultGarbageCollectionBehavior,omitempty"`
+	BaseURL                               string             `json:"__BaseURL" plist:"__BaseURL,omitempty"`
+	CanUseLocalCacheServer                bool               `json:"__CanUseLocalCacheServer" plist:"__CanUseLocalCacheServer,omitempty"`
+	HideInstallAlert                      bool               `json:"__HideInstallAlert" plist:"__HideInstallAlert,omitempty"`
+	QueuingServiceURL                     string             `json:"__QueuingServiceURL" plist:"__QueuingServiceURL,omitempty"`
+	RelativePath                          string             `json:"__RelativePath" plist:"__RelativePath,omitempty"`
+}
+
+func (a OtaAsset) String() string {
+	var prereq string
+	if len(a.PrerequisiteBuild) > 0 {
+		prereq = fmt.Sprintf(", prereq_version: %s (%s)", a.PrerequisiteOSVersion, a.PrerequisiteBuild)
+	}
+	return fmt.Sprintf("name: %s, version: %s, build: %s, os: %s, asset_type: %s%s, devices: %d, model: %s, size: %s, zip: %s",
+		a.DocumentationID,
+		a.RestoreVersion,
+		a.Build,
+		a.OSVersion,
+		a.AssetType,
+		prereq,
+		len(a.SupportedDevices),
+		strings.Join(a.SupportedDeviceModels, ","),
+		humanize.Bytes(uint64(a.UnarchivedSize)),
+		filepath.Base(a.RelativePath),
+	)
 }
 
 // NewOTA downloads and parses the itumes plist for iOS14 release/developer beta OTAs
@@ -224,6 +278,7 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 }
 
 // FilterOtaAssets returns a filtered list of OTA assets
+// Deprecated: in favor of the NEW pallas API
 func (o *Ota) FilterOtaAssets() []OtaAsset {
 
 	var otas []OtaAsset
@@ -284,7 +339,9 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "tvos":
 		return []assetType{softwareUpdate}, nil
 	case "macos":
-		return []assetType{macSoftwareUpdate, sfrSoftwareUpdate}, nil
+		return []assetType{macSoftwareUpdate}, nil
+	case "recovery":
+		return []assetType{recoveryOsSoftwareUpdate}, nil
 	}
 	return nil, fmt.Errorf("unsupported platform %s", o.Config.Platform)
 }
@@ -299,6 +356,8 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
 				}
 				switch segs[0] { // MAJOR
+				case 0:
+					return []assetAudienceID{iOS15DeveloperBeta}, nil
 				case 11:
 					return []assetAudienceID{iOS11Beta}, nil
 				case 12:
@@ -401,6 +460,8 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return nil, fmt.Errorf("invalid version %s (must be in semver format; i.e. 1.1.1)", o.Config.Version)
 				}
 				switch segs[0] { // MAJOR
+				case 0: // empty version
+					return []assetAudienceID{macOS12DeveloperBeta, macOS12CustomerBeta, macOS12PublicBeta}, nil
 				case 11:
 					return []assetAudienceID{macOS11DeveloperBeta, macOS11CustomerBeta, macOS11PublicBeta}, nil
 				case 12:
@@ -419,7 +480,27 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 }
 
 func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ string) (reqs []pallasRequest, err error) {
-	if o.Config.Version != nil && len(o.Config.Device) == 0 {
+
+	req := pallasRequest{
+		ClientVersion:        clientVersion,
+		AssetType:            atype,
+		AssetAudience:        audienceID,
+		ProductVersion:       o.Config.Version.Original(),
+		BuildVersion:         o.Config.Build,
+		CompatibilityVersion: 20,
+	}
+
+	if o.Config.Version.Original() != "0" {
+		req.RequestedProductVersion = o.Config.Version.Original()
+		req.Supervised = true
+		req.DelayRequested = false
+	}
+	if o.Config.Beta && o.Config.Platform != "macos" {
+		req.ReleaseType = "Beta"
+	}
+	if len(o.Config.Device) > 0 {
+		req.ProductType = o.Config.Device
+	} else {
 		var model string
 		devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
 		if len(devices) == 0 {
@@ -432,74 +513,106 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 				log.Debugf("failed to lookup model for device %s", device)
 				continue
 			}
-			if o.Config.Beta {
-				reqs = append(reqs, pallasRequest{
-					ClientVersion:  clientVersion,
-					AssetType:      atype,
-					AssetAudience:  audienceID,
-					ProductType:    device,
-					HWModelStr:     model,
-					ProductVersion: "0",
-					BuildVersion:   "0",
-				})
-			} else {
-				reqs = append(reqs, pallasRequest{
-					ClientVersion:           clientVersion,
-					AssetType:               atype,
-					AssetAudience:           audienceID,
-					ProductType:             device,
-					HWModelStr:              model,
-					ProductVersion:          "0",
-					BuildVersion:            "0",
-					RequestedProductVersion: o.Config.Version.Original(),
-					Supervised:              true,
-					DelayRequested:          false,
-				})
-			}
+			req.ProductType = device
+			req.HWModelStr = model
+			reqNEW := req
+			reqs = append(reqs, reqNEW)
 		}
-	} else if o.Config.Version != nil && len(o.Config.Device) > 0 {
-		reqs = append(reqs, pallasRequest{
-			ClientVersion:           clientVersion,
-			AssetType:               atype,
-			AssetAudience:           audienceID,
-			ProductType:             o.Config.Device,
-			HWModelStr:              o.Config.Model,
-			ProductVersion:          "0",
-			BuildVersion:            "0",
-			RequestedProductVersion: o.Config.Version.Original(),
-			Supervised:              true,
-			DelayRequested:          false,
-		})
-	} else if o.Config.Version == nil && len(o.Config.Device) == 0 {
-		var model string
-		for _, device := range o.as.GetDevicesForVersion(o.as.Latest(typ), typ) {
-			model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
-			if err != nil {
-				// return nil, err
-				log.Debugf("failed to lookup model for device %s", device)
-				continue
-			}
-			reqs = append(reqs, pallasRequest{
-				ClientVersion:  clientVersion,
-				AssetType:      atype,
-				AssetAudience:  audienceID,
-				ProductType:    device,
-				HWModelStr:     model,
-				ProductVersion: "0",
-				BuildVersion:   "0",
-			})
-		}
-	} else {
-		reqs = append(reqs, pallasRequest{
-			ClientVersion:  clientVersion,
-			AssetType:      atype,
-			AssetAudience:  audienceID,
-			ProductType:    o.Config.Device,
-			HWModelStr:     o.Config.Model,
-			ProductVersion: "0",
-			BuildVersion:   "0",
-		})
 	}
+
+	if len(o.Config.Model) > 0 {
+		req.HWModelStr = o.Config.Model
+	}
+
+	reqs = append(reqs, req)
+
+	// if o.Config.Version != nil && len(o.Config.Device) == 0 {
+	// 	var model string
+	// 	devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
+	// 	if len(devices) == 0 {
+	// 		devices = o.as.GetDevicesForVersion(o.as.Latest(typ), typ)
+	// 	}
+	// 	for _, device := range devices {
+	// 		model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
+	// 		if err != nil {
+	// 			// return nil, err
+	// 			log.Debugf("failed to lookup model for device %s", device)
+	// 			continue
+	// 		}
+	// 		if o.Config.Beta {
+	// 			reqs = append(reqs, pallasRequest{
+	// 				ClientVersion:        clientVersion,
+	// 				AssetType:            atype,
+	// 				AssetAudience:        audienceID,
+	// 				ProductType:          device,
+	// 				HWModelStr:           model,
+	// 				ProductVersion:       "0",
+	// 				BuildVersion:         o.Config.Build,
+	// 				CompatibilityVersion: 20,
+	// 				ReleaseType:          "Beta",
+	// 			})
+	// 		} else {
+	// 			reqs = append(reqs, pallasRequest{
+	// 				ClientVersion:           clientVersion,
+	// 				AssetType:               atype,
+	// 				AssetAudience:           audienceID,
+	// 				ProductType:             device,
+	// 				HWModelStr:              model,
+	// 				ProductVersion:          "0",
+	// 				BuildVersion:            o.Config.Build,
+	// 				RequestedProductVersion: o.Config.Version.Original(),
+	// 				Supervised:              true,
+	// 				DelayRequested:          false,
+	// 				CompatibilityVersion:    20,
+	// 			})
+	// 		}
+	// 	}
+	// } else if o.Config.Version != nil && len(o.Config.Device) > 0 {
+	// 	reqs = append(reqs, pallasRequest{
+	// 		ClientVersion:           clientVersion,
+	// 		AssetType:               atype,
+	// 		AssetAudience:           audienceID,
+	// 		ProductType:             o.Config.Device,
+	// 		HWModelStr:              o.Config.Model,
+	// 		ProductVersion:          o.Config.Version.Original(),
+	// 		BuildVersion:            o.Config.Build,
+	// 		RequestedProductVersion: o.Config.Version.Original(),
+	// 		Supervised:              true,
+	// 		DelayRequested:          false,
+	// 		CompatibilityVersion:    20,
+	// 	})
+	// } else if o.Config.Version == nil && len(o.Config.Device) == 0 {
+	// 	var model string
+	// 	for _, device := range o.as.GetDevicesForVersion(o.as.Latest(typ), typ) {
+	// 		model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
+	// 		if err != nil {
+	// 			// return nil, err
+	// 			log.Debugf("failed to lookup model for device %s", device)
+	// 			continue
+	// 		}
+	// 		reqs = append(reqs, pallasRequest{
+	// 			ClientVersion:        clientVersion,
+	// 			AssetType:            atype,
+	// 			AssetAudience:        audienceID,
+	// 			ProductType:          device,
+	// 			HWModelStr:           model,
+	// 			ProductVersion:       "0",
+	// 			BuildVersion:         o.Config.Build,
+	// 			CompatibilityVersion: 20,
+	// 		})
+	// 	}
+	// } else {
+	// 	reqs = append(reqs, pallasRequest{
+	// 		ClientVersion:        clientVersion,
+	// 		AssetType:            atype,
+	// 		AssetAudience:        audienceID,
+	// 		ProductType:          o.Config.Device,
+	// 		HWModelStr:           o.Config.Model,
+	// 		ProductVersion:       "0",
+	// 		BuildVersion:         o.Config.Build,
+	// 		CompatibilityVersion: 20,
+	// 	})
+	// }
 
 	return reqs, nil
 }
@@ -628,6 +741,27 @@ func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
 		oassets = append(oassets, res.Assets...)
 	}
 
+	for idx, asset := range oassets { // TODO: what other BuildManifest fields should I capture?
+		if asset.PreflightBuildManifest != nil {
+			xzBuf := new(bytes.Buffer)
+			xr, err := xz.NewReader(bytes.NewReader(asset.PreflightBuildManifest))
+			if err != nil {
+				return nil, err
+			}
+			io.Copy(xzBuf, xr)
+			bm, err := info.ParseBuildManifest(xzBuf.Bytes())
+			if err != nil {
+				return nil, err
+			}
+			sort.Strings(bm.SupportedProductTypes)
+			oassets[idx].SupportedDevices = bm.SupportedProductTypes
+		}
+	}
+
+	for _, oa := range oassets {
+		fmt.Println(oa.String())
+	}
+
 	return o.filterOTADevices(oassets), nil
 }
 
@@ -673,11 +807,11 @@ func (o *Ota) filterOTADevices(otas []OtaAsset) []OtaAsset {
 		for _, ota := range otas {
 			if utils.StrSliceHas(ota.SupportedDeviceModels, device) {
 				if devOTA.SupportedDevices == nil {
-					devOTA = ota
-				} else {
 					if ota.DownloadSize > devOTA.DownloadSize {
 						devOTA = ota
 					}
+				} else {
+					devOTA = ota
 				}
 			}
 		}
