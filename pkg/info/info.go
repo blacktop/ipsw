@@ -5,10 +5,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"log"
 	"path/filepath"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -65,7 +65,7 @@ func getProcessor(cpuid string) processors {
 
 	err := json.Unmarshal(procsData, &ps)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	for _, p := range ps {
@@ -82,7 +82,7 @@ func getFirmwareKeys(device, build string) map[string]string {
 
 	err := json.Unmarshal(keysJSONData, &keys)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	return keys[device][build]
@@ -94,7 +94,7 @@ func getApFirmwareKey(device, build, filename string) (string, string, error) {
 
 	err := json.Unmarshal(t8030APKeysJSONData, &a13Keys)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	for _, key := range a13Keys {
@@ -105,7 +105,7 @@ func getApFirmwareKey(device, build, filename string) (string, string, error) {
 
 	err = json.Unmarshal(t8101APKeysJSONData, &a14Keys)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 
 	for _, key := range a14Keys {
@@ -349,7 +349,11 @@ func ParseZipFiles(files []*zip.File) (*Info, error) {
 	}
 	i.DeviceTrees, err = devicetree.ParseZipFiles(files)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse remote devicetree")
+		if errors.Is(err, devicetree.ErrEncryptedDeviceTree) {
+			log.Error(err.Error())
+		} else {
+			return nil, errors.Wrap(err, "failed to parse remote devicetree")
+		}
 	}
 
 	return i, nil

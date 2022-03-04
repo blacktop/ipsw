@@ -337,7 +337,7 @@ func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
 
 			dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				return nil, fmt.Errorf("failed to parse DeviceTree: %w", err)
 			}
 		}
 	}
