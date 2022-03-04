@@ -22,11 +22,11 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -36,8 +36,9 @@ import (
 
 func init() {
 	rootCmd.AddCommand(updateDBCmd)
+	updateDBCmd.Flags().StringP("urls", "u", "", "Path to file containing list of URLs to scan (one per line)")
 	updateDBCmd.Flags().StringP("remote", "r", "", "Remote IPSW/OTA URL to parse")
-	updateDBCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	updateDBCmd.Flags().StringP("db", "d", "", "Path to ipsw device DB JSON")
 }
 
 // updateDBCmd represents the updatedb command
@@ -54,13 +55,13 @@ var updateDBCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		urlList, _ := cmd.Flags().GetString("urls")
 		remoteURL, _ := cmd.Flags().GetString("remote")
-		outputFolder, _ := cmd.Flags().GetString("output")
+		dbPath, _ := cmd.Flags().GetString("db")
 
-		dbFile := filepath.Join(outputFolder, "ipsw_db.json")
-
-		if _, err := os.Stat(dbFile); err == nil {
-			f, err := os.Open(dbFile)
+		mut := "Creating"
+		if _, err := os.Stat(dbPath); err == nil {
+			f, err := os.Open(dbPath)
 			if err != nil {
 				log.WithError(err).Fatal("failed to open DB file")
 			}
@@ -72,11 +73,40 @@ var updateDBCmd = &cobra.Command{
 			if err := json.Unmarshal(dat, &devices); err != nil {
 				log.WithError(err).Fatal("failed to unmarshal DB JSON file")
 			}
+			mut = "Updating"
 		} else {
 			devices = make(info.Devices)
 		}
 
-		if len(remoteURL) > 0 {
+		if len(urlList) > 0 {
+			uf, err := os.Open(urlList)
+			if err != nil {
+				log.WithError(err).Fatal("failed to open URL list file")
+			}
+			defer uf.Close()
+
+			scanner := bufio.NewScanner(uf)
+
+			for scanner.Scan() {
+				url := scanner.Text()
+				if err := scanner.Err(); err != nil {
+					log.WithError(err).Fatal("failed to read line from URL list file")
+				}
+
+				zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{})
+				if err != nil {
+					// log.WithError(err).Fatal("failed to create remote zip reader")
+					continue
+				}
+				i, err := info.ParseZipFiles(zr.File)
+				if err != nil {
+					log.WithError(err).Fatal("failed to parse remote zip")
+				}
+				if err := i.GetDevices(&devices); err != nil {
+					log.WithError(err).Fatal("failed to get devices")
+				}
+			}
+		} else if len(remoteURL) > 0 {
 			zr, err := download.NewRemoteZipReader(remoteURL, &download.RemoteConfig{})
 			if err != nil {
 				log.WithError(err).Fatal("failed to create remote zip reader")
@@ -87,19 +117,6 @@ var updateDBCmd = &cobra.Command{
 			}
 			if err := i.GetDevices(&devices); err != nil {
 				log.WithError(err).Fatal("failed to get devices")
-			}
-			dat, err := json.Marshal(devices)
-			if err != nil {
-				log.WithError(err).Fatal("failed to marshal JSON")
-			}
-			if len(outputFolder) > 0 {
-				os.MkdirAll(outputFolder, os.ModePerm)
-				log.Infof("Creating %s", dbFile)
-				if err := ioutil.WriteFile(dbFile, dat, 0755); err != nil {
-					log.WithError(err).Fatalf("failed to write file %s", dbFile)
-				}
-			} else {
-				fmt.Println(string(dat))
 			}
 		} else {
 			// for _, version := range []string{"9.0", "10.0", "11.0", "12.0", "13.0", "14.0", "15.0"} {
@@ -152,20 +169,19 @@ var updateDBCmd = &cobra.Command{
 					log.WithError(err).Fatal("failed to get devices")
 				}
 			}
-
-			dat, err := json.Marshal(devices)
-			if err != nil {
-				log.WithError(err).Fatal("failed to marshal JSON")
+		}
+		// OUTPUT JSON
+		dat, err := json.Marshal(devices)
+		if err != nil {
+			log.WithError(err).Fatal("failed to marshal JSON")
+		}
+		if len(dbPath) > 0 {
+			log.Infof("%s %s", mut, dbPath)
+			if err := ioutil.WriteFile(dbPath, dat, 0755); err != nil {
+				log.WithError(err).Fatalf("failed to write file %s", dbPath)
 			}
-			if len(outputFolder) > 0 {
-				os.MkdirAll(outputFolder, os.ModePerm)
-				log.Infof("Creating %s", dbFile)
-				if err := ioutil.WriteFile(dbFile, dat, 0755); err != nil {
-					log.WithError(err).Fatalf("failed to write file %s", dbFile)
-				}
-			} else {
-				fmt.Println(string(dat))
-			}
+		} else {
+			fmt.Println(string(dat))
 		}
 	},
 }

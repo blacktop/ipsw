@@ -91,16 +91,26 @@ type buildIdentityManifestInfo struct {
 }
 
 type OTAInfo struct {
-	CFBundleIdentifier    string                `plist:"CFBundleIdentifier,omitempty"`
-	MobileAssetProperties mobileAssetProperties `plist:"MobileAssetProperties,omitempty"`
+	CFBundleIdentifier            string                `plist:"CFBundleIdentifier,omitempty"`
+	CFBundleInfoDictionaryVersion string                `plist:"CFBundleInfoDictionaryVersion,omitempty"`
+	CFBundleName                  string                `plist:"CFBundleName,omitempty"`
+	CFBundleShortVersionString    string                `plist:"CFBundleShortVersionString,omitempty"`
+	CFBundleVersion               string                `plist:"CFBundleVersion,omitempty"`
+	MobileAssetProperties         mobileAssetProperties `plist:"MobileAssetProperties,omitempty"`
 }
 
 type mobileAssetProperties struct {
-	Build                 string   `plist:"Build,omitempty"`
-	OSVersion             string   `plist:"OSVersion,omitempty"`
-	ReleaseType           string   `plist:"ReleaseType,omitempty"`
-	SupportedDeviceModels []string `plist:"SupportedDeviceModels,omitempty"`
-	SupportedDevices      []string `plist:"SupportedDevices,omitempty"`
+	DeviceName             string   `plist:"DeviceName,omitempty"`
+	FirmwareBundle         string   `plist:"FirmwareBundle,omitempty"`
+	FirmwareVersionMajor   int      `plist:"FirmwareVersionMajor,omitempty"`
+	FirmwareVersionMinor   int      `plist:"FirmwareVersionMinor,omitempty"`
+	FirmwareVersionRelease int      `plist:"FirmwareVersionRelease,omitempty"`
+	FormatVersion          int      `plist:"FormatVersion,omitempty"`
+	Build                  string   `plist:"Build,omitempty"`
+	OSVersion              string   `plist:"OSVersion,omitempty"`
+	ReleaseType            string   `plist:"ReleaseType,omitempty"`
+	SupportedDeviceModels  []string `plist:"SupportedDeviceModels,omitempty"`
+	SupportedDevices       []string `plist:"SupportedDevices,omitempty"`
 }
 
 // Info object found in OTAs
