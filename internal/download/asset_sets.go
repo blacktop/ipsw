@@ -26,6 +26,48 @@ type AssetSets struct {
 	AssetSets       map[string][]AssetSet `json:"AssetSets,omitempty"`
 }
 
+// GetAssetSets queries and returns the asset sets
+func GetAssetSets(proxy string, insecure bool) (*AssetSets, error) {
+	var assets AssetSets
+
+	req, err := http.NewRequest("GET", assetSetListURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create http request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Add("User-Agent", utils.RandomAgent())
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("api returned status: %s", res.Status)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, err
+	}
+	res.Body.Close()
+
+	err = json.Unmarshal(body, &assets)
+	if err != nil {
+		return nil, err
+	}
+
+	return &assets, nil
+}
+
 // ForDevice returns the assets for a given device
 func (a *AssetSets) ForDevice(device string) []AssetSet {
 	var assets []AssetSet
@@ -92,46 +134,4 @@ func (a *AssetSets) Latest(typ, platform string) string {
 	sort.Sort(version.Collection(versions))
 
 	return versions[len(versions)-1].Original()
-}
-
-// GetAssetSets queries and returns the asset sets
-func GetAssetSets(proxy string, insecure bool) (*AssetSets, error) {
-	var assets AssetSets
-
-	req, err := http.NewRequest("GET", assetSetListURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create http request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Add("User-Agent", utils.RandomAgent())
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		},
-	}
-
-	res, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("api returned status: %s", res.Status)
-	}
-
-	body, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	res.Body.Close()
-
-	err = json.Unmarshal(body, &assets)
-	if err != nil {
-		return nil, err
-	}
-
-	return &assets, nil
 }
