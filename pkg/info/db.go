@@ -17,17 +17,10 @@ type Board struct {
 	BoardID     int    `json:"board_id,omitempty"`
 }
 
-type Intro struct {
-	Date    string `json:"date,omitempty"`
-	Version string `json:"first_version,omitempty"`
-	Build   string `json:"first_build,omitempty"`
-}
-
 type Device struct {
-	Name       string  `json:"name,omitempty"`
-	Boards     []Board `json:"boards,omitempty"`
-	MemClass   int     `json:"mem_class,omitempty"`
-	Introduced Intro   `json:"introduced,omitempty"`
+	Name     string  `json:"name,omitempty"`
+	Boards   []Board `json:"boards,omitempty"`
+	MemClass int     `json:"mem_class,omitempty"`
 }
 
 type Devices map[string]Device
@@ -49,32 +42,29 @@ func (i *Info) GetDevices(devs *Devices) error {
 						break
 					}
 				}
-			} else if len(prodName) == 0 {
-				prodName = dt.Model
 			}
 
 			if i.Plists.Restore != nil { // IPSW
+				var boards []Board
 				for _, board := range i.Plists.Restore.DeviceMap {
 					if board.BoardConfig == strings.ToLower(dt.BoardConfig) {
-						if _, ok := (*devs)[dt.Model]; !ok {
-							proc := getProcessor(board.Platform)
-							(*devs)[dt.Model] = Device{
-								Name: prodName,
-								Boards: []Board{
-									{
-										CPU:         proc.Name,
-										Platform:    board.Platform,
-										CpuID:       board.CPID,
-										CpuISA:      proc.CPUISA,
-										Arch:        xdev.DeviceTrait.PreferredArchitecture,
-										BoardConfig: dt.BoardConfig,
-										BoardID:     board.BDID,
-									},
-								},
-								MemClass:   xdev.DeviceTrait.DevicePerformanceMemoryClass,
-								Introduced: Intro{},
-							}
-						}
+						proc := getProcessor(board.Platform)
+						boards = append(boards, Board{
+							CPU:         proc.Name,
+							Platform:    board.Platform,
+							CpuID:       board.CPID,
+							CpuISA:      proc.CPUISA,
+							Arch:        xdev.DeviceTrait.PreferredArchitecture,
+							BoardConfig: dt.BoardConfig,
+							BoardID:     board.BDID,
+						})
+					}
+				}
+				if _, ok := (*devs)[dt.Model]; !ok {
+					(*devs)[dt.Model] = Device{
+						Name:     prodName,
+						Boards:   boards,
+						MemClass: xdev.DeviceTrait.DevicePerformanceMemoryClass,
 					}
 				}
 			} else { // OTA
@@ -103,8 +93,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 										BoardID:     int(boardID),
 									},
 								},
-								MemClass:   xdev.DeviceTrait.DevicePerformanceMemoryClass,
-								Introduced: Intro{},
+								MemClass: xdev.DeviceTrait.DevicePerformanceMemoryClass,
 							}
 						}
 					}
@@ -147,8 +136,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 								BoardID:     i.Plists.Restore.DeviceMap[idx].BDID,
 							},
 						},
-						MemClass:   xdev.DeviceTrait.DevicePerformanceMemoryClass,
-						Introduced: Intro{},
+						MemClass: xdev.DeviceTrait.DevicePerformanceMemoryClass,
 					}
 				}
 			}

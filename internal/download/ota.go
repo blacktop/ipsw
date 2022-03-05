@@ -9,15 +9,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/ota/types"
 	info "github.com/blacktop/ipsw/pkg/plist"
-	"github.com/dustin/go-humanize"
 	"github.com/hashicorp/go-version"
 	"github.com/ulikunitz/xz"
 )
@@ -122,7 +121,7 @@ type pallasRequest struct {
 
 type ota struct {
 	AssetSetID      string          `plist:"AssetSetId,omitempty" json:"AssetSetId,omitempty"`
-	Assets          []OtaAsset      `plist:"Assets,omitempty" json:"Assets,omitempty"`
+	Assets          []types.Asset   `plist:"Assets,omitempty" json:"Assets,omitempty"`
 	Certificate     []byte          `plist:"Certificate,omitempty"`
 	Signature       []byte          `plist:"Signature,omitempty"`
 	SigningKey      string          `plist:"SigningKey,omitempty"`
@@ -138,100 +137,6 @@ type transformations struct {
 	RSEPDigest  string `json:"RSEPDigest"`
 	SEPDigest   string `json:"SEPDigest"`
 	Measurement string `json:"_Measurement"`
-}
-
-type bridgeVersionInfo struct {
-	BridgeBuildGroup          string `json:"BridgeBuildGroup,omitempty"`
-	BridgeProductBuildVersion string `json:"BridgeProductBuildVersion,omitempty"`
-	BridgeVersion             string `json:"BridgeVersion,omitempty"`
-	CatalogURL                string `json:"CatalogURL,omitempty"`
-	IsSeed                    string `json:"IsSeed,omitempty"`
-	SEPEpoch                  struct {
-		Major int `json:"Major,omitempty"`
-		Minor int `json:"Minor,omitempty"`
-	} `json:"SEPEpoch,omitempty"`
-}
-
-type restoreVersionInfo struct {
-	IsSeed             bool   `json:"IsSeed,omitempty"`
-	RestoreBuildGroup  string `json:"RestoreBuildGroup,omitempty"`
-	RestoreLongVersion string `json:"RestoreLongVersion,omitempty"`
-	RestoreVersion     string `json:"RestoreVersion,omitempty"`
-}
-
-type assetReceipt struct {
-	AssetReceipt   string `json:"AssetReceipt"`
-	AssetSignature string `json:"AssetSignature"`
-}
-
-// OtaAsset is an OTA asset object
-type OtaAsset struct {
-	ActualMinimumSystemPartition          int                `json:"ActualMinimumSystemPartition" plist:"ActualMinimumSystemPartition,omitempty"`
-	AutoUpdate                            bool               `json:"AutoUpdate" plist:"AutoUpdate,omitempty"`
-	AssetType                             string             `json:"AssetType" plist:"AssetType,omitempty"`
-	BridgeVersionInfo                     bridgeVersionInfo  `json:"BridgeVersionInfo,omitempty" plist:"BridgeVersionInfo,omitempty"`
-	Build                                 string             `json:"Build" plist:"Build,omitempty"`
-	DataTemplateSize                      int                `json:"DataTemplateSize" plist:"DataTemplateSize,omitempty"`
-	InstallationSize                      string             `json:"InstallationSize" plist:"InstallationSize,omitempty"`
-	InstallationSizeSnapshot              string             `json:"InstallationSize-Snapshot" plist:"InstallationSize-Snapshot,omitempty"`
-	MinimumSystemPartition                int                `json:"MinimumSystemPartition" plist:"MinimumSystemPartition,omitempty"`
-	OSVersion                             string             `json:"OSVersion" plist:"OSVersion,omitempty"`
-	PreflightBuildManifest                []byte             `json:"PreflightBuildManifest" plist:"PreflightBuildManifest,omitempty"`
-	PreflightGlobalSignatures             []byte             `json:"PreflightGlobalSignatures" plist:"PreflightGlobalSignatures,omitempty"`
-	RestoreVersion                        string             `json:"RestoreVersion,omitempty" plist:"RestoreVersion,omitempty"`
-	RestoreVersionInfo                    restoreVersionInfo `json:"RestoreVersionInfo,omitempty" plist:"RestoreVersionInfo,omitempty"`
-	PrerequisiteBuild                     string             `json:"PrerequisiteBuild" plist:"PrerequisiteBuild,omitempty"`
-	PrerequisiteOSVersion                 string             `json:"PrerequisiteOSVersion" plist:"PrerequisiteOSVersion,omitempty"`
-	RSEPDigest                            []byte             `json:"RSEPDigest" plist:"RSEPDigest,omitempty"`
-	Ramp                                  bool               `json:"Ramp" plist:"Ramp,omitempty"`
-	RescueMinimumSystemPartition          int                `json:"RescueMinimumSystemPartition" plist:"RescueMinimumSystemPartition,omitempty"`
-	SEPDigest                             []byte             `json:"SEPDigest" plist:"SEPDigest,omitempty"`
-	ConvReqd                              bool               `json:"SUConvReqd" plist:"SUConvReqd,omitempty"`
-	DocumentationID                       string             `json:"SUDocumentationID" plist:"SUDocumentationID,omitempty"`
-	ReleaseType                           string             `json:"ReleaseType" plist:"ReleaseType,omitempty"`
-	InstallTonightEnabled                 bool               `json:"SUInstallTonightEnabled" plist:"SUInstallTonightEnabled,omitempty"`
-	MultiPassEnabled                      bool               `json:"SUMultiPassEnabled" plist:"SUMultiPassEnabled,omitempty"`
-	ProductSystemName                     string             `json:"SUProductSystemName" plist:"SUProductSystemName,omitempty"`
-	Publisher                             string             `json:"SUPublisher" plist:"SUPublisher,omitempty"`
-	SupportedDeviceModels                 []string           `json:"SupportedDeviceModels" plist:"SupportedDeviceModels,omitempty"`
-	SupportedDevices                      []string           `json:"SupportedDevices" plist:"SupportedDevices,omitempty"`
-	SystemPartitionPadding                map[string]int     `json:"SystemPartitionPadding" plist:"SystemPartitionPadding,omitempty"`
-	SystemVolumeSealingOverhead           int                `json:"SystemVolumeSealingOverhead" plist:"SystemVolumeSealingOverhead,omitempty"`
-	TargetUpdateBridgeVersion             string             `json:"TargetUpdateBridgeVersion" plist:"TargetUpdateBridgeVersion,omitempty"`
-	AssetReceipt                          assetReceipt       `json:"_AssetReceipt" plist:"_AssetReceipt,omitempty"`
-	CompressionAlgorithm                  string             `json:"_CompressionAlgorithm" plist:"_CompressionAlgorithm,omitempty"`
-	DownloadSize                          int                `json:"_DownloadSize" plist:"_DownloadSize,omitempty"`
-	EventRecordingServiceURL              string             `json:"_EventRecordingServiceURL" plist:"_EventRecordingServiceURL,omitempty"`
-	IsZipStreamable                       bool               `json:"_IsZipStreamable" plist:"_IsZipStreamable,omitempty"`
-	MasteredVersion                       string             `json:"_MasteredVersion" plist:"_MasteredVersion,omitempty"`
-	Hash                                  []byte             `json:"_Measurement" plist:"_Measurement,omitempty"`
-	HashAlgorithm                         string             `json:"_MeasurementAlgorithm" plist:"_MeasurementAlgorithm,omitempty"`
-	UnarchivedSize                        int                `json:"_UnarchivedSize" plist:"_UnarchivedSize,omitempty"`
-	AssetDefaultGarbageCollectionBehavior string             `json:"__AssetDefaultGarbageCollectionBehavior" plist:"__AssetDefaultGarbageCollectionBehavior,omitempty"`
-	BaseURL                               string             `json:"__BaseURL" plist:"__BaseURL,omitempty"`
-	CanUseLocalCacheServer                bool               `json:"__CanUseLocalCacheServer" plist:"__CanUseLocalCacheServer,omitempty"`
-	HideInstallAlert                      bool               `json:"__HideInstallAlert" plist:"__HideInstallAlert,omitempty"`
-	QueuingServiceURL                     string             `json:"__QueuingServiceURL" plist:"__QueuingServiceURL,omitempty"`
-	RelativePath                          string             `json:"__RelativePath" plist:"__RelativePath,omitempty"`
-}
-
-func (a OtaAsset) String() string {
-	var prereq string
-	if len(a.PrerequisiteBuild) > 0 {
-		prereq = fmt.Sprintf(", prereq_version: %s (%s)", a.PrerequisiteOSVersion, a.PrerequisiteBuild)
-	}
-	return fmt.Sprintf("name: %s, version: %s, build: %s, os: %s, asset_type: %s%s, devices: %d, model: %s, size: %s, zip: %s",
-		a.DocumentationID,
-		a.RestoreVersion,
-		a.Build,
-		a.OSVersion,
-		a.AssetType,
-		prereq,
-		len(a.SupportedDevices),
-		strings.Join(a.SupportedDeviceModels, ","),
-		humanize.Bytes(uint64(a.UnarchivedSize)),
-		filepath.Base(a.RelativePath),
-	)
 }
 
 // NewOTA downloads and parses the itumes plist for iOS14 release/developer beta OTAs
@@ -279,11 +184,11 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 
 // FilterOtaAssets returns a filtered list of OTA assets
 // Deprecated: in favor of the NEW pallas API
-func (o *Ota) FilterOtaAssets() []OtaAsset {
+func (o *Ota) FilterOtaAssets() []types.Asset {
 
-	var otas []OtaAsset
-	var filteredOtas []OtaAsset
-	// var outOTAs []OtaAsset
+	var otas []types.Asset
+	var filteredOtas []types.Asset
+	// var outOTAs []types.Asset
 
 	for _, ota := range uniqueOTAs(o.Assets) {
 		if len(o.Config.Device) > 0 {
@@ -670,9 +575,9 @@ func (o *Ota) buildPallasRequests() (reqs []pallasRequest, err error) {
 }
 
 // GetPallasOTAs returns an OTA assets for a given config using the newstyle OTA - CREDIT: https://gist.github.com/Siguza/0331c183c8c59e4850cd0b62fd501424
-func (o *Ota) GetPallasOTAs() ([]OtaAsset, error) {
+func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	var err error
-	var oassets []OtaAsset
+	var oassets []types.Asset
 
 	pallasReqs, err := o.buildPallasRequests()
 	if err != nil {
@@ -784,9 +689,9 @@ func (o *Ota) lookupHWModel(device string) (string, error) {
 	return "0", fmt.Errorf("failed to find model for device %s in list of OTAs (please supply a --model)", device)
 }
 
-func uniqueOTAs(otas []OtaAsset) []OtaAsset {
+func uniqueOTAs(otas []types.Asset) []types.Asset {
 	unique := make(map[string]bool, len(otas))
-	os := make([]OtaAsset, len(unique))
+	os := make([]types.Asset, len(unique))
 	for _, elem := range otas {
 		if len(elem.BaseURL+elem.RelativePath) != 0 {
 			if !unique[elem.BaseURL+elem.RelativePath] {
@@ -798,9 +703,9 @@ func uniqueOTAs(otas []OtaAsset) []OtaAsset {
 	return os
 }
 
-func (o *Ota) filterOTADevices(otas []OtaAsset) []OtaAsset {
+func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset {
 	var devices []string
-	var filteredOtas []OtaAsset
+	var filteredOtas []types.Asset
 
 	for _, ota := range otas {
 		devices = append(devices, ota.SupportedDeviceModels...)
@@ -808,7 +713,7 @@ func (o *Ota) filterOTADevices(otas []OtaAsset) []OtaAsset {
 	devices = utils.Unique(devices)
 
 	for _, device := range devices {
-		var devOTA OtaAsset
+		var devOTA types.Asset
 		for _, ota := range otas {
 			if utils.StrSliceHas(ota.SupportedDeviceModels, device) {
 				if devOTA.SupportedDevices == nil {
