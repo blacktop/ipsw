@@ -22,58 +22,110 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"archive/zip"
 	"fmt"
 	"os"
+	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(infoCmd)
-
-	infoCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
-	infoCmd.MarkZshCompPositionalArgumentFile(1, "*ipsw")
+	infoCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	infoCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	infoCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
+	infoCmd.Flags().BoolP("list", "l", false, "List files in IPSW/OTA")
+	infoCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
+	infoCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
+	}
 }
 
 // infoCmd represents the info command
 var infoCmd = &cobra.Command{
-	Use:   "info <IPSW>",
-	Short: "Display IPSW Info",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "info <IPSW>",
+	Short:         "Display IPSW/OTA Info",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		var pIPSW *info.Info
+
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		var err error
-		var pIPSW *info.Info
+		// settings
+		proxy, _ := cmd.Flags().GetString("proxy")
+		insecure, _ := cmd.Flags().GetBool("insecure")
+		// flags
+		remoteFlag, _ := cmd.Flags().GetBool("remote")
+		listFiles, _ := cmd.Flags().GetBool("list")
 
 		if remoteFlag {
-			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{})
+			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
+				Proxy:    proxy,
+				Insecure: insecure,
+			})
 			if err != nil {
 				return errors.Wrap(err, "failed to create new remote zip reader")
 			}
-			pIPSW, err = info.ParseZipFiles(zr.File)
-			if err != nil {
-				return errors.Wrap(err, "failed to extract remote plists")
+			if listFiles {
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				fmt.Fprintf(w, "PATH\tSIZE\n")
+				fmt.Fprintf(w, "----\t----\n")
+				for _, f := range zr.File {
+					fmt.Fprintf(w, "%s\t%s\n", f.Name, humanize.Bytes(f.UncompressedSize64))
+				}
+				w.Flush()
+			} else {
+				pIPSW, err = info.ParseZipFiles(zr.File)
+				if err != nil {
+					return errors.Wrap(err, "failed to extract remote plists")
+				}
 			}
 		} else {
-			if _, err = os.Stat(args[0]); os.IsNotExist(err) {
-				return fmt.Errorf("file %s does not exist", args[0])
+			fPath := filepath.Clean(args[0])
+			if _, err := os.Stat(fPath); os.IsNotExist(err) {
+				return fmt.Errorf("file %s does not exist", fPath)
 			}
-			pIPSW, err = info.Parse(args[0])
-			if err != nil {
-				return errors.Wrap(err, "failed to extract and parse IPSW info")
+			if listFiles {
+				zr, err := zip.OpenReader(fPath)
+				if err != nil {
+					return fmt.Errorf("failed to open %s: %v", fPath, err)
+				}
+				defer zr.Close()
+
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				fmt.Fprintf(w, "PATH\tSIZE\n")
+				fmt.Fprintf(w, "----\t----\n")
+				for _, f := range zr.File {
+					fmt.Fprintf(w, "%s\t%s\n", f.Name, humanize.Bytes(f.UncompressedSize64))
+				}
+				w.Flush()
+			} else {
+				var err error
+				pIPSW, err = info.Parse(fPath)
+				if err != nil {
+					return errors.Wrap(err, "failed to extract and parse IPSW info")
+				}
 			}
 		}
 
-		fmt.Println("\n[IPSW Info]")
-		fmt.Println("===========")
-		fmt.Println(pIPSW)
+		if !listFiles {
+			fmt.Println("\n[IPSW Info]")
+			fmt.Println("===========")
+			fmt.Println(pIPSW)
+		}
+
 		return nil
 	},
 }

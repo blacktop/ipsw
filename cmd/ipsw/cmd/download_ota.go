@@ -280,7 +280,7 @@ var otaDLCmd = &cobra.Command{
 							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
 						}
 					}
-					if remoteDyld { // PATTERN DSC MODE
+					if remoteDyld { // REMOTE DSC MODE
 						var dscRegex string
 						if dyldDriverKit {
 							dscRegex = fmt.Sprintf("%s(%s)%s", dyld.DriverKitCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
@@ -314,7 +314,7 @@ var otaDLCmd = &cobra.Command{
 							return fmt.Errorf("failed to download dyld_shared_cache(s) from remote OTA: %v", err)
 						}
 					}
-					if len(remotePattern) > 0 { // PATTERN MATCHING MODE
+					if len(remotePattern) > 0 { // REMOTE PATTERN MATCHING MODE
 						rfiles, err := ota.RemoteList(zr)
 						if err != nil {
 							return fmt.Errorf("failed to list remote OTA files: %v", err)
