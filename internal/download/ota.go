@@ -88,7 +88,7 @@ const ( // CREDIT: Siguza
 type Ota struct {
 	ota
 	as     *AssetSets
-	db     info.Devices
+	db     *info.Devices
 	Config OtaConf
 }
 
@@ -372,7 +372,7 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 	} else if len(o.Config.Model) > 0 {
 		req.HWModelStr = o.Config.Model
 	} else {
-		for prod, dev := range o.db {
+		for prod, dev := range *o.db {
 			if dev.SDKPlatform == o.Config.Platform {
 				req.ProductType = prod
 				model, err := o.lookupHWModel(prod)
@@ -558,16 +558,18 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 
 func (o *Ota) lookupHWModel(device string) (string, error) {
 	var err error
-	if o.db == nil {
-		o.db, err = info.GetIpswDB()
-		if err != nil {
-			return "", fmt.Errorf("failed to get ipsw db: %v", err)
-		}
-	}
 
 	dev, err := o.db.LookupDevice(device)
 	if err != nil {
-		return "", fmt.Errorf("failed to lookup device: %v", err)
+		log.Warnf("failed to lookup device: %v; updating ipsw DB from server and will try again", err)
+		o.db, err = GetIpswDB(o.Config.Proxy, o.Config.Insecure)
+		if err != nil {
+			return "", err
+		}
+		dev, err = o.db.LookupDevice(device)
+		if err != nil {
+			return "", fmt.Errorf("failed to lookup device: %v", err)
+		}
 	}
 
 	for bc := range dev.Boards {
