@@ -1,147 +1,199 @@
 package info
 
 import (
+	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/xcode"
 )
 
 type Board struct {
-	CPU         string `json:"cpu,omitempty"`
-	Platform    string `json:"platform,omitempty"`
-	CpuID       int    `json:"cpu_id,omitempty"`
-	Arch        string `json:"arch,omitempty"`
-	CpuISA      string `json:"cpu_isa,omitempty"`
-	BoardConfig string `json:"board_config,omitempty"`
-	BoardID     int    `json:"board_id,omitempty"`
+	CPU               string `json:"cpu,omitempty"`
+	Platform          string `json:"platform,omitempty"`
+	PlatformName      string `json:"platform_name,omitempty"`
+	ChipID            string `json:"cpuid,omitempty"`
+	Arch              string `json:"arch,omitempty"`
+	CpuISA            string `json:"cpuisa,omitempty"`
+	BoardID           string `json:"board_id,omitempty"`
+	BasebandChipID    string `json:"bbid,omitempty"`
+	KernelCacheType   string `json:"kc_type,omitempty"`
+	ResearchSupported bool   `json:"research_support,omitempty"`
 }
 
 type Device struct {
-	Name     string  `json:"name,omitempty"`
-	Boards   []Board `json:"boards,omitempty"`
-	MemClass int     `json:"mem_class,omitempty"`
+	Name        string           `json:"name,omitempty"`
+	Description string           `json:"desc,omitempty"`
+	Boards      map[string]Board `json:"boards,omitempty"`
+	MemClass    string           `json:"mem_class,omitempty"`
+	SDKPlatform string           `json:"sdk,omitempty"`
 }
 
 type Devices map[string]Device
 
 func (i *Info) GetDevices(devs *Devices) error {
-	var xdev xcode.Device
 	if i.DeviceTrees != nil && len(i.DeviceTrees) > 0 {
 		for _, dtree := range i.DeviceTrees {
-			dt, _ := dtree.Summary()
-			prodName := dt.ProductName
+			dt, err := dtree.Summary()
+			if err != nil {
+				return fmt.Errorf("error getting device tree summary: %v", err)
+			}
 
-			if devices, err := xcode.GetDevices(); err == nil {
-				for _, device := range devices {
-					if device.ProductType == dt.Model {
-						xdev = device
-						if len(prodName) == 0 {
-							prodName = xdev.ProductDescription
+			var kctype string
+			if kcs := i.Plists.BuildManifest.GetKernelForModel(strings.ToLower(dt.BoardConfig)); kcs != nil {
+				if len(kcs) == 1 {
+					kctype = kcs[0][strings.LastIndex(kcs[0], ".")+1:]
+				} else {
+					kctype = kcs[0][strings.LastIndex(kcs[0], ".")+1:] // FIXME: what?
+				}
+			}
+
+			xdev, err := xcode.GetDeviceForProd(dt.ProductType)
+			if err != nil {
+				return fmt.Errorf("error getting device %s in xcode device list: %v", dt.ProductType, err)
+			}
+
+			if len(dt.ProductType) > 0 {
+				if _, ok := (*devs)[dt.ProductType]; !ok {
+					if dt.ProductName != dt.ProductDescription {
+						(*devs)[dt.ProductType] = Device{
+							Name:        dt.ProductName,
+							Description: dt.ProductDescription,
+							Boards:      make(map[string]Board),
+							MemClass:    strconv.Itoa(xdev.DeviceTrait.DevicePerformanceMemoryClass),
 						}
-						break
+					} else {
+						(*devs)[dt.ProductType] = Device{
+							Name:     dt.ProductName,
+							Boards:   make(map[string]Board),
+							MemClass: strconv.Itoa(xdev.DeviceTrait.DevicePerformanceMemoryClass),
+						}
 					}
 				}
 			}
 
-			if i.Plists.Restore != nil { // IPSW
-				var boards []Board
-				for _, board := range i.Plists.Restore.DeviceMap {
-					if board.BoardConfig == strings.ToLower(dt.BoardConfig) {
-						proc := getProcessor(board.Platform)
-						boards = append(boards, Board{
-							CPU:         proc.Name,
-							Platform:    board.Platform,
-							CpuID:       board.CPID,
-							CpuISA:      proc.CPUISA,
-							Arch:        xdev.DeviceTrait.PreferredArchitecture,
-							BoardConfig: dt.BoardConfig,
-							BoardID:     board.BDID,
-						})
-					}
-				}
-				if _, ok := (*devs)[dt.Model]; !ok {
-					(*devs)[dt.Model] = Device{
-						Name:     prodName,
-						Boards:   boards,
-						MemClass: xdev.DeviceTrait.DevicePerformanceMemoryClass,
-					}
-				}
-			} else { // OTA
-				for _, board := range i.Plists.BuildIdentities {
-					if board.Info.DeviceClass == strings.ToLower(dt.BoardConfig) {
-						if _, ok := (*devs)[dt.Model]; !ok {
-							chipID, err := utils.ConvertStrToInt(board.ApChipID)
-							if err != nil {
-								chipID = 0
-							}
-							boardID, err := utils.ConvertStrToInt(board.ApBoardID)
-							if err != nil {
-								boardID = 0
-							}
-							proc := getProcessor(xdev.Platform)
-							(*devs)[dt.Model] = Device{
-								Name: prodName,
-								Boards: []Board{
-									{
-										CPU:         proc.Name,
-										Platform:    xdev.Platform,
-										CpuID:       int(chipID),
-										CpuISA:      proc.CPUISA,
-										Arch:        xdev.DeviceTrait.PreferredArchitecture,
-										BoardConfig: dt.BoardConfig,
-										BoardID:     int(boardID),
-									},
-								},
-								MemClass: xdev.DeviceTrait.DevicePerformanceMemoryClass,
-							}
-						}
-					}
-				}
+			proc := getProcessor(xdev.Platform)
+			if len(proc.Name) == 0 {
+				log.Errorf("no processor for %s for board %s: %s", dt.ProductType, dt.BoardConfig, dt.ProductName)
+			}
+
+			(*devs)[dt.ProductType].Boards[dt.BoardConfig] = Board{
+				CPU:      proc.Name,
+				Platform: xdev.Platform,
+				// PlatformName:      d.PlatformName,
+				ChipID:          i.Plists.BuildManifest.BuildIdentities[0].ApChipID,
+				CpuISA:          proc.CPUISA,
+				Arch:            xdev.DeviceTrait.PreferredArchitecture,
+				BoardID:         i.Plists.BuildManifest.BuildIdentities[0].ApBoardID,
+				BasebandChipID:  i.Plists.BuildManifest.BuildIdentities[0].BbChipID,
+				KernelCacheType: kctype,
+				// ResearchSupported: d.ResearchSupported,
 			}
 		}
 	} else {
 		if i.Plists.Restore != nil {
+			var prodType string
 			var prodName string
-			for idx, prod := range i.Plists.Restore.SupportedProductTypes {
-				if devices, err := xcode.GetDevices(); err == nil {
-					for _, device := range devices {
-						if device.ProductType == prod {
-							xdev = device
-							if len(prodName) == 0 {
-								prodName = xdev.ProductDescription
-							}
-							break
-						}
-					}
-				} else if len(prodName) == 0 {
+			var arch string
+			var memClass string
+			if len(i.Plists.Restore.SupportedProductTypes) == 1 {
+				prodType = i.Plists.Restore.SupportedProductTypes[0]
+			} else {
+				prodType = i.Plists.Restore.SupportedProductTypes[0]
+				log.Error("BAD ASSUMPTIONS: multiple product types in restore plist")
+			}
+			kcs := i.Plists.BuildManifest.GetKernelCaches()
+			for _, dev := range i.Plists.Restore.DeviceMap {
+				if xdev, err := xcode.GetDeviceForProd(prodType); err == nil {
+					prodName = xdev.ProductDescription
+					arch = xdev.DeviceTrait.PreferredArchitecture
+					memClass = strconv.Itoa(xdev.DeviceTrait.DevicePerformanceMemoryClass)
+				}
+				if len(prodName) == 0 {
 					if i.Plists.OTAInfo != nil {
 						prodName = "FIXME - " + i.Plists.OTAInfo.MobileAssetProperties.DeviceName
 					} else {
 						prodName = "FIXME"
 					}
 				}
-				if _, ok := (*devs)[prod]; !ok {
-					proc := getProcessor(i.Plists.Restore.DeviceMap[idx].Platform)
-					(*devs)[prod] = Device{
+				if _, ok := (*devs)[prodType]; !ok {
+					proc := getProcessor(dev.Platform)
+					if len(proc.Name) == 0 {
+						log.Errorf("no processor for %s for board %s: %s", dev.Platform, dev.BoardConfig, prodName)
+					}
+					(*devs)[prodType] = Device{
 						Name: prodName,
-						Boards: []Board{
-							{
-								CPU:         proc.Name,
-								Platform:    i.Plists.Restore.DeviceMap[idx].Platform,
-								CpuID:       i.Plists.Restore.DeviceMap[idx].CPID,
-								CpuISA:      proc.CPUISA,
-								Arch:        xdev.DeviceTrait.PreferredArchitecture,
-								BoardConfig: strings.ToUpper(i.Plists.Restore.DeviceMap[idx].BoardConfig),
-								BoardID:     i.Plists.Restore.DeviceMap[idx].BDID,
+						Boards: map[string]Board{
+							strings.ToUpper(dev.BoardConfig): {
+								CPU:      proc.Name,
+								Platform: dev.Platform,
+								// PlatformName:      d.PlatformName,
+								ChipID:          i.Plists.BuildManifest.BuildIdentities[0].ApChipID,
+								CpuISA:          proc.CPUISA,
+								Arch:            arch,
+								BoardID:         i.Plists.BuildManifest.BuildIdentities[0].ApBoardID,
+								BasebandChipID:  i.Plists.BuildManifest.BuildIdentities[0].BbChipID,
+								KernelCacheType: kcs[dev.BoardConfig][0][strings.LastIndex(kcs[dev.BoardConfig][0], ".")+1:],
+								// ResearchSupported: d.ResearchSupported,
 							},
 						},
-						MemClass: xdev.DeviceTrait.DevicePerformanceMemoryClass,
+						MemClass: memClass,
 					}
 				}
 			}
 		} else {
-			panic("unsupport IPSW/OTA type w/ no devicetree?")
+			panic("unsupported IPSW/OTA type")
+		}
+	}
+
+	return nil
+}
+
+func mLBTypeToBoardConfig(bc string, mlbType string) string {
+	return mlbType + strings.ToUpper(strings.TrimPrefix(bc, strings.ToLower(mlbType)))
+}
+
+func (i *Info) GetDevicesFromMap(dmap *types.DeviceMap, devs *Devices) error {
+	for bc, d := range *dmap {
+		if len(d.ProductType) > 0 {
+			if _, ok := (*devs)[d.ProductType]; !ok {
+				if d.ProductName != d.ProductDescription {
+					(*devs)[d.ProductType] = Device{
+						Name:        d.ProductName,
+						Description: d.ProductDescription,
+						Boards:      make(map[string]Board),
+						MemClass:    d.DevicePerformanceMemoryClass,
+						SDKPlatform: d.SDKPlatform,
+					}
+				} else {
+					(*devs)[d.ProductType] = Device{
+						Name:        d.ProductName,
+						Boards:      make(map[string]Board),
+						MemClass:    d.DevicePerformanceMemoryClass,
+						SDKPlatform: d.SDKPlatform,
+					}
+				}
+			}
+			proc := getProcessor(d.Platform)
+			if len(proc.Name) == 0 {
+				log.Errorf("no processor for %s for board %s: %s", d.Platform, bc, d.ProductName)
+			}
+			(*devs)[d.ProductType].Boards[mLBTypeToBoardConfig(bc, d.MLBType)] = Board{
+				CPU:               proc.Name,
+				Platform:          d.Platform,
+				PlatformName:      d.PlatformName,
+				ChipID:            d.ChipID,
+				CpuISA:            proc.CPUISA,
+				Arch:              d.KernelMachOArchitecture,
+				BoardID:           d.BoardID,
+				BasebandChipID:    d.BasebandChipID,
+				KernelCacheType:   d.KernelCacheType,
+				ResearchSupported: d.ResearchSupported,
+			}
+		} else {
+			log.Debugf("Board %s has no product type", bc)
 		}
 	}
 

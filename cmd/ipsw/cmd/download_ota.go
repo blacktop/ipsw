@@ -122,7 +122,6 @@ var otaDLCmd = &cobra.Command{
 		otaInfo := viper.GetBool("download.ota.info")
 		otaInfoType := viper.GetString("download.ota.info-type")
 		output := viper.GetString("download.ota.output")
-
 		// verify args
 		if len(dyldArches) > 0 && !remoteDyld {
 			return errors.New("--dyld-arch || -a can only be used with --dyld || -d")
@@ -361,8 +360,7 @@ var otaDLCmd = &cobra.Command{
 						// download file
 						downloader.URL = url
 						downloader.DestName = destName
-						err = downloader.Do()
-						if err != nil {
+						if err := downloader.Do(); err != nil {
 							return fmt.Errorf("failed to download file: %v", err)
 						}
 					} else {

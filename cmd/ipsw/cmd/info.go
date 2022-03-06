@@ -26,13 +26,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/dustin/go-humanize"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -57,7 +57,7 @@ var infoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var pIPSW *info.Info
+		var i *info.Info
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -76,7 +76,7 @@ var infoCmd = &cobra.Command{
 				Insecure: insecure,
 			})
 			if err != nil {
-				return errors.Wrap(err, "failed to create new remote zip reader")
+				return fmt.Errorf("failed to create new remote zip reader: %w", err)
 			}
 			if listFiles {
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
@@ -87,9 +87,9 @@ var infoCmd = &cobra.Command{
 				}
 				w.Flush()
 			} else {
-				pIPSW, err = info.ParseZipFiles(zr.File)
+				i, err = info.ParseZipFiles(zr.File)
 				if err != nil {
-					return errors.Wrap(err, "failed to extract remote plists")
+					return fmt.Errorf("failed to parse plists in zip: %w", err)
 				}
 			}
 		} else {
@@ -113,17 +113,18 @@ var infoCmd = &cobra.Command{
 				w.Flush()
 			} else {
 				var err error
-				pIPSW, err = info.Parse(fPath)
+				i, err = info.Parse(fPath)
 				if err != nil {
-					return errors.Wrap(err, "failed to extract and parse IPSW info")
+					return fmt.Errorf("failed to parse plists: %w", err)
 				}
 			}
 		}
 
 		if !listFiles {
-			fmt.Println("\n[IPSW Info]")
-			fmt.Println("===========")
-			fmt.Println(pIPSW)
+			title := fmt.Sprintf("[%s Info]", i.Plists.Type)
+			fmt.Printf("\n%s\n", title)
+			fmt.Println(strings.Repeat("=", len(title)))
+			fmt.Println(i)
 		}
 
 		return nil

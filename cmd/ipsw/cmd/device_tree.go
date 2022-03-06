@@ -104,7 +104,7 @@ var deviceTreeCmd = &cobra.Command{
 					if err != nil {
 						return errors.Wrap(err, "failed to parse device-tree")
 					}
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
 				}
@@ -143,7 +143,7 @@ var deviceTreeCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to parse device-tree")
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
 			}

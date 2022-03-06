@@ -25,12 +25,16 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
+	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/spf13/cobra"
 )
 
@@ -95,7 +99,7 @@ var updateDBCmd = &cobra.Command{
 
 				zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{})
 				if err != nil {
-					// log.WithError(err).Fatal("failed to create remote zip reader")
+					log.Error("failed to create remote zip reader")
 					continue
 				}
 				i, err := info.ParseZipFiles(zr.File)
@@ -115,42 +119,41 @@ var updateDBCmd = &cobra.Command{
 			if err != nil {
 				log.WithError(err).Fatal("failed to parse remote zip")
 			}
-			if err := i.GetDevices(&devices); err != nil {
-				log.WithError(err).Fatal("failed to get devices")
+			if i.Plists.Type == "OTA" {
+				foundMap := false
+				for _, f := range zr.File {
+					if regexp.MustCompile(`.*plist$`).MatchString(f.Name) {
+						switch {
+						case strings.HasSuffix(f.Name, "AssetData/boot/Firmware/device_map.plist"):
+							foundMap = true
+							dat := make([]byte, f.UncompressedSize64)
+							rc, err := f.Open()
+							if err != nil {
+								log.WithError(err).Fatal("failed to open file within zip")
+							}
+							defer rc.Close()
+							io.ReadFull(rc, dat)
+							dmap, err := types.ParseDeviceMap(dat)
+							if err != nil {
+								log.WithError(err).Fatal("failed to parse device map")
+							}
+							if err := i.GetDevicesFromMap(dmap, &devices); err != nil {
+								log.WithError(err).Fatal("failed to get devices")
+							}
+						}
+					}
+				}
+				if !foundMap {
+					if err := i.GetDevices(&devices); err != nil {
+						log.WithError(err).Fatal("failed to get devices")
+					}
+				}
+			} else {
+				if err := i.GetDevices(&devices); err != nil {
+					log.WithError(err).Fatal("failed to get devices")
+				}
 			}
-		} else {
-			// for _, version := range []string{"9.0", "10.0", "11.0", "12.0", "13.0", "14.0", "15.0"} {
-			// for _, version := range []string{"10.0", "11.0", "12.0", "13.0", "14.0", "15.0"} {
-			// 	ipsws, err := download.GetAllIPSW(version)
-			// 	if err != nil {
-			// 		log.WithError(err).Fatal("failed to get IPSWs")
-			// 	}
-			// 	unique := make(map[string]bool, len(ipsws))
-			// 	uniqueIPSWs := make([]download.IPSW, len(unique))
-			// 	for _, i := range ipsws {
-			// 		if len(i.URL) != 0 {
-			// 			if !unique[i.URL] {
-			// 				uniqueIPSWs = append(uniqueIPSWs, i)
-			// 				unique[i.URL] = true
-			// 			}
-			// 		}
-			// 	}
-			// 	for _, ipsw := range uniqueIPSWs {
-			// 		zr, err := download.NewRemoteZipReader(ipsw.URL, &download.RemoteConfig{})
-			// 		if err != nil {
-			// 			log.WithError(err).Fatal("failed to create remote zip reader")
-			// 		}
-			// 		i, err := info.ParseZipFiles(zr.File)
-			// 		if err != nil {
-			// 			// log.WithError(err).Fatal("failed to parse remote ipsw")
-			// 			continue
-			// 		}
-			// 		if err := i.GetDevices(&devices); err != nil {
-			// 			log.WithError(err).Fatal("failed to get devices")
-			// 		}
-			// 	}
-			// }
-
+		} else { // TODO: add default "latest" URL streams here to collect new devices
 			itunes, err := download.NewMacOsXML()
 			if err != nil {
 				log.WithError(err).Fatal("failed to create itunes API")
@@ -170,6 +173,7 @@ var updateDBCmd = &cobra.Command{
 				}
 			}
 		}
+
 		// OUTPUT JSON
 		dat, err := json.Marshal(devices)
 		if err != nil {

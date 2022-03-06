@@ -17,6 +17,7 @@ import (
 
 // Plists IPSW/OTA plists object
 type Plists struct {
+	Type string
 	*BuildManifest
 	*Restore
 	*AssetDataInfo
@@ -116,7 +117,7 @@ func Parse(path string) (*Plists, error) {
 
 // ParseZipFiles parses plists in remote ipsw zip
 func ParseZipFiles(files []*zip.File) (*Plists, error) {
-	ipsw := &Plists{}
+	ipsw := &Plists{Type: "IPSW"}
 
 	for _, f := range files {
 		if regexp.MustCompile(`.*plist$`).MatchString(f.Name) {
@@ -143,6 +144,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 					return nil, err
 				}
 			case strings.HasSuffix(f.Name, "AssetData/Info.plist"):
+				ipsw.Type = "OTA"
 				dat, err := readZipFile(f)
 				if err != nil {
 					return nil, fmt.Errorf("failed to read plist file: %s", err)
@@ -152,6 +154,7 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 					return nil, err
 				}
 			case strings.EqualFold(f.Name, "Info.plist"):
+				ipsw.Type = "OTA"
 				dat, err := readZipFile(f)
 				if err != nil {
 					return nil, fmt.Errorf("failed to read plist file: %s", err)
@@ -168,11 +171,10 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 }
 
 func (p *Plists) GetOSType() string {
-	if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]) > 0 {
-		return p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]
-	}
 	if p.OTAInfo != nil {
 		return p.OTAInfo.MobileAssetProperties.ReleaseType
+	} else if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]) > 0 {
+		return p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]
 	}
 	return ""
 }
