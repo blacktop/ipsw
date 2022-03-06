@@ -94,9 +94,13 @@ func (a Asset) String() string {
 	if len(a.PrerequisiteBuild) > 0 {
 		prereq = fmt.Sprintf(", prereq_version: %s (%s)", a.PrerequisiteOSVersion, a.PrerequisiteBuild)
 	}
-	return fmt.Sprintf("name: %s, version: %s, build: %s, os: %s, asset_type: %s%s, devices: %d, model: %s, size: %s, zip: %s",
+	var version string
+	if len(a.RestoreVersion) > 0 {
+		version = fmt.Sprintf(", version: %s", a.RestoreVersion)
+	}
+	return fmt.Sprintf("name: %s%s, build: %s, os: %s, asset_type: %s%s, devices: %d, model: %s, size: %s, zip: %s",
 		a.DocumentationID,
-		a.RestoreVersion,
+		version,
 		a.Build,
 		a.OSVersion,
 		a.AssetType,

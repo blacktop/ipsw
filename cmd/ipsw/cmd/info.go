@@ -125,6 +125,12 @@ var infoCmd = &cobra.Command{
 			fmt.Printf("\n%s\n", title)
 			fmt.Println(strings.Repeat("=", len(title)))
 			fmt.Println(i)
+			if Verbose {
+				fmt.Println(i.Plists.BuildManifest)
+				fmt.Println(i.Plists.Restore)
+				fmt.Println(i.Plists.AssetDataInfo)
+				fmt.Println(i.Plists.OTAInfo)
+			}
 		}
 
 		return nil

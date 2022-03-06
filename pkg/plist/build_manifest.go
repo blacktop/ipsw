@@ -19,7 +19,8 @@ type BuildManifest struct {
 
 func (b *BuildManifest) String() string {
 	var out string
-	out += "BuildManifest:\n"
+	out += "[BuildManifest]\n"
+	out += "===============\n"
 	out += fmt.Sprintf("  ManifestVersion:       %d\n", b.ManifestVersion)
 	out += fmt.Sprintf("  ProductBuildVersion:   %s\n", b.ProductBuildVersion)
 	out += fmt.Sprintf("  ProductVersion:        %s\n", b.ProductVersion)
