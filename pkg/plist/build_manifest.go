@@ -44,17 +44,7 @@ type buildIdentity struct {
 	Manifest                      map[string]buildIdentityManifest
 	PearlCertificationRootPub     []byte
 	ProductMarketingVersion       string
-	SEChipID                      string `plist:"SE,ChipID,omitempty"`
-	SavageChipID                  string `plist:"Savage,ChipID,omitempty"`
-	SavagePatchEpoch              string `plist:"Savage,PatchEpoch,omitempty"`
 	UniqueBuildID                 []byte
-	YonkersBoardID                int    `plist:"Yonkers,BoardID,omitempty"`
-	YonkersChipID                 string `plist:"Yonkers,ChipID,omitempty"`
-	YonkersPatchEpoch             int    `plist:"Yonkers,PatchEpoch,omitempty"`
-	RapBoardID                    int    `plist:"Rap,BoardID,omitempty"`
-	RapChipID                     string `plist:"Rap,ChipID,omitempty"`
-	RapSecurityDomain             int    `plist:"Rap,SecurityDomain,omitempty"`
-	EUICCChipID                   string `plist:"eUICC,ChipID,omitempty"`
 }
 
 func (i buildIdentity) String() string {
