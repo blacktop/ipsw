@@ -144,17 +144,17 @@ func (i *Info) String() string {
 			devices, err := xcode.GetDevices()
 			if err == nil {
 				for _, device := range devices {
-					if device.ProductType == dt.Model {
+					if device.ProductType == dt.ProductType {
 						prodName = device.ProductDescription
 						break
 					}
 				}
 			} else {
-				prodName = dt.Model
+				prodName = dt.ProductType
 			}
 		}
 		iStr += fmt.Sprintf("\n%s\n", prodName)
-		iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+		iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
 		if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
 			iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
 		}
@@ -169,7 +169,7 @@ func (i *Info) String() string {
 		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
 			iStr += fmt.Sprintf("   - BootLoaders\n")
 			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
-				if _, key, err := getApFirmwareKey(dt.Model, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
+				if _, key, err := getApFirmwareKey(dt.ProductType, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
 					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
 				} else {
 					iStr += fmt.Sprintf("       * %s 🔑 -> %s\n", filepath.Base(bl), key)
@@ -191,7 +191,7 @@ func (i *Info) GetFolder() string {
 	var devs []string
 	for _, dtree := range i.DeviceTrees {
 		dt, _ := dtree.Summary()
-		devs = append(devs, dt.Model)
+		devs = append(devs, dt.ProductType)
 	}
 	devs = utils.SortDevices(utils.Unique(devs))
 	return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs))
@@ -202,7 +202,7 @@ func (i *Info) GetFolders() []string {
 	var folders []string
 	for _, dtree := range i.DeviceTrees {
 		dt, _ := dtree.Summary()
-		folders = append(folders, fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion))
+		folders = append(folders, fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion))
 	}
 	return folders
 }
@@ -214,7 +214,7 @@ func (i *Info) GetFolderForFile(fileName string) string {
 		dt, _ := dtree.Summary()
 		for _, file := range files[strings.ToLower(dt.BoardConfig)] {
 			if strings.Contains(fileName, filepath.Base(file)) {
-				return fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+				return fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
 			}
 		}
 	}
@@ -247,7 +247,7 @@ func (i *Info) getFolders() []folder {
 	for _, dtree := range i.DeviceTrees {
 		dt, _ := dtree.Summary()
 		fs = append(fs, folder{
-			Name:         fmt.Sprintf("%s_%s_%s", dt.Model, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion),
+			Name:         fmt.Sprintf("%s_%s_%s", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion),
 			KernelCaches: kcs[strings.ToLower(dt.BoardConfig)],
 		})
 	}
@@ -285,7 +285,7 @@ func (i *Info) GetDevicesForKernelCache(kc string) []string {
 			for _, dtree := range i.DeviceTrees {
 				dt, _ := dtree.Summary()
 				if strings.ToLower(bconf) == strings.ToLower(dt.BoardConfig) {
-					devices = append(devices, dt.Model)
+					devices = append(devices, dt.ProductType)
 				}
 			}
 		}
@@ -341,6 +341,7 @@ func Parse(ipswPath string) (*Info, error) {
 // ParseZipFiles parses plist files and devicetree in a remote zip file
 func ParseZipFiles(files []*zip.File) (*Info, error) {
 	var err error
+
 	i := &Info{}
 
 	i.Plists, err = plist.ParseZipFiles(files)

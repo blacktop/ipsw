@@ -17,6 +17,20 @@ type BuildManifest struct {
 	SupportedProductTypes []string        `plist:"SupportedProductTypes,omitempty"`
 }
 
+func (b *BuildManifest) String() string {
+	var out string
+	out += "BuildManifest:\n"
+	out += fmt.Sprintf("  ManifestVersion:       %d\n", b.ManifestVersion)
+	out += fmt.Sprintf("  ProductBuildVersion:   %s\n", b.ProductBuildVersion)
+	out += fmt.Sprintf("  ProductVersion:        %s\n", b.ProductVersion)
+	out += fmt.Sprintf("  SupportedProductTypes: %v\n", b.SupportedProductTypes)
+	out += "  BuildIdentities:\n"
+	for _, bID := range b.BuildIdentities {
+		out += fmt.Sprintf("   -\n%s", bID.String())
+	}
+	return out
+}
+
 type buildIdentity struct {
 	ApBoardID                     string
 	ApChipID                      string
@@ -42,6 +56,23 @@ type buildIdentity struct {
 	EUICCChipID                   int    `plist:"eUICC,ChipID,omitempty"`
 }
 
+func (i buildIdentity) String() string {
+	var out string
+	out += fmt.Sprintf("    ProductMarketingVersion: %s\n", i.ProductMarketingVersion)
+	out += fmt.Sprintf("    ApBoardID:               %s\n", i.ApBoardID)
+	out += fmt.Sprintf("    ApChipID:                %s\n", i.ApChipID)
+	out += fmt.Sprintf("    ApSecurityDomain:        %s\n", i.ApSecurityDomain)
+	out += fmt.Sprintf("    BbChipID:                %s\n", i.BbChipID)
+	out += fmt.Sprintf("    Info:\n%s", i.Info.String())
+	out += fmt.Sprintf("    Manifest:\n")
+	for k, v := range i.Manifest {
+		if len(v.Info.Path) > 0 {
+			out += fmt.Sprintf("      %s: %s\n", k, v.String())
+		}
+	}
+	return out
+}
+
 type buildIdentityInfo struct {
 	BuildNumber            string
 	CodeName               string `plist:"BuildTrain,omitempty"`
@@ -56,11 +87,40 @@ type buildIdentityInfo struct {
 	VariantContents        map[string]string
 }
 
+func (i buildIdentityInfo) String() string {
+	return fmt.Sprintf(
+		"      BuildNumber:            %s\n"+
+			"      CodeName:               %s\n"+
+			"      DeviceClass:            %s\n"+
+			"      FDRSupport:             %t\n"+
+			"      MinimumSystemPartition: %d\n"+
+			"      MobileDeviceMinVersion: %s\n"+
+			"      RestoreBehavior:        %s\n"+
+			"      Variant:                %s\n",
+		i.BuildNumber,
+		i.CodeName,
+		i.DeviceClass,
+		i.FDRSupport,
+		i.MinimumSystemPartition,
+		i.MobileDeviceMinVersion,
+		i.RestoreBehavior,
+		i.Variant,
+	)
+}
+
 type buildIdentityManifest struct {
 	Digest      []byte
 	BuildString string `plist:"BuildString,omitempty"`
 	Info        buildIdentityManifestInfo
 	Trusted     bool
+}
+
+func (m buildIdentityManifest) String() string {
+	var bs string
+	if len(m.BuildString) > 0 {
+		bs = fmt.Sprintf(" (%s)", m.BuildString)
+	}
+	return fmt.Sprintf("%s%s", m.Info.Path, bs)
 }
 
 type buildIdentityManifestInfo struct {
@@ -95,6 +155,18 @@ func (b *BuildManifest) GetKernelCaches() map[string][]string {
 	return kernelCaches
 }
 
+func (b *BuildManifest) GetKernelForModel(model string) []string {
+	kcs := b.GetKernelCaches()
+	if v, ok := kcs[model]; ok {
+		return v
+	} else if len(kcs) == 1 {
+		for _, v := range kcs {
+			return v
+		}
+	}
+	return nil
+}
+
 func (b *BuildManifest) GetBootLoaders() map[string][]string {
 	bootLoaders := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
@@ -116,6 +188,11 @@ func (b *BuildManifest) GetBootLoaders() map[string][]string {
 		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
 			if len(bID.Manifest["LLB"].Info.Path) > 0 {
 				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path)
+			}
+		}
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info.Path) {
+			if len(bID.Manifest["SEP"].Info.Path) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info.Path)
 			}
 		}
 	}
