@@ -7,9 +7,11 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -221,6 +223,32 @@ func Verify(sha1sum, name string) (bool, error) {
 	}
 
 	return match, nil
+}
+
+// RemoteUnzip unzips a remote file from zip (like partialzip)
+func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string) error {
+	for _, f := range files {
+		if pattern.MatchString(f.Name) {
+			os.Mkdir(folder, os.ModePerm)
+			fname := filepath.Join(folder, filepath.Base(f.Name))
+			if _, err := os.Stat(fname); os.IsNotExist(err) {
+				data := make([]byte, f.UncompressedSize64)
+				rc, err := f.Open()
+				if err != nil {
+					return fmt.Errorf("error opening remote zip file %s: %v", f.Name, err)
+				}
+				io.ReadFull(rc, data)
+				rc.Close()
+				if err := ioutil.WriteFile(fname, data, 0644); err != nil {
+					return fmt.Errorf("error writing remote zip file %s data: %v", f.Name, err)
+				}
+			} else {
+				log.Warnf("%s already exists", fname)
+			}
+		}
+	}
+
+	return nil
 }
 
 // Unzip - https://stackoverflow.com/a/24792688
