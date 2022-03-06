@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota/types"
+	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
 
@@ -49,6 +50,34 @@ type AssetDataInfo struct {
 	TargetUpdate                 string            `plist:"TargetUpdate,omitempty"`
 }
 
+// AssetDataInfo Stringer
+func (a *AssetDataInfo) String() string {
+	var out string
+	out += "[AssetData/Info.plist]\n"
+	out += "======================\n"
+	out += fmt.Sprintf("Build:                        %s\n", a.Build)
+	out += fmt.Sprintf("DeviceClass:                  %s\n", a.DeviceClass)
+	out += fmt.Sprintf("HardwareModel:                %s\n", a.HardwareModel)
+	out += fmt.Sprintf("MinimumSystemPartition:       %d\n", a.MinimumSystemPartition)
+	out += fmt.Sprintf("PackageVersion:               %s\n", a.PackageVersion)
+	out += fmt.Sprintf("ProductType:                  %s\n", a.ProductType)
+	out += fmt.Sprintf("ProductVersion:               %s\n", a.ProductVersion)
+	out += fmt.Sprintf("RequiredSpace:                %s\n", humanize.Bytes(uint64(a.RequiredSpace)))
+	out += fmt.Sprintf("ReserveFileAware:             %v\n", a.ReserveFileAware)
+	out += fmt.Sprintf("SizeArchiveRoot:              %s\n", humanize.Bytes(uint64(a.SizeArchiveRoot)))
+	out += fmt.Sprintf("SizePatchedBinaries:          %s\n", humanize.Bytes(uint64(a.SizePatchedBinaries)))
+	out += fmt.Sprintf("SizePatchedBinaries-Snapshot: %s\n", humanize.Bytes(uint64(a.SizePatchedBinariesSnapshot)))
+	if len(a.SystemUpdatePathMap) > 0 {
+		out += "SystemUpdatePathMap:\n"
+		for k, v := range a.SystemUpdatePathMap {
+			out += fmt.Sprintf("  - %s: %s\n", k, v)
+		}
+	}
+	out += fmt.Sprintf("SystemVolumeSealingOverhead:  %d\n", a.SystemVolumeSealingOverhead)
+	out += fmt.Sprintf("TargetUpdate:                 %s\n", a.TargetUpdate)
+	return out
+}
+
 // OTAInfo Info.plist object found in OTAs
 type OTAInfo struct {
 	CFBundleIdentifier            string      `plist:"CFBundleIdentifier,omitempty"`
@@ -57,6 +86,20 @@ type OTAInfo struct {
 	CFBundleShortVersionString    string      `plist:"CFBundleShortVersionString,omitempty"`
 	CFBundleVersion               string      `plist:"CFBundleVersion,omitempty"`
 	MobileAssetProperties         types.Asset `plist:"MobileAssetProperties,omitempty"`
+}
+
+// OTAInfo Stringer
+func (o *OTAInfo) String() string {
+	var out string
+	out += "[OTA Info.plist]\n"
+	out += "================\n"
+	out += fmt.Sprintf("CFBundleIdentifier:            %s\n", o.CFBundleIdentifier)
+	// out += fmt.Sprintf("CFBundleInfoDictionaryVersion: %s\n", o.CFBundleInfoDictionaryVersion)
+	// out += fmt.Sprintf("CFBundleName:                  %s\n", o.CFBundleName)
+	// out += fmt.Sprintf("CFBundleShortVersionString:    %s\n", o.CFBundleShortVersionString)
+	// out += fmt.Sprintf("CFBundleVersion:               %s\n", o.CFBundleVersion)
+	out += fmt.Sprintf("MobileAssetProperties:\n  %s\n", o.MobileAssetProperties)
+	return out
 }
 
 func readZipFile(f *zip.File) ([]byte, error) {
@@ -172,7 +215,11 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 
 func (p *Plists) GetOSType() string {
 	if p.OTAInfo != nil {
-		return p.OTAInfo.MobileAssetProperties.ReleaseType
+		if len(p.OTAInfo.MobileAssetProperties.ReleaseType) > 0 {
+			return p.OTAInfo.MobileAssetProperties.ReleaseType
+		} else {
+			return p.OTAInfo.MobileAssetProperties.DocumentationID
+		}
 	} else if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]) > 0 {
 		return p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]
 	}

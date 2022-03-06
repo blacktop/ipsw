@@ -128,9 +128,13 @@ func (i *Info) String() string {
 		i.Plists.GetOSType(),
 	)
 	if i.Plists.Restore != nil {
-		iStr += fmt.Sprintf("FileSystem     = ")
-		for file, fsType := range i.Plists.Restore.SystemRestoreImageFileSystems {
-			iStr += fmt.Sprintf("%s (Type: %s)\n", file, fsType)
+		iStr += "FileSystem     = "
+		if len(i.Plists.Restore.SystemRestoreImageFileSystems) > 0 {
+			for file, fsType := range i.Plists.Restore.SystemRestoreImageFileSystems {
+				iStr += fmt.Sprintf("%s (Type: %s)\n", file, fsType)
+			}
+		} else {
+			iStr += i.GetOsDmg()
 		}
 	}
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
@@ -155,19 +159,20 @@ func (i *Info) String() string {
 		}
 		iStr += fmt.Sprintf("\n%s\n", prodName)
 		iStr += fmt.Sprintf(" > %s_%s_%s\n", dt.ProductType, strings.ToUpper(dt.BoardConfig), i.Plists.BuildManifest.ProductBuildVersion)
+		iStr += fmt.Sprintf("   - TimeStamp: %s\n", dt.Timestamp.Format("02 Jan 2006 15:04:05 MST"))
 		if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
-			iStr += fmt.Sprintf("   - KernelCache: %s\n", kcs[strings.ToLower(dt.BoardConfig)])
+			iStr += fmt.Sprintf("   - KernelCache: %s\n", strings.Join(kcs[strings.ToLower(dt.BoardConfig)], ", "))
 		}
 		if i.Plists.Restore != nil {
 			for _, device := range i.Plists.Restore.DeviceMap {
-				if strings.ToLower(device.BoardConfig) == strings.ToLower(dt.BoardConfig) {
+				if strings.EqualFold(device.BoardConfig, dt.BoardConfig) {
 					proc := getProcessor(device.Platform)
 					iStr += fmt.Sprintf("   - CPU: %s (%s), ID: %s\n", proc.Name, proc.CPUISA, device.Platform)
 				}
 			}
 		}
 		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
-			iStr += fmt.Sprintf("   - BootLoaders\n")
+			iStr += "   - BootLoaders\n"
 			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
 				if _, key, err := getApFirmwareKey(dt.ProductType, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
 					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
