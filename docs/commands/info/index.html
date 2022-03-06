@@ -195,7 +195,7 @@
           
 <h1 class="title">info</h1>
 <div class="content ">
-  <h3 id="display-info-about-ipsws">Display info about IPSWs</h3>
+  <h3 id="display-info-about-ipsws-and-otas">Display info about IPSWs and OTAs</h3>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw info iPhone11,2,iPhone11,4,iPhone11,6,iPhone12,3,iPhone12,5_15.0_19A5318f_Restore.ipsw
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl"><span class="o">[</span>IPSW Info<span class="o">]</span>
@@ -259,7 +259,28 @@
 </span></span><span class="line"><span class="cl">       * LLB.d331.RELEASE.im4p
 </span></span></code></pre></div><h3 id="or-remotely">Or remotely</h3>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw info --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
-</span></span></code></pre></div>
+</span></span></code></pre></div><h3 id="to-list-all-the-files-in-a-remote-ipsw-or-ota">To list all the files in a remote IPSW or OTA</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw info --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw --list
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">PATH                                                                   SIZE
+</span></span><span class="line"><span class="cl">----                                                                   ----
+</span></span><span class="line"><span class="cl">018-95664-055.dmg                                                      <span class="m">124</span> MB
+</span></span><span class="line"><span class="cl">018-95777-055.dmg                                                      <span class="m">126</span> MB
+</span></span><span class="line"><span class="cl">018-95946-047.dmg                                                      6.1 GB
+</span></span><span class="line"><span class="cl">BuildManifest.plist                                                    <span class="m">282</span> kB
+</span></span><span class="line"><span class="cl">Firmware/                                                              <span class="m">0</span> B
+</span></span><span class="line"><span class="cl">Firmware/018-95664-055.dmg.trustcache                                  5.3 kB
+</span></span><span class="line"><span class="cl">Firmware/018-95777-055.dmg.trustcache                                  5.4 kB
+</span></span><span class="line"><span class="cl">Firmware/018-95946-047.dmg.mtree                                       <span class="m">32</span> MB
+</span></span><span class="line"><span class="cl">Firmware/018-95946-047.dmg.root_hash                                   <span class="m">229</span> B
+</span></span><span class="line"><span class="cl">Firmware/018-95946-047.dmg.trustcache                                  <span class="m">56</span> kB
+</span></span><span class="line"><span class="cl">&lt;SNIP&gt;
+</span></span></code></pre></div><h3 id="to-dump-a-verbose-version-of-the-info-summary">To dump a VERBOSE version of the info summary</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw info OTA -V
+</span></span></code></pre></div><blockquote>
+<p><strong>NOTE:</strong> This will also dump out the full BuidManifest.plist, Restore.plist, and Info.plists etc</p>
+</blockquote>
+
 </div>
 </div>
 

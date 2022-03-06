@@ -195,9 +195,34 @@
           
 <h1 class="title">extract</h1>
 <div class="content ">
-  <h3 id="extract-_kernelcache_-from-a-previously-downloaded-_ipsw_">Extract <em>kernelcache</em> from a previously downloaded <em>ipsw</em></h3>
+  <h3 id="extract-from-ipsw-or-ota-zip">Extract from IPSW or OTA zip</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw extract --help
+</span></span><span class="line"><span class="cl">Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Usage:
+</span></span><span class="line"><span class="cl">  ipsw extract &lt;IPSW/OTA <span class="p">|</span> URL&gt; <span class="o">[</span>flags<span class="o">]</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Flags:
+</span></span><span class="line"><span class="cl">  -f, --dmg                     Extract File System DMG
+</span></span><span class="line"><span class="cl">  -t, --dtree                   Extract DeviceTree
+</span></span><span class="line"><span class="cl">  -d, --dyld                    Extract dyld_shared_cache
+</span></span><span class="line"><span class="cl">  -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
+</span></span><span class="line"><span class="cl">  -h, --help                    <span class="nb">help</span> <span class="k">for</span> extract
+</span></span><span class="line"><span class="cl">  -i, --iboot                   Extract iBoot
+</span></span><span class="line"><span class="cl">      --insecure                <span class="k">do</span> not verify ssl certs
+</span></span><span class="line"><span class="cl">  -k, --kernel                  Extract kernelcache
+</span></span><span class="line"><span class="cl">  -o, --output string           Folder to extract files to
+</span></span><span class="line"><span class="cl">      --pattern string          Download remote files that match <span class="o">(</span>not regex<span class="o">)</span>
+</span></span><span class="line"><span class="cl">      --proxy string            HTTP/HTTPS proxy
+</span></span><span class="line"><span class="cl">  -r, --remote                  Extract from URL
+</span></span><span class="line"><span class="cl">  -s, --sep                     Extract sep-firmware
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">Global Flags:
+</span></span><span class="line"><span class="cl">      --config string   config file <span class="o">(</span>default is <span class="nv">$HOME</span>/.ipsw.yaml<span class="o">)</span>
+</span></span><span class="line"><span class="cl">  -V, --verbose         verbose output
+</span></span></code></pre></div><h3 id="extract-_kernelcache_-from-a-previously-downloaded-ipsw-or-ota">Extract <em>kernelcache</em> from a previously downloaded IPSW or OTA</h3>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
-</span></span></code></pre></div><h3 id="extract-_dyld_shared_cache_-from-a-previously-downloaded-_ipsw_">Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></h3>
+</span></span></code></pre></div><h3 id="extract-_dyld_shared_cache_-from-a-previously-downloaded-ipsw">Extract <em>dyld_shared_cache</em> from a previously downloaded IPSW</h3>
 <ul>
 <li><code>macOS</code></li>
 </ul>
@@ -214,6 +239,8 @@
 </span></span></span><span class="line"><span class="cl"><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
 </span></span></span><span class="line"><span class="cl"><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
 </span></span></span><span class="line"><span class="cl"><span class="se"></span>             blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
+</span></span></code></pre></div><h3 id="extract-all-files-matching-a-user-specified-regex-pattern-from-remote-ipsw-or-ota-zip">Extract all files matching a user-specified regex pattern from remote IPSW or OTA zip</h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw extract --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw --pattern <span class="s1">&#39;.*BuidManifest.plist$&#39;</span>
 </span></span></code></pre></div>
 </div>
 </div>
