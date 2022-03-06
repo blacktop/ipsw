@@ -1,6 +1,7 @@
 package info
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -9,6 +10,9 @@ import (
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/xcode"
 )
+
+//go:embed data/ipsw_db.json
+var ipswDB []byte
 
 type Board struct {
 	CPU               string `json:"cpu,omitempty"`
@@ -32,6 +36,15 @@ type Device struct {
 }
 
 type Devices map[string]Device
+
+func GetIpswDB() (*types.DeviceMap, error) {
+	var db *types.DeviceMap
+	err := json.Unmarshal(ipswDB, &db)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling ipsw_db.json: %v", err)
+	}
+	return db, nil
+}
 
 func (i *Info) GetDevices(devs *Devices) error {
 	if i.DeviceTrees != nil && len(i.DeviceTrees) > 0 {
