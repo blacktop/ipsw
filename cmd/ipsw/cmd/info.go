@@ -126,10 +126,18 @@ var infoCmd = &cobra.Command{
 			fmt.Println(strings.Repeat("=", len(title)))
 			fmt.Println(i)
 			if Verbose {
-				fmt.Println(i.Plists.BuildManifest)
-				fmt.Println(i.Plists.Restore)
-				fmt.Println(i.Plists.AssetDataInfo)
-				fmt.Println(i.Plists.OTAInfo)
+				if i.Plists.BuildManifest != nil {
+					fmt.Println(i.Plists.BuildManifest)
+				}
+				if i.Plists.Restore != nil {
+					fmt.Println(i.Plists.Restore)
+				}
+				if i.Plists.AssetDataInfo != nil {
+					fmt.Println(i.Plists.AssetDataInfo)
+				}
+				if i.Plists.OTAInfo != nil {
+					fmt.Println(i.Plists.OTAInfo)
+				}
 			}
 		}
 
