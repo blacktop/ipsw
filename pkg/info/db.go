@@ -38,13 +38,12 @@ type Device struct {
 
 type Devices map[string]Device
 
-func GetIpswDB() (Devices, error) {
+func GetIpswDB() (*Devices, error) {
 	var db Devices
-	err := json.Unmarshal(ipswDB, &db)
-	if err != nil {
+	if err := json.Unmarshal(ipswDB, &db); err != nil {
 		return nil, fmt.Errorf("error unmarshaling ipsw_db.json: %v", err)
 	}
-	return db, nil
+	return &db, nil
 }
 
 func (ds Devices) LookupDevice(prod string) (Device, error) {
