@@ -215,11 +215,6 @@ var otaDLCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
 		}
 
-		// otas := otaXML.FilterOtaAssets(doDownload, doNotDownload) FIXME: integrate the white-list into the filter AND as a device list (if no device is given)
-		// if len(otas) == 0 {
-		// 	log.Fatal(fmt.Sprintf("no OTAs match device %s %s", device, doDownload))
-		// }
-
 		otas, err := otaXML.GetPallasOTAs()
 		if err != nil {
 			return err
@@ -229,12 +224,12 @@ var otaDLCmd = &cobra.Command{
 			log.Info("OTA(s):")
 			for _, o := range otas {
 				utils.Indent(log.WithFields(log.Fields{
-					"name":    o.DocumentationID,
-					"version": o.OSVersion,
-					"build":   o.Build,
-					"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices[:3], " "), len(o.SupportedDevices)),
-					"models":  strings.Join(o.SupportedDeviceModels, " "),
-					"size":    humanize.Bytes(uint64(o.UnarchivedSize)),
+					"name":         o.DocumentationID,
+					"version":      o.OSVersion,
+					"build":        o.Build,
+					"device_count": len(o.SupportedDevices),
+					"model_count":  len(o.SupportedDeviceModels),
+					"size":         humanize.Bytes(uint64(o.UnarchivedSize)),
 				}).Info, 2)(filepath.Base(o.RelativePath))
 			}
 		}

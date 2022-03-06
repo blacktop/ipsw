@@ -15,8 +15,9 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/types"
-	info "github.com/blacktop/ipsw/pkg/plist"
+	ilist "github.com/blacktop/ipsw/pkg/plist"
 	"github.com/hashicorp/go-version"
 	"github.com/ulikunitz/xz"
 )
@@ -87,6 +88,7 @@ const ( // CREDIT: Siguza
 type Ota struct {
 	ota
 	as     *AssetSets
+	db     info.Devices
 	Config OtaConf
 }
 
@@ -179,58 +181,12 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 		return nil, fmt.Errorf("failed to decode OTA plist response: %v", err)
 	}
 
+	o.db, err = info.GetIpswDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ipsw db: %v", err)
+	}
+
 	return &o, nil
-}
-
-// FilterOtaAssets returns a filtered list of OTA assets
-// Deprecated: in favor of the NEW pallas API
-func (o *Ota) FilterOtaAssets() []types.Asset {
-
-	var otas []types.Asset
-	var filteredOtas []types.Asset
-	// var outOTAs []types.Asset
-
-	for _, ota := range uniqueOTAs(o.Assets) {
-		if len(o.Config.Device) > 0 {
-			if utils.StrSliceHas(ota.SupportedDevices, o.Config.Device) {
-				otas = append(otas, ota)
-			}
-		} else {
-			otas = append(otas, ota)
-		}
-	}
-
-	for _, ota := range otas {
-		if len(o.Config.DeviceWhiteList) > 0 {
-			if utils.StrSliceHas(o.Config.DeviceWhiteList, ota.SupportedDevices[0]) {
-				filteredOtas = append(filteredOtas, ota)
-			}
-		} else if len(o.Config.DeviceBlackList) > 0 {
-			if !utils.StrSliceHas(o.Config.DeviceBlackList, ota.SupportedDevices[0]) {
-				filteredOtas = append(filteredOtas, ota)
-			}
-		} else {
-			filteredOtas = append(filteredOtas, ota)
-		}
-	}
-
-	filteredOtas = o.filterOTADevices(filteredOtas)
-
-	deviceList := make(map[string]string)
-	for _, o := range filteredOtas {
-		if len(o.SupportedDevices) == 1 && len(o.SupportedDeviceModels) == 1 {
-			deviceList[o.SupportedDevices[0]] = o.SupportedDeviceModels[0]
-		}
-	}
-
-	// for dev, model := range deviceList { FIXME: NOW
-	// 	if ota, err := o.GetOtaForDevice(dev, model); err == nil {
-	// 		outOTAs = append(outOTAs, ota)
-	// 	}
-	// }
-
-	return filteredOtas
-	// return outOTAs
 }
 
 func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
@@ -289,7 +245,8 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					return []assetAudienceID{watchOS8Beta}, nil
+					// return []assetAudienceID{watchOS8Beta}, nil
+					return []assetAudienceID{watchOS6Beta, watchOS7Beta, watchOS8Beta}, nil
 				case 4:
 					return []assetAudienceID{watchOS4Beta}, nil
 				case 5:
@@ -398,13 +355,13 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 		req.Supervised = true
 		req.DelayRequested = false
 	}
-	if o.Config.Beta && o.Config.Platform != "macos" {
+	if o.Config.Beta && (o.Config.Platform != "macos" && o.Config.Platform != "watchos") {
 		req.ReleaseType = "Beta"
 	}
 	if len(o.Config.Device) > 0 {
 		req.ProductType = o.Config.Device
 		if len(o.Config.Model) == 0 {
-			model, err := o.lookupHWModel(o.Config.Device) // TODO: replace w/ internal DB
+			model, err := o.lookupHWModel(o.Config.Device)
 			if err != nil {
 				return nil, err
 			}
@@ -415,119 +372,43 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 	} else if len(o.Config.Model) > 0 {
 		req.HWModelStr = o.Config.Model
 	} else {
-		// var model string
-		// devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
-		// if len(devices) == 0 {
-		// 	req.RequestedProductVersion = o.as.Latest(typ, o.Config.Platform)
-		// 	req.Supervised = true
-		// 	req.DelayRequested = false
-		// 	devices = o.as.GetDevicesForVersion(req.RequestedProductVersion, typ)
-		// }
-		// for _, device := range devices {
-		// 	req.ProductType = device
-		// 	model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
-		// 	if err != nil {
-		// 		// return nil, err
-		// 		log.Debugf("failed to lookup model for device %s", device)
-		// 		// continue
-		// 	} else {
-		// 		req.HWModelStr = model
-		// 	}
-		// 	reqNEW := req
-		// 	reqs = append(reqs, reqNEW)
-		// }
-		// return reqs, nil
+		for prod, dev := range o.db {
+			if dev.SDKPlatform == o.Config.Platform {
+				req.ProductType = prod
+				model, err := o.lookupHWModel(prod)
+				if err != nil {
+					return nil, err
+				}
+				req.HWModelStr = model
+				reqNEW := req
+				reqs = append(reqs, reqNEW)
+			}
+		}
+		var model string
+		devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
+		if len(devices) == 0 {
+			req.RequestedProductVersion = o.as.Latest(typ, o.Config.Platform)
+			req.Supervised = true
+			req.DelayRequested = false
+			devices = o.as.GetDevicesForVersion(req.RequestedProductVersion, typ)
+		}
+		for _, device := range devices {
+			req.ProductType = device
+			model, err = o.lookupHWModel(device)
+			if err != nil {
+				// return nil, err
+				log.Debugf("failed to lookup model for device %s", device)
+				continue
+			} else {
+				req.HWModelStr = model
+			}
+			reqNEW := req
+			reqs = append(reqs, reqNEW)
+		}
+		return reqs, nil
 	}
 
 	reqs = append(reqs, req)
-
-	// if o.Config.Version != nil && len(o.Config.Device) == 0 {
-	// 	var model string
-	// 	devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
-	// 	if len(devices) == 0 {
-	// 		devices = o.as.GetDevicesForVersion(o.as.Latest(typ), typ)
-	// 	}
-	// 	for _, device := range devices {
-	// 		model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
-	// 		if err != nil {
-	// 			// return nil, err
-	// 			log.Debugf("failed to lookup model for device %s", device)
-	// 			continue
-	// 		}
-	// 		if o.Config.Beta {
-	// 			reqs = append(reqs, pallasRequest{
-	// 				ClientVersion:        clientVersion,
-	// 				AssetType:            atype,
-	// 				AssetAudience:        audienceID,
-	// 				ProductType:          device,
-	// 				HWModelStr:           model,
-	// 				ProductVersion:       "0",
-	// 				BuildVersion:         o.Config.Build,
-	// 				CompatibilityVersion: 20,
-	// 				ReleaseType:          "Beta",
-	// 			})
-	// 		} else {
-	// 			reqs = append(reqs, pallasRequest{
-	// 				ClientVersion:           clientVersion,
-	// 				AssetType:               atype,
-	// 				AssetAudience:           audienceID,
-	// 				ProductType:             device,
-	// 				HWModelStr:              model,
-	// 				ProductVersion:          "0",
-	// 				BuildVersion:            o.Config.Build,
-	// 				RequestedProductVersion: o.Config.Version.Original(),
-	// 				Supervised:              true,
-	// 				DelayRequested:          false,
-	// 				CompatibilityVersion:    20,
-	// 			})
-	// 		}
-	// 	}
-	// } else if o.Config.Version != nil && len(o.Config.Device) > 0 {
-	// 	reqs = append(reqs, pallasRequest{
-	// 		ClientVersion:           clientVersion,
-	// 		AssetType:               atype,
-	// 		AssetAudience:           audienceID,
-	// 		ProductType:             o.Config.Device,
-	// 		HWModelStr:              o.Config.Model,
-	// 		ProductVersion:          o.Config.Version.Original(),
-	// 		BuildVersion:            o.Config.Build,
-	// 		RequestedProductVersion: o.Config.Version.Original(),
-	// 		Supervised:              true,
-	// 		DelayRequested:          false,
-	// 		CompatibilityVersion:    20,
-	// 	})
-	// } else if o.Config.Version == nil && len(o.Config.Device) == 0 {
-	// 	var model string
-	// 	for _, device := range o.as.GetDevicesForVersion(o.as.Latest(typ), typ) {
-	// 		model, err = o.lookupHWModel(device) // TODO: replace w/ internal DB
-	// 		if err != nil {
-	// 			// return nil, err
-	// 			log.Debugf("failed to lookup model for device %s", device)
-	// 			continue
-	// 		}
-	// 		reqs = append(reqs, pallasRequest{
-	// 			ClientVersion:        clientVersion,
-	// 			AssetType:            atype,
-	// 			AssetAudience:        audienceID,
-	// 			ProductType:          device,
-	// 			HWModelStr:           model,
-	// 			ProductVersion:       "0",
-	// 			BuildVersion:         o.Config.Build,
-	// 			CompatibilityVersion: 20,
-	// 		})
-	// 	}
-	// } else {
-	// 	reqs = append(reqs, pallasRequest{
-	// 		ClientVersion:        clientVersion,
-	// 		AssetType:            atype,
-	// 		AssetAudience:        audienceID,
-	// 		ProductType:          o.Config.Device,
-	// 		HWModelStr:           o.Config.Model,
-	// 		ProductVersion:       "0",
-	// 		BuildVersion:         o.Config.Build,
-	// 		CompatibilityVersion: 20,
-	// 	})
-	// }
 
 	return reqs, nil
 }
@@ -657,7 +538,7 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 				return nil, err
 			}
 			io.Copy(xzBuf, xr)
-			bm, err := info.ParseBuildManifest(xzBuf.Bytes())
+			bm, err := ilist.ParseBuildManifest(xzBuf.Bytes())
 			if err != nil {
 				return nil, err
 			}
@@ -676,17 +557,28 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 }
 
 func (o *Ota) lookupHWModel(device string) (string, error) {
-	for _, ota := range o.Assets {
-		if utils.StrSliceHas(ota.SupportedDevices, device) {
-			if len(ota.SupportedDeviceModels) > 1 {
-				return "0", fmt.Errorf("found more than one hw model for device %s", device)
-			} else if len(ota.SupportedDeviceModels) == 0 {
-				return "0", fmt.Errorf("device %s has 0 supported device models", device)
-			}
-			return ota.SupportedDeviceModels[0], nil
+	var err error
+	if o.db == nil {
+		o.db, err = info.GetIpswDB()
+		if err != nil {
+			return "", fmt.Errorf("failed to get ipsw db: %v", err)
 		}
 	}
-	return "0", fmt.Errorf("failed to find model for device %s in list of OTAs (please supply a --model)", device)
+
+	dev, err := o.db.LookupDevice(device)
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup device: %v", err)
+	}
+
+	for bc := range dev.Boards {
+		if len(dev.Boards) == 1 {
+			return bc, nil
+		} else if !strings.HasSuffix(bc, "DEV") {
+			return bc, nil
+		}
+	}
+
+	return "", fmt.Errorf("failed to lookup HWModel for device %s", device)
 }
 
 func uniqueOTAs(otas []types.Asset) []types.Asset {
@@ -705,17 +597,33 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 
 func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset {
 	var devices []string
+	var filteredDevices []string
 	var filteredOtas []types.Asset
 
 	for _, ota := range otas {
-		devices = append(devices, ota.SupportedDeviceModels...)
+		devices = append(devices, ota.SupportedDevices...)
 	}
+
 	devices = utils.Unique(devices)
 
 	for _, device := range devices {
+		if len(o.Config.DeviceWhiteList) > 0 {
+			if utils.StrSliceHas(o.Config.DeviceWhiteList, device) {
+				filteredDevices = append(filteredDevices, device)
+			}
+		} else if len(o.Config.DeviceBlackList) > 0 {
+			if !utils.StrSliceHas(o.Config.DeviceBlackList, device) {
+				filteredDevices = append(filteredDevices, device)
+			}
+		} else {
+			filteredDevices = append(filteredDevices, device)
+		}
+	}
+
+	for _, device := range filteredDevices {
 		var devOTA types.Asset
 		for _, ota := range otas {
-			if utils.StrSliceHas(ota.SupportedDeviceModels, device) {
+			if utils.StrSliceHas(ota.SupportedDevices, device) {
 				if devOTA.SupportedDevices == nil {
 					if ota.DownloadSize > devOTA.DownloadSize {
 						devOTA = ota
