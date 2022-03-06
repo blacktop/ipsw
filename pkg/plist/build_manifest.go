@@ -11,7 +11,7 @@ import (
 // BuildManifest is the BuildManifest.plist object found in IPSWs/OTAs
 type BuildManifest struct {
 	BuildIdentities       []buildIdentity `plist:"BuildIdentities,omitempty"`
-	ManifestVersion       uint64          `plist:"ManifestVersion,omitempty"`
+	ManifestVersion       int             `plist:"ManifestVersion,omitempty"`
 	ProductBuildVersion   string          `plist:"ProductBuildVersion,omitempty"`
 	ProductVersion        string          `plist:"ProductVersion,omitempty"`
 	SupportedProductTypes []string        `plist:"SupportedProductTypes,omitempty"`
@@ -52,9 +52,9 @@ type buildIdentity struct {
 	YonkersChipID                 string `plist:"Yonkers,ChipID,omitempty"`
 	YonkersPatchEpoch             int    `plist:"Yonkers,PatchEpoch,omitempty"`
 	RapBoardID                    int    `plist:"Rap,BoardID,omitempty"`
-	RapChipID                     int    `plist:"Rap,ChipID,omitempty"`
+	RapChipID                     string `plist:"Rap,ChipID,omitempty"`
 	RapSecurityDomain             int    `plist:"Rap,SecurityDomain,omitempty"`
-	EUICCChipID                   int    `plist:"eUICC,ChipID,omitempty"`
+	EUICCChipID                   string `plist:"eUICC,ChipID,omitempty"`
 }
 
 func (i buildIdentity) String() string {
@@ -65,7 +65,7 @@ func (i buildIdentity) String() string {
 	out += fmt.Sprintf("    ApSecurityDomain:        %s\n", i.ApSecurityDomain)
 	out += fmt.Sprintf("    BbChipID:                %s\n", i.BbChipID)
 	out += fmt.Sprintf("    Info:\n%s", i.Info.String())
-	out += fmt.Sprintf("    Manifest:\n")
+	out += "    Manifest:\n"
 	for k, v := range i.Manifest {
 		if len(v.Info.Path) > 0 {
 			out += fmt.Sprintf("      %s: %s\n", k, v.String())

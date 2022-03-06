@@ -1,6 +1,7 @@
 package info
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -37,13 +38,20 @@ type Device struct {
 
 type Devices map[string]Device
 
-func GetIpswDB() (*types.DeviceMap, error) {
-	var db *types.DeviceMap
+func GetIpswDB() (Devices, error) {
+	var db Devices
 	err := json.Unmarshal(ipswDB, &db)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling ipsw_db.json: %v", err)
 	}
 	return db, nil
+}
+
+func (ds Devices) LookupDevice(prod string) (Device, error) {
+	if d, ok := ds[prod]; ok {
+		return d, nil
+	}
+	return Device{}, fmt.Errorf("device %s not found", prod)
 }
 
 func (i *Info) GetDevices(devs *Devices) error {
