@@ -197,33 +197,33 @@
 <div class="content ">
   <h3 id="parse-devicetrees">Parse DeviceTrees</h3>
 <p>Print out SUMMARY</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dtree DeviceTree.d431ap.im4p
-
-      • Product Name: iPhone <span class="m">11</span> Pro Max
-      • Model: iPhone12,5
-      • BoardConfig: D431AP
-</code></pre></div><p>Or print out JSON</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dtree --json DeviceTree.d431ap.im4p <span class="p">|</span> jq .
-</code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="p">{</span>
-  <span class="nt">&#34;device-tree&#34;</span><span class="p">:</span> <span class="p">{</span>
-    <span class="nt">&#34;#address-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-    <span class="nt">&#34;#size-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-    <span class="nt">&#34;AAPL,phandle&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
-    <span class="nt">&#34;children&#34;</span><span class="p">:</span> <span class="p">[</span>
-      <span class="p">{</span>
-        <span class="nt">&#34;chosen&#34;</span><span class="p">:</span> <span class="p">{</span>
-          <span class="nt">&#34;#address-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-          <span class="nt">&#34;AAPL,phandle&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
-   <span class="err">&lt;SNIP&gt;</span>
-</code></pre></div><p>Or remotely</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
-
-   • DeviceTree.n112ap.im4p
-      • Product Name: iPod touch
-      • Model: iPod9,1
-      • BoardConfig: N112AP
-</code></pre></div>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download -v 13.3 -d iPhone12,3 pattern DeviceTree
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw dtree DeviceTree.d431ap.im4p
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">      • Product Name: iPhone <span class="m">11</span> Pro Max
+</span></span><span class="line"><span class="cl">      • Model: iPhone12,5
+</span></span><span class="line"><span class="cl">      • BoardConfig: D431AP
+</span></span></code></pre></div><p>Or print out JSON</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw dtree --json DeviceTree.d431ap.im4p <span class="p">|</span> jq .
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;device-tree&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;#address-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;#size-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;AAPL,phandle&#34;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;children&#34;</span><span class="p">:</span> <span class="p">[</span>
+</span></span><span class="line"><span class="cl">      <span class="p">{</span>
+</span></span><span class="line"><span class="cl">        <span class="nt">&#34;chosen&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;#address-cells&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">          <span class="nt">&#34;AAPL,phandle&#34;</span><span class="p">:</span> <span class="mi">2</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">   <span class="err">&lt;SNIP&gt;</span>
+</span></span></code></pre></div><p>Or remotely</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw dtree --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">   • DeviceTree.n112ap.im4p
+</span></span><span class="line"><span class="cl">      • Product Name: iPod touch
+</span></span><span class="line"><span class="cl">      • Model: iPod9,1
+</span></span><span class="line"><span class="cl">      • BoardConfig: N112AP
+</span></span></code></pre></div>
 </div>
 </div>
 
@@ -256,7 +256,7 @@
   
 
   
-  <script type="text/javascript" src="/ipsw/js/scripts.min.eaf147370baecdd07c022597db631f99cab1c9cd6479de586f30327a568d6a0f.js"></script>
+  <script type="text/javascript" src="/ipsw/js/scripts.min.bafc052229b4b40bf03c477d31c5cdd9352ece8afbadf35ab97ed14495098fc9.js"></script>
   
 
   
