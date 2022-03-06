@@ -196,25 +196,25 @@
 <h1 class="title">extract</h1>
 <div class="content ">
   <h3 id="extract-_kernelcache_-from-a-previously-downloaded-_ipsw_">Extract <em>kernelcache</em> from a previously downloaded <em>ipsw</em></h3>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
-</code></pre></div><h3 id="extract-_dyld_shared_cache_-from-a-previously-downloaded-_ipsw_">Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></h3>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw extract --kernel iPhone11,2_12.0_16A366_Restore.ipsw
+</span></span></code></pre></div><h3 id="extract-_dyld_shared_cache_-from-a-previously-downloaded-_ipsw_">Extract <em>dyld_shared_cache</em> from a previously downloaded <em>ipsw</em></h3>
 <ul>
 <li><code>macOS</code></li>
 </ul>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
-   • Extracting dyld_shared_cache from IPSW
-   • Mounting DMG
-   • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
-   • Unmounting DMG
-</code></pre></div><ul>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw extract --dyld iPhone11,2_12.0_16A366_Restore.ipsw
+</span></span><span class="line"><span class="cl">   • Extracting dyld_shared_cache from IPSW
+</span></span><span class="line"><span class="cl">   • Mounting DMG
+</span></span><span class="line"><span class="cl">   • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
+</span></span><span class="line"><span class="cl">   • Unmounting DMG
+</span></span></code></pre></div><ul>
 <li><code>docker</code></li>
 </ul>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash">❯ docker run --init -it --rm <span class="se">\
-</span><span class="se"></span>             --device /dev/fuse <span class="se">\
-</span><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
-</span><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
-</span><span class="se"></span>             blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
-</code></pre></div>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ docker run --init -it --rm <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>             --device /dev/fuse <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>             --cap-add<span class="o">=</span>SYS_ADMIN <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>             -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> :/data <span class="se">\
+</span></span></span><span class="line"><span class="cl"><span class="se"></span>             blacktop/ipsw -V extract --dyld iPhone11_2_12.4.1_16G102_Restore.ipsw
+</span></span></code></pre></div>
 </div>
 </div>
 
@@ -247,7 +247,7 @@
   
 
   
-  <script type="text/javascript" src="/ipsw/js/scripts.min.eaf147370baecdd07c022597db631f99cab1c9cd6479de586f30327a568d6a0f.js"></script>
+  <script type="text/javascript" src="/ipsw/js/scripts.min.bafc052229b4b40bf03c477d31c5cdd9352ece8afbadf35ab97ed14495098fc9.js"></script>
   
 
   
