@@ -6,7 +6,7 @@ weight: 6
 summary: Display info about IPSW(s).
 ---
 
-### Display info about IPSWs
+### Display info about IPSWs and OTAs
 
 ```bash
 ❯ ipsw info iPhone11,2,iPhone11,4,iPhone11,6,iPhone12,3,iPhone12,5_15.0_19A5318f_Restore.ipsw
@@ -78,3 +78,31 @@ iPhone XS Max
 ```bash
 ❯ ipsw info --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw
 ```
+
+### To list all the files in a remote IPSW or OTA
+
+```bash
+❯ ipsw info --remote https://updates.cdn-apple.com/../iPodtouch_7_13.3_17C54_Restore.ipsw --list
+
+PATH                                                                   SIZE
+----                                                                   ----
+018-95664-055.dmg                                                      124 MB
+018-95777-055.dmg                                                      126 MB
+018-95946-047.dmg                                                      6.1 GB
+BuildManifest.plist                                                    282 kB
+Firmware/                                                              0 B
+Firmware/018-95664-055.dmg.trustcache                                  5.3 kB
+Firmware/018-95777-055.dmg.trustcache                                  5.4 kB
+Firmware/018-95946-047.dmg.mtree                                       32 MB
+Firmware/018-95946-047.dmg.root_hash                                   229 B
+Firmware/018-95946-047.dmg.trustcache                                  56 kB
+<SNIP>
+```
+
+### To dump a VERBOSE version of the info summary
+
+```bash
+❯ ipsw info OTA -V
+```
+
+> **NOTE:** This will also dump out the full BuidManifest.plist, Restore.plist, and Info.plists etc
