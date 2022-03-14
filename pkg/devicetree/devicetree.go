@@ -105,9 +105,11 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 		zone, _ := time.Now().Zone()
 		location, err = time.LoadLocation(zone)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+			// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+			summary.Timestamp = t
+		} else {
+			summary.Timestamp = t.In(location)
 		}
-		summary.Timestamp = t.In(location)
 	}
 
 	return summary, nil

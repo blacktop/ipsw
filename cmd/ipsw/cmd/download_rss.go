@@ -109,7 +109,7 @@ var rssCmd = &cobra.Command{
 				if err != nil {
 					log.Fatal(err.Error())
 				}
-				fmt.Fprintf(w, "- %s\t<%s>\t%s  \n", item.Title, date.Format("Mon, 02Jan2006 15:04:05"), item.Link)
+				fmt.Fprintf(w, "- %s\t<%s>\t%s  \n", item.Title, date.Format("Mon, 02Jan2006 15:04:05 MST"), item.Link)
 			}
 			w.Flush()
 			fmt.Println()
