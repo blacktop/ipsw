@@ -148,16 +148,27 @@ func (infos ProductInfos) GetLatest() ProductInfos {
 
 func (infos ProductInfos) String() string {
 	tableString := &strings.Builder{}
-	zone, _ := time.Now().Zone()
-	location, _ := time.LoadLocation(zone)
 	pdata := [][]string{}
-	for _, pinfo := range infos {
-		pdata = append(pdata, []string{
-			pinfo.Title,
-			pinfo.Version,
-			pinfo.Build,
-			pinfo.PostDate.In(location).Format("02Jan2006 15:04:05"),
-		})
+	zone, _ := time.Now().Zone()
+	location, err := time.LoadLocation(zone)
+	if err != nil {
+		for _, pinfo := range infos {
+			pdata = append(pdata, []string{
+				pinfo.Title,
+				pinfo.Version,
+				pinfo.Build,
+				pinfo.PostDate.Format("02Jan2006 15:04:05 MST"),
+			})
+		}
+	} else {
+		for _, pinfo := range infos {
+			pdata = append(pdata, []string{
+				pinfo.Title,
+				pinfo.Version,
+				pinfo.Build,
+				pinfo.PostDate.In(location).Format("02Jan2006 15:04:05"),
+			})
+		}
 	}
 	table := tablewriter.NewWriter(tableString)
 	table.SetHeader([]string{"Title", "Version", "Build", "Post Date"})

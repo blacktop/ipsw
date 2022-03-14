@@ -27,14 +27,16 @@ func (d pubDate) GetDate() (*time.Time, error) {
 	if err != nil {
 		return nil, err
 	}
+	var tt time.Time
 
 	zone, _ := time.Now().Zone()
 	location, err = time.LoadLocation(zone)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+		// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+		tt = t
+	} else {
+		tt = t.In(location)
 	}
-
-	tt := t.In(location)
 
 	return &tt, nil
 }

@@ -195,7 +195,10 @@ func (i *Info) GetOsDmg() string {
 func (i *Info) GetFolder() string {
 	var devs []string
 	for _, dtree := range i.DeviceTrees {
-		dt, _ := dtree.Summary()
+		dt, err := dtree.Summary()
+		if err != nil {
+			log.Fatal(err.Error())
+		}
 		devs = append(devs, dt.ProductType)
 	}
 	devs = utils.SortDevices(utils.Unique(devs))
