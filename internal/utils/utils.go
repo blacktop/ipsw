@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"crypto/sha1"
 	"fmt"
 	"io"
@@ -20,7 +21,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
-	gzip "github.com/klauspost/pgzip"
 )
 
 var normalPadding = cli.Default.Padding
