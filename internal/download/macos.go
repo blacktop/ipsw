@@ -2,6 +2,7 @@ package download
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -18,7 +19,6 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/dustin/go-humanize"
-	gzip "github.com/klauspost/pgzip"
 	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
 )
@@ -223,6 +223,11 @@ func GetProductInfo() (ProductInfos, error) {
 		resp, err := http.Get(seed.DeveloperSeed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 		}
 
 		document, err := ioutil.ReadAll(resp.Body)
