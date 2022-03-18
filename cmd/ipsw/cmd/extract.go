@@ -119,13 +119,6 @@ var extractCmd = &cobra.Command{
 				log.Fatal("must supply valid URL when using the remote flag")
 			}
 
-			i, err := info.Parse(remoteURL)
-			if err != nil {
-				return errors.Wrap(err, "failed to parse ipsw info")
-			}
-
-			destPath = filepath.Join(destPath, i.GetFolder())
-
 			if dyldFlag {
 				log.Error("unable to extract dyld_shared_cache remotely (try `ipsw download ota --dyld`)")
 			}
