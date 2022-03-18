@@ -1,9 +1,10 @@
-// +build darwin,cgo
+//go:build darwin && cgo
 
 package xcode
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/jinzhu/gorm"
 	// importing the sqlite dialects
@@ -33,16 +34,18 @@ func ReadDeviceTraitsDB() ([]Device, error) {
 	for _, osType := range []string{"iPhoneOS", "AppleTVOS", "WatchOS"} {
 		for _, releaseType := range []string{"", "-beta"} {
 			dbFile := fmt.Sprintf("/Applications/Xcode%s.app/Contents/Developer/Platforms/%s.platform/usr/standalone/device_traits.db", releaseType, osType)
-			db, err := gorm.Open("sqlite3", dbFile)
-			if err != nil {
-				return nil, errors.Wrapf(err, "unable to open database: %s", dbFile)
+			if _, err := os.Stat(dbFile); err == nil {
+				db, err := gorm.Open("sqlite3", dbFile)
+				if err != nil {
+					return nil, errors.Wrapf(err, "unable to open database: %s", dbFile)
+				}
+				defer db.Close()
+
+				var devices []Device
+				db.Preload("DeviceTrait").Find(&devices)
+
+				allDevices = append(allDevices, devices...)
 			}
-			defer db.Close()
-
-			var devices []Device
-			db.Preload("DeviceTrait").Find(&devices)
-
-			allDevices = append(allDevices, devices...)
 		}
 	}
 
