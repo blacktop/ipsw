@@ -124,7 +124,7 @@ var updateDBCmd = &cobra.Command{
 				for _, f := range zr.File {
 					if regexp.MustCompile(`.*plist$`).MatchString(f.Name) {
 						switch {
-						case strings.HasSuffix(f.Name, "AssetData/boot/Firmware/device_map.plist"):
+						case strings.Contains(f.Name, "device_map.plist"):
 							foundMap = true
 							dat := make([]byte, f.UncompressedSize64)
 							rc, err := f.Open()
