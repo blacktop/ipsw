@@ -72,7 +72,9 @@ func (i *Info) GetDevices(devs *Devices) error {
 
 			xdev, err := xcode.GetDeviceForProd(dt.ProductType)
 			if err != nil {
-				return fmt.Errorf("error getting device %s in xcode device list: %v", dt.ProductType, err)
+				xdev = &xcode.Device{}
+				log.Errorf("error getting device %s in xcode device list: %v", dt.ProductType, err)
+				// return fmt.Errorf("error getting device %s in xcode device list: %v", dt.ProductType, err)
 			}
 
 			if len(dt.ProductType) > 0 {
