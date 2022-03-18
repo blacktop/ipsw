@@ -67,7 +67,7 @@ test-docs: ## Start local server hosting hugo docs
 .PHONY: update_mod
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
-	rm go.sum
+	rm go.sum || true
 	$(GO_BIN) mod download
 	$(GO_BIN) mod tidy
 
