@@ -84,7 +84,7 @@ const ( // CREDIT: Siguza
 	macOS12DeveloperBeta assetAudienceID = "298e518d-b45e-4d36-94be-34a63d6777ec" // macOS 12 developer beta
 	macOS12PublicBeta    assetAudienceID = "9f86c787-7c59-45a7-a79a-9c164b00f866" // macOS 12 public beta
 
-	displayIOSRelease assetAudienceID = "60b55e25-a8ed-4f45-826c-c1495a4ccc65" // studio display iOS 15 release
+	displayIOSRelease assetAudienceID = macOSRelease // studio display iOS 15 release
 )
 
 // Ota is an OTA object
