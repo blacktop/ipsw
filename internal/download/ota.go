@@ -41,6 +41,7 @@ const (
 	// For macOS devices
 	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
 	recoveryOsSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
+	accessorySoftwareUpdate  assetType = "com.apple.MobileAsset.DarwinAccessoryUpdate.A2525"
 )
 
 type assetAudienceID string
@@ -82,6 +83,8 @@ const ( // CREDIT: Siguza
 	macOS12CustomerBeta  assetAudienceID = "a3799e8a-246d-4dee-b418-76b4519a15a2" // macOS 12 customer beta
 	macOS12DeveloperBeta assetAudienceID = "298e518d-b45e-4d36-94be-34a63d6777ec" // macOS 12 developer beta
 	macOS12PublicBeta    assetAudienceID = "9f86c787-7c59-45a7-a79a-9c164b00f866" // macOS 12 public beta
+
+	displayIOSRelease assetAudienceID = "60b55e25-a8ed-4f45-826c-c1495a4ccc65" // studio display iOS 15 release
 )
 
 // Ota is an OTA object
@@ -198,7 +201,7 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "audioos":
 		fallthrough
 	case "tvos":
-		return []assetType{softwareUpdate}, nil
+		return []assetType{softwareUpdate, accessorySoftwareUpdate}, nil
 	case "macos":
 		return []assetType{macSoftwareUpdate}, nil
 	case "recovery":
@@ -234,7 +237,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 			}
 		} else {
-			return []assetAudienceID{iOSRelease, iOS14SecurityUpdates}, nil
+			return []assetAudienceID{iOSRelease, iOS14SecurityUpdates, displayIOSRelease}, nil
 		}
 	case "watchos":
 		if o.Config.Beta {
@@ -492,11 +495,6 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 		}
 		defer resp.Body.Close()
 
-		if resp.StatusCode != 200 {
-			// log.Debugf("failed to connect to URL: got status %s", resp.Status)
-			continue
-		}
-
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("failed to read response body: %v", err)
@@ -513,6 +511,11 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 		b64data, err := base64.StdEncoding.WithPadding(base64.NoPadding).DecodeString(b64Str)
 		if err != nil {
 			log.Errorf("failed to base64 decode pallas response: %v", err)
+			continue
+		}
+
+		if resp.StatusCode != 200 {
+			log.Debugf("[ERROR]\n%s", string(b64data))
 			continue
 		}
 

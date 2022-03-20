@@ -83,6 +83,57 @@ type wikiParseResults struct {
 	Parse wikiParseData `json:"parse"`
 }
 
+type wikiFWKeys struct {
+	Version            string
+	Build              string
+	Device             string
+	Codename           string
+	Baseband           string
+	DownloadURL        string
+	RootFS             string
+	RootFSKey          string
+	UpdateRamdisk      string
+	UpdateRamdiskIV    string
+	RestoreRamdisk     string
+	RestoreRamdiskIV   string
+	AppleLogo          string
+	AppleLogoIV        string
+	BatteryCharging0   string
+	BatteryCharging0IV string
+	BatteryCharging1   string
+	BatteryCharging1IV string
+	BatteryFull        string
+	BatteryFullIV      string
+	BatteryLow0        string
+	BatteryLow0IV      string
+	BatteryLow1        string
+	BatteryLow1IV      string
+	DeviceTree         string
+	DeviceTreeIV       string
+	GlyphPlugin        string
+	GlyphPluginIV      string
+	IBEC               string
+	IBECIV             string
+	IBECKey            string
+	IBoot              string
+	IBootIV            string
+	IBootKey           string
+	IBSS               string
+	IBSSIV             string
+	IBSSKey            string
+	Kernelcache        string
+	KernelcacheIV      string
+	LLB                string
+	LLBIV              string
+	LLBKey             string
+	RecoveryMode       string
+	RecoveryModeIV     string
+	SEPFirmware        string
+	SEPFirmwareIV      string
+	SEPFirmwareKey     string
+	SEPFirmwareKBAG    string
+}
+
 func getWikiPage(page string, proxy string, insecure bool) (*wikiParseResults, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -417,6 +468,78 @@ func GetWikiIPSWs(proxy string, insecure bool) ([]*WikiIPSW, error) {
 }
 
 func GetWikiOTAs(proxy string, insecure bool) ([]*WikiOTA, error) {
+	var otas []*WikiOTA
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	req, err := http.NewRequest("GET", iPhoneWikiAPI, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	q := req.URL.Query()
+	q.Add("format", "json")
+	q.Add("action", "parse")
+	q.Add("page", "OTA Updates")
+	q.Add("prop", "links")
+	q.Add("redirects", "true")
+	req.URL.RawQuery = q.Encode()
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get response: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
+	}
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// parse the response
+	var parseResp wikiParseResults
+	if err := json.Unmarshal(data, &parseResp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	for _, link := range parseResp.Parse.Links {
+		// if strings.HasPrefix(link.Link, "OTA Updates/") {
+		if strings.HasPrefix(link.Link, "OTA Updates/iPhone/15") {
+
+			wpage, err := getWikiPage(link.Link, proxy, insecure)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse page %s: %w", link.Link, err)
+			}
+
+			if utils.StrSliceContains(wpage.Parse.ExternalLinks, ".zip") {
+				wtable, err := getWikiTable(link.Link, proxy, insecure)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse wikitable for %s: %w", link.Link, err)
+				}
+				// parse the wikitable
+				tableIPSWs, err := parseWikiTable(wtable.Parse.WikiText.Text)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse wikitable: %w", err)
+				}
+				fmt.Println(tableIPSWs)
+				// otas = append(otas, tableIPSWs...)
+			}
+		}
+	}
+
+	return otas, nil
+}
+
+func GetWikiFirmwareKeys(proxy string, insecure bool) ([]*WikiOTA, error) {
 	var otas []*WikiOTA
 
 	client := &http.Client{
