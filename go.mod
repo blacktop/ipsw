@@ -1,10 +1,9 @@
 module github.com/blacktop/ipsw
 
-go 1.17
+go 1.18
 
 require (
-	github.com/AlecAivazis/survey/v2 v2.3.2
-	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2 // indirect
+	github.com/AlecAivazis/survey/v2 v2.3.3
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.52
@@ -20,7 +19,6 @@ require (
 	github.com/hashicorp/go-version v1.4.0
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02 // indirect
 	github.com/jinzhu/gorm v1.9.16
-	github.com/kr/pty v1.1.8 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/muesli/mango-cobra v1.0.0
@@ -30,10 +28,10 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1
 	github.com/ulikunitz/xz v0.5.10
-	github.com/vbauerster/mpb/v7 v7.3.2
-	golang.org/x/crypto v0.0.0-20220315160706-3147a52a75dd
+	github.com/vbauerster/mpb/v7 v7.4.1
+	golang.org/x/crypto v0.0.0-20220321153916-2c7772ba3064
 	golang.org/x/net v0.0.0-20220225172249-27dd8689420f
-	golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf
+	golang.org/x/sys v0.0.0-20220319134239-a9b59b0215f8
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
