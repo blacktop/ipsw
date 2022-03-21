@@ -231,11 +231,11 @@ type CacheImageInfo struct {
 }
 
 type Rebase struct {
-	CacheFileOffset uint64      `json:"cache_file_offset,omitempty"`
-	CacheVMAddress  uint64      `json:"cache_vm_address,omitempty"`
-	Target          uint64      `json:"target,omitempty"`
-	Pointer         interface{} `json:"pointer,omitempty"`
-	Symbol          string      `json:"symbol,omitempty"`
+	CacheFileOffset uint64 `json:"cache_file_offset,omitempty"`
+	CacheVMAddress  uint64 `json:"cache_vm_address,omitempty"`
+	Target          uint64 `json:"target,omitempty"`
+	Pointer         any    `json:"pointer,omitempty"`
+	Symbol          string `json:"symbol,omitempty"`
 }
 
 type slideInfo interface {

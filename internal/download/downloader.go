@@ -194,7 +194,7 @@ func (d *Download) Do() error {
 	trace := &httptrace.ClientTrace{
 		GotConn: func(connInfo httptrace.GotConnInfo) {
 			if d.verbose {
-				addr := strings.Split(connInfo.Conn.RemoteAddr().String(), ":")[0]
+				addr, _, _ := strings.Cut(connInfo.Conn.RemoteAddr().String(), ":")
 
 				req, err := http.NewRequest("GET", fmt.Sprintf("http://ip-api.com/json/%s", addr), nil)
 				if err != nil {
@@ -264,20 +264,32 @@ func (d *Download) Do() error {
 		mpb.WithRefreshRate(180*time.Millisecond),
 	)
 
-	bar := p.Add(d.size,
+	var bar *mpb.Bar
+
+	bar = p.Add(d.size,
 		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
 		mpb.PrependDecorators(
-			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
+			decor.CountersKibiByte("\t% .2f / % .2f"),
 		),
 		mpb.AppendDecorators(
-			decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
+			decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
 			decor.Name(" ] "),
-			decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048), decor.WCSyncSpace),
-			// decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+			decor.AverageSpeed(decor.UnitKiB, "% .2f"),
 		),
 	)
 
 	if d.resume {
+		bar = p.Add(d.size,
+			mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+			mpb.PrependDecorators(
+				decor.CountersKibiByte("\t% .2f / % .2f"),
+			),
+			mpb.AppendDecorators(
+				decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
+				decor.Name(" ] "),
+				decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048)),
+			),
+		)
 		// bar.SetCurrent(d.bytesResumed)
 		bar.SetRefill(d.bytesResumed)
 		bar.IncrInt64(d.bytesResumed)
