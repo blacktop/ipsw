@@ -129,8 +129,13 @@ var machoInfoCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
-		if _, err := os.Stat(machoPath); os.IsNotExist(err) {
+		if info, err := os.Stat(machoPath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", machoPath)
+		} else if info.IsDir() {
+			if filepath.Ext(machoPath) == ".app" {
+				base, _, _ := strings.Cut(filepath.Base(machoPath), ".app")
+				machoPath = filepath.Join(machoPath, "Contents", "MacOS", base)
+			}
 		}
 
 		// first check for fat file
