@@ -74,7 +74,7 @@ func (r *AppInfo) String() string {
 	return out
 }
 
-// ParseRestore parses the Restore.plist
+// ParseAppInfo parses the .app/Info.plist
 func ParseAppInfo(data []byte) (*AppInfo, error) {
 	i := &AppInfo{}
 	if err := plist.NewDecoder(bytes.NewReader(data)).Decode(i); err != nil {
