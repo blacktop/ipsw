@@ -40,6 +40,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -132,9 +133,9 @@ var machoInfoCmd = &cobra.Command{
 		if info, err := os.Stat(machoPath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", machoPath)
 		} else if info.IsDir() {
-			if filepath.Ext(machoPath) == ".app" {
-				base, _, _ := strings.Cut(filepath.Base(machoPath), ".app")
-				machoPath = filepath.Join(machoPath, "Contents", "MacOS", base)
+			machoPath, err = plist.GetBinaryInApp(machoPath)
+			if err != nil {
+				return err
 			}
 		}
 
