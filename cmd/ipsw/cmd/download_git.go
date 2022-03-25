@@ -81,37 +81,20 @@ var gitCmd = &cobra.Command{
 			}
 		}
 
+		var err error
 		tags := make(map[string]download.GithubTag)
 
 		if len(apiToken) == 0 {
 			log.Info("Querying github.com/blacktop/ipsw/apple_meta/github/tag_links.json for repositories...")
-			var err error
 			tags, err = download.GetPreprocessedAppleOssTags(proxy, insecure)
 			if err != nil {
 				return fmt.Errorf("failed to get tags from `ipsw` apple_meta: %w", err)
 			}
 		} else {
 			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
-			cursor := ""
-			hasNext := true
-			for hasNext {
-				ql, err := download.AppleOssGraphQLTags(proxy, insecure, apiToken, cursor)
-				if err != nil {
-					return fmt.Errorf("download.GraphQLTags: %w", err)
-				}
-				for _, edge := range ql.Data.Search.Edges {
-					tags[edge.Node.Name] = download.GithubTag{
-						Name:   edge.Node.Refs.Nodes[0].Target.Name,
-						TarURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.tar.gz", edge.Node.Name, edge.Node.Refs.Nodes[0].Target.Name),
-						ZipURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.zip", edge.Node.Name, edge.Node.Refs.Nodes[0].Target.Name),
-						Commit: download.GithubCommit{
-							SHA: edge.Node.Refs.Nodes[0].Target.Target.OID,
-							URL: edge.Node.Refs.Nodes[0].Target.CommitURL,
-						},
-					}
-				}
-				hasNext = ql.Data.Search.PageInfo.HasNext
-				cursor = ql.Data.Search.PageInfo.EndCursor
+			tags, err = download.AppleOssGraphQLTags(proxy, insecure, apiToken)
+			if err != nil {
+				return fmt.Errorf("failed to get tags from `ipsw` apple_meta: %w", err)
 			}
 
 			if asJSON {

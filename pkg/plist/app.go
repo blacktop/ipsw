@@ -116,5 +116,5 @@ func GetBinaryInApp(path string) (string, error) {
 			return "", fmt.Errorf("failed to find CFBundleExecutable in %s", infoPath)
 		}
 	}
-	return "", fmt.Errorf("%s is not a .app/<binary> or a .app/Contents/MacOS/<binary>", path)
+	return path, fmt.Errorf("%s is not a <binary>, .app/<binary> or a .app/Contents/MacOS/<binary>", path)
 }
