@@ -22,9 +22,11 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -136,14 +138,38 @@ var gitCmd = &cobra.Command{
 				log.WithFields(log.Fields{
 					"file": destName,
 				}).Info("Downloading")
-				// download file
-				downloader := download.NewDownload(proxy, insecure, false, false, false, false, false)
-				downloader.URL = tag.TarURL
-				downloader.DestName = destName
 
-				err = downloader.Do()
+				req, err := http.NewRequest("GET", tag.TarURL, nil)
 				if err != nil {
-					return fmt.Errorf("failed to download file: %v", err)
+					return fmt.Errorf("cannot create http request: %v", err)
+				}
+
+				client := &http.Client{
+					Transport: &http.Transport{
+						Proxy:           download.GetProxy(proxy),
+						TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+					},
+				}
+
+				resp, err := client.Do(req)
+				if err != nil {
+					return fmt.Errorf("client failed to perform request: %v", err)
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode != 200 {
+					return fmt.Errorf("failed to connect to URL: %s", resp.Status)
+				}
+
+				document, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					return fmt.Errorf("failed to read remote tarfile data: %v", err)
+				}
+
+				resp.Body.Close()
+
+				if err := ioutil.WriteFile(destName, document, 0755); err != nil {
+					return fmt.Errorf("failed to write file %s: %v", destName, err)
 				}
 			} else {
 				log.Warnf("file already exists: %s", destName)
