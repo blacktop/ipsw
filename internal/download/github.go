@@ -502,8 +502,8 @@ func AppleOssGraphQLTags(proxy string, insecure bool, apikey string) (map[string
 			for _, ref := range repo.Ref.Nodes {
 				tags[repo.Name] = GithubTag{
 					Name:   repo.Name,
-					TarURL: fmt.Sprintf("https://codeload.github.com/apple-oss-distributions/%s/tar.gz/refs/tags/%s", repo.Name, ref.Name),
-					ZipURL: fmt.Sprintf("https://codeload.github.com/apple-oss-distributions/%s/zip/refs/tags/%s", repo.Name, ref.Name),
+					TarURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.tar.gz", repo.Name, ref.Name),
+					ZipURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.zip", repo.Name, ref.Name),
 					Commit: GithubCommit{
 						SHA:  ref.Target.Tag.Target.Commit.OID,
 						URL:  ref.Target.Tag.CommitURL,
