@@ -1,7 +1,7 @@
 package download
 
 import (
-	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -11,61 +11,51 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/shurcooL/githubv4"
+	"golang.org/x/oauth2"
 )
 
 const (
 	preprocTagsURL = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/tag_links.json"
 	githubApiURL   = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
 	graphqlQuery   = `query ($endCursor: String) {
-					rateLimit {
-						cost
-						remaining
-						resetAt
-					}
-					search(
-						query: "org:apple-oss-distributions, archived:false"
-						type: REPOSITORY
-						first: 100
-						after: $endCursor
-					) {
-						repositoryCount
-						pageInfo {
-							endCursor
-							hasNextPage
-						}
-						edges {
-							node {
-								... on Repository {
+						organization(login: "apple-oss-distributions") {
+							repositories(first: 100, after: $endCursor) {
+								nodes {
 									name
-									refs(
-										first: 1
-										refPrefix: "refs/tags/"
-										orderBy: { field: TAG_COMMIT_DATE, direction: DESC }
-									) {
+									refs(refPrefix: "refs/tags/", last: 1) {
 										nodes {
 											name
 											target {
 												__typename
 												... on Tag {
-													oid
-													name
 													commitUrl
 													target {
-														oid
+														... on Commit {
+															zipballUrl
+															tarballUrl
+															author {
+																name
+																date
+															}
+														}
 													}
-												}
-												... on Commit {
-													commit_message: message
 												}
 											}
 										}
 									}
 								}
+								pageInfo {
+									hasNextPage
+									endCursor
+								}
 							}
 						}
-					}
-				}`
+					}`
 )
+
+type GithubRepos []githubRepo
 
 type githubRepo struct {
 	ID          int       `json:"id,omitempty"`
@@ -93,8 +83,6 @@ type pageInfo struct {
 	After         string
 }
 
-type GithubRepos []githubRepo
-
 type GithubReleaseAsset struct {
 	ID            int       `json:"id,omitempty"`
 	Name          string    `json:"name,omitempty"`
@@ -110,6 +98,8 @@ func (a GithubReleaseAsset) String() string {
 	return a.Name
 }
 
+type GithubReleases []githubRelease
+
 type githubRelease struct {
 	ID          int                  `json:"id,omitempty"`
 	URL         string               `json:"url,omitempty"`
@@ -122,12 +112,7 @@ type githubRelease struct {
 	Body        string               `json:"body,omitempty"`
 }
 
-type GithubReleases []githubRelease
-
-type GithubCommit struct {
-	SHA string `json:"sha,omitempty"`
-	URL string `json:"url,omitempty"`
-}
+type GithubTags []GithubTag
 
 type GithubTag struct {
 	Name   string       `json:"name,omitempty"`
@@ -136,53 +121,10 @@ type GithubTag struct {
 	Commit GithubCommit `json:"commit,omitempty"`
 }
 
-type GithubTags []GithubTag
-
-type githubTar struct {
-	Name   string `json:"name,omitempty"`
-	Tag    string `json:"tag,omitempty"`
-	TarURL string `json:"tar_url,omitempty"`
-	ZipURL string `json:"zip_url,omitempty"`
-}
-
-type graphqlRateLimit struct {
-	Cost      int       `json:"cost,omitempty"`
-	Remaining int       `json:"remaining,omitempty"`
-	ResetAt   time.Time `json:"resetAt,omitempty"`
-}
-type graphqlNode struct {
-	Name   string `json:"name,omitempty"`
-	Target struct {
-		Type      string `json:"__typename,omitempty"`
-		OID       string `json:"oid,omitempty"`
-		Name      string `json:"name,omitempty"`
-		CommitURL string `json:"commitUrl,omitempty"`
-		Target    struct {
-			OID string `json:"oid,omitempty"`
-		} `json:"target,omitempty"`
-	} `json:"target,omitempty"`
-}
-type graphqlEdge struct {
-	Node struct {
-		Name string `json:"name,omitempty"`
-		Refs struct {
-			Nodes []graphqlNode `json:"nodes,omitempty"`
-		} `json:"refs,omitempty"`
-	} `json:"node,omitempty"`
-}
-type graphqlSearch struct {
-	RepositoryCount int `json:"repositoryCount,omitempty"`
-	PageInfo        struct {
-		EndCursor string `json:"endCursor,omitempty"`
-		HasNext   bool   `json:"hasNextPage,omitempty"`
-	} `json:"pageInfo,omitempty"`
-	Edges []graphqlEdge `json:"edges,omitempty"`
-}
-type GithubGraphQLData struct {
-	Data struct {
-		RateLimit graphqlRateLimit `json:"rateLimit,omitempty"`
-		Search    graphqlSearch    `json:"search,omitempty"`
-	} `json:"data,omitempty"`
+type GithubCommit struct {
+	SHA  string    `json:"sha,omitempty"`
+	URL  string    `json:"url,omitempty"`
+	Date time.Time `json:"date,omitempty"`
 }
 
 func queryAppleGithubRepo(prod, proxy string, insecure bool, api string) (*githubRepo, error) {
@@ -498,67 +440,83 @@ func GetPreprocessedAppleOssTags(proxy string, insecure bool) (map[string]Github
 	return tags, nil
 }
 
-type graphQLRequest struct {
-	Query     string `json:"query,omitempty"`
-	Variables struct {
-		EndCursor string `json:"endCursor,omitempty"`
-	} `json:"variables,omitempty"`
+type Commit struct {
+	OID        string `json:"oid"`
+	ZipballUrl string `json:"zipballUrl"`
+	TarballUrl string `json:"tarballUrl"`
+	Author     struct {
+		Name string    `json:"name,omitempty"`
+		Date time.Time `json:"date,omitempty"`
+	} `json:"author"`
+}
+
+type Repo struct {
+	Name string
+	Ref  struct {
+		Nodes []struct {
+			Name   string
+			Target struct {
+				Tag struct {
+					CommitURL string `json:"commitUrl"`
+					Target    struct {
+						Commit `graphql:"... on Commit"`
+					}
+				} `graphql:"... on Tag"`
+			}
+		}
+	} `graphql:"refs(refPrefix: \"refs/tags/\", last: 1)"`
 }
 
 // AppleOssGraphQLTags returns a list of apple-oss-distributions tags from the Github GraphQL API
-func AppleOssGraphQLTags(proxy string, insecure bool, api, cursor string) (*GithubGraphQLData, error) {
-	var data GithubGraphQLData
+func AppleOssGraphQLTags(proxy string, insecure bool, apikey string) (map[string]GithubTag, error) {
+	tags := make(map[string]GithubTag)
 
-	qlRequest := graphQLRequest{
-		Query: graphqlQuery,
+	httpClient := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: apikey},
+	))
+
+	client := githubv4.NewClient(httpClient)
+
+	var q struct {
+		Organization struct {
+			Repositories struct {
+				Nodes    []Repo
+				PageInfo struct {
+					EndCursor   githubv4.String
+					HasNextPage bool
+				}
+			} `graphql:"repositories(first: 100, after: $endCursor)"`
+		} `graphql:"organization(login: \"apple-oss-distributions\")"`
 	}
 
-	if len(cursor) > 0 {
-		qlRequest.Variables.EndCursor = cursor
-
-	}
-	jsonValue, err := json.Marshal(qlRequest)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal graphQL query json data: %v", err)
+	variables := map[string]interface{}{
+		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
 	}
 
-	req, err := http.NewRequest("POST", "https://api.github.com/graphql", bytes.NewBuffer(jsonValue))
-	if err != nil {
-		return nil, fmt.Errorf("cannot create http request: %v", err)
-	}
-	req.Header.Set("Accept", "application/json")
-	if len(api) > 0 {
-		req.Header.Add("Authorization", "Bearer "+api)
-	}
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		},
-		Timeout: time.Second * 10,
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("client failed to perform request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
+	for {
+		err := client.Query(context.Background(), &q, variables)
+		if err != nil {
+			return nil, err
+		}
+		for _, repo := range q.Organization.Repositories.Nodes {
+			for _, ref := range repo.Ref.Nodes {
+				tags[repo.Name] = GithubTag{
+					Name:   repo.Name,
+					TarURL: ref.Target.Tag.Target.Commit.TarballUrl,
+					ZipURL: ref.Target.Tag.Target.Commit.ZipballUrl,
+					Commit: GithubCommit{
+						SHA:  ref.Target.Tag.Target.Commit.OID,
+						URL:  ref.Target.Tag.CommitURL,
+						Date: ref.Target.Tag.Target.Commit.Author.Date,
+					},
+				}
+			}
+		}
+		if !q.Organization.Repositories.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.NewString(q.Organization.Repositories.PageInfo.EndCursor)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
-	}
-
-	ioutil.WriteFile("/tmp/graphql.json", document, 0644)
-
-	if err := json.Unmarshal(document, &data); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal the github api JSON: %v", err)
-	}
-
-	return &data, nil
+	return tags, nil
 }
