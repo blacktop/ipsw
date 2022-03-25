@@ -122,6 +122,10 @@ func (d *Download) getHEAD() error {
 	}
 	defer resp.Body.Close()
 
+	if resp.ContentLength < 0 {
+		return fmt.Errorf("content length is not set")
+	}
+
 	d.size = resp.ContentLength
 
 	if resp.Header.Get("Accept-Ranges") == "bytes" {
