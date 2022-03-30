@@ -67,7 +67,7 @@ func init() {
 var ipswCmd = &cobra.Command{
 	Use:           "ipsw",
 	Short:         "Download and parse IPSW(s) from the internets",
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -129,6 +129,18 @@ var ipswCmd = &cobra.Command{
 		var destPath string
 		if len(output) > 0 {
 			destPath = filepath.Clean(output)
+		}
+
+		if len(device) > 0 {
+			db, err := info.GetIpswDB()
+			if err != nil {
+				return fmt.Errorf("failed to get ipsw device DB: %v", err)
+			}
+			if dev, err := db.LookupDevice(device); err == nil {
+				if dev.SDKPlatform == "macosx" {
+					macos = true
+				}
+			}
 		}
 
 		if macos {

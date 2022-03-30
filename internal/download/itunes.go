@@ -143,6 +143,10 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 
 	}
 
+	if len(versionsRaw) == 0 {
+		return nil, fmt.Errorf("no versions found for device %s", device)
+	}
+
 	versions := make([]*version.Version, len(versionsRaw))
 
 	for i, raw := range versionsRaw {
@@ -155,7 +159,9 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 	}
 
 	sort.Sort(version.Collection(versions))
+
 	newestVersion := versions[len(versions)-1]
+
 	utils.Indent(log.Info, 1)(fmt.Sprintf("Latest release found is: %s", newestVersion.Original()))
 
 	// // check canijailbreak.com
