@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/blacktop/ipsw/internal/download"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -145,12 +144,16 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 			}
 		} else {
 			if len(doDownload) > 0 {
-				if utils.StrSliceHas(doDownload, i.Identifier) {
-					filteredIPSWs = append(filteredIPSWs, i)
+				for _, doDown := range doDownload {
+					if strings.HasPrefix(strings.ToLower(i.Identifier), strings.ToLower(doDown)) {
+						filteredIPSWs = append(filteredIPSWs, i)
+					}
 				}
 			} else if len(doNotDownload) > 0 {
-				if !utils.StrSliceHas(doNotDownload, i.Identifier) {
-					filteredIPSWs = append(filteredIPSWs, i)
+				for _, dontDown := range doNotDownload {
+					if !strings.HasPrefix(strings.ToLower(i.Identifier), strings.ToLower(dontDown)) {
+						filteredIPSWs = append(filteredIPSWs, i)
+					}
 				}
 			} else {
 				filteredIPSWs = append(filteredIPSWs, i)
