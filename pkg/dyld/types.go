@@ -16,9 +16,9 @@ const (
 	IPhoneCacheFolder    = "System/Library/Caches/com.apple.dyld/"
 	DriverKitCacheFolder = "System/DriverKit/System/Library/dyld/"
 
-	MacOSCacheRegex     = `^System\/Library\/dyld\/dyld_shared_cache_`
-	IPhoneCacheRegex    = `^System\/Library\/Caches\/com\.apple\.dyld\/dyld_shared_cache_`
-	DriverKitCacheRegex = `^System\/DriverKit\/System\/Library\/dyld\/dyld_shared_cache_`
+	MacOSCacheRegex     = `System/Library/dyld/dyld_shared_cache_`
+	IPhoneCacheRegex    = `System/Library/Caches/com\.apple\.dyld/dyld_shared_cache_`
+	DriverKitCacheRegex = `System/DriverKit/System/Library/dyld/dyld_shared_cache_`
 	CacheRegexEnding    = `(\..*)?$`
 )
 
