@@ -104,10 +104,7 @@ var extractCmd = &cobra.Command{
 			}
 		}
 
-		var destPath string
-		if len(args) > 1 {
-			destPath = filepath.Clean(output)
-		}
+		destPath := filepath.Clean(output)
 
 		if remote {
 			proxy, _ := cmd.Flags().GetString("proxy")

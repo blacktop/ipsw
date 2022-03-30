@@ -92,18 +92,20 @@ func Extract(ipsw, destPath string, arches []string) error {
 
 		if config.IsMacOS {
 			if len(arches) == 0 {
+				selMatches := []string{}
 				prompt := &survey.MultiSelect{
 					Message:  "Which files would you like to extract:",
-					Options:  utils.TrimPrefixStrSlice(matches, config.Prefix),
+					Options:  matches,
 					PageSize: 15,
 				}
-				if err := survey.AskOne(prompt, &matches); err != nil {
+				if err := survey.AskOne(prompt, &selMatches); err != nil {
 					if err == terminal.InterruptErr {
 						log.Warn("Exiting...")
 						return nil
 					}
 					return err
 				}
+				matches = selMatches
 			} else {
 				var filtered []string
 				r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", config.CacheRegex, strings.Join(arches, "|"), CacheRegexEnding))
