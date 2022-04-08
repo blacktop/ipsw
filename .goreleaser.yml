@@ -76,14 +76,6 @@ brews:
       man1.install "manpages/ipsw.1.gz"
     test: |
       system "#{bin}/ipsw --version"
-rigs:
-  - name: ipsw
-    rig:
-      owner: blacktop
-      name: fish-food
-    homepage: https://github.com/blacktop/ipsw
-    description: iOS/macOS Research Swiss Army Knife
-    license: MIT
 checksum:
   name_template: "checksums.darwin.txt"
 signs:

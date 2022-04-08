@@ -34,6 +34,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -439,8 +440,7 @@ var dyldMachoCmd = &cobra.Command{
 					fmt.Printf("\nCStrings\n")
 					fmt.Println("--------")
 					for _, sec := range m.Sections {
-
-						if sec.Flags.IsCstringLiterals() || strings.Contains(sec.Name, "cstring") {
+						if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
 							dat, err := sec.Data()
 							if err != nil {
 								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
@@ -461,8 +461,13 @@ var dyldMachoCmd = &cobra.Command{
 									return fmt.Errorf("failed to read string: %v", err)
 								}
 
+								s = strings.Trim(s, "\x00")
+
 								if len(s) > 0 {
-									fmt.Printf("%#x: %#v\n", pos, strings.Trim(s, "\x00"))
+									if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) {
+										continue // skip non-ascii strings when dumping __TEXT.__const
+									}
+									fmt.Printf("%#x: %#v\n", pos, s)
 								}
 							}
 						}

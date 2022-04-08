@@ -7,6 +7,7 @@ summary: Parse kernelcache.
 ---
 
 - [**kernel --help**](#kernel---help)
+- [**kernel version**](#kernel-version)
 - [**kernel extract**](#kernel-extract)
 - [**kernel dec**](#kernel-dec)
 - [**kernel kexts**](#kernel-kexts)
@@ -45,6 +46,40 @@ Global Flags:
   -V, --verbose         verbose output
 
 Use "ipsw kernel [command] --help" for more information about a command.
+```
+
+### **kernel version**
+
+Dump kernelcache version
+
+```bash
+❯ ipsw kernel version kernelcache.release.iPhone14,2
+0xfffffff00703e0ca: "Darwin Kernel Version 21.5.0: Mon Mar 28 22:30:10 PDT 2022; root:xnu-8020.120.43.112.1~1/RELEASE_ARM64_T8110"
+0xfffffff00703e169: "Apple LLVM 13.1.6 (clang-1316.0.21.3) [+internal-os, ptrauth-isa=deployment-target-based]"
+```
+
+Dump as JSON
+
+```
+❯ ipsw kernel version kernelcache.release.iPhone14,2 --json | jq .
+```
+
+```json
+{
+  "kernel": {
+    "darwin": "21.5.0",
+    "date": "2022-03-28T22:30:10Z",
+    "xnu": "8020.120.43.112.1~1",
+    "type": "RELEASE",
+    "arch": "ARM64",
+    "cpu": "T8110"
+  },
+  "llvm": {
+    "version": "13.1.6",
+    "clang": "1316.0.21.3",
+    "flags": ["+internal-os", "ptrauth-isa=deployment-target-based"]
+  }
+}
 ```
 
 ### **kernel extract**
