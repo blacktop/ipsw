@@ -197,6 +197,7 @@
 <div class="content ">
   <ul>
 <li><a href="#kernel---help"><strong>kernel &ndash;help</strong></a></li>
+<li><a href="#kernel-version"><strong>kernel version</strong></a></li>
 <li><a href="#kernel-extract"><strong>kernel extract</strong></a></li>
 <li><a href="#kernel-dec"><strong>kernel dec</strong></a></li>
 <li><a href="#kernel-kexts"><strong>kernel kexts</strong></a></li>
@@ -231,6 +232,28 @@
 </span></span><span class="line"><span class="cl">  -V, --verbose         verbose output
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl">Use <span class="s2">&#34;ipsw kernel [command] --help&#34;</span> <span class="k">for</span> more information about a command.
+</span></span></code></pre></div><h3 id="kernel-version"><strong>kernel version</strong></h3>
+<p>Dump kernelcache version</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw kernel version kernelcache.release.iPhone14,2
+</span></span><span class="line"><span class="cl">0xfffffff00703e0ca: <span class="s2">&#34;Darwin Kernel Version 21.5.0: Mon Mar 28 22:30:10 PDT 2022; root:xnu-8020.120.43.112.1~1/RELEASE_ARM64_T8110&#34;</span>
+</span></span><span class="line"><span class="cl">0xfffffff00703e169: <span class="s2">&#34;Apple LLVM 13.1.6 (clang-1316.0.21.3) [+internal-os, ptrauth-isa=deployment-target-based]&#34;</span>
+</span></span></code></pre></div><p>Dump as JSON</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-fallback" data-lang="fallback"><span class="line"><span class="cl">❯ ipsw kernel version kernelcache.release.iPhone14,2 --json | jq .
+</span></span></code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;kernel&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;darwin&#34;</span><span class="p">:</span> <span class="s2">&#34;21.5.0&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;date&#34;</span><span class="p">:</span> <span class="s2">&#34;2022-03-28T22:30:10Z&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;xnu&#34;</span><span class="p">:</span> <span class="s2">&#34;8020.120.43.112.1~1&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;RELEASE&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;arch&#34;</span><span class="p">:</span> <span class="s2">&#34;ARM64&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;cpu&#34;</span><span class="p">:</span> <span class="s2">&#34;T8110&#34;</span>
+</span></span><span class="line"><span class="cl">  <span class="p">},</span>
+</span></span><span class="line"><span class="cl">  <span class="nt">&#34;llvm&#34;</span><span class="p">:</span> <span class="p">{</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;version&#34;</span><span class="p">:</span> <span class="s2">&#34;13.1.6&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;clang&#34;</span><span class="p">:</span> <span class="s2">&#34;1316.0.21.3&#34;</span><span class="p">,</span>
+</span></span><span class="line"><span class="cl">    <span class="nt">&#34;flags&#34;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&#34;+internal-os&#34;</span><span class="p">,</span> <span class="s2">&#34;ptrauth-isa=deployment-target-based&#34;</span><span class="p">]</span>
+</span></span><span class="line"><span class="cl">  <span class="p">}</span>
+</span></span><span class="line"><span class="cl"><span class="p">}</span>
 </span></span></code></pre></div><h3 id="kernel-extract"><strong>kernel extract</strong></h3>
 <p>Extract and decompress a kernelcache from IPSW</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw kernel extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
