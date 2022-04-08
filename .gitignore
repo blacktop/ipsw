@@ -46,6 +46,8 @@ unicorn2/
 
 # Docs
 public
+site/
+www/docs/static/releases*.json
 
 *.unstripped
 *.bndb

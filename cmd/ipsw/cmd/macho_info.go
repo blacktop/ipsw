@@ -649,13 +649,13 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			for _, sec := range m.Sections {
-				if sec.Flags.IsCstringLiterals() {
+				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
 					dat, err := sec.Data()
 					if err != nil {
 						return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 					}
 
-					csr := bytes.NewBuffer(dat[:])
+					csr := bytes.NewBuffer(dat)
 
 					for {
 						pos := sec.Addr + uint64(csr.Cap()-csr.Len())
@@ -670,8 +670,13 @@ var machoInfoCmd = &cobra.Command{
 							return fmt.Errorf("failed to read string: %v", err)
 						}
 
+						s = strings.Trim(s, "\x00")
+
 						if len(s) > 0 {
-							fmt.Printf("%#x: %#v\n", pos, strings.Trim(s, "\x00"))
+							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) {
+								continue // skip non-ascii strings when dumping __TEXT.__const
+							}
+							fmt.Printf("%#x: %#v\n", pos, s)
 						}
 					}
 				}
