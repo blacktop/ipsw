@@ -119,6 +119,7 @@ var kernelVersionCmd = &cobra.Command{
 								foundKV = true
 								matches := reKV.FindStringSubmatch(s)
 								kv.Kernel.Darwin = matches[reKV.SubexpIndex("darwin")]
+								// TODO: confirm that day is not in form 02 for day
 								kv.Kernel.Date, err = time.Parse("Mon Jan 2 15:04:05 MST 2006", matches[reKV.SubexpIndex("date")])
 								if err != nil {
 									return fmt.Errorf("failed to parse date %s: %v", matches[reKV.SubexpIndex("date")], err)
