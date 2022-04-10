@@ -40,6 +40,7 @@ RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git 
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+ENV IPSW_IN_DOCKER=1
 
 COPY --from=builder /bin/ipsw /bin/ipsw
 
