@@ -380,7 +380,8 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 				req.ProductType = prod
 				model, err := o.lookupHWModel(prod)
 				if err != nil {
-					return nil, err
+					log.Debug(err.Error())
+					continue
 				}
 				req.HWModelStr = model
 				reqNEW := req
