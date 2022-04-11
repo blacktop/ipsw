@@ -318,7 +318,7 @@ jobs:
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --platform windows_x86_64 -V --api ${{ secrets.GITHUB_TOKEN }}
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --detect --api ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: Releases
           path: build/dist/
