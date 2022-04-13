@@ -47,10 +47,10 @@ func init() {
 
 	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
-	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
+	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
+	otaDLCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	otaDLCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
-	otaDLCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
 	otaDLCmd.Flags().String("info-type", "", "OS type to show OTAs for")
