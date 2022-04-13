@@ -25,6 +25,7 @@ require (
 	github.com/muesli/roff v0.1.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
+	github.com/sergi/go-diff v1.2.0
 	github.com/shurcooL/githubv4 v0.0.0-20220115235240-a14260e6f8a2
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/viper v1.10.1
