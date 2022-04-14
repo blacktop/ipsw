@@ -22,12 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"fmt"
-	"os"
+	"path/filepath"
 
-	mcobra "github.com/muesli/mango-cobra"
-	"github.com/muesli/roff"
 	"github.com/spf13/cobra"
+	"github.com/spf13/cobra/doc"
 )
 
 // manCmd represents the man command
@@ -37,15 +35,15 @@ var manCmd = &cobra.Command{
 	SilenceUsage:          true,
 	DisableFlagsInUseLine: true,
 	Hidden:                true,
-	Args:                  cobra.NoArgs,
+	Args:                  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		manPage, err := mcobra.NewManPage(1, rootCmd.Root())
-		if err != nil {
-			return err
-		}
 
-		_, err = fmt.Fprint(os.Stdout, manPage.Build(roff.NewDocument()))
-		return err
+		// header := &doc.GenManHeader{
+		// 	Title:   "ipsw",
+		// 	Section: "1",
+		// }
+
+		return doc.GenManTree(cmd.Root(), nil, filepath.Clean(args[0]))
 	},
 }
 

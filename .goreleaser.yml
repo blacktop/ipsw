@@ -73,7 +73,7 @@ brews:
       bash_completion.install "completions/_bash" => "ipsw"
       zsh_completion.install "completions/_zsh" => "_ipsw"
       fish_completion.install "completions/_fish" => "ipsw.fish"
-      man1.install "manpages/ipsw.1.gz"
+      man1.install Dir["manpages/*"]
     test: |
       system "#{bin}/ipsw --version"
 checksum:
@@ -101,7 +101,7 @@ changelog:
       - "^bumping"
       - "^Update"
       - "^Delete"
-      - "^Working"      
+      - "^Working"
       - "reorg"
       - "updates"
       - Merge pull request

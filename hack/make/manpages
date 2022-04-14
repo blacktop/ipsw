@@ -2,4 +2,5 @@
 set -e
 rm -rf manpages
 mkdir manpages
-go run ./cmd/ipsw/main.go man | gzip -c >manpages/ipsw.1.gz
+go run ./cmd/ipsw/main.go man manpages
+gzip -r manpages
