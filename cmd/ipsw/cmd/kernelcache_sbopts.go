@@ -30,6 +30,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
@@ -71,6 +72,9 @@ var kernelSandboxCmd = &cobra.Command{
 		}
 
 		if diff {
+			in := color.New(color.FgGreen).Add(color.Bold)
+			dl := color.New(color.FgRed).Add(color.Bold)
+
 			if len(args) < 2 {
 				return fmt.Errorf("please provide two kernelcache files to diff")
 			}
@@ -92,27 +96,34 @@ var kernelSandboxCmd = &cobra.Command{
 				return err
 			}
 
-			sb1OUT := fmt.Sprintf("Sandbox Operations (%d)\n", len(sbOpts))
-			sb1OUT += fmt.Sprintln(strings.Repeat("=", len(sb1OUT)))
-			for _, opt := range sbOpts {
-				sb1OUT += fmt.Sprintln(opt)
-			}
-
-			sb2OUT := fmt.Sprintf("Sandbox Operations (%d)\n", len(sbOpts2))
-			sb2OUT += fmt.Sprintln(strings.Repeat("=", len(sb2OUT)))
-			for _, opt := range sbOpts2 {
-				sb2OUT += fmt.Sprintln(opt)
-			}
+			sb1OUT := strings.Join(sbOpts, "\n")
+			sb2OUT := strings.Join(sbOpts2, "\n")
 
 			dmp := diffmatchpatch.New()
 
 			diffs := dmp.DiffMain(sb1OUT, sb2OUT, true)
+			if len(diffs) > 2 {
+				diffs = dmp.DiffCleanupSemantic(diffs)
+				diffs = dmp.DiffCleanupEfficiency(diffs)
+			}
+
 			if len(diffs) == 1 {
 				if diffs[0].Type == diffmatchpatch.DiffEqual {
 					log.Info("No differences found")
 				}
 			} else {
-				fmt.Println(dmp.DiffPrettyText(diffs))
+				log.Info("Differences found")
+				if Verbose {
+					fmt.Println(dmp.DiffPrettyText(diffs))
+				} else {
+					for _, d := range diffs {
+						if d.Type == diffmatchpatch.DiffInsert {
+							in.Println(d.Text)
+						} else if d.Type == diffmatchpatch.DiffDelete {
+							dl.Println(d.Text)
+						}
+					}
+				}
 			}
 		} else {
 			title := fmt.Sprintf("Sandbox Operations (%d)", len(sbOpts))
