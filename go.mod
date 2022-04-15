@@ -14,7 +14,7 @@ require (
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.13.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-	github.com/gen2brain/beeep v0.0.0-20210529141713-5586760f0cc1
+	github.com/gen2brain/beeep v0.0.0-20220402123239-6a3042f4b71a
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/hashicorp/go-version v1.4.0
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02 // indirect
@@ -35,7 +35,8 @@ require (
 	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
 )
 
-// replace github.com/blacktop/go-macho => ../go-macho
+replace github.com/blacktop/go-macho => ../go-macho
+
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 
 require (
@@ -52,8 +53,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/gopherjs/gopherjs v0.0.0-20220221023154-0b2280d3ff96 // indirect
-	github.com/gopherjs/gopherwasm v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
