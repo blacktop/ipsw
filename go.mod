@@ -35,8 +35,7 @@ require (
 	golang.org/x/sys v0.0.0-20220412211240-33da011f77ad
 )
 
-replace github.com/blacktop/go-macho => ../go-macho
-
+// replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 
 require (
