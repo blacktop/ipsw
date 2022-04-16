@@ -24,14 +24,17 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	kernelcacheCmd.AddCommand(kextsCmd)
+	kextsCmd.Flags().BoolP("diff", "d", false, "Diff two kernel's kexts")
 	kextsCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
@@ -46,13 +49,51 @@ var kextsCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		diff, _ := cmd.Flags().GetBool("diff")
+
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])
 		}
 
-		err := kernelcache.KextList(args[0])
-		if err != nil {
-			return err
+		if diff {
+			if len(args) < 2 {
+				return fmt.Errorf("please provide two kernelcache files to diff")
+			}
+
+			kout1, err := kernelcache.KextList(args[0], true)
+			if err != nil {
+				return err
+			}
+			kout2, err := kernelcache.KextList(args[1], true)
+			if err != nil {
+				return err
+			}
+
+			dmp := diffmatchpatch.New()
+
+			diffs := dmp.DiffMain(strings.Join(kout1, "\n"), strings.Join(kout2, "\n"), false)
+			if len(diffs) > 2 {
+				diffs = dmp.DiffCleanupSemantic(diffs)
+				diffs = dmp.DiffCleanupEfficiency(diffs)
+			}
+
+			if len(diffs) == 1 {
+				if diffs[0].Type == diffmatchpatch.DiffEqual {
+					log.Info("No differences found")
+				}
+			} else {
+				log.Info("Differences found")
+				fmt.Println(dmp.DiffPrettyText(diffs))
+			}
+		} else {
+			kout, err := kernelcache.KextList(args[0], false)
+			if err != nil {
+				return err
+			}
+			log.WithField("count", len(kout)).Info("Kexts")
+			for _, k := range kout {
+				fmt.Println(k)
+			}
 		}
 
 		return nil

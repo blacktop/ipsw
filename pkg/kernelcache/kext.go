@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/apex/log"
@@ -183,11 +184,12 @@ func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
 }
 
 // KextList lists all the kernel extensions in the kernelcache
-func KextList(kernel string) error {
+func KextList(kernel string, diffable bool) ([]string, error) {
+	var out []string
 
 	m, err := macho.Open(kernel)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer m.Close()
 
@@ -200,25 +202,32 @@ func KextList(kernel string) error {
 
 		data, err := infoSec.Data()
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("failed to read __PRELINK_INFO.__info section: %v", err)
 		}
 
 		var prelink PrelinkInfo
 		decoder := plist.NewDecoder(bytes.NewReader(bytes.Trim([]byte(data), "\x00")))
 		err = decoder.Decode(&prelink)
 		if err != nil {
-			return err
+			return nil, fmt.Errorf("failed to decode __PRELINK_INFO.__info section: %v", err)
 		}
 
-		fmt.Println("FOUND:", len(prelink.PrelinkInfoDictionary))
-		for _, bundle := range prelink.PrelinkInfoDictionary {
-			if !bundle.OSKernelResource && len(kextStartAdddrs) > 0 {
-				fmt.Printf("%#x: %s (%s)\n", kextStartAdddrs[bundle.ModuleIndex]|tagPtrMask, bundle.ID, bundle.Version)
-			} else {
-				fmt.Printf("%#x: %s (%s)\n", bundle.ExecutableLoadAddr, bundle.ID, bundle.Version)
+		if diffable {
+			for _, bundle := range prelink.PrelinkInfoDictionary {
+				out = append(out, fmt.Sprintf("%s (%s)", bundle.ID, bundle.Version))
+			}
+		} else {
+			for _, bundle := range prelink.PrelinkInfoDictionary {
+				if !bundle.OSKernelResource && len(kextStartAdddrs) > 0 {
+					out = append(out, fmt.Sprintf("%#x: %s (%s)", kextStartAdddrs[bundle.ModuleIndex]|tagPtrMask, bundle.ID, bundle.Version))
+				} else {
+					out = append(out, fmt.Sprintf("%#x: %s (%s)", bundle.ExecutableLoadAddr, bundle.ID, bundle.Version))
+				}
 			}
 		}
 	}
 
-	return nil
+	sort.Strings(out)
+
+	return out, nil
 }
