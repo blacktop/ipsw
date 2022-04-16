@@ -127,6 +127,18 @@ com.apple.driver.AppleIPAppender (1.0)
 <SNIP>
 ```
 
+Diff two kernelcache's KEXTs
+
+```bash
+❯ ipsw kernel kexts --diff 18A8395/kernelcache 18E5178a/kernelcache # iOS 14.1 vs. iOS 14.5beta4
+   • Differences found
+com.apple.AGXFirmwareKextG14PRTBuddy (1)
+com.apple.AGXFirmwareKextRTBuddy64 (187.3390.17.2)
+com.apple.AGXG14P (187.3390.17.2)
+com.apple.AUC (1.0)
+<SNIP>
+```
+
 ### **kernel sbopts**
 
 List kernel sandbox operations
