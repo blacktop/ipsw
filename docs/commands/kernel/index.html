@@ -284,6 +284,14 @@
 </span></span><span class="line"><span class="cl">com.apple.iokit.IOSkywalkFamily <span class="o">(</span>1<span class="o">)</span>
 </span></span><span class="line"><span class="cl">com.apple.driver.AppleIPAppender <span class="o">(</span>1.0<span class="o">)</span>
 </span></span><span class="line"><span class="cl">&lt;SNIP&gt;
+</span></span></code></pre></div><p>Diff two kernelcache&rsquo;s KEXTs</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw kernel kexts --diff 18A8395/kernelcache 18E5178a/kernelcache <span class="c1"># iOS 14.1 vs. iOS 14.5beta4</span>
+</span></span><span class="line"><span class="cl">   • Differences found
+</span></span><span class="line"><span class="cl">com.apple.AGXFirmwareKextG14PRTBuddy <span class="o">(</span>1<span class="o">)</span>
+</span></span><span class="line"><span class="cl">com.apple.AGXFirmwareKextRTBuddy64 <span class="o">(</span>187.3390.17.2<span class="o">)</span>
+</span></span><span class="line"><span class="cl">com.apple.AGXG14P <span class="o">(</span>187.3390.17.2<span class="o">)</span>
+</span></span><span class="line"><span class="cl">com.apple.AUC <span class="o">(</span>1.0<span class="o">)</span>
+</span></span><span class="line"><span class="cl">&lt;SNIP&gt;
 </span></span></code></pre></div><h3 id="kernel-sbopts"><strong>kernel sbopts</strong></h3>
 <p>List kernel sandbox operations</p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw kernel sbopts 18A8395/kernelcache <span class="c1"># iOS 14.1</span>
@@ -632,7 +640,7 @@
   
 
   
-  <script type="text/javascript" src="/ipsw/js/scripts.min.bafc052229b4b40bf03c477d31c5cdd9352ece8afbadf35ab97ed14495098fc9.js"></script>
+  <script type="text/javascript" src="/ipsw/js/scripts.min.55e8e1e2e7596c9a982bc04119cee1e2d4624c4c5a2dc0e9eb63ce401be14a24.js"></script>
   
 
   
