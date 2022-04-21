@@ -172,7 +172,7 @@ func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
 					return 0, fmt.Errorf("failed to read string: %v", err)
 				}
 
-				if len(s) > 0 && strings.EqualFold(strings.Trim(s, "\x00"), cstr) {
+				if len(s) > 0 && strings.Contains(strings.Trim(s, "\x00"), cstr) {
 					return pos, nil
 				}
 			}

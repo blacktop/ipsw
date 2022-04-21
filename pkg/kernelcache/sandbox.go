@@ -293,12 +293,12 @@ func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error
 
 func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	log.Info("Searching for sandbox profile data")
-	return getSandboxData(m, r, "\"failed to initialize platform sandbox\"")
+	return getSandboxData(m, r, "failed to initialize platform sandbox")
 }
 
 func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	log.Info("Searching for sandbox collection data")
-	return getSandboxData(m, r, "\"failed to initialize collection\"")
+	return getSandboxData(m, r, "failed to initialize collection")
 }
 
 func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
