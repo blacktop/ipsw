@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,10 +38,34 @@ func init() {
 
 	macosCmd.Flags().BoolP("list", "l", false, "Show latest macOS installers")
 	macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")
+	macosCmd.Flags().Bool("ignore", false, "Do NOT verify pkg digests")
+	macosCmd.Flags().BoolP("assistant", "a", false, "Only download the InstallAssistant.pkg")
+	macosCmd.Flags().Bool("latest", false, "Download latest macOS installer")
 	// macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote installer")
 	viper.BindPFlag("download.macos.list", macosCmd.Flags().Lookup("list"))
 	viper.BindPFlag("download.macos.work-dir", macosCmd.Flags().Lookup("work-dir"))
+	viper.BindPFlag("download.macos.ignore", macosCmd.Flags().Lookup("ignore"))
+	viper.BindPFlag("download.macos.assistant", macosCmd.Flags().Lookup("assistant"))
+	viper.BindPFlag("download.macos.latest", macosCmd.Flags().Lookup("latest"))
 	// viper.BindPFlag("download.macos.kernel", macosCmd.Flags().Lookup("kernel"))
+	survey.MultiSelectQuestionTemplate = `
+{{- define "option"}}
+    {{- if eq .SelectedIndex .CurrentIndex }}{{color .Config.Icons.SelectFocus.Format }}{{ .Config.Icons.SelectFocus.Text }}{{color "reset"}}{{else}} {{end}}
+    {{- if index .Checked .CurrentOpt.Index }}{{color .Config.Icons.MarkedOption.Format }} {{ .Config.Icons.MarkedOption.Text }} {{else}}{{color .Config.Icons.UnmarkedOption.Format }} {{ .Config.Icons.UnmarkedOption.Text }} {{end}}
+    {{- color "reset"}}
+    {{- " "}}{{- .CurrentOpt.Value}}
+{{end}}
+{{- if .ShowHelp }}{{- color .Config.Icons.Help.Format }}{{ .Config.Icons.Help.Text }} {{ .Help }}{{color "reset"}}{{"\n"}}{{end}}
+{{- color .Config.Icons.Question.Format }}{{ .Config.Icons.Question.Text }} {{color "reset"}}
+{{- color "default+hb"}}{{ .Message }}{{ .FilterMessage }}{{color "reset"}}
+{{- if .ShowAnswer}}{{color "cyan"}} ✅{{color "reset"}}{{"\n"}}
+{{- else }}
+	{{- "  "}}{{- color "cyan"}}[Use arrows to move, space to select, <right> to all, <left> to none, type to filter{{- if and .Help (not .ShowHelp)}}, {{ .Config.HelpInput }} for more help{{end}}]{{color "reset"}}
+  {{- "\n"}}
+  {{- range $ix, $option := .PageEntries}}
+    {{- template "option" $.IterateOption $ix $option}}
+  {{- end}}
+{{- end}}`
 }
 
 // macosCmd represents the macos command
@@ -62,7 +86,6 @@ var macosCmd = &cobra.Command{
 		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
 		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
 		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		// viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
 		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
 		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
 		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
@@ -85,11 +108,16 @@ var macosCmd = &cobra.Command{
 		// flags
 		showInstallers := viper.GetBool("download.macos.list")
 		workDir := viper.GetString("download.macos.work-dir")
+		ignoreSha1 := viper.GetBool("download.macos.ignore")
+		assistantOnly := viper.GetBool("download.macos.assistant")
+		latest := viper.GetBool("download.macos.latest")
 		// remoteKernel := viper.GetString("download.macos.kernel")
 
 		// verify args
 		if len(version) > 0 && len(build) > 0 {
 			return fmt.Errorf("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		} else if (len(version) > 0 || len(build) > 0) && latest {
+			return fmt.Errorf("you cannot supply a --latest AND (--version OR --build) (they are mutually exclusive)")
 		}
 
 		prods, err := download.GetProductInfo()
@@ -102,47 +130,53 @@ var macosCmd = &cobra.Command{
 			return nil
 		}
 
+		// filter installers
 		if len(version) > 0 {
 			prods = prods.FilterByVersion(version)
+		} else if len(build) > 0 {
+			prods = prods.FilterByBuild(build)
+		} else if latest {
+			prods = prods.GetLatest()
 		}
 
 		var prodList []string
 		for _, p := range prods {
-			prodList = append(prodList, fmt.Sprintf("%-35s%-8s - %-8s - %s", p.Title, p.Version, p.Build, p.PostDate.Format("01Jan06 15:04:05")))
+			prodList = append(prodList, fmt.Sprintf("%-35s%-8s %-8s %s", p.Title, p.Version, p.Build, p.PostDate.Format("02Jan2006 15:04:05")))
 		}
 
 		if len(prodList) == 0 {
 			return fmt.Errorf("no installers found for given options")
 		}
 
-		var prod download.ProductInfo
-		if len(prodList) > 1 && len(build) == 0 {
-			choice := 0
-			prompt := &survey.Select{
-				Message:  "Choose an installer:",
+		if len(prodList) > 1 && len(build) == 0 && !latest {
+			choices := []int{}
+			prompt := &survey.MultiSelect{
+				Message:  "Choose installer(s):",
 				Options:  prodList,
-				PageSize: 20,
+				PageSize: 25,
 			}
-			if err := survey.AskOne(prompt, &choice); err != nil {
+			if err := survey.AskOne(prompt, &choices); err != nil {
 				if err == terminal.InterruptErr {
 					log.Warn("Exiting...")
 					os.Exit(0)
 				}
 				log.Fatal(err.Error())
 			}
-			prod = prods[choice]
-		} else {
-			for _, p := range prods {
-				if version == p.Version || build == p.Build {
-					prod = p
-				}
+			var chosenProds []download.ProductInfo
+			for choice := range choices {
+				chosenProds = append(chosenProds, prods[choice])
 			}
+			prods = chosenProds
 		}
 
 		cont := true
 		if !confirm {
+			msg := fmt.Sprintf("You are about to download %d installer(s). Continue?", len(prods))
+			if assistantOnly {
+				msg = fmt.Sprintf("You are about to download %d InstallAssistant.pkg(s). Continue?", len(prods))
+			}
 			prompt := &survey.Confirm{
-				Message: fmt.Sprintf("You are about to download the %s installer files. Continue?", prod.Title),
+				Message: msg,
 			}
 			if err := survey.AskOne(prompt, &cont); err != nil {
 				if err == terminal.InterruptErr {
@@ -152,9 +186,12 @@ var macosCmd = &cobra.Command{
 				log.Fatal(err.Error())
 			}
 		}
+
 		if cont {
-			if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll, resumeAll, restartAll); err != nil {
-				return err
+			for _, prod := range prods {
+				if err := prod.DownloadInstaller(workDir, proxy, insecure, skipAll, resumeAll, restartAll, ignoreSha1, assistantOnly); err != nil {
+					return err
+				}
 			}
 		}
 

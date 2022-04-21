@@ -7,6 +7,7 @@ before:
     # you may remove this if you don't need go generate
     - go generate ./...
     - ./hack/make/completions
+    - ./hack/make/manpages
     - ./hack/make/json_mini
 builds:
   - main: ./cmd/ipsw
@@ -50,7 +51,10 @@ archives:
       - goos: windows
         format: zip
     files:
+      - README.md
+      - LICENSE
       - completions/*
+      - manpages/*
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 brews:
@@ -59,7 +63,8 @@ brews:
       name: homebrew-tap
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
-    description: "Download and parse ipsw(s)"
+    description: "iOS/macOS Research Swiss Army Knife"
+    license: MIT
     dependencies:
       - name: bat
         type: optional
@@ -68,20 +73,15 @@ brews:
       bash_completion.install "completions/_bash" => "ipsw"
       zsh_completion.install "completions/_zsh" => "_ipsw"
       fish_completion.install "completions/_fish" => "ipsw.fish"
+      man1.install Dir["manpages/*"]
     test: |
       system "#{bin}/ipsw --version"
-rigs:
-  - name: ipsw
-    rig:
-      owner: blacktop
-      name: fish-food
-    homepage: https://github.com/blacktop/ipsw
-    description: Download and parse IPSWs
-    license: MIT
 checksum:
   name_template: "checksums.darwin.txt"
 signs:
   - artifacts: checksum
+sboms:
+  - artifacts: archive
 changelog:
   sort: asc
   use: github
@@ -101,6 +101,7 @@ changelog:
       - "^bumping"
       - "^Update"
       - "^Delete"
+      - "^Working"
       - "reorg"
       - "updates"
       - Merge pull request
@@ -111,8 +112,10 @@ release:
     ### Summary
     **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .PreviousTag }}...{{ .Tag }}
     ## What to do next?
-    - Follow us on [Twitter](https://twitter.com/blacktop__)
     - Read the [documentation](https://blacktop.github.io/ipsw/docs/)
+    - Join our [Discord server](https://discord.gg/M5Wqf6JT)
+    - Follow us on [Twitter](https://twitter.com/blacktop__)
+
 announce:
   skip: "{{gt .Patch 0}}"
 

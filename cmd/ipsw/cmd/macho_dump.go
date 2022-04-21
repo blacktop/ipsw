@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -47,16 +47,18 @@ func init() {
 	machoDumpCmd.Flags().Uint64P("size", "s", 0, "Size of data in bytes")
 	machoDumpCmd.Flags().Uint64P("count", "c", 0, "The number of total items to display")
 	machoDumpCmd.Flags().BoolP("addr", "v", false, "Output as addresses/uint64s")
-	machoDumpCmd.Flags().BoolP("hex", "x", false, "Output as hexdump")
+	machoDumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
 	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
 	machoDumpCmd.Flags().Bool("color", false, "Force color (for piping to less etc)")
+
 	viper.BindPFlag("macho.dump.arch", machoDumpCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.dump.size", machoDumpCmd.Flags().Lookup("size"))
 	viper.BindPFlag("macho.dump.count", machoDumpCmd.Flags().Lookup("count"))
 	viper.BindPFlag("macho.dump.addr", machoDumpCmd.Flags().Lookup("addr"))
-	viper.BindPFlag("macho.dump.hex", machoDumpCmd.Flags().Lookup("hex"))
+	viper.BindPFlag("macho.dump.bytes", machoDumpCmd.Flags().Lookup("bytes"))
 	viper.BindPFlag("macho.dump.output", machoDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("macho.dump.color", machoDumpCmd.Flags().Lookup("color"))
+
 	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -79,40 +81,38 @@ var machoDumpCmd = &cobra.Command{
 		size := viper.GetUint64("macho.dump.size")
 		count := viper.GetUint64("macho.dump.count")
 		asAddrs := viper.GetBool("macho.dump.addr")
-		asHex := viper.GetBool("macho.dump.hex")
+		asBytes := viper.GetBool("macho.dump.bytes")
 		outFile := viper.GetString("macho.dump.output")
 		forceColor := viper.GetBool("macho.dump.color")
 
-		if forceColor {
-			color.NoColor = false
-		}
+		color.NoColor = !forceColor
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")
+		} else if asAddrs && asBytes {
+			return fmt.Errorf("you can only use --addr OR --bytes")
+		} else if asAddrs && size > 0 {
+			return fmt.Errorf("you can only use --addr with --count")
+		} else if asBytes && count > 0 {
+			return fmt.Errorf("you can only use --bytes with --size")
 		}
 
-		if asAddrs && asHex {
-			return fmt.Errorf("you can only use --addr OR --hex")
-		} else if !asAddrs && !asHex {
-			asHex = true
-			if size == 0 && count == 0 {
-				log.Info("Setting --size=256")
-				size = 256
-			}
-		} else if asAddrs && !asHex {
-			if size == 0 && count == 0 {
+		if asAddrs {
+			if count == 0 {
 				log.Info("Setting --count=20")
 				count = 20
+			}
+			size = count * uint64(binary.Size(uint64(0)))
+		} else {
+			if size == 0 {
+				log.Info("Setting --size=256")
+				size = 256
 			}
 		}
 
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
 			return err
-		}
-
-		if asAddrs && size == 0 {
-			size = count * uint64(binary.Size(uint64(0)))
 		}
 
 		machoPath := filepath.Clean(args[0])
@@ -167,23 +167,7 @@ var machoDumpCmd = &cobra.Command{
 				return err
 			}
 
-			if asHex {
-				if len(outFile) > 0 {
-					ioutil.WriteFile(outFile, dat, 0755)
-					log.Infof("Wrote data to file %s", outFile)
-				} else {
-					if s := m.FindSegmentForVMAddr(addr); s != nil {
-						if s.Nsect > 0 {
-							if c := m.FindSectionForVMAddr(addr); c != nil {
-								log.WithFields(log.Fields{"section": fmt.Sprintf("%s.%s", c.Seg, c.Name)}).Info("Address location")
-							}
-						} else {
-							log.WithFields(log.Fields{"segment": s.Name}).Info("Address location")
-						}
-					}
-					fmt.Println(utils.HexDump(dat, addr))
-				}
-			} else if asAddrs {
+			if asAddrs {
 				addrs := make([]uint64, count)
 				if err := binary.Read(bytes.NewReader(dat), m.ByteOrder, addrs); err != nil {
 					return err
@@ -201,6 +185,26 @@ var machoDumpCmd = &cobra.Command{
 					for _, a := range addrs {
 						fmt.Printf("%#x\n", a)
 					}
+				}
+			} else if asBytes {
+				if _, err := os.Stdout.Write(dat); err != nil {
+					return fmt.Errorf("failed to write bytes to stdout: %s", err)
+				}
+			} else {
+				if len(outFile) > 0 {
+					ioutil.WriteFile(outFile, dat, 0755)
+					log.Infof("Wrote data to file %s", outFile)
+				} else {
+					if s := m.FindSegmentForVMAddr(addr); s != nil {
+						if s.Nsect > 0 {
+							if c := m.FindSectionForVMAddr(addr); c != nil {
+								log.WithFields(log.Fields{"section": fmt.Sprintf("%s.%s", c.Seg, c.Name)}).Info("Address location")
+							}
+						} else {
+							log.WithFields(log.Fields{"segment": s.Name}).Info("Address location")
+						}
+					}
+					fmt.Println(utils.HexDump(dat, addr))
 				}
 			}
 		}

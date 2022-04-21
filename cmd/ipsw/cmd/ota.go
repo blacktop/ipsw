@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -41,8 +41,10 @@ func init() {
 	rootCmd.AddCommand(otaCmd)
 
 	otaCmd.Flags().BoolP("info", "i", false, "Display OTA Info")
+	otaCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
 	// otaCmd.Flags().BoolP("single", "s", false, "Stop after first match") TODO: impliment this
 	otaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
+	viper.BindPFlag("ota.info", otaCmd.Flags().Lookup("info"))
 	viper.BindPFlag("ota.output", otaCmd.Flags().Lookup("output"))
 	otaCmd.MarkZshCompPositionalArgumentFile(1, "*.zip")
 }
@@ -64,7 +66,8 @@ var otaCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", otaPath)
 		}
 
-		showInfo, _ := cmd.Flags().GetBool("info")
+		showInfo := viper.GetBool("ota.info")
+		// remote := viper.GetBool("ota.remote")
 		output := viper.GetString("ota.output")
 
 		if showInfo {

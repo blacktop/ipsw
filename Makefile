@@ -13,7 +13,7 @@ build-deps: ## Install the build dependencies
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
 	$(GO_BIN) install golang.org/x/tools/...@latest
-	$(GO_BIN) install github.com/spf13/cobra/cobra
+	$(GO_BIN) install github.com/spf13/cobra-cli@latest
 	$(GO_BIN) get -d golang.org/x/tools/cmd/cover
 	$(GO_BIN) get -d github.com/caarlos0/svu@v1.4.1
 
@@ -23,7 +23,7 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@goreleaser build --rm-dist --snapshot --single-target
+	@goreleaser build --rm-dist --snapshot --single-target --output dist/ipsw
 
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot
@@ -67,7 +67,7 @@ test-docs: ## Start local server hosting hugo docs
 .PHONY: update_mod
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
-	rm go.sum
+	rm go.sum || true
 	$(GO_BIN) mod download
 	$(GO_BIN) mod tidy
 

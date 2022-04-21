@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,17 +23,12 @@ package cmd
 
 import (
 	"archive/zip"
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -44,34 +39,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type releaseAsset struct {
-	ID            int       `json:"id,omitempty"`
-	Name          string    `json:"name,omitempty"`
-	URL           string    `json:"url,omitempty"`
-	DownloadURL   string    `json:"browser_download_url,omitempty"`
-	Size          int       `json:"size,omitempty"`
-	DownloadCount int       `json:"download_count,omitempty"`
-	CreatedAt     time.Time `json:"created_at,omitempty"`
-	UpdatedAt     time.Time `json:"updated_at,omitempty"`
-}
-
-func (a releaseAsset) String() string {
-	return a.Name
-}
-
-type githubRelease struct {
-	ID          int            `json:"id,omitempty"`
-	URL         string         `json:"url,omitempty"`
-	HtmlURL     string         `json:"html_url,omitempty"`
-	Tag         string         `json:"tag_name,omitempty"`
-	CreatedAt   time.Time      `json:"created_at,omitempty"`
-	PublishedAt time.Time      `json:"published_at,omitempty"`
-	Assets      []releaseAsset `json:"assets,omitempty"`
-	Body        string         `json:"body,omitempty"`
-}
-
-type GithubReleases []githubRelease
-
 func init() {
 	rootCmd.AddCommand(updateCmd)
 
@@ -80,47 +47,9 @@ func init() {
 	updateCmd.Flags().Bool("detect", false, "detect my platform")
 	updateCmd.Flags().Bool("replace", false, "overwrite current ipsw")
 	// updateCmd.Flags().BoolP("yes", "y", false, "do not prompt user")
+	updateCmd.Flags().StringP("api", "a", "", "Github API Token (incase you get rate limited)")
 
 	updateCmd.Flags().StringP("platform", "p", "", "ipsw platform binary to update")
-}
-
-func queryGithub(proxy string, insecure bool) (GithubReleases, error) {
-
-	var releases GithubReleases
-
-	req, err := http.NewRequest("GET", "https://api.github.com/repos/blacktop/ipsw/releases", nil)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create http request: %v", err)
-	}
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			Proxy:           download.GetProxy(proxy),
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
-		},
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("client failed to perform request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
-	}
-
-	document, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
-	}
-
-	if err := json.Unmarshal(document, &releases); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal the github api JSON: %v", err)
-	}
-
-	return releases, nil
 }
 
 // updateCmd represents the update command
@@ -140,6 +69,7 @@ var updateCmd = &cobra.Command{
 
 		platform, _ := cmd.Flags().GetString("platform")
 		detectPlatform, _ := cmd.Flags().GetBool("detect")
+		apiToken, _ := cmd.Flags().GetString("api")
 
 		if detectPlatform {
 			os := runtime.GOOS
@@ -170,7 +100,17 @@ var updateCmd = &cobra.Command{
 			destPath = filepath.Clean(args[0])
 		}
 
-		releases, err := queryGithub(proxy, insecure)
+		if len(apiToken) == 0 {
+			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
+				apiToken = val
+			} else {
+				if val, ok := os.LookupEnv("GITHUB_API_TOKEN"); ok {
+					apiToken = val
+				}
+			}
+		}
+
+		releases, err := download.GetGithubIPSWReleases(proxy, insecure, apiToken)
 		if err != nil {
 			return err
 		}
@@ -197,7 +137,7 @@ var updateCmd = &cobra.Command{
 			}
 		}
 
-		var asset releaseAsset
+		var asset download.GithubReleaseAsset
 		var assetFiles []string
 
 		for _, a := range latestRelease.Assets {
@@ -230,13 +170,13 @@ var updateCmd = &cobra.Command{
 			}
 		}
 
-		downloader := download.NewDownload(proxy, insecure, false, false, false, Verbose)
+		downloader := download.NewDownload(proxy, insecure, false, false, false, false, Verbose)
 		fname := strings.Replace(path.Base(asset.DownloadURL), ",", "_", -1)
 		fname = filepath.Join(destPath, fname)
 		if _, err := os.Stat(fname); os.IsNotExist(err) {
 			log.WithFields(log.Fields{
 				"version":        latestRelease.Tag,
-				"published_at":   latestRelease.PublishedAt.Format("01Jan06 15:04:05"),
+				"published_at":   latestRelease.PublishedAt.Format("02Jan2006 15:04:05"),
 				"size":           humanize.Bytes(uint64(asset.Size)),
 				"download_count": asset.DownloadCount,
 			}).Info("Getting Update")

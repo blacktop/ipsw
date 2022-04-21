@@ -18,14 +18,14 @@ jobs:
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       -
         name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
-          go-version: 1.17
+          go-version: 1.18
 
       - name: Set output
         id: vars
@@ -124,7 +124,7 @@ jobs:
       - name: Run Extract Remote Kernelcache (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download ipsw --kernel -v 14.6 -d iPhone12,1
+          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download ipsw --kernel --latest -d iPhone12,1
           dir
 
       #
@@ -142,7 +142,7 @@ jobs:
       - name: Run Extract Remote Kernelcache
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download ipsw --kernel -v 14.6 -d iPhone12,1
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V download ipsw --kernel --latest -d iPhone12,1
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho info */kernelcache*
 
       - name: Make cache folder
@@ -154,7 +154,7 @@ jobs:
       - name: Run Extract ALL Remote Kernelcaches
         if: matrix.platform == 'macos-11'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download ipsw --kernel -v 14.6 -d iPhone12,1
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download ipsw --kernel --latest -d iPhone12,1 --insecure
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw -V macho info */kernelcache*
       - name: Run download latest
         if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
@@ -170,7 +170,7 @@ jobs:
         if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download ota --device iPhone12,3 --beta --kernel
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download ota --platform ios --device iPhone12,3 --beta --kernel
       - name: Run download oss
         if: matrix.platform == 'macos-11' && steps.cache-ipsws.outputs.cache-hit != 'true'
         run: |
@@ -226,10 +226,10 @@ jobs:
         if: matrix.platform == 'macos-11'
         run: |
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
-      - name: Run dyld symaddr (ALL)
-        if: matrix.platform == 'macos-11'
-        run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
+      # - name: Run dyld symaddr (ALL)
+      #   if: matrix.platform == 'macos-11'
+      #   run: |
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
 
       - name: Run dyld macho
         if: matrix.platform == 'macos-11'
@@ -246,10 +246,10 @@ jobs:
       #   run: |
       #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --auth
 
-      # - name: Run dyld patches TODO: fix this
-      #   if: matrix.platform == 'macos-11'
-      #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+      - name: Run dyld patches
+        if: matrix.platform == 'macos-11'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
 
       - name: Run dyld imports
         if: matrix.platform == 'macos-11'
@@ -315,10 +315,10 @@ jobs:
         if: matrix.platform == 'macos-11'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --platform windows_x86_64 -V
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --detect
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --platform windows_x86_64 -V --api ${{ secrets.GITHUB_TOKEN }}
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw update --detect --api ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: Releases
           path: build/dist/

@@ -37,6 +37,7 @@ usr
 dist/
 test-caches/
 completions/
+manpages/
 *.txt
 *.prof
 *.download
@@ -45,6 +46,8 @@ unicorn2/
 
 # Docs
 public
+site/
+www/docs/static/releases*.json
 
 *.unstripped
 *.bndb

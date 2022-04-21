@@ -1,5 +1,5 @@
 /*
-Copyright © 2019 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,8 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/rsa"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"math"
@@ -36,6 +38,9 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/certs"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -58,7 +63,9 @@ func init() {
 	machoInfoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
 	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
-	machoInfoCmd.MarkZshCompPositionalArgumentFile(1)
+	machoInfoCmd.Flags().Bool("dump-cert", false, "Dump the certificate")
+	machoInfoCmd.Flags().String("output", "", "Directory to extract files to")
+
 	viper.BindPFlag("macho.info.arch", machoInfoCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.info.header", machoInfoCmd.Flags().Lookup("header"))
 	viper.BindPFlag("macho.info.loads", machoInfoCmd.Flags().Lookup("loads"))
@@ -72,6 +79,10 @@ func init() {
 	viper.BindPFlag("macho.info.fixups", machoInfoCmd.Flags().Lookup("fixups"))
 	viper.BindPFlag("macho.info.fileset-entry", machoInfoCmd.Flags().Lookup("fileset-entry"))
 	viper.BindPFlag("macho.info.extract-fileset-entry", machoInfoCmd.Flags().Lookup("extract-fileset-entry"))
+	viper.BindPFlag("macho.info.dump-cert", machoInfoCmd.Flags().Lookup("dump-cert"))
+	viper.BindPFlag("macho.info.output", machoInfoCmd.Flags().Lookup("output"))
+
+	machoInfoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // machoInfoCmd represents the macho command
@@ -103,6 +114,8 @@ var machoInfoCmd = &cobra.Command{
 		showFixups := viper.GetBool("macho.info.fixups")
 		filesetEntry := viper.GetString("macho.info.fileset-entry")
 		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
+		dumpCert := viper.GetBool("macho.info.dump-cert")
+		extractPath := viper.GetString("macho.info.output")
 
 		if len(filesetEntry) == 0 && extractfilesetEntry {
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
@@ -117,8 +130,13 @@ var machoInfoCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
-		if _, err := os.Stat(machoPath); os.IsNotExist(err) {
+		if info, err := os.Stat(machoPath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", machoPath)
+		} else if info.IsDir() {
+			machoPath, err = plist.GetBinaryInApp(machoPath)
+			if err != nil {
+				return err
+			}
 		}
 
 		// first check for fat file
@@ -162,6 +180,46 @@ var machoInfoCmd = &cobra.Command{
 			}
 		}
 
+		folder := filepath.Dir(machoPath) // default to folder of macho file
+		if len(extractPath) > 0 {
+			folder = extractPath
+		}
+
+		if dumpCert {
+			if cs := m.CodeSignature(); cs != nil {
+				if len(m.CodeSignature().CMSSignature) > 0 {
+					// parse cert
+					p7, err := pkcs7.Parse(m.CodeSignature().CMSSignature)
+					if err != nil {
+						return fmt.Errorf("failed to parse pkcs7: %v", err)
+					}
+					// create output file
+					outPEM := filepath.Join(folder, filepath.Base(filepath.Clean(machoPath))+".pem")
+					f, err := os.Create(outPEM)
+					if err != nil {
+						return fmt.Errorf("failed to create pem file %s: %v", outPEM, err)
+					}
+					defer f.Close()
+					// write certs to file
+					for _, cert := range p7.Certificates {
+						publicKeyBlock := pem.Block{
+							Type:  "CERTIFICATE",
+							Bytes: cert.Raw,
+						}
+						if _, err := f.WriteString(string(pem.EncodeToMemory(&publicKeyBlock))); err != nil {
+							return fmt.Errorf("failed to write pem file: %v", err)
+						}
+					}
+					log.Infof("Created %s", outPEM)
+				} else {
+					return fmt.Errorf("no CMS signature found")
+				}
+				return nil
+			} else {
+				return fmt.Errorf("no LC_CODE_SIGNATURE found")
+			}
+		}
+
 		// Fileset MachO type
 		if len(filesetEntry) > 0 {
 			if m.FileTOC.FileHeader.Type == types.FileSet {
@@ -180,11 +238,11 @@ var machoInfoCmd = &cobra.Command{
 				}
 
 				if extractfilesetEntry {
-					err = m.Export(filepath.Join(filepath.Dir(machoPath), filesetEntry), dcf, baseAddress, nil) // TODO: do I want to add any extra syms?
+					err = m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil) // TODO: do I want to add any extra syms?
 					if err != nil {
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
-					log.Infof("Created %s", filepath.Join(filepath.Dir(machoPath), filesetEntry))
+					log.Infof("Created %s", filepath.Join(folder, filesetEntry))
 				}
 
 			} else {
@@ -272,18 +330,97 @@ var machoInfoCmd = &cobra.Command{
 					}
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 					for _, cert := range p7.Certificates {
-						var ou string
-						if cert.Issuer.Organization != nil {
-							ou = cert.Issuer.Organization[0]
+						if Verbose {
+							fmt.Fprintf(w, "Certificate:\n")
+							fmt.Fprintf(w, "\tData:\n")
+							fmt.Fprintf(w, "\t\tVersion: %d (%#x)\n", cert.Version, cert.Version)
+							fmt.Fprintf(w, "\t\tSerial Number: %d (%#x)\n", cert.SerialNumber, cert.SerialNumber)
+							fmt.Fprintf(w, "\t\tIssuer: %s\n", cert.Issuer.String())
+							fmt.Fprintf(w, "\t\tValidity:\n")
+							fmt.Fprintf(w, "\t\t\tNot Before: %s\n", cert.NotBefore.Format("Jan 2 15:04:05 2006 MST"))
+							fmt.Fprintf(w, "\t\t\tNot After:  %s\n", cert.NotAfter.Format("Jan 2 15:04:05 2006 MST"))
+							fmt.Fprintf(w, "\t\tSubject: %s\n", cert.Subject.String())
+							fmt.Fprintf(w, "\t\tSubject Public Key Info:\n")
+							fmt.Fprintf(w, "\t\t\tPublic Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
+							fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", cert.PublicKey.(*rsa.PublicKey).Size()*8) // convert bytes to bits
+							fmt.Fprintf(w, "\t\t\t\tModulus: \n%s\n", certs.ReprData(cert.PublicKey.(*rsa.PublicKey).N.Bytes(), 5, 14))
+							fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", cert.PublicKey.(*rsa.PublicKey).E, cert.PublicKey.(*rsa.PublicKey).E)
+							fmt.Fprintf(w, "\tX509v3 Extensions:\n")
+							for _, ext := range cert.Extensions {
+								critical := ""
+								if ext.Critical {
+									critical = " (critical)"
+								}
+								if ext.Id.Equal(certs.OIDSubjectKeyId) {
+									fmt.Fprintf(w, "\t\tSubject Key ID: %s\n\t\t\t%s\n", critical, certs.ReprData(cert.SubjectKeyId, 0, len(cert.SubjectKeyId)+1))
+								} else if ext.Id.Equal(certs.OIDKeyUsage) {
+									fmt.Fprintf(w, "\t\tKey Usage: %s\n\t\t\t%s\n", critical, certs.KeyUsage(cert.KeyUsage).String())
+								} else if ext.Id.Equal(certs.OIDExtendedKeyUsage) {
+									var exu []string
+									for _, e := range cert.ExtKeyUsage {
+										exu = append(exu, certs.ExtKeyUsage(e).String())
+									}
+									fmt.Fprintf(w, "\t\tExtended Key Usage: %s\n\t\t\t%s\n", critical, strings.Join(exu, ", "))
+								} else if ext.Id.Equal(certs.OIDAuthorityKeyId) {
+									fmt.Fprintf(w, "\t\tAuthority Key ID: %s\n\t\t\tkeyid:%s\n", critical, certs.ReprData(cert.AuthorityKeyId, 0, len(cert.AuthorityKeyId)+1))
+								} else if ext.Id.Equal(certs.OIDBasicConstraints) {
+									var bconst string
+									if cert.IsCA {
+										bconst += "CA:TRUE"
+									} else {
+										bconst += "CA:FALSE"
+									}
+									fmt.Fprintf(w, "\t\tBasic Constraints: %s\n\t\t\t%s\n", critical, bconst)
+								} else if ext.Id.Equal(certs.OIDSubjectAltName) {
+									fmt.Fprintf(w, "\t\tSubject Alt Name: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(certs.OIDCertificatePolicies) {
+									var policies []string
+									for _, p := range cert.PolicyIdentifiers {
+										if p.Equal(certs.OIDAppleCertificatePolicy) {
+											policies = append(policies, "\t\t\tApple Certificate Policy")
+										} else {
+											policies = append(policies, fmt.Sprintf("\t\t\tUnknown (%s)", p.String()))
+										}
+									}
+									fmt.Fprintf(w, "\t\tCertificate Policies: %s\n%s\n", critical, strings.Join(policies, "\n"))
+								} else if ext.Id.Equal(certs.OIDNameConstraints) {
+									fmt.Fprintf(w, "\t\tName Constraints: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+								} else if ext.Id.Equal(certs.OIDCRLDistributionPoints) {
+									fmt.Fprintf(w, "\t\tCRL Distribution Points: %s\n\t\t\t%s\n", critical, strings.Join(cert.CRLDistributionPoints, ", "))
+								} else if ext.Id.Equal(certs.OIDAuthorityInfoAccess) {
+									var auths []string
+									for _, a := range cert.OCSPServer {
+										auths = append(auths, fmt.Sprintf("\t\t\tOCSP: %s", a))
+									}
+									fmt.Fprintf(w, "\t\tAuthority Info Access: %s\n%s\n", critical, strings.Join(auths, "\n"))
+								} else if ext.Id.Equal(certs.OIDCRLNumber) {
+									fmt.Fprintf(w, "\t\tCRL Number: %s\n%s", critical, utils.HexDump(ext.Value, 0))
+								} else {
+									fmt.Fprintf(w, "\t\t%s: %s\n%s\n", certs.LookupOID(ext.Id), critical, utils.HexDump(ext.Value, 0))
+								}
+							}
+							fmt.Fprintf(w, "\tSignature (algorithm - %s): \n%s\n", cert.SignatureAlgorithm, certs.ReprData(cert.Signature, 2, 18))
+							publicKeyBlock := pem.Block{
+								Type:  "CERTIFICATE",
+								Bytes: cert.Raw,
+							}
+							publicKeyPem := string(pem.EncodeToMemory(&publicKeyBlock))
+							fmt.Fprintf(w, "\n%s\n", publicKeyPem)
+						} else {
+							var ou string
+							if cert.Issuer.Organization != nil {
+								ou = cert.Issuer.Organization[0]
+							}
+							if cert.Issuer.OrganizationalUnit != nil {
+								ou = cert.Issuer.OrganizationalUnit[0]
+							}
+							fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
+								ou,
+								cert.Subject.CommonName,
+								cert.NotBefore.Format("02Jan2006 15:04:05"),
+								cert.NotAfter.Format("02Jan2006 15:04:05"))
 						}
-						if cert.Issuer.OrganizationalUnit != nil {
-							ou = cert.Issuer.OrganizationalUnit[0]
-						}
-						fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
-							ou,
-							cert.Subject.CommonName,
-							cert.NotBefore.Format("01Jan06 15:04:05"),
-							cert.NotAfter.Format("01Jan06 15:04:05"))
+
 					}
 					w.Flush()
 				}
@@ -512,13 +649,13 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			for _, sec := range m.Sections {
-				if sec.Flags.IsCstringLiterals() {
+				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
 					dat, err := sec.Data()
 					if err != nil {
 						return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 					}
 
-					csr := bytes.NewBuffer(dat[:])
+					csr := bytes.NewBuffer(dat)
 
 					for {
 						pos := sec.Addr + uint64(csr.Cap()-csr.Len())
@@ -533,8 +670,13 @@ var machoInfoCmd = &cobra.Command{
 							return fmt.Errorf("failed to read string: %v", err)
 						}
 
+						s = strings.Trim(s, "\x00")
+
 						if len(s) > 0 {
-							fmt.Printf("%#x: %#v\n", pos, strings.Trim(s, "\x00"))
+							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) {
+								continue // skip non-ascii strings when dumping __TEXT.__const
+							}
+							fmt.Printf("%#x: %#v\n", pos, s)
 						}
 					}
 				}

@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
@@ -35,6 +36,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
 
@@ -46,6 +48,7 @@ func init() {
 	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
 	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	dyldInfoCmd.Flags().Bool("diff", false, "Diff two DSC's images")
 	dyldInfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -58,16 +61,16 @@ type dylib struct {
 }
 
 type dyldInfo struct {
-	Magic           string                                      `json:"magic,omitempty"`
-	UUID            string                                      `json:"uuid,omitempty"`
-	Platform        string                                      `json:"platform,omitempty"`
-	MaxSlide        int                                         `json:"max_slide,omitempty"`
-	NumSubCaches    int                                         `json:"num_sub_caches,omitempty"`
-	SubCacheGroupID int                                         `json:"sub_cache_group_id,omitempty"`
-	SymSubCacheUUID string                                      `json:"sym_sub_cache_uuid,omitempty"`
-	Mappings        map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
-	CodeSignature   map[string]types.CodeSignature              `json:"code_signature,omitempty"`
-	Dylibs          []dylib                                     `json:"dylibs,omitempty"`
+	Magic              string                                      `json:"magic,omitempty"`
+	UUID               string                                      `json:"uuid,omitempty"`
+	Platform           string                                      `json:"platform,omitempty"`
+	MaxSlide           int                                         `json:"max_slide,omitempty"`
+	SubCacheArrayCount int                                         `json:"num_sub_caches,omitempty"`
+	SubCacheGroupID    int                                         `json:"sub_cache_group_id,omitempty"`
+	SymSubCacheUUID    string                                      `json:"sym_sub_cache_uuid,omitempty"`
+	Mappings           map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
+	CodeSignature      map[string]types.CodeSignature              `json:"code_signature,omitempty"`
+	Dylibs             []dylib                                     `json:"dylibs,omitempty"`
 }
 
 // infoCmd represents the info command
@@ -89,6 +92,7 @@ var dyldInfoCmd = &cobra.Command{
 		showSignature, _ := cmd.Flags().GetBool("sig")
 
 		outAsJSON, _ := cmd.Flags().GetBool("json")
+		diff, _ := cmd.Flags().GetBool("diff")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -254,8 +258,8 @@ var dyldInfoCmd = &cobra.Command{
 							fmt.Fprintf(w, "        OU: %s\tCN: %s\t(%s thru %s)\n",
 								ou,
 								cert.Subject.CommonName,
-								cert.NotBefore.Format("01Jan06 15:04:05"),
-								cert.NotAfter.Format("01Jan06 15:04:05"))
+								cert.NotBefore.Format("02Jan2006 15:04:05"),
+								cert.NotAfter.Format("02Jan2006 15:04:05"))
 						}
 						w.Flush()
 					}
@@ -267,40 +271,89 @@ var dyldInfoCmd = &cobra.Command{
 		}
 
 		if showDylibs {
-			fmt.Println("Images")
-			fmt.Println("======")
-			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			for idx, img := range f.Images {
-				if f.Headers[f.UUID].FormatVersion.IsDylibsExpectedOnDisk() {
-					m, err := macho.Open(img.Name)
-					if err != nil {
-						if serr, ok := err.(*macho.FormatError); !ok {
-							return errors.Wrapf(serr, "failed to open MachO %s", img.Name)
-						}
-						fat, err := macho.OpenFat(img.Name)
-						if err != nil {
-							return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
-						}
-						fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].SourceVersion().Version, img.Name)
-						fat.Close()
-						continue
-					}
-					fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, m.SourceVersion().Version, img.Name)
-					m.Close()
-				} else {
+			if diff {
+				if len(args) < 2 {
+					return fmt.Errorf("please provide two dyld_shared_cache files to diff")
+				}
+
+				var dout1 []string
+				for idx, img := range f.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
-					if Verbose {
-						fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), m.SourceVersion().Version, img.Name)
-					} else {
-						fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, m.DylibID().CurrentVersion, img.Name)
-					}
-					m.Close()
+					dout1 = append(dout1, fmt.Sprintf("%4d: (%s)\t%s", idx+1, m.SourceVersion().Version, img.Name))
 				}
+
+				f2, err := dyld.Open(filepath.Clean(args[1]))
+				if err != nil {
+					return err
+				}
+				defer f.Close()
+
+				var dout2 []string
+				for idx, img := range f2.Images {
+					m, err := img.GetPartialMacho()
+					if err != nil {
+						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+					}
+					dout2 = append(dout2, fmt.Sprintf("%4d: (%s)\t%s", idx+1, m.SourceVersion().Version, img.Name))
+				}
+
+				dmp := diffmatchpatch.New()
+
+				diffs := dmp.DiffMain(strings.Join(dout1, "\n"), strings.Join(dout2, "\n"), false)
+				if len(diffs) > 2 {
+					diffs = dmp.DiffCleanupSemantic(diffs)
+					diffs = dmp.DiffCleanupEfficiency(diffs)
+				}
+
+				fmt.Println("Images")
+				fmt.Println("======")
+				if len(diffs) == 1 {
+					if diffs[0].Type == diffmatchpatch.DiffEqual {
+						log.Info("No differences found")
+					}
+				} else {
+					log.Info("Differences found")
+					fmt.Println(dmp.DiffPrettyText(diffs))
+				}
+			} else {
+				fmt.Println("Images")
+				fmt.Println("======")
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+				for idx, img := range f.Images {
+					if f.Headers[f.UUID].FormatVersion.IsDylibsExpectedOnDisk() {
+						m, err := macho.Open(img.Name)
+						if err != nil {
+							if serr, ok := err.(*macho.FormatError); !ok {
+								return errors.Wrapf(serr, "failed to open MachO %s", img.Name)
+							}
+							fat, err := macho.OpenFat(img.Name)
+							if err != nil {
+								return errors.Wrapf(err, "failed to open Fat MachO %s", img.Name)
+							}
+							fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, fat.Arches[0].SourceVersion().Version, img.Name)
+							fat.Close()
+							continue
+						}
+						fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, m.SourceVersion().Version, img.Name)
+						m.Close()
+					} else {
+						m, err := img.GetPartialMacho()
+						if err != nil {
+							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+						}
+						if Verbose {
+							fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), m.SourceVersion().Version, img.Name)
+						} else {
+							fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, m.DylibID().CurrentVersion, img.Name)
+						}
+						m.Close()
+					}
+				}
+				w.Flush()
 			}
-			w.Flush()
 		}
 
 		if showClosures {
@@ -310,7 +363,7 @@ var dyldInfoCmd = &cobra.Command{
 			if f.Headers[f.UUID].ProgClosuresTrieAddr != 0 {
 				pclosureAddr = f.Headers[f.UUID].ProgClosuresAddr
 			} else {
-				pclosureAddr = f.Headers[f.UUID].ProgClosuresWithSubCachesAddr
+				pclosureAddr = f.Headers[f.UUID].ProgramsPblSetPoolAddr
 			}
 			pcs, err := f.GetProgClosuresOffsets()
 			if err != nil {

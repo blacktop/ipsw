@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -40,7 +41,15 @@ func init() {
 	a2fCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	a2fCmd.Flags().StringP("in", "i", "", "Path to file containing list of addresses to lookup")
 	a2fCmd.Flags().StringP("out", "o", "", "Path to output JSON file")
+	a2fCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	a2fCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+
+	viper.BindPFlag("dyld.a2f.slide", a2fCmd.Flags().Lookup("slide"))
+	viper.BindPFlag("dyld.a2f.in", a2fCmd.Flags().Lookup("in"))
+	viper.BindPFlag("dyld.a2f.out", a2fCmd.Flags().Lookup("out"))
+	viper.BindPFlag("dyld.a2f.json", a2fCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dyld.a2f.cache", a2fCmd.Flags().Lookup("cache"))
+
 	a2fCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -66,10 +75,11 @@ var a2fCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		slide, _ := cmd.Flags().GetUint64("slide")
-		ptrFile, _ := cmd.Flags().GetString("in")
-		jsonFile, _ := cmd.Flags().GetString("out")
-		cacheFile, _ := cmd.Flags().GetString("cache")
+		slide := viper.GetUint64("dyld.a2f.slide")
+		ptrFile := viper.GetString("dyld.a2f.in")
+		jsonFile := viper.GetString("dyld.a2f.out")
+		asJSON := viper.GetBool("dyld.a2f.json")
+		cacheFile := viper.GetString("dyld.a2f.cache")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -180,7 +190,6 @@ var a2fCmd = &cobra.Command{
 			if err := enc.Encode(fs); err != nil {
 				return err
 			}
-
 		} else {
 			if len(args) < 2 {
 				return fmt.Errorf("you must supply an virtual address")
@@ -212,16 +221,31 @@ var a2fCmd = &cobra.Command{
 			}
 
 			if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
-				if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-					if unslidAddr-fn.StartAddr == 0 {
-						fmt.Printf("\n%#x: %s (start: %#x, end: %#x)\n", addr, symName, fn.StartAddr, fn.EndAddr)
-					} else {
-						fmt.Printf("\n%#x: %s + %d (start: %#x, end: %#x)\n", addr, symName, unslidAddr-fn.StartAddr, fn.StartAddr, fn.EndAddr)
+				if asJSON {
+					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+						fn.Name = symName
 					}
-					return nil
+					if err := json.NewEncoder(os.Stdout).Encode(Func{
+						Addr:  addr,
+						Start: fn.StartAddr,
+						End:   fn.EndAddr,
+						Size:  fn.EndAddr - fn.StartAddr,
+						Name:  fn.Name,
+						Image: filepath.Base(image.Name),
+					}); err != nil {
+						return err
+					}
+				} else {
+					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+						if unslidAddr-fn.StartAddr == 0 {
+							fmt.Printf("\n%#x: %s (start: %#x, end: %#x)\n", addr, symName, fn.StartAddr, fn.EndAddr)
+						} else {
+							fmt.Printf("\n%#x: %s + %d (start: %#x, end: %#x)\n", addr, symName, unslidAddr-fn.StartAddr, fn.StartAddr, fn.EndAddr)
+						}
+						return nil
+					}
+					fmt.Printf("\n%#x: func_%x (start: %#x, end: %#x)\n", addr, addr, fn.StartAddr, fn.EndAddr)
 				}
-				fmt.Printf("\n%#x: func_%x (start: %#x, end: %#x)\n", addr, addr, fn.StartAddr, fn.EndAddr)
-				return nil
 			} else {
 				log.Errorf("%#x is not in any known function", unslidAddr)
 			}

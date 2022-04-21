@@ -84,3 +84,39 @@ func GetDevices() ([]Device, error) {
 
 	return devices, nil
 }
+
+// GetDeviceForProd returns the device matching a given product type
+func GetDeviceForProd(prod string) (*Device, error) {
+	var devices []Device
+
+	err := json.Unmarshal(traitsData, &devices)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, device := range devices {
+		if device.ProductType == prod {
+			return &device, nil
+		}
+	}
+
+	return nil, fmt.Errorf("device not found")
+}
+
+// GetDeviceForModel returns the device matching a given model
+func GetDeviceForModel(model string) (*Device, error) {
+	var devices []Device
+
+	err := json.Unmarshal(traitsData, &devices)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, device := range devices {
+		if device.Target == model {
+			return &device, nil
+		}
+	}
+
+	return nil, fmt.Errorf("device not found")
+}

@@ -11,132 +11,217 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/ota/types"
+	"github.com/dustin/go-humanize"
 	"github.com/pkg/errors"
 )
 
-// Plists ipsw plists object
+// Plists IPSW/OTA plists object
 type Plists struct {
+	Type string
 	*BuildManifest
 	*Restore
+	*AssetDataInfo
 	*OTAInfo
-	*Info
 }
 
-type BuildManifest struct {
-	BuildIdentities       []buildIdentity `plist:"BuildIdentities,omitempty"`
-	ManifestVersion       uint64          `plist:"ManifestVersion,omitempty"`
-	ProductBuildVersion   string          `plist:"ProductBuildVersion,omitempty"`
-	ProductVersion        string          `plist:"ProductVersion,omitempty"`
-	SupportedProductTypes []string        `plist:"SupportedProductTypes,omitempty"`
+// AssetDataInfo AssetData/Info.plist object found in OTAs
+type AssetDataInfo struct {
+	ActualMinimumSystemPartition int               `plist:"ActualMinimumSystemPartition,omitempty"`
+	Build                        string            `plist:"Build,omitempty"`
+	DeviceClass                  string            `plist:"DeviceClass,omitempty"`
+	HardwareModel                string            `plist:"HardwareModel,omitempty"`
+	MinimumSystemPartition       int               `plist:"MinimumSystemPartition,omitempty"`
+	PackageVersion               string            `plist:"PackageVersion,omitempty"`
+	ProductType                  string            `plist:"ProductType,omitempty"`
+	ProductVersion               string            `plist:"ProductVersion,omitempty"`
+	RSEPDigest                   []byte            `plist:"RSEPDigest,omitempty"`
+	RSEPTBMDigests               []byte            `plist:"RSEPTBMDigests,omitempty"`
+	RequiredSpace                int               `plist:"RequiredSpace,omitempty"`
+	ReserveFileAware             bool              `plist:"ReserveFileAware,omitempty"`
+	SEPDigest                    []byte            `plist:"SEPDigest,omitempty"`
+	SEPTBMDigests                []byte            `plist:"SEPTBMDigests,omitempty"`
+	SizeArchiveRoot              int               `plist:"SizeArchiveRoot,omitempty"`
+	SizePatchedBinaries          int               `plist:"SizePatchedBinaries,omitempty"`
+	SizePatchedBinariesSnapshot  int               `plist:"SizePatchedBinaries-Snapshot,omitempty"`
+	SystemPartitionPadding       map[string]int    `plist:"SystemPartitionPadding,omitempty"`
+	SystemUpdatePathMap          map[string]string `plist:"SystemUpdatePathMap,omitempty"`
+	SystemVolumeSealingOverhead  int               `plist:"SystemVolumeSealingOverhead,omitempty"`
+	TargetUpdate                 string            `plist:"TargetUpdate,omitempty"`
 }
 
-type buildIdentity struct {
-	ApBoardID                     string
-	ApChipID                      string
-	ApSecurityDomain              string
-	BbActivationManifestKeyHash   []byte
-	BbChipID                      string
-	BbFDRSecurityKeyHash          []byte
-	BbProvisioningManifestKeyHash []byte
-	Info                          buildIdentityInfo
-	Manifest                      map[string]buildIdentityManifestType
-	PearlCertificationRootPub     []byte
-	ProductMarketingVersion       string
-	SEChipID                      string `plist:"SE,ChipID,omitempty"`
-	SavageChipID                  string `plist:"Savage,ChipID,omitempty"`
-	SavagePatchEpoch              string `plist:"Savage,PatchEpoch,omitempty"`
-	UniqueBuildID                 []byte
+// AssetDataInfo Stringer
+func (a *AssetDataInfo) String() string {
+	var out string
+	out += "[AssetData/Info.plist]\n"
+	out += "======================\n"
+	out += fmt.Sprintf("Build:                        %s\n", a.Build)
+	out += fmt.Sprintf("DeviceClass:                  %s\n", a.DeviceClass)
+	out += fmt.Sprintf("HardwareModel:                %s\n", a.HardwareModel)
+	out += fmt.Sprintf("MinimumSystemPartition:       %d\n", a.MinimumSystemPartition)
+	out += fmt.Sprintf("PackageVersion:               %s\n", a.PackageVersion)
+	out += fmt.Sprintf("ProductType:                  %s\n", a.ProductType)
+	out += fmt.Sprintf("ProductVersion:               %s\n", a.ProductVersion)
+	out += fmt.Sprintf("RequiredSpace:                %s\n", humanize.Bytes(uint64(a.RequiredSpace)))
+	out += fmt.Sprintf("ReserveFileAware:             %v\n", a.ReserveFileAware)
+	out += fmt.Sprintf("SizeArchiveRoot:              %s\n", humanize.Bytes(uint64(a.SizeArchiveRoot)))
+	out += fmt.Sprintf("SizePatchedBinaries:          %s\n", humanize.Bytes(uint64(a.SizePatchedBinaries)))
+	out += fmt.Sprintf("SizePatchedBinaries-Snapshot: %s\n", humanize.Bytes(uint64(a.SizePatchedBinariesSnapshot)))
+	if len(a.SystemUpdatePathMap) > 0 {
+		out += "SystemUpdatePathMap:\n"
+		for k, v := range a.SystemUpdatePathMap {
+			out += fmt.Sprintf("  - %s: %s\n", k, v)
+		}
+	}
+	out += fmt.Sprintf("SystemVolumeSealingOverhead:  %d\n", a.SystemVolumeSealingOverhead)
+	out += fmt.Sprintf("TargetUpdate:                 %s\n", a.TargetUpdate)
+	return out
 }
 
-type buildIdentityInfo struct {
-	BuildNumber            string
-	CodeName               string `plist:"BuildTrain,omitempty"`
-	DeviceClass            string
-	FDRSupport             bool
-	MinimumSystemPartition int
-	MobileDeviceMinVersion string
-	OSVarContentSize       int
-	RestoreBehavior        string
-	SystemPartitionPadding map[string]int
-	Variant                string
-	VariantContents        map[string]string
-}
-
-type variantContents struct {
-	BasebandFirmware     string
-	DFU                  string
-	Firmware             string
-	InstalledKernelCache string
-	OS                   string
-	RestoreKernelCache   string
-	RestoreRamDisk       string
-	RestoreSEP           string
-	SEP                  string
-	VinylFirmware        string
-}
-
-type buildIdentityManifestType struct {
-	Digest      []byte
-	BuildString string `plist:"BuildString,omitempty"`
-	Info        buildIdentityManifestInfo
-	Trusted     bool
-}
-type buildIdentityManifestInfo struct {
-	IsFTAB            bool
-	IsFUDFirmware     bool `plist:"IsFUDFirmware,omitempty"`
-	IsFirmwarePayload bool `plist:"IsFirmwarePayload,omitempty"`
-	IsLoadedByiBoot   bool
-	Path              string `plist:"Path"`
-	Personalize       bool
-}
-
+// OTAInfo Info.plist object found in OTAs
 type OTAInfo struct {
-	CFBundleIdentifier    string                `plist:"CFBundleIdentifier,omitempty"`
-	MobileAssetProperties mobileAssetProperties `plist:"MobileAssetProperties,omitempty"`
+	CFBundleIdentifier            string      `plist:"CFBundleIdentifier,omitempty"`
+	CFBundleInfoDictionaryVersion string      `plist:"CFBundleInfoDictionaryVersion,omitempty"`
+	CFBundleName                  string      `plist:"CFBundleName,omitempty"`
+	CFBundleShortVersionString    string      `plist:"CFBundleShortVersionString,omitempty"`
+	CFBundleVersion               string      `plist:"CFBundleVersion,omitempty"`
+	MobileAssetProperties         types.Asset `plist:"MobileAssetProperties,omitempty"`
 }
 
-type mobileAssetProperties struct {
-	Build                 string   `plist:"Build,omitempty"`
-	OSVersion             string   `plist:"OSVersion,omitempty"`
-	ReleaseType           string   `plist:"ReleaseType,omitempty"`
-	SupportedDeviceModels []string `plist:"SupportedDeviceModels,omitempty"`
-	SupportedDevices      []string `plist:"SupportedDevices,omitempty"`
+// OTAInfo Stringer
+func (o *OTAInfo) String() string {
+	var out string
+	out += "[OTA Info.plist]\n"
+	out += "================\n"
+	out += fmt.Sprintf("CFBundleIdentifier:            %s\n", o.CFBundleIdentifier)
+	// out += fmt.Sprintf("CFBundleInfoDictionaryVersion: %s\n", o.CFBundleInfoDictionaryVersion)
+	// out += fmt.Sprintf("CFBundleName:                  %s\n", o.CFBundleName)
+	// out += fmt.Sprintf("CFBundleShortVersionString:    %s\n", o.CFBundleShortVersionString)
+	// out += fmt.Sprintf("CFBundleVersion:               %s\n", o.CFBundleVersion)
+	out += fmt.Sprintf("MobileAssetProperties:\n  %s\n", o.MobileAssetProperties)
+	return out
 }
 
-// Info object found in OTAs
-type Info struct {
-	DeviceClass    string `plist:"DeviceClass,omitempty"`
-	HardwareModel  string `plist:"HardwareModel,omitempty"`
-	PackageVersion string `plist:"PackageVersion,omitempty"`
-	ProductType    string `plist:"ProductType,omitempty"`
-	ProductVersion string `plist:"ProductVersion,omitempty"`
-	Build          string `plist:"TargetUpdate,omitempty"`
+func readZipFile(f *zip.File) ([]byte, error) {
+	pData := make([]byte, f.UncompressedSize64)
+	rc, err := f.Open()
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file within zip: %s", err)
+	}
+	defer rc.Close()
+	io.ReadFull(rc, pData)
+	return pData, nil
 }
 
-type Restore struct {
-	DeviceMap                     []restoreDeviceMap `plist:"DeviceMap,omitempty"`
-	ProductBuildVersion           string             `plist:"ProductBuildVersion,omitempty"`
-	ProductVersion                string             `plist:"ProductVersion,omitempty"`
-	SupportedProductTypeIDs       map[string][]int   `plist:"SupportedProductTypeIDs,omitempty"`
-	SupportedProductTypes         []string           `plist:"SupportedProductTypes,omitempty"`
-	SystemRestoreImageFileSystems map[string]string  `plist:"SystemRestoreImageFileSystems,omitempty"`
+// Extract extracts plists from IPSW
+func Extract(ipsw string) error {
+	log.Info("Extracting plists from IPSW")
+
+	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		var validPlist = regexp.MustCompile(`.*plist$`)
+		return validPlist.MatchString(f.Name)
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to extract plists from ipsw")
+	}
+
+	return nil
 }
 
-type restoreDeviceMap struct {
-	BDID        int
-	BoardConfig string
-	CPID        int
-	Platform    string
-	SCEP        int
-	SDOM        int
+// ParseOTAInfo parses the Info.plist file from an OTA
+func ParseOTAInfo(data []byte) (*OTAInfo, error) {
+	i := &OTAInfo{}
+	if err := plist.NewDecoder(bytes.NewReader(data)).Decode(i); err != nil {
+		return nil, fmt.Errorf("failed to decode OTA Info.plist: %w", err)
+	}
+	return i, nil
+}
+
+// ParseBuildManifest parses the AssetData/Info.plist file from an OTA
+func ParseAssetDataInfoPlist(data []byte) (*AssetDataInfo, error) {
+	i := &AssetDataInfo{}
+	if err := plist.NewDecoder(bytes.NewReader(data)).Decode(i); err != nil {
+		return nil, fmt.Errorf("failed to parse AssetData/Info.plist: %w", err)
+	}
+	return i, nil
+}
+
+// Parse parses plist files in a local IPSW/OTA file
+func Parse(path string) (*Plists, error) {
+
+	zr, err := zip.OpenReader(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open ipsw zip: %s", err)
+	}
+	defer zr.Close()
+
+	return ParseZipFiles(zr.File)
+}
+
+// ParseZipFiles parses plists in remote ipsw zip
+func ParseZipFiles(files []*zip.File) (*Plists, error) {
+	ipsw := &Plists{Type: "IPSW"}
+
+	for _, f := range files {
+		if regexp.MustCompile(`.*plist$`).MatchString(f.Name) {
+			switch {
+			case strings.HasSuffix(f.Name, "Restore.plist"):
+				dat, err := readZipFile(f)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read plist file: %s", err)
+				}
+				ipsw.Restore, err = ParseRestore(dat)
+				if err != nil {
+					return nil, err
+				}
+			case strings.HasSuffix(f.Name, "BuildManifest.plist"):
+				if strings.Contains(f.Name, "Restore") {
+					continue
+				}
+				dat, err := readZipFile(f)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read plist file: %s", err)
+				}
+				ipsw.BuildManifest, err = ParseBuildManifest(dat)
+				if err != nil {
+					return nil, err
+				}
+			case strings.HasSuffix(f.Name, "AssetData/Info.plist"):
+				ipsw.Type = "OTA"
+				dat, err := readZipFile(f)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read plist file: %s", err)
+				}
+				ipsw.AssetDataInfo, err = ParseAssetDataInfoPlist(dat)
+				if err != nil {
+					return nil, err
+				}
+			case strings.EqualFold(f.Name, "Info.plist"):
+				ipsw.Type = "OTA"
+				dat, err := readZipFile(f)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read plist file: %s", err)
+				}
+				ipsw.OTAInfo, err = ParseOTAInfo(dat)
+				if err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	return ipsw, nil
 }
 
 func (p *Plists) GetOSType() string {
-	if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]) > 0 {
-		return p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]
-	}
 	if p.OTAInfo != nil {
-		return p.OTAInfo.MobileAssetProperties.ReleaseType
+		if len(p.OTAInfo.MobileAssetProperties.ReleaseType) > 0 {
+			return p.OTAInfo.MobileAssetProperties.ReleaseType
+		} else {
+			return p.OTAInfo.MobileAssetProperties.DocumentationID
+		}
+	} else if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]) > 0 {
+		return p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]
 	}
 	return ""
 }
@@ -148,43 +233,6 @@ func (p *Plists) GetKernelType(name string) string {
 		}
 	}
 	return p.OTAInfo.MobileAssetProperties.ReleaseType
-}
-
-func (b *BuildManifest) GetKernelCaches() map[string][]string {
-	kernelCaches := make(map[string][]string, len(b.BuildIdentities))
-	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceHas(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path) {
-			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path)
-		}
-	}
-	return kernelCaches
-}
-
-func (b *BuildManifest) GetBootLoaders() map[string][]string {
-	bootLoaders := make(map[string][]string, len(b.BuildIdentities))
-	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path) {
-			if len(bID.Manifest["iBEC"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path)
-			}
-		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
-			if len(bID.Manifest["iBoot"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path)
-			}
-		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
-			if len(bID.Manifest["iBSS"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path)
-			}
-		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
-			if len(bID.Manifest["LLB"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path)
-			}
-		}
-	}
-	return bootLoaders
 }
 
 func (i *Plists) String() string {
@@ -199,15 +247,15 @@ func (i *Plists) String() string {
 		i.BuildManifest.ProductBuildVersion,
 		i.GetOSType(),
 	)
-	iStr += fmt.Sprintf("FileSystem     = ")
+	iStr += "FileSystem     = "
 	for file, fsType := range i.Restore.SystemRestoreImageFileSystems {
 		iStr += fmt.Sprintf("%s (Type: %s)\n", file, fsType)
 	}
-	iStr += fmt.Sprintf("\nSupported Products:\n")
+	iStr += "\nSupported Products:\n"
 	for _, prodType := range i.BuildManifest.SupportedProductTypes {
 		iStr += fmt.Sprintf(" - %s\n", prodType)
 	}
-	iStr += fmt.Sprintf("\nDeviceMap:\n")
+	iStr += "\nDeviceMap:\n"
 	for _, device := range i.Restore.DeviceMap {
 		iStr += fmt.Sprintf(
 			"BDID %d)\n"+
@@ -224,156 +272,10 @@ func (i *Plists) String() string {
 			device.SDOM,
 		)
 	}
-	iStr += fmt.Sprintf("\nKernelCaches:\n")
+	iStr += "\nKernelCaches:\n"
 	kcs := i.BuildManifest.GetKernelCaches()
 	for key, value := range kcs {
 		iStr += fmt.Sprintf(" - BoardConfig: %s => %s\n", key, value)
 	}
 	return iStr
-}
-
-// parseBuildManifest parses the BuildManifest.plist
-func parseBuildManifest(data []byte) (*BuildManifest, error) {
-	bm := &BuildManifest{}
-
-	decoder := plist.NewDecoder(bytes.NewReader(data))
-	err := decoder.Decode(bm)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse BuildManifest.plist")
-	}
-
-	return bm, nil
-}
-
-// parseRestore parses the Restore.plist
-func parseRestore(data []byte) (*Restore, error) {
-	r := &Restore{}
-
-	decoder := plist.NewDecoder(bytes.NewReader(data))
-	err := decoder.Decode(r)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse Restore.plist")
-	}
-
-	return r, nil
-}
-
-func parseOTAInfo(data []byte) (*OTAInfo, error) {
-	o := &OTAInfo{}
-
-	decoder := plist.NewDecoder(bytes.NewReader(data))
-	err := decoder.Decode(o)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse Info.plist")
-	}
-
-	return o, nil
-}
-
-func parseInfoPlist(data []byte) (*Info, error) {
-	i := &Info{}
-
-	decoder := plist.NewDecoder(bytes.NewReader(data))
-	err := decoder.Decode(i)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse AssetData/Info.plist")
-	}
-
-	return i, nil
-}
-
-// Parse parses plist files in a local ipsw file
-func Parse(ipswPath string) (*Plists, error) {
-
-	zr, err := zip.OpenReader(ipswPath)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open ipsw as zip")
-	}
-	defer zr.Close()
-
-	return ParseZipFiles(zr.File)
-}
-
-// ParseZipFiles parses plists in remote ipsw zip
-func ParseZipFiles(files []*zip.File) (*Plists, error) {
-	ipsw := &Plists{}
-
-	var validPlist = regexp.MustCompile(`.*plist$`)
-
-	for _, f := range files {
-		if validPlist.MatchString(f.Name) {
-			switch {
-			case strings.HasSuffix(f.Name, "Restore.plist"):
-				pData := make([]byte, f.UncompressedSize64)
-				rc, err := f.Open()
-				if err != nil {
-					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-				}
-				io.ReadFull(rc, pData)
-				rc.Close()
-				ipsw.Restore, err = parseRestore(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse Restore.plist")
-				}
-			case strings.HasSuffix(f.Name, "BuildManifest.plist"):
-				if strings.Contains(f.Name, "Restore") {
-					continue
-				}
-				pData := make([]byte, f.UncompressedSize64)
-				rc, err := f.Open()
-				if err != nil {
-					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-				}
-				io.ReadFull(rc, pData)
-				rc.Close()
-				ipsw.BuildManifest, err = parseBuildManifest(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse BuildManifest.plist")
-				}
-			case strings.HasSuffix(f.Name, "AssetData/Info.plist"):
-				pData := make([]byte, f.UncompressedSize64)
-				rc, err := f.Open()
-				if err != nil {
-					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-				}
-				io.ReadFull(rc, pData)
-				rc.Close()
-				ipsw.Info, err = parseInfoPlist(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse AssetData/Info.plist")
-				}
-			case strings.EqualFold(f.Name, "Info.plist"):
-				pData := make([]byte, f.UncompressedSize64)
-				rc, err := f.Open()
-				if err != nil {
-					return nil, errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
-				}
-				io.ReadFull(rc, pData)
-				rc.Close()
-				ipsw.OTAInfo, err = parseOTAInfo(pData)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to parse Info.plist")
-				}
-			}
-		}
-	}
-	return ipsw, nil
-}
-
-// Extract extracts plists from ipsw
-func Extract(ipsw string) error {
-	log.Info("Extracting plists from IPSW")
-	_, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		var validPlist = regexp.MustCompile(`.*plist$`)
-		if validPlist.MatchString(f.Name) {
-			return true
-		}
-		return false
-	})
-
-	if err != nil {
-		return errors.Wrap(err, "failed to extract plists from ipsw")
-	}
-
-	return nil
 }

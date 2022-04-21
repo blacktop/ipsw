@@ -30,8 +30,8 @@ const (
 	sucatalogs17      = "https://swscan.apple.com/content/catalogs/others/index-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs18      = "https://swscan.apple.com/content/catalogs/others/index-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs19      = "https://swscan.apple.com/content/catalogs/others/index-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
-	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-11-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
-	sucatalogs21      = "https://swscan.apple.com/content/catalogs/others/index-12seed-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs21      = "https://swscan.apple.com/content/catalogs/others/index-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 )
 
 type seedCatalog struct {
@@ -109,7 +109,7 @@ func (i ProductInfo) String() string {
 		i.Title,
 		i.Version,
 		i.Build,
-		i.PostDate.Format("01Jan06 15:04:05"))
+		i.PostDate.Format("02Jan2006 15:04:05"))
 }
 
 type ProductInfos []ProductInfo
@@ -125,17 +125,50 @@ func (infos ProductInfos) FilterByVersion(version string) ProductInfos {
 	return out
 }
 
+func (infos ProductInfos) FilterByBuild(build string) ProductInfos {
+	var out ProductInfos
+	for _, i := range infos {
+		if build == i.Build {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+func (infos ProductInfos) GetLatest() ProductInfos {
+	var out ProductInfos
+	lastDate := infos[len(infos)-1].PostDate
+	for _, i := range infos {
+		if i.PostDate.YearDay() == lastDate.YearDay() {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
 func (infos ProductInfos) String() string {
 	tableString := &strings.Builder{}
-
 	pdata := [][]string{}
-	for _, pinfo := range infos {
-		pdata = append(pdata, []string{
-			pinfo.Title,
-			pinfo.Version,
-			pinfo.Build,
-			pinfo.PostDate.Format("01Jan06 15:04:05"),
-		})
+	zone, _ := time.Now().Zone()
+	location, err := time.LoadLocation(zone)
+	if err != nil {
+		for _, pinfo := range infos {
+			pdata = append(pdata, []string{
+				pinfo.Title,
+				pinfo.Version,
+				pinfo.Build,
+				pinfo.PostDate.Format("02Jan2006 15:04:05 MST"),
+			})
+		}
+	} else {
+		for _, pinfo := range infos {
+			pdata = append(pdata, []string{
+				pinfo.Title,
+				pinfo.Version,
+				pinfo.Build,
+				pinfo.PostDate.In(location).Format("02Jan2006 15:04:05"),
+			})
+		}
 	}
 	table := tablewriter.NewWriter(tableString)
 	table.SetHeader([]string{"Title", "Version", "Build", "Post Date"})
@@ -190,6 +223,11 @@ func GetProductInfo() (ProductInfos, error) {
 		resp, err := http.Get(seed.DeveloperSeed)
 		if err != nil {
 			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 		}
 
 		document, err := ioutil.ReadAll(resp.Body)
@@ -309,17 +347,20 @@ func GetProductInfo() (ProductInfos, error) {
 	return prods, nil
 }
 
-func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll bool) error {
+func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll, resumeAll, restartAll, ignoreSha1, assistantOnly bool) error {
 
-	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, true)
+	downloader := NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, ignoreSha1, true)
 
-	folder := filepath.Join(workDir, i.Title)
+	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))
 
 	os.MkdirAll(folder, os.ModePerm)
 
 	log.Info("Downloading packages")
 	for _, pkg := range i.Product.Packages {
 		if len(pkg.URL) > 0 {
+			if assistantOnly && !strings.HasSuffix(pkg.URL, "InstallAssistant.pkg") {
+				continue
+			}
 			destName := getDestName(pkg.URL, false)
 			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
 				log.WithFields(log.Fields{
@@ -340,6 +381,9 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 			}
 
 		} else if len(pkg.MetadataURL) > 0 {
+			if assistantOnly && !strings.HasSuffix(pkg.MetadataURL, "InstallAssistant.pkg") {
+				continue
+			}
 			destName := getDestName(pkg.MetadataURL, false)
 			if _, err := os.Stat(filepath.Join(folder, destName)); os.IsNotExist(err) {
 				log.WithFields(log.Fields{
@@ -360,6 +404,10 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 				log.Warnf("pkg already exists: %s", filepath.Join(folder, destName))
 			}
 		}
+	}
+
+	if assistantOnly {
+		return nil
 	}
 
 	volumeName := fmt.Sprintf("Install_macOS_%s-%s", i.Version, i.Build)

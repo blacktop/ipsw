@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,6 +27,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -44,7 +45,7 @@ func init() {
 	symaddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	symaddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
 	symaddrCmd.Flags().String("out", "", "Path to output JSON file")
-	symaddrCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
+	symaddrCmd.Flags().Bool("color", false, "Colorize output")
 	// symaddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	symaddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -69,9 +70,7 @@ var symaddrCmd = &cobra.Command{
 		showBinds, _ := cmd.Flags().GetBool("binds")
 		forceColor, _ := cmd.Flags().GetBool("color")
 
-		if forceColor {
-			color.NoColor = false
-		}
+		color.NoColor = !forceColor
 
 		dscPath := filepath.Clean(args[0])
 
@@ -115,16 +114,16 @@ var symaddrCmd = &cobra.Command{
 			}
 
 			// group syms by image
-			symages := make(map[string][]string)
+			symages := make(map[string][]dyld.Symbol)
 			for _, s := range slin {
 				if len(s.Image) > 0 {
 					image, err := f.Image(s.Image)
 					if err != nil {
 						return err
 					}
-					symages[image.Name] = append(symages[image.Name], s.Name)
+					symages[image.Name] = append(symages[image.Name], s)
 				} else {
-					symages["unknown"] = append(symages["unknown"], s.Name)
+					symages["unknown"] = append(symages["unknown"], s)
 				}
 			}
 
@@ -132,21 +131,55 @@ var symaddrCmd = &cobra.Command{
 				log.Warn("you should supply 'image' fields for each symbol to GREATLY increase speed")
 			}
 
-			for imageName, symNames := range symages {
+			for imageName, syms := range symages {
 				if imageName == "unknown" {
-					for _, sname := range symNames {
+					for _, s := range syms {
 						found := false
 						for _, image := range f.Images {
-							if sym, err := image.GetSymbol(sname); err == nil {
-								if sym.Address > 0 {
-									slout = append(slout, *sym)
-									found = true
-									break
+							if len(s.Regex) > 0 {
+								re, err := regexp.Compile(s.Regex)
+								if err != nil {
+									return err
+								}
+								m, err := image.GetPartialMacho()
+								if err != nil {
+									return err
+								}
+								image.ParseLocalSymbols(false)
+								for _, lsym := range image.LocalSymbols {
+									if re.MatchString(lsym.Name) {
+										var sec string
+										if lsym.Sect > 0 && int(lsym.Sect) <= len(m.Sections) {
+											sec = fmt.Sprintf("%s.%s", m.Sections[lsym.Sect-1].Seg, m.Sections[lsym.Sect-1].Name)
+										}
+										slout = append(slout, dyld.Symbol{
+											Name:    lsym.Name,
+											Address: lsym.Value,
+											Type:    lsym.Type.String(sec),
+											Image:   image.Name,
+											Kind:    dyld.LOCAL,
+										})
+									}
+								}
+								image.ParsePublicSymbols(false)
+								for _, sym := range image.PublicSymbols {
+									if re.MatchString(sym.Name) {
+										sym.Image = filepath.Base(image.Name)
+										slout = append(slout, *sym)
+									}
+								}
+							} else {
+								if sym, err := image.GetSymbol(s.Name); err == nil {
+									if sym.Address > 0 {
+										slout = append(slout, *sym)
+										found = true
+										break
+									}
 								}
 							}
 						}
 						if !found {
-							log.Errorf("failed to find address for symbol %s", sname)
+							log.Errorf("failed to find address for symbol %s", s.Name)
 						}
 					}
 				} else {
@@ -154,11 +187,45 @@ var symaddrCmd = &cobra.Command{
 					if err != nil {
 						return err
 					}
-					for _, name := range symNames {
-						if sym, err := image.GetSymbol(name); err == nil {
-							slout = append(slout, *sym)
+					for _, s := range syms {
+						if len(s.Regex) > 0 {
+							re, err := regexp.Compile(s.Regex)
+							if err != nil {
+								return err
+							}
+							m, err := image.GetPartialMacho()
+							if err != nil {
+								return err
+							}
+							image.ParseLocalSymbols(false)
+							for _, lsym := range image.LocalSymbols {
+								if re.MatchString(lsym.Name) {
+									var sec string
+									if lsym.Sect > 0 && int(lsym.Sect) <= len(m.Sections) {
+										sec = fmt.Sprintf("%s.%s", m.Sections[lsym.Sect-1].Seg, m.Sections[lsym.Sect-1].Name)
+									}
+									slout = append(slout, dyld.Symbol{
+										Name:    lsym.Name,
+										Address: lsym.Value,
+										Type:    lsym.Type.String(sec),
+										Image:   image.Name,
+										Kind:    dyld.LOCAL,
+									})
+								}
+							}
+							image.ParsePublicSymbols(false)
+							for _, sym := range image.PublicSymbols {
+								if re.MatchString(sym.Name) {
+									sym.Image = filepath.Base(image.Name)
+									slout = append(slout, *sym)
+								}
+							}
 						} else {
-							log.Errorf("failed to find address for symbol %s in image %s", name, filepath.Base(image.Name))
+							if sym, err := image.GetSymbol(s.Name); err == nil {
+								slout = append(slout, *sym)
+							} else {
+								log.Errorf("failed to find address for symbol %s in image %s", s.Name, filepath.Base(image.Name))
+							}
 						}
 					}
 				}
@@ -193,6 +260,7 @@ var symaddrCmd = &cobra.Command{
 				if lsym, err := i.GetSymbol(args[1]); err == nil {
 					fmt.Println(lsym.String(forceColor))
 				}
+
 				// if lsym, err := i.GetLocalSymbol(args[1]); err == nil {
 				// 	fmt.Println(lsym)
 				// }

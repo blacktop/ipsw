@@ -11,11 +11,13 @@ summary: Download and parse IPSW(s) from the internets.
 - [**download ipsw --latest**](#download-ipsw---latest)
 - [**download ipsw --kernel**](#download-ipsw---kernel)
 - [**download ipsw --pattern**](#download-ipsw---pattern)
-- [**download beta**](#download-beta)
+- [**download ipsw --ibridge**](#download-ipsw---ibridge)
+- [**download wiki**](#download-wiki)
 - [**download ota**](#download-ota)
 - [**download macos**](#download-macos)
 - [**download dev**](#download-dev)
 - [**download oss**](#download-oss)
+- [**download git**](#download-git)
 - [**download rss**](#download-rss)
 - [**download tss**](#download-tss)
 
@@ -283,17 +285,32 @@ Only download files that match a given name/path
       • Created 19B74__iPhone14,2/iBootData.d63.RELEASE.im4p.plist
 ```
 
-## **download beta**
+### **download ipsw --ibridge**
+
+Download iBridge firmwares
+
+```bash
+❯ ipsw download ipsw --ibridge --latest
+   • Latest release found is: 6.2
+   • Getting IPSW              build=19P744 device=iBridge2,7 signed=true version=6.2
+	50.6 MiB / 577.2 MiB [====>-----------------------------------------------------| 7m20s ]  1.20 MiB/s
+```
+
+## **download wiki**
 
 > This is done by scraping [theiphonewiki.com](https://theiphonewiki.com).
 
-Download BETA ipsws
+Download IPSWs from The iPhone Wiki
 
 ```bash
-❯ ipsw download beta 17C5046a
+❯ ipsw download wiki --device Watch6,9 --kernel
+? You are about to download 4 ipsw files. Continue? Yes
+   • Parsing remote IPSW       build=19R346 devices=Watch6,9 version=8.0
+   • Extracting remote kernelcache
+      • Writing 19R346__Watch6,9/kernelcache.release.Watch6,9
 ```
 
-> **NOTE:** This depends on the iphonewiki maintainers publishing the `beta` firmware download links
+> **NOTE:** This depends on the iphonewiki maintainers publishing the IPSW firmware download links.
 
 ## **download ota**
 
@@ -378,7 +395,7 @@ You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` re
 
 ## **download macos**
 
-List macOS installers
+#### List macOS installers
 
 ```bash
 ❯ ipsw download macos --list
@@ -406,7 +423,7 @@ List macOS installers
 | macOS Monterey                 | 12.0.1  | 21A559   | 10Oct21 17:23:38 |
 | macOS Monterey beta            | 12.1    | 21C5021h | 10Oct21 17:04:37 |
 
-Download **macOS Monterey**
+#### Download **macOS Monterey**
 
 ```bash
 ❯ ipsw download macos --build 21A559
@@ -422,6 +439,28 @@ Download **macOS Monterey**
 ```
 
 > ⚠️ **NOTE:** macOS sandboxes certain folders and prevents you from running some of the Apple utils required to build the FULL installers. _(try running in `/Users/Shared`)_
+
+#### To ignore digest verification errors
+
+```bash
+❯ ipsw download macos --ignore
+```
+
+> **NOTE:** This is probably a bad idea, but I've noticed some of the recent installer parts have bad sha1 digests listed in the sucatalogs
+
+#### To _ONLY_ download the `InstallAssistant.pkg` file _(which includes the install App as well)_
+
+```bash
+❯ ipsw download macos --assistant
+```
+
+#### To download the latest installer(s)
+
+```bash
+❯ ipsw download macos --latest
+```
+
+> **NOTE** This will find the latest installer and then also download any other installers released on the same day.
 
 ## **download dev**
 
@@ -543,6 +582,41 @@ List all downloads
       }
    }
 }
+```
+
+## **download git**
+
+> Download [apple-oss-distributions](https://github.com/apple-oss-distributions) tarballs
+
+Download all latest
+
+```
+❯ ipsw download git
+```
+
+Download single product
+
+```
+❯ ipsw download git --product dyld
+```
+
+Supply API token _(to prevent rate limiting)_
+
+```
+❯ ipsw download git --api GITHUB_TOKEN
+```
+
+> **NOTE:** `ipsw` will also check for env vars `GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `IPSW_DOWNLOAD_GIT_API`
+
+Download repo archive links as JSON
+
+```
+❯ ipsw download git --json --output /tmp/git
+   • Querying github.com/orgs/apple-oss-distributions for repositories...
+   • Adding to JSON            tag=dyld-940
+   • Adding to JSON            tag=notify-45.3
+   • Adding to JSON            tag=DiskArbitration-366.0.2
+   • Adding to JSON            tag=pam_modules-188
 ```
 
 ## **download rss**

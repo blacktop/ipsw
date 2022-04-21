@@ -3,8 +3,8 @@
   <h1 align="center">ipsw</h1>
   <h4><p align="center">iOS/macOS Research Swiss Army Knife</p></h4>
   <p align="center">
-    <a href="https://github.com/blacktop/ipsw/actions?query=workflow%3AGo" alt="Actions">
-          <img src="https://github.com/blacktop/ipsw/workflows/Go/badge.svg" /></a>
+    <a href="https://github.com/blacktop/ipsw/actions" alt="Actions">
+          <img src="https://github.com/blacktop/ipsw/actions/workflows/go.yml/badge.svg" /></a>
     <a href="https://github.com/blacktop/ipsw/releases/latest" alt="Downloads">
           <img src="https://img.shields.io/github/downloads/blacktop/ipsw/total.svg" /></a>
     <a href="https://github.com/blacktop/ipsw/releases" alt="GitHub Release">
@@ -82,4 +82,4 @@ Big shout out to Jonathan Levin's amazing books and his legendary `jtool`
 
 ## License
 
-MIT Copyright (c) 2018-2021 **blacktop**
+MIT Copyright (c) 2018-2022 **blacktop**

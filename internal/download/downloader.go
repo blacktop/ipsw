@@ -39,6 +39,7 @@ type Download struct {
 	skipAll      bool
 	resumeAll    bool
 	restartAll   bool
+	ignoreSha1   bool
 	verbose      bool
 
 	client *http.Client
@@ -62,7 +63,7 @@ type geoQuery struct {
 }
 
 // NewDownload creates a new downloader
-func NewDownload(proxy string, insecure, skipAll, resumeAll, restartAll, verbose bool) *Download {
+func NewDownload(proxy string, insecure, skipAll, resumeAll, restartAll, ignoreSha1, verbose bool) *Download {
 	return &Download{
 		// URL:     url,
 		// Sha1:    sha1,
@@ -70,6 +71,7 @@ func NewDownload(proxy string, insecure, skipAll, resumeAll, restartAll, verbose
 		skipAll:    skipAll,
 		resumeAll:  resumeAll,
 		restartAll: restartAll,
+		ignoreSha1: ignoreSha1,
 		verbose:    verbose,
 		client: &http.Client{
 			Transport: &http.Transport{
@@ -119,6 +121,10 @@ func (d *Download) getHEAD() error {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.ContentLength < 0 {
+		return fmt.Errorf("content length is not set")
+	}
 
 	d.size = resp.ContentLength
 
@@ -192,7 +198,7 @@ func (d *Download) Do() error {
 	trace := &httptrace.ClientTrace{
 		GotConn: func(connInfo httptrace.GotConnInfo) {
 			if d.verbose {
-				addr := strings.Split(connInfo.Conn.RemoteAddr().String(), ":")[0]
+				addr, _, _ := strings.Cut(connInfo.Conn.RemoteAddr().String(), ":")
 
 				req, err := http.NewRequest("GET", fmt.Sprintf("http://ip-api.com/json/%s", addr), nil)
 				if err != nil {
@@ -213,7 +219,7 @@ func (d *Download) Do() error {
 	}
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 
-	utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Downloading")
+	// utils.Indent(log.WithField("file", d.DestName).Debug, 2)("Downloading") TODO: should I remove this?
 	resp, err := d.client.Do(req)
 	if err != nil {
 		if errors.Is(err, syscall.ECONNRESET) {
@@ -262,20 +268,32 @@ func (d *Download) Do() error {
 		mpb.WithRefreshRate(180*time.Millisecond),
 	)
 
-	bar := p.Add(d.size,
+	var bar *mpb.Bar
+
+	bar = p.Add(d.size,
 		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
 		mpb.PrependDecorators(
-			decor.CountersKibiByte("\t% 6.1f / % 6.1f"),
+			decor.CountersKibiByte("\t% .2f / % .2f"),
 		),
 		mpb.AppendDecorators(
-			decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
+			decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
 			decor.Name(" ] "),
-			decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048), decor.WCSyncSpace),
-			// decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+			decor.AverageSpeed(decor.UnitKiB, "% .2f"),
 		),
 	)
 
 	if d.resume {
+		bar = p.Add(d.size,
+			mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+			mpb.PrependDecorators(
+				decor.CountersKibiByte("\t% .2f / % .2f"),
+			),
+			mpb.AppendDecorators(
+				decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
+				decor.Name(" ] "),
+				decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048)),
+			),
+		)
 		// bar.SetCurrent(d.bytesResumed)
 		bar.SetRefill(d.bytesResumed)
 		bar.IncrInt64(d.bytesResumed)
@@ -296,7 +314,7 @@ func (d *Download) Do() error {
 		dest.Sync()
 		dest.Close()
 
-		if len(d.Sha1) > 0 {
+		if len(d.Sha1) > 0 && !d.ignoreSha1 {
 			utils.Indent(log.Info, 2)("verifying sha1sum...")
 			if ok, _ := utils.Verify(d.Sha1, d.DestName+".download"); !ok {
 				// fileLock.Unlock()
@@ -321,7 +339,7 @@ func (d *Download) Do() error {
 		dest.Sync()
 		dest.Close()
 
-		if len(d.Sha1) > 0 {
+		if len(d.Sha1) > 0 && !d.ignoreSha1 {
 			utils.Indent(log.Info, 2)("verifying sha1sum...")
 			checksum, _ := hex.DecodeString(d.Sha1)
 

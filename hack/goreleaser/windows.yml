@@ -4,6 +4,7 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
+
 builds:
   - main: ./cmd/ipsw
     binary: ipsw
@@ -13,14 +14,33 @@ builds:
       - windows
     goarch:
       - amd64
+      # - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+
 archives:
   - replacements:
+      darwin: macOS
       amd64: x86_64
-    name_template: "ipsw_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+      all: universal
     format_overrides:
       - goos: windows
         format: zip
     files:
+      - README.md
+      - LICENSE
       - completions/*
+      - manpages/*
+
 checksum:
   name_template: 'checksums.win.txt'
+
+# scoop:
+#   bucket:
+#     owner: blacktop
+#     name: scoop-bucket
+#   homepage:  https://github.com/blacktop/ipsw
+#   description: iOS/macOS Research Swiss Army Knife
+#   license: MIT

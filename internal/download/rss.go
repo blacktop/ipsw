@@ -4,32 +4,61 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
+	"time"
 )
 
-const rssURL = "http://developer.apple.com/news/releases/rss/releases.rss"
+const rssURL = "https://developer.apple.com/news/releases/rss/releases.rss"
 
 type RssContent struct {
-	Data string `xml:",chardata"`
+	Data string `xml:",chardata" json:"data,omitempty"`
+}
+
+type pubDate string
+
+func (d pubDate) GetDate() (*time.Time, error) {
+	layout := "Mon, 02 Jan 2006 15:04:05 MST"
+
+	location, err := time.LoadLocation("PST8PDT")
+	if err != nil {
+		return nil, fmt.Errorf("failed to load location PST8PDT: %v", err)
+	}
+
+	t, err := time.ParseInLocation(layout, string(d), location)
+	if err != nil {
+		return nil, err
+	}
+	var tt time.Time
+
+	zone, _ := time.Now().Zone()
+	location, err = time.LoadLocation(zone)
+	if err != nil {
+		// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+		tt = t
+	} else {
+		tt = t.In(location)
+	}
+
+	return &tt, nil
 }
 
 type RssItem struct {
-	Title   string     `xml:"title"`
-	Link    string     `xml:"link"`
-	Desc    string     `xml:"description"`
-	GUID    string     `xml:"guid"`
-	PubDate string     `xml:"pubDate"`
-	Content RssContent `xml:"encoded"`
+	Title   string     `xml:"title" json:"title,omitempty"`
+	Link    string     `xml:"link" json:"link,omitempty"`
+	Desc    string     `xml:"description" json:"desc,omitempty"`
+	GUID    string     `xml:"guid" json:"guid,omitempty"`
+	PubDate pubDate    `xml:"pubDate" json:"pub_date,omitempty"`
+	Content RssContent `xml:"encoded" json:"content,omitempty"`
 }
 
 type RssChannel struct {
-	Title string    `xml:"title"`
-	Link  string    `xml:"link"`
-	Desc  string    `xml:"description"`
-	Items []RssItem `xml:"item"`
+	Title string    `xml:"title" json:"title,omitempty"`
+	Link  string    `xml:"link" json:"link,omitempty"`
+	Desc  string    `xml:"description" json:"desc,omitempty"`
+	Items []RssItem `xml:"item" json:"items,omitempty"`
 }
 
 type Rss struct {
-	Channel RssChannel `xml:"channel"`
+	Channel RssChannel `xml:"channel" json:"channel,omitempty"`
 }
 
 // GetRSS returns the developer.apple.com/news/releases RSS feed as Rss object
@@ -39,6 +68,10 @@ func GetRSS() (*Rss, error) {
 		return nil, fmt.Errorf("failed to GET RSS URL: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("RSS feed returned status: %s", resp.Status)
+	}
 
 	rss := Rss{}
 

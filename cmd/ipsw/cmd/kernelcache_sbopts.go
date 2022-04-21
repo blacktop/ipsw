@@ -1,7 +1,7 @@
 // +build cgo
 
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,12 +32,14 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/fatih/color"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	kernelcacheCmd.AddCommand(kernelSandboxCmd)
-
+	kernelSandboxCmd.Flags().BoolP("diff", "d", false, "Diff two kernel's sandbox operations")
 	kernelSandboxCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
@@ -51,6 +53,8 @@ var kernelSandboxCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		diff, _ := cmd.Flags().GetBool("diff")
 
 		kcPath := filepath.Clean(args[0])
 
@@ -68,11 +72,68 @@ var kernelSandboxCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		title := fmt.Sprintf("Sandbox Operations (%d)", len(sbOpts))
-		fmt.Println(title)
-		fmt.Println(strings.Repeat("=", len(title)))
-		for _, opt := range sbOpts {
-			fmt.Println(opt)
+
+		if diff {
+			in := color.New(color.FgGreen).Add(color.Bold)
+			dl := color.New(color.FgRed).Add(color.Bold)
+
+			if len(args) < 2 {
+				return fmt.Errorf("please provide two kernelcache files to diff")
+			}
+
+			kcPath2 := filepath.Clean(args[1])
+
+			if _, err := os.Stat(kcPath2); os.IsNotExist(err) {
+				return fmt.Errorf("file %s does not exist", args[1])
+			}
+
+			m2, err := macho.Open(kcPath2)
+			if err != nil {
+				return err
+			}
+			defer m2.Close()
+
+			sbOpts2, err := kernelcache.GetSandboxOpts(m2)
+			if err != nil {
+				return err
+			}
+
+			sb1OUT := strings.Join(sbOpts, "\n")
+			sb2OUT := strings.Join(sbOpts2, "\n")
+
+			dmp := diffmatchpatch.New()
+
+			diffs := dmp.DiffMain(sb1OUT, sb2OUT, true)
+			if len(diffs) > 2 {
+				diffs = dmp.DiffCleanupSemantic(diffs)
+				diffs = dmp.DiffCleanupEfficiency(diffs)
+			}
+
+			if len(diffs) == 1 {
+				if diffs[0].Type == diffmatchpatch.DiffEqual {
+					log.Info("No differences found")
+				}
+			} else {
+				log.Info("Differences found")
+				if Verbose {
+					fmt.Println(dmp.DiffPrettyText(diffs))
+				} else {
+					for _, d := range diffs {
+						if d.Type == diffmatchpatch.DiffInsert {
+							in.Println(d.Text)
+						} else if d.Type == diffmatchpatch.DiffDelete {
+							dl.Println(d.Text)
+						}
+					}
+				}
+			}
+		} else {
+			title := fmt.Sprintf("Sandbox Operations (%d)", len(sbOpts))
+			fmt.Println(title)
+			fmt.Println(strings.Repeat("=", len(title)))
+			for _, opt := range sbOpts {
+				fmt.Println(opt)
+			}
 		}
 
 		return nil

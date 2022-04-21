@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -27,7 +27,6 @@ import (
 	"strings"
 
 	"github.com/blacktop/ipsw/internal/download"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -110,26 +109,31 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 	doNotDownload := viper.GetStringSlice("download.black-list")
 
 	// verify args
-	if len(version) == 0 && len(build) == 0 {
-		return nil, fmt.Errorf("you must also supply a --version OR a --build (or use --latest)")
+	if len(device) == 0 && len(version) == 0 && len(build) == 0 {
+		return nil, fmt.Errorf("you must also supply a --device || --version || --build (or use --latest)")
 	}
 	if len(version) > 0 && len(build) > 0 {
-		return nil, fmt.Errorf("you cannot supply a --version AND a --build (they are mutually exclusive)")
+		return nil, fmt.Errorf("you cannot supply --version AND --build (they are mutually exclusive)")
 	}
 
 	if len(version) > 0 {
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
 		}
-	} else { // using build
+	} else if len(build) > 0 {
 		version, err = download.GetVersion(build)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for buildID => version: %v", err)
+			return nil, fmt.Errorf("failed to query ipsw.me api for buildID %s => version: %v", build, err)
 		}
 		ipsws, err = download.GetAllIPSW(version)
 		if err != nil {
-			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws: %v", err)
+			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
+		}
+	} else if len(device) > 0 {
+		ipsws, err = download.GetDeviceIPSWs(device)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query ipsw.me api for device %s: %v", device, err)
 		}
 	}
 
@@ -140,12 +144,16 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 			}
 		} else {
 			if len(doDownload) > 0 {
-				if utils.StrSliceHas(doDownload, i.Identifier) {
-					filteredIPSWs = append(filteredIPSWs, i)
+				for _, doDown := range doDownload {
+					if strings.HasPrefix(strings.ToLower(i.Identifier), strings.ToLower(doDown)) {
+						filteredIPSWs = append(filteredIPSWs, i)
+					}
 				}
 			} else if len(doNotDownload) > 0 {
-				if !utils.StrSliceHas(doNotDownload, i.Identifier) {
-					filteredIPSWs = append(filteredIPSWs, i)
+				for _, dontDown := range doNotDownload {
+					if !strings.HasPrefix(strings.ToLower(i.Identifier), strings.ToLower(dontDown)) {
+						filteredIPSWs = append(filteredIPSWs, i)
+					}
 				}
 			} else {
 				filteredIPSWs = append(filteredIPSWs, i)

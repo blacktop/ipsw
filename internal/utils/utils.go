@@ -8,9 +8,11 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -105,7 +107,7 @@ func Pad(length int) string {
 // StrSliceContains returns true if string slice contains given string
 func StrSliceContains(slice []string, item string) bool {
 	for _, s := range slice {
-		if strings.Contains(strings.ToLower(item), strings.ToLower(s)) {
+		if strings.Contains(strings.ToLower(s), strings.ToLower(item)) {
 			return true
 		}
 	}
@@ -120,6 +122,37 @@ func StrSliceHas(slice []string, item string) bool {
 		}
 	}
 	return false
+}
+
+// FilterStrSlice removes all the strings that do NOT contain the filter from a string slice
+func FilterStrSlice(slice []string, filter string) []string {
+	var filtered []string
+	for _, s := range slice {
+		if strings.Contains(strings.ToLower(s), strings.ToLower(filter)) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// FilterStrFromSlice removes all the strings that contain the filter from a string slice
+func FilterStrFromSlice(slice []string, filter string) []string {
+	var filtered []string
+	for _, s := range slice {
+		if !strings.Contains(strings.ToLower(s), strings.ToLower(filter)) {
+			filtered = append(filtered, s)
+		}
+	}
+	return filtered
+}
+
+// TrimPrefixStrSlice trims the prefix from all strings in string slice
+func TrimPrefixStrSlice(slice []string, prefix string) []string {
+	var trimmed []string
+	for _, s := range slice {
+		trimmed = append(trimmed, strings.TrimPrefix(s, prefix))
+	}
+	return trimmed
 }
 
 // RemoveStrFromSlice removes a single string from a string slice
@@ -192,6 +225,32 @@ func Verify(sha1sum, name string) (bool, error) {
 	return match, nil
 }
 
+// RemoteUnzip unzips a remote file from zip (like partialzip)
+func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string) error {
+	for _, f := range files {
+		if pattern.MatchString(f.Name) {
+			os.Mkdir(folder, os.ModePerm)
+			fname := filepath.Join(folder, filepath.Base(f.Name))
+			if _, err := os.Stat(fname); os.IsNotExist(err) {
+				data := make([]byte, f.UncompressedSize64)
+				rc, err := f.Open()
+				if err != nil {
+					return fmt.Errorf("error opening remote zip file %s: %v", f.Name, err)
+				}
+				io.ReadFull(rc, data)
+				rc.Close()
+				if err := ioutil.WriteFile(fname, data, 0644); err != nil {
+					return fmt.Errorf("error writing remote zip file %s data: %v", f.Name, err)
+				}
+			} else {
+				log.Warnf("%s already exists", fname)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Unzip - https://stackoverflow.com/a/24792688
 func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 
@@ -221,7 +280,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 			}
 		}()
 
-		path := filepath.Join(dest, filepath.Base(f.Name))
+		path := filepath.Join(dest, filepath.Base(filepath.Clean(f.Name)))
 
 		if f.FileInfo().IsDir() {
 			os.MkdirAll(path, f.Mode())
@@ -248,7 +307,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 
 	for _, f := range r.File {
 		if filter(f) {
-			fNames = append(fNames, filepath.Base(f.Name))
+			fNames = append(fNames, filepath.Base(filepath.Clean(f.Name)))
 			err := extractAndWriteFile(f)
 			if err != nil {
 				return nil, err

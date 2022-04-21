@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -46,6 +46,7 @@ func init() {
 	ipswCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	ipswCmd.Flags().Bool("show-latest", false, "Show latest iOS version")
 	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
+	ipswCmd.Flags().Bool("ibridge", false, "Download iBridge IPSWs")
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
@@ -54,6 +55,7 @@ func init() {
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
+	viper.BindPFlag("download.ipsw.ibridge", ipswCmd.Flags().Lookup("ibridge"))
 	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
 	// viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
@@ -65,7 +67,7 @@ func init() {
 var ipswCmd = &cobra.Command{
 	Use:           "ipsw",
 	Short:         "Download and parse IPSW(s) from the internets",
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -112,6 +114,7 @@ var ipswCmd = &cobra.Command{
 		latest := viper.GetBool("download.ipsw.latest")
 		showLatest := viper.GetBool("download.ipsw.show-latest")
 		macos := viper.GetBool("download.ipsw.macos")
+		ibridge := viper.GetBool("download.ipsw.ibridge")
 		kernel := viper.GetBool("download.ipsw.kernel")
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		pattern := viper.GetString("download.ipsw.pattern")
@@ -128,8 +131,25 @@ var ipswCmd = &cobra.Command{
 			destPath = filepath.Clean(output)
 		}
 
+		if len(device) > 0 {
+			db, err := info.GetIpswDB()
+			if err != nil {
+				return fmt.Errorf("failed to get ipsw device DB: %v", err)
+			}
+			if dev, err := db.LookupDevice(device); err == nil {
+				if dev.SDKPlatform == "macosx" {
+					macos = true
+				}
+			}
+		}
+
 		if macos {
 			itunes, err = download.NewMacOsXML()
+			if err != nil {
+				return fmt.Errorf("failed to create itunes API: %v", err)
+			}
+		} else if ibridge {
+			itunes, err = download.NewIBridgeXML()
 			if err != nil {
 				return fmt.Errorf("failed to create itunes API: %v", err)
 			}
@@ -143,7 +163,7 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if showLatest {
-			if macos {
+			if macos || ibridge {
 				latestVersion, err := itunes.GetLatestVersion()
 				if err != nil {
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
@@ -164,7 +184,7 @@ var ipswCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
 				}
-				fmt.Print(assets.Latest("iOS"))
+				fmt.Print(assets.Latest("iOS", "ios"))
 			}
 			return nil
 		}
@@ -277,7 +297,7 @@ var ipswCmd = &cobra.Command{
 					for _, f := range zr.File {
 						if strings.Contains(f.Name, pattern) {
 							found = true
-							fileName := filepath.Join(destPath, filepath.Base(f.Name))
+							fileName := filepath.Join(destPath, filepath.Base(filepath.Clean(f.Name)))
 							if _, err := os.Stat(fileName); os.IsNotExist(err) {
 								data := make([]byte, f.UncompressedSize64)
 								rc, err := f.Open()
@@ -311,7 +331,7 @@ var ipswCmd = &cobra.Command{
 							"signed":  i.Signed,
 						}).Info("Getting IPSW")
 
-						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, Verbose)
+						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
 						downloader.URL = i.URL
 						downloader.Sha1 = i.SHA1
 						downloader.DestName = destName

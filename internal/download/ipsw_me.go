@@ -87,6 +87,15 @@ func GetDevice(identifier string) (Device, error) {
 	return d, nil
 }
 
+// GetDeviceIPSWs returns a device's IPSWs from it's identifier
+func GetDeviceIPSWs(identifier string) ([]IPSW, error) {
+	d, err := GetDevice(identifier)
+	if err != nil {
+		return nil, err
+	}
+	return d.Firmwares, nil
+}
+
 // GetAllIPSW finds all IPSW files for a given iOS version
 func GetAllIPSW(version string) ([]IPSW, error) {
 	ipsws := []IPSW{}
