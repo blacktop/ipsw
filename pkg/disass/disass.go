@@ -229,7 +229,7 @@ func Disassemble(d Disass) {
 					fmt.Printf("%#08x:  %s   %s\t%s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), op, oprs, comment)
 				}
 
-				continue
+				goto INCR_ADDR
 			}
 
 			instrStr = instruction.String()
@@ -400,11 +400,11 @@ func Disassemble(d Disass) {
 					SetFlags:    0,
 					Disassembly: fmt.Sprintf(".long\t%#x ; (%s)\n", instrValue, err.Error()), // TODO: same with error enhancements above
 				})
-				continue
+				goto INCR_ADDR
 			}
 			instructions = append(instructions, *instruction)
 		}
-
+	INCR_ADDR:
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 

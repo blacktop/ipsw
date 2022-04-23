@@ -145,6 +145,7 @@ func (d *DyldDisass) Triage() error {
 
 		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 		if err != nil {
+			startAddr += uint64(binary.Size(uint32(0)))
 			continue
 		}
 
