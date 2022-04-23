@@ -14,18 +14,28 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
-type Sandbox struct {
-	Globals  map[uint16]string
-	Regexes  map[uint16][]byte
-	OpNodes  map[uint16]uint64
-	Profiles []SandboxProfile
-}
+const (
+	profileInitPanic    = "failed to initialize platform sandbox"
+	collectionInitPanic = "failed to initialize builtin collection"
+)
 
-type SandboxProfileCollection struct {
+type SandboxProfileHeader14 struct {
 	Version        uint16
-	OpNodeSize     uint16
+	OpNodeCount    uint16
 	OpCount        uint8
 	GlobalVarCount uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	MsgItemCount   uint16
+}
+
+type SandboxProfileHeader15 struct {
+	Version        uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	Unknown1       uint8
+	Unknown2       uint8
 	ProfileCount   uint16
 	RegexItemCount uint16
 	MsgItemCount   uint16
@@ -51,10 +61,42 @@ func (sp SandboxProfile) String() string {
 	return out
 }
 
-func GetSandboxOpts(m *macho.File) ([]string, error) {
-	var bcOpts []string
+type Sandbox struct {
+	Globals  map[uint16]string
+	Regexes  map[uint16][]byte
+	OpNodes  map[uint16]uint64
+	Profiles []SandboxProfile
 
-	if dconst := m.Section("__DATA_CONST", "__const"); dconst != nil {
+	operations          []string
+	collectionData      []byte
+	platformProfileData []byte
+
+	kern          *macho.File
+	kextStartAddr uint64
+	kextEndAddr   uint64
+	xrefs         map[uint64]uint64
+}
+
+func NewSandbox(m *macho.File) (*Sandbox, error) {
+	sb := Sandbox{
+		Globals:  make(map[uint16]string),
+		Regexes:  make(map[uint16][]byte),
+		OpNodes:  make(map[uint16]uint64),
+		Profiles: make([]SandboxProfile, 0),
+		kern:     m,
+	}
+	if _, err := sb.GetOperations(); err != nil {
+		return nil, fmt.Errorf("failed to parse sandbox operations: %w", err)
+	}
+	return &sb, nil
+}
+
+func (sb *Sandbox) GetOperations() ([]string, error) {
+	if len(sb.operations) > 0 {
+		return sb.operations, nil
+	}
+
+	if dconst := sb.kern.Section("__DATA_CONST", "__const"); dconst != nil {
 		data, err := dconst.Data()
 		if err != nil {
 			return nil, err
@@ -69,7 +111,7 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 				continue
 			}
 
-			str, err := m.GetCString(ptr | tagPtrMask)
+			str, err := sb.kern.GetCString(ptr | tagPtrMask)
 			if err != nil {
 				if found {
 					break
@@ -82,7 +124,7 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 			}
 
 			if found {
-				bcOpts = append(bcOpts, str)
+				sb.operations = append(sb.operations, str)
 				if getTag(ptr) != 0x17 { // always directly followed by another pointer
 					break
 				}
@@ -90,245 +132,93 @@ func GetSandboxOpts(m *macho.File) ([]string, error) {
 		}
 	}
 
-	// GetSandboxProfiles(m)
-
-	return bcOpts, nil
+	return sb.operations, nil
 }
 
-// TODO: finish this (make it so when I look at it I don't want to 🤮)
-func getSandboxData(m *macho.File, r *bytes.Reader, panic string) ([]byte, error) {
-	var profiles []byte
-	var sandboxKextStartVaddr uint64
-	var sandboxKextStartOffset uint64
-	var sandboxKextEndVaddr uint64
-
-	panicStrVMAddr, err := findCStringVMaddr(m, panic)
-	if err != nil {
-		return nil, err
-	}
-	panicStrOffset, err := m.GetOffset(panicStrVMAddr)
-	if err != nil {
-		return nil, err
-	}
-	utils.Indent(log.WithFields(log.Fields{
-		"vmaddr": fmt.Sprintf("%#x", panicStrVMAddr),
-		"offset": fmt.Sprintf("%#x", panicStrOffset),
-	}).Debug, 2)(fmt.Sprintf("Found: %v", panic))
-
-	startAdders, err := getKextStartVMAddrs(m)
-	if err != nil {
-		return nil, err
+func (sb *Sandbox) GetCollectionData() ([]byte, error) {
+	if len(sb.collectionData) > 0 {
+		return sb.collectionData, nil
 	}
 
-	infos, err := getKextInfos(m)
-	if err != nil {
-		return nil, err
-	}
-
-	for idx, info := range infos {
-		if strings.Contains(string(info.Name[:]), "sandbox") {
-			sandboxKextStartVaddr = startAdders[idx] | tagPtrMask
-			sandboxKextEndVaddr = startAdders[idx+1] | tagPtrMask
-			sandboxKextStartOffset, err = m.GetOffset(sandboxKextStartVaddr)
-			if err != nil {
-				return nil, err
-			}
-			break
-		}
-	}
-
-	// sandbox, err := macho.NewFile(io.NewSectionReader(r, int64(sandboxKextStartOffset), int64(sandboxKextEndVaddr-sandboxKextStartVaddr)), macho.FileConfig{
-	// 	Offset:    int64(sandboxKextStartOffset),
-	// 	SrcReader: io.NewSectionReader(r, 0, 1<<63-1),
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// fmt.Println(sandbox.FileTOC.String())
-
-	sbInstrData := make([]byte, sandboxKextEndVaddr-sandboxKextStartVaddr)
-	_, err = m.ReadAt(sbInstrData, int64(sandboxKextStartOffset))
-	if err != nil {
-		return nil, err
-	}
-
-	var instrValue uint32
-	var results [1024]byte
-	var prevInstr *disassemble.Instruction
-
-	dr := bytes.NewReader(sbInstrData)
-	references := make(map[uint64]uint64)
-	startAddr := sandboxKextStartVaddr
-
-	for {
-		err = binary.Read(dr, binary.LittleEndian, &instrValue)
-
-		if err == io.EOF {
-			break
-		}
-
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
-			continue
-		}
-
-		if instruction.Encoding == disassemble.ENC_BL_ONLY_BRANCH_IMM || instruction.Encoding == disassemble.ENC_B_ONLY_BRANCH_IMM {
-			references[instruction.Address] = uint64(instruction.Operands[0].Immediate)
-		} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
-			references[instruction.Address] = uint64(instruction.Operands[1].Immediate)
-		} else if instruction.Operation == disassemble.ARM64_ADR || instruction.Operation == disassemble.ARM64_LDR {
-			references[instruction.Address] = instruction.Operands[1].Immediate
-		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
-			(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
-			adrpRegister := prevInstr.Operands[0].Registers[0]
-			adrpImm := prevInstr.Operands[1].Immediate
-			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[1].Immediate
-			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
-				adrpImm += instruction.Operands[2].Immediate
-			}
-			references[instruction.Address] = adrpImm
-		}
-
-		// fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction)
-
-		prevInstr = instruction
-		startAddr += uint64(binary.Size(uint32(0)))
-	}
-
-	var panicXrefVMAddr uint64
-	for k, v := range references {
-		if v == panicStrVMAddr {
-			panicXrefVMAddr = k - 4
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("Panic string Xref %#x => %#x", panicXrefVMAddr, v))
-			break
-		}
-	}
-
-	var failXrefVMAddr uint64
-	for k, v := range references {
-		if v == panicXrefVMAddr {
-			failXrefVMAddr = k
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("Failure path Xref %#x => %#x", failXrefVMAddr, v))
-			break
-		}
-	}
-
-	var profileVMAddr uint64
-	var profileSize uint64
-
-	startAddr = sandboxKextStartVaddr
-	dr = bytes.NewReader(sbInstrData)
-
-	for {
-		err = binary.Read(dr, binary.LittleEndian, &instrValue)
-
-		if err == io.EOF {
-			break
-		}
-
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-		if err != nil {
-			continue
-		}
-
-		operation := instruction.Operation
-
-		// TODO: identify basic blocks so I could only disass the block that contains the Xref
-		if failXrefVMAddr-0x20 < instruction.Address && instruction.Address < failXrefVMAddr {
-			if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
-				(instruction.Operation == disassemble.ARM64_ADD || instruction.Operation == disassemble.ARM64_LDR) {
-				adrpRegister := prevInstr.Operands[0].Registers[0]
-				adrpImm := prevInstr.Operands[1].Immediate
-				if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
-					adrpImm += instruction.Operands[1].Immediate
-				} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
-					adrpImm += instruction.Operands[2].Immediate
-				}
-				profileVMAddr = adrpImm
-			} else if operation == disassemble.ARM64_MOV {
-				if operands := instruction.Operands; operands != nil {
-					for _, operand := range operands {
-						if operand.Class == disassemble.IMM64 {
-							profileSize = operand.Immediate
-						}
-					}
-				}
-			} else if operation == disassemble.ARM64_MOVK && prevInstr.Operation == disassemble.ARM64_MOV {
-				if operands := instruction.Operands; operands != nil && prevInstr.Operands != nil {
-					movRegister := prevInstr.Operands[0].Registers[0]
-					movImm := prevInstr.Operands[1].Immediate
-					if movRegister == operands[0].Registers[0] {
-						if operands[1].Class == disassemble.IMM32 && operands[1].ShiftType == disassemble.SHIFT_TYPE_LSL {
-							profileSize = movImm + (operands[1].Immediate << uint64(operands[1].ShiftValue))
-						}
-					}
-				}
-			}
-		}
-
-		prevInstr = instruction
-		startAddr += uint64(binary.Size(uint32(0)))
-	}
-
-	utils.Indent(log.WithFields(log.Fields{
-		"vmaddr": fmt.Sprintf("%#x", profileVMAddr),
-		"size":   fmt.Sprintf("%#x", profileSize),
-	}).Info, 2)("Located data")
-
-	profileOffset, err := m.GetOffset(profileVMAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	profiles = make([]byte, profileSize)
-	_, err = m.ReadAt(profiles, int64(profileOffset))
-	if err != nil {
-		return nil, err
-	}
-
-	return profiles, nil
-}
-
-func GetSandboxProfiles(m *macho.File, r *bytes.Reader) ([]byte, error) {
-	log.Info("Searching for sandbox profile data")
-	return getSandboxData(m, r, "failed to initialize platform sandbox")
-}
-
-func GetSandboxCollections(m *macho.File, r *bytes.Reader) ([]byte, error) {
 	log.Info("Searching for sandbox collection data")
-	return getSandboxData(m, r, "failed to initialize collection")
+	regs, err := sb.emulateBlock(collectionInitPanic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to emulate block containing call to _collection_init(): %v", err)
+	}
+
+	collection_data_addr := regs["x2"]
+	collection_data_size := regs["w3"]
+
+	// _collection_init(&_builtin_collection, "builtin collection", &_collection_data, 0xc6d6a, ...);
+	utils.Indent(log.Info, 2)(fmt.Sprintf("emulated args:: _collection_init(%#x, \"builtin collection\", %#x, %#x, x4);",
+		regs["x0"],
+		collection_data_addr,
+		collection_data_size),
+	)
+
+	collectionOffset, err := sb.kern.GetOffset(collection_data_addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get offset for _collection_data: %w", err)
+	}
+
+	sb.collectionData = make([]byte, collection_data_size)
+	if _, err = sb.kern.ReadAt(sb.collectionData, int64(collectionOffset)); err != nil {
+		return nil, fmt.Errorf("failed to read _collection_data: %w", err)
+	}
+	return sb.collectionData, nil
 }
 
-func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
-	var collection SandboxProfileCollection
+func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
+	if len(sb.platformProfileData) > 0 {
+		return sb.platformProfileData, nil
+	}
 
-	// init Sandbox
-	sb := &Sandbox{}
-	sb.Globals = make(map[uint16]string)
-	sb.OpNodes = make(map[uint16]uint64)
-	sb.Regexes = make(map[uint16][]byte)
+	log.Info("Searching for sandbox platform profile data")
+	regs, err := sb.emulateBlock(profileInitPanic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to emulate block containing call to _profile_init(): %v", err)
+	}
 
-	r := bytes.NewReader(data)
+	platform_profile_data_addr := regs["x1"]
+	platform_profile_data_size := regs["w2"]
+
+	utils.Indent(log.Info, 2)(fmt.Sprintf("emulated args:: _profile_init(%#x, %#x, %#x);", regs["x0"], platform_profile_data_addr, platform_profile_data_size))
+
+	profileOffset, err := sb.kern.GetOffset(platform_profile_data_addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get offset for _platform_profile_data: %w", err)
+	}
+
+	sb.platformProfileData = make([]byte, platform_profile_data_size)
+	if _, err = sb.kern.ReadAt(sb.platformProfileData, int64(profileOffset)); err != nil {
+		return nil, fmt.Errorf("failed to read _platform_profile_data: %w", err)
+	}
+
+	return sb.platformProfileData, nil
+}
+
+func (sb *Sandbox) ParseSandboxCollection() error {
+	var collection SandboxProfileHeader15
+
+	r := bytes.NewReader(sb.collectionData)
 
 	if err := binary.Read(r, binary.LittleEndian, &collection); err != nil {
-		return nil, fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
+		return fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
 	}
 
 	regexOffsets := make([]uint16, collection.RegexItemCount)
 	if err := binary.Read(r, binary.LittleEndian, &regexOffsets); err != nil {
-		return nil, fmt.Errorf("failed to read sandbox profile regex offets: %v", err)
+		return fmt.Errorf("failed to read sandbox profile regex offets: %v", err)
 	}
 
 	globalOffsets := make([]uint16, collection.GlobalVarCount)
 	if err := binary.Read(r, binary.LittleEndian, &globalOffsets); err != nil {
-		return nil, fmt.Errorf("failed to read sandbox profile global offets: %v", err)
+		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
 	msgOffsets := make([]uint16, collection.MsgItemCount)
 	if err := binary.Read(r, binary.LittleEndian, &msgOffsets); err != nil {
-		return nil, fmt.Errorf("failed to read sandbox profile message offets: %v", err)
+		return fmt.Errorf("failed to read sandbox profile message offets: %v", err)
 	}
 
 	profileSize := uint32(collection.OpCount+uint8(binary.Size(uint16(0)))) * 2
@@ -353,14 +243,14 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 	log.Debugf("[+] op node start: %#x", opNodeStart)
 
 	// start address of regex, global, messsages
-	baseAddr := opNodeStart + uint32(collection.OpNodeSize)*8
+	baseAddr := opNodeStart + uint32(collection.OpNodeCount)*8
 	log.Debugf("[+] start address of regex, global, messsages: %#x", baseAddr)
 
 	var profileDatas [][]byte
 	for i := uint16(0); i < collection.ProfileCount; i++ {
 		profile := make([]byte, profileSize)
 		if err := binary.Read(r, binary.LittleEndian, &profile); err != nil {
-			return nil, fmt.Errorf("failed to read sandbox profiles: %v", err)
+			return fmt.Errorf("failed to read sandbox profiles: %v", err)
 		}
 		profileDatas = append(profileDatas, profile)
 	}
@@ -372,17 +262,17 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 
 		var nameOffset uint16
 		if err := binary.Read(pr, binary.LittleEndian, &nameOffset); err != nil {
-			return nil, fmt.Errorf("failed to read profile name offset for index %d: %v", idx, err)
+			return fmt.Errorf("failed to read profile name offset for index %d: %v", idx, err)
 		}
 
 		if err := binary.Read(pr, binary.LittleEndian, &sp.Version); err != nil {
-			return nil, fmt.Errorf("failed to read profile version for index %d: %v", idx, err)
+			return fmt.Errorf("failed to read profile version for index %d: %v", idx, err)
 		}
 
 		for i := 0; i < int(collection.OpCount); i++ {
-			so := SandboxOperation{Name: opsList[i]}
+			so := SandboxOperation{Name: sb.operations[i]}
 			if err := binary.Read(pr, binary.LittleEndian, &so.Index); err != nil {
-				return nil, fmt.Errorf("failed to read sandbox operation index for %s: %v", opsList[i], err)
+				return fmt.Errorf("failed to read sandbox operation index for %s: %v", sb.operations[i], err)
 			}
 			// TODO: lookup operation value
 			sp.Operations = append(sp.Operations, so)
@@ -391,13 +281,12 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 		r.Seek(int64(baseAddr+8*uint32(nameOffset)), io.SeekStart)
 		var nameLength uint16
 		if err := binary.Read(r, binary.LittleEndian, &nameLength); err != nil {
-			return nil, fmt.Errorf("failed to read profile name length for index %d: %v", idx, err)
+			return fmt.Errorf("failed to read profile name length for index %d: %v", idx, err)
 		}
 
 		str := make([]byte, nameLength)
-		_, err := r.Read(str)
-		if err != nil {
-			return nil, err
+		if _, err := r.Read(str); err != nil {
+			return fmt.Errorf("failed to read profile name for index %d: %v", idx, err)
 		}
 
 		sp.Name = strings.Trim(string(str[:]), "\x00")
@@ -413,7 +302,7 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 	opNodeCount := (baseAddr - opNodeStart) / 8
 	opNodeOffsets := make([]uint16, opNodeCount)
 	if err := binary.Read(r, binary.LittleEndian, &opNodeOffsets); err != nil {
-		return nil, fmt.Errorf("failed to read sandbox op node offets: %v", err)
+		return fmt.Errorf("failed to read sandbox op node offets: %v", err)
 	}
 	// TODO: refactor to only use sb.OpNodes
 	opNodes := make([]uint64, opNodeCount)
@@ -421,7 +310,7 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 		var opNodeValue uint64
 		r.Seek(int64(opoff), io.SeekStart)
 		if err := binary.Read(r, binary.LittleEndian, &opNodeValue); err != nil {
-			return nil, fmt.Errorf("failed to read sandbox op node offets: %v", err)
+			return fmt.Errorf("failed to read sandbox op node offets: %v", err)
 		}
 		opNodes = append(opNodes, opNodeValue)
 		sb.OpNodes[opoff] = opNodeValue
@@ -457,13 +346,12 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 
 		var globalLength uint16
 		if err := binary.Read(r, binary.LittleEndian, &globalLength); err != nil {
-			return nil, fmt.Errorf("failed to read global variable length: %v", err)
+			return fmt.Errorf("failed to read global variable length: %v", err)
 		}
 
 		str := make([]byte, globalLength)
-		_, err := r.Read(str)
-		if err != nil {
-			return nil, err
+		if _, err := r.Read(str); err != nil {
+			return fmt.Errorf("failed to read global variable data: %v", err)
 		}
 
 		sb.Globals[goff] = strings.Trim(string(str[:]), "\x00")
@@ -475,12 +363,12 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 
 		var itemLength uint16
 		if err := binary.Read(r, binary.LittleEndian, &itemLength); err != nil {
-			return nil, fmt.Errorf("failed to read regex table offset: %v", err)
+			return fmt.Errorf("failed to read regex table offset: %v", err)
 		}
 
 		data := make([]byte, itemLength)
 		if _, err := r.Read(data); err != nil {
-			return nil, err
+			return fmt.Errorf("failed to read regex table data: %v", err)
 		}
 
 		log.Debugf("[+] idx: %03d, offset: %#x, location: %#x, length: %#x\n\n%s", idx, baseAddr+8*uint32(roff), 8*roff, itemLength, hex.Dump(data))
@@ -488,7 +376,195 @@ func ParseSandboxCollection(data []byte, opsList []string) (*Sandbox, error) {
 		sb.Regexes[roff] = data
 	}
 
-	return sb, nil
+	return nil
+}
+
+func (sb *Sandbox) parseXrefs() error {
+	if len(sb.xrefs) > 0 {
+		return nil
+	}
+
+	var kextStartOffset uint64
+
+	startAdders, err := getKextStartVMAddrs(sb.kern)
+	if err != nil {
+		return fmt.Errorf("failed to get kext start addresses: %w", err)
+	}
+
+	infos, err := getKextInfos(sb.kern)
+	if err != nil {
+		return fmt.Errorf("failed to get kext infos: %w", err)
+	}
+
+	for idx, info := range infos {
+		if strings.Contains(string(info.Name[:]), "sandbox") {
+			sb.kextStartAddr = startAdders[idx] | tagPtrMask
+			sb.kextEndAddr = startAdders[idx+1] | tagPtrMask
+			kextStartOffset, err = sb.kern.GetOffset(sb.kextStartAddr)
+			if err != nil {
+				return fmt.Errorf("failed to get sandbox kext start offset: %w", err)
+			}
+			break
+		}
+	}
+
+	// TODO: only get function data (avoid parsing macho header etc)
+	data := make([]byte, sb.kextEndAddr-sb.kextStartAddr)
+	if _, err = sb.kern.ReadAt(data, int64(kextStartOffset)); err != nil {
+		return fmt.Errorf("failed to read sandbox kext data: %w", err)
+	}
+
+	var instrValue uint32
+	var results [1024]byte
+	var prevInstr *disassemble.Instruction
+
+	dr := bytes.NewReader(data)
+	sb.xrefs = make(map[uint64]uint64)
+	startAddr := sb.kextStartAddr
+
+	for {
+		err = binary.Read(dr, binary.LittleEndian, &instrValue)
+
+		if err == io.EOF {
+			break
+		}
+
+		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+		if err != nil {
+			startAddr += uint64(binary.Size(uint32(0)))
+			continue
+		}
+
+		if strings.Contains(instruction.Encoding.String(), "branch") { // TODO: this could be slow?
+			for _, op := range instruction.Operands {
+				if op.Class == disassemble.LABEL {
+					sb.xrefs[instruction.Address] = uint64(op.Immediate)
+				}
+			}
+		} else if strings.Contains(instruction.Encoding.String(), "loadlit") { // TODO: this could be slow?
+			sb.xrefs[instruction.Address] = uint64(instruction.Operands[1].Immediate)
+		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
+			(instruction.Operation == disassemble.ARM64_ADD ||
+				instruction.Operation == disassemble.ARM64_LDR ||
+				instruction.Operation == disassemble.ARM64_LDRB ||
+				instruction.Operation == disassemble.ARM64_LDRSW) {
+			adrpRegister := prevInstr.Operands[0].Registers[0]
+			adrpImm := prevInstr.Operands[1].Immediate
+			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
+			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[2].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
+			}
+			sb.xrefs[instruction.Address] = adrpImm
+		}
+
+		// fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction)
+
+		prevInstr = instruction
+		startAddr += uint64(binary.Size(uint32(0)))
+	}
+
+	return nil
+}
+
+// emulateBlock emulates the register state of a block of code that if fails branches to a given panic containing the given error message.
+func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
+	if err := sb.parseXrefs(); err != nil {
+		return nil, fmt.Errorf("failed to parse sandbox kext xrefs: %w", err)
+	}
+
+	panicStrVMAddr, err := findCStringVMaddr(sb.kern, errmsg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find panic string matching %s: %w", errmsg, err)
+	}
+
+	var panicXrefVMAddr uint64
+	for k, v := range sb.xrefs {
+		if v == panicStrVMAddr {
+			panicXrefVMAddr = k - 4
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("panic string xref %#x => %#x", panicXrefVMAddr, v))
+			break
+		}
+	}
+
+	if panicXrefVMAddr == 0 {
+		return nil, fmt.Errorf("failed to find panic string cross reference for given error message: %s", errmsg)
+	}
+
+	hook_policy_init, err := sb.kern.GetFunctionForVMAddr(panicXrefVMAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find _hook_policy_init function: %w", err)
+	}
+
+	data, err := sb.kern.GetFunctionData(hook_policy_init)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get _hook_policy_init function data: %w", err)
+	}
+
+	instrs, err := disassemble.GetInstructions(hook_policy_init.StartAddr, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to disassemble _hook_policy_init function: %w", err)
+	}
+
+	block, err := instrs.GetAddressBlock(panicXrefVMAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get _hook_policy_init function block containing address %#x: %w", panicXrefVMAddr, err)
+	}
+
+	var failXrefVMAddr uint64
+	for k, v := range sb.xrefs {
+		if v == block[0].Address {
+			failXrefVMAddr = k
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("failure path xref %#x => %#x", failXrefVMAddr, v))
+			break
+		}
+	}
+
+	block, err = instrs.GetAddressBlock(failXrefVMAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get _hook_policy_init function block containing xref to failure path %#x: %w", failXrefVMAddr, err)
+	}
+
+	/*****************
+	 * EMULATE BLOCK *
+	 *****************/
+
+	var prevInstr *disassemble.Instruction
+	regs := make(map[string]uint64)
+
+	for _, instruction := range block {
+		if strings.Contains(instruction.Encoding.String(), "loadlit") { // TODO: this could be slow?
+			regs[instruction.Operands[0].Registers[0].String()] = uint64(instruction.Operands[1].Immediate)
+		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_ADRP) &&
+			(instruction.Operation == disassemble.ARM64_ADD ||
+				instruction.Operation == disassemble.ARM64_LDR ||
+				instruction.Operation == disassemble.ARM64_LDRB ||
+				instruction.Operation == disassemble.ARM64_LDRSW) {
+			adrpRegister := prevInstr.Operands[0].Registers[0]
+			adrpImm := prevInstr.Operands[1].Immediate
+			if instruction.Operation == disassemble.ARM64_LDR && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRB && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
+			} else if instruction.Operation == disassemble.ARM64_ADD && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[2].Immediate
+			} else if instruction.Operation == disassemble.ARM64_LDRSW && adrpRegister == instruction.Operands[1].Registers[0] {
+				adrpImm += instruction.Operands[1].Immediate
+			}
+			regs[instruction.Operands[0].Registers[0].String()] = adrpImm
+		} else if instruction.Operation == disassemble.ARM64_MOV {
+			regs[instruction.Operands[0].Registers[0].String()] = instruction.Operands[1].Immediate
+		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_MOV) && instruction.Operation == disassemble.ARM64_MOVK {
+			regs[instruction.Operands[0].Registers[0].String()] += instruction.Operands[1].GetImmediate()
+		}
+		prevInstr = instruction
+	}
+
+	return regs, nil
 }
 
 func getTag(ptr uint64) uint64 {

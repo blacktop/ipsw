@@ -1,4 +1,4 @@
-// +build cgo
+//go:build cgo
 
 /*
 Copyright © 2018-2022 blacktop
@@ -24,7 +24,6 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -37,22 +36,26 @@ import (
 )
 
 func init() {
-	kernelcacheCmd.AddCommand(sbprofCmd)
-
-	sbprofCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	kernelcacheCmd.AddCommand(sbdecCmd)
+	sbdecCmd.Flags().BoolP("dump", "d", false, "Dump sandbox profile data")
+	sbdecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
-// sbprofCmd represents the sbprof command
-var sbprofCmd = &cobra.Command{
-	Use:    "sbprof",
-	Short:  "🚧 [WIP] Extract kernel sandbox profile data",
-	Args:   cobra.MinimumNArgs(1),
-	Hidden: true,
+// sbdecCmd represents the kernel sbdec command
+var sbdecCmd = &cobra.Command{
+	Use:           "sbdec",
+	Short:         "🚧 [WIP] Decompile Sandbox Profile",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		dump, _ := cmd.Flags().GetBool("dump")
 
 		kcPath := filepath.Clean(args[0])
 
@@ -66,43 +69,34 @@ var sbprofCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		data, err := ioutil.ReadFile(kcPath)
+		sb, err := kernelcache.NewSandbox(m)
 		if err != nil {
 			return err
 		}
 
-		the_real_platform_profile_data, err := kernelcache.GetSandboxProfiles(m, bytes.NewReader(data))
-		if err != nil {
-			return err
+		if dump {
+			if dat, err := sb.GetPlatformProfileData(); err != nil {
+				return fmt.Errorf("failed to get sandbox platform profile data: %v", err)
+			} else {
+				sbppath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
+				log.Infof("Creating %s...", sbppath)
+				if err := ioutil.WriteFile(sbppath, dat, 0755); err != nil {
+					return fmt.Errorf("failed to write sandbox platform profile data: %v", err)
+				}
+			}
+			if dat, err := sb.GetCollectionData(); err != nil {
+				return fmt.Errorf("failed to get sandbox collection data: %v", err)
+			} else {
+				sbcpath := filepath.Join(filepath.Dir(kcPath), "sandbox_collection.bin")
+				log.Infof("Creating %s...", sbcpath)
+				if err := ioutil.WriteFile(sbcpath, dat, 0755); err != nil {
+					return fmt.Errorf("failed to write sandbox collection data: %v", err)
+				}
+			}
 		}
 
-		sbProfPath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
-		err = ioutil.WriteFile(sbProfPath, the_real_platform_profile_data, 0755)
-		if err != nil {
-			return err
-		}
-		log.Info("Created " + sbProfPath)
-
-		collection_data, err := kernelcache.GetSandboxCollections(m, bytes.NewReader(data))
-		if err != nil {
-			return err
-		}
-
-		sbColPath := filepath.Join(filepath.Dir(kcPath), "sandbox_collection.bin")
-		err = ioutil.WriteFile(sbColPath, collection_data, 0755)
-		if err != nil {
-			return err
-		}
-		log.Info("Created " + sbColPath)
-
-		log.Info("Parsing " + sbColPath)
-		sbOpsList, err := kernelcache.GetSandboxOpts(m)
-		if err != nil {
-			return err
-		}
-		_, err = kernelcache.ParseSandboxCollection(collection_data, sbOpsList)
-		if err != nil {
-			return err
+		if err := sb.ParseSandboxCollection(); err != nil {
+			return fmt.Errorf("failed parsing sandbox collection: %s", err)
 		}
 
 		// regexFolder := filepath.Join(filepath.Dir(kcPath), "regex")

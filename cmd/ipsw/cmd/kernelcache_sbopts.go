@@ -1,4 +1,4 @@
-// +build cgo
+//go:build cgo
 
 /*
 Copyright © 2018-2022 blacktop
@@ -45,9 +45,11 @@ func init() {
 
 // kernelSandboxCmd represents the kernelSandboxCmd command
 var kernelSandboxCmd = &cobra.Command{
-	Use:   "sbopts",
-	Short: "List kernel sandbox operations",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "sbopts",
+	Short:         "List kernel sandbox operations",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -68,9 +70,14 @@ var kernelSandboxCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sbOpts, err := kernelcache.GetSandboxOpts(m)
+		sb, err := kernelcache.NewSandbox(m)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create kernelcache sandbox parser: %v", err)
+		}
+
+		sbOpts, err := sb.GetOperations()
+		if err != nil {
+			return fmt.Errorf("failed to get sandbox operations: %s", err)
 		}
 
 		if diff {
@@ -93,9 +100,14 @@ var kernelSandboxCmd = &cobra.Command{
 			}
 			defer m2.Close()
 
-			sbOpts2, err := kernelcache.GetSandboxOpts(m2)
+			sb2, err := kernelcache.NewSandbox(m2)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to create kernelcache sandbox parser: %v", err)
+			}
+
+			sbOpts2, err := sb2.GetOperations()
+			if err != nil {
+				return fmt.Errorf("failed to get sandbox operations: %s", err)
 			}
 
 			sb1OUT := strings.Join(sbOpts, "\n")
