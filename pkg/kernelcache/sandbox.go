@@ -12,15 +12,17 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/hashicorp/go-version"
 )
 
 const (
-	profileInitPanic    = "failed to initialize platform sandbox"
-	collectionInitPanic = "failed to initialize builtin collection"
+	profileInitPanic      = "failed to initialize platform sandbox"
+	collectionInitPanic14 = "failed to initialize collection"
+	collectionInitPanic15 = "failed to initialize builtin collection"
 )
 
 type SandboxProfileHeader14 struct {
-	Version        uint16
+	Type           uint16
 	OpNodeCount    uint16
 	OpCount        uint8
 	GlobalVarCount uint8
@@ -30,7 +32,7 @@ type SandboxProfileHeader14 struct {
 }
 
 type SandboxProfileHeader15 struct {
-	Version        uint16
+	Type           uint16
 	OpNodeCount    uint16
 	OpCount        uint8
 	GlobalVarCount uint8
@@ -62,6 +64,8 @@ func (sp SandboxProfile) String() string {
 }
 
 type Sandbox struct {
+	Hdr header
+
 	Globals  map[uint16]string
 	Regexes  map[uint16][]byte
 	OpNodes  map[uint16]uint64
@@ -72,9 +76,30 @@ type Sandbox struct {
 	platformProfileData []byte
 
 	kern          *macho.File
+	darwin        *version.Version
 	kextStartAddr uint64
 	kextEndAddr   uint64
 	xrefs         map[uint64]uint64
+	config        Config
+}
+
+type header struct {
+	Type           uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	MsgItemCount   uint16
+}
+
+type Config struct {
+	profileInitPanic    string
+	profileInitArgs     []string
+	profileHeader       any
+	collectionInitPanic string
+	collectionInitArgs  []string
+	collectionHeader    any
 }
 
 func NewSandbox(m *macho.File) (*Sandbox, error) {
@@ -85,9 +110,45 @@ func NewSandbox(m *macho.File) (*Sandbox, error) {
 		Profiles: make([]SandboxProfile, 0),
 		kern:     m,
 	}
+
 	if _, err := sb.GetOperations(); err != nil {
 		return nil, fmt.Errorf("failed to parse sandbox operations: %w", err)
 	}
+
+	kv, err := GetVersion(sb.kern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kernel version: %w", err)
+	}
+	sb.darwin, err = version.NewVersion(kv.Kernel.Darwin)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse darwin version: %w", err)
+	}
+
+	// configure sandbox parser
+	sb.config.profileInitPanic = profileInitPanic
+	sb.config.profileInitArgs = []string{"x1", "w2"}
+
+	iOS14x, err := version.NewConstraint(">= 20.0.0, < 21.0.0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse darwin version constraint: %w", err)
+	}
+	iOS15x, err := version.NewConstraint(">= 21.0.0, < 22.0.0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse darwin version constraint: %w", err)
+	}
+
+	if iOS14x.Check(sb.darwin) {
+		sb.config.collectionInitPanic = collectionInitPanic14
+		sb.config.collectionInitArgs = []string{"x1", "w2"}
+		sb.config.collectionHeader = &SandboxProfileHeader14{}
+	} else if iOS15x.Check(sb.darwin) {
+		sb.config.collectionInitPanic = collectionInitPanic15
+		sb.config.collectionInitArgs = []string{"x2", "w3"}
+		sb.config.collectionHeader = &SandboxProfileHeader15{}
+	} else {
+		return nil, fmt.Errorf("unsupported darwin version: %s (only supports iOS14.x and iOS15.x)", sb.darwin)
+	}
+
 	return &sb, nil
 }
 
@@ -101,10 +162,12 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		ptrs := make([]uint64, dconst.Size/8)
 		if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &ptrs); err != nil {
 			return nil, err
 		}
+
 		found := false
 		for _, ptr := range ptrs {
 			if ptr == 0 {
@@ -141,17 +204,16 @@ func (sb *Sandbox) GetCollectionData() ([]byte, error) {
 	}
 
 	log.Info("Searching for sandbox collection data")
-	regs, err := sb.emulateBlock(collectionInitPanic)
+	regs, err := sb.emulateBlock(sb.config.collectionInitPanic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to emulate block containing call to _collection_init(): %v", err)
 	}
 
-	collection_data_addr := regs["x2"]
-	collection_data_size := regs["w3"]
+	collection_data_addr := regs[sb.config.collectionInitArgs[0]]
+	collection_data_size := regs[sb.config.collectionInitArgs[1]]
 
-	// _collection_init(&_builtin_collection, "builtin collection", &_collection_data, 0xc6d6a, ...);
-	utils.Indent(log.Info, 2)(fmt.Sprintf("emulated args:: _collection_init(%#x, \"builtin collection\", %#x, %#x, x4);",
-		regs["x0"],
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("emulated args:: _collection_init(%#x, \"builtin collection\", %#x, %#x, x4);",
+		regs["x0"], // &_builtin_collection
 		collection_data_addr,
 		collection_data_size),
 	)
@@ -174,15 +236,15 @@ func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
 	}
 
 	log.Info("Searching for sandbox platform profile data")
-	regs, err := sb.emulateBlock(profileInitPanic)
+	regs, err := sb.emulateBlock(sb.config.profileInitPanic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to emulate block containing call to _profile_init(): %v", err)
 	}
 
-	platform_profile_data_addr := regs["x1"]
-	platform_profile_data_size := regs["w2"]
+	platform_profile_data_addr := regs[sb.config.profileInitArgs[0]]
+	platform_profile_data_size := regs[sb.config.profileInitArgs[1]]
 
-	utils.Indent(log.Info, 2)(fmt.Sprintf("emulated args:: _profile_init(%#x, %#x, %#x);", regs["x0"], platform_profile_data_addr, platform_profile_data_size))
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("emulated args:: _profile_init(%#x, %#x, %#x);", regs["x0"], platform_profile_data_addr, platform_profile_data_size))
 
 	profileOffset, err := sb.kern.GetOffset(platform_profile_data_addr)
 	if err != nil {
@@ -198,37 +260,44 @@ func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
 }
 
 func (sb *Sandbox) ParseSandboxCollection() error {
-	var collection SandboxProfileHeader15
+
+	if _, err := sb.GetCollectionData(); err != nil {
+		return err
+	}
 
 	r := bytes.NewReader(sb.collectionData)
 
-	if err := binary.Read(r, binary.LittleEndian, &collection); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, sb.config.collectionHeader); err != nil {
 		return fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
 	}
 
-	regexOffsets := make([]uint16, collection.RegexItemCount)
+	if err := sb.parseHdr(sb.config.collectionHeader); err != nil {
+		return fmt.Errorf("failed to parse sandbox profile header structure: %v", err)
+	}
+
+	regexOffsets := make([]uint16, sb.Hdr.RegexItemCount)
 	if err := binary.Read(r, binary.LittleEndian, &regexOffsets); err != nil {
 		return fmt.Errorf("failed to read sandbox profile regex offets: %v", err)
 	}
 
-	globalOffsets := make([]uint16, collection.GlobalVarCount)
+	globalOffsets := make([]uint16, sb.Hdr.GlobalVarCount)
 	if err := binary.Read(r, binary.LittleEndian, &globalOffsets); err != nil {
 		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
-	msgOffsets := make([]uint16, collection.MsgItemCount)
+	msgOffsets := make([]uint16, sb.Hdr.MsgItemCount)
 	if err := binary.Read(r, binary.LittleEndian, &msgOffsets); err != nil {
 		return fmt.Errorf("failed to read sandbox profile message offets: %v", err)
 	}
 
-	profileSize := uint32(collection.OpCount+uint8(binary.Size(uint16(0)))) * 2
+	profileSize := uint32(sb.Hdr.OpCount+uint8(binary.Size(uint16(0)))) * 2
 	log.Debugf("[+] profile size: %d", profileSize)
 
-	globalVarStart := 2*uint32(collection.RegexItemCount) + 12
-	globalVarEnd := globalVarStart + 2*uint32(collection.GlobalVarCount)
+	globalVarStart := 2*uint32(sb.Hdr.RegexItemCount) + 12
+	globalVarEnd := globalVarStart + 2*uint32(sb.Hdr.GlobalVarCount)
 	log.Debugf("[+] global var start: %#x, end: %#x", globalVarStart, globalVarEnd)
 
-	opNodeStartTmp := globalVarEnd + 2*uint32(collection.MsgItemCount) + profileSize*uint32(collection.ProfileCount)
+	opNodeStartTmp := globalVarEnd + 2*uint32(sb.Hdr.MsgItemCount) + profileSize*uint32(sb.Hdr.ProfileCount)
 	log.Debugf("[+] temp op node start: %#x", opNodeStartTmp)
 
 	// delta op node start
@@ -243,11 +312,11 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 	log.Debugf("[+] op node start: %#x", opNodeStart)
 
 	// start address of regex, global, messsages
-	baseAddr := opNodeStart + uint32(collection.OpNodeCount)*8
+	baseAddr := opNodeStart + uint32(sb.Hdr.OpNodeCount)*8
 	log.Debugf("[+] start address of regex, global, messsages: %#x", baseAddr)
 
 	var profileDatas [][]byte
-	for i := uint16(0); i < collection.ProfileCount; i++ {
+	for i := uint16(0); i < sb.Hdr.ProfileCount; i++ {
 		profile := make([]byte, profileSize)
 		if err := binary.Read(r, binary.LittleEndian, &profile); err != nil {
 			return fmt.Errorf("failed to read sandbox profiles: %v", err)
@@ -269,7 +338,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 			return fmt.Errorf("failed to read profile version for index %d: %v", idx, err)
 		}
 
-		for i := 0; i < int(collection.OpCount); i++ {
+		for i := 0; i < int(sb.Hdr.OpCount); i++ {
 			so := SandboxOperation{Name: sb.operations[i]}
 			if err := binary.Read(pr, binary.LittleEndian, &so.Index); err != nil {
 				return fmt.Errorf("failed to read sandbox operation index for %s: %v", sb.operations[i], err)
@@ -565,6 +634,30 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 	}
 
 	return regs, nil
+}
+
+func (sb *Sandbox) parseHdr(hdr any) error {
+	switch v := hdr.(type) {
+	case *SandboxProfileHeader14:
+		sb.Hdr.Type = v.Type
+		sb.Hdr.OpNodeCount = v.OpNodeCount
+		sb.Hdr.OpCount = v.OpCount
+		sb.Hdr.GlobalVarCount = v.GlobalVarCount
+		sb.Hdr.ProfileCount = v.ProfileCount
+		sb.Hdr.RegexItemCount = v.RegexItemCount
+		sb.Hdr.MsgItemCount = v.MsgItemCount
+	case *SandboxProfileHeader15:
+		sb.Hdr.Type = v.Type
+		sb.Hdr.OpNodeCount = v.OpNodeCount
+		sb.Hdr.OpCount = v.OpCount
+		sb.Hdr.GlobalVarCount = v.GlobalVarCount
+		sb.Hdr.ProfileCount = v.ProfileCount
+		sb.Hdr.RegexItemCount = v.RegexItemCount
+		sb.Hdr.MsgItemCount = v.MsgItemCount
+	default:
+		return fmt.Errorf("unknown profile header type: %T", v)
+	}
+	return nil
 }
 
 func getTag(ptr uint64) uint64 {
