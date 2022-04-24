@@ -906,10 +906,6 @@ func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to find _operation_info symbol: %w", err)
 	}
-	uuid, operationInfoOff, err := d.GetOffset(operationInfoAddr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get _operation_info offset: %w", err)
-	}
 
 	dat, err := d.ReadBytesForUUID(uuid, int64(operationNamesOff), operationInfoAddr-operationNamesAddr)
 	if err != nil {
@@ -927,6 +923,11 @@ func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
 			return nil, fmt.Errorf("failed to read operation name: %w", err)
 		}
 		opNames = append(opNames, name)
+	}
+
+	uuid, operationInfoOff, err := d.GetOffset(operationInfoAddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get _operation_info offset: %w", err)
 	}
 
 	dat, err = d.ReadBytesForUUID(uuid, int64(operationInfoOff), uint64(len(opNames)*binary.Size(operationInfo{})))
