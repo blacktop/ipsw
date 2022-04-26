@@ -84,7 +84,8 @@ const ( // CREDIT: Siguza
 	macOS12DeveloperBeta assetAudienceID = "298e518d-b45e-4d36-94be-34a63d6777ec" // macOS 12 developer beta
 	macOS12PublicBeta    assetAudienceID = "9f86c787-7c59-45a7-a79a-9c164b00f866" // macOS 12 public beta
 
-	displayIOSRelease assetAudienceID = macOSRelease // studio display iOS release
+	displayIOSRelease assetAudienceID = macOSRelease         // studio display iOS release
+	displayIOSBeta    assetAudienceID = macOS12DeveloperBeta // studio display iOS beta
 )
 
 // Ota is an OTA object
@@ -221,7 +222,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					return []assetAudienceID{iOS15DeveloperBeta}, nil
+					return []assetAudienceID{iOS15DeveloperBeta, displayIOSBeta}, nil
 				case 11:
 					return []assetAudienceID{iOS11Beta}, nil
 				case 12:
