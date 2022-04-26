@@ -13,6 +13,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/kernelcache/sandbox"
 	"github.com/hashicorp/go-version"
 )
 
@@ -87,7 +88,7 @@ type Sandbox struct {
 
 	Profiles  []SandboxProfile
 	OpNodes   []operationNode
-	Regexes   [][]byte
+	Regexes   []*sandbox.Regex
 	Globals   []string
 	Modifiers []string
 
@@ -378,8 +379,12 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		if err := binary.Read(r, binary.LittleEndian, &rdat); err != nil {
 			return fmt.Errorf("failed to read sandbox collection regex data: %v", err)
 		}
-		utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, length: %#x\n\n%s", idx+1, loc, size, hex.Dump(rdat)))
-		sb.Regexes = append(sb.Regexes, rdat)
+		re, err := sandbox.NewRegex(rdat)
+		if err != nil {
+			return fmt.Errorf("failed to parse sandbox collection regex: %v", err)
+		}
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, version: %d, length: %#x\n\n%s", idx+1, loc, re.Version, re.Length, hex.Dump(re.Data)))
+		sb.Regexes = append(sb.Regexes, re)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing variables (%d)", sb.Hdr.GlobalVarCount))
