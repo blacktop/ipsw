@@ -22,7 +22,11 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
+	"compress/gzip"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -35,8 +39,15 @@ import (
 
 func init() {
 	kernelcacheCmd.AddCommand(libsandboxCmd)
-
+	libsandboxCmd.Flags().BoolP("json", "j", false, "Output to stdout as JSON")
+	libsandboxCmd.Flags().StringP("output", "o", "", "Folder to write JSON")
 	libsandboxCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+}
+
+type LibSandbox struct {
+	Operations []kernelcache.OperationInfo `json:"operations,omitempty"`
+	Filters    []kernelcache.FilterInfo    `json:"filters,omitempty"`
+	Modifiers  []kernelcache.ModifierInfo  `json:"modifiers,omitempty"`
 }
 
 // libsandboxCmd represents the libsandbox command
@@ -52,6 +63,10 @@ var libsandboxCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		// flags
+		asJSON, _ := cmd.Flags().GetBool("json")
+		output, _ := cmd.Flags().GetString("output")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -84,31 +99,9 @@ var libsandboxCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println("Filter Info")
-		fmt.Println("===========")
-		for idx, filter := range fi {
-			fmt.Printf("%02d: %s\t(%s)\n", idx, filter.Name, filter.Category)
-			if len(filter.Aliases) > 0 {
-				for _, alias := range filter.Aliases {
-					fmt.Printf("    %d) %s\n", alias.Value, alias.Name)
-				}
-			}
-		}
-
 		mi, err := kernelcache.GetModifierInfo(f)
 		if err != nil {
 			return err
-		}
-		fmt.Println()
-		fmt.Println("Modifier Info")
-		fmt.Println("=============")
-		for idx, modifier := range mi {
-			fmt.Printf("%02d: %s\n", idx, modifier.Name)
-			if len(modifier.Aliases) > 0 {
-				for _, alias := range modifier.Aliases {
-					fmt.Printf("    %d) %s\n", alias.Value, alias.Name)
-				}
-			}
 		}
 
 		oi, err := kernelcache.GetOperationInfo(f)
@@ -116,11 +109,57 @@ var libsandboxCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Println()
-		fmt.Println("Operation Names")
-		fmt.Println("===============")
-		for idx, o := range oi {
-			fmt.Printf("%02d: %s\n", idx, o.Name)
+		if asJSON {
+			dat, err := json.Marshal(LibSandbox{
+				Operations: oi,
+				Filters:    fi,
+				Modifiers:  mi,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to marshal json: %w", err)
+			}
+
+			if len(output) > 0 {
+				fpath := filepath.Join(output, fmt.Sprintf("libsandbox_%s.gz", f.Headers[f.UUID].OsVersion.String()))
+				log.Infof("Creating %s", fpath)
+				var buf bytes.Buffer
+				gz := gzip.NewWriter(&buf)
+				gz.Write(dat)
+				gz.Close()
+				if err := ioutil.WriteFile(fpath, buf.Bytes(), 0755); err != nil {
+					return err
+				}
+			} else {
+				fmt.Println(string(dat))
+			}
+		} else {
+			fmt.Println("Filter Info")
+			fmt.Println("===========")
+			for idx, filter := range fi {
+				fmt.Printf("%02d: %s\t(%s)\n", idx, filter.Name, filter.Category)
+				if len(filter.Aliases) > 0 {
+					for _, alias := range filter.Aliases {
+						fmt.Printf("    %d) %s\n", alias.ID, alias.Name)
+					}
+				}
+			}
+			fmt.Println()
+			fmt.Println("Modifier Info")
+			fmt.Println("=============")
+			for idx, modifier := range mi {
+				fmt.Printf("%02d: %s\n", idx, modifier.Name)
+				if len(modifier.Aliases) > 0 {
+					for _, alias := range modifier.Aliases {
+						fmt.Printf("    %d) %s\n", alias.ID, alias.Name)
+					}
+				}
+			}
+			fmt.Println()
+			fmt.Println("Operation Names")
+			fmt.Println("===============")
+			for idx, o := range oi {
+				fmt.Printf("%02d: %s\n", idx, o.Name)
+			}
 		}
 
 		return nil

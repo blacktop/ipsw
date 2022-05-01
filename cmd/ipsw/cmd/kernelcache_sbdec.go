@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -99,12 +100,51 @@ var sbdecCmd = &cobra.Command{
 			return fmt.Errorf("failed parsing sandbox collection: %s", err)
 		}
 
+		wk, err := sb.GetProfile("com.apple.WebKit.WebContent")
+		if err != nil {
+			return err
+		}
+
+		fmt.Println(wk)
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		for idx, opName := range sb.Operations {
+			if idx >= len(wk.Operands) {
+				break
+			}
+			fmt.Fprintf(w, "- %s:\t%s\n", opName, sb.OpNodes[wk.Operands[idx]].String())
+		}
+		w.Flush()
+
+		// for _, op := range sb.OpNodes {
+		// 	if op.IsTerminal() {
+		// 		fmt.Println(op)
+		// 	}
+		// }
+
+		// rl, err := sb.Regexes[0].Parse()
+		// if err != nil {
+		// 	return err
+		// }
+
+		if _, err := sb.Regexes[3].NFA(); err != nil {
+			return err
+		}
+
+		sb.Regexes[3].Graph()
+		// sb.Regexes[80].Graph()
+
+		// for _, re := range sb.Regexes {
+		// 	fmt.Println(re)
+		// 	if _, err := re.Graph(); err != nil {
+		// 		return err
+		// 	}
+		// }
+
 		// regexFolder := filepath.Join(filepath.Dir(kcPath), "regex")
 		// os.MkdirAll(regexFolder, 0755)
-
-		// for off, data := range sb.Regexes {
-		// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%x", off))
-		// 	err = ioutil.WriteFile(regexPath, data, 0755)
+		// for idx, re := range sb.Regexes {
+		// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%d", idx))
+		// 	err = ioutil.WriteFile(regexPath, re.Data, 0755)
 		// 	if err != nil {
 		// 		return err
 		// 	}

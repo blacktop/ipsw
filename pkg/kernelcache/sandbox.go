@@ -71,28 +71,23 @@ type SandboxProfile struct {
 	Name       string
 	nameOffset uint16
 	Version    uint16
-	Operations []SandboxOperation
-	ops        []uint16
+	Operands   []uint16
 }
 
 func (sp SandboxProfile) String() string {
-	out := fmt.Sprintf("[+] %s, version: %d\n", sp.Name, sp.Version)
-	for _, o := range sp.Operations {
-		out += fmt.Sprintf("  name: %s, index: %#x, value: %#016x\n", o.Name, o.Index, o.Value)
-	}
-	return out
+	return fmt.Sprintf("[+] %s, version: %d", sp.Name, sp.Version)
 }
 
 type Sandbox struct {
 	Hdr header
 
 	Profiles  []SandboxProfile
-	OpNodes   []operationNode
+	OpNodes   []sandbox.OperationNode
 	Regexes   []*sandbox.Regex
 	Globals   []string
 	Modifiers []string
 
-	operations          []string
+	Operations          []string
 	collectionData      []byte
 	platformProfileData []byte
 
@@ -173,8 +168,8 @@ func NewSandbox(m *macho.File) (*Sandbox, error) {
 }
 
 func (sb *Sandbox) GetOperations() ([]string, error) {
-	if len(sb.operations) > 0 {
-		return sb.operations, nil
+	if len(sb.Operations) > 0 {
+		return sb.Operations, nil
 	}
 
 	if dconst := sb.kern.Section("__DATA_CONST", "__const"); dconst != nil {
@@ -207,7 +202,7 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 			}
 
 			if found {
-				sb.operations = append(sb.operations, str)
+				sb.Operations = append(sb.Operations, str)
 				if getTag(ptr) != 0x17 { // always directly followed by another pointer
 					break
 				}
@@ -215,7 +210,7 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 		}
 	}
 
-	return sb.operations, nil
+	return sb.Operations, nil
 }
 
 func (sb *Sandbox) GetCollectionData() ([]byte, error) {
@@ -327,8 +322,8 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox profile structure: %v", err)
 		}
-		sbp.ops = make([]uint16, sb.Hdr.OpCount)
-		if err := binary.Read(r, binary.LittleEndian, sbp.ops); err != nil {
+		sbp.Operands = make([]uint16, sb.Hdr.OpCount)
+		if err := binary.Read(r, binary.LittleEndian, sbp.Operands); err != nil {
 			return fmt.Errorf("failed to read sandbox profile structure: %v", err)
 		}
 		sb.Profiles = append(sb.Profiles, sbp)
@@ -344,7 +339,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing operation nodes (%d)", sb.Hdr.OpNodeCount))
 	opNodeStart, _ := r.Seek(0, io.SeekCurrent)
-	sb.OpNodes = make([]operationNode, sb.Hdr.OpNodeCount)
+	sb.OpNodes = make([]sandbox.OperationNode, sb.Hdr.OpNodeCount)
 	if err := binary.Read(r, binary.LittleEndian, sb.OpNodes); err != nil {
 		return fmt.Errorf("failed to read sandbox collection operation nodes: %v", err)
 	}
@@ -420,6 +415,15 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 	// }
 
 	return nil
+}
+
+func (sb *Sandbox) GetProfile(name string) (SandboxProfile, error) {
+	for _, p := range sb.Profiles {
+		if p.Name == name {
+			return p, nil
+		}
+	}
+	return SandboxProfile{}, fmt.Errorf("profile %s not found", name)
 }
 
 func (sb *Sandbox) parseXrefs() error {
@@ -647,10 +651,11 @@ func (sb *Sandbox) parseProfile(p any) (uint16, uint16, error) {
 }
 
 type FilterInfo struct {
-	Name     string
-	Category string
-	Aliases  []Alias
-	filterInfo
+	ID         int     `json:"id"`
+	Name       string  `json:"name,omitempty"`
+	Category   string  `json:"category,omitempty"`
+	Aliases    []Alias `json:"aliases,omitempty"`
+	filterInfo `json:"-"`
 }
 
 type filterInfo struct {
@@ -663,16 +668,16 @@ type filterInfo struct {
 }
 
 type Alias struct {
-	Name string
+	Name string `json:"name,omitempty"`
 	alias
 }
 
 type alias struct {
-	NameAddr uint64
-	Value    uint16
-	Unknown1 uint16
-	Unknown2 uint16
-	Unknown3 uint16
+	NameAddr uint64 `json:"-,omitempty"`
+	ID       uint16 `json:"id"`
+	Unknown1 uint16 `json:"-,omitempty"`
+	Unknown2 uint16 `json:"-,omitempty"`
+	Unknown3 uint16 `json:"-,omitempty"`
 }
 
 func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
@@ -707,7 +712,7 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 	r := bytes.NewReader(dat)
 
 	for i := 0; i <= NUM_INFO_ENTRIES; i++ {
-		var fi FilterInfo
+		fi := FilterInfo{ID: i}
 		if err := binary.Read(r, binary.LittleEndian, &fi.filterInfo); err != nil {
 			return nil, fmt.Errorf("failed to read _filter_info item %d: %w", i, err)
 		}
@@ -758,9 +763,10 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 }
 
 type ModifierInfo struct {
-	Name    string
-	Aliases []Alias
-	modifierInfo
+	ID           int     `json:"id"`
+	Name         string  `json:"name,omitempty"`
+	Aliases      []Alias `json:"aliases,omitempty"`
+	modifierInfo `json:"-"`
 }
 
 type modifierInfo struct {
@@ -804,7 +810,7 @@ func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 	r := bytes.NewReader(dat)
 
 	for i := 0; i < SB_MODIFIER_COUNT; i++ {
-		var mi ModifierInfo
+		mi := ModifierInfo{ID: i}
 		if err := binary.Read(r, binary.LittleEndian, &mi.modifierInfo); err != nil {
 			return nil, fmt.Errorf("failed to read _modifier_info item %d: %w", i, err)
 		}
@@ -849,10 +855,11 @@ func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 }
 
 type OperationInfo struct {
-	Name       string
-	Modifiers  []string
-	Categories []string
-	operationInfo
+	ID            int      `json:"id"`
+	Name          string   `json:"name,omitempty"`
+	Modifiers     []string `json:"modifiers,omitempty"`
+	Categories    []string `json:"categories,omitempty"`
+	operationInfo `json:"-"`
 }
 
 type operationInfo struct {
@@ -927,6 +934,7 @@ func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
 
 	for idx, oi := range oinfos {
 		oinfo := OperationInfo{
+			ID:            idx,
 			Name:          opNames[idx],
 			operationInfo: oi,
 		}
