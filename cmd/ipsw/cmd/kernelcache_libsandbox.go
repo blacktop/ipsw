@@ -32,7 +32,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/sandbox"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -42,12 +42,6 @@ func init() {
 	libsandboxCmd.Flags().BoolP("json", "j", false, "Output to stdout as JSON")
 	libsandboxCmd.Flags().StringP("output", "o", "", "Folder to write JSON")
 	libsandboxCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
-}
-
-type LibSandbox struct {
-	Operations []kernelcache.OperationInfo `json:"operations,omitempty"`
-	Filters    []kernelcache.FilterInfo    `json:"filters,omitempty"`
-	Modifiers  []kernelcache.ModifierInfo  `json:"modifiers,omitempty"`
 }
 
 // libsandboxCmd represents the libsandbox command
@@ -94,23 +88,23 @@ var libsandboxCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		fi, err := kernelcache.GetFilterInfo(f)
+		fi, err := sandbox.GetFilterInfo(f)
 		if err != nil {
 			return err
 		}
 
-		mi, err := kernelcache.GetModifierInfo(f)
+		mi, err := sandbox.GetModifierInfo(f)
 		if err != nil {
 			return err
 		}
 
-		oi, err := kernelcache.GetOperationInfo(f)
+		oi, err := sandbox.GetOperationInfo(f)
 		if err != nil {
 			return err
 		}
 
 		if asJSON {
-			dat, err := json.Marshal(LibSandbox{
+			dat, err := json.Marshal(sandbox.LibSandbox{
 				Operations: oi,
 				Filters:    fi,
 				Modifiers:  mi,

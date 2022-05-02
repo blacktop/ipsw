@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	OPERATION_NODE_TYPE_NON_TERMINAL = 0x00
-	OPERATION_NODE_TYPE_TERMINAL     = 0x01
+	OPERATION_NODE_TYPE_NON_TERMINAL = 0
+	OPERATION_NODE_TYPE_TERMINAL     = 1
 )
 
 type OperationNode uint64
@@ -31,21 +31,21 @@ func (o OperationNode) String() string {
 }
 
 const (
-	TERMINAL_NODE_TYPE_ALLOW = 0x00
-	TERMINAL_NODE_TYPE_DENY  = 0x01
+	TERMINAL_NODE_TYPE_ALLOW = 0
+	TERMINAL_NODE_TYPE_DENY  = 1
 )
 
 // TerminalNode a terminal node, when reached, either denies or allows the rule.
 type TerminalNode uint64
 
 func (n TerminalNode) Type() byte {
-	return byte(types.ExtractBits(uint64(n), 0, 1))
+	return byte(types.ExtractBits(uint64(n), 8, 1))
 }
 func (n TerminalNode) Flags() byte {
-	return byte(types.ExtractBits(uint64(n), 1, 7))
+	return byte(types.ExtractBits(uint64(n), 9, 7))
 }
 func (n TerminalNode) Extra() uint64 {
-	return types.ExtractBits(uint64(n), 8, 54)
+	return types.ExtractBits(uint64(n), 16, 48)
 }
 func (n TerminalNode) IsAllow() bool {
 	return n.Type() == TERMINAL_NODE_TYPE_ALLOW

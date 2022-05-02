@@ -33,6 +33,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/sandbox"
 	"github.com/spf13/cobra"
 )
 
@@ -105,13 +106,54 @@ var sbdecCmd = &cobra.Command{
 			return err
 		}
 
+		db, err := sandbox.GetLibSandBoxDB()
+		if err != nil {
+			return err
+		}
+
 		fmt.Println(wk)
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 		for idx, opName := range sb.Operations {
 			if idx >= len(wk.Operands) {
 				break
 			}
-			fmt.Fprintf(w, "- %s:\t%s\n", opName, sb.OpNodes[wk.Operands[idx]].String())
+			// if opName != "default" && sb.OpNodes[wk.Operands[idx]].IsTerminal() {
+			// 	continue
+			// }
+			if sb.OpNodes[wk.Operands[idx]].IsNonTerminal() {
+				nt := sandbox.NonTerminalNode(sb.OpNodes[wk.Operands[idx]])
+				filter, err := db.GetFilter(int(nt.FilterID()))
+				if err != nil {
+					log.Error(fmt.Sprintf("failed to get filter %d for node %s: %v", nt.FilterID(), sb.OpNodes[wk.Operands[idx]].String(), err))
+					continue
+				}
+				var arg string
+				if len(filter.Aliases) > 0 {
+					if alias, err := filter.Aliases.Get(int(nt.ArgumentID())); err != nil {
+						log.Error(fmt.Sprintf("failed to get alias %d for filter %s: %v", nt.ArgumentID(), filter.Name, err))
+					} else {
+						arg = alias.Name
+					}
+				} else {
+					if filter.Name == "extension" {
+						arg, err = sb.GetStringAtOffset(uint32(nt.ArgumentID()))
+						if err != nil {
+							return err
+						}
+					}
+				}
+				match := sb.OpNodes[nt.MatchOffset()]
+				unmatch := sb.OpNodes[nt.UnmatchOffset()]
+				fmt.Fprintf(w, "- %s:\t%s (%s %s)\n\t - match:   %s\n\t - unmatch: %s\n",
+					opName,
+					sb.OpNodes[wk.Operands[idx]].String(),
+					filter.Name,
+					arg,
+					match.String(),
+					unmatch.String())
+			} else {
+				fmt.Fprintf(w, "- %s:\t%s\n", opName, sb.OpNodes[wk.Operands[idx]].String())
+			}
 		}
 		w.Flush()
 
