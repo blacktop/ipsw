@@ -101,25 +101,27 @@ var sbdecCmd = &cobra.Command{
 			return fmt.Errorf("failed parsing sandbox collection: %s", err)
 		}
 
-		wk, err := sb.GetProfile("com.apple.WebKit.WebContent")
-		if err != nil {
-			return err
-		}
-
 		db, err := sandbox.GetLibSandBoxDB()
 		if err != nil {
 			return err
 		}
 
+		wk, err := sb.GetProfile("com.apple.WebKit.WebContent")
+		if err != nil {
+			return err
+		}
 		fmt.Println(wk)
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 		for idx, opName := range sb.Operations {
 			if idx >= len(wk.Operands) {
 				break
 			}
-			// if opName != "default" && sb.OpNodes[wk.Operands[idx]].IsTerminal() {
-			// 	continue
-			// }
+			if opName != "default" && sb.OpNodes[wk.Operands[idx]].IsTerminal() {
+				if sandbox.TerminalNode(sb.OpNodes[wk.Operands[idx]]).IsDeny() {
+					continue
+				}
+			}
 			if sb.OpNodes[wk.Operands[idx]].IsNonTerminal() {
 				nt := sandbox.NonTerminalNode(sb.OpNodes[wk.Operands[idx]])
 				filter, err := db.GetFilter(int(nt.FilterID()))
