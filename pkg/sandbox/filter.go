@@ -11,6 +11,19 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
+const (
+	ARG_BOOLEAN       = 1 // boolean
+	ARG_OCTAL         = 2 // bit pattern
+	ARG_OWNER         = 3 // integer
+	ARG_CTRL          = 4 // string
+	ARG_STRING_OFFSET = 5 // pattern
+	ARG_RSS_OFFSET    = 6 // pattern
+	// ??           = 7 // pattern
+	ARG_RSS_OFFSET_WITH_TYPE = 8 // path
+	// ??           = 9 // regex
+	// ??           = 10 // network
+)
+
 //go:embed data/libsandbox_12.3.0.gz
 var libsandboxData []byte
 
@@ -36,11 +49,50 @@ func GetLibSandBoxDB() (*LibSandbox, error) {
 	return lb, nil
 }
 
-func (db *LibSandbox) GetFilter(id int) (*FilterInfo, error) {
-	if id < 0 || id >= len(db.Filters) {
+func (db *LibSandbox) GetFilter(id uint8) (*FilterInfo, error) {
+	if int(id) >= len(db.Filters) {
 		return nil, fmt.Errorf("invalid filter id: %d", id)
 	}
 	return &db.Filters[id], nil
+}
+
+func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16) (any, error) {
+	switch f.DataType {
+	case ARG_BOOLEAN:
+		if id == 1 {
+			return "#t", nil
+		}
+		return "#f", nil
+	case ARG_OCTAL:
+		return fmt.Sprintf("#o%04o", id), nil
+	case ARG_CTRL: // Convert integer value to IO control string
+		if f.SideEffects > 0 {
+			alias, err := f.Aliases.Get(int(id))
+			if err != nil {
+				return nil, err
+			}
+			return alias.Name, nil
+		}
+		// alias, err := f.Aliases.Get(int(id & 0xff)) // TODO: why do these have aliases?
+		// if err != nil {
+		// 	return nil, err
+		// }
+		return fmt.Sprintf("_IO %c %d", rune(id>>8), int(id&0xff)), nil
+	case ARG_OWNER:
+		alias, err := f.Aliases.Get(int(id))
+		if err != nil {
+			return nil, err
+		}
+		return alias.Name, nil
+	case ARG_STRING_OFFSET:
+		return sb.GetStringAtOffset(uint32(id))
+	case ARG_RSS_OFFSET:
+		return sb.GetStringAtOffset(uint32(id)) // FIXME: this is a rss or sandbox string
+	case ARG_RSS_OFFSET_WITH_TYPE:
+		return sb.GetStringAtOffset(uint32(id)) // FIXME: this is a rss or sandbox string
+	default:
+		return nil, fmt.Errorf("unsupported filter category: %s", f.Category)
+	}
 }
 
 /**********************
@@ -48,20 +100,21 @@ func (db *LibSandbox) GetFilter(id int) (*FilterInfo, error) {
  **********************/
 
 type FilterInfo struct {
-	ID         int     `json:"id"`
-	Name       string  `json:"name,omitempty"`
-	Category   string  `json:"category,omitempty"`
-	Aliases    Aliases `json:"aliases,omitempty"`
-	filterInfo `json:"-"`
+	ID       int     `json:"id"`
+	Name     string  `json:"name,omitempty"`
+	Category string  `json:"category,omitempty"`
+	Aliases  Aliases `json:"aliases,omitempty"`
+	filterInfo
 }
 
 type filterInfo struct {
-	NameAddr     uint64
-	CategoryAddr uint64
-	Unknown1     uint16
-	Unknown2     uint16
-	Unknown3     uint32
-	AliasesAddr  uint64
+	NameAddr     uint64 `json:"-"`
+	CategoryAddr uint64 `json:"-"`
+	DataType     uint8  `json:"data_type,omitempty"`
+	Namespace    uint8  `json:"namespace,omitempty"`
+	SideEffects  uint16 `json:"side_effects,omitempty"`
+	Dependency   uint32 `json:"dependency,omitempty"`
+	AliasesAddr  uint64 `json:"-"`
 }
 
 type Aliases []Alias
@@ -85,10 +138,9 @@ type Alias struct {
 
 type alias struct {
 	NameAddr uint64 `json:"-,omitempty"`
-	ID       uint16 `json:"id"`
-	Unknown1 uint16 `json:"-,omitempty"`
-	Unknown2 uint16 `json:"-,omitempty"`
-	Unknown3 uint16 `json:"-,omitempty"`
+	ID       uint16 `json:"id,omitempty"`
+	Unknown  uint16 `json:"unknown,omitempty"`
+	Padding  uint32 `json:"-,omitempty"`
 }
 
 func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
@@ -174,19 +226,19 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 }
 
 type ModifierInfo struct {
-	ID           int     `json:"id"`
-	Name         string  `json:"name,omitempty"`
-	Aliases      []Alias `json:"aliases,omitempty"`
-	modifierInfo `json:"-"`
+	ID      int     `json:"id"`
+	Name    string  `json:"name,omitempty"`
+	Aliases []Alias `json:"aliases,omitempty"`
+	modifierInfo
 }
 
 type modifierInfo struct {
-	NameAddr    uint64
-	Unknown1    uint32
-	Unknown2    uint32
-	Unknown3    uint32
-	Unknown4    uint32
-	AliasesAddr uint64
+	NameAddr    uint64 `json:"-"`
+	ActionMask  uint32 `json:"action_mask,omitempty"`
+	ActionFlag  uint32 `json:"action_flag,omitempty"`
+	Unknown1    uint32 `json:"unknown_1,omitempty"`
+	Unknown2    uint32 `json:"unknown_2,omitempty"`
+	AliasesAddr uint64 `json:"-"`
 }
 
 func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
@@ -266,20 +318,21 @@ func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 }
 
 type OperationInfo struct {
-	ID            int      `json:"id"`
-	Name          string   `json:"name,omitempty"`
-	Modifiers     []string `json:"modifiers,omitempty"`
-	Categories    []string `json:"categories,omitempty"`
-	operationInfo `json:"-"`
+	ID         int      `json:"id,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	Modifiers  []string `json:"modifiers,omitempty"`
+	Categories []string `json:"categories,omitempty"`
+	Unknown1   uint32   `json:"unknown1,omitempty"`
+	operationInfo
 }
 
 type operationInfo struct {
-	Unknown1       uint32
-	Unknown2       uint32
-	Unknown3       uint64
-	CategoriesAddr uint64
-	ModifiersAddr  uint64
-	UnknownAddr    uint64
+	Version             uint32 `json:"version,omitempty"`
+	JumpTargetOperation uint32 `json:"jump_target_operation,omitempty"`
+	Unknown2            uint64 `json:"unknown2,omitempty"`
+	CategoriesAddr      uint64 `json:"-"`
+	ModifiersAddr       uint64 `json:"-"`
+	UnknownAddr         uint64 `json:"-"`
 }
 
 func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
@@ -388,7 +441,20 @@ func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
 			}
 		}
 		if oi.UnknownAddr != 0 {
-			// TODO: read unknown struct
+			uuid, off, err := d.GetOffset(d.SlideInfo.SlidePointer(oi.UnknownAddr))
+			if err != nil {
+				return nil, fmt.Errorf("failed to get _operation_info unknown struct offset: %w", err)
+			}
+			dat, err = d.ReadBytesForUUID(uuid, int64(off), uint64(len(opNames)*binary.Size(uint32(0))))
+			if err != nil {
+				return nil, fmt.Errorf("failed to read _operation_info unknown struct data: %w", err)
+			}
+			if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &oinfo.Unknown1); err != nil {
+				return nil, fmt.Errorf("failed to read _operation_info unknown uint32 data: %w", err)
+			}
+			// if oinfo.Unknown1 != 0 {
+			// 	log.Log.Debugf("%s: %d", oinfo.Name, oinfo.Unknown1)
+			// }
 		}
 		opInfos = append(opInfos, oinfo)
 	}

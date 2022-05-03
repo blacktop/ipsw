@@ -32,7 +32,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/sandbox"
 	"github.com/spf13/cobra"
 )
@@ -71,7 +70,7 @@ var sbdecCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sb, err := kernelcache.NewSandbox(m)
+		sb, err := sandbox.NewSandbox(m)
 		if err != nil {
 			return err
 		}
@@ -101,61 +100,68 @@ var sbdecCmd = &cobra.Command{
 			return fmt.Errorf("failed parsing sandbox collection: %s", err)
 		}
 
-		db, err := sandbox.GetLibSandBoxDB()
-		if err != nil {
-			return err
-		}
+		// for _, prof := range sb.Profiles {
+		// 	fmt.Println(prof.Name)
+		// }
 
 		wk, err := sb.GetProfile("com.apple.WebKit.WebContent")
+		// wk, err := sb.GetProfile("debugserver")
 		if err != nil {
 			return err
 		}
 		fmt.Println(wk)
 
+		defaultOp := sandbox.TerminalNode(sb.OpNodes[0])
+
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-		for idx, opName := range sb.Operations {
+		for idx, op := range wk.Operands {
 			if idx >= len(wk.Operands) {
 				break
 			}
-			if opName != "default" && sb.OpNodes[wk.Operands[idx]].IsTerminal() {
-				if sandbox.TerminalNode(sb.OpNodes[wk.Operands[idx]]).IsDeny() {
+			if sb.Operations[idx] != "default" && (sandbox.TerminalNode(sb.OpNodes[wk.Operands[0]]).Type() == defaultOp.Type()) {
+				if sandbox.TerminalNode(sb.OpNodes[op]).IsDeny() {
 					continue
 				}
 			}
-			if sb.OpNodes[wk.Operands[idx]].IsNonTerminal() {
-				nt := sandbox.NonTerminalNode(sb.OpNodes[wk.Operands[idx]])
-				filter, err := db.GetFilter(int(nt.FilterID()))
-				if err != nil {
-					log.Error(fmt.Sprintf("failed to get filter %d for node %s: %v", nt.FilterID(), sb.OpNodes[wk.Operands[idx]].String(), err))
-					continue
-				}
-				var arg string
-				if len(filter.Aliases) > 0 {
-					if alias, err := filter.Aliases.Get(int(nt.ArgumentID())); err != nil {
-						log.Error(fmt.Sprintf("failed to get alias %d for filter %s: %v", nt.ArgumentID(), filter.Name, err))
-					} else {
-						arg = alias.Name
-					}
-				} else {
-					if filter.Name == "extension" {
-						arg, err = sb.GetStringAtOffset(uint32(nt.ArgumentID()))
-						if err != nil {
-							return err
-						}
-					}
-				}
-				match := sb.OpNodes[nt.MatchOffset()]
-				unmatch := sb.OpNodes[nt.UnmatchOffset()]
-				fmt.Fprintf(w, "- %s:\t%s (%s %s)\n\t - match:   %s\n\t - unmatch: %s\n",
-					opName,
-					sb.OpNodes[wk.Operands[idx]].String(),
-					filter.Name,
-					arg,
-					match.String(),
-					unmatch.String())
-			} else {
-				fmt.Fprintf(w, "- %s:\t%s\n", opName, sb.OpNodes[wk.Operands[idx]].String())
+			o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+			if err != nil {
+				return fmt.Errorf("failed to parse operation for node %s: %s", sb.OpNodes[op], err)
 			}
+			fmt.Println(o.String(sb.Operations[idx]))
+			// if sb.OpNodes[op].IsNonTerminal() {
+			// 	nt := sandbox.NonTerminalNode(sb.OpNodes[op])
+			// 	filter, err := db.GetFilter(int(nt.FilterID()))
+			// 	if err != nil {
+			// 		log.Error(fmt.Sprintf("failed to get filter %d for node %s: %v", nt.FilterID(), sb.OpNodes[op].String(), err))
+			// 		continue
+			// 	}
+			// 	var arg string
+			// 	if len(filter.Aliases) > 0 {
+			// 		if alias, err := filter.Aliases.Get(int(nt.ArgumentID())); err != nil {
+			// 			log.Error(fmt.Sprintf("failed to get alias %d for filter %s: %v", nt.ArgumentID(), filter.Name, err))
+			// 		} else {
+			// 			arg = alias.Name
+			// 		}
+			// 	} else {
+			// 		if filter.Name == "extension" {
+			// 			arg, err = sb.GetStringAtOffset(uint32(nt.ArgumentID()))
+			// 			if err != nil {
+			// 				return err
+			// 			}
+			// 		}
+			// 	}
+			// 	match := sb.OpNodes[nt.MatchOffset()]
+			// 	unmatch := sb.OpNodes[nt.UnmatchOffset()]
+			// 	fmt.Fprintf(w, "- %s:\t%s (%s %s)\n\t - match:   %s\n\t - unmatch: %s\n",
+			// 		sb.Operations[idx],
+			// 		sb.OpNodes[op].String(),
+			// 		filter.Name,
+			// 		arg,
+			// 		match.String(),
+			// 		unmatch.String())
+			// } else {
+			// 	fmt.Fprintf(w, "- %s:\t%s\n", sb.Operations[idx], sb.OpNodes[op].String())
+			// }
 		}
 		w.Flush()
 

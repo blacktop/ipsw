@@ -1,4 +1,4 @@
-package kernelcache
+package sandbox
 
 import (
 	"bytes"
@@ -12,77 +12,25 @@ import (
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/sandbox"
+	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/hashicorp/go-version"
 )
 
 const (
 	typeProfile           = 0x0000
 	typeCollection        = 0x8000
+	tagPtrMask            = 0xffff000000000000
 	profileInitPanic      = "failed to initialize platform sandbox"
 	collectionInitPanic14 = "failed to initialize collection"
 	collectionInitPanic15 = "failed to initialize builtin collection"
 )
 
-type SandboxProfileHeader14 struct {
-	Type           uint16
-	OpNodeCount    uint16
-	OpCount        uint8
-	GlobalVarCount uint8
-	ProfileCount   uint16
-	RegexItemCount uint16
-	MsgItemCount   uint16
-}
-
-type SandboxProfileHeader15 struct {
-	Type           uint16
-	OpNodeCount    uint16
-	OpCount        uint8
-	GlobalVarCount uint8
-	Unknown1       uint8
-	Unknown2       uint8
-	ProfileCount   uint16
-	RegexItemCount uint16
-	MsgItemCount   uint16
-}
-
-type operationNode uint64
-
-type SandboxOperation struct {
-	Name  string
-	Index uint16
-	Value uint64
-	operationNode
-}
-
-type profile14 struct {
-	NameOffset uint16
-	Version    uint16
-}
-
-type profile15 struct {
-	NameOffset uint16
-	Version    uint16
-	Unknown    uint16
-}
-
-type SandboxProfile struct {
-	Name       string
-	nameOffset uint16
-	Version    uint16
-	Operands   []uint16
-}
-
-func (sp SandboxProfile) String() string {
-	return fmt.Sprintf("[+] %s, version: %d", sp.Name, sp.Version)
-}
-
 type Sandbox struct {
 	Hdr header
 
-	Profiles  []SandboxProfile
-	OpNodes   []sandbox.OperationNode
-	Regexes   []*sandbox.Regex
+	Profiles  []Profile
+	OpNodes   []OperationNode
+	Regexes   []*Regex
 	Globals   []string
 	Modifiers []string
 
@@ -97,6 +45,7 @@ type Sandbox struct {
 	kextEndAddr   uint64
 	xrefs         map[uint64]uint64
 	config        Config
+	db            *LibSandbox
 }
 
 type header struct {
@@ -107,6 +56,50 @@ type header struct {
 	ProfileCount   uint16
 	RegexItemCount uint16
 	MsgItemCount   uint16
+}
+
+type header14 struct {
+	Type           uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	MsgItemCount   uint16
+}
+
+type header15 struct {
+	Type           uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	Unknown1       uint8
+	Unknown2       uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	MsgItemCount   uint16
+}
+
+type profile14 struct {
+	NameOffset uint16
+	Version    uint16
+}
+
+type profile15 struct {
+	NameOffset uint16
+	Version    uint16
+	Unknown    uint16
+}
+
+type Profile struct {
+	Name       string
+	nameOffset uint16
+	Version    uint16
+	Operands   []uint16
+}
+
+func (p Profile) String() string {
+	return fmt.Sprintf("[+] %s, version: %d", p.Name, p.Version)
 }
 
 type Config struct {
@@ -120,7 +113,7 @@ type Config struct {
 
 func NewSandbox(m *macho.File) (*Sandbox, error) {
 	sb := Sandbox{
-		Profiles: make([]SandboxProfile, 0),
+		Profiles: make([]Profile, 0),
 		kern:     m,
 	}
 
@@ -128,7 +121,7 @@ func NewSandbox(m *macho.File) (*Sandbox, error) {
 		return nil, fmt.Errorf("failed to parse sandbox operations: %w", err)
 	}
 
-	if kv, err := GetVersion(sb.kern); err != nil {
+	if kv, err := kernelcache.GetVersion(sb.kern); err != nil {
 		return nil, fmt.Errorf("failed to get kernel version: %w", err)
 	} else {
 		sb.darwin, err = version.NewVersion(kv.Kernel.Darwin)
@@ -151,17 +144,22 @@ func NewSandbox(m *macho.File) (*Sandbox, error) {
 	}
 
 	if iOS14x.Check(sb.darwin) {
-		sb.config.sbHeader = &SandboxProfileHeader14{}
+		sb.config.sbHeader = &header14{}
 		sb.config.profileType = &profile14{}
 		sb.config.collectionInitPanic = collectionInitPanic14
 		sb.config.collectionInitArgs = []string{"x1", "w2"}
 	} else if iOS15x.Check(sb.darwin) {
-		sb.config.sbHeader = &SandboxProfileHeader15{}
+		sb.config.sbHeader = &header15{}
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
 	} else {
 		return nil, fmt.Errorf("unsupported darwin version: %s (only supports iOS14.x and iOS15.x)", sb.darwin)
+	}
+
+	sb.db, err = GetLibSandBoxDB()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get libsandbox db: %w", err)
 	}
 
 	return &sb, nil
@@ -314,7 +312,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 	profileStart, _ := r.Seek(0, io.SeekCurrent)
 	for i := uint16(0); i < sb.Hdr.ProfileCount; i++ {
 		var err error
-		var sbp SandboxProfile
+		var sbp Profile
 		if err := binary.Read(r, binary.LittleEndian, sb.config.profileType); err != nil {
 			return fmt.Errorf("failed to read sandbox profile structure: %v", err)
 		}
@@ -339,7 +337,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing operation nodes (%d)", sb.Hdr.OpNodeCount))
 	opNodeStart, _ := r.Seek(0, io.SeekCurrent)
-	sb.OpNodes = make([]sandbox.OperationNode, sb.Hdr.OpNodeCount)
+	sb.OpNodes = make([]OperationNode, sb.Hdr.OpNodeCount)
 	if err := binary.Read(r, binary.LittleEndian, sb.OpNodes); err != nil {
 		return fmt.Errorf("failed to read sandbox collection operation nodes: %v", err)
 	}
@@ -374,7 +372,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		if err := binary.Read(r, binary.LittleEndian, &rdat); err != nil {
 			return fmt.Errorf("failed to read sandbox collection regex data: %v", err)
 		}
-		re, err := sandbox.NewRegex(rdat)
+		re, err := NewRegex(rdat)
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox collection regex: %v", err)
 		}
@@ -417,13 +415,13 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 	return nil
 }
 
-func (sb *Sandbox) GetProfile(name string) (SandboxProfile, error) {
+func (sb *Sandbox) GetProfile(name string) (Profile, error) {
 	for _, p := range sb.Profiles {
 		if p.Name == name {
 			return p, nil
 		}
 	}
-	return SandboxProfile{}, fmt.Errorf("profile %s not found", name)
+	return Profile{}, fmt.Errorf("profile %s not found", name)
 }
 
 func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
@@ -440,6 +438,7 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 	if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
 		return "", fmt.Errorf("failed to read sandbox collection string size: %v", err)
 	}
+
 	name := make([]byte, size)
 	if err := binary.Read(r, binary.LittleEndian, &name); err != nil {
 		return "", fmt.Errorf("failed to read sandbox collection string data: %v", err)
@@ -455,12 +454,12 @@ func (sb *Sandbox) parseXrefs() error {
 
 	var kextStartOffset uint64
 
-	startAdders, err := getKextStartVMAddrs(sb.kern)
+	startAdders, err := kernelcache.GetKextStartVMAddrs(sb.kern)
 	if err != nil {
 		return fmt.Errorf("failed to get kext start addresses: %w", err)
 	}
 
-	infos, err := getKextInfos(sb.kern)
+	infos, err := kernelcache.GetKextInfos(sb.kern)
 	if err != nil {
 		return fmt.Errorf("failed to get kext infos: %w", err)
 	}
@@ -639,7 +638,7 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 // TODO: replace with generics
 func (sb *Sandbox) parseHdr(hdr any) error {
 	switch v := hdr.(type) {
-	case *SandboxProfileHeader14:
+	case *header14:
 		sb.Hdr.Type = v.Type
 		sb.Hdr.OpNodeCount = v.OpNodeCount
 		sb.Hdr.OpCount = v.OpCount
@@ -647,7 +646,7 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.ProfileCount = v.ProfileCount
 		sb.Hdr.RegexItemCount = v.RegexItemCount
 		sb.Hdr.MsgItemCount = v.MsgItemCount
-	case *SandboxProfileHeader15:
+	case *header15:
 		sb.Hdr.Type = v.Type
 		sb.Hdr.OpNodeCount = v.OpNodeCount
 		sb.Hdr.OpCount = v.OpCount
@@ -670,6 +669,42 @@ func (sb *Sandbox) parseProfile(p any) (uint16, uint16, error) {
 	default:
 		return 0, 0, fmt.Errorf("unknown profile header type: %T", v)
 	}
+}
+
+/* UTILS */
+
+func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
+	for _, sec := range m.Sections {
+
+		if sec.Flags.IsCstringLiterals() || strings.Contains(sec.Name, "cstring") {
+			dat, err := sec.Data()
+			if err != nil {
+				return 0, fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
+			}
+
+			csr := bytes.NewBuffer(dat[:])
+
+			for {
+				pos := sec.Addr + uint64(csr.Cap()-csr.Len())
+
+				s, err := csr.ReadString('\x00')
+
+				if err == io.EOF {
+					break
+				}
+
+				if err != nil {
+					return 0, fmt.Errorf("failed to read string: %v", err)
+				}
+
+				if len(s) > 0 && strings.Contains(strings.Trim(s, "\x00"), cstr) {
+					return pos, nil
+				}
+			}
+		}
+	}
+
+	return 0, fmt.Errorf("string not found in MachO")
 }
 
 func getTag(ptr uint64) uint64 {
