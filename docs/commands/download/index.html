@@ -466,10 +466,16 @@
 </span></span><span class="line"><span class="cl">   • Getting OTA               <span class="nv">build</span><span class="o">=</span>19C5026i <span class="nv">device</span><span class="o">=</span>iPhone12,3 <span class="nv">version</span><span class="o">=</span>iOS152DevBeta1
 </span></span><span class="line"><span class="cl">	495.3 MiB / 5.8 GiB <span class="o">[====</span>&gt;-----------------------------------------------------<span class="p">|</span> 1h17m52s <span class="o">]</span>  1.17 MiB/s
 </span></span></code></pre></div><p>Download the latest macOS <code>beta</code> OTA</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download ota --platform macos --beta --device Macmini9,1 --model J274AP
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download ota --platform macos --beta --device Macmini9,1
 </span></span><span class="line"><span class="cl">
 </span></span><span class="line"><span class="cl">? You are about to download <span class="m">1</span> OTA files. Continue? Yes
 </span></span><span class="line"><span class="cl">   • Getting OTA               <span class="nv">build</span><span class="o">=</span>21C5021h <span class="nv">device</span><span class="o">=</span> <span class="nv">version</span><span class="o">=</span>PreRelease
+</span></span><span class="line"><span class="cl">	143.4 MiB / 775.7 MiB <span class="o">[==========</span>&gt;-----------------------------------------------<span class="p">|</span> 8m51s <span class="o">]</span>  1.19 MiB/s
+</span></span></code></pre></div><p>Download the latest Studio Display <code>beta</code> OTA</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download ota --platform accessory --beta --device AppleDisplay2,1
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">? You are about to download <span class="m">1</span> OTA files. Continue? Yes
+</span></span><span class="line"><span class="cl">   • Getting  15.5 OTA         <span class="nv">build</span><span class="o">=</span>19F5070b <span class="nv">device</span><span class="o">=</span>AppleDisplay2,1 <span class="nv">model</span><span class="o">=</span>J327AP
 </span></span><span class="line"><span class="cl">	143.4 MiB / 775.7 MiB <span class="o">[==========</span>&gt;-----------------------------------------------<span class="p">|</span> 8m51s <span class="o">]</span>  1.19 MiB/s
 </span></span></code></pre></div><p>Just download the <em>kernelcache</em> and <em>dyld_shared_cache</em></p>
 <div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download ota --device iPod9,1 --kernel --dyld
@@ -652,7 +658,7 @@
 </span></span><span class="line"><span class="cl">   • Downloading               <span class="nv">file</span><span class="o">=</span><span class="s2">&#34;UniversalMac_12.0_21A5268h_Restore.ipsw&#34;</span>
 </span></span><span class="line"><span class="cl">        65.9 MiB / 12.8 GiB <span class="o">[</span>----------------------------------------------------------<span class="p">|</span> 2h20m56s <span class="o">]</span>  1.54 MiB/s
 </span></span></code></pre></div><p>Watch for 🆕 <strong>beta</strong> IPSWs</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download dev --beta --watch iPadOS --watch iOS --watch macOS
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download dev  --watch iOS --watch macOS
 </span></span><span class="line"><span class="cl">? Please <span class="nb">type</span> your username: blacktop
 </span></span><span class="line"><span class="cl">? Please <span class="nb">type</span> your password: ***********************************
 </span></span><span class="line"><span class="cl">? Please <span class="nb">type</span> your verification code: ******
@@ -663,24 +669,12 @@
 <p><strong>NOTE:</strong> This will check every 5 minutes for new files and download them. (I&rsquo;ve seem apple expire the session and am not sure how to prevent it yet.)</p>
 </blockquote>
 <p>Output downloadable items as JSON</p>
-<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download dev --beta --json --pretty --output .
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-bash" data-lang="bash"><span class="line"><span class="cl">❯ ipsw download dev  --json --pretty --output .
 </span></span><span class="line"><span class="cl">? Please <span class="nb">type</span> your username: blacktop
 </span></span><span class="line"><span class="cl">? Please <span class="nb">type</span> your password: ***********************************
 </span></span><span class="line"><span class="cl">? Please <span class="nb">type</span> your verification code: ******
 </span></span><span class="line"><span class="cl">   • Creating dev_portal_beta.json
 </span></span></code></pre></div><div class="highlight"><pre tabindex="0" class="chroma"><code class="language-json" data-lang="json"><span class="line"><span class="cl"><span class="p">{</span>
-</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Reality Converter beta 3&#34;</span><span class="p">:</span> <span class="p">[</span>
-</span></span><span class="line"><span class="cl">        <span class="p">{</span>
-</span></span><span class="line"><span class="cl">            <span class="nt">&#34;url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://developer.apple.com/services-account/download?path=/Applications/Reality_Converter_beta_3/Reality_Converter_beta_3.dmg&#34;</span><span class="p">,</span>
-</span></span><span class="line"><span class="cl">            <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;app&#34;</span>
-</span></span><span class="line"><span class="cl">        <span class="p">}</span>
-</span></span><span class="line"><span class="cl">    <span class="p">],</span>
-</span></span><span class="line"><span class="cl">    <span class="nt">&#34;Xcode 13.2 beta&#34;</span><span class="p">:</span> <span class="p">[</span>
-</span></span><span class="line"><span class="cl">        <span class="p">{</span>
-</span></span><span class="line"><span class="cl">            <span class="nt">&#34;url&#34;</span><span class="p">:</span> <span class="s2">&#34;https://developer.apple.com/services-account/download?path=/Developer_Tools/Xcode_13.2_beta/Xcode_13.2_beta.xip&#34;</span><span class="p">,</span>
-</span></span><span class="line"><span class="cl">            <span class="nt">&#34;type&#34;</span><span class="p">:</span> <span class="s2">&#34;app&#34;</span>
-</span></span><span class="line"><span class="cl">        <span class="p">}</span>
-</span></span><span class="line"><span class="cl">    <span class="p">],</span>
 </span></span><span class="line"><span class="cl">    <span class="nt">&#34;iOS 15.2 beta&#34;</span><span class="p">:</span> <span class="p">[</span>
 </span></span><span class="line"><span class="cl">        <span class="p">{</span>
 </span></span><span class="line"><span class="cl">            <span class="nt">&#34;title&#34;</span><span class="p">:</span> <span class="s2">&#34;iPhone 13&#34;</span><span class="p">,</span>
