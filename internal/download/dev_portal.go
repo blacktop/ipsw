@@ -11,7 +11,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"strings"
 
 	"time"
 
@@ -31,8 +30,8 @@ import (
 */
 
 const (
-	betaDownloadsURL    = "https://developer.apple.com/download/"
-	releaseDownloadsURL = "https://developer.apple.com/download/release/"
+	downloadURL     = "https://developer.apple.com/download/"
+	downloadAppsURL = "https://developer.apple.com/download/applications/"
 
 	downloadActionURL      = "https://developer.apple.com/devcenter/download.action"
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
@@ -61,7 +60,6 @@ type DevConfig struct {
 	Proxy    string
 	Insecure bool
 	// download type config
-	Beta      bool
 	WatchList []string
 	// behavior config
 	SkipAll      bool
@@ -402,13 +400,25 @@ func (app *App) signIn(username, password string) error {
 
 		code := ""
 		// USED FOR DEBUGGING
+		// cwd, err := os.Getwd()
+		// if err != nil {
+		// 	log.Error(err.Error())
+		// }
+		// cpath := filepath.Join(cwd, "..", "..", "test-caches", "CODE")
+		// fmt.Printf("Enter code in file (%s): ", cpath)
 		// for {
-		// 	codeSTR, err := ioutil.ReadFile("CODE")
+		// 	codeSTR, err := ioutil.ReadFile(cpath)
 		// 	if err != nil {
 		// 		return err
 		// 	}
 		// 	if len(codeSTR) > 0 {
 		// 		code = string(codeSTR)
+		// 		// remove code for next time
+		// 		defer func() {
+		// 			if err := ioutil.WriteFile(cpath, []byte(""), 0644); err != nil {
+		// 				log.Error(err.Error())
+		// 			}
+		// 		}()
 		// 		break
 		// 	}
 		// }
@@ -636,7 +646,7 @@ func (app *App) Watch() error {
 
 	for {
 		// scrape dev portal
-		ipsws, err := app.getDevDownloads(app.config.Beta)
+		ipsws, err := app.getDevDownloads()
 		if err != nil {
 			return err
 		}
@@ -656,7 +666,7 @@ func (app *App) Watch() error {
 		}
 
 		for version := range ipsws {
-			if utils.StrSliceHas(app.config.WatchList, version) {
+			if utils.StrContainsStrSliceItem(version, app.config.WatchList) {
 				for _, ipsw := range ipsws[version] {
 					if err := app.Download(ipsw.URL); err != nil {
 						log.Error(err.Error())
@@ -669,14 +679,36 @@ func (app *App) Watch() error {
 
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
 func (app *App) DownloadPrompt(downloadType string) error {
-	isBeta := false
-
 	switch downloadType {
-	case "beta":
-		isBeta = true
-		fallthrough
-	case "release":
-		ipsws, err := app.getDevDownloads(isBeta)
+	case "more":
+		dloads, err := app.getDownloads()
+		if err != nil {
+			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
+		}
+
+		var choices []string
+		for _, dl := range dloads.Downloads {
+			choices = append(choices, fmt.Sprintf("%s (%s)", dl.Name, dl.DateCreated))
+		}
+
+		dfiles := []int{}
+		prompt := &survey.MultiSelect{
+			Message:  "Select what file(s) to download:",
+			Options:  choices,
+			PageSize: app.config.PageSize,
+		}
+		if err := survey.AskOne(prompt, &dfiles); err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			os.Exit(0)
+		}
+
+		for _, idx := range dfiles {
+			for _, f := range dloads.Downloads[idx].Files {
+				app.Download(f.URL())
+			}
+		}
+	default:
+		ipsws, err := app.getDevDownloads()
 		if err != nil {
 			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 		}
@@ -727,34 +759,6 @@ func (app *App) DownloadPrompt(downloadType string) error {
 		} else {
 			app.Download(ipsws[version][0].URL)
 		}
-
-	case "more":
-		dloads, err := app.getDownloads()
-		if err != nil {
-			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
-		}
-
-		var choices []string
-		for _, dl := range dloads.Downloads {
-			choices = append(choices, fmt.Sprintf("%s (%s)", dl.Name, dl.DateCreated))
-		}
-
-		dfiles := []int{}
-		prompt := &survey.MultiSelect{
-			Message:  "Select what file(s) to download:",
-			Options:  choices,
-			PageSize: app.config.PageSize,
-		}
-		if err := survey.AskOne(prompt, &dfiles); err == terminal.InterruptErr {
-			log.Warn("Exiting...")
-			os.Exit(0)
-		}
-
-		for _, idx := range dfiles {
-			for _, f := range dloads.Downloads[idx].Files {
-				app.Download(f.URL())
-			}
-		}
 	}
 
 	return nil
@@ -800,20 +804,7 @@ func (app *App) Download(url string) error {
 }
 
 func (app *App) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
-	isBeta := false
 	switch downloadType {
-	case "beta":
-		isBeta = true
-		fallthrough
-	case "release":
-		ipsws, err := app.getDevDownloads(isBeta)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get developer downloads: %v", err)
-		}
-		if pretty {
-			return json.MarshalIndent(ipsws, "", "    ")
-		}
-		return json.Marshal(ipsws)
 	case "more":
 		dloads, err := app.getDownloads()
 		if err != nil {
@@ -823,8 +814,16 @@ func (app *App) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, er
 			return json.MarshalIndent(dloads, "", "    ")
 		}
 		return json.Marshal(dloads)
+	default:
+		ipsws, err := app.getDevDownloads()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get developer downloads: %v", err)
+		}
+		if pretty {
+			return json.MarshalIndent(ipsws, "", "    ")
+		}
+		return json.Marshal(ipsws)
 	}
-	return nil, fmt.Errorf("unsupported download type: %s", downloadType)
 }
 
 // getDownloads returns all the downloads in "More Downloads" - https://developer.apple.com/download/all/
@@ -871,15 +870,8 @@ func (app *App) getDownloads() (*Downloads, error) {
 }
 
 // getDevDownloads scrapes the https://developer.apple.com/download/ page for links
-func (app *App) getDevDownloads(beta bool) (map[string][]DevDownload, error) {
+func (app *App) getDevDownloads() (map[string][]DevDownload, error) {
 	ipsws := make(map[string][]DevDownload)
-
-	var downloadURL string
-	if beta {
-		downloadURL = betaDownloadsURL
-	} else {
-		downloadURL = releaseDownloadsURL
-	}
 
 	req, err := http.NewRequest("GET", downloadURL, nil)
 	if err != nil {
@@ -901,7 +893,7 @@ func (app *App) getDevDownloads(beta bool) (map[string][]DevDownload, error) {
 		return nil, err
 	}
 
-	doc.Find("#main li.os-links").Each(func(i int, s *goquery.Selection) {
+	doc.Find("#main > section.section.section-downloads > div").Each(func(i int, s *goquery.Selection) {
 		s.Find(".row").Each(func(index int, row *goquery.Selection) {
 
 			// Get ALL the iOS ipsw links
@@ -910,7 +902,7 @@ func (app *App) getDevDownloads(beta bool) (map[string][]DevDownload, error) {
 					a := li.Find("a[href]")
 					href, _ := a.Attr("href")
 					p := li.Find("p")
-					version := ul.Parent().Parent().Parent().Find("h2")
+					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
 						Title: a.Text(),
 						Build: p.Text(),
@@ -926,56 +918,18 @@ func (app *App) getDevDownloads(beta bool) (map[string][]DevDownload, error) {
 					a := li.Find("a[href]")
 					href, _ := a.Attr("href")
 					p := li.Find("p")
-					version := ul.Parent().Parent().Parent().Find("h2")
+					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
 						Title: a.Text(),
 						Build: p.Text(),
 						URL:   href,
-						Type:  "tvos",
+						// Type:  "tvos", TODO: this is commented out because macOS is also labeled as tvos
 					})
 				})
 			})
 
 		})
 	})
-
-	// Get ALL the App download links
-	doc.Find("#main li.app-links").Each(func(i int, s *goquery.Selection) {
-		s.Find(".row").Each(func(index int, row *goquery.Selection) {
-			row.Find("a[href]").Each(func(index int, a *goquery.Selection) {
-				href, _ := a.Attr("href")
-				if strings.Contains(href, "/services-account/download") {
-					version := a.Parent().Parent().Find("h2")
-					if len(version.Text()) > 0 {
-						ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
-							URL:  fmt.Sprintf("https://developer.apple.com%s", href),
-							Type: "app",
-						})
-					}
-				}
-			})
-		})
-	})
-
-	if len(ipsws) == 0 {
-		// Get ALL the App download links (non-developer account)
-		doc.Find("#main").Each(func(i int, s *goquery.Selection) {
-			s.Find(".row").Each(func(index int, row *goquery.Selection) {
-				row.Find("a[href]").Each(func(index int, a *goquery.Selection) {
-					href, _ := a.Attr("href")
-					if strings.Contains(href, "/services-account/download") {
-						version := a.Parent().Parent().Find("h2")
-						if len(version.Text()) > 0 {
-							ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
-								URL:  fmt.Sprintf("https://developer.apple.com%s", href),
-								Type: "app",
-							})
-						}
-					}
-				})
-			})
-		})
-	}
 
 	return ipsws, nil
 }
