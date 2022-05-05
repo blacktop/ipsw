@@ -21,3 +21,4 @@
 - [ ] parse operation node graph (reduce etc)
 - [ ] support older versions of the sandbox (iOS13.x, iOS14.x)
 - [ ] document RE in comment strings (for next time that it breaks)
+- [ ] also process the sandbox profile (in addition to the sandbox collection)
