@@ -114,6 +114,16 @@ func StrSliceContains(slice []string, item string) bool {
 	return false
 }
 
+// StrContainsStrSliceItem returns true if given string contains any item in the string slice
+func StrContainsStrSliceItem(item string, slice []string) bool {
+	for _, s := range slice {
+		if strings.Contains(strings.ToLower(item), strings.ToLower(s)) {
+			return true
+		}
+	}
+	return false
+}
+
 // StrSliceHas returns true if string slice has an exact given string
 func StrSliceHas(slice []string, item string) bool {
 	for _, s := range slice {
