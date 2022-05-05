@@ -369,10 +369,20 @@ Download iOS `15.2` developer **beta** OTA
 Download the latest macOS `beta` OTA
 
 ```bash
-❯ ipsw download ota --platform macos --beta --device Macmini9,1 --model J274AP
+❯ ipsw download ota --platform macos --beta --device Macmini9,1
 
 ? You are about to download 1 OTA files. Continue? Yes
    • Getting OTA               build=21C5021h device= version=PreRelease
+	143.4 MiB / 775.7 MiB [==========>-----------------------------------------------| 8m51s ]  1.19 MiB/s
+```
+
+Download the latest Studio Display `beta` OTA
+
+```bash
+❯ ipsw download ota --platform accessory --beta --device AppleDisplay2,1
+
+? You are about to download 1 OTA files. Continue? Yes
+   • Getting  15.5 OTA         build=19F5070b device=AppleDisplay2,1 model=J327AP
 	143.4 MiB / 775.7 MiB [==========>-----------------------------------------------| 8m51s ]  1.19 MiB/s
 ```
 
