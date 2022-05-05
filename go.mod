@@ -29,10 +29,10 @@ require (
 	github.com/spf13/viper v1.11.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v7 v7.4.1
-	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
-	golang.org/x/net v0.0.0-20220421235706-1d1ef9303861
+	golang.org/x/crypto v0.0.0-20220427172511-eb4f295cb31f
+	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5
-	golang.org/x/sys v0.0.0-20220422013727-9388b58f7150
+	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
@@ -45,8 +45,8 @@ require (
 	github.com/antchfx/htmlquery v1.2.4 // indirect
 	github.com/antchfx/xmlquery v1.3.10 // indirect
 	github.com/antchfx/xpath v1.2.0 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
-	github.com/fsnotify/fsnotify v1.5.3 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -65,7 +65,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.0-beta.8 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.0 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
