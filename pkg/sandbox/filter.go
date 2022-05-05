@@ -7,19 +7,21 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 const (
-	ARG_BOOLEAN       = 1 // boolean
-	ARG_OCTAL         = 2 // bit pattern
-	ARG_OWNER         = 3 // integer
-	ARG_CTRL          = 4 // string
-	ARG_STRING_OFFSET = 5 // pattern
-	ARG_RSS_OFFSET    = 6 // pattern
-	// ??           = 7 // pattern
+	ARG_BOOLEAN              = 1 // boolean
+	ARG_OCTAL                = 2 // bit pattern
+	ARG_OWNER                = 3 // integer
+	ARG_CTRL                 = 4 // string
+	ARG_STRING_OFFSET        = 5 // pattern
+	ARG_RSS_OFFSET           = 6 // pattern
+	ARG_NOT_SURE_YET         = 7 // pattern TODO: fix this
 	ARG_RSS_OFFSET_WITH_TYPE = 8 // path
+	ARG_NETWORK_OFFSET       = 9 // pattern
 	// ??           = 9 // regex
 	// ??           = 10 // network
 )
@@ -66,30 +68,54 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16) (any, error) {
 	case ARG_OCTAL:
 		return fmt.Sprintf("#o%04o", id), nil
 	case ARG_CTRL: // Convert integer value to IO control string
-		if f.SideEffects > 0 {
-			alias, err := f.Aliases.Get(int(id))
-			if err != nil {
-				return nil, err
-			}
-			return alias.Name, nil
+		alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
+		if err != nil {
+			return fmt.Sprintf("_IO \"%c\" %d", rune(id>>8), int(id&0xff)), nil
 		}
-		// alias, err := f.Aliases.Get(int(id & 0xff)) // TODO: why do these have aliases?
-		// if err != nil {
-		// 	return nil, err
-		// }
-		return fmt.Sprintf("_IO %c %d", rune(id>>8), int(id&0xff)), nil
+		return alias.Name, nil
 	case ARG_OWNER:
-		alias, err := f.Aliases.Get(int(id))
+		alias, err := f.Aliases.Get(id)
 		if err != nil {
 			return nil, err
 		}
 		return alias.Name, nil
 	case ARG_STRING_OFFSET:
-		return sb.GetStringAtOffset(uint32(id))
-	case ARG_RSS_OFFSET:
-		return sb.GetStringAtOffset(uint32(id)) // FIXME: this is a rss or sandbox string
+		s, err := sb.GetStringAtOffset(uint32(id))
+		if err != nil {
+			return nil, err
+		}
+		return fmt.Sprintf("\"%s\"", s), nil
+	case ARG_RSS_OFFSET, ARG_NOT_SURE_YET:
+		ss, err := sb.GetRSStringAtOffset(uint32(id))
+		if err != nil {
+			return nil, err
+		}
+		return strings.Join(ss, " "), nil
 	case ARG_RSS_OFFSET_WITH_TYPE:
-		return sb.GetStringAtOffset(uint32(id)) // FIXME: this is a rss or sandbox string
+		ss, err := sb.GetRSStringAtOffset(uint32(id))
+		if err != nil {
+			return nil, err
+		}
+		return []string{"literal", strings.Join(ss, " ")}, nil
+	case ARG_NETWORK_OFFSET:
+		host, port, err := sb.GetHostPortAtOffset(uint32(id))
+		if err != nil {
+			return nil, err
+		}
+		hostStr := "*"
+		if host > 0x100 {
+			hostStr = "localhost"
+			host &= 0xff
+		}
+		alias, err := f.Aliases.Get(host)
+		if err != nil {
+			return nil, err
+		}
+		portStr := "*"
+		if port != 0 {
+			portStr = fmt.Sprintf("%d", port)
+		}
+		return fmt.Sprintf("%s \"%s:%s\"", alias.Name, hostStr, portStr), nil
 	default:
 		return nil, fmt.Errorf("unsupported filter category: %s", f.Category)
 	}
@@ -119,12 +145,9 @@ type filterInfo struct {
 
 type Aliases []Alias
 
-func (a Aliases) Get(id int) (*Alias, error) {
-	if id < 0 || id >= len(a) {
-		return nil, fmt.Errorf("invalid alias id: %d", id)
-	}
+func (a Aliases) Get(id uint16) (*Alias, error) {
 	for _, alias := range a {
-		if int(alias.ID) == id {
+		if alias.ID == id {
 			return &alias, nil
 		}
 	}
@@ -137,10 +160,10 @@ type Alias struct {
 }
 
 type alias struct {
-	NameAddr uint64 `json:"-,omitempty"`
+	NameAddr uint64 `json:"-"`
 	ID       uint16 `json:"id,omitempty"`
 	Unknown  uint16 `json:"unknown,omitempty"`
-	Padding  uint32 `json:"-,omitempty"`
+	Padding  uint32 `json:"-"`
 }
 
 func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {

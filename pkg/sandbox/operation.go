@@ -133,11 +133,8 @@ func (o *Operation) String(name string) string {
 		out = fmt.Sprintf("(%s %s)", TerminalNode(o.node).TypeString(), name)
 	} else {
 		out = fmt.Sprintf("(%s %s %s)", o.Filter.Name, o.Argument, name)
-		if o.Match.node.IsTerminal() {
-			out += fmt.Sprintf("\t%s", o.Match.String(name))
-		} else {
-			out += fmt.Sprintf("\t%s", o.Unmatch.String(name))
-		}
+		out += fmt.Sprintf("\n\t%s", o.Match.String(name))
+		out += fmt.Sprintf("\n\t%s", o.Unmatch.String(name))
 	}
 	return out
 }

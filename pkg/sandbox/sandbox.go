@@ -447,6 +447,51 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 	return strings.Trim(string(name[:]), "\x00"), nil
 }
 
+func (sb *Sandbox) GetRSStringAtOffset(offset uint32) ([]string, error) {
+	// make sure we have the data
+	if _, err := sb.GetCollectionData(); err != nil {
+		return nil, err
+	}
+
+	r := bytes.NewReader(sb.collectionData)
+
+	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
+
+	var size uint16
+	if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+		return nil, fmt.Errorf("failed to read sandbox string pattern size: %v", err)
+	}
+
+	byteString := make([]byte, size)
+	if err := binary.Read(r, binary.LittleEndian, &byteString); err != nil {
+		return nil, fmt.Errorf("failed to read sandbox string pattern data: %v", err)
+	}
+
+	return ParseRSS(byteString, sb.Globals)
+}
+
+func (sb *Sandbox) GetHostPortAtOffset(offset uint32) (uint16, uint16, error) {
+	// make sure we have the data
+	if _, err := sb.GetCollectionData(); err != nil {
+		return 0, 0, err
+	}
+
+	r := bytes.NewReader(sb.collectionData)
+
+	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
+
+	var host uint16
+	if err := binary.Read(r, binary.LittleEndian, &host); err != nil {
+		return 0, 0, fmt.Errorf("failed to read sandbox network host: %v", err)
+	}
+	var port uint16
+	if err := binary.Read(r, binary.LittleEndian, &port); err != nil {
+		return 0, 0, fmt.Errorf("failed to read sandbox network port: %v", err)
+	}
+
+	return host, port, nil
+}
+
 func (sb *Sandbox) parseXrefs() error {
 	if len(sb.xrefs) > 0 {
 		return nil

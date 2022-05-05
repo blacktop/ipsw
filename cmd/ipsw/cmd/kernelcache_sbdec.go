@@ -28,7 +28,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -38,6 +37,7 @@ import (
 
 func init() {
 	kernelcacheCmd.AddCommand(sbdecCmd)
+	sbdecCmd.Flags().BoolP("diff", "f", false, "Diff two kernel's sandbox profiles")
 	sbdecCmd.Flags().BoolP("dump", "d", false, "Dump sandbox profile data")
 	sbdecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
@@ -56,6 +56,7 @@ var sbdecCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		diff, _ := cmd.Flags().GetBool("diff")
 		dump, _ := cmd.Flags().GetBool("dump")
 
 		kcPath := filepath.Clean(args[0])
@@ -100,105 +101,112 @@ var sbdecCmd = &cobra.Command{
 			return fmt.Errorf("failed parsing sandbox collection: %s", err)
 		}
 
-		// for _, prof := range sb.Profiles {
-		// 	fmt.Println(prof.Name)
-		// }
-
-		wk, err := sb.GetProfile("com.apple.WebKit.WebContent")
-		// wk, err := sb.GetProfile("debugserver")
-		if err != nil {
-			return err
-		}
-		fmt.Println(wk)
-
-		defaultOp := sandbox.TerminalNode(sb.OpNodes[0])
-
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-		for idx, op := range wk.Operands {
-			if idx >= len(wk.Operands) {
-				break
+		if diff {
+			if len(args) < 3 {
+				return fmt.Errorf("please provide two kernelcache files to diff AND a profile name to compare")
 			}
-			if sb.Operations[idx] != "default" && (sandbox.TerminalNode(sb.OpNodes[wk.Operands[0]]).Type() == defaultOp.Type()) {
-				if sandbox.TerminalNode(sb.OpNodes[op]).IsDeny() {
-					continue
+
+			kcPath2 := filepath.Clean(args[1])
+
+			if _, err := os.Stat(kcPath2); os.IsNotExist(err) {
+				return fmt.Errorf("file %s does not exist", args[1])
+			}
+
+			// m2, err := macho.Open(kcPath2)
+			// if err != nil {
+			// 	return err
+			// }
+			// defer m.Close()
+
+			// sb2, err := sandbox.NewSandbox(m2)
+			// if err != nil {
+			// 	return err
+			// }
+
+			panic("diffing is not implemented yet")
+		} else {
+			if len(args) > 1 { // decompile single profile
+
+				// for _, op := range sb.OpNodes {
+				// 	if op.IsTerminal() {
+				// 		fmt.Println(op)
+				// 	}
+				// }
+
+				prof, err := sb.GetProfile(args[1])
+				if err != nil {
+					return err
+				}
+				fmt.Println(prof)
+
+				defaultOp := sandbox.TerminalNode(sb.OpNodes[0])
+
+				for idx, op := range prof.Operands {
+					if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
+						if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
+							continue
+						}
+					}
+					o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+					if err != nil {
+						// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+						log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+						continue
+					}
+					fmt.Println(o.String(sb.Operations[idx]))
+				}
+
+				// rl, err := sb.Regexes[0].Parse()
+				// if err != nil {
+				// 	return err
+				// }
+
+				// if _, err := sb.Regexes[3].NFA(); err != nil {
+				// 	return err
+				// }
+
+				// sb.Regexes[3].Graph()
+				// sb.Regexes[80].Graph()
+
+				// for _, re := range sb.Regexes {
+				// 	fmt.Println(re)
+				// 	if _, err := re.Graph(); err != nil {
+				// 		return err
+				// 	}
+				// }
+
+				// regexFolder := filepath.Join(filepath.Dir(kcPath), "regex")
+				// os.MkdirAll(regexFolder, 0755)
+				// for idx, re := range sb.Regexes {
+				// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%d", idx))
+				// 	err = ioutil.WriteFile(regexPath, re.Data, 0755)
+				// 	if err != nil {
+				// 		return err
+				// 	}
+				// }
+
+			} else { // decompile all profiles
+				for _, prof := range sb.Profiles {
+					fmt.Println(prof.Name)
+					defaultOp := sandbox.TerminalNode(sb.OpNodes[0])
+
+					for idx, op := range prof.Operands {
+						if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
+							if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
+								continue
+							}
+						}
+						o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+						if err != nil {
+							// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+							log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+							continue
+						}
+						fmt.Println(o.String(sb.Operations[idx]))
+					}
 				}
 			}
-			o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
-			if err != nil {
-				return fmt.Errorf("failed to parse operation for node %s: %s", sb.OpNodes[op], err)
-			}
-			fmt.Println(o.String(sb.Operations[idx]))
-			// if sb.OpNodes[op].IsNonTerminal() {
-			// 	nt := sandbox.NonTerminalNode(sb.OpNodes[op])
-			// 	filter, err := db.GetFilter(int(nt.FilterID()))
-			// 	if err != nil {
-			// 		log.Error(fmt.Sprintf("failed to get filter %d for node %s: %v", nt.FilterID(), sb.OpNodes[op].String(), err))
-			// 		continue
-			// 	}
-			// 	var arg string
-			// 	if len(filter.Aliases) > 0 {
-			// 		if alias, err := filter.Aliases.Get(int(nt.ArgumentID())); err != nil {
-			// 			log.Error(fmt.Sprintf("failed to get alias %d for filter %s: %v", nt.ArgumentID(), filter.Name, err))
-			// 		} else {
-			// 			arg = alias.Name
-			// 		}
-			// 	} else {
-			// 		if filter.Name == "extension" {
-			// 			arg, err = sb.GetStringAtOffset(uint32(nt.ArgumentID()))
-			// 			if err != nil {
-			// 				return err
-			// 			}
-			// 		}
-			// 	}
-			// 	match := sb.OpNodes[nt.MatchOffset()]
-			// 	unmatch := sb.OpNodes[nt.UnmatchOffset()]
-			// 	fmt.Fprintf(w, "- %s:\t%s (%s %s)\n\t - match:   %s\n\t - unmatch: %s\n",
-			// 		sb.Operations[idx],
-			// 		sb.OpNodes[op].String(),
-			// 		filter.Name,
-			// 		arg,
-			// 		match.String(),
-			// 		unmatch.String())
-			// } else {
-			// 	fmt.Fprintf(w, "- %s:\t%s\n", sb.Operations[idx], sb.OpNodes[op].String())
-			// }
 		}
-		w.Flush()
-
-		// for _, op := range sb.OpNodes {
-		// 	if op.IsTerminal() {
-		// 		fmt.Println(op)
-		// 	}
-		// }
-
-		// rl, err := sb.Regexes[0].Parse()
-		// if err != nil {
-		// 	return err
-		// }
-
-		if _, err := sb.Regexes[3].NFA(); err != nil {
-			return err
-		}
-
-		sb.Regexes[3].Graph()
-		// sb.Regexes[80].Graph()
-
-		// for _, re := range sb.Regexes {
-		// 	fmt.Println(re)
-		// 	if _, err := re.Graph(); err != nil {
-		// 		return err
-		// 	}
-		// }
-
-		// regexFolder := filepath.Join(filepath.Dir(kcPath), "regex")
-		// os.MkdirAll(regexFolder, 0755)
-		// for idx, re := range sb.Regexes {
-		// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%d", idx))
-		// 	err = ioutil.WriteFile(regexPath, re.Data, 0755)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// }
 
 		return nil
 	},
