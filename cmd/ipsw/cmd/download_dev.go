@@ -26,6 +26,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -40,8 +41,6 @@ func init() {
 	downloadCmd.AddCommand(devCmd)
 
 	devCmd.Flags().StringArray("watch", []string{}, "dev portal type to watch")
-	devCmd.Flags().Bool("release", false, "Download 'Release' OSs/Apps")
-	devCmd.Flags().Bool("beta", false, "Download 'Beta' OSs/Apps")
 	devCmd.Flags().Bool("more", false, "Download 'More' OSs/Apps")
 	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
 	devCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
@@ -49,8 +48,6 @@ func init() {
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
-	viper.BindPFlag("download.dev.release", devCmd.Flags().Lookup("release"))
-	viper.BindPFlag("download.dev.beta", devCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.dev.more", devCmd.Flags().Lookup("more"))
 	viper.BindPFlag("download.dev.page", devCmd.Flags().Lookup("page"))
 	viper.BindPFlag("download.dev.sms", devCmd.Flags().Lookup("sms"))
@@ -95,8 +92,6 @@ var devCmd = &cobra.Command{
 		removeCommas := viper.GetBool("download.remove-commas")
 		// flags
 		watchList := viper.GetStringSlice("download.dev.watch")
-		release := viper.GetBool("download.dev.release")
-		beta := viper.GetBool("download.dev.beta")
 		more := viper.GetBool("download.dev.more")
 		pageSize := viper.GetInt("download.dev.page")
 		sms := viper.GetBool("download.dev.sms")
@@ -113,7 +108,6 @@ var devCmd = &cobra.Command{
 			RemoveCommas: removeCommas,
 			PreferSMS:    sms,
 			PageSize:     pageSize,
-			Beta:         beta,
 			WatchList:    watchList,
 			Verbose:      Verbose,
 		})
@@ -161,17 +155,12 @@ var devCmd = &cobra.Command{
 		}
 
 		dlType := ""
-		if release {
-			dlType = "release"
-		} else if beta {
-			dlType = "beta"
-		} else if more {
+		if more {
 			dlType = "more"
 		} else {
-
 			prompt := &survey.Select{
 				Message: "Choose a download type:",
-				Options: []string{"beta", "release", "more"},
+				Options: []string{"OSes (iOS, macOS, tvOS...)", "More (XCode, KDKs...)"},
 			}
 			if err := survey.AskOne(prompt, &dlType); err != nil {
 				if err == terminal.InterruptErr {
@@ -180,7 +169,9 @@ var devCmd = &cobra.Command{
 				}
 				return err
 			}
-
+			if strings.Contains(dlType, "More") {
+				dlType = "more"
+			}
 		}
 
 		if asJSON {

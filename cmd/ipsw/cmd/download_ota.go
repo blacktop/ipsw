@@ -45,7 +45,7 @@ import (
 func init() {
 	downloadCmd.AddCommand(otaDLCmd)
 
-	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || macos, recovery)")
+	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
@@ -133,8 +133,8 @@ var otaDLCmd = &cobra.Command{
 				}
 			}
 		}
-		if len(platform) == 0 || !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos"}, platform) {
-			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos || macos, recovery")
+		if len(platform) == 0 || !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory"}, platform) {
+			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos || accessory, macos, recovery")
 		}
 		if len(version) == 0 {
 			version = "0"

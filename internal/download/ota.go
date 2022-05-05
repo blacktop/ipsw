@@ -84,7 +84,8 @@ const ( // CREDIT: Siguza
 	macOS12DeveloperBeta assetAudienceID = "298e518d-b45e-4d36-94be-34a63d6777ec" // macOS 12 developer beta
 	macOS12PublicBeta    assetAudienceID = "9f86c787-7c59-45a7-a79a-9c164b00f866" // macOS 12 public beta
 
-	displayIOSRelease assetAudienceID = macOSRelease // studio display iOS release
+	displayIOSRelease assetAudienceID = macOSRelease         // studio display iOS release
+	displayIOSBeta    assetAudienceID = macOS12DeveloperBeta // studio display iOS beta
 )
 
 // Ota is an OTA object
@@ -201,7 +202,9 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "audioos":
 		fallthrough
 	case "tvos":
-		return []assetType{softwareUpdate, accessorySoftwareUpdate}, nil
+		return []assetType{softwareUpdate}, nil
+	case "accessory":
+		return []assetType{accessorySoftwareUpdate}, nil
 	case "macos":
 		return []assetType{macSoftwareUpdate}, nil
 	case "recovery":
@@ -315,9 +318,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 		} else {
 			return []assetAudienceID{audioOSRelease}, nil
 		}
-	case "recovery":
-		fallthrough
-	case "macos":
+	case "accessory", "recovery", "macos":
 		if o.Config.Beta {
 			if o.Config.Version != nil {
 				segs := o.Config.Version.Segments()
@@ -376,7 +377,7 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 		req.HWModelStr = o.Config.Model
 	} else {
 		for prod, dev := range *o.db {
-			if dev.SDKPlatform == o.Config.Platform {
+			if dev.SDKPlatform == o.Config.Platform || (o.Config.Platform == "accessory" && dev.SDKPlatform == "ios") { // TODO: this exception might break
 				req.ProductType = prod
 				model, err := o.lookupHWModel(prod)
 				if err != nil {
@@ -391,7 +392,11 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID, typ strin
 		var model string
 		devices := o.as.GetDevicesForVersion(o.Config.Version.Original(), typ)
 		if len(devices) == 0 {
-			req.RequestedProductVersion = o.as.Latest(typ, o.Config.Platform)
+			if o.Config.Platform == "accessory" { // TODO: this exception might break
+				req.RequestedProductVersion = o.as.Latest(typ, "ios")
+			} else {
+				req.RequestedProductVersion = o.as.Latest(typ, o.Config.Platform)
+			}
 			req.Supervised = true
 			req.DelayRequested = false
 			devices = o.as.GetDevicesForVersion(req.RequestedProductVersion, typ)
@@ -444,9 +449,7 @@ func (o *Ota) buildPallasRequests() (reqs []pallasRequest, err error) {
 					return nil, fmt.Errorf("failed to get %s pallas requests: %v", o.Config.Platform, err)
 				}
 				reqs = append(reqs, rr...)
-			case "recovery":
-				fallthrough
-			case "macos":
+			case "accessory", "recovery", "macos":
 				rr, err := o.getRequests(atype, audienceID, "macOS")
 				if err != nil {
 					return nil, fmt.Errorf("failed to get %s pallas requests: %v", o.Config.Platform, err)
