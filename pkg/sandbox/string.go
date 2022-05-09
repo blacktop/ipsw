@@ -65,7 +65,7 @@ func (s *Stack[T]) Prev() T {
 	return s.vals[len(s.vals)-1]
 }
 
-// FIXME: this is NOT done and has bugs
+// FIXME: this is NOT done and has bugs (I think this is func ___define_filter_block_invoke)
 func ParseRSS(dat []byte, globals []string) ([]string, error) {
 	var out []string
 	var base string
@@ -208,7 +208,19 @@ func ParseRSS(dat []byte, globals []string) ([]string, error) {
 				var len int
 				switch state {
 				case 3:
-					return nil, fmt.Errorf("not sure what to do here yet 🤷: STATE_TOKEN_READ with state %d", state)
+					/* TODO:
+					 *  STRING DATA:
+					 *     0000000000000000:  03 2f 0f 0b 01 30 ff 00  2e 0f 02 2f 0f 47 53 43  |./...0...../.GSC|
+					 *     0000000000000010:  5f 49 6e 66 6f 2f 0f 0a                           |_Info/..|
+					 *
+					 * Corresponding line in com.apple.WebKit.WebContent.sb.in:
+					 *     (regex #"/[^/]+/SC_Info/")))
+					 *
+					 * The first byte is 0x03 and then there is a single char before the next "state" byte
+					 * so I think the length should be 1. (I'd love to confirm via RE in libsandbox or the sandbox kext)
+					 */
+					// fmt.Println(utils.HexDump(dat, 0))
+					len = 1
 				case 4:
 					l, err := r.ReadByte()
 					if err != nil {

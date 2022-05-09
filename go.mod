@@ -39,7 +39,6 @@ require (
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 
 require (
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/wolever/nfa2regex v0.0.0-20211219155029-4e37010164f4
 	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
 )
@@ -58,7 +57,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect

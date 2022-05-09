@@ -29,6 +29,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -127,33 +128,65 @@ var libsandboxCmd = &cobra.Command{
 				fmt.Println(string(dat))
 			}
 		} else {
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			fmt.Println("Filter Info")
 			fmt.Println("===========")
-			for idx, filter := range fi {
-				fmt.Printf("%02d: %s\t(%s)\n", idx, filter.Name, filter.Category)
-				if len(filter.Aliases) > 0 {
-					for _, alias := range filter.Aliases {
-						fmt.Printf("    %d) %s\n", alias.ID, alias.Name)
+			for _, f := range fi {
+				if f.DataType != sandbox.SB_VALUE_TYPE_NONE {
+					fmt.Fprintf(w, "%d)\t%s\t%s\ttype: %d\tcost: %#x\tdep: %d\taliases: %d\n",
+						f.ID,
+						f.Name,
+						f.Category,
+						f.DataType,
+						f.CostFactor,
+						f.Dependency,
+						len(f.Aliases))
+					for _, a := range f.Aliases {
+						if a.Unknown != 0 {
+							fmt.Fprintf(w, "\t- %d) %s\t%d\n", a.ID, a.Name, a.Unknown)
+						} else {
+							fmt.Fprintf(w, "\t- %d) %s\n", a.ID, a.Name)
+						}
 					}
 				}
 			}
+			w.Flush()
+
 			fmt.Println()
 			fmt.Println("Modifier Info")
 			fmt.Println("=============")
-			for idx, modifier := range mi {
-				fmt.Printf("%02d: %s\n", idx, modifier.Name)
-				if len(modifier.Aliases) > 0 {
-					for _, alias := range modifier.Aliases {
-						fmt.Printf("    %d) %s\n", alias.ID, alias.Name)
+			for _, modifier := range mi {
+				if modifier.ID > 0 {
+					fmt.Printf("%02d) %-20s\taction: %d\tunknown: %d\tflag: %-4d\tmask: %-4d\n",
+						modifier.ID,
+						modifier.Name,
+						modifier.Action,
+						modifier.Unknown,
+						modifier.ActionFlag,
+						modifier.ActionMask,
+					)
+					for _, a := range modifier.Aliases {
+						if a.Unknown != 0 {
+							fmt.Fprintf(w, "\t- %d) %s\t%d\n", a.ID, a.Name, a.Unknown)
+						} else {
+							fmt.Fprintf(w, "\t- %d) %s\n", a.ID, a.Name)
+						}
 					}
 				}
 			}
+			w.Flush()
+
 			fmt.Println()
 			fmt.Println("Operation Names")
 			fmt.Println("===============")
 			for idx, o := range oi {
-				fmt.Printf("%02d: %s\n", idx, o.Name)
+				if o.NodeType == sandbox.OPERATION_NODE_TYPE_TERMINAL {
+					fmt.Fprintf(w, "%3d) %s\tTERMINAL\tjump_op: %d\taction: %d\tmsg_filt_op: %d\n", idx, o.Name, o.JumpTargetOperation, o.Action, o.MsgFilterOp)
+				} else {
+					fmt.Fprintf(w, "%3d) %s\tNON_TERMINAL\tjump_op: %d\taction: %d\tmsg_filt_op: %d\n", idx, o.Name, o.JumpTargetOperation, o.Action, o.MsgFilterOp)
+				}
 			}
+			w.Flush()
 		}
 
 		return nil
