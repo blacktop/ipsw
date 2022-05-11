@@ -447,6 +447,43 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 	return strings.Trim(string(name[:]), "\x00"), nil
 }
 
+// FIXME: not sure how this works yet (look at func 'generate_syscallmask' in libsandbox.1.dylib)
+func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]byte, error) {
+	// make sure we have the data
+	if _, err := sb.GetCollectionData(); err != nil {
+		return nil, err
+	}
+
+	r := bytes.NewReader(sb.collectionData)
+
+	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
+
+	var version uint16
+	if err := binary.Read(r, binary.LittleEndian, &version); err != nil {
+		return nil, fmt.Errorf("failed to read sandbox collection bitmask data version: %v", err)
+	}
+
+	if version != 1 {
+		return nil, fmt.Errorf("unsupported bitmask version: %d, expected 1", version)
+	}
+
+	var byteCount uint16
+	if err := binary.Read(r, binary.LittleEndian, &byteCount); err != nil {
+		return nil, fmt.Errorf("failed to read sandbox collection bitmask data byte count: %v", err)
+	}
+
+	if byteCount >= 8191 { // TODO: remove this?
+		return nil, fmt.Errorf("bitmask byte count too large: %d >= UINT16_MAX / NBBY", byteCount)
+	}
+
+	data := make([]byte, byteCount)
+	if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
+		return nil, fmt.Errorf("failed to read sandbox collection bitmask data: %v", err)
+	}
+	// TODO: I do notice that the bytes in the array seem to decrease cyclically (pattern?)
+	return data, nil
+}
+
 func (sb *Sandbox) GetRSStringAtOffset(offset uint32) ([]string, error) {
 	// make sure we have the data
 	if _, err := sb.GetCollectionData(); err != nil {

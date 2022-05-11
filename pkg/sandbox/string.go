@@ -65,7 +65,7 @@ func (s *Stack[T]) Prev() T {
 	return s.vals[len(s.vals)-1]
 }
 
-// FIXME: this is NOT done and has bugs (I think this is func ___define_filter_block_invoke)
+// FIXME: this is NOT done and has bugs (I think this is func ___define_filter_block_invoke in libsandbox.1.dylib)
 func ParseRSS(dat []byte, globals []string) ([]string, error) {
 	var out []string
 	var base string
@@ -175,7 +175,7 @@ func ParseRSS(dat []byte, globals []string) ([]string, error) {
 				}
 				token += "]"
 			} else {
-				if len(barray) == 2 {
+				if len(barray) >= 2 {
 					tuple1 := barray[0]
 					tuple2 := barray[1]
 					if tuple1[1] == 0xff && tuple2[0] == 0x00 {
@@ -188,7 +188,12 @@ func ParseRSS(dat []byte, globals []string) ([]string, error) {
 						token = "[TODO]"
 					}
 				} else {
-					return nil, fmt.Errorf("b-array should have length 2: got %d", len(barray))
+					token = "["
+					for _, tuple := range barray {
+						token += fmt.Sprintf("\\x%02x-\\x%02x", tuple[0], tuple[1])
+					}
+					token += "]"
+					// return nil, fmt.Errorf("b-array should have length 2: got %d", len(barray))
 				}
 			}
 			ss.Push(STATE_RANGE_BYTE_READ)
@@ -208,7 +213,7 @@ func ParseRSS(dat []byte, globals []string) ([]string, error) {
 				var len int
 				switch state {
 				case 3:
-					/* TODO:
+					/*
 					 *  STRING DATA:
 					 *     0000000000000000:  03 2f 0f 0b 01 30 ff 00  2e 0f 02 2f 0f 47 53 43  |./...0...../.GSC|
 					 *     0000000000000010:  5f 49 6e 66 6f 2f 0f 0a                           |_Info/..|
@@ -217,7 +222,7 @@ func ParseRSS(dat []byte, globals []string) ([]string, error) {
 					 *     (regex #"/[^/]+/SC_Info/")))
 					 *
 					 * The first byte is 0x03 and then there is a single char before the next "state" byte
-					 * so I think the length should be 1. (I'd love to confirm via RE in libsandbox or the sandbox kext)
+					 * so I think the length should be 1. (TODO: I'd love to confirm via RE in libsandbox or the sandbox kext)
 					 */
 					// fmt.Println(utils.HexDump(dat, 0))
 					len = 1

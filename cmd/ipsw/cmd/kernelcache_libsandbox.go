@@ -143,9 +143,9 @@ var libsandboxCmd = &cobra.Command{
 						len(f.Aliases))
 					for _, a := range f.Aliases {
 						if a.Unknown != 0 {
-							fmt.Fprintf(w, "\t- %d) %s\t%d\n", a.ID, a.Name, a.Unknown)
+							fmt.Fprintf(w, "    - %d) %s\t%d\n", a.ID, a.Name, a.Unknown)
 						} else {
-							fmt.Fprintf(w, "\t- %d) %s\n", a.ID, a.Name)
+							fmt.Fprintf(w, "    - %d) %s\n", a.ID, a.Name)
 						}
 					}
 				}
@@ -157,7 +157,7 @@ var libsandboxCmd = &cobra.Command{
 			fmt.Println("=============")
 			for _, modifier := range mi {
 				if modifier.ID > 0 {
-					fmt.Printf("%02d) %-20s\taction: %d\tunknown: %d\tflag: %-4d\tmask: %-4d\n",
+					fmt.Fprintf(w, "%02d) %-20s\taction: %d\tunknown: %d\tflag: %-4d\tmask: %-4d\n",
 						modifier.ID,
 						modifier.Name,
 						modifier.Action,
@@ -167,9 +167,9 @@ var libsandboxCmd = &cobra.Command{
 					)
 					for _, a := range modifier.Aliases {
 						if a.Unknown != 0 {
-							fmt.Fprintf(w, "\t- %d) %s\t%d\n", a.ID, a.Name, a.Unknown)
+							fmt.Fprintf(w, "    - %d) %s\t%d\n", a.ID, a.Name, a.Unknown)
 						} else {
-							fmt.Fprintf(w, "\t- %d) %s\n", a.ID, a.Name)
+							fmt.Fprintf(w, "    - %d) %s\n", a.ID, a.Name)
 						}
 					}
 				}
