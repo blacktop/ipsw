@@ -39,6 +39,8 @@ func init() {
 	kernelcacheCmd.AddCommand(sbdecCmd)
 	sbdecCmd.Flags().BoolP("diff", "f", false, "Diff two kernel's sandbox profiles")
 	sbdecCmd.Flags().BoolP("dump", "d", false, "Dump sandbox profile data")
+	sbdecCmd.Flags().BoolP("profile", "p", false, "Decompile sandbox profile")
+	sbdecCmd.Flags().StringP("input", "i", "", "Input sandbox profile binary file")
 	sbdecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
@@ -58,6 +60,8 @@ var sbdecCmd = &cobra.Command{
 
 		diff, _ := cmd.Flags().GetBool("diff")
 		dump, _ := cmd.Flags().GetBool("dump")
+		decProfile, _ := cmd.Flags().GetBool("profile")
+		input, _ := cmd.Flags().GetString("input")
 
 		kcPath := filepath.Clean(args[0])
 
@@ -71,7 +75,7 @@ var sbdecCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sb, err := sandbox.NewSandbox(m)
+		sb, err := sandbox.NewSandbox(&sandbox.Config{Kernel: m, ProfileBinPath: input})
 		if err != nil {
 			return err
 		}
@@ -97,8 +101,64 @@ var sbdecCmd = &cobra.Command{
 			}
 		}
 
-		if err := sb.ParseSandboxCollection(); err != nil {
-			return fmt.Errorf("failed parsing sandbox collection: %s", err)
+		if len(input) > 0 {
+			if err := sb.ParseSandboxProfile(); err != nil {
+				return fmt.Errorf("failed parsing sandbox profile: %s", err)
+			}
+
+			re, err := sb.Regexes[0].NFA()
+			if err != nil {
+				return err
+			}
+			fmt.Println(re)
+
+			defaultOp := sandbox.TerminalNode(sb.OpNodes[sb.Profiles[0].Operands[0]])
+
+			for idx, op := range sb.Profiles[0].Operands {
+				if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
+					if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
+						continue
+					}
+				}
+				o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+				if err != nil {
+					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+					continue
+				}
+				fmt.Println(o.String(sb.Operations[idx]))
+			}
+
+			return nil
+		}
+
+		if decProfile {
+			if err := sb.ParseSandboxProfile(); err != nil {
+				return fmt.Errorf("failed parsing sandbox profile: %s", err)
+			}
+
+			defaultOp := sandbox.TerminalNode(sb.OpNodes[sb.Profiles[0].Operands[0]])
+
+			for idx, op := range sb.Profiles[0].Operands {
+				if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
+					if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
+						continue
+					}
+				}
+				o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+				if err != nil {
+					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+					continue
+				}
+				fmt.Println(o.String(sb.Operations[idx]))
+			}
+
+			return nil
+		} else {
+			if err := sb.ParseSandboxCollection(); err != nil {
+				return fmt.Errorf("failed parsing sandbox collection: %s", err)
+			}
 		}
 
 		if diff {
@@ -139,7 +199,7 @@ var sbdecCmd = &cobra.Command{
 				}
 				fmt.Println(prof)
 
-				defaultOp := sandbox.TerminalNode(sb.OpNodes[0])
+				defaultOp := sandbox.TerminalNode(sb.OpNodes[prof.Operands[0]])
 
 				for idx, op := range prof.Operands {
 					if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 
 	"github.com/apex/log"
@@ -34,12 +35,10 @@ type Sandbox struct {
 	Globals   []string
 	Modifiers []string
 
-	Operations          []string
-	collectionData      []byte
-	platformProfileData []byte
-	baseOffset          int64
+	Operations []string
+	sbData     []byte
+	baseOffset int64
 
-	kern          *macho.File
 	darwin        *version.Version
 	kextStartAddr uint64
 	kextEndAddr   uint64
@@ -103,6 +102,9 @@ func (p Profile) String() string {
 }
 
 type Config struct {
+	Kernel         *macho.File
+	ProfileBinPath string
+
 	sbHeader            any
 	profileType         any
 	profileInitPanic    string
@@ -111,17 +113,17 @@ type Config struct {
 	collectionInitArgs  []string
 }
 
-func NewSandbox(m *macho.File) (*Sandbox, error) {
+func NewSandbox(c *Config) (*Sandbox, error) {
 	sb := Sandbox{
 		Profiles: make([]Profile, 0),
-		kern:     m,
+		config:   *c,
 	}
 
 	if _, err := sb.GetOperations(); err != nil {
 		return nil, fmt.Errorf("failed to parse sandbox operations: %w", err)
 	}
 
-	if kv, err := kernelcache.GetVersion(sb.kern); err != nil {
+	if kv, err := kernelcache.GetVersion(sb.config.Kernel); err != nil {
 		return nil, fmt.Errorf("failed to get kernel version: %w", err)
 	} else {
 		sb.darwin, err = version.NewVersion(kv.Kernel.Darwin)
@@ -170,7 +172,7 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 		return sb.Operations, nil
 	}
 
-	if dconst := sb.kern.Section("__DATA_CONST", "__const"); dconst != nil {
+	if dconst := sb.config.Kernel.Section("__DATA_CONST", "__const"); dconst != nil {
 		data, err := dconst.Data()
 		if err != nil {
 			return nil, err
@@ -187,7 +189,7 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 				continue
 			}
 
-			str, err := sb.kern.GetCString(ptr | tagPtrMask)
+			str, err := sb.config.Kernel.GetCString(ptr | tagPtrMask)
 			if err != nil {
 				if found {
 					break
@@ -212,8 +214,17 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 }
 
 func (sb *Sandbox) GetCollectionData() ([]byte, error) {
-	if len(sb.collectionData) > 0 {
-		return sb.collectionData, nil
+	if len(sb.sbData) > 0 {
+		return sb.sbData, nil
+	}
+
+	if len(sb.config.ProfileBinPath) > 0 {
+		var err error
+		sb.sbData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read sandbox collection profile data file: %w", err)
+		}
+		return sb.sbData, nil
 	}
 
 	log.Info("Searching for sandbox collection data")
@@ -231,21 +242,31 @@ func (sb *Sandbox) GetCollectionData() ([]byte, error) {
 		collection_data_size),
 	)
 
-	collectionOffset, err := sb.kern.GetOffset(collection_data_addr)
+	collectionOffset, err := sb.config.Kernel.GetOffset(collection_data_addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get offset for _collection_data: %w", err)
 	}
 
-	sb.collectionData = make([]byte, collection_data_size)
-	if _, err = sb.kern.ReadAt(sb.collectionData, int64(collectionOffset)); err != nil {
+	sb.sbData = make([]byte, collection_data_size)
+	if _, err = sb.config.Kernel.ReadAt(sb.sbData, int64(collectionOffset)); err != nil {
 		return nil, fmt.Errorf("failed to read _collection_data: %w", err)
 	}
-	return sb.collectionData, nil
+
+	return sb.sbData, nil
 }
 
 func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
-	if len(sb.platformProfileData) > 0 {
-		return sb.platformProfileData, nil
+	if len(sb.sbData) > 0 {
+		return sb.sbData, nil
+	}
+
+	if len(sb.config.ProfileBinPath) > 0 {
+		var err error
+		sb.sbData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read platform profile data file: %w", err)
+		}
+		return sb.sbData, nil
 	}
 
 	log.Info("Searching for sandbox platform profile data")
@@ -259,17 +280,119 @@ func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("emulated args:: _profile_init(%#x, %#x, %#x);", regs["x0"], platform_profile_data_addr, platform_profile_data_size))
 
-	profileOffset, err := sb.kern.GetOffset(platform_profile_data_addr)
+	profileOffset, err := sb.config.Kernel.GetOffset(platform_profile_data_addr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get offset for _platform_profile_data: %w", err)
 	}
 
-	sb.platformProfileData = make([]byte, platform_profile_data_size)
-	if _, err = sb.kern.ReadAt(sb.platformProfileData, int64(profileOffset)); err != nil {
+	sb.sbData = make([]byte, platform_profile_data_size)
+	if _, err = sb.config.Kernel.ReadAt(sb.sbData, int64(profileOffset)); err != nil {
 		return nil, fmt.Errorf("failed to read _platform_profile_data: %w", err)
 	}
 
-	return sb.platformProfileData, nil
+	return sb.sbData, nil
+}
+
+func (sb *Sandbox) ParseSandboxProfile() error {
+
+	if _, err := sb.GetPlatformProfileData(); err != nil {
+		return err
+	}
+
+	log.Info("Parsing sandbox profile data")
+
+	r := bytes.NewReader(sb.sbData)
+
+	if err := binary.Read(r, binary.LittleEndian, sb.config.sbHeader); err != nil {
+		return fmt.Errorf("failed to read sandbox profile structure: %v", err)
+	}
+	if err := sb.parseHdr(sb.config.sbHeader); err != nil {
+		return fmt.Errorf("failed to parse sandbox profile header structure: %v", err)
+	}
+
+	if sb.Hdr.Type != typeProfile {
+		return fmt.Errorf("expected profile type, got %#x", sb.Hdr.Type)
+	}
+
+	regexOffsets := make([]uint16, sb.Hdr.RegexItemCount)
+	if err := binary.Read(r, binary.LittleEndian, &regexOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile regex offets: %v", err)
+	}
+
+	globalOffsets := make([]uint16, sb.Hdr.GlobalVarCount)
+	if err := binary.Read(r, binary.LittleEndian, &globalOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
+	}
+
+	msgOffsets := make([]uint16, sb.Hdr.MsgItemCount)
+	if err := binary.Read(r, binary.LittleEndian, &msgOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile message offets: %v", err)
+	}
+
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing profile operands (%d)", sb.Hdr.OpCount))
+	var sbp Profile
+	sbp.Operands = make([]uint16, sb.Hdr.OpCount)
+	if err := binary.Read(r, binary.LittleEndian, sbp.Operands); err != nil {
+		return fmt.Errorf("failed to read sandbox profile operands: %v", err)
+	}
+	sb.Profiles = append(sb.Profiles, sbp)
+
+	operandEnd, _ := r.Seek(0, io.SeekCurrent)
+	r.Seek(int64(roundUp(uint64(operandEnd), 8)), io.SeekStart) // alignment
+
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing operation nodes (%d)", sb.Hdr.OpNodeCount))
+	opNodeStart, _ := r.Seek(0, io.SeekCurrent)
+	sb.OpNodes = make([]OperationNode, sb.Hdr.OpNodeCount)
+	if err := binary.Read(r, binary.LittleEndian, sb.OpNodes); err != nil {
+		return fmt.Errorf("failed to read sandbox collection operation nodes: %v", err)
+	}
+
+	sb.baseOffset, _ = r.Seek(0, io.SeekCurrent)
+	utils.Indent(log.WithFields(log.Fields{
+		"start": fmt.Sprintf("%#x", opNodeStart),
+		"end":   fmt.Sprintf("%#x", sb.baseOffset),
+		"size":  fmt.Sprintf("%#x", sb.baseOffset-opNodeStart),
+	}).Debug, 3)("operation nodes")
+
+	if sb.Hdr.RegexItemCount > 0 {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing regex (%d)", sb.Hdr.RegexItemCount))
+		for idx, roff := range regexOffsets {
+			loc, _ := r.Seek(sb.baseOffset+int64(roff)*8, io.SeekStart)
+			var size uint16
+			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+				return fmt.Errorf("failed to read sandbox collection regex size: %v", err)
+			}
+			rdat := make([]byte, size)
+			if err := binary.Read(r, binary.LittleEndian, &rdat); err != nil {
+				return fmt.Errorf("failed to read sandbox collection regex data: %v", err)
+			}
+			re, err := NewRegex(rdat)
+			if err != nil {
+				return fmt.Errorf("failed to parse sandbox collection regex: %v", err)
+			}
+			utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, version: %d, length: %#x\n\n%s", idx+1, loc, re.Version, re.Length, hex.Dump(re.Data)))
+			sb.Regexes = append(sb.Regexes, re)
+		}
+	}
+
+	if sb.Hdr.GlobalVarCount > 0 {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing variables (%d)", sb.Hdr.GlobalVarCount))
+		for idx, goff := range globalOffsets {
+			r.Seek(sb.baseOffset+int64(goff)*8, io.SeekStart)
+			var size uint16
+			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+				return fmt.Errorf("failed to read sandbox collection global variable size: %v", err)
+			}
+			gdat := make([]byte, size)
+			if err := binary.Read(r, binary.LittleEndian, &gdat); err != nil {
+				return fmt.Errorf("failed to read sandbox collection global variable data: %v", err)
+			}
+			sb.Globals = append(sb.Globals, strings.Trim(string(gdat[:]), "\x00"))
+			utils.Indent(log.Debug, 3)(sb.Globals[idx])
+		}
+	}
+
+	return nil
 }
 
 func (sb *Sandbox) ParseSandboxCollection() error {
@@ -280,13 +403,13 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 
 	log.Info("Parsing sandbox collection data")
 
-	r := bytes.NewReader(sb.collectionData)
+	r := bytes.NewReader(sb.sbData)
 
 	if err := binary.Read(r, binary.LittleEndian, sb.config.sbHeader); err != nil {
 		return fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
 	}
 	if err := sb.parseHdr(sb.config.sbHeader); err != nil {
-		return fmt.Errorf("failed to parse sandbox profile header structure: %v", err)
+		return fmt.Errorf("failed to parse sandbox profile collection header structure: %v", err)
 	}
 
 	if sb.Hdr.Type != typeCollection {
@@ -322,7 +445,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		}
 		sbp.Operands = make([]uint16, sb.Hdr.OpCount)
 		if err := binary.Read(r, binary.LittleEndian, sbp.Operands); err != nil {
-			return fmt.Errorf("failed to read sandbox profile structure: %v", err)
+			return fmt.Errorf("failed to read sandbox profile operands: %v", err)
 		}
 		sb.Profiles = append(sb.Profiles, sbp)
 	}
@@ -425,12 +548,11 @@ func (sb *Sandbox) GetProfile(name string) (Profile, error) {
 }
 
 func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
-	// make sure we have the data
-	if _, err := sb.GetCollectionData(); err != nil {
-		return "", err
+	if len(sb.sbData) == 0 {
+		return "", fmt.Errorf("sandbox data not loaded")
 	}
 
-	r := bytes.NewReader(sb.collectionData)
+	r := bytes.NewReader(sb.sbData)
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -449,12 +571,10 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 
 // FIXME: not sure how this works yet (look at func 'generate_syscallmask' in libsandbox.1.dylib)
 func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]byte, error) {
-	// make sure we have the data
-	if _, err := sb.GetCollectionData(); err != nil {
-		return nil, err
+	if len(sb.sbData) == 0 {
+		return nil, fmt.Errorf("sandbox data not loaded")
 	}
-
-	r := bytes.NewReader(sb.collectionData)
+	r := bytes.NewReader(sb.sbData)
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -485,12 +605,10 @@ func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]byte, error) {
 }
 
 func (sb *Sandbox) GetRSStringAtOffset(offset uint32) ([]string, error) {
-	// make sure we have the data
-	if _, err := sb.GetCollectionData(); err != nil {
-		return nil, err
+	if len(sb.sbData) == 0 {
+		return nil, fmt.Errorf("sandbox data not loaded")
 	}
-
-	r := bytes.NewReader(sb.collectionData)
+	r := bytes.NewReader(sb.sbData)
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -508,12 +626,11 @@ func (sb *Sandbox) GetRSStringAtOffset(offset uint32) ([]string, error) {
 }
 
 func (sb *Sandbox) GetHostPortAtOffset(offset uint32) (uint16, uint16, error) {
-	// make sure we have the data
-	if _, err := sb.GetCollectionData(); err != nil {
-		return 0, 0, err
+	if len(sb.sbData) == 0 {
+		return 0, 0, fmt.Errorf("sandbox data not loaded")
 	}
 
-	r := bytes.NewReader(sb.collectionData)
+	r := bytes.NewReader(sb.sbData)
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -536,12 +653,12 @@ func (sb *Sandbox) parseXrefs() error {
 
 	var kextStartOffset uint64
 
-	startAdders, err := kernelcache.GetKextStartVMAddrs(sb.kern)
+	startAdders, err := kernelcache.GetKextStartVMAddrs(sb.config.Kernel)
 	if err != nil {
 		return fmt.Errorf("failed to get kext start addresses: %w", err)
 	}
 
-	infos, err := kernelcache.GetKextInfos(sb.kern)
+	infos, err := kernelcache.GetKextInfos(sb.config.Kernel)
 	if err != nil {
 		return fmt.Errorf("failed to get kext infos: %w", err)
 	}
@@ -550,7 +667,7 @@ func (sb *Sandbox) parseXrefs() error {
 		if strings.Contains(string(info.Name[:]), "sandbox") {
 			sb.kextStartAddr = startAdders[idx] | tagPtrMask
 			sb.kextEndAddr = startAdders[idx+1] | tagPtrMask
-			kextStartOffset, err = sb.kern.GetOffset(sb.kextStartAddr)
+			kextStartOffset, err = sb.config.Kernel.GetOffset(sb.kextStartAddr)
 			if err != nil {
 				return fmt.Errorf("failed to get sandbox kext start offset: %w", err)
 			}
@@ -560,7 +677,7 @@ func (sb *Sandbox) parseXrefs() error {
 
 	// TODO: only get function data (avoid parsing macho header etc)
 	data := make([]byte, sb.kextEndAddr-sb.kextStartAddr)
-	if _, err = sb.kern.ReadAt(data, int64(kextStartOffset)); err != nil {
+	if _, err = sb.config.Kernel.ReadAt(data, int64(kextStartOffset)); err != nil {
 		return fmt.Errorf("failed to read sandbox kext data: %w", err)
 	}
 
@@ -627,7 +744,7 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 		return nil, fmt.Errorf("failed to parse sandbox kext xrefs: %w", err)
 	}
 
-	panicStrVMAddr, err := findCStringVMaddr(sb.kern, errmsg)
+	panicStrVMAddr, err := findCStringVMaddr(sb.config.Kernel, errmsg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find panic string matching %s: %w", errmsg, err)
 	}
@@ -645,12 +762,12 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 		return nil, fmt.Errorf("failed to find panic string cross reference for given error message: %s", errmsg)
 	}
 
-	hook_policy_init, err := sb.kern.GetFunctionForVMAddr(panicXrefVMAddr)
+	hook_policy_init, err := sb.config.Kernel.GetFunctionForVMAddr(panicXrefVMAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find _hook_policy_init function: %w", err)
 	}
 
-	data, err := sb.kern.GetFunctionData(hook_policy_init)
+	data, err := sb.config.Kernel.GetFunctionData(hook_policy_init)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get _hook_policy_init function data: %w", err)
 	}

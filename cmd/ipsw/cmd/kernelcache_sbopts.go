@@ -70,7 +70,7 @@ var kernelSandboxCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sb, err := sandbox.NewSandbox(m)
+		sb, err := sandbox.NewSandbox(&sandbox.Config{Kernel: m})
 		if err != nil {
 			return fmt.Errorf("failed to create kernelcache sandbox parser: %v", err)
 		}
@@ -100,7 +100,7 @@ var kernelSandboxCmd = &cobra.Command{
 			}
 			defer m2.Close()
 
-			sb2, err := sandbox.NewSandbox(m2)
+			sb2, err := sandbox.NewSandbox(&sandbox.Config{Kernel: m2})
 			if err != nil {
 				return fmt.Errorf("failed to create kernelcache sandbox parser: %v", err)
 			}
