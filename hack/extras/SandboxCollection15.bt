@@ -21,7 +21,7 @@ typedef struct
     uchar unknown2<format = decimal>;
     uint16 ProfileCount<format = decimal>;
     uint16 RegexItemCount<format = decimal>;
-    uint16 MsgItemCount<format = decimal>;
+    uint16 emitted_modifier_descriptor_count<format = decimal>;
 } CollectionHeader;
 
 LittleEndian();

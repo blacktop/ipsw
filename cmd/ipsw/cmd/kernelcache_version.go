@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 )
@@ -61,6 +62,13 @@ var kernelVersionCmd = &cobra.Command{
 		m, err := macho.Open(machoPath)
 		if err != nil {
 			return err
+		}
+
+		if m.FileTOC.FileHeader.Type == types.FileSet {
+			m, err = m.GetFileSetFileByName("kernel")
+			if err != nil {
+				return fmt.Errorf("failed to parse fileset entry kernel: %v", err)
+			}
 		}
 
 		kv, err := kernelcache.GetVersion(m)
