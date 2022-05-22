@@ -43,8 +43,11 @@ const (
 	 * but they didn't know how to parse it. I've seen the filter "syscall-number" have this high bit set in it's ID
 	 * so I think that means it's the "syscall-mask" variant? There also used to be a LOT of regex versions of filters
 	 * xattr-regex etc etc so it might mean a regex variant as well */
-	INSTR_TYPE_JUMP   = 1
-	INSTR_TYPE_ACTION = 2
+	INSTR_TYPE_NONE     = 0
+	INSTR_TYPE_JUMP     = 1 << 0 // 1
+	INSTR_TYPE_ACTION   = 1 << 1 // 2
+	INSTR_TYPE_UNKNOWN  = 1 << 2 // 4
+	INSTR_TYPE_UNKNOWN2 = 1 << 4 // 16
 )
 
 // TerminalNode a terminal node, when reached, either denies or allows the rule.
@@ -123,9 +126,14 @@ func (n NonTerminalNode) UnmatchOffset() uint16 {
 	return uint16(types.ExtractBits(uint64(n), 48, 8) + (types.ExtractBits(uint64(n), 56, 8) << 8))
 }
 func (n NonTerminalNode) String() string {
-	return fmt.Sprintf("non-terminal (filter_id: %d, argument_id: %d, condition->value.type: %#x, match_off: %#x, unmatch_off: %#x)",
+	typ := "type"
+	if n.AltArgument() {
+		typ = "alt-type"
+	}
+	return fmt.Sprintf("non-terminal (filter_id: %2d, argument: %#04x, %8s: %2d, match_off: %#x, unmatch_off: %#x)",
 		n.FilterID(),
 		n.ArgumentID(),
+		typ,
 		n.DataType(),
 		n.MatchOffset(),
 		n.UnmatchOffset())

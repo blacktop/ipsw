@@ -190,7 +190,7 @@ var sbdecCmd = &cobra.Command{
 			if len(args) > 1 { // decompile single profile
 
 				// for _, op := range sb.OpNodes {
-				// 	if op.IsTerminal() {
+				// 	if op.IsNonTerminal() {
 				// 		fmt.Println(op)
 				// 	}
 				// }
@@ -251,6 +251,7 @@ var sbdecCmd = &cobra.Command{
 			} else { // decompile all profiles
 				for _, prof := range sb.Profiles {
 					fmt.Println(prof.Name)
+
 					defaultOp := sandbox.TerminalNode(sb.OpNodes[0])
 
 					for idx, op := range prof.Operands {
