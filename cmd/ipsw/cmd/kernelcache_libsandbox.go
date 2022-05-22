@@ -157,11 +157,11 @@ var libsandboxCmd = &cobra.Command{
 			fmt.Println("=============")
 			for _, modifier := range mi {
 				if modifier.ID > 0 {
-					fmt.Fprintf(w, "%02d) %-20s\taction: %d\tunknown: %d\tflag: %-4d\tmask: %-4d\n",
+					fmt.Fprintf(w, "%02d) %-20s\taction: %d\ttype: %d\tflag: %-4d\tmask: %-4d\n",
 						modifier.ID,
 						modifier.Name,
 						modifier.Action,
-						modifier.Unknown,
+						modifier.Type,
 						modifier.ActionFlag,
 						modifier.ActionMask,
 					)

@@ -106,11 +106,13 @@ var sbdecCmd = &cobra.Command{
 				return fmt.Errorf("failed parsing sandbox profile: %s", err)
 			}
 
-			re, err := sb.Regexes[0].NFA()
-			if err != nil {
-				return err
+			if len(sb.Regexes) > 0 {
+				re, err := sb.Regexes[0].NFA()
+				if err != nil {
+					return err
+				}
+				fmt.Println(re)
 			}
-			fmt.Println(re)
 
 			defaultOp := sandbox.TerminalNode(sb.OpNodes[sb.Profiles[0].Operands[0]])
 
@@ -208,6 +210,7 @@ var sbdecCmd = &cobra.Command{
 						}
 					}
 					o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+					// _, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
 					if err != nil {
 						// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 						log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)

@@ -27,56 +27,56 @@ const (
 )
 
 type Sandbox struct {
-	Hdr header
-
-	Profiles  []Profile
-	OpNodes   []OperationNode
-	Regexes   []*Regex
-	Globals   []string
-	Modifiers []string
-
+	Hdr        header
+	Profiles   []Profile
+	OpNodes    []OperationNode
+	Regexes    []*Regex
+	Globals    []string
+	Modifiers  []string
 	Operations []string
+
 	sbData     []byte
 	baseOffset int64
+	ops        map[OperationNode]*Operation // cache of parsed operations
 
+	config        Config
 	darwin        *version.Version
+	db            *LibSandbox
 	kextStartAddr uint64
 	kextEndAddr   uint64
 	xrefs         map[uint64]uint64
-	config        Config
-	db            *LibSandbox
 }
 
 type header struct {
-	Type           uint16
-	OpNodeCount    uint16
-	OpCount        uint8
-	GlobalVarCount uint8
-	ProfileCount   uint16
-	RegexItemCount uint16
-	MsgItemCount   uint16
+	Type                    uint16
+	OpNodeCount             uint16
+	OpCount                 uint8
+	GlobalVarCount          uint8
+	ProfileCount            uint16
+	RegexItemCount          uint16
+	ModifierDescriptorCount uint16
 }
 
 type header14 struct {
-	Type           uint16
-	OpNodeCount    uint16
-	OpCount        uint8
-	GlobalVarCount uint8
-	ProfileCount   uint16
-	RegexItemCount uint16
-	MsgItemCount   uint16
+	Type                    uint16
+	OpNodeCount             uint16
+	OpCount                 uint8
+	GlobalVarCount          uint8
+	ProfileCount            uint16
+	RegexItemCount          uint16
+	ModifierDescriptorCount uint16
 }
 
 type header15 struct {
-	Type           uint16
-	OpNodeCount    uint16
-	OpCount        uint8
-	GlobalVarCount uint8
-	Unknown1       uint8
-	Unknown2       uint8
-	ProfileCount   uint16
-	RegexItemCount uint16
-	MsgItemCount   uint16
+	Type                    uint16
+	OpNodeCount             uint16
+	OpCount                 uint8
+	GlobalVarCount          uint8
+	Unknown1                uint8
+	Unknown2                uint8
+	ProfileCount            uint16
+	RegexItemCount          uint16
+	ModifierDescriptorCount uint16
 }
 
 type profile14 struct {
@@ -116,6 +116,7 @@ type Config struct {
 func NewSandbox(c *Config) (*Sandbox, error) {
 	sb := Sandbox{
 		Profiles: make([]Profile, 0),
+		ops:      make(map[OperationNode]*Operation),
 		config:   *c,
 	}
 
@@ -311,7 +312,7 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 	}
 
 	if sb.Hdr.Type != typeProfile {
-		return fmt.Errorf("expected profile type, got %#x", sb.Hdr.Type)
+		return fmt.Errorf("expected profile type %#x, got %#x", typeProfile, sb.Hdr.Type)
 	}
 
 	regexOffsets := make([]uint16, sb.Hdr.RegexItemCount)
@@ -324,9 +325,9 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
-	msgOffsets := make([]uint16, sb.Hdr.MsgItemCount)
-	if err := binary.Read(r, binary.LittleEndian, &msgOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox profile message offets: %v", err)
+	modifierDescriptorOffsets := make([]uint16, sb.Hdr.ModifierDescriptorCount)
+	if err := binary.Read(r, binary.LittleEndian, &modifierDescriptorOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile modifier descriptor offets: %v", err)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing profile operands (%d)", sb.Hdr.OpCount))
@@ -337,8 +338,8 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 	}
 	sb.Profiles = append(sb.Profiles, sbp)
 
-	operandEnd, _ := r.Seek(0, io.SeekCurrent)
-	r.Seek(int64(roundUp(uint64(operandEnd), 8)), io.SeekStart) // alignment
+	currPos, _ := r.Seek(0, io.SeekCurrent)
+	r.Seek(int64(roundUp(uint64(currPos), 8)), io.SeekStart) // alignment
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing operation nodes (%d)", sb.Hdr.OpNodeCount))
 	opNodeStart, _ := r.Seek(0, io.SeekCurrent)
@@ -413,7 +414,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 	}
 
 	if sb.Hdr.Type != typeCollection {
-		return fmt.Errorf("expected collection type, got %#x", sb.Hdr.Type)
+		return fmt.Errorf("expected collection type %#x, got %#x", typeCollection, sb.Hdr.Type)
 	}
 
 	regexOffsets := make([]uint16, sb.Hdr.RegexItemCount)
@@ -426,9 +427,9 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
-	msgOffsets := make([]uint16, sb.Hdr.MsgItemCount)
-	if err := binary.Read(r, binary.LittleEndian, &msgOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox profile message offets: %v", err)
+	modifierDescriptorOffsets := make([]uint16, sb.Hdr.ModifierDescriptorCount)
+	if err := binary.Read(r, binary.LittleEndian, &modifierDescriptorOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile modifier descriptor offets: %v", err)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing profiles (%d)", sb.Hdr.ProfileCount))
@@ -518,19 +519,20 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		utils.Indent(log.Debug, 3)(sb.Globals[idx])
 	}
 
-	// utils.Indent(log.Debug, 2)("Parsing messages")
-	// for _, moff := range msgOffsets {
+	// utils.Indent(log.Debug, 2)("Parsing modifier descriptors")
+	// for _, moff := range modifierDescriptorOffsets {
+	// 	loc, _ := r.Seek(int64(moff)*8, io.SeekStart)
 	// 	// loc, _ := r.Seek(sb.baseOffset+int64(moff)*8, io.SeekStart)
-	// 	loc, _ := r.Seek(sb.baseOffset+int64(moff), io.SeekStart)
+	// 	// loc, _ := r.Seek(sb.baseOffset+int64(moff), io.SeekStart)
 	// 	fmt.Printf("mod loc: %#x\n", loc)
 	// 	// var size uint16
 	// 	var size byte
 	// 	if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-	// 		return fmt.Errorf("failed to read sandbox collection msg size: %v", err)
+	// 		return fmt.Errorf("failed to read sandbox collection modifier descriptor size: %v", err)
 	// 	}
 	// 	mdat := make([]byte, size)
 	// 	if err := binary.Read(r, binary.LittleEndian, &mdat); err != nil {
-	// 		return fmt.Errorf("failed to read sandbox collection msg data: %v", err)
+	// 		return fmt.Errorf("failed to read sandbox collection modifier descriptor data: %v", err)
 	// 	}
 	// 	sb.Modifiers = append(sb.Modifiers, string(mdat))
 	// }
@@ -844,7 +846,7 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.GlobalVarCount = v.GlobalVarCount
 		sb.Hdr.ProfileCount = v.ProfileCount
 		sb.Hdr.RegexItemCount = v.RegexItemCount
-		sb.Hdr.MsgItemCount = v.MsgItemCount
+		sb.Hdr.ModifierDescriptorCount = v.ModifierDescriptorCount
 	case *header15:
 		sb.Hdr.Type = v.Type
 		sb.Hdr.OpNodeCount = v.OpNodeCount
@@ -852,7 +854,7 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.GlobalVarCount = v.GlobalVarCount
 		sb.Hdr.ProfileCount = v.ProfileCount
 		sb.Hdr.RegexItemCount = v.RegexItemCount
-		sb.Hdr.MsgItemCount = v.MsgItemCount
+		sb.Hdr.ModifierDescriptorCount = v.ModifierDescriptorCount
 	default:
 		return fmt.Errorf("unknown profile header type: %T", v)
 	}
@@ -870,7 +872,9 @@ func (sb *Sandbox) parseProfile(p any) (uint16, uint16, error) {
 	}
 }
 
-/* UTILS */
+/*********
+ * UTILS *
+ *********/
 
 func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
 	for _, sec := range m.Sections {

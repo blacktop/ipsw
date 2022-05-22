@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
@@ -68,7 +70,10 @@ func (db *LibSandbox) GetFilter(id uint8) (*FilterInfo, error) {
 	return &db.Filters[id], nil
 }
 
-func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16) (any, error) {
+func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) {
+	if alt {
+		log.Debugf("💁 %s: type: %#x, arg: %#x, alt: %t\n", f.Name, f.DataType, id, alt)
+	}
 	switch f.DataType {
 	case SB_VALUE_TYPE_BOOLEAN:
 		if id == 1 {
@@ -77,12 +82,22 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16) (any, error) {
 		return "#f", nil
 	case SB_VALUE_TYPE_BIT_PATTERN:
 		return fmt.Sprintf("#o%04o", id), nil
-	case ARG_CTRL: // Convert integer value to IO control string
-		alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
-		if err != nil {
-			return fmt.Sprintf("_IO \"%c\" %d", rune(id>>8), int(id&0xff)), nil
+	case ARG_CTRL:
+		if alt { // bitmask variant
+			dat, err := sb.GetBitMaskAtOffset(uint32(id)) // TODO: emit_bitmask/generate_syscallmask
+			if err != nil {
+				return "", err
+			}
+			log.Debugf("bitmask:\n%s", utils.HexDump(dat, 0))
+			return nil, fmt.Errorf("not sure how to parse bit masks yet")
+		} else {
+			alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
+			if err != nil {
+				// Convert integer value to IO control string
+				return fmt.Sprintf("_IO \"%c\" %d", rune(id>>8), int(id&0xff)), nil
+			}
+			return alias.Name, nil
 		}
-		return alias.Name, nil
 	case SB_VALUE_TYPE_INTEGER:
 		alias, err := f.Aliases.Get(id)
 		if err != nil {
@@ -96,17 +111,37 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16) (any, error) {
 		}
 		return fmt.Sprintf("\"%s\"", s), nil
 	case ARG_RSS_OFFSET, ARG_NOT_SURE_YET:
-		ss, err := sb.GetRSStringAtOffset(uint32(id))
-		if err != nil {
-			return nil, err
+		if alt { // regex variant
+			n, err := sb.Regexes[id].NFA()
+			if err != nil {
+				return nil, err
+			}
+			fmt.Println(n)
+			return "regex #\"\"", nil
+			// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
+		} else {
+			ss, err := sb.GetRSStringAtOffset(uint32(id))
+			if err != nil {
+				return nil, err
+			}
+			return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
 		}
-		return strings.Join(ss, " "), nil
 	case SB_VALUE_TYPE_PATTERN_LITERAL:
-		ss, err := sb.GetRSStringAtOffset(uint32(id))
-		if err != nil {
-			return nil, err
+		if alt { // regex variant
+			n, err := sb.Regexes[id].NFA()
+			if err != nil {
+				return nil, err
+			}
+			fmt.Println(n)
+			return "regex #\"\"", nil
+			// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
+		} else {
+			ss, err := sb.GetRSStringAtOffset(uint32(id))
+			if err != nil {
+				return nil, err
+			}
+			return []string{"literal", fmt.Sprintf("\"%s\"", strings.Join(ss, " "))}, nil
 		}
-		return []string{"literal", strings.Join(ss, " ")}, nil
 	case SB_VALUE_TYPE_NETWORK:
 		host, port, err := sb.GetHostPortAtOffset(uint32(id))
 		if err != nil {
@@ -171,7 +206,7 @@ type Alias struct {
 
 type alias struct {
 	NameAddr uint64 `json:"-"`
-	ID       uint16 `json:"id,omitempty"`
+	ID       uint16 `json:"id"`
 	Unknown  uint16 `json:"unknown,omitempty"`
 	Padding  uint32 `json:"-"`
 }
@@ -271,7 +306,7 @@ type ModifierInfo struct {
 type modifierInfo struct {
 	NameAddr    uint64 `json:"-"`
 	Action      uint32 `json:"action"`
-	Unknown     uint32 `json:"unknown,omitempty"`
+	Type        uint32 `json:"type"` // NOTE: sb_modifier_requires_argument in libsandbox.1.dylib
 	ActionMask  uint32 `json:"action_mask"`
 	ActionFlag  uint32 `json:"action_flag"`
 	AliasesAddr uint64 `json:"-"`
@@ -357,7 +392,7 @@ func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 }
 
 type OperationInfo struct {
-	ID            int      `json:"id,omitempty"`
+	ID            int      `json:"id"`
 	Name          string   `json:"name,omitempty"`
 	Modifiers     []string `json:"modifiers,omitempty"`
 	Categories    []string `json:"categories,omitempty"`
