@@ -162,7 +162,7 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 		}
 		return fmt.Sprintf("%s \"%s:%s\"", alias.Name, hostStr, portStr), nil
 	default:
-		return nil, fmt.Errorf("unsupported filter category: %s", f.Category)
+		return nil, fmt.Errorf("unsupported filter argument type: %d", f.DataType)
 	}
 }
 

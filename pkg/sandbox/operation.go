@@ -110,14 +110,11 @@ type NonTerminalNode uint64 // condition
 func (n NonTerminalNode) FilterID() uint8 {
 	return uint8(types.ExtractBits(uint64(n)&^uint64(ALT_TYPE_FLAG), 8, 8))
 }
-func (n NonTerminalNode) ArgumentID() uint16 {
-	return uint16(types.ExtractBits(uint64(n), 16, 8) + (types.ExtractBits(uint64(n), 24, 8) << 8))
-}
-func (n NonTerminalNode) DataType() uint32 {
-	return uint32(types.ExtractBits(uint64(n), 24, 8))
-}
 func (n NonTerminalNode) AltArgument() bool {
 	return (uint64(n) & ALT_TYPE_FLAG) != 0
+}
+func (n NonTerminalNode) ArgumentID() uint16 {
+	return uint16(types.ExtractBits(uint64(n), 16, 8) + (types.ExtractBits(uint64(n), 24, 8) << 8))
 }
 func (n NonTerminalNode) MatchOffset() uint16 {
 	return uint16(types.ExtractBits(uint64(n), 32, 8) + (types.ExtractBits(uint64(n), 40, 8) << 8))
@@ -126,15 +123,14 @@ func (n NonTerminalNode) UnmatchOffset() uint16 {
 	return uint16(types.ExtractBits(uint64(n), 48, 8) + (types.ExtractBits(uint64(n), 56, 8) << 8))
 }
 func (n NonTerminalNode) String() string {
-	typ := "type"
+	arg := "arg"
 	if n.AltArgument() {
-		typ = "alt-type"
+		arg = "alt-arg"
 	}
-	return fmt.Sprintf("non-terminal (filter_id: %2d, argument: %#04x, %8s: %2d, match_off: %#x, unmatch_off: %#x)",
+	return fmt.Sprintf("non-terminal (filter_id: %2d, %7s: %#04x, match_off: %#x, unmatch_off: %#x)",
 		n.FilterID(),
+		arg,
 		n.ArgumentID(),
-		typ,
-		n.DataType(),
 		n.MatchOffset(),
 		n.UnmatchOffset())
 }
