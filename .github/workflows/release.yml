@@ -40,7 +40,7 @@ jobs:
       -
         if: matrix.platform == 'ubuntu-latest'
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
           version: latest
@@ -50,7 +50,7 @@ jobs:
       -
         if: matrix.platform == 'windows-latest'
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
           version: latest
