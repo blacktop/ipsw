@@ -241,6 +241,7 @@ func ParseRSS(dat []byte, globals []string) ([]string, error) {
 				}
 				token = string(dat)
 				ss.Push(STATE_TOKEN_READ)
+				continue
 			} else {
 				log.Warn("read token byte from token state")
 			}

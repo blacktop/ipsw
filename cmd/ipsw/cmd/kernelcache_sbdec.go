@@ -128,7 +128,7 @@ var sbdecCmd = &cobra.Command{
 					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					continue
 				}
-				fmt.Println(o.String(sb.Operations[idx]))
+				fmt.Println(o.String(sb.Operations[idx], 0))
 			}
 
 			return nil
@@ -153,7 +153,7 @@ var sbdecCmd = &cobra.Command{
 					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					continue
 				}
-				fmt.Println(o.String(sb.Operations[idx]))
+				fmt.Println(o.String(sb.Operations[idx], 0))
 			}
 
 			return nil
@@ -216,7 +216,7 @@ var sbdecCmd = &cobra.Command{
 						log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 						continue
 					}
-					fmt.Println(o.String(sb.Operations[idx]))
+					fmt.Println(o.String(sb.Operations[idx], 0))
 				}
 
 				// rl, err := sb.Regexes[0].Parse()
@@ -224,9 +224,9 @@ var sbdecCmd = &cobra.Command{
 				// 	return err
 				// }
 
-				// if _, err := sb.Regexes[3].NFA(); err != nil {
-				// 	return err
-				// }
+				if _, err := sb.Regexes[3].NFA(); err != nil {
+					return err
+				}
 
 				// sb.Regexes[3].Graph()
 				// sb.Regexes[80].Graph()
@@ -266,7 +266,7 @@ var sbdecCmd = &cobra.Command{
 							log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 							continue
 						}
-						fmt.Println(o.String(sb.Operations[idx]))
+						fmt.Println(o.String(sb.Operations[idx], 0))
 					}
 				}
 			}

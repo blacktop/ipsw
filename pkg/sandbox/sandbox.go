@@ -878,7 +878,6 @@ func (sb *Sandbox) parseProfile(p any) (uint16, uint16, error) {
 
 func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
 	for _, sec := range m.Sections {
-
 		if sec.Flags.IsCstringLiterals() || strings.Contains(sec.Name, "cstring") {
 			dat, err := sec.Data()
 			if err != nil {

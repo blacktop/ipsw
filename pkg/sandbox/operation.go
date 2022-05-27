@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
@@ -195,7 +196,7 @@ func ParseOperation(sb *Sandbox, op OperationNode) (*Operation, error) {
 	}
 }
 
-func (o *Operation) String(name string) string {
+func (o *Operation) String(name string, indent int) string {
 	var out string
 	if o.node.IsTerminal() {
 		node := TerminalNode(o.node)
@@ -211,8 +212,8 @@ func (o *Operation) String(name string) string {
 		}
 	} else {
 		out = fmt.Sprintf("(%s %s %s)", o.Filter.Name, o.Argument, name)
-		out += fmt.Sprintf("\n\t  MATCH: %s", o.Match.String(name))
-		out += fmt.Sprintf("\n\tUNMATCH: %s", o.Unmatch.String(name))
+		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(name, indent+1))
+		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String(name, indent+1))
 	}
 	return out
 }

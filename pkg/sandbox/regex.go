@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"strconv"
@@ -420,12 +419,17 @@ func (re *Regex) NFA() (*n.NFA, error) {
 
 	nfa.Nodes[strconv.Itoa(0)].IsInitial = true
 
-	rstr, err := n.ToRegex(nfa)
-	if err != nil {
-		return nil, err
-	}
+	// rstr, err := n.ToRegexWithConfig(nfa, n.ToRegexConfig{
+	// 	StepCallback: func(nfa *n.NFA, stepName string) error {
+	// 		fmt.Printf("%s\n", stepName)
+	// 		return nil
+	// 	},
+	// })
+	// if err != nil {
+	// 	return nil, err
+	// }
 	// fmt.Println("NFA:", rstr)
-	ioutil.WriteFile("regex", []byte(rstr), 0644)
+	// ioutil.WriteFile("regex", []byte(rstr), 0644)
 
 	fmt.Println("Graph:")
 	fmt.Println("https://dreampuf.github.io/GraphvizOnline/#" + url.PathEscape(n.ToDot(nfa)))

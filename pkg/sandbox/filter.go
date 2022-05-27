@@ -124,7 +124,11 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			if err != nil {
 				return nil, err
 			}
-			return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
+			if len(ss) == 1 {
+				return fmt.Sprintf("\"%s\"", ss[0]), nil
+			}
+			return ss, nil
+			// return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
 		}
 	case SB_VALUE_TYPE_PATTERN_LITERAL:
 		if alt { // regex variant
@@ -143,6 +147,7 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			return []string{"literal", fmt.Sprintf("\"%s\"", strings.Join(ss, " "))}, nil
 		}
 	case SB_VALUE_TYPE_NETWORK:
+		// NOTE: ___define_network_filter_block_invoke(void* arg1, int64_t* arg2, int32_t* arg3) in libsandbox.1.dylib
 		host, port, err := sb.GetHostPortAtOffset(uint32(id))
 		if err != nil {
 			return nil, err
