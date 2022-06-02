@@ -20,6 +20,13 @@ $ brew install blacktop/tap/ipsw
 
 Download from [releases](https://github.com/blacktop/ipsw/releases/latest)
 
+### Via `scoop`
+
+```bash
+$ scoop bucket add org https://github.com/blacktop/scoop-bucket.git
+$ scoop install blacktop/ipsw
+```
+
 ---
 
 ## linux/docker
