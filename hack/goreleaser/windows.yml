@@ -41,7 +41,7 @@ scoop:
   bucket:
     owner: blacktop
     name: scoop-bucket
+    token: "{{ .Env.SCOOP_TAP_GITHUB_TOKEN }}"
   homepage:  https://blacktop.github.io/ipsw
   description: iOS/macOS Research Swiss Army Knife
   license: MIT
-  token: "{{ .Env.SCOOP_TAP_GITHUB_TOKEN }}"
