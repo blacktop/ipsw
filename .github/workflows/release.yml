@@ -32,7 +32,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         name: linux-deps
         run: |
-          sudo apt-get -yq --no-install-suggests --no-install-recommends install gcc-aarch64-linux-gnu jq
+          sudo apt-get -yq install gcc-aarch64-linux-gnu jq
       -
         if: matrix.platform == 'ubuntu-latest'
         name: setup-snapcraft
