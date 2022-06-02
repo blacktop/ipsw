@@ -29,14 +29,14 @@ jobs:
         with:
           go-version: 1.18
       -
-        name: Build Dependencies (Linux)
         if: matrix.platform == 'ubuntu-latest'
+        name: setup-snapcraft
+        # FIXME: the mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715
         run: |
-          sudo apt-get update && sudo apt-get install gcc-aarch64-linux-gnu jq snapd --yes
-          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
-          sudo apt update
-          sudo apt install nfpm
-          sudo snap install --classic snapcraft
+          sudo apt-get update
+          sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
+          mkdir -p $HOME/.cache/snapcraft/download
+          mkdir -p $HOME/.cache/snapcraft/stage-packages
       -
         if: matrix.platform == 'ubuntu-latest'
         name: Run GoReleaser
@@ -58,6 +58,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
+      -
+        name: snapcraft-login
+        if: matrix.platform == 'ubuntu-latest'
+        run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
       -
         if: matrix.platform == 'ubuntu-latest'
         name: Upload assets
