@@ -43,6 +43,10 @@ jobs:
           mkdir -p $HOME/.cache/snapcraft/download
           mkdir -p $HOME/.cache/snapcraft/stage-packages
       -
+        name: snapcraft-login
+        if: matrix.platform == 'ubuntu-latest'
+        run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
+      -
         if: matrix.platform == 'ubuntu-latest'
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
@@ -63,10 +67,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
-      -
-        name: snapcraft-login
-        if: matrix.platform == 'ubuntu-latest'
-        run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
       -
         if: matrix.platform == 'ubuntu-latest'
         name: Upload assets
