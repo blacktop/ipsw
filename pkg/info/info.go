@@ -188,6 +188,9 @@ func (i *Info) String() string {
 
 // GetOsDmg returns the name of the OS dmg
 func (i *Info) GetOsDmg() string {
+	if sysOS, ok := i.Plists.BuildIdentities[0].Manifest["Cryptex1,SystemOS"]; ok {
+		return sysOS.Info.Path
+	}
 	return i.Plists.BuildIdentities[0].Manifest["OS"].Info.Path
 }
 
