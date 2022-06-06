@@ -26,6 +26,14 @@ type NFANode struct {
 	IsTerminal bool
 }
 
+// NewNFA creates a new NFA.
+func NewNFA() *NFA {
+	return &NFA{
+		Nodes: map[nfaNodeName]*NFANode{},
+		Edges: []*NFAEdge{},
+	}
+}
+
 // Adds an edge between nodes ``srcName`` and ``dstName`` with ``value`` to the NFA.
 func (nfa *NFA) AddEdge(srcName nfaNodeName, dstName nfaNodeName, value nfaEdgeValue) {
 	srcNode := nfa.GetOrCreateNode(srcName)
@@ -161,10 +169,7 @@ func (nfa *NFA) Match(input string) bool {
 	return false
 }
 
-// NewNFA creates a new NFA.
-func NewNFA() *NFA {
-	return &NFA{
-		Nodes: map[nfaNodeName]*NFANode{},
-		Edges: []*NFAEdge{},
-	}
+func (nfa *NFA) Walk() error {
+
+	return nil
 }

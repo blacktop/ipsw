@@ -6,11 +6,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"net/url"
-	"os"
 	"strconv"
 
-	n "github.com/wolever/nfa2regex"
+	// n "github.com/wolever/nfa2regex"
 	"github.com/yourbasic/graph"
 )
 
@@ -380,13 +378,15 @@ func (re *Regex) Graph() (*graph.Mutable, error) {
 	return g, nil
 }
 
-func (re *Regex) NFA() (*n.NFA, error) {
+// func (re *Regex) NFA() (*n.NFA, error) {
+func (re *Regex) NFA() (*NFA, error) {
 	rlist, err := re.Parse()
 	if err != nil {
 		return nil, err
 	}
 
-	nfa := n.NewNFA()
+	// nfa := n.NewNFA()
+	nfa := NewNFA()
 
 	i := 0
 	for {
@@ -419,6 +419,10 @@ func (re *Regex) NFA() (*n.NFA, error) {
 
 	nfa.Nodes[strconv.Itoa(0)].IsInitial = true
 
+	if err := nfa.Walk(); err != nil {
+		return nil, err
+	}
+
 	// rstr, err := n.ToRegexWithConfig(nfa, n.ToRegexConfig{
 	// 	StepCallback: func(nfa *n.NFA, stepName string) error {
 	// 		fmt.Printf("%s\n", stepName)
@@ -431,17 +435,17 @@ func (re *Regex) NFA() (*n.NFA, error) {
 	// fmt.Println("NFA:", rstr)
 	// ioutil.WriteFile("regex", []byte(rstr), 0644)
 
-	fmt.Println("Graph:")
-	fmt.Println("https://dreampuf.github.io/GraphvizOnline/#" + url.PathEscape(n.ToDot(nfa)))
+	// fmt.Println("Graph:")
+	// fmt.Println("https://dreampuf.github.io/GraphvizOnline/#" + url.PathEscape(n.ToDot(nfa)))
 
-	f, err := os.Create("nfa.svg")
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	if err := n.ToSVG(nfa, f); err != nil {
-		return nil, err
-	}
+	// f, err := os.Create("nfa.svg")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// defer f.Close()
+	// if err := n.ToSVG(nfa, f); err != nil {
+	// 	return nil, err
+	// }
 
 	return nfa, nil
 }

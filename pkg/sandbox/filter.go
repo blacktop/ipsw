@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -109,14 +108,14 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 		if err != nil {
 			return nil, err
 		}
-		return fmt.Sprintf("\"%s\"", s), nil
+		return s, nil
 	case ARG_RSS_OFFSET, ARG_NOT_SURE_YET:
 		if alt { // regex variant
-			n, err := sb.Regexes[id].NFA()
-			if err != nil {
-				return nil, err
-			}
-			fmt.Println(n)
+			// n, err := sb.Regexes[id].NFA()
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// fmt.Println(n)
 			return "regex #\"\"", nil
 			// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
 		} else {
@@ -125,18 +124,18 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 				return nil, err
 			}
 			if len(ss) == 1 {
-				return fmt.Sprintf("\"%s\"", ss[0]), nil
+				return ss[0], nil
 			}
 			return ss, nil
 			// return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
 		}
 	case SB_VALUE_TYPE_PATTERN_LITERAL:
 		if alt { // regex variant
-			n, err := sb.Regexes[id].NFA()
-			if err != nil {
-				return nil, err
-			}
-			fmt.Println(n)
+			// n, err := sb.Regexes[id].NFA()
+			// if err != nil {
+			// 	return nil, err
+			// }
+			// fmt.Println(n)
 			return "regex #\"\"", nil
 			// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
 		} else {
@@ -144,7 +143,8 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			if err != nil {
 				return nil, err
 			}
-			return []string{"literal", fmt.Sprintf("\"%s\"", strings.Join(ss, " "))}, nil
+			// return []string{"literal", fmt.Sprintf("\"%s\"", strings.Join(ss, " "))}, nil
+			return ss, nil
 		}
 	case SB_VALUE_TYPE_NETWORK:
 		// NOTE: ___define_network_filter_block_invoke(void* arg1, int64_t* arg2, int32_t* arg3) in libsandbox.1.dylib

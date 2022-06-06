@@ -122,13 +122,13 @@ var sbdecCmd = &cobra.Command{
 						continue
 					}
 				}
-				o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+				o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
 				if err != nil {
 					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					continue
 				}
-				fmt.Println(o.String(sb.Operations[idx], 0))
+				fmt.Println(o.String(0))
 			}
 
 			return nil
@@ -147,13 +147,13 @@ var sbdecCmd = &cobra.Command{
 						continue
 					}
 				}
-				o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+				o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
 				if err != nil {
 					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					continue
 				}
-				fmt.Println(o.String(sb.Operations[idx], 0))
+				fmt.Println(o.String(0))
 			}
 
 			return nil
@@ -189,6 +189,10 @@ var sbdecCmd = &cobra.Command{
 		} else {
 			if len(args) > 1 { // decompile single profile
 
+				// for _, prof := range sb.Profiles {
+				// 	fmt.Println(prof.Name)
+				// }
+
 				// for _, op := range sb.OpNodes {
 				// 	if op.IsNonTerminal() {
 				// 		fmt.Println(op)
@@ -209,14 +213,28 @@ var sbdecCmd = &cobra.Command{
 							continue
 						}
 					}
-					o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+					o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
 					// _, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
 					if err != nil {
 						// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 						log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 						continue
 					}
-					fmt.Println(o.String(sb.Operations[idx], 0))
+					fmt.Println(o.String(0))
+					if o.Match > 0 {
+						match, err := sb.ParseOperation(o.Name, o.Match)
+						if err != nil {
+							log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
+						}
+						fmt.Println("MATCH:", match.String(1))
+					}
+					if o.Unmatch > 0 {
+						unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
+						if err != nil {
+							log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
+						}
+						fmt.Println("UNMATCH:", unmatch.String(1))
+					}
 				}
 
 				// rl, err := sb.Regexes[0].Parse()
@@ -224,9 +242,9 @@ var sbdecCmd = &cobra.Command{
 				// 	return err
 				// }
 
-				if _, err := sb.Regexes[3].NFA(); err != nil {
-					return err
-				}
+				// if _, err := sb.Regexes[3].NFA(); err != nil {
+				// 	return err
+				// }
 
 				// sb.Regexes[3].Graph()
 				// sb.Regexes[80].Graph()
@@ -260,13 +278,13 @@ var sbdecCmd = &cobra.Command{
 								continue
 							}
 						}
-						o, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
+						o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
 						if err != nil {
 							// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 							log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 							continue
 						}
-						fmt.Println(o.String(sb.Operations[idx], 0))
+						fmt.Println(o.String(0))
 					}
 				}
 			}

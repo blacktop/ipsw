@@ -141,16 +141,18 @@ type Operation struct {
 	Name     string
 	Filter   *FilterInfo
 	Argument any
-	Match    *Operation
-	Unmatch  *Operation
+	Match    OperationNode
+	Unmatch  OperationNode
 
 	node   OperationNode
 	parsed bool
 }
 
-func ParseOperation(sb *Sandbox, op OperationNode) (*Operation, error) {
+func (sb *Sandbox) ParseOperation(name string, op OperationNode) (*Operation, error) {
 	if opr, ok := sb.ops[op]; ok {
-		return opr, nil
+		if opr.Name == name {
+			return opr, nil
+		}
 	}
 
 	log.Debugf("parsing op node: %s", op.String())
@@ -166,27 +168,45 @@ func ParseOperation(sb *Sandbox, op OperationNode) (*Operation, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get argument for ID %d: %v", node.ArgumentID(), err)
 		}
-		match, err := ParseOperation(sb, sb.OpNodes[node.MatchOffset()])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[node.MatchOffset()], err)
+		switch v := arg.(type) {
+		default:
+			fmt.Printf("unexpected type %T", v)
+		case []string:
+			if len(v) == 1 {
+				arg = fmt.Sprintf("\"%s\"", v[0])
+			}
+			if len(v) > 1 {
+				arg = dedup(arg.([]string))
+				if len(arg.([]string)) == 1 {
+					arg = fmt.Sprintf("\"%s\"", arg.([]string)[0])
+				}
+			}
+		case string:
+			arg = fmt.Sprintf("\"%s\"", arg)
 		}
-		unmatch, err := ParseOperation(sb, sb.OpNodes[node.UnmatchOffset()])
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[node.UnmatchOffset()], err)
-		}
+		// match, err := sb.ParseOperation(name, sb.OpNodes[node.MatchOffset()])
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[node.MatchOffset()], err)
+		// }
+		// unmatch, err := sb.ParseOperation(name, sb.OpNodes[node.UnmatchOffset()])
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[node.UnmatchOffset()], err)
+		// }
 		// cache the parsed node
 		sb.ops[op] = &Operation{
+			Name:     name,
 			Filter:   filter,
 			Argument: arg,
-			Match:    match,
-			Unmatch:  unmatch,
+			Match:    sb.OpNodes[node.MatchOffset()],
+			Unmatch:  sb.OpNodes[node.UnmatchOffset()],
 			node:     op,
-			parsed:   true,
+			parsed:   false,
 		}
 		return sb.ops[op], nil
 	case OPERATION_NODE_TYPE_TERMINAL:
 		// cache the parsed node
 		sb.ops[op] = &Operation{
+			Name:   name,
 			node:   op,
 			parsed: true,
 		}
@@ -196,24 +216,87 @@ func ParseOperation(sb *Sandbox, op OperationNode) (*Operation, error) {
 	}
 }
 
-func (o *Operation) String(name string, indent int) string {
+func dedup(args []string) []string {
+	// sort.Slice(args, func(i, j int) bool {
+	// 	return len(args[i]) < len(args[j])
+	// })
+	var ret []string
+	seen := make(map[string]bool)
+	for _, arg := range args {
+		if !seen[arg] && !seen[arg+"/"] {
+			ret = append(ret, arg)
+			seen[arg] = true
+		}
+	}
+	return ret
+}
+
+func (o *Operation) IsNonTerminalDeny() bool {
+	if o.Match.Type() == OPERATION_NODE_TYPE_NON_TERMINAL &&
+		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
+		return TerminalNode(o.Unmatch).IsDeny()
+	}
+	return false // TODO: should this error?
+}
+func (o *Operation) IsNonTerminalAllow() bool {
+	if o.Match.Type() == OPERATION_NODE_TYPE_NON_TERMINAL &&
+		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
+		return TerminalNode(o.Unmatch).IsAllow()
+	}
+	return false // TODO: should this error?
+}
+func (o *Operation) IsNonTerminalNonTerminal() bool {
+	return o.Match.Type() == OPERATION_NODE_TYPE_NON_TERMINAL && o.Unmatch.Type() == OPERATION_NODE_TYPE_NON_TERMINAL
+}
+func (o *Operation) IsAllowNonTerminal() bool {
+	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
+		o.Unmatch.Type() == OPERATION_NODE_TYPE_NON_TERMINAL {
+		return TerminalNode(o.Match).IsAllow()
+	}
+	return false // TODO: should this error?
+}
+func (o *Operation) IsDenyNonTerminal() bool {
+	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
+		o.Unmatch.Type() == OPERATION_NODE_TYPE_NON_TERMINAL {
+		return TerminalNode(o.Match).IsDeny()
+	}
+	return false // TODO: should this error?
+}
+func (o *Operation) IsDenyAllow() bool {
+	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
+		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
+		return TerminalNode(o.Match).IsDeny() && TerminalNode(o.Unmatch).IsAllow()
+	}
+	return false // TODO: should this error?
+}
+func (o *Operation) IsAllowDeny() bool {
+	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
+		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
+		return TerminalNode(o.Match).IsAllow() && TerminalNode(o.Unmatch).IsDeny()
+	}
+	return false // TODO: should this error?
+}
+
+func (o *Operation) String(indent int) string {
 	var out string
 	if o.node.IsTerminal() {
 		node := TerminalNode(o.node)
 		if node.ActionInline() {
-			out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), name, node)
+			out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
 		} else {
 			_, cdr := node.ModParts()
 			if cdr > 0 {
-				out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), name, node)
+				out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
 			} else {
-				out = fmt.Sprintf("(%s %s)", node.Decision(), name)
+				out = fmt.Sprintf("(%s %s)", node.Decision(), o.Name)
 			}
 		}
 	} else {
-		out = fmt.Sprintf("(%s %s %s)", o.Filter.Name, o.Argument, name)
-		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(name, indent+1))
-		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String(name, indent+1))
+		out = fmt.Sprintf("(%s %s %s)", o.Filter.Name, o.Argument, o.Name)
+		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String())
+		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String())
+		// out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(indent+1))
+		// out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String(indent+1))
 	}
 	return out
 }
