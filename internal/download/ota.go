@@ -57,6 +57,7 @@ const ( // CREDIT: Siguza
 	iOS14SecurityUpdates assetAudienceID = "c724cb61-e974-42d3-a911-ffd4dce11eda" // iOS 14 security updates
 	iOS15DeveloperBeta   assetAudienceID = "ce48f60c-f590-4157-a96f-41179ca08278" // iOS 15 developer beta
 	iOS15PublicBeta      assetAudienceID = "9e12a7a5-36ac-4583-b4fb-484736c739a8" // iOS 15 public beta
+	iOS16DeveloperBeta   assetAudienceID = "a6050bca-50d8-4e45-adc2-f7333396a42c" // iOS 16 developer beta
 
 	tvOSRelease assetAudienceID = "356d9da0-eee4-4c6c-bbe5-99b60eadddf0" // tvOS release
 	tvOS11Beta  assetAudienceID = "ebd90ea1-6216-4a7c-920e-666faccb2d50" // tvOS 11 beta (returns 404)
@@ -64,6 +65,7 @@ const ( // CREDIT: Siguza
 	tvOS13Beta  assetAudienceID = "975af5cb-019b-42db-9543-20327280f1b2" // tvOS 13 beta
 	tvOS14Beta  assetAudienceID = "65254ac3-f331-4c19-8559-cbe22f5bc1a6" // tvOS 14 beta
 	tvOS15Beta  assetAudienceID = "4d0dcdf7-12f2-4ebf-9672-ac4a4459a8bc" // tvOS 15 beta
+	tvOS16Beta  assetAudienceID = "d6bac98b-9e2a-4f87-9aba-22c898b25d84" // tvOS 16 beta
 
 	watchOSRelease assetAudienceID = "b82fcf9c-c284-41c9-8eb2-e69bf5a5269f" // watchOS release
 	watchOS4Beta   assetAudienceID = "f659e06d-86a2-4bab-bcbb-61b7c60969ce" // watchOS 4 beta (returns 404)
@@ -71,10 +73,12 @@ const ( // CREDIT: Siguza
 	watchOS6Beta   assetAudienceID = "d08cfd47-4a4a-4825-91b5-3353dfff194f" // watchOS 6 beta
 	watchOS7Beta   assetAudienceID = "ff6df985-3cbe-4d54-ba5f-50d02428d2a3" // watchOS 7 beta
 	watchOS8Beta   assetAudienceID = "b407c130-d8af-42fc-ad7a-171efea5a3d0" // watchOS 8 beta
+	watchOS9Beta   assetAudienceID = "341f2a17-0024-46cd-968d-b4444ec3699f" // watchOS 9 beta
 
 	audioOSRelease assetAudienceID = "0322d49d-d558-4ddf-bdff-c0443d0e6fac" // audioOS release
 	audioOS14Beta  assetAudienceID = "b05ddb59-b26d-4c89-9d09-5fda15e99207" // audioOS 14 beta
 	audioOS15Beta  assetAudienceID = "58ff8d56-1d77-4473-ba88-ee1690475e40" // audioOS 15 beta
+	audioOS16Beta  assetAudienceID = "58ff8d56-1d77-4473-ba88-ee1690475e40" // audioOS 16 beta
 
 	macOSRelease         assetAudienceID = "60b55e25-a8ed-4f45-826c-c1495a4ccc65" // macOS release
 	macOS11CustomerBeta  assetAudienceID = "215447a0-bb03-4e18-8598-7b6b6e7d34fd" // macOS 11 customer beta
@@ -83,6 +87,9 @@ const ( // CREDIT: Siguza
 	macOS12CustomerBeta  assetAudienceID = "a3799e8a-246d-4dee-b418-76b4519a15a2" // macOS 12 customer beta
 	macOS12DeveloperBeta assetAudienceID = "298e518d-b45e-4d36-94be-34a63d6777ec" // macOS 12 developer beta
 	macOS12PublicBeta    assetAudienceID = "9f86c787-7c59-45a7-a79a-9c164b00f866" // macOS 12 public beta
+	macOS13CustomerBeta  assetAudienceID = "3c45c074-41be-4b5b-a511-8592336e6783" // macOS 13 customer beta
+	macOS13DeveloperBeta assetAudienceID = "683e9586-8a82-4e5f-b0e7-767541864b8b" // macOS 13 developer beta
+	macOS13PublicBeta    assetAudienceID = "800034a9-994c-4ecc-af4d-7b3b2ee0a5a6" // macOS 13 public beta
 
 	displayIOSRelease assetAudienceID = macOSRelease         // studio display iOS release
 	displayIOSBeta    assetAudienceID = macOS12DeveloperBeta // studio display iOS beta
@@ -224,7 +231,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					return []assetAudienceID{iOS15DeveloperBeta}, nil
+					return []assetAudienceID{iOS16DeveloperBeta}, nil
 				case 11:
 					return []assetAudienceID{iOS11Beta}, nil
 				case 12:
@@ -235,8 +242,10 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return []assetAudienceID{iOS14DeveloperBeta}, nil
 				case 15:
 					return []assetAudienceID{iOS15DeveloperBeta}, nil
+				case 16:
+					return []assetAudienceID{iOS16DeveloperBeta}, nil
 				default:
-					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x, 13.x, 14.x or 15.x)", o.Config.Version)
+					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x, 13.x, 14.x, 15.x or 16.x)", o.Config.Version)
 				}
 			}
 		} else {
@@ -251,8 +260,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					// return []assetAudienceID{watchOS8Beta}, nil
-					return []assetAudienceID{watchOS6Beta, watchOS7Beta, watchOS8Beta}, nil
+					return []assetAudienceID{watchOS9Beta}, nil
 				case 4:
 					return []assetAudienceID{watchOS4Beta}, nil
 				case 5:
@@ -263,8 +271,10 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return []assetAudienceID{watchOS7Beta}, nil
 				case 8:
 					return []assetAudienceID{watchOS8Beta}, nil
+				case 9:
+					return []assetAudienceID{watchOS9Beta}, nil
 				default:
-					return nil, fmt.Errorf("invalid version %s (must be 4.x, 5.x, 6.x, 7.x or 8.x)", o.Config.Version)
+					return nil, fmt.Errorf("invalid version %s (must be 4.x, 5.x, 6.x, 7.x, 8.x or 9.x)", o.Config.Version)
 				}
 			}
 		} else {
@@ -279,7 +289,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					return []assetAudienceID{tvOS15Beta}, nil
+					return []assetAudienceID{tvOS16Beta}, nil
 				case 11:
 					return []assetAudienceID{tvOS11Beta}, nil
 				case 12:
@@ -290,8 +300,10 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 					return []assetAudienceID{tvOS14Beta}, nil
 				case 15:
 					return []assetAudienceID{tvOS15Beta}, nil
+				case 16:
+					return []assetAudienceID{tvOS16Beta}, nil
 				default:
-					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x, 13.x, 14.x or 15.x)", o.Config.Version)
+					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x, 13.x, 14.x, 15.x or 16.x)", o.Config.Version)
 				}
 			}
 		} else {
@@ -306,13 +318,15 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					return []assetAudienceID{audioOS15Beta}, nil
+					return []assetAudienceID{audioOS16Beta}, nil
 				case 14:
 					return []assetAudienceID{audioOS14Beta}, nil
 				case 15:
 					return []assetAudienceID{audioOS15Beta}, nil
+				case 16:
+					return []assetAudienceID{audioOS16Beta}, nil
 				default:
-					return nil, fmt.Errorf("invalid version %s (must be 14.x or 15.x)", o.Config.Version)
+					return nil, fmt.Errorf("invalid version %s (must be 14.x, 15.x or 16.x)", o.Config.Version)
 				}
 			}
 		} else {
@@ -327,13 +341,15 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					return []assetAudienceID{macOS12DeveloperBeta, macOS12CustomerBeta, macOS12PublicBeta}, nil
+					return []assetAudienceID{macOS13DeveloperBeta, macOS13CustomerBeta, macOS13PublicBeta}, nil
 				case 11:
 					return []assetAudienceID{macOS11DeveloperBeta, macOS11CustomerBeta, macOS11PublicBeta}, nil
 				case 12:
 					return []assetAudienceID{macOS12DeveloperBeta, macOS12CustomerBeta, macOS12PublicBeta}, nil
+				case 13:
+					return []assetAudienceID{macOS13DeveloperBeta, macOS13CustomerBeta, macOS13PublicBeta}, nil
 				default:
-					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x)", o.Config.Version)
+					return nil, fmt.Errorf("invalid version %s (must be 11.x, 12.x or 13.x)", o.Config.Version)
 				}
 			}
 		} else {
