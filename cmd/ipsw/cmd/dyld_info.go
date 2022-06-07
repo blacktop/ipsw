@@ -347,7 +347,7 @@ var dyldInfoCmd = &cobra.Command{
 						if Verbose {
 							fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), m.SourceVersion().Version, img.Name)
 						} else {
-							fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, m.DylibID().CurrentVersion, img.Name)
+							fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, m.SourceVersion().Version, img.Name)
 						}
 						m.Close()
 					}
