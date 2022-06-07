@@ -757,19 +757,19 @@ func (p patchableLocationV2) Discriminator() uint32 {
 }
 
 type SubCacheInfo struct {
-	UUID           types.UUID
-	CumulativeSize uint64
+	UUID          types.UUID
+	CacheVMOffset uint64
 }
 
 type SubCacheInfo16 struct {
-	UUID           types.UUID
-	CumulativeSize uint64
-	SubCacheFlags  uint32
-	MoreFlags      uint32
-	DyldData       uint32
-	DyldLinkEdit   uint32
-	Unknown1       uint64
-	Unknown2       uint64
+	UUID          types.UUID
+	CacheVMOffset uint64
+	SubCacheFlags uint32
+	MoreFlags     uint32
+	DyldData      uint32
+	DyldLinkEdit  uint32
+	Unknown1      uint64
+	Unknown2      uint64
 }
 
 type CacheExportFlag int
