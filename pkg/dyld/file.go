@@ -624,7 +624,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			}
 			for idx, susubCacheInfo := range subCacheInfo {
 				f.SubCacheInfo[idx].UUID = susubCacheInfo.UUID
-				f.SubCacheInfo[idx].CumulativeSize = susubCacheInfo.CumulativeSize
+				f.SubCacheInfo[idx].CacheVMOffset = susubCacheInfo.CacheVMOffset
 			}
 		}
 	}
