@@ -31,6 +31,14 @@ const (
 	BuiltFromChainedFixups formatVersion = 0x800
 )
 
+type cacheType uint64
+
+const (
+	CacheTypeDevelopment cacheType = 0
+	CacheTypeProduction  cacheType = 1
+	CacheTypeiOS16       cacheType = 2 // FIXME: what is this? check NEW dyld src in the `cache-builder/dyld_cache_format.h` file
+)
+
 func (f formatVersion) Version() uint8 {
 	return uint8(f & 0xff)
 }
@@ -111,7 +119,7 @@ type CacheHeader struct {
 	LocalSymbolsOffset        uint64         // file offset of where local symbols are stored
 	LocalSymbolsSize          uint64         // size of local symbols information
 	UUID                      types.UUID     // unique value for each shared cache file
-	CacheType                 uint64         // 0 for development, 1 for production
+	CacheType                 cacheType      // 0 for development, 1 for production
 	BranchPoolsOffset         uint32         // file offset to table of uint64_t pool addresses
 	BranchPoolsCount          uint32         // number of uint64_t entries
 	AccelerateInfoAddr        uint64         // (unslid) address of optimization info
@@ -751,6 +759,17 @@ func (p patchableLocationV2) Discriminator() uint32 {
 type SubCacheInfo struct {
 	UUID           types.UUID
 	CumulativeSize uint64
+}
+
+type SubCacheInfo16 struct {
+	UUID           types.UUID
+	CumulativeSize uint64
+	SubCacheFlags  uint32
+	MoreFlags      uint32
+	DyldData       uint32
+	DyldLinkEdit   uint32
+	Unknown1       uint64
+	Unknown2       uint64
 }
 
 type CacheExportFlag int
