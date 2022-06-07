@@ -5,9 +5,11 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/fs"
 	"math/bits"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/apex/log"
@@ -68,7 +70,7 @@ type File struct {
 	AddressToSymbol map[uint64]string
 
 	IsDyld4      bool
-	SubCacheInfo []SubCacheInfo
+	SubCacheInfo []SubCacheInfo16
 	symUUID      mtypes.UUID
 
 	r       map[mtypes.UUID]io.ReaderAt
@@ -109,6 +111,35 @@ func getUUID(r io.ReaderAt) (mtypes.UUID, error) {
 	return uuid, nil
 }
 
+func findSubCache(name string, sub int) (string, error) {
+	var found string
+
+	re := regexp.MustCompile(fmt.Sprintf("%s.0*%d(.dylddata|.dyldlinkedit)?$", name, sub))
+
+	if err := filepath.Walk(filepath.Dir(name), func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		} else {
+			if !re.MatchString(path) {
+				return nil
+			}
+			found = path
+		}
+		return nil
+	}); err != nil {
+		return "", fmt.Errorf("failed to walk the shared cache directory: %v", err)
+	}
+
+	if len(found) > 0 {
+		return found, nil
+	}
+
+	return "", fmt.Errorf("subcache.%d not found in %s", sub, filepath.Dir(name))
+}
+
 // Open opens the named file using os.Open and prepares it for use as a dyld binary.
 func Open(name string) (*File, error) {
 
@@ -131,10 +162,15 @@ func Open(name string) (*File, error) {
 		ff.IsDyld4 = true // NEW iOS15 dyld4 style caches
 
 		for i := 1; i <= int(ff.Headers[ff.UUID].SubCacheArrayCount); i++ {
+			subCacheName, err := findSubCache(name, i)
+			if err != nil {
+				return nil, fmt.Errorf("failed to open shared cache: %v", err)
+			}
 			log.WithFields(log.Fields{
-				"cache": fmt.Sprintf("%s.%d", name, i),
+				"cache": subCacheName,
 			}).Debug("Parsing SubCache")
-			fsub, err := os.Open(fmt.Sprintf("%s.%d", name, i))
+
+			fsub, err := os.Open(subCacheName)
 			if err != nil {
 				return nil, err
 			}
@@ -149,9 +185,9 @@ func Open(name string) (*File, error) {
 			ff.closers[uuid] = fsub
 
 			if ff.Headers[uuid].UUID != ff.SubCacheInfo[i-1].UUID {
-				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
-					ff.SubCacheInfo[i].UUID,
-					ff.Headers[uuid].UUID)
+				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", subCacheName,
+					ff.SubCacheInfo[i-1].UUID.String(),
+					ff.Headers[uuid].UUID.String())
 			}
 		}
 
@@ -170,7 +206,7 @@ func Open(name string) (*File, error) {
 			}
 
 			if uuid != ff.Headers[ff.UUID].SymbolFileUUID {
-				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid, ff.Headers[ff.UUID].SymbolFileUUID)
+				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid.String(), ff.Headers[ff.UUID].SymbolFileUUID.String())
 			}
 
 			ff.symUUID = uuid
@@ -575,9 +611,21 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset > 0 {
 		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
-		f.SubCacheInfo = make([]SubCacheInfo, f.Headers[uuid].SubCacheArrayCount)
-		if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
-			return err
+		f.SubCacheInfo = make([]SubCacheInfo16, f.Headers[uuid].SubCacheArrayCount)
+		if f.Headers[f.UUID].CacheType == CacheTypeiOS16 {
+			if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
+				return err
+			}
+		} else {
+			// TODO: gross hack to read the subcache info for pre iOS 16.
+			subCacheInfo := make([]SubCacheInfo, f.Headers[uuid].SubCacheArrayCount)
+			if err := binary.Read(sr, f.ByteOrder, subCacheInfo); err != nil {
+				return err
+			}
+			for idx, susubCacheInfo := range subCacheInfo {
+				f.SubCacheInfo[idx].UUID = susubCacheInfo.UUID
+				f.SubCacheInfo[idx].CumulativeSize = susubCacheInfo.CumulativeSize
+			}
 		}
 	}
 
