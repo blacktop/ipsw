@@ -340,7 +340,8 @@ func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 	}
 
 	// TODO: maybe get SB_MODIFIER_COUNT from xref to ___sb_modifiers_apply_action_flags_block_invoke (is 0x15 in test libsandbox)
-	SB_MODIFIER_COUNT := 0x15
+	// SB_MODIFIER_COUNT := 0x15
+	SB_MODIFIER_COUNT := 0x14 // TODO: this changed in macOS 13.0beta1
 	dat, err := d.ReadBytesForUUID(uuid, int64(modifierInfoOff), uint64(SB_MODIFIER_COUNT*binary.Size(modifierInfo{})))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read _modifier_info data: %w", err)
