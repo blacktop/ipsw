@@ -1,6 +1,7 @@
 package dyld
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"strings"
@@ -130,4 +131,16 @@ func (f *File) ReadPointerAtAddress(address uint64) (uint64, error) {
 		return 0, fmt.Errorf("failed to get offset for address %#x: %v", address, err)
 	}
 	return f.ReadPointerForUUID(uuid, offset)
+}
+
+func (f *File) GetSubCacheExtensionFromUUID(uuid types.UUID) (string, error) {
+	for idx, sc := range f.SubCacheInfo {
+		if sc.UUID == uuid {
+			if len(string(bytes.Trim(sc.Extention[:], "\x00"))) == 0 {
+				return fmt.Sprintf(".%d", idx), nil
+			}
+			return string(bytes.Trim(sc.Extention[:], "\x00")), nil
+		}
+	}
+	return "", fmt.Errorf("failed to find subcache extension for uuid %s", uuid.String())
 }

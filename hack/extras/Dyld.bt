@@ -444,31 +444,26 @@ typedef struct
 {
     Uuid uuid;                          // UUID of subcache
     uint64 cacheVMOffset<format = hex>; // The offset of this subcache from the main cache base address
-} subcache_info<bgcolor = cLtPurple>;
+} dyld_subcache_entry<bgcolor = cLtPurple>;
 
 typedef struct
 {
     Uuid uuid;                          // UUID of subcache
     uint64 cacheVMOffset<format = hex>; // The offset of this subcache from the main cache base address
-    uint32 sub_cache_flags;             // includes sub_cache number
-    uint32 more_flags;
-    uint32 dyld_data;
-    uint32 dyld_linkedit;
-    uint64 unknown1;
-    uint64 unknown2;
-} subcache_info_16<bgcolor = cLtPurple>;
+    char extension[32];
+} dyld_subcache_entry_pagein_link<bgcolor = cLtPurple>;
 
 if (header.subCacheArrayOffset > 0 && header.subCacheArrayCount > 0)
 {
     if (header.cacheType == 2)
     {
         FSeek(header.subCacheArrayOffset);
-        subcache_info_16 info[header.subCacheArrayCount];
+        dyld_subcache_entry_pagein_link info[header.subCacheArrayCount];
     }
     else
     {
         FSeek(header.subCacheArrayOffset);
-        subcache_info info[header.subCacheArrayCount];
+        dyld_subcache_entry info[header.subCacheArrayCount];
     }
 }
 
