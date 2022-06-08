@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/blacktop/go-macho/types"
@@ -493,33 +494,30 @@ func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 			output += cacheMappings.String()
 		}
 	} else {
-		var max uint64
-		var sortedMaps []types.UUID
-		for uuid, cacheMappings := range f.MappingsWithSlideInfo { // TODO this is disgusting
-			if uuid != f.UUID && cacheMappings[0].Address > 0 {
-				if cacheMappings[0].Address > max {
-					sortedMaps = append(sortedMaps, uuid)
-					max = cacheMappings[0].Address
+		// sort mappings map by address
+		uuids := make([]types.UUID, 0, len(f.MappingsWithSlideInfo))
+		for u := range f.MappingsWithSlideInfo {
+			uuids = append(uuids, u)
+		}
+		sort.SliceStable(uuids, func(i, j int) bool {
+			return f.MappingsWithSlideInfo[uuids[i]][0].Address < f.MappingsWithSlideInfo[uuids[j]][0].Address
+		})
+		for _, uuid := range uuids {
+			if uuid == f.symUUID {
+				output += fmt.Sprintf("\n> Cache (.symbols) UUID: %s\n\n", uuid)
+			} else {
+				ext, err := f.GetSubCacheExtensionFromUUID(uuid)
+				if err != nil {
+					output += fmt.Sprintf("\n> Cache UUID: %s\n\n", uuid)
 				} else {
-					sortedMaps = append([]types.UUID{uuid}, sortedMaps...)
+					output += fmt.Sprintf("\n> Cache (%s) UUID: %s\n\n", ext, uuid)
 				}
 			}
-		}
-		sortedMaps = append([]types.UUID{f.UUID}, sortedMaps...)
-		if !f.symUUID.IsNull() {
-			sortedMaps = append(sortedMaps, f.symUUID)
-		}
-		for i := 0; i < len(sortedMaps); i++ {
-			if sortedMaps[i] == f.symUUID {
-				output += fmt.Sprintf("\n> Symbol Cache UUID: %s\n\n", sortedMaps[i])
-			} else {
-				output += fmt.Sprintf("\n> Cache UUID: %s\n\n", sortedMaps[i])
-			}
 			output += "Mappings\n--------\n\n"
-			output += f.MappingsWithSlideInfo[sortedMaps[i]].String(slideVersion, verbose)
+			output += f.MappingsWithSlideInfo[uuid].String(slideVersion, verbose)
 			output += fmt.Sprintln()
-			output += f.getCodeSignature(sortedMaps[i])
-			output += f.getRosetta(sortedMaps[i])
+			output += f.getCodeSignature(uuid)
+			output += f.getRosetta(uuid)
 		}
 	}
 	return output

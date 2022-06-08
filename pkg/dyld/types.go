@@ -756,20 +756,15 @@ func (p patchableLocationV2) Discriminator() uint32 {
 	return uint32(types.ExtractBits(uint64(p), 16, 16))
 }
 
-type SubCacheInfo struct {
+type SubcacheEntry struct {
 	UUID          types.UUID
 	CacheVMOffset uint64
 }
 
-type SubCacheInfo16 struct {
+type SubcacheEntryPageInLink struct {
 	UUID          types.UUID
 	CacheVMOffset uint64
-	SubCacheFlags uint32
-	MoreFlags     uint32
-	DyldData      uint32
-	DyldLinkEdit  uint32
-	Unknown1      uint64
-	Unknown2      uint64
+	Extention     [32]byte
 }
 
 type CacheExportFlag int
