@@ -592,7 +592,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset > 0 {
 		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
 		f.SubCacheInfo = make([]SubcacheEntryPageInLink, f.Headers[uuid].SubCacheArrayCount)
-		if f.Headers[f.UUID].CacheType == CacheTypeiOS16 {
+		if f.Headers[f.UUID].CacheType == CacheTypeStubIslands {
 			if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
 				return err
 			}

@@ -36,7 +36,7 @@ type cacheType uint64
 const (
 	CacheTypeDevelopment cacheType = 0
 	CacheTypeProduction  cacheType = 1
-	CacheTypeiOS16       cacheType = 2 // FIXME: what is this? check NEW dyld src in the `cache-builder/dyld_cache_format.h` file
+	CacheTypeStubIslands cacheType = 2 // FIXME: what is this? check NEW dyld src in the `cache-builder/dyld_cache_format.h` file
 )
 
 func (f formatVersion) Version() uint8 {
