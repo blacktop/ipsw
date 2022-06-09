@@ -99,8 +99,8 @@ typedef struct
     uint64 cacheType;                     // 0 for development, 1 for production
     uint branchPoolsOffset;               // file offset to table of uint64 pool addresses
     uint branchPoolsCount;                // number of uint64 entries
-    uint64 accelerateInfoAddr;            // (unslid) address of optimization info
-    uint64 accelerateInfoSize;            // size of optimization info
+    uint64 dyldImageAddr;                 // (unslid) address of optimization info
+    uint64 dyldStartAddr;                 // size of optimization info
     uint64 imagesTextOffset;              // file offset to first dyld_cache_image_text_info
     uint64 imagesTextCount;               // number of dyld_cache_image_text_info entries
     uint64 patchInfoAddr;                 // (unslid) address of dyld_cache_patch_info
@@ -151,6 +151,9 @@ typedef struct
     uint64 rosettaReadWriteSize; // maximum size of the Rosetta read-write region
     uint32 imagesOffset;         // file offset to first dyld_cache_image_info
     uint32 imagesCount;          // number of dyld_cache_image_info entries
+    uint64 pageInLinkType;
+    uint64 unknwon;
+    uint64 unknown2;
 } dyld_cache_header;
 
 typedef struct
