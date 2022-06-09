@@ -438,9 +438,15 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 	gots := make(map[uint64]uint64)
 
 	if authPtr := m.Section("__AUTH_CONST", "__auth_ptr"); authPtr != nil {
-		dat, err := authPtr.Data()
+
+		off, err := m.GetOffset(authPtr.Addr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get %s.%s section data: %v", authPtr.Seg, authPtr.Name, err)
+			return nil, fmt.Errorf("failed to get offset for __AUTH_CONST.__auth_ptr: %v", err)
+		}
+
+		dat := make([]byte, authPtr.Size)
+		if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
+			return nil, fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr data: %v", err)
 		}
 
 		ptrs := make([]uint64, authPtr.Size/8)
@@ -449,13 +455,16 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 		}
 
 		for idx, ptr := range ptrs {
-			// gots[authPtr.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
-			gots[authPtr.Addr+uint64(idx*8)] = ptr
+			gots[authPtr.Addr+uint64(idx*8)] = m.SlidePointer(ptr)
 		}
 	}
 
 	for _, sec := range m.Sections {
 		if sec.Flags.IsNonLazySymbolPointers() || sec.Flags.IsLazySymbolPointers() { // TODO: make sure this doesn't break things
+			if sec.Seg == "__AUTH_CONST" && sec.Name == "__auth_ptr" {
+				continue
+			}
+
 			dat, err := sec.Data()
 			if err != nil {
 				return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)

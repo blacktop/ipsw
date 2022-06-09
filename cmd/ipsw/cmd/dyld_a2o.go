@@ -104,17 +104,20 @@ var a2oCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
+				ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
 				if f.IsDyld4 {
 					log.WithFields(log.Fields{
 						"uuid":    uuid.String(),
 						"hex":     fmt.Sprintf("%#x", off),
 						"dec":     fmt.Sprintf("%d", off),
+						"ext":     ext,
 						"mapping": m.Name,
 					}).Info("Offset")
 				} else {
 					log.WithFields(log.Fields{
 						"hex":     fmt.Sprintf("%#x", off),
 						"dec":     fmt.Sprintf("%d", off),
+						"ext":     ext,
 						"mapping": m.Name,
 					}).Info("Offset")
 				}
