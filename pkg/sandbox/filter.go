@@ -239,7 +239,7 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 	}
 
 	// TODO: maybe get filter info count from xref to _lookup_filter_info (is 0x56 in test libsandbox)
-	NUM_INFO_ENTRIES := 0x56
+	NUM_INFO_ENTRIES := 0x57
 	dat, err := d.ReadBytesForUUID(uuid, int64(filterInfoOff), uint64((NUM_INFO_ENTRIES)*binary.Size(filterInfo{})))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read _filter_info data: %w", err)
