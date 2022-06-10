@@ -78,9 +78,11 @@ type File struct {
 
 	AddressToSymbol map[uint64]string
 
-	IsDyld4      bool
-	SubCacheInfo []SubcacheEntryPageInLink
-	symUUID      mtypes.UUID
+	IsDyld4         bool
+	SubCacheInfo    []SubcacheEntryPageInLink
+	symUUID         mtypes.UUID
+	dyldImageAddr   uint64
+	dyldStartFnAddr uint64
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
@@ -496,86 +498,98 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		f.BranchPools = bPools
 	}
 
-	// Read dyld optimization info.
-	if f.Headers[uuid].AccelerateInfoAddr != 0 {
-		for _, mapping := range f.Mappings[uuid] {
-			if mapping.Address <= f.Headers[uuid].AccelerateInfoAddr && f.Headers[uuid].AccelerateInfoAddr < mapping.Address+mapping.Size {
-				accelInfoPtr := int64(f.Headers[uuid].AccelerateInfoAddr - mapping.Address + mapping.FileOffset)
-				sr.Seek(accelInfoPtr, io.SeekStart)
-				if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
-					return err
-				}
-				// Read dyld 16-bit array of sorted image indexes.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.BottomUpListOffset), io.SeekStart)
-				bottomUpList := make([]uint16, f.AcceleratorInfo.ImageExtrasCount)
-				if err := binary.Read(sr, f.ByteOrder, &bottomUpList); err != nil {
-					return err
-				}
-				// Read dyld 16-bit array of dependencies.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), io.SeekStart)
-				depList := make([]uint16, f.AcceleratorInfo.DepListCount)
-				if err := binary.Read(sr, f.ByteOrder, &depList); err != nil {
-					return err
-				}
-				// Read dyld 16-bit array of re-exports.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), io.SeekStart)
-				reExportList := make([]uint16, f.AcceleratorInfo.ReExportCount)
-				if err := binary.Read(sr, f.ByteOrder, &reExportList); err != nil {
-					return err
-				}
-				// Read dyld image info extras.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ImagesExtrasOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.ImageExtrasCount; i++ {
-					imgXtrInfo := CacheImageInfoExtra{}
-					if err := binary.Read(sr, f.ByteOrder, &imgXtrInfo); err != nil {
+	if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr != 0 {
+		// iOS16 added dyld to the shared cache and resued these fields to point to the dyld image and _dyld_start
+		if f.IsDyld4 {
+			sr.Seek(int64(f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr), io.SeekStart)
+			if err := binary.Read(sr, f.ByteOrder, &f.dyldImageAddr); err != nil {
+				return err
+			}
+			sr.Seek(int64(f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr), io.SeekStart)
+			if err := binary.Read(sr, f.ByteOrder, &f.dyldStartFnAddr); err != nil {
+				return err
+			}
+		} else {
+			// Read dyld optimization info.
+			for _, mapping := range f.Mappings[uuid] {
+				if mapping.Address <= f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr && f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr < mapping.Address+mapping.Size {
+					accelInfoPtr := int64(f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr - mapping.Address + mapping.FileOffset)
+					sr.Seek(accelInfoPtr, io.SeekStart)
+					if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
 						return err
 					}
-					f.Images[i].CacheImageInfoExtra = imgXtrInfo
-				}
-				// Read dyld initializers list.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.InitializersOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.InitializersCount; i++ {
-					accelInit := CacheAcceleratorInitializer{}
-					if err := binary.Read(sr, f.ByteOrder, &accelInit); err != nil {
+					// Read dyld 16-bit array of sorted image indexes.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.BottomUpListOffset), io.SeekStart)
+					bottomUpList := make([]uint16, f.AcceleratorInfo.ImageExtrasCount)
+					if err := binary.Read(sr, f.ByteOrder, &bottomUpList); err != nil {
 						return err
 					}
-					// fmt.Printf("  image[%3d] 0x%X\n", accelInit.ImageIndex, f.Mappings[0].Address+uint64(accelInit.FunctionOffset))
-					f.Images[accelInit.ImageIndex].Initializer = f.Mappings[uuid][0].Address + uint64(accelInit.FunctionOffset)
-				}
-				// Read dyld DOF sections list.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DofSectionsOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.DofSectionsCount; i++ {
-					accelDOF := CacheAcceleratorDof{}
-					if err := binary.Read(sr, f.ByteOrder, &accelDOF); err != nil {
+					// Read dyld 16-bit array of dependencies.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), io.SeekStart)
+					depList := make([]uint16, f.AcceleratorInfo.DepListCount)
+					if err := binary.Read(sr, f.ByteOrder, &depList); err != nil {
 						return err
 					}
-					// fmt.Printf("  image[%3d] 0x%X -> 0x%X\n", accelDOF.ImageIndex, accelDOF.SectionAddress, accelDOF.SectionAddress+uint64(accelDOF.SectionSize))
-					f.Images[accelDOF.ImageIndex].DOFSectionAddr = accelDOF.SectionAddress
-					f.Images[accelDOF.ImageIndex].DOFSectionSize = accelDOF.SectionSize
-				}
-				// Read dyld offset to start of ss.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.RangeTableCount; i++ {
-					rEntry := CacheRangeEntry{}
-					if err := binary.Read(sr, f.ByteOrder, &rEntry); err != nil {
+					// Read dyld 16-bit array of re-exports.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), io.SeekStart)
+					reExportList := make([]uint16, f.AcceleratorInfo.ReExportCount)
+					if err := binary.Read(sr, f.ByteOrder, &reExportList); err != nil {
 						return err
 					}
-					// fmt.Printf("  0x%X -> 0x%X %s\n", rangeEntry.StartAddress, rangeEntry.StartAddress+uint64(rangeEntry.Size), f.Images[rangeEntry.ImageIndex].Name)
-					offset, err := f.GetOffsetForUUID(uuid, rEntry.StartAddress)
-					if err != nil {
-						return fmt.Errorf("failed to get range entry's file offset: %v", err)
+					// Read dyld image info extras.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ImagesExtrasOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.ImageExtrasCount; i++ {
+						imgXtrInfo := CacheImageInfoExtra{}
+						if err := binary.Read(sr, f.ByteOrder, &imgXtrInfo); err != nil {
+							return err
+						}
+						f.Images[i].CacheImageInfoExtra = imgXtrInfo
 					}
-					f.Images[rEntry.ImageIndex].RangeEntries = append(f.Images[rEntry.ImageIndex].RangeEntries, rangeEntry{
-						StartAddr:  rEntry.StartAddress,
-						FileOffset: offset,
-						Size:       rEntry.Size,
-					})
-				}
-				// Read dyld trie containing all dylib paths.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), io.SeekStart)
-				dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
-				if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
-					return err
+					// Read dyld initializers list.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.InitializersOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.InitializersCount; i++ {
+						accelInit := CacheAcceleratorInitializer{}
+						if err := binary.Read(sr, f.ByteOrder, &accelInit); err != nil {
+							return err
+						}
+						// fmt.Printf("  image[%3d] 0x%X\n", accelInit.ImageIndex, f.Mappings[0].Address+uint64(accelInit.FunctionOffset))
+						f.Images[accelInit.ImageIndex].Initializer = f.Mappings[uuid][0].Address + uint64(accelInit.FunctionOffset)
+					}
+					// Read dyld DOF sections list.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DofSectionsOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.DofSectionsCount; i++ {
+						accelDOF := CacheAcceleratorDof{}
+						if err := binary.Read(sr, f.ByteOrder, &accelDOF); err != nil {
+							return err
+						}
+						// fmt.Printf("  image[%3d] 0x%X -> 0x%X\n", accelDOF.ImageIndex, accelDOF.SectionAddress, accelDOF.SectionAddress+uint64(accelDOF.SectionSize))
+						f.Images[accelDOF.ImageIndex].DOFSectionAddr = accelDOF.SectionAddress
+						f.Images[accelDOF.ImageIndex].DOFSectionSize = accelDOF.SectionSize
+					}
+					// Read dyld offset to start of ss.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.RangeTableCount; i++ {
+						rEntry := CacheRangeEntry{}
+						if err := binary.Read(sr, f.ByteOrder, &rEntry); err != nil {
+							return err
+						}
+						// fmt.Printf("  0x%X -> 0x%X %s\n", rangeEntry.StartAddress, rangeEntry.StartAddress+uint64(rangeEntry.Size), f.Images[rangeEntry.ImageIndex].Name)
+						offset, err := f.GetOffsetForUUID(uuid, rEntry.StartAddress)
+						if err != nil {
+							return fmt.Errorf("failed to get range entry's file offset: %v", err)
+						}
+						f.Images[rEntry.ImageIndex].RangeEntries = append(f.Images[rEntry.ImageIndex].RangeEntries, rangeEntry{
+							StartAddr:  rEntry.StartAddress,
+							FileOffset: offset,
+							Size:       rEntry.Size,
+						})
+					}
+					// Read dyld trie containing all dylib paths.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), io.SeekStart)
+					dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
+					if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
+						return err
+					}
 				}
 			}
 		}

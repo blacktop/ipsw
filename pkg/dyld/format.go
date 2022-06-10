@@ -85,7 +85,7 @@ func (dch CacheHeader) Print() {
 	fmt.Println(dch.String())
 	fmt.Printf("Slide Info:     %4dKB,  file offset: 0x%09X -> 0x%09X\n", dch.SlideInfoSizeUnused/1024, dch.SlideInfoOffsetUnused, dch.SlideInfoOffsetUnused+dch.SlideInfoSizeUnused)
 	fmt.Printf("Local Symbols:  %3dMB,  file offset: 0x%09X -> 0x%09X\n", dch.LocalSymbolsSize/(1024*1024), dch.LocalSymbolsOffset, dch.LocalSymbolsOffset+dch.LocalSymbolsSize)
-	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%09X -> 0x%09X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
+	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%09X -> 0x%09X\n", dch.AccelerateInfoSizeUnusedOrDyldStartFuncAddr/1024, dch.AccelerateInfoAddrUnusedOrDyldAddr, dch.AccelerateInfoAddrUnusedOrDyldAddr+dch.AccelerateInfoSizeUnusedOrDyldStartFuncAddr)
 	fmt.Println()
 }
 
@@ -373,11 +373,11 @@ func (f *File) getBranchPools(uuid types.UUID) string {
 
 func (f *File) getAccelerateInfo(uuid types.UUID) string {
 	var output string
-	if f.Headers[uuid].AccelerateInfoAddr > 0 {
+	if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr > 0 {
 		output = fmt.Sprintf("Accelerate Tab:              %3dKB, address: 0x%09X -> 0x%09X\n",
-			f.Headers[uuid].AccelerateInfoSize/1024,
-			f.Headers[uuid].AccelerateInfoAddr,
-			f.Headers[uuid].AccelerateInfoAddr+f.Headers[uuid].AccelerateInfoSize)
+			f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr/1024,
+			f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr,
+			f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr+f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr)
 	}
 	return output
 }
