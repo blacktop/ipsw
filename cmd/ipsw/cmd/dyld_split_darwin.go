@@ -19,7 +19,7 @@ func init() {
 	dyldCmd.AddCommand(splitCmd)
 
 	splitCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app")
-	viper.BindPFlag("dyld.split.xcode", ipswCmd.Flags().Lookup("xcode"))
+	viper.BindPFlag("dyld.split.xcode", splitCmd.Flags().Lookup("xcode"))
 
 	splitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
