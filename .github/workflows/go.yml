@@ -146,6 +146,7 @@ jobs:
       - name: Download beta IPSW
         if: steps.cache-beta-ipsw.outputs.cache-hit != 'true'
         run: |
+          mkdir ~/beta
           wget -O ~/beta/beta.ipsw https://archive.org/download/iPhone142_16.0_20A5283p_Restore.ipsw/iPhone142_16.0_20A5283p_Restore.ipsw
 
       #
