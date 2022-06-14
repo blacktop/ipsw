@@ -118,7 +118,7 @@ jobs:
       - name: Run Extract Remote Kernelcache (Windows)
         if: matrix.platform == 'windows-latest'
         run: |
-          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download ipsw --kernel --latest -d iPhone12,1
+          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download ipsw --kernel --latest -d iPhone12,1 --insecure
           dir
 
       #
