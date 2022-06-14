@@ -45,7 +45,7 @@ jobs:
         with:
           path: |
             ~/beta
-          key: ${{ runner.os }}-beta-ipsw
+          key: beta-ipsw
       # - name: Cache Downloaded IPSWs
       #   id: cache-ipsws
       #   if: matrix.platform == 'macos-11'
@@ -131,7 +131,7 @@ jobs:
       - id: get-latest
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-11'
         run: |
-          echo ::set-output name=version::$(LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download ipsw --show-latest)
+          echo ::set-output name=version::$(LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw download ipsw --show-latest --insecure)
 
       - name: Run Extract Remote Kernelcache
         if: matrix.platform == 'ubuntu-latest'
