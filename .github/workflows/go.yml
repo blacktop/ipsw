@@ -31,26 +31,21 @@ jobs:
         id: vars
         run: echo ::set-output name=tag::${GITHUB_REF#refs/*/}
 
-      - name: Build Dependencies (Linux)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo apt-get update && sudo apt-get install -y cmake libtool libc6-dev
-          cd /tmp
-          git clone https://github.com/lzfse/lzfse.git
-          cd lzfse
-          mkdir build
-          cd build
-          cmake ..
-          sudo make install
-
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-11'
         run: |
-          brew install lzfse tree
+          brew install tree
 
       #
       # CACHE
       #
+      - name: Cache beta IPSW
+        id: cache-beta-ipsw
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/beta
+          key: ${{ runner.os }}-beta-ipsw
       # - name: Cache Downloaded IPSWs
       #   id: cache-ipsws
       #   if: matrix.platform == 'macos-11'
@@ -58,44 +53,43 @@ jobs:
       #   with:
       #     path: ~/.ipsw
       #     key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
-      # - name: Cache go.mod (macOS)
-      #   if: matrix.platform == 'macos-11'
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: |
-      #       ~/Library/Caches/go-build
-      #       ~/go/pkg/mod
-      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-go-
-      # - name: Cache go.mod (Linux)
-      #   if: matrix.platform == 'ubuntu-latest'
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: |
-      #       ~/.cache/go-build
-      #       ~/go/pkg/mod
-      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-go-
-      # - name: Cache go.mod (Windows)
-      #   if: matrix.platform == 'windows-latest'
-      #   uses: actions/cache@v2
-      #   with:
-      #     path: |
-      #       %LocalAppData%\go-build
-      #       ~/go/pkg/mod
-      #     key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-go-
-
-      - name: Get dependencies
-        run: |
-          go mod download
+      - name: Cache go.mod (macOS)
+        if: matrix.platform == 'macos-11'
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/Library/Caches/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Cache go.mod (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Cache go.mod (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~\AppData\Local\go-build
+            ~\go\pkg\mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
 
       #
       # BUILD
       #
+      - name: Get dependencies
+        run: |
+          go mod download
       - name: Build (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
@@ -148,6 +142,12 @@ jobs:
       - name: Make cache folder
         if: matrix.platform == 'macos-11'
         run: mkdir -p ~/.ipsw
+
+      - name: Download beta IPSW
+        if: steps.cache-beta-ipsw.outputs.cache-hit != 'true'
+        run: |
+          wget -O ~/beta/beta.ipsw https://archive.org/download/iPhone142_16.0_20A5283p_Restore.ipsw/iPhone142_16.0_20A5283p_Restore.ipsw
+
       #
       # DOWNLOAD CMD (macOS)
       #
@@ -194,6 +194,12 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree *.ipsw
+      - name: Run extract BETA - (kernel, dsc and dtree)
+        if: matrix.platform == 'macos-11'
+        run: |
+          export PATH=$PWD/build/dist:$PATH
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree ~/beta/beta.ipsw
+          tree ~/beta
       #
       # KERNEL CMD (macOS)
       #
