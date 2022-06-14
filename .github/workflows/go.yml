@@ -9,6 +9,22 @@ on:
     branches:
       - master
 jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cache beta IPSW
+        id: cache-beta-ipsw
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/beta
+          key: beta-ipsw
+      - name: Download beta IPSW
+        if: steps.cache-beta-ipsw.outputs.cache-hit != 'true'
+        run: |
+          mkdir ~/beta
+          wget -O ~/beta/beta.ipsw https://archive.org/download/iPhone142_16.0_20A5283p_Restore.ipsw/iPhone142_16.0_20A5283p_Restore.ipsw
+
   build:
     strategy:
       matrix:
@@ -142,12 +158,6 @@ jobs:
       - name: Make cache folder
         if: matrix.platform == 'macos-11'
         run: mkdir -p ~/.ipsw
-
-      - name: Download beta IPSW
-        if: steps.cache-beta-ipsw.outputs.cache-hit != 'true'
-        run: |
-          mkdir ~/beta
-          wget -O ~/beta/beta.ipsw https://archive.org/download/iPhone142_16.0_20A5283p_Restore.ipsw/iPhone142_16.0_20A5283p_Restore.ipsw
 
       #
       # DOWNLOAD CMD (macOS)
