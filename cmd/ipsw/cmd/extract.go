@@ -28,7 +28,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
+	"io/fs"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -54,6 +56,7 @@ func init() {
 	extractCmd.Flags().BoolP("dmg", "f", false, "Extract File System DMG")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
+	extractCmd.Flags().BoolP("files", "", false, "Extract File System files")
 	extractCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
@@ -67,6 +70,123 @@ func init() {
 func isURL(str string) bool {
 	u, err := url.Parse(str)
 	return err == nil && u.Scheme != "" && u.Host != ""
+}
+
+func unmount(device string) error {
+	utils.Indent(log.Info, 2)("Unmounting DMG")
+	err := utils.Unmount(device, false)
+	if err != nil {
+		return errors.Wrapf(err, "failed to unmount %s", device)
+	}
+	return nil
+}
+
+func isDirectory(path string) (bool, error) {
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		return false, err
+	}
+
+	return fileInfo.IsDir(), err
+}
+
+func isSymlink(path string) (bool, error) {
+	fileInfo, err := os.Lstat(path)
+	if err != nil {
+		return false, err
+	}
+
+	return fileInfo.Mode() & fs.ModeSymlink != 0, err
+}
+
+// Extract files for rootfs
+func ExtractFiles(ipsw, destPath string, files_pattern string) error {
+
+	if runtime.GOOS == "windows" {
+		return errors.New("dyld extraction is not supported on Windows")
+	}
+
+	i, err := info.Parse(ipsw)
+	if err != nil {
+		return errors.Wrap(err, "failed to parse ipsw info")
+	}
+
+	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed extract dyld_shared_cache from ipsw")
+	}
+
+	if len(dmgs) == 1 {
+		defer os.Remove(dmgs[0])
+
+		var MountPoint string
+		if runtime.GOOS == "darwin" {
+			os.MkdirAll(destPath, os.ModePerm)
+			MountPoint = "/tmp/ios"
+
+		} else {
+			if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
+				os.MkdirAll(filepath.Join("/data", destPath), os.ModePerm)
+				MountPoint = "/mnt"
+			} else {
+				// Create temporary mount point
+				os.MkdirAll(destPath, os.ModePerm)
+				MountPoint = dmgs[0] + "_temp_mount"
+				if err := os.Mkdir(MountPoint, os.ModePerm); err != nil {
+					return errors.Wrapf(err, "Unable to create temporary mount point.")
+				} else {
+					defer os.RemoveAll(MountPoint)
+				}
+			}
+		}
+
+		utils.Indent(log.Info, 2)("Mounting DMG")
+		if err := utils.Mount(dmgs[0], MountPoint); err != nil {
+			return errors.Wrapf(err, "failed to mount %s", dmgs[0])
+		}
+		defer unmount(MountPoint)
+
+
+		matches, err := filepath.Glob(filepath.Join(MountPoint, filepath.Join("root", files_pattern)))
+		if err != nil {
+			return err
+		}
+
+		if len(matches) == 0 {
+			return errors.Errorf("failed to find selected files %s in ipsw: %s", files_pattern, ipsw)
+		}
+
+		for _, match := range matches {
+			matchFpath, err := filepath.Rel(filepath.Join(MountPoint, "root"), match)
+			dyldDest := filepath.Join(destPath, matchFpath)
+			utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting %s to %s", filepath.Join("/", matchFpath), dyldDest))
+
+
+			isdir, err := isDirectory(match)
+			if isdir {
+				utils.Indent(log.Info, 3)(fmt.Sprintf("Ignoring directory %s to %s", filepath.Join("/", matchFpath), dyldDest))
+				// err = os.MkdirAll(dyldDest, 0755)
+				// err = copy.Copy(match, dyldDest)
+				// if err != nil {
+				// 	return err
+				// }
+				continue
+			} else {
+				err = os.MkdirAll(filepath.Dir(dyldDest), 0755)
+				err = utils.Cp(match, dyldDest)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+	} else {
+		return fmt.Errorf("found more or less than one DMG (should only be one): %v", dmgs)
+	}
+
+	return nil
 }
 
 // extractCmd represents the extract command
@@ -89,6 +209,7 @@ var extractCmd = &cobra.Command{
 		ibootFlag, _ := cmd.Flags().GetBool("iboot")
 		sepFlag, _ := cmd.Flags().GetBool("sep")
 		remote, _ := cmd.Flags().GetBool("remote")
+		filesFlag, _ := cmd.Flags().GetBool("files")
 		pattern, _ := cmd.Flags().GetString("pattern")
 		output, _ := cmd.Flags().GetString("output")
 		dyldArches, _ := cmd.Flags().GetStringArray("dyld-arch")
@@ -198,6 +319,19 @@ var extractCmd = &cobra.Command{
 				err := dyld.Extract(ipswPath, destPath, dyldArches)
 				if err != nil {
 					return errors.Wrap(err, "failed to extract dyld_shared_cache")
+				}
+			}
+
+			if filesFlag {
+				if len(pattern) == 0 {
+					pattern = "/*" 
+				} 
+
+				log.Info("Extracting files from rootfs using pattern")
+				log.Info(pattern)
+				err := ExtractFiles(ipswPath, destPath, pattern)
+				if err != nil {
+					return errors.Wrap(err, "failed to extract selected files")
 				}
 			}
 
