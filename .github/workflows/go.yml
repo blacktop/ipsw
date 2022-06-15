@@ -24,7 +24,11 @@ jobs:
         run: |
           mkdir ~/beta
           wget -O ~/beta/beta.ipsw https://archive.org/download/iPhone142_16.0_20A5283p_Restore.ipsw/iPhone142_16.0_20A5283p_Restore.ipsw
-
+      - name: Upload beta IPSW
+        uses: actions/upload-artifact@v3
+        with:
+          name: beta-ipsw
+          path: ~/beta/beta.ipsw
   build:
     strategy:
       matrix:
@@ -162,6 +166,12 @@ jobs:
       #
       # DOWNLOAD CMD (macOS)
       #
+      - name: Download beta IPSW from Artifacts
+        if: steps.cache-beta-ipsw.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: beta-ipsw
+          path: ~/beta/beta.ipsw
       - name: Run Extract ALL Remote Kernelcaches
         if: matrix.platform == 'macos-11'
         run: |
