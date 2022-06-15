@@ -61,11 +61,18 @@ jobs:
       #
       - name: Cache beta IPSW
         id: cache-beta-ipsw
+        if: matrix.platform == 'macos-11'
         uses: actions/cache@v3
         with:
           path: |
             ~/beta
           key: beta-ipsw
+      - name: Download beta IPSW from Artifacts
+        if: matrix.platform == 'macos-11' && steps.cache-beta-ipsw.outputs.cache-hit != 'true'
+        uses: actions/download-artifact@v3
+        with:
+          name: beta-ipsw
+          path: ~/beta/beta.ipsw
       # - name: Cache Downloaded IPSWs
       #   id: cache-ipsws
       #   if: matrix.platform == 'macos-11'
@@ -166,12 +173,6 @@ jobs:
       #
       # DOWNLOAD CMD (macOS)
       #
-      - name: Download beta IPSW from Artifacts
-        if: steps.cache-beta-ipsw.outputs.cache-hit != 'true'
-        uses: actions/download-artifact@v3
-        with:
-          name: beta-ipsw
-          path: ~/beta/beta.ipsw
       - name: Run Extract ALL Remote Kernelcaches
         if: matrix.platform == 'macos-11'
         run: |
