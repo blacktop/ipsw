@@ -8,5 +8,5 @@ for item in ${files[*]}; do
   cp $item /tmp/$(basename -- $item)
   cat /tmp/$(basename -- $item) | jq -c >$item
   rm /tmp/$(basename -- $item)
-  gzip -c $item >"$(dirname $item)/$(basename -- $item .json).gz"
+  gzip -cn $item >"$(dirname $item)/$(basename -- $item .json).gz"
 done
