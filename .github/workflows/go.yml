@@ -221,7 +221,7 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree ~/beta/beta.ipsw
-          tree ~/beta
+          tree ~/.ipsw
       #
       # KERNEL CMD (macOS)
       #
@@ -347,6 +347,7 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw info *.ipsw
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw info ~/beta/beta.ipsw
       #
       # UPDATE CMD (macOS)
       #
