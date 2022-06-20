@@ -1,6 +1,8 @@
 package info
 
 import (
+	"bytes"
+	"compress/gzip"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -12,8 +14,8 @@ import (
 	"github.com/blacktop/ipsw/pkg/xcode"
 )
 
-//go:embed data/ipsw_db.json
-var ipswDB []byte
+//go:embed data/ipsw_db.gz
+var ipswDbData []byte
 
 type Board struct {
 	CPU               string `json:"cpu,omitempty"`
@@ -40,9 +42,17 @@ type Devices map[string]Device
 
 func GetIpswDB() (*Devices, error) {
 	var db Devices
-	if err := json.Unmarshal(ipswDB, &db); err != nil {
-		return nil, fmt.Errorf("error unmarshaling ipsw_db.json: %v", err)
+
+	zr, err := gzip.NewReader(bytes.NewReader(ipswDbData))
+	if err != nil {
+		return nil, err
 	}
+	defer zr.Close()
+
+	if err := json.NewDecoder(zr).Decode(&db); err != nil {
+		return nil, fmt.Errorf("failed unmarshaling ipsw_db data: %w", err)
+	}
+
 	return &db, nil
 }
 
@@ -96,7 +106,11 @@ func (i *Info) GetDevices(devs *Devices) error {
 				}
 			}
 
-			proc := getProcessor(xdev.Platform)
+			proc, err := getProcessor(xdev.Platform)
+			if err != nil {
+				return fmt.Errorf("failed to get processor for CPU ID %s: %v", xdev.Platform, err)
+			}
+
 			if len(proc.Name) == 0 {
 				log.Errorf("no processor for %s for board %s: %s", dt.ProductType, dt.BoardConfig, dt.ProductName)
 			}
@@ -141,7 +155,10 @@ func (i *Info) GetDevices(devs *Devices) error {
 					}
 				}
 				if _, ok := (*devs)[prodType]; !ok {
-					proc := getProcessor(dev.Platform)
+					proc, err := getProcessor(dev.Platform)
+					if err != nil {
+						return fmt.Errorf("failed to get processor for CPU ID %s: %v", dev.Platform, err)
+					}
 					if len(proc.Name) == 0 {
 						log.Errorf("no processor for %s for board %s: %s", dev.Platform, dev.BoardConfig, prodName)
 					}
@@ -198,7 +215,10 @@ func (i *Info) GetDevicesFromMap(dmap *types.DeviceMap, devs *Devices) error {
 					}
 				}
 			}
-			proc := getProcessor(d.Platform)
+			proc, err := getProcessor(d.Platform)
+			if err != nil {
+				return fmt.Errorf("failed to get processor for CPU ID %s: %v", d.Platform, err)
+			}
 			if len(proc.Name) == 0 {
 				log.Errorf("no processor for %s for board %s: %s", d.Platform, bc, d.ProductName)
 			}
