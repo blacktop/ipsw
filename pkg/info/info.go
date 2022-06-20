@@ -25,15 +25,26 @@ var (
 	t8030APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/2b8c2d6d37da5a04a222469987fcfa2b - A13 Bionic
 	//go:embed data/t8101_ap_keys.json
 	t8101APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/fd627adebaa4120269754cd613e81877 - A14 Bionic
+	//go:embed data/t8103_ap_keys.json
+	t8103APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/a12ff77d9cf38fa70e6238794896093d - M1
 )
 
 type apKey struct {
-	Device   string
-	Build    string
-	Type     string
-	Filename string
-	KBag     string
-	Key      string
+	Device   string `json:"device,omitempty"`
+	Build    string `json:"build,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Filename string `json:"filename,omitempty"`
+	File     string `json:"file,omitempty"`
+	IPSW     string `json:"fw,omitempty"`
+	KBag     string `json:"kbag,omitempty"`
+	Key      string `json:"key,omitempty"`
+}
+
+func (a apKey) Name() string {
+	if len(a.Filename) == 0 {
+		return a.File
+	}
+	return a.Filename
 }
 
 // Info in the info object
@@ -89,11 +100,11 @@ func getFirmwareKeys(device, build string) map[string]string {
 }
 
 func getApFirmwareKey(device, build, filename string) (string, string, error) {
+	var m1Keys []apKey
 	var a13Keys []apKey
 	var a14Keys []apKey
 
-	err := json.Unmarshal(t8030APKeysJSONData, &a13Keys)
-	if err != nil {
+	if err := json.Unmarshal(t8030APKeysJSONData, &a13Keys); err != nil {
 		log.Fatal(err.Error())
 	}
 
@@ -103,13 +114,22 @@ func getApFirmwareKey(device, build, filename string) (string, string, error) {
 		}
 	}
 
-	err = json.Unmarshal(t8101APKeysJSONData, &a14Keys)
-	if err != nil {
+	if err := json.Unmarshal(t8101APKeysJSONData, &a14Keys); err != nil {
 		log.Fatal(err.Error())
 	}
 
 	for _, key := range a14Keys {
 		if key.Device == device && key.Build == build && key.Filename == filename {
+			return key.KBag, key.Key, nil
+		}
+	}
+
+	if err := json.Unmarshal(t8103APKeysJSONData, &m1Keys); err != nil {
+		log.Fatal(err.Error())
+	}
+
+	for _, key := range m1Keys {
+		if key.Name() == filename {
 			return key.KBag, key.Key, nil
 		}
 	}
