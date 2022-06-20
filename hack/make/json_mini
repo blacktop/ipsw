@@ -6,6 +6,7 @@ files=($(find -E ./pkg -type f -name '*.json'))
 for item in ${files[*]}; do
   printf "Minimizing JSON: %s\n" $item
   cp $item /tmp/$(basename -- $item)
-  cat /tmp/$(basename -- $item) | jq -c > $item
+  cat /tmp/$(basename -- $item) | jq -c >$item
   rm /tmp/$(basename -- $item)
+  gzip -c $item >"$(dirname $item)/$(basename -- $item .json).gz"
 done
