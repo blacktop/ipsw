@@ -3,10 +3,10 @@
 //
 //      File: RawImageDiff.bt
 //   Authors: blacktop
-//   Version:
+//   Version: 1.0
 //   Purpose: Apple Raw Image Diff
 //  Category: Image
-// File Mask:
+// File Mask: *
 //  ID Bytes: 52 49 44 49 46 46 31 30
 //   History:
 //------------------------------------------------
@@ -20,10 +20,10 @@ typedef enum <uint64> {
 typedef struct Header
 {
     Magic magic<format = hex>;
-    uint32 variants;
-    uint16 unknown1;
-    uint64 unknown2<format = hex>;
-    uint64 unknown3<format = hex>;
+    uint16 variants;
+    uint64 flags;
+    uint64 control_count;
+    uint32 unknown<format = hex>;
     uint64 meta_data_offset<format = hex>;
     uint64 controls_offset<format = hex>;
     uint64 patch_data_offset<format = hex>;
