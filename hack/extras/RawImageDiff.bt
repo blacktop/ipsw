@@ -26,8 +26,14 @@ typedef struct Header
     uint32 excess_space<format = hex>;
     uint64 meta_data_offset<format = hex>;
     uint64 controls_offset<format = hex>;
-    uint64 patch_data_offset<format = hex>;
+    uint64 patch_data_offset[variants]<format = hex>;
     uint64 diff_size<format = hex>;
+};
+
+typedef struct Control
+{
+    uint64 offset<format = hex>;
+    uint64 size<format = hex>;
 };
 
 Header header<comment = "Raw Image Diff header information">;
