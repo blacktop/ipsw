@@ -23,7 +23,7 @@ typedef struct Header
     uint16 variants;
     uint64 flags;
     uint64 control_count;
-    uint32 unknown<format = hex>;
+    uint32 excess_space<format = hex>;
     uint64 meta_data_offset<format = hex>;
     uint64 controls_offset<format = hex>;
     uint64 patch_data_offset<format = hex>;
