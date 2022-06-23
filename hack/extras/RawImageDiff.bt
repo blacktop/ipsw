@@ -1,0 +1,39 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: RawImageDiff.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: Apple Raw Image Diff
+//  Category: Image
+// File Mask: *
+//  ID Bytes: 52 49 44 49 46 46 31 30
+//   History:
+//------------------------------------------------
+
+LittleEndian();
+
+typedef enum <uint64> {
+    RIDIFF10        = 0x3031464649444952
+} Magic <format=hex>;
+
+typedef struct Header
+{
+    Magic magic<format = hex>;
+    uint16 variants;
+    uint64 flags;
+    uint64 control_count;
+    uint32 excess_space<format = hex>;
+    uint64 meta_data_offset<format = hex>;
+    uint64 controls_offset<format = hex>;
+    uint64 patch_data_offset[variants]<format = hex>;
+    uint64 diff_size<format = hex>;
+};
+
+typedef struct Control
+{
+    uint64 offset<format = hex>;
+    uint64 size<format = hex>;
+};
+
+Header header<comment = "Raw Image Diff header information">;
