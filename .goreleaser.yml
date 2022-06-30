@@ -55,6 +55,7 @@ archives:
       - LICENSE
       - completions/*
       - manpages/*
+    wrap_in_directory: true
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 brews:
