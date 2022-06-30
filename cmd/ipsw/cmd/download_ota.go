@@ -336,7 +336,7 @@ var otaDLCmd = &cobra.Command{
 				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
 				for _, o := range otas {
 					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
-					os.MkdirAll(folder, os.ModePerm)
+					os.MkdirAll(folder, 0750)
 					var devices string
 					if len(o.SupportedDevices) > 0 {
 						devices = strings.Join(o.SupportedDevices, "_")

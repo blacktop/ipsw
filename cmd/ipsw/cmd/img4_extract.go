@@ -72,12 +72,12 @@ var img4ExtractCmd = &cobra.Command{
 				return fmt.Errorf("failed to lzfse decompress %s: %v", args[0], err)
 			}
 
-			err = ioutil.WriteFile(outFile, dat, 0644)
+			err = ioutil.WriteFile(outFile, dat, 0660)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write file: ", outFile)
 			}
 		} else {
-			err = ioutil.WriteFile(outFile, i.Data, 0644)
+			err = ioutil.WriteFile(outFile, i.Data, 0660)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write file: ", outFile)
 			}

@@ -72,7 +72,7 @@ func WriteToJSON(devices []Device, dest string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath.Clean(dest), dJSON, 0644)
+	return ioutil.WriteFile(filepath.Clean(dest), dJSON, 0660)
 }
 
 // GetDevices reads the devices from embedded JSON

@@ -192,7 +192,7 @@ var machoDumpCmd = &cobra.Command{
 				}
 			} else {
 				if len(outFile) > 0 {
-					ioutil.WriteFile(outFile, dat, 0755)
+					ioutil.WriteFile(outFile, dat, 0660)
 					log.Infof("Wrote data to file %s", outFile)
 				} else {
 					if s := m.FindSegmentForVMAddr(addr); s != nil {

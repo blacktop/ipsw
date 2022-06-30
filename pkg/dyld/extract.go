@@ -68,19 +68,19 @@ func Extract(ipsw, destPath string, arches []string) error {
 		}
 
 		if runtime.GOOS == "darwin" {
-			os.MkdirAll(destPath, os.ModePerm)
+			os.MkdirAll(destPath, 0750)
 			config.MountPoint = "/tmp/ios"
 			config.Prefix = filepath.Join(config.MountPoint, config.CacheFolder) + "/"
 			config.Glob = config.CacheFolder + "dyld_shared_cache_*"
 		} else {
 			if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
-				os.MkdirAll(filepath.Join("/data", destPath), os.ModePerm)
+				os.MkdirAll(filepath.Join("/data", destPath), 0750)
 				config.MountPoint = "/mnt"
 			} else {
 				// Create temporary mount point
-				os.MkdirAll(destPath, os.ModePerm)
+				os.MkdirAll(destPath, 0750)
 				config.MountPoint = dmgs[0] + "_temp_mount"
-				if err := os.Mkdir(config.MountPoint, os.ModePerm); err != nil {
+				if err := os.Mkdir(config.MountPoint, 0750); err != nil {
 					return errors.Wrapf(err, "Unable to create temporary mount point.")
 				} else {
 					defer os.RemoveAll(config.MountPoint)

@@ -398,14 +398,14 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 	}
 	// append to user specified output directory
 	folder = filepath.Join(outputDir, folder)
-	if err := os.MkdirAll(folder, os.ModePerm); err != nil {
+	if err := os.MkdirAll(folder, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", folder, err)
 	}
 	// check for matches in the OTA zip
 	for _, f := range zr.File {
 		if regexp.MustCompile(extractPattern).MatchString(f.Name) {
 			fileName := filepath.Join(folder, "_OTAZIP", filepath.Clean(f.Name))
-			if err := os.MkdirAll(filepath.Dir(fileName), os.ModePerm); err != nil {
+			if err := os.MkdirAll(filepath.Dir(fileName), 0750); err != nil {
 				return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fileName), err)
 			}
 			if f.FileInfo().IsDir() {
@@ -422,7 +422,7 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 				}
 				rc.Close()
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
-				err = ioutil.WriteFile(fileName, data, 0644)
+				err = ioutil.WriteFile(fileName, data, 0660)
 				if err != nil {
 					return errors.Wrapf(err, "failed to write %s", f.Name)
 				}
@@ -586,7 +586,7 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 			}
 			if !f.IsDir() {
 				fname = filepath.Join(folder, filepath.Clean(strings.TrimPrefix(path, dir)))
-				if err := os.MkdirAll(filepath.Dir(fname), os.ModePerm); err != nil {
+				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
 					return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s\t%s\t%s", f.Mode(), humanize.Bytes(uint64(f.Size())), fname))
@@ -739,12 +739,12 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 					return false, "", err
 				}
 
-				if err := os.MkdirAll(folder, os.ModePerm); err != nil {
+				if err := os.MkdirAll(folder, 0750); err != nil {
 					return false, "", fmt.Errorf("failed to create folder: %s", folder)
 				}
 				fname := filepath.Join(folder, filepath.Clean(ent.Path))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s", ent.Mod, ent.Uid, ent.Gid, humanize.Bytes(uint64(ent.Size)), fname))
-				if err := ioutil.WriteFile(fname, fileBytes, 0644); err != nil {
+				if err := ioutil.WriteFile(fname, fileBytes, 0660); err != nil {
 					return false, "", err
 				}
 

@@ -353,7 +353,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 
 	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))
 
-	os.MkdirAll(folder, os.ModePerm)
+	os.MkdirAll(folder, 0750)
 
 	log.Info("Downloading packages")
 	for _, pkg := range i.Product.Packages {
@@ -432,7 +432,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 
 	distPath := filepath.Join(folder, getDestName(i.Product.Distributions["English"], false))
 	if _, err := os.Stat(sparseDiskimagePath); os.IsNotExist(err) {
-		if err := ioutil.WriteFile(distPath, i.distributionData, 0755); err != nil {
+		if err := ioutil.WriteFile(distPath, i.distributionData, 0660); err != nil {
 			return err
 		}
 	}

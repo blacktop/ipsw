@@ -307,7 +307,7 @@ var ipswCmd = &cobra.Command{
 								io.ReadFull(rc, data)
 								rc.Close()
 								utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
-								err = ioutil.WriteFile(fileName, data, 0644)
+								err = ioutil.WriteFile(fileName, data, 0660)
 								if err != nil {
 									return errors.Wrapf(err, "failed to write %s", f.Name)
 								}
