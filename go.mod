@@ -29,10 +29,10 @@ require (
 	github.com/spf13/viper v1.12.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/vbauerster/mpb/v7 v7.4.2
-	golang.org/x/crypto v0.0.0-20220525230936-793ad666bf5e
-	golang.org/x/net v0.0.0-20220607020251-c690dde0001d
-	golang.org/x/oauth2 v0.0.0-20220608161450-d0670ef3b1eb
-	golang.org/x/sys v0.0.0-20220608164250-635b8c9b7f68
+	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
+	golang.org/x/net v0.0.0-20220624214902-1bab6f366d9e
+	golang.org/x/oauth2 v0.0.0-20220628200809-02e64fa58f26
+	golang.org/x/sys v0.0.0-20220627191245-f75cf1eec38b
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
@@ -65,7 +65,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
