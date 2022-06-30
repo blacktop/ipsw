@@ -401,35 +401,13 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 	if err := os.MkdirAll(folder, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", folder, err)
 	}
+
 	// check for matches in the OTA zip
-	for _, f := range zr.File {
-		if regexp.MustCompile(extractPattern).MatchString(f.Name) {
-			fileName := filepath.Join(folder, "_OTAZIP", filepath.Clean(f.Name))
-			if err := os.MkdirAll(filepath.Dir(fileName), 0750); err != nil {
-				return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fileName), err)
-			}
-			if f.FileInfo().IsDir() {
-				continue
-			}
-			if _, err := os.Stat(fileName); os.IsNotExist(err) {
-				rc, err := f.Open()
-				if err != nil {
-					return fmt.Errorf("failed to open file %s in zip: %v", f.Name, err)
-				}
-				data := make([]byte, f.UncompressedSize64)
-				if _, err := io.ReadFull(rc, data); err != nil {
-					return fmt.Errorf("failed to read file %s in zip: %v", f.Name, err)
-				}
-				rc.Close()
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
-				err = ioutil.WriteFile(fileName, data, 0660)
-				if err != nil {
-					return errors.Wrapf(err, "failed to write %s", f.Name)
-				}
-			} else {
-				log.Warnf("%s already exists", fileName)
-			}
-		}
+	if err := utils.RemoteUnzip(zr.File,
+		regexp.MustCompile(extractPattern),
+		filepath.Join(folder, "_OTAZIP"),
+		false); err != nil {
+		return fmt.Errorf("failed to extract OTA zip files: %v", err)
 	}
 
 	// hack: to get a priori list of files to extract (so we know when to stop)
