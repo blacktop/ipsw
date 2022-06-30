@@ -25,10 +25,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
@@ -83,16 +85,35 @@ var otaCmd = &cobra.Command{
 		}
 
 		if len(args) > 1 {
-			log.Infof("Extracting %s...", args[1])
-			return ota.Extract(otaPath, args[1], output)
+			pattern := args[1]
+			if len(pattern) == 0 {
+				return fmt.Errorf("you must supply an extract regex pattern")
+			}
+			log.Infof("Extracting files that match %#v", pattern)
+			return ota.Extract(otaPath, pattern, output)
 		}
 
-		log.Info("Listing files...")
-		files, err := ota.List(otaPath)
+		log.Info("Listing files in OTA zip...")
+		files, err := ota.ListZip(otaPath)
 		if err != nil {
 			return err
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+		for _, f := range files {
+			if !f.IsDir() {
+				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+			}
+		}
+		w.Flush()
+
+		fmt.Fprintf(w, "[ payload files ] %s\n", strings.Repeat("-", 50))
+
+		log.Info("Listing files in OTA payload...")
+		utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
+		files, err = ota.List(otaPath)
+		if err != nil {
+			return err
+		}
 		for _, f := range files {
 			if !f.IsDir() {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
