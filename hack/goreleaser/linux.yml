@@ -45,6 +45,7 @@ archives:
       - LICENSE
       - completions/*
       - manpages/*
+    wrap_in_directory: true
 
 checksum:
   name_template: 'checksums.linux.txt'
