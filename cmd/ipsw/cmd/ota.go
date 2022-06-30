@@ -43,11 +43,16 @@ func init() {
 	rootCmd.AddCommand(otaCmd)
 
 	otaCmd.Flags().BoolP("info", "i", false, "Display OTA Info")
-	otaCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
+	otaCmd.Flags().BoolP("list", "l", false, "List files in OTA")
+	// otaCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
 	// otaCmd.Flags().BoolP("single", "s", false, "Stop after first match") TODO: impliment this
 	otaCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
+
 	viper.BindPFlag("ota.info", otaCmd.Flags().Lookup("info"))
+	viper.BindPFlag("ota.list", otaCmd.Flags().Lookup("list"))
+	// viper.BindPFlag("ota.remote", otaCmd.Flags().Lookup("remote"))
 	viper.BindPFlag("ota.output", otaCmd.Flags().Lookup("output"))
+
 	otaCmd.MarkZshCompPositionalArgumentFile(1, "*.zip")
 }
 
@@ -69,6 +74,7 @@ var otaCmd = &cobra.Command{
 		}
 
 		showInfo := viper.GetBool("ota.info")
+		listFiles := viper.GetBool("ota.list")
 		// remote := viper.GetBool("ota.remote")
 		output := viper.GetString("ota.output")
 
@@ -84,6 +90,36 @@ var otaCmd = &cobra.Command{
 			return nil
 		}
 
+		if listFiles {
+			log.Info("Listing files in OTA zip...")
+			files, err := ota.ListZip(otaPath)
+			if err != nil {
+				return err
+			}
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+			fmt.Fprintf(w, "[ OTA zip files ] %s\n", strings.Repeat("-", 50))
+			for _, f := range files {
+				if !f.IsDir() {
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+				}
+			}
+			w.Flush()
+
+			log.Info("Listing files in OTA payload...")
+			utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
+			fmt.Fprintf(w, "\n[ payload files ] %s\n", strings.Repeat("-", 50))
+			files, err = ota.List(otaPath)
+			if err != nil {
+				return err
+			}
+			for _, f := range files {
+				if !f.IsDir() {
+					fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
+				}
+			}
+			w.Flush()
+		}
+
 		if len(args) > 1 {
 			pattern := args[1]
 			if len(pattern) == 0 {
@@ -92,34 +128,6 @@ var otaCmd = &cobra.Command{
 			log.Infof("Extracting files that match %#v", pattern)
 			return ota.Extract(otaPath, pattern, output)
 		}
-
-		log.Info("Listing files in OTA zip...")
-		files, err := ota.ListZip(otaPath)
-		if err != nil {
-			return err
-		}
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-		fmt.Fprintf(w, "[ OTA zip files ] %s\n", strings.Repeat("-", 50))
-		for _, f := range files {
-			if !f.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
-			}
-		}
-		w.Flush()
-
-		log.Info("Listing files in OTA payload...")
-		utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
-		fmt.Fprintf(w, "\n[ payload files ] %s\n", strings.Repeat("-", 50))
-		files, err = ota.List(otaPath)
-		if err != nil {
-			return err
-		}
-		for _, f := range files {
-			if !f.IsDir() {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
-			}
-		}
-		w.Flush()
 
 		return nil
 	},
