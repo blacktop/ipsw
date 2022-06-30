@@ -432,16 +432,21 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 		}
 		var matches []string
 		for _, rf := range rfiles {
-			if regexp.MustCompile(extractPattern).MatchString(rf.Name()) {
-				matches = append(matches, rf.Name())
+			if !rf.IsDir() {
+				if regexp.MustCompile(extractPattern).MatchString(rf.Name()) {
+					matches = append(matches, rf.Name())
+				}
 			}
 		}
 		return parsePayload(&zr.Reader, extractPattern, func(path string) bool {
-			for i, v := range matches {
-				if strings.HasSuffix(v, filepath.Base(path)) {
-					matches = append(matches[:i], matches[i+1:]...)
+			i := 0
+			for _, v := range matches {
+				if !strings.HasSuffix(path, v) {
+					matches[i] = v
+					i++
 				}
 			}
+			matches = matches[:i]
 			return len(matches) == 0 // stop if we've extracted all matches
 		})
 	}
@@ -505,7 +510,7 @@ func parsePayload(zr *zip.Reader, extractPattern string, shouldStop func(string)
 	}
 
 	// sortFileBySize(zr.File)
-	sortFileByNameAscend(zr.File)
+	// sortFileByNameAscend(zr.File)
 
 	found := false
 	for _, f := range zr.File {
@@ -535,6 +540,7 @@ func parsePayload(zr *zip.Reader, extractPattern string, shouldStop func(string)
 // Parse parses a ota payload file inside the zip
 func Parse(payload *zip.File, folder, extractPattern string) (bool, string, error) {
 
+	// This is the FAST path that execs the 'aa' binary if found on macOS
 	if aaPath, err := execabs.LookPath("aa"); err == nil {
 		// make tmp folder
 		dir, err := ioutil.TempDir("", "ota_"+filepath.Base(payload.Name))
@@ -573,11 +579,12 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 				return err
 			}
 			if !f.IsDir() {
-				os.Mkdir(folder, os.ModePerm)
-				fname = filepath.Join(folder, filepath.Base(filepath.Clean(f.Name())))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s\t%s\t%s to %s", f.Mode(), humanize.Bytes(uint64(f.Size())), strings.TrimPrefix(path, dir), fname))
-				err = os.Rename(path, fname)
-				if err != nil {
+				fname = filepath.Join(folder, filepath.Clean(strings.TrimPrefix(path, dir)))
+				if err := os.MkdirAll(filepath.Dir(fname), os.ModePerm); err != nil {
+					return fmt.Errorf("failed to create dir: %v", err)
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s\t%s\t%s", f.Mode(), humanize.Bytes(uint64(f.Size())), fname))
+				if err := os.Rename(path, fname); err != nil {
 					return fmt.Errorf("failed to mv file %s to %s: %v", strings.TrimPrefix(path, dir), fname, err)
 				}
 			}
@@ -726,11 +733,12 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 					return false, "", err
 				}
 
-				os.Mkdir(folder, os.ModePerm)
-				fname := filepath.Join(folder, filepath.Base(ent.Path))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s to %s", ent.Mod, ent.Uid, ent.Gid, humanize.Bytes(uint64(ent.Size)), ent.Path, fname))
-				err = ioutil.WriteFile(fname, fileBytes, 0644)
-				if err != nil {
+				if err := os.MkdirAll(folder, os.ModePerm); err != nil {
+					return false, "", fmt.Errorf("failed to create folder: %s", folder)
+				}
+				fname := filepath.Join(folder, filepath.Clean(ent.Path))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s", ent.Mod, ent.Uid, ent.Gid, humanize.Bytes(uint64(ent.Size)), fname))
+				if err := ioutil.WriteFile(fname, fileBytes, 0644); err != nil {
 					return false, "", err
 				}
 
