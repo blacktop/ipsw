@@ -153,7 +153,7 @@ var ctfdumpCmd = &cobra.Command{
 
 				cwd, _ := os.Getwd()
 				log.Infof("Creating %s", filepath.Join(cwd, "ctfdump.json"))
-				if err := ioutil.WriteFile("ctfdump.json", b, 0755); err != nil {
+				if err := ioutil.WriteFile("ctfdump.json", b, 0660); err != nil {
 					return err
 				}
 			} else {

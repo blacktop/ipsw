@@ -415,7 +415,7 @@ func (app *App) signIn(username, password string) error {
 		// 		code = string(codeSTR)
 		// 		// remove code for next time
 		// 		defer func() {
-		// 			if err := ioutil.WriteFile(cpath, []byte(""), 0644); err != nil {
+		// 			if err := ioutil.WriteFile(cpath, []byte(""), 0660); err != nil {
 		// 				log.Error(err.Error())
 		// 			}
 		// 		}()

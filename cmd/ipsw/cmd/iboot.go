@@ -115,7 +115,7 @@ var ibootCmd = &cobra.Command{
 			}
 
 			utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", name))
-			ioutil.WriteFile(name, decData, 0644)
+			ioutil.WriteFile(name, decData, 0660)
 			if err != nil {
 				return errors.Wrapf(err, "unabled to write file: %s", name)
 			}

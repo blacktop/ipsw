@@ -75,7 +75,7 @@ var sbprofCmd = &cobra.Command{
 		}
 
 		sbProfPath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
-		err = ioutil.WriteFile(sbProfPath, the_real_platform_profile_data, 0755)
+		err = ioutil.WriteFile(sbProfPath, the_real_platform_profile_data, 0660)
 		if err != nil {
 			return err
 		}
@@ -87,7 +87,7 @@ var sbprofCmd = &cobra.Command{
 		}
 
 		sbColPath := filepath.Join(filepath.Dir(kcPath), "sandbox_collection.bin")
-		err = ioutil.WriteFile(sbColPath, collection_data, 0755)
+		err = ioutil.WriteFile(sbColPath, collection_data, 0660)
 		if err != nil {
 			return err
 		}
@@ -104,11 +104,11 @@ var sbprofCmd = &cobra.Command{
 		}
 
 		// regexFolder := filepath.Join(filepath.Dir(kcPath), "regex")
-		// os.MkdirAll(regexFolder, 0755)
+		// os.MkdirAll(regexFolder, 0750)
 
 		// for off, data := range sb.Regexes {
 		// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%x", off))
-		// 	err = ioutil.WriteFile(regexPath, data, 0755)
+		// 	err = ioutil.WriteFile(regexPath, data, 0660)
 		// 	if err != nil {
 		// 		return err
 		// 	}
