@@ -23,10 +23,9 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -43,11 +42,13 @@ import (
 func init() {
 	downloadCmd.AddCommand(wikiCmd)
 	wikiCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
-	wikiCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
+	wikiCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	wikiCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.wiki.pattern", wikiCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.wiki.output", wikiCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.wiki.flat", wikiCmd.Flags().Lookup("flat"))
 }
 
 // wikiCmd represents the wiki command
@@ -90,6 +91,7 @@ var wikiCmd = &cobra.Command{
 		kernel := viper.GetBool("download.wiki.kernel")
 		pattern := viper.GetString("download.wiki.pattern")
 		output := viper.GetString("download.wiki.output")
+		flat := viper.GetBool("download.wiki.flat")
 
 		// verify args
 		if kernel && len(pattern) > 0 {
@@ -146,6 +148,10 @@ var wikiCmd = &cobra.Command{
 					}
 				}
 			} else if len(pattern) > 0 { // PATTERN MATCHING MODE
+				dlRE, err := regexp.Compile(pattern)
+				if err != nil {
+					return errors.Wrap(err, "failed to compile regexp")
+				}
 				for _, url := range filteredURLS {
 					d, v, b := download.ParseIpswURLString(url)
 					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
@@ -162,32 +168,8 @@ var wikiCmd = &cobra.Command{
 						return errors.Wrap(err, "failed to parse remote ipsw")
 					}
 					destPath = filepath.Join(destPath, iinfo.GetFolder())
-					os.Mkdir(destPath, os.ModePerm)
-					found := false
-					for _, f := range zr.File {
-						if strings.Contains(f.Name, pattern) {
-							found = true
-							fileName := filepath.Join(destPath, filepath.Base(filepath.Clean(f.Name)))
-							if _, err := os.Stat(fileName); os.IsNotExist(err) {
-								data := make([]byte, f.UncompressedSize64)
-								rc, err := f.Open()
-								if err != nil {
-									return fmt.Errorf("failed to open file in zip: %v", err)
-								}
-								io.ReadFull(rc, data)
-								rc.Close()
-								utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
-								err = ioutil.WriteFile(fileName, data, 0660)
-								if err != nil {
-									return errors.Wrapf(err, "failed to write %s", f.Name)
-								}
-							} else {
-								log.Warnf("%s already exists", fileName)
-							}
-						}
-					}
-					if !found {
-						utils.Indent(log.Error, 2)(fmt.Sprintf("No files contain pattern %s", pattern))
+					if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
+						return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
 					}
 				}
 			} else { // NORMAL MODE
