@@ -99,6 +99,7 @@ var otaCmd = &cobra.Command{
 			return err
 		}
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+		fmt.Fprintf(w, "[ OTA zip files ] %s\n", strings.Repeat("-", 50))
 		for _, f := range files {
 			if !f.IsDir() {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", f.Mode(), f.ModTime().Format(time.RFC3339), humanize.Bytes(uint64(f.Size())), f.Name())
@@ -106,10 +107,9 @@ var otaCmd = &cobra.Command{
 		}
 		w.Flush()
 
-		fmt.Fprintf(w, "[ payload files ] %s\n", strings.Repeat("-", 50))
-
 		log.Info("Listing files in OTA payload...")
 		utils.Indent(log.Warn, 1)("(OTA might not actually contain all these files if it is a partial update file)")
+		fmt.Fprintf(w, "\n[ payload files ] %s\n", strings.Repeat("-", 50))
 		files, err = ota.List(otaPath)
 		if err != nil {
 			return err
