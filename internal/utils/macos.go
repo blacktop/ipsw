@@ -21,7 +21,7 @@ func Cp(src, dst string) error {
 	}
 	defer from.Close()
 
-	to, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
+	to, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0660)
 	if err != nil {
 		return err
 	}
@@ -294,6 +294,29 @@ func Mount(image, mountPoint string) error {
 	}
 
 	return nil
+}
+
+func MountFS(image string) (string, error) {
+	var mountPoint string
+	if runtime.GOOS == "darwin" {
+		mountPoint = "/tmp/ios"
+	} else {
+		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
+			// Create in-docker mount point
+			os.MkdirAll("/data", 0750)
+			mountPoint = "/mnt"
+		} else {
+			// Create temporary non-darwin mount point
+			mountPoint = image + "_temp_mount"
+			if err := os.Mkdir(mountPoint, 0750); err != nil {
+				return "", fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
+			}
+		}
+	}
+	if err := Mount(image, mountPoint); err != nil {
+		return "", fmt.Errorf("failed to mount %s: %v", image, err)
+	}
+	return mountPoint, nil
 }
 
 // Unmount unmounts a DMG with hdiutil
