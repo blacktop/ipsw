@@ -54,9 +54,10 @@ func init() {
 	extractCmd.Flags().BoolP("dmg", "m", false, "Extract File System DMG file")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
+	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().String("pattern", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
-	extractCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when extracting")
+	extractCmd.Flags().Bool("flat", false, "Do NOT perserve directory structure when extracting")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
 
 	viper.BindPFlag("extract.proxy", extractCmd.Flags().Lookup("proxy"))
@@ -68,6 +69,7 @@ func init() {
 	viper.BindPFlag("extract.dmg", extractCmd.Flags().Lookup("dmg"))
 	viper.BindPFlag("extract.iboot", extractCmd.Flags().Lookup("iboot"))
 	viper.BindPFlag("extract.sep", extractCmd.Flags().Lookup("sep"))
+	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("extract.flat", extractCmd.Flags().Lookup("flat"))
@@ -256,13 +258,61 @@ var extractCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to compile regexp")
 				}
-				zr, err := zip.OpenReader(ipswPath)
-				if err != nil {
-					return errors.Wrap(err, "failed to open ota zip")
-				}
-				defer zr.Close()
-				if err := utils.RemoteUnzip(zr.File, validRegex, destPath, viper.GetBool("extract.flat")); err != nil {
-					return fmt.Errorf("failed to extract files matching pattern: %v", err)
+
+				if viper.GetBool("extract.files") {
+					dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+						return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
+					})
+					if err != nil {
+						return errors.Wrap(err, "failed extract dyld_shared_cache from ipsw")
+					}
+					if len(dmgs) == 0 {
+						return fmt.Errorf("no OS File System .dmg found in IPSW")
+					}
+					defer os.Remove(dmgs[0])
+
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgs[0]))
+					mountPoint, err := utils.MountFS(dmgs[0])
+					if err != nil {
+						return fmt.Errorf("failed to IPSW FS dmg: %v", err)
+					}
+					defer func() {
+						utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", dmgs[0]))
+						if err := utils.Unmount(mountPoint, false); err != nil {
+							log.Errorf("failed to unmount File System DMG mount at %s: %v", dmgs[0], err)
+						}
+					}()
+					// extract files that match regex pattern
+					if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+						if err != nil {
+							return err
+						}
+						if info.IsDir() {
+							return nil
+						}
+						if validRegex.MatchString(info.Name()) {
+							fname := strings.TrimPrefix(path, mountPoint)
+							if err := os.MkdirAll(filepath.Join(destPath, filepath.Dir(fname)), 0750); err != nil {
+								return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)
+							}
+							utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting %s", fname))
+							if err := utils.Cp(path, filepath.Join(destPath, fname)); err != nil {
+								return fmt.Errorf("failed to extract %s: %v", fname, err)
+							}
+						}
+						return nil
+					}); err != nil {
+						return fmt.Errorf("failed to extract File System files from IPSW: %v", err)
+					}
+				} else {
+					zr, err := zip.OpenReader(ipswPath)
+					if err != nil {
+						return errors.Wrap(err, "failed to open ota zip")
+					}
+					defer zr.Close()
+					if err := utils.RemoteUnzip(zr.File, validRegex, destPath, viper.GetBool("extract.flat")); err != nil {
+						return fmt.Errorf("failed to extract files matching pattern: %v", err)
+					}
 				}
 			}
 		}
