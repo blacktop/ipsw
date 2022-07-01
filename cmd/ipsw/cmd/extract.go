@@ -35,11 +35,17 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/devicetree"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+func isURL(str string) bool {
+	u, err := url.Parse(str)
+	return err == nil && u.Scheme != "" && u.Host != ""
+}
 
 func init() {
 	rootCmd.AddCommand(extractCmd)
@@ -53,6 +59,7 @@ func init() {
 	extractCmd.Flags().BoolP("dmg", "m", false, "Extract File System DMG file")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
+	extractCmd.Flags().BoolP("kbag", "b", false, "Extract Im4p Keybags")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().String("pattern", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
@@ -68,6 +75,7 @@ func init() {
 	viper.BindPFlag("extract.dmg", extractCmd.Flags().Lookup("dmg"))
 	viper.BindPFlag("extract.iboot", extractCmd.Flags().Lookup("iboot"))
 	viper.BindPFlag("extract.sep", extractCmd.Flags().Lookup("sep"))
+	viper.BindPFlag("extract.kbag", extractCmd.Flags().Lookup("kbag"))
 	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
@@ -78,11 +86,6 @@ func init() {
 	extractCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	}
-}
-
-func isURL(str string) bool {
-	u, err := url.Parse(str)
-	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
 // extractCmd represents the extract command
@@ -131,7 +134,7 @@ var extractCmd = &cobra.Command{
 				Insecure: viper.GetBool("extract.insecure"),
 			})
 			if err != nil {
-				return fmt.Errorf("unable to download remote IPSW: %v", err)
+				return fmt.Errorf("unable to download remote zip: %v", err)
 			}
 
 			i, err := info.ParseZipFiles(zr.File)
@@ -174,8 +177,17 @@ var extractCmd = &cobra.Command{
 				}
 			}
 
+			if viper.GetBool("extract.kbag") {
+				log.Info("Extracting im4p kbags")
+				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i)
+				if err != nil {
+					return fmt.Errorf("failed to parse im4p kbags: %v", err)
+				}
+				fmt.Println(out)
+			}
+
 			if len(viper.GetString("extract.pattern")) > 0 {
-				log.Infof("Extracting files matching pattern $#v", viper.GetString("extract.pattern"))
+				log.Infof("Extracting files matching pattern %#v", viper.GetString("extract.pattern"))
 				validRegex, err := regexp.Compile(viper.GetString("extract.pattern"))
 				if err != nil {
 					return fmt.Errorf("failed to compile regexp: %v", err)
@@ -251,6 +263,20 @@ var extractCmd = &cobra.Command{
 				}); err != nil {
 					return fmt.Errorf("failed to extract sep-firmwares from IPSW: %v", err)
 				}
+			}
+
+			if viper.GetBool("extract.kbag") {
+				log.Info("Extracting im4p kbags")
+				zr, err := zip.OpenReader(ipswPath)
+				if err != nil {
+					return fmt.Errorf("failed to open zip: %v", err)
+				}
+				defer zr.Close()
+				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i)
+				if err != nil {
+					return fmt.Errorf("failed to parse im4p kbags: %v", err)
+				}
+				fmt.Println(out)
 			}
 
 			if len(viper.GetString("extract.pattern")) > 0 {
