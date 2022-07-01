@@ -22,7 +22,7 @@ func ParseMachO(name string) error {
 
 	fmt.Println(f.FileHeader)
 
-	err = os.Mkdir("diff", os.ModePerm)
+	err = os.Mkdir("diff", 0750)
 	if err != nil {
 		return err
 	}

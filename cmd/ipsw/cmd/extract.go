@@ -24,6 +24,7 @@ package cmd
 import (
 	"archive/zip"
 	"fmt"
+	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -144,10 +145,6 @@ var extractCmd = &cobra.Command{
 
 			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), i.GetFolder())
 
-			if err := os.MkdirAll(destPath, 0750); err != nil {
-				return fmt.Errorf("failed to create output directory %s: %v", destPath, err)
-			}
-
 			if viper.GetBool("extract.kernel") {
 				log.Info("Extracting remote kernelcache")
 				err = kernelcache.RemoteParse(zr, destPath)
@@ -184,6 +181,10 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse im4p kbags: %v", err)
 				}
 				fmt.Println(out)
+				os.Mkdir(destPath, 0770)
+				if err := ioutil.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
+					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
+				}
 			}
 
 			if len(viper.GetString("extract.pattern")) > 0 {
@@ -209,10 +210,6 @@ var extractCmd = &cobra.Command{
 			}
 
 			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), i.GetFolder())
-
-			if err := os.MkdirAll(destPath, 0750); err != nil {
-				return fmt.Errorf("failed to create output directory %s: %v", destPath, err)
-			}
 
 			if viper.GetBool("extract.kernel") {
 				log.Info("Extracting kernelcaches")
@@ -277,6 +274,10 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse im4p kbags: %v", err)
 				}
 				fmt.Println(out)
+				os.Mkdir(destPath, 0770)
+				if err := ioutil.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
+					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
+				}
 			}
 
 			if len(viper.GetString("extract.pattern")) > 0 {

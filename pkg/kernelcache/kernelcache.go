@@ -100,9 +100,9 @@ func Extract(ipsw, destPath string) error {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
 
-		os.Mkdir(destPath, os.ModePerm)
+		os.Mkdir(destPath, 0750)
 
-		err = ioutil.WriteFile(fname, dec, 0644)
+		err = ioutil.WriteFile(fname, dec, 0660)
 		if err != nil {
 			return errors.Wrap(err, "failed to write kernelcache")
 		}
@@ -132,7 +132,7 @@ func Decompress(kcache string) error {
 		return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 	}
 
-	err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
+	err = ioutil.WriteFile(kcache+".decompressed", dec, 0660)
 	if err != nil {
 		return errors.Wrap(err, "failed to write kernelcache")
 	}
@@ -244,8 +244,8 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 					return errors.Wrapf(err, "failed to decompress kernelcache %s", fname)
 				}
 
-				os.Mkdir(destPath, os.ModePerm)
-				err = ioutil.WriteFile(fname, dec, 0644)
+				os.Mkdir(destPath, 0750)
+				err = ioutil.WriteFile(fname, dec, 0660)
 				if err != nil {
 					return errors.Wrap(err, "failed to write kernelcache")
 				}
