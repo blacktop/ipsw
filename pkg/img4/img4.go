@@ -1,13 +1,19 @@
 package img4
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/asn1"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"io"
+	"path/filepath"
+	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
+	"github.com/blacktop/ipsw/pkg/info"
 )
 
 // Img4 object
@@ -37,13 +43,66 @@ type img4 struct {
 	RestoreInfo img4RestoreInfo `asn1:"explicit,tag:1"`
 }
 
+type Im4p struct {
+	im4p
+	Kbags []Keybag
+}
+
 type im4p struct {
 	Raw         asn1.RawContent
-	Name        string // IM4P
-	Type        string
+	Name        string `asn1:"ia5"` // IM4P
+	Type        string `asn1:"ia5"`
 	Description string
 	Data        []byte
-	Kbag        []byte `asn1:"optional"`
+	KbagData    []byte `asn1:"optional"`
+}
+
+type kbagType int
+
+const (
+	PRODUCTION  kbagType = 1
+	DEVELOPMENT kbagType = 2
+)
+
+func (t kbagType) String() string {
+	if t == PRODUCTION {
+		return "PRODUCTION"
+	}
+	return "DEVELOPMENT"
+}
+func (t kbagType) Short() string {
+	if t == PRODUCTION {
+		return "prod"
+	}
+	return "dev"
+}
+
+type Keybag struct {
+	Type kbagType
+	IV   []byte
+	Key  []byte
+}
+
+func (k Keybag) String() string {
+	return fmt.Sprintf(
+		"-\n"+
+			"  type: %s\n"+
+			"    iv: %x\n"+
+			"   key: %x",
+		k.Type.String(),
+		k.IV,
+		k.Key)
+}
+func (k Keybag) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Type string `json:"type,omitempty"`
+		IV   string `json:"iv,omitempty"`
+		Key  string `json:"key,omitempty"`
+	}{
+		Type: k.Type.Short(),
+		IV:   hex.EncodeToString(k.IV),
+		Key:  hex.EncodeToString(k.Key),
+	})
 }
 
 const typeBNCN = "private,tag:1112425294"
@@ -158,11 +217,32 @@ type srvn struct {
 	dataProp
 }
 
+const ( // sepi private tags
+	typeImpl = "private,tag:1768779884"
+	typeArms = "private,tag:1634889075"
+	typeTbmr = "private,tag:1952607602"
+	typeTbms = "private,tag:1952607603"
+	typeTz0s = "private,tag:1954164851"
+)
+
+type arms struct {
+	idProp
+}
+type tbmr struct {
+	dataProp
+}
+type tbms struct {
+	dataProp
+}
+type tz0s struct {
+	idProp
+}
+
 func parseDataProp(data []byte, pType string) (*dataProp, []byte, error) {
 	var d []dataProp
 	rest, err := asn1.UnmarshalWithParams(data, &d, pType)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to ASN.1 parse data property")
+		return nil, nil, fmt.Errorf("failed to ASN.1 parse data property: %v", err)
 	}
 	return &d[0], rest, nil
 }
@@ -171,7 +251,7 @@ func parseIDProp(data []byte, pType string) (*idProp, []byte, error) {
 	var i []idProp
 	rest, err := asn1.UnmarshalWithParams(data, &i, pType)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to ASN.1 parse id property")
+		return nil, nil, fmt.Errorf("failed to ASN.1 parse id property: %v", err)
 	}
 	return &i[0], rest, nil
 }
@@ -180,7 +260,7 @@ func parseBoolProp(data []byte, pType string) (*boolProp, []byte, error) {
 	var b []boolProp
 	rest, err := asn1.UnmarshalWithParams(data, &b, pType)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to ASN.1 parse bool property")
+		return nil, nil, fmt.Errorf("failed to ASN.1 parse bool property: %v", err)
 	}
 	return &b[0], rest, nil
 }
@@ -262,35 +342,35 @@ func Parse(r io.Reader) (*Img4, error) {
 
 	_, err := asn1.Unmarshal(data.Bytes(), &i)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Img4")
+		return nil, fmt.Errorf("failed to ASN.1 parse Img4: %v", err)
 	}
 
 	var m img4Manifest
 	_, err = asn1.Unmarshal(i.Manifest.Bytes, &m)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Img4 manifest")
+		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest: %v", err)
 	}
 
 	var mb []manifestBody
 	_, err = asn1.UnmarshalWithParams(m.Body.Bytes, &mb, typeMANB)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Img4 manifest body")
+		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest body: %v", err)
 	}
 
 	var mProps []manifestProperties
 	_, err = asn1.UnmarshalWithParams(mb[0].Properties.Bytes, &mProps, typeMANP)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Img4 manifest properties")
+		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest properties: %v", err)
 	}
 
 	props, err := parseManifestProperties(mProps[0].Properties.Bytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Img4 manifest property")
+		return nil, fmt.Errorf("failed to ASN.1 parse Img4 manifest property: %v", err)
 	}
 
 	gen, _, err := parseDataProp(i.RestoreInfo.Generator.Bytes, typeBNCN)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Generator")
+		return nil, fmt.Errorf("failed to ASN.1 parse Generator: %v", err)
 	}
 
 	return &Img4{
@@ -308,18 +388,70 @@ func Parse(r io.Reader) (*Img4, error) {
 	}, nil
 }
 
-func ParseIm4p(r io.Reader) (*im4p, error) {
-	utils.Indent(log.Info, 1)("Parsing Im4p")
+func ParseIm4p(r io.Reader) (*Im4p, error) {
 
 	data := new(bytes.Buffer)
 	data.ReadFrom(r)
 
-	var i im4p
+	var i Im4p
 
-	_, err := asn1.Unmarshal(data.Bytes(), &i)
+	_, err := asn1.Unmarshal(data.Bytes(), &i.im4p)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to ASN.1 parse Im4p")
+		return nil, fmt.Errorf("failed to ASN.1 parse Im4p: %v", err)
+	}
+
+	if i.im4p.KbagData != nil {
+		_, err = asn1.Unmarshal(i.im4p.KbagData, &i.Kbags)
+		if err != nil {
+			return nil, fmt.Errorf("failed to ASN.1 parse Im4p KBAG: %v", err)
+		}
 	}
 
 	return &i, nil
+}
+
+type im4pKBag struct {
+	Name    string   `json:"name,omitempty"`
+	Keybags []Keybag `json:"kbags,omitempty"`
+}
+
+func ParseZipKeyBagsAsJSON(files []*zip.File, inf *info.Info) (string, error) {
+	var kbags []im4pKBag
+	for _, f := range files {
+		if regexp.MustCompile(`.*im4p$`).MatchString(f.Name) {
+			rc, err := f.Open()
+			if err != nil {
+				return "", fmt.Errorf("error opening zipped file %s: %v", f.Name, err)
+			}
+			im4p, err := ParseIm4p(rc)
+			if err != nil {
+				log.Errorf("failed to parse im4p %s: %v", f.Name, err)
+			}
+			if im4p.Kbags == nil { // kbags are optional
+				continue
+			}
+			kbags = append(kbags, im4pKBag{
+				Name:    filepath.Base(f.Name),
+				Keybags: im4p.Kbags,
+			})
+			rc.Close()
+		}
+	}
+	dat, err := json.Marshal(&struct {
+		Type    string     `json:"type,omitempty"`
+		Version string     `json:"version,omitempty"`
+		Build   string     `json:"build,omitempty"`
+		Devices []string   `json:"devices,omitempty"`
+		Files   []im4pKBag `json:"files,omitempty"`
+	}{
+		Type:    inf.Plists.Type,
+		Version: inf.Plists.BuildManifest.ProductVersion,
+		Build:   inf.Plists.BuildManifest.ProductBuildVersion,
+		Devices: inf.Plists.Restore.SupportedProductTypes,
+		Files:   kbags,
+	})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal im4p kbag: %v", err)
+	}
+	return string(dat), nil
 }
