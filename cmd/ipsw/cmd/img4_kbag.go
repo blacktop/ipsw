@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,30 +22,32 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
+	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
+	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
-	"github.com/blacktop/ipsw/pkg/lzfse"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
-	img4Cmd.AddCommand(img4ExtractCmd)
+	img4Cmd.AddCommand(img4KbagCmd)
+	img4KbagCmd.Flags().BoolP("json", "j", false, "Extract as JSON")
+	img4KbagCmd.MarkZshCompPositionalArgumentFile(1)
 
-	img4ExtractCmd.MarkZshCompPositionalArgumentFile(1)
+	viper.BindPFlag("img4.kbag.json", img4KbagCmd.Flags().Lookup("json"))
 }
 
-// img4ExtractCmd represents the extract command
-var img4ExtractCmd = &cobra.Command{
-	Use:   "extract <img4>",
-	Short: "Extract img4 payloads",
-	Args:  cobra.MinimumNArgs(1),
+// img4KbagCmd represents the kbag command
+var img4KbagCmd = &cobra.Command{
+	Use:           "kbag <IMG4>",
+	Short:         "Extract kbag from img4",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -54,33 +56,35 @@ var img4ExtractCmd = &cobra.Command{
 
 		f, err := os.Open(args[0])
 		if err != nil {
-			return errors.Wrapf(err, "unabled to open file: %s", args[0])
+			return fmt.Errorf("failed to open file %s: %v", args[0], err)
 		}
 		defer f.Close()
 
+		log.Info("Parsing Im4p")
+
 		i, err := img4.ParseIm4p(f)
 		if err != nil {
-			return errors.Wrap(err, "unabled to parse Im4p")
+			return fmt.Errorf("failed to parse img4: %v", err)
 		}
 
-		outFile := args[0] + ".payload"
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Exracting payload to file %s", outFile))
-
-		if bytes.Contains(i.Data[:4], []byte("bvx2")) {
-			utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-			dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
+		if viper.GetBool("img4.kbag.json") {
+			dat, err := json.Marshal(&struct {
+				Name        string        `json:"name,omitempty"`
+				Description string        `json:"description,omitempty"`
+				Keybags     []img4.Keybag `json:"keybags,omitempty"`
+			}{
+				Name:        filepath.Base(args[0]),
+				Description: i.Description,
+				Keybags:     i.Kbags,
+			})
 			if err != nil {
-				return fmt.Errorf("failed to lzfse decompress %s: %v", args[0], err)
+				return fmt.Errorf("failed to marshal im4g kbag: %v", err)
 			}
-
-			err = ioutil.WriteFile(outFile, dat, 0660)
-			if err != nil {
-				return errors.Wrapf(err, "failed to write file: ", outFile)
-			}
+			fmt.Println(string(dat))
 		} else {
-			err = ioutil.WriteFile(outFile, i.Data, 0660)
-			if err != nil {
-				return errors.Wrapf(err, "failed to write file: ", outFile)
+			fmt.Println("Keybags:")
+			for _, kb := range i.Kbags {
+				fmt.Println(kb)
 			}
 		}
 

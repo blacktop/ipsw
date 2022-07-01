@@ -261,13 +261,13 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				data := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
 				if err != nil {
-					return fmt.Errorf("error opening remote zip file %s: %v", f.Name, err)
+					return fmt.Errorf("error opening remote zipped file %s: %v", f.Name, err)
 				}
 				io.ReadFull(rc, data)
 				rc.Close()
 				Indent(log.Info, 2)(fmt.Sprintf("Created %s", strings.TrimPrefix(fname, cwd)))
 				if err := ioutil.WriteFile(fname, data, 0660); err != nil {
-					return fmt.Errorf("error writing remote zip file %s data: %v", f.Name, err)
+					return fmt.Errorf("error writing remote unzipped file %s data: %v", f.Name, err)
 				}
 			} else {
 				log.Warnf("%s already exists", fname)
