@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -110,4 +111,24 @@ func (a Asset) String() string {
 		humanize.Bytes(uint64(a.UnarchivedSize)),
 		filepath.Base(a.RelativePath),
 	)
+}
+
+func (a Asset) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		URL         string   `json:"url,omitempty"`
+		Description string   `json:"description,omitempty"`
+		Product     string   `json:"product,omitempty"`
+		Devices     []string `json:"devices,omitempty"`
+		Version     string   `json:"version,omitempty"`
+		Build       string   `json:"build,omitempty"`
+		Size        string   `json:"size,omitempty"`
+	}{
+		URL:         a.BaseURL + a.RelativePath,
+		Description: a.DocumentationID,
+		Product:     a.ProductSystemName,
+		Devices:     a.SupportedDevices,
+		Version:     strings.TrimPrefix(a.OSVersion, "9.9."),
+		Build:       a.Build,
+		Size:        humanize.Bytes(uint64(a.DownloadSize)),
+	})
 }
