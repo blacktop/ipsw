@@ -186,7 +186,7 @@ var ipswCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
 				}
-				fmt.Print(assets.Latest("iOS", "ios"))
+				fmt.Print(assets.LatestVersion("iOS", "ios"))
 			}
 			return nil
 		}
