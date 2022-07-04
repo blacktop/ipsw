@@ -313,13 +313,15 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 	}
 
 	var rsBase uint64
-	sec, opt, err := i.cache.getOptimizations()
-	if err != nil {
-		return nil, err
-	}
+	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
+		sec, opt, err := i.cache.getOptimizations()
+		if err != nil {
+			return nil, err
+		}
 
-	if opt.Version == 16 {
-		rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
+		if opt.Version == 16 {
+			rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
+		}
 	}
 
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
