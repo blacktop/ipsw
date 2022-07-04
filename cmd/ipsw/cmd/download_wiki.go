@@ -43,12 +43,14 @@ func init() {
 	downloadCmd.AddCommand(wikiCmd)
 	wikiCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	wikiCmd.Flags().String("pattern", "", "Download remote files that match regex")
-	wikiCmd.Flags().Bool("beta", false, "Download beta IPSWs")
+	wikiCmd.Flags().Bool("beta", false, "Download beta IPSWs/OTAs")
+	wikiCmd.Flags().Bool("ota", false, "Download OTAs 🚧")
 	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	wikiCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.wiki.pattern", wikiCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.wiki.beta", wikiCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.wiki.ota", wikiCmd.Flags().Lookup("ota"))
 	viper.BindPFlag("download.wiki.output", wikiCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.wiki.flat", wikiCmd.Flags().Lookup("flat"))
 }
@@ -105,92 +107,135 @@ var wikiCmd = &cobra.Command{
 			destPath = filepath.Clean(output)
 		}
 
-		ipsws, err := download.ScrapeIPSWs(viper.GetBool("download.wiki.beta"))
-		if err != nil {
-			return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
-		}
-
-		filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
-		if len(filteredURLS) == 0 {
-			log.Errorf("no ipsws match %s", strings.Join([]string{device, version, build}, ", "))
-			return nil
-		}
-
-		log.Debug("URLs to download:")
-		for _, url := range filteredURLS {
-			utils.Indent(log.Debug, 2)(url)
-		}
-
-		cont := true
-		if !confirm {
-			if len(filteredURLS) > 1 { // if filtered to a single device skip the prompt
-				cont = false
-				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredURLS)),
-				}
-				survey.AskOne(prompt, &cont)
+		if viper.GetBool("download.wiki.ota") { //OTAs
+			otas, err := download.ScrapeOTAs(viper.GetBool("download.wiki.beta"))
+			if err != nil {
+				return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 			}
-		}
+			log.Debug("OTA URLs to download:")
+			for _, url := range otas {
+				utils.Indent(log.Debug, 2)(url)
+			}
+			downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
+			for _, url := range otas {
+				fname := filepath.Join(destPath, getDestName(url, removeCommas))
+				if _, err := os.Stat(fname); os.IsNotExist(err) {
+					zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
+						Proxy:    proxy,
+						Insecure: insecure,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+					}
+					i, err := info.ParseZipFiles(zr.File)
+					if err != nil {
+						return fmt.Errorf("failed parsing remote OTA URL: %v", err)
+					}
+					log.WithFields(log.Fields{
+						"devices": i.Plists.MobileAssetProperties.SupportedDevices,
+						"build":   i.Plists.BuildManifest.ProductBuildVersion,
+						"version": i.Plists.BuildManifest.ProductVersion,
+					}).Info("Getting OTA")
+					// download file
+					downloader.URL = url
+					downloader.DestName = fname
 
-		if cont {
-			if kernel { // REMOTE KERNEL MODE
-				for _, url := range filteredURLS {
-					d, v, b := download.ParseIpswURLString(url)
-					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
-					log.Info("Extracting remote kernelcache")
-					zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
+					err = downloader.Do()
 					if err != nil {
-						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+						return fmt.Errorf("failed to download OTA: %v", err)
 					}
-					if err := kernelcache.RemoteParse(zr, destPath); err != nil {
-						return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
-					}
+				} else {
+					log.Warnf("OTA already exists: %s", fname)
 				}
-			} else if len(pattern) > 0 { // PATTERN MATCHING MODE
-				dlRE, err := regexp.Compile(pattern)
-				if err != nil {
-					return errors.Wrap(err, "failed to compile regexp")
+			}
+		} else { // IPSWs
+			ipsws, err := download.ScrapeIPSWs(viper.GetBool("download.wiki.beta"))
+			if err != nil {
+				return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
+			}
+
+			filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
+			if len(filteredURLS) == 0 {
+				log.Errorf("no ipsws match %s", strings.Join([]string{device, version, build}, ", "))
+				return nil
+			}
+
+			log.Debug("URLs to download:")
+			for _, url := range filteredURLS {
+				utils.Indent(log.Debug, 2)(url)
+			}
+
+			cont := true
+			if !confirm {
+				if len(filteredURLS) > 1 { // if filtered to a single device skip the prompt
+					cont = false
+					prompt := &survey.Confirm{
+						Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredURLS)),
+					}
+					survey.AskOne(prompt, &cont)
 				}
-				for _, url := range filteredURLS {
-					d, v, b := download.ParseIpswURLString(url)
-					log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
-					log.Infof("Downloading files that contain: %s", pattern)
-					zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
-					}
-					iinfo, err := info.ParseZipFiles(zr.File)
-					if err != nil {
-						return errors.Wrap(err, "failed to parse remote ipsw")
-					}
-					destPath = filepath.Join(destPath, iinfo.GetFolder())
-					if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
-						return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
-					}
-				}
-			} else { // NORMAL MODE
-				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
-				for _, url := range filteredURLS {
-					fname := filepath.Join(destPath, getDestName(url, removeCommas))
-					if _, err := os.Stat(fname); os.IsNotExist(err) {
+			}
+
+			if cont {
+				if kernel { // REMOTE KERNEL MODE
+					for _, url := range filteredURLS {
 						d, v, b := download.ParseIpswURLString(url)
-						log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Getting IPSW")
-						// download file
-						downloader.URL = url
-						downloader.DestName = fname
-
-						err = downloader.Do()
+						log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
+						log.Info("Extracting remote kernelcache")
+						zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
+							Proxy:    proxy,
+							Insecure: insecure,
+						})
 						if err != nil {
-							return fmt.Errorf("failed to download IPSW: %v", err)
+							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
 						}
-					} else {
-						log.Warnf("ipsw already exists: %s", fname)
+						if err := kernelcache.RemoteParse(zr, destPath); err != nil {
+							return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+						}
+					}
+				} else if len(pattern) > 0 { // PATTERN MATCHING MODE
+					dlRE, err := regexp.Compile(pattern)
+					if err != nil {
+						return errors.Wrap(err, "failed to compile regexp")
+					}
+					for _, url := range filteredURLS {
+						d, v, b := download.ParseIpswURLString(url)
+						log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
+						log.Infof("Downloading files that contain: %s", pattern)
+						zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
+							Proxy:    proxy,
+							Insecure: insecure,
+						})
+						if err != nil {
+							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+						}
+						iinfo, err := info.ParseZipFiles(zr.File)
+						if err != nil {
+							return errors.Wrap(err, "failed to parse remote ipsw")
+						}
+						destPath = filepath.Join(destPath, iinfo.GetFolder())
+						if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
+							return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
+						}
+					}
+				} else { // NORMAL MODE
+					downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
+					for _, url := range filteredURLS {
+						fname := filepath.Join(destPath, getDestName(url, removeCommas))
+						if _, err := os.Stat(fname); os.IsNotExist(err) {
+							d, v, b := download.ParseIpswURLString(url)
+							log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Getting IPSW")
+							// download file
+							downloader.URL = url
+							downloader.DestName = fname
+
+							err = downloader.Do()
+							if err != nil {
+								return fmt.Errorf("failed to download IPSW: %v", err)
+							}
+						} else {
+							log.Warnf("ipsw already exists: %s", fname)
+						}
 					}
 				}
 			}
