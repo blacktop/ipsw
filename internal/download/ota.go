@@ -601,10 +601,14 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 	return os
 }
 
-func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset {
+func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: this is too strict and loses some OTAs (i.e. macOS)
 	var devices []string
 	var filteredDevices []string
 	var filteredOtas []types.Asset
+
+	if o.Config.Platform == "macos" {
+		return otas
+	}
 
 	for _, ota := range otas {
 		devices = append(devices, ota.SupportedDevices...)
