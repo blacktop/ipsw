@@ -43,10 +43,12 @@ func init() {
 	downloadCmd.AddCommand(wikiCmd)
 	wikiCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	wikiCmd.Flags().String("pattern", "", "Download remote files that match regex")
+	wikiCmd.Flags().Bool("beta", false, "Download beta IPSWs")
 	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	wikiCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.wiki.pattern", wikiCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("download.wiki.beta", wikiCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.wiki.output", wikiCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.wiki.flat", wikiCmd.Flags().Lookup("flat"))
 }
@@ -103,7 +105,7 @@ var wikiCmd = &cobra.Command{
 			destPath = filepath.Clean(output)
 		}
 
-		ipsws, err := download.ScrapeIPSWs()
+		ipsws, err := download.ScrapeIPSWs(viper.GetBool("download.wiki.beta"))
 		if err != nil {
 			return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 		}

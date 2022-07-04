@@ -15,10 +15,10 @@ import (
 
 const (
 	iphoneWikiURL                  = "www.theiphonewiki.com"
-	iphoneWikiOtaUrlRegex          = "^https://www\\.theiphonewiki\\.com/wiki/OTA_Updates/(.+)$"
-	iphoneWikiBetaOtaUrlRegex      = "^https://www\\.theiphonewiki\\.com/wiki/Beta_OTA_Updates/(.+)$"
-	iphoneWikiFirmwareUrlRegex     = "^https://www\\.theiphonewiki\\.com/wiki/Firmware/(.+)$"
-	iphoneWikiBetaFirmwareUrlRegex = "^https://www\\.theiphonewiki\\.com/wiki/Beta_Firmware/(.+)$"
+	iphoneWikiOtaUrlRegex          = "^https://www.theiphonewiki.com/wiki/OTA_Updates/(.+)$"
+	iphoneWikiBetaOtaUrlRegex      = "^https://www.theiphonewiki.com/wiki/Beta_OTA_Updates/(.+)$"
+	iphoneWikiFirmwareUrlRegex     = "^https://www.theiphonewiki.com/wiki/Firmware/(.+)$"
+	iphoneWikiBetaFirmwareUrlRegex = "^https://www.theiphonewiki.com/wiki/Beta_Firmware/(.+)$"
 )
 
 var devices = []string{"iPad", "iPad_Air", "iPad_Pro", "iPad_mini", "iPhone", "iPod_touch", "Apple_Watch", "Mac", "HomePod"}
@@ -172,7 +172,7 @@ func FilterIpswURLs(urls []string, device, version, build string) []string {
 	return filteredUrls
 }
 
-func ScrapeIPSWs() ([]string, error) {
+func ScrapeIPSWs(beta bool) ([]string, error) {
 	var ipsws []string
 
 	c := colly.NewCollector(
@@ -199,11 +199,14 @@ func ScrapeIPSWs() ([]string, error) {
 	})
 
 	for _, device := range devices {
-		if err := c.Visit("https://www.theiphonewiki.com/wiki/Firmware/" + device); err != nil {
-			return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
-		}
-		if err := c.Visit("https://www.theiphonewiki.com/wiki/Beta_Firmware/" + device); err != nil {
-			return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+		if beta {
+			if err := c.Visit("https://www.theiphonewiki.com/wiki/Beta_Firmware/" + device); err != nil {
+				return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+			}
+		} else {
+			if err := c.Visit("https://www.theiphonewiki.com/wiki/Firmware/" + device); err != nil {
+				return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+			}
 		}
 	}
 
