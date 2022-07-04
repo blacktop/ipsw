@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -91,9 +92,37 @@ var o2aCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if f.Headers[f.UUID].CacheType == dyld.CacheTypeStubIslands {
+			log.Warn("dyld4 cache with stub islands detected (will search within dyld_subcache_entry's cacheVMOffsets)")
+			var uuid types.UUID
+			var delta uint64
+			for _, subcache := range f.SubCacheInfo {
+				if subcache.CacheVMOffset <= offset {
+					uuid = subcache.UUID
+					delta = offset - subcache.CacheVMOffset
+				} else {
+					break
+				}
+			}
+			address := f.MappingsWithSlideInfo[uuid][0].Address + delta
+			if f.IsDyld4 {
+				ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
+				_, m, _ := f.GetMappingForVMAddress(address)
+				log.WithFields(log.Fields{
+					"uuid":    uuid.String(),
+					"hex":     fmt.Sprintf("%#x", address),
+					"dec":     fmt.Sprintf("%d", address),
+					"ext":     fmt.Sprintf("\"%s\"", ext),
+					"mapping": m.Name,
+				}).Info("Address")
+				return nil
+			}
+		}
+
 		if f.IsDyld4 {
 			log.Warn("dyld4 cache detected (will search for offset in each subcache)")
 		}
+
 		for uuid := range f.MappingsWithSlideInfo {
 			address, err := f.GetVMAddressForUUID(uuid, offset)
 			if err != nil {
@@ -104,21 +133,24 @@ var o2aCmd = &cobra.Command{
 				} else if inHex {
 					fmt.Printf("%#x\n", address)
 				} else {
-					_, m, err := f.GetMappingForVMAddress(address)
+					uuid, m, err := f.GetMappingForVMAddress(address)
 					if err != nil {
 						return err
 					}
+					ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
 					if f.IsDyld4 {
 						log.WithFields(log.Fields{
 							"uuid":    uuid.String(),
 							"hex":     fmt.Sprintf("%#x", address),
 							"dec":     fmt.Sprintf("%d", address),
+							"ext":     fmt.Sprintf("\"%s\"", ext),
 							"mapping": m.Name,
 						}).Info("Address")
 					} else {
 						log.WithFields(log.Fields{
 							"hex":     fmt.Sprintf("%#x", address),
 							"dec":     fmt.Sprintf("%d", address),
+							"ext":     fmt.Sprintf("\"%s\"", ext),
 							"mapping": m.Name,
 						}).Info("Address")
 					}

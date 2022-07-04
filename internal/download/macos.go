@@ -32,6 +32,9 @@ const (
 	sucatalogs19      = "https://swscan.apple.com/content/catalogs/others/index-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs20      = "https://swscan.apple.com/content/catalogs/others/index-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
 	sucatalogs21      = "https://swscan.apple.com/content/catalogs/others/index-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs22      = "https://swscan.apple.com/content/catalogs/others/index-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogs22Beta  = "https://swscan.apple.com/content/catalogs/others/index-13seed-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+	sucatalogsLatest  = sucatalogs22Beta
 )
 
 type seedCatalog struct {
@@ -248,7 +251,7 @@ func GetProductInfo() (ProductInfos, error) {
 		catData = buff.Bytes()
 
 	} else {
-		resp, err := http.Get(sucatalogs21)
+		resp, err := http.Get(sucatalogsLatest)
 		if err != nil {
 			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
 		}
@@ -353,7 +356,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 
 	folder := filepath.Join(workDir, fmt.Sprintf("%s_%s_%s", strings.ReplaceAll(i.Title, " ", "_"), i.Version, i.Build))
 
-	os.MkdirAll(folder, os.ModePerm)
+	os.MkdirAll(folder, 0750)
 
 	log.Info("Downloading packages")
 	for _, pkg := range i.Product.Packages {
@@ -432,7 +435,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 
 	distPath := filepath.Join(folder, getDestName(i.Product.Distributions["English"], false))
 	if _, err := os.Stat(sparseDiskimagePath); os.IsNotExist(err) {
-		if err := ioutil.WriteFile(distPath, i.distributionData, 0755); err != nil {
+		if err := ioutil.WriteFile(distPath, i.distributionData, 0660); err != nil {
 			return err
 		}
 	}

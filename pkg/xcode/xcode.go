@@ -1,6 +1,8 @@
 package xcode
 
 import (
+	"bytes"
+	"compress/gzip"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -10,7 +12,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
-//go:embed device_traits.json
+//go:embed device_traits.gz
 var traitsData []byte
 
 // Device object
@@ -70,16 +72,21 @@ func WriteToJSON(devices []Device, dest string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath.Clean(dest), dJSON, 0644)
+	return ioutil.WriteFile(filepath.Clean(dest), dJSON, 0660)
 }
 
 // GetDevices reads the devices from embedded JSON
 func GetDevices() ([]Device, error) {
 	var devices []Device
 
-	err := json.Unmarshal(traitsData, &devices)
+	zr, err := gzip.NewReader(bytes.NewReader(traitsData))
 	if err != nil {
 		return nil, err
+	}
+	defer zr.Close()
+
+	if err := json.NewDecoder(zr).Decode(&devices); err != nil {
+		return nil, fmt.Errorf("failed unmarshaling device_traits.gz data: %w", err)
 	}
 
 	return devices, nil
@@ -87,9 +94,8 @@ func GetDevices() ([]Device, error) {
 
 // GetDeviceForProd returns the device matching a given product type
 func GetDeviceForProd(prod string) (*Device, error) {
-	var devices []Device
 
-	err := json.Unmarshal(traitsData, &devices)
+	devices, err := GetDevices()
 	if err != nil {
 		return nil, err
 	}
@@ -105,9 +111,8 @@ func GetDeviceForProd(prod string) (*Device, error) {
 
 // GetDeviceForModel returns the device matching a given model
 func GetDeviceForModel(model string) (*Device, error) {
-	var devices []Device
 
-	err := json.Unmarshal(traitsData, &devices)
+	devices, err := GetDevices()
 	if err != nil {
 		return nil, err
 	}

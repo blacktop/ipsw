@@ -31,6 +31,14 @@ const (
 	BuiltFromChainedFixups formatVersion = 0x800
 )
 
+type cacheType uint64
+
+const (
+	CacheTypeDevelopment cacheType = 0
+	CacheTypeProduction  cacheType = 1
+	CacheTypeStubIslands cacheType = 2 // FIXME: what is this? check NEW dyld src in the `cache-builder/dyld_cache_format.h` file
+)
+
 func (f formatVersion) Version() uint8 {
 	return uint8(f & 0xff)
 }
@@ -98,36 +106,36 @@ func (m magic) String() string {
 
 // CacheHeader is the header for a dyld_shared_cache file (struct dyld_cache_header)
 type CacheHeader struct {
-	Magic                     magic          // e.g. "dyld_v0    i386"
-	MappingOffset             uint32         // file offset to first dyld_cache_mapping_info
-	MappingCount              uint32         // number of dyld_cache_mapping_info entries
-	ImagesOffsetOld           uint32         // UNUSED: moved to imagesOffset to prevent older dsc_extarctors from crashing
-	ImagesCountOld            uint32         // UNUSED: moved to imagesCount to prevent older dsc_extarctors from crashing
-	DyldBaseAddress           uint64         // base address of dyld when cache was built
-	CodeSignatureOffset       uint64         // file offset of code signature blob
-	CodeSignatureSize         uint64         // size of code signature blob (zero means to end of file)
-	SlideInfoOffsetUnused     uint64         // unused.  Used to be file offset of kernel slid info
-	SlideInfoSizeUnused       uint64         // unused.  Used to be size of kernel slid info
-	LocalSymbolsOffset        uint64         // file offset of where local symbols are stored
-	LocalSymbolsSize          uint64         // size of local symbols information
-	UUID                      types.UUID     // unique value for each shared cache file
-	CacheType                 uint64         // 0 for development, 1 for production
-	BranchPoolsOffset         uint32         // file offset to table of uint64_t pool addresses
-	BranchPoolsCount          uint32         // number of uint64_t entries
-	AccelerateInfoAddr        uint64         // (unslid) address of optimization info
-	AccelerateInfoSize        uint64         // size of optimization info
-	ImagesTextOffset          uint64         // file offset to first dyld_cache_image_text_info
-	ImagesTextCount           uint64         // number of dyld_cache_image_text_info entries
-	PatchInfoAddr             uint64         // (unslid) address of dyld_cache_patch_info
-	PatchInfoSize             uint64         // Size of all of the patch information pointed to via the dyld_cache_patch_info
-	OtherImageGroupAddrUnused uint64         // unused
-	OtherImageGroupSizeUnused uint64         // unused
-	ProgClosuresAddr          uint64         // (unslid) address of list of program launch closures
-	ProgClosuresSize          uint64         // size of list of program launch closures
-	ProgClosuresTrieAddr      uint64         // (unslid) address of trie of indexes into program launch closures
-	ProgClosuresTrieSize      uint64         // size of trie of indexes into program launch closures
-	Platform                  types.Platform // platform number (macOS=1, etc)
-	FormatVersion             formatVersion  /* : 8,  // dyld3::closure::kFormatVersion
+	Magic                                       magic          // e.g. "dyld_v0    i386"
+	MappingOffset                               uint32         // file offset to first dyld_cache_mapping_info
+	MappingCount                                uint32         // number of dyld_cache_mapping_info entries
+	ImagesOffsetOld                             uint32         // UNUSED: moved to imagesOffset to prevent older dsc_extarctors from crashing
+	ImagesCountOld                              uint32         // UNUSED: moved to imagesCount to prevent older dsc_extarctors from crashing
+	DyldBaseAddress                             uint64         // base address of dyld when cache was built
+	CodeSignatureOffset                         uint64         // file offset of code signature blob
+	CodeSignatureSize                           uint64         // size of code signature blob (zero means to end of file)
+	SlideInfoOffsetUnused                       uint64         // unused.  Used to be file offset of kernel slid info
+	SlideInfoSizeUnused                         uint64         // unused.  Used to be size of kernel slid info
+	LocalSymbolsOffset                          uint64         // file offset of where local symbols are stored
+	LocalSymbolsSize                            uint64         // size of local symbols information
+	UUID                                        types.UUID     // unique value for each shared cache file
+	CacheType                                   cacheType      // 0 for development, 1 for production
+	BranchPoolsOffset                           uint32         // file offset to table of uint64_t pool addresses
+	BranchPoolsCount                            uint32         // number of uint64_t entries
+	AccelerateInfoAddrUnusedOrDyldAddr          uint64         // unused. (unslid) address of optimization info NOTE: when cacheType=2 this is the address of the dylb macho in the cache
+	AccelerateInfoSizeUnusedOrDyldStartFuncAddr uint64         // unused. size of optimization info             NOTE: when cacheType=2 this is the address of the function _dyld_start
+	ImagesTextOffset                            uint64         // file offset to first dyld_cache_image_text_info
+	ImagesTextCount                             uint64         // number of dyld_cache_image_text_info entries
+	PatchInfoAddr                               uint64         // (unslid) address of dyld_cache_patch_info
+	PatchInfoSize                               uint64         // Size of all of the patch information pointed to via the dyld_cache_patch_info
+	OtherImageGroupAddrUnused                   uint64         // unused
+	OtherImageGroupSizeUnused                   uint64         // unused
+	ProgClosuresAddr                            uint64         // (unslid) address of list of program launch closures
+	ProgClosuresSize                            uint64         // size of list of program launch closures
+	ProgClosuresTrieAddr                        uint64         // (unslid) address of trie of indexes into program launch closures
+	ProgClosuresTrieSize                        uint64         // size of trie of indexes into program launch closures
+	Platform                                    types.Platform // platform number (macOS=1, etc)
+	FormatVersion                               formatVersion  /* : 8,  // dyld3::closure::kFormatVersion
 	   dylibsExpectedOnDisk   : 1,  // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
 	   simulator              : 1,  // for simulator of specified platform
 	   locallyBuiltCache      : 1,  // 0 for B&I built cache, 1 for locally built cache
@@ -748,9 +756,15 @@ func (p patchableLocationV2) Discriminator() uint32 {
 	return uint32(types.ExtractBits(uint64(p), 16, 16))
 }
 
-type SubCacheInfo struct {
-	UUID           types.UUID
-	CumulativeSize uint64
+type SubcacheEntry struct {
+	UUID          types.UUID
+	CacheVMOffset uint64
+}
+
+type SubcacheEntryPageInLink struct {
+	UUID          types.UUID
+	CacheVMOffset uint64
+	Extention     [32]byte
 }
 
 type CacheExportFlag int

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/blacktop/go-macho/types"
@@ -84,7 +85,7 @@ func (dch CacheHeader) Print() {
 	fmt.Println(dch.String())
 	fmt.Printf("Slide Info:     %4dKB,  file offset: 0x%09X -> 0x%09X\n", dch.SlideInfoSizeUnused/1024, dch.SlideInfoOffsetUnused, dch.SlideInfoOffsetUnused+dch.SlideInfoSizeUnused)
 	fmt.Printf("Local Symbols:  %3dMB,  file offset: 0x%09X -> 0x%09X\n", dch.LocalSymbolsSize/(1024*1024), dch.LocalSymbolsOffset, dch.LocalSymbolsOffset+dch.LocalSymbolsSize)
-	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%09X -> 0x%09X\n", dch.AccelerateInfoSize/1024, dch.AccelerateInfoAddr, dch.AccelerateInfoAddr+dch.AccelerateInfoSize)
+	fmt.Printf("Accelerate Tab: %3dKB,  address: 0x%09X -> 0x%09X\n", dch.AccelerateInfoSizeUnusedOrDyldStartFuncAddr/1024, dch.AccelerateInfoAddrUnusedOrDyldAddr, dch.AccelerateInfoAddrUnusedOrDyldAddr+dch.AccelerateInfoSizeUnusedOrDyldStartFuncAddr)
 	fmt.Println()
 }
 
@@ -372,11 +373,11 @@ func (f *File) getBranchPools(uuid types.UUID) string {
 
 func (f *File) getAccelerateInfo(uuid types.UUID) string {
 	var output string
-	if f.Headers[uuid].AccelerateInfoAddr > 0 {
+	if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr > 0 {
 		output = fmt.Sprintf("Accelerate Tab:              %3dKB, address: 0x%09X -> 0x%09X\n",
-			f.Headers[uuid].AccelerateInfoSize/1024,
-			f.Headers[uuid].AccelerateInfoAddr,
-			f.Headers[uuid].AccelerateInfoAddr+f.Headers[uuid].AccelerateInfoSize)
+			f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr/1024,
+			f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr,
+			f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr+f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr)
 	}
 	return output
 }
@@ -493,33 +494,30 @@ func (f *File) getMappings(slideVersion uint32, verbose bool) string {
 			output += cacheMappings.String()
 		}
 	} else {
-		var max uint64
-		var sortedMaps []types.UUID
-		for uuid, cacheMappings := range f.MappingsWithSlideInfo { // TODO this is disgusting
-			if uuid != f.UUID && cacheMappings[0].Address > 0 {
-				if cacheMappings[0].Address > max {
-					sortedMaps = append(sortedMaps, uuid)
-					max = cacheMappings[0].Address
+		// sort mappings map by address
+		uuids := make([]types.UUID, 0, len(f.MappingsWithSlideInfo))
+		for u := range f.MappingsWithSlideInfo {
+			uuids = append(uuids, u)
+		}
+		sort.SliceStable(uuids, func(i, j int) bool {
+			return f.MappingsWithSlideInfo[uuids[i]][0].Address < f.MappingsWithSlideInfo[uuids[j]][0].Address
+		})
+		for _, uuid := range uuids {
+			if uuid == f.symUUID {
+				output += fmt.Sprintf("\n> Cache (.symbols) UUID: %s\n\n", uuid)
+			} else {
+				ext, err := f.GetSubCacheExtensionFromUUID(uuid)
+				if err != nil {
+					output += fmt.Sprintf("\n> Cache UUID: %s\n\n", uuid)
 				} else {
-					sortedMaps = append([]types.UUID{uuid}, sortedMaps...)
+					output += fmt.Sprintf("\n> Cache (%s) UUID: %s\n\n", ext, uuid)
 				}
 			}
-		}
-		sortedMaps = append([]types.UUID{f.UUID}, sortedMaps...)
-		if !f.symUUID.IsNull() {
-			sortedMaps = append(sortedMaps, f.symUUID)
-		}
-		for i := 0; i < len(sortedMaps); i++ {
-			if sortedMaps[i] == f.symUUID {
-				output += fmt.Sprintf("\n> Symbol Cache UUID: %s\n\n", sortedMaps[i])
-			} else {
-				output += fmt.Sprintf("\n> Cache UUID: %s\n\n", sortedMaps[i])
-			}
 			output += "Mappings\n--------\n\n"
-			output += f.MappingsWithSlideInfo[sortedMaps[i]].String(slideVersion, verbose)
+			output += f.MappingsWithSlideInfo[uuid].String(slideVersion, verbose)
 			output += fmt.Sprintln()
-			output += f.getCodeSignature(sortedMaps[i])
-			output += f.getRosetta(sortedMaps[i])
+			output += f.getCodeSignature(uuid)
+			output += f.getRosetta(uuid)
 		}
 	}
 	return output

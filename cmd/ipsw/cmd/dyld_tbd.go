@@ -93,7 +93,7 @@ var tbdCmd = &cobra.Command{
 		tbdFile := filepath.Base(t.Path)
 
 		log.Info("Created " + tbdFile + ".tbd")
-		err = ioutil.WriteFile(tbdFile+".tbd", []byte(outTBD), 0644)
+		err = ioutil.WriteFile(tbdFile+".tbd", []byte(outTBD), 0660)
 		if err != nil {
 			return fmt.Errorf("failed to write tbd file %s: %v", tbdFile+".tbd", err)
 		}

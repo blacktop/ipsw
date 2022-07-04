@@ -39,12 +39,12 @@ func init() {
 	a2sCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	a2sCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
 	a2sCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
-	a2sCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	// a2sCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	viper.BindPFlag("dyld.a2s.slide", a2sCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.a2s.image", a2sCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.a2s.mapping", a2sCmd.Flags().Lookup("mapping"))
-	viper.BindPFlag("dyld.a2s.cache", a2sCmd.Flags().Lookup("cache"))
+	// viper.BindPFlag("dyld.a2s.cache", a2sCmd.Flags().Lookup("cache"))
 
 	a2sCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -115,60 +115,93 @@ var a2sCmd = &cobra.Command{
 
 	retry:
 		if showMapping {
-			_, mapping, err := f.GetMappingForVMAddress(unslidAddr)
+			uuid, mapping, err := f.GetMappingForVMAddress(unslidAddr)
 			if err != nil {
 				return err
 			}
+
+			var ext string
+			ext, _ = f.GetSubCacheExtensionFromUUID(uuid)
 			fmt.Printf("\nMAPPING\n")
-			fmt.Printf("=======\n\n")
+			fmt.Printf("=======\n")
+			fmt.Printf("  > (dsc%s) UUID: %s\n\n", ext, uuid.String())
 			fmt.Println(mapping.String())
 		}
 
-		image, err := f.GetImageContainingVMAddr(unslidAddr)
-		if err != nil {
-			return err
-		}
-
-		m, err := image.GetMacho()
-		if err != nil {
-			return err
-		}
-		defer m.Close()
-
-		if showImage {
-			fmt.Println("IMAGE")
-			fmt.Println("-----")
-			fmt.Printf(" > %s\n\n", image.Name)
-		}
-
-		if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
-			if s.Nsect > 0 {
-				if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
-					if showImage {
-						fmt.Println(s)
-						secFlags := ""
-						if !c.Flags.IsRegular() {
-							secFlags = fmt.Sprintf("(%s)", c.Flags)
-						}
-						fmt.Printf("\tsz=0x%08x off=0x%08x-0x%08x addr=0x%09x-0x%09x\t\t%s.%-20v%s %s\n", c.Size, c.Offset, uint64(c.Offset)+c.Size, c.Addr, c.Addr+c.Size, s.Name, c.Name, c.Flags.AttributesString(), secFlags)
-					} else {
-						log.WithFields(log.Fields{
-							"dylib":   image.Name,
-							"section": fmt.Sprintf("%s.%s", s.Name, c.Name),
-						}).Info("Address location")
-					}
-				}
-			} else {
-				log.WithFields(log.Fields{
-					"dylib":   image.Name,
-					"segment": s.Name,
-				}).Info("Address location")
+		if image, err := f.GetImageContainingVMAddr(unslidAddr); err == nil {
+			m, err := image.GetMacho()
+			if err != nil {
+				return err
 			}
-		}
+			defer m.Close()
 
-		// Load all symbols
-		if err := image.Analyze(); err != nil {
-			return err
+			if showImage {
+				fmt.Println("IMAGE")
+				fmt.Println("-----")
+				fmt.Printf(" > %s\n\n", image.Name)
+			}
+
+			if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
+				if s.Nsect > 0 {
+					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
+						if showImage {
+							fmt.Println(s)
+							secFlags := ""
+							if !c.Flags.IsRegular() {
+								secFlags = fmt.Sprintf("(%s)", c.Flags)
+							}
+							fmt.Printf("\tsz=0x%08x off=0x%08x-0x%08x addr=0x%09x-0x%09x\t\t%s.%-20v%s %s\n", c.Size, c.Offset, uint64(c.Offset)+c.Size, c.Addr, c.Addr+c.Size, s.Name, c.Name, c.Flags.AttributesString(), secFlags)
+						} else {
+							log.WithFields(log.Fields{
+								"dylib":   image.Name,
+								"section": fmt.Sprintf("%s.%s", s.Name, c.Name),
+							}).Info("Address location")
+						}
+					}
+				} else {
+					log.WithFields(log.Fields{
+						"dylib":   image.Name,
+						"segment": s.Name,
+					}).Info("Address location")
+				}
+			}
+
+			// Load all symbols
+			if err := image.Analyze(); err != nil {
+				return err
+			}
+
+			if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
+				delta := ""
+				if unslidAddr-fn.StartAddr != 0 {
+					delta = fmt.Sprintf(" + %d", unslidAddr-fn.StartAddr)
+				}
+				if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+					if secondAttempt {
+						symName = "_ptr." + symName
+					}
+					fmt.Printf("\n%#x: %s%s\n", addr, symName, delta)
+				} else {
+					if secondAttempt {
+						fmt.Printf("\n%#x: _ptr.func_%x%s\n", addr, fn.StartAddr, delta)
+						return nil
+					}
+					fmt.Printf("\n%#x: func_%x%s\n", addr, fn.StartAddr, delta)
+				}
+				return nil
+			}
+
+			if cstr, ok := m.IsCString(unslidAddr); ok {
+				if secondAttempt {
+					fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
+				} else {
+					fmt.Printf("\n%#x: %#v\n", addr, cstr)
+				}
+				return nil
+			}
+
+		} else {
+			log.Error(err.Error())
 		}
 
 		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
@@ -176,35 +209,6 @@ var a2sCmd = &cobra.Command{
 				symName = "_ptr." + symName
 			}
 			fmt.Printf("\n%#x: %s\n", addr, symName)
-			return nil
-		}
-
-		if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
-			delta := ""
-			if unslidAddr-fn.StartAddr != 0 {
-				delta = fmt.Sprintf(" + %d", unslidAddr-fn.StartAddr)
-			}
-			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-				if secondAttempt {
-					symName = "_ptr." + symName
-				}
-				fmt.Printf("\n%#x: %s%s\n", addr, symName, delta)
-			} else {
-				if secondAttempt {
-					fmt.Printf("\n%#x: _ptr.func_%x%s\n", addr, fn.StartAddr, delta)
-					return nil
-				}
-				fmt.Printf("\n%#x: func_%x%s\n", addr, fn.StartAddr, delta)
-			}
-			return nil
-		}
-
-		if cstr, ok := m.IsCString(unslidAddr); ok {
-			if secondAttempt {
-				fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
-			} else {
-				fmt.Printf("\n%#x: %#v\n", addr, cstr)
-			}
 			return nil
 		}
 

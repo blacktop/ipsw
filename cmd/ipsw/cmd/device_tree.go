@@ -91,7 +91,7 @@ var deviceTreeCmd = &cobra.Command{
 						return err
 					}
 					fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
-					err = ioutil.WriteFile(fileName+".json", j, 0644)
+					err = ioutil.WriteFile(fileName+".json", j, 0660)
 					if err != nil {
 						return errors.Wrap(err, "failed to decompress kernelcache")
 					}

@@ -23,10 +23,9 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -49,9 +48,10 @@ func init() {
 	ipswCmd.Flags().Bool("ibridge", false, "Download iBridge IPSWs")
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
-	ipswCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
+	ipswCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
@@ -61,6 +61,7 @@ func init() {
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
 }
 
 // ipswCmd represents the ipsw command
@@ -119,6 +120,7 @@ var ipswCmd = &cobra.Command{
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		pattern := viper.GetString("download.ipsw.pattern")
 		output := viper.GetString("download.ipsw.output")
+		flat := viper.GetBool("download.ipsw.flat")
 		// beta := viper.GetBool("download.ipsw.beta")
 
 		// verify args
@@ -184,7 +186,7 @@ var ipswCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
 				}
-				fmt.Print(assets.Latest("iOS", "ios"))
+				fmt.Print(assets.LatestVersion("iOS", "ios"))
 			}
 			return nil
 		}
@@ -278,8 +280,11 @@ var ipswCmd = &cobra.Command{
 						"version": i.Version,
 						"signed":  i.Signed,
 					}).Info("Parsing remote IPSW")
-
-					log.Infof("Downloading files that contain: %s", pattern)
+					dlRE, err := regexp.Compile(pattern)
+					if err != nil {
+						return errors.Wrap(err, "failed to compile regexp")
+					}
+					log.Infof("Downloading files matching pattern %#v", pattern)
 					zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
 						Proxy:    proxy,
 						Insecure: insecure,
@@ -292,32 +297,8 @@ var ipswCmd = &cobra.Command{
 						return errors.Wrap(err, "failed to parse remote ipsw")
 					}
 					destPath = filepath.Join(destPath, iinfo.GetFolder())
-					os.Mkdir(destPath, os.ModePerm)
-					found := false
-					for _, f := range zr.File {
-						if strings.Contains(f.Name, pattern) {
-							found = true
-							fileName := filepath.Join(destPath, filepath.Base(filepath.Clean(f.Name)))
-							if _, err := os.Stat(fileName); os.IsNotExist(err) {
-								data := make([]byte, f.UncompressedSize64)
-								rc, err := f.Open()
-								if err != nil {
-									return fmt.Errorf("failed to open file in zip: %v", err)
-								}
-								io.ReadFull(rc, data)
-								rc.Close()
-								utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
-								err = ioutil.WriteFile(fileName, data, 0644)
-								if err != nil {
-									return errors.Wrapf(err, "failed to write %s", f.Name)
-								}
-							} else {
-								log.Warnf("%s already exists", fileName)
-							}
-						}
-					}
-					if !found {
-						utils.Indent(log.Error, 2)(fmt.Sprintf("No files contain pattern %s", pattern))
+					if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
+						return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
 					}
 				}
 			} else { // NORMAL MODE

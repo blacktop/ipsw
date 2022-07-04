@@ -38,7 +38,7 @@ func ParseRAW(r io.Reader) error {
 		return err
 	}
 	name := fmt.Sprintf("%d.dumped.shsh", img4.Manifest.Properties["ECID"])
-	err = ioutil.WriteFile(name, pDatam, 0644)
+	err = ioutil.WriteFile(name, pDatam, 0660)
 	if err != nil {
 		return err
 	}

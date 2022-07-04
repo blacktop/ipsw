@@ -126,7 +126,7 @@ var lipoCmd = &cobra.Command{
 				folder = extractPath
 			}
 			fname := filepath.Join(folder, filepath.Base(outFile)) // default to NOT full dylib path
-			if err := ioutil.WriteFile(fname, dat, 0755); err != nil {
+			if err := ioutil.WriteFile(fname, dat, 0660); err != nil {
 				return fmt.Errorf("failed to create file %s: %v", outFile, err)
 			}
 			log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), fname)

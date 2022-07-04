@@ -337,17 +337,25 @@ var dyldInfoCmd = &cobra.Command{
 							fat.Close()
 							continue
 						}
-						fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, m.SourceVersion().Version, img.Name)
+						if m.SourceVersion() != nil {
+							fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, m.SourceVersion().Version, img.Name)
+						} else {
+							fmt.Fprintf(w, "%4d: %#x\t(%s)\t%s\n", idx+1, img.Info.Address, "No SourceVersion", img.Name)
+						}
 						m.Close()
 					} else {
 						m, err := img.GetPartialMacho()
 						if err != nil {
 							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 						}
+						srcVer := "No SourceVersion"
+						if m.SourceVersion() != nil {
+							srcVer = m.SourceVersion().Version
+						}
 						if Verbose {
-							fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), m.SourceVersion().Version, img.Name)
+							fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), srcVer, img.Name)
 						} else {
-							fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, m.DylibID().CurrentVersion, img.Name)
+							fmt.Fprintf(w, "%4d: (%s)\t%s\n", idx+1, srcVer, img.Name)
 						}
 						m.Close()
 					}

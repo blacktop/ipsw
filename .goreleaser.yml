@@ -55,6 +55,7 @@ archives:
       - LICENSE
       - completions/*
       - manpages/*
+    wrap_in_directory: true
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 brews:
@@ -86,17 +87,20 @@ changelog:
   sort: asc
   use: github
   groups:
-    - title: "New Features and updates"
+    - title: 'New Features'
       regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 0
-    - title: "Bug fixes"
+      order: 100
+    - title: 'Bug fixes'
       regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 10
+      order: 200
+    - title: Dependency updates
+      regexp: "^.*chore\\(deps\\)*:+.*$"
+      order: 300
     - title: 'Documentation updates'
       regexp: "^.*docs[(\\w)]*:+.*$"
-      order: 20
+      order: 400
     - title: Other work
-      order: 999
+      order: 9999
   filters:
     exclude:
       - "^docs:"

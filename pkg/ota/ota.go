@@ -114,21 +114,29 @@ func sortFileByNameAscend(files []*zip.File) {
 	})
 }
 
-// List lists the files in the ota payloads
-func List(otaZIP string) ([]os.FileInfo, error) {
-
+// ListZip lists the files in the OTA zip file
+func ListZip(otaZIP string) ([]os.FileInfo, error) {
 	zr, err := zip.OpenReader(otaZIP)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open ota zip")
 	}
 	defer zr.Close()
+	return parseBOM(&zr.Reader, `payload.bom$`)
+}
 
-	return parseBOM(&zr.Reader)
+// List lists the files in the OTA payloads
+func List(otaZIP string) ([]os.FileInfo, error) {
+	zr, err := zip.OpenReader(otaZIP)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open ota zip")
+	}
+	defer zr.Close()
+	return parseBOM(&zr.Reader, `post.bom$`)
 }
 
 // RemoteList lists the files in a remote ota payloads
 func RemoteList(zr *zip.Reader) ([]os.FileInfo, error) {
-	return parseBOM(zr)
+	return parseBOM(zr, `post.bom$`)
 }
 
 // NewXZReader uses the xz command to extract the Apple Archives (xz streams) or falls back to the pure Golang xz decompression lib
@@ -157,9 +165,8 @@ func NewXZReader(r io.Reader) (io.ReadCloser, error) {
 	return rpipe, nil
 }
 
-func parseBOM(zr *zip.Reader) ([]os.FileInfo, error) {
-	// var validPostBOM = regexp.MustCompile(`post.bom$`)
-	var validPostBOM = regexp.MustCompile(`.*\.bom$`)
+func parseBOM(zr *zip.Reader, bomPathPattern string) ([]os.FileInfo, error) {
+	var validPostBOM = regexp.MustCompile(bomPathPattern)
 
 	for _, f := range zr.File {
 		if validPostBOM.MatchString(f.Name) {
@@ -378,75 +385,56 @@ func yaaDecodeHeader(r *bytes.Reader) (*Entry, error) {
 
 // Extract extracts and decompresses OTA payload files
 func Extract(otaZIP, extractPattern, outputDir string) error {
-
+	// open the OTA ZIP file
 	zr, err := zip.OpenReader(otaZIP)
 	if err != nil {
 		return errors.Wrap(err, "failed to open ota zip")
 	}
 	defer zr.Close()
+	// create the output directory based on OTA metadata
+	folder, err := getFolder(&zr.Reader)
+	if err != nil {
+		return fmt.Errorf("failed to get folder for OTA: %v", err)
+	}
+	// append to user specified output directory
+	folder = filepath.Join(outputDir, folder)
+	if err := os.MkdirAll(folder, 0750); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %v", folder, err)
+	}
 
-	if len(extractPattern) > 0 {
-		// iinfo, err := info.ParseZipFiles(zr.File)
-		// if err != nil {
-		// 	return errors.Wrap(err, "failed to parse remote ipsw")
-		// }
+	// check for matches in the OTA zip
+	if err := utils.RemoteUnzip(zr.File,
+		regexp.MustCompile(extractPattern),
+		filepath.Join(folder, "_OTAZIP"),
+		false); err != nil {
+		return fmt.Errorf("failed to extract OTA zip files: %v", err)
+	}
 
-		folder, err := getFolder(&zr.Reader)
-		if err != nil {
-			return fmt.Errorf("failed to get folder for OTA: %v", err)
-		}
-		outputDir = filepath.Join(outputDir, folder)
-		os.Mkdir(outputDir, os.ModePerm)
-
-		found := false
-		for _, f := range zr.File {
-			match, _ := regexp.MatchString(extractPattern, f.Name)
-			if match || strings.Contains(strings.ToLower(f.Name), strings.ToLower(extractPattern)) {
-				found = true
-				fileName := filepath.Join(outputDir, filepath.Base(filepath.Clean(f.Name)))
-				if _, err := os.Stat(fileName); os.IsNotExist(err) {
-					data := make([]byte, f.UncompressedSize64)
-					rc, err := f.Open()
-					if err != nil {
-						return fmt.Errorf("failed to open file in zip: %v", err)
-					}
-					io.ReadFull(rc, data)
-					rc.Close()
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
-					err = ioutil.WriteFile(fileName, data, 0644)
-					if err != nil {
-						return errors.Wrapf(err, "failed to write %s", f.Name)
-					}
-				} else {
-					log.Warnf("%s already exists", fileName)
-				}
-			}
-		}
-		if found {
-			return nil
-		}
-		// hack: to get a priori list of files to extract (so we know when to stop)
-		rfiles, err := parseBOM(&zr.Reader)
-		if err != nil {
-			return fmt.Errorf("failed to list remote OTA files: %v", err)
-		}
-		var matches []string
-		for _, rf := range rfiles {
+	// hack: to get a priori list of files to extract (so we know when to stop)
+	// this prevents us from having to parse ALL the payload.0?? files
+	rfiles, err := parseBOM(&zr.Reader, `post.bom$`)
+	if err != nil {
+		return fmt.Errorf("failed to list remote OTA files: %v", err)
+	}
+	var matches []string
+	for _, rf := range rfiles {
+		if !rf.IsDir() {
 			if regexp.MustCompile(extractPattern).MatchString(rf.Name()) {
 				matches = append(matches, rf.Name())
 			}
 		}
-		return parsePayload(&zr.Reader, extractPattern, func(path string) bool {
-			for i, v := range matches {
-				if strings.HasSuffix(v, filepath.Base(path)) {
-					matches = append(matches[:i], matches[i+1:]...)
-				}
-			}
-			return len(matches) == 0 // stop if we've extracted all matches
-		})
 	}
-
-	return fmt.Errorf("you must supply an extract regex pattern")
+	return parsePayload(&zr.Reader, extractPattern, outputDir, func(path string) bool {
+		i := 0
+		for _, v := range matches {
+			if !strings.HasSuffix(path, v) {
+				matches[i] = v
+				i++
+			}
+		}
+		matches = matches[:i]
+		return len(matches) == 0 // stop if we've extracted all matches
+	})
 }
 
 func getFolder(zr *zip.Reader) (string, error) {
@@ -496,16 +484,17 @@ func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop f
 	return fmt.Errorf("%s not found", extractPattern)
 }
 
-func parsePayload(zr *zip.Reader, extractPattern string, shouldStop func(string) bool) error {
+func parsePayload(zr *zip.Reader, extractPattern, outputDir string, shouldStop func(string) bool) error {
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
 
 	folder, err := getFolder(zr)
 	if err != nil {
 		return err
 	}
+	folder = filepath.Join(outputDir, folder)
 
 	// sortFileBySize(zr.File)
-	sortFileByNameAscend(zr.File)
+	// sortFileByNameAscend(zr.File)
 
 	found := false
 	for _, f := range zr.File {
@@ -535,6 +524,7 @@ func parsePayload(zr *zip.Reader, extractPattern string, shouldStop func(string)
 // Parse parses a ota payload file inside the zip
 func Parse(payload *zip.File, folder, extractPattern string) (bool, string, error) {
 
+	// This is the FAST path that execs the 'aa' binary if found on macOS
 	if aaPath, err := execabs.LookPath("aa"); err == nil {
 		// make tmp folder
 		dir, err := ioutil.TempDir("", "ota_"+filepath.Base(payload.Name))
@@ -573,11 +563,12 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 				return err
 			}
 			if !f.IsDir() {
-				os.Mkdir(folder, os.ModePerm)
-				fname = filepath.Join(folder, filepath.Base(filepath.Clean(f.Name())))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s\t%s\t%s to %s", f.Mode(), humanize.Bytes(uint64(f.Size())), strings.TrimPrefix(path, dir), fname))
-				err = os.Rename(path, fname)
-				if err != nil {
+				fname = filepath.Join(folder, filepath.Clean(strings.TrimPrefix(path, dir)))
+				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+					return fmt.Errorf("failed to create dir %s: %v", filepath.Dir(fname), err)
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s\t%s\t%s", f.Mode(), humanize.Bytes(uint64(f.Size())), fname))
+				if err := os.Rename(path, fname); err != nil {
 					return fmt.Errorf("failed to mv file %s to %s: %v", strings.TrimPrefix(path, dir), fname, err)
 				}
 			}
@@ -726,11 +717,12 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 					return false, "", err
 				}
 
-				os.Mkdir(folder, os.ModePerm)
-				fname := filepath.Join(folder, filepath.Base(ent.Path))
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s to %s", ent.Mod, ent.Uid, ent.Gid, humanize.Bytes(uint64(ent.Size)), ent.Path, fname))
-				err = ioutil.WriteFile(fname, fileBytes, 0644)
-				if err != nil {
+				if err := os.MkdirAll(folder, 0750); err != nil {
+					return false, "", fmt.Errorf("failed to create folder: %s", folder)
+				}
+				fname := filepath.Join(folder, filepath.Clean(ent.Path))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s", ent.Mod, ent.Uid, ent.Gid, humanize.Bytes(uint64(ent.Size)), fname))
+				if err := ioutil.WriteFile(fname, fileBytes, 0660); err != nil {
 					return false, "", err
 				}
 

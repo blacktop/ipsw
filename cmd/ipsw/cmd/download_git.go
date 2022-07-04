@@ -105,10 +105,10 @@ var gitCmd = &cobra.Command{
 					return fmt.Errorf("failed to marshal JSON: %v", err)
 				}
 				if len(outputFolder) > 0 {
-					os.MkdirAll(outputFolder, os.ModePerm)
+					os.MkdirAll(outputFolder, 0750)
 					fpath := filepath.Join(outputFolder, "tag_links.json")
 					log.Infof("Creating %s", fpath)
-					if err := ioutil.WriteFile(fpath, dat, 0755); err != nil {
+					if err := ioutil.WriteFile(fpath, dat, 0660); err != nil {
 						return fmt.Errorf("failed to write file: %v", err)
 					}
 				} else {
@@ -168,7 +168,7 @@ var gitCmd = &cobra.Command{
 
 				resp.Body.Close()
 
-				if err := ioutil.WriteFile(destName, document, 0755); err != nil {
+				if err := ioutil.WriteFile(destName, document, 0660); err != nil {
 					return fmt.Errorf("failed to write file %s: %v", destName, err)
 				}
 			} else {
