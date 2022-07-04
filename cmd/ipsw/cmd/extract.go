@@ -176,7 +176,7 @@ var extractCmd = &cobra.Command{
 
 			if viper.GetBool("extract.kbag") {
 				log.Info("Extracting im4p kbags")
-				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i)
+				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i, viper.GetString("extract.pattern"))
 				if err != nil {
 					return fmt.Errorf("failed to parse im4p kbags: %v", err)
 				}
@@ -269,7 +269,7 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("failed to open zip: %v", err)
 				}
 				defer zr.Close()
-				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i)
+				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i, viper.GetString("extract.pattern"))
 				if err != nil {
 					return fmt.Errorf("failed to parse im4p kbags: %v", err)
 				}

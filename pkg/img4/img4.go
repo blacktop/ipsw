@@ -415,10 +415,17 @@ type im4pKBag struct {
 	Keybags []Keybag `json:"kbags,omitempty"`
 }
 
-func ParseZipKeyBagsAsJSON(files []*zip.File, inf *info.Info) (string, error) {
+func ParseZipKeyBagsAsJSON(files []*zip.File, inf *info.Info, pattern string) (string, error) {
 	var kbags []im4pKBag
+	rePattern := `.*im4p$`
+	if len(pattern) > 0 {
+		if _, err := regexp.Compile(pattern); err != nil {
+			return "", fmt.Errorf("failed to compile --pattern regexp: %v", err)
+		}
+		rePattern = pattern
+	}
 	for _, f := range files {
-		if regexp.MustCompile(`.*im4p$`).MatchString(f.Name) {
+		if regexp.MustCompile(rePattern).MatchString(f.Name) {
 			rc, err := f.Open()
 			if err != nil {
 				return "", fmt.Errorf("error opening zipped file %s: %v", f.Name, err)
