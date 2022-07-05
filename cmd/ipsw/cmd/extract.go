@@ -143,7 +143,11 @@ var extractCmd = &cobra.Command{
 				return fmt.Errorf("failed to parse plists in remote zip: %v", err)
 			}
 
-			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), i.GetFolder())
+			folder, err := i.GetFolder()
+			if err != nil {
+				log.Errorf("failed to get folder from remote zip metadata: %v", err)
+			}
+			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), folder)
 
 			if viper.GetBool("extract.kernel") {
 				log.Info("Extracting remote kernelcache")
@@ -209,7 +213,11 @@ var extractCmd = &cobra.Command{
 				return fmt.Errorf("failed to parse plists in IPSW: %v", err)
 			}
 
-			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), i.GetFolder())
+			folder, err := i.GetFolder()
+			if err != nil {
+				log.Errorf("failed to get folder from zip metadata: %v", err)
+			}
+			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), folder)
 
 			if viper.GetBool("extract.kernel") {
 				log.Info("Extracting kernelcaches")

@@ -442,7 +442,7 @@ func getFolder(zr *zip.Reader) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to parse plists in remote zip: %v", err)
 	}
-	return i.GetFolder(), nil
+	return i.GetFolder()
 }
 
 // RemoteExtract extracts and decompresses remote OTA payload files

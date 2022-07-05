@@ -96,7 +96,7 @@ func (ds Devices) GetDevicesForSDK(sdk string) (*Devices, error) {
 }
 
 func (i *Info) GetDevices(devs *Devices) error {
-	if i.DeviceTrees != nil && len(i.DeviceTrees) > 0 {
+	if len(i.DeviceTrees) > 0 {
 		for _, dtree := range i.DeviceTrees {
 			dt, err := dtree.Summary()
 			if err != nil {

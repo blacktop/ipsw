@@ -192,7 +192,7 @@ func ScrapeIPSWs(beta bool) ([]string, error) {
 
 	c.OnHTML("body", func(e *colly.HTMLElement) {
 		e.ForEach("a[href]", func(_ int, e *colly.HTMLElement) {
-			if strings.Contains(e.Text, ".ipsw") {
+			if strings.Contains(e.Text, ".ipsw") && !strings.HasPrefix(e.Text, "https://download.developer.apple.com") {
 				ipsws = append(ipsws, e.Request.AbsoluteURL(e.Attr("href")))
 			}
 		})
