@@ -18,36 +18,36 @@ import (
 
 // Plists IPSW/OTA plists object
 type Plists struct {
-	Type string
-	*BuildManifest
-	*Restore
-	*AssetDataInfo
-	*OTAInfo
+	Type           string `json:"type,omitempty"`
+	*BuildManifest `json:"build_manifest,omitempty"`
+	*Restore       `json:"restore,omitempty"`
+	*AssetDataInfo `json:"asset_data_info,omitempty"`
+	*OTAInfo       `json:"ota_info,omitempty"`
 }
 
 // AssetDataInfo AssetData/Info.plist object found in OTAs
 type AssetDataInfo struct {
-	ActualMinimumSystemPartition int               `plist:"ActualMinimumSystemPartition,omitempty"`
-	Build                        string            `plist:"Build,omitempty"`
-	DeviceClass                  string            `plist:"DeviceClass,omitempty"`
-	HardwareModel                string            `plist:"HardwareModel,omitempty"`
-	MinimumSystemPartition       int               `plist:"MinimumSystemPartition,omitempty"`
-	PackageVersion               string            `plist:"PackageVersion,omitempty"`
-	ProductType                  string            `plist:"ProductType,omitempty"`
-	ProductVersion               string            `plist:"ProductVersion,omitempty"`
-	RSEPDigest                   []byte            `plist:"RSEPDigest,omitempty"`
-	RSEPTBMDigests               []byte            `plist:"RSEPTBMDigests,omitempty"`
-	RequiredSpace                int               `plist:"RequiredSpace,omitempty"`
-	ReserveFileAware             bool              `plist:"ReserveFileAware,omitempty"`
-	SEPDigest                    []byte            `plist:"SEPDigest,omitempty"`
-	SEPTBMDigests                []byte            `plist:"SEPTBMDigests,omitempty"`
-	SizeArchiveRoot              int               `plist:"SizeArchiveRoot,omitempty"`
-	SizePatchedBinaries          int               `plist:"SizePatchedBinaries,omitempty"`
-	SizePatchedBinariesSnapshot  int               `plist:"SizePatchedBinaries-Snapshot,omitempty"`
-	SystemPartitionPadding       map[string]int    `plist:"SystemPartitionPadding,omitempty"`
-	SystemUpdatePathMap          map[string]string `plist:"SystemUpdatePathMap,omitempty"`
-	SystemVolumeSealingOverhead  int               `plist:"SystemVolumeSealingOverhead,omitempty"`
-	TargetUpdate                 string            `plist:"TargetUpdate,omitempty"`
+	ActualMinimumSystemPartition int               `plist:"ActualMinimumSystemPartition,omitempty" json:"actual_minimum_system_partition,omitempty"`
+	Build                        string            `plist:"Build,omitempty" json:"build,omitempty"`
+	DeviceClass                  string            `plist:"DeviceClass,omitempty" json:"device_class,omitempty"`
+	HardwareModel                string            `plist:"HardwareModel,omitempty" json:"hardware_model,omitempty"`
+	MinimumSystemPartition       int               `plist:"MinimumSystemPartition,omitempty" json:"minimum_system_partition,omitempty"`
+	PackageVersion               string            `plist:"PackageVersion,omitempty" json:"package_version,omitempty"`
+	ProductType                  string            `plist:"ProductType,omitempty" json:"product_type,omitempty"`
+	ProductVersion               string            `plist:"ProductVersion,omitempty" json:"product_version,omitempty"`
+	RSEPDigest                   []byte            `plist:"RSEPDigest,omitempty" json:"rsep_digest,omitempty"`
+	RSEPTBMDigests               []byte            `plist:"RSEPTBMDigests,omitempty" json:"rseptbm_digests,omitempty"`
+	RequiredSpace                int               `plist:"RequiredSpace,omitempty" json:"required_space,omitempty"`
+	ReserveFileAware             bool              `plist:"ReserveFileAware,omitempty" json:"reserve_file_aware,omitempty"`
+	SEPDigest                    []byte            `plist:"SEPDigest,omitempty" json:"sep_digest,omitempty"`
+	SEPTBMDigests                []byte            `plist:"SEPTBMDigests,omitempty" json:"septbm_digests,omitempty"`
+	SizeArchiveRoot              int               `plist:"SizeArchiveRoot,omitempty" json:"size_archive_root,omitempty"`
+	SizePatchedBinaries          int               `plist:"SizePatchedBinaries,omitempty" json:"size_patched_binaries,omitempty"`
+	SizePatchedBinariesSnapshot  int               `plist:"SizePatchedBinaries-Snapshot,omitempty" json:"size_patched_binaries_snapshot,omitempty"`
+	SystemPartitionPadding       map[string]int    `plist:"SystemPartitionPadding,omitempty" json:"system_partition_padding,omitempty"`
+	SystemUpdatePathMap          map[string]string `plist:"SystemUpdatePathMap,omitempty" json:"system_update_path_map,omitempty"`
+	SystemVolumeSealingOverhead  int               `plist:"SystemVolumeSealingOverhead,omitempty" json:"system_volume_sealing_overhead,omitempty"`
+	TargetUpdate                 string            `plist:"TargetUpdate,omitempty" json:"target_update,omitempty"`
 }
 
 // AssetDataInfo Stringer
@@ -80,12 +80,12 @@ func (a *AssetDataInfo) String() string {
 
 // OTAInfo Info.plist object found in OTAs
 type OTAInfo struct {
-	CFBundleIdentifier            string      `plist:"CFBundleIdentifier,omitempty"`
-	CFBundleInfoDictionaryVersion string      `plist:"CFBundleInfoDictionaryVersion,omitempty"`
-	CFBundleName                  string      `plist:"CFBundleName,omitempty"`
-	CFBundleShortVersionString    string      `plist:"CFBundleShortVersionString,omitempty"`
-	CFBundleVersion               string      `plist:"CFBundleVersion,omitempty"`
-	MobileAssetProperties         types.Asset `plist:"MobileAssetProperties,omitempty"`
+	CFBundleIdentifier            string      `plist:"CFBundleIdentifier,omitempty" json:"cf_bundle_identifier,omitempty"`
+	CFBundleInfoDictionaryVersion string      `plist:"CFBundleInfoDictionaryVersion,omitempty" json:"cf_bundle_info_dictionary_version,omitempty"`
+	CFBundleName                  string      `plist:"CFBundleName,omitempty" json:"cf_bundle_name,omitempty"`
+	CFBundleShortVersionString    string      `plist:"CFBundleShortVersionString,omitempty" json:"cf_bundle_short_version_string,omitempty"`
+	CFBundleVersion               string      `plist:"CFBundleVersion,omitempty" json:"cf_bundle_version,omitempty"`
+	MobileAssetProperties         types.Asset `plist:"MobileAssetProperties,omitempty" json:"mobile_asset_properties,omitempty"`
 }
 
 // OTAInfo Stringer

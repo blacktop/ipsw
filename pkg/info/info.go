@@ -87,12 +87,12 @@ func getProcessor(cpuid string) (processors, error) {
 	}
 
 	for _, p := range ps {
-		if strings.ToLower(p.CPUID) == strings.ToLower(cpuid) {
+		if strings.EqualFold(p.CPUID, cpuid) {
 			return p, nil
 		}
 	}
 
-	return processors{}, nil
+	return processors{}, fmt.Errorf("failed to find processor for %s", cpuid)
 }
 
 func getFirmwareKeys(device, build string) (map[string]string, error) {
@@ -213,17 +213,7 @@ func (i *Info) String() string {
 		if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
 			iStr += fmt.Sprintf("   - KernelCache: %s\n", strings.Join(kcs[strings.ToLower(dt.BoardConfig)], ", "))
 		}
-		if i.Plists.Restore != nil {
-			for _, device := range i.Plists.Restore.DeviceMap {
-				if strings.EqualFold(device.BoardConfig, dt.BoardConfig) {
-					if proc, err := getProcessor(device.Platform); err == nil {
-						iStr += fmt.Sprintf("   - CPU: %s (%s), ID: %s\n", proc.Name, proc.CPUISA, device.Platform)
-					} else {
-						iStr += fmt.Sprintf("   - ID: %s\n", device.Platform)
-					}
-				}
-			}
-		}
+		iStr += fmt.Sprintf("   - %s\n", i.GetCPU(dt.BoardConfig))
 		if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
 			iStr += "   - BootLoaders\n"
 			for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
@@ -238,6 +228,50 @@ func (i *Info) String() string {
 
 	return iStr
 }
+func (i *Info) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Type    string `json:"type,omitempty"`
+		Version string `json:"version,omitempty"`
+		Build   string `json:"build,omitempty"`
+		OS      string `json:"os,omitempty"`
+		Devices any    `json:"devices,omitempty"`
+	}{
+		Type:    i.Plists.Type,
+		Version: i.Plists.BuildManifest.ProductVersion,
+		Build:   i.Plists.BuildManifest.ProductBuildVersion,
+		OS:      i.Plists.GetOSType(),
+		Devices: func() any {
+			if len(i.DeviceTrees) > 0 {
+				var devs []struct {
+					Name      string `json:"name,omitempty"`
+					Product   string `json:"product,omitempty"`
+					Board     string `json:"board,omitempty"`
+					Timestamp string `json:"timestamp,omitempty"`
+					CPU       string `json:"cpu,omitempty"`
+				}
+				for _, dtree := range i.DeviceTrees {
+					dt, _ := dtree.Summary()
+					devs = append(devs, struct {
+						Name      string `json:"name,omitempty"`
+						Product   string `json:"product,omitempty"`
+						Board     string `json:"board,omitempty"`
+						Timestamp string `json:"timestamp,omitempty"`
+						CPU       string `json:"cpu,omitempty"`
+					}{
+						Name:      dt.ProductName,
+						Product:   dt.ProductType,
+						Board:     dt.BoardConfig,
+						Timestamp: dt.Timestamp.Format("02 Jan 2006 15:04:05 MST"),
+						CPU:       i.GetCPU(dt.BoardConfig),
+					})
+				}
+				return devs
+			} else {
+				return i.Plists.MobileAssetProperties.SupportedDevices
+			}
+		}(),
+	})
+}
 
 // GetOsDmg returns the name of the OS dmg
 func (i *Info) GetOsDmg() string {
@@ -245,6 +279,33 @@ func (i *Info) GetOsDmg() string {
 		return sysOS.Info.Path
 	}
 	return i.Plists.BuildIdentities[0].Manifest["OS"].Info.Path
+}
+
+// GetOsDmg returns the name of the OS dmg
+func (i *Info) GetCPU(board string) string {
+	if i.Plists.Restore != nil {
+		for _, device := range i.Plists.Restore.DeviceMap {
+			if strings.EqualFold(device.BoardConfig, board) {
+				if proc, err := getProcessor(device.Platform); err == nil {
+					return fmt.Sprintf("CPU: %s (%s), ID: %s", proc.Name, proc.CPUISA, device.Platform)
+				} else {
+					return fmt.Sprintf("ID: %s", device.Platform)
+				}
+			}
+		}
+	} else if i.Plists.BuildManifest != nil {
+		for _, ident := range i.Plists.BuildIdentities {
+			if strings.EqualFold(ident.Info.DeviceClass, board) {
+				plat := "t" + strings.TrimPrefix(ident.ApChipID, "0x")
+				if proc, err := getProcessor(plat); err == nil {
+					return fmt.Sprintf("CPU: %s (%s), ID: %s", proc.Name, proc.CPUISA, plat)
+				} else {
+					return fmt.Sprintf("AP ChipID: %s", ident.ApChipID)
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // GetFolder returns a folder name for all the devices included in an IPSW
