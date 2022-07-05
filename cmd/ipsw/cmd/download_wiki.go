@@ -130,6 +130,7 @@ var wikiCmd = &cobra.Command{
 					}
 				}()
 				for _, url := range otas {
+					log.Debugf("Parsing OTA %s", url)
 					zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
 						Proxy:    proxy,
 						Insecure: insecure,
@@ -209,9 +210,16 @@ var wikiCmd = &cobra.Command{
 				return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 			}
 
+			filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
+			if len(filteredURLS) == 0 {
+				log.Errorf("no ipsws match %s", strings.Join([]string{device, version, build}, ", "))
+				return nil
+			}
+
 			if viper.GetBool("download.wiki.json") {
 				db := make(map[string]*info.Info)
-				for _, url := range ipsws {
+				for _, url := range filteredURLS {
+					log.Debugf("Parsing IPSW %s", url)
 					defer func() {
 						// try and write out DB JSON on exit if possible
 						dat, err := json.Marshal(db)
@@ -255,12 +263,6 @@ var wikiCmd = &cobra.Command{
 					return fmt.Errorf("failed to write IPSW metadata: %v", err)
 				}
 			} else {
-				filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
-				if len(filteredURLS) == 0 {
-					log.Errorf("no ipsws match %s", strings.Join([]string{device, version, build}, ", "))
-					return nil
-				}
-
 				log.Debug("URLs to download:")
 				for _, url := range filteredURLS {
 					utils.Indent(log.Debug, 2)(url)
@@ -314,7 +316,11 @@ var wikiCmd = &cobra.Command{
 							if err != nil {
 								return fmt.Errorf("failed to parse remote IPSW URL: %v", err)
 							}
-							destPath = filepath.Join(destPath, iinfo.GetFolder())
+							folder, err := iinfo.GetFolder()
+							if err != nil {
+								log.Errorf("failed to get folder from remote ipsw: %v", err)
+							}
+							destPath = filepath.Join(destPath, folder)
 							if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
 								return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
 							}

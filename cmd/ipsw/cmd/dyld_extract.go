@@ -78,8 +78,11 @@ var extractDyldCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to parse ipsw info: %v", err)
 		}
-
-		destPath = filepath.Join(destPath, i.GetFolder())
+		folder, err := i.GetFolder()
+		if err != nil {
+			log.Errorf("failed to get folder from zip metadata: %v", err)
+		}
+		destPath = filepath.Join(destPath, folder)
 
 		log.Info("Extracting dyld_shared_cache")
 		return dyld.Extract(ipswPath, destPath, dyldArches)

@@ -217,8 +217,11 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 	if err != nil {
 		return err
 	}
-
-	destPath = filepath.Join(destPath, i.GetFolder())
+	folder, err := i.GetFolder()
+	if err != nil {
+		log.Errorf("failed to get folder from remote zip metadata: %v", err)
+	}
+	destPath = filepath.Join(destPath, folder)
 
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
