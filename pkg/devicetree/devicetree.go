@@ -93,22 +93,25 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 	}
 
 	if stamp, ok := (*dtree)["device-tree"]["time-stamp"].(string); ok {
-		location, err := time.LoadLocation("PST8PDT")
-		if err != nil {
-			return nil, fmt.Errorf("failed to load location PST8PDT: %v", err)
-		}
 		layout := "Mon Jan 2 15:04:05 MST 2006"
-		t, err := time.ParseInLocation(layout, stamp, location)
-		if err != nil {
-			return nil, err
-		}
-		zone, _ := time.Now().Zone()
-		location, err = time.LoadLocation(zone)
-		if err != nil {
-			// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
-			summary.Timestamp = t
+		if location, err := time.LoadLocation("PST8PDT"); err == nil {
+			t, err := time.ParseInLocation(layout, stamp, location)
+			if err != nil {
+				return nil, err
+			}
+			zone, _ := time.Now().Zone()
+			location, err = time.LoadLocation(zone)
+			if err != nil {
+				// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+				summary.Timestamp = t
+			} else {
+				summary.Timestamp = t.In(location)
+			}
 		} else {
-			summary.Timestamp = t.In(location)
+			summary.Timestamp, err = time.Parse(layout, stamp)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse device-tree time-stamp: %v", err)
+			}
 		}
 	}
 
