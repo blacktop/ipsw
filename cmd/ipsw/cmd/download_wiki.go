@@ -249,7 +249,7 @@ var wikiCmd = &cobra.Command{
 						continue
 					}
 					log.WithFields(log.Fields{
-						"devices": i.Plists.MobileAssetProperties.SupportedDevices,
+						"devices": i.Plists.Restore.SupportedProductTypes,
 						"build":   i.Plists.BuildManifest.ProductBuildVersion,
 						"version": i.Plists.BuildManifest.ProductVersion,
 					}).Info("Parsing IPSW")
