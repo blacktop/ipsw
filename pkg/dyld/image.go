@@ -639,9 +639,23 @@ func (i *CacheImage) ParseStubs() error {
 		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
 	}
 
-	i.Analysis.SymbolStubs, err = disass.ParseStubsForMachO(m)
-	if err != nil {
-		return err
+	i.Analysis.SymbolStubs = make(map[uint64]uint64)
+	for _, sec := range m.Sections {
+		if sec.Flags.IsSymbolStubs() {
+			dat := make([]byte, sec.Size)
+			if _, err := i.ReadAtAddr(dat, sec.Addr); err != nil {
+				return err
+			}
+			stubs, err := disass.ParseStubsASM(dat, sec.Addr, func(u uint64) (uint64, error) {
+				return i.cache.ReadPointerAtAddress(u)
+			})
+			if err != nil {
+				return err
+			}
+			for k, v := range stubs {
+				i.Analysis.SymbolStubs[k] = i.cache.SlideInfo.SlidePointer(v)
+			}
+		}
 	}
 
 	i.Analysis.State.SetStubs(true)
