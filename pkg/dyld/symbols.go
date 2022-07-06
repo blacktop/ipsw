@@ -292,6 +292,21 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 				return err
 			}
 		}
+		if f.Headers[f.UUID].CacheType == CacheTypeStubIslands {
+			log.Info("parsing stub islands...")
+			if err := f.ParseStubIslands(); err != nil {
+				return fmt.Errorf("failed to parse stub islands: %v", err)
+			}
+			for stub, target := range f.islandStubs {
+				if symName, ok := f.AddressToSymbol[target]; ok {
+					if !strings.HasPrefix(symName, "j_") {
+						f.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
+					} else {
+						f.AddressToSymbol[stub] = symName
+					}
+				}
+			}
+		}
 
 		if err := f.SaveAddrToSymMap(cacheFile); err != nil {
 			return err

@@ -313,15 +313,13 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 	}
 
 	var rsBase uint64
-	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
-		sec, opt, err := i.cache.getOptimizations()
-		if err != nil {
-			return nil, err
-		}
+	sec, opt, err := i.cache.getOptimizations()
+	if err != nil {
+		return nil, err
+	}
 
-		if opt.Version == 16 {
-			rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
-		}
+	if opt.Version == 16 {
+		rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
 	}
 
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
@@ -416,7 +414,8 @@ func (i *CacheImage) Analyze() error {
 	}
 
 	if err := i.ParseObjC(); err != nil {
-		return fmt.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err)
+		log.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err)
+		// return fmt.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err) FIXME: should this error out?
 	}
 
 	if !i.cache.IsArm64() {
@@ -593,15 +592,15 @@ func (i *CacheImage) ParseObjC() error {
 		if err := i.cache.MethodsForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(i.Name), err)
 		}
-		if strings.Contains(i.Name, "libobjc.A.dylib") {
-			if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
-				return fmt.Errorf("failed to parse objc all selectors: %v", err)
-			}
-		} else {
-			if err := i.cache.SelectorsForImage(i.Name); err != nil {
-				return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
-			}
+		// if strings.Contains(i.Name, "libobjc.A.dylib") {
+		// 	if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
+		// 		return fmt.Errorf("failed to parse objc all selectors: %v", err)
+		// 	}
+		// } else {
+		if err := i.cache.SelectorsForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
 		}
+		// }
 		if err := i.cache.ClassesForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc classes for image %s: %v", filepath.Base(i.Name), err)
 		}
@@ -640,9 +639,23 @@ func (i *CacheImage) ParseStubs() error {
 		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
 	}
 
-	i.Analysis.SymbolStubs, err = disass.ParseStubsASM(m)
-	if err != nil {
-		return err
+	i.Analysis.SymbolStubs = make(map[uint64]uint64)
+	for _, sec := range m.Sections {
+		if sec.Flags.IsSymbolStubs() {
+			dat := make([]byte, sec.Size)
+			if _, err := i.ReadAtAddr(dat, sec.Addr); err != nil {
+				return err
+			}
+			stubs, err := disass.ParseStubsASM(dat, sec.Addr, func(u uint64) (uint64, error) {
+				return i.cache.ReadPointerAtAddress(u)
+			})
+			if err != nil {
+				return err
+			}
+			for k, v := range stubs {
+				i.Analysis.SymbolStubs[k] = i.cache.SlideInfo.SlidePointer(v)
+			}
+		}
 	}
 
 	i.Analysis.State.SetStubs(true)
