@@ -536,7 +536,7 @@ func ParseStubsASM(data []byte, addr uint64, readPtr func(uint64) (uint64, error
 	var results [1024]byte
 	var prevInst *disassemble.Instruction
 
-	instrQueue := make(chan *disassemble.Instruction, 3)
+	// instrQueue := make(chan *disassemble.Instruction, 3)
 
 	stubs := make(map[uint64]uint64)
 
