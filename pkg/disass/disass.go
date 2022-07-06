@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
@@ -534,9 +535,8 @@ func ParseStubsASM(data []byte, addr uint64, readPtr func(uint64) (uint64, error
 	var adrpAddr uint64
 	var instrValue uint32
 	var results [1024]byte
-	var prevInst *disassemble.Instruction
 
-	// instrQueue := make(chan *disassemble.Instruction, 3)
+	queue := make([]*disassemble.Instruction, 2)
 
 	stubs := make(map[uint64]uint64)
 
@@ -554,64 +554,99 @@ func ParseStubsASM(data []byte, addr uint64, readPtr func(uint64) (uint64, error
 		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 		if err != nil {
 			startAddr += uint64(binary.Size(uint32(0)))
+			queue[1] = queue[0] // push instruction onto const length FIFO queue
+			queue[0] = instruction
 			continue
 		}
 
-		if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+		if (queue[1] != nil && queue[1].Operation == disassemble.ARM64_ADRP) &&
+			(queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADD) &&
+			instruction.Operation == disassemble.ARM64_LDR {
+			// adrp     x17, 0x221baf000
+			adrpRegister := queue[1].Operands[0].Registers[0] // x17
+			adrpImm = queue[1].Operands[1].Immediate          // #0x221baf000
+			// add      x17, x17, #0xbe0
+			if adrpRegister == queue[0].Operands[0].Registers[0] {
+				adrpImm += queue[0].Operands[2].Immediate
+				adrpAddr = queue[0].Address
+			}
+			// ldr      x16, [x17]
+			if len(instruction.Operands[1].Registers) > 0 &&
+				(queue[0].Operands[0].Registers[0] == instruction.Operands[1].Registers[0]) { // check add reg and ldr reg are the same
+				if instruction.Operands[1].Immediate != 0 { // check for immediate
+					adrpImm += instruction.Operands[1].Immediate
+				}
+				addr, err := readPtr(adrpImm)
+				if err != nil {
+					log.Debugf("%#08x:  %s\t%s", instruction.Address, disassemble.GetOpCodeByteString(instruction.Raw), instruction) // TODO: DRY this up
+					for _, i := range queue {
+						if i != nil {
+							log.Debugf("%#08x:  %s\t%s", i.Address, disassemble.GetOpCodeByteString(i.Raw), i)
+						}
+					}
+					return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", adrpImm, err)
+				}
+				stubs[adrpAddr] = addr
+			}
+			// braa     x16, x17
+		} else if (queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADRP) &&
 			instruction.Operation == disassemble.ARM64_ADD {
-			if instruction.Operands != nil && prevInst.Operands != nil {
+			if instruction.Operands != nil && queue[0].Operands != nil {
 				// adrp      	x17, #0x1e3be9000
-				adrpRegister := prevInst.Operands[0].Registers[0] // x17
-				adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+				adrpRegister := queue[0].Operands[0].Registers[0] // x17
+				adrpImm = queue[0].Operands[1].Immediate          // #0x1e3be9000
 				// add       	x17, x17, #0x1c0
 				if adrpRegister == instruction.Operands[0].Registers[0] {
 					adrpImm += instruction.Operands[2].Immediate
-					adrpAddr = prevInst.Address
+					adrpAddr = queue[0].Address
 				}
 				stubs[adrpAddr] = adrpImm
 			}
-		} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+		} else if (queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADRP) &&
 			instruction.Operation == disassemble.ARM64_LDR {
-			if instruction.Operands != nil && prevInst.Operands != nil {
+			if instruction.Operands != nil && queue[0].Operands != nil {
 				// adrp	x16, #0x1e3be9000
-				adrpRegister := prevInst.Operands[0].Registers[0] // x16
-				adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+				adrpRegister := queue[0].Operands[0].Registers[0] // x16
+				adrpImm = queue[0].Operands[1].Immediate          // #0x1e3be9000
 				// ldr	x16, [x16, #0x560]
 				if adrpRegister == instruction.Operands[0].Registers[0] {
 					adrpImm += instruction.Operands[1].Immediate
-					adrpAddr = prevInst.Address
+					adrpAddr = queue[0].Address
 					addr, err := readPtr(adrpImm)
 					if err != nil {
+						log.Debugf("%#08x:  %s\t%s", instruction.Address, disassemble.GetOpCodeByteString(instruction.Raw), instruction)
+						for _, i := range queue {
+							if i != nil {
+								log.Debugf("%#08x:  %s\t%s", i.Address, disassemble.GetOpCodeByteString(i.Raw), i)
+							}
+						}
 						return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", adrpImm, err)
 					}
 					stubs[adrpAddr] = addr
 				}
 			}
-		} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
+		} else if (queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADD) &&
 			instruction.Operation == disassemble.ARM64_LDR {
 			// add       	x17, x17, #0x1c0
-			addRegister := prevInst.Operands[0].Registers[0] // x17
+			addRegister := queue[0].Operands[0].Registers[0] // x17
 			// ldr       	x16, [x17]
 			if len(instruction.Operands[1].Registers) > 0 && addRegister == instruction.Operands[1].Registers[0] {
 				addr, err := readPtr(adrpImm)
 				if err != nil {
+					log.Debugf("%#08x:  %s\t%s", instruction.Address, disassemble.GetOpCodeByteString(instruction.Raw), instruction)
+					for _, i := range queue {
+						if i != nil {
+							log.Debugf("%#08x:  %s\t%s", i.Address, disassemble.GetOpCodeByteString(i.Raw), i)
+						}
+					}
 					return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", adrpImm, err)
 				}
 				stubs[adrpAddr] = addr
 			}
-		} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
-			instruction.Operation == disassemble.ARM64_BR {
-			// add       	x16, x16, #0x828
-			addRegister := prevInst.Operands[0].Registers[0] // x16
-			// br        	x16
-			if addRegister == instruction.Operands[0].Registers[0] {
-				// stubs[adrpAddr] = m.SlidePointer(adrpImm)
-				stubs[adrpAddr] = adrpImm
-			}
 		}
 
-		// instrQueue <- instruction FIXME: I need a const size FILO queue for instructions or use a channel?
-		prevInst = instruction
+		queue[1] = queue[0] // push instruction onto const length FIFO queue
+		queue[0] = instruction
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
