@@ -586,9 +586,23 @@ func ParseStubsASM(data []byte, begin uint64, readPtr func(uint64) (uint64, erro
 					}
 					return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", adrpImm, err)
 				}
+				// braa     x16, x17
 				stubs[adrpAddr] = addr
 			}
-			// braa     x16, x17
+		} else if (queue[1] != nil && queue[1].Operation == disassemble.ARM64_ADRP) &&
+			(queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADD) &&
+			strings.Contains(instruction.Encoding.String(), "branch") {
+			// adrp     x16, 0x19089b000
+			adrpRegister := queue[1].Operands[0].Registers[0] // x16
+			adrpImm = queue[1].Operands[1].Immediate          // #0x221baf000
+			// add      x16, x16, #0x94c ; ___stack_chk_fail
+			if adrpRegister == queue[0].Operands[0].Registers[0] { // check that adrp reg is the same as add reg
+				adrpImm += queue[0].Operands[2].Immediate
+				adrpAddr = queue[1].Address // addr of begining of stub (adrp)
+			}
+			// br       x16
+			stubs[adrpAddr] = adrpImm
+			// brk      #0x1
 		} else if (queue[0] != nil && queue[0].Operation == disassemble.ARM64_ADRP) &&
 			instruction.Operation == disassemble.ARM64_LDR {
 			if instruction.Operands != nil && queue[0].Operands != nil {
