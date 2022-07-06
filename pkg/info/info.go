@@ -229,14 +229,18 @@ func (i *Info) String() string {
 	}
 	return iStr
 }
-func (i *Info) MarshalJSON() ([]byte, error) {
-	return json.Marshal(&struct {
-		Type    string `json:"type,omitempty"`
-		Version string `json:"version,omitempty"`
-		Build   string `json:"build,omitempty"`
-		OS      string `json:"os,omitempty"`
-		Devices any    `json:"devices,omitempty"`
-	}{
+
+type InfoJSON struct {
+	Type    string `json:"type,omitempty"`
+	Version string `json:"version,omitempty"`
+	Build   string `json:"build,omitempty"`
+	OS      string `json:"os,omitempty"`
+	Devices any    `json:"devices,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+func (i *Info) ToJSON() InfoJSON {
+	return InfoJSON{
 		Type:    i.Plists.Type,
 		Version: i.Plists.BuildManifest.ProductVersion,
 		Build:   i.Plists.BuildManifest.ProductBuildVersion,
@@ -271,7 +275,7 @@ func (i *Info) MarshalJSON() ([]byte, error) {
 				return i.Plists.MobileAssetProperties.SupportedDevices
 			}
 		}(),
-	})
+	}
 }
 
 // GetOsDmg returns the name of the OS dmg
