@@ -106,6 +106,9 @@ var a2sCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		if err := f.ParseStubIslands(); err != nil {
+			return fmt.Errorf("failed to parse stub islands: %v", err)
+		}
 		// if len(cacheFile) == 0 {
 		// 	cacheFile = dscPath + ".a2s"
 		// }
@@ -122,9 +125,13 @@ var a2sCmd = &cobra.Command{
 
 			var ext string
 			ext, _ = f.GetSubCacheExtensionFromUUID(uuid)
+			var stubs string
+			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+				stubs = "STUB Island "
+			}
 			fmt.Printf("\nMAPPING\n")
 			fmt.Printf("=======\n")
-			fmt.Printf("  > (dsc%s) UUID: %s\n\n", ext, uuid.String())
+			fmt.Printf("  > %s(dsc%s) UUID: %s\n\n", stubs, ext, uuid.String())
 			fmt.Println(mapping.String())
 		}
 

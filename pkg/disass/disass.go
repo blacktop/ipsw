@@ -439,14 +439,16 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 
 	if authPtr := m.Section("__AUTH_CONST", "__auth_ptr"); authPtr != nil {
 
-		off, err := m.GetOffset(authPtr.Addr)
+		dat, err := authPtr.Data()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get offset for __AUTH_CONST.__auth_ptr: %v", err)
-		}
-
-		dat := make([]byte, authPtr.Size)
-		if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
-			return nil, fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr data: %v", err)
+			off, err := m.GetOffset(authPtr.Addr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get offset for __AUTH_CONST.__auth_ptr: %v", err)
+			}
+			dat = make([]byte, authPtr.Size)
+			if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
+				return nil, fmt.Errorf("failed to read __AUTH_CONST.__auth_ptr data: %v", err)
+			}
 		}
 
 		ptrs := make([]uint64, authPtr.Size/8)
@@ -467,7 +469,14 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 
 			dat, err := sec.Data()
 			if err != nil {
-				return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+				off, err := m.GetOffset(sec.Addr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get offset for %s.%s section: %v", sec.Seg, sec.Name, err)
+				}
+				dat = make([]byte, sec.Size)
+				if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
+					return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+				}
 			}
 
 			ptrs := make([]uint64, sec.Size/8)
@@ -485,97 +494,125 @@ func ParseGotPtrs(m *macho.File) (map[uint64]uint64, error) {
 	return gots, nil
 }
 
-func ParseStubsASM(m *macho.File) (map[uint64]uint64, error) {
+func ParseStubsForMachO(m *macho.File) (map[uint64]uint64, error) {
 
 	stubs := make(map[uint64]uint64)
 
 	for _, sec := range m.Sections {
 		if sec.Flags.IsSymbolStubs() {
-			var adrpImm uint64
-			var adrpAddr uint64
-			var instrValue uint32
-			var results [1024]byte
-			var prevInst *disassemble.Instruction
 
 			dat, err := sec.Data()
 			if err != nil {
-				return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+				off, err := m.GetOffset(sec.Addr)
+				if err != nil {
+					return nil, fmt.Errorf("failed to get offset for %s.%s section: %v", sec.Seg, sec.Name, err)
+				}
+				dat := make([]byte, sec.Size)
+				if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
+					return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+				}
 			}
 
-			r := bytes.NewReader(dat)
+			sb, err := ParseStubsASM(dat, sec.Addr, func(u uint64) (uint64, error) {
+				return m.GetPointerAtAddress(m.SlidePointer(u))
+			})
+			if err != nil {
+				return nil, err
+			}
 
-			startAddr := sec.Addr
-
-			for {
-				err = binary.Read(r, binary.LittleEndian, &instrValue)
-
-				if err == io.EOF {
-					break
-				}
-
-				instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
-				if err != nil {
-					startAddr += uint64(binary.Size(uint32(0)))
-					continue
-				}
-
-				if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
-					instruction.Operation == disassemble.ARM64_ADD {
-					if instruction.Operands != nil && prevInst.Operands != nil {
-						// adrp      	x17, #0x1e3be9000
-						adrpRegister := prevInst.Operands[0].Registers[0] // x17
-						adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
-						// add       	x17, x17, #0x1c0
-						if adrpRegister == instruction.Operands[0].Registers[0] {
-							adrpImm += instruction.Operands[2].Immediate
-							adrpAddr = prevInst.Address
-						}
-						stubs[adrpAddr] = adrpImm
-					}
-				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
-					instruction.Operation == disassemble.ARM64_LDR {
-					if instruction.Operands != nil && prevInst.Operands != nil {
-						// adrp	x16, #0x1e3be9000
-						adrpRegister := prevInst.Operands[0].Registers[0] // x16
-						adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
-						// ldr	x16, [x16, #0x560]
-						if adrpRegister == instruction.Operands[0].Registers[0] {
-							adrpImm += instruction.Operands[1].Immediate
-							adrpAddr = prevInst.Address
-							addr, err := m.GetPointerAtAddress(adrpImm)
-							if err != nil {
-								return nil, fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
-							}
-							stubs[adrpAddr] = addr
-						}
-					}
-				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
-					instruction.Operation == disassemble.ARM64_LDR {
-					// add       	x17, x17, #0x1c0
-					addRegister := prevInst.Operands[0].Registers[0] // x17
-					// ldr       	x16, [x17]
-					if len(instruction.Operands[1].Registers) > 0 && addRegister == instruction.Operands[1].Registers[0] {
-						addr, err := m.GetPointerAtAddress(adrpImm)
-						if err != nil {
-							return nil, fmt.Errorf("failed to read pointer at %#x: %v", adrpImm, err)
-						}
-						stubs[adrpAddr] = addr
-					}
-				} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
-					instruction.Operation == disassemble.ARM64_BR {
-					// add       	x16, x16, #0x828
-					addRegister := prevInst.Operands[0].Registers[0] // x16
-					// br        	x16
-					if addRegister == instruction.Operands[0].Registers[0] {
-						// stubs[adrpAddr] = m.SlidePointer(adrpImm)
-						stubs[adrpAddr] = adrpImm
-					}
-				}
-
-				prevInst = instruction
-				startAddr += uint64(binary.Size(uint32(0)))
+			for k, v := range sb {
+				stubs[k] = v
 			}
 		}
+	}
+
+	return stubs, nil
+}
+
+func ParseStubsASM(data []byte, addr uint64, readPtr func(uint64) (uint64, error)) (map[uint64]uint64, error) {
+	var adrpImm uint64
+	var adrpAddr uint64
+	var instrValue uint32
+	var results [1024]byte
+	var prevInst *disassemble.Instruction
+
+	instrQueue := make(chan *disassemble.Instruction, 3)
+
+	stubs := make(map[uint64]uint64)
+
+	r := bytes.NewReader(data)
+
+	startAddr := addr
+
+	for {
+		err := binary.Read(r, binary.LittleEndian, &instrValue)
+
+		if err == io.EOF {
+			break
+		}
+
+		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+		if err != nil {
+			startAddr += uint64(binary.Size(uint32(0)))
+			continue
+		}
+
+		if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+			instruction.Operation == disassemble.ARM64_ADD {
+			if instruction.Operands != nil && prevInst.Operands != nil {
+				// adrp      	x17, #0x1e3be9000
+				adrpRegister := prevInst.Operands[0].Registers[0] // x17
+				adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+				// add       	x17, x17, #0x1c0
+				if adrpRegister == instruction.Operands[0].Registers[0] {
+					adrpImm += instruction.Operands[2].Immediate
+					adrpAddr = prevInst.Address
+				}
+				stubs[adrpAddr] = adrpImm
+			}
+		} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADRP) &&
+			instruction.Operation == disassemble.ARM64_LDR {
+			if instruction.Operands != nil && prevInst.Operands != nil {
+				// adrp	x16, #0x1e3be9000
+				adrpRegister := prevInst.Operands[0].Registers[0] // x16
+				adrpImm = prevInst.Operands[1].Immediate          // #0x1e3be9000
+				// ldr	x16, [x16, #0x560]
+				if adrpRegister == instruction.Operands[0].Registers[0] {
+					adrpImm += instruction.Operands[1].Immediate
+					adrpAddr = prevInst.Address
+					addr, err := readPtr(adrpImm)
+					if err != nil {
+						return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", adrpImm, err)
+					}
+					stubs[adrpAddr] = addr
+				}
+			}
+		} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
+			instruction.Operation == disassemble.ARM64_LDR {
+			// add       	x17, x17, #0x1c0
+			addRegister := prevInst.Operands[0].Registers[0] // x17
+			// ldr       	x16, [x17]
+			if len(instruction.Operands[1].Registers) > 0 && addRegister == instruction.Operands[1].Registers[0] {
+				addr, err := readPtr(adrpImm)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read stub target pointer at %#x: %v", adrpImm, err)
+				}
+				stubs[adrpAddr] = addr
+			}
+		} else if (prevInst != nil && prevInst.Operation == disassemble.ARM64_ADD) &&
+			instruction.Operation == disassemble.ARM64_BR {
+			// add       	x16, x16, #0x828
+			addRegister := prevInst.Operands[0].Registers[0] // x16
+			// br        	x16
+			if addRegister == instruction.Operands[0].Registers[0] {
+				// stubs[adrpAddr] = m.SlidePointer(adrpImm)
+				stubs[adrpAddr] = adrpImm
+			}
+		}
+
+		// instrQueue <- instruction FIXME: I need a const size FILO queue for instructions or use a channel?
+		prevInst = instruction
+		startAddr += uint64(binary.Size(uint32(0)))
 	}
 
 	return stubs, nil
@@ -590,7 +627,14 @@ func ParseHelpersASM(m *macho.File) (map[uint64]uint64, error) {
 	if sec := m.Section("__TEXT", "__stub_helper"); sec != nil {
 		dat, err := sec.Data()
 		if err != nil {
-			return nil, err
+			off, err := m.GetOffset(sec.Addr)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get offset for %s.%s section: %v", sec.Seg, sec.Name, err)
+			}
+			dat := make([]byte, sec.Size)
+			if n, err := m.ReadAt(dat, int64(off)); err != nil || n != len(dat) {
+				return nil, fmt.Errorf("failed to get %s.%s section data: %v", sec.Seg, sec.Name, err)
+			}
 		}
 
 		startAddr := sec.Addr
