@@ -214,14 +214,14 @@ func ParseZipFiles(files []*zip.File) (*Plists, error) {
 }
 
 func (p *Plists) GetOSType() string {
-	if p.OTAInfo != nil {
+	if p != nil && p.OTAInfo != nil {
 		if len(p.OTAInfo.MobileAssetProperties.ReleaseType) > 0 {
 			return p.OTAInfo.MobileAssetProperties.ReleaseType
 		} else {
 			return p.OTAInfo.MobileAssetProperties.DocumentationID
 		}
-	} else if len(p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]) > 0 {
-		return p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]
+	} else if os, ok := p.BuildManifest.BuildIdentities[0].Info.VariantContents["OS"]; ok {
+		return os
 	}
 	return ""
 }
