@@ -22,20 +22,80 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"archive/zip"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
+var haveChecked []string
+
+func scanDmg(ipswPath, dmgPath, dmgType, dylib string) error {
+	if utils.StrSliceHas(haveChecked, dmgPath) {
+		return nil // already checked
+	}
+
+	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	}
+	if len(dmgs) == 0 {
+		return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+	}
+	defer os.Remove(dmgs[0])
+
+	utils.Indent(log.Info, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
+	mountPoint, err := utils.MountFS(dmgs[0])
+	if err != nil {
+		return fmt.Errorf("failed to mount DMG: %v", err)
+	}
+	defer func() {
+		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
+		if err := utils.Unmount(mountPoint, false); err != nil {
+			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
+		}
+	}()
+
+	var files []string
+	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
+	}
+
+	for _, file := range files {
+		if m, err := macho.Open(file); err == nil {
+			for _, imp := range m.ImportedLibraries() {
+				if strings.Contains(strings.ToLower(imp), strings.ToLower(dylib)) {
+					fmt.Printf("%s\n", file)
+				}
+			}
+			m.Close()
+		}
+	}
+
+	haveChecked = append(haveChecked, dmgPath)
+
+	return nil
+}
+
 func init() {
 	dyldCmd.AddCommand(importsCmd)
-
+	importsCmd.Flags().BoolP("file-system", "f", false, "Scan File System in IPSW for MachO files that import dylib")
 	importsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -50,51 +110,78 @@ var importsCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		dscPath := filepath.Clean(args[0])
+		scanFS, _ := cmd.Flags().GetBool("file-system")
 
-		fileInfo, err := os.Lstat(dscPath)
-		if err != nil {
-			return fmt.Errorf("file %s does not exist", dscPath)
-		}
+		if scanFS {
+			ipswPath := filepath.Clean(args[0])
 
-		// Check if file is a symlink
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			symlinkPath, err := os.Readlink(dscPath)
+			i, err := info.Parse(ipswPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+				return fmt.Errorf("failed to parse IPSW: %v", err)
 			}
-			// TODO: this seems like it would break
-			linkParent := filepath.Dir(dscPath)
-			linkRoot := filepath.Dir(linkParent)
 
-			dscPath = filepath.Join(linkRoot, symlinkPath)
-		}
+			if appOS, err := i.GetAppOsDmg(); err == nil {
+				if err := scanDmg(ipswPath, appOS, "AppOS", args[1]); err != nil {
+					return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+				}
+			}
+			if systemOS, err := i.GetSystemOsDmg(); err == nil {
+				if err := scanDmg(ipswPath, systemOS, "SystemOS", args[1]); err != nil {
+					return fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
+				}
+			}
+			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+				if err := scanDmg(ipswPath, fsOS, "filesystem", args[1]); err != nil {
+					return fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
+				}
+			}
+		} else {
+			dscPath := filepath.Clean(args[0])
 
-		f, err := dyld.Open(dscPath)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
+			fileInfo, err := os.Lstat(dscPath)
+			if err != nil {
+				return fmt.Errorf("file %s does not exist", dscPath)
+			}
 
-		image, err := f.Image(args[1])
-		if err != nil {
-			return fmt.Errorf("image not in %s: %v", dscPath, err)
-		}
+			// Check if file is a symlink
+			if fileInfo.Mode()&os.ModeSymlink != 0 {
+				symlinkPath, err := os.Readlink(dscPath)
+				if err != nil {
+					return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+				}
+				// TODO: this seems like it would break
+				linkParent := filepath.Dir(dscPath)
+				linkRoot := filepath.Dir(linkParent)
 
-		title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(image.Name))
-		fmt.Print(title)
-		fmt.Println(strings.Repeat("=", len(title)-1))
-		for _, img := range f.Images {
-			m, err := img.GetPartialMacho()
+				dscPath = filepath.Join(linkRoot, symlinkPath)
+			}
+
+			f, err := dyld.Open(dscPath)
 			if err != nil {
 				return err
 			}
-			for _, imp := range m.ImportedLibraries() {
-				if strings.EqualFold(imp, image.Name) {
-					fmt.Printf("%s\n", img.Name)
-				}
+			defer f.Close()
+
+			image, err := f.Image(args[1])
+			if err != nil {
+				return fmt.Errorf("image not in %s: %v", dscPath, err)
 			}
-			m.Close()
+
+			title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(image.Name))
+			fmt.Print(title)
+			fmt.Println(strings.Repeat("=", len(title)-1))
+			for _, img := range f.Images {
+				m, err := img.GetPartialMacho()
+				if err != nil {
+					return err
+				}
+				for _, imp := range m.ImportedLibraries() {
+					if strings.EqualFold(imp, image.Name) {
+						fmt.Printf("%s\n", img.Name)
+					}
+				}
+				m.Close()
+			}
 		}
 
 		return nil
