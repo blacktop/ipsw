@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -83,15 +82,17 @@ var importsCmd = &cobra.Command{
 		}
 
 		title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(image.Name))
-		fmt.Printf(title)
+		fmt.Print(title)
 		fmt.Println(strings.Repeat("=", len(title)-1))
-		for _, image := range f.Images {
-			m, err := image.GetPartialMacho()
+		for _, img := range f.Images {
+			m, err := img.GetPartialMacho()
 			if err != nil {
 				return err
 			}
-			if utils.StrSliceHas(m.ImportedLibraries(), image.Name) {
-				fmt.Println(image.Name)
+			for _, imp := range m.ImportedLibraries() {
+				if strings.EqualFold(imp, image.Name) {
+					fmt.Printf("%s\n", img.Name)
+				}
 			}
 			m.Close()
 		}
