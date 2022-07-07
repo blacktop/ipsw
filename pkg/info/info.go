@@ -184,7 +184,9 @@ func (i *Info) String() string {
 				iStr += fmt.Sprintf("%s (Type: %s)\n", file, fsType)
 			}
 		} else {
-			iStr += i.GetOsDmg()
+			if fsDMG, err := i.GetSystemOsDmg(); err == nil {
+				iStr += fsDMG
+			}
 		}
 	}
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
@@ -214,7 +216,9 @@ func (i *Info) String() string {
 			if len(kcs[strings.ToLower(dt.BoardConfig)]) > 0 {
 				iStr += fmt.Sprintf("   - KernelCache: %s\n", strings.Join(kcs[strings.ToLower(dt.BoardConfig)], ", "))
 			}
-			iStr += fmt.Sprintf("   - %s\n", i.GetCPU(dt.BoardConfig))
+			if cpu := i.GetCPU(dt.BoardConfig); len(cpu) > 0 {
+				iStr += fmt.Sprintf("   - %s\n", cpu)
+			}
 			if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
 				iStr += "   - BootLoaders\n"
 				for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
@@ -278,12 +282,80 @@ func (i *Info) ToJSON() InfoJSON {
 	}
 }
 
-// GetOsDmg returns the name of the OS dmg
-func (i *Info) GetOsDmg() string {
-	if sysOS, ok := i.Plists.BuildIdentities[0].Manifest["Cryptex1,SystemOS"]; ok {
-		return sysOS.Info.Path
+// GetAppOsDmg returns the name of the AppOS dmg
+func (i *Info) GetAppOsDmg() (string, error) {
+	var dmgs []string
+	if i.Plists != nil && i.Plists.BuildManifest != nil {
+		for _, bi := range i.Plists.BuildIdentities {
+			if appOS, ok := bi.Manifest["Cryptex1,AppOS"]; ok {
+				dmgs = append(dmgs, appOS.Info.Path)
+			}
+		}
+		dmgs = utils.Unique(dmgs)
+		if len(dmgs) == 1 {
+			return dmgs[0], nil
+		} else {
+			return "", fmt.Errorf("multiple AppOS dmgs found")
+		}
 	}
-	return i.Plists.BuildIdentities[0].Manifest["OS"].Info.Path
+	return "", fmt.Errorf("no AppOS DMG found")
+}
+
+// GetSystemOsDmg returns the name of the SystemOS dmg (the one with the dyld_shared_cache(s))
+func (i *Info) GetSystemOsDmg() (string, error) {
+	var dmgs []string
+	if i.Plists != nil && i.Plists.BuildManifest != nil {
+		for _, bi := range i.Plists.BuildIdentities {
+			if sysOS, ok := bi.Manifest["Cryptex1,SystemOS"]; ok {
+				return sysOS.Info.Path, nil
+			} else if _, ok := bi.Manifest["OS"]; ok {
+				return i.GetFileSystemOsDmg()
+			}
+		}
+		dmgs = utils.Unique(dmgs)
+		if len(dmgs) == 1 {
+			return dmgs[0], nil
+		} else {
+			return "", fmt.Errorf("multiple SystemOS dmgs found")
+		}
+	}
+	return "", fmt.Errorf("no SystemOS or pre-cryptex FS DMG found")
+}
+
+// GetFileSystemOsDmg returns the name of the file system dmg
+func (i *Info) GetFileSystemOsDmg() (string, error) {
+	var dmgs []string
+	if i.Plists != nil && i.Plists.BuildManifest != nil {
+		for _, bi := range i.Plists.BuildIdentities {
+			if fsOS, ok := bi.Manifest["OS"]; ok {
+				dmgs = append(dmgs, fsOS.Info.Path)
+			}
+		}
+		dmgs = utils.Unique(dmgs)
+		if len(dmgs) == 1 {
+			return dmgs[0], nil
+		} else {
+			return "", fmt.Errorf("multiple filesystem dmgs found")
+		}
+	}
+	return "", fmt.Errorf("filesystem DMG not found")
+}
+
+// GetRestoreRamDiskDmgs returns the name of the RestoreRamDisk dmg
+func (i *Info) GetRestoreRamDiskDmgs() ([]string, error) {
+	var dmgs []string
+	if i.Plists != nil && i.Plists.BuildManifest != nil {
+		for _, bi := range i.Plists.BuildIdentities {
+			if rrdisk, ok := bi.Manifest["RestoreRamDisk"]; ok {
+				dmgs = append(dmgs, rrdisk.Info.Path)
+			}
+		}
+		dmgs = utils.Unique(dmgs)
+	}
+	if len(dmgs) > 0 {
+		return dmgs, nil
+	}
+	return nil, fmt.Errorf("no RestoreRamDisk DMG found")
 }
 
 // GetOsDmg returns the name of the OS dmg

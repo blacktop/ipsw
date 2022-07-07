@@ -37,14 +37,18 @@ func Extract(ipsw, destPath string, arches []string) error {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
 	}
 
+	systemDMG, err := i.GetSystemOsDmg()
+	if err != nil {
+		return fmt.Errorf("failed to get system DMG: %v", err)
+	}
 	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
+		return strings.EqualFold(filepath.Base(f.Name), systemDMG)
 	})
 	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %v", i.GetOsDmg(), err)
+		return fmt.Errorf("failed to extract %s from IPSW: %v", systemDMG, err)
 	}
 	if len(dmgs) == 0 {
-		return fmt.Errorf("File System %s NOT found in IPSW", i.GetOsDmg())
+		return fmt.Errorf("File System %s NOT found in IPSW", systemDMG)
 	}
 	defer os.Remove(dmgs[0])
 

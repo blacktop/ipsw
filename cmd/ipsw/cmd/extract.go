@@ -48,6 +48,25 @@ func isURL(str string) bool {
 	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
+func extractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) error {
+	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	}
+	if len(dmgs) == 0 {
+		return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+	}
+	defer os.Remove(dmgs[0])
+
+	if err := utils.ExtractFromDMG(dmgs[0], destPath, pattern); err != nil {
+		return fmt.Errorf("failed to extract files matching pattern: %v", err)
+	}
+
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(extractCmd)
 
@@ -241,13 +260,17 @@ var extractCmd = &cobra.Command{
 			}
 
 			if viper.GetBool("extract.dmg") {
+				fsDMG, err := i.GetFileSystemOsDmg()
+				if err != nil {
+					return fmt.Errorf("failed to find filesystem DMG in IPSW: %v", err)
+				}
 				log.Info("Extracting File System DMG")
 				if _, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
-					return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
+					return strings.EqualFold(filepath.Base(f.Name), fsDMG)
 				}); err != nil {
-					return fmt.Errorf("failed extract %s from IPSW: %v", i.GetOsDmg(), err)
+					return fmt.Errorf("failed extract %s from IPSW: %v", fsDMG, err)
 				}
-				log.Infof("Created %s", filepath.Join(destPath, i.GetOsDmg()))
+				log.Infof("Created %s", filepath.Join(destPath, fsDMG))
 			}
 
 			if viper.GetBool("extract.iboot") {
@@ -295,22 +318,23 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("failed to compile regexp: %v", err)
 				}
 
-				if viper.GetBool("extract.files") {
-					dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-						return strings.EqualFold(filepath.Base(f.Name), i.GetOsDmg())
-					})
-					if err != nil {
-						return fmt.Errorf("failed to extract %s from IPSW: %v", i.GetOsDmg(), err)
+				if viper.GetBool("extract.files") { // SEARCH THE DMGs
+					if appOS, err := i.GetAppOsDmg(); err == nil {
+						if err := extractFromDMG(ipswPath, destPath, appOS, patternRE); err != nil {
+							return fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
+						}
 					}
-					if len(dmgs) == 0 {
-						return fmt.Errorf("no OS File System .dmg found in IPSW")
+					if systemOS, err := i.GetSystemOsDmg(); err == nil {
+						if err := extractFromDMG(ipswPath, destPath, systemOS, patternRE); err != nil {
+							return fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
+						}
 					}
-					defer os.Remove(dmgs[0])
-
-					if err := utils.ExtractFromDMG(dmgs[0], destPath, patternRE); err != nil {
-						return fmt.Errorf("failed to extract files matching pattern: %v", err)
+					if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+						if err := extractFromDMG(ipswPath, destPath, fsOS, patternRE); err != nil {
+							return fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
+						}
 					}
-				} else {
+				} else { // SEARCH THE ZIP
 					zr, err := zip.OpenReader(ipswPath)
 					if err != nil {
 						return fmt.Errorf("failed to open IPSW: %v", err)
