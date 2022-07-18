@@ -378,7 +378,7 @@ func (d *MachoDisass) parseGOT() error {
 }
 
 func (d *MachoDisass) parseStubs() error {
-	stubs, err := ParseStubsASM(d.f)
+	stubs, err := ParseStubsForMachO(d.f)
 	if err != nil {
 		return err
 	}

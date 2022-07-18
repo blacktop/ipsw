@@ -64,7 +64,11 @@ var kerExtractCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse ipsw info: %v", err)
 		}
 
-		destPath = filepath.Join(destPath, i.GetFolder())
+		folder, err := i.GetFolder()
+		if err != nil {
+			log.Errorf("failed to get IPSW spec folder: %v", err)
+		}
+		destPath = filepath.Join(destPath, folder)
 
 		log.Info("Extracting kernelcaches")
 		return kernelcache.Extract(ipswPath, destPath)

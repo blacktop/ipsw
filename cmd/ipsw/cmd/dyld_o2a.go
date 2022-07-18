@@ -108,11 +108,16 @@ var o2aCmd = &cobra.Command{
 			if f.IsDyld4 {
 				ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
 				_, m, _ := f.GetMappingForVMAddress(address)
+				var stubs bool
+				if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+					stubs = true
+				}
 				log.WithFields(log.Fields{
 					"uuid":    uuid.String(),
 					"hex":     fmt.Sprintf("%#x", address),
 					"dec":     fmt.Sprintf("%d", address),
 					"ext":     fmt.Sprintf("\"%s\"", ext),
+					"stubs":   stubs,
 					"mapping": m.Name,
 				}).Info("Address")
 				return nil
@@ -137,20 +142,24 @@ var o2aCmd = &cobra.Command{
 					if err != nil {
 						return err
 					}
-					ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
 					if f.IsDyld4 {
+						ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
+						var stubs bool
+						if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+							stubs = true
+						}
 						log.WithFields(log.Fields{
 							"uuid":    uuid.String(),
 							"hex":     fmt.Sprintf("%#x", address),
 							"dec":     fmt.Sprintf("%d", address),
 							"ext":     fmt.Sprintf("\"%s\"", ext),
+							"stubs":   stubs,
 							"mapping": m.Name,
 						}).Info("Address")
 					} else {
 						log.WithFields(log.Fields{
 							"hex":     fmt.Sprintf("%#x", address),
 							"dec":     fmt.Sprintf("%d", address),
-							"ext":     fmt.Sprintf("\"%s\"", ext),
 							"mapping": m.Name,
 						}).Info("Address")
 					}
