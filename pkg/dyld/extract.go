@@ -25,32 +25,8 @@ type extractConfig struct {
 	IsMacOS     bool
 }
 
-// Extract extracts dyld_shared_cache from IPSW
-func Extract(ipsw, destPath string, arches []string) error {
-
-	if runtime.GOOS == "windows" {
-		return fmt.Errorf("dyld extraction is not supported on Windows (see github.com/blacktop/go-apfs)")
-	}
-
-	i, err := info.Parse(ipsw)
-	if err != nil {
-		return fmt.Errorf("failed to parse IPSW: %v", err)
-	}
-
-	systemDMG, err := i.GetSystemOsDmg()
-	if err != nil {
-		return fmt.Errorf("failed to get system DMG: %v", err)
-	}
-	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), systemDMG)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %v", systemDMG, err)
-	}
-	if len(dmgs) == 0 {
-		return fmt.Errorf("File System %s NOT found in IPSW", systemDMG)
-	}
-	defer os.Remove(dmgs[0])
+func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) error {
+	var err error
 
 	var config extractConfig
 	if utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") {
@@ -62,15 +38,15 @@ func Extract(ipsw, destPath string, arches []string) error {
 		config.CacheRegex = IPhoneCacheRegex
 	}
 
-	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgs[0]))
-	config.MountPoint, err = utils.MountFS(dmgs[0])
+	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
+	config.MountPoint, err = utils.MountFS(dmgPath)
 	if err != nil {
 		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
 	defer func() {
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", dmgs[0]))
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", dmgPath))
 		if err := utils.Unmount(config.MountPoint, false); err != nil {
-			log.Errorf("failed to unmount File System DMG mount at %s: %v", dmgs[0], err)
+			log.Errorf("failed to unmount File System DMG mount at %s: %v", dmgPath, err)
 		}
 	}()
 
@@ -138,7 +114,7 @@ func Extract(ipsw, destPath string, arches []string) error {
 	}
 
 	if len(matches) == 0 {
-		return fmt.Errorf("failed to find dyld_shared_cache(s) in ipsw: %s", ipsw)
+		return fmt.Errorf("failed to find dyld_shared_cache(s) in DMG: %s", dmgPath)
 	}
 
 	for _, match := range matches {
@@ -150,4 +126,34 @@ func Extract(ipsw, destPath string, arches []string) error {
 	}
 
 	return nil
+}
+
+// Extract extracts dyld_shared_cache from IPSW
+func Extract(ipsw, destPath string, arches []string) error {
+
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("dyld extraction is not supported on Windows (see github.com/blacktop/go-apfs)")
+	}
+
+	i, err := info.Parse(ipsw)
+	if err != nil {
+		return fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+
+	systemDMG, err := i.GetSystemOsDmg()
+	if err != nil {
+		return fmt.Errorf("failed to get system DMG: %v", err)
+	}
+	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+		return strings.EqualFold(filepath.Base(f.Name), systemDMG)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to extract %s from IPSW: %v", systemDMG, err)
+	}
+	if len(dmgs) == 0 {
+		return fmt.Errorf("File System %s NOT found in IPSW", systemDMG)
+	}
+	defer os.Remove(dmgs[0])
+
+	return ExtractFromDMG(i, dmgs[0], destPath, arches)
 }
