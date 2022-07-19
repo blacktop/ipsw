@@ -23,7 +23,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 
 RUN buildDeps='libfuse3-dev bzip2 libbz2-dev libz-dev cmake build-essential git libattr1-dev' \
     && apt-get update \
-    && apt-get install -y $buildDeps fuse3 unzip lzma tzdata \
+    && apt-get install -y $buildDeps fuse3 unzip lzma tzdata xz-utils \
     && echo "===> Installing apfs-fuse..." \
     && cd /tmp \
     && git clone https://github.com/sgan81/apfs-fuse.git \
