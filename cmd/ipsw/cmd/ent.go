@@ -41,6 +41,63 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type Entitlements map[string]interface{}
+
+func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
+	if utils.StrSliceHas(haveChecked, dmgPath) {
+		return nil, nil // already checked
+	}
+
+	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	}
+	if len(dmgs) == 0 {
+		return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
+	}
+	defer os.Remove(dmgs[0])
+
+	utils.Indent(log.Info, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
+	mountPoint, err := utils.MountFS(dmgs[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to mount DMG: %v", err)
+	}
+	defer func() {
+		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
+		if err := utils.Unmount(mountPoint, false); err != nil {
+			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
+		}
+	}()
+
+	var files []string
+	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			files = append(files, path)
+		}
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
+	}
+
+	entDB := make(map[string]string)
+
+	for _, file := range files {
+		if m, err := macho.Open(file); err == nil {
+			if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
+				entDB[strings.TrimPrefix(file, mountPoint)] = m.CodeSignature().Entitlements
+			} else {
+				entDB[strings.TrimPrefix(file, mountPoint)] = ""
+			}
+		}
+	}
+
+	haveChecked = append(haveChecked, dmgPath)
+
+	return entDB, nil
+}
+
 func init() {
 	rootCmd.AddCommand(entCmd)
 
@@ -48,8 +105,6 @@ func init() {
 	entCmd.Flags().String("db", "", "Path to entitlement database to use")
 	entCmd.Flags().StringP("file", "f", "", "Output entitlements for file")
 }
-
-type Entitlements map[string]interface{}
 
 // entCmd represents the ent command
 var entCmd = &cobra.Command{
@@ -59,8 +114,6 @@ var entCmd = &cobra.Command{
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var fsDMG string
-		var entDB map[string]string
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -78,98 +131,75 @@ var entCmd = &cobra.Command{
 		}
 
 		ipswPath := filepath.Clean(args[0])
-		if len(entDBPath) > 0 {
+
+		if len(entDBPath) == 0 {
 			entDBPath = strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
 		}
 
+		i, err := info.Parse(ipswPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse IPSW: %v", err)
+		}
+
+		entDB := make(map[string]string)
+
 		if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
-			i, err := info.Parse(ipswPath)
-			if err != nil {
-				return fmt.Errorf("failed to parse ipsw info: %v", err)
-			}
+			log.Info("Generating entitlement database file...")
 
-			found := false
-			for k, v := range i.Plists.Restore.SystemRestoreImageFileSystems {
-				if v == "APFS" {
-					fsDMG = k
-					found = true
+			if appOS, err := i.GetAppOsDmg(); err == nil {
+				if ents, err := scanEnts(ipswPath, appOS, "AppOS"); err != nil {
+					return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+				} else {
+					for k, v := range ents {
+						entDB[k] = v
+					}
 				}
 			}
-			if !found {
-				return fmt.Errorf("failed to parse ipsw info: %v", err)
-			}
-
-			fileSystem, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-				return strings.EqualFold(f.Name, fsDMG)
-			})
-			if err != nil || len(fileSystem) != 1 {
-				return fmt.Errorf("failed extract %s from ipsw, found %v: %v", fsDMG, fileSystem, err)
-			}
-			defer os.Remove(fileSystem[0])
-
-			mountPoint := "/tmp/filesystem_dmg"
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", fileSystem[0]))
-			if err := utils.Mount(fileSystem[0], mountPoint); err != nil {
-				return fmt.Errorf("failed to mount %s: %v", fileSystem[0], err)
-			}
-			defer func() {
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", fileSystem[0]))
-				if err := utils.Unmount(mountPoint, false); err != nil {
-					utils.Indent(log.Fatal, 2)(fmt.Sprintf("failed to unmount %s: %v", mountPoint, err))
+			if systemOS, err := i.GetSystemOsDmg(); err == nil {
+				if ents, err := scanEnts(ipswPath, systemOS, "SystemOS"); err != nil {
+					return fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
+				} else {
+					for k, v := range ents {
+						entDB[k] = v
+					}
 				}
-			}()
-
-			var files []string
-			if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-				if !info.IsDir() {
-					files = append(files, path)
-				}
-				return nil
-			}); err != nil {
-				return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
 			}
-
-			entDB = make(map[string]string)
-
-			for _, file := range files {
-				if m, err := macho.Open(file); err == nil {
-					if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-						entDB[strings.TrimPrefix(file, mountPoint)] = m.CodeSignature().Entitlements
-					} else {
-						entDB[strings.TrimPrefix(file, mountPoint)] = ""
+			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+				if ents, err := scanEnts(ipswPath, fsOS, "filesystem"); err != nil {
+					return fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
+				} else {
+					for k, v := range ents {
+						entDB[k] = v
 					}
 				}
 			}
 
-			if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
-				log.Info("Generating entitlement database file...")
-				buff := new(bytes.Buffer)
+			buff := new(bytes.Buffer)
 
-				e := gob.NewEncoder(buff)
+			e := gob.NewEncoder(buff)
 
-				// Encoding the map
-				err := e.Encode(entDB)
-				if err != nil {
-					return fmt.Errorf("failed to encode entitlement db to binary: %v", err)
-				}
-
-				of, err := os.Create(entDBPath)
-				if err != nil {
-					return fmt.Errorf("failed to create file %s: %v", ipswPath+".entDB", err)
-				}
-				defer of.Close()
-
-				gzw := gzip.NewWriter(of)
-				defer gzw.Close()
-
-				_, err = buff.WriteTo(gzw)
-				if err != nil {
-					return fmt.Errorf("failed to write entitlement db to gzip file: %v", err)
-				}
+			// Encoding the map
+			err := e.Encode(entDB)
+			if err != nil {
+				return fmt.Errorf("failed to encode entitlement db to binary: %v", err)
 			}
 
+			of, err := os.Create(entDBPath)
+			if err != nil {
+				return fmt.Errorf("failed to create file %s: %v", ipswPath+".entDB", err)
+			}
+			defer of.Close()
+
+			gzw := gzip.NewWriter(of)
+			defer gzw.Close()
+
+			_, err = buff.WriteTo(gzw)
+			if err != nil {
+				return fmt.Errorf("failed to write entitlement db to gzip file: %v", err)
+			}
 		} else {
 			log.Info("Found ipsw entitlement database file...")
+
 			edbFile, err := os.Open(entDBPath)
 			if err != nil {
 				return fmt.Errorf("failed to open entitlement database file %s; %v", entDBPath, err)
@@ -200,14 +230,12 @@ var entCmd = &cobra.Command{
 					}
 				}
 			}
-
 		} else {
 			log.Infof("Files containing entitlement: %s", entitlement)
 			fmt.Println()
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for f, ent := range entDB {
 				if strings.Contains(ent, entitlement) {
-					fmt.Println(ent)
 					ents := Entitlements{}
 					if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
 						return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
