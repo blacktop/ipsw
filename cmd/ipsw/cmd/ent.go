@@ -29,7 +29,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"text/tabwriter"
 
@@ -41,7 +40,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type Entitlements map[string]interface{}
+type Entitlements map[string]any
 
 func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 	if utils.StrSliceHas(haveChecked, dmgPath) {
@@ -242,13 +241,20 @@ var entCmd = &cobra.Command{
 					}
 					for k, v := range ents {
 						if strings.Contains(k, entitlement) {
-							switch v := reflect.ValueOf(v); v.Kind() {
-							case reflect.Bool:
-								if v.Bool() {
+							switch v := v.(type) {
+							case bool:
+								if v {
 									fmt.Fprintf(w, "%s\t%s\n", k, f)
 								}
+							case []string:
+								fmt.Fprintf(w, "%s\t(%s)\t%s\n", k, strings.Join(v, ", "), f)
+							case []any:
+								fmt.Fprintf(w, "%s\t%s\n", k, f)
+								for _, i := range v {
+									fmt.Fprintf(w, " - %v\n", i)
+								}
 							default:
-								log.Error(fmt.Sprintf("unhandled entitlement kind %s in %s", f, v.Kind()))
+								log.Error(fmt.Sprintf("unhandled entitlement kind %T in %s", v, f))
 							}
 						}
 					}
