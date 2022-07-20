@@ -31,6 +31,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/sandbox"
 	"github.com/spf13/cobra"
 )
@@ -75,9 +77,29 @@ var sbdecCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		sb, err := sandbox.NewSandbox(&sandbox.Config{Kernel: m, ProfileBinPath: input})
-		if err != nil {
-			return err
+		var sb *sandbox.Sandbox
+		if m.FileTOC.FileHeader.Type == types.FileSet {
+			fixups := make(map[uint64]uint64)
+			if m.HasFixups() {
+				dcf, err := m.DyldChainedFixups()
+				if err != nil {
+					return err
+				}
+				for _, start := range dcf.Starts {
+					if start.PageStarts != nil {
+						for _, fixup := range start.Fixups {
+							switch f := fixup.(type) {
+							case fixupchains.Rebase:
+								fixups[f.Raw()] = uint64(f.Offset()) + m.GetBaseAddress()
+							}
+						}
+					}
+				}
+			}
+			sb, err = sandbox.NewSandbox(&sandbox.Config{Kernel: m, ProfileBinPath: input, Fixups: fixups})
+			if err != nil {
+				return err
+			}
 		}
 
 		if dump {

@@ -12,6 +12,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/hashicorp/go-version"
@@ -103,7 +104,9 @@ func (p Profile) String() string {
 
 type Config struct {
 	Kernel         *macho.File
+	SBKext         *macho.File
 	ProfileBinPath string
+	Fixups         map[uint64]uint64
 
 	sbHeader            any
 	profileType         any
@@ -120,8 +123,16 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		config:   *c,
 	}
 
-	if _, err := sb.GetOperations(); err != nil {
-		return nil, fmt.Errorf("failed to parse sandbox operations: %w", err)
+	// if _, err := sb.GetOperations(); err != nil {
+	// 	return nil, fmt.Errorf("failed to parse sandbox operations: %w", err)
+	// }
+
+	if sb.config.Kernel.FileTOC.FileHeader.Type == types.FileSet {
+		var err error
+		sb.config.SBKext, err = sb.config.Kernel.GetFileSetFileByName("com.apple.security.sandbox")
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse fileset entry 'com.apple.security.sandbox': %v", err)
+		}
 	}
 
 	if kv, err := kernelcache.GetVersion(sb.config.Kernel); err != nil {
@@ -145,6 +156,10 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse darwin version constraint: %w", err)
 	}
+	iOS16x, err := version.NewConstraint(">= 22.0.0, < 23.0.0")
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse darwin version constraint: %w", err)
+	}
 
 	if iOS14x.Check(sb.darwin) {
 		sb.config.sbHeader = &header14{}
@@ -156,13 +171,22 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
+	} else if iOS16x.Check(sb.darwin) {
+		sb.config.sbHeader = &header15{}
+		sb.config.profileType = &profile15{}
+		sb.config.collectionInitPanic = collectionInitPanic15
+		sb.config.collectionInitArgs = []string{"x2", "w3"}
 	} else {
-		return nil, fmt.Errorf("unsupported darwin version: %s (only supports iOS14.x and iOS15.x)", sb.darwin)
+		return nil, fmt.Errorf("unsupported darwin version: %s (only supports iOS 14.x-16.x)", sb.darwin)
 	}
 
 	sb.db, err = GetLibSandBoxDB()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get libsandbox db: %w", err)
+	}
+
+	for _, op := range sb.db.Operations { // TODO: are these always the same?  Should I still compare with what is in the samdbox kext?
+		sb.Operations = append(sb.Operations, op.Name)
 	}
 
 	return &sb, nil
@@ -173,7 +197,22 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 		return sb.Operations, nil
 	}
 
-	if dconst := sb.config.Kernel.Section("__DATA_CONST", "__const"); dconst != nil {
+	m := sb.config.Kernel
+
+	if sb.config.SBKext != nil {
+		m = sb.config.SBKext
+	}
+
+	for _, sym := range m.Symtab.Syms {
+		if strings.HasPrefix(sym.Name, "operation_names") {
+			str, err := sb.config.Kernel.GetCString(sym.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse operation names: %v", err)
+			}
+			fmt.Println(str)
+		}
+	}
+	if dconst := m.Section("__DATA_CONST", "__const"); dconst != nil {
 		data, err := dconst.Data()
 		if err != nil {
 			return nil, err
@@ -189,8 +228,12 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 			if ptr == 0 {
 				continue
 			}
-
-			str, err := sb.config.Kernel.GetCString(ptr | tagPtrMask)
+			if fptr, ok := sb.config.Fixups[ptr]; ok {
+				ptr = fptr
+			} else {
+				ptr |= tagPtrMask
+			}
+			str, err := m.GetCString(ptr)
 			if err != nil {
 				if found {
 					break
@@ -209,6 +252,8 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 				}
 			}
 		}
+	} else {
+		return nil, fmt.Errorf("failed to find __DATA_CONST.__const section")
 	}
 
 	return sb.Operations, nil
@@ -653,34 +698,48 @@ func (sb *Sandbox) parseXrefs() error {
 		return nil
 	}
 
-	var kextStartOffset uint64
+	var data []byte
 
-	startAdders, err := kernelcache.GetKextStartVMAddrs(sb.config.Kernel)
-	if err != nil {
-		return fmt.Errorf("failed to get kext start addresses: %w", err)
-	}
-
-	infos, err := kernelcache.GetKextInfos(sb.config.Kernel)
-	if err != nil {
-		return fmt.Errorf("failed to get kext infos: %w", err)
-	}
-
-	for idx, info := range infos {
-		if strings.Contains(string(info.Name[:]), "sandbox") {
-			sb.kextStartAddr = startAdders[idx] | tagPtrMask
-			sb.kextEndAddr = startAdders[idx+1] | tagPtrMask
-			kextStartOffset, err = sb.config.Kernel.GetOffset(sb.kextStartAddr)
+	if sb.config.Kernel.FileTOC.FileHeader.Type == types.FileSet {
+		var err error
+		if sec := sb.config.SBKext.Section("__TEXT_EXEC", "__text"); sec != nil {
+			sb.kextStartAddr = sec.Addr
+			data, err = sec.Data()
 			if err != nil {
-				return fmt.Errorf("failed to get sandbox kext start offset: %w", err)
+				return fmt.Errorf("failed to read sandbox __TEXT_EXEC __text section data: %v", err)
 			}
-			break
+		} else {
+			return fmt.Errorf("failed to find __TEXT_EXEC __text section")
 		}
-	}
+	} else {
+		var kextStartOffset uint64
 
-	// TODO: only get function data (avoid parsing macho header etc)
-	data := make([]byte, sb.kextEndAddr-sb.kextStartAddr)
-	if _, err = sb.config.Kernel.ReadAt(data, int64(kextStartOffset)); err != nil {
-		return fmt.Errorf("failed to read sandbox kext data: %w", err)
+		startAdders, err := kernelcache.GetKextStartVMAddrs(sb.config.Kernel)
+		if err != nil {
+			return fmt.Errorf("failed to get kext start addresses: %w", err)
+		}
+
+		infos, err := kernelcache.GetKextInfos(sb.config.Kernel)
+		if err != nil {
+			return fmt.Errorf("failed to get kext infos: %w", err)
+		}
+
+		for idx, info := range infos {
+			if strings.Contains(string(info.Name[:]), "sandbox") {
+				sb.kextStartAddr = startAdders[idx] | tagPtrMask
+				sb.kextEndAddr = startAdders[idx+1] | tagPtrMask
+				kextStartOffset, err = sb.config.Kernel.GetOffset(sb.kextStartAddr)
+				if err != nil {
+					return fmt.Errorf("failed to get sandbox kext start offset: %w", err)
+				}
+				break
+			}
+		}
+		// TODO: only get function data (avoid parsing macho header etc)
+		data = make([]byte, sb.kextEndAddr-sb.kextStartAddr)
+		if _, err = sb.config.Kernel.ReadAt(data, int64(kextStartOffset)); err != nil {
+			return fmt.Errorf("failed to read sandbox kext data: %w", err)
+		}
 	}
 
 	var instrValue uint32
@@ -692,7 +751,7 @@ func (sb *Sandbox) parseXrefs() error {
 	startAddr := sb.kextStartAddr
 
 	for {
-		err = binary.Read(dr, binary.LittleEndian, &instrValue)
+		err := binary.Read(dr, binary.LittleEndian, &instrValue)
 
 		if err == io.EOF {
 			break
@@ -764,12 +823,17 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 		return nil, fmt.Errorf("failed to find panic string cross reference for given error message: %s", errmsg)
 	}
 
-	hook_policy_init, err := sb.config.Kernel.GetFunctionForVMAddr(panicXrefVMAddr)
+	m := sb.config.Kernel
+	if sb.config.SBKext != nil {
+		m = sb.config.SBKext
+	}
+
+	hook_policy_init, err := m.GetFunctionForVMAddr(panicXrefVMAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find _hook_policy_init function: %w", err)
 	}
 
-	data, err := sb.config.Kernel.GetFunctionData(hook_policy_init)
+	data, err := m.GetFunctionData(hook_policy_init)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get _hook_policy_init function data: %w", err)
 	}
@@ -877,7 +941,17 @@ func (sb *Sandbox) parseProfile(p any) (uint16, uint16, error) {
  *********/
 
 func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
-	for _, sec := range m.Sections {
+	sbm := m
+
+	if m.FileTOC.FileHeader.Type == types.FileSet {
+		var err error
+		sbm, err = m.GetFileSetFileByName("com.apple.security.sandbox")
+		if err != nil {
+			return 0, fmt.Errorf("failed to parse fileset entry 'kernel': %v", err)
+		}
+	}
+
+	for _, sec := range sbm.Sections {
 		if sec.Flags.IsCstringLiterals() || strings.Contains(sec.Name, "cstring") {
 			dat, err := sec.Data()
 			if err != nil {
