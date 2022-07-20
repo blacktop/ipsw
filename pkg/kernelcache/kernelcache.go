@@ -290,8 +290,7 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 func Parse(r io.ReadCloser) ([]byte, error) {
 	var buf bytes.Buffer
 
-	_, err := r.Read(buf.Bytes())
-	if err != nil {
+	if _, err := r.Read(buf.Bytes()); err != nil {
 		return nil, errors.Wrap(err, "failed to read data")
 	}
 
@@ -312,7 +311,17 @@ func Parse(r io.ReadCloser) ([]byte, error) {
 func GetVersion(m *macho.File) (*Version, error) {
 	var kv Version
 
-	if sec := m.Section("__TEXT", "__const"); sec != nil {
+	kc := m
+
+	if kc.FileTOC.FileHeader.Type == types.FileSet {
+		var err error
+		kc, err = m.GetFileSetFileByName("kernel")
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse fileset entry 'kernel': %v", err)
+		}
+	}
+
+	if sec := kc.Section("__TEXT", "__const"); sec != nil {
 		dat, err := sec.Data()
 		if err != nil {
 			return nil, fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
