@@ -43,10 +43,12 @@ func init() {
 	gitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	gitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
+	gitCmd.Flags().Bool("webkit", false, "Get WebKit tags")
 	viper.BindPFlag("download.git.product", gitCmd.Flags().Lookup("product"))
 	viper.BindPFlag("download.git.output", gitCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.git.api", gitCmd.Flags().Lookup("api"))
 	viper.BindPFlag("download.git.json", gitCmd.Flags().Lookup("json"))
+	viper.BindPFlag("download.git.webkit", gitCmd.Flags().Lookup("webkit"))
 }
 
 // gitCmd represents the git command
@@ -96,7 +98,30 @@ var gitCmd = &cobra.Command{
 			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
 			tags, err = download.AppleOssGraphQLTags(proxy, insecure, apiToken)
 			if err != nil {
-				return fmt.Errorf("failed to get tags from `ipsw` apple_meta: %w", err)
+				return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
+			}
+
+			if viper.GetBool("download.git.webkit") {
+				wkTags, err := download.WebKitGraphQLTags(proxy, insecure, apiToken)
+				if err != nil {
+					return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
+				}
+				if asJSON {
+					dat, err := json.Marshal(wkTags)
+					if err != nil {
+						return fmt.Errorf("failed to marshal JSON: %v", err)
+					}
+					if len(outputFolder) > 0 {
+						os.MkdirAll(outputFolder, 0750)
+						fpath := filepath.Join(outputFolder, "webkit_tags.json")
+						log.Infof("Creating %s", fpath)
+						if err := ioutil.WriteFile(fpath, dat, 0660); err != nil {
+							return fmt.Errorf("failed to write file: %v", err)
+						}
+					} else {
+						fmt.Println(string(dat))
+					}
+				}
 			}
 
 			if asJSON {

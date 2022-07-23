@@ -278,7 +278,7 @@ jobs:
       - name: Run dyld webkit
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --rev
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --git --api ${{ secrets.GITHUB_TOKEN }}
 
       # - name: Run dyld slide
       #   if: matrix.platform == 'macos-12'
