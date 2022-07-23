@@ -20,6 +20,15 @@ jobs:
       uses: actions/setup-go@v3
       with:
         go-version: 1.18
+    - name: Cache go.mod
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
     - name: Run build
       run: |
         make setup
