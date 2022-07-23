@@ -95,13 +95,7 @@ var gitCmd = &cobra.Command{
 				return fmt.Errorf("failed to get tags from `ipsw` apple_meta: %w", err)
 			}
 		} else {
-			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
-			tags, err = download.AppleOssGraphQLTags(proxy, insecure, apiToken)
-			if err != nil {
-				return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
-			}
-
-			if viper.GetBool("download.git.webkit") {
+			if viper.GetBool("download.git.webkit") { // only download WebKit tags JSON
 				log.Info("Querying github.com/WebKit/WebKit for tags...")
 				wkTags, err := download.WebKitGraphQLTags(proxy, insecure, apiToken)
 				if err != nil {
@@ -124,6 +118,12 @@ var gitCmd = &cobra.Command{
 					}
 				}
 				return nil
+			}
+
+			log.Info("Querying github.com/orgs/apple-oss-distributions for repositories...")
+			tags, err = download.AppleOssGraphQLTags(proxy, insecure, apiToken)
+			if err != nil {
+				return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
 			}
 
 			if asJSON {

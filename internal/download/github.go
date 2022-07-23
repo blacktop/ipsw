@@ -627,7 +627,7 @@ func WebKitGraphQLTags(proxy string, insecure bool, apikey string) ([]GithubTag,
 					EndCursor   githubv4.String
 					HasNextPage bool
 				}
-			} `graphql:"refs(refPrefix: \"refs/tags/\", first: 100, after: $endCursor)"`
+			} `graphql:"refs(refPrefix: \"refs/tags/\", first: 100, after: $endCursor, orderBy: { field: TAG_COMMIT_DATE, direction: DESC})"`
 		} `graphql:"repository(owner: \"WebKit\", name: \"WebKit\")"`
 	}
 
