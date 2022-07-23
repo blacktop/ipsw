@@ -1,0 +1,54 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# IDE
+.idea
+.vscode
+debug
+__debug_bin
+
+# ipsw files
+*.ipsw
+*.zip
+*.im4p
+kernelcache.*
+dyld_shared_cache*
+*_Restore
+System
+usr
+*.xz
+*.bin
+*.s
+.DS_Store
+*.dmg
+
+# Repo
+*.bu
+dist/
+test-caches/
+completions/
+manpages/
+*.txt
+*.prof
+*.download
+checksums.txt.sha1
+unicorn2/
+
+# Docs
+public
+site/
+www/docs/static/releases*.json
+
+*.unstripped
+*.bndb
+*.lock
