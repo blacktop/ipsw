@@ -24,6 +24,19 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - main: ./cmd/ipsw
+    id: ios
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - ios
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
   # - main: ./cmd/ipsw
   #   id: "others"
   #   binary: ipsw
@@ -45,6 +58,7 @@ universal_binaries:
 archives:
   - replacements:
       darwin: macOS
+      ios: iOS
       amd64: x86_64
       all: universal
     format_overrides:
