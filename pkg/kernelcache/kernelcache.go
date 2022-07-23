@@ -60,7 +60,11 @@ type Version struct {
 }
 
 func (v *Version) String() string {
-	return fmt.Sprintf("%s\n%s", v.rawKernel, v.rawLLVM)
+	var llvm string
+	if len(v.rawLLVM) > 0 {
+		llvm = fmt.Sprintf("\n%s", v.rawLLVM)
+	}
+	return fmt.Sprintf("%s%s", v.rawKernel, llvm)
 }
 
 // ParseImg4Data parses a img4 data containing a compressed kernelcache.
