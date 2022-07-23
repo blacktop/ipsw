@@ -136,9 +136,9 @@ var webkitCmd = &cobra.Command{
 			for _, tag := range tags {
 				if strings.Contains(tag.Name, m.SourceVersion().Version) {
 					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  '%s'", tag.Name))
-					utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  '%s'", tag.TarURL))
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Date: '%s'", tag.Commit.Date.Format("02Jan2006 15:04:05")))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Date: %s", tag.Commit.Date.Format("02Jan2006 15:04:05")))
 					return nil
 				}
 			}
