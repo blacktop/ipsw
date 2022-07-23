@@ -102,6 +102,7 @@ var gitCmd = &cobra.Command{
 			}
 
 			if viper.GetBool("download.git.webkit") {
+				log.Info("Querying github.com/WebKit/WebKit for tags...")
 				wkTags, err := download.WebKitGraphQLTags(proxy, insecure, apiToken)
 				if err != nil {
 					return fmt.Errorf("failed to get tags from Github GraphQL API: %w", err)
@@ -122,6 +123,7 @@ var gitCmd = &cobra.Command{
 						fmt.Println(string(dat))
 					}
 				}
+				return nil
 			}
 
 			if asJSON {
