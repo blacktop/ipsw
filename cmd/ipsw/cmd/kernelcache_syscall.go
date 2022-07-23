@@ -35,8 +35,8 @@ import (
 
 func init() {
 	kernelcacheCmd.AddCommand(syscallCmd)
-	syscallCmd.Flags().BoolP("gen", "g", false, "Generate syscall table data JSON files")
-	syscallCmd.Flags().StringP("output", "o", "", "Output JSON files")
+	syscallCmd.Flags().BoolP("gen", "g", false, "Generate syscall table data gzip file")
+	syscallCmd.Flags().StringP("output", "o", "", "Output gzip file")
 	syscallCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
