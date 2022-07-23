@@ -127,6 +127,46 @@ type GithubCommit struct {
 	Date time.Time `json:"date,omitempty"`
 }
 
+func GetLatestTag(prod, proxy string, insecure bool, api string) (string, error) {
+	var tags []GithubTag
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/apple-oss-distributions/"+prod+"/tags", nil)
+	if err != nil {
+		return "", fmt.Errorf("cannot create http request: %v", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("client failed to perform request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("failed to connect to URL: %s", resp.Status)
+	}
+
+	document, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read github api JSON: %v", err)
+	}
+
+	if err := json.Unmarshal(document, &tags); err != nil {
+		return "", fmt.Errorf("failed to unmarshal the github api JSON: %v", err)
+	}
+
+	return tags[0].Name, nil
+}
+
 func queryAppleGithubRepo(prod, proxy string, insecure bool, api string) (*githubRepo, error) {
 	var repo githubRepo
 	req, err := http.NewRequest("GET", "https://api.github.com/repos/apple-oss-distributions/"+prod, nil)

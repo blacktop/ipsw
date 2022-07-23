@@ -103,6 +103,7 @@ func init() {
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
 	entCmd.Flags().String("db", "", "Path to entitlement database to use")
 	entCmd.Flags().StringP("file", "f", "", "Output entitlements for file")
+	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 }
 
 // entCmd represents the ent command
@@ -120,6 +121,7 @@ var entCmd = &cobra.Command{
 		entitlement, _ := cmd.Flags().GetString("ent")
 		entDBPath, _ := cmd.Flags().GetString("db")
 		searchFile, _ := cmd.Flags().GetString("file")
+		doDiff, _ := cmd.Flags().GetBool("diff")
 
 		if len(entitlement) == 0 && len(searchFile) == 0 {
 			log.Errorf("you must supply a --ent OR --file")
@@ -142,6 +144,7 @@ var entCmd = &cobra.Command{
 
 		entDB := make(map[string]string)
 
+		// create or load entitlement database
 		if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
 			log.Info("Generating entitlement database file...")
 
@@ -218,7 +221,9 @@ var entCmd = &cobra.Command{
 			edbFile.Close()
 		}
 
-		if len(searchFile) > 0 {
+		if doDiff {
+			return fmt.Errorf("--diff is not implemented yet")
+		} else if len(searchFile) > 0 {
 			for f, ent := range entDB {
 				if strings.Contains(strings.ToLower(f), strings.ToLower(searchFile)) {
 					log.Infof(f)
@@ -246,8 +251,9 @@ var entCmd = &cobra.Command{
 								if v {
 									fmt.Fprintf(w, "%s\t%s\n", k, f)
 								}
-							case []string:
-								fmt.Fprintf(w, "%s\t(%s)\t%s\n", k, strings.Join(v, ", "), f)
+							case string:
+								fmt.Fprintf(w, "%s\t%s\n", k, f)
+								fmt.Fprintf(w, " - %s\n", v)
 							case []any:
 								fmt.Fprintf(w, "%s\t%s\n", k, f)
 								for _, i := range v {
