@@ -92,11 +92,16 @@ type Sysent struct {
 	Name   string
 	Number int
 	Proto  string
+	New    bool
 	sysent
 }
 
 func (s Sysent) String() string {
-	return fmt.Sprintf("%d:\t%s\tcall=%#x\tmunge=%#x\tret=%s\tnarg=%d (bytes=%d)\t%s", s.Number, s.Name, s.Call, s.Munge, s.ReturnType, s.NArg, s.ArgBytes, s.Proto)
+	var isNew string
+	if s.New {
+		isNew = "(found 🆕 syscall)"
+	}
+	return fmt.Sprintf("%d:\t%s\tcall=%#x\tmunge=%#x\tret=%s\tnarg=%d (bytes=%d)\t%s%s", s.Number, s.Name, s.Call, s.Munge, s.ReturnType, s.NArg, s.ArgBytes, s.Proto, isNew)
 }
 
 func getSyscallData() (*SyscallData, error) {
@@ -143,7 +148,7 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 			return nil, err
 		}
 
-		sysents := make([]sysent, SYS_MAXSYSCALL)
+		sysents := make([]sysent, SYS_MAXSYSCALL+20)
 
 		pattern, err := hex.DecodeString(syscall2Pattern)
 		if err != nil {
@@ -158,6 +163,13 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 			}
 			// fixup syscall table call/munge addresses
 			for idx, sc := range sysents {
+				isNew := false
+				if sc.ReturnType > RET_UINT64_T || sc.ReturnType < RET_NONE {
+					break
+				}
+				if idx > SYS_MAXSYSCALL {
+					isNew = true
+				}
 				sysents[idx].Call = m.SlidePointer(sc.Call)
 				sysents[idx].Munge = m.SlidePointer(sc.Munge)
 				name := "enosys"
@@ -172,6 +184,7 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 					Name:   name,
 					Number: idx,
 					Proto:  proto,
+					New:    isNew,
 					sysent: sysents[idx],
 				})
 			}
@@ -301,7 +314,7 @@ func ParseSyscallsMaster() (map[int]sysMaster, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to convert %s to int: %v", match[1], err)
 			}
-			if _, ok := syscalls[num]; ok {
+			if _, ok := syscalls[num]; ok { // already have this syscall
 				if match[2] != "AUE_NULL" {
 					syscalls[num] = sysMaster{
 						Audit:       match[2],
