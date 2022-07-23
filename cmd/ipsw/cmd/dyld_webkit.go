@@ -29,6 +29,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -134,7 +135,10 @@ var webkitCmd = &cobra.Command{
 			}
 			for _, tag := range tags {
 				if strings.Contains(tag.Name, m.SourceVersion().Version) {
-					log.Infof("WebKit Version: %s (git tag '%s', url='%s', date='%s')", m.SourceVersion().Version, tag.Name, tag.TarURL, tag.Commit.Date.Format("02Jan2006 15:04:05"))
+					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+					utils.Indent(log.Info, 1)(fmt.Sprintf("git tag '%s'", tag.Name))
+					utils.Indent(log.Info, 1)(fmt.Sprintf("URL '%s'", tag.TarURL))
+					utils.Indent(log.Info, 1)(fmt.Sprintf("Date '%s'", tag.Commit.Date.Format("02Jan2006 15:04:05")))
 					return nil
 				}
 			}
