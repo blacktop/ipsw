@@ -20,6 +20,7 @@ import (
 
 const (
 	typeProfile           = 0x0000
+	typeProfile2          = 0x4000 // another profile type
 	typeCollection        = 0x8000
 	tagPtrMask            = 0xffff000000000000
 	profileInitPanic      = "failed to initialize platform sandbox"
@@ -33,7 +34,7 @@ type Sandbox struct {
 	OpNodes    []OperationNode
 	Regexes    []*Regex
 	Globals    []string
-	Modifiers  []string
+	Policies   []uint16
 	Operations []string
 
 	sbData     []byte
@@ -49,35 +50,35 @@ type Sandbox struct {
 }
 
 type header struct {
-	Type                    uint16
-	OpNodeCount             uint16
-	OpCount                 uint8
-	GlobalVarCount          uint8
-	ProfileCount            uint16
-	RegexItemCount          uint16
-	ModifierDescriptorCount uint16
+	Type           uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	PolicyCount    uint16
 }
 
 type header14 struct {
-	Type                    uint16
-	OpNodeCount             uint16
-	OpCount                 uint8
-	GlobalVarCount          uint8
-	ProfileCount            uint16
-	RegexItemCount          uint16
-	ModifierDescriptorCount uint16
+	Type           uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	PolicyCount    uint16
 }
 
 type header15 struct {
-	Type                    uint16
-	OpNodeCount             uint16
-	OpCount                 uint8
-	GlobalVarCount          uint8
-	Unknown1                uint8
-	Unknown2                uint8
-	ProfileCount            uint16
-	RegexItemCount          uint16
-	ModifierDescriptorCount uint16
+	Type           uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	Unknown1       uint8
+	Unknown2       uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	PolicyCount    uint16
 }
 
 type profile14 struct {
@@ -370,7 +371,7 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
-	modifierDescriptorOffsets := make([]uint16, sb.Hdr.ModifierDescriptorCount)
+	modifierDescriptorOffsets := make([]uint16, sb.Hdr.PolicyCount)
 	if err := binary.Read(r, binary.LittleEndian, &modifierDescriptorOffsets); err != nil {
 		return fmt.Errorf("failed to read sandbox profile modifier descriptor offets: %v", err)
 	}
@@ -472,9 +473,10 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
-	modifierDescriptorOffsets := make([]uint16, sb.Hdr.ModifierDescriptorCount)
-	if err := binary.Read(r, binary.LittleEndian, &modifierDescriptorOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox profile modifier descriptor offets: %v", err)
+	utils.Indent(log.Debug, 2)("Parsing policies")
+	sb.Policies = make([]uint16, sb.Hdr.PolicyCount)
+	if err := binary.Read(r, binary.LittleEndian, &sb.Policies); err != nil {
+		return fmt.Errorf("failed to read sandbox profile policies: %v", err)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing profiles (%d)", sb.Hdr.ProfileCount))
@@ -521,11 +523,11 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		r.Seek(sb.baseOffset+int64(prof.nameOffset)*8, io.SeekStart)
 		var size uint16
 		if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-			return fmt.Errorf("failed to read sandbox collection global variable size: %v", err)
+			return fmt.Errorf("failed to read sandbox collection profile name size: %v", err)
 		}
 		name := make([]byte, size)
 		if err := binary.Read(r, binary.LittleEndian, &name); err != nil {
-			return fmt.Errorf("failed to read sandbox collection global variable data: %v", err)
+			return fmt.Errorf("failed to read sandbox collection profile name data: %v", err)
 		}
 		sb.Profiles[idx].Name = strings.Trim(string(name[:]), "\x00")
 	}
@@ -563,24 +565,6 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		sb.Globals = append(sb.Globals, strings.Trim(string(gdat[:]), "\x00"))
 		utils.Indent(log.Debug, 3)(sb.Globals[idx])
 	}
-
-	// utils.Indent(log.Debug, 2)("Parsing modifier descriptors")
-	// for _, moff := range modifierDescriptorOffsets {
-	// 	loc, _ := r.Seek(int64(moff)*8, io.SeekStart)
-	// 	// loc, _ := r.Seek(sb.baseOffset+int64(moff)*8, io.SeekStart)
-	// 	// loc, _ := r.Seek(sb.baseOffset+int64(moff), io.SeekStart)
-	// 	fmt.Printf("mod loc: %#x\n", loc)
-	// 	// var size uint16
-	// 	var size byte
-	// 	if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-	// 		return fmt.Errorf("failed to read sandbox collection modifier descriptor size: %v", err)
-	// 	}
-	// 	mdat := make([]byte, size)
-	// 	if err := binary.Read(r, binary.LittleEndian, &mdat); err != nil {
-	// 		return fmt.Errorf("failed to read sandbox collection modifier descriptor data: %v", err)
-	// 	}
-	// 	sb.Modifiers = append(sb.Modifiers, string(mdat))
-	// }
 
 	return nil
 }
@@ -830,7 +814,20 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 
 	hook_policy_init, err := m.GetFunctionForVMAddr(panicXrefVMAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find _hook_policy_init function: %w", err)
+		hook_proc_check_migroutine_invoke_sym, err := m.FindSymbolAddress("_hook_proc_check_migroutine_invoke")
+		if err != nil {
+			return nil, fmt.Errorf("failed to find _hook_proc_check_migroutine_invoke: %w", err)
+		}
+		hook_policy_init_sym, err := m.FindSymbolAddress("_hook_policy_init")
+		if err != nil {
+			return nil, fmt.Errorf("failed to find _hook_policy_init: %w", err)
+		}
+		hook_policy_init = types.Function{
+			Name:      "_hook_policy_init",
+			StartAddr: hook_policy_init_sym,
+			EndAddr:   hook_proc_check_migroutine_invoke_sym,
+		}
+		// return nil, fmt.Errorf("failed to find _hook_policy_init function: %w", err)
 	}
 
 	data, err := m.GetFunctionData(hook_policy_init)
@@ -910,7 +907,7 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.GlobalVarCount = v.GlobalVarCount
 		sb.Hdr.ProfileCount = v.ProfileCount
 		sb.Hdr.RegexItemCount = v.RegexItemCount
-		sb.Hdr.ModifierDescriptorCount = v.ModifierDescriptorCount
+		sb.Hdr.PolicyCount = v.PolicyCount
 	case *header15:
 		sb.Hdr.Type = v.Type
 		sb.Hdr.OpNodeCount = v.OpNodeCount
@@ -918,7 +915,7 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.GlobalVarCount = v.GlobalVarCount
 		sb.Hdr.ProfileCount = v.ProfileCount
 		sb.Hdr.RegexItemCount = v.RegexItemCount
-		sb.Hdr.ModifierDescriptorCount = v.ModifierDescriptorCount
+		sb.Hdr.PolicyCount = v.PolicyCount
 	default:
 		return fmt.Errorf("unknown profile header type: %T", v)
 	}
