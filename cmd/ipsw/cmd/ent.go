@@ -37,6 +37,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 )
 
@@ -106,6 +107,92 @@ func init() {
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 }
 
+func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, error) {
+	entDB := make(map[string]string)
+
+	i, err := info.Parse(ipswPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+
+	// create or load entitlement database
+	if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
+		log.Info("Generating entitlement database file...")
+
+		if appOS, err := i.GetAppOsDmg(); err == nil {
+			if ents, err := scanEnts(ipswPath, appOS, "AppOS"); err != nil {
+				return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+			} else {
+				for k, v := range ents {
+					entDB[k] = v
+				}
+			}
+		}
+		if systemOS, err := i.GetSystemOsDmg(); err == nil {
+			if ents, err := scanEnts(ipswPath, systemOS, "SystemOS"); err != nil {
+				return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
+			} else {
+				for k, v := range ents {
+					entDB[k] = v
+				}
+			}
+		}
+		if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+			if ents, err := scanEnts(ipswPath, fsOS, "filesystem"); err != nil {
+				return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
+			} else {
+				for k, v := range ents {
+					entDB[k] = v
+				}
+			}
+		}
+
+		buff := new(bytes.Buffer)
+
+		e := gob.NewEncoder(buff)
+
+		// Encoding the map
+		err := e.Encode(entDB)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode entitlement db to binary: %v", err)
+		}
+
+		of, err := os.Create(entDBPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create file %s: %v", ipswPath+".entDB", err)
+		}
+		defer of.Close()
+
+		gzw := gzip.NewWriter(of)
+		defer gzw.Close()
+
+		if _, err := buff.WriteTo(gzw); err != nil {
+			return nil, fmt.Errorf("failed to write entitlement db to gzip file: %v", err)
+		}
+	} else {
+		log.Info("Found ipsw entitlement database file...")
+
+		edbFile, err := os.Open(entDBPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open entitlement database file %s; %v", entDBPath, err)
+		}
+		defer edbFile.Close()
+
+		gzr, err := gzip.NewReader(edbFile)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %v", err)
+		}
+		defer gzr.Close()
+
+		// Decoding the serialized data
+		if err := gob.NewDecoder(gzr).Decode(&entDB); err != nil {
+			return nil, fmt.Errorf("failed to decode entitlement database; %v", err)
+		}
+	}
+
+	return entDB, nil
+}
+
 // entCmd represents the ent command
 var entCmd = &cobra.Command{
 	Use:          "ent <IPSW>",
@@ -123,11 +210,11 @@ var entCmd = &cobra.Command{
 		searchFile, _ := cmd.Flags().GetString("file")
 		doDiff, _ := cmd.Flags().GetBool("diff")
 
-		if len(entitlement) == 0 && len(searchFile) == 0 {
-			log.Errorf("you must supply a --ent OR --file")
-			return nil
-		} else if len(entitlement) > 0 && len(searchFile) > 0 {
+		if len(entitlement) > 0 && len(searchFile) > 0 {
 			log.Errorf("you can only use --ent OR --file (not both)")
+			return nil
+		} else if len(entitlement) > 0 && doDiff {
+			log.Errorf("you can only use --ent OR --diff (not both)")
 			return nil
 		}
 
@@ -137,93 +224,77 @@ var entCmd = &cobra.Command{
 			entDBPath = strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
 		}
 
-		i, err := info.Parse(ipswPath)
+		entDB, err := getEntitlementDatabase(ipswPath, entDBPath)
 		if err != nil {
-			return fmt.Errorf("failed to parse IPSW: %v", err)
-		}
-
-		entDB := make(map[string]string)
-
-		// create or load entitlement database
-		if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
-			log.Info("Generating entitlement database file...")
-
-			if appOS, err := i.GetAppOsDmg(); err == nil {
-				if ents, err := scanEnts(ipswPath, appOS, "AppOS"); err != nil {
-					return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
-				} else {
-					for k, v := range ents {
-						entDB[k] = v
-					}
-				}
-			}
-			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				if ents, err := scanEnts(ipswPath, systemOS, "SystemOS"); err != nil {
-					return fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
-				} else {
-					for k, v := range ents {
-						entDB[k] = v
-					}
-				}
-			}
-			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				if ents, err := scanEnts(ipswPath, fsOS, "filesystem"); err != nil {
-					return fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
-				} else {
-					for k, v := range ents {
-						entDB[k] = v
-					}
-				}
-			}
-
-			buff := new(bytes.Buffer)
-
-			e := gob.NewEncoder(buff)
-
-			// Encoding the map
-			err := e.Encode(entDB)
-			if err != nil {
-				return fmt.Errorf("failed to encode entitlement db to binary: %v", err)
-			}
-
-			of, err := os.Create(entDBPath)
-			if err != nil {
-				return fmt.Errorf("failed to create file %s: %v", ipswPath+".entDB", err)
-			}
-			defer of.Close()
-
-			gzw := gzip.NewWriter(of)
-			defer gzw.Close()
-
-			_, err = buff.WriteTo(gzw)
-			if err != nil {
-				return fmt.Errorf("failed to write entitlement db to gzip file: %v", err)
-			}
-		} else {
-			log.Info("Found ipsw entitlement database file...")
-
-			edbFile, err := os.Open(entDBPath)
-			if err != nil {
-				return fmt.Errorf("failed to open entitlement database file %s; %v", entDBPath, err)
-			}
-
-			gzr, err := gzip.NewReader(edbFile)
-			if err != nil {
-				return fmt.Errorf("failed to create gzip reader: %v", err)
-			}
-
-			// Decoding the serialized data
-			err = gob.NewDecoder(gzr).Decode(&entDB)
-			if err != nil {
-				return fmt.Errorf("failed to decode entitlement database; %v", err)
-			}
-			gzr.Close()
-			edbFile.Close()
+			return fmt.Errorf("failed to get entitlement database: %v", err)
 		}
 
 		if doDiff {
-			return fmt.Errorf("--diff is not implemented yet")
-		} else if len(searchFile) > 0 {
+			ipswPath2 := filepath.Clean(args[1])
+			entDBPath2 := strings.TrimSuffix(ipswPath2, filepath.Ext(ipswPath2)) + ".entDB"
+
+			entDB2, err := getEntitlementDatabase(ipswPath2, entDBPath2)
+			if err != nil {
+				return fmt.Errorf("failed to get entitlement database: %v", err)
+			}
+
+			dmp := diffmatchpatch.New()
+
+			if len(searchFile) > 0 {
+				for f2, ent2 := range entDB2 {
+					if strings.Contains(strings.ToLower(f2), strings.ToLower(searchFile)) {
+						if e, ok := entDB[f2]; ok {
+							log.Infof(f2)
+							diffs := dmp.DiffMain(e, ent2, false)
+							if len(diffs) > 2 {
+								diffs = dmp.DiffCleanupSemantic(diffs)
+								diffs = dmp.DiffCleanupEfficiency(diffs)
+							}
+							if len(diffs) == 0 {
+								utils.Indent(log.Info, 2)("No differences found")
+							} else if len(diffs) == 1 {
+								if diffs[0].Type == diffmatchpatch.DiffEqual {
+									utils.Indent(log.Info, 2)("No differences found")
+								} else {
+									fmt.Println(dmp.DiffPrettyText(diffs))
+								}
+							} else {
+								fmt.Println(dmp.DiffPrettyText(diffs))
+							}
+						} else {
+							log.Errorf("file %s is NEW and not found in first IPSW", f2)
+							fmt.Println(ent2)
+						}
+					}
+				}
+			} else {
+				for f2, e2 := range entDB2 {
+					if e, ok := entDB[f2]; ok {
+						diffs := dmp.DiffMain(e, e2, false)
+						if len(diffs) > 2 {
+							diffs = dmp.DiffCleanupSemantic(diffs)
+							diffs = dmp.DiffCleanupEfficiency(diffs)
+						}
+						if len(diffs) == 0 {
+							continue
+						} else if len(diffs) == 1 {
+							if diffs[0].Type == diffmatchpatch.DiffEqual {
+								continue
+							} else {
+								fmt.Printf("\n%s\n\n", f2)
+								fmt.Println(dmp.DiffPrettyText(diffs))
+							}
+						} else {
+							fmt.Printf("\n%s\n\n", f2)
+							fmt.Println(dmp.DiffPrettyText(diffs))
+						}
+					} else {
+						fmt.Printf("\n🆕 %s 🆕\n\n%s", f2, e2)
+					}
+				}
+			}
+			return nil
+		} else if len(searchFile) > 0 { // DUMP FILE'S ENTITLEMENTS
 			for f, ent := range entDB {
 				if strings.Contains(strings.ToLower(f), strings.ToLower(searchFile)) {
 					log.Infof(f)
@@ -234,7 +305,7 @@ var entCmd = &cobra.Command{
 					}
 				}
 			}
-		} else {
+		} else if len(entitlement) > 0 { // FIND ALL FILES WITH ENTITLEMENT
 			log.Infof("Files containing entitlement: %s", entitlement)
 			fmt.Println()
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
@@ -267,6 +338,10 @@ var entCmd = &cobra.Command{
 				}
 			}
 			w.Flush()
+		} else { // DUMP ALL ENTITLEMENTS
+			for f, ent := range entDB {
+				fmt.Printf("%s\n\n%s\n", f, ent)
+			}
 		}
 
 		return nil
