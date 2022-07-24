@@ -1,4 +1,4 @@
-name: "AppleMETA"
+name: "WebKitMETA"
 
 on:
   push:
@@ -34,18 +34,18 @@ jobs:
         make setup
         make build
     - name: Run download git --json --webkit
-      run: ./ipsw download git --json --api ${{ secrets.GITHUB_TOKEN }} --output /tmp
+      run: ./ipsw download git --json --api ${{ secrets.GITHUB_TOKEN }} --output /tmp --webkit
     - name: Switch branch
       run: |
         git stash
         git checkout apple_meta
-    - name: Commit JSON
+    - name: Commit WebKit JSON
       run: |
         go install github.com/josephburnett/jd@v1.5.1
-        jd -set /tmp/tag_links.json github/tag_links.json || true
-        mv /tmp/tag_links.json github/tag_links.json
-        git --no-pager diff github/tag_links.json
+        jd -set /tmp/webkit_tags.json github/webkit_tags.json || true
+        mv /tmp/webkit_tags.json github/webkit_tags.json
+        git --no-pager diff github/webkit_tags.json
         git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git config --local user.name "github-actions[bot]"
-        git commit -am "AppleMETA refresh"
+        git commit -am "AppleMETA WebKit refresh"
         git push

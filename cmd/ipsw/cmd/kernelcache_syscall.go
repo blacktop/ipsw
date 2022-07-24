@@ -22,10 +22,10 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
-	"time"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -34,35 +34,17 @@ import (
 )
 
 func init() {
-	kernelcacheCmd.AddCommand(kernelVersionCmd)
-	kernelVersionCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	kernelVersionCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache.*")
-	// kernelVersionCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// 	return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
-	// }
+	kernelcacheCmd.AddCommand(syscallCmd)
+	syscallCmd.Flags().BoolP("gen", "g", false, "Generate syscall table data gzip file")
+	syscallCmd.Flags().StringP("output", "o", "", "Output gzip file")
+	syscallCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
-type kernVersion struct {
-	Kernel struct {
-		Darwin string    `json:"darwin,omitempty"`
-		Date   time.Time `json:"date,omitempty"`
-		XNU    string    `json:"xnu,omitempty"`
-		Type   string    `json:"type,omitempty"`
-		Arch   string    `json:"arch,omitempty"`
-		CPU    string    `json:"cpu,omitempty"`
-	} `json:"kernel,omitempty"`
-	LLVM struct {
-		Version string   `json:"version,omitempty"`
-		Clang   string   `json:"clang,omitempty"`
-		Flags   []string `json:"flags,omitempty"`
-	} `json:"llvm,omitempty"`
-}
-
-// kernelVersionCmd represents the version command
-var kernelVersionCmd = &cobra.Command{
-	Use:           "version",
-	Short:         "Dump kernelcache version",
-	Args:          cobra.MinimumNArgs(1),
+// syscallCmd represents the syscall command
+var syscallCmd = &cobra.Command{
+	Use:           "syscall",
+	Short:         "Dump kernelcache syscalls",
+	Args:          cobra.MinimumNArgs(0),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -71,7 +53,16 @@ var kernelVersionCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		asJSON, _ := cmd.Flags().GetBool("json")
+		gen, _ := cmd.Flags().GetBool("gen")
+		output, _ := cmd.Flags().GetString("output")
+
+		if gen {
+			return kernelcache.ParseSyscallFiles(output)
+		}
+
+		if len(args) == 0 {
+			return fmt.Errorf("no kernelcache files specified")
+		}
 
 		machoPath := filepath.Clean(args[0])
 
@@ -79,22 +70,18 @@ var kernelVersionCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		defer m.Close()
 
-		kv, err := kernelcache.GetVersion(m)
+		syscalls, err := kernelcache.GetSyscallTable(m)
 		if err != nil {
 			return err
 		}
 
-		if asJSON {
-			o, err := json.Marshal(kv)
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(o))
-			return nil
+		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		for _, syscall := range syscalls {
+			fmt.Fprintf(w, "%s\n", syscall)
 		}
-
-		fmt.Println(kv)
+		w.Flush()
 
 		return nil
 	},
