@@ -98,15 +98,6 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 	return entDB, nil
 }
 
-func init() {
-	rootCmd.AddCommand(entCmd)
-
-	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
-	entCmd.Flags().String("db", "", "Path to entitlement database to use")
-	entCmd.Flags().StringP("file", "f", "", "Output entitlements for file")
-	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
-}
-
 func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 	entDB := make(map[string]string)
 
@@ -191,6 +182,15 @@ func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, erro
 	}
 
 	return entDB, nil
+}
+
+func init() {
+	rootCmd.AddCommand(entCmd)
+
+	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
+	entCmd.Flags().String("db", "", "Path to entitlement database to use")
+	entCmd.Flags().StringP("file", "f", "", "Output entitlements for file")
+	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 }
 
 // entCmd represents the ent command
