@@ -51,6 +51,12 @@ const (
 	INSTR_TYPE_UNKNOWN2 = 1 << 4 // 16
 )
 
+type Modifier struct {
+	ID          uint8
+	PolicyOpIdx uint8
+	Argument    uint16
+}
+
 // TerminalNode a terminal node, when reached, either denies or allows the rule.
 type TerminalNode uint64
 
@@ -75,6 +81,13 @@ func (n TerminalNode) ActionModifiers() uint32 {
 func (n TerminalNode) ModParts() (uint16, uint16) {
 	return uint16(types.ExtractBits(uint64(n), 48, 16)), uint16(types.ExtractBits(uint64(n), 32, 16))
 }
+func (n TerminalNode) Modifier() Modifier {
+	return Modifier{
+		ID:          uint8(types.ExtractBits(uint64(n), 32, 8)),
+		PolicyOpIdx: uint8(types.ExtractBits(uint64(n), 40, 8)),
+		Argument:    uint16(types.ExtractBits(uint64(n), 48, 16)),
+	}
+}
 func (n TerminalNode) IsAllow() bool {
 	return n.Action() == TERMINAL_NODE_TYPE_ALLOW
 }
@@ -90,12 +103,12 @@ func (n TerminalNode) Decision() string {
 func (n TerminalNode) String() string {
 	var mod string
 	if n.ActionInline() {
-		car, cdr := n.ModParts()
-		mod = fmt.Sprintf("action-inline(%d, %#x), ", car, cdr)
+		m := n.Modifier()
+		mod = fmt.Sprintf("action-inline(%v), ", m)
 	} else {
-		car, cdr := n.ModParts()
-		if cdr > 0 {
-			mod = fmt.Sprintf("modifiers(%d, %d), ", car, cdr)
+		m := n.Modifier()
+		if m.Argument > 0 {
+			mod = fmt.Sprintf("modifiers(%v), ", m)
 		}
 	}
 	return fmt.Sprintf("terminal (%s type: %d, flag: %#x, %sraw: %#016x)",
@@ -284,8 +297,8 @@ func (o *Operation) String(indent int) string {
 		if node.ActionInline() {
 			out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
 		} else {
-			_, cdr := node.ModParts()
-			if cdr > 0 {
+			mod := node.Modifier()
+			if mod.Argument > 0 {
 				out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
 			} else {
 				out = fmt.Sprintf("(%s %s)", node.Decision(), o.Name)
