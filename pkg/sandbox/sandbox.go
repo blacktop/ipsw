@@ -28,6 +28,13 @@ const (
 	collectionInitPanic15 = "failed to initialize builtin collection"
 )
 
+type sbmode uint8
+
+const (
+	COLLECTION sbmode = iota
+	PROFILE
+)
+
 type Sandbox struct {
 	Hdr        header
 	Profiles   []Profile
@@ -36,10 +43,12 @@ type Sandbox struct {
 	Globals    []string
 	Policies   []uint16
 	Operations []string
+	Unknown    []byte
 
-	sbData     []byte
-	baseOffset int64
-	ops        map[OperationNode]*Operation // cache of parsed operations
+	sbProfileData    []byte
+	sbCollectionData []byte
+	baseOffset       int64
+	ops              map[OperationNode]*Operation // cache of parsed operations
 
 	config        Config
 	darwin        *version.Version
@@ -57,6 +66,7 @@ type header struct {
 	ProfileCount   uint16
 	RegexItemCount uint16
 	PolicyCount    uint16
+	Unknown        uint8
 }
 
 type header14 struct {
@@ -79,6 +89,19 @@ type header15 struct {
 	ProfileCount   uint16
 	RegexItemCount uint16
 	PolicyCount    uint16
+}
+
+type header16 struct {
+	Type           uint16
+	OpNodeCount    uint16
+	OpCount        uint8
+	GlobalVarCount uint8
+	Unknown1       uint8
+	Unknown2       uint8
+	ProfileCount   uint16
+	RegexItemCount uint16
+	PolicyCount    uint16
+	Unknown3       uint16
 }
 
 type profile14 struct {
@@ -115,6 +138,7 @@ type Config struct {
 	profileInitArgs     []string
 	collectionInitPanic string
 	collectionInitArgs  []string
+	sbMode              sbmode
 }
 
 func NewSandbox(c *Config) (*Sandbox, error) {
@@ -173,7 +197,7 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
 	} else if iOS16x.Check(sb.darwin) {
-		sb.config.sbHeader = &header15{}
+		sb.config.sbHeader = &header16{}
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
@@ -191,6 +215,13 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 	}
 
 	return &sb, nil
+}
+
+func (sb *Sandbox) GetSBData() []byte {
+	if sb.config.sbMode == COLLECTION {
+		return sb.sbCollectionData
+	}
+	return sb.sbProfileData
 }
 
 func (sb *Sandbox) GetOperations() ([]string, error) {
@@ -261,17 +292,19 @@ func (sb *Sandbox) GetOperations() ([]string, error) {
 }
 
 func (sb *Sandbox) GetCollectionData() ([]byte, error) {
-	if len(sb.sbData) > 0 {
-		return sb.sbData, nil
+	sb.config.sbMode = COLLECTION
+
+	if len(sb.sbCollectionData) > 0 {
+		return sb.sbCollectionData, nil
 	}
 
 	if len(sb.config.ProfileBinPath) > 0 {
 		var err error
-		sb.sbData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		sb.sbCollectionData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read sandbox collection profile data file: %w", err)
 		}
-		return sb.sbData, nil
+		return sb.sbCollectionData, nil
 	}
 
 	log.Info("Searching for sandbox collection data")
@@ -294,26 +327,28 @@ func (sb *Sandbox) GetCollectionData() ([]byte, error) {
 		return nil, fmt.Errorf("failed to get offset for _collection_data: %w", err)
 	}
 
-	sb.sbData = make([]byte, collection_data_size)
-	if _, err = sb.config.Kernel.ReadAt(sb.sbData, int64(collectionOffset)); err != nil {
+	sb.sbCollectionData = make([]byte, collection_data_size)
+	if _, err = sb.config.Kernel.ReadAt(sb.sbCollectionData, int64(collectionOffset)); err != nil {
 		return nil, fmt.Errorf("failed to read _collection_data: %w", err)
 	}
 
-	return sb.sbData, nil
+	return sb.sbCollectionData, nil
 }
 
 func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
-	if len(sb.sbData) > 0 {
-		return sb.sbData, nil
+	sb.config.sbMode = PROFILE
+
+	if len(sb.sbProfileData) > 0 {
+		return sb.sbProfileData, nil
 	}
 
 	if len(sb.config.ProfileBinPath) > 0 {
 		var err error
-		sb.sbData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		sb.sbProfileData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read platform profile data file: %w", err)
 		}
-		return sb.sbData, nil
+		return sb.sbProfileData, nil
 	}
 
 	log.Info("Searching for sandbox platform profile data")
@@ -332,12 +367,12 @@ func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
 		return nil, fmt.Errorf("failed to get offset for _platform_profile_data: %w", err)
 	}
 
-	sb.sbData = make([]byte, platform_profile_data_size)
-	if _, err = sb.config.Kernel.ReadAt(sb.sbData, int64(profileOffset)); err != nil {
+	sb.sbProfileData = make([]byte, platform_profile_data_size)
+	if _, err = sb.config.Kernel.ReadAt(sb.sbProfileData, int64(profileOffset)); err != nil {
 		return nil, fmt.Errorf("failed to read _platform_profile_data: %w", err)
 	}
 
-	return sb.sbData, nil
+	return sb.sbProfileData, nil
 }
 
 func (sb *Sandbox) ParseSandboxProfile() error {
@@ -348,7 +383,7 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 
 	log.Info("Parsing sandbox profile data")
 
-	r := bytes.NewReader(sb.sbData)
+	r := bytes.NewReader(sb.GetSBData())
 
 	if err := binary.Read(r, binary.LittleEndian, sb.config.sbHeader); err != nil {
 		return fmt.Errorf("failed to read sandbox profile structure: %v", err)
@@ -450,7 +485,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 
 	log.Info("Parsing sandbox collection data")
 
-	r := bytes.NewReader(sb.sbData)
+	r := bytes.NewReader(sb.GetSBData())
 
 	if err := binary.Read(r, binary.LittleEndian, sb.config.sbHeader); err != nil {
 		return fmt.Errorf("failed to read sandbox profile collection structure: %v", err)
@@ -477,6 +512,14 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 	sb.Policies = make([]uint16, sb.Hdr.PolicyCount)
 	if err := binary.Read(r, binary.LittleEndian, &sb.Policies); err != nil {
 		return fmt.Errorf("failed to read sandbox profile policies: %v", err)
+	}
+
+	if sb.Hdr.Unknown > 0 {
+		utils.Indent(log.Debug, 2)("Parsing unknown NEW iOS16 thing (sha1 hash??)")
+		sb.Unknown = make([]uint8, 38)
+		if err := binary.Read(r, binary.LittleEndian, &sb.Unknown); err != nil {
+			return fmt.Errorf("failed to read sandbox profile iOS16.x unknowns: %v", err)
+		}
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing profiles (%d)", sb.Hdr.ProfileCount))
@@ -530,6 +573,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 			return fmt.Errorf("failed to read sandbox collection profile name data: %v", err)
 		}
 		sb.Profiles[idx].Name = strings.Trim(string(name[:]), "\x00")
+		log.Debug(sb.Profiles[idx].Name)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing regex (%d)", sb.Hdr.RegexItemCount))
@@ -579,11 +623,11 @@ func (sb *Sandbox) GetProfile(name string) (Profile, error) {
 }
 
 func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
-	if len(sb.sbData) == 0 {
+	if len(sb.GetSBData()) == 0 {
 		return "", fmt.Errorf("sandbox data not loaded")
 	}
 
-	r := bytes.NewReader(sb.sbData)
+	r := bytes.NewReader(sb.GetSBData())
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -602,10 +646,10 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 
 // FIXME: not sure how this works yet (look at func 'generate_syscallmask' in libsandbox.1.dylib)
 func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]byte, error) {
-	if len(sb.sbData) == 0 {
+	if len(sb.GetSBData()) == 0 {
 		return nil, fmt.Errorf("sandbox data not loaded")
 	}
-	r := bytes.NewReader(sb.sbData)
+	r := bytes.NewReader(sb.GetSBData())
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -636,10 +680,10 @@ func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]byte, error) {
 }
 
 func (sb *Sandbox) GetRSStringAtOffset(offset uint32) ([]string, error) {
-	if len(sb.sbData) == 0 {
+	if len(sb.GetSBData()) == 0 {
 		return nil, fmt.Errorf("sandbox data not loaded")
 	}
-	r := bytes.NewReader(sb.sbData)
+	r := bytes.NewReader(sb.GetSBData())
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -657,11 +701,12 @@ func (sb *Sandbox) GetRSStringAtOffset(offset uint32) ([]string, error) {
 }
 
 func (sb *Sandbox) GetHostPortAtOffset(offset uint32) (uint16, uint16, error) {
-	if len(sb.sbData) == 0 {
+
+	if len(sb.GetSBData()) == 0 {
 		return 0, 0, fmt.Errorf("sandbox data not loaded")
 	}
 
-	r := bytes.NewReader(sb.sbData)
+	r := bytes.NewReader(sb.GetSBData())
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
 
@@ -916,6 +961,15 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.ProfileCount = v.ProfileCount
 		sb.Hdr.RegexItemCount = v.RegexItemCount
 		sb.Hdr.PolicyCount = v.PolicyCount
+	case *header16:
+		sb.Hdr.Type = v.Type
+		sb.Hdr.OpNodeCount = v.OpNodeCount
+		sb.Hdr.OpCount = v.OpCount
+		sb.Hdr.GlobalVarCount = v.GlobalVarCount
+		sb.Hdr.ProfileCount = v.ProfileCount
+		sb.Hdr.RegexItemCount = v.RegexItemCount
+		sb.Hdr.PolicyCount = v.PolicyCount
+		sb.Hdr.Unknown = v.Unknown1
 	default:
 		return fmt.Errorf("unknown profile header type: %T", v)
 	}

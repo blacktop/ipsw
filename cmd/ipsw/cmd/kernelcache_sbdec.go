@@ -77,7 +77,11 @@ var sbdecCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		var sb *sandbox.Sandbox
+		conf := &sandbox.Config{
+			Kernel:         m,
+			ProfileBinPath: input,
+		}
+
 		if m.FileTOC.FileHeader.Type == types.FileSet {
 			fixups := make(map[uint64]uint64)
 			if m.HasFixups() {
@@ -96,10 +100,13 @@ var sbdecCmd = &cobra.Command{
 					}
 				}
 			}
-			sb, err = sandbox.NewSandbox(&sandbox.Config{Kernel: m, ProfileBinPath: input, Fixups: fixups})
-			if err != nil {
-				return err
-			}
+			conf.Kernel = m
+			conf.Fixups = fixups
+		}
+
+		sb, err := sandbox.NewSandbox(conf)
+		if err != nil {
+			return err
 		}
 
 		if dump {
@@ -121,6 +128,7 @@ var sbdecCmd = &cobra.Command{
 					return fmt.Errorf("failed to write sandbox collection data: %v", err)
 				}
 			}
+			return nil
 		}
 
 		if len(input) > 0 {
