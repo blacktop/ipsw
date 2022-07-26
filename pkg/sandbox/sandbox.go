@@ -572,6 +572,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		"size":  fmt.Sprintf("%#x", sb.baseOffset-opNodeStart),
 	}).Debug, 3)("operation nodes")
 
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Profiles (%d)", sb.Hdr.ProfileCount))
 	for idx, prof := range sb.Profiles {
 		r.Seek(sb.baseOffset+int64(prof.nameOffset)*8, io.SeekStart)
 		var size uint16
@@ -583,7 +584,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 			return fmt.Errorf("failed to read sandbox collection profile name data: %v", err)
 		}
 		sb.Profiles[idx].Name = strings.Trim(string(name[:]), "\x00")
-		log.Debug(sb.Profiles[idx].Name)
+		utils.Indent(log.Debug, 3)(sb.Profiles[idx].Name)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing regex (%d)", sb.Hdr.RegexItemCount))
