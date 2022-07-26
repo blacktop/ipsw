@@ -10,31 +10,24 @@ import (
 	"sort"
 
 	"github.com/apex/log"
+	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
 const (
-	SB_VALUE_TYPE_NONE            = 0 // none
-	SB_VALUE_TYPE_BOOLEAN         = 1 // boolean
-	SB_VALUE_TYPE_BIT_PATTERN     = 2 // bit pattern
-	SB_VALUE_TYPE_INTEGER         = 3 // integer
-	ARG_CTRL                      = 4 // string
-	SB_VALUE_TYPE_STRING          = 5 // pattern
-	ARG_RSS_OFFSET                = 6 // pattern
-	ARG_NOT_SURE_YET              = 7 // <unknown>
-	SB_VALUE_TYPE_PATTERN_LITERAL = 8 // path
-	SB_VALUE_TYPE_NETWORK         = 9 // regex
-	// ??           = 9 // regex
-	// ??           = 10 // network
-
-	SB_VALUE_TYPE_BITMASK = 11
+	SB_VALUE_TYPE_NONE            = 0
+	SB_VALUE_TYPE_BOOL            = 1
+	SB_VALUE_TYPE_BITFIELD        = 2
+	SB_VALUE_TYPE_INTEGER         = 3
+	SB_VALUE_TYPE_STRING          = 4
+	SB_VALUE_TYPE_PATTERN_LITERAL = 5
+	SB_VALUE_TYPE_PATTERN_PREFIX  = 6
+	SB_VALUE_TYPE_PATTERN_SUBPATH = 7
+	SB_VALUE_TYPE_PATTERN_REGEX   = 8
+	SB_VALUE_TYPE_REGEX           = 9
+	SB_VALUE_TYPE_NETWORK         = 10
+	// SB_VALUE_TYPE_BITMASK         = 11
 )
-
-// SB_VALUE_TYPE_STRING
-// SB_VALUE_TYPE_PATTERN_LITERAL
-// SB_VALUE_TYPE_PATTERN_PREFIX
-// SB_VALUE_TYPE_PATTERN_SUBPATH
-// SB_VALUE_TYPE_PATTERN_REGEX
 
 type lsversion uint8
 
@@ -43,8 +36,8 @@ const (
 	IOS16
 )
 
-//go:embed data/libsandbox_12.3.0.gz
-var libsandbox1230Data []byte
+//go:embed data/libsandbox_12.5.0.gz
+var libsandbox1250Data []byte
 
 //go:embed data/libsandbox_13.0.0.gz
 var libsandbox1300Data []byte
@@ -62,7 +55,7 @@ func GetLibSandBoxDB(ver lsversion) (*LibSandbox, error) {
 
 	switch ver {
 	case IOS15:
-		zr, err = gzip.NewReader(bytes.NewReader(libsandbox1230Data))
+		zr, err = gzip.NewReader(bytes.NewReader(libsandbox1250Data))
 		if err != nil {
 			return nil, err
 		}
@@ -82,6 +75,11 @@ func GetLibSandBoxDB(ver lsversion) (*LibSandbox, error) {
 	return lb, nil
 }
 
+// NOTE: bool __fastcall sb_filter_accepts_type(unsigned int a1, unsigned int a2) in libsandbox.1.dylib
+func (db *LibSandbox) FilterAcceptsType(filter *FilterInfo, filterArgType int) bool {
+	return false
+}
+
 func (db *LibSandbox) GetFilter(id uint8) (*FilterInfo, error) {
 	if int(id) >= len(db.Filters) {
 		return nil, fmt.Errorf("invalid filter id: %d", id)
@@ -94,16 +92,16 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 		log.Debugf("💁 %s: type: %#x, arg: %#x, alt: %t\n", f.Name, f.DataType, id, alt)
 	}
 	switch f.DataType {
-	case SB_VALUE_TYPE_BOOLEAN:
+	case SB_VALUE_TYPE_BOOL:
 		if id == 1 {
 			return "#t", nil
 		}
 		return "#f", nil
-	case SB_VALUE_TYPE_BIT_PATTERN:
+	case SB_VALUE_TYPE_BITFIELD:
 		return fmt.Sprintf("#o%04o", id), nil
-	case ARG_CTRL:
+	case SB_VALUE_TYPE_STRING:
 		if alt { // bitmask variant
-			mask, err := sb.GetBitMaskAtOffset(uint32(id)) // TODO: emit_bitmask/generate_syscallmask
+			mask, err := sb.GetBitMaskAtOffset(uint32(id))
 			if err != nil {
 				return nil, err
 			}
@@ -132,15 +130,15 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			return fmt.Sprintf("%d", id), nil
 		}
 		return alias.Name, nil
-	case SB_VALUE_TYPE_STRING:
+	case SB_VALUE_TYPE_PATTERN_LITERAL:
 		s, err := sb.GetStringAtOffset(uint32(id))
 		if err != nil {
 			return nil, err
 		}
 		return s, nil
-	case ARG_RSS_OFFSET, ARG_NOT_SURE_YET:
+	case SB_VALUE_TYPE_PATTERN_PREFIX, SB_VALUE_TYPE_PATTERN_SUBPATH:
 		if alt { // regex variant
-			// n, err := sb.Regexes[id].NFA()
+			// n, err := sb.Regexes[id].NFA() // FIXME: finish NFA implimentation
 			// if err != nil {
 			// 	return nil, err
 			// }
@@ -158,9 +156,9 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			return ss, nil
 			// return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
 		}
-	case SB_VALUE_TYPE_PATTERN_LITERAL:
+	case SB_VALUE_TYPE_PATTERN_REGEX:
 		if alt { // regex variant
-			// n, err := sb.Regexes[id].NFA()
+			// n, err := sb.Regexes[id].NFA() // FIXME: finish NFA implimentation
 			// if err != nil {
 			// 	return nil, err
 			// }
@@ -245,6 +243,59 @@ type alias struct {
 	Padding  uint32 `json:"-"`
 }
 
+func getNumInfoEntries(d *dyld.File) (int, error) {
+	libsand, err := d.Image("libsandbox.1.dylib")
+	if err != nil {
+		return -1, fmt.Errorf("failed to get libsandbox.1.dylib image: %w", err)
+	}
+
+	m, err := libsand.GetMacho()
+	if err != nil {
+		return -1, fmt.Errorf("failed to get libsandbox.1.dylib macho: %w", err)
+	}
+
+	lookup_filter_info, err := m.FindSymbolAddress("_lookup_filter_info")
+	if err != nil {
+		return -1, fmt.Errorf("failed to find _lookup_filter_info symbol: %w", err)
+	}
+
+	lookup_filter_info_fn, err := m.GetFunctionForVMAddr(lookup_filter_info)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get _lookup_filter_info function info: %v", err)
+	}
+
+	data, err := m.GetFunctionData(lookup_filter_info_fn)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get _lookup_filter_info function data: %v", err)
+	}
+
+	instrs, err := disassemble.GetInstructions(lookup_filter_info_fn.StartAddr, data)
+	if err != nil {
+		return -1, fmt.Errorf("failed to disassemble _lookup_filter_info function: %w", err)
+	}
+
+	/****************
+	 * EMULATE FUNC *
+	 ****************/
+	var filterInfoSize int
+	startAddr := lookup_filter_info_fn.StartAddr
+	for _, instr := range instrs {
+		if instr.Operation == disassemble.ARM64_CMP {
+			if len(instr.Operands) > 1 {
+				filterInfoSize = int(instr.Operands[1].Immediate)
+				break
+			} else {
+				log.Errorf("failed to emulate _lookup_filter_info function: code might have changed")
+				log.Errorf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instr.Raw), instr)
+			}
+		}
+		// fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instr.Raw), instr)
+		startAddr += uint64(binary.Size(uint32(0)))
+	}
+
+	return filterInfoSize, nil
+}
+
 func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 	var finfos []FilterInfo
 
@@ -267,8 +318,11 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 		return nil, fmt.Errorf("failed to get _filter_info offset: %w", err)
 	}
 
-	// TODO: maybe get filter info count from xref to _lookup_filter_info (is 0x56 in test libsandbox)
-	NUM_INFO_ENTRIES := 0x59
+	NUM_INFO_ENTRIES, err := getNumInfoEntries(d)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get NUM_INFO_ENTRIES: %v", err)
+	}
+
 	dat, err := d.ReadBytesForUUID(uuid, int64(filterInfoOff), uint64((NUM_INFO_ENTRIES)*binary.Size(filterInfo{})))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read _filter_info data: %w", err)
@@ -346,6 +400,59 @@ type modifierInfo struct {
 	AliasesAddr uint64 `json:"-"`
 }
 
+func getModifierCount(d *dyld.File) (int, error) {
+	libsand, err := d.Image("libsandbox.1.dylib")
+	if err != nil {
+		return -1, fmt.Errorf("failed to get libsandbox.1.dylib image: %w", err)
+	}
+
+	m, err := libsand.GetMacho()
+	if err != nil {
+		return -1, fmt.Errorf("failed to get libsandbox.1.dylib macho: %w", err)
+	}
+
+	sb_modifier_requires_argument, err := m.FindSymbolAddress("_sb_modifier_requires_argument")
+	if err != nil {
+		return -1, fmt.Errorf("failed to find _sb_modifier_requires_argument symbol: %w", err)
+	}
+
+	sb_modifier_requires_argument_fn, err := m.GetFunctionForVMAddr(sb_modifier_requires_argument)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get _sb_modifier_requires_argument function info: %v", err)
+	}
+
+	data, err := m.GetFunctionData(sb_modifier_requires_argument_fn)
+	if err != nil {
+		return -1, fmt.Errorf("failed to get _sb_modifier_requires_argument function data: %v", err)
+	}
+
+	instrs, err := disassemble.GetInstructions(sb_modifier_requires_argument_fn.StartAddr, data)
+	if err != nil {
+		return -1, fmt.Errorf("failed to disassemble _sb_modifier_requires_argument function: %w", err)
+	}
+
+	/****************
+	 * EMULATE FUNC *
+	 ****************/
+	var filterInfoSize int
+	startAddr := sb_modifier_requires_argument_fn.StartAddr
+	for _, instr := range instrs {
+		if instr.Operation == disassemble.ARM64_CMP {
+			if len(instr.Operands) > 1 {
+				filterInfoSize = int(instr.Operands[1].Immediate)
+				break
+			} else {
+				log.Errorf("failed to emulate _sb_modifier_requires_argument function: code might have changed")
+				log.Errorf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instr.Raw), instr)
+			}
+		}
+		// fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instr.Raw), instr)
+		startAddr += uint64(binary.Size(uint32(0)))
+	}
+
+	return filterInfoSize, nil
+}
+
 func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 	var minfos []ModifierInfo
 
@@ -368,9 +475,11 @@ func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 		return nil, fmt.Errorf("failed to get _modifier_info offset: %w", err)
 	}
 
-	// TODO: maybe get SB_MODIFIER_COUNT from xref to ___sb_modifiers_apply_action_flags_block_invoke (is 0x15 in test libsandbox)
-	// SB_MODIFIER_COUNT := 0x15
-	SB_MODIFIER_COUNT := 0x14 // TODO: this changed in macOS 13.0beta1
+	SB_MODIFIER_COUNT, err := getModifierCount(d)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get SB_MODIFIER_COUNT: %v", err)
+	}
+
 	dat, err := d.ReadBytesForUUID(uuid, int64(modifierInfoOff), uint64(SB_MODIFIER_COUNT*binary.Size(modifierInfo{})))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read _modifier_info data: %w", err)
