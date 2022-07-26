@@ -1,16 +1,15 @@
 //------------------------------------------------
 //--- 010 Editor v10.0.1 Binary Template
 //
-//      File: SandboxCollection15.bt
+//      File: SandboxCollection16.bt
 //   Authors: blacktop
-//   Version: 1.5
-//   Purpose: iOS 15.x Sandbox Profile Collection
+//   Version: 1.0
+//   Purpose: iOS 16.x Sandbox Profile Collection
 //  Category: Operating System
 // File Mask:
 //  ID Bytes: 00 80, 00 00, 00 40
 //   History:
-//   1.5  2022-07-25 blacktop: Add support for iOS16.x and process more fields
-//   1.0  2021-04-17 blacktop: Initial header processing
+//   1.0  2022-07-25 blacktop: Add support for iOS16.x and process more fields
 //------------------------------------------------
 
 typedef struct
@@ -24,6 +23,7 @@ typedef struct
     uint16 ProfileCount<format = decimal>;
     uint16 RegexItemCount<format = decimal>;
     uint16 PolicyCount<format = decimal>;
+    uint16 unknown3<format = decimal>;
 } CollectionHeader;
 
 typedef struct
@@ -45,6 +45,8 @@ offset globalsOffsets[header.GlobalVarCount]<format = hex, bgcolor = cLtPurple>;
 offset policyOffsets[header.PolicyCount]<format = hex, bgcolor = cLtAqua>;
 if (header.unknown1 > 0)
     offset entitlements[header.unknown1]<format = hex, bgcolor = cLtRed>;
+if (header.unknown3 > 0)
+    offset unknown_iOS16[header.unknown3]<format = hex, bgcolor = cLtGreen>;
 Profile profiles[header.ProfileCount]<format = hex, bgcolor = cLtGray>;
 local uint64 pos = FTell();
 if (pos % 8)

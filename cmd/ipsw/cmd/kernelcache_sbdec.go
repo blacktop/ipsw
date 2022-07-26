@@ -42,6 +42,7 @@ func init() {
 	sbdecCmd.Flags().BoolP("diff", "f", false, "Diff two kernel's sandbox profiles")
 	sbdecCmd.Flags().BoolP("dump", "d", false, "Dump sandbox profile data")
 	sbdecCmd.Flags().BoolP("profile", "p", false, "Decompile sandbox profile")
+	sbdecCmd.Flags().BoolP("protobox", "b", false, "Decompile sandbox protobox collection")
 	sbdecCmd.Flags().StringP("input", "i", "", "Input sandbox profile binary file")
 	sbdecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
@@ -63,6 +64,7 @@ var sbdecCmd = &cobra.Command{
 		diff, _ := cmd.Flags().GetBool("diff")
 		dump, _ := cmd.Flags().GetBool("dump")
 		decProfile, _ := cmd.Flags().GetBool("profile")
+		decProtobox, _ := cmd.Flags().GetBool("protobox")
 		input, _ := cmd.Flags().GetString("input")
 
 		kcPath := filepath.Clean(args[0])
@@ -110,15 +112,6 @@ var sbdecCmd = &cobra.Command{
 		}
 
 		if dump {
-			if dat, err := sb.GetPlatformProfileData(); err != nil {
-				return fmt.Errorf("failed to get sandbox platform profile data: %v", err)
-			} else {
-				sbppath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
-				log.Infof("Creating %s...", sbppath)
-				if err := ioutil.WriteFile(sbppath, dat, 0755); err != nil {
-					return fmt.Errorf("failed to write sandbox platform profile data: %v", err)
-				}
-			}
 			if dat, err := sb.GetCollectionData(); err != nil {
 				return fmt.Errorf("failed to get sandbox collection data: %v", err)
 			} else {
@@ -126,6 +119,24 @@ var sbdecCmd = &cobra.Command{
 				log.Infof("Creating %s...", sbcpath)
 				if err := ioutil.WriteFile(sbcpath, dat, 0755); err != nil {
 					return fmt.Errorf("failed to write sandbox collection data: %v", err)
+				}
+			}
+			if dat, err := sb.GetProtoboxCollectionData(); err != nil {
+				return fmt.Errorf("failed to get sandbox protobox collection data: %v", err)
+			} else {
+				sbcpath := filepath.Join(filepath.Dir(kcPath), "sandbox_protobox.bin")
+				log.Infof("Creating %s...", sbcpath)
+				if err := ioutil.WriteFile(sbcpath, dat, 0755); err != nil {
+					return fmt.Errorf("failed to write sandbox protobox collection data: %v", err)
+				}
+			}
+			if dat, err := sb.GetPlatformProfileData(); err != nil {
+				return fmt.Errorf("failed to get sandbox platform profile data: %v", err)
+			} else {
+				sbppath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
+				log.Infof("Creating %s...", sbppath)
+				if err := ioutil.WriteFile(sbppath, dat, 0755); err != nil {
+					return fmt.Errorf("failed to write sandbox platform profile data: %v", err)
 				}
 			}
 			return nil
@@ -187,7 +198,17 @@ var sbdecCmd = &cobra.Command{
 			}
 
 			return nil
+		} else if decProtobox {
+			if _, err := sb.GetProtoboxCollectionData(); err != nil {
+				return fmt.Errorf("failed to get sandbox protoboxcollection data: %v", err)
+			}
+			if err := sb.ParseProtoboxCollection(); err != nil {
+				return fmt.Errorf("failed parsing sandbox protobox collection: %s", err)
+			}
 		} else {
+			if _, err := sb.GetCollectionData(); err != nil {
+				return fmt.Errorf("failed to get sandbox collection data: %v", err)
+			}
 			if err := sb.ParseSandboxCollection(); err != nil {
 				return fmt.Errorf("failed parsing sandbox collection: %s", err)
 			}

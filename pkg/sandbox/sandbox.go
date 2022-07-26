@@ -19,19 +19,21 @@ import (
 )
 
 const (
-	typeProfile           = 0x0000
-	typeProfile2          = 0x4000 // another profile type
-	typeCollection        = 0x8000
-	tagPtrMask            = 0xffff000000000000
-	profileInitPanic      = "failed to initialize platform sandbox"
-	collectionInitPanic14 = "failed to initialize collection"
-	collectionInitPanic15 = "failed to initialize builtin collection"
+	typeProfile                   = 0x0000
+	typeProfile2                  = 0x4000 // another profile type
+	typeCollection                = 0x8000
+	tagPtrMask                    = 0xffff000000000000
+	profileInitPanic              = "failed to initialize platform sandbox"
+	collectionInitPanic14         = "failed to initialize collection"
+	collectionInitPanic15         = "failed to initialize builtin collection"
+	protoboxCollectionInitPanic16 = "failed to initialize protobox collection"
 )
 
 type sbmode uint8
 
 const (
 	COLLECTION sbmode = iota
+	PROTOBOX
 	PROFILE
 )
 
@@ -48,6 +50,7 @@ type Sandbox struct {
 
 	sbProfileData    []byte
 	sbCollectionData []byte
+	sbProtoboxData   []byte
 	baseOffset       int64
 	ops              map[OperationNode]*Operation // cache of parsed operations
 
@@ -140,6 +143,7 @@ type Config struct {
 	profileInitArgs     []string
 	collectionInitPanic string
 	collectionInitArgs  []string
+	protoboxPanic       string
 	sbMode              sbmode
 }
 
@@ -203,6 +207,7 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
+		sb.config.protoboxPanic = protoboxCollectionInitPanic16
 	} else {
 		return nil, fmt.Errorf("unsupported darwin version: %s (only supports iOS 14.x-16.x)", sb.darwin)
 	}
@@ -220,10 +225,16 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 }
 
 func (sb *Sandbox) GetSBData() []byte {
-	if sb.config.sbMode == COLLECTION {
+	switch sb.config.sbMode {
+	case COLLECTION:
 		return sb.sbCollectionData
+	case PROTOBOX:
+		return sb.sbProtoboxData
+	case PROFILE:
+		return sb.sbProfileData
+	default:
+		panic(fmt.Sprintf("unknown sandbox mode: %#v", sb.config.sbMode))
 	}
-	return sb.sbProfileData
 }
 
 func (sb *Sandbox) GetOperations() ([]string, error) {
@@ -335,6 +346,50 @@ func (sb *Sandbox) GetCollectionData() ([]byte, error) {
 	}
 
 	return sb.sbCollectionData, nil
+}
+
+func (sb *Sandbox) GetProtoboxCollectionData() ([]byte, error) {
+	sb.config.sbMode = PROTOBOX
+
+	if len(sb.sbProtoboxData) > 0 {
+		return sb.sbProtoboxData, nil
+	}
+
+	if len(sb.config.ProfileBinPath) > 0 {
+		var err error
+		sb.sbProtoboxData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read sandbox protobox collection profile data file: %w", err)
+		}
+		return sb.sbProtoboxData, nil
+	}
+
+	log.Info("Searching for sandbox collection data")
+	regs, err := sb.emulateBlock(sb.config.protoboxPanic)
+	if err != nil {
+		return nil, fmt.Errorf("failed to emulate block containing call to _collection_init(): %v", err)
+	}
+
+	collection_data_addr := regs[sb.config.collectionInitArgs[0]]
+	collection_data_size := regs[sb.config.collectionInitArgs[1]]
+
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("emulated args:: _collection_init(%#x, \"protobox collection\", %#x, %#x, x4);",
+		regs["x0"], // &_builtin_collection
+		collection_data_addr,
+		collection_data_size),
+	)
+
+	collectionOffset, err := sb.config.Kernel.GetOffset(collection_data_addr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get offset for _protobox_data: %w", err)
+	}
+
+	sb.sbProtoboxData = make([]byte, collection_data_size)
+	if _, err = sb.config.Kernel.ReadAt(sb.sbProtoboxData, int64(collectionOffset)); err != nil {
+		return nil, fmt.Errorf("failed to read _protobox_data: %w", err)
+	}
+
+	return sb.sbProtoboxData, nil
 }
 
 func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
@@ -480,10 +535,6 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 }
 
 func (sb *Sandbox) ParseSandboxCollection() error {
-
-	if _, err := sb.GetCollectionData(); err != nil {
-		return err
-	}
 
 	log.Info("Parsing sandbox collection data")
 
@@ -639,9 +690,14 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 	return nil
 }
 
+func (sb *Sandbox) ParseProtoboxCollection() error {
+	sb.config.sbMode = PROTOBOX
+	return sb.ParseSandboxCollection()
+}
+
 func (sb *Sandbox) GetProfile(name string) (Profile, error) {
 	for _, p := range sb.Profiles {
-		if p.Name == name {
+		if strings.Contains(strings.ToLower(p.Name), strings.ToLower(name)) {
 			return p, nil
 		}
 	}
