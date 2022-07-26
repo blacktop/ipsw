@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/bits"
 	"strings"
 
 	"github.com/apex/log"
@@ -202,19 +203,22 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
+		sb.db, err = GetLibSandBoxDB(IOS15)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get libsandbox db: %w", err)
+		}
 	} else if iOS16x.Check(sb.darwin) {
 		sb.config.sbHeader = &header16{}
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
 		sb.config.protoboxPanic = protoboxCollectionInitPanic16
+		sb.db, err = GetLibSandBoxDB(IOS16)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get libsandbox db: %w", err)
+		}
 	} else {
 		return nil, fmt.Errorf("unsupported darwin version: %s (only supports iOS 14.x-16.x)", sb.darwin)
-	}
-
-	sb.db, err = GetLibSandBoxDB()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get libsandbox db: %w", err)
 	}
 
 	for _, op := range sb.db.Operations { // TODO: are these always the same?  Should I still compare with what is in the samdbox kext?
@@ -726,11 +730,11 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 	return strings.Trim(string(name[:]), "\x00"), nil
 }
 
-// FIXME: not sure how this works yet (look at func 'generate_syscallmask' in libsandbox.1.dylib)
-func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]byte, error) {
+func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]bool, error) {
 	if len(sb.GetSBData()) == 0 {
 		return nil, fmt.Errorf("sandbox data not loaded")
 	}
+
 	r := bytes.NewReader(sb.GetSBData())
 
 	r.Seek(sb.baseOffset+int64(offset)*8, io.SeekStart)
@@ -757,8 +761,20 @@ func (sb *Sandbox) GetBitMaskAtOffset(offset uint32) ([]byte, error) {
 	if err := binary.Read(r, binary.LittleEndian, &data); err != nil {
 		return nil, fmt.Errorf("failed to read sandbox collection bitmask data: %v", err)
 	}
-	// TODO: I do notice that the bytes in the array seem to decrease cyclically (pattern?)
-	return data, nil
+
+	var mask []bool
+	for _, abyte := range data {
+		for _, abit := range fmt.Sprintf("%08b", bits.Reverse8(abyte)) {
+			switch abit {
+			case rune('0'):
+				mask = append(mask, false)
+			case rune('1'):
+				mask = append(mask, true)
+			}
+		}
+	}
+
+	return mask, nil
 }
 
 func (sb *Sandbox) GetRSStringAtOffset(offset uint32) ([]string, error) {

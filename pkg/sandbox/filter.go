@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
@@ -37,8 +36,18 @@ const (
 // SB_VALUE_TYPE_PATTERN_SUBPATH
 // SB_VALUE_TYPE_PATTERN_REGEX
 
+type lsversion uint8
+
+const (
+	IOS15 lsversion = iota
+	IOS16
+)
+
 //go:embed data/libsandbox_12.3.0.gz
-var libsandboxData []byte
+var libsandbox1230Data []byte
+
+//go:embed data/libsandbox_13.0.0.gz
+var libsandbox1300Data []byte
 
 type LibSandbox struct {
 	Operations []OperationInfo `json:"operations,omitempty"`
@@ -46,14 +55,25 @@ type LibSandbox struct {
 	Modifiers  []ModifierInfo  `json:"modifiers,omitempty"`
 }
 
-func GetLibSandBoxDB() (*LibSandbox, error) {
+func GetLibSandBoxDB(ver lsversion) (*LibSandbox, error) {
+	var err error
 	var lb *LibSandbox
+	var zr *gzip.Reader
 
-	zr, err := gzip.NewReader(bytes.NewReader(libsandboxData))
-	if err != nil {
-		return nil, err
+	switch ver {
+	case IOS15:
+		zr, err = gzip.NewReader(bytes.NewReader(libsandbox1230Data))
+		if err != nil {
+			return nil, err
+		}
+		defer zr.Close()
+	case IOS16:
+		zr, err = gzip.NewReader(bytes.NewReader(libsandbox1300Data))
+		if err != nil {
+			return nil, err
+		}
+		defer zr.Close()
 	}
-	defer zr.Close()
 
 	if err := json.NewDecoder(zr).Decode(&lb); err != nil {
 		return nil, fmt.Errorf("failed to decode libsandbox data: %w", err)
@@ -83,12 +103,21 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 		return fmt.Sprintf("#o%04o", id), nil
 	case ARG_CTRL:
 		if alt { // bitmask variant
-			dat, err := sb.GetBitMaskAtOffset(uint32(id)) // TODO: emit_bitmask/generate_syscallmask
+			mask, err := sb.GetBitMaskAtOffset(uint32(id)) // TODO: emit_bitmask/generate_syscallmask
 			if err != nil {
-				return "", err
+				return nil, err
 			}
-			log.Debugf("bitmask:\n%s", utils.HexDump(dat, 0))
-			return nil, fmt.Errorf("not sure how to parse bit masks yet")
+			var aliases []string
+			for idx, add := range mask {
+				if add {
+					alias, err := f.Aliases.Get(uint16(idx))
+					if err != nil {
+						return nil, err
+					}
+					aliases = append(aliases, alias.Name)
+				}
+			}
+			return aliases, nil
 		} else {
 			alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
 			if err != nil {
