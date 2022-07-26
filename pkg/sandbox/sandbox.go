@@ -36,14 +36,15 @@ const (
 )
 
 type Sandbox struct {
-	Hdr        header
-	Profiles   []Profile
-	OpNodes    []OperationNode
-	Regexes    []*Regex
-	Globals    []string
-	Policies   []uint16
-	Operations []string
-	Unknown    []byte
+	Hdr          header
+	Profiles     []Profile
+	OpNodes      []OperationNode
+	Regexes      []*Regex
+	Globals      []string
+	Policies     []uint16
+	Operations   []string
+	Entitlements []string
+	Unknown      []uint16
 
 	sbProfileData    []byte
 	sbCollectionData []byte
@@ -67,6 +68,7 @@ type header struct {
 	RegexItemCount uint16
 	PolicyCount    uint16
 	Unknown        uint8
+	Unknown2       uint16
 }
 
 type header14 struct {
@@ -514,11 +516,19 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		return fmt.Errorf("failed to read sandbox profile policies: %v", err)
 	}
 
+	var unknownVarOffsets []uint16
+
 	if sb.Hdr.Unknown > 0 {
-		utils.Indent(log.Debug, 2)("Parsing unknown NEW iOS16 thing (sha1 hash??)")
-		sb.Unknown = make([]uint8, 38)
+		unknownVarOffsets = make([]uint16, sb.Hdr.Unknown)
+		if err := binary.Read(r, binary.LittleEndian, &unknownVarOffsets); err != nil {
+			return fmt.Errorf("failed to read sandbox profile iOS16.x unknown var offsets: %v", err)
+		}
+	}
+
+	if sb.Hdr.Unknown2 > 0 {
+		sb.Unknown = make([]uint16, sb.Hdr.Unknown2)
 		if err := binary.Read(r, binary.LittleEndian, &sb.Unknown); err != nil {
-			return fmt.Errorf("failed to read sandbox profile iOS16.x unknowns: %v", err)
+			return fmt.Errorf("failed to read sandbox profile iOS16.x unknown2 offsets: %v", err)
 		}
 	}
 
@@ -608,6 +618,21 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		}
 		sb.Globals = append(sb.Globals, strings.Trim(string(gdat[:]), "\x00"))
 		utils.Indent(log.Debug, 3)(sb.Globals[idx])
+	}
+
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing unknown NEW iOS16 variables (%d)", sb.Hdr.Unknown))
+	for idx, uoff := range unknownVarOffsets {
+		r.Seek(sb.baseOffset+int64(uoff)*8, io.SeekStart)
+		var size uint16
+		if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable size: %v", err)
+		}
+		udat := make([]byte, size)
+		if err := binary.Read(r, binary.LittleEndian, &udat); err != nil {
+			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable data: %v", err)
+		}
+		sb.Entitlements = append(sb.Entitlements, strings.Trim(string(udat[:]), "\x00"))
+		utils.Indent(log.Debug, 3)(sb.Entitlements[idx])
 	}
 
 	return nil
@@ -970,6 +995,7 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.RegexItemCount = v.RegexItemCount
 		sb.Hdr.PolicyCount = v.PolicyCount
 		sb.Hdr.Unknown = v.Unknown1
+		sb.Hdr.Unknown2 = v.Unknown3
 	default:
 		return fmt.Errorf("unknown profile header type: %T", v)
 	}

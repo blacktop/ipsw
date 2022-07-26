@@ -25,7 +25,7 @@ typedef struct
     uint16 RegexItemCount<format = decimal>;
     uint16 PolicyCount<format = decimal>;
     if( unknown1 > 0 )
-        uint16 Unknown<format = decimal>;
+        uint16 unknown3<format = decimal>;
 } CollectionHeader;
 
 typedef struct
@@ -46,7 +46,9 @@ offset regexOffset[header.RegexItemCount]<format = hex, bgcolor = cLtBlue>;
 offset globalsOffsets[header.GlobalVarCount]<format = hex, bgcolor = cLtPurple>;
 offset policyOffsets[header.PolicyCount]<format = hex, bgcolor = cLtAqua>;
 if (header.unknown1 > 0)
-    byte padding0[38];
+    offset entitlements[header.unknown1]<format = hex, bgcolor = cLtRed>;
+if (header.unknown3 > 0)
+    offset unknown_iOS16[header.unknown3]<format = hex, bgcolor = cLtGreen>;
 Profile profiles[header.ProfileCount]<format = hex, bgcolor = cLtGray>;
 local uint64 pos = FTell();
 if (pos % 8)
