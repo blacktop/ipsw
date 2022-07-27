@@ -132,12 +132,12 @@ var libsandboxCmd = &cobra.Command{
 			fmt.Println("Filter Info")
 			fmt.Println("===========")
 			for _, f := range fi {
-				if f.DataType != sandbox.SB_VALUE_TYPE_NONE {
+				if f.ArgumentType != sandbox.SB_VALUE_TYPE_NONE {
 					fmt.Fprintf(w, "%d)\t%s\t%s\ttype: %d\tcost: %#x\tdep: %d\taliases: %d\n",
 						f.ID,
 						f.Name,
 						f.Category,
-						f.DataType,
+						f.ArgumentType,
 						f.CostFactor,
 						f.Dependency,
 						len(f.Aliases))

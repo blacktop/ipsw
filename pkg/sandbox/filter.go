@@ -15,24 +15,25 @@ import (
 )
 
 const (
-	SB_VALUE_TYPE_NONE            = 0
-	SB_VALUE_TYPE_BOOL            = 1
-	SB_VALUE_TYPE_BITFIELD        = 2
-	SB_VALUE_TYPE_INTEGER         = 3
-	SB_VALUE_TYPE_STRING          = 4
-	SB_VALUE_TYPE_PATTERN_LITERAL = 5
-	SB_VALUE_TYPE_PATTERN_PREFIX  = 6
-	SB_VALUE_TYPE_PATTERN_SUBPATH = 7
-	SB_VALUE_TYPE_PATTERN_REGEX   = 8
-	SB_VALUE_TYPE_REGEX           = 9
-	SB_VALUE_TYPE_NETWORK         = 10
-	// SB_VALUE_TYPE_BITMASK         = 11
+	SB_VALUE_TYPE_NONE            uint8 = 0
+	SB_VALUE_TYPE_BOOL            uint8 = 1
+	SB_VALUE_TYPE_BITFIELD        uint8 = 2
+	SB_VALUE_TYPE_INTEGER         uint8 = 3
+	SB_VALUE_TYPE_STRING          uint8 = 4
+	SB_VALUE_TYPE_PATTERN_LITERAL uint8 = 5
+	SB_VALUE_TYPE_PATTERN_PREFIX  uint8 = 6
+	SB_VALUE_TYPE_PATTERN_SUBPATH uint8 = 7
+	SB_VALUE_TYPE_PATTERN_REGEX   uint8 = 8
+	SB_VALUE_TYPE_REGEX           uint8 = 9
+	SB_VALUE_TYPE_NETWORK         uint8 = 10
+	// SB_VALUE_TYPE_BITMASK         uint8 = 11
 )
 
 type lsversion uint8
 
 const (
-	IOS15 lsversion = iota
+	IOS14 lsversion = iota
+	IOS15
 	IOS16
 )
 
@@ -76,7 +77,57 @@ func GetLibSandBoxDB(ver lsversion) (*LibSandbox, error) {
 }
 
 // NOTE: bool __fastcall sb_filter_accepts_type(unsigned int a1, unsigned int a2) in libsandbox.1.dylib
-func (db *LibSandbox) FilterAcceptsType(filter *FilterInfo, filterArgType int) bool {
+func FilterAcceptsType15(filter *FilterInfo, typ uint8) bool {
+	switch filter.ArgumentType {
+	case SB_VALUE_TYPE_BOOL:
+		return typ == SB_VALUE_TYPE_BOOL
+	case SB_VALUE_TYPE_BITFIELD:
+		return typ == SB_VALUE_TYPE_BITFIELD
+	case SB_VALUE_TYPE_INTEGER, SB_VALUE_TYPE_STRING:
+		return (typ & 0xF7) == SB_VALUE_TYPE_INTEGER
+	case SB_VALUE_TYPE_PATTERN_LITERAL:
+		return typ == SB_VALUE_TYPE_STRING
+	case SB_VALUE_TYPE_PATTERN_PREFIX, SB_VALUE_TYPE_PATTERN_SUBPATH:
+		return (typ == SB_VALUE_TYPE_PATTERN_LITERAL) ||
+			(typ == SB_VALUE_TYPE_PATTERN_PREFIX) ||
+			(typ == SB_VALUE_TYPE_PATTERN_SUBPATH) ||
+			(typ == SB_VALUE_TYPE_REGEX)
+	case SB_VALUE_TYPE_PATTERN_REGEX:
+		return (typ == SB_VALUE_TYPE_PATTERN_LITERAL) ||
+			(typ == SB_VALUE_TYPE_PATTERN_PREFIX) ||
+			(typ == SB_VALUE_TYPE_PATTERN_SUBPATH) ||
+			(typ == SB_VALUE_TYPE_PATTERN_REGEX) ||
+			(typ == SB_VALUE_TYPE_REGEX)
+	case SB_VALUE_TYPE_REGEX:
+		return typ == SB_VALUE_TYPE_NETWORK
+	}
+	return false
+}
+
+func FilterAcceptsType16(filter *FilterInfo, typ uint8) bool {
+	switch filter.ArgumentType {
+	case SB_VALUE_TYPE_BOOL:
+		return typ == SB_VALUE_TYPE_BOOL
+	case SB_VALUE_TYPE_BITFIELD:
+		return typ == SB_VALUE_TYPE_BITFIELD
+	case SB_VALUE_TYPE_INTEGER:
+		return (typ & 0xF7) == SB_VALUE_TYPE_INTEGER
+	case SB_VALUE_TYPE_STRING, SB_VALUE_TYPE_PATTERN_LITERAL:
+		return typ == SB_VALUE_TYPE_STRING
+	case SB_VALUE_TYPE_PATTERN_PREFIX, SB_VALUE_TYPE_PATTERN_SUBPATH:
+		return (typ == SB_VALUE_TYPE_PATTERN_LITERAL) ||
+			(typ == SB_VALUE_TYPE_PATTERN_PREFIX) ||
+			(typ == SB_VALUE_TYPE_PATTERN_SUBPATH) ||
+			(typ == SB_VALUE_TYPE_REGEX)
+	case SB_VALUE_TYPE_PATTERN_REGEX:
+		return (typ == SB_VALUE_TYPE_PATTERN_LITERAL) ||
+			(typ == SB_VALUE_TYPE_PATTERN_PREFIX) ||
+			(typ == SB_VALUE_TYPE_PATTERN_SUBPATH) ||
+			(typ == SB_VALUE_TYPE_PATTERN_REGEX) ||
+			(typ == SB_VALUE_TYPE_REGEX)
+	case SB_VALUE_TYPE_REGEX:
+		return typ == SB_VALUE_TYPE_NETWORK
+	}
 	return false
 }
 
@@ -89,17 +140,18 @@ func (db *LibSandbox) GetFilter(id uint8) (*FilterInfo, error) {
 
 func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) {
 	if alt {
-		log.Debugf("💁 %s: type: %#x, arg: %#x, alt: %t\n", f.Name, f.DataType, id, alt)
+		log.Debugf("💁 %s: type: %#x, arg: %#x, alt: %t\n", f.Name, f.ArgumentType, id, alt)
 	}
-	switch f.DataType {
-	case SB_VALUE_TYPE_BOOL:
+
+	if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_BOOL) {
 		if id == 1 {
 			return "#t", nil
 		}
 		return "#f", nil
-	case SB_VALUE_TYPE_BITFIELD:
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_BITFIELD) {
 		return fmt.Sprintf("#o%04o", id), nil
-	case SB_VALUE_TYPE_STRING:
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_STRING) ||
+		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_INTEGER) {
 		if alt { // bitmask variant
 			mask, err := sb.GetBitMaskAtOffset(uint32(id))
 			if err != nil {
@@ -124,25 +176,31 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			}
 			return alias.Name, nil
 		}
-	case SB_VALUE_TYPE_INTEGER:
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_INTEGER) {
 		alias, err := f.Aliases.Get(id)
 		if err != nil {
 			return fmt.Sprintf("%d", id), nil
 		}
 		return alias.Name, nil
-	case SB_VALUE_TYPE_PATTERN_LITERAL:
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_LITERAL) {
 		s, err := sb.GetStringAtOffset(uint32(id))
 		if err != nil {
 			return nil, err
 		}
 		return s, nil
-	case SB_VALUE_TYPE_PATTERN_PREFIX, SB_VALUE_TYPE_PATTERN_SUBPATH:
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_PREFIX) ||
+		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_SUBPATH) ||
+		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_REGEX) {
 		if alt { // regex variant
-			// n, err := sb.Regexes[id].NFA() // FIXME: finish NFA implimentation
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// fmt.Println(n)
+			n, err := sb.Regexes[id].NFA() // FIXME: finish NFA implimentation
+			if err != nil {
+				return nil, err
+			}
+			rstr, err := n.ToRegex()
+			if err != nil {
+				return nil, err
+			}
+			fmt.Println(rstr)
 			return "regex #\"\"", nil
 			// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
 		} else {
@@ -156,24 +214,7 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			return ss, nil
 			// return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
 		}
-	case SB_VALUE_TYPE_PATTERN_REGEX:
-		if alt { // regex variant
-			// n, err := sb.Regexes[id].NFA() // FIXME: finish NFA implimentation
-			// if err != nil {
-			// 	return nil, err
-			// }
-			// fmt.Println(n)
-			return "regex #\"\"", nil
-			// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
-		} else {
-			ss, err := sb.GetRSStringAtOffset(uint32(id))
-			if err != nil {
-				return nil, err
-			}
-			// return []string{"literal", fmt.Sprintf("\"%s\"", strings.Join(ss, " "))}, nil
-			return ss, nil
-		}
-	case SB_VALUE_TYPE_NETWORK:
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_NETWORK) {
 		// NOTE: ___define_network_filter_block_invoke(void* arg1, int64_t* arg2, int32_t* arg3) in libsandbox.1.dylib
 		host, port, err := sb.GetHostPortAtOffset(uint32(id))
 		if err != nil {
@@ -193,9 +234,115 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			portStr = fmt.Sprintf("%d", port)
 		}
 		return fmt.Sprintf("%s \"%s:%s\"", alias.Name, hostStr, portStr), nil
-	default:
-		return nil, fmt.Errorf("unsupported filter argument type: %d", f.DataType)
+	} else {
+		return nil, fmt.Errorf("unsupported filter argument type: %d", f.ArgumentType)
 	}
+
+	// switch f.DataType {
+	// case SB_VALUE_TYPE_BOOL:
+	// 	if id == 1 {
+	// 		return "#t", nil
+	// 	}
+	// 	return "#f", nil
+	// case SB_VALUE_TYPE_BITFIELD:
+	// 	return fmt.Sprintf("#o%04o", id), nil
+	// case SB_VALUE_TYPE_STRING:
+	// 	if alt { // bitmask variant
+	// 		mask, err := sb.GetBitMaskAtOffset(uint32(id))
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		var aliases []string
+	// 		for idx, add := range mask {
+	// 			if add {
+	// 				alias, err := f.Aliases.Get(uint16(idx))
+	// 				if err != nil {
+	// 					return nil, err
+	// 				}
+	// 				aliases = append(aliases, alias.Name)
+	// 			}
+	// 		}
+	// 		return aliases, nil
+	// 	} else {
+	// 		alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
+	// 		if err != nil {
+	// 			// Convert integer value to IO control string
+	// 			return fmt.Sprintf("_IO \"%c\" %d", rune(id>>8), int(id&0xff)), nil
+	// 		}
+	// 		return alias.Name, nil
+	// 	}
+	// case SB_VALUE_TYPE_INTEGER:
+	// 	alias, err := f.Aliases.Get(id)
+	// 	if err != nil {
+	// 		return fmt.Sprintf("%d", id), nil
+	// 	}
+	// 	return alias.Name, nil
+	// case SB_VALUE_TYPE_PATTERN_LITERAL:
+	// 	s, err := sb.GetStringAtOffset(uint32(id))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	return s, nil
+	// case SB_VALUE_TYPE_PATTERN_PREFIX, SB_VALUE_TYPE_PATTERN_SUBPATH:
+	// 	if alt { // regex variant
+	// 		// n, err := sb.Regexes[id].NFA() // FIXME: finish NFA implimentation
+	// 		// if err != nil {
+	// 		// 	return nil, err
+	// 		// }
+	// 		// fmt.Println(n)
+	// 		return "regex #\"\"", nil
+	// 		// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
+	// 	} else {
+	// 		ss, err := sb.GetRSStringAtOffset(uint32(id))
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		if len(ss) == 1 {
+	// 			return ss[0], nil
+	// 		}
+	// 		return ss, nil
+	// 		// return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
+	// 	}
+	// case SB_VALUE_TYPE_PATTERN_REGEX:
+	// 	if alt { // regex variant
+	// 		// n, err := sb.Regexes[id].NFA() // FIXME: finish NFA implimentation
+	// 		// if err != nil {
+	// 		// 	return nil, err
+	// 		// }
+	// 		// fmt.Println(n)
+	// 		return "regex #\"\"", nil
+	// 		// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
+	// 	} else {
+	// 		ss, err := sb.GetRSStringAtOffset(uint32(id))
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		// return []string{"literal", fmt.Sprintf("\"%s\"", strings.Join(ss, " "))}, nil
+	// 		return ss, nil
+	// 	}
+	// case SB_VALUE_TYPE_NETWORK:
+	// 	// NOTE: ___define_network_filter_block_invoke(void* arg1, int64_t* arg2, int32_t* arg3) in libsandbox.1.dylib
+	// 	host, port, err := sb.GetHostPortAtOffset(uint32(id))
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	hostStr := "*"
+	// 	if host > 0x100 {
+	// 		hostStr = "localhost"
+	// 		host &= 0xff
+	// 	}
+	// 	alias, err := f.Aliases.Get(host)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	portStr := "*"
+	// 	if port != 0 {
+	// 		portStr = fmt.Sprintf("%d", port)
+	// 	}
+	// 	return fmt.Sprintf("%s \"%s:%s\"", alias.Name, hostStr, portStr), nil
+	// default:
+	// 	return nil, fmt.Errorf("unsupported filter argument type: %d", f.DataType)
+	// }
 }
 
 /**********************
@@ -213,7 +360,7 @@ type FilterInfo struct {
 type filterInfo struct {
 	NameAddr     uint64 `json:"-"`
 	CategoryAddr uint64 `json:"-"`
-	DataType     uint8  `json:"data_type,omitempty"`
+	ArgumentType uint8  `json:"arg_type,omitempty"`
 	IsContrary   uint8  `json:"is_contrary,omitempty"`
 	CostFactor   uint16 `json:"cost_factor,omitempty"`
 	Dependency   uint32 `json:"dependency,omitempty"`

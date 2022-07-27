@@ -1,12 +1,18 @@
 package sandbox
 
-// nfaNodeName and nfaEdgeValue are type aliases for node name values and edge
-// values.
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+// CREDIT: https://github.com/wolever/nfa2regex
+
+// nfaNodeName and nfaEdgeValue are type aliases for node name values and edge values.
 type nfaNodeName = string
 type nfaEdgeValue = string
 
-// NFA defines a non-deterministic finite state automata specifically for use
-// with the nfa2regex package.
+// NFA defines a non-deterministic finite state automata specifically for use with the nfa2regex package.
 type NFA struct {
 	Nodes map[nfaNodeName](*NFANode)
 	Edges [](*NFAEdge)
@@ -45,8 +51,7 @@ func (nfa *NFA) AddEdge(srcName nfaNodeName, dstName nfaNodeName, value nfaEdgeV
 	})
 }
 
-// Replaces a node in the NFA without mutating any of the underlying data
-// structures.
+// Replaces a node in the NFA without mutating any of the underlying data structures.
 func (nfa *NFA) ReplaceNode(name nfaNodeName, newNode *NFANode) {
 	newEdges := make([](*NFAEdge), 0, len(nfa.Edges))
 	oldNode := nfa.Nodes[name]
@@ -85,8 +90,7 @@ func (nfa *NFA) RemoveNode(nodeName nfaNodeName) {
 	nfa.Edges = newEdges
 }
 
-// EdgesIn returns a list of edges into ``nodeName`` (ie, where edge.DstNode ==
-// nodeName).
+// EdgesIn returns a list of edges into ``nodeName`` (ie, where edge.DstNode == nodeName).
 func (nfa *NFA) EdgesIn(nodeName nfaNodeName) [](*NFAEdge) {
 	node := nfa.Nodes[nodeName]
 	res := [](*NFAEdge){}
@@ -169,7 +173,176 @@ func (nfa *NFA) Match(input string) bool {
 	return false
 }
 
-func (nfa *NFA) Walk() error {
+func (nfa *NFA) ToRegex() (string, error) {
 
-	return nil
+	if nfa == nil {
+		return "", errors.New("NFA must be non-nil")
+	}
+
+	nfa = nfa.ShallowCopy()
+
+	// 1. Create single initial and terminal nodes with empty transitions to
+	initialNode := nfa.GetOrCreateNode("__initial__")
+	terminalNode := nfa.GetOrCreateNode("__terminal__")
+	nfaHasInitial := false
+	nfaHasTerminal := false
+	for _, node := range nfa.Nodes {
+		if node.IsInitial {
+			nfaHasInitial = true
+			nfa.AddEdge(initialNode.Name, node.Name, "")
+			nfa.ReplaceNode(node.Name, &NFANode{
+				Name:       node.Name,
+				IsInitial:  false,
+				IsTerminal: false,
+			})
+		}
+		if node.IsTerminal {
+			nfaHasTerminal = true
+			nfa.AddEdge(node.Name, terminalNode.Name, "")
+			nfa.ReplaceNode(node.Name, &NFANode{
+				Name:       node.Name,
+				IsInitial:  false,
+				IsTerminal: false,
+			})
+		}
+	}
+	initialNode.IsInitial = true
+	terminalNode.IsTerminal = true
+
+	if !nfaHasInitial {
+		return "", errors.New("NFA has no initial node(s)")
+	}
+
+	if !nfaHasTerminal {
+		return "", errors.New("NFA has no terminal node(s)")
+	}
+
+	// 2. Iteritively remove nodes which aren't the initial or terminal node
+	for len(nfa.Nodes) > 2 {
+		for _, node := range nfa.Nodes {
+			if node == initialNode || node == terminalNode {
+				continue
+			}
+
+			// Collect any loops (ie, where the node references its self) so they
+			// can be converted to kleen star in the middle of new edges
+			kleenStarValues := []string{}
+			inEdges := nfa.EdgesIn(node.Name)
+			for _, inEdge := range inEdges {
+				if inEdge.SrcNode == inEdge.DstNode {
+					kleenStarValues = append(kleenStarValues, inEdge.Value)
+				}
+			}
+
+			kleenStarMiddle := addKleenStar(orJoin(kleenStarValues), len(kleenStarValues) > 1)
+			for _, inEdge := range inEdges {
+				if inEdge.SrcNode == inEdge.DstNode {
+					continue
+				}
+				for _, outEdge := range nfa.EdgesOut(node.Name) {
+					if outEdge.SrcNode == outEdge.DstNode {
+						continue
+					}
+
+					nfa.AddEdge(
+						inEdge.SrcNode.Name,
+						outEdge.DstNode.Name,
+						inEdge.Value+kleenStarMiddle+outEdge.Value,
+					)
+				}
+			}
+
+			nfa.RemoveNode(node.Name)
+
+		}
+	}
+
+	// 3. Produce the regular expression
+	hasInitialTerminalEdge := false
+	res := make([]string, 0, len(nfa.Edges))
+	for _, edge := range nfa.Edges {
+		if edge.SrcNode.IsInitial && edge.DstNode.IsTerminal {
+			hasInitialTerminalEdge = true
+		}
+		res = append(res, edge.Value)
+	}
+	if !hasInitialTerminalEdge {
+		return "", errors.New("NFA has no path between initial and terminal node(s)")
+	}
+
+	return orJoin(res), nil
+}
+
+// ToDot generates a graphviz dot file from a NFA.
+func ToDot(nfa *NFA) string {
+	res := make([]string, 0, len(nfa.Edges)+5)
+
+	res = append(res, "\trankdir = LR;")
+
+	for _, edge := range nfa.Edges {
+		label := edge.Value
+		if len(label) == 0 {
+			label = "''"
+		}
+		res = append(res, fmt.Sprintf(
+			"\t%q -> %q [label=%q];",
+			edge.SrcNode.Name,
+			edge.DstNode.Name,
+			label,
+		))
+	}
+
+	for _, node := range nfa.Nodes {
+		if node.IsInitial {
+			res = append(res, fmt.Sprintf("\t%q [shape=point];", node.Name+"__initial"))
+			res = append(res, fmt.Sprintf("\t%q -> %q;", node.Name+"__initial", node.Name))
+		}
+		if node.IsTerminal {
+			res = append(res, fmt.Sprintf("\t%q [peripheries=2];", node.Name))
+		}
+	}
+
+	return "digraph g {\n" + strings.Join(res, "\n") + "\n}\n"
+}
+
+// addKleenStar a kleen star to ``s``:
+//   addKleenStar("") -> ""
+//   addKleenStar("a") -> "a*"
+//   addKleenStar("abc") -> "(abc)*"
+//   addKleenStar("(abc|123)", true) -> "(abc|123)*"
+func addKleenStar(s string, noWrap ...bool) string {
+	switch len(s) {
+	case 0:
+		return ""
+	case 1:
+		return s + "*"
+	default:
+		if len(noWrap) > 0 && noWrap[0] {
+			return s + "*"
+		}
+		return fmt.Sprintf("(%s)*", s)
+	}
+}
+
+// orJoin joins a series of strings together in an "or" statement, ignoring
+// empty strings:
+//   orJoin({"a"}) -> "a"
+//   orJoin({"a", "b"}) -> "(a|b)"
+//   orJoin({"", "a", "b"}) -> "(a|b)"
+func orJoin(inputStrs []string) string {
+	strs := make([]string, 0, len(inputStrs))
+	for _, s := range inputStrs {
+		if len(s) > 0 {
+			strs = append(strs, s)
+		}
+	}
+
+	switch len(strs) {
+	case 0:
+		return ""
+	case 1:
+		return strs[0]
+	default:
+		return "(" + strings.Join(strs, "|") + ")"
+	}
 }

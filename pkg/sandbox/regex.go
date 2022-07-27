@@ -378,14 +378,12 @@ func (re *Regex) Graph() (*graph.Mutable, error) {
 	return g, nil
 }
 
-// func (re *Regex) NFA() (*n.NFA, error) {
 func (re *Regex) NFA() (*NFA, error) {
 	rlist, err := re.Parse()
 	if err != nil {
 		return nil, err
 	}
 
-	// nfa := n.NewNFA()
 	nfa := NewNFA()
 
 	i := 0
@@ -419,9 +417,9 @@ func (re *Regex) NFA() (*NFA, error) {
 
 	nfa.Nodes[strconv.Itoa(0)].IsInitial = true
 
-	if err := nfa.Walk(); err != nil {
-		return nil, err
-	}
+	// if err := nfa.Walk(); err != nil {
+	// 	return nil, err
+	// }
 
 	// rstr, err := n.ToRegexWithConfig(nfa, n.ToRegexConfig{
 	// 	StepCallback: func(nfa *n.NFA, stepName string) error {

@@ -146,6 +146,7 @@ type Config struct {
 	collectionInitArgs  []string
 	protoboxPanic       string
 	sbMode              sbmode
+	filterAcceptsType   func(*FilterInfo, uint8) bool
 }
 
 func NewSandbox(c *Config) (*Sandbox, error) {
@@ -203,6 +204,7 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
+		sb.config.filterAcceptsType = FilterAcceptsType15
 		sb.db, err = GetLibSandBoxDB(IOS15)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get libsandbox db: %w", err)
@@ -213,6 +215,7 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
 		sb.config.protoboxPanic = protoboxCollectionInitPanic16
+		sb.config.filterAcceptsType = FilterAcceptsType16
 		sb.db, err = GetLibSandBoxDB(IOS16)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get libsandbox db: %w", err)
