@@ -29,9 +29,7 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CGO_CFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk
-      - CGO_LDFLAGS="-isysroot /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk
-      - SDKROOT=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk
+      - CC=$GOROOT/misc/ios/clangwrap.sh
     goos:
       - ios
     goarch:
@@ -40,6 +38,8 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    hooks:
+      post: ./hack/make/codesign {{ .Path }}
   # - main: ./cmd/ipsw
   #   id: "others"
   #   binary: ipsw

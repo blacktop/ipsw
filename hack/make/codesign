@@ -1,0 +1,4 @@
+#!/bin/sh
+set -e
+
+$(xcrun -find codesign) --entitlements $(dirname "$0")/data/ent.plist -s - -f $1
