@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/sandbox"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -43,7 +44,16 @@ func init() {
 	sbdecCmd.Flags().BoolP("dump", "d", false, "Dump sandbox profile data")
 	sbdecCmd.Flags().BoolP("profile", "p", false, "Decompile sandbox profile")
 	sbdecCmd.Flags().BoolP("protobox", "b", false, "Decompile sandbox protobox collection")
+	sbdecCmd.Flags().BoolP("list-profiles", "l", false, "List sandbox collection profiles")
 	sbdecCmd.Flags().StringP("input", "i", "", "Input sandbox profile binary file")
+
+	viper.BindPFlag("kernel.sbdec.diff", sbdecCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("kernel.sbdec.dump", sbdecCmd.Flags().Lookup("dump"))
+	viper.BindPFlag("kernel.sbdec.profile", sbdecCmd.Flags().Lookup("profile"))
+	viper.BindPFlag("kernel.sbdec.protobox", sbdecCmd.Flags().Lookup("protobox"))
+	viper.BindPFlag("kernel.sbdec.list-profiles", sbdecCmd.Flags().Lookup("list-profiles"))
+	viper.BindPFlag("kernel.sbdec.input", sbdecCmd.Flags().Lookup("input"))
+
 	sbdecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
@@ -61,27 +71,17 @@ var sbdecCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		diff, _ := cmd.Flags().GetBool("diff")
-		dump, _ := cmd.Flags().GetBool("dump")
-		decProfile, _ := cmd.Flags().GetBool("profile")
-		decProtobox, _ := cmd.Flags().GetBool("protobox")
-		input, _ := cmd.Flags().GetString("input")
-
 		kcPath := filepath.Clean(args[0])
-
-		if _, err := os.Stat(kcPath); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", args[0])
-		}
 
 		m, err := macho.Open(kcPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to open %s: %v", kcPath, err)
 		}
 		defer m.Close()
 
 		conf := &sandbox.Config{
 			Kernel:         m,
-			ProfileBinPath: input,
+			ProfileBinPath: viper.GetString("kernel.sbdec.input"), // supply your own sandbox profile data blob
 		}
 
 		if m.FileTOC.FileHeader.Type == types.FileSet {
@@ -111,7 +111,7 @@ var sbdecCmd = &cobra.Command{
 			return err
 		}
 
-		if dump {
+		if viper.GetBool("kernel.sbdec.dump") { // DUMP OUT PROFILE DATA BLOBS
 			if dat, err := sb.GetCollectionData(); err != nil {
 				return fmt.Errorf("failed to get sandbox collection data: %v", err)
 			} else {
@@ -142,40 +142,7 @@ var sbdecCmd = &cobra.Command{
 			return nil
 		}
 
-		if len(input) > 0 {
-			if err := sb.ParseSandboxProfile(); err != nil {
-				return fmt.Errorf("failed parsing sandbox profile: %s", err)
-			}
-
-			if len(sb.Regexes) > 0 {
-				re, err := sb.Regexes[0].NFA()
-				if err != nil {
-					return err
-				}
-				fmt.Println(re)
-			}
-
-			defaultOp := sandbox.TerminalNode(sb.OpNodes[sb.Profiles[0].Operands[0]])
-
-			for idx, op := range sb.Profiles[0].Operands {
-				if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-					if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
-						continue
-					}
-				}
-				o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
-				if err != nil {
-					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
-					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
-					continue
-				}
-				fmt.Println(o.String(0))
-			}
-
-			return nil
-		}
-
-		if decProfile {
+		if viper.GetBool("kernel.sbdec.profile") { // PARSE DEFAULT SANDBOX PROFILE
 			if err := sb.ParseSandboxProfile(); err != nil {
 				return fmt.Errorf("failed parsing sandbox profile: %s", err)
 			}
@@ -196,16 +163,15 @@ var sbdecCmd = &cobra.Command{
 				}
 				fmt.Println(o.String(0))
 			}
-
 			return nil
-		} else if decProtobox {
+		} else if viper.GetBool("kernel.sbdec.protobox") { // PARSE PROTOBOX COLLECTION
 			if _, err := sb.GetProtoboxCollectionData(); err != nil {
 				return fmt.Errorf("failed to get sandbox protoboxcollection data: %v", err)
 			}
 			if err := sb.ParseProtoboxCollection(); err != nil {
 				return fmt.Errorf("failed parsing sandbox protobox collection: %s", err)
 			}
-		} else {
+		} else { // PARSE BUILTIN COLLECTION
 			if _, err := sb.GetCollectionData(); err != nil {
 				return fmt.Errorf("failed to get sandbox collection data: %v", err)
 			}
@@ -214,7 +180,16 @@ var sbdecCmd = &cobra.Command{
 			}
 		}
 
-		if diff {
+		if viper.GetBool("kernel.sbdec.list-profiles") {
+			fmt.Println("PROFILES")
+			fmt.Println("========")
+			for _, prof := range sb.Profiles {
+				fmt.Println(prof.Name)
+			}
+			return nil
+		}
+
+		if viper.GetBool("kernel.sbdec.diff") {
 			if len(args) < 3 {
 				return fmt.Errorf("please provide two kernelcache files to diff AND a profile name to compare")
 			}
@@ -238,7 +213,7 @@ var sbdecCmd = &cobra.Command{
 
 			panic("diffing is not implemented yet")
 		} else {
-			if len(args) > 1 { // decompile single profile
+			if len(args) > 1 { // DECOMPILE SINGLE PROFILE
 
 				// for _, prof := range sb.Profiles {
 				// 	fmt.Println(prof.Name)
@@ -317,7 +292,7 @@ var sbdecCmd = &cobra.Command{
 				// 	}
 				// }
 
-			} else { // decompile all profiles
+			} else { // DECOMPILE ALL PROFILES
 				for _, prof := range sb.Profiles {
 					fmt.Println(prof.Name)
 

@@ -150,8 +150,13 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 		return "#f", nil
 	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_BITFIELD) {
 		return fmt.Sprintf("#o%04o", id), nil
-	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_STRING) ||
-		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_INTEGER) {
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_STRING) {
+		s, err := sb.GetStringAtOffset(uint32(id))
+		if err != nil {
+			return nil, err
+		}
+		return s, nil
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_INTEGER) {
 		if alt { // bitmask variant
 			mask, err := sb.GetBitMaskAtOffset(uint32(id))
 			if err != nil {
@@ -182,13 +187,8 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			return fmt.Sprintf("%d", id), nil
 		}
 		return alias.Name, nil
-	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_LITERAL) {
-		s, err := sb.GetStringAtOffset(uint32(id))
-		if err != nil {
-			return nil, err
-		}
-		return s, nil
-	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_PREFIX) ||
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_LITERAL) ||
+		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_PREFIX) ||
 		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_SUBPATH) ||
 		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_REGEX) {
 		if alt { // regex variant
@@ -470,14 +470,14 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 		return nil, fmt.Errorf("failed to get NUM_INFO_ENTRIES: %v", err)
 	}
 
-	dat, err := d.ReadBytesForUUID(uuid, int64(filterInfoOff), uint64((NUM_INFO_ENTRIES)*binary.Size(filterInfo{})))
+	dat, err := d.ReadBytesForUUID(uuid, int64(filterInfoOff), uint64((NUM_INFO_ENTRIES+1)*binary.Size(filterInfo{})))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read _filter_info data: %w", err)
 	}
 
 	r := bytes.NewReader(dat)
 
-	for i := 0; i < NUM_INFO_ENTRIES; i++ {
+	for i := 0; i <= NUM_INFO_ENTRIES; i++ {
 		fi := FilterInfo{ID: i}
 		if err := binary.Read(r, binary.LittleEndian, &fi.filterInfo); err != nil {
 			return nil, fmt.Errorf("failed to read _filter_info item %d: %w", i, err)
@@ -494,8 +494,7 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 				return nil, fmt.Errorf("failed to read _filter_info item %d category: %w", i, err)
 			}
 		}
-		if fi.AliasesAddr != 0 {
-			// parse aliases
+		if fi.AliasesAddr != 0 { // parse aliases
 			next := uint64(0)
 			sizeOfAlias := uint64(binary.Size(alias{}))
 			for {
@@ -531,6 +530,30 @@ func GetFilterInfo(d *dyld.File) ([]FilterInfo, error) {
 	return finfos, nil
 }
 
+type modAction uint32
+
+const (
+	ACTION_NONE  modAction = 0
+	ACTION_DENY  modAction = 1
+	ACTION_ALLOW modAction = 2
+	ACTION_ALL   modAction = 0xFFFFFFFF
+)
+
+func (m modAction) String() string {
+	switch m {
+	case ACTION_NONE:
+		return "none"
+	case ACTION_DENY:
+		return "deny"
+	case ACTION_ALLOW:
+		return "allow"
+	case ACTION_ALL:
+		return "all"
+	default:
+		return fmt.Sprintf("unknown (%d)", m)
+	}
+}
+
 type ModifierInfo struct {
 	ID      int     `json:"id"`
 	Name    string  `json:"name,omitempty"`
@@ -539,12 +562,12 @@ type ModifierInfo struct {
 }
 
 type modifierInfo struct {
-	NameAddr    uint64 `json:"-"`
-	Action      uint32 `json:"action"`
-	Type        uint32 `json:"type"` // NOTE: sb_modifier_requires_argument in libsandbox.1.dylib
-	ActionMask  uint32 `json:"action_mask"`
-	ActionFlag  uint32 `json:"action_flag"`
-	AliasesAddr uint64 `json:"-"`
+	NameAddr    uint64    `json:"-"`
+	Action      modAction `json:"action"`
+	Type        uint32    `json:"type"` // NOTE: sb_modifier_requires_argument in libsandbox.1.dylib
+	ActionMask  uint32    `json:"action_mask"`
+	ActionFlag  uint32    `json:"action_flag"`
+	AliasesAddr uint64    `json:"-"`
 }
 
 func getModifierCount(d *dyld.File) (int, error) {
@@ -645,8 +668,7 @@ func GetModifierInfo(d *dyld.File) ([]ModifierInfo, error) {
 				return nil, fmt.Errorf("failed to read _modifier_info item %d name: %w", i, err)
 			}
 		}
-		if mi.AliasesAddr != 0 {
-			// parse aliases
+		if mi.AliasesAddr != 0 { // parse aliases
 			next := uint64(0)
 			sizeOfAlias := uint64(binary.Size(alias{}))
 			for {
