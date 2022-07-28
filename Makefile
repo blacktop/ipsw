@@ -34,7 +34,7 @@ snapshot: ## Run goreleaser snapshot
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@CUR_VERSION=${CUR_VERSION} NEXT_VERSION=${NEXT_VERSION} goreleaser --rm-dist
+	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
