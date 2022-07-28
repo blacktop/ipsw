@@ -58,7 +58,7 @@ universal_binaries:
 archives:
   - replacements:
       darwin: macOS
-      # ios: iOS
+      ios: iOS
       amd64: x86_64
       all: universal
     format_overrides:
