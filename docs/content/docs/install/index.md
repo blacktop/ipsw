@@ -37,6 +37,12 @@ $ scoop install blacktop/ipsw
 $ brew install blacktop/tap/ipsw
 ```
 
+### Via Snapcraft
+
+```bash
+$ sudo snap install ipsw
+```
+
 ### Via [docker](https://www.docker.com)
 
 [![Docker Stars](https://img.shields.io/docker/stars/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Pulls](https://img.shields.io/docker/pulls/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Image](https://img.shields.io/badge/docker%20image-114MB-blue.svg)](https://hub.docker.com/r/blacktop/ipsw/)
