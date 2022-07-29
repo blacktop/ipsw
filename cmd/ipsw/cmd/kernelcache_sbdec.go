@@ -146,12 +146,20 @@ var sbdecCmd = &cobra.Command{
 			if err := sb.ParseSandboxProfile(); err != nil {
 				return fmt.Errorf("failed parsing sandbox profile: %s", err)
 			}
-
+			for idx, op := range sb.OpNodes {
+				o, err := sb.ParseOperation(fmt.Sprintf("op_node_%d", idx), op)
+				if err != nil {
+					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
+					log.Errorf("failed to parse operation for node %s: %v", op, err)
+					continue
+				}
+				fmt.Println(o.String(0))
+			}
 			defaultOp := sandbox.TerminalNode(sb.OpNodes[sb.Profiles[0].Operands[0]])
 
 			for idx, op := range sb.Profiles[0].Operands {
 				if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-					if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
+					if sandbox.TerminalNode(sb.OpNodes[op]).Action() == defaultOp.Action() {
 						continue
 					}
 				}
@@ -281,7 +289,7 @@ var sbdecCmd = &cobra.Command{
 
 				for idx, op := range prof.Operands {
 					if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-						if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
+						if sandbox.TerminalNode(sb.OpNodes[op]).Action() == defaultOp.Action() {
 							continue
 						}
 					}
@@ -346,7 +354,7 @@ var sbdecCmd = &cobra.Command{
 
 					for idx, op := range prof.Operands {
 						if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-							if sandbox.TerminalNode(sb.OpNodes[op]).Type() == defaultOp.Type() {
+							if sandbox.TerminalNode(sb.OpNodes[op]).Action() == defaultOp.Action() {
 								continue
 							}
 						}

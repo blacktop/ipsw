@@ -38,7 +38,7 @@ func (o OperationNode) String() string {
 const (
 	TERMINAL_NODE_TYPE_ALLOW = 0
 	TERMINAL_NODE_TYPE_DENY  = 1
-	ACTION_INLINE_FLAG       = 0x8000
+	ACTION_INLINE_FLAG       = 0x80
 	ALT_TYPE_FLAG            = 0x8000 /* some op nodes filter ids have this bit set (I think this means
 	 * a different kind of argument variant) for example there used to be a filter name "syscall-mask" in sandblaster,
 	 * but they didn't know how to parse it. I've seen the filter "syscall-number" have this high bit set in it's ID
@@ -51,48 +51,52 @@ const (
 	INSTR_TYPE_UNKNOWN2 = 1 << 4 // 16
 )
 
-type Modifier struct {
+type InlineModifier struct {
 	ID          uint8
 	PolicyOpIdx uint8
 	Argument    uint16
 }
 
+type Modifier struct {
+	Count   uint8
+	Unknown uint8
+	Offset  uint16
+}
+
 // TerminalNode a terminal node, when reached, either denies or allows the rule.
 type TerminalNode uint64
 
-func (n TerminalNode) Action() uint8 {
-	return uint8(types.ExtractBits(uint64(n), 8, 1))
+func (n TerminalNode) Action() uint16 {
+	return uint16(types.ExtractBits(uint64(n), 8, 16))
 }
-func (n TerminalNode) Type() uint8 {
-	return uint8(types.ExtractBits(uint64(n), 9, 7))
-}
-func (n TerminalNode) Flags() uint16 {
-	return uint16(types.ExtractBits(uint64(n), 16, 16))
+func (n TerminalNode) ModifierFlags() uint16 {
+	return uint16(types.ExtractBits(uint64(n), 24, 8))
 }
 func (n TerminalNode) ActionInline() bool {
 	/* NOTE: from emit_instruction(_QWORD *a1, __int64 instruction, _WORD *a3) in libsandbox.1.dylib (macOS 12.3.1)
 	 *     if ( (flags & 0x8000) != 0 )
 	 *         j____assert_rtn_2("sb_instr_get_action_flags", "instruction.c", 475, "(flags & ACTION_INLINE_FLAG) == 0");   */
-	return (n.Flags() & ACTION_INLINE_FLAG) != 0
+	return (n.ModifierFlags() & ACTION_INLINE_FLAG) != 0
 }
-func (n TerminalNode) ActionModifiers() uint32 {
-	return uint32(types.ExtractBits(uint64(n), 24, 8))
-}
-func (n TerminalNode) ModParts() (uint16, uint16) {
-	return uint16(types.ExtractBits(uint64(n), 48, 16)), uint16(types.ExtractBits(uint64(n), 32, 16))
-}
-func (n TerminalNode) Modifier() Modifier {
-	return Modifier{
+func (n TerminalNode) InlineModifier() InlineModifier {
+	return InlineModifier{
 		ID:          uint8(types.ExtractBits(uint64(n), 32, 8)),
 		PolicyOpIdx: uint8(types.ExtractBits(uint64(n), 40, 8)),
 		Argument:    uint16(types.ExtractBits(uint64(n), 48, 16)),
 	}
 }
+func (n TerminalNode) Modifier() Modifier {
+	return Modifier{
+		Count:   uint8(types.ExtractBits(uint64(n), 32, 8)),
+		Unknown: uint8(types.ExtractBits(uint64(n), 40, 8)),
+		Offset:  uint16(types.ExtractBits(uint64(n), 48, 16)),
+	}
+}
 func (n TerminalNode) IsAllow() bool {
-	return n.Action() == TERMINAL_NODE_TYPE_ALLOW
+	return (n.Action() & 0x1) == TERMINAL_NODE_TYPE_ALLOW
 }
 func (n TerminalNode) IsDeny() bool {
-	return n.Action() == TERMINAL_NODE_TYPE_DENY
+	return (n.Action() & 0x1) == TERMINAL_NODE_TYPE_DENY
 }
 func (n TerminalNode) Decision() string {
 	if n.IsAllow() {
@@ -103,18 +107,16 @@ func (n TerminalNode) Decision() string {
 func (n TerminalNode) String() string {
 	var mod string
 	if n.ActionInline() {
-		m := n.Modifier()
-		mod = fmt.Sprintf("action-inline(%v), ", m)
+		mod = fmt.Sprintf("inline_mod(%v), ", n.InlineModifier())
 	} else {
-		m := n.Modifier()
-		if m.Argument > 0 {
-			mod = fmt.Sprintf("modifiers(%v), ", m)
+		if n.Modifier().Count > 0 {
+			mod = fmt.Sprintf("modifiers(%v), ", n.Modifier())
 		}
 	}
-	return fmt.Sprintf("terminal (%s type: %d, flag: %#x, %sraw: %#016x)",
+	return fmt.Sprintf("terminal (%s action: %d, flags: %#x, %sraw: %#016x)",
 		n.Decision(),
-		n.Type(),
-		n.Flags(),
+		n.Action(),
+		n.ModifierFlags(),
 		mod,
 		uint64(n))
 }
@@ -298,7 +300,7 @@ func (o *Operation) String(indent int) string {
 			out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
 		} else {
 			mod := node.Modifier()
-			if mod.Argument > 0 {
+			if mod.Count > 0 {
 				out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
 			} else {
 				out = fmt.Sprintf("(%s %s)", node.Decision(), o.Name)

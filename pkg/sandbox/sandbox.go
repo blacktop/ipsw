@@ -21,7 +21,7 @@ import (
 
 const (
 	typeProfile                   = 0x0000
-	typeProfile2                  = 0x4000 // another profile type
+	typeProfile2                  = 0x4000 // single compiled profile collection
 	typeCollection                = 0x8000
 	tagPtrMask                    = 0xffff000000000000
 	profileInitPanic              = "failed to initialize platform sandbox"
@@ -117,20 +117,20 @@ type profile14 struct {
 
 type profile15 struct {
 	NameOffset  uint16
-	SyscallMask uint16
+	Flags       uint16
 	PolicyIndex uint16
 }
 
 type Profile struct {
 	Name        string
 	nameOffset  uint16
-	SyscallMask uint16
+	Flags       uint16
 	PolicyIndex uint16
 	Operands    []uint16
 }
 
 func (p Profile) String() string {
-	return fmt.Sprintf("[+] %s, syscall_mask: %#x, policy_idx: %d", p.Name, p.SyscallMask, p.PolicyIndex)
+	return fmt.Sprintf("[+] %s, flags: %#x, policy_idx: %d", p.Name, p.Flags, p.PolicyIndex)
 }
 
 type Config struct {
@@ -599,7 +599,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		if err := binary.Read(r, binary.LittleEndian, sb.config.profileType); err != nil {
 			return fmt.Errorf("failed to read sandbox profile structure: %v", err)
 		}
-		sbp.nameOffset, sbp.SyscallMask, sbp.PolicyIndex, err = sb.parseProfile(sb.config.profileType)
+		sbp.nameOffset, sbp.Flags, sbp.PolicyIndex, err = sb.parseProfile(sb.config.profileType)
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox profile structure: %v", err)
 		}
@@ -643,7 +643,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 			return fmt.Errorf("failed to read sandbox collection profile name data: %v", err)
 		}
 		sb.Profiles[idx].Name = strings.Trim(string(name[:]), "\x00")
-		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s\t(syscall_mask: %#x, policy: %d)", sb.Profiles[idx].Name, sb.Profiles[idx].SyscallMask, sb.Profiles[idx].PolicyIndex))
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s\t(flags: %#x, policy: %d)", sb.Profiles[idx].Name, sb.Profiles[idx].Flags, sb.Profiles[idx].PolicyIndex))
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing regex (%d)", sb.Hdr.RegexItemCount))
@@ -1084,7 +1084,7 @@ func (sb *Sandbox) parseProfile(p any) (uint16, uint16, uint16, error) {
 	case *profile14:
 		return v.NameOffset, v.Version, 0, nil
 	case *profile15:
-		return v.NameOffset, v.SyscallMask, v.PolicyIndex, nil
+		return v.NameOffset, v.Flags, v.PolicyIndex, nil
 	default:
 		return 0, 0, 0, fmt.Errorf("unknown profile header type: %T", v)
 	}
