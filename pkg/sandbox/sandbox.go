@@ -116,20 +116,21 @@ type profile14 struct {
 }
 
 type profile15 struct {
-	NameOffset uint16
-	Version    uint16
-	Unknown    uint16
+	NameOffset  uint16
+	SyscallMask uint16
+	PolicyIndex uint16
 }
 
 type Profile struct {
-	Name       string
-	nameOffset uint16
-	Version    uint16
-	Operands   []uint16
+	Name        string
+	nameOffset  uint16
+	SyscallMask uint16
+	PolicyIndex uint16
+	Operands    []uint16
 }
 
 func (p Profile) String() string {
-	return fmt.Sprintf("[+] %s, version: %d", p.Name, p.Version)
+	return fmt.Sprintf("[+] %s, syscall_mask: %#x, policy_idx: %d", p.Name, p.SyscallMask, p.PolicyIndex)
 }
 
 type Config struct {
@@ -598,7 +599,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		if err := binary.Read(r, binary.LittleEndian, sb.config.profileType); err != nil {
 			return fmt.Errorf("failed to read sandbox profile structure: %v", err)
 		}
-		sbp.nameOffset, sbp.Version, err = sb.parseProfile(sb.config.profileType)
+		sbp.nameOffset, sbp.SyscallMask, sbp.PolicyIndex, err = sb.parseProfile(sb.config.profileType)
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox profile structure: %v", err)
 		}
@@ -642,7 +643,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 			return fmt.Errorf("failed to read sandbox collection profile name data: %v", err)
 		}
 		sb.Profiles[idx].Name = strings.Trim(string(name[:]), "\x00")
-		utils.Indent(log.Debug, 3)(sb.Profiles[idx].Name)
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s\t(syscall_mask: %#x, policy: %d)", sb.Profiles[idx].Name, sb.Profiles[idx].SyscallMask, sb.Profiles[idx].PolicyIndex))
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing regex (%d)", sb.Hdr.RegexItemCount))
@@ -1078,14 +1079,14 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 	return nil
 }
 
-func (sb *Sandbox) parseProfile(p any) (uint16, uint16, error) {
+func (sb *Sandbox) parseProfile(p any) (uint16, uint16, uint16, error) {
 	switch v := p.(type) {
 	case *profile14:
-		return v.NameOffset, v.Version, nil
+		return v.NameOffset, v.Version, 0, nil
 	case *profile15:
-		return v.NameOffset, v.Version, nil
+		return v.NameOffset, v.SyscallMask, v.PolicyIndex, nil
 	default:
-		return 0, 0, fmt.Errorf("unknown profile header type: %T", v)
+		return 0, 0, 0, fmt.Errorf("unknown profile header type: %T", v)
 	}
 }
 

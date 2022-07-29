@@ -180,6 +180,52 @@ var sbdecCmd = &cobra.Command{
 			}
 		}
 
+		// for idx, pol := range sb.Policies {
+		// 	o, err := sb.ParseOperation(fmt.Sprintf("policy_%d", idx), sb.OpNodes[pol])
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	fmt.Println(o.String(0))
+		// 	if o.Match > 0 {
+		// 		match, err := sb.ParseOperation(o.Name, o.Match)
+		// 		if err != nil {
+		// 			log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
+		// 		}
+		// 		fmt.Println("MATCH:", match.String(1))
+		// 	}
+		// 	if o.Unmatch > 0 {
+		// 		unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
+		// 		if err != nil {
+		// 			log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
+		// 		}
+		// 		fmt.Println("UNMATCH:", unmatch.String(1))
+		// 	}
+		// }
+
+		// for idx, unk := range sb.Unknown {
+		// 	o, err := sb.ParsePolicy(unk)
+		// 	if err != nil {
+		// 		log.Error(err.Error())
+		// 		continue
+		// 	}
+		// 	fmt.Printf("\n\nUnknown (%d)\n", idx)
+		// 	fmt.Println(o.String(0))
+		// 	if o.Match > 0 {
+		// 		match, err := sb.ParseOperation(o.Name, o.Match)
+		// 		if err != nil {
+		// 			log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
+		// 		}
+		// 		fmt.Println("MATCH:", match.String(1))
+		// 	}
+		// 	if o.Unmatch > 0 {
+		// 		unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
+		// 		if err != nil {
+		// 			log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
+		// 		}
+		// 		fmt.Println("UNMATCH:", unmatch.String(1))
+		// 	}
+		// }
+
 		if viper.GetBool("kernel.sbdec.list-profiles") {
 			fmt.Println("PROFILES")
 			fmt.Println("========")
