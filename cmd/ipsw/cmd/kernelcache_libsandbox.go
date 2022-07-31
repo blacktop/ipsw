@@ -181,9 +181,9 @@ var libsandboxCmd = &cobra.Command{
 			fmt.Println("===============")
 			for idx, o := range oi {
 				if o.NodeType == sandbox.OPERATION_NODE_TYPE_TERMINAL {
-					fmt.Fprintf(w, "%3d) %s\tTERMINAL\tjump_op: %d\taction: %d\tmsg_filt_op: %d\n", idx, o.Name, o.JumpTargetOperation, o.Action, o.MsgFilterOp)
+					fmt.Fprintf(w, "%3d) %s\tTERMINAL\tjump_op: %d\taction: %d\tmsg_filt_ops: %v\n", idx, o.Name, o.JumpTargetOperation, o.Action, o.MsgFilterOps)
 				} else {
-					fmt.Fprintf(w, "%3d) %s\tNON_TERMINAL\tjump_op: %d\taction: %d\tmsg_filt_op: %d\n", idx, o.Name, o.JumpTargetOperation, o.Action, o.MsgFilterOp)
+					fmt.Fprintf(w, "%3d) %s\tNON_TERMINAL\tjump_op: %d\taction: %d\tmsg_filt_ops: %v\n", idx, o.Name, o.JumpTargetOperation, o.Action, o.MsgFilterOps)
 				}
 			}
 			w.Flush()

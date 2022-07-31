@@ -28,6 +28,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -159,7 +160,7 @@ var sbdecCmd = &cobra.Command{
 
 			for idx, op := range sb.Profiles[0].Operands {
 				if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-					if sandbox.TerminalNode(sb.OpNodes[op]).Action() == defaultOp.Action() {
+					if sandbox.TerminalNode(sb.OpNodes[op]).Decision() == defaultOp.Decision() {
 						continue
 					}
 				}
@@ -185,6 +186,27 @@ var sbdecCmd = &cobra.Command{
 			}
 			if err := sb.ParseSandboxCollection(); err != nil {
 				return fmt.Errorf("failed parsing sandbox collection: %s", err)
+			}
+			for idx, ent := range sb.Entitlements {
+				o, err := sb.ParseOperation(fmt.Sprintf("ent_%d", idx), sb.OpNodes[ent])
+				if err != nil {
+					return err
+				}
+				fmt.Println(o.String(0))
+				if o.Match > 0 {
+					match, err := sb.ParseOperation(o.Name, o.Match)
+					if err != nil {
+						log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
+					}
+					fmt.Println("MATCH:", match.String(1))
+				}
+				if o.Unmatch > 0 {
+					unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
+					if err != nil {
+						log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
+					}
+					fmt.Println("UNMATCH:", unmatch.String(1))
+				}
 			}
 		}
 
@@ -237,9 +259,11 @@ var sbdecCmd = &cobra.Command{
 		if viper.GetBool("kernel.sbdec.list-profiles") {
 			fmt.Println("PROFILES")
 			fmt.Println("========")
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			for _, prof := range sb.Profiles {
-				fmt.Println(prof.Name)
+				fmt.Fprintf(w, "%s\tflags=%#x\tpolicy=%d\n", prof.Name, prof.Flags, prof.PolicyIndex)
 			}
+			w.Flush()
 			return nil
 		}
 
@@ -289,7 +313,7 @@ var sbdecCmd = &cobra.Command{
 
 				for idx, op := range prof.Operands {
 					if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-						if sandbox.TerminalNode(sb.OpNodes[op]).Action() == defaultOp.Action() {
+						if sandbox.TerminalNode(sb.OpNodes[op]).Decision() == defaultOp.Decision() {
 							continue
 						}
 					}
@@ -354,7 +378,7 @@ var sbdecCmd = &cobra.Command{
 
 					for idx, op := range prof.Operands {
 						if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-							if sandbox.TerminalNode(sb.OpNodes[op]).Action() == defaultOp.Action() {
+							if sandbox.TerminalNode(sb.OpNodes[op]).Decision() == defaultOp.Decision() {
 								continue
 							}
 						}

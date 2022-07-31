@@ -131,18 +131,51 @@ func FilterAcceptsType16(filter *FilterInfo, typ uint8) bool {
 	return false
 }
 
+func (db *LibSandbox) GetOperation(id uint8) (*OperationInfo, error) {
+	if int(id) >= len(db.Operations) {
+		return nil, fmt.Errorf("invalid operation id: %d", id)
+	}
+	return &db.Operations[id], nil
+}
 func (db *LibSandbox) GetFilter(id uint8) (*FilterInfo, error) {
 	if int(id) >= len(db.Filters) {
 		return nil, fmt.Errorf("invalid filter id: %d", id)
 	}
 	return &db.Filters[id], nil
 }
+func (db *LibSandbox) GetModifier(id uint8) (*ModifierInfo, error) {
+	if int(id) >= len(db.Modifiers) {
+		return nil, fmt.Errorf("invalid modifier id: %d", id)
+	}
+	return &db.Modifiers[id], nil
+}
+
+func (db *LibSandbox) GetModifiersFromAction(action uint16) ([]ModifierInfo, error) {
+	var mods []ModifierInfo
+	if action <= 1 {
+		return nil, nil
+	}
+	for _, mod := range db.Modifiers {
+		if mod.Action == ACTION_NONE {
+			continue // skip NULL mod
+		}
+		if mod.ActionMask > 0 {
+			if (uint32(action) & mod.ActionMask) == mod.ActionFlag {
+				mods = append(mods, mod)
+			}
+		}
+	}
+	if len(mods) == 0 {
+		return nil, fmt.Errorf("failed to find modifier for actions %#x", action)
+	}
+	return mods, nil
+}
 
 func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) {
 	if alt {
 		log.Debugf("💁 %s: type: %#x, arg: %#x, alt: %t\n", f.Name, f.ArgumentType, id, alt)
 	}
-	if f.Name == "iokit-method-number" {
+	if f.Name == `%entitlement-is-present` || f.Name == "state-flag" {
 		fmt.Println("STAP")
 	}
 
@@ -153,7 +186,19 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 		return "#f", nil
 	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_BITFIELD) {
 		return fmt.Sprintf("#o%04o", id), nil
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_LITERAL) {
+		ss, err := sb.GetRSStringAtOffset(uint32(id))
+		if err != nil {
+			return nil, err
+		}
+		if len(ss) == 1 {
+			return ss[0], nil
+		}
+		return ss, nil
 	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_STRING) {
+		if id == 0 {
+			return "wat?", nil
+		}
 		s, err := sb.GetStringAtOffset(uint32(id))
 		if err != nil {
 			return nil, err
@@ -168,11 +213,17 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			var aliases []string
 			for idx, add := range mask {
 				if add {
-					alias, err := f.Aliases.Get(uint16(idx))
-					if err != nil {
-						return nil, err
+					switch f.Category {
+					case "mach-message-filter":
+						aliases = append(aliases, f.Aliases[idx].Name)
+					default:
+						alias, err := f.Aliases.Get(uint16(idx))
+						if err != nil {
+							log.Errorf("unable to lookup alias %d for filter %s: %v", idx, f.Name, err)
+							continue
+						}
+						aliases = append(aliases, alias.Name)
 					}
-					aliases = append(aliases, alias.Name)
 				}
 			}
 			return aliases, nil
@@ -719,7 +770,7 @@ type OperationInfo struct {
 	Name          string   `json:"name,omitempty"`
 	Modifiers     []string `json:"modifiers,omitempty"`
 	Categories    []string `json:"categories,omitempty"`
-	MsgFilterOp   uint32   `json:"msg_filter_op,omitempty"`
+	MsgFilterOps  []uint32 `json:"msg_filter_ops,omitempty"`
 	operationInfo `json:"info,omitempty"`
 }
 
@@ -729,7 +780,7 @@ type operationInfo struct {
 	Action              uint64     `json:"action,omitempty"`
 	CategoriesAddr      uint64     `json:"-"`
 	ModifiersAddr       uint64     `json:"-"`
-	UnknownAddr         uint64     `json:"-"`
+	MessageFiltersAddr  uint64     `json:"-"`
 }
 
 func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
@@ -799,8 +850,7 @@ func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
 			Name:          opNames[idx],
 			operationInfo: oi,
 		}
-		if oi.CategoriesAddr != 0 {
-			// parse catergories
+		if oi.CategoriesAddr != 0 { // parse catergories
 			next := uint64(0)
 			for {
 				addr, err := d.ReadPointerAtAddress(d.SlideInfo.SlidePointer(oi.CategoriesAddr) + next)
@@ -818,8 +868,7 @@ func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
 				next += uint64(binary.Size(uint64(0)))
 			}
 		}
-		if oi.ModifiersAddr != 0 {
-			// parse modifiers
+		if oi.ModifiersAddr != 0 { // parse modifiers
 			next := uint64(0)
 			for {
 				addr, err := d.ReadPointerAtAddress(d.SlideInfo.SlidePointer(oi.ModifiersAddr) + next)
@@ -837,17 +886,25 @@ func GetOperationInfo(d *dyld.File) ([]OperationInfo, error) {
 				next += uint64(binary.Size(uint64(0)))
 			}
 		}
-		if oi.UnknownAddr != 0 {
-			uuid, off, err := d.GetOffset(d.SlideInfo.SlidePointer(oi.UnknownAddr))
+		if oi.MessageFiltersAddr != 0 { // NOTE: __define_action_block_invoke_117
+			uuid, off, err := d.GetOffset(d.SlideInfo.SlidePointer(oi.MessageFiltersAddr))
 			if err != nil {
-				return nil, fmt.Errorf("failed to get _operation_info MsgFilterOp uint32 offset: %w", err)
+				return nil, fmt.Errorf("failed to get _operation_info msgfilterop uint32 offsets: %w", err)
 			}
 			dat, err = d.ReadBytesForUUID(uuid, int64(off), uint64(len(opNames)*binary.Size(uint32(0))))
 			if err != nil {
-				return nil, fmt.Errorf("failed to read _operation_info MsgFilterOp uint32 data: %w", err)
+				return nil, fmt.Errorf("failed to read _operation_info msgfilterops data: %w", err)
 			}
-			if err := binary.Read(bytes.NewReader(dat), binary.LittleEndian, &oinfo.MsgFilterOp); err != nil {
-				return nil, fmt.Errorf("failed to read _operation_info MsgFilterOp uint32 data: %w", err)
+			r := bytes.NewReader(dat)
+			for {
+				var msgFilterOp uint32
+				if err := binary.Read(r, binary.LittleEndian, &msgFilterOp); err != nil {
+					return nil, fmt.Errorf("failed to read _operation_info msgfilterop uint32 data: %w", err)
+				}
+				if msgFilterOp == 0 {
+					break
+				}
+				oinfo.MsgFilterOps = append(oinfo.MsgFilterOps, msgFilterOp)
 			}
 		}
 		opInfos = append(opInfos, oinfo)
