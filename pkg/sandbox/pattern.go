@@ -26,13 +26,13 @@ const (
 )
 
 type SandboxString struct {
-	Len           int
-	Pos           int
 	Base          string
-	BaseStack     []string
 	Token         string
-	TokenStack    []byte
 	OutputStrings []string
+	BaseStack     []string
+	TokenStack    []byte
+	Pos           int
+	Len           int
 }
 
 type Stack[T any] struct {
@@ -148,6 +148,9 @@ func ParseRSS(dat []byte, globals []string) ([]string, error) {
 			ss.Push(STATE_CONCAT_SAVE_BYTE_READ)
 		case state >= 16 && state < 63: // STATE_CONSTANT_READ
 			ss.Push(STATE_CONSTANT_READ)
+			if len(globals) <= int(state-16) {
+				return nil, fmt.Errorf("failed to parse state 'STATE_CONSTANT_READ': %d > len(globals)", state-16) // FIXME: why is this happening
+			}
 			token = "${" + globals[state-16] + "}"
 		case state == 11: // STATE_RANGE_BYTE_READ
 			bs.Push(base)

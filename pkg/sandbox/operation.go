@@ -143,92 +143,194 @@ func (n NonTerminalNode) String() string {
 	if n.AltArgument() {
 		arg = "alt-arg"
 	}
-	return fmt.Sprintf("non-terminal (filter_id: %2d, %7s: %#04x, match_off: %#x, unmatch_off: %#x)",
+	return fmt.Sprintf("non-terminal (filter_id: %2d, %7s: %#04x, match_off: %#x, unmatch_off: %#x, raw: %#x)",
 		n.FilterID(),
 		arg,
 		n.ArgumentID(),
 		n.MatchOffset(),
-		n.UnmatchOffset())
+		n.UnmatchOffset(),
+		uint64(n))
 }
 
 // FIXME: turn this into an acyclic graph
 type Operation struct {
-	Name     string
-	Filter   *FilterInfo
-	Argument any
-	Match    OperationNode
-	Unmatch  OperationNode
-
-	node   OperationNode
-	parsed bool
+	Argument      any
+	Filter        *FilterInfo
+	Modiers       []ModifierInfo
+	Node          OperationNode
+	Match         OperationNode
+	Unmatch       OperationNode
+	UnmatchOffset uint16
+	MatchOffset   uint16
+	Terminal      bool
+	Allow         bool
+	parsed        bool
 }
 
-func (sb *Sandbox) ParseOperation(name string, op OperationNode) (*Operation, error) {
-	if opr, ok := sb.ops[op]; ok {
-		if opr.Name == name {
-			return opr, nil
-		}
+// type OpVertex struct {
+// 	Filter   *FilterInfo
+// 	Match    *OpVertex
+// 	Unmatch  *OpVertex
+// 	Name     string
+// 	Type     string
+// 	Decision string
+// 	Node     OperationNode
+// }
+
+// func (sb *Sandbox) CreateOperationGraph(name string, op OperationNode) (*OpVertex, error) {
+// 	var err error
+
+// 	ov := &OpVertex{
+// 		Name: name,
+// 		Node: op,
+// 	}
+
+// 	switch op.Type() {
+// 	case OPERATION_NODE_TYPE_NON_TERMINAL:
+// 		ov.Type = "NON_TERMINAL"
+// 		node := NonTerminalNode(op)
+// 		ov.Filter, err = sb.db.GetFilter(node.FilterID())
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to get filter for ID %d: %v", node.FilterID(), err)
+// 		}
+// 		ov.Match, err = sb.CreateOperationGraph(name, sb.OpNodes[node.Match])
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to create vertex for match offset %#x: %v", node.MatchOffset(), err)
+// 		}
+// 		ov.Unmatch, err = sb.CreateOperationGraph(name, sb.OpNodes[node.UnmatchOffset()])
+// 		if err != nil {
+// 			return nil, fmt.Errorf("failed to create vertex for unmatch offset %#x: %v", node.UnmatchOffset(), err)
+// 		}
+// 	case OPERATION_NODE_TYPE_TERMINAL:
+// 		ov.Type = "TERMINAL"
+// 		node := TerminalNode(op)
+// 		ov.Decision = node.Decision()
+// 	}
+
+// 	return ov, nil
+// }
+
+// func (o *OpVertex) Depth() int {
+// 	if o == nil {
+// 		return 0
+// 	}
+// 	if o.Match == nil && o.Unmatch == nil {
+// 		return 1
+// 	}
+// 	lHeight := o.Match.Depth()
+// 	rHeight := o.Unmatch.Depth()
+// 	if lHeight >= rHeight {
+// 		return lHeight + 1
+// 	} else {
+// 		return rHeight + 1
+// 	}
+// }
+
+// func (o *OpVertex) String(indent int) string {
+// 	var out string
+// 	if o.Node.IsTerminal() {
+// 		node := TerminalNode(o.Node)
+// 		out = fmt.Sprintf("(%s %s", node.Decision(), o.Name)
+// 		if o.Match == nil && o.Unmatch == nil {
+// 			out += ")"
+// 		}
+// 	} else {
+// 		out = fmt.Sprintf("(%s %s arg=%#x)", o.Name, o.Filter.Name, NonTerminalNode(o.Node).ArgumentID())
+// 		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(indent+1))
+// 		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String(indent+1))
+// 	}
+// 	return out
+// }
+
+func (sb *Sandbox) ParseOperation(op *Operation) (err error) {
+	if op.parsed {
+		return nil
 	}
 
-	log.Debugf("parsing op node: %s", op.String())
+	log.Debugf("parsing op node: %s", op.Node.String())
 
-	switch op.Type() {
+	switch op.Node.Type() {
 	case OPERATION_NODE_TYPE_NON_TERMINAL:
-		node := NonTerminalNode(op)
-		filter, err := sb.db.GetFilter(node.FilterID())
+		node := NonTerminalNode(op.Node)
+		op.Match = sb.OpNodes[op.MatchOffset].Node
+		op.Unmatch = sb.OpNodes[op.UnmatchOffset].Node
+		op.Filter, err = sb.db.GetFilter(node.FilterID())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get filter for ID %d: %v", node.FilterID(), err)
+			return fmt.Errorf("failed to get filter for ID %d: %v", node.FilterID(), err)
 		}
-		arg, err := filter.GetArgument(sb, node.ArgumentID(), node.AltArgument())
+		op.Argument, err = op.Filter.GetArgument(sb, node.ArgumentID(), node.AltArgument())
 		if err != nil {
-			return nil, fmt.Errorf("failed to get argument for ID %d: %v", node.ArgumentID(), err)
+			return fmt.Errorf("failed to get argument for ID %d: %v", node.ArgumentID(), err)
 		}
-		switch v := arg.(type) {
+		switch v := op.Argument.(type) {
 		default:
 			fmt.Printf("unexpected type %T", v)
 		case []string:
 			if len(v) == 1 {
-				arg = fmt.Sprintf("\"%s\"", v[0])
+				op.Argument = fmt.Sprintf("\"%s\"", v[0])
 			}
 			if len(v) > 1 {
-				arg = dedup(arg.([]string))
-				if len(arg.([]string)) == 1 {
-					arg = fmt.Sprintf("\"%s\"", arg.([]string)[0])
+				op.Argument = dedup(op.Argument.([]string))
+				if len(op.Argument.([]string)) == 1 {
+					op.Argument = fmt.Sprintf("\"%s\"", op.Argument.([]string)[0])
 				}
 			}
 		case string:
-			arg = fmt.Sprintf("\"%s\"", arg)
+			op.Argument = fmt.Sprintf("\"%s\"", op.Argument)
+			if len(op.Argument.(string)) > 500 {
+				op.Argument = op.Argument.(string)[:200]
+			}
 		}
-		// match, err := sb.ParseOperation(name, sb.OpNodes[node.MatchOffset()])
-		// if err != nil {
-		// 	return nil, fmt.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[node.MatchOffset()], err)
-		// }
-		// unmatch, err := sb.ParseOperation(name, sb.OpNodes[node.UnmatchOffset()])
-		// if err != nil {
-		// 	return nil, fmt.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[node.UnmatchOffset()], err)
-		// }
-		// cache the parsed node
-		sb.ops[op] = &Operation{
-			Name:     name,
-			Filter:   filter,
-			Argument: arg,
-			Match:    sb.OpNodes[node.MatchOffset()],
-			Unmatch:  sb.OpNodes[node.UnmatchOffset()],
-			node:     op,
-			parsed:   false,
-		}
-		return sb.ops[op], nil
+		op.parsed = true
 	case OPERATION_NODE_TYPE_TERMINAL:
-		// cache the parsed node
-		sb.ops[op] = &Operation{
-			Name:   name,
-			node:   op,
-			parsed: true,
+		node := TerminalNode(op.Node)
+		op.Allow = node.IsAllow()
+		// var mods []ModifierInfo
+		// if node.ActionInline() {
+		// 	mod, err := sb.db.GetModifier(node.InlineModifier().ID)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	fmt.Printf("(apply-%s\n", mod.Name)
+		// 	oper, err := sb.db.GetOperation(node.InlineModifier().PolicyOpIdx)
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	oo, err := sb.ParseOperation(sb.OpNodes[sb.Policies[node.InlineModifier().Argument]])
+		// 	if err != nil {
+		// 		return err
+		// 	}
+		// 	fmt.Println(oo.String(0))
+		// 	if oo.Match > 0 {
+		// 		match, err := sb.ParseOperation(oo.Name, oo.Match)
+		// 		if err != nil {
+		// 			log.Errorf("failed to parse match operation node %s: %v", oo.Match, err)
+		// 		}
+		// 		fmt.Println("MATCH:", match.String(1))
+		// 	}
+		// 	if oo.Unmatch > 0 {
+		// 		unmatch, err := sb.ParseOperation(oo.Name, oo.Unmatch)
+		// 		if err != nil {
+		// 			log.Errorf("failed to parse unmatch operation node %s: %v", oo.Unmatch, err)
+		// 		}
+		// 		fmt.Println("UNMATCH:", unmatch.String(1))
+		// 	}
+		// } else if node.Modifier().Count > 0 {
+		// 	mod := node.Modifier()
+		// 	if mod.Count > 0 {
+		// 		fmt.Println(mod)
+		// 	}
+		// } else {
+		// 	var err error
+		op.Modiers, err = sb.db.GetModifiersFromAction(node.Action())
+		if err != nil {
+			return err
 		}
-		return sb.ops[op], nil
+		op.parsed = true
 	default:
-		return nil, fmt.Errorf("unknown operation node type: %d", op.Type())
+		return fmt.Errorf("unknown operation node type: %d", op.Node.Type())
 	}
+	return nil
 }
 
 func dedup(args []string) []string {
@@ -292,22 +394,25 @@ func (o *Operation) IsAllowDeny() bool {
 	return false // TODO: should this error?
 }
 
-func (o *Operation) String(indent int) string {
+func (o *Operation) String(name string, indent int) string {
 	var out string
-	if o.node.IsTerminal() {
-		node := TerminalNode(o.node)
-		if node.ActionInline() {
-			out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
+	if o.Node.IsTerminal() {
+		node := TerminalNode(o.Node)
+		out = fmt.Sprintf("(%s %s ", node.Decision(), name)
+		if len(o.Modiers) > 0 {
+			for _, mod := range o.Modiers {
+				out += fmt.Sprintf("(with %s) 👀 ", mod.Name)
+			}
+		} else if node.ActionInline() {
+			out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), name, node)
 		} else {
 			mod := node.Modifier()
 			if mod.Count > 0 {
-				out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), o.Name, node)
-			} else {
-				out = fmt.Sprintf("(%s %s)", node.Decision(), o.Name)
+				out = fmt.Sprintf("(%s, %s) %s 👀", node.Decision(), name, node)
 			}
 		}
 	} else {
-		out = fmt.Sprintf("(%s %s %s)", o.Filter.Name, o.Argument, o.Name)
+		out = fmt.Sprintf("(%s %s %s)", name, o.Filter.Name, o.Argument)
 		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String())
 		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String())
 		// out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(indent+1))

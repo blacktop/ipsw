@@ -9,49 +9,115 @@
 // File Mask:
 //  ID Bytes: 00 80, 00 00, 00 40
 //   History:
+//   1.1  2022-07-30 blacktop: Add more fields etc CREDIT to github.com/0xalsr for sharing knowleddge
 //   1.0  2022-07-25 blacktop: Add support for iOS16.x and process more fields
 //------------------------------------------------
 
-typedef struct
-{
+typedef struct {
     uint16 Type<format = hex>;
     uint16 OpNodeCount<format = hex>;
-    uchar OpCount<format = decimal>;
-    uchar GlobalVarCount<format = decimal>;
-    uchar unknown1<format = decimal>;
-    uchar unknown2<format = decimal>;
+    uchar  OpCount<format = decimal>;
+    uchar  GlobalVarCount<format = decimal>;
+    uchar  unknown1<format = decimal>;
+    uchar  unknown2<format = decimal>;
     uint16 ProfileCount<format = decimal>;
-    uint16 RegexItemCount<format = decimal>;
+    uint16 RegexCount<format = decimal>;
     uint16 PolicyCount<format = decimal>;
     uint16 unknown3<format = decimal>;
 } CollectionHeader;
 
-typedef struct
-{
+typedef struct {
     uint16 NameOffset<format = hex>;
-    uint16 Version<format = hex>;
-    uint16 Unknown<format = hex>;
+    uint16 Flags<format = hex>;
+    uint16 PolicyIndex<format = hex>;
     uint16 OpCount[header.OpCount]<format = hex>;
 } Profile;
+
+typedef struct {
+    uchar id;
+    uchar policyFilter<format = hex>;
+    uint16 arg<format = hex>;
+} Modifier;
+
+typedef struct {
+    uchar type<format = hex>;
+    if ( (type & 1) == 0 ) {
+        uchar filter<format = hex>;
+        uint16 arg<format = hex>;
+        uint16 match<format = hex>;
+        uint16 unmatch<format = hex>;
+    } else {
+        uint16 actions<format = hex>;
+        uchar modifierFlags<format = hex>;
+        if ( (modifierFlags & 0x80) != 0 ) {
+            Modifier inlineModifier;
+        } else {
+            uchar modifierCount<format = hex>;
+            uchar unk2<format = decimal>;
+            uint16 modifiersOffset<format = hex>;
+        }
+    }
+} OpNode;
+
+typedef struct {
+    if ( header.OpNodeCount > 0 ) {
+        local quad opNodeStart = sizeof(header) + (header.RegexCount*2) + (header.GlobalVarCount*2) + (header.unknown1*2) + (header.PolicyCount*2);
+        if ( header.Type == 0x8000 ) {
+            if ( header.ProfileCount > 0 )
+                opNodeStart += header.ProfileCount * sizeof(profiles[0]);
+        } else if ( header.Type == 0x0000 || header.Type == 0x4000 ) {
+            opNodeStart += (header.OpCount*2);
+        }
+        if ( (opNodeStart & 6) != 0 )
+            uchar opNodeAlignmentPadding[8 - (opNodeStart & 6)];
+        OpNode opNodes[header.OpNodeCount]<optimize=false>;
+    }
+} OpNodes;
 
 typedef uint16 offset;
 typedef uint64 node;
 
+typedef struct {
+    CollectionHeader header;
+    if ( header.RegexCount > 0 )
+        offset regexOffset[header.RegexCount]<format = hex, bgcolor = cLtBlue>;
+    if ( header.GlobalVarCount > 0 )
+        offset globalsOffsets[header.GlobalVarCount]<format = hex, bgcolor = cLtPurple>;
+    if ( header.PolicyCount > 0 )
+        offset policyOffsets[header.PolicyCount]<format = hex, bgcolor = cLtAqua>;
+    if ( header.unknown1 > 0 )
+        offset entitlements[header.unknown1]<format = hex, bgcolor = cLtRed>;
+    if ( header.unknown3 > 0 )
+        offset unknown_iOS16[header.unknown3]<format = hex, bgcolor = cLtGreen>;
+    if ( header.Type == 0x8000 ) {
+        if ( header.ProfileCount > 0 )
+            Profile profiles[header.ProfileCount]<format = hex, bgcolor = cLtGray>;
+    } else if ( header.Type == 0x0000 || header.Type == 0x4000 ) {
+        uint16 ops[header.OpCount];
+    }
+    OpNodes opNodes<optimize=false, bgcolor = cLtYellow>;
+    local uint64 baseOffset = FTell();
+    Printf("baseOffset: %#x\n", baseOffset);
+    uchar data[FileSize() - FTell()];
+} Collection;
+
 LittleEndian();
 
-CollectionHeader header;
-offset regexOffset[header.RegexItemCount]<format = hex, bgcolor = cLtBlue>;
-offset globalsOffsets[header.GlobalVarCount]<format = hex, bgcolor = cLtPurple>;
-offset policyOffsets[header.PolicyCount]<format = hex, bgcolor = cLtAqua>;
-if (header.unknown1 > 0)
-    offset entitlements[header.unknown1]<format = hex, bgcolor = cLtRed>;
-if (header.unknown3 > 0)
-    offset unknown_iOS16[header.unknown3]<format = hex, bgcolor = cLtGreen>;
-Profile profiles[header.ProfileCount]<format = hex, bgcolor = cLtGray>;
-local uint64 pos = FTell();
-if (pos % 8)
-byte padding[8 - ((pos + 8) % 8)]; // align to 8 byte boundary
-node operations[header.OpNodeCount]<format = hex, bgcolor = cLtYellow>;
+//CollectionHeader header;
+//offset regexOffset[header.RegexItemCount]<format = hex, bgcolor = cLtBlue>;
+//offset globalsOffsets[header.GlobalVarCount]<format = hex, bgcolor = cLtPurple>;
+//offset policyOffsets[header.PolicyCount]<format = hex, bgcolor = cLtAqua>;
+//if (header.unknown1 > 0)
+//    offset entitlements[header.unknown1]<format = hex, bgcolor = cLtRed>;
+//if (header.unknown3 > 0)
+//    offset unknown_iOS16[header.unknown3]<format = hex, bgcolor = cLtGreen>;
+//Profile profiles[header.ProfileCount]<format = hex, bgcolor = cLtGray>;
+//local uint64 pos = FTell();
+//if (pos % 8)
+//byte padding[8 - ((pos + 8) % 8)]; // align to 8 byte boundary
+//node operations[header.OpNodeCount]<format = hex, bgcolor = cLtYellow>;
+//
+//local uint64 baseOffset = FTell();
+//Printf("baseOffset: %#x\n", baseOffset);
 
-local uint64 baseOffset = FTell();
-Printf("baseOffset: %#x\n", baseOffset);
+Collection collection;

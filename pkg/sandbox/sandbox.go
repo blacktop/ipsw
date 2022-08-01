@@ -39,28 +39,25 @@ const (
 )
 
 type Sandbox struct {
-	Hdr          header
-	Profiles     []Profile
-	OpNodes      []OperationNode
-	Regexes      []*Regex
-	Globals      []string
-	Policies     []uint16
-	Operations   []string
-	Entitlements []string
-	Unknown      []uint16
-
-	sbProfileData    []byte
+	db               *LibSandbox
+	xrefs            map[uint64]uint64
+	darwin           *version.Version
+	Profiles         []Profile
 	sbCollectionData []byte
+	Operations       []string
+	Entitlements     []uint16
+	Unknown          []uint16
+	sbProfileData    []byte
+	Policies         []uint16
 	sbProtoboxData   []byte
+	Globals          []string
+	Regexes          []*Regex
+	OpNodes          []Operation
+	config           Config
 	baseOffset       int64
-	ops              map[OperationNode]*Operation // cache of parsed operations
-
-	config        Config
-	darwin        *version.Version
-	db            *LibSandbox
-	kextStartAddr uint64
-	kextEndAddr   uint64
-	xrefs         map[uint64]uint64
+	kextStartAddr    uint64
+	kextEndAddr      uint64
+	Hdr              header
 }
 
 type header struct {
@@ -123,10 +120,10 @@ type profile15 struct {
 
 type Profile struct {
 	Name        string
+	Operands    []uint16
 	nameOffset  uint16
 	Flags       uint16
 	PolicyIndex uint16
-	Operands    []uint16
 }
 
 func (p Profile) String() string {
@@ -134,26 +131,24 @@ func (p Profile) String() string {
 }
 
 type Config struct {
-	Kernel         *macho.File
-	SBKext         *macho.File
-	ProfileBinPath string
-	Fixups         map[uint64]uint64
-
-	sbHeader            any
 	profileType         any
+	sbHeader            any
+	SBKext              *macho.File
+	Kernel              *macho.File
+	Fixups              map[uint64]uint64
+	filterAcceptsType   func(*FilterInfo, uint8) bool
+	ProfileBinPath      string
+	collectionInitPanic string
+	protoboxPanic       string
 	profileInitPanic    string
 	profileInitArgs     []string
-	collectionInitPanic string
 	collectionInitArgs  []string
-	protoboxPanic       string
 	sbMode              sbmode
-	filterAcceptsType   func(*FilterInfo, uint8) bool
 }
 
 func NewSandbox(c *Config) (*Sandbox, error) {
 	sb := Sandbox{
 		Profiles: make([]Profile, 0),
-		ops:      make(map[OperationNode]*Operation),
 		config:   *c,
 	}
 
@@ -489,9 +484,23 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing operation nodes (%d)", sb.Hdr.OpNodeCount))
 	opNodeStart, _ := r.Seek(0, io.SeekCurrent)
-	sb.OpNodes = make([]OperationNode, sb.Hdr.OpNodeCount)
-	if err := binary.Read(r, binary.LittleEndian, sb.OpNodes); err != nil {
+	opNodes := make([]OperationNode, sb.Hdr.OpNodeCount)
+	if err := binary.Read(r, binary.LittleEndian, opNodes); err != nil {
 		return fmt.Errorf("failed to read sandbox collection operation nodes: %v", err)
+	}
+	for _, opNode := range opNodes {
+		if opNode.IsNonTerminal() {
+			sb.OpNodes = append(sb.OpNodes, Operation{
+				Node:          opNode,
+				MatchOffset:   NonTerminalNode(opNode).MatchOffset(),
+				UnmatchOffset: NonTerminalNode(opNode).UnmatchOffset(),
+			})
+		} else {
+			sb.OpNodes = append(sb.OpNodes, Operation{
+				Terminal: true,
+				Node:     opNode,
+			})
+		}
 	}
 
 	sb.baseOffset, _ = r.Seek(0, io.SeekCurrent)
@@ -517,7 +526,7 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 			if err != nil {
 				return fmt.Errorf("failed to parse sandbox collection regex: %v", err)
 			}
-			utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, version: %d, length: %#x\n\n%s", idx+1, loc, re.Version, re.Length, hex.Dump(re.Data)))
+			utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, version: %d, length: %d\n\n%s", idx+1, loc, re.Version, re.Length, hex.Dump(re.Data)))
 			sb.Regexes = append(sb.Regexes, re)
 		}
 	}
@@ -575,11 +584,11 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		return fmt.Errorf("failed to read sandbox profile policies: %v", err)
 	}
 
-	var unknownVarOffsets []uint16
+	// var unknownVarOffsets []uint16
 
 	if sb.Hdr.Unknown > 0 {
-		unknownVarOffsets = make([]uint16, sb.Hdr.Unknown)
-		if err := binary.Read(r, binary.LittleEndian, &unknownVarOffsets); err != nil {
+		sb.Entitlements = make([]uint16, sb.Hdr.Unknown)
+		if err := binary.Read(r, binary.LittleEndian, &sb.Entitlements); err != nil {
 			return fmt.Errorf("failed to read sandbox profile iOS16.x unknown var offsets: %v", err)
 		}
 	}
@@ -620,9 +629,23 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing operation nodes (%d)", sb.Hdr.OpNodeCount))
 	opNodeStart, _ := r.Seek(0, io.SeekCurrent)
-	sb.OpNodes = make([]OperationNode, sb.Hdr.OpNodeCount)
-	if err := binary.Read(r, binary.LittleEndian, sb.OpNodes); err != nil {
+	opNodes := make([]OperationNode, sb.Hdr.OpNodeCount)
+	if err := binary.Read(r, binary.LittleEndian, opNodes); err != nil {
 		return fmt.Errorf("failed to read sandbox collection operation nodes: %v", err)
+	}
+	for _, opNode := range opNodes {
+		if opNode.IsNonTerminal() {
+			sb.OpNodes = append(sb.OpNodes, Operation{
+				Node:          opNode,
+				MatchOffset:   NonTerminalNode(opNode).MatchOffset(),
+				UnmatchOffset: NonTerminalNode(opNode).UnmatchOffset(),
+			})
+		} else {
+			sb.OpNodes = append(sb.OpNodes, Operation{
+				Terminal: true,
+				Node:     opNode,
+			})
+		}
 	}
 	sb.baseOffset, _ = r.Seek(0, io.SeekCurrent)
 	utils.Indent(log.WithFields(log.Fields{
@@ -643,7 +666,10 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 			return fmt.Errorf("failed to read sandbox collection profile name data: %v", err)
 		}
 		sb.Profiles[idx].Name = strings.Trim(string(name[:]), "\x00")
-		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s\t(flags: %#x, policy: %d)", sb.Profiles[idx].Name, sb.Profiles[idx].Flags, sb.Profiles[idx].PolicyIndex))
+		utils.Indent(log.WithFields(log.Fields{
+			"flags":  fmt.Sprintf("%#x", sb.Profiles[idx].Flags),
+			"policy": sb.Profiles[idx].PolicyIndex,
+		}).Debug, 3)(sb.Profiles[idx].Name)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing regex (%d)", sb.Hdr.RegexItemCount))
@@ -661,7 +687,7 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		if err != nil {
 			return fmt.Errorf("failed to parse sandbox collection regex: %v", err)
 		}
-		utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, version: %d, length: %#x\n\n%s", idx+1, loc, re.Version, re.Length, hex.Dump(re.Data)))
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, version: %d, length: %d\n\n%s", idx+1, loc, re.Version, re.Length, hex.Dump(re.Data)))
 		sb.Regexes = append(sb.Regexes, re)
 	}
 
@@ -680,20 +706,20 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		utils.Indent(log.Debug, 3)(sb.Globals[idx])
 	}
 
-	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing unknown NEW iOS16 variables (%d)", sb.Hdr.Unknown))
-	for idx, uoff := range unknownVarOffsets {
-		r.Seek(sb.baseOffset+int64(uoff)*8, io.SeekStart)
-		var size uint16
-		if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable size: %v", err)
-		}
-		udat := make([]byte, size)
-		if err := binary.Read(r, binary.LittleEndian, &udat); err != nil {
-			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable data: %v", err)
-		}
-		sb.Entitlements = append(sb.Entitlements, strings.Trim(string(udat[:]), "\x00"))
-		utils.Indent(log.Debug, 3)(sb.Entitlements[idx])
-	}
+	// utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing unknown NEW iOS16 variables (%d)", sb.Hdr.Unknown))
+	// for idx, uoff := range unknownVarOffsets {
+	// 	r.Seek(sb.baseOffset+int64(uoff)*8, io.SeekStart)
+	// 	var size uint16
+	// 	if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+	// 		return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable size: %v", err)
+	// 	}
+	// 	udat := make([]byte, size)
+	// 	if err := binary.Read(r, binary.LittleEndian, &udat); err != nil {
+	// 		return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable data: %v", err)
+	// 	}
+	// 	sb.Entitlements = append(sb.Entitlements, strings.Trim(string(udat[:]), "\x00"))
+	// 	utils.Indent(log.Debug, 3)(sb.Entitlements[idx])
+	// }
 
 	return nil
 }
@@ -724,6 +750,10 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 	var size uint16
 	if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
 		return "", fmt.Errorf("failed to read sandbox collection string size: %v", err)
+	}
+
+	if size > 0x1000 {
+		return "", fmt.Errorf("string is WAY to long (probably wrong type)")
 	}
 
 	name := make([]byte, size)

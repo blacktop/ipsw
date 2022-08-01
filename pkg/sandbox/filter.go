@@ -137,12 +137,26 @@ func (db *LibSandbox) GetOperation(id uint8) (*OperationInfo, error) {
 	}
 	return &db.Operations[id], nil
 }
+
+func (db *LibSandbox) GetMessageFilterOps(op *OperationInfo) ([]*OperationInfo, error) {
+	var mfops []*OperationInfo
+	for _, mfoID := range op.MsgFilterOps {
+		if mfo, err := db.GetOperation(uint8(mfoID)); err != nil {
+			return nil, fmt.Errorf("failed to get message filter operation for ID %d: %v", mfoID, err)
+		} else {
+			mfops = append(mfops, mfo)
+		}
+	}
+	return mfops, nil
+}
+
 func (db *LibSandbox) GetFilter(id uint8) (*FilterInfo, error) {
 	if int(id) >= len(db.Filters) {
 		return nil, fmt.Errorf("invalid filter id: %d", id)
 	}
 	return &db.Filters[id], nil
 }
+
 func (db *LibSandbox) GetModifier(id uint8) (*ModifierInfo, error) {
 	if int(id) >= len(db.Modifiers) {
 		return nil, fmt.Errorf("invalid modifier id: %d", id)
@@ -175,7 +189,10 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 	if alt {
 		log.Debugf("💁 %s: type: %#x, arg: %#x, alt: %t\n", f.Name, f.ArgumentType, id, alt)
 	}
-	if f.Name == `%entitlement-is-present` || f.Name == "state-flag" {
+	if f.Name == `%entitlement-is-present` ||
+		f.Name == `%entitlement-is-bool-true` ||
+		f.Name == "state-flag" ||
+		f.Name == `%entitlement-load` {
 		fmt.Println("STAP")
 	}
 
@@ -186,24 +203,6 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 		return "#f", nil
 	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_BITFIELD) {
 		return fmt.Sprintf("#o%04o", id), nil
-	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_LITERAL) {
-		ss, err := sb.GetRSStringAtOffset(uint32(id))
-		if err != nil {
-			return nil, err
-		}
-		if len(ss) == 1 {
-			return ss[0], nil
-		}
-		return ss, nil
-	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_STRING) {
-		if id == 0 {
-			return "wat?", nil
-		}
-		s, err := sb.GetStringAtOffset(uint32(id))
-		if err != nil {
-			return nil, err
-		}
-		return s, nil
 	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_INTEGER) {
 		if alt { // bitmask variant
 			mask, err := sb.GetBitMaskAtOffset(uint32(id))
@@ -215,7 +214,11 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 				if add {
 					switch f.Category {
 					case "mach-message-filter":
-						aliases = append(aliases, f.Aliases[idx].Name)
+						if idx < len(f.Aliases) {
+							aliases = append(aliases, f.Aliases[idx].Name)
+						} else {
+							log.Errorf("unable to lookup alias %d for filter %s: (out of bounds)", idx, f.Name)
+						}
 					default:
 						alias, err := f.Aliases.Get(uint16(idx))
 						if err != nil {
@@ -227,20 +230,80 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 				}
 			}
 			return aliases, nil
-		} else {
-			alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
-			if err != nil {
-				// Convert integer value to IO control string
-				return fmt.Sprintf("_IO \"%c\" %d", rune(id>>8), int(id&0xff)), nil
-			}
-			return alias.Name, nil
 		}
-	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_INTEGER) {
 		alias, err := f.Aliases.Get(id)
 		if err != nil {
-			return fmt.Sprintf("%d", id), nil
+			return fmt.Sprintf("_IO \"%c\" %d", rune(id>>8), int(id&0xff)), nil
 		}
 		return alias.Name, nil
+	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_STRING) {
+		return sb.GetStringAtOffset(uint32(id))
+		// if alt { // bitmask variant
+		// 	mask, err := sb.GetBitMaskAtOffset(uint32(id))
+		// 	if err != nil {
+		// 		return nil, err
+		// 	}
+		// 	var aliases []string
+		// 	for idx, add := range mask {
+		// 		if add {
+		// 			switch f.Category {
+		// 			case "mach-message-filter":
+		// 				aliases = append(aliases, f.Aliases[idx].Name)
+		// 			default:
+		// 				alias, err := f.Aliases.Get(uint16(idx))
+		// 				if err != nil {
+		// 					log.Errorf("unable to lookup alias %d for filter %s: %v", idx, f.Name, err)
+		// 					continue
+		// 				}
+		// 				aliases = append(aliases, alias.Name)
+		// 			}
+		// 		}
+		// 	}
+		// 	return aliases, nil
+		// } else {
+		// 	// return s, nil
+		// 	s, err = sb.GetStringAtOffset(uint32(id))
+		// 	if err != nil {
+		// 		alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
+		// 		if err != nil {
+		// 			// Convert integer value to IO control string
+		// 			return fmt.Sprintf("_IO %c %d", rune(id>>8), int(id&0xff)), nil
+		// 		}
+		// 		return alias.Name, nil
+		// 	}
+		// 	return s, nil
+		// }
+		// } else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_INTEGER) {
+		// 	if alt { // bitmask variant
+		// 		mask, err := sb.GetBitMaskAtOffset(uint32(id))
+		// 		if err != nil {
+		// 			return nil, err
+		// 		}
+		// 		var aliases []string
+		// 		for idx, add := range mask {
+		// 			if add {
+		// 				switch f.Category {
+		// 				case "mach-message-filter":
+		// 					aliases = append(aliases, f.Aliases[idx].Name)
+		// 				default:
+		// 					alias, err := f.Aliases.Get(uint16(idx))
+		// 					if err != nil {
+		// 						log.Errorf("unable to lookup alias %d for filter %s: %v", idx, f.Name, err)
+		// 						continue
+		// 					}
+		// 					aliases = append(aliases, alias.Name)
+		// 				}
+		// 			}
+		// 		}
+		// 		return aliases, nil
+		// 	} else {
+		// 		alias, err := f.Aliases.Get(id) // TODO: why do these have aliases?
+		// 		if err != nil {
+		// 			// Convert integer value to IO control string
+		// 			return fmt.Sprintf("_IO \"%c\" %d", rune(id>>8), int(id&0xff)), nil
+		// 		}
+		// 		return alias.Name, nil
+		// 	}
 	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_LITERAL) ||
 		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_PREFIX) ||
 		sb.config.filterAcceptsType(f, SB_VALUE_TYPE_PATTERN_SUBPATH) ||
@@ -256,17 +319,8 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			}
 			fmt.Println(rstr)
 			return "regex #\"\"", nil
-			// return nil, fmt.Errorf("not sure how to parse alt for data type %d yet", f.DataType)
 		} else {
-			ss, err := sb.GetRSStringAtOffset(uint32(id))
-			if err != nil {
-				return nil, err
-			}
-			if len(ss) == 1 {
-				return ss[0], nil
-			}
-			return ss, nil
-			// return fmt.Sprintf("\"%s\"", strings.Join(ss, " ")), nil
+			return sb.GetRSStringAtOffset(uint32(id))
 		}
 	} else if sb.config.filterAcceptsType(f, SB_VALUE_TYPE_NETWORK) {
 		// NOTE: ___define_network_filter_block_invoke(void* arg1, int64_t* arg2, int32_t* arg3) in libsandbox.1.dylib
@@ -404,11 +458,11 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
  **********************/
 
 type FilterInfo struct {
-	ID       int     `json:"id"`
 	Name     string  `json:"name,omitempty"`
 	Category string  `json:"category,omitempty"`
 	Aliases  Aliases `json:"aliases,omitempty"`
 	filterInfo
+	ID int `json:"id"`
 }
 
 type filterInfo struct {
@@ -609,10 +663,10 @@ func (m modAction) String() string {
 }
 
 type ModifierInfo struct {
-	ID      int     `json:"id"`
 	Name    string  `json:"name,omitempty"`
 	Aliases []Alias `json:"aliases,omitempty"`
 	modifierInfo
+	ID int `json:"id"`
 }
 
 type modifierInfo struct {
@@ -766,12 +820,12 @@ const (
 )
 
 type OperationInfo struct {
-	ID            int      `json:"id"`
 	Name          string   `json:"name,omitempty"`
 	Modifiers     []string `json:"modifiers,omitempty"`
 	Categories    []string `json:"categories,omitempty"`
 	MsgFilterOps  []uint32 `json:"msg_filter_ops,omitempty"`
 	operationInfo `json:"info,omitempty"`
+	ID            int `json:"id"`
 }
 
 type operationInfo struct {

@@ -147,30 +147,42 @@ var sbdecCmd = &cobra.Command{
 			if err := sb.ParseSandboxProfile(); err != nil {
 				return fmt.Errorf("failed parsing sandbox profile: %s", err)
 			}
+
 			for idx, op := range sb.OpNodes {
-				o, err := sb.ParseOperation(fmt.Sprintf("op_node_%d", idx), op)
-				if err != nil {
+				if err := sb.ParseOperation(&op); err != nil {
 					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					log.Errorf("failed to parse operation for node %s: %v", op, err)
 					continue
 				}
-				fmt.Println(o.String(0))
+				fmt.Println(op.String(fmt.Sprintf("op_node_%d", idx), 0))
 			}
-			defaultOp := sandbox.TerminalNode(sb.OpNodes[sb.Profiles[0].Operands[0]])
+
+			defaultOp := sandbox.TerminalNode(sb.OpNodes[0].Node)
 
 			for idx, op := range sb.Profiles[0].Operands {
-				if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-					if sandbox.TerminalNode(sb.OpNodes[op]).Decision() == defaultOp.Decision() {
+				if sb.Operations[idx] != "default" && sb.OpNodes[op].Node.IsTerminal() {
+					if sandbox.TerminalNode(sb.OpNodes[op].Node).Decision() == defaultOp.Decision() {
 						continue
 					}
 				}
-				o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
-				if err != nil {
+				if err := sb.ParseOperation(&sb.OpNodes[op]); err != nil {
 					// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 					continue
 				}
-				fmt.Println(o.String(0))
+				fmt.Println(sb.OpNodes[op].String(sb.Operations[idx], 0))
+				if sb.OpNodes[op].Match > 0 {
+					if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].MatchOffset]); err != nil {
+						log.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[op].Match, err)
+					}
+					fmt.Println("MATCH:", sb.OpNodes[sb.OpNodes[op].MatchOffset].String(sb.Operations[idx], 1))
+				}
+				if sb.OpNodes[op].Unmatch > 0 {
+					if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].UnmatchOffset]); err != nil {
+						log.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[op].Unmatch, err)
+					}
+					fmt.Println("UNMATCH:", sb.OpNodes[sb.OpNodes[op].UnmatchOffset].String(sb.Operations[idx], 1))
+				}
 			}
 			return nil
 		} else if viper.GetBool("kernel.sbdec.protobox") { // PARSE PROTOBOX COLLECTION
@@ -187,27 +199,28 @@ var sbdecCmd = &cobra.Command{
 			if err := sb.ParseSandboxCollection(); err != nil {
 				return fmt.Errorf("failed parsing sandbox collection: %s", err)
 			}
-			for idx, ent := range sb.Entitlements {
-				o, err := sb.ParseOperation(fmt.Sprintf("ent_%d", idx), sb.OpNodes[ent])
-				if err != nil {
-					return err
-				}
-				fmt.Println(o.String(0))
-				if o.Match > 0 {
-					match, err := sb.ParseOperation(o.Name, o.Match)
-					if err != nil {
-						log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
-					}
-					fmt.Println("MATCH:", match.String(1))
-				}
-				if o.Unmatch > 0 {
-					unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
-					if err != nil {
-						log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
-					}
-					fmt.Println("UNMATCH:", unmatch.String(1))
-				}
-			}
+
+			// for idx, ent := range sb.Entitlements {
+			// 	o, err := sb.ParseOperation(fmt.Sprintf("ent_%d", idx), sb.OpNodes[ent])
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// 	fmt.Println(o.String(0))
+			// 	if o.Match > 0 {
+			// 		match, err := sb.ParseOperation(o.Name, o.Match)
+			// 		if err != nil {
+			// 			log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
+			// 		}
+			// 		fmt.Println("MATCH:", match.String(1))
+			// 	}
+			// 	if o.Unmatch > 0 {
+			// 		unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
+			// 		if err != nil {
+			// 			log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
+			// 		}
+			// 		fmt.Println("UNMATCH:", unmatch.String(1))
+			// 	}
+			// }
 		}
 
 		// for idx, pol := range sb.Policies {
@@ -309,35 +322,31 @@ var sbdecCmd = &cobra.Command{
 				}
 				fmt.Println(prof)
 
-				defaultOp := sandbox.TerminalNode(sb.OpNodes[prof.Operands[0]])
+				defaultOp := sandbox.TerminalNode(sb.OpNodes[prof.Operands[0]].Node)
 
 				for idx, op := range prof.Operands {
-					if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-						if sandbox.TerminalNode(sb.OpNodes[op]).Decision() == defaultOp.Decision() {
+					if sb.Operations[idx] != "default" && sb.OpNodes[op].Node.IsTerminal() {
+						if sandbox.TerminalNode(sb.OpNodes[op].Node).Decision() == defaultOp.Decision() {
 							continue
 						}
 					}
-					o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
-					// _, err := sandbox.ParseOperation(sb, sb.OpNodes[op])
-					if err != nil {
+					if err := sb.ParseOperation(&sb.OpNodes[op]); err != nil {
 						// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 						log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 						continue
 					}
-					fmt.Println(o.String(0))
-					if o.Match > 0 {
-						match, err := sb.ParseOperation(o.Name, o.Match)
-						if err != nil {
-							log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
+					fmt.Println(sb.OpNodes[op].String(sb.Operations[idx], 0))
+					if sb.OpNodes[op].Match > 0 {
+						if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].MatchOffset]); err != nil {
+							log.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[op].Match, err)
 						}
-						fmt.Println("MATCH:", match.String(1))
+						fmt.Println("MATCH:", sb.OpNodes[sb.OpNodes[op].MatchOffset].String(sb.Operations[idx], 1))
 					}
-					if o.Unmatch > 0 {
-						unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
-						if err != nil {
-							log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
+					if sb.OpNodes[op].Unmatch > 0 {
+						if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].UnmatchOffset]); err != nil {
+							log.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[op].Unmatch, err)
 						}
-						fmt.Println("UNMATCH:", unmatch.String(1))
+						fmt.Println("UNMATCH:", sb.OpNodes[sb.OpNodes[op].UnmatchOffset].String(sb.Operations[idx], 1))
 					}
 				}
 
@@ -371,26 +380,56 @@ var sbdecCmd = &cobra.Command{
 				// }
 
 			} else { // DECOMPILE ALL PROFILES
+				var max int
 				for _, prof := range sb.Profiles {
-					fmt.Println(prof.Name)
-
-					defaultOp := sandbox.TerminalNode(sb.OpNodes[0])
+					fmt.Println(prof)
+					// if prof.Name == "BTServer" {
+					// 	fmt.Println("SKIPPING>>>>>>>>")
+					// 	continue
+					// }
+					// fmt.Println("DUMP SIMPLE GRAPHS")
+					// defaultOp2 := sandbox.TerminalNode(sb.OpNodes[prof.Operands[0]])
+					// for idx, op := range prof.Operands {
+					// 	if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
+					// 		if sandbox.TerminalNode(sb.OpNodes[op]).Decision() == defaultOp2.Decision() {
+					// 			continue
+					// 		}
+					// 	}
+					// 	og, err := sb.CreateOperationGraph(sb.Operations[idx], sb.OpNodes[op])
+					// 	if err != nil {
+					// 		return err
+					// 	}
+					// 	depth := og.Depth()
+					// 	if depth <= 10 {
+					// 		fmt.Printf("DEPTH: %d %s\n", depth, og.String(0))
+					// 	} else {
+					// 		fmt.Printf("DEPTH: %d (%s\n", depth, og.Name)
+					// 		fmt.Println("<SNIP>")
+					// 	}
+					// 	if depth > max {
+					// 		fmt.Printf("NEW max %d found in %s for %s\n", depth, prof.Name, og.Name)
+					// 		max = depth
+					// 	}
+					// 	og = nil
+					// }
+					// continue
+					defaultOp := sandbox.TerminalNode(sb.OpNodes[0].Node)
 
 					for idx, op := range prof.Operands {
-						if sb.Operations[idx] != "default" && sb.OpNodes[op].IsTerminal() {
-							if sandbox.TerminalNode(sb.OpNodes[op]).Decision() == defaultOp.Decision() {
+						if sb.Operations[idx] != "default" && sb.OpNodes[op].Node.IsTerminal() {
+							if sandbox.TerminalNode(sb.OpNodes[op].Node).Decision() == defaultOp.Decision() {
 								continue
 							}
 						}
-						o, err := sb.ParseOperation(sb.Operations[idx], sb.OpNodes[op])
-						if err != nil {
+						if err := sb.ParseOperation(&sb.OpNodes[op]); err != nil {
 							// return fmt.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 							log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 							continue
 						}
-						fmt.Println(o.String(0))
+						fmt.Println(sb.OpNodes[op].String(sb.Operations[idx], 0))
 					}
 				}
+				fmt.Println("MAX: ", max)
 			}
 		}
 

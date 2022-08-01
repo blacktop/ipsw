@@ -25,13 +25,12 @@ const (
 )
 
 type reNode struct {
-	// Postion int
+	Value   any
+	accum   string
 	Next    int
 	Type    reType
-	Value   any
 	isStart bool
 	isEnd   bool
-	accum   string
 }
 
 func (n reNode) String(nn *reNode) string {
@@ -103,9 +102,9 @@ func (rl reList) String() string {
 }
 
 type Regex struct {
+	Data    []byte
 	Version uint32
 	Length  uint16
-	Data    []byte
 }
 
 func NewRegex(data []byte) (*Regex, error) {
