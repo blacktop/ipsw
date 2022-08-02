@@ -61,7 +61,6 @@ typedef struct {
 
 typedef struct {
     if ( header.OpNodeCount > 0 ) {
-        local quad opNodeStart = sizeof(header) + (header.RegexCount*2) + (header.GlobalVarCount*2) + (header.unknown1*2) + (header.PolicyCount*2);
         if ( header.Type == 0x8000 ) {
             if ( header.ProfileCount > 0 )
                 opNodeStart += header.ProfileCount * sizeof(profiles[0]);
