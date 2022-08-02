@@ -29,11 +29,13 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -52,6 +54,8 @@ func init() {
 	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	ipswCmd.Flags().BoolP("usb", "u", false, "Download IPSWs for USB attached iDevices")
+
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
@@ -62,6 +66,7 @@ func init() {
 	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
+	viper.BindPFlag("download.ipsw.usb", ipswCmd.Flags().Lookup("usb"))
 }
 
 // ipswCmd represents the ipsw command
@@ -126,6 +131,77 @@ var ipswCmd = &cobra.Command{
 		// verify args
 		if kernel && len(pattern) > 0 {
 			return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
+		}
+
+		if viper.GetBool("download.ipsw.usb") {
+			uconn, err := usb.NewConnection(AppVersion)
+			if err != nil {
+				return err
+			}
+			defer uconn.Close()
+
+			devs, err := uconn.ListDevices()
+			if err != nil {
+				return err
+			}
+			if len(devs) == 0 {
+				return fmt.Errorf("no USB devices found")
+			}
+
+			type ipswDetails struct {
+				ProductType   string
+				HardwareModel string
+				BuildVersion  string
+			}
+
+			var ideets []ipswDetails
+			for _, dev := range devs {
+				ld, err := uconn.ConnectLockdown(dev)
+				if err != nil {
+					return err
+				}
+				if err := ld.StartSession(); err != nil {
+					return err
+				}
+				dd, err := ld.GetDeviceDetail(dev)
+				if err != nil {
+					return err
+				}
+				ideets = append(ideets, ipswDetails{
+					ProductType:   dd.ProductType,
+					HardwareModel: dd.HardwareModel,
+					BuildVersion:  dd.BuildVersion,
+				})
+				if err := ld.StopSession(); err != nil {
+					return err
+				}
+				if err := uconn.Refresh(); err != nil {
+					return err
+				}
+			}
+
+			if len(ideets) == 1 {
+				dFlg.Device = ideets[0].ProductType
+				dFlg.Build = ideets[0].BuildVersion
+			} else {
+				var choices []string
+				for _, d := range ideets {
+					choices = append(choices, fmt.Sprintf("%s_%s_%s", d.ProductType, d.HardwareModel, d.BuildVersion))
+				}
+				dfiles := []int{}
+				prompt := &survey.Select{
+					Message: "Select what iDevice's IPSW to download:",
+					Options: choices,
+				}
+				if err := survey.AskOne(prompt, &dfiles); err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				for _, idx := range dfiles {
+					dFlg.Device = ideets[idx].ProductType
+					dFlg.Build = ideets[idx].BuildVersion
+				}
+			}
 		}
 
 		var destPath string
