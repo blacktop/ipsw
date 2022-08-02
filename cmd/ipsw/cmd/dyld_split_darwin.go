@@ -7,9 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	homedir "github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -19,7 +21,13 @@ func init() {
 	dyldCmd.AddCommand(splitCmd)
 
 	splitCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app")
+	splitCmd.Flags().BoolP("cache", "c", false, "Build XCode device support cache")
+	splitCmd.Flags().StringP("version", "v", "", "Cache version")
+	splitCmd.Flags().StringP("build", "b", "", "Cache build")
 	viper.BindPFlag("dyld.split.xcode", splitCmd.Flags().Lookup("xcode"))
+	viper.BindPFlag("dyld.split.cache", splitCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("dyld.split.version", splitCmd.Flags().Lookup("version"))
+	viper.BindPFlag("dyld.split.build", splitCmd.Flags().Lookup("build"))
 
 	splitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -62,17 +70,49 @@ var splitCmd = &cobra.Command{
 			log.Fatal("dyld_shared_cache splitting only works on macOS")
 		}
 
-		if len(args) > 1 {
+		outputPath := filepath.Dir(dscPath)
+
+		if len(args) > 1 && viper.GetBool("dyld.split.cache") {
+			return fmt.Errorf("cannot specify output path and use --cache flag at the same time")
+		} else if len(args) > 1 {
 			outputPath, _ := filepath.Abs(filepath.Clean(args[1]))
 			if _, err := os.Stat(outputPath); os.IsNotExist(err) {
 				return fmt.Errorf("path %s does not exist", outputPath)
 			}
-			log.Infof("Splitting dyld_shared_cache to %s\n", outputPath)
-			return dyld.Split(dscPath, outputPath, xcodePath)
+		} else if viper.GetBool("dyld.split.cache") {
+			if len(viper.GetString("dyld.split.version")) == 0 || len(viper.GetString("dyld.split.build")) == 0 {
+				return fmt.Errorf("--version and --build are required when --cache is used")
+			}
+
+			home, err := homedir.Dir()
+			if err != nil {
+				return err
+			}
+
+			f, err := dyld.Open(dscPath)
+			if err != nil {
+				return errors.Wrapf(err, "failed to open dyld_shared_cache %s", dscPath)
+			}
+
+			var arm64e string
+			if strings.Contains(f.Headers[f.UUID].Magic.String(), "arm64e") {
+				arm64e = " arm64e"
+			}
+			f.Close()
+
+			version := viper.GetString("dyld.split.version")
+			if strings.HasSuffix(version, ".0.0") {
+				version = strings.TrimSuffix(version, ".0")
+			}
+
+			outputPath = filepath.Join(home, fmt.Sprintf("/Library/Developer/Xcode/iOS DeviceSupport/%s (%s)%s", version, viper.GetString("dyld.split.build"), arm64e))
+			if err := os.MkdirAll(outputPath, 0755); err != nil {
+				return fmt.Errorf("failed to create cache directory %s: %v", outputPath, err)
+			}
 		}
 
-		log.Info("Splitting dyld_shared_cache")
-		return dyld.Split(dscPath, filepath.Dir(dscPath), xcodePath)
+		log.Infof("Splitting dyld_shared_cache to %s\n", outputPath)
+		return dyld.Split(dscPath, outputPath, xcodePath, viper.GetBool("dyld.split.cache"))
 
 		// dscPath := filepath.Clean(args[0])
 
