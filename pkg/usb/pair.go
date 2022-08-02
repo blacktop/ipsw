@@ -7,39 +7,15 @@ import (
 	"io"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/pkg/usb/types"
 )
 
-type readPair struct {
-	BundleID            string
-	ClientVersionString string
-	MessageType         string
-	ProgName            string
-	LibUSBMuxVersion    uint32 `plist:"kLibUSBMuxVersion"`
-	PairRecordID        string
-}
+func (u *USBConnection) GetPair(dev types.Device) (*types.PairRecord, error) {
 
-type pairRecordData struct {
-	PairRecordData []byte
-}
-
-type PairRecord struct {
-	HostID            string
-	SystemBUID        string
-	HostCertificate   []byte
-	HostPrivateKey    []byte
-	DeviceCertificate []byte
-	EscrowBag         []byte
-	WiFiMACAddress    string
-	RootCertificate   []byte
-	RootPrivateKey    []byte
-}
-
-func (u *USBConnection) GetPair(dev Device) (*PairRecord, error) {
-
-	data, err := plist.Marshal(readPair{
-		BundleID:            bundleID,
+	data, err := plist.Marshal(types.ReadPair{
+		BundleID:            types.BundleID,
 		ClientVersionString: u.clientVersion,
-		ProgName:            progName,
+		ProgName:            types.ProgName,
 		MessageType:         "ReadPairRecord",
 		LibUSBMuxVersion:    3,
 		PairRecordID:        dev.Properties.UDID,
@@ -75,6 +51,10 @@ func (u *USBConnection) GetPair(dev Device) (*PairRecord, error) {
 		return nil, err
 	}
 
+	type pairRecordData struct {
+		PairRecordData []byte
+	}
+
 	prd := pairRecordData{}
 	if err := plist.NewDecoder(bytes.NewReader(payload)).Decode(&prd); err != nil {
 		return nil, err
@@ -82,7 +62,7 @@ func (u *USBConnection) GetPair(dev Device) (*PairRecord, error) {
 
 	// ioutil.WriteFile("dev_pair.plist", prd.PairRecordData, 0664)
 
-	u.pair = PairRecord{}
+	u.pair = types.PairRecord{}
 	if err := plist.NewDecoder(bytes.NewReader(prd.PairRecordData)).Decode(&u.pair); err != nil {
 		return nil, err
 	}

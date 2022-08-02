@@ -22,6 +22,8 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/spf13/cobra"
@@ -33,9 +35,10 @@ func init() {
 
 // idevCmd represents the idev command
 var idevCmd = &cobra.Command{
-	Use:   "idev",
-	Short: "Dump info about USB connected iDevices",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "idev",
+	Short:         "Dump info about USB connected iDevices",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -48,16 +51,78 @@ var idevCmd = &cobra.Command{
 		}
 		defer uconn.Close()
 
-		dev, err := uconn.ListDevices()
+		devs, err := uconn.ListDevices()
 		if err != nil {
 			return err
 		}
 
-		for _, dev := range dev {
-			if _, err := uconn.StartService(dev, "com.apple.instruments.remoteserver"); err != nil {
+		for _, dev := range devs {
+			fmt.Println(dev)
+
+			ld, err := uconn.ConnectLockdown(dev)
+			if err != nil {
 				return err
 			}
-			uconn.GetValue(dev, "", "ProductVersion")
+
+			if err := ld.StartSession(); err != nil {
+				return err
+			}
+
+			// if _, err := ld.StartService("com.apple.instruments.remoteserver"); err != nil {
+			// 	return err
+			// }
+
+			dd, err := ld.GetDeviceDetail(dev)
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf(
+				"Device Name:         %s\n"+
+					"Device Color:        %s\n"+
+					"Device Class:        %s\n"+
+					"Product Name:        %s\n"+
+					"Product Type:        %s\n"+
+					"HardwareModel:       %s\n"+
+					"BoardId:             %d\n"+
+					"BuildVersion:        %s\n"+
+					"Product Version:     %s\n"+
+					"ChipID:              %#x (%s)\n"+
+					"ProductionSOC:       %t\n"+
+					"HasSiDP:             %t\n"+
+					"TelephonyCapability: %t\n"+
+					"UniqueChipID:        %#x\n"+
+					"DieID:               %#x\n"+
+					"PartitionType:       %s\n"+
+					"UniqueDeviceID:      %s\n"+
+					"WiFiAddress:         %s\n\n",
+				dd.DeviceName,
+				dd.DeviceColor,
+				dd.DeviceClass,
+				dd.ProductName,
+				dd.ProductType,
+				dd.HardwareModel,
+				dd.BoardId,
+				dd.BuildVersion,
+				dd.ProductVersion,
+				dd.ChipID,
+				dd.CPUArchitecture,
+				dd.ProductionSOC,
+				dd.HasSiDP,
+				dd.TelephonyCapability,
+				dd.UniqueChipID,
+				dd.DieID,
+				dd.PartitionType,
+				dd.UniqueDeviceID,
+				dd.WiFiAddress,
+			)
+
+			if err := ld.StopSession(); err != nil {
+				return err
+			}
+			if err := uconn.Refresh(); err != nil {
+				return err
+			}
 		}
 
 		return nil

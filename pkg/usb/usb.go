@@ -9,16 +9,9 @@ import (
 	"net"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/pkg/usb/lockdown"
+	"github.com/blacktop/ipsw/pkg/usb/types"
 )
-
-const (
-	progName             = "ipsw"
-	bundleID             = "io.blacktop.ipsw"
-	usbMuxAddress        = "/var/run/usbmuxd"
-	lockdownPort  uint16 = 32498
-)
-
-var sizeOfHeader = uint32(binary.Size(UsbMuxHeader{}))
 
 type UsbMuxHeader struct {
 	Length  uint32
@@ -36,27 +29,29 @@ func (u UsbMuxResponse) IsSuccessFull() bool {
 	return u.Number == 0
 }
 
+var sizeOfHeader = uint32(binary.Size(UsbMuxHeader{}))
+
 type USBConnection struct {
 	c   net.Conn
 	ssl *tls.Conn
+	ldc *lockdown.Client
 
-	pair PairRecord
-	tag  uint32
+	devs []types.Device
+	pair types.PairRecord
 
-	devs []Device
-
+	tag           uint32
 	clientVersion string
 	sess          string
 }
 
 func NewConnection(version string) (*USBConnection, error) {
-	c, err := net.Dial("unix", usbMuxAddress)
+	c, err := net.Dial("unix", types.UsbMuxAddress)
 	if err != nil {
 		return nil, err
 	}
 	return &USBConnection{
 		c:             c,
-		clientVersion: fmt.Sprintf("%s-%s", progName, version),
+		clientVersion: fmt.Sprintf("%s-%s", types.ProgName, version),
 		tag:           0,
 	}, nil
 }
@@ -65,37 +60,24 @@ func (u *USBConnection) Close() error {
 	return u.c.Close()
 }
 
-type readDevicesType struct {
-	MessageType         string
-	BundleID            string
-	ProgName            string
-	ClientVersionString string
-	LibUSBMuxVersion    int
+func (u *USBConnection) Refresh() error {
+	if err := u.c.Close(); err != nil {
+		return err
+	}
+	c, err := net.Dial("unix", types.UsbMuxAddress)
+	if err != nil {
+		return err
+	}
+	u.c = c
+	return nil
 }
 
-type Device struct {
-	MessageType string
-	DeviceID    int
-	Properties  DeviceProperties
-}
+func (u *USBConnection) ListDevices() ([]types.Device, error) {
 
-type DeviceProperties struct {
-	DeviceID        int
-	ConnectionType  string
-	ConnectionSpeed int
-	ProductID       int
-	LocationID      int
-	SerialNumber    string
-	UDID            string
-	USBSerialNumber string
-}
-
-func (u *USBConnection) ListDevices() ([]Device, error) {
-
-	data, err := plist.Marshal(readDevicesType{
+	data, err := plist.Marshal(types.ReadDevicesType{
 		MessageType:         "ListDevices",
-		BundleID:            bundleID,
-		ProgName:            progName,
+		BundleID:            types.BundleID,
+		ProgName:            types.ProgName,
 		ClientVersionString: u.clientVersion,
 		LibUSBMuxVersion:    3,
 	}, plist.XMLFormat)
@@ -133,7 +115,7 @@ func (u *USBConnection) ListDevices() ([]Device, error) {
 	// ioutil.WriteFile("dev_list.plist", payload, 0664)
 
 	type DeviceList struct {
-		DeviceList []Device
+		DeviceList []types.Device
 	}
 
 	deviceList := DeviceList{}
@@ -148,10 +130,10 @@ func (u *USBConnection) ListDevices() ([]Device, error) {
 
 func (u *USBConnection) ReadBUID() (string, error) {
 
-	data, err := plist.Marshal(readDevicesType{
+	data, err := plist.Marshal(types.ReadDevicesType{
 		MessageType:         "ReadBUID",
-		BundleID:            bundleID,
-		ProgName:            progName,
+		BundleID:            types.BundleID,
+		ProgName:            types.ProgName,
 		ClientVersionString: u.clientVersion,
 		LibUSBMuxVersion:    3,
 	}, plist.XMLFormat)
@@ -208,19 +190,19 @@ type connectMessage struct {
 	PortNumber          uint16
 }
 
-func (u *USBConnection) ConnectLockdown(dev Device) error {
+func (u *USBConnection) ConnectLockdown(dev types.Device) (*lockdown.Client, error) {
 
 	data, err := plist.Marshal(connectMessage{
-		BundleID:            bundleID,
+		BundleID:            types.BundleID,
+		ProgName:            types.ProgName,
 		ClientVersionString: u.clientVersion,
-		ProgName:            progName,
 		MessageType:         "Connect",
 		LibUSBMuxVersion:    3,
 		DeviceID:            uint32(dev.DeviceID),
-		PortNumber:          lockdownPort,
+		PortNumber:          lockdown.Port,
 	}, plist.XMLFormat)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	u.tag++
@@ -231,34 +213,41 @@ func (u *USBConnection) ConnectLockdown(dev Device) error {
 		Version: 1,
 		Tag:     u.tag,
 	}); err != nil {
-		return err
+		return nil, err
 	}
-	n, err := u.c.Write(data)
-	if n < len(data) {
-		return fmt.Errorf("failed writing %d bytes to usb, only %d sent", len(data), n)
-	}
+	_, err = u.c.Write(data)
+	// if n < len(data) {
+	// 	return nil, fmt.Errorf("failed writing %d bytes to usb, only %d sent", len(data), n)
+	// }
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var header UsbMuxHeader
 	if err := binary.Read(u.c, binary.LittleEndian, &header); err != nil {
-		return err
+		return nil, err
 	}
 	u.tag = header.Tag
 	payload := make([]byte, header.Length-sizeOfHeader)
 	if _, err = io.ReadFull(u.c, payload); err != nil {
-		return err
+		return nil, err
 	}
 
 	resp := UsbMuxResponse{}
 	if err := plist.NewDecoder(bytes.NewReader(payload)).Decode(&resp); err != nil {
-		return err
+		return nil, err
 	}
 
 	if !resp.IsSuccessFull() {
-		return fmt.Errorf("failed to connect to lockdown service: %v", resp)
+		return nil, fmt.Errorf("failed to connect to lockdown service: %v", resp)
 	}
 
-	return nil
+	// pair, err := u.GetPair(dev)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	u.ldc = lockdown.NewClient(u.c, dev, types.PairRecord{})
+
+	return u.ldc, nil
 }
