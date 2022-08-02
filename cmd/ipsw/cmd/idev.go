@@ -31,6 +31,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(idevCmd)
+	idevCmd.Flags().BoolP("ipsw", "i", false, "Display devices as ipsw spec names")
 }
 
 // idevCmd represents the idev command
@@ -45,6 +46,8 @@ var idevCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
+
 		uconn, err := usb.NewConnection(AppVersion)
 		if err != nil {
 			return err
@@ -57,7 +60,6 @@ var idevCmd = &cobra.Command{
 		}
 
 		for _, dev := range devs {
-			fmt.Println(dev)
 
 			ld, err := uconn.ConnectLockdown(dev)
 			if err != nil {
@@ -77,45 +79,50 @@ var idevCmd = &cobra.Command{
 				return err
 			}
 
-			fmt.Printf(
-				"Device Name:         %s\n"+
-					"Device Color:        %s\n"+
-					"Device Class:        %s\n"+
-					"Product Name:        %s\n"+
-					"Product Type:        %s\n"+
-					"HardwareModel:       %s\n"+
-					"BoardId:             %d\n"+
-					"BuildVersion:        %s\n"+
-					"Product Version:     %s\n"+
-					"ChipID:              %#x (%s)\n"+
-					"ProductionSOC:       %t\n"+
-					"HasSiDP:             %t\n"+
-					"TelephonyCapability: %t\n"+
-					"UniqueChipID:        %#x\n"+
-					"DieID:               %#x\n"+
-					"PartitionType:       %s\n"+
-					"UniqueDeviceID:      %s\n"+
-					"WiFiAddress:         %s\n\n",
-				dd.DeviceName,
-				dd.DeviceColor,
-				dd.DeviceClass,
-				dd.ProductName,
-				dd.ProductType,
-				dd.HardwareModel,
-				dd.BoardId,
-				dd.BuildVersion,
-				dd.ProductVersion,
-				dd.ChipID,
-				dd.CPUArchitecture,
-				dd.ProductionSOC,
-				dd.HasSiDP,
-				dd.TelephonyCapability,
-				dd.UniqueChipID,
-				dd.DieID,
-				dd.PartitionType,
-				dd.UniqueDeviceID,
-				dd.WiFiAddress,
-			)
+			if ipswSpec {
+				fmt.Printf("%s_%s_%s\n", dd.ProductType, dd.HardwareModel, dd.BuildVersion)
+			} else {
+				fmt.Println(dev)
+				fmt.Printf(
+					"Device Name:         %s\n"+
+						"Device Color:        %s\n"+
+						"Device Class:        %s\n"+
+						"Product Name:        %s\n"+
+						"Product Type:        %s\n"+
+						"HardwareModel:       %s\n"+
+						"BoardId:             %d\n"+
+						"BuildVersion:        %s\n"+
+						"Product Version:     %s\n"+
+						"ChipID:              %#x (%s)\n"+
+						"ProductionSOC:       %t\n"+
+						"HasSiDP:             %t\n"+
+						"TelephonyCapability: %t\n"+
+						"UniqueChipID:        %#x\n"+
+						"DieID:               %#x\n"+
+						"PartitionType:       %s\n"+
+						"UniqueDeviceID:      %s\n"+
+						"WiFiAddress:         %s\n\n",
+					dd.DeviceName,
+					dd.DeviceColor,
+					dd.DeviceClass,
+					dd.ProductName,
+					dd.ProductType,
+					dd.HardwareModel,
+					dd.BoardId,
+					dd.BuildVersion,
+					dd.ProductVersion,
+					dd.ChipID,
+					dd.CPUArchitecture,
+					dd.ProductionSOC,
+					dd.HasSiDP,
+					dd.TelephonyCapability,
+					dd.UniqueChipID,
+					dd.DieID,
+					dd.PartitionType,
+					dd.UniqueDeviceID,
+					dd.WiFiAddress,
+				)
+			}
 
 			if err := ld.StopSession(); err != nil {
 				return err
