@@ -22,16 +22,19 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
+	"github.com/blacktop/ipsw/pkg/usb/lockdown"
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(idevCmd)
 	idevCmd.Flags().BoolP("ipsw", "i", false, "Display devices as ipsw spec names")
+	idevCmd.Flags().BoolP("json", "j", false, "Display devices as JSON")
 }
 
 // idevCmd represents the idev command
@@ -47,6 +50,7 @@ var idevCmd = &cobra.Command{
 		}
 
 		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
+		asJSON, _ := cmd.Flags().GetBool("json")
 
 		uconn, err := usb.NewConnection(AppVersion)
 		if err != nil {
@@ -59,6 +63,7 @@ var idevCmd = &cobra.Command{
 			return err
 		}
 
+		var dds []*lockdown.DeviceDetail
 		for _, dev := range devs {
 
 			ld, err := uconn.ConnectLockdown(dev)
@@ -81,6 +86,8 @@ var idevCmd = &cobra.Command{
 
 			if ipswSpec {
 				fmt.Printf("%s_%s_%s\n", dd.ProductType, dd.HardwareModel, dd.BuildVersion)
+			} else if asJSON {
+				dds = append(dds, dd)
 			} else {
 				fmt.Println(dev)
 				fmt.Printf(
@@ -130,6 +137,14 @@ var idevCmd = &cobra.Command{
 			if err := uconn.Refresh(); err != nil {
 				return err
 			}
+		}
+
+		if asJSON {
+			ddsJSON, err := json.Marshal(dds)
+			if err != nil {
+				return fmt.Errorf("failed to marshal device details to JSON: %s", err)
+			}
+			fmt.Println(string(ddsJSON))
 		}
 
 		return nil
