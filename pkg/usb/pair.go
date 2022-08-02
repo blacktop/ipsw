@@ -21,7 +21,7 @@ func (u *USBConnection) GetPair(dev types.Device) (*types.PairRecord, error) {
 		PairRecordID:        dev.Properties.UDID,
 	}, plist.XMLFormat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal ReadPair: %v", err)
 	}
 
 	u.tag++
@@ -32,23 +32,23 @@ func (u *USBConnection) GetPair(dev types.Device) (*types.PairRecord, error) {
 		Version: 1,
 		Tag:     u.tag,
 	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write header: %v", err)
 	}
 	n, err := u.c.Write(data)
 	if n < len(data) {
 		return nil, fmt.Errorf("failed writing %d bytes to usb, only %d sent", len(data), n)
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write data: %v", err)
 	}
 
 	var header UsbMuxHeader
 	if err := binary.Read(u.c, binary.LittleEndian, &header); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read header: %v", err)
 	}
 	payload := make([]byte, header.Length-sizeOfHeader)
 	if _, err = io.ReadFull(u.c, payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read payload: %v", err)
 	}
 
 	type pairRecordData struct {
@@ -57,14 +57,14 @@ func (u *USBConnection) GetPair(dev types.Device) (*types.PairRecord, error) {
 
 	prd := pairRecordData{}
 	if err := plist.NewDecoder(bytes.NewReader(payload)).Decode(&prd); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode payload: %v", err)
 	}
 
 	// ioutil.WriteFile("dev_pair.plist", prd.PairRecordData, 0664)
 
 	u.pair = types.PairRecord{}
 	if err := plist.NewDecoder(bytes.NewReader(prd.PairRecordData)).Decode(&u.pair); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode read pair record payload: %v", err)
 	}
 
 	return &u.pair, nil

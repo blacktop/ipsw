@@ -58,7 +58,7 @@ func (ld *Client) GetValue(dev types.Device, domain, key string) (*ValueResponse
 		Key:             key,
 	}, plist.XMLFormat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal GetValue request: %v", err)
 	}
 
 	if err := ld.SendData(data); err != nil {
@@ -80,12 +80,12 @@ func (ld *Client) GetValue(dev types.Device, domain, key string) (*ValueResponse
 func (ld *Client) GetDeviceDetail(dev types.Device) (*DeviceDetail, error) {
 	v, err := ld.GetValue(dev, "", "")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get device detail: %v", err)
 	}
 
 	var dd DeviceDetail
 	if err := mapstructure.Decode(v.Value, &dd); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode device detail: %v", err)
 	}
 
 	return &dd, nil

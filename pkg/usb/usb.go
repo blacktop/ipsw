@@ -2,7 +2,6 @@ package usb
 
 import (
 	"bytes"
-	"crypto/tls"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -33,7 +32,6 @@ var sizeOfHeader = uint32(binary.Size(UsbMuxHeader{}))
 
 type USBConnection struct {
 	c   net.Conn
-	ssl *tls.Conn
 	ldc *lockdown.Client
 
 	devs []types.Device
@@ -41,7 +39,6 @@ type USBConnection struct {
 
 	tag           uint32
 	clientVersion string
-	sess          string
 }
 
 func NewConnection(version string) (*USBConnection, error) {
@@ -62,11 +59,11 @@ func (u *USBConnection) Close() error {
 
 func (u *USBConnection) Refresh() error {
 	if err := u.c.Close(); err != nil {
-		return err
+		return fmt.Errorf("failed to close connection: %s", err)
 	}
 	c, err := net.Dial("unix", types.UsbMuxAddress)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to reconnect: %s", err)
 	}
 	u.c = c
 	return nil
@@ -82,7 +79,7 @@ func (u *USBConnection) ListDevices() ([]types.Device, error) {
 		LibUSBMuxVersion:    3,
 	}, plist.XMLFormat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal types.ReadDevicesType: %v", err)
 	}
 
 	u.tag++
@@ -93,23 +90,19 @@ func (u *USBConnection) ListDevices() ([]types.Device, error) {
 		Version: 1,
 		Tag:     u.tag,
 	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write header: %v", err)
 	}
-	n, err := u.c.Write(data)
-	if n < len(data) {
-		return nil, fmt.Errorf("failed writing %d bytes to usb, only %d sent", len(data), n)
-	}
-	if err != nil {
-		return nil, err
+	if _, err := u.c.Write(data); err != nil {
+		return nil, fmt.Errorf("failed to write data: %v", err)
 	}
 
 	var header UsbMuxHeader
 	if err := binary.Read(u.c, binary.LittleEndian, &header); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read header: %v", err)
 	}
 	payload := make([]byte, header.Length-sizeOfHeader)
 	if _, err = io.ReadFull(u.c, payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read payload: %v", err)
 	}
 
 	// ioutil.WriteFile("dev_list.plist", payload, 0664)
@@ -120,7 +113,7 @@ func (u *USBConnection) ListDevices() ([]types.Device, error) {
 
 	deviceList := DeviceList{}
 	if err := plist.NewDecoder(bytes.NewReader(payload)).Decode(&deviceList); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode payload: %v", err)
 	}
 
 	u.devs = deviceList.DeviceList
@@ -138,7 +131,7 @@ func (u *USBConnection) ReadBUID() (string, error) {
 		LibUSBMuxVersion:    3,
 	}, plist.XMLFormat)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to marshal types.ReadDevicesType: %v", err)
 	}
 
 	u.tag++
@@ -149,23 +142,19 @@ func (u *USBConnection) ReadBUID() (string, error) {
 		Version: 1,
 		Tag:     u.tag,
 	}); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to write header: %v", err)
 	}
-	n, err := u.c.Write(data)
-	if n < len(data) {
-		return "", fmt.Errorf("failed writing %d bytes to usb, only %d sent", len(data), n)
-	}
-	if err != nil {
-		return "", err
+	if _, err := u.c.Write(data); err != nil {
+		return "", fmt.Errorf("failed to write data: %v", err)
 	}
 
 	var header UsbMuxHeader
 	if err := binary.Read(u.c, binary.LittleEndian, &header); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read header: %v", err)
 	}
 	payload := make([]byte, header.Length-sizeOfHeader)
 	if _, err = io.ReadFull(u.c, payload); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to read payload: %v", err)
 	}
 
 	// ioutil.WriteFile("dev_buid.plist", payload, 0664)
@@ -174,7 +163,7 @@ func (u *USBConnection) ReadBUID() (string, error) {
 		BUID string `plist:"BUID"`
 	}{}
 	if err := plist.NewDecoder(bytes.NewReader(payload)).Decode(&reply); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to decode payload: %v", err)
 	}
 
 	return reply.BUID, nil
@@ -202,7 +191,7 @@ func (u *USBConnection) ConnectLockdown(dev types.Device) (*lockdown.Client, err
 		PortNumber:          lockdown.Port,
 	}, plist.XMLFormat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal connectMessage: %v", err)
 	}
 
 	u.tag++
@@ -213,29 +202,25 @@ func (u *USBConnection) ConnectLockdown(dev types.Device) (*lockdown.Client, err
 		Version: 1,
 		Tag:     u.tag,
 	}); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to write header: %v", err)
 	}
-	_, err = u.c.Write(data)
-	// if n < len(data) {
-	// 	return nil, fmt.Errorf("failed writing %d bytes to usb, only %d sent", len(data), n)
-	// }
-	if err != nil {
-		return nil, err
+	if _, err = u.c.Write(data); err != nil {
+		return nil, fmt.Errorf("failed to write data: %v", err)
 	}
 
 	var header UsbMuxHeader
 	if err := binary.Read(u.c, binary.LittleEndian, &header); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read header: %v", err)
 	}
 	u.tag = header.Tag
 	payload := make([]byte, header.Length-sizeOfHeader)
 	if _, err = io.ReadFull(u.c, payload); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read payload: %v", err)
 	}
 
 	resp := UsbMuxResponse{}
 	if err := plist.NewDecoder(bytes.NewReader(payload)).Decode(&resp); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode payload: %v", err)
 	}
 
 	if !resp.IsSuccessFull() {
@@ -244,7 +229,7 @@ func (u *USBConnection) ConnectLockdown(dev types.Device) (*lockdown.Client, err
 
 	// pair, err := u.GetPair(dev)
 	// if err != nil {
-	// 	return nil, err
+	// 	return nil, fmt.Errorf("failed to get pair record for lockdownd connection: %v", err)
 	// }
 
 	u.ldc = lockdown.NewClient(u.c, dev, types.PairRecord{})

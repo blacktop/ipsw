@@ -78,6 +78,7 @@ type stopSessionRequest struct {
 
 type Client struct {
 	c    net.Conn
+	ssl  *tls.Conn
 	dev  types.Device
 	pair types.PairRecord
 	sess string
@@ -97,7 +98,7 @@ func (ld *Client) StartSession() error {
 		SystemBUID:      ld.pair.SystemBUID,
 	}, plist.XMLFormat)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal start session request: %v", err)
 	}
 
 	if err := ld.SendData(data); err != nil {
@@ -118,7 +119,7 @@ func (ld *Client) StartSession() error {
 		// FIXME: re-start usbmuxd session ?
 		cert, err := tls.X509KeyPair(ld.pair.HostCertificate, ld.pair.HostPrivateKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to load host certificate: %v", err)
 		}
 		tlsConn := tls.Server(ld.c, &tls.Config{
 			InsecureSkipVerify: true,
@@ -130,7 +131,7 @@ func (ld *Client) StartSession() error {
 		if err := tlsConn.Handshake(); err != nil {
 			return fmt.Errorf("failed to perfrom tls handshake: %v", err)
 		}
-		ld.c = net.Conn(tlsConn)
+		ld.ssl = tlsConn
 	}
 
 	return nil
@@ -145,21 +146,17 @@ func (ld *Client) StopSession() error {
 		SessionID:       ld.sess,
 	}, plist.XMLFormat)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal stop session request: %v", err)
 	}
 
 	if err := ld.SendData(data); err != nil {
-		return fmt.Errorf("failed to send lockdown start session request: %v", err)
+		return fmt.Errorf("failed to send lockdown stop session request: %v", err)
 	}
 
-	// resp := &LockdownBasicResponse{}
-	// if err := u.LockDownRead(resp); err != nil {
-	// 	return fmt.Errorf("failed to read lockdown start session response: %v", err)
-	// }
-
-	// if resp.Error != "" {
-	// 	return fmt.Errorf(resp.Error)
-	// }
+	resp := &LockdownBasicResponse{}
+	if err := ld.ReadData(resp); err != nil {
+		return fmt.Errorf("failed to read lockdown stop session response: %v", err)
+	}
 
 	ld.sess = ""
 
@@ -178,7 +175,7 @@ func (ld *Client) StartService(service string) (*StartServiceResponse, error) {
 		Service: service,
 	}, plist.XMLFormat)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to marshal start service request: %v", err)
 	}
 
 	if err := ld.SendData(data); err != nil {
@@ -220,16 +217,16 @@ func (ld *Client) SendData(data []byte) error {
 func (ld *Client) ReadData(obj any) error {
 	var length uint32
 	if err := binary.Read(ld.c, binary.BigEndian, &length); err != nil {
-		return err
+		return fmt.Errorf("failed to read packet length: %v", err)
 	}
 
 	payload := make([]byte, length)
 	if _, err := io.ReadFull(ld.c, payload); err != nil {
-		return err
+		return fmt.Errorf("failed to read packet payload: %v", err)
 	}
 
 	if err := plist.NewDecoder(bytes.NewReader(payload)).Decode(obj); err != nil {
-		return err
+		return fmt.Errorf("failed to decode payload: %v", err)
 	}
 
 	return nil
