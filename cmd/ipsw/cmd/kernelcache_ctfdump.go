@@ -156,7 +156,7 @@ var ctfdumpCmd = &cobra.Command{
 			}
 
 			if err == macho.ErrNotFat {
-				m2, err = macho.Open(machoPath)
+				m2, err = macho.Open(machoPath2)
 				if err != nil {
 					return err
 				}
@@ -211,8 +211,8 @@ var ctfdumpCmd = &cobra.Command{
 			}
 
 			for _, id := range ids2 {
-				if c.Types[id].Name() == args[2] {
-					t2 = c.Types[id]
+				if c2.Types[id].Name() == args[2] {
+					t2 = c2.Types[id]
 					break
 				}
 			}
