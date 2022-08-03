@@ -56,9 +56,11 @@ func init() {
 
 // ctfdumpCmd represents the ctfdump command
 var ctfdumpCmd = &cobra.Command{
-	Use:   "ctfdump",
-	Short: "Dump CTF info",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "ctfdump",
+	Short:         "Dump CTF info",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File
@@ -215,6 +217,10 @@ var ctfdumpCmd = &cobra.Command{
 					t2 = c2.Types[id]
 					break
 				}
+			}
+
+			if t1 == nil || t2 == nil {
+				return fmt.Errorf("could not find struct '%s' in either file", args[2])
 			}
 
 			dmp := diffmatchpatch.New()
