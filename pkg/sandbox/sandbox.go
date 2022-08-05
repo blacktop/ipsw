@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/bits"
+	"sort"
 	"strings"
 
 	"github.com/apex/log"
@@ -210,6 +211,7 @@ func NewSandbox(c *Config) (*Sandbox, error) {
 		sb.config.profileType = &profile15{}
 		sb.config.collectionInitPanic = collectionInitPanic15
 		sb.config.collectionInitArgs = []string{"x2", "w3"}
+		sb.config.profileInitArgs = []string{"x8", "w9"}
 		sb.config.protoboxPanic = protoboxCollectionInitPanic16
 		sb.config.filterAcceptsType = FilterAcceptsType16
 		sb.db, err = GetLibSandBoxDB(IOS16)
@@ -1022,18 +1024,22 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 		return nil, fmt.Errorf("failed to get _hook_policy_init function block containing address %#x: %w", panicXrefVMAddr, err)
 	}
 
-	var failXrefVMAddr uint64
+	var failXrefVMAddrs []uint64
 	for k, v := range sb.xrefs {
 		if v == block[0].Address {
-			failXrefVMAddr = k
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("failure path xref %#x => %#x", failXrefVMAddr, v))
-			break
+			failXrefVMAddrs = append(failXrefVMAddrs, k)
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("failure path xrefs %#x => %#x", failXrefVMAddrs[len(failXrefVMAddrs)-1], v))
+			if sb.config.sbMode != PROFILE {
+				break
+			}
 		}
 	}
 
-	block, err = instrs.GetAddressBlock(failXrefVMAddr)
+	sort.Slice(failXrefVMAddrs, func(i, j int) bool { return failXrefVMAddrs[i] < failXrefVMAddrs[j] })
+
+	block, err = instrs.GetAddressBlock(failXrefVMAddrs[0])
 	if err != nil {
-		return nil, fmt.Errorf("failed to get _hook_policy_init function block containing xref to failure path %#x: %w", failXrefVMAddr, err)
+		return nil, fmt.Errorf("failed to get _hook_policy_init function block containing xref to failure path %#x: %w", failXrefVMAddrs[0], err)
 	}
 
 	/*****************
@@ -1069,6 +1075,15 @@ func (sb *Sandbox) emulateBlock(errmsg string) (map[string]uint64, error) {
 			regs[instruction.Operands[0].Registers[0].String()] += instruction.Operands[1].GetImmediate()
 		}
 		prevInstr = instruction
+		if sb.config.sbMode == PROFILE {
+			if instruction.Operation == disassemble.ARM64_STP {
+				break // in iOS16beta this function changed
+				/* ADRL            X0, _platform_profile
+				 * ADRL            X8, _platform_profile_data
+				 * MOV             W9, #0x189A9
+				 */
+			}
+		}
 	}
 
 	return regs, nil
