@@ -378,7 +378,7 @@ var sepCmd = &cobra.Command{
 
 		// 	fname := fmt.Sprintf("sepdump_%s_%s", macho.Name, m.SourceVersion())
 		// 	utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", fname))
-		// 	ioutil.WriteFile(fname, outDat, 0644)
+		// 	ioutil.WriteFile(fname, outDat, 0660)
 		// 	if err != nil {
 		// 		return errors.Wrapf(err, "unabled to write file: %s", fname)
 		// 	}

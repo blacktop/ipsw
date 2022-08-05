@@ -17,9 +17,10 @@ import (
 )
 
 const (
-	preprocTagsURL = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/tag_links.json"
-	githubApiURL   = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
-	graphqlQuery   = `query ($endCursor: String) {
+	preprocTagsURL       = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/tag_links.json"
+	preprocWebKitTagsURL = "https://raw.githubusercontent.com/blacktop/ipsw/apple_meta/github/webkit_tags.json"
+	githubApiURL         = "https://api.github.com/orgs/apple-oss-distributions/repos?sort=updated&per_page=100"
+	graphqlQuery         = `query ($endCursor: String) {
 						organization(login: "apple-oss-distributions") {
 							repositories(first: 100, after: $endCursor) {
 								nodes {
@@ -125,6 +126,46 @@ type GithubCommit struct {
 	SHA  string    `json:"sha,omitempty"`
 	URL  string    `json:"url,omitempty"`
 	Date time.Time `json:"date,omitempty"`
+}
+
+func GetLatestTag(prod, proxy string, insecure bool, api string) (string, error) {
+	var tags []GithubTag
+	req, err := http.NewRequest("GET", "https://api.github.com/repos/apple-oss-distributions/"+prod+"/tags", nil)
+	if err != nil {
+		return "", fmt.Errorf("cannot create http request: %v", err)
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("client failed to perform request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("failed to connect to URL: %s", resp.Status)
+	}
+
+	document, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read github api JSON: %v", err)
+	}
+
+	if err := json.Unmarshal(document, &tags); err != nil {
+		return "", fmt.Errorf("failed to unmarshal the github api JSON: %v", err)
+	}
+
+	return tags[0].Name, nil
 }
 
 func queryAppleGithubRepo(prod, proxy string, insecure bool, api string) (*githubRepo, error) {
@@ -440,6 +481,44 @@ func GetPreprocessedAppleOssTags(proxy string, insecure bool) (map[string]Github
 	return tags, nil
 }
 
+func GetPreprocessedWebKitTags(proxy string, insecure bool) ([]GithubTag, error) {
+	var tags []GithubTag
+
+	req, err := http.NewRequest("GET", preprocWebKitTagsURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create http request: %v", err)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("client failed to perform request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
+	}
+
+	document, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
+	}
+
+	if err := json.Unmarshal(document, &tags); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal the github api JSON: %v", err)
+	}
+
+	return tags, nil
+}
+
 type Commit struct {
 	OID        string `json:"oid"`
 	ZipballUrl string `json:"zipballUrl"`
@@ -516,6 +595,67 @@ func AppleOssGraphQLTags(proxy string, insecure bool, apikey string) (map[string
 			break
 		}
 		variables["endCursor"] = githubv4.NewString(q.Organization.Repositories.PageInfo.EndCursor)
+	}
+
+	return tags, nil
+}
+
+func WebKitGraphQLTags(proxy string, insecure bool, apikey string) ([]GithubTag, error) {
+	var tags []GithubTag
+
+	httpClient := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: apikey},
+	))
+
+	client := githubv4.NewClient(httpClient)
+
+	var q struct {
+		Repository struct {
+			Refs struct {
+				Nodes []struct {
+					Name   string
+					Target struct {
+						Tag struct {
+							CommitURL string `json:"commitUrl"`
+							Target    struct {
+								Commit `graphql:"... on Commit"`
+							}
+						} `graphql:"... on Tag"`
+					}
+				}
+				PageInfo struct {
+					EndCursor   githubv4.String
+					HasNextPage bool
+				}
+			} `graphql:"refs(refPrefix: \"refs/tags/\", first: 100, after: $endCursor, orderBy: { field: TAG_COMMIT_DATE, direction: DESC})"`
+		} `graphql:"repository(owner: \"WebKit\", name: \"WebKit\")"`
+	}
+
+	variables := map[string]interface{}{
+		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
+	}
+
+	for {
+		err := client.Query(context.Background(), &q, variables)
+		if err != nil {
+			return nil, err
+		}
+		for _, ref := range q.Repository.Refs.Nodes {
+			tags = append(tags, GithubTag{
+				Name:   ref.Name,
+				TarURL: fmt.Sprintf("https://github.com/WebKit/WebKit/archive/refs/tags/%s.tar.gz", ref.Name),
+				ZipURL: fmt.Sprintf("https://github.com/WebKit/WebKit/archive/refs/tags/%s.zip", ref.Name),
+				Commit: GithubCommit{
+					SHA:  ref.Target.Tag.Target.Commit.OID,
+					URL:  ref.Target.Tag.CommitURL,
+					Date: ref.Target.Tag.Target.Commit.Author.Date,
+				},
+			})
+		}
+		if !q.Repository.Refs.PageInfo.HasNextPage {
+			break
+		}
+		variables["endCursor"] = githubv4.NewString(q.Repository.Refs.PageInfo.EndCursor)
 	}
 
 	return tags, nil

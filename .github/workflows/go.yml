@@ -278,7 +278,7 @@ jobs:
       - name: Run dyld webkit
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --rev
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --git --api ${{ secrets.GITHUB_TOKEN }}
 
       # - name: Run dyld slide
       #   if: matrix.platform == 'macos-12'
@@ -330,7 +330,7 @@ jobs:
         if: matrix.platform == 'macos-12'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw macho info ~/.ipsw/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw macho info ~/.ipsw/*/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
       # #
       # # ENT CMD (macOS)
       # #

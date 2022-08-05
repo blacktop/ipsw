@@ -91,12 +91,14 @@ func (a *AssetSets) GetDevicesForVersion(version string, typ string) []string {
 	return nil
 }
 
-// Latest returns the newest released version
-func (a *AssetSets) Latest(typ, platform string) string {
+// LatestVersion returns the newest released version
+func (a *AssetSets) LatestVersion(typ, platform string) string {
 	var versionsRaw []string
 
 	for _, asset := range a.PublicAssetSets[typ] {
 		switch platform {
+		case "accessory":
+			fallthrough
 		case "ios":
 			if utils.StrSliceContains(asset.SupportedDevices, "iP") {
 				versionsRaw = append(versionsRaw, asset.ProductVersion)

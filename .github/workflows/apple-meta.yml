@@ -19,12 +19,21 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
-        go-version: 1.18  
+        go-version: 1.18
+    - name: Cache go.mod
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
     - name: Run build
       run: |
         make setup
         make build
-    - name: Run download git --json
+    - name: Run download git --json --webkit
       run: ./ipsw download git --json --api ${{ secrets.GITHUB_TOKEN }} --output /tmp
     - name: Switch branch
       run: |
@@ -33,7 +42,7 @@ jobs:
     - name: Commit JSON
       run: |
         go install github.com/josephburnett/jd@v1.5.1
-        jd -set /tmp/tag_links.json github/tag_links.json || true   
+        jd -set /tmp/tag_links.json github/tag_links.json || true
         mv /tmp/tag_links.json github/tag_links.json
         git --no-pager diff github/tag_links.json
         git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"

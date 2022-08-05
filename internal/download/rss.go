@@ -18,26 +18,28 @@ type pubDate string
 func (d pubDate) GetDate() (*time.Time, error) {
 	layout := "Mon, 02 Jan 2006 15:04:05 MST"
 
-	location, err := time.LoadLocation("PST8PDT")
-	if err != nil {
-		return nil, fmt.Errorf("failed to load location PST8PDT: %v", err)
+	if location, err := time.LoadLocation("PST8PDT"); err == nil {
+		t, err := time.ParseInLocation(layout, string(d), location)
+		if err != nil {
+			return nil, err
+		}
+		var tt time.Time
+
+		zone, _ := time.Now().Zone()
+		location, err = time.LoadLocation(zone)
+		if err != nil {
+			// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+			tt = t
+		} else {
+			tt = t.In(location)
+		}
+		return &tt, nil
 	}
 
-	t, err := time.ParseInLocation(layout, string(d), location)
+	tt, err := time.Parse(layout, string(d))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse pub date: %v", err)
 	}
-	var tt time.Time
-
-	zone, _ := time.Now().Zone()
-	location, err = time.LoadLocation(zone)
-	if err != nil {
-		// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
-		tt = t
-	} else {
-		tt = t.In(location)
-	}
-
 	return &tt, nil
 }
 

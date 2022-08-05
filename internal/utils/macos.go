@@ -8,8 +8,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 )
 
@@ -21,7 +24,7 @@ func Cp(src, dst string) error {
 	}
 	defer from.Close()
 
-	to, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0666)
+	to, err := os.OpenFile(dst, os.O_RDWR|os.O_CREATE, 0660)
 	if err != nil {
 		return err
 	}
@@ -296,6 +299,29 @@ func Mount(image, mountPoint string) error {
 	return nil
 }
 
+func MountFS(image string) (string, error) {
+	var mountPoint string
+	if runtime.GOOS == "darwin" {
+		mountPoint = "/tmp/ios"
+	} else {
+		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
+			// Create in-docker mount point
+			os.MkdirAll("/data", 0750)
+			mountPoint = "/mnt"
+		} else {
+			// Create temporary non-darwin mount point
+			mountPoint = image + "_temp_mount"
+			if err := os.Mkdir(mountPoint, 0750); err != nil {
+				return "", fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
+			}
+		}
+	}
+	if err := Mount(image, mountPoint); err != nil {
+		return "", fmt.Errorf("failed to mount %s: %v", image, err)
+	}
+	return mountPoint, nil
+}
+
 // Unmount unmounts a DMG with hdiutil
 func Unmount(mountPoint string, force bool) error {
 	if runtime.GOOS == "darwin" {
@@ -319,6 +345,46 @@ func Unmount(mountPoint string, force bool) error {
 		if err != nil {
 			return fmt.Errorf("failed to unmount %s: %v", mountPoint, err)
 		}
+	}
+
+	return nil
+}
+
+func ExtractFromDMG(dmgPath, destPath string, pattern *regexp.Regexp) error {
+
+	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
+	mountPoint, err := MountFS(dmgPath)
+	if err != nil {
+		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
+	}
+	defer func() {
+		Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", dmgPath))
+		if err := Unmount(mountPoint, false); err != nil {
+			log.Errorf("failed to unmount File System DMG mount at %s: %v", dmgPath, err)
+		}
+	}()
+
+	// extract files that match regex pattern
+	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if pattern.MatchString(info.Name()) {
+			fname := strings.TrimPrefix(path, mountPoint)
+			if err := os.MkdirAll(filepath.Join(destPath, filepath.Dir(fname)), 0750); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", filepath.Join(destPath, filepath.Dir(fname)), err)
+			}
+			Indent(log.Info, 3)(fmt.Sprintf("Extracting %s", fname))
+			if err := Cp(path, filepath.Join(destPath, fname)); err != nil {
+				return fmt.Errorf("failed to extract %s: %v", fname, err)
+			}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to extract File System files from IPSW: %v", err)
 	}
 
 	return nil

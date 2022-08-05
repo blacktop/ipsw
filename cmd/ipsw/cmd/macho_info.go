@@ -63,6 +63,7 @@ func init() {
 	machoInfoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
 	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
+	machoInfoCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
 	machoInfoCmd.Flags().Bool("dump-cert", false, "Dump the certificate")
 	machoInfoCmd.Flags().String("output", "", "Directory to extract files to")
 
@@ -79,6 +80,7 @@ func init() {
 	viper.BindPFlag("macho.info.fixups", machoInfoCmd.Flags().Lookup("fixups"))
 	viper.BindPFlag("macho.info.fileset-entry", machoInfoCmd.Flags().Lookup("fileset-entry"))
 	viper.BindPFlag("macho.info.extract-fileset-entry", machoInfoCmd.Flags().Lookup("extract-fileset-entry"))
+	viper.BindPFlag("macho.info.all-fileset-entries", machoInfoCmd.Flags().Lookup("all-fileset-entries"))
 	viper.BindPFlag("macho.info.dump-cert", machoInfoCmd.Flags().Lookup("dump-cert"))
 	viper.BindPFlag("macho.info.output", machoInfoCmd.Flags().Lookup("output"))
 
@@ -248,6 +250,14 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				log.Error("MachO type is not FileSet")
 				return nil
+			}
+		} else if viper.GetBool("macho.info.all-fileset-entries") {
+			for _, fe := range m.FileSets() {
+				mfe, err := m.GetFileSetFileByName(fe.EntryID)
+				if err != nil {
+					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
+				}
+				fmt.Printf("\n%s\n\n%s\n", fe.EntryID, mfe.FileTOC.String())
 			}
 		}
 
@@ -682,10 +692,12 @@ var machoInfoCmd = &cobra.Command{
 				}
 			}
 			if cfstrs, err := m.GetCFStrings(); err == nil {
-				fmt.Printf("\nCFStrings\n")
-				fmt.Println("---------")
-				for _, cfstr := range cfstrs {
-					fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
+				if len(cfstrs) > 0 {
+					fmt.Printf("\nCFStrings\n")
+					fmt.Println("---------")
+					for _, cfstr := range cfstrs {
+						fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
+					}
 				}
 			}
 		}

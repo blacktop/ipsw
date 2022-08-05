@@ -105,7 +105,7 @@ func ScrapeURLs(build string) error {
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile("procs.json", procsJSON, 0644)
+	ioutil.WriteFile("procs.json", procsJSON, 0660)
 
 	return nil
 }

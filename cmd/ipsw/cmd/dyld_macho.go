@@ -474,10 +474,12 @@ var dyldMachoCmd = &cobra.Command{
 					}
 
 					if cfstrs, err := m.GetCFStrings(); err == nil {
-						fmt.Printf("\nCFStrings\n")
-						fmt.Println("---------")
-						for _, cfstr := range cfstrs {
-							fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
+						if len(cfstrs) > 0 {
+							fmt.Printf("\nCFStrings\n")
+							fmt.Println("---------")
+							for _, cfstr := range cfstrs {
+								fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
+							}
 						}
 					}
 				}

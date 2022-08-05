@@ -73,6 +73,7 @@ var decImg4Cmd = &cobra.Command{
 		if err != nil {
 			return errors.Wrapf(err, "unabled to open file: %s", args[0])
 		}
+		defer f.Close()
 
 		i, err := img4.ParseIm4p(f)
 		if err != nil {

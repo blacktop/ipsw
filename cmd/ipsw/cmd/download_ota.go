@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,6 +50,8 @@ func init() {
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
+	otaDLCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
+	otaDLCmd.Flags().BoolP("json", "j", false, "Dump URLs as JSON only")
 	otaDLCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	otaDLCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().String("pattern", "", "Download remote files that match regex")
@@ -58,6 +61,8 @@ func init() {
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
+	viper.BindPFlag("download.ota.urls", otaDLCmd.Flags().Lookup("urls"))
+	viper.BindPFlag("download.ota.json", otaDLCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.ota.dyld-arch", otaDLCmd.Flags().Lookup("dyld-arch"))
 	viper.BindPFlag("download.ota.driver-kit", otaDLCmd.Flags().Lookup("driver-kit"))
 	viper.BindPFlag("download.ota.kernel", otaDLCmd.Flags().Lookup("kernel"))
@@ -210,6 +215,7 @@ var otaDLCmd = &cobra.Command{
 			DeviceBlackList: doNotDownload,
 			Proxy:           proxy,
 			Insecure:        insecure,
+			TimeoutSeconds:  90,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
@@ -218,6 +224,21 @@ var otaDLCmd = &cobra.Command{
 		otas, err := otaXML.GetPallasOTAs()
 		if err != nil {
 			return err
+		}
+
+		if viper.GetBool("download.ota.urls") || viper.GetBool("download.ota.json") {
+			if viper.GetBool("download.ota.json") {
+				dat, err := json.Marshal(otas)
+				if err != nil {
+					return fmt.Errorf("failed to marshal OTA URLs in JSON: %v", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, o := range otas {
+					fmt.Println(o.BaseURL + o.RelativePath)
+				}
+			}
+			return nil
 		}
 
 		if Verbose {
@@ -336,7 +357,7 @@ var otaDLCmd = &cobra.Command{
 				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, Verbose)
 				for _, o := range otas {
 					folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.ProductSystemName, strings.TrimPrefix(o.OSVersion, "9.9.")))
-					os.MkdirAll(folder, os.ModePerm)
+					os.MkdirAll(folder, 0750)
 					var devices string
 					if len(o.SupportedDevices) > 0 {
 						devices = strings.Join(o.SupportedDevices, "_")

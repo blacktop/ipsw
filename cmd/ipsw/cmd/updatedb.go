@@ -181,7 +181,7 @@ var updateDBCmd = &cobra.Command{
 		}
 		if len(dbPath) > 0 {
 			log.Infof("%s %s", mut, dbPath)
-			if err := ioutil.WriteFile(dbPath, dat, 0755); err != nil {
+			if err := ioutil.WriteFile(dbPath, dat, 0660); err != nil {
 				log.WithError(err).Fatalf("failed to write file %s", dbPath)
 			}
 		} else {

@@ -236,21 +236,38 @@ func Verify(sha1sum, name string) (bool, error) {
 }
 
 // RemoteUnzip unzips a remote file from zip (like partialzip)
-func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string) error {
+func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat bool) error {
+	var fname string
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %v", err)
+	}
+
 	for _, f := range files {
 		if pattern.MatchString(f.Name) {
-			os.Mkdir(folder, os.ModePerm)
-			fname := filepath.Join(folder, filepath.Base(f.Name))
+			if flat {
+				fname = filepath.Join(folder, filepath.Base(f.Name))
+			} else {
+				fname = filepath.Join(folder, filepath.Clean(f.Name))
+				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+					return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+				}
+				if f.FileInfo().IsDir() {
+					continue
+				}
+			}
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				data := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
 				if err != nil {
-					return fmt.Errorf("error opening remote zip file %s: %v", f.Name, err)
+					return fmt.Errorf("error opening remote zipped file %s: %v", f.Name, err)
 				}
 				io.ReadFull(rc, data)
 				rc.Close()
-				if err := ioutil.WriteFile(fname, data, 0644); err != nil {
-					return fmt.Errorf("error writing remote zip file %s data: %v", f.Name, err)
+				Indent(log.Info, 2)(fmt.Sprintf("Created %s", strings.TrimPrefix(fname, cwd)))
+				if err := ioutil.WriteFile(fname, data, 0660); err != nil {
+					return fmt.Errorf("error writing remote unzipped file %s data: %v", f.Name, err)
 				}
 			} else {
 				log.Warnf("%s already exists", fname)
@@ -276,7 +293,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 		}
 	}()
 
-	os.MkdirAll(dest, 0755)
+	os.MkdirAll(dest, 0750)
 
 	// Closure to address file descriptors issue with all the deferred .Close() methods
 	extractAndWriteFile := func(f *zip.File) error {
@@ -293,10 +310,10 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 		path := filepath.Join(dest, filepath.Base(filepath.Clean(f.Name)))
 
 		if f.FileInfo().IsDir() {
-			os.MkdirAll(path, f.Mode())
+			os.MkdirAll(path, 0750)
 		} else {
 			// TODO: add the ability to preserve folder structure if user wants
-			// os.MkdirAll(filepath.Dir(path), f.Mode())
+			// os.MkdirAll(filepath.Dir(path), 0750)
 			f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 			if err != nil {
 				return err

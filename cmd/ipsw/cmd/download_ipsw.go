@@ -23,18 +23,19 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -49,9 +50,12 @@ func init() {
 	ipswCmd.Flags().Bool("ibridge", false, "Download iBridge IPSWs")
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
-	ipswCmd.Flags().String("pattern", "", "Download remote files that match (not regex)")
+	ipswCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	ipswCmd.Flags().BoolP("usb", "u", false, "Download IPSWs for USB attached iDevices")
+
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
@@ -61,6 +65,8 @@ func init() {
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
+	viper.BindPFlag("download.ipsw.usb", ipswCmd.Flags().Lookup("usb"))
 }
 
 // ipswCmd represents the ipsw command
@@ -119,11 +125,83 @@ var ipswCmd = &cobra.Command{
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		pattern := viper.GetString("download.ipsw.pattern")
 		output := viper.GetString("download.ipsw.output")
+		flat := viper.GetBool("download.ipsw.flat")
 		// beta := viper.GetBool("download.ipsw.beta")
 
 		// verify args
 		if kernel && len(pattern) > 0 {
 			return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
+		}
+
+		if viper.GetBool("download.ipsw.usb") {
+			uconn, err := usb.NewConnection(AppVersion)
+			if err != nil {
+				return err
+			}
+			defer uconn.Close()
+
+			devs, err := uconn.ListDevices()
+			if err != nil {
+				return err
+			}
+			if len(devs) == 0 {
+				return fmt.Errorf("no USB devices found")
+			}
+
+			type ipswDetails struct {
+				ProductType   string
+				HardwareModel string
+				BuildVersion  string
+			}
+
+			var ideets []ipswDetails
+			for _, dev := range devs {
+				ld, err := uconn.ConnectLockdown(dev)
+				if err != nil {
+					return err
+				}
+				if err := ld.StartSession(); err != nil {
+					return err
+				}
+				dd, err := ld.GetDeviceDetail(dev)
+				if err != nil {
+					return err
+				}
+				ideets = append(ideets, ipswDetails{
+					ProductType:   dd.ProductType,
+					HardwareModel: dd.HardwareModel,
+					BuildVersion:  dd.BuildVersion,
+				})
+				if err := ld.StopSession(); err != nil {
+					return err
+				}
+				if err := uconn.Refresh(); err != nil {
+					return err
+				}
+			}
+
+			if len(ideets) == 1 {
+				dFlg.Device = ideets[0].ProductType
+				dFlg.Build = ideets[0].BuildVersion
+			} else {
+				var choices []string
+				for _, d := range ideets {
+					choices = append(choices, fmt.Sprintf("%s_%s_%s", d.ProductType, d.HardwareModel, d.BuildVersion))
+				}
+				dfiles := []int{}
+				prompt := &survey.Select{
+					Message: "Select what iDevice's IPSW to download:",
+					Options: choices,
+				}
+				if err := survey.AskOne(prompt, &dfiles); err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				for _, idx := range dfiles {
+					dFlg.Device = ideets[idx].ProductType
+					dFlg.Build = ideets[idx].BuildVersion
+				}
+			}
 		}
 
 		var destPath string
@@ -184,7 +262,7 @@ var ipswCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to get latest iOS version: %v", err)
 				}
-				fmt.Print(assets.Latest("iOS", "ios"))
+				fmt.Print(assets.LatestVersion("iOS", "ios"))
 			}
 			return nil
 		}
@@ -278,8 +356,11 @@ var ipswCmd = &cobra.Command{
 						"version": i.Version,
 						"signed":  i.Signed,
 					}).Info("Parsing remote IPSW")
-
-					log.Infof("Downloading files that contain: %s", pattern)
+					dlRE, err := regexp.Compile(pattern)
+					if err != nil {
+						return errors.Wrap(err, "failed to compile regexp")
+					}
+					log.Infof("Downloading files matching pattern %#v", pattern)
 					zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
 						Proxy:    proxy,
 						Insecure: insecure,
@@ -291,33 +372,13 @@ var ipswCmd = &cobra.Command{
 					if err != nil {
 						return errors.Wrap(err, "failed to parse remote ipsw")
 					}
-					destPath = filepath.Join(destPath, iinfo.GetFolder())
-					os.Mkdir(destPath, os.ModePerm)
-					found := false
-					for _, f := range zr.File {
-						if strings.Contains(f.Name, pattern) {
-							found = true
-							fileName := filepath.Join(destPath, filepath.Base(filepath.Clean(f.Name)))
-							if _, err := os.Stat(fileName); os.IsNotExist(err) {
-								data := make([]byte, f.UncompressedSize64)
-								rc, err := f.Open()
-								if err != nil {
-									return fmt.Errorf("failed to open file in zip: %v", err)
-								}
-								io.ReadFull(rc, data)
-								rc.Close()
-								utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", fileName))
-								err = ioutil.WriteFile(fileName, data, 0644)
-								if err != nil {
-									return errors.Wrapf(err, "failed to write %s", f.Name)
-								}
-							} else {
-								log.Warnf("%s already exists", fileName)
-							}
-						}
+					folder, err := iinfo.GetFolder()
+					if err != nil {
+						log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
 					}
-					if !found {
-						utils.Indent(log.Error, 2)(fmt.Sprintf("No files contain pattern %s", pattern))
+					destPath = filepath.Join(destPath, folder)
+					if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
+						return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
 					}
 				}
 			} else { // NORMAL MODE
