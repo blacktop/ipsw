@@ -30,7 +30,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -46,9 +45,11 @@ func init() {
 
 // xrefCmd represents the xref command
 var xrefCmd = &cobra.Command{
-	Use:   "xref <dyld_shared_cache> <vaddr>",
-	Short: "🚧 [WIP] Find all cross references to an address",
-	Args:  cobra.MinimumNArgs(2),
+	Use:           "xref <dyld_shared_cache> <vaddr>",
+	Short:         "🚧 [WIP] Find all cross references to an address",
+	Args:          cobra.MinimumNArgs(2),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -82,7 +83,7 @@ var xrefCmd = &cobra.Command{
 		if fileInfo.Mode()&os.ModeSymlink != 0 {
 			symlinkPath, err := os.Readlink(dscPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
+				return fmt.Errorf("failed to read symlink %s: %v", dscPath, err)
 			}
 			// TODO: this seems like it would break
 			linkParent := filepath.Dir(dscPath)

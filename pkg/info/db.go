@@ -6,10 +6,10 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	"github.com/blacktop/ipsw/pkg/xcode"
 )
@@ -34,8 +34,9 @@ type Device struct {
 	Name        string           `json:"name,omitempty"`
 	Description string           `json:"desc,omitempty"`
 	Boards      map[string]Board `json:"boards,omitempty"`
-	MemClass    string           `json:"mem_class,omitempty"`
+	MemClass    uint64           `json:"mem_class,omitempty"`
 	SDKPlatform string           `json:"sdk,omitempty"`
+	Type        string           `json:"type,omitempty"`
 }
 
 type Devices map[string]Device
@@ -63,8 +64,39 @@ func (ds Devices) LookupDevice(prod string) (Device, error) {
 	return Device{}, fmt.Errorf("device %s not found", prod)
 }
 
+func (ds Devices) GetProductForModel(model string) (string, error) {
+	for prod, dev := range ds {
+		for m := range dev.Boards {
+			if strings.EqualFold(m, model) {
+				return prod, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("model %s not found", model)
+}
+
+func (ds Devices) GetDevicesForType(typ string) (*Devices, error) {
+	devs := make(Devices)
+	for prod, dev := range ds {
+		if dev.Type == typ {
+			devs[prod] = dev
+		}
+	}
+	return &devs, nil
+}
+
+func (ds Devices) GetDevicesForSDK(sdk string) (*Devices, error) {
+	devs := make(Devices)
+	for prod, dev := range ds {
+		if dev.SDKPlatform == sdk {
+			devs[prod] = dev
+		}
+	}
+	return &devs, nil
+}
+
 func (i *Info) GetDevices(devs *Devices) error {
-	if i.DeviceTrees != nil && len(i.DeviceTrees) > 0 {
+	if len(i.DeviceTrees) > 0 {
 		for _, dtree := range i.DeviceTrees {
 			dt, err := dtree.Summary()
 			if err != nil {
@@ -94,13 +126,13 @@ func (i *Info) GetDevices(devs *Devices) error {
 							Name:        dt.ProductName,
 							Description: dt.ProductDescription,
 							Boards:      make(map[string]Board),
-							MemClass:    strconv.Itoa(xdev.DeviceTrait.DevicePerformanceMemoryClass),
+							MemClass:    uint64(xdev.DeviceTrait.DevicePerformanceMemoryClass),
 						}
 					} else {
 						(*devs)[dt.ProductType] = Device{
 							Name:     dt.ProductName,
 							Boards:   make(map[string]Board),
-							MemClass: strconv.Itoa(xdev.DeviceTrait.DevicePerformanceMemoryClass),
+							MemClass: uint64(xdev.DeviceTrait.DevicePerformanceMemoryClass),
 						}
 					}
 				}
@@ -133,7 +165,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 			var prodType string
 			var prodName string
 			var arch string
-			var memClass string
+			var memClass uint64
 			if len(i.Plists.Restore.SupportedProductTypes) == 1 {
 				prodType = i.Plists.Restore.SupportedProductTypes[0]
 			} else {
@@ -145,7 +177,7 @@ func (i *Info) GetDevices(devs *Devices) error {
 				if xdev, err := xcode.GetDeviceForProd(prodType); err == nil {
 					prodName = xdev.ProductDescription
 					arch = xdev.DeviceTrait.PreferredArchitecture
-					memClass = strconv.Itoa(xdev.DeviceTrait.DevicePerformanceMemoryClass)
+					memClass = uint64(xdev.DeviceTrait.DevicePerformanceMemoryClass)
 				}
 				if len(prodName) == 0 {
 					if i.Plists.OTAInfo != nil {
@@ -198,20 +230,49 @@ func (i *Info) GetDevicesFromMap(dmap *types.DeviceMap, devs *Devices) error {
 	for bc, d := range *dmap {
 		if len(d.ProductType) > 0 {
 			if _, ok := (*devs)[d.ProductType]; !ok {
+				var err error
+				var memClass uint64
+				if len(d.DevicePerformanceMemoryClass) > 0 {
+					memClass, err = utils.ConvertStrToInt(d.DevicePerformanceMemoryClass)
+					if err != nil {
+						return fmt.Errorf("failed to parse int: %v", err)
+					}
+				}
+				devType := "unknown"
+				switch {
+				case strings.HasPrefix(d.ProductType, "iPod"):
+					fallthrough
+				case strings.HasPrefix(d.ProductType, "iPad"):
+					fallthrough
+				case strings.HasPrefix(d.ProductType, "iPhone"):
+					devType = "ios"
+				case strings.HasPrefix(d.ProductType, "Watch"):
+					devType = "watchos"
+				case strings.HasPrefix(d.ProductType, "AudioAccessory"):
+					devType = "audioos"
+				case strings.HasPrefix(d.ProductType, "AppleTV") || d.SDKPlatform == "appletvos":
+					devType = "tvos"
+				case strings.HasPrefix(d.ProductType, "Mac") || d.SDKPlatform == "macosx":
+					devType = "macos"
+				case strings.HasPrefix(d.ProductType, "AppleDisplay"):
+					devType = "accessory"
+				}
 				if d.ProductName != d.ProductDescription {
 					(*devs)[d.ProductType] = Device{
 						Name:        d.ProductName,
 						Description: d.ProductDescription,
 						Boards:      make(map[string]Board),
-						MemClass:    d.DevicePerformanceMemoryClass,
+						MemClass:    memClass,
 						SDKPlatform: d.SDKPlatform,
+						Type:        devType,
 					}
 				} else {
 					(*devs)[d.ProductType] = Device{
 						Name:        d.ProductName,
 						Boards:      make(map[string]Board),
-						MemClass:    d.DevicePerformanceMemoryClass,
+						MemClass:    memClass,
 						SDKPlatform: d.SDKPlatform,
+						Type:        devType,
 					}
 				}
 			}

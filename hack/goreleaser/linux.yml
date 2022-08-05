@@ -45,6 +45,7 @@ archives:
       - LICENSE
       - completions/*
       - manpages/*
+    wrap_in_directory: true
 
 checksum:
   name_template: 'checksums.linux.txt'
@@ -96,6 +97,6 @@ snapcrafts:
     description: |
       iOS/macOS Research Swiss Army Knife.
     grade: stable
-    confinement: classic
+    confinement: strict
     publish: true
     license: MIT

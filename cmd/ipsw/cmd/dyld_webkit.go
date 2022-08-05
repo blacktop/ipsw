@@ -25,8 +25,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -35,6 +38,10 @@ import (
 func init() {
 	dyldCmd.AddCommand(webkitCmd)
 	webkitCmd.Flags().BoolP("rev", "r", false, "Lookup svn rev on trac.webkit.org")
+	webkitCmd.Flags().BoolP("git", "g", false, "Lookup git tag on github.com")
+	webkitCmd.Flags().StringP("api", "a", "", "Github API Token")
+	webkitCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	webkitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	webkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -50,6 +57,20 @@ var webkitCmd = &cobra.Command{
 		}
 
 		getRev, _ := cmd.Flags().GetBool("rev")
+		getGit, _ := cmd.Flags().GetBool("git")
+		proxy, _ := cmd.Flags().GetString("proxy")
+		insecure, _ := cmd.Flags().GetBool("insecure")
+		apiToken, _ := cmd.Flags().GetString("api")
+
+		if len(apiToken) == 0 {
+			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
+				apiToken = val
+			} else {
+				if val, ok := os.LookupEnv("GITHUB_API_TOKEN"); ok {
+					apiToken = val
+				}
+			}
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -91,10 +112,36 @@ var webkitCmd = &cobra.Command{
 			log.Info("Querying https://trac.webkit.org...")
 			ver, rev, err := dyld.ScrapeWebKitTRAC(m.SourceVersion().Version)
 			if err != nil {
+				log.Infof("WebKit Version: %s", m.SourceVersion().Version)
 				return err
 			}
 			log.Infof("%s (svn rev %s)", ver, rev)
 			return nil
+		} else if getGit {
+			log.Info("Querying https://github.com API...")
+			var tags []download.GithubTag
+			if len(apiToken) == 0 {
+				tags, err = download.GetPreprocessedWebKitTags(proxy, insecure)
+				if err != nil {
+					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+					return err
+				}
+			} else {
+				tags, err = download.WebKitGraphQLTags(proxy, insecure, apiToken)
+				if err != nil {
+					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+					return err
+				}
+			}
+			for _, tag := range tags {
+				if strings.Contains(tag.Name, m.SourceVersion().Version) {
+					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Date: %s", tag.Commit.Date.Format("02Jan2006 15:04:05")))
+					return nil
+				}
+			}
 		}
 
 		log.Infof("WebKit Version: %s", m.SourceVersion().Version)

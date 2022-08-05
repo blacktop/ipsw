@@ -24,6 +24,22 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - main: ./cmd/ipsw
+    id: ios
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=$GOROOT/misc/ios/clangwrap.sh
+    goos:
+      - ios
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    hooks:
+      post: ./hack/make/codesign {{ .Path }}
   # - main: ./cmd/ipsw
   #   id: "others"
   #   binary: ipsw
@@ -45,6 +61,7 @@ universal_binaries:
 archives:
   - replacements:
       darwin: macOS
+      ios: iOS
       amd64: x86_64
       all: universal
     format_overrides:
@@ -55,6 +72,7 @@ archives:
       - LICENSE
       - completions/*
       - manpages/*
+    wrap_in_directory: true
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 brews:
@@ -86,14 +104,20 @@ changelog:
   sort: asc
   use: github
   groups:
-    - title: "New Features"
+    - title: 'New Features'
       regexp: "^.*feat[(\\w)]*:+.*$"
-      order: 0
-    - title: "Bug fixes"
+      order: 100
+    - title: 'Bug fixes'
       regexp: "^.*fix[(\\w)]*:+.*$"
-      order: 10
+      order: 200
+    - title: Dependency updates
+      regexp: "^.*chore\\(deps\\)*:+.*$"
+      order: 300
+    - title: 'Documentation updates'
+      regexp: "^.*docs[(\\w)]*:+.*$"
+      order: 400
     - title: Other work
-      order: 999
+      order: 9999
   filters:
     exclude:
       - "^docs:"

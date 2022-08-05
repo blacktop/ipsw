@@ -16,6 +16,7 @@ import (
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/disass"
 )
 
 // Known good magic
@@ -83,6 +84,7 @@ type File struct {
 	symUUID         mtypes.UUID
 	dyldImageAddr   uint64
 	dyldStartFnAddr uint64
+	islandStubs     map[uint64]uint64
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
@@ -256,6 +258,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.closers = make(map[mtypes.UUID]io.Closer)
 	f.AddressToSymbol = make(map[uint64]string, 7000000)
 	f.ImageArray = make(map[uint32]*CImage)
+	f.islandStubs = make(map[uint64]uint64)
 
 	// Read and decode dyld magic
 	var ident [16]byte
@@ -606,12 +609,13 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset > 0 {
 		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
 		f.SubCacheInfo = make([]SubcacheEntryPageInLink, f.Headers[uuid].SubCacheArrayCount)
-		if f.Headers[f.UUID].CacheType == CacheTypeStubIslands {
+		// TODO: gross hack to read the subcache info for pre iOS 16.
+		endOfSubCacheInfoArray := f.Headers[f.UUID].SubCacheArrayOffset + uint32(binary.Size(SubcacheEntryPageInLink{})*int(f.Headers[f.UUID].SubCacheArrayCount))
+		if endOfSubCacheInfoArray == f.Images[0].PathOffset {
 			if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
 				return err
 			}
 		} else {
-			// TODO: gross hack to read the subcache info for pre iOS 16.
 			subCacheInfo := make([]SubcacheEntry, f.Headers[uuid].SubCacheArrayCount)
 			if err := binary.Read(sr, f.ByteOrder, subCacheInfo); err != nil {
 				return err
@@ -648,6 +652,28 @@ func (f *File) ParseImageArrays() error {
 		}
 	}
 
+	return nil
+}
+
+func (f *File) ParseStubIslands() error {
+	for _, sc := range f.SubCacheInfo {
+		if f.Headers[sc.UUID].ImagesCountOld == 0 && f.Headers[sc.UUID].ImagesCount == 0 {
+			// found a stub island
+			dat := make([]byte, f.Headers[sc.UUID].CodeSignatureOffset-0x4000)
+			if _, err := f.r[sc.UUID].ReadAt(dat, 0x4000); err != nil {
+				return fmt.Errorf("failed to read stub island data: %v", err)
+			}
+			stubs, err := disass.ParseStubsASM(dat, f.MappingsWithSlideInfo[sc.UUID][0].Address+0x4000, func(u uint64) (uint64, error) {
+				return f.ReadPointerAtAddress(u)
+			})
+			if err != nil {
+				return err
+			}
+			for k, v := range stubs {
+				f.islandStubs[k] = v
+			}
+		}
+	}
 	return nil
 }
 

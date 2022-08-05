@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/dustin/go-humanize"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -42,6 +44,14 @@ func init() {
 	infoCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	infoCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
 	infoCmd.Flags().BoolP("list", "l", false, "List files in IPSW/OTA")
+	infoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+
+	viper.BindPFlag("info.proxy", infoCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("info.insecure", infoCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("info.remote", infoCmd.Flags().Lookup("remote"))
+	viper.BindPFlag("info.list", infoCmd.Flags().Lookup("list"))
+	viper.BindPFlag("info.json", infoCmd.Flags().Lookup("json"))
+
 	infoCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw", "*.zip")
 	infoCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
@@ -63,22 +73,15 @@ var infoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// settings
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		// flags
-		remoteFlag, _ := cmd.Flags().GetBool("remote")
-		listFiles, _ := cmd.Flags().GetBool("list")
-
-		if remoteFlag {
+		if viper.GetBool("info.remote") {
 			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
-				Proxy:    proxy,
-				Insecure: insecure,
+				Proxy:    viper.GetString("info.proxy"),
+				Insecure: viper.GetBool("info.insecure"),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to create new remote zip reader: %w", err)
 			}
-			if listFiles {
+			if viper.GetBool("info.list") {
 				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 				fmt.Fprintf(w, "PATH\tSIZE\n")
 				fmt.Fprintf(w, "----\t----\n")
@@ -92,12 +95,12 @@ var infoCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse plists in zip: %w", err)
 				}
 			}
-		} else {
+		} else { // LOCAL
 			fPath := filepath.Clean(args[0])
 			if _, err := os.Stat(fPath); os.IsNotExist(err) {
 				return fmt.Errorf("file %s does not exist", fPath)
 			}
-			if listFiles {
+			if viper.GetBool("info.list") {
 				zr, err := zip.OpenReader(fPath)
 				if err != nil {
 					return fmt.Errorf("failed to open %s: %v", fPath, err)
@@ -119,24 +122,32 @@ var infoCmd = &cobra.Command{
 				}
 			}
 		}
-
-		if !listFiles {
-			title := fmt.Sprintf("[%s Info]", i.Plists.Type)
-			fmt.Printf("\n%s\n", title)
-			fmt.Println(strings.Repeat("=", len(title)))
-			fmt.Println(i)
-			if Verbose {
-				if i.Plists.BuildManifest != nil {
-					fmt.Println(i.Plists.BuildManifest)
+		// DISPLAY
+		if !viper.GetBool("info.list") {
+			if viper.GetBool("info.json") {
+				dat, err := json.Marshal(i.ToJSON())
+				if err != nil {
+					return fmt.Errorf("failed to JSON marshal info: %v", err)
 				}
-				if i.Plists.Restore != nil {
-					fmt.Println(i.Plists.Restore)
-				}
-				if i.Plists.AssetDataInfo != nil {
-					fmt.Println(i.Plists.AssetDataInfo)
-				}
-				if i.Plists.OTAInfo != nil {
-					fmt.Println(i.Plists.OTAInfo)
+				fmt.Println(string(dat))
+			} else {
+				title := fmt.Sprintf("[%s Info]", i.Plists.Type)
+				fmt.Printf("\n%s\n", title)
+				fmt.Println(strings.Repeat("=", len(title)))
+				fmt.Println(i)
+				if Verbose {
+					if i.Plists.BuildManifest != nil {
+						fmt.Println(i.Plists.BuildManifest)
+					}
+					if i.Plists.Restore != nil {
+						fmt.Println(i.Plists.Restore)
+					}
+					if i.Plists.AssetDataInfo != nil {
+						fmt.Println(i.Plists.AssetDataInfo)
+					}
+					if i.Plists.OTAInfo != nil {
+						fmt.Println(i.Plists.OTAInfo)
+					}
 				}
 			}
 		}

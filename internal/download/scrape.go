@@ -15,10 +15,10 @@ import (
 
 const (
 	iphoneWikiURL                  = "www.theiphonewiki.com"
-	iphoneWikiOtaUrlRegex          = "^https://www\\.theiphonewiki\\.com/wiki/OTA_Updates/(.+)$"
-	iphoneWikiBetaOtaUrlRegex      = "^https://www\\.theiphonewiki\\.com/wiki/Beta_OTA_Updates/(.+)$"
-	iphoneWikiFirmwareUrlRegex     = "^https://www\\.theiphonewiki\\.com/wiki/Firmware/(.+)$"
-	iphoneWikiBetaFirmwareUrlRegex = "^https://www\\.theiphonewiki\\.com/wiki/Beta_Firmware/(.+)$"
+	iphoneWikiOtaUrlRegex          = "^https://www.theiphonewiki.com/wiki/OTA_Updates/(.+)$"
+	iphoneWikiBetaOtaUrlRegex      = "^https://www.theiphonewiki.com/wiki/Beta_OTA_Updates/(.+)$"
+	iphoneWikiFirmwareUrlRegex     = "^https://www.theiphonewiki.com/wiki/Firmware/(.+)$"
+	iphoneWikiBetaFirmwareUrlRegex = "^https://www.theiphonewiki.com/wiki/Beta_Firmware/(.+)$"
 )
 
 var devices = []string{"iPad", "iPad_Air", "iPad_Pro", "iPad_mini", "iPhone", "iPod_touch", "Apple_Watch", "Mac", "HomePod"}
@@ -172,7 +172,7 @@ func FilterIpswURLs(urls []string, device, version, build string) []string {
 	return filteredUrls
 }
 
-func ScrapeIPSWs() ([]string, error) {
+func ScrapeIPSWs(beta bool) ([]string, error) {
 	var ipsws []string
 
 	c := colly.NewCollector(
@@ -192,18 +192,21 @@ func ScrapeIPSWs() ([]string, error) {
 
 	c.OnHTML("body", func(e *colly.HTMLElement) {
 		e.ForEach("a[href]", func(_ int, e *colly.HTMLElement) {
-			if strings.Contains(e.Text, ".ipsw") {
+			if strings.Contains(e.Text, ".ipsw") && !strings.Contains(e.Text, "download.developer.apple.com") {
 				ipsws = append(ipsws, e.Request.AbsoluteURL(e.Attr("href")))
 			}
 		})
 	})
 
 	for _, device := range devices {
-		if err := c.Visit("https://www.theiphonewiki.com/wiki/Firmware/" + device); err != nil {
-			return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
-		}
-		if err := c.Visit("https://www.theiphonewiki.com/wiki/Beta_Firmware/" + device); err != nil {
-			return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+		if beta {
+			if err := c.Visit("https://www.theiphonewiki.com/wiki/Beta_Firmware/" + device); err != nil {
+				return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+			}
+		} else {
+			if err := c.Visit("https://www.theiphonewiki.com/wiki/Firmware/" + device); err != nil {
+				return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+			}
 		}
 	}
 
@@ -216,14 +219,14 @@ func ScrapeIPSWs() ([]string, error) {
 	return utils.Unique(ipsws), nil
 }
 
-func ScrapeOTAs() ([]string, error) {
+func ScrapeOTAs(beta bool) ([]string, error) {
 	var otas []string
 
 	c := colly.NewCollector(
 		colly.AllowedDomains(iphoneWikiURL),
 		colly.URLFilters(
 			regexp.MustCompile(iphoneWikiOtaUrlRegex),
-			regexp.MustCompile(iphoneWikiBetaFirmwareUrlRegex),
+			regexp.MustCompile(iphoneWikiBetaOtaUrlRegex),
 		),
 		colly.Async(true),
 		colly.MaxDepth(1),
@@ -243,11 +246,14 @@ func ScrapeOTAs() ([]string, error) {
 	})
 
 	for _, device := range devices {
-		if err := c.Visit("https://www.theiphonewiki.com/wiki/OTA_Updates/" + device); err != nil {
-			return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
-		}
-		if err := c.Visit("https://www.theiphonewiki.com/wiki/Beta_OTA_Updates/" + device); err != nil {
-			return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+		if beta {
+			if err := c.Visit("https://www.theiphonewiki.com/wiki/Beta_OTA_Updates/" + device); err != nil {
+				return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+			}
+		} else {
+			if err := c.Visit("https://www.theiphonewiki.com/wiki/OTA_Updates/" + device); err != nil {
+				return nil, errors.Wrap(err, "failed to scrape "+iphoneWikiURL)
+			}
 		}
 	}
 
