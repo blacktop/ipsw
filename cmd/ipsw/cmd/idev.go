@@ -27,7 +27,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
-	"github.com/blacktop/ipsw/pkg/usb/lockdown"
+	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+
 	"github.com/spf13/cobra"
 )
 
@@ -52,90 +53,58 @@ var idevCmd = &cobra.Command{
 		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
 		asJSON, _ := cmd.Flags().GetBool("json")
 
-		uconn, err := usb.NewConnection(AppVersion)
+		// cli, err := afc.NewClient("")
+		// if err != nil {
+		// 	return err
+		// }
+		// defer func(cli *afc.Client) {
+		// 	_ = cli.Close()
+		// }(cli)
+
+		// fs, err := cli.ReadDir("/")
+		// if err != nil {
+		// 	return err
+		// }
+
+		// for _, f := range fs {
+		// 	if f == "." || f == ".." {
+		// 		continue
+		// 	}
+		// 	fmt.Println(f)
+		// }
+
+		conn, err := usb.NewConn()
 		if err != nil {
 			return err
 		}
-		defer uconn.Close()
+		defer conn.Close()
 
-		devs, err := uconn.ListDevices()
+		devices, err := conn.ListDevices()
 		if err != nil {
 			return err
 		}
 
-		var dds []*lockdown.DeviceDetail
-		for _, dev := range devs {
+		var dds []*lockdownd.DeviceValues
 
-			ld, err := uconn.ConnectLockdown(dev)
+		for _, device := range devices {
+			cli, err := lockdownd.NewClient(device.UDID)
 			if err != nil {
 				return err
 			}
+			defer cli.Close()
 
-			if err := ld.StartSession(); err != nil {
-				return err
-			}
-
-			// if _, err := ld.StartService("com.apple.instruments.remoteserver"); err != nil {
-			// 	return err
-			// }
-
-			dd, err := ld.GetDeviceDetail(dev)
+			values, err := cli.GetValues()
 			if err != nil {
 				return err
 			}
 
 			if ipswSpec {
-				fmt.Printf("%s_%s_%s\n", dd.ProductType, dd.HardwareModel, dd.BuildVersion)
+				fmt.Printf("%s_%s_%s\n", values.ProductType, values.HardwareModel, values.BuildVersion)
 			} else if asJSON {
-				dds = append(dds, dd)
+				dds = append(dds, values)
 			} else {
-				fmt.Println(dev)
-				fmt.Printf(
-					"Device Name:         %s\n"+
-						"Device Color:        %s\n"+
-						"Device Class:        %s\n"+
-						"Product Name:        %s\n"+
-						"Product Type:        %s\n"+
-						"HardwareModel:       %s\n"+
-						"BoardId:             %d\n"+
-						"BuildVersion:        %s\n"+
-						"Product Version:     %s\n"+
-						"ChipID:              %#x (%s)\n"+
-						"ProductionSOC:       %t\n"+
-						"HasSiDP:             %t\n"+
-						"TelephonyCapability: %t\n"+
-						"UniqueChipID:        %#x\n"+
-						"DieID:               %#x\n"+
-						"PartitionType:       %s\n"+
-						"UniqueDeviceID:      %s\n"+
-						"WiFiAddress:         %s\n\n",
-					dd.DeviceName,
-					dd.DeviceColor,
-					dd.DeviceClass,
-					dd.ProductName,
-					dd.ProductType,
-					dd.HardwareModel,
-					dd.BoardId,
-					dd.BuildVersion,
-					dd.ProductVersion,
-					dd.ChipID,
-					dd.CPUArchitecture,
-					dd.ProductionSOC,
-					dd.HasSiDP,
-					dd.TelephonyCapability,
-					dd.UniqueChipID,
-					dd.DieID,
-					dd.PartitionType,
-					dd.UniqueDeviceID,
-					dd.WiFiAddress,
-				)
-			}
-
-			if err := ld.StopSession(); err != nil {
-				return err
-			}
-			if err := uconn.Refresh(); err != nil {
-				return err
+				fmt.Println(device)
+				fmt.Println(values)
 			}
 		}
 
