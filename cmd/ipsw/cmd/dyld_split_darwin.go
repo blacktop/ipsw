@@ -75,10 +75,7 @@ var splitCmd = &cobra.Command{
 		if len(args) > 1 && viper.GetBool("dyld.split.cache") {
 			return fmt.Errorf("cannot specify output path and use --cache flag at the same time")
 		} else if len(args) > 1 {
-			outputPath, _ := filepath.Abs(filepath.Clean(args[1]))
-			if _, err := os.Stat(outputPath); os.IsNotExist(err) {
-				return fmt.Errorf("path %s does not exist", outputPath)
-			}
+			outputPath, _ = filepath.Abs(filepath.Clean(args[1]))
 		} else if viper.GetBool("dyld.split.cache") {
 			if len(viper.GetString("dyld.split.version")) == 0 || len(viper.GetString("dyld.split.build")) == 0 {
 				return fmt.Errorf("--version and --build are required when --cache is used")
@@ -106,9 +103,10 @@ var splitCmd = &cobra.Command{
 			}
 
 			outputPath = filepath.Join(home, fmt.Sprintf("/Library/Developer/Xcode/iOS DeviceSupport/%s (%s)%s", version, viper.GetString("dyld.split.build"), arm64e))
-			if err := os.MkdirAll(outputPath, 0755); err != nil {
-				return fmt.Errorf("failed to create cache directory %s: %v", outputPath, err)
-			}
+		}
+
+		if err := os.MkdirAll(outputPath, 0755); err != nil {
+			return fmt.Errorf("failed to create output directory %s: %v", outputPath, err)
 		}
 
 		log.Infof("Splitting dyld_shared_cache to %s\n", outputPath)
