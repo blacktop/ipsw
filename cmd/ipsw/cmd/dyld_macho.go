@@ -534,7 +534,11 @@ var dyldMachoCmd = &cobra.Command{
 								} else if found = bytes.Index(data[i:], gad); foundFirstPart && found == 0 {
 									if idx == len(gadget)-1 {
 										// pattern found
-										fmt.Printf("addr=%#08x\t%s\n", textSeg.Addr+foundOffset, image.Name)
+										if dumpALL {
+											fmt.Printf("%#x\t%s\n", textSeg.Addr+foundOffset, image.Name)
+										} else {
+											fmt.Printf("%#x\n", textSeg.Addr+foundOffset)
+										}
 										foundFirstPart = false // reset state
 										i += len(gad)
 									} else {
