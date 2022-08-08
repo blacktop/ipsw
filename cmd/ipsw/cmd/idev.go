@@ -28,6 +28,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/fatih/color"
 
 	"github.com/spf13/cobra"
 )
@@ -36,6 +37,7 @@ func init() {
 	rootCmd.AddCommand(idevCmd)
 	idevCmd.Flags().BoolP("ipsw", "i", false, "Display devices as ipsw spec names")
 	idevCmd.Flags().BoolP("json", "j", false, "Display devices as JSON")
+	idevCmd.Flags().Bool("color", false, "Force color output (for piping to less etc)")
 }
 
 // idevCmd represents the idev command
@@ -52,6 +54,9 @@ var idevCmd = &cobra.Command{
 
 		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
 		asJSON, _ := cmd.Flags().GetBool("json")
+		forceColor, _ := cmd.Flags().GetBool("color")
+
+		color.NoColor = !forceColor
 
 		// cli, err := afc.NewClient("")
 		// if err != nil {
