@@ -36,6 +36,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/usb"
+	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -134,17 +135,17 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("download.ipsw.usb") {
-			uconn, err := usb.NewConnection(AppVersion)
+			conn, err := usb.NewConn()
 			if err != nil {
 				return err
 			}
-			defer uconn.Close()
+			defer conn.Close()
 
-			devs, err := uconn.ListDevices()
+			devices, err := conn.ListDevices()
 			if err != nil {
 				return err
 			}
-			if len(devs) == 0 {
+			if len(devices) == 0 {
 				return fmt.Errorf("no USB devices found")
 			}
 
@@ -155,15 +156,14 @@ var ipswCmd = &cobra.Command{
 			}
 
 			var ideets []ipswDetails
-			for _, dev := range devs {
-				ld, err := uconn.ConnectLockdown(dev)
+			for _, dev := range devices {
+				cli, err := lockdownd.NewClient(dev.UDID)
 				if err != nil {
 					return err
 				}
-				if err := ld.StartSession(); err != nil {
-					return err
-				}
-				dd, err := ld.GetDeviceDetail(dev)
+				defer cli.Close()
+
+				dd, err := cli.GetValues()
 				if err != nil {
 					return err
 				}
@@ -172,12 +172,6 @@ var ipswCmd = &cobra.Command{
 					HardwareModel: dd.HardwareModel,
 					BuildVersion:  dd.BuildVersion,
 				})
-				if err := ld.StopSession(); err != nil {
-					return err
-				}
-				if err := uconn.Refresh(); err != nil {
-					return err
-				}
 			}
 
 			if len(ideets) == 1 {
