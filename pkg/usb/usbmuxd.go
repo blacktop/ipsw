@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/blacktop/go-plist"
+	"github.com/fatih/color"
 )
 
 const (
@@ -16,6 +17,9 @@ const (
 	BundleID            = "io.blacktop.ipsw"
 	ClientVersionString = "ipsw-usbmux-0.0.1"
 )
+
+var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+var colorBold = color.New(color.Bold).SprintFunc()
 
 type Header struct {
 	Length      uint32
@@ -117,14 +121,14 @@ type DeviceAttachment struct {
 
 func (d DeviceAttachment) String() string {
 	return fmt.Sprintf(
-		"DeviceID: %d\n"+
-			"    ConnectionType:  %s\n"+
-			"    ConnectionSpeed: %d\n"+
-			"    ProductID:       %#x\n"+
-			"    LocationID:      %d\n"+
-			"    SerialNumber:    %s\n"+
-			"    UDID:            %s\n"+
-			"    USBSerialNumber: %s\n",
+		colorFaint("DeviceID: ")+colorBold("%d\n")+
+			colorFaint("    ConnectionType:  ")+colorBold("%s\n")+
+			colorFaint("    ConnectionSpeed: ")+colorBold("%d\n")+
+			colorFaint("    ProductID:       ")+colorBold("%#x\n")+
+			colorFaint("    LocationID:      ")+colorBold("%d\n")+
+			colorFaint("    SerialNumber:    ")+colorBold("%s\n")+
+			colorFaint("    UDID:            ")+colorBold("%s\n")+
+			colorFaint("    USBSerialNumber: ")+colorBold("%s\n"),
 		d.DeviceID,
 		d.ConnectionType,
 		d.ConnectionSpeed,

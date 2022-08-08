@@ -4,7 +4,11 @@ import (
 	"fmt"
 
 	"github.com/blacktop/ipsw/pkg/usb"
+	"github.com/fatih/color"
 )
+
+var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+var colorBold = color.New(color.Bold).SprintFunc()
 
 type Client struct {
 	*usb.Client
@@ -201,35 +205,39 @@ type DeviceValues struct {
 }
 
 func (dv DeviceValues) String() string {
+	releaseType := dv.ReleaseType
+	if releaseType == "" {
+		releaseType = "Release"
+	}
 	return fmt.Sprintf(
-		"Device Name:         %s\n"+
-			"Device Color:        %s\n"+
-			"Device Class:        %s\n"+
-			"Product Name:        %s\n"+
-			"Product Type:        %s\n"+
-			"HardwareModel:       %s\n"+
-			"BoardId:             %d\n"+
-			"BuildVersion:        %s\n"+
-			"Product Version:     %s\n"+
-			"ChipID:              %#x (%s)\n"+
-			"HardwarePlatform:    %s\n"+
-			"ProductionSOC:       %t\n"+
-			"HasSiDP:             %t\n"+
-			"TelephonyCapability: %t\n"+
-			"WiFiAddress:         %s\n"+
-			"EthernetAddress:     %s\n"+
-			"BluetoothAddress:    %s\n"+
-			"FirmwareVersion:     %s\n"+
-			"UniqueChipID:        %#x\n"+
-			"DieID:               %#x\n"+
-			"PartitionType:       %s\n"+
-			"UniqueDeviceID:      %s\n"+
-			"SerialNumber:        %s\n"+
-			"TimeZone:            %s\n"+
-			"ReleaseType:         %s\n"+
-			"HostAttached:        %t\n"+
-			"TrustedHostAttached: %t\n"+
-			"ActivationState:     %s\n\n",
+		colorFaint("Device Name:         ")+colorBold("%s\n")+
+			colorFaint("Device Color:        ")+colorBold("%s\n")+
+			colorFaint("Device Class:        ")+colorBold("%s\n")+
+			colorFaint("Product Name:        ")+colorBold("%s\n")+
+			colorFaint("Product Type:        ")+colorBold("%s\n")+
+			colorFaint("HardwareModel:       ")+colorBold("%s\n")+
+			colorFaint("BoardId:             ")+colorBold("%d\n")+
+			colorFaint("BuildVersion:        ")+colorBold("%s\n")+
+			colorFaint("Product Version:     ")+colorBold("%s\n")+
+			colorFaint("ChipID:              ")+colorBold("%#x (%s)\n")+
+			colorFaint("HardwarePlatform:    ")+colorBold("%s\n")+
+			colorFaint("ProductionSOC:       ")+colorBold("%t\n")+
+			colorFaint("HasSiDP:             ")+colorBold("%t\n")+
+			colorFaint("TelephonyCapability: ")+colorBold("%t\n")+
+			colorFaint("WiFiAddress:         ")+colorBold("%s\n")+
+			colorFaint("EthernetAddress:     ")+colorBold("%s\n")+
+			colorFaint("BluetoothAddress:    ")+colorBold("%s\n")+
+			colorFaint("FirmwareVersion:     ")+colorBold("%s\n")+
+			colorFaint("UniqueChipID:        ")+colorBold("%#x\n")+
+			colorFaint("DieID:               ")+colorBold("%#x\n")+
+			colorFaint("PartitionType:       ")+colorBold("%s\n")+
+			colorFaint("UniqueDeviceID:      ")+colorBold("%s\n")+
+			colorFaint("SerialNumber:        ")+colorBold("%s\n")+
+			colorFaint("TimeZone:            ")+colorBold("%s\n")+
+			colorFaint("ReleaseType:         ")+colorBold("%s\n")+
+			colorFaint("HostAttached:        ")+colorBold("%t\n")+
+			colorFaint("TrustedHostAttached: ")+colorBold("%t\n")+
+			colorFaint("ActivationState:     ")+colorBold("%s\n\n"),
 		dv.DeviceName,
 		dv.DeviceColor,
 		dv.DeviceClass,
@@ -255,7 +263,7 @@ func (dv DeviceValues) String() string {
 		dv.UniqueDeviceID,
 		dv.SerialNumber,
 		dv.TimeZone,
-		dv.ReleaseType,
+		releaseType,
 		dv.HostAttached,
 		dv.TrustedHostAttached,
 		dv.ActivationState,
