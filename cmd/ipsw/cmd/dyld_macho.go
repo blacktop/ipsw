@@ -24,6 +24,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -53,6 +54,7 @@ func init() {
 	dyldMachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	dyldMachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
 	dyldMachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
+	dyldMachoCmd.Flags().String("search", "", "Search for byte pattern")
 
 	dyldMachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
 	dyldMachoCmd.Flags().String("output", "", "Directory to extract the dylib(s)")
@@ -131,6 +133,7 @@ var dyldMachoCmd = &cobra.Command{
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
 		dumpStubs, _ := cmd.Flags().GetBool("stubs")
+		searchPattern, _ := cmd.Flags().GetString("search")
 		dumpALL, _ := cmd.Flags().GetBool("all")
 		extractDylib, _ := cmd.Flags().GetBool("extract")
 		extractPath, _ := cmd.Flags().GetString("output")
@@ -138,6 +141,7 @@ var dyldMachoCmd = &cobra.Command{
 
 		onlyFuncStarts := !showLoadCommands && !showObjC && !dumpStubs && showFuncStarts
 		onlyStubs := !showLoadCommands && !showObjC && !showFuncStarts && dumpStubs
+		onlySearch := !showLoadCommands && !showObjC && !showFuncStarts && !dumpStubs && searchPattern != ""
 
 		dscPath := filepath.Clean(args[0])
 
@@ -198,19 +202,19 @@ var dyldMachoCmd = &cobra.Command{
 				images = append(images, image)
 			}
 
-			for _, i := range images {
+			for _, image := range images {
 
 				if dumpALL {
-					log.WithField("name", i.Name).Debug("Image")
+					log.WithField("name", image.Name).Debug("Image")
 				}
 
-				m, err := i.GetMacho()
+				m, err := image.GetMacho()
 				if err != nil {
-					log.Warnf("failed to parse full MachO for %s: %v", i.Name, err)
+					log.Warnf("failed to parse full MachO for %s: %v", image.Name, err)
 					if extractDylib {
 						continue
 					}
-					m, err = i.GetPartialMacho()
+					m, err = image.GetPartialMacho()
 					if err != nil {
 						return err
 					}
@@ -223,9 +227,9 @@ var dyldMachoCmd = &cobra.Command{
 					if len(extractPath) > 0 {
 						folder = extractPath
 					}
-					fname := filepath.Join(folder, filepath.Base(i.Name)) // default to NOT full dylib path
+					fname := filepath.Join(folder, filepath.Base(image.Name)) // default to NOT full dylib path
 					if dumpALL {
-						fname = filepath.Join(folder, i.Name)
+						fname = filepath.Join(folder, image.Name)
 					}
 
 					if _, err := os.Stat(fname); os.IsNotExist(err) || forceExtract {
@@ -237,7 +241,7 @@ var dyldMachoCmd = &cobra.Command{
 							}
 						}
 
-						i.ParseLocalSymbols(false)
+						image.ParseLocalSymbols(false)
 
 						// cc, err := m.GetObjCClasses()
 						// if err != nil {
@@ -247,9 +251,9 @@ var dyldMachoCmd = &cobra.Command{
 						// 	fmt.Println(c)
 						// }
 
-						err = m.Export(fname, dcf, m.GetBaseAddress(), i.GetLocalSymbolsAsMachoSymbols())
+						err = m.Export(fname, dcf, m.GetBaseAddress(), image.GetLocalSymbolsAsMachoSymbols())
 						if err != nil {
-							return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
+							return fmt.Errorf("failed to export entry MachO %s; %v", image.Name, err)
 						}
 
 						if err := rebaseMachO(f, fname); err != nil {
@@ -270,7 +274,7 @@ var dyldMachoCmd = &cobra.Command{
 					continue
 				}
 
-				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs {
+				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs && searchPattern == "" {
 					fmt.Println(m.FileTOC.String())
 				}
 
@@ -489,12 +493,68 @@ var dyldMachoCmd = &cobra.Command{
 						fmt.Printf("\nStubs\n")
 						fmt.Println("=====")
 					}
-					if err := i.Analyze(); err != nil {
+					if err := image.Analyze(); err != nil {
 						return err
 					}
-					for stubAddr, addr := range i.Analysis.SymbolStubs {
+					for stubAddr, addr := range image.Analysis.SymbolStubs {
 						if symName, ok := f.AddressToSymbol[addr]; ok {
 							fmt.Printf("%#x => %#x: %s\n", stubAddr, addr, symName)
+						}
+					}
+				}
+
+				if len(searchPattern) > 0 {
+					var gadget [][]byte
+					for _, literal := range strings.Split(searchPattern, "*") {
+						pattern, err := hex.DecodeString(strings.Replace(literal, " ", "", -1))
+						if err != nil {
+							return fmt.Errorf("failed to decode pattern '%s': %v", literal, err)
+						}
+						gadget = append(gadget, pattern)
+					}
+					if !dumpALL || !onlySearch {
+						fmt.Printf("\nSearch Results\n")
+						fmt.Println("--------------")
+					}
+					if textSeg := m.Segment("__TEXT"); textSeg != nil {
+						data, err := textSeg.Data()
+						if err != nil {
+							return err
+						}
+
+						i := 0
+						found := 0
+						foundOffset := uint64(0)
+						foundFirstPart := false
+
+						for found >= 0 && i < len(data) { // stop if not found
+							for idx, gad := range gadget {
+								if len(gad) == 0 { // sequencential wildcards
+									i += 1
+								} else if found = bytes.Index(data[i:], gad); foundFirstPart && found == 0 {
+									if idx == len(gadget)-1 {
+										// pattern found
+										fmt.Printf("addr=%#08x\t%s\n", textSeg.Addr+foundOffset, image.Name)
+										foundFirstPart = false // reset state
+										i += len(gad)
+									} else {
+										i += len(gad) + 1 // +1 for the *
+									}
+								} else if foundFirstPart && found > 0 {
+									// pattern broken
+									foundFirstPart = false
+									i += len(gad)
+									break
+								} else if !foundFirstPart && found >= 0 { // found first part of pattern
+									if idx == 0 {
+										foundFirstPart = true
+										foundOffset = uint64(i + found)
+									}
+									i += found + len(gad) + 1 // +1 for the *
+								} else if found < 0 {
+									break
+								}
+							}
 						}
 					}
 				}
