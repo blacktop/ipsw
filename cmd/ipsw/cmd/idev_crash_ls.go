@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"io/fs"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -84,7 +85,7 @@ var iDevCrashLsCmd = &cobra.Command{
 			if info.IsDir() {
 				return nil
 			}
-			fmt.Println(path)
+			fmt.Println(strings.TrimPrefix(path, "/"))
 			return nil
 		})
 		if err != nil {
