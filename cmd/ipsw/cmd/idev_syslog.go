@@ -92,7 +92,7 @@ func colorSyslog(line string) string {
 // iDevSyslogCmd represents the syslog command
 var iDevSyslogCmd = &cobra.Command{
 	Use:           "syslog",
-	Short:         "Dump screenshot as a PNG",
+	Short:         "Dump syslog lines",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
