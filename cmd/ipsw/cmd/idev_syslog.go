@@ -22,10 +22,13 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/apex/log"
@@ -36,12 +39,55 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var loc *time.Location
+
 func init() {
 	idevCmd.AddCommand(iDevSyslogCmd)
 
 	iDevSyslogCmd.Flags().StringP("uuid", "u", "", "Device UUID to connect")
-	iDevSyslogCmd.Flags().DurationP("timeout", "t", time.Second*10, "Log timeout")
+	iDevSyslogCmd.Flags().Uint64P("timeout", "t", 0, "Log timeout in seconds")
 	iDevSyslogCmd.Flags().Bool("color", false, "Colorize output")
+}
+
+var colorTime = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorProc = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorLib = color.New(color.Bold, color.FgHiCyan).SprintFunc()
+var colorNotice = color.New(color.Bold, color.FgHiGreen).SprintFunc()
+var colorError = color.New(color.Bold, color.FgHiRed).SprintFunc()
+var colorErrorMsg = color.New(color.Faint, color.FgHiRed).SprintFunc()
+var colorWarning = color.New(color.Bold, color.FgHiYellow).SprintFunc()
+var colorWarningMsg = color.New(color.FgYellow).SprintFunc()
+var colorDebug = color.New(color.Bold, color.FgHiWhite).SprintFunc()
+
+func colorSyslog(line string) string {
+	re := regexp.MustCompile(`(?s)(?P<date>\w{3}\s\d{1,2}\s\d{2}:\d{2}:\d{2})\s(?P<device>\S+)\s(?P<proc>[a-zA-Z]+)(\((?P<lib>\S+)\))?\[(?P<pid>\S+)\]\s(?P<type>\S+)\s(?P<msg>.*)\n$`)
+	return re.ReplaceAllStringFunc(line, func(s string) string {
+		matches := re.FindStringSubmatch(line)
+		level := strings.Trim(matches[7], "<>:")
+		body := matches[8]
+		switch level {
+		case "Notice":
+			level = colorNotice(level)
+		case "Error":
+			level = colorError(level)
+			body = colorErrorMsg(body)
+		case "Warning":
+			level = colorWarning(level)
+			body = colorWarningMsg(body)
+		case "Debug":
+			level = colorDebug(level)
+		default:
+			level = colorDebug(level)
+		}
+		t, _ := time.Parse(time.Stamp, matches[1])
+		t = t.AddDate(time.Now().Year(), 0, 0)
+		var lib string
+		if matches[5] != "" {
+			lib = fmt.Sprintf("(%s)", colorLib(matches[5]))
+		}
+		proc := fmt.Sprintf("%s%s[%s]", colorProc(matches[3]), lib, colorDebug(matches[6]))
+		return colorTime(t.In(loc).Format("02Jan2006 15:04:05 MST")) + " " + level + " " + proc + " " + body
+	})
 }
 
 // iDevSyslogCmd represents the syslog command
@@ -68,9 +114,16 @@ var iDevSyslogCmd = &cobra.Command{
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
 			uuid = dev.UniqueDeviceID
+			loc, _ = time.LoadLocation(dev.TimeZone)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		var ctx context.Context
+		var cancel context.CancelFunc
+		if timeout > 0 {
+			ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		} else {
+			ctx, cancel = context.WithCancel(context.Background())
+		}
 		defer cancel()
 
 		if err := ctrlc.Default.Run(ctx, func() error {
@@ -79,8 +132,24 @@ var iDevSyslogCmd = &cobra.Command{
 				return err
 			}
 			defer r.Close()
-			_, err = io.Copy(os.Stdout, r)
-			return err
+
+			if forceColor {
+				br := bufio.NewReader(r)
+				for {
+					line, err := br.ReadString('\x00')
+					if err != nil {
+						if err == io.EOF {
+							break
+						}
+						return fmt.Errorf("failed to read syslog line: %w", err)
+					}
+					fmt.Println(colorSyslog(strings.Trim(line, "\x00")))
+				}
+			} else {
+				_, err = io.Copy(os.Stdout, r)
+				return err
+			}
+			return nil
 		}); err != nil {
 			return err
 		}
