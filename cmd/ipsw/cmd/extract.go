@@ -339,17 +339,17 @@ var extractCmd = &cobra.Command{
 
 				if viper.GetBool("extract.files") { // SEARCH THE DMGs
 					if appOS, err := i.GetAppOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, destPath, appOS, patternRE); err != nil {
+						if err := extractFromDMG(ipswPath, appOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
 						}
 					}
 					if systemOS, err := i.GetSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, destPath, systemOS, patternRE); err != nil {
+						if err := extractFromDMG(ipswPath, systemOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
 						}
 					}
 					if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, destPath, fsOS, patternRE); err != nil {
+						if err := extractFromDMG(ipswPath, fsOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
 						}
 					}
