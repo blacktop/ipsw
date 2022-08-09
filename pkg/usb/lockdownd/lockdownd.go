@@ -299,6 +299,7 @@ func (lc *Client) GetValues() (*DeviceValues, error) {
 }
 
 type queryTypeRequest struct {
+	Label   string
 	Request string `plist:"Request"`
 }
 
@@ -306,11 +307,25 @@ type queryTypeResponse struct {
 	Request string
 	Result  string
 	Type    string
+	Error   string `plist:"Error,omitempty"`
 }
 
 func (lc *Client) QueryType() (string, error) {
 	req := &queryTypeRequest{
 		Request: "QueryType",
+	}
+	var resp queryTypeResponse
+	if err := lc.Request(req, &resp); err != nil {
+		return "", err
+	}
+
+	return resp.Type, nil
+}
+
+func (lc *Client) EnterRecovery() (string, error) {
+	req := &queryTypeRequest{
+		Label:   usb.BundleID,
+		Request: "EnterRecovery",
 	}
 	var resp queryTypeResponse
 	if err := lc.Request(req, &resp); err != nil {
