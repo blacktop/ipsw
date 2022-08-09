@@ -22,29 +22,26 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
+	"io/fs"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/usb/fetchsymbols"
+	"github.com/blacktop/ipsw/pkg/usb/crashlog"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	idevCmd.AddCommand(iDevFetchsymbolsCmd)
+	iDevCrashCmd.AddCommand(iDevCrashClearCmd)
 
-	iDevFetchsymbolsCmd.Flags().StringP("output", "o", "", "Folder to save files")
 }
 
-// iDevFetchsymbolsCmd represents the fetchsymbols command
-var iDevFetchsymbolsCmd = &cobra.Command{
-	Use:           "fetchsymbols",
-	Short:         "Dump device linker and dyld_shared_cache file",
+// iDevCrashClearCmd represents the clear command
+var iDevCrashClearCmd = &cobra.Command{
+	Use:           "clear",
+	Short:         "Delete all crashlogs",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,16 +51,15 @@ var iDevFetchsymbolsCmd = &cobra.Command{
 		}
 
 		uuid, _ := cmd.Flags().GetString("uuid")
-		output, _ := cmd.Flags().GetString("output")
 
 		var err error
 		var dev *lockdownd.DeviceValues
+
 		if len(uuid) == 0 {
 			dev, err = utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-			uuid = dev.UniqueDeviceID
 		} else {
 			ldc, err := lockdownd.NewClient(uuid)
 			if err != nil {
@@ -77,31 +73,33 @@ var iDevFetchsymbolsCmd = &cobra.Command{
 			}
 		}
 
-		cli := fetchsymbols.NewClient(uuid)
-		files, err := cli.ListFiles()
+		cli, err := crashlog.NewClient(dev.UniqueDeviceID)
 		if err != nil {
-			return fmt.Errorf("failed to list files: %w", err)
+			return fmt.Errorf("failed to connect to crashlog service: %w", err)
 		}
+		defer cli.Close()
 
-		for idx, file := range files {
-			fname := filepath.Join(output, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion), file)
-			if err := os.MkdirAll(filepath.Dir(fname), 0755); err != nil {
-				return fmt.Errorf("failed to create fetchsymbols directory %s: %w", filepath.Dir(fname), err)
-			}
+		yes := false
+		prompt := &survey.Confirm{
+			Message: "Are you sure you want to delete ALL the crashlogs?",
+		}
+		survey.AskOne(prompt, &yes)
 
-			log.Infof("Copying %s", fname)
-			fr, err := cli.GetFile(uint32(idx))
-			if err != nil {
-				return fmt.Errorf("failed to get file %s from device: %w", file, err)
-			}
-
-			var buf bytes.Buffer
-			if _, err := buf.ReadFrom(fr); err != nil {
-				return fmt.Errorf("failed to read file %s: %w", file, err)
-			}
-
-			if err := ioutil.WriteFile(fname, buf.Bytes(), 0660); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", fname, err)
+		if yes {
+			if err := cli.RemoveAll("/"); err != nil {
+				log.Errorf("failed to remove all crashlogs from device: %v", err)
+				if err := cli.Walk("/", func(path string, info fs.FileInfo, err error) error {
+					if err != nil {
+						return err
+					}
+					if info.IsDir() {
+						return nil
+					}
+					utils.Indent(log.Error, 2)(path)
+					return nil
+				}); err != nil {
+					log.Errorf("failed to list crashlogs: %v", err)
+				}
 			}
 		}
 

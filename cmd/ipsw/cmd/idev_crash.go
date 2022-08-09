@@ -26,14 +26,13 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(idevCmd)
-	idevCmd.PersistentFlags().StringP("uuid", "u", "", "Device UUID to connect")
+	idevCmd.AddCommand(iDevCrashCmd)
 }
 
-// idevCmd represents the idev command
-var idevCmd = &cobra.Command{
-	Use:   "idev",
-	Short: "USB connected device commands",
+// iDevCrashCmd represents the crash command
+var iDevCrashCmd = &cobra.Command{
+	Use:   "crash",
+	Short: "Crashlog commands",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

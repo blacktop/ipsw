@@ -38,7 +38,6 @@ import (
 func init() {
 	idevCmd.AddCommand(iDevScreenCmd)
 
-	iDevScreenCmd.Flags().StringP("uuid", "u", "", "Device UUID to connect")
 	iDevScreenCmd.Flags().StringP("output", "o", "", "Folder to save screenshot(s)")
 }
 

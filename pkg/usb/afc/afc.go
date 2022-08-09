@@ -176,8 +176,12 @@ func listToDict(kv []string) map[string]string {
 	return ret
 }
 
-func NewClient(udid string) (*Client, error) {
-	c, err := lockdownd.NewClientForService(serviceName, udid, false)
+func NewClient(udid string, service ...string) (*Client, error) {
+	afcServiceName := serviceName
+	if len(service) > 0 {
+		afcServiceName = service[0]
+	}
+	c, err := lockdownd.NewClientForService(afcServiceName, udid, false)
 	if err != nil {
 		return nil, err
 	}

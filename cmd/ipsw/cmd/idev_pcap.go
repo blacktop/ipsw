@@ -26,16 +26,15 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(idevCmd)
-	idevCmd.PersistentFlags().StringP("uuid", "u", "", "Device UUID to connect")
+	idevCmd.AddCommand(iDevPcapCmd)
+
 }
 
-// idevCmd represents the idev command
-var idevCmd = &cobra.Command{
-	Use:   "idev",
-	Short: "USB connected device commands",
-	Args:  cobra.NoArgs,
+// iDevPcapCmd represents the pcap command
+var iDevPcapCmd = &cobra.Command{
+	Use:   "pcap",
+	Short: "Dump network traffic",
 	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
+		panic("not implemented yet")
 	},
 }
