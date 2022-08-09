@@ -55,7 +55,7 @@ func PickDevice() (*lockdownd.DeviceValues, error) {
 
 		var picked string
 		prompt := &survey.Select{
-			Message: "Select what iDevice's IPSW to download:",
+			Message: "Select what iDevice to connect to:",
 			Options: choices,
 		}
 		if err := survey.AskOne(prompt, &picked); err == terminal.InterruptErr {
@@ -105,7 +105,7 @@ func PickDevices() ([]*lockdownd.DeviceValues, error) {
 		}
 		selected := []int{}
 		prompt := &survey.MultiSelect{
-			Message: "Select what iDevice's IPSW to download:",
+			Message: "Select what iDevices to connect to:",
 			Options: choices,
 		}
 		if err := survey.AskOne(prompt, &selected); err == terminal.InterruptErr {

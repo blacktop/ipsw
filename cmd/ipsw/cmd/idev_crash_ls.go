@@ -22,29 +22,24 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"bytes"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
+	"io/fs"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/usb/fetchsymbols"
+	"github.com/blacktop/ipsw/pkg/usb/crashlog"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	idevCmd.AddCommand(iDevFetchsymbolsCmd)
-
-	iDevFetchsymbolsCmd.Flags().StringP("output", "o", "", "Folder to save files")
+	iDevCrashCmd.AddCommand(iDevCrashLsCmd)
 }
 
-// iDevFetchsymbolsCmd represents the fetchsymbols command
-var iDevFetchsymbolsCmd = &cobra.Command{
-	Use:           "fetchsymbols",
-	Short:         "Dump device linker and dyld_shared_cache file",
+// iDevCrashLsCmd represents the ls command
+var iDevCrashLsCmd = &cobra.Command{
+	Use:           "ls",
+	Short:         "List crashlogs",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -54,16 +49,15 @@ var iDevFetchsymbolsCmd = &cobra.Command{
 		}
 
 		uuid, _ := cmd.Flags().GetString("uuid")
-		output, _ := cmd.Flags().GetString("output")
 
 		var err error
 		var dev *lockdownd.DeviceValues
+
 		if len(uuid) == 0 {
 			dev, err = utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-			uuid = dev.UniqueDeviceID
 		} else {
 			ldc, err := lockdownd.NewClient(uuid)
 			if err != nil {
@@ -77,32 +71,24 @@ var iDevFetchsymbolsCmd = &cobra.Command{
 			}
 		}
 
-		cli := fetchsymbols.NewClient(uuid)
-		files, err := cli.ListFiles()
+		cli, err := crashlog.NewClient(dev.UniqueDeviceID)
 		if err != nil {
-			return fmt.Errorf("failed to list files: %w", err)
+			return fmt.Errorf("failed to connect to crashlog service: %w", err)
 		}
+		defer cli.Close()
 
-		for idx, file := range files {
-			fname := filepath.Join(output, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion), file)
-			if err := os.MkdirAll(filepath.Dir(fname), 0755); err != nil {
-				return fmt.Errorf("failed to create fetchsymbols directory %s: %w", filepath.Dir(fname), err)
-			}
-
-			log.Infof("Copying %s", fname)
-			fr, err := cli.GetFile(uint32(idx))
+		err = cli.Walk("/", func(path string, info fs.FileInfo, err error) error {
 			if err != nil {
-				return fmt.Errorf("failed to get file %s from device: %w", file, err)
+				return err
 			}
-
-			var buf bytes.Buffer
-			if _, err := buf.ReadFrom(fr); err != nil {
-				return fmt.Errorf("failed to read file %s: %w", file, err)
+			if info.IsDir() {
+				return nil
 			}
-
-			if err := ioutil.WriteFile(fname, buf.Bytes(), 0660); err != nil {
-				return fmt.Errorf("failed to write file %s: %w", fname, err)
-			}
+			fmt.Println(path)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to list crashlogs: %w", err)
 		}
 
 		return nil

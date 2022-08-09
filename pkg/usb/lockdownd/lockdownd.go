@@ -130,7 +130,7 @@ type DeviceValues struct {
 	BluetoothAddress                              string           `plist:"BluetoothAddress,omitempty" json:"bluetooth_address,omitempty"`
 	BoardId                                       int              `plist:"BoardId,omitempty" json:"board_id,omitempty"`
 	BootSessionID                                 string           `plist:"BootSessionID,omitempty" json:"boot_session_id,omitempty"`
-	BrickState                                    bool             `plist:"BrickState,omitempty" json:"brick_state,omitempty"`
+	BrickState                                    bool             `plist:"BrickState,omitempty" json:"brick_state"`
 	BuildVersion                                  string           `plist:"BuildVersion,omitempty" json:"build_version,omitempty"`
 	CertID                                        int              `plist:"CertID,omitempty" json:"cert_id,omitempty"`
 	ChipID                                        int              `plist:"ChipID,omitempty" json:"chip_id,omitempty"`
@@ -148,8 +148,8 @@ type DeviceValues struct {
 	GID2                                          string           `plist:"GID2,omitempty" json:"gid_2,omitempty"`
 	HardwareModel                                 string           `plist:"HardwareModel,omitempty" json:"hardware_model,omitempty"`
 	HardwarePlatform                              string           `plist:"HardwarePlatform,omitempty" json:"hardware_platform,omitempty"`
-	HasSiDP                                       bool             `plist:"HasSiDP,omitempty" json:"has_si_dp,omitempty"`
-	HostAttached                                  bool             `plist:"HostAttached,omitempty" json:"host_attached,omitempty"`
+	HasSiDP                                       bool             `plist:"HasSiDP,omitempty" json:"has_si_dp"`
+	HostAttached                                  bool             `plist:"HostAttached,omitempty" json:"host_attached"`
 	IntegratedCircuitCardIdentity                 string           `plist:"IntegratedCircuitCardIdentity,omitempty" json:"integrated_circuit_card_identity,omitempty"`
 	InternationalMobileEquipmentIdentity          string           `plist:"InternationalMobileEquipmentIdentity,omitempty" json:"international_mobile_equipment_identity,omitempty"`
 	InternationalMobileEquipmentIdentity2         string           `plist:"InternationalMobileEquipmentIdentity2,omitempty" json:"international_mobile_equipment_identity_2,omitempty"`
@@ -166,18 +166,18 @@ type DeviceValues struct {
 	PRIVersion_ReleaseNo                          int              `plist:"PRIVersion_ReleaseNo,omitempty" json:"pri_version___release_no,omitempty"`
 	PairRecordProtectionClass                     int              `plist:"PairRecordProtectionClass,omitempty" json:"pair_record_protection_class,omitempty"`
 	PartitionType                                 string           `plist:"PartitionType,omitempty" json:"partition_type,omitempty"`
-	PasswordProtected                             bool             `plist:"PasswordProtected,omitempty" json:"password_protected,omitempty"`
+	PasswordProtected                             bool             `plist:"PasswordProtected,omitempty" json:"password_protected"`
 	PhoneNumber                                   string           `plist:"PhoneNumber,omitempty" json:"phone_number,omitempty"`
 	PkHash                                        []byte           `plist:"PkHash,omitempty" json:"pk_hash,omitempty"`
 	ProductName                                   string           `plist:"ProductName,omitempty" json:"product_name,omitempty"`
 	ProductType                                   string           `plist:"ProductType,omitempty" json:"product_type,omitempty"`
 	ProductVersion                                string           `plist:"ProductVersion,omitempty" json:"product_version,omitempty"`
-	ProductionSOC                                 bool             `plist:"ProductionSOC,omitempty" json:"production_soc,omitempty"`
+	ProductionSOC                                 bool             `plist:"ProductionSOC,omitempty" json:"production_soc"`
 	ProtocolVersion                               string           `plist:"ProtocolVersion,omitempty" json:"protocol_version,omitempty"`
 	ProximitySensorCalibration                    []byte           `plist:"ProximitySensorCalibration,omitempty" json:"proximity_sensor_calibration,omitempty"`
 	RegionInfo                                    string           `plist:"RegionInfo,omitempty" json:"region_info,omitempty"`
 	ReleaseType                                   string           `plist:"ReleaseType,omitempty" json:"release_type,omitempty"`
-	SIM1IsEmbedded                                bool             `plist:"SIM1IsEmbedded,omitempty" json:"sim_1_is_embedded,omitempty"`
+	SIM1IsEmbedded                                bool             `plist:"SIM1IsEmbedded,omitempty" json:"sim_1_is_embedded"`
 	SIMGID1                                       []byte           `plist:"SIMGID1,omitempty" json:"simgid_1,omitempty"`
 	SIMGID2                                       []byte           `plist:"SIMGID2,omitempty" json:"simgid_2,omitempty"`
 	SIMStatus                                     any              `plist:"SIMStatus,omitempty" json:"sim_status,omitempty"`
@@ -186,21 +186,21 @@ type DeviceValues struct {
 	SoftwareBehavior                              []byte           `plist:"SoftwareBehavior,omitempty" json:"software_behavior,omitempty"`
 	SoftwareBundleVersion                         string           `plist:"SoftwareBundleVersion,omitempty" json:"software_bundle_version,omitempty"`
 	SupportedDeviceFamilies                       []int            `plist:"SupportedDeviceFamilies,omitempty" json:"supported_device_families,omitempty"`
-	TelephonyCapability                           bool             `plist:"TelephonyCapability,omitempty" json:"telephony_capability,omitempty"`
+	TelephonyCapability                           bool             `plist:"TelephonyCapability,omitempty" json:"telephony_capability"`
 	TimeIntervalSince1970                         float64          `plist:"TimeIntervalSince1970,omitempty" json:"time_interval_since_1970,omitempty"`
 	TimeZone                                      string           `plist:"TimeZone,omitempty" json:"time_zone,omitempty"`
 	TimeZoneOffsetFromUTC                         float64          `plist:"TimeZoneOffsetFromUTC,omitempty" json:"time_zone_offset_from_utc,omitempty"`
-	TrustedHostAttached                           bool             `plist:"TrustedHostAttached,omitempty" json:"trusted_host_attached,omitempty"`
+	TrustedHostAttached                           bool             `plist:"TrustedHostAttached,omitempty" json:"trusted_host_attached"`
 	UniqueChipID                                  int64            `plist:"UniqueChipID,omitempty" json:"unique_chip_id,omitempty"`
 	UniqueDeviceID                                string           `plist:"UniqueDeviceID,omitempty" json:"unique_device_id,omitempty"`
 	UntrustedHostBUID                             string           `plist:"UntrustedHostBUID,omitempty" json:"untrusted_host_buid,omitempty"`
-	UseRaptorCerts                                bool             `plist:"UseRaptorCerts,omitempty" json:"use_raptor_certs,omitempty"`
-	Uses24HourClock                               bool             `plist:"Uses24HourClock,omitempty" json:"uses_24_hour_clock,omitempty"`
+	UseRaptorCerts                                bool             `plist:"UseRaptorCerts,omitempty" json:"use_raptor_certs"`
+	Uses24HourClock                               bool             `plist:"Uses24HourClock,omitempty" json:"uses_24_hour_clock"`
 	WiFiAddress                                   string           `plist:"WiFiAddress,omitempty" json:"wi_fi_address,omitempty"`
 	WirelessBoardSerialNumber                     string           `plist:"WirelessBoardSerialNumber,omitempty" json:"wireless_board_serial_number,omitempty"`
 	CTPostponementInfoPRIVersion                  string           `plist:"kCTPostponementInfoPRIVersion,omitempty" json:"ct_postponement_info_pri_version,omitempty"`
 	CTPostponementInfoPRLName                     int              `plist:"kCTPostponementInfoPRLName,omitempty" json:"ct_postponement_info_prl_name,omitempty"`
-	CTPostponementInfoServiceProvisioningState    bool             `plist:"kCTPostponementInfoServiceProvisioningState,omitempty" json:"ct_postponement_info_service_provisioning_state,omitempty"`
+	CTPostponementInfoServiceProvisioningState    bool             `plist:"kCTPostponementInfoServiceProvisioningState,omitempty" json:"ct_postponement_info_service_provisioning_state"`
 	CTPostponementStatus                          string           `plist:"kCTPostponementStatus,omitempty" json:"ct_postponement_status,omitempty"`
 }
 

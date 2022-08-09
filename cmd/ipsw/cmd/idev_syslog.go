@@ -44,7 +44,6 @@ var loc *time.Location
 func init() {
 	idevCmd.AddCommand(iDevSyslogCmd)
 
-	iDevSyslogCmd.Flags().StringP("uuid", "u", "", "Device UUID to connect")
 	iDevSyslogCmd.Flags().Uint64P("timeout", "t", 0, "Log timeout in seconds")
 	iDevSyslogCmd.Flags().Bool("color", false, "Colorize output")
 }
