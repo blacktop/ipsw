@@ -1,4 +1,4 @@
-package screenshotr
+package screenshot
 
 import (
 	"bytes"

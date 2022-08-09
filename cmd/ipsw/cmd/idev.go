@@ -22,105 +22,19 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"encoding/json"
-	"fmt"
-
-	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/usb"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
-	"github.com/fatih/color"
-
 	"github.com/spf13/cobra"
 )
 
 func init() {
 	rootCmd.AddCommand(idevCmd)
-	idevCmd.Flags().BoolP("ipsw", "i", false, "Display devices as ipsw spec names")
-	idevCmd.Flags().BoolP("json", "j", false, "Display devices as JSON")
-	idevCmd.Flags().Bool("color", false, "Force color output (for piping to less etc)")
 }
 
 // idevCmd represents the idev command
 var idevCmd = &cobra.Command{
-	Use:           "idev",
-	Short:         "Dump info about USB connected iDevices",
-	SilenceUsage:  true,
-	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-
-		if Verbose {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
-		asJSON, _ := cmd.Flags().GetBool("json")
-		forceColor, _ := cmd.Flags().GetBool("color")
-
-		color.NoColor = !forceColor
-
-		// cli, err := afc.NewClient("")
-		// if err != nil {
-		// 	return err
-		// }
-		// defer func(cli *afc.Client) {
-		// 	_ = cli.Close()
-		// }(cli)
-
-		// fs, err := cli.ReadDir("/")
-		// if err != nil {
-		// 	return err
-		// }
-
-		// for _, f := range fs {
-		// 	if f == "." || f == ".." {
-		// 		continue
-		// 	}
-		// 	fmt.Println(f)
-		// }
-
-		conn, err := usb.NewConn()
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-
-		devices, err := conn.ListDevices()
-		if err != nil {
-			return err
-		}
-
-		var dds []*lockdownd.DeviceValues
-
-		for _, device := range devices {
-			cli, err := lockdownd.NewClient(device.UDID)
-			if err != nil {
-				return err
-			}
-			defer cli.Close()
-
-			values, err := cli.GetValues()
-			if err != nil {
-				return err
-			}
-
-			if ipswSpec {
-				fmt.Printf("%s_%s_%s\n", values.ProductType, values.HardwareModel, values.BuildVersion)
-			} else if asJSON {
-				dds = append(dds, values)
-			} else {
-				fmt.Println(device)
-				fmt.Println(values)
-			}
-		}
-
-		if asJSON {
-			ddsJSON, err := json.Marshal(dds)
-			if err != nil {
-				return fmt.Errorf("failed to marshal device details to JSON: %s", err)
-			}
-			fmt.Println(string(ddsJSON))
-		}
-
-		return nil
+	Use:   "idev",
+	Short: "USB connected device commands",
+	Args:  cobra.NoArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
 	},
 }
