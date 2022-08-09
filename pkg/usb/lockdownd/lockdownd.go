@@ -7,6 +7,8 @@ import (
 	"github.com/fatih/color"
 )
 
+const port = 62078
+
 var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
 var colorBold = color.New(color.Bold).SprintFunc()
 
@@ -30,7 +32,7 @@ type startSessionResponse struct {
 }
 
 func NewClient(udid string) (*Client, error) {
-	cli, err := usb.NewClient(udid, 62078)
+	cli, err := usb.NewClient(udid, port)
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +62,7 @@ func NewClientForService(serviceName, udid string, withEscrowBag bool) (*usb.Cli
 	if err != nil {
 		return nil, err
 	}
-	defer func(lc *Client) {
-		_ = lc.Close()
-	}(lc)
+	defer lc.Close()
 
 	svc, err := lc.StartService(serviceName, withEscrowBag)
 	if err != nil {
@@ -84,7 +84,7 @@ type startServiceRequest struct {
 	Label     string
 	Request   string `plist:"Request"`
 	Service   string
-	EscrowBag []byte `plist:",omitempty"`
+	EscrowBag []byte `plist:"EscrowBag,omitempty"`
 }
 
 type StartServiceResponse struct {
