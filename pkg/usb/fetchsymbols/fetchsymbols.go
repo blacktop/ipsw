@@ -18,8 +18,8 @@ var (
 )
 
 type ListFilesResponse struct {
-	Files   []string `plist:"files"`
-	Version int      `plist:"version"`
+	Version uint64   `plist:"version,omitempty"`
+	Files   []string `plist:"files,omitempty"`
 }
 
 type Client struct {
@@ -32,7 +32,7 @@ func NewClient(udid string) *Client {
 	}
 }
 
-func (c *Client) List() ([]string, error) {
+func (c *Client) ListFiles() ([]string, error) {
 	fc, err := lockdownd.NewClientForService(serviceName, c.udid, false)
 	if err != nil {
 		return nil, err
@@ -40,8 +40,8 @@ func (c *Client) List() ([]string, error) {
 	if err := c.sendCommand(fc.Conn(), ListFilesPlistRequest); err != nil {
 		return nil, err
 	}
-	resp := &ListFilesResponse{}
-	if err := fc.Recv(resp); err != nil {
+	var resp ListFilesResponse
+	if err := fc.Recv(&resp); err != nil {
 		return nil, err
 	}
 	return resp.Files, nil
