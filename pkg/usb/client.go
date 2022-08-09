@@ -127,6 +127,14 @@ func (c *Client) RecvBytes() ([]byte, error) {
 	return data, nil
 }
 
+func (c *Client) RecvByte() (byte, error) {
+	var b byte
+	if err := binary.Read(c.Conn(), binary.BigEndian, &b); err != nil {
+		return byte(0), err
+	}
+	return b, nil
+}
+
 func (c *Client) UDID() string {
 	return c.udid
 }
