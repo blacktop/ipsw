@@ -39,8 +39,6 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"github.com/vbauerster/mpb/v7"
-	"github.com/vbauerster/mpb/v7/decor"
 )
 
 func init() {
@@ -115,12 +113,12 @@ func rebaseMachO(dsc *dyld.File, machoPath string) error {
 
 // dyldMachoCmd represents the macho command
 var dyldMachoCmd = &cobra.Command{
-	Use:   "macho <dyld_shared_cache> <dylib>",
-	Short: "Parse a dylib file",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "macho <dyld_shared_cache> <dylib>",
+	Short:         "Parse a dylib file",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-
-		var bar *mpb.Bar
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -173,27 +171,10 @@ var dyldMachoCmd = &cobra.Command{
 
 			var images []*dyld.CacheImage
 
+			foundPattern := false
+
 			if dumpALL {
 				images = f.Images
-				// initialize progress bar
-				p := mpb.New(mpb.WithWidth(80))
-				// adding a single bar, which will inherit container's width
-				bar = p.Add(int64(len(images)),
-					// progress bar filler with customized style
-					mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
-					mpb.PrependDecorators(
-						decor.Name("     ", decor.WC{W: len("     ") + 1, C: decor.DidentRight}),
-						// replace ETA decorator with "done" message, OnComplete event
-						decor.OnComplete(
-							decor.AverageETA(decor.ET_STYLE_GO, decor.WC{W: 4}), "✅ ",
-						),
-					),
-					mpb.AppendDecorators(
-						decor.Percentage(),
-						// decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(len(images))/2048), "✅ "),
-						decor.Name(" ] "),
-					),
-				)
 			} else {
 				image, err := f.Image(args[1])
 				if err != nil {
@@ -261,14 +242,10 @@ var dyldMachoCmd = &cobra.Command{
 						}
 						if !dumpALL {
 							log.Infof("Created %s", fname)
-						} else {
-							bar.Increment()
 						}
 					} else {
 						if !dumpALL {
 							log.Warnf("dylib already exists: %s", fname)
-						} else {
-							bar.Increment()
 						}
 					}
 					continue
@@ -525,37 +502,40 @@ var dyldMachoCmd = &cobra.Command{
 						i := 0
 						found := 0
 						foundOffset := uint64(0)
-						foundFirstPart := false
+
+						done := func() {
+							foundPattern = true
+							if dumpALL {
+								fmt.Printf("%#x\t%s\n", textSeg.Addr+foundOffset, image.Name)
+							} else {
+								fmt.Printf("%#x\n", textSeg.Addr+foundOffset)
+							}
+						}
 
 						for found >= 0 && i < len(data) { // stop if not found
+							foundFirstPart := false
 							for idx, gad := range gadget {
-								if len(gad) == 0 { // sequencential wildcards
-									i += 1
-								} else if found = bytes.Index(data[i:], gad); foundFirstPart && found == 0 {
-									if idx == len(gadget)-1 {
-										// pattern found
-										if dumpALL {
-											fmt.Printf("%#x\t%s\n", textSeg.Addr+foundOffset, image.Name)
-										} else {
-											fmt.Printf("%#x\n", textSeg.Addr+foundOffset)
-										}
-										foundFirstPart = false // reset state
-										i += len(gad)
-									} else {
-										i += len(gad) + 1 // +1 for the *
+								if len(gad) == 0 { //  wildcards
+									if foundFirstPart && idx == len(gadget)-1 { // last wildcard after found; DONE
+										done()
 									}
-								} else if foundFirstPart && found > 0 {
-									// pattern broken
-									foundFirstPart = false
+									i += 1
+								} else if found = bytes.Index(data[i:], gad); foundFirstPart && found == 0 { // found next part of pattern
+									if idx == len(gadget)-1 { // last part of pattern; DONE
+										done()
+									}
 									i += len(gad)
-									break
-								} else if !foundFirstPart && found >= 0 { // found first part of pattern
-									if idx == 0 {
+								} else if !foundFirstPart && found >= 0 {
+									if idx == 0 { // found first part of pattern
 										foundFirstPart = true
 										foundOffset = uint64(i + found)
 									}
-									i += found + len(gad) + 1 // +1 for the *
-								} else if found < 0 {
+									if len(gadget) == 1 { // only one part of pattern; DONE
+										done()
+									}
+									i += found + len(gad)
+								} else if found < 0 { // pattern broken or not found
+									i += len(gad)
 									break
 								}
 							}
@@ -563,6 +543,11 @@ var dyldMachoCmd = &cobra.Command{
 					}
 				}
 			}
+
+			if len(searchPattern) > 0 && !foundPattern {
+				return fmt.Errorf("pattern '%s' not found", searchPattern)
+			}
+
 		} else {
 			log.Error("you must supply a dylib MachO to parse")
 		}
