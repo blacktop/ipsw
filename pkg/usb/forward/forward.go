@@ -22,7 +22,6 @@ func Start(ctx context.Context, udid string, lport, rport int, callback func(str
 				_ = listen.Close()
 				return
 			default:
-
 			}
 
 			conn, err := listen.Accept()
@@ -47,23 +46,19 @@ func startNewProxy(ctx context.Context, conn net.Conn, udid string, rport int, c
 	c, err := usb.NewClient(udid, rport)
 	if err != nil {
 		if callback != nil {
-			callback("", fmt.Errorf("连接设备端口[%d]错误：%v", rport, err))
+			callback("", fmt.Errorf("failed to connect to device port %d: %v", rport, err))
 		}
 		return
 	}
-
 	go func() {
-		select {
-		case <-ctx.Done():
-			_ = conn.Close()
-			_ = c.Close()
-		}
-	}()
-
-	go func() {
-		_, _ = io.Copy(conn, c.Conn())
+		<-ctx.Done()
+		_ = conn.Close()
+		_ = c.Close()
 	}()
 	go func() {
-		_, _ = io.Copy(c.Conn(), conn)
+		io.Copy(conn, c.Conn())
+	}()
+	go func() {
+		io.Copy(c.Conn(), conn)
 	}()
 }
