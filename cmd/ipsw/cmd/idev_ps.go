@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -38,6 +39,7 @@ func init() {
 	idevCmd.AddCommand(iDevPsCmd)
 
 	iDevPsCmd.Flags().StringP("proc", "p", "", "process to get pid for")
+	iDevPsCmd.Flags().BoolP("json", "j", false, "Display processes as JSON")
 }
 
 // iDevPsCmd represents the ps command
@@ -54,6 +56,7 @@ var iDevPsCmd = &cobra.Command{
 
 		uuid, _ := cmd.Flags().GetString("uuid")
 		proc, _ := cmd.Flags().GetString("proc")
+		asJSON, _ := cmd.Flags().GetBool("json")
 
 		var err error
 		var dev *lockdownd.DeviceValues
@@ -100,8 +103,16 @@ var iDevPsCmd = &cobra.Command{
 				return numA < numB
 			})
 
-			for _, k := range keys {
-				fmt.Printf("%3s:\t%s\n", k, pids[k])
+			if asJSON {
+				pidJSON, err := json.Marshal(pids)
+				if err != nil {
+					return fmt.Errorf("failed to marshal process/pids to JSON: %s", err)
+				}
+				fmt.Println(string(pidJSON))
+			} else {
+				for _, k := range keys {
+					fmt.Printf("%3s:\t%s\n", k, pids[k])
+				}
 			}
 		}
 
