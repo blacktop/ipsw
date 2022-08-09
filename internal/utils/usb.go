@@ -11,6 +11,62 @@ import (
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 )
 
+func PickDevice() (*lockdownd.DeviceValues, error) {
+	var deets []*lockdownd.DeviceValues
+
+	conn, err := usb.NewConn()
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	devices, err := conn.ListDevices()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, device := range devices {
+		ldc, err := lockdownd.NewClient(device.UDID)
+		if err != nil {
+			return nil, err
+		}
+		defer ldc.Close()
+
+		deet, err := ldc.GetValues()
+		if err != nil {
+			return nil, err
+		}
+
+		deets = append(deets, deet)
+	}
+
+	if len(deets) == 1 {
+		return deets[0], nil
+	} else {
+		selected := make(map[string]*lockdownd.DeviceValues, len(deets))
+		for _, d := range deets {
+			selected[fmt.Sprintf("%s_%s_%s", d.ProductType, d.HardwareModel, d.BuildVersion)] = d
+		}
+
+		var choices []string
+		for s := range selected {
+			choices = append(choices, s)
+		}
+
+		var picked string
+		prompt := &survey.Select{
+			Message: "Select what iDevice's IPSW to download:",
+			Options: choices,
+		}
+		if err := survey.AskOne(prompt, &picked); err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			os.Exit(0)
+		}
+
+		return selected[picked], nil
+	}
+}
+
 func PickDevices() ([]*lockdownd.DeviceValues, error) {
 	var deets []*lockdownd.DeviceValues
 

@@ -29,14 +29,11 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
-	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/blacktop/ipsw/pkg/usb"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -135,67 +132,12 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("download.ipsw.usb") {
-			conn, err := usb.NewConn()
+			dev, err := utils.PickDevice()
 			if err != nil {
 				return err
 			}
-			defer conn.Close()
-
-			devices, err := conn.ListDevices()
-			if err != nil {
-				return err
-			}
-			if len(devices) == 0 {
-				return fmt.Errorf("no USB devices found")
-			}
-
-			type ipswDetails struct {
-				ProductType   string
-				HardwareModel string
-				BuildVersion  string
-			}
-
-			var ideets []ipswDetails
-			for _, dev := range devices {
-				cli, err := lockdownd.NewClient(dev.UDID)
-				if err != nil {
-					return err
-				}
-				defer cli.Close()
-
-				dd, err := cli.GetValues()
-				if err != nil {
-					return err
-				}
-				ideets = append(ideets, ipswDetails{
-					ProductType:   dd.ProductType,
-					HardwareModel: dd.HardwareModel,
-					BuildVersion:  dd.BuildVersion,
-				})
-			}
-
-			if len(ideets) == 1 {
-				dFlg.Device = ideets[0].ProductType
-				dFlg.Build = ideets[0].BuildVersion
-			} else {
-				var choices []string
-				for _, d := range ideets {
-					choices = append(choices, fmt.Sprintf("%s_%s_%s", d.ProductType, d.HardwareModel, d.BuildVersion))
-				}
-				dfiles := []int{}
-				prompt := &survey.Select{
-					Message: "Select what iDevice's IPSW to download:",
-					Options: choices,
-				}
-				if err := survey.AskOne(prompt, &dfiles); err == terminal.InterruptErr {
-					log.Warn("Exiting...")
-					os.Exit(0)
-				}
-				for _, idx := range dfiles {
-					dFlg.Device = ideets[idx].ProductType
-					dFlg.Build = ideets[idx].BuildVersion
-				}
-			}
+			dFlg.Device = dev.ProductType
+			dFlg.Build = dev.BuildVersion
 		}
 
 		var destPath string
