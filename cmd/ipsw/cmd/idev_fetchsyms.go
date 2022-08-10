@@ -36,14 +36,14 @@ import (
 )
 
 func init() {
-	idevCmd.AddCommand(iDevFetchsymbolsCmd)
+	idevCmd.AddCommand(iDevFetchsymsCmd)
 
-	iDevFetchsymbolsCmd.Flags().StringP("output", "o", "", "Folder to save files")
+	iDevFetchsymsCmd.Flags().StringP("output", "o", "", "Folder to save files")
 }
 
-// iDevFetchsymbolsCmd represents the fetchsymbols command
-var iDevFetchsymbolsCmd = &cobra.Command{
-	Use:           "fetchsymbols",
+// iDevFetchsymsCmd represents the fetchsyms command
+var iDevFetchsymsCmd = &cobra.Command{
+	Use:           "fetchsyms",
 	Short:         "Dump device linker and dyld_shared_cache file",
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -63,7 +63,6 @@ var iDevFetchsymbolsCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-			uuid = dev.UniqueDeviceID
 		} else {
 			ldc, err := lockdownd.NewClient(uuid)
 			if err != nil {
@@ -77,7 +76,7 @@ var iDevFetchsymbolsCmd = &cobra.Command{
 			}
 		}
 
-		cli := fetchsymbols.NewClient(uuid)
+		cli := fetchsymbols.NewClient(dev.UniqueDeviceID)
 		files, err := cli.ListFiles()
 		if err != nil {
 			return fmt.Errorf("failed to list files: %w", err)
