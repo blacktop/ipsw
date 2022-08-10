@@ -43,7 +43,7 @@ func init() {
 
 // iDevFetchsymsCmd represents the fetchsyms command
 var iDevFetchsymsCmd = &cobra.Command{
-	Use:           "fetchsyms",
+	Use:           "fsyms",
 	Short:         "Dump device linker and dyld_shared_cache file",
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -53,18 +53,18 @@ var iDevFetchsymsCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		uuid, _ := cmd.Flags().GetString("uuid")
+		udid, _ := cmd.Flags().GetString("udid")
 		output, _ := cmd.Flags().GetString("output")
 
 		var err error
 		var dev *lockdownd.DeviceValues
-		if len(uuid) == 0 {
+		if len(udid) == 0 {
 			dev, err = utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
 		} else {
-			ldc, err := lockdownd.NewClient(uuid)
+			ldc, err := lockdownd.NewClient(udid)
 			if err != nil {
 				return fmt.Errorf("failed to connect to lockdownd: %w", err)
 			}
@@ -72,7 +72,7 @@ var iDevFetchsymsCmd = &cobra.Command{
 
 			dev, err = ldc.GetValues()
 			if err != nil {
-				return fmt.Errorf("failed to get device values for %s: %w", uuid, err)
+				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
 			}
 		}
 
