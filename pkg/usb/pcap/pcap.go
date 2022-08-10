@@ -54,7 +54,7 @@ type IOSPacketHeader struct {
 	InterfaceName   [16]byte
 	Pid             uint32 // little endian
 	ProcName        [17]byte
-	Svc             uint32 // little endian
+	Svc             uint32 // little endian TODO: map this to name
 	SubPid          uint32 // little endian
 	SubProcName     [17]byte
 	Seconds         uint32
@@ -75,6 +75,7 @@ func NewClient(udid string) (*Client, error) {
 	}, nil
 }
 
+// TODO: look at tools/idevicebtlogger.c for ideas on how to properly construct PCAP header (missing directionality)
 func (c *Client) ReadPacket(ctx context.Context, procName string, wr io.Writer, dump func(IOSPacketHeader, []byte)) error {
 
 	header := GlobalHeader{
