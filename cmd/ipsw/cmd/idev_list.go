@@ -60,13 +60,18 @@ var iDevListCmd = &cobra.Command{
 
 		conn, err := usb.NewConn()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to connect to usbmuxd: %w", err)
 		}
 		defer conn.Close()
 
 		devices, err := conn.ListDevices()
 		if err != nil {
 			return err
+		}
+
+		if len(devices) == 0 {
+			log.Warn("no devices found")
+			return nil
 		}
 
 		var dds []*lockdownd.DeviceValues

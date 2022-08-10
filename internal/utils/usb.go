@@ -16,13 +16,17 @@ func PickDevice() (*lockdownd.DeviceValues, error) {
 
 	conn, err := usb.NewConn()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to usbmuxd: %w", err)
 	}
 	defer conn.Close()
 
 	devices, err := conn.ListDevices()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list devices: %w", err)
+	}
+
+	if len(devices) == 0 {
+		return nil, fmt.Errorf("no devices found")
 	}
 
 	for _, device := range devices {
@@ -72,13 +76,17 @@ func PickDevices() ([]*lockdownd.DeviceValues, error) {
 
 	conn, err := usb.NewConn()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to connect to usbmuxd: %w", err)
 	}
 	defer conn.Close()
 
 	devices, err := conn.ListDevices()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list devices: %w", err)
+	}
+
+	if len(devices) == 0 {
+		return nil, fmt.Errorf("no devices found")
 	}
 
 	for _, device := range devices {
