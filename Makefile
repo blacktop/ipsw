@@ -90,7 +90,7 @@ update_keys: ## Scrape the iPhoneWiki for AES keys
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"
-	docker build -t $(REPO)/$(NAME):$(NEXT_VERSION) .
+	docker build --build-arg VERSION=$(NEXT_VERSION) -t $(REPO)/$(NAME):$(NEXT_VERSION) .
 
 .PHONY: docker-tag
 docker-tag: docker ## Tag docker image
