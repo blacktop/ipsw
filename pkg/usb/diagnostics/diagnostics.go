@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	serviceName = "com.apple.mobile.diagnostics_relay"
+	serviceName    = "com.apple.mobile.diagnostics_relay"
+	oldServiceName = "com.apple.iosdiagnostics.relay"
 )
 
-type Response map[string]interface{}
+type Response map[string]any
 
 type Request struct {
 	Request string `plist:"Request"`
@@ -22,6 +23,11 @@ type Request struct {
 type MobileGesaltRequest struct {
 	Request
 	MobileGestaltKeys []string `plist:"MobileGestaltKeys"`
+}
+
+type DiagnosticsResponse struct {
+	Status      string         `plist:"Status,omitempty" json:"status,omitempty"`
+	Diagnostics map[string]any `plist:"Diagnostics,omitempty" json:"diagnostics,omitempty"`
 }
 
 type IORegistryRequest struct {
@@ -58,18 +64,21 @@ func (c *Client) Diagnostics(diagnosticType string) error {
 	return c.c.Request(req, resp)
 }
 
-func (c *Client) IORegistry(plane, entryName, entryClass string) error {
+func (c *Client) IORegistry(plane, entryName, entryClass string) (*DiagnosticsResponse, error) {
 	req := &IORegistryRequest{
 		Request:      Request{"IORegistry"},
 		CurrentPlane: plane,
 		EntryName:    entryName,
 		EntryClass:   entryClass,
 	}
-	resp := &Response{}
-	return c.c.Request(req, resp)
+	resp := &DiagnosticsResponse{}
+	if err := c.c.Request(req, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
-func (c *Client) MobileGestalt(keys ...string) error {
+func (c *Client) MobileGestalt(keys ...string) (*DiagnosticsResponse, error) {
 	newKeys := make([]string, 0, len(keys))
 	for _, key := range keys {
 		if strings.HasPrefix(key, "!") {
@@ -81,8 +90,11 @@ func (c *Client) MobileGestalt(keys ...string) error {
 		Request:           Request{"MobileGestalt"},
 		MobileGestaltKeys: newKeys,
 	}
-	resp := &Response{}
-	return c.c.Request(req, resp)
+	resp := &DiagnosticsResponse{}
+	if err := c.c.Request(req, resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (c *Client) Goodbye() error {
