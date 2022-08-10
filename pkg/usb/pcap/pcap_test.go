@@ -30,7 +30,7 @@ func TestClient_ReadOPacket(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = cli.ReadPacket(context.Background(), "", os.Stdout, func(data []byte) {
+		err = cli.ReadPacket(context.Background(), "", os.Stdout, func(hdr IOSPacketHeader, data []byte) {
 			fmt.Println("\n----")
 			fmt.Println(hex.Dump(data))
 		})

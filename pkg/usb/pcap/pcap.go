@@ -14,47 +14,51 @@ import (
 )
 
 const (
-	TcpdumpMagic = 0xa1b2c3d4
-	VersionMajor = 2
-	VersionMinor = 4
-	DltEn10mb    = 1
-	serviceName  = "com.apple.pcapd"
+	serviceName      = "com.apple.pcapd"
+	TcpdumpMagic     = 0xa1b2c3d4
+	VersionMajor     = 2
+	VersionMinor     = 4
+	LinkTypeEthernet = 1
+	LinkTypeRaw      = 101
 )
 
+var ethernetHeader = []byte{0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0x08, 0x00}
+
 type GlobalHeader struct {
-	MagicNumber  uint32
-	VersionMajor uint16
-	VersionMinor uint16
-	Thiszone     int32
-	Sigfigs      uint32
-	Snaplen      uint32
-	Network      uint32
+	MagicNumber  uint32 // magic number
+	VersionMajor uint16 // major version number
+	VersionMinor uint16 // minor version number
+	Thiszone     int32  // GMT to local correction
+	Sigfigs      uint32 // accuracy of timestamps
+	Snaplen      uint32 // max length of captured packets, in octets
+	Network      uint32 // data link type
 }
 
 type PacketHeader struct {
-	Timestamp1 uint32
-	Timestamp2 uint32
-	CapLen     uint32
-	Len        uint32
+	TimestampSecs      uint32 // timestamp seconds
+	TimestampMicroSecs uint32 // timestamp microseconds
+	InclLength         uint32 // number of octets of packet saved in file
+	OrigLength         uint32 // actual length of packet
 }
 
 type IOSPacketHeader struct {
-	HdrLength      uint32
-	Version        uint8
-	Length         uint32
-	Type           uint8
-	Unit           uint16
-	IO             uint8
-	ProtocolFamily uint32
-	FramePreLength uint32
-	FramePstLength uint32
-	IFName         [16]byte
-	Pid            uint32
-	ProcName       [17]byte
-	Unknown        uint32
-	SubPid         uint32
-	SubProcName    [17]byte
-	Unknown2       [8]byte
+	HdrLength       uint32
+	HdrVersion      uint8
+	PktLength       uint32
+	InterfaceType   iface
+	Unit            uint16
+	IO              uint8
+	ProtocolFamily  protocolFamily
+	FramePreLength  uint32
+	FramePostLength uint32
+	InterfaceName   [16]byte
+	Pid             uint32 // little endian
+	ProcName        [17]byte
+	Svc             uint32 // little endian
+	SubPid          uint32 // little endian
+	SubProcName     [17]byte
+	Seconds         uint32
+	MicroSeconds    uint32
 }
 
 type Client struct {
@@ -71,10 +75,7 @@ func NewClient(udid string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) ReadPacket(ctx context.Context, procName string, wr io.Writer, dump func([]byte)) error {
-	defer func(c *Client) {
-		_ = c.Close()
-	}(c)
+func (c *Client) ReadPacket(ctx context.Context, procName string, wr io.Writer, dump func(IOSPacketHeader, []byte)) error {
 
 	header := GlobalHeader{
 		MagicNumber:  TcpdumpMagic,
@@ -83,7 +84,7 @@ func (c *Client) ReadPacket(ctx context.Context, procName string, wr io.Writer, 
 		Thiszone:     0,
 		Sigfigs:      0,
 		Snaplen:      uint32(65535),
-		Network:      uint32(DltEn10mb),
+		Network:      uint32(LinkTypeEthernet),
 	}
 
 	if err := binary.Write(wr, binary.LittleEndian, header); err != nil {
@@ -123,21 +124,21 @@ func (c *Client) ReadPacket(ctx context.Context, procName string, wr io.Writer, 
 		}
 
 		if dump != nil {
-			go dump(data)
+			go dump(hdr, data)
 		}
 
 		pphdr := PacketHeader{
-			Timestamp1: uint32(time.Now().Unix()),
-			Timestamp2: uint32(time.Now().UnixNano() / 1e6),
-			CapLen:     hdr.Length,
-			Len:        hdr.Length,
+			TimestampSecs:      uint32(time.Now().Unix()),
+			TimestampMicroSecs: uint32(time.Now().UnixNano() / 1e6),
+			InclLength:         hdr.PktLength,
+			OrigLength:         hdr.PktLength,
 		}
 		if err := binary.Write(wr, binary.LittleEndian, pphdr); err != nil {
 			return err
 		}
 
 		if hdr.FramePreLength == 0 {
-			ext := []byte{0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0xbe, 0xfe, 0x08, 0x00}
+			ext := ethernetHeader
 			body := append(ext, data[hdr.HdrLength:]...)
 			err = binary.Write(wr, binary.LittleEndian, body)
 		} else {

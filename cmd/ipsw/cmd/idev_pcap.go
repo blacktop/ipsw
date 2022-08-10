@@ -22,19 +22,118 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"bytes"
+	"context"
+	"fmt"
+	"math/bits"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/blacktop/ipsw/pkg/usb/pcap"
+	"github.com/caarlos0/ctrlc"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	idevCmd.AddCommand(iDevPcapCmd)
+	idevCmd.AddCommand(idevPcapCmd)
 
+	idevPcapCmd.Flags().StringP("proc", "p", "", "process to get pcap for")
+	idevPcapCmd.Flags().StringP("output", "o", "", "Folder to save pcap")
+	idevPcapCmd.Flags().Bool("color", false, "Colorize output")
 }
 
-// iDevPcapCmd represents the pcap command
-var iDevPcapCmd = &cobra.Command{
-	Use:   "pcap",
-	Short: "Dump network traffic",
-	Run: func(cmd *cobra.Command, args []string) {
-		panic("not implemented yet")
+// idevPcapCmd represents the pcap command
+var idevPcapCmd = &cobra.Command{
+	Use:           "pcap",
+	Short:         "Dump network traffic",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+
+		if Verbose {
+			log.SetLevel(log.DebugLevel)
+		}
+
+		udid, _ := cmd.Flags().GetString("udid")
+		proc, _ := cmd.Flags().GetString("proc")
+		output, _ := cmd.Flags().GetString("output")
+		forceColor, _ := cmd.Flags().GetBool("color")
+
+		color.NoColor = !forceColor
+
+		var err error
+		var dev *lockdownd.DeviceValues
+		if len(udid) == 0 {
+			dev, err = utils.PickDevice()
+			if err != nil {
+				return fmt.Errorf("failed to pick USB connected devices: %w", err)
+			}
+		} else {
+			ldc, err := lockdownd.NewClient(udid)
+			if err != nil {
+				return fmt.Errorf("failed to connect to lockdownd: %w", err)
+			}
+			defer ldc.Close()
+
+			dev, err = ldc.GetValues()
+			if err != nil {
+				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
+			}
+		}
+
+		cli, err := pcap.NewClient(dev.UniqueDeviceID)
+		if err != nil {
+			return fmt.Errorf("failed to connect to pcap: %w", err)
+		}
+		defer cli.Close()
+
+		pcapName := fmt.Sprintf("%s.pcap", time.Now())
+		pcapName = filepath.Join(output, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion), pcapName)
+		if err := os.MkdirAll(filepath.Dir(pcapName), 0755); err != nil {
+			return fmt.Errorf("failed to create pcap directory %s: %w", filepath.Dir(pcapName), err)
+		}
+		pcapfile, err := os.Create(pcapName)
+		if err != nil {
+			return fmt.Errorf("failed to create pcap file: %w", err)
+		}
+		defer pcapfile.Close()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		if err := ctrlc.Default.Run(ctx, func() error {
+			if err := cli.ReadPacket(ctx, proc, pcapfile, func(hdr pcap.IOSPacketHeader, data []byte) {
+				var subProc string
+				if len(bytes.Trim(hdr.SubProcName[:], "\x00")) > 0 {
+					subProc = fmt.Sprintf(", Sub Process %s[%s]", colorProc(string(hdr.SubProcName[:])), colorDebug(int32(bits.ReverseBytes32(hdr.SubPid))))
+				}
+				var sevice string
+				if bits.ReverseBytes32(hdr.Svc) > 0 {
+					sevice = fmt.Sprintf(", Service %s", colorDebug(int32(bits.ReverseBytes32(hdr.Svc))))
+				}
+				fmt.Printf("%s: Process %s[%s]%s%s, Interface: %s (%s) %s\n%s\n",
+					colorTime(time.Unix(int64(hdr.Seconds), int64(hdr.MicroSeconds)).Format("02Jan06 15:04:05")),
+					colorProc(string(hdr.ProcName[:])),
+					colorDebug(int32(bits.ReverseBytes32(hdr.Pid))),
+					subProc,
+					sevice,
+					colorDebug(string(hdr.InterfaceName[:])),
+					colorLib(hdr.InterfaceType),
+					colorNotice(hdr.ProtocolFamily),
+					utils.HexDump(data, 0))
+			}); err != nil {
+				return fmt.Errorf("failed to read packets: %w", err)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
+
+		return nil
 	},
 }
