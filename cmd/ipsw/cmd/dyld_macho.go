@@ -481,18 +481,42 @@ var dyldMachoCmd = &cobra.Command{
 				}
 
 				if len(searchPattern) > 0 {
+					var run string
 					var gadget [][]byte
-					for _, literal := range strings.Split(searchPattern, "*") {
-						pattern, err := hex.DecodeString(strings.Replace(literal, " ", "", -1))
-						if err != nil {
-							return fmt.Errorf("failed to decode pattern '%s': %v", literal, err)
+
+					patternBytes := strings.Fields(searchPattern) // split on whitespace
+
+					for idx, abyte := range patternBytes {
+						if abyte == "*" {
+							if len(run) > 0 { // got a wildcard, but you were building a run
+								pattern, err := hex.DecodeString(run)
+								if err != nil {
+									return fmt.Errorf("failed to decode pattern '%s': %v", run, err)
+								}
+								// add the run to the gadget list
+								gadget = append(gadget, pattern)
+								// zero out the run
+								run = ""
+							}
+							gadget = append(gadget, []byte{}) // add a wildcard to the gadget as empty array
+						} else {
+							run += abyte
+							if idx == len(patternBytes)-1 { // last byte
+								pattern, err := hex.DecodeString(run)
+								if err != nil {
+									return fmt.Errorf("failed to decode pattern '%s': %v", run, err)
+								}
+								// add the run to the gadget list
+								gadget = append(gadget, pattern)
+							}
 						}
-						gadget = append(gadget, pattern)
 					}
+
 					if !dumpALL || !onlySearch {
 						fmt.Printf("\nSearch Results\n")
 						fmt.Println("--------------")
 					}
+
 					if textSeg := m.Segment("__TEXT"); textSeg != nil {
 						data, err := textSeg.Data()
 						if err != nil {
