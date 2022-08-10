@@ -1,16 +1,14 @@
 package pcap
 
-import "syscall"
-
 //go:generate stringer -type=iface,protocolFamily -output types_string.go
 
-type protocolFamily uint32
+type protocolFamily uint32 // for darwin
 
 const (
-	Unspecified protocolFamily = syscall.AF_UNSPEC
-	Unix        protocolFamily = syscall.AF_UNIX  // Unix domain sockets
-	IPv4        protocolFamily = syscall.AF_INET  // Internet Protocol v4
-	IPv6        protocolFamily = syscall.AF_INET6 // Internet Protocol v6
+	Unspecified protocolFamily = 0  // syscall.AF_UNSPEC
+	Unix        protocolFamily = 1  // syscall.AF_UNIX  - Unix domain sockets
+	IPv4        protocolFamily = 2  // syscall.AF_INET  - Internet Protocol v4
+	IPv6        protocolFamily = 30 // syscall.AF_INET6 - Internet Protocol v6
 )
 
 type iface uint8
