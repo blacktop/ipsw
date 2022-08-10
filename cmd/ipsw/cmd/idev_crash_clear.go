@@ -50,7 +50,7 @@ var iDevCrashClearCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		udid, _ := cmd.Flags().GetString("uuudidd")
+		udid, _ := cmd.Flags().GetString("udid")
 
 		var err error
 		var dev *lockdownd.DeviceValues
