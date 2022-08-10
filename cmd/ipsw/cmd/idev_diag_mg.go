@@ -34,7 +34,7 @@ import (
 
 func init() {
 	idevDiagCmd.AddCommand(idevDiagMobileGestaltCmd)
-	idevDiagMobileGestaltCmd.Flags().StringArrayP("keys", "k", []string{}, "Keys to retrieve")
+	idevDiagMobileGestaltCmd.Flags().StringSliceP("keys", "k", []string{}, "Keys to retrieve (can be csv)")
 	idevDiagMobileGestaltCmd.MarkFlagRequired("keys")
 }
 
@@ -51,7 +51,7 @@ var idevDiagMobileGestaltCmd = &cobra.Command{
 		}
 
 		uuid, _ := cmd.Flags().GetString("uuid")
-		keys, _ := cmd.Flags().GetStringArray("keys")
+		keys, _ := cmd.Flags().GetStringSlice("keys")
 
 		var err error
 		var dev *lockdownd.DeviceValues
