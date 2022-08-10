@@ -27,7 +27,7 @@ import (
 
 func init() {
 	rootCmd.AddCommand(idevCmd)
-	idevCmd.PersistentFlags().StringP("uuid", "u", "", "Device UUID to connect")
+	idevCmd.PersistentFlags().StringP("udid", "u", "", "Device UniqueDeviceID to connect to")
 }
 
 // idevCmd represents the idev command

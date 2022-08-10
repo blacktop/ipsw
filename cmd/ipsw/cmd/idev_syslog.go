@@ -101,18 +101,18 @@ var iDevSyslogCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		uuid, _ := cmd.Flags().GetString("uuid")
+		udid, _ := cmd.Flags().GetString("udid")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
 		forceColor, _ := cmd.Flags().GetBool("color")
 
 		color.NoColor = !forceColor
 
-		if len(uuid) == 0 {
+		if len(udid) == 0 {
 			dev, err := utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-			uuid = dev.UniqueDeviceID
+			udid = dev.UniqueDeviceID
 			loc, _ = time.LoadLocation(dev.TimeZone)
 		}
 
@@ -126,7 +126,7 @@ var iDevSyslogCmd = &cobra.Command{
 		defer cancel()
 
 		if err := ctrlc.Default.Run(ctx, func() error {
-			r, err := syslog.Syslog(uuid)
+			r, err := syslog.Syslog(udid)
 			if err != nil {
 				return err
 			}

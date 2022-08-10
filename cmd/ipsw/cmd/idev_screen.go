@@ -74,11 +74,11 @@ var iDevScreenCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		uuid, _ := cmd.Flags().GetString("uuid")
+		udid, _ := cmd.Flags().GetString("udid")
 		output, _ := cmd.Flags().GetString("output")
 
-		if len(uuid) > 0 {
-			ldc, err := lockdownd.NewClient(uuid)
+		if len(udid) > 0 {
+			ldc, err := lockdownd.NewClient(udid)
 			if err != nil {
 				return err
 			}
