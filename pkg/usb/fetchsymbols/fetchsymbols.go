@@ -62,7 +62,7 @@ func (c *Client) GetFile(idx uint32) (io.Reader, error) {
 	return io.LimitReader(fc.Conn(), int64(size)), nil
 }
 
-func (c *Client) sendRecv(rw io.ReadWriter, req, resp interface{}) error {
+func (c *Client) sendRecv(rw io.ReadWriter, req, resp any) error {
 	if err := binary.Write(rw, binary.BigEndian, req); err != nil {
 		return err
 	}

@@ -236,6 +236,6 @@ func (f *fileInfo) IsDir() bool {
 	return f.mode&os.ModeDir != 0
 }
 
-func (f *fileInfo) Sys() interface{} {
+func (f *fileInfo) Sys() any {
 	return nil
 }
