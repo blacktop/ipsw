@@ -66,6 +66,7 @@ func (c *Client) EnableSSL() error {
 
 	c.tlsConn = tls.Client(c.conn, &tls.Config{
 		Certificates:       []tls.Certificate{cert},
+		ClientAuth:         tls.NoClientCert,
 		InsecureSkipVerify: true,
 	})
 	if err := c.tlsConn.Handshake(); err != nil {

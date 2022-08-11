@@ -73,8 +73,11 @@ func NewClientForService(serviceName, udid string, withEscrowBag bool) (*usb.Cli
 	if err != nil {
 		return nil, err
 	}
+
 	if svc.EnableServiceSSL {
-		_ = cli.EnableSSL()
+		if err := cli.EnableSSL(); err != nil {
+			return nil, fmt.Errorf("failed to enable SSL for lockdown service %s: %v", serviceName, err)
+		}
 	}
 
 	return cli, nil
