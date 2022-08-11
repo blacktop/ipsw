@@ -336,7 +336,6 @@ func (bt *lzBinTree) skip(num uint32) {
 	}
 }
 
-
 var crcTable []uint32 = make([]uint32, 256)
 
 // should be called in the encoder's contructor

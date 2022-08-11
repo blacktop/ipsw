@@ -41,6 +41,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var haveChecked []string
+
 type Entitlements map[string]any
 
 func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {

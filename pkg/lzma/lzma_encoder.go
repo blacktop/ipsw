@@ -95,16 +95,16 @@ type compressionLevel struct {
 
 // levels is intended to be constant, but there is no way to enforce this constraint
 var levels = []compressionLevel{
-	compressionLevel{},                        // 0
-	compressionLevel{16, 64, 3, 0, 2, "bt4"},  // 1
-	compressionLevel{18, 64, 3, 0, 2, "bt4"},  // 2
-	compressionLevel{20, 64, 3, 0, 2, "bt4"},  // 3
-	compressionLevel{22, 128, 3, 0, 2, "bt4"}, // 4
-	compressionLevel{23, 128, 3, 0, 2, "bt4"}, // 5
-	compressionLevel{24, 128, 3, 0, 2, "bt4"}, // 6
-	compressionLevel{25, 256, 3, 0, 2, "bt4"}, // 7
-	compressionLevel{26, 256, 3, 0, 2, "bt4"}, // 8
-	compressionLevel{27, 256, 3, 0, 2, "bt4"}, // 9
+	{},                        // 0
+	{16, 64, 3, 0, 2, "bt4"},  // 1
+	{18, 64, 3, 0, 2, "bt4"},  // 2
+	{20, 64, 3, 0, 2, "bt4"},  // 3
+	{22, 128, 3, 0, 2, "bt4"}, // 4
+	{23, 128, 3, 0, 2, "bt4"}, // 5
+	{24, 128, 3, 0, 2, "bt4"}, // 6
+	{25, 256, 3, 0, 2, "bt4"}, // 7
+	{26, 256, 3, 0, 2, "bt4"}, // 8
+	{27, 256, 3, 0, 2, "bt4"}, // 9
 }
 
 func (cl *compressionLevel) checkValues() {
@@ -1116,7 +1116,6 @@ func (z *encoder) encoder(r io.Reader, w io.Writer, size int64, level int) (err 
 // size and level (the lzma header) are written to w before any compressed data.
 // If size is -1, last bytes are encoded in a different way to mark the end of
 // the stream. The size of the compressed data will increase by 5 or 6 bytes.
-//
 func NewWriterSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
 	// the reason for which size is an argument is that lzma, unlike gzip,
 	// stores the size before any compressed data. gzip appends the size and
@@ -1132,19 +1131,16 @@ func NewWriterSizeLevel(w io.Writer, size int64, level int) io.WriteCloser {
 }
 
 // Same as NewWriterSizeLevel(w, -1, level).
-//
 func NewWriterLevel(w io.Writer, level int) io.WriteCloser {
 	return NewWriterSizeLevel(w, -1, level)
 }
 
 // Same as NewWriterSizeLevel(w, size, DefaultCompression).
-//
 func NewWriterSize(w io.Writer, size int64) io.WriteCloser {
 	return NewWriterSizeLevel(w, size, DefaultCompression)
 }
 
 // Same as NewWriterSizeLevel(w, -1, DefaultCompression).
-//
 func NewWriter(w io.Writer) io.WriteCloser {
 	return NewWriterSizeLevel(w, -1, DefaultCompression)
 }
