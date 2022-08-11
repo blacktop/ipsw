@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"encoding/json"
@@ -37,7 +37,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(rssCmd)
+	DownloadCmd.AddCommand(rssCmd)
 
 	rssCmd.Flags().BoolP("watch", "w", false, "Watch for NEW releases")
 	rssCmd.Flags().BoolP("json", "j", false, "Output as JSON")

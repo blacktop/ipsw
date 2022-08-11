@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"encoding/json"
@@ -34,7 +34,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(ossCmd)
+	DownloadCmd.AddCommand(ossCmd)
 
 	ossCmd.Flags().String("macos", "", "macOS version to download")
 	ossCmd.MarkFlagRequired("macos")

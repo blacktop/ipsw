@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/download"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/dyld"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/idev"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img4"
@@ -80,6 +81,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
 	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
 
+	rootCmd.AddCommand(download.DownloadCmd)
 	rootCmd.AddCommand(dyld.DyldCmd)
 	rootCmd.AddCommand(idev.IDevCmd)
 	rootCmd.AddCommand(img4.Img4Cmd)

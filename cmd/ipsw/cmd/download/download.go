@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"fmt"
@@ -52,33 +52,33 @@ var dFlg downloadFlags
 
 func init() {
 	// Persistent Flags which will work for this command and all subcommands
-	downloadCmd.PersistentFlags().StringVar(&dFlg.Proxy, "proxy", "", "HTTP/HTTPS proxy")
-	downloadCmd.PersistentFlags().BoolVar(&dFlg.Insecure, "insecure", false, "do not verify ssl certs")
-	downloadCmd.PersistentFlags().BoolVarP(&dFlg.Confirm, "confirm", "y", false, "do not prompt user for confirmation")
-	downloadCmd.PersistentFlags().BoolVar(&dFlg.SkipAll, "skip-all", false, "always skip resumable IPSWs")
-	downloadCmd.PersistentFlags().BoolVar(&dFlg.ResumeAll, "resume-all", false, "always resume resumable IPSWs")
-	downloadCmd.PersistentFlags().BoolVar(&dFlg.RestartAll, "restart-all", false, "always restart resumable IPSWs")
-	downloadCmd.PersistentFlags().BoolVarP(&dFlg.RemoveCommas, "remove-commas", "_", false, "replace commas in IPSW filename with underscores")
-	viper.BindPFlag("download.proxy", downloadCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("download.insecure", downloadCmd.Flags().Lookup("insecure"))
-	viper.BindPFlag("download.confirm", downloadCmd.Flags().Lookup("confirm"))
-	viper.BindPFlag("download.skip-all", downloadCmd.Flags().Lookup("skip-all"))
-	viper.BindPFlag("download.resume-all", downloadCmd.Flags().Lookup("resume-all"))
-	viper.BindPFlag("download.restart-all", downloadCmd.Flags().Lookup("restart-all"))
-	viper.BindPFlag("download.remove-commas", downloadCmd.Flags().Lookup("remove-commas"))
+	DownloadCmd.PersistentFlags().StringVar(&dFlg.Proxy, "proxy", "", "HTTP/HTTPS proxy")
+	DownloadCmd.PersistentFlags().BoolVar(&dFlg.Insecure, "insecure", false, "do not verify ssl certs")
+	DownloadCmd.PersistentFlags().BoolVarP(&dFlg.Confirm, "confirm", "y", false, "do not prompt user for confirmation")
+	DownloadCmd.PersistentFlags().BoolVar(&dFlg.SkipAll, "skip-all", false, "always skip resumable IPSWs")
+	DownloadCmd.PersistentFlags().BoolVar(&dFlg.ResumeAll, "resume-all", false, "always resume resumable IPSWs")
+	DownloadCmd.PersistentFlags().BoolVar(&dFlg.RestartAll, "restart-all", false, "always restart resumable IPSWs")
+	DownloadCmd.PersistentFlags().BoolVarP(&dFlg.RemoveCommas, "remove-commas", "_", false, "replace commas in IPSW filename with underscores")
+	viper.BindPFlag("download.proxy", DownloadCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("download.insecure", DownloadCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("download.confirm", DownloadCmd.Flags().Lookup("confirm"))
+	viper.BindPFlag("download.skip-all", DownloadCmd.Flags().Lookup("skip-all"))
+	viper.BindPFlag("download.resume-all", DownloadCmd.Flags().Lookup("resume-all"))
+	viper.BindPFlag("download.restart-all", DownloadCmd.Flags().Lookup("restart-all"))
+	viper.BindPFlag("download.remove-commas", DownloadCmd.Flags().Lookup("remove-commas"))
 	// Filters
-	downloadCmd.PersistentFlags().StringArrayVar(&dFlg.WhiteList, "white-list", []string{}, "iOS device white list")
-	downloadCmd.PersistentFlags().StringArrayVar(&dFlg.BlackList, "black-list", []string{}, "iOS device black list")
-	downloadCmd.PersistentFlags().StringVarP(&dFlg.Device, "device", "d", "", "iOS Device (i.e. iPhone11,2)")
-	downloadCmd.PersistentFlags().StringVarP(&dFlg.Model, "model", "m", "", "iOS Model (i.e. D321AP)")
-	downloadCmd.PersistentFlags().StringVarP(&dFlg.Version, "version", "v", "", "iOS Version (i.e. 12.3.1)")
-	downloadCmd.PersistentFlags().StringVarP(&dFlg.Build, "build", "b", "", "iOS BuildID (i.e. 16F203)")
-	viper.BindPFlag("download.white-list", downloadCmd.Flags().Lookup("white-list"))
-	viper.BindPFlag("download.black-list", downloadCmd.Flags().Lookup("black-list"))
-	viper.BindPFlag("download.device", downloadCmd.Flags().Lookup("device"))
-	viper.BindPFlag("download.model", downloadCmd.Flags().Lookup("model"))
-	viper.BindPFlag("download.version", downloadCmd.Flags().Lookup("version"))
-	viper.BindPFlag("download.build", downloadCmd.Flags().Lookup("build"))
+	DownloadCmd.PersistentFlags().StringArrayVar(&dFlg.WhiteList, "white-list", []string{}, "iOS device white list")
+	DownloadCmd.PersistentFlags().StringArrayVar(&dFlg.BlackList, "black-list", []string{}, "iOS device black list")
+	DownloadCmd.PersistentFlags().StringVarP(&dFlg.Device, "device", "d", "", "iOS Device (i.e. iPhone11,2)")
+	DownloadCmd.PersistentFlags().StringVarP(&dFlg.Model, "model", "m", "", "iOS Model (i.e. D321AP)")
+	DownloadCmd.PersistentFlags().StringVarP(&dFlg.Version, "version", "v", "", "iOS Version (i.e. 12.3.1)")
+	DownloadCmd.PersistentFlags().StringVarP(&dFlg.Build, "build", "b", "", "iOS BuildID (i.e. 16F203)")
+	viper.BindPFlag("download.white-list", DownloadCmd.Flags().Lookup("white-list"))
+	viper.BindPFlag("download.black-list", DownloadCmd.Flags().Lookup("black-list"))
+	viper.BindPFlag("download.device", DownloadCmd.Flags().Lookup("device"))
+	viper.BindPFlag("download.model", DownloadCmd.Flags().Lookup("model"))
+	viper.BindPFlag("download.version", DownloadCmd.Flags().Lookup("version"))
+	viper.BindPFlag("download.build", DownloadCmd.Flags().Lookup("build"))
 }
 
 func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
@@ -185,8 +185,8 @@ func getDestName(url string, removeCommas bool) string {
 	return path.Base(url)
 }
 
-// downloadCmd represents the download command
-var downloadCmd = &cobra.Command{
+// DownloadCmd represents the download command
+var DownloadCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Download Apple Firmware files (and more)",
 	Args:  cobra.NoArgs,

@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"fmt"
@@ -34,7 +34,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(macosCmd)
+	DownloadCmd.AddCommand(macosCmd)
 
 	macosCmd.Flags().BoolP("list", "l", false, "Show latest macOS installers")
 	macosCmd.Flags().StringP("work-dir", "w", "", "macOS installer creator working directory")

@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"encoding/json"
@@ -41,7 +41,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(wikiCmd)
+	DownloadCmd.AddCommand(wikiCmd)
 	wikiCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	wikiCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	wikiCmd.Flags().Bool("beta", false, "Download beta IPSWs/OTAs")
