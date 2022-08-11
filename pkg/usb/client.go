@@ -79,7 +79,7 @@ func (c *Client) DisableSSL() {
 	c.tlsConn = nil
 }
 
-func (c *Client) Request(req, resp interface{}) error {
+func (c *Client) Request(req, resp any) error {
 	if err := c.Send(req); err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (c *Client) Request(req, resp interface{}) error {
 	return c.Recv(resp)
 }
 
-func (c *Client) Send(req interface{}) error {
+func (c *Client) Send(req any) error {
 	data, err := plist.Marshal(req, plist.XMLFormat)
 	if err != nil {
 		return err
@@ -100,7 +100,7 @@ func (c *Client) Send(req interface{}) error {
 	return binary.Write(c.Conn(), binary.BigEndian, data)
 }
 
-func (c Client) Recv(resp interface{}) error {
+func (c Client) Recv(resp any) error {
 	data, err := c.RecvBytes()
 	if err != nil {
 		return err
@@ -160,24 +160,24 @@ func (c Client) Close() error {
 }
 
 func (c *Client) DeviceLinkHandshake() error {
-	var versionExchange []interface{}
+	var versionExchange []any
 	if err := c.Recv(&versionExchange); err != nil {
 		return err
 	}
-	reply := []interface{}{"DLMessageVersionExchange", "DLVersionsOk", versionExchange[1]}
+	reply := []any{"DLMessageVersionExchange", "DLVersionsOk", versionExchange[1]}
 	if err := c.Send(reply); err != nil {
 		return err
 	}
-	var ready []interface{}
+	var ready []any
 	return c.Recv(&ready)
 }
 
-func (c *Client) DeviceLinkSend(msg interface{}) error {
-	return c.Send([]interface{}{"DLMessageProcessMessage", msg})
+func (c *Client) DeviceLinkSend(msg any) error {
+	return c.Send([]any{"DLMessageProcessMessage", msg})
 }
 
-func (c *Client) DeviceLinkRecv() (interface{}, error) {
-	var dlMsg []interface{}
+func (c *Client) DeviceLinkRecv() (any, error) {
+	var dlMsg []any
 	if err := c.Recv(&dlMsg); err != nil {
 		return nil, err
 	}

@@ -7,13 +7,15 @@ import (
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 )
 
+const serviceName = "com.apple.debugserver"
+
 type Client struct {
 	c         *usb.Client
 	gdbServer *GDBServer
 }
 
 func NewClient(udid string) (*Client, error) {
-	cli, err := lockdownd.NewClientForService("com.apple.debugserver", udid, false)
+	cli, err := lockdownd.NewClientForService(serviceName, udid, false)
 	if err != nil {
 		return nil, err
 	}

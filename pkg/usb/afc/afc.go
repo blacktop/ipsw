@@ -132,7 +132,7 @@ func openFlagsToAfcFlags(flags int) uint64 {
 	return 0
 }
 
-func encodeArgs(args ...interface{}) []byte {
+func encodeArgs(args ...any) []byte {
 	ret := make([]byte, 0)
 	for _, arg := range args {
 		switch v := arg.(type) {
@@ -191,25 +191,25 @@ func NewClient(udid string, service ...string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) request(operation int, payload []byte, args ...interface{}) (*response, error) {
+func (c *Client) request(operation int, payload []byte, args ...any) (*response, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.requestNoLock(operation, payload, args...)
 }
 
-func (c *Client) requestNoLock(operation int, payload []byte, args ...interface{}) (*response, error) {
+func (c *Client) requestNoLock(operation int, payload []byte, args ...any) (*response, error) {
 	if err := c.sendRequest(operation, payload, args...); err != nil {
 		return nil, err
 	}
 	return c.recvResponse()
 }
 
-func (c *Client) requestNoReply(operation int, payload []byte, args ...interface{}) error {
+func (c *Client) requestNoReply(operation int, payload []byte, args ...any) error {
 	_, err := c.request(operation, payload, args...)
 	return err
 }
 
-func (c *Client) requestStringList(operation int, payload []byte, args ...interface{}) ([]string, error) {
+func (c *Client) requestStringList(operation int, payload []byte, args ...any) ([]string, error) {
 	resp, err := c.request(operation, payload, args...)
 	if err != nil {
 		return nil, err
@@ -297,7 +297,7 @@ func (c *Client) recvResponseTo(payloadBuf []byte) (*response, error) {
 	return resp, nil
 }
 
-func (c *Client) sendRequest(operation int, payload []byte, args ...interface{}) error {
+func (c *Client) sendRequest(operation int, payload []byte, args ...any) error {
 	argsData := encodeArgs(args...)
 	if err := c.sendHeader(operation, argsData, payload); err != nil {
 		return err

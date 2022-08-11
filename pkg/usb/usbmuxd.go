@@ -205,7 +205,7 @@ func (c *Conn) ReadPairRecord(udid string) (*PairRecord, error) {
 	return &record, nil
 }
 
-func (c *Conn) Request(req, resp interface{}) error {
+func (c *Conn) Request(req, resp any) error {
 	if err := c.Send(req); err != nil {
 		return err
 	}
@@ -213,7 +213,7 @@ func (c *Conn) Request(req, resp interface{}) error {
 	return c.Recv(resp)
 }
 
-func (c *Conn) Send(msg interface{}) error {
+func (c *Conn) Send(msg any) error {
 	data, err := plist.Marshal(msg, plist.XMLFormat)
 	if err != nil {
 		return err
@@ -232,7 +232,7 @@ func (c *Conn) Send(msg interface{}) error {
 	return binary.Write(c, binary.LittleEndian, data)
 }
 
-func (c *Conn) Recv(msg interface{}) error {
+func (c *Conn) Recv(msg any) error {
 	var hdr Header
 	if err := binary.Read(c, binary.LittleEndian, &hdr); err != nil {
 		return err
