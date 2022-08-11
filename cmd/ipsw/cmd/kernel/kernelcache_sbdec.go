@@ -21,11 +21,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package kernel
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
@@ -40,7 +39,7 @@ import (
 )
 
 func init() {
-	kernelcacheCmd.AddCommand(sbdecCmd)
+	KernelcacheCmd.AddCommand(sbdecCmd)
 	sbdecCmd.Flags().BoolP("diff", "f", false, "Diff two kernel's sandbox profiles")
 	sbdecCmd.Flags().BoolP("dump", "d", false, "Dump sandbox profile data")
 	sbdecCmd.Flags().BoolP("profile", "p", false, "Decompile sandbox profile")
@@ -68,7 +67,7 @@ var sbdecCmd = &cobra.Command{
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if Verbose {
+		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
@@ -118,7 +117,7 @@ var sbdecCmd = &cobra.Command{
 			} else {
 				sbcpath := filepath.Join(filepath.Dir(kcPath), "sandbox_collection.bin")
 				log.Infof("Creating %s...", sbcpath)
-				if err := ioutil.WriteFile(sbcpath, dat, 0755); err != nil {
+				if err := os.WriteFile(sbcpath, dat, 0755); err != nil {
 					return fmt.Errorf("failed to write sandbox collection data: %v", err)
 				}
 			}
@@ -127,7 +126,7 @@ var sbdecCmd = &cobra.Command{
 			} else {
 				sbcpath := filepath.Join(filepath.Dir(kcPath), "sandbox_protobox.bin")
 				log.Infof("Creating %s...", sbcpath)
-				if err := ioutil.WriteFile(sbcpath, dat, 0755); err != nil {
+				if err := os.WriteFile(sbcpath, dat, 0755); err != nil {
 					return fmt.Errorf("failed to write sandbox protobox collection data: %v", err)
 				}
 			}
@@ -136,7 +135,7 @@ var sbdecCmd = &cobra.Command{
 			} else {
 				sbppath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
 				log.Infof("Creating %s...", sbppath)
-				if err := ioutil.WriteFile(sbppath, dat, 0755); err != nil {
+				if err := os.WriteFile(sbppath, dat, 0755); err != nil {
 					return fmt.Errorf("failed to write sandbox platform profile data: %v", err)
 				}
 			}
@@ -373,7 +372,7 @@ var sbdecCmd = &cobra.Command{
 				// os.MkdirAll(regexFolder, 0755)
 				// for idx, re := range sb.Regexes {
 				// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%d", idx))
-				// 	err = ioutil.WriteFile(regexPath, re.Data, 0755)
+				// 	err = os.WriteFile(regexPath, re.Data, 0755)
 				// 	if err != nil {
 				// 		return err
 				// 	}

@@ -19,14 +19,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package kernel
 
 import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"text/tabwriter"
@@ -36,10 +35,11 @@ import (
 	"github.com/blacktop/ipsw/pkg/sandbox"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
-	kernelcacheCmd.AddCommand(libsandboxCmd)
+	KernelcacheCmd.AddCommand(libsandboxCmd)
 	libsandboxCmd.Flags().BoolP("json", "j", false, "Output to stdout as JSON")
 	libsandboxCmd.Flags().StringP("output", "o", "", "Folder to write JSON")
 	libsandboxCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
@@ -55,7 +55,7 @@ var libsandboxCmd = &cobra.Command{
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if Verbose {
+		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
@@ -121,7 +121,7 @@ var libsandboxCmd = &cobra.Command{
 				gz := gzip.NewWriter(&buf)
 				gz.Write(dat)
 				gz.Close()
-				if err := ioutil.WriteFile(fpath, buf.Bytes(), 0755); err != nil {
+				if err := os.WriteFile(fpath, buf.Bytes(), 0755); err != nil {
 					return err
 				}
 			} else {

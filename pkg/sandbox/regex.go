@@ -430,7 +430,7 @@ func (re *Regex) NFA() (*NFA, error) {
 	// 	return nil, err
 	// }
 	// fmt.Println("NFA:", rstr)
-	// ioutil.WriteFile("regex", []byte(rstr), 0644)
+	// os.WriteFile("regex", []byte(rstr), 0644)
 
 	// fmt.Println("Graph:")
 	// fmt.Println("https://dreampuf.github.io/GraphvizOnline/#" + url.PathEscape(n.ToDot(nfa)))

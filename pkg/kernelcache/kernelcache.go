@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -113,7 +112,7 @@ func Extract(ipsw, destPath string) error {
 		// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(kcache, filepath.Ext(kcache)), strings.Join(i.GetDevicesForKernelCache(kcache), "_"))
 		fname = filepath.Join(destPath, fname)
 
-		content, err := ioutil.ReadFile(kcache)
+		content, err := os.ReadFile(kcache)
 		if err != nil {
 			return errors.Wrap(err, "failed to read Kernelcache")
 		}
@@ -130,7 +129,7 @@ func Extract(ipsw, destPath string) error {
 
 		os.Mkdir(destPath, 0750)
 
-		err = ioutil.WriteFile(fname, dec, 0660)
+		err = os.WriteFile(fname, dec, 0660)
 		if err != nil {
 			return errors.Wrap(err, "failed to write kernelcache")
 		}
@@ -143,7 +142,7 @@ func Extract(ipsw, destPath string) error {
 
 // Decompress decompresses a compressed kernelcache
 func Decompress(kcache string) error {
-	content, err := ioutil.ReadFile(kcache)
+	content, err := os.ReadFile(kcache)
 	if err != nil {
 		return errors.Wrap(err, "failed to read Kernelcache")
 	}
@@ -160,7 +159,7 @@ func Decompress(kcache string) error {
 		return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 	}
 
-	err = ioutil.WriteFile(kcache+".decompressed", dec, 0660)
+	err = os.WriteFile(kcache+".decompressed", dec, 0660)
 	if err != nil {
 		return errors.Wrap(err, "failed to write kernelcache")
 	}
@@ -276,7 +275,7 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 				}
 
 				os.Mkdir(destPath, 0750)
-				err = ioutil.WriteFile(fname, dec, 0660)
+				err = os.WriteFile(fname, dec, 0660)
 				if err != nil {
 					return errors.Wrap(err, "failed to write kernelcache")
 				}

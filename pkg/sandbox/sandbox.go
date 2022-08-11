@@ -6,8 +6,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/bits"
+	"os"
 	"sort"
 	"strings"
 
@@ -318,7 +318,7 @@ func (sb *Sandbox) GetCollectionData() ([]byte, error) {
 
 	if len(sb.config.ProfileBinPath) > 0 {
 		var err error
-		sb.sbCollectionData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		sb.sbCollectionData, err = os.ReadFile(sb.config.ProfileBinPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read sandbox collection profile data file: %w", err)
 		}
@@ -362,7 +362,7 @@ func (sb *Sandbox) GetProtoboxCollectionData() ([]byte, error) {
 
 	if len(sb.config.ProfileBinPath) > 0 {
 		var err error
-		sb.sbProtoboxData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		sb.sbProtoboxData, err = os.ReadFile(sb.config.ProfileBinPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read sandbox protobox collection profile data file: %w", err)
 		}
@@ -406,7 +406,7 @@ func (sb *Sandbox) GetPlatformProfileData() ([]byte, error) {
 
 	if len(sb.config.ProfileBinPath) > 0 {
 		var err error
-		sb.sbProfileData, err = ioutil.ReadFile(sb.config.ProfileBinPath)
+		sb.sbProfileData, err = os.ReadFile(sb.config.ProfileBinPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read platform profile data file: %w", err)
 		}
