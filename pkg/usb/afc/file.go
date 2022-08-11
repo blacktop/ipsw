@@ -91,6 +91,42 @@ func (c *Client) ReadDir(dir string) ([]string, error) {
 	return c.requestStringList(afcOpReadDir, nil, dir)
 }
 
+func (c *Client) GetDirs(dir string) ([]string, error) {
+	var dirs []string
+	files, err := c.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		finfo, err := c.GetFileInfo(path.Join(dir, f))
+		if err != nil {
+			return nil, err
+		}
+		if finfo.IsDir() {
+			dirs = append(dirs, f)
+		}
+	}
+	return dirs, nil
+}
+
+func (c *Client) GetFiles(dir string) ([]string, error) {
+	var files []string
+	items, err := c.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	for _, i := range items {
+		finfo, err := c.GetFileInfo(path.Join(dir, i))
+		if err != nil {
+			return nil, err
+		}
+		if !finfo.IsDir() {
+			files = append(files, i)
+		}
+	}
+	return files, nil
+}
+
 func (c *Client) WriteFile(name string, data []byte) error {
 	return nil
 }
