@@ -11,6 +11,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v7"
 	"github.com/vbauerster/mpb/v7/decor"
 )

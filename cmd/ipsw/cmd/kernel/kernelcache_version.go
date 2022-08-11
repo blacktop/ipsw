@@ -25,7 +25,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -41,22 +40,6 @@ func init() {
 	// kernelVersionCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// 	return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	// }
-}
-
-type kernVersion struct {
-	Kernel struct {
-		Darwin string    `json:"darwin,omitempty"`
-		Date   time.Time `json:"date,omitempty"`
-		XNU    string    `json:"xnu,omitempty"`
-		Type   string    `json:"type,omitempty"`
-		Arch   string    `json:"arch,omitempty"`
-		CPU    string    `json:"cpu,omitempty"`
-	} `json:"kernel,omitempty"`
-	LLVM struct {
-		Version string   `json:"version,omitempty"`
-		Clang   string   `json:"clang,omitempty"`
-		Flags   []string `json:"flags,omitempty"`
-	} `json:"llvm,omitempty"`
 }
 
 // kernelVersionCmd represents the version command
