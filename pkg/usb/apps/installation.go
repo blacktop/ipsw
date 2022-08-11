@@ -1,4 +1,4 @@
-package installation
+package apps
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/afc"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -39,12 +40,12 @@ func (c *Client) Lookup() (map[string]*AppBundle, error) {
 	return resp.LookupResult, nil
 }
 
-func (c *Client) LookupRaw(keys ...string) (map[string]interface{}, error) {
+func (c *Client) LookupRaw(keys ...string) (map[string]any, error) {
 	req := &Lookup{
 		Command: NewCommand("Lookup", keys...),
 	}
 	resp := &struct {
-		LookupResult map[string]interface{}
+		LookupResult map[string]any
 	}{}
 	if err := c.c.Request(req, resp); err != nil {
 		return nil, err
@@ -58,7 +59,7 @@ func (c *Client) LookupExePath(bundleId string) (string, error) {
 		return "", err
 	}
 	if d, ok := apps[bundleId]; ok {
-		values := d.(map[string]interface{})
+		values := d.(map[string]any)
 		exePath := values["Path"].(string) + "/" + values["CFBundleExecutable"].(string)
 		return exePath, nil
 	}
@@ -71,7 +72,7 @@ func (c *Client) LookupDisplayName(bundleId string) (string, error) {
 		return "", err
 	}
 	if d, ok := apps[bundleId]; ok {
-		values := d.(map[string]interface{})
+		values := d.(map[string]any)
 		return values["CFBundleDisplayName"].(string), nil
 	}
 	return "", nil
@@ -84,7 +85,7 @@ func (c *Client) LookupContainer(bundleId string) (string, error) {
 	}
 
 	if val, ok := apps[bundleId]; ok {
-		values := val.(map[string]interface{})
+		values := val.(map[string]any)
 		if container, ok := values["Container"].(string); ok {
 			return container, nil
 		}
@@ -103,8 +104,8 @@ type AppInfo struct {
 	CFBundleShortVersionString   string
 	CFBundleVersion              string
 	Container                    string
-	Entitlements                 map[string]interface{}
-	EnvironmentVariables         map[string]interface{}
+	Entitlements                 map[string]any
+	EnvironmentVariables         map[string]any
 	MinimumOSVersion             string
 	Path                         string
 	ProfileValidated             bool
@@ -112,6 +113,10 @@ type AppInfo struct {
 	SignerIdentity               string
 	UIDeviceFamily               []int
 	UIRequiredDeviceCapabilities []string
+}
+
+func (i AppInfo) String() string {
+	return fmt.Sprintf("%s\t%s\t(%s)\t%s", i.CFBundleDisplayName, i.CFBundleShortVersionString, i.CFBundleIdentifier, i.Path)
 }
 
 func (c *Client) InstalledApps() ([]AppInfo, error) {
@@ -140,48 +145,28 @@ func (c *Client) InstalledApps() ([]AppInfo, error) {
 	}
 
 	result := make([]AppInfo, len(apps))
-	for _, v := range apps {
-		m := v.(map[string]interface{})
-		var ai AppInfo
-		if ret, ok := m["CFBundleIdentifier"].(string); ok {
-			ai.CFBundleIdentifier = ret
-		}
-		if ret, ok := m["CFBundleDisplayName"].(string); ok {
-			ai.CFBundleDisplayName = ret
-		}
-		if ret, ok := m["CFBundleName"].(string); ok {
-			ai.CFBundleName = ret
-		}
-		if ret, ok := m["CFBundleExecutable"].(string); ok {
-			ai.CFBundleExecutable = ret
-		}
-		if ret, ok := m["Path"].(string); ok {
-			ai.Path = ret
-		}
-		if ret, ok := m["CFBundleVersion"].(string); ok {
-			ai.CFBundleVersion = ret
-		}
-		if ret, ok := m["CFBundleShortVersionString"].(string); ok {
-			ai.CFBundleShortVersionString = ret
-		}
-		if ret, ok := m["ApplicationType"].(string); ok {
-			ai.ApplicationType = ret
-		}
-		if ret, ok := m["Container"].(string); ok {
-			ai.Container = ret
-		}
 
-		result = append(result, ai)
+	var app AppInfo
+	if err := mapstructure.Decode(apps, &app); err != nil {
+		return nil, err
+	}
+
+	for _, a := range apps {
+		var app AppInfo
+		if err := mapstructure.Decode(a, &app); err != nil {
+			return nil, err
+		}
+		result = append(result, app)
 	}
 
 	return result, nil
 }
 
-func (c *Client) Browse() (interface{}, error) {
+func (c *Client) Browse() (any, error) {
 	req := &Browse{
 		Command: NewCommand("Browse"),
 	}
-	resp := map[string]interface{}{}
+	resp := map[string]any{}
 	if err := c.c.Request(req, resp); err != nil {
 		return nil, err
 	}
@@ -195,11 +180,6 @@ func (c *Client) watchProgress(cb ProgressFunc) error {
 		ev := &ProgressEvent{}
 		if err := c.c.Recv(ev); err != nil {
 			return err
-		}
-		// Some iOS versions send a message that is not a status message.
-		// Ignore it.
-		if ev.Status != "" {
-			continue
 		}
 		if ev.Status == "Complete" {
 			ev.PercentComplete = 100
@@ -272,9 +252,7 @@ func (c *Client) CopyAndInstall(pkgPath string, progressCb ProgressFunc) error {
 	if err != nil {
 		return err
 	}
-	defer func(afcClient *afc.Client) {
-		_ = afcClient.Close()
-	}(afcClient)
+	defer afcClient.Close()
 
 	if err := afcClient.CopyToDevice("/", pkgPath, func(dst, src string, info os.FileInfo) {
 		fmt.Println(src, "->", dst)
