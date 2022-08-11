@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	serviceName = "com.apple.mobile.notification_proxy"
+	serviceName         = "com.apple.mobile.notification_proxy"
+	insecureServiceName = "com.apple.mobile.insecure_notification_proxy"
 )
 
 type ObserveNotificationRequest struct {
