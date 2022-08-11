@@ -28,6 +28,11 @@ import (
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/dyld"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/idev"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img4"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/kernel"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/macho"
 	"github.com/spf13/cobra"
 
 	// "github.com/spf13/cobra/doc"
@@ -68,10 +73,18 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 
+	// Flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
-	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
+
+	rootCmd.AddCommand(dyld.DyldCmd)
+	rootCmd.AddCommand(idev.IDevCmd)
+	rootCmd.AddCommand(img4.Img4Cmd)
+	rootCmd.AddCommand(kernel.KernelcacheCmd)
+	rootCmd.AddCommand(macho.MachoCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.

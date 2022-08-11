@@ -22,7 +22,7 @@ var lzmaTests = []lzmaTest{
 	// fmt -w 80 -s file
 	// cat file | sed s/\\\\/\\\\\\\\/g | sed s/\"/\\\\\"/g | sed s/^/\"/ | sed s/$/\\\\n\"\ +/
 	// hexdump -Cv file.lzma | awk '{for (i=2; i<18; i++) {printf("0x%s, ", $i); if (i==9) printf("\n");} printf("\n")}'
-	lzmaTest{
+	{
 		"empty test",
 		3,
 		true,
@@ -34,7 +34,7 @@ var lzmaTests = []lzmaTest{
 		},
 		nil,
 	},
-	lzmaTest{
+	{
 		"empty (with size == -1) test",
 		3,
 		false,
@@ -46,7 +46,7 @@ var lzmaTests = []lzmaTest{
 		},
 		nil,
 	},
-	lzmaTest{
+	{
 		"hello world test",
 		3,
 		true,
@@ -59,7 +59,7 @@ var lzmaTests = []lzmaTest{
 		},
 		nil,
 	},
-	lzmaTest{
+	{
 		"hello world (with size == -1) test",
 		3,
 		false,
@@ -73,7 +73,7 @@ var lzmaTests = []lzmaTest{
 		},
 		nil,
 	},
-	lzmaTest{
+	{
 		"text test",
 		3,
 		true,
@@ -173,7 +173,7 @@ var lzmaTests = []lzmaTest{
 		},
 		nil,
 	},
-	lzmaTest{
+	{
 		"text test with size == -1",
 		3,
 		false,
@@ -273,7 +273,7 @@ var lzmaTests = []lzmaTest{
 		},
 		nil,
 	},
-	lzmaTest{
+	{
 		"hello world test with corrupt lc, lp, pb in header",
 		3,
 		true,

@@ -1225,19 +1225,25 @@ func (s StringHash) String() string {
 --------------------------------------------------------------------
 mix -- mix 3 64-bit values reversibly.
 mix() takes 48 machine instructions, but only 24 cycles on a superscalar
-  machine (like Intel's new MMX architecture).  It requires 4 64-bit
-  registers for 4::2 parallelism.
+
+	machine (like Intel's new MMX architecture).  It requires 4 64-bit
+	registers for 4::2 parallelism.
+
 All 1-bit deltas, all 2-bit deltas, all deltas composed of top bits of
-  (a,b,c), and all deltas of bottom bits were tested.  All deltas were
-  tested both on random keys and on keys that were nearly all zero.
-  These deltas all cause every bit of c to change between 1/3 and 2/3
-  of the time (well, only 113/400 to 287/400 of the time for some
-  2-bit delta).  These deltas all cause at least 80 bits to change
-  among (a,b,c) when the mix is run either forward or backward (yes it
-  is reversible).
+
+	(a,b,c), and all deltas of bottom bits were tested.  All deltas were
+	tested both on random keys and on keys that were nearly all zero.
+	These deltas all cause every bit of c to change between 1/3 and 2/3
+	of the time (well, only 113/400 to 287/400 of the time for some
+	2-bit delta).  These deltas all cause at least 80 bits to change
+	among (a,b,c) when the mix is run either forward or backward (yes it
+	is reversible).
+
 This implies that a hash using mix64 has no funnels.  There may be
-  characteristics with 3-bit deltas or bigger, I didn't test for
-  those.
+
+	characteristics with 3-bit deltas or bigger, I didn't test for
+	those.
+
 --------------------------------------------------------------------
 */
 func mix64(a, b, c *uint64) {

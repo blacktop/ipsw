@@ -921,7 +921,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 	return nil
 }
 
-//  returns the public symbol matching the given name
+// returns the public symbol matching the given name
 func (i *CacheImage) GetPublicSymbol(name string) (*Symbol, error) {
 	i.ParsePublicSymbols(false)
 
