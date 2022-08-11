@@ -39,7 +39,7 @@ brew install blacktop/tap/ipsw
 ```
 ❯ ipsw
 
-Download and Parse IPSWs
+Download and Parse IPSWs (and SO much more)
 
 Usage:
   ipsw [command]
@@ -50,11 +50,12 @@ Available Commands:
   dtree           Parse DeviceTree
   dyld            Parse dyld_shared_cache
   ent             Search IPSW filesystem DMG for MachOs with a given entitlement
-  extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW
+  extract         Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
   help            Help about any command
   iboot           Dump firmwares
+  idev            USB connected device commands
   img4            Parse Img4
-  info            Display IPSW Info
+  info            Display IPSW/OTA Info
   kernel          Parse kernelcache
   macho           Parse MachO
   ota             Extract file(s) from OTA
