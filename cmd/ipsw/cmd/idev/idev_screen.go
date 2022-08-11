@@ -23,7 +23,6 @@ package idev
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -60,7 +59,7 @@ func saveScreenshot(dev *lockdownd.DeviceValues, destPath string) error {
 		return fmt.Errorf("failed to create screenshot directory %s: %w", filepath.Dir(fname), err)
 	}
 	log.Infof("Creating screenshot: %s", fname)
-	return ioutil.WriteFile(fname, png, 0660)
+	return os.WriteFile(fname, png, 0660)
 }
 
 // ScreenCmd represents the screen command

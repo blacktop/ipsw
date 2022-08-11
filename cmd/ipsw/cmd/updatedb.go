@@ -26,7 +26,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"regexp"
 	"strings"
@@ -70,7 +69,7 @@ var updateDBCmd = &cobra.Command{
 				log.WithError(err).Fatal("failed to open DB file")
 			}
 			defer f.Close()
-			dat, err := ioutil.ReadAll(f)
+			dat, err := io.ReadAll(f)
 			if err != nil {
 				log.WithError(err).Fatal("failed to read DB file")
 			}
@@ -181,7 +180,7 @@ var updateDBCmd = &cobra.Command{
 		}
 		if len(dbPath) > 0 {
 			log.Infof("%s %s", mut, dbPath)
-			if err := ioutil.WriteFile(dbPath, dat, 0660); err != nil {
+			if err := os.WriteFile(dbPath, dat, 0660); err != nil {
 				log.WithError(err).Fatalf("failed to write file %s", dbPath)
 			}
 		} else {

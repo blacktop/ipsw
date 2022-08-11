@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -146,7 +145,7 @@ func NewXZReader(r io.Reader) (io.ReadCloser, error) {
 		if err != nil {
 			return nil, err
 		}
-		return ioutil.NopCloser(xr), nil
+		return io.NopCloser(xr), nil
 	}
 
 	rpipe, wpipe := io.Pipe()
@@ -527,7 +526,7 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 	// This is the FAST path that execs the 'aa' binary if found on macOS
 	if aaPath, err := execabs.LookPath("aa"); err == nil {
 		// make tmp folder
-		dir, err := ioutil.TempDir("", "ota_"+filepath.Base(payload.Name))
+		dir, err := os.MkdirTemp("", "ota_"+filepath.Base(payload.Name))
 		if err != nil {
 			return false, "", fmt.Errorf("failed to create tmp folder: %v", err)
 		}
@@ -722,7 +721,7 @@ func Parse(payload *zip.File, folder, extractPattern string) (bool, string, erro
 				}
 				fname := filepath.Join(folder, filepath.Clean(ent.Path))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Extracting %s uid=%d, gid=%d, %s, %s", ent.Mod, ent.Uid, ent.Gid, humanize.Bytes(uint64(ent.Size)), fname))
-				if err := ioutil.WriteFile(fname, fileBytes, 0660); err != nil {
+				if err := os.WriteFile(fname, fileBytes, 0660); err != nil {
 					return false, "", err
 				}
 

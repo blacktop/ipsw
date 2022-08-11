@@ -26,7 +26,6 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,7 +148,7 @@ var debugserverCmd = &cobra.Command{
 			}()
 
 			// Read entitlements.plist and write to tmp file
-			tmpEntsFile, err := ioutil.TempFile("", "entitlements.plist")
+			tmpEntsFile, err := os.CreateTemp("", "entitlements.plist")
 			if err != nil {
 				log.Error(err.Error())
 				return
@@ -171,7 +170,7 @@ var debugserverCmd = &cobra.Command{
 				return
 			}
 			defer roDbgSvr.Close()
-			tmpDbgSrvFile, err := ioutil.TempFile("", "debugserver")
+			tmpDbgSrvFile, err := os.CreateTemp("", "debugserver")
 			if err != nil {
 				log.Error(err.Error())
 				return

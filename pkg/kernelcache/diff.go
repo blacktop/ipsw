@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -115,5 +114,5 @@ func InsertStringToFile(path, str string, index int) error {
 		fileContent += "\n"
 	}
 
-	return ioutil.WriteFile(path, []byte(fileContent), 0660)
+	return os.WriteFile(path, []byte(fileContent), 0660)
 }

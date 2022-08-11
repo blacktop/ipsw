@@ -25,7 +25,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -110,7 +110,7 @@ var gitCmd = &cobra.Command{
 						os.MkdirAll(outputFolder, 0750)
 						fpath := filepath.Join(outputFolder, "webkit_tags.json")
 						log.Infof("Creating %s", fpath)
-						if err := ioutil.WriteFile(fpath, dat, 0660); err != nil {
+						if err := os.WriteFile(fpath, dat, 0660); err != nil {
 							return fmt.Errorf("failed to write file: %v", err)
 						}
 					} else {
@@ -135,7 +135,7 @@ var gitCmd = &cobra.Command{
 					os.MkdirAll(outputFolder, 0750)
 					fpath := filepath.Join(outputFolder, "tag_links.json")
 					log.Infof("Creating %s", fpath)
-					if err := ioutil.WriteFile(fpath, dat, 0660); err != nil {
+					if err := os.WriteFile(fpath, dat, 0660); err != nil {
 						return fmt.Errorf("failed to write file: %v", err)
 					}
 				} else {
@@ -188,14 +188,14 @@ var gitCmd = &cobra.Command{
 					return fmt.Errorf("failed to connect to URL: %s", resp.Status)
 				}
 
-				document, err := ioutil.ReadAll(resp.Body)
+				document, err := io.ReadAll(resp.Body)
 				if err != nil {
 					return fmt.Errorf("failed to read remote tarfile data: %v", err)
 				}
 
 				resp.Body.Close()
 
-				if err := ioutil.WriteFile(destName, document, 0660); err != nil {
+				if err := os.WriteFile(destName, document, 0660); err != nil {
 					return fmt.Errorf("failed to write file %s: %v", destName, err)
 				}
 			} else {

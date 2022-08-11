@@ -7,7 +7,6 @@ package lzma
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"log"
 	"testing"
 )
@@ -35,7 +34,7 @@ func testEmpty(t *testing.T, sizeIsKnown bool) {
 	pipe(t,
 		func(w io.WriteCloser) {},
 		func(r io.ReadCloser) {
-			b, err := ioutil.ReadAll(r)
+			b, err := io.ReadAll(r)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}
@@ -71,7 +70,7 @@ func testBoth(t *testing.T, sizeIsKnown bool) {
 			}
 		},
 		func(r io.ReadCloser) {
-			b, err := ioutil.ReadAll(r)
+			b, err := io.ReadAll(r)
 			if err != nil {
 				t.Fatalf("%v", err)
 			}

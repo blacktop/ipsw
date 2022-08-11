@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 
@@ -85,7 +85,7 @@ func NewOSS(macOSVersion, proxy string, insecure bool) (*Oss, error) {
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read OSS plist: %v", err)
 	}

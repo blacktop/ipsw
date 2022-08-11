@@ -23,7 +23,6 @@ package cmd
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -181,7 +180,7 @@ var devCmd = &cobra.Command{
 				if len(output) > 0 {
 					fpath := filepath.Join(output, fmt.Sprintf("dev_portal_%s.json", dlType))
 					log.Infof("Creating %s", fpath)
-					if err := ioutil.WriteFile(fpath, dat, 0660); err != nil {
+					if err := os.WriteFile(fpath, dat, 0660); err != nil {
 						return err
 					}
 				} else {

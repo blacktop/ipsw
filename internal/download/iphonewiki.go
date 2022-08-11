@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -164,7 +164,7 @@ func getWikiPage(page string, proxy string, insecure bool) (*wikiParseResults, e
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -210,7 +210,7 @@ func getWikiTable(page string, proxy string, insecure bool) (*wikiParseResults, 
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -429,7 +429,7 @@ func GetWikiIPSWs(proxy string, insecure bool) ([]*WikiIPSW, error) {
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -500,7 +500,7 @@ func GetWikiOTAs(proxy string, insecure bool) ([]*WikiOTA, error) {
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
@@ -572,7 +572,7 @@ func GetWikiFirmwareKeys(proxy string, insecure bool) ([]*WikiOTA, error) {
 		return nil, fmt.Errorf("failed to get response: %s", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}

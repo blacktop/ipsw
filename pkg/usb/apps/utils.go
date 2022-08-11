@@ -2,7 +2,7 @@ package apps
 
 import (
 	"archive/zip"
-	"io/ioutil"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,7 +30,7 @@ func AppBundleFromIPA(ipa string) (*AppBundle, error) {
 		return nil, err
 	}
 	defer r.Close()
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, err
 	}

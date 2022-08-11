@@ -23,7 +23,7 @@ package idev
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
@@ -98,7 +98,7 @@ var idevImgMountCmd = &cobra.Command{
 			if err != nil {
 				log.Fatal("failed to convert version into semver object")
 			}
-			imgData, err = ioutil.ReadFile(
+			imgData, err = os.ReadFile(
 				filepath.Join(xcode,
 					fmt.Sprintf("/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/%d.%d/DeveloperDiskImage.dmg",
 						version.Segments()[0],
@@ -107,7 +107,7 @@ var idevImgMountCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to read DeveloperDiskImage.dmg: %w", err)
 			}
-			sigData, err = ioutil.ReadFile(
+			sigData, err = os.ReadFile(
 				filepath.Join(xcode,
 					fmt.Sprintf("/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/%d.%d/DeveloperDiskImage.dmg.signature",
 						version.Segments()[0],
@@ -117,11 +117,11 @@ var idevImgMountCmd = &cobra.Command{
 				return fmt.Errorf("failed to read DeveloperDiskImage.dmg.signature: %w", err)
 			}
 		} else {
-			imgData, err = ioutil.ReadFile(args[0])
+			imgData, err = os.ReadFile(args[0])
 			if err != nil {
 				return fmt.Errorf("failed to read image: %w", err)
 			}
-			sigData, err = ioutil.ReadFile(args[1])
+			sigData, err = os.ReadFile(args[1])
 			if err != nil {
 				return fmt.Errorf("failed to read image: %w", err)
 			}

@@ -23,7 +23,6 @@ package macho
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,11 +100,10 @@ var lipoCmd = &cobra.Command{
 			} else {
 				choice := 0
 				prompt := &survey.Select{
-					Message: fmt.Sprintf("Detected a universal MachO file, please select an architecture to extract:"),
+					Message: "Detected a universal MachO file, please select an architecture to extract:",
 					Options: options,
 				}
 				survey.AskOne(prompt, &choice)
-				selectedArch = fat.Arches[choice].CPU.String()
 				farch = fat.Arches[choice]
 			}
 
@@ -126,7 +124,7 @@ var lipoCmd = &cobra.Command{
 				folder = extractPath
 			}
 			fname := filepath.Join(folder, filepath.Base(outFile)) // default to NOT full dylib path
-			if err := ioutil.WriteFile(fname, dat, 0660); err != nil {
+			if err := os.WriteFile(fname, dat, 0660); err != nil {
 				return fmt.Errorf("failed to create file %s: %v", outFile, err)
 			}
 			log.Infof("Extracted %s file as %s", farch.SubCPU.String(farch.CPU), fname)

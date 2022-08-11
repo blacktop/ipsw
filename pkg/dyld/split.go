@@ -25,7 +25,7 @@ import "C"
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -136,7 +136,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		// get XCodeVersion
 		xcodeContentPath := strings.TrimSuffix(dscExtractor.Libname, "/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
 		xcodeContentPath = filepath.Join(xcodeContentPath, "Info.plist")
-		data, err := ioutil.ReadFile(xcodeContentPath)
+		data, err := os.ReadFile(xcodeContentPath)
 		if err != nil {
 			return fmt.Errorf("failed to read %s: %v", xcodeContentPath, err)
 		}
@@ -157,7 +157,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 			return fmt.Errorf("failed to marshal stop session request: %v", err)
 		}
 		log.Infof("Creating XCode cache %s\n", infoPlistPath)
-		ioutil.WriteFile(infoPlistPath, data, 0644)
+		os.WriteFile(infoPlistPath, data, 0644)
 
 		destinationPath = filepath.Join(destinationPath, "Symbols")
 	}

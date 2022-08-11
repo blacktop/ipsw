@@ -24,7 +24,6 @@ package kernel
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -65,7 +64,7 @@ var sbprofCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		data, err := ioutil.ReadFile(kcPath)
+		data, err := os.ReadFile(kcPath)
 		if err != nil {
 			return err
 		}
@@ -76,7 +75,7 @@ var sbprofCmd = &cobra.Command{
 		}
 
 		sbProfPath := filepath.Join(filepath.Dir(kcPath), "sandbox_profile.bin")
-		err = ioutil.WriteFile(sbProfPath, the_real_platform_profile_data, 0660)
+		err = os.WriteFile(sbProfPath, the_real_platform_profile_data, 0660)
 		if err != nil {
 			return err
 		}
@@ -88,7 +87,7 @@ var sbprofCmd = &cobra.Command{
 		}
 
 		sbColPath := filepath.Join(filepath.Dir(kcPath), "sandbox_collection.bin")
-		err = ioutil.WriteFile(sbColPath, collection_data, 0660)
+		err = os.WriteFile(sbColPath, collection_data, 0660)
 		if err != nil {
 			return err
 		}
@@ -109,7 +108,7 @@ var sbprofCmd = &cobra.Command{
 
 		// for off, data := range sb.Regexes {
 		// 	regexPath := filepath.Join(regexFolder, fmt.Sprintf("regex_%x", off))
-		// 	err = ioutil.WriteFile(regexPath, data, 0660)
+		// 	err = os.WriteFile(regexPath, data, 0660)
 		// 	if err != nil {
 		// 		return err
 		// 	}

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"sort"
@@ -194,7 +193,7 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read OTA plist: %v", err)
 	}
@@ -517,7 +516,7 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	}()
 
 	for resp := range c {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("failed to read response body: %v", err)
 			continue

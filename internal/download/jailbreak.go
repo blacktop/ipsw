@@ -3,7 +3,7 @@ package download
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"time"
@@ -89,7 +89,7 @@ func GetJailbreaks() (Jailbreaks, error) {
 		return jbs, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return jbs, err
 	}

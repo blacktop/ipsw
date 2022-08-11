@@ -23,7 +23,7 @@ package cmd
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/blacktop/ipsw/internal/download"
@@ -47,7 +47,7 @@ var keyListGenCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return ioutil.WriteFile(filepath.Clean(args[0]), keysJSON, 0660)
+		return os.WriteFile(filepath.Clean(args[0]), keysJSON, 0660)
 	},
 }
 
