@@ -1,4 +1,4 @@
-package installation
+package apps
 
 import (
 	"archive/zip"
@@ -12,7 +12,7 @@ import (
 
 var infoPlistName = regexp.MustCompile("Payload/[a-zA-Z0-9]+.app/Info.plist")
 
-func AppBundleFromIpa(ipa string) (*AppBundle, error) {
+func AppBundleFromIPA(ipa string) (*AppBundle, error) {
 	ipaFile, err := zip.OpenReader(ipa)
 	if err != nil {
 		return nil, err

@@ -53,7 +53,7 @@ func (c *Client) Screenshot() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	respMap := resp.(map[string]interface{})
+	respMap := resp.(map[string]any)
 	return respMap["ScreenShotData"].([]byte), nil
 }
 

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/blacktop/ipsw/pkg/usb"
-	"github.com/blacktop/ipsw/pkg/usb/installation"
+	"github.com/blacktop/ipsw/pkg/usb/apps"
 )
 
 func TestProcess_Start(t *testing.T) {
@@ -28,7 +28,7 @@ func TestProcess_Start(t *testing.T) {
 	}
 
 	device := devices[0]
-	cli, err := installation.NewClient(device.UDID)
+	cli, err := apps.NewClient(device.UDID)
 	if err != nil {
 		t.Fatal(err)
 	}
