@@ -22,6 +22,7 @@ require (
 	github.com/jinzhu/gorm v1.9.16
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/mitchellh/go-homedir v1.1.0
+	github.com/mitchellh/mapstructure v1.5.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.2.0
@@ -34,7 +35,7 @@ require (
 	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced
 	golang.org/x/oauth2 v0.0.0-20220808172628-8227340efae7
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
-	golang.org/x/sys v0.0.0-20220808155132-1c4a2a72c664
+	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab
 )
 
 // replace github.com/blacktop/go-macho => ../go-macho
@@ -64,7 +65,6 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
-	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.2 // indirect
