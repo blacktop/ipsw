@@ -24,7 +24,6 @@ package kernel
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -269,7 +268,7 @@ var ctfdumpCmd = &cobra.Command{
 				cwd, _ := os.Getwd()
 				fileName := fmt.Sprintf("ctfdump-%s.json", kver.Kernel.XNU)
 				log.Infof("Creating %s", filepath.Join(cwd, fileName))
-				if err := ioutil.WriteFile(fileName, b, 0660); err != nil {
+				if err := os.WriteFile(fileName, b, 0660); err != nil {
 					return err
 				}
 			} else {

@@ -23,7 +23,6 @@ package idev
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -93,6 +92,6 @@ var idevSpringbIconCmd = &cobra.Command{
 			return fmt.Errorf("failed to create wallpaper directory %s: %w", filepath.Dir(fname), err)
 		}
 		log.Infof("Creating %s icon: %s", args[0], fname)
-		return ioutil.WriteFile(fname, iconData, 0660)
+		return os.WriteFile(fname, iconData, 0660)
 	},
 }

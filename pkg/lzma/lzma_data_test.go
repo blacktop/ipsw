@@ -5,8 +5,8 @@
 package lzma
 
 import (
-	"io/ioutil"
 	"log"
+	"os"
 )
 
 type lzmaTest struct {
@@ -296,7 +296,7 @@ type lzmaBenchmark struct {
 }
 
 func readFile(filename string) []byte {
-	file, err := ioutil.ReadFile(filename)
+	file, err := os.ReadFile(filename)
 	if err != nil {
 		log.Fatalf("%v", err)
 	}

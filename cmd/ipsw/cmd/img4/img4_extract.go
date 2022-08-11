@@ -24,7 +24,6 @@ package img4
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 
 	"github.com/apex/log"
@@ -74,12 +73,12 @@ var img4ExtractCmd = &cobra.Command{
 				return fmt.Errorf("failed to lzfse decompress %s: %v", args[0], err)
 			}
 
-			err = ioutil.WriteFile(outFile, dat, 0660)
+			err = os.WriteFile(outFile, dat, 0660)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write file: ", outFile)
 			}
 		} else {
-			err = ioutil.WriteFile(outFile, i.Data, 0660)
+			err = os.WriteFile(outFile, i.Data, 0660)
 			if err != nil {
 				return errors.Wrapf(err, "failed to write file: ", outFile)
 			}

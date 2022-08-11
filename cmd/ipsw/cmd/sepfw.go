@@ -26,7 +26,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -217,7 +216,7 @@ var sepCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		dat, err := ioutil.ReadAll(f)
+		dat, err := io.ReadAll(f)
 		if err != nil {
 			return errors.Wrapf(err, "unabled to read file: %s", args[0])
 		}
@@ -378,7 +377,7 @@ var sepCmd = &cobra.Command{
 
 		// 	fname := fmt.Sprintf("sepdump_%s_%s", macho.Name, m.SourceVersion())
 		// 	utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", fname))
-		// 	ioutil.WriteFile(fname, outDat, 0660)
+		// 	os.WriteFile(fname, outDat, 0660)
 		// 	if err != nil {
 		// 		return errors.Wrapf(err, "unabled to write file: %s", fname)
 		// 	}

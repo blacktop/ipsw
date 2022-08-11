@@ -24,7 +24,6 @@ package dyld
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -269,7 +268,7 @@ var DisassCmd = &cobra.Command{
 
 		if len(funcFile) > 0 {
 			funcFile = filepath.Clean(funcFile)
-			fdata, _ := ioutil.ReadFile(funcFile)
+			fdata, _ := os.ReadFile(funcFile)
 
 			var funcs []Func
 			if err := json.Unmarshal(fdata, &funcs); err != nil {

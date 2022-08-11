@@ -24,7 +24,6 @@ package idev
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -100,7 +99,7 @@ var FetchsymsCmd = &cobra.Command{
 				return fmt.Errorf("failed to read file %s: %w", file, err)
 			}
 
-			if err := ioutil.WriteFile(fname, buf.Bytes(), 0660); err != nil {
+			if err := os.WriteFile(fname, buf.Bytes(), 0660); err != nil {
 				return fmt.Errorf("failed to write file %s: %w", fname, err)
 			}
 		}

@@ -3,7 +3,6 @@ package plist
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -88,7 +87,7 @@ func GetBinaryInApp(path string) (string, error) {
 	if filepath.Ext(path) == ".app" {
 		infoPath := filepath.Join(path, "Info.plist")
 		if _, err := os.Stat(filepath.Join(path, "Info.plist")); err == nil { // iOS
-			dat, err := ioutil.ReadFile(infoPath)
+			dat, err := os.ReadFile(infoPath)
 			if err != nil {
 				return "", fmt.Errorf("failed to read %s: %w", infoPath, err)
 			}
@@ -102,7 +101,7 @@ func GetBinaryInApp(path string) (string, error) {
 			return "", fmt.Errorf("failed to find CFBundleExecutable in %s", infoPath)
 		} else if _, err := os.Stat(filepath.Join(path, "Contents", "Info.plist")); err == nil { // MacOS
 			infoPath = filepath.Join(path, "Contents", "Info.plist")
-			dat, err := ioutil.ReadFile(infoPath)
+			dat, err := os.ReadFile(infoPath)
 			if err != nil {
 				return "", fmt.Errorf("failed to read %s: %w", infoPath, err)
 			}

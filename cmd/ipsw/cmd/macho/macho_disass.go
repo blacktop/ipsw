@@ -231,7 +231,7 @@ var machoDisassCmd = &cobra.Command{
 					}
 				}
 			}
-			if data == nil {
+			if len(data) > 0 {
 				log.Fatal("failed to disassemble")
 			}
 

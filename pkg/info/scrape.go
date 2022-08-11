@@ -2,8 +2,8 @@ package info
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
+	"os"
 
 	"github.com/gocolly/colly/v2"
 )
@@ -105,7 +105,7 @@ func ScrapeURLs(build string) error {
 	if err != nil {
 		return err
 	}
-	ioutil.WriteFile("procs.json", procsJSON, 0660)
+	os.WriteFile("procs.json", procsJSON, 0660)
 
 	return nil
 }

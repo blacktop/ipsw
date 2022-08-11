@@ -6,7 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/blacktop/ipsw/internal/utils"
@@ -72,7 +72,7 @@ func WriteToJSON(devices []Device, dest string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath.Clean(dest), dJSON, 0660)
+	return os.WriteFile(filepath.Clean(dest), dJSON, 0660)
 }
 
 // GetDevices reads the devices from embedded JSON

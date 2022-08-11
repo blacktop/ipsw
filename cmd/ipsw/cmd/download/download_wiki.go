@@ -24,7 +24,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -135,7 +134,7 @@ var wikiCmd = &cobra.Command{
 					if err != nil {
 						log.Errorf("failed to marshal OTA metadata: %v", err)
 					}
-					if err := ioutil.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
+					if err := os.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
 						log.Errorf("failed to write OTA metadata: %v", err)
 					}
 				}()
@@ -168,7 +167,7 @@ var wikiCmd = &cobra.Command{
 						// if err != nil {
 						// 	return fmt.Errorf("failed to marshal OTA metadata: %v", err)
 						// }
-						// if err := ioutil.WriteFile(filepath.Join(destPath, fmt.Sprintf("ota_db_%d.json", idx)), dat, 0660); err != nil {
+						// if err := os.WriteFile(filepath.Join(destPath, fmt.Sprintf("ota_db_%d.json", idx)), dat, 0660); err != nil {
 						// 	return fmt.Errorf("failed to write OTA metadata: %v", err)
 						// }
 						db[url] = i.ToJSON()
@@ -176,7 +175,7 @@ var wikiCmd = &cobra.Command{
 						if err != nil {
 							return fmt.Errorf("failed to marshal OTA metadata: %v", err)
 						}
-						if err := ioutil.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
+						if err := os.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
 							return fmt.Errorf("failed to write OTA metadata: %v", err)
 						}
 					} else {
@@ -247,7 +246,7 @@ var wikiCmd = &cobra.Command{
 						if err != nil {
 							log.Errorf("failed to marshal IPSW metadata: %v", err)
 						}
-						if err := ioutil.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
+						if err := os.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
 							log.Errorf("failed to write IPSW metadata: %v", err)
 						}
 					}()
@@ -280,7 +279,7 @@ var wikiCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to marshal IPSW metadata: %v", err)
 				}
-				if err := ioutil.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
+				if err := os.WriteFile(viper.GetString("download.wiki.db"), dat, 0660); err != nil {
 					return fmt.Errorf("failed to write IPSW metadata: %v", err)
 				}
 			} else {

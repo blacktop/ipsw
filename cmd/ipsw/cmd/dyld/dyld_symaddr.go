@@ -24,7 +24,6 @@ package dyld
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -107,7 +106,7 @@ var SymAddrCmd = &cobra.Command{
 			var slout []dyld.Symbol
 
 			symbolFile = filepath.Clean(symbolFile)
-			sdata, _ := ioutil.ReadFile(symbolFile)
+			sdata, _ := os.ReadFile(symbolFile)
 
 			if err := json.Unmarshal(sdata, &slin); err != nil {
 				return fmt.Errorf("failed to parse symbol lookup JSON file %s: %v", symbolFile, err)

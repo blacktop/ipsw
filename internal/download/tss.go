@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"net/http"
 	"strconv"
@@ -234,7 +234,7 @@ func GetTSS(version, proxy string, insecure bool) (*TSSBlob, error) {
 		return nil, fmt.Errorf("failed to connect to URL: got status %s", resp.Status)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %v", err)
 	}
