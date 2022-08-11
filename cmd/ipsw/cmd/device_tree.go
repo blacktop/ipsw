@@ -25,11 +25,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	// "sort"
-	"io/ioutil"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -91,7 +91,7 @@ var deviceTreeCmd = &cobra.Command{
 						return err
 					}
 					fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
-					err = ioutil.WriteFile(fileName+".json", j, 0660)
+					err = os.WriteFile(fileName+".json", j, 0660)
 					if err != nil {
 						return errors.Wrap(err, "failed to decompress kernelcache")
 					}
@@ -110,7 +110,7 @@ var deviceTreeCmd = &cobra.Command{
 				}
 			}
 		} else {
-			content, err := ioutil.ReadFile(args[0])
+			content, err := os.ReadFile(args[0])
 			if err != nil {
 				return errors.Wrap(err, "failed to read DeviceTree")
 			}

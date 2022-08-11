@@ -24,7 +24,6 @@ package cmd
 import (
 	"archive/zip"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -178,7 +177,7 @@ var extractCmd = &cobra.Command{
 				if len(sysDMG) == 0 {
 					return fmt.Errorf("only iOS16.x/macOS13.x supported: no SystemOS DMG found in remote zip metadata")
 				}
-				tmpDIR, err := ioutil.TempDir("", "ipsw_extract_remote_dyld")
+				tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
 				if err != nil {
 					return fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
 				}
@@ -224,7 +223,7 @@ var extractCmd = &cobra.Command{
 				}
 				fmt.Println(out)
 				os.Mkdir(destPath, 0770)
-				if err := ioutil.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
+				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
 					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
 				}
 			}
@@ -325,7 +324,7 @@ var extractCmd = &cobra.Command{
 				}
 				fmt.Println(out)
 				os.Mkdir(destPath, 0770)
-				if err := ioutil.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
+				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
 					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
 				}
 			}
@@ -339,17 +338,17 @@ var extractCmd = &cobra.Command{
 
 				if viper.GetBool("extract.files") { // SEARCH THE DMGs
 					if appOS, err := i.GetAppOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, destPath, appOS, patternRE); err != nil {
+						if err := extractFromDMG(ipswPath, appOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
 						}
 					}
 					if systemOS, err := i.GetSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, destPath, systemOS, patternRE); err != nil {
+						if err := extractFromDMG(ipswPath, systemOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
 						}
 					}
 					if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, destPath, fsOS, patternRE); err != nil {
+						if err := extractFromDMG(ipswPath, fsOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
 						}
 					}

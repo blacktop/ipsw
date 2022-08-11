@@ -87,7 +87,6 @@ func (lc *lenCoder) setPrices(prices []uint32, posState, numSymbols, st uint32) 
 	}
 }
 
-
 type lenPriceTableCoder struct {
 	lc        *lenCoder
 	prices    []uint32

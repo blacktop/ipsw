@@ -336,8 +336,9 @@ const (
 )
 
 // encoding ::= <(function) name> <bare-function-type>
-//              <(data) name>
-//              <special-name>
+//
+//	<(data) name>
+//	<special-name>
 func (st *state) encoding(params bool, local forLocalNameType) AST {
 	if len(st.str) < 1 {
 		st.fail("expected encoding")
@@ -513,15 +514,18 @@ func (st *state) taggedName(a AST) AST {
 }
 
 // <name> ::= <nested-name>
-//        ::= <unscoped-name>
-//        ::= <unscoped-template-name> <template-args>
-//        ::= <local-name>
+//
+//	::= <unscoped-name>
+//	::= <unscoped-template-name> <template-args>
+//	::= <local-name>
 //
 // <unscoped-name> ::= <unqualified-name>
-//                 ::= St <unqualified-name>
+//
+//	::= St <unqualified-name>
 //
 // <unscoped-template-name> ::= <unscoped-name>
-//                          ::= <substitution>
+//
+//	::= <substitution>
 func (st *state) name() AST {
 	if len(st.str) < 1 {
 		st.fail("expected name")
@@ -597,7 +601,8 @@ func (st *state) name() AST {
 }
 
 // <nested-name> ::= N [<CV-qualifiers>] [<ref-qualifier>] <prefix> <unqualified-name> E
-//               ::= N [<CV-qualifiers>] [<ref-qualifier>] <template-prefix> <template-args> E
+//
+//	::= N [<CV-qualifiers>] [<ref-qualifier>] <template-prefix> <template-args> E
 func (st *state) nestedName() AST {
 	st.checkChar('N')
 	q := st.cvQualifiers()
@@ -614,18 +619,21 @@ func (st *state) nestedName() AST {
 }
 
 // <prefix> ::= <prefix> <unqualified-name>
-//          ::= <template-prefix> <template-args>
-//          ::= <template-param>
-//          ::= <decltype>
-//          ::=
-//          ::= <substitution>
+//
+//	::= <template-prefix> <template-args>
+//	::= <template-param>
+//	::= <decltype>
+//	::=
+//	::= <substitution>
 //
 // <template-prefix> ::= <prefix> <(template) unqualified-name>
-//                   ::= <template-param>
-//                   ::= <substitution>
+//
+//	::= <template-param>
+//	::= <substitution>
 //
 // <decltype> ::= Dt <expression> E
-//            ::= DT <expression> E
+//
+//	::= DT <expression> E
 func (st *state) prefix() AST {
 	var a AST
 
@@ -781,11 +789,12 @@ func (st *state) prefix() AST {
 }
 
 // <unqualified-name> ::= <operator-name>
-//                    ::= <ctor-dtor-name>
-//                    ::= <source-name>
-//                    ::= <local-source-name>
 //
-//  <local-source-name>	::= L <source-name> <discriminator>
+//	                  ::= <ctor-dtor-name>
+//	                  ::= <source-name>
+//	                  ::= <local-source-name>
+//
+//	<local-source-name>	::= L <source-name> <discriminator>
 func (st *state) unqualifiedName() (r AST, isCast bool) {
 	if len(st.str) < 1 {
 		st.fail("expected unqualified name")
@@ -1034,8 +1043,9 @@ var operators = map[string]operator{
 }
 
 // operator_name ::= many different two character encodings.
-//               ::= cv <type>
-//               ::= v <digit> <source-name>
+//
+//	::= cv <type>
+//	::= v <digit> <source-name>
 //
 // We need to know whether we are in an expression because it affects
 // how we handle template parameters in the type of a cast operator.
@@ -1072,8 +1082,9 @@ func (st *state) operatorName(inExpression bool) (AST, int) {
 }
 
 // <local-name> ::= Z <(function) encoding> E <(entity) name> [<discriminator>]
-//              ::= Z <(function) encoding> E s [<discriminator>]
-//              ::= Z <(function) encoding> E d [<parameter> number>] _ <entity name>
+//
+//	::= Z <(function) encoding> E s [<discriminator>]
+//	::= Z <(function) encoding> E d [<parameter> number>] _ <entity name>
 func (st *state) localName() AST {
 	st.checkChar('Z')
 	fn := st.encoding(true, forLocalName)
@@ -1143,22 +1154,25 @@ func (st *state) javaResource() AST {
 }
 
 // <special-name> ::= TV <type>
-//                ::= TT <type>
-//                ::= TI <type>
-//                ::= TS <type>
-//                ::= TA <template-arg>
-//                ::= GV <(object) name>
-//                ::= T <call-offset> <(base) encoding>
-//                ::= Tc <call-offset> <call-offset> <(base) encoding>
+//
+//	::= TT <type>
+//	::= TI <type>
+//	::= TS <type>
+//	::= TA <template-arg>
+//	::= GV <(object) name>
+//	::= T <call-offset> <(base) encoding>
+//	::= Tc <call-offset> <call-offset> <(base) encoding>
+//
 // Also g++ extensions:
-//                ::= TC <type> <(offset) number> _ <(base) type>
-//                ::= TF <type>
-//                ::= TJ <type>
-//                ::= GR <name>
-//                ::= GA <encoding>
-//                ::= Gr <resource name>
-//                ::= GTt <encoding>
-//                ::= GTn <encoding>
+//
+//	::= TC <type> <(offset) number> _ <(base) type>
+//	::= TF <type>
+//	::= TJ <type>
+//	::= GR <name>
+//	::= GA <encoding>
+//	::= Gr <resource name>
+//	::= GTt <encoding>
+//	::= GTn <encoding>
 func (st *state) specialName() AST {
 	if st.str[0] == 'T' {
 		st.advance(1)
@@ -1272,7 +1286,8 @@ func (st *state) specialName() AST {
 }
 
 // <call-offset> ::= h <nv-offset> _
-//               ::= v <v-offset> _
+//
+//	::= v <v-offset> _
 //
 // <nv-offset> ::= <(offset) number>
 //
@@ -1335,23 +1350,25 @@ var builtinTypes = map[byte]string{
 }
 
 // <type> ::= <builtin-type>
-//        ::= <function-type>
-//        ::= <class-enum-type>
-//        ::= <array-type>
-//        ::= <pointer-to-member-type>
-//        ::= <template-param>
-//        ::= <template-template-param> <template-args>
-//        ::= <substitution>
-//        ::= <CV-qualifiers> <type>
-//        ::= P <type>
-//        ::= R <type>
-//        ::= O <type> (C++0x)
-//        ::= C <type>
-//        ::= G <type>
-//        ::= U <source-name> <type>
+//
+//	::= <function-type>
+//	::= <class-enum-type>
+//	::= <array-type>
+//	::= <pointer-to-member-type>
+//	::= <template-param>
+//	::= <template-template-param> <template-args>
+//	::= <substitution>
+//	::= <CV-qualifiers> <type>
+//	::= P <type>
+//	::= R <type>
+//	::= O <type> (C++0x)
+//	::= C <type>
+//	::= G <type>
+//	::= U <source-name> <type>
 //
 // <builtin-type> ::= various one letter codes
-//                ::= u <source-name>
+//
+//	::= u <source-name>
 func (st *state) demangleType(isCast bool) AST {
 	if len(st.str) == 0 {
 		st.fail("expected type")
@@ -1762,7 +1779,8 @@ qualLoop:
 }
 
 // <ref-qualifier> ::= R
-//                 ::= O
+//
+//	::= O
 func (st *state) refQualifier() string {
 	if len(st.str) > 0 {
 		switch st.str[0] {
@@ -1850,7 +1868,8 @@ func (st *state) bareFunctionType(hasReturnType bool) AST {
 }
 
 // <array-type> ::= A <(positive dimension) number> _ <(element) type>
-//              ::= A [<(dimension) expression>] _ <(element) type>
+//
+//	::= A [<(dimension) expression>] _ <(element) type>
 func (st *state) arrayType(isCast bool) AST {
 	st.checkChar('A')
 
@@ -1891,7 +1910,8 @@ func (st *state) arrayType(isCast bool) AST {
 }
 
 // <vector-type> ::= Dv <number> _ <type>
-//               ::= Dv _ <expression> _ <type>
+//
+//	::= Dv _ <expression> _ <type>
 func (st *state) vectorType(isCast bool) AST {
 	if len(st.str) == 0 {
 		st.fail("expected vector dimension")
@@ -1962,9 +1982,10 @@ func (st *state) compactNumber() int {
 }
 
 // <template-param> ::= T_
-//                  ::= T <(parameter-2 non-negative) number> _
-//                  ::= TL <level-1> __
-//                  ::= TL <level-1> _ <parameter-2 non-negative number> _
+//
+//	::= T <(parameter-2 non-negative) number> _
+//	::= TL <level-1> __
+//	::= TL <level-1> _ <parameter-2 non-negative number> _
 //
 // When a template parameter is a substitution candidate, any
 // reference to that substitution refers to the template parameter
@@ -2078,8 +2099,9 @@ func (st *state) templateArgs() []AST {
 }
 
 // <template-arg> ::= <type>
-//                ::= X <expression> E
-//                ::= <expr-primary>
+//
+//	::= X <expression> E
+//	::= <expr-primary>
 func (st *state) templateArg() AST {
 	if len(st.str) == 0 {
 		st.fail("missing template argument")
@@ -2126,65 +2148,67 @@ func (st *state) exprList(stop byte) AST {
 }
 
 // <expression> ::= <(unary) operator-name> <expression>
-//              ::= <(binary) operator-name> <expression> <expression>
-//              ::= <(trinary) operator-name> <expression> <expression> <expression>
-//              ::= pp_ <expression>
-//              ::= mm_ <expression>
-//              ::= cl <expression>+ E
-//              ::= cl <expression>+ E
-//              ::= cv <type> <expression>
-//              ::= cv <type> _ <expression>* E
-//              ::= tl <type> <braced-expression>* E
-//              ::= il <braced-expression>* E
-//              ::= [gs] nw <expression>* _ <type> E
-//              ::= [gs] nw <expression>* _ <type> <initializer>
-//              ::= [gs] na <expression>* _ <type> E
-//              ::= [gs] na <expression>* _ <type> <initializer>
-//              ::= [gs] dl <expression>
-//              ::= [gs] da <expression>
-//              ::= dc <type> <expression>
-//              ::= sc <type> <expression>
-//              ::= cc <type> <expression>
-//              ::= mc <parameter type> <expr> [<offset number>] E
-//              ::= rc <type> <expression>
-//              ::= ti <type>
-//              ::= te <expression>
-//              ::= so <referent type> <expr> [<offset number>] <union-selector>* [p] E
-//              ::= st <type>
-//              ::= sz <expression>
-//              ::= at <type>
-//              ::= az <expression>
-//              ::= nx <expression>
-//              ::= <template-param>
-//              ::= <function-param>
-//              ::= dt <expression> <unresolved-name>
-//              ::= pt <expression> <unresolved-name>
-//              ::= ds <expression> <expression>
-//              ::= sZ <template-param>
-//              ::= sZ <function-param>
-//              ::= sP <template-arg>* E
-//              ::= sp <expression>
-//              ::= fl <binary operator-name> <expression>
-//              ::= fr <binary operator-name> <expression>
-//              ::= fL <binary operator-name> <expression> <expression>
-//              ::= fR <binary operator-name> <expression> <expression>
-//              ::= tw <expression>
-//              ::= tr
-//              ::= u <source-name> <template-arg>* E
-//              ::= <unresolved-name>
-//              ::= <expr-primary>
+//
+//	::= <(binary) operator-name> <expression> <expression>
+//	::= <(trinary) operator-name> <expression> <expression> <expression>
+//	::= pp_ <expression>
+//	::= mm_ <expression>
+//	::= cl <expression>+ E
+//	::= cl <expression>+ E
+//	::= cv <type> <expression>
+//	::= cv <type> _ <expression>* E
+//	::= tl <type> <braced-expression>* E
+//	::= il <braced-expression>* E
+//	::= [gs] nw <expression>* _ <type> E
+//	::= [gs] nw <expression>* _ <type> <initializer>
+//	::= [gs] na <expression>* _ <type> E
+//	::= [gs] na <expression>* _ <type> <initializer>
+//	::= [gs] dl <expression>
+//	::= [gs] da <expression>
+//	::= dc <type> <expression>
+//	::= sc <type> <expression>
+//	::= cc <type> <expression>
+//	::= mc <parameter type> <expr> [<offset number>] E
+//	::= rc <type> <expression>
+//	::= ti <type>
+//	::= te <expression>
+//	::= so <referent type> <expr> [<offset number>] <union-selector>* [p] E
+//	::= st <type>
+//	::= sz <expression>
+//	::= at <type>
+//	::= az <expression>
+//	::= nx <expression>
+//	::= <template-param>
+//	::= <function-param>
+//	::= dt <expression> <unresolved-name>
+//	::= pt <expression> <unresolved-name>
+//	::= ds <expression> <expression>
+//	::= sZ <template-param>
+//	::= sZ <function-param>
+//	::= sP <template-arg>* E
+//	::= sp <expression>
+//	::= fl <binary operator-name> <expression>
+//	::= fr <binary operator-name> <expression>
+//	::= fL <binary operator-name> <expression> <expression>
+//	::= fR <binary operator-name> <expression> <expression>
+//	::= tw <expression>
+//	::= tr
+//	::= u <source-name> <template-arg>* E
+//	::= <unresolved-name>
+//	::= <expr-primary>
 //
 // <function-param> ::= fp <CV-qualifiers> _
-//                  ::= fp <CV-qualifiers> <number>
-//                  ::= fL <number> p <CV-qualifiers> _
-//                  ::= fL <number> p <CV-qualifiers> <number>
-//                  ::= fpT
+//
+//	::= fp <CV-qualifiers> <number>
+//	::= fL <number> p <CV-qualifiers> _
+//	::= fL <number> p <CV-qualifiers> <number>
+//	::= fpT
 //
 // <braced-expression> ::= <expression>
-//                     ::= di <field source-name> <braced-expression>
-//                     ::= dx <index expression> <braced-expression>
-//                     ::= dX <range begin expression> <range end expression> <braced-expression>
 //
+//	::= di <field source-name> <braced-expression>
+//	::= dx <index expression> <braced-expression>
+//	::= dX <range begin expression> <range end expression> <braced-expression>
 func (st *state) expression() AST {
 	if len(st.str) == 0 {
 		st.fail("expected expression")
@@ -2466,9 +2490,10 @@ func (st *state) subobject() AST {
 }
 
 // <unresolved-name> ::= [gs] <base-unresolved-name>
-//                   ::= sr <unresolved-type> <base-unresolved-name>
-//                   ::= srN <unresolved-type> <unresolved-qualifier-level>+ E <base-unresolved-name>
-//                   ::= [gs] sr <unresolved-qualifier-level>+ E <base-unresolved-name>
+//
+//	::= sr <unresolved-type> <base-unresolved-name>
+//	::= srN <unresolved-type> <unresolved-qualifier-level>+ E <base-unresolved-name>
+//	::= [gs] sr <unresolved-qualifier-level>+ E <base-unresolved-name>
 func (st *state) unresolvedName() AST {
 	if len(st.str) >= 2 && st.str[:2] == "gs" {
 		st.advance(2)
@@ -2542,11 +2567,12 @@ func (st *state) unresolvedName() AST {
 }
 
 // <base-unresolved-name> ::= <simple-id>
-//                        ::= on <operator-name>
-//                        ::= on <operator-name> <template-args>
-//                        ::= dn <destructor-name>
 //
-//<simple-id> ::= <source-name> [ <template-args> ]
+//	::= on <operator-name>
+//	::= on <operator-name> <template-args>
+//	::= dn <destructor-name>
+//
+// <simple-id> ::= <source-name> [ <template-args> ]
 func (st *state) baseUnresolvedName() AST {
 	var n AST
 	if len(st.str) >= 2 && st.str[:2] == "on" {
@@ -2576,8 +2602,9 @@ func (st *state) baseUnresolvedName() AST {
 }
 
 // <expr-primary> ::= L <type> <(value) number> E
-//                ::= L <type> <(value) float> E
-//                ::= L <mangled-name> E
+//
+//	::= L <type> <(value) float> E
+//	::= L <mangled-name> E
 func (st *state) exprPrimary() AST {
 	st.checkChar('L')
 	if len(st.str) == 0 {
@@ -2646,7 +2673,8 @@ func (st *state) exprPrimary() AST {
 }
 
 // <discriminator> ::= _ <(non-negative) number> (when number < 10)
-//                     __ <(non-negative) number> _ (when number >= 10)
+//
+//	__ <(non-negative) number> _ (when number >= 10)
 func (st *state) discriminator(a AST) AST {
 	if len(st.str) == 0 || st.str[0] != '_' {
 		// clang can generate a discriminator at the end of
@@ -2725,9 +2753,10 @@ func (st *state) closureTypeName() AST {
 }
 
 // <template-param-decl> ::= Ty                          # type parameter
-//                       ::= Tn <type>                   # non-type parameter
-//                       ::= Tt <template-param-decl>* E # template parameter
-//                       ::= Tp <template-param-decl>    # parameter pack
+//
+//	::= Tn <type>                   # non-type parameter
+//	::= Tt <template-param-decl>* E # template parameter
+//	::= Tp <template-param-decl>    # parameter pack
 //
 // Returns the new AST to include in the AST we are building and the
 // new AST to add to the list of template parameters.
@@ -2907,14 +2936,15 @@ var verboseAST = map[byte]AST{
 }
 
 // <substitution> ::= S <seq-id> _
-//                ::= S_
-//                ::= St
-//                ::= Sa
-//                ::= Sb
-//                ::= Ss
-//                ::= Si
-//                ::= So
-//                ::= Sd
+//
+//	::= S_
+//	::= St
+//	::= Sa
+//	::= Sb
+//	::= Ss
+//	::= Si
+//	::= So
+//	::= Sd
 func (st *state) substitution(forPrefix bool) AST {
 	st.checkChar('S')
 	if len(st.str) == 0 {

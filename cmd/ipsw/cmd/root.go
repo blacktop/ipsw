@@ -28,6 +28,12 @@ import (
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/download"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/dyld"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/idev"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img4"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/kernel"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/macho"
 	"github.com/spf13/cobra"
 
 	// "github.com/spf13/cobra/doc"
@@ -48,7 +54,7 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "ipsw",
-	Short: "Download and Parse IPSWs",
+	Short: "Download and Parse IPSWs (and SO much more)",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -68,10 +74,19 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 
+	// Flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
-	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
+
+	rootCmd.AddCommand(download.DownloadCmd)
+	rootCmd.AddCommand(dyld.DyldCmd)
+	rootCmd.AddCommand(idev.IDevCmd)
+	rootCmd.AddCommand(img4.Img4Cmd)
+	rootCmd.AddCommand(kernel.KernelcacheCmd)
+	rootCmd.AddCommand(macho.MachoCmd)
 }
 
 // initConfig reads in config file and ENV variables if set.

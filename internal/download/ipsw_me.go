@@ -3,7 +3,7 @@ package download
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 )
@@ -47,7 +47,7 @@ func GetAllDevices() ([]Device, error) {
 		return devices, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return devices, err
 	}
@@ -73,7 +73,7 @@ func GetDevice(identifier string) (Device, error) {
 		return d, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return d, err
 	}
@@ -108,7 +108,7 @@ func GetAllIPSW(version string) ([]IPSW, error) {
 		return nil, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return ipsws, err
 	}
@@ -136,7 +136,7 @@ func GetIPSW(identifier, buildID string) (IPSW, error) {
 		return i, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return i, err
 	}
@@ -167,7 +167,7 @@ func GetVersion(buildID string) (string, error) {
 			return "", fmt.Errorf("api returned status: %s", res.Status)
 		}
 
-		body, err := ioutil.ReadAll(res.Body)
+		body, err := io.ReadAll(res.Body)
 		if err != nil {
 			return "", err
 		}
@@ -200,7 +200,7 @@ func GetBuildID(version, identifier string) (string, error) {
 		return "", fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return "", err
 	}

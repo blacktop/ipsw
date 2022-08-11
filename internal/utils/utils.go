@@ -8,7 +8,6 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -266,7 +265,7 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				io.ReadFull(rc, data)
 				rc.Close()
 				Indent(log.Info, 2)(fmt.Sprintf("Created %s", strings.TrimPrefix(fname, cwd)))
-				if err := ioutil.WriteFile(fname, data, 0660); err != nil {
+				if err := os.WriteFile(fname, data, 0660); err != nil {
 					return fmt.Errorf("error writing remote unzipped file %s data: %v", f.Name, err)
 				}
 			} else {

@@ -3,7 +3,7 @@ package download
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -319,7 +319,7 @@ func NewiTunesVersionMaster() (*ITunesVersionMaster, error) {
 		return nil, errors.Wrap(err, "failed to create http client")
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read plist")
 	}
@@ -339,7 +339,7 @@ func NewMacOsXML() (*ITunesVersionMaster, error) {
 		return nil, errors.Wrap(err, "failed to create http client")
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read plist")
 	}
@@ -359,7 +359,7 @@ func NewIBridgeXML() (*ITunesVersionMaster, error) {
 		return nil, errors.Wrap(err, "failed to create http client")
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read plist")
 	}

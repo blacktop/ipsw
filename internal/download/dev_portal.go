@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -291,7 +291,7 @@ func (app *App) getITCServiceKey() error {
 	}
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
@@ -337,7 +337,7 @@ func (app *App) signIn(username, password string) error {
 	}
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
@@ -407,7 +407,7 @@ func (app *App) signIn(username, password string) error {
 		// cpath := filepath.Join(cwd, "..", "..", "test-caches", "CODE")
 		// fmt.Printf("Enter code in file (%s): ", cpath)
 		// for {
-		// 	codeSTR, err := ioutil.ReadFile(cpath)
+		// 	codeSTR, err := os.ReadFile(cpath)
 		// 	if err != nil {
 		// 		return err
 		// 	}
@@ -415,7 +415,7 @@ func (app *App) signIn(username, password string) error {
 		// 		code = string(codeSTR)
 		// 		// remove code for next time
 		// 		defer func() {
-		// 			if err := ioutil.WriteFile(cpath, []byte(""), 0660); err != nil {
+		// 			if err := os.WriteFile(cpath, []byte(""), 0660); err != nil {
 		// 				log.Error(err.Error())
 		// 			}
 		// 		}()
@@ -466,7 +466,7 @@ func (app *App) getAuthOptions() error {
 	}
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
@@ -506,7 +506,7 @@ func (app *App) requestCode(phoneID int) error {
 	}
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
@@ -570,7 +570,7 @@ func (app *App) verifyCode(codeType, code string, phoneID int) error {
 	}
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
@@ -612,7 +612,7 @@ func (app *App) updateSession() error {
 	}
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}
@@ -842,7 +842,7 @@ func (app *App) getDownloads() (*Downloads, error) {
 	}
 	defer response.Body.Close()
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
