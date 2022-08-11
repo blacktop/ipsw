@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"fmt"
@@ -37,7 +37,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(devCmd)
+	DownloadCmd.AddCommand(devCmd)
 
 	devCmd.Flags().StringArray("watch", []string{}, "dev portal type to watch")
 	devCmd.Flags().Bool("more", false, "Download 'More' OSs/Apps")

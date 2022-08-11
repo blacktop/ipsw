@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"fmt"
@@ -40,7 +40,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(ipswCmd)
+	DownloadCmd.AddCommand(ipswCmd)
 
 	ipswCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	ipswCmd.Flags().Bool("show-latest", false, "Show latest iOS version")

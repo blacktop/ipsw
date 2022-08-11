@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"encoding/json"
@@ -44,7 +44,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(otaDLCmd)
+	DownloadCmd.AddCommand(otaDLCmd)
 
 	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")

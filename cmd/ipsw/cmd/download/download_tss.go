@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"fmt"
@@ -31,7 +31,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(tssCmd)
+	DownloadCmd.AddCommand(tssCmd)
 
 	tssCmd.Flags().StringP("signed", "s", "", "Check if iOS version is still being signed")
 	viper.BindPFlag("download.tss.signed", tssCmd.Flags().Lookup("signed"))

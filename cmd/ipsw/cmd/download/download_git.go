@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package download
 
 import (
 	"crypto/tls"
@@ -37,7 +37,7 @@ import (
 )
 
 func init() {
-	downloadCmd.AddCommand(gitCmd)
+	DownloadCmd.AddCommand(gitCmd)
 
 	gitCmd.Flags().StringP("product", "p", "", "macOS product to download (i.e. dyld)")
 	gitCmd.Flags().StringP("output", "o", "", "Folder to download files to")
