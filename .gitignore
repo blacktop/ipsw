@@ -21,8 +21,6 @@ __debug_bin
 *.ipsw
 *.zip
 *.im4p
-kernelcache.*
-dyld_shared_cache*
 *_Restore
 System
 usr
@@ -49,6 +47,7 @@ public
 site/
 www/docs/static/releases*.json
 
+# Other
 *.unstripped
 *.bndb
 *.lock
