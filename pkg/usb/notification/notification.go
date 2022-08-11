@@ -1,6 +1,10 @@
 package notification
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 )
@@ -9,18 +13,14 @@ const (
 	serviceName = "com.apple.mobile.notification_proxy"
 )
 
-type RequestBase struct {
-	Command string `plist:"Command"`
-}
-
 type ObserveNotificationRequest struct {
-	RequestBase
-	Name string `plist:"Name"`
+	Command string `plist:"Command,omitempty"`
+	Name    string `plist:"Name,omitempty"`
 }
 
 type ObserveNotificationEvent struct {
-	RequestBase
-	Name string `plist:"Name"`
+	Command string `plist:"Command,omitempty"`
+	Name    string `plist:"Name,omitempty"`
 }
 
 type Client struct {
@@ -39,13 +39,79 @@ func NewClient(udid string) (*Client, error) {
 
 func (c *Client) ObserveNotification(notification string) error {
 	req := ObserveNotificationRequest{
-		RequestBase: RequestBase{"ObserveNotification"},
-		Name:        notification,
+		Command: "ObserveNotification",
+		Name:    notification,
 	}
-	_ = req
+	if err := c.c.Send(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) ObserveAllNotifications() error {
+	for _, notification := range notifications {
+		req := ObserveNotificationRequest{
+			Command: "ObserveNotification",
+			Name:    notification,
+		}
+		if err := c.c.Send(req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) PostNotification(notification string) error {
+	req := ObserveNotificationEvent{
+		Command: "PostNotification",
+		Name:    notification,
+	}
+	if err := c.c.Send(req); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c *Client) Listen(ctx context.Context) error {
+	stoped := false
+	event := &ObserveNotificationEvent{}
+
+	go func() {
+		<-ctx.Done()
+		stoped = true
+	}()
+
+	for {
+		if err := c.c.Recv(event); err != nil {
+			return err
+		}
+		switch event.Command {
+		case "RelayNotification":
+			log.Info(event.Name)
+		case "ProxyDeath":
+			return fmt.Errorf("notification %s proxy died", event.Name)
+		default:
+			log.Log.Debugf("unknown notification event: %#v", event)
+		}
+		if stoped {
+			break
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) shutdown() error {
+	req := ObserveNotificationEvent{
+		Command: "Shutdown",
+	}
+	if err := c.c.Send(req); err != nil {
+		return err
+	}
 	return nil
 }
 
 func (c *Client) Close() error {
+	c.shutdown()
 	return c.c.Close()
 }
