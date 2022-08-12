@@ -22,7 +22,7 @@ func TestClient_CopyFileToDevice(t *testing.T) {
 	t.Log(devices)
 
 	device := devices[0]
-	afcClient, err := NewClient(device.UDID)
+	afcClient, err := NewClient(device.SerialNumber)
 	if err != nil {
 		t.Fatal(err)
 	}

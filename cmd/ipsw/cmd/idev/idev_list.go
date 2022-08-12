@@ -78,7 +78,7 @@ var ListDevicesCmd = &cobra.Command{
 		var dds []*lockdownd.DeviceValues
 
 		for _, device := range devices {
-			cli, err := lockdownd.NewClient(device.UDID)
+			cli, err := lockdownd.NewClient(device.SerialNumber)
 			if err != nil {
 				return err
 			}

@@ -23,7 +23,7 @@ func TestSyslog(t *testing.T) {
 	}
 
 	for _, device := range devices {
-		r, err := Syslog(device.UDID)
+		r, err := Syslog(device.SerialNumber)
 		if err != nil {
 			t.Fatal(err)
 		}

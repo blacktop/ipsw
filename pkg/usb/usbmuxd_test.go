@@ -20,7 +20,7 @@ func TestConn_ListDevices(t *testing.T) {
 
 	for _, device := range devices {
 		t.Logf("%#v", device)
-		pair, err := conn.ReadPairRecord(device.UDID)
+		pair, err := conn.ReadPairRecord(device.SerialNumber)
 		if err != nil {
 			t.Fatal(err)
 		}

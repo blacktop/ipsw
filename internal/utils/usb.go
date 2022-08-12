@@ -30,7 +30,7 @@ func PickDevice() (*lockdownd.DeviceValues, error) {
 	}
 
 	for _, device := range devices {
-		ldc, err := lockdownd.NewClient(device.UDID)
+		ldc, err := lockdownd.NewClient(device.SerialNumber)
 		if err != nil {
 			return nil, err
 		}
@@ -91,7 +91,7 @@ func PickDevices() ([]*lockdownd.DeviceValues, error) {
 	}
 
 	for _, device := range devices {
-		ldc, err := lockdownd.NewClient(device.UDID)
+		ldc, err := lockdownd.NewClient(device.SerialNumber)
 		if err != nil {
 			return nil, err
 		}
