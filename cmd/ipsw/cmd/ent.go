@@ -232,6 +232,10 @@ var entCmd = &cobra.Command{
 		}
 
 		if doDiff {
+			if len(args) < 2 {
+				return fmt.Errorf("you must specify two IPSWs to diff")
+			}
+
 			ipswPath2 := filepath.Clean(args[1])
 			entDBPath2 := strings.TrimSuffix(ipswPath2, filepath.Ext(ipswPath2)) + ".entDB"
 
