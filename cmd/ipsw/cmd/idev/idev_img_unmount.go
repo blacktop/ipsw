@@ -68,6 +68,7 @@ var idevImgUnmountCmd = &cobra.Command{
 		}
 		defer cli.Close()
 
+		log.Infof("Unmounting %s image from %s", imageType, mountPoint)
 		if err := cli.Unmount(imageType, mountPoint, []byte{}); err != nil {
 			return fmt.Errorf("failed to unmount image: %w", err)
 		}
