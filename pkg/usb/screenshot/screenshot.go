@@ -30,8 +30,7 @@ func NewClient(udid string) (*Client, error) {
 		return nil, err
 	}
 
-	err = c.DeviceLinkHandshake()
-	if err != nil {
+	if _, err := c.DeviceLinkHandshake(); err != nil {
 		return nil, err
 	}
 
@@ -44,8 +43,7 @@ func (c *Client) Screenshot() ([]byte, error) {
 	req := ScreenShotRequest{
 		MessageType: "ScreenShotRequest",
 	}
-	err := c.c.DeviceLinkSend(req)
-	if err != nil {
+	if err := c.c.DeviceLinkSend(req); err != nil {
 		return nil, err
 	}
 

@@ -82,7 +82,6 @@ var ListDevicesCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			defer cli.Close()
 
 			values, err := cli.GetValues()
 			if err != nil {
@@ -97,6 +96,8 @@ var ListDevicesCmd = &cobra.Command{
 				fmt.Println(device)
 				fmt.Println(values)
 			}
+
+			cli.Close()
 		}
 
 		if asJSON {

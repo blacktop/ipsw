@@ -57,25 +57,26 @@ const (
 )
 
 type connectMessage struct {
-	BundleID            string
-	ClientVersionString string
 	MessageType         string
+	BundleID            string
 	ProgName            string
+	ClientVersionString string
 	LibUSBMuxVersion    uint32 `plist:"kLibUSBMuxVersion"`
 	DeviceID            uint32
 	PortNumber          uint16
 }
 
 type resultResponse struct {
-	Number ResultValue
+	MessageType string      `plist:"MessageType,omitempty"`
+	Number      ResultValue `plist:"Number,omitempty"`
 }
 
 func (c *Conn) Dial(deviceId, port int) error {
 	req := &connectMessage{
-		BundleID:            BundleID,
-		ClientVersionString: ClientVersionString,
 		MessageType:         "Connect",
+		BundleID:            BundleID,
 		ProgName:            ProgName,
+		ClientVersionString: ClientVersionString,
 		LibUSBMuxVersion:    3,
 		DeviceID:            uint32(deviceId),
 		PortNumber:          htonl(uint16(port)),
@@ -151,7 +152,7 @@ func (c *Conn) ListDevices() ([]*DeviceAttachment, error) {
 		return nil, err
 	}
 
-	devices := make([]*DeviceAttachment, 0, len(resp.DeviceList))
+	var devices []*DeviceAttachment
 	for _, device := range resp.DeviceList {
 		devices = append(devices, device.Properties)
 	}
@@ -171,22 +172,24 @@ type PairRecord struct {
 }
 
 type readPairRecordRequest struct {
-	BundleID            string
-	ClientVersionString string
-	ProgName            string
-	MessageType         string
-	PairRecordID        string `plist:"PairRecordID"`
+	MessageType         string `plist:"MessageType"`
+	BundleID            string `plist:"BundleID,omitempty"`
+	ClientVersionString string `plist:"ClientVersionString"`
+	ProgName            string `plist:"ProgName,omitempty"`
 	LibUSBMuxVersion    uint32 `plist:"kLibUSBMuxVersion"`
+	PairRecordID        string `plist:"PairRecordID,omitempty"`
 }
 
 type readPairRecordResponse struct {
+	MessageType    string      `plist:"MessageType,omitempty"`
+	Number         ResultValue `plist:"Number,omitempty"`
 	PairRecordData []byte
 }
 
 func (c *Conn) ReadPairRecord(udid string) (*PairRecord, error) {
 	req := &readPairRecordRequest{
-		BundleID:            BundleID,
 		MessageType:         "ReadPairRecord",
+		BundleID:            BundleID,
 		ClientVersionString: ClientVersionString,
 		ProgName:            ProgName,
 		PairRecordID:        udid,
@@ -195,6 +198,10 @@ func (c *Conn) ReadPairRecord(udid string) (*PairRecord, error) {
 	var resp readPairRecordResponse
 	if err := c.Request(req, &resp); err != nil {
 		return nil, err
+	}
+
+	if len(resp.PairRecordData) == 0 {
+		return nil, fmt.Errorf("pair record not found")
 	}
 
 	var record PairRecord

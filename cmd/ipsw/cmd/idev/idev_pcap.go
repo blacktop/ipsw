@@ -79,12 +79,11 @@ var PcapCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to connect to lockdownd: %w", err)
 			}
-			defer ldc.Close()
-
 			dev, err = ldc.GetValues()
 			if err != nil {
 				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
 			}
+			ldc.Close()
 		}
 
 		cli, err := pcap.NewClient(dev.UniqueDeviceID)

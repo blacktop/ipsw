@@ -27,7 +27,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/apps"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"github.com/vbauerster/mpb/v7"
@@ -54,27 +53,15 @@ var idevAppsUninstallCmd = &cobra.Command{
 
 		udid, _ := cmd.Flags().GetString("udid")
 
-		var err error
-		var dev *lockdownd.DeviceValues
 		if len(udid) == 0 {
-			dev, err = utils.PickDevice()
+			dev, err := utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-		} else {
-			ldc, err := lockdownd.NewClient(udid)
-			if err != nil {
-				return fmt.Errorf("failed to connect to lockdownd: %w", err)
-			}
-			defer ldc.Close()
-
-			dev, err = ldc.GetValues()
-			if err != nil {
-				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
-			}
+			udid = dev.UniqueDeviceID
 		}
 
-		cli, err := apps.NewClient(dev.UniqueDeviceID)
+		cli, err := apps.NewClient(udid)
 		if err != nil {
 			return fmt.Errorf("failed to connect to apps client: %w", err)
 		}

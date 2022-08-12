@@ -29,7 +29,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/afc"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/dustin/go-humanize"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -62,27 +61,15 @@ var idevAfcTreeCmd = &cobra.Command{
 
 		color.NoColor = !forceColor
 
-		var err error
-		var dev *lockdownd.DeviceValues
 		if len(udid) == 0 {
-			dev, err = utils.PickDevice()
+			dev, err := utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-		} else {
-			ldc, err := lockdownd.NewClient(udid)
-			if err != nil {
-				return fmt.Errorf("failed to connect to lockdownd: %w", err)
-			}
-			defer ldc.Close()
-
-			dev, err = ldc.GetValues()
-			if err != nil {
-				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
-			}
+			udid = dev.UniqueDeviceID
 		}
 
-		cli, err := afc.NewClient(dev.UniqueDeviceID)
+		cli, err := afc.NewClient(udid)
 		if err != nil {
 			return fmt.Errorf("failed to connect to afc: %w", err)
 		}

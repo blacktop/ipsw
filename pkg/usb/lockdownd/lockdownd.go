@@ -7,7 +7,7 @@ import (
 	"github.com/fatih/color"
 )
 
-const port = 62078
+const lockdownPort = 62078
 
 var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
 var colorBold = color.New(color.Bold).SprintFunc()
@@ -32,7 +32,7 @@ type startSessionResponse struct {
 }
 
 func NewClient(udid string) (*Client, error) {
-	cli, err := usb.NewClient(udid, port)
+	cli, err := usb.NewClient(udid, lockdownPort)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func NewClient(udid string) (*Client, error) {
 
 	if resp.EnableSessionSSL {
 		if err := cli.EnableSSL(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to enable SSL for lockdown service: %v", err)
 		}
 	}
 
@@ -60,18 +60,18 @@ func NewClient(udid string) (*Client, error) {
 func NewClientForService(serviceName, udid string, withEscrowBag bool) (*usb.Client, error) {
 	lc, err := NewClient(udid)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create lockdownd client for service %s: %v", serviceName, err)
 	}
 	defer lc.Close()
 
 	svc, err := lc.StartService(serviceName, withEscrowBag)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to start service %s: %v", serviceName, err)
 	}
 
 	cli, err := usb.NewClient(udid, svc.Port)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create usbmux client for service %s on port %d: %v", serviceName, svc.Port, err)
 	}
 
 	if svc.EnableServiceSSL {
@@ -274,22 +274,22 @@ func (dv DeviceValues) String() string {
 }
 
 type getValueRequest struct {
-	Label   string
 	Request string
+	Label   string
 	Domain  string `plist:"Domain,omitempty"`
 	Key     string `plist:"Key,omitempty"`
 }
 
 type getValueResponse struct {
 	Request string
-	Result  string
+	Result  string `plist:"Result,omitempty"`
 	Value   *DeviceValues
 }
 
 func (lc *Client) GetValues() (*DeviceValues, error) {
 	req := &getValueRequest{
-		Label:   usb.BundleID,
 		Request: "GetValue",
+		Label:   usb.BundleID,
 		Domain:  "",
 		Key:     "",
 	}
@@ -327,8 +327,8 @@ func (lc *Client) QueryType() (string, error) {
 
 func (lc *Client) EnterRecovery() (string, error) {
 	req := &queryTypeRequest{
-		Label:   usb.BundleID,
 		Request: "EnterRecovery",
+		Label:   usb.BundleID,
 	}
 	var resp queryTypeResponse
 	if err := lc.Request(req, &resp); err != nil {
