@@ -141,7 +141,7 @@ func (c *Client) Restart() error {
 }
 
 func (c *Client) Shutdown() error {
-	req := &Request{"Shutdown2"}
+	req := &Request{"Shutdown"}
 	var resp Response
 	if err := c.c.Request(req, &resp); err != nil {
 		return err
