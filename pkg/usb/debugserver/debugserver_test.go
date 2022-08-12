@@ -44,7 +44,7 @@ func TestProxy(t *testing.T) {
 			t.Log(err)
 			continue
 		}
-		dc, err := NewClient(device.UDID)
+		dc, err := NewClient(device.SerialNumber)
 		if err != nil {
 			conn.Close()
 			t.Log(err)

@@ -21,7 +21,7 @@ func TestLockdowndClient_GetValues(t *testing.T) {
 	}
 
 	for _, device := range devices {
-		cli, err := NewClient(device.UDID)
+		cli, err := NewClient(device.SerialNumber)
 		if err != nil {
 			t.Fatal(err)
 		}
