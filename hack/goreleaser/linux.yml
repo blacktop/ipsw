@@ -15,7 +15,6 @@ builds:
     env:
       - CGO_ENABLED=1
     goos:
-      - dragonfly
       - linux
       - freebsd
       - netbsd
