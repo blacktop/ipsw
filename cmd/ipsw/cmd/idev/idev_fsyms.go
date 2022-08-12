@@ -68,15 +68,20 @@ var FetchsymsCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to connect to lockdownd: %w", err)
 			}
-			defer ldc.Close()
 
 			dev, err = ldc.GetValues()
 			if err != nil {
 				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
 			}
+			ldc.Close()
 		}
 
-		cli := fetchsymbols.NewClient(dev.UniqueDeviceID)
+		cli, err := fetchsymbols.NewClient(dev.UniqueDeviceID)
+		if err != nil {
+			return fmt.Errorf("failed to connect to fetchsymbols service: %w", err)
+		}
+		defer cli.Close()
+
 		files, err := cli.ListFiles()
 		if err != nil {
 			return fmt.Errorf("failed to list files: %w", err)

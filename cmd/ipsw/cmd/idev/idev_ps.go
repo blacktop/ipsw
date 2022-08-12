@@ -30,7 +30,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/ostrace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -59,27 +58,15 @@ var PsCmd = &cobra.Command{
 		proc, _ := cmd.Flags().GetString("proc")
 		asJSON, _ := cmd.Flags().GetBool("json")
 
-		var err error
-		var dev *lockdownd.DeviceValues
 		if len(udid) == 0 {
-			dev, err = utils.PickDevice()
+			dev, err := utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-		} else {
-			ldc, err := lockdownd.NewClient(udid)
-			if err != nil {
-				return fmt.Errorf("failed to connect to lockdownd: %w", err)
-			}
-			defer ldc.Close()
-
-			dev, err = ldc.GetValues()
-			if err != nil {
-				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
-			}
+			udid = dev.UniqueDeviceID
 		}
 
-		cli := ostrace.NewClient(dev.UniqueDeviceID)
+		cli := ostrace.NewClient(udid)
 
 		pids, err := cli.PidList()
 		if err != nil {

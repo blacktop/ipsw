@@ -82,12 +82,12 @@ var ScreenCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			defer ldc.Close()
 
 			dev, err := ldc.GetValues()
 			if err != nil {
 				return err
 			}
+			ldc.Close()
 			return saveScreenshot(dev, output)
 		} else {
 			devs, err := utils.PickDevices()

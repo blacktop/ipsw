@@ -34,7 +34,6 @@ func PickDevice() (*lockdownd.DeviceValues, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer ldc.Close()
 
 		deet, err := ldc.GetValues()
 		if err != nil {
@@ -42,6 +41,8 @@ func PickDevice() (*lockdownd.DeviceValues, error) {
 		}
 
 		deets = append(deets, deet)
+
+		ldc.Close()
 	}
 
 	if len(deets) == 1 {
@@ -94,7 +95,6 @@ func PickDevices() ([]*lockdownd.DeviceValues, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer ldc.Close()
 
 		deet, err := ldc.GetValues()
 		if err != nil {
@@ -102,6 +102,8 @@ func PickDevices() ([]*lockdownd.DeviceValues, error) {
 		}
 
 		deets = append(deets, deet)
+
+		ldc.Close()
 	}
 
 	if len(deets) == 1 {

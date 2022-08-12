@@ -12,7 +12,7 @@ import (
 func Start(ctx context.Context, udid string, lport, rport int, callback func(string, error)) (err error) {
 	listen, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", lport))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to listen on tcp port %d: %v", lport, err)
 	}
 
 	go func() {

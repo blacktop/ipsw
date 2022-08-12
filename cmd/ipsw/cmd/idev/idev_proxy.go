@@ -31,7 +31,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/forward"
-	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -59,24 +58,12 @@ var ProxyCmd = &cobra.Command{
 		lport, _ := cmd.Flags().GetInt("lport")
 		rport, _ := cmd.Flags().GetInt("rport")
 
-		var err error
-		var dev *lockdownd.DeviceValues
 		if len(udid) == 0 {
-			dev, err = utils.PickDevice()
+			dev, err := utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}
-		} else {
-			ldc, err := lockdownd.NewClient(udid)
-			if err != nil {
-				return fmt.Errorf("failed to connect to lockdownd: %w", err)
-			}
-			defer ldc.Close()
-
-			dev, err = ldc.GetValues()
-			if err != nil {
-				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
-			}
+			udid = dev.UniqueDeviceID
 		}
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGABRT)
@@ -86,7 +73,7 @@ var ProxyCmd = &cobra.Command{
 			"lport": lport,
 			"rport": rport,
 		}).Info("Connecting proxy to device")
-		if err := forward.Start(ctx, dev.UniqueDeviceID, lport, rport, func(s string, err error) {
+		if err := forward.Start(ctx, udid, lport, rport, func(s string, err error) {
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
