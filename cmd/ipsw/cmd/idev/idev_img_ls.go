@@ -72,6 +72,11 @@ var idevImgListCmd = &cobra.Command{
 			return fmt.Errorf("failed to list images: %w", err)
 		}
 
+		if len(images) == 0 {
+			log.Warn("No images found")
+			return nil
+		}
+
 		if asJSON {
 			imgJSON, err := json.Marshal(images)
 			if err != nil {

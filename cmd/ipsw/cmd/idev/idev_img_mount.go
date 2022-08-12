@@ -86,7 +86,8 @@ var idevImgMountCmd = &cobra.Command{
 		defer cli.Close()
 
 		if _, err := cli.LookupImage(imageType); err == nil {
-			return fmt.Errorf("image type %s already mounted", imageType)
+			log.Warnf("image type %s already mounted", imageType)
+			return nil
 		}
 
 		var imgData []byte
@@ -126,10 +127,11 @@ var idevImgMountCmd = &cobra.Command{
 			}
 		}
 
+		log.Infof("Uploading %s image", imageType)
 		if err := cli.Upload(imageType, imgData, sigData); err != nil {
 			return fmt.Errorf("failed to upload image: %w", err)
 		}
-
+		log.Infof("Mounting %s image", imageType)
 		if err := cli.Mount(imageType, sigData); err != nil {
 			return fmt.Errorf("failed to mount image: %w", err)
 		}
