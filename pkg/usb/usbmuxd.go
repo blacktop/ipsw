@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/fatih/color"
 )
@@ -201,7 +202,7 @@ func (c *Conn) ReadPairRecord(udid string) (*PairRecord, error) {
 	}
 
 	if len(resp.PairRecordData) == 0 {
-		return nil, fmt.Errorf("pair record not found")
+		log.Errorf("pair record not found: ReadPairRecord request=%#v, response=%#v", req, resp)
 	}
 
 	var record PairRecord
