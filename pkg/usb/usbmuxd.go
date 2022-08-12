@@ -202,7 +202,8 @@ func (c *Conn) ReadPairRecord(udid string) (*PairRecord, error) {
 	}
 
 	if len(resp.PairRecordData) == 0 {
-		log.Errorf("pair record not found: ReadPairRecord request=%#v, response=%#v", req, resp)
+		log.Debugf("'ReadPairRecord' request=%#v, response=%#v", req, resp)
+		return nil, fmt.Errorf("pair record not found")
 	}
 
 	var record PairRecord
