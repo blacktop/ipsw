@@ -24,11 +24,6 @@ func NewClient(udid string, port int) (*Client, error) {
 		return nil, err
 	}
 
-	pairRecord, err := conn.ReadPairRecord(udid)
-	if err != nil {
-		return nil, err
-	}
-
 	devices, err := conn.ListDevices()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list devices: %v", err)
@@ -44,6 +39,11 @@ func NewClient(udid string, port int) (*Client, error) {
 
 	if deviceID < 0 {
 		return nil, fmt.Errorf("unable to find device with udid: %v", udid)
+	}
+
+	pairRecord, err := conn.ReadPairRecord(udid)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := conn.Dial(deviceID, port); err != nil {
