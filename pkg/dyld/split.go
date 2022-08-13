@@ -4,6 +4,7 @@ package dyld
 
 /*
 #cgo CFLAGS: -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
+#cgo CFLAGS: -Wno-nullability-completeness
 #cgo LDFLAGS: -ldl
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +15,7 @@ int
 dsc_extract(void *f, const char* shared_cache_file_path, const char* extraction_root_path){
     int (*extractor_proc)(const char* shared_cache_file_path, const char* extraction_root_path,
                           void (^progress)(unsigned current, unsigned total));
-    extractor_proc = (int (*)(const char *))f;
+    extractor_proc = f;
     int result = (*extractor_proc)(shared_cache_file_path, extraction_root_path,
                                    ^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
     return result;
