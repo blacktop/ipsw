@@ -117,6 +117,10 @@ jobs:
       - name: Get dependencies
         run: |
           go mod download
+      - name: Deps (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get -yq install libusb-dev
       - name: Build (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
