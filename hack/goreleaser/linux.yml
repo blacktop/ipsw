@@ -16,8 +16,6 @@ builds:
       - CGO_ENABLED=1
     goos:
       - linux
-      - solaris
-      - plan9
     goarch:
       - amd64
     mod_timestamp: "{{ .CommitTimestamp }}"
