@@ -91,13 +91,13 @@ type AppBundle struct {
 	Entitlements                             map[string]any    `plist:"Entitlements"`
 	EnvironmentVariables                     map[string]string `plist:"EnvironmentVariables"`
 	GroupContainers                          map[string]string `plist:"GroupContainers"`
-	ITSAppUsesNonExemptEncryption            bool              `plist:"ITSAppUsesNonExemptEncryption"`
+	ITSAppUsesNonExemptEncryption            any               `plist:"ITSAppUsesNonExemptEncryption"`
 	IsDemotedApp                             bool              `plist:"IsDemotedApp"`
 	IsUpgradeable                            bool              `plist:"IsUpgradeable"`
 	LSApplicationQueriesSchemes              any               `plist:"LSApplicationQueriesSchemes"`
 	LSRequiresIPhoneOS                       bool              `plist:"LSRequiresIPhoneOS"`
 	MinimumOSVersion                         string            `plist:"MinimumOSVersion"`
-	NSUserActivityTypes                      []string          `plist:"NSUserActivityTypes"`
+	NSUserActivityTypes                      any               `plist:"NSUserActivityTypes"`
 	ParallelPlaceholderPath                  bool              `plist:"ParallelPlaceholderPath"`
 	Path                                     string            `plist:"Path"`
 	ProfileValidated                         bool              `plist:"ProfileValidated"`
