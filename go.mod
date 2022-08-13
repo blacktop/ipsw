@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.5
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
-	github.com/blacktop/arm64-cgo v1.0.54
+	github.com/blacktop/arm64-cgo v1.0.55
 	github.com/blacktop/go-macho v1.1.93
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
@@ -17,6 +17,7 @@ require (
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20220518085355-d7852edf42fc
 	github.com/gocolly/colly/v2 v2.1.0
+	github.com/google/gousb v1.1.2
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02 // indirect
 	github.com/jinzhu/gorm v1.9.16
@@ -55,7 +56,6 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/gousb v1.1.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
