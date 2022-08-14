@@ -10,7 +10,9 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	// lzfse "github.com/blacktop/go-lzfse"
@@ -37,6 +39,32 @@ type CompressedCache struct {
 	Header interface{}
 	Size   int
 	Data   []byte
+}
+
+type Version struct {
+	Kernel struct {
+		Darwin string    `json:"darwin,omitempty"`
+		Date   time.Time `json:"date,omitempty"`
+		XNU    string    `json:"xnu,omitempty"`
+		Type   string    `json:"type,omitempty"`
+		Arch   string    `json:"arch,omitempty"`
+		CPU    string    `json:"cpu,omitempty"`
+	} `json:"kernel,omitempty"`
+	LLVM struct {
+		Version string   `json:"version,omitempty"`
+		Clang   string   `json:"clang,omitempty"`
+		Flags   []string `json:"flags,omitempty"`
+	} `json:"llvm,omitempty"`
+	rawKernel string
+	rawLLVM   string
+}
+
+func (v *Version) String() string {
+	var llvm string
+	if len(v.rawLLVM) > 0 {
+		llvm = fmt.Sprintf("\n%s", v.rawLLVM)
+	}
+	return fmt.Sprintf("%s%s", v.rawKernel, llvm)
 }
 
 // ParseImg4Data parses a img4 data containing a compressed kernelcache.
@@ -100,9 +128,9 @@ func Extract(ipsw, destPath string) error {
 			return errors.Wrap(err, "failed to decompress kernelcache")
 		}
 
-		os.Mkdir(destPath, os.ModePerm)
+		os.Mkdir(destPath, 0750)
 
-		err = ioutil.WriteFile(fname, dec, 0644)
+		err = ioutil.WriteFile(fname, dec, 0660)
 		if err != nil {
 			return errors.Wrap(err, "failed to write kernelcache")
 		}
@@ -132,7 +160,7 @@ func Decompress(kcache string) error {
 		return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 	}
 
-	err = ioutil.WriteFile(kcache+".decompressed", dec, 0644)
+	err = ioutil.WriteFile(kcache+".decompressed", dec, 0660)
 	if err != nil {
 		return errors.Wrap(err, "failed to write kernelcache")
 	}
@@ -217,14 +245,17 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 	if err != nil {
 		return err
 	}
-
-	destPath = filepath.Join(destPath, i.GetFolder())
+	folder, err := i.GetFolder()
+	if err != nil {
+		log.Errorf("failed to get folder from remote zip metadata: %v", err)
+	}
+	destPath = filepath.Join(destPath, folder)
 
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
 			fname := i.GetKernelCacheFileName(f.Name)
 			// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(f.Name, filepath.Ext(f.Name)), strings.Join(i.GetDevicesForKernelCache(f.Name), "_"))
-			fname = filepath.Join(destPath, fname)
+			fname = filepath.Join(destPath, filepath.Clean(fname))
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				kdata := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
@@ -244,8 +275,8 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 					return errors.Wrapf(err, "failed to decompress kernelcache %s", fname)
 				}
 
-				os.Mkdir(destPath, os.ModePerm)
-				err = ioutil.WriteFile(fname, dec, 0644)
+				os.Mkdir(destPath, 0750)
+				err = ioutil.WriteFile(fname, dec, 0660)
 				if err != nil {
 					return errors.Wrap(err, "failed to write kernelcache")
 				}
@@ -263,8 +294,7 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 func Parse(r io.ReadCloser) ([]byte, error) {
 	var buf bytes.Buffer
 
-	_, err := r.Read(buf.Bytes())
-	if err != nil {
+	if _, err := r.Read(buf.Bytes()); err != nil {
 		return nil, errors.Wrap(err, "failed to read data")
 	}
 
@@ -280,4 +310,83 @@ func Parse(r io.ReadCloser) ([]byte, error) {
 	r.Close()
 
 	return dec, nil
+}
+
+func GetVersion(m *macho.File) (*Version, error) {
+	var kv Version
+
+	kc := m
+
+	if kc.FileTOC.FileHeader.Type == types.FileSet {
+		var err error
+		kc, err = m.GetFileSetFileByName("kernel")
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse fileset entry 'kernel': %v", err)
+		}
+	}
+
+	if sec := kc.Section("__TEXT", "__const"); sec != nil {
+		dat, err := sec.Data()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
+		}
+
+		csr := bytes.NewBuffer(dat[:])
+
+		foundKV := false
+		foundLLVM := false
+
+		for {
+			s, err := csr.ReadString('\x00')
+
+			if err == io.EOF {
+				break
+			}
+
+			if err != nil {
+				return nil, fmt.Errorf("failed to read string: %v", err)
+			}
+
+			s = strings.Trim(s, "\x00")
+
+			if len(s) > 0 {
+				if utils.IsASCII(s) {
+					reKV := regexp.MustCompile(`^Darwin Kernel Version (?P<darwin>.+): (?P<date>.+); root:xnu-(?P<xnu>.+)/(?P<type>.+)_(?P<arch>.+)_(?P<cpu>.+)$`)
+					if reKV.MatchString(s) {
+						foundKV = true
+						kv.rawKernel = s
+						matches := reKV.FindStringSubmatch(s)
+						kv.Kernel.Darwin = matches[reKV.SubexpIndex("darwin")]
+						// TODO: confirm that day is not in form 02 for day
+						kv.Kernel.Date, err = time.Parse("Mon Jan 2 15:04:05 MST 2006", matches[reKV.SubexpIndex("date")])
+						if err != nil {
+							return nil, fmt.Errorf("failed to parse date %s: %v", matches[reKV.SubexpIndex("date")], err)
+						}
+						kv.Kernel.XNU = matches[reKV.SubexpIndex("xnu")]
+						kv.Kernel.Type = matches[reKV.SubexpIndex("type")]
+						kv.Kernel.Arch = matches[reKV.SubexpIndex("arch")]
+						kv.Kernel.CPU = matches[reKV.SubexpIndex("cpu")]
+					}
+
+					reLLVM := regexp.MustCompile(`^Apple LLVM (?P<version>.+) \(clang-(?P<clang>.+)\) \[(?P<flags>.+)\]$`)
+					if reLLVM.MatchString(s) {
+						foundLLVM = true
+						kv.rawLLVM = s
+						matches := reLLVM.FindStringSubmatch(s)
+						kv.LLVM.Version = matches[reLLVM.SubexpIndex("version")]
+						kv.LLVM.Clang = matches[reLLVM.SubexpIndex("clang")]
+						kv.LLVM.Flags = strings.Split(matches[reLLVM.SubexpIndex("flags")], ", ")
+					}
+
+					if foundKV && foundLLVM {
+						break
+					}
+				}
+			}
+		}
+	} else {
+		return nil, fmt.Errorf("section __TEXT.__const not found in kernelcache (if this is a macOS kernel you might need to first extract the fileset entry)")
+	}
+
+	return &kv, nil
 }

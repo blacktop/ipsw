@@ -46,82 +46,114 @@ typedef struct
     uint64 n_value; /* value of this symbol (or stab offset) */
 } nlist_64;
 
+typedef enum<uint>
+{
+    unknown = 0,
+    macOS = 1,             // PLATFORM_MACOS
+    iOS = 2,               // PLATFORM_IOS
+    tvOS = 3,              // PLATFORM_TVOS
+    watchOS = 4,           // PLATFORM_WATCHOS
+    bridgeOS = 5,          // PLATFORM_BRIDGEOS
+    iOSMac = 6,            // PLATFORM_MACCATALYST
+    iOS_simulator = 7,     // PLATFORM_IOSSIMULATOR
+    tvOS_simulator = 8,    // PLATFORM_TVOSSIMULATOR
+    watchOS_simulator = 9, // PLATFORM_WATCHOSSIMULATOR
+    driverKit = 10,        // PLATFORM_DRIVERKIT
+} Platform<format = hex>;
+
 typedef struct
 {
-    char magic[16]<bgcolor = cLtBlue>; // e.g. "dyld_v0    i386"
-    uint mappingOffset;                // file offset to first dyld_cache_mapping_info
-    uint mappingCount;                 // number of dyld_cache_mapping_info entries
-    uint imagesOffset;                 // file offset to first dyld_cache_image_info
-    uint imagesCount;                  // number of dyld_cache_image_info entries
-    uint64 dyldBaseAddress;            // base address of dyld when cache was built
-    uint64 codeSignatureOffset;        // file offset of code signature blob
-    uint64 codeSignatureSize;          // size of code signature blob (zero means to end of file)
-    uint64 slideInfoOffset;            // file offset of kernel slid info
-    uint64 slideInfoSize;              // size of kernel slid info
-    uint64 localSymbolsOffset;         // file offset of where local symbols are stored
-    uint64 localSymbolsSize;           // size of local symbols information
-    Uuid uuid;                         // unique value for each shared cache file
-    uint64 cacheType;                  // 0 for development, 1 for production
-    uint branchPoolsOffset;            // file offset to table of uint64 pool addresses
-    uint branchPoolsCount;             // number of uint64 entries
-    uint64 accelerateInfoAddr;         // (unslid) address of optimization info
-    uint64 accelerateInfoSize;         // size of optimization info
-    uint64 imagesTextOffset;           // file offset to first dyld_cache_image_text_info
-    uint64 imagesTextCount;            // number of dyld_cache_image_text_info entries
-    uint64 patchInfoAddr;              // (unslid) address of dyld_cache_patch_info
-    uint64 patchInfoSize;              // Size of all of the patch information pointed to via the dyld_cache_patch_info
-    uint64 otherImageGroupAddrUnused;  // unused
-    uint64 otherImageGroupSizeUnused;  // unused
-    uint64 progClosuresAddr;           // (unslid) address of list of program launch closures
-    uint64 progClosuresSize;           // size of list of program launch closures
-    uint64 progClosuresTrieAddr;       // (unslid) address of trie of indexes into program launch closures
-    uint64 progClosuresTrieSize;       // size of trie of indexes into program launch closures
-    uint platform;                     // platform number (macOS=1, etc)
-    uint formatVersion : 8;            // dyld3::closure::kFormatVersion
-    uint dylibsExpectedOnDisk : 1;     // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
-    uint simulator : 1;                // for simulator of specified platform
-    uint locallyBuiltCache : 1;        // 0 for B&I built cache, 1 for locally built cache
-    uint builtFromChainedFixups : 1;   // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
-    uint padding : 20;                 // TBD
-    uint64 sharedRegionStart;          // base load address of cache if not slid
-    uint64 sharedRegionSize;           // overall size of region cache can be mapped into
-    uint64 maxSlide<format = hex>;     // runtime slide of cache can be between zero and this value
-    uint64 dylibsImageArrayAddr;       // (unslid) address of ImageArray for dylibs in this cache
-    uint64 dylibsImageArraySize;       // size of ImageArray for dylibs in this cache
-    uint64 dylibsTrieAddr;             // (unslid) address of trie of indexes of all cached dylibs
-    uint64 dylibsTrieSize;             // size of trie of cached dylib paths
-    uint64 otherImageArrayAddr;        // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
-    uint64 otherImageArraySize;        // size of ImageArray for dylibs and bundles with dlopen closures
-    uint64 otherTrieAddr;              // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
-    uint64 otherTrieSize;              // size of trie of dylibs and bundles with dlopen closures
-    uint32 mappingWithSlideOffset;     // file offset to first dyld_cache_mapping_and_slide_info
-    uint32 mappingWithSlideCount;      // number of dyld_cache_mapping_and_slide_info entries
-    uint64 dataMappingStartAddr;
-    uint64 dylibsImageArrayWithSubCachesAddr; // NOTICE: no Size, but you can calculate by progClosuresWithSubCachesAddr - dylibsImageArrayWithSubCachesAddr
-    uint64 progClosuresWithSubCachesAddr;
-    uint64 progClosuresWithSubCachesSize;
-    uint64 progClosuresTrieWithSubCachesAddr;
-    uint32 progClosuresTrieWithSubCachesSize;
-    //uint32 unknown7;
-    uint dyld4FormatVersion : 8;     // dyld4::closure::kFormatVersion
-    uint dylibsExpectedOnDisk : 1;   // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
-    uint simulator : 1;              // for simulator of specified platform
-    uint locallyBuiltCache : 1;      // 0 for B&I built cache, 1 for locally built cache
-    uint builtFromChainedFixups : 1; // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
-    uint padding : 20;               // TBD
-    uint32 unknown8;
-    uint32 unknown9;
-    uint64 unknown10Offset;
-    uint64 unknown10Size;
-    uint32 subCacheInfoOffset;
-    uint32 numSubCaches;     // number of dyld_shared_cache .1,.2,.3 files
-    Uuid symbolSubCacheUUID; // unique value for .symbols sub-cache
-    uint64 zero1;
-    uint64 zero2;
-    uint64 zero3;
-    uint64 zero4;
-    uint imagesOffsetWithSubCaches; // file offset to first dyld_cache_image_info
-    uint imagesCountWithSubCaches;  // number of dyld_cache_image_info entries
+    uint32 version;
+} Version<read = VersionRead>;
+
+string VersionRead(Version &version)
+{
+    local string version_string;
+    if (version.version & 0xFF == 0)
+    {
+        SPrintf(version_string, "%u.%u", version.version >> 16, (version.version >> 8) & 0xFF);
+    }
+    else
+    {
+
+        SPrintf(version_string, "%u.%u.%u", version.version >> 16, (version.version >> 8) & 0xFF, version.version & 0xFF);
+    }
+    return version_string;
+}
+
+typedef struct
+{
+    char magic[16]<bgcolor = cLtBlue>;    // e.g. "dyld_v0    i386"
+    uint mappingOffset;                   // file offset to first dyld_cache_mapping_info
+    uint mappingCount;                    // number of dyld_cache_mapping_info entries
+    uint32 imagesOffsetOld;               // UNUSED: moved to imagesOffset to prevent older dsc_extarctors from crashing
+    uint32 imagesCountOld;                // UNUSED: moved to imagesCount to prevent older dsc_extarctors from crashing
+    uint64 dyldBaseAddress;               // base address of dyld when cache was built
+    uint64 codeSignatureOffset;           // file offset of code signature blob
+    uint64 codeSignatureSize;             // size of code signature blob (zero means to end of file)
+    uint64 slideInfoOffset;               // file offset of kernel slid info
+    uint64 slideInfoSize;                 // size of kernel slid info
+    uint64 localSymbolsOffset;            // file offset of where local symbols are stored
+    uint64 localSymbolsSize;              // size of local symbols information
+    Uuid uuid;                            // unique value for each shared cache file
+    uint64 cacheType;                     // 0 for development, 1 for production
+    uint branchPoolsOffset;               // file offset to table of uint64 pool addresses
+    uint branchPoolsCount;                // number of uint64 entries
+    uint64 dyldImageAddr;                 // (unslid) address of optimization info
+    uint64 dyldStartAddr;                 // size of optimization info
+    uint64 imagesTextOffset;              // file offset to first dyld_cache_image_text_info
+    uint64 imagesTextCount;               // number of dyld_cache_image_text_info entries
+    uint64 patchInfoAddr;                 // (unslid) address of dyld_cache_patch_info
+    uint64 patchInfoSize;                 // Size of all of the patch information pointed to via the dyld_cache_patch_info
+    uint64 otherImageGroupAddrUnused;     // unused
+    uint64 otherImageGroupSizeUnused;     // unused
+    uint64 progClosuresAddr;              // (unslid) address of list of program launch closures
+    uint64 progClosuresSize;              // size of list of program launch closures
+    uint64 progClosuresTrieAddr;          // (unslid) address of trie of indexes into program launch closures
+    uint64 progClosuresTrieSize;          // size of trie of indexes into program launch closures
+    uint platform;                        // platform number (macOS=1, etc)
+    uint formatVersion : 8;               // dyld3::closure::kFormatVersion
+    uint dylibsExpectedOnDisk : 1;        // dyld should expect the dylib exists on disk and to compare inode/mtime to see if cache is valid
+    uint simulator : 1;                   // for simulator of specified platform
+    uint locallyBuiltCache : 1;           // 0 for B&I built cache, 1 for locally built cache
+    uint builtFromChainedFixups : 1;      // some dylib in cache was built using chained fixups, so patch tables must be used for overrides
+    uint padding : 20;                    // TBD
+    uint64 sharedRegionStart;             // base load address of cache if not slid
+    uint64 sharedRegionSize;              // overall size of region cache can be mapped into
+    uint64 maxSlide<format = hex>;        // runtime slide of cache can be between zero and this value
+    uint64 dylibsImageArrayAddr;          // (unslid) address of ImageArray for dylibs in this cache
+    uint64 dylibsImageArraySize;          // size of ImageArray for dylibs in this cache
+    uint64 dylibsTrieAddr;                // (unslid) address of trie of indexes of all cached dylibs
+    uint64 dylibsTrieSize;                // size of trie of cached dylib paths
+    uint64 otherImageArrayAddr;           // (unslid) address of ImageArray for dylibs and bundles with dlopen closures
+    uint64 otherImageArraySize;           // size of ImageArray for dylibs and bundles with dlopen closures
+    uint64 otherTrieAddr;                 // (unslid) address of trie of indexes of all dylibs and bundles with dlopen closures
+    uint64 otherTrieSize;                 // size of trie of dylibs and bundles with dlopen closures
+    uint32 mappingWithSlideOffset;        // file offset to first dyld_cache_mapping_and_slide_info
+    uint32 mappingWithSlideCount;         // number of dyld_cache_mapping_and_slide_info entries
+    uint64 dylibsPBLStateArrayAddrUnused; // unused
+    uint64 dylibsPBLSetAddr;              // (unslid) address of PrebuiltLoaderSet of all cached dylibs
+    uint64 programsPBLSetPoolAddr;        // (unslid) address of pool of PrebuiltLoaderSet for each program
+    uint64 programsPBLSetPoolSize;        // size of pool of PrebuiltLoaderSet for each program
+    uint64 programTrieAddr;               // (unslid) address of trie mapping program path to PrebuiltLoaderSet
+    uint32 programTrieSize;
+    Version osVersion;           // OS Version of dylibs in this cache for the main platform
+    Platform altPlatform;        // e.g. iOSMac on macOS
+    Version altOsVersion;        // e.g. 14.0 for iOSMac
+    uint64 swiftOptsOffset;      // file offset to Swift optimizations header
+    uint64 swiftOptsSize;        // size of Swift optimizations header
+    uint32 subCacheArrayOffset;  // file offset to first dyld_subcache_entry
+    uint32 subCacheArrayCount;   // number of subCache entries
+    Uuid symbolFileUUID;         // unique value for the shared cache file containing unmapped local symbols
+    uint64 rosettaReadOnlyAddr;  // (unslid) address of the start of where Rosetta can add read-only/executable data
+    uint64 rosettaReadOnlySize;  // maximum size of the Rosetta read-only/executable region
+    uint64 rosettaReadWriteAddr; // (unslid) address of the start of where Rosetta can add read-write data
+    uint64 rosettaReadWriteSize; // maximum size of the Rosetta read-write region
+    uint32 imagesOffset;         // file offset to first dyld_cache_image_info
+    uint32 imagesCount;          // number of dyld_cache_image_info entries
+    uint64 pageInLinkType;
+    uint64 unknwon;
+    uint64 unknown2;
 } dyld_cache_header;
 
 typedef struct
@@ -318,9 +350,9 @@ typedef struct
     uint32 entriesCount;  // number of elements in dyld_cache_local_symbols_entry array
     FSeek(base + nlistOffset);
     strtableoff = base + stringsOffset;
-    //allnlist lists(nlistCount);
+    // allnlist lists(nlistCount);
     FSeek(base + entriesOffset);
-    if (header.imagesOffset > 0)
+    if (header.imagesOffsetOld > 0)
     {
         dyld_cache_local_symbols_entry nlistentry[entriesCount];
     }
@@ -332,24 +364,26 @@ typedef struct
 
 typedef struct
 {
-    uint64 version;
-    uint64 offset1;
-    uint64 offset2;
-    uint64 offset3;
-} new_struct<bgcolor = cPurple>;
+    uint32 version;
+    uint32 padding;
+    uint64 typeConformanceHashTableCacheOffset;
+    uint64 metadataConformanceHashTableCacheOffset;
+    uint64 foreignTypeConformanceHashTableCacheOffset;
+} SwiftOptimizationHeader<bgcolor = cPurple>;
 
 typedef struct
 {
-    uint32 unknown1;
-    uint32 unknown2;
-    uint32 unknown3;
-    uint64 mask;
-    uint32 unknown4;
-    uint32 unknown5;
-    uint32 unknown6;
-    uint32 unknown7;
-    uint32 unknown8;
-} new_sub_struct<bgcolor = cLtPurple>;
+    uint32 capacity;
+    uint32 occupied;
+    uint32 shift;
+    uint32 mask;
+    uint32 sentinelTarget;
+    uint32 roundedTabSize;
+    uint64 salt;
+
+    uint32 scramble[256];
+    uchar tab0; /* tab[mask+1] (always power-of-2). Rounded up to roundedTabSize */
+} SwiftHashTable<bgcolor = cLtPurple>;
 
 void get_dyld_cache_local_symbols_info(uint64 totalsize)
 {
@@ -381,43 +415,59 @@ for (i = 0; i < header.mappingCount; i++)
     }
 }
 
-if (header.imagesOffset > 0)
+if (header.imagesOffsetOld > 0)
+{
+    FSeek(header.imagesOffsetOld);
+    dyld_cache_image_info imageinfo[header.imagesCountOld];
+}
+else if (header.imagesOffset > 0)
 {
     FSeek(header.imagesOffset);
     dyld_cache_image_info imageinfo[header.imagesCount];
 }
-else if (header.imagesOffsetWithSubCaches > 0)
-{
-    FSeek(header.imagesOffsetWithSubCaches);
-    dyld_cache_image_info imageinfo[header.imagesCountWithSubCaches];
-}
 
-FSeek(header.imagesTextOffset);
-dyld_cache_image_text_info imagetext[header.imagesTextCount];
+// FSeek(header.imagesTextOffset);
+// dyld_cache_image_text_info imagetext[header.imagesTextCount];
 
-if (header.imagesOffset == 0 && header.unknown10Offset > 0)
-{
-    FSeek(header.unknown10Offset);
-    new_struct new;
+// FIXME: this is wrong for iOS16 caches
+// if (header.imagesOffsetOld == 0 && header.swiftOptsOffset > 0)
+// {
+//     FSeek(header.swiftOptsOffset);
+//     SwiftOptimizationHeader swiftOpt;
 
-    FSeek(new.offset1);
-    new_sub_struct new_sub1;
-    FSeek(new.offset2);
-    new_sub_struct new_sub2;
-    FSeek(new.offset3);
-    new_sub_struct new_sub3;
-}
+//     FSeek(swiftOpt.typeConformanceHashTableCacheOffset);
+//     SwiftHashTable typeConformance;
+//     FSeek(swiftOpt.metadataConformanceHashTableCacheOffset);
+//     SwiftHashTable metadataConformance;
+//     FSeek(swiftOpt.foreignTypeConformanceHashTableCacheOffset);
+//     SwiftHashTable foreignTypeConformance;
+// }
 
 typedef struct
 {
-    Uuid uuid;                           // UUID of subcache
-    uint64 cumulativeSize<format = hex>; // total size of caches read
-} subcache_info<bgcolor = cLtPurple>;
+    Uuid uuid;                          // UUID of subcache
+    uint64 cacheVMOffset<format = hex>; // The offset of this subcache from the main cache base address
+} dyld_subcache_entry<bgcolor = cLtPurple>;
 
-if (header.subCacheInfoOffset > 0 && header.numSubCaches > 0)
+typedef struct
 {
-    FSeek(header.subCacheInfoOffset);
-    subcache_info info[header.numSubCaches];
+    Uuid uuid;                          // UUID of subcache
+    uint64 cacheVMOffset<format = hex>; // The offset of this subcache from the main cache base address
+    char extension[32];
+} dyld_subcache_entry_pagein_link<bgcolor = cLtPurple>;
+
+if (header.subCacheArrayOffset > 0 && header.subCacheArrayCount > 0)
+{
+    if (header.cacheType == 2)
+    {
+        FSeek(header.subCacheArrayOffset);
+        dyld_subcache_entry_pagein_link info[header.subCacheArrayCount];
+    }
+    else
+    {
+        FSeek(header.subCacheArrayOffset);
+        dyld_subcache_entry info[header.subCacheArrayCount];
+    }
 }
 
 // FSeek(header.codeSignatureOffset);
@@ -1021,26 +1071,6 @@ string readUUID2(ubyte uuid[16])
 
 typedef struct
 {
-    uint32 version;
-} Version<read = VersionRead>;
-
-string VersionRead(Version &version)
-{
-    local string version_string;
-    if (version.version & 0xFF == 0)
-    {
-        SPrintf(version_string, "%u.%u", version.version >> 16, (version.version >> 8) & 0xFF);
-    }
-    else
-    {
-
-        SPrintf(version_string, "%u.%u.%u", version.version >> 16, (version.version >> 8) & 0xFF, version.version & 0xFF);
-    }
-    return version_string;
-}
-
-typedef struct
-{
     uint32 tool;     // enum for the tool
     Version version; // version of the tool
 } build_tool_version;
@@ -1049,7 +1079,7 @@ typedef struct
 {
     local uint64 o_pos = FTell();
 
-    //LoadCommandHead loadCommandHead <comment="Load command type and size">;
+    // LoadCommandHead loadCommandHead <comment="Load command type and size">;
     LoadCommandType command;
     uint command_size;
 
@@ -1301,9 +1331,9 @@ typedef struct
         uint32 pad;                     /* padding to make this struct's size a multiple of 8 */
         break;
     case LC_BUILD_VERSION:
-        uint32 platform; // platform
-        Version minos;   // X.Y.Z is encoded in nibbles xxxx.yy.zz
-        Version sdk;     // X.Y.Z is encoded in nibbles xxxx.yy.zz
+        Platform platform; // platform
+        Version minos;     // X.Y.Z is encoded in nibbles xxxx.yy.zz
+        Version sdk;       // X.Y.Z is encoded in nibbles xxxx.yy.zz
         uint32 ntools;
         if (ntools > 0)
         {
@@ -1318,7 +1348,7 @@ typedef struct
 
     default:
         Warning("Hit an unknown or unsupported load command : [%d]", command);
-        break; //Exit(-1);
+        break; // Exit(-1);
     }
 
     FSeek(o_pos + command_size); // AIO solution, fixes default case, need for unk/pad, and all of the LoadCommandString + Seeks all over //
@@ -1330,7 +1360,7 @@ string LoadCommandReader(LoadCommand &loadCommand)
     return "load_command[" + LoadCommandTypeRead(loadCommand.command) + "]";
 }
 
-//parse each macho
+// parse each macho
 typedef struct(uint64 offset)
 {
     local uint64 endpos = FTell();

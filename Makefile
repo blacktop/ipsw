@@ -13,7 +13,7 @@ build-deps: ## Install the build dependencies
 dev-deps: ## Install the dev dependencies
 	@echo " > Installing dev deps"
 	$(GO_BIN) install golang.org/x/tools/...@latest
-	$(GO_BIN) install github.com/spf13/cobra/cobra
+	$(GO_BIN) install github.com/spf13/cobra-cli@latest
 	$(GO_BIN) get -d golang.org/x/tools/cmd/cover
 	$(GO_BIN) get -d github.com/caarlos0/svu@v1.4.1
 
@@ -23,18 +23,18 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@goreleaser build --rm-dist --snapshot --single-target
+	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin --rm-dist --snapshot --single-target --output dist/ipsw
 
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
-	@goreleaser --rm-dist --snapshot
+	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --snapshot
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@CUR_VERSION=${CUR_VERSION} NEXT_VERSION=${NEXT_VERSION} goreleaser --rm-dist
+	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
@@ -54,6 +54,12 @@ build: ## Build ipsw
 	@$(GO_BIN) mod download
 	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
 
+build-ios: ## Build ipsw for iOS
+	@echo " > Building ipsw"
+	@$(GO_BIN) mod download
+	@CGO_ENABLED=1 GOOS=ios GOARHC=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
+
 .PHONY: docs
 docs: ## Build the hugo docs
 	@echo " > Building Docs"
@@ -67,7 +73,7 @@ test-docs: ## Start local server hosting hugo docs
 .PHONY: update_mod
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
-	rm go.sum
+	rm go.sum || true
 	$(GO_BIN) mod download
 	$(GO_BIN) mod tidy
 
@@ -84,7 +90,7 @@ update_keys: ## Scrape the iPhoneWiki for AES keys
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"
-	docker build -t $(REPO)/$(NAME):$(NEXT_VERSION) .
+	docker build --build-arg VERSION=$(NEXT_VERSION) -t $(REPO)/$(NAME):$(NEXT_VERSION) .
 
 .PHONY: docker-tag
 docker-tag: docker ## Tag docker image

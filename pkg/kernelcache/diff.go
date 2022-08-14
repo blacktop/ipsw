@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,7 +21,7 @@ func ParseMachO(name string) error {
 
 	fmt.Println(f.FileHeader)
 
-	err = os.Mkdir("diff", os.ModePerm)
+	err = os.Mkdir("diff", 0750)
 	if err != nil {
 		return err
 	}
@@ -55,7 +54,7 @@ func ParseMachO(name string) error {
 						lineNum := parts[1]
 						fmt.Printf("%s on line %s ==> %s\n", filePath, lineNum, assertStr)
 
-						err = os.MkdirAll(filepath.Dir(filepath.Join("diff", filePath)), os.ModePerm)
+						err = os.MkdirAll(filepath.Dir(filepath.Join("diff", filePath)), 0750)
 						if err != nil {
 							return err
 						}
@@ -115,5 +114,5 @@ func InsertStringToFile(path, str string, index int) error {
 		fileContent += "\n"
 	}
 
-	return ioutil.WriteFile(path, []byte(fileContent), 0644)
+	return os.WriteFile(path, []byte(fileContent), 0660)
 }

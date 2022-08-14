@@ -3,7 +3,7 @@ package download
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -143,6 +143,10 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 
 	}
 
+	if len(versionsRaw) == 0 {
+		return nil, fmt.Errorf("no versions found for device %s", device)
+	}
+
 	versions := make([]*version.Version, len(versionsRaw))
 
 	for i, raw := range versionsRaw {
@@ -155,7 +159,9 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 	}
 
 	sort.Sort(version.Collection(versions))
+
 	newestVersion := versions[len(versions)-1]
+
 	utils.Indent(log.Info, 1)(fmt.Sprintf("Latest release found is: %s", newestVersion.Original()))
 
 	// // check canijailbreak.com
@@ -313,7 +319,7 @@ func NewiTunesVersionMaster() (*ITunesVersionMaster, error) {
 		return nil, errors.Wrap(err, "failed to create http client")
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read plist")
 	}
@@ -333,7 +339,27 @@ func NewMacOsXML() (*ITunesVersionMaster, error) {
 		return nil, errors.Wrap(err, "failed to create http client")
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read plist")
+	}
+
+	vm := ITunesVersionMaster{}
+
+	dec := plist.NewDecoder(bytes.NewReader(document))
+	dec.Decode(&vm)
+
+	return &vm, nil
+}
+
+// NewIBridgeXML downloads and parses the iBridge IPSW plist
+func NewIBridgeXML() (*ITunesVersionMaster, error) {
+	resp, err := http.Get(iBridgeOSURL)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create http client")
+	}
+
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read plist")
 	}

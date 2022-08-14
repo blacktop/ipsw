@@ -21,8 +21,6 @@ __debug_bin
 *.ipsw
 *.zip
 *.im4p
-kernelcache.*
-dyld_shared_cache*
 *_Restore
 System
 usr
@@ -37,6 +35,7 @@ usr
 dist/
 test-caches/
 completions/
+manpages/
 *.txt
 *.prof
 *.download
@@ -45,7 +44,10 @@ unicorn2/
 
 # Docs
 public
+site/
+www/docs/static/releases*.json
 
+# Other
 *.unstripped
 *.bndb
 *.lock

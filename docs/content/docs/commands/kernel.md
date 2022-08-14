@@ -7,6 +7,7 @@ summary: Parse kernelcache.
 ---
 
 - [**kernel --help**](#kernel---help)
+- [**kernel version**](#kernel-version)
 - [**kernel extract**](#kernel-extract)
 - [**kernel dec**](#kernel-dec)
 - [**kernel kexts**](#kernel-kexts)
@@ -45,6 +46,40 @@ Global Flags:
   -V, --verbose         verbose output
 
 Use "ipsw kernel [command] --help" for more information about a command.
+```
+
+### **kernel version**
+
+Dump kernelcache version
+
+```bash
+❯ ipsw kernel version kernelcache.release.iPhone14,2
+0xfffffff00703e0ca: "Darwin Kernel Version 21.5.0: Mon Mar 28 22:30:10 PDT 2022; root:xnu-8020.120.43.112.1~1/RELEASE_ARM64_T8110"
+0xfffffff00703e169: "Apple LLVM 13.1.6 (clang-1316.0.21.3) [+internal-os, ptrauth-isa=deployment-target-based]"
+```
+
+Dump as JSON
+
+```
+❯ ipsw kernel version kernelcache.release.iPhone14,2 --json | jq .
+```
+
+```json
+{
+  "kernel": {
+    "darwin": "21.5.0",
+    "date": "2022-03-28T22:30:10Z",
+    "xnu": "8020.120.43.112.1~1",
+    "type": "RELEASE",
+    "arch": "ARM64",
+    "cpu": "T8110"
+  },
+  "llvm": {
+    "version": "13.1.6",
+    "clang": "1316.0.21.3",
+    "flags": ["+internal-os", "ptrauth-isa=deployment-target-based"]
+  }
+}
 ```
 
 ### **kernel extract**
@@ -92,73 +127,50 @@ com.apple.driver.AppleIPAppender (1.0)
 <SNIP>
 ```
 
+Diff two kernelcache's KEXTs
+
+```bash
+❯ ipsw kernel kexts --diff 18A8395/kernelcache 18E5178a/kernelcache # iOS 14.1 vs. iOS 14.5beta4
+   • Differences found
+com.apple.AGXFirmwareKextG14PRTBuddy (1)
+com.apple.AGXFirmwareKextRTBuddy64 (187.3390.17.2)
+com.apple.AGXG14P (187.3390.17.2)
+com.apple.AUC (1.0)
+<SNIP>
+```
+
 ### **kernel sbopts**
 
 List kernel sandbox operations
 
 ```bash
-❯ ipsw kernel sbopts 18A8395/kernelcache > sbopts_14_1.txt # iOS 14.1
+❯ ipsw kernel sbopts 18A8395/kernelcache # iOS 14.1
 ```
+
+Diff two kernelcache's sandbox operations
 
 ```bash
-❯ ipsw kernel sbopts 18E5178a/kernelcache > sbopts_14_5beta4.txt # iOS 14.5beta4
-```
-
-```bash
-❯ git diff --no-index sbopts_14_1.txt sbopts_14_5beta4.txt
-```
-
-```diff
-diff --git a/sb.txt b/sb1.txt
-index b682adf..7492255 100644
---- a/sb.txt
-+++ b/sb1.txt
-@@ -89,7 +89,10 @@ mach-priv*
- mach-priv-host-port
- mach-priv-task-port
- mach-register
+❯ ipsw kernel sbopts --diff 18A8395/kernelcache 18E5178a/kernelcache # iOS 14.1 vs. iOS 14.5beta4
+   • Differences found
 +mach-task*
 +mach-task-inspect
- mach-task-name
+
 +mach-task-read
- network*
- network-inbound
- network-bind
-@@ -100,9 +103,16 @@ nvram-get
- nvram-set
- opendirectory-user-modify
- process*
+
 +process-codesigning*
 +process-codesigning-blob-get
 +process-codesigning-cdhash-get
 +process-codesigning-entitlements-blob-get
 +process-codesigning-identity-get
- process-codesigning-status*
- process-codesigning-status-set
- process-codesigning-status-get
+
 +process-codesigning-teamid-get
 +process-codesigning-text-offset-get
- process-exec*
- process-exec-interpreter
- process-fork
-@@ -119,6 +129,9 @@ process-info-setcontrol
- pseudo-tty
- signal
- socket-ioctl
+
 +socket-option*
 +socket-option-get
 +socket-option-set
- sysctl*
- sysctl-read
- sysctl-write
-@@ -127,6 +140,7 @@ system-acct
- system-audit
- system-automount
- system-debug
+
 +system-fcntl
- system-fsctl
- system-info
- system-kext*
 ```
 
 ### **kernel diff**

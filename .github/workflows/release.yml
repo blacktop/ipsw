@@ -11,29 +11,46 @@ jobs:
   goreleaser:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-latest, windows-latest, macos-12]
 
     runs-on: ${{ matrix.platform }}
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
       -
-        name: Set up Go
-        uses: actions/setup-go@v2
-        with:
-          go-version: 1.17
+        name: Fetch all tags
+        run: git fetch --force --tags
       -
-        name: Build Dependencies (Linux)
+        name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - # LINUX ################################################################
         if: matrix.platform == 'ubuntu-latest'
+        name: linux-deps
         run: |
-          sudo apt-get update && sudo apt-get install gcc-aarch64-linux-gnu
+          sudo apt-get -yq install gcc-aarch64-linux-gnu jq
+      -
+        if: matrix.platform == 'ubuntu-latest'
+        name: setup-snapcraft
+        # FIXME: the mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715
+        run: |
+          sudo apt-get update
+          sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
+          mkdir -p $HOME/.cache/snapcraft/download
+          mkdir -p $HOME/.cache/snapcraft/stage-packages
+      -
+        name: snapcraft-login
+        if: matrix.platform == 'ubuntu-latest'
+        run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
       -
         if: matrix.platform == 'ubuntu-latest'
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
           version: latest
@@ -41,26 +58,65 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       -
+        if: matrix.platform == 'ubuntu-latest'
+        name: Upload assets
+        uses: actions/upload-artifact@v3
+        with:
+          name: ipsw_linux
+          path: dist/*
+
+      -  # WINDOWS ################################################################
+        if: matrix.platform == 'windows-latest'
+        name: windows-deps
+        run: |
+          brew install libusb
+      -
         if: matrix.platform == 'windows-latest'
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
           version: latest
           args: release --rm-dist -f hack/goreleaser/windows.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
       -
         if: matrix.platform == 'ubuntu-latest'
         name: Upload assets
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: disass_linux
           path: dist/*
       -
         if: matrix.platform == 'windows-latest'
         name: Upload assets
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
-          name: disass_windows
+          name: ipsw_windows
+          path: dist/*
+
+      -  # MACOS ################################################################
+        if: matrix.platform == 'macos-12'
+        name: macos-deps
+        run: |
+          brew install libusb unicorn
+          arch -arm64 brew install libusb unicorn
+      -
+        if: matrix.platform == 'macos-12'
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v3
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --rm-dist -f hack/goreleaser/darwin.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
+      -
+        if: matrix.platform == 'macos-12'
+        name: Upload assets
+        uses: actions/upload-artifact@v3
+        with:
+          name: ipsw_macos
           path: dist/*

@@ -28,10 +28,12 @@ type rangeEntry struct {
 	Size       uint32
 }
 
-type patchableExport struct {
-	Name           string
-	OffsetOfImpl   uint32
-	PatchLocations []CachePatchableLocation
+type PatchableExport struct {
+	Name             string
+	OffsetOfImpl     uint32
+	ClientIndex      uint32
+	PatchLocations   []CachePatchableLocationV1
+	PatchLocationsV2 []CachePatchableLocationV2
 }
 
 type astate struct {
@@ -164,7 +166,7 @@ type CacheImage struct {
 	Index    uint32
 	Info     CacheImageInfo
 	Mappings *cacheMappingsWithSlideInfo
-	CacheLocalSymbolsEntry
+	CacheLocalSymbolsEntry64
 	CacheImageInfoExtra
 	CacheImageTextInfo
 	Initializer    uint64
@@ -173,7 +175,7 @@ type CacheImage struct {
 
 	SlideInfo        slideInfo
 	RangeEntries     []rangeEntry
-	PatchableExports []patchableExport
+	PatchableExports []PatchableExport
 	LocalSymbols     []*CacheLocalSymbol64
 	PublicSymbols    []*Symbol
 	ObjC             objcInfo
@@ -407,12 +409,13 @@ func (i *CacheImage) Analyze() error {
 
 	if err := i.ParseLocalSymbols(false); err != nil {
 		if !errors.Is(err, ErrNoLocals) {
-			return err
+			return fmt.Errorf("failed to parse local symbols for %s: %w", i.Name, err)
 		}
 	}
 
 	if err := i.ParseObjC(); err != nil {
-		return fmt.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err)
+		log.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err)
+		// return fmt.Errorf("failed to parse objc data for image %s: %v", filepath.Base(i.Name), err) FIXME: should this error out?
 	}
 
 	if !i.cache.IsArm64() {
@@ -421,7 +424,7 @@ func (i *CacheImage) Analyze() error {
 
 	if !i.Analysis.State.IsSlideInfoDone() {
 		if err := i.ParseSlideInfo(); err != nil {
-			return err
+			return fmt.Errorf("failed to parse slide info for %s: %w", i.Name, err)
 		}
 	}
 
@@ -429,7 +432,7 @@ func (i *CacheImage) Analyze() error {
 		log.Debugf("parsing %s symbol stub helpers", i.Name)
 		if err := i.ParseHelpers(); err != nil {
 			if !errors.Is(err, macho.ErrMachOSectionNotFound) {
-				return err
+				return fmt.Errorf("failed to parse stub helpers for %s: %w", i.Name, err)
 			}
 		}
 
@@ -448,7 +451,7 @@ func (i *CacheImage) Analyze() error {
 	if !i.Analysis.State.IsGotDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s global offset table", i.Name)
 		if err := i.ParseGOT(); err != nil {
-			return err
+			return fmt.Errorf("failed to parse GOT for %s: %w", i.Name, err)
 		}
 
 		for entry, target := range i.Analysis.GotPointers {
@@ -460,7 +463,7 @@ func (i *CacheImage) Analyze() error {
 			} else {
 				if img, err := i.cache.GetImageContainingVMAddr(target); err == nil {
 					if err := img.Analyze(); err != nil {
-						return err
+						return fmt.Errorf("failed parse GOT target %#x: failed to analyze image %s: %w", target, img.Name, err)
 					}
 					if symName, ok := i.cache.AddressToSymbol[target]; ok {
 						i.cache.AddressToSymbol[entry] = fmt.Sprintf("__got.%s", symName)
@@ -482,7 +485,7 @@ func (i *CacheImage) Analyze() error {
 	if !i.Analysis.State.IsStubsDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s symbol stubs", i.Name)
 		if err := i.ParseStubs(); err != nil {
-			return err
+			return fmt.Errorf("failed to parse stubs for %s: %w", i.Name, err)
 		}
 
 		for stub, target := range i.Analysis.SymbolStubs {
@@ -498,10 +501,10 @@ func (i *CacheImage) Analyze() error {
 			} else {
 				img, err := i.cache.GetImageContainingVMAddr(target)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to find image containing stub target %#x: %w", target, err)
 				}
 				if err := img.Analyze(); err != nil {
-					return err
+					return fmt.Errorf("failed to lookup symbol stub target %#x: failed to analyze image %s: %w", target, img.Name, err)
 				}
 				if symName, ok := i.cache.AddressToSymbol[target]; ok {
 					i.cache.AddressToSymbol[stub] = fmt.Sprintf("j_%s", symName)
@@ -589,15 +592,15 @@ func (i *CacheImage) ParseObjC() error {
 		if err := i.cache.MethodsForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(i.Name), err)
 		}
-		if strings.Contains(i.Name, "libobjc.A.dylib") {
-			if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
-				return fmt.Errorf("failed to parse objc all selectors: %v", err)
-			}
-		} else {
-			if err := i.cache.SelectorsForImage(i.Name); err != nil {
-				return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
-			}
+		// if strings.Contains(i.Name, "libobjc.A.dylib") {
+		// 	if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
+		// 		return fmt.Errorf("failed to parse objc all selectors: %v", err)
+		// 	}
+		// } else {
+		if err := i.cache.SelectorsForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
 		}
+		// }
 		if err := i.cache.ClassesForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc classes for image %s: %v", filepath.Base(i.Name), err)
 		}
@@ -636,9 +639,23 @@ func (i *CacheImage) ParseStubs() error {
 		return fmt.Errorf("failed to get MachO for image %s; %v", i.Name, err)
 	}
 
-	i.Analysis.SymbolStubs, err = disass.ParseStubsASM(m)
-	if err != nil {
-		return err
+	i.Analysis.SymbolStubs = make(map[uint64]uint64)
+	for _, sec := range m.Sections {
+		if sec.Flags.IsSymbolStubs() {
+			dat := make([]byte, sec.Size)
+			if _, err := i.ReadAtAddr(dat, sec.Addr); err != nil {
+				return err
+			}
+			stubs, err := disass.ParseStubsASM(dat, sec.Addr, func(u uint64) (uint64, error) {
+				return i.cache.ReadPointerAtAddress(u)
+			})
+			if err != nil {
+				return err
+			}
+			for k, v := range stubs {
+				i.Analysis.SymbolStubs[k] = i.cache.SlideInfo.SlidePointer(v)
+			}
+		}
 	}
 
 	i.Analysis.State.SetStubs(true)
@@ -722,11 +739,11 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					if err != nil {
 						return err
 					}
-					fmt.Fprintf(w, "%s\n", &CacheLocalSymbol64{
+					fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
 						Name:    s,
 						Nlist64: nlist,
 						Macho:   m,
-					})
+					}.String(true))
 				}
 			}
 
@@ -904,7 +921,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 	return nil
 }
 
-//  returns the public symbol matching the given name
+// returns the public symbol matching the given name
 func (i *CacheImage) GetPublicSymbol(name string) (*Symbol, error) {
 	i.ParsePublicSymbols(false)
 

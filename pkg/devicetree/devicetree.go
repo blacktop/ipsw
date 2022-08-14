@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"time"
 
 	"fmt"
 	"io"
@@ -16,7 +17,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
 )
 
 // Img4 DeviceTree object
@@ -47,9 +47,11 @@ type DeviceTree map[string]Properties
 
 // Summary object
 type Summary struct {
-	ProductName string
-	BoardConfig string
-	Model       string
+	ProductName        string
+	ProductDescription string
+	ProductType        string
+	BoardConfig        string
+	Timestamp          time.Time
 }
 
 // Summary prints out a summary of the DeviceTree
@@ -67,11 +69,14 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 			if product, ok := (c)["product"]["product-name"].(string); ok {
 				summary.ProductName = product
 			}
+			if productDesc, ok := (c)["product"]["product-description"].(string); ok {
+				summary.ProductDescription = productDesc
+			}
 		}
 	}
 
 	if model, ok := (*dtree)["device-tree"]["model"].(string); ok {
-		summary.Model = model
+		summary.ProductType = model
 		compatible := (*dtree)["device-tree"]["compatible"]
 		switch reflect.TypeOf(compatible).Kind() {
 		case reflect.Slice:
@@ -85,6 +90,29 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 		}
 	} else {
 		return nil, fmt.Errorf("devicetree model is not a string")
+	}
+
+	if stamp, ok := (*dtree)["device-tree"]["time-stamp"].(string); ok {
+		layout := "Mon Jan 2 15:04:05 MST 2006"
+		if location, err := time.LoadLocation("PST8PDT"); err == nil {
+			t, err := time.ParseInLocation(layout, stamp, location)
+			if err != nil {
+				return nil, err
+			}
+			zone, _ := time.Now().Zone()
+			location, err = time.LoadLocation(zone)
+			if err != nil {
+				// return nil, fmt.Errorf("failed to load location %s: %v", zone, err)
+				summary.Timestamp = t
+			} else {
+				summary.Timestamp = t.In(location)
+			}
+		} else {
+			summary.Timestamp, err = time.Parse(layout, stamp)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse device-tree time-stamp: %v", err)
+			}
+		}
 	}
 
 	return summary, nil
@@ -133,17 +161,6 @@ func (dtree *DeviceTree) GetModel() (string, error) {
 		return model, nil
 	}
 	return "", fmt.Errorf("failed to get model")
-}
-
-func findDeviceTreesInList(list []string) []string {
-	var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
-	dTrees := []string{}
-	for _, v := range list {
-		if validDT.MatchString(v) {
-			dTrees = append(dTrees, v)
-		}
-	}
-	return dTrees
 }
 
 func parseValue(value []byte) interface{} {
@@ -280,7 +297,7 @@ func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 
 	zr, err := zip.OpenReader(ipswPath)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open ipsw as zip")
+		return nil, fmt.Errorf("failed to open zip: %s", err)
 	}
 	defer zr.Close()
 
@@ -293,7 +310,7 @@ func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 
 			dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
 			}
 		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
@@ -303,7 +320,7 @@ func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 
 			dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				return nil, fmt.Errorf("failed to parse Img3 DeviceTree: %w", err)
 			}
 		}
 	}
@@ -327,7 +344,7 @@ func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
 
 			dt[filepath.Base(f.Name)], err = ParseImg4Data(dtData)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				return nil, fmt.Errorf("failed to parse Img4 DeviceTree: %v", err)
 			}
 		} else if regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name) {
 			dtData := make([]byte, f.UncompressedSize64)
@@ -337,7 +354,7 @@ func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
 
 			dt[filepath.Base(f.Name)], err = ParseImg3Data(dtData)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to parse DeviceTree")
+				return nil, fmt.Errorf("failed to parse Img3 DeviceTree: %w", err)
 			}
 		}
 	}
@@ -348,19 +365,14 @@ func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
 // Extract extracts DeviceTree(s) from ipsw
 func Extract(ipsw, destPath string) error {
 	_, err := utils.Unzip(ipsw, destPath, func(f *zip.File) bool {
-		var validDT = regexp.MustCompile(`.*DeviceTree.*im4p$`)
-		if validDT.MatchString(f.Name) {
+		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
 			return true
 		}
-		validDT = regexp.MustCompile(`.*DeviceTree.*img3$`)
-		if validDT.MatchString(f.Name) {
-			return true
-		}
-		return false
+		return regexp.MustCompile(`.*DeviceTree.*img3$`).MatchString(f.Name)
 	})
 
 	if err != nil {
-		return errors.Wrap(err, "failed to extract DeviceTree from ipsw")
+		return fmt.Errorf("failed to extract DeviceTree: %w", err)
 	}
 
 	return nil

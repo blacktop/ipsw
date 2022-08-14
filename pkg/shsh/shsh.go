@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
@@ -38,7 +38,7 @@ func ParseRAW(r io.Reader) error {
 		return err
 	}
 	name := fmt.Sprintf("%d.dumped.shsh", img4.Manifest.Properties["ECID"])
-	err = ioutil.WriteFile(name, pDatam, 0644)
+	err = os.WriteFile(name, pDatam, 0660)
 	if err != nil {
 		return err
 	}

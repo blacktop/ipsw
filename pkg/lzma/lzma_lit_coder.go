@@ -14,7 +14,6 @@ func newLitSubCoder() *litSubCoder {
 	}
 }
 
-
 func (lsc *litSubCoder) decodeNormal(rd *rangeDecoder) byte {
 	symbol := uint32(1)
 	for symbol < 0x100 {
@@ -42,7 +41,6 @@ func (lsc *litSubCoder) decodeWithMatchByte(rd *rangeDecoder, matchByte byte) by
 	}
 	return byte(symbol)
 }
-
 
 func (lsc *litSubCoder) encode(re *rangeEncoder, symbol byte) {
 	uSymbol := uint32(symbol)
@@ -100,7 +98,6 @@ func (lsc *litSubCoder) getPrice(matchMode bool, matchByte, symbol byte) uint32 
 	}
 	return price
 }
-
 
 type litCoder struct {
 	coders      []*litSubCoder

@@ -1,5 +1,5 @@
 /*
-Copyright © 2019 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,11 +25,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	// "sort"
-	"io/ioutil"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -40,36 +40,37 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	jsonFlag   bool
-	remoteFlag bool
-)
-
 func init() {
 	rootCmd.AddCommand(deviceTreeCmd)
-
-	deviceTreeCmd.PersistentFlags().String("proxy", "", "HTTP/HTTPS proxy")
-	deviceTreeCmd.PersistentFlags().Bool("insecure", false, "do not verify ssl certs")
-
-	deviceTreeCmd.Flags().BoolVarP(&jsonFlag, "json", "j", false, "Output to stdout as JSON")
-	deviceTreeCmd.Flags().BoolVarP(&remoteFlag, "remote", "r", false, "Extract from URL")
-
-	deviceTreeCmd.MarkZshCompPositionalArgumentFile(1, "DeviceTree*")
+	deviceTreeCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	deviceTreeCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	deviceTreeCmd.Flags().BoolP("json", "j", false, "Output to stdout as JSON")
+	deviceTreeCmd.Flags().BoolP("remote", "r", false, "Extract from URL")
+	deviceTreeCmd.MarkZshCompPositionalArgumentFile(1, "DeviceTree*im4p")
+	deviceTreeCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"im4p"}, cobra.ShellCompDirectiveFilterFileExt
+	}
 }
 
 // deviceTreeCmd represents the deviceTree command
 var deviceTreeCmd = &cobra.Command{
-	Use:   "dtree <DeviceTree>",
-	Short: "Parse DeviceTree",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "dtree <DeviceTree>",
+	Short:         "Parse DeviceTree",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// settings
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
+		// flags
+		remoteFlag, _ := cmd.Flags().GetBool("remote")
+		asJSON, _ := cmd.Flags().GetBool("json")
 
 		if remoteFlag {
 			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
@@ -83,14 +84,14 @@ var deviceTreeCmd = &cobra.Command{
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
 			}
-			if jsonFlag {
+			if asJSON {
 				for fileName, dtree := range dtrees {
 					j, err := json.Marshal(dtree)
 					if err != nil {
 						return err
 					}
 					fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
-					err = ioutil.WriteFile(fileName+".json", j, 0644)
+					err = os.WriteFile(fileName+".json", j, 0660)
 					if err != nil {
 						return errors.Wrap(err, "failed to decompress kernelcache")
 					}
@@ -103,13 +104,13 @@ var deviceTreeCmd = &cobra.Command{
 					if err != nil {
 						return errors.Wrap(err, "failed to parse device-tree")
 					}
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
+					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
 				}
 			}
 		} else {
-			content, err := ioutil.ReadFile(args[0])
+			content, err := os.ReadFile(args[0])
 			if err != nil {
 				return errors.Wrap(err, "failed to read DeviceTree")
 			}
@@ -127,7 +128,7 @@ var deviceTreeCmd = &cobra.Command{
 				}
 			}
 
-			if jsonFlag {
+			if asJSON {
 				// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
 				// jq '.[ "device-tree" ].compatible'
 				// jq '.[ "device-tree" ].model'
@@ -142,7 +143,7 @@ var deviceTreeCmd = &cobra.Command{
 				if err != nil {
 					return errors.Wrap(err, "failed to parse device-tree")
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.Model))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
 			}

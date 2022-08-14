@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -25,7 +25,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
@@ -68,7 +68,7 @@ var ibootCmd = &cobra.Command{
 			return errors.Wrapf(err, "unabled to open file: %s", args[0])
 		}
 
-		dat, err := ioutil.ReadAll(f)
+		dat, err := io.ReadAll(f)
 		if err != nil {
 			return errors.Wrapf(err, "unabled to read file: %s", args[0])
 		}
@@ -115,7 +115,7 @@ var ibootCmd = &cobra.Command{
 			}
 
 			utils.Indent(log.Info, 2)(fmt.Sprintf("Dumping %s", name))
-			ioutil.WriteFile(name, decData, 0644)
+			os.WriteFile(name, decData, 0660)
 			if err != nil {
 				return errors.Wrapf(err, "unabled to write file: %s", name)
 			}

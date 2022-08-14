@@ -18,7 +18,6 @@ const (
 
 // The actual read interface needed by NewDecoder. If the passed in io.Reader
 // does not also have ReadByte, the NewDecoder will introduce its own buffering.
-//
 type Reader interface {
 	io.Reader
 	ReadByte() (c byte, err error)
@@ -121,7 +120,6 @@ const (
 // The actual write interface needed by NewEncoder. If the passed in io.Writer
 // does not also have WriteByte and Flush, the NewEncoder will wrap it into an
 // bufio.Writer.
-//
 type Writer interface {
 	io.Writer
 	Flush() error

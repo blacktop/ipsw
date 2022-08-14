@@ -73,6 +73,7 @@ func (d *MachoDisass) Triage() error {
 
 		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 		if err != nil {
+			startAddr += uint64(binary.Size(uint32(0)))
 			continue
 		}
 
@@ -377,7 +378,7 @@ func (d *MachoDisass) parseGOT() error {
 }
 
 func (d *MachoDisass) parseStubs() error {
-	stubs, err := ParseStubsASM(d.f)
+	stubs, err := ParseStubsForMachO(d.f)
 	if err != nil {
 		return err
 	}

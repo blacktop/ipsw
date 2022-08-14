@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 blacktop
+Copyright © 2018-2022 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@ package cmd
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/blacktop/ipsw/internal/download"
@@ -47,7 +47,7 @@ var keyListGenCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return ioutil.WriteFile(filepath.Clean(args[0]), keysJSON, 0644)
+		return os.WriteFile(filepath.Clean(args[0]), keysJSON, 0660)
 	},
 }
 

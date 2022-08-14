@@ -2,6 +2,7 @@ package dyld
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -15,7 +16,7 @@ import (
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
+	"github.com/blacktop/ipsw/pkg/disass"
 )
 
 // Known good magic
@@ -41,8 +42,18 @@ type localSymbolInfo struct {
 
 type cacheImages []*CacheImage
 type cacheMappings []*CacheMapping
-type cacheMappingsWithSlideInfo []*CacheMappingWithSlideInfo
 type codesignature *ctypes.CodeSignature
+type cacheMappingsWithSlideInfo []*CacheMappingWithSlideInfo
+
+func (m cacheMappingsWithSlideInfo) Len() int {
+	return len(m)
+}
+func (m cacheMappingsWithSlideInfo) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
+}
+func (m cacheMappingsWithSlideInfo) Less(i, j int) bool {
+	return m[i].Address < m[j].Address
+}
 
 // A File represents an open dyld file.
 type File struct {
@@ -56,21 +67,24 @@ type File struct {
 
 	Images cacheImages
 
-	SlideInfo       slideInfo
-	PatchInfo       CachePatchInfo
-	LocalSymInfo    localSymbolInfo
-	AcceleratorInfo CacheAcceleratorInfo
-	ImageArray      map[uint32]*CImage
-	Closures        []*LaunchClosure
+	SlideInfo        slideInfo
+	PatchInfoVersion uint32
+	LocalSymInfo     localSymbolInfo
+	AcceleratorInfo  CacheAcceleratorInfo
+	ImageArray       map[uint32]*CImage
+	Closures         []*LaunchClosure
 
 	BranchPools    []uint64
 	CodeSignatures map[mtypes.UUID]codesignature
 
 	AddressToSymbol map[uint64]string
 
-	IsDyld4      bool
-	SubCacheInfo []SubCacheInfo
-	symUUID      mtypes.UUID
+	IsDyld4         bool
+	SubCacheInfo    []SubcacheEntryPageInLink
+	symUUID         mtypes.UUID
+	dyldImageAddr   uint64
+	dyldStartFnAddr uint64
+	islandStubs     map[uint64]uint64
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
@@ -81,7 +95,7 @@ type File struct {
 type FormatError struct {
 	off int64
 	msg string
-	val interface{}
+	val any
 }
 
 func (e *FormatError) Error() string {
@@ -127,15 +141,20 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 
-	if ff.Headers[ff.UUID].ImagesOffset == 0 && ff.Headers[ff.UUID].ImagesCount == 0 {
+	if ff.Headers[ff.UUID].ImagesOffsetOld == 0 && ff.Headers[ff.UUID].ImagesCountOld == 0 {
 
 		ff.IsDyld4 = true // NEW iOS15 dyld4 style caches
 
-		for i := 1; i <= int(ff.Headers[ff.UUID].NumSubCaches); i++ {
+		for i := 1; i <= int(ff.Headers[ff.UUID].SubCacheArrayCount); i++ {
+			subCacheName := fmt.Sprintf("%s.%d", name, i)
+			if len(string(bytes.Trim(ff.SubCacheInfo[i-1].Extention[:], "\x00"))) > 0 {
+				subCacheName = fmt.Sprintf("%s%s", name, string(bytes.Trim(ff.SubCacheInfo[i-1].Extention[:], "\x00")))
+			}
 			log.WithFields(log.Fields{
-				"cache": fmt.Sprintf("%s.%d", name, i),
+				"cache": subCacheName,
 			}).Debug("Parsing SubCache")
-			fsub, err := os.Open(fmt.Sprintf("%s.%d", name, i))
+
+			fsub, err := os.Open(subCacheName)
 			if err != nil {
 				return nil, err
 			}
@@ -150,13 +169,13 @@ func Open(name string) (*File, error) {
 			ff.closers[uuid] = fsub
 
 			if ff.Headers[uuid].UUID != ff.SubCacheInfo[i-1].UUID {
-				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", fmt.Sprintf("%s.%d", name, i),
-					ff.SubCacheInfo[i].UUID,
-					ff.Headers[uuid].UUID)
+				return nil, fmt.Errorf("sub cache %s did not match expected UUID: %#x, got: %#x", subCacheName,
+					ff.SubCacheInfo[i-1].UUID.String(),
+					ff.Headers[uuid].UUID.String())
 			}
 		}
 
-		if !ff.Headers[ff.UUID].SymbolsSubCacheUUID.IsNull() {
+		if !ff.Headers[ff.UUID].SymbolFileUUID.IsNull() {
 			log.WithFields(log.Fields{
 				"cache": name + ".symbols",
 			}).Debug("Parsing SubCache")
@@ -170,8 +189,8 @@ func Open(name string) (*File, error) {
 				return nil, err
 			}
 
-			if uuid != ff.Headers[ff.UUID].SymbolsSubCacheUUID {
-				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid, ff.Headers[ff.UUID].SymbolsSubCacheUUID)
+			if uuid != ff.Headers[ff.UUID].SymbolFileUUID {
+				return nil, fmt.Errorf("%s.symbols UUID %s did NOT match expected UUID %s", name, uuid.String(), ff.Headers[ff.UUID].SymbolFileUUID.String())
 			}
 
 			ff.symUUID = uuid
@@ -204,21 +223,25 @@ func (f *File) Close() error {
 	return nil
 }
 
-// ReadHeader opens a given cache and returns the dyld_shared_cache header
-// func parseSubCache(name string) error {
-// 	var header CacheHeader
+// ReadHeader opens a given cache and returns the dyld_cache_header
+func ReadHeader(name string) (*CacheHeader, error) {
+	var header CacheHeader
 
-// 	cache, err := os.Open(path)
-// 	if err != nil {
-// 		return nil, err
-// 	}
+	log.WithFields(log.Fields{
+		"cache": name,
+	}).Debug("Parsing Cache Header")
 
-// 	if err := binary.Read(cache, binary.LittleEndian, &header); err != nil {
-// 		return nil, err
-// 	}
+	f, err := os.Open(name)
+	if err != nil {
+		return nil, err
+	}
 
-// 	return &header, nil
-// }
+	if err := binary.Read(f, binary.LittleEndian, &header); err != nil {
+		return nil, err
+	}
+
+	return &header, nil
+}
 
 // NewFile creates a new File for accessing a dyld binary in an underlying reader.
 // The dyld binary is expected to start at position 0 in the ReaderAt.
@@ -235,6 +258,7 @@ func NewFile(r io.ReaderAt) (*File, error) {
 	f.closers = make(map[mtypes.UUID]io.Closer)
 	f.AddressToSymbol = make(map[uint64]string, 7000000)
 	f.ImageArray = make(map[uint32]*CImage)
+	f.islandStubs = make(map[uint64]uint64)
 
 	// Read and decode dyld magic
 	var ident [16]byte
@@ -242,8 +266,8 @@ func NewFile(r io.ReaderAt) (*File, error) {
 		return nil, err
 	}
 	// Verify magic
-	if !utils.StrSliceContains(knownMagic, string(ident[:16])) {
-		return nil, &FormatError{0, "invalid magic number", nil}
+	if !utils.StrSliceHas(knownMagic, strings.Trim(string(ident[:16]), "\x00")) {
+		return nil, &FormatError{0, "invalid dyld_shared_cache magic", string(ident[:16])}
 	}
 
 	f.ByteOrder = binary.LittleEndian
@@ -277,8 +301,8 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		return err
 	}
 	// Verify magic
-	if !utils.StrSliceContains(knownMagic, string(ident[:16])) {
-		return &FormatError{0, "invalid magic number", nil}
+	if !utils.StrSliceHas(knownMagic, strings.Trim(string(ident[:16]), "\x00")) {
+		return &FormatError{0, "invalid dyld_shared_cache magic", string(ident[:16])}
 	}
 
 	f.r[uuid] = r
@@ -360,12 +384,12 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	// Read dyld images.
 	var imagesCount uint32
-	if f.Headers[uuid].ImagesOffset > 0 {
+	if f.Headers[uuid].ImagesOffsetOld > 0 {
+		imagesCount = f.Headers[uuid].ImagesCountOld
+		sr.Seek(int64(f.Headers[uuid].ImagesOffsetOld), io.SeekStart)
+	} else {
 		imagesCount = f.Headers[uuid].ImagesCount
 		sr.Seek(int64(f.Headers[uuid].ImagesOffset), io.SeekStart)
-	} else {
-		imagesCount = f.Headers[uuid].ImagesWithSubCachesCount
-		sr.Seek(int64(f.Headers[uuid].ImagesWithSubCachesOffset), io.SeekStart)
 	}
 
 	if len(f.Images) == 0 {
@@ -433,13 +457,13 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			// if err := binary.Read(sr, f.ByteOrder, &f.Images[i].CacheLocalSymbolsEntry); err != nil {
 			// 	return nil, err
 			// }
-			var localSymEntry CacheLocalSymbolsEntry
-			if f.Headers[uuid].ImagesOffset == 0 && f.Headers[uuid].ImagesCount == 0 { // NEW iOS15 dyld4 style caches
+			var localSymEntry CacheLocalSymbolsEntry64
+			if f.Headers[uuid].ImagesOffsetOld == 0 && f.Headers[uuid].ImagesCountOld == 0 { // NEW iOS15 dyld4 style caches
 				if err := binary.Read(sr, f.ByteOrder, &localSymEntry); err != nil {
 					return err
 				}
 			} else {
-				var preDyld4LSEntry preDyld4cacheLocalSymbolsEntry
+				var preDyld4LSEntry CacheLocalSymbolsEntry
 				if err := binary.Read(sr, f.ByteOrder, &preDyld4LSEntry); err != nil {
 					return err
 				}
@@ -449,13 +473,13 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			}
 
 			if len(f.Images) > i {
-				f.Images[i].CacheLocalSymbolsEntry = localSymEntry
+				f.Images[i].CacheLocalSymbolsEntry64 = localSymEntry
 			} else {
 				f.Images = append(f.Images, &CacheImage{
 					Index: uint32(i),
 					// Info:      iinfo,
-					cache:                  f,
-					CacheLocalSymbolsEntry: localSymEntry,
+					cache:                    f,
+					CacheLocalSymbolsEntry64: localSymEntry,
 				})
 			}
 			// f.Images[i].ReaderAt = io.NewSectionReader(r, int64(f.Images[i].DylibOffset), 1<<63-1)
@@ -477,86 +501,98 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		f.BranchPools = bPools
 	}
 
-	// Read dyld optimization info.
-	if f.Headers[uuid].AccelerateInfoAddr != 0 {
-		for _, mapping := range f.Mappings[uuid] {
-			if mapping.Address <= f.Headers[uuid].AccelerateInfoAddr && f.Headers[uuid].AccelerateInfoAddr < mapping.Address+mapping.Size {
-				accelInfoPtr := int64(f.Headers[uuid].AccelerateInfoAddr - mapping.Address + mapping.FileOffset)
-				sr.Seek(accelInfoPtr, io.SeekStart)
-				if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
-					return err
-				}
-				// Read dyld 16-bit array of sorted image indexes.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.BottomUpListOffset), io.SeekStart)
-				bottomUpList := make([]uint16, f.AcceleratorInfo.ImageExtrasCount)
-				if err := binary.Read(sr, f.ByteOrder, &bottomUpList); err != nil {
-					return err
-				}
-				// Read dyld 16-bit array of dependencies.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), io.SeekStart)
-				depList := make([]uint16, f.AcceleratorInfo.DepListCount)
-				if err := binary.Read(sr, f.ByteOrder, &depList); err != nil {
-					return err
-				}
-				// Read dyld 16-bit array of re-exports.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), io.SeekStart)
-				reExportList := make([]uint16, f.AcceleratorInfo.ReExportCount)
-				if err := binary.Read(sr, f.ByteOrder, &reExportList); err != nil {
-					return err
-				}
-				// Read dyld image info extras.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ImagesExtrasOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.ImageExtrasCount; i++ {
-					imgXtrInfo := CacheImageInfoExtra{}
-					if err := binary.Read(sr, f.ByteOrder, &imgXtrInfo); err != nil {
+	if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr != 0 {
+		// iOS16 added dyld to the shared cache and resued these fields to point to the dyld image and _dyld_start
+		if f.IsDyld4 {
+			sr.Seek(int64(f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr), io.SeekStart)
+			if err := binary.Read(sr, f.ByteOrder, &f.dyldImageAddr); err != nil {
+				return err
+			}
+			sr.Seek(int64(f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr), io.SeekStart)
+			if err := binary.Read(sr, f.ByteOrder, &f.dyldStartFnAddr); err != nil {
+				return err
+			}
+		} else {
+			// Read dyld optimization info.
+			for _, mapping := range f.Mappings[uuid] {
+				if mapping.Address <= f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr && f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr < mapping.Address+mapping.Size {
+					accelInfoPtr := int64(f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr - mapping.Address + mapping.FileOffset)
+					sr.Seek(accelInfoPtr, io.SeekStart)
+					if err := binary.Read(sr, f.ByteOrder, &f.AcceleratorInfo); err != nil {
 						return err
 					}
-					f.Images[i].CacheImageInfoExtra = imgXtrInfo
-				}
-				// Read dyld initializers list.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.InitializersOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.InitializersCount; i++ {
-					accelInit := CacheAcceleratorInitializer{}
-					if err := binary.Read(sr, f.ByteOrder, &accelInit); err != nil {
+					// Read dyld 16-bit array of sorted image indexes.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.BottomUpListOffset), io.SeekStart)
+					bottomUpList := make([]uint16, f.AcceleratorInfo.ImageExtrasCount)
+					if err := binary.Read(sr, f.ByteOrder, &bottomUpList); err != nil {
 						return err
 					}
-					// fmt.Printf("  image[%3d] 0x%X\n", accelInit.ImageIndex, f.Mappings[0].Address+uint64(accelInit.FunctionOffset))
-					f.Images[accelInit.ImageIndex].Initializer = f.Mappings[uuid][0].Address + uint64(accelInit.FunctionOffset)
-				}
-				// Read dyld DOF sections list.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DofSectionsOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.DofSectionsCount; i++ {
-					accelDOF := CacheAcceleratorDof{}
-					if err := binary.Read(sr, f.ByteOrder, &accelDOF); err != nil {
+					// Read dyld 16-bit array of dependencies.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DepListOffset), io.SeekStart)
+					depList := make([]uint16, f.AcceleratorInfo.DepListCount)
+					if err := binary.Read(sr, f.ByteOrder, &depList); err != nil {
 						return err
 					}
-					// fmt.Printf("  image[%3d] 0x%X -> 0x%X\n", accelDOF.ImageIndex, accelDOF.SectionAddress, accelDOF.SectionAddress+uint64(accelDOF.SectionSize))
-					f.Images[accelDOF.ImageIndex].DOFSectionAddr = accelDOF.SectionAddress
-					f.Images[accelDOF.ImageIndex].DOFSectionSize = accelDOF.SectionSize
-				}
-				// Read dyld offset to start of ss.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), io.SeekStart)
-				for i := uint32(0); i != f.AcceleratorInfo.RangeTableCount; i++ {
-					rEntry := CacheRangeEntry{}
-					if err := binary.Read(sr, f.ByteOrder, &rEntry); err != nil {
+					// Read dyld 16-bit array of re-exports.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ReExportListOffset), io.SeekStart)
+					reExportList := make([]uint16, f.AcceleratorInfo.ReExportCount)
+					if err := binary.Read(sr, f.ByteOrder, &reExportList); err != nil {
 						return err
 					}
-					// fmt.Printf("  0x%X -> 0x%X %s\n", rangeEntry.StartAddress, rangeEntry.StartAddress+uint64(rangeEntry.Size), f.Images[rangeEntry.ImageIndex].Name)
-					offset, err := f.GetOffsetForUUID(uuid, rEntry.StartAddress)
-					if err != nil {
-						return fmt.Errorf("failed to get range entry's file offset: %v", err)
+					// Read dyld image info extras.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.ImagesExtrasOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.ImageExtrasCount; i++ {
+						imgXtrInfo := CacheImageInfoExtra{}
+						if err := binary.Read(sr, f.ByteOrder, &imgXtrInfo); err != nil {
+							return err
+						}
+						f.Images[i].CacheImageInfoExtra = imgXtrInfo
 					}
-					f.Images[rEntry.ImageIndex].RangeEntries = append(f.Images[rEntry.ImageIndex].RangeEntries, rangeEntry{
-						StartAddr:  rEntry.StartAddress,
-						FileOffset: offset,
-						Size:       rEntry.Size,
-					})
-				}
-				// Read dyld trie containing all dylib paths.
-				sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), io.SeekStart)
-				dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
-				if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
-					return err
+					// Read dyld initializers list.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.InitializersOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.InitializersCount; i++ {
+						accelInit := CacheAcceleratorInitializer{}
+						if err := binary.Read(sr, f.ByteOrder, &accelInit); err != nil {
+							return err
+						}
+						// fmt.Printf("  image[%3d] 0x%X\n", accelInit.ImageIndex, f.Mappings[0].Address+uint64(accelInit.FunctionOffset))
+						f.Images[accelInit.ImageIndex].Initializer = f.Mappings[uuid][0].Address + uint64(accelInit.FunctionOffset)
+					}
+					// Read dyld DOF sections list.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DofSectionsOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.DofSectionsCount; i++ {
+						accelDOF := CacheAcceleratorDof{}
+						if err := binary.Read(sr, f.ByteOrder, &accelDOF); err != nil {
+							return err
+						}
+						// fmt.Printf("  image[%3d] 0x%X -> 0x%X\n", accelDOF.ImageIndex, accelDOF.SectionAddress, accelDOF.SectionAddress+uint64(accelDOF.SectionSize))
+						f.Images[accelDOF.ImageIndex].DOFSectionAddr = accelDOF.SectionAddress
+						f.Images[accelDOF.ImageIndex].DOFSectionSize = accelDOF.SectionSize
+					}
+					// Read dyld offset to start of ss.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.RangeTableOffset), io.SeekStart)
+					for i := uint32(0); i != f.AcceleratorInfo.RangeTableCount; i++ {
+						rEntry := CacheRangeEntry{}
+						if err := binary.Read(sr, f.ByteOrder, &rEntry); err != nil {
+							return err
+						}
+						// fmt.Printf("  0x%X -> 0x%X %s\n", rangeEntry.StartAddress, rangeEntry.StartAddress+uint64(rangeEntry.Size), f.Images[rangeEntry.ImageIndex].Name)
+						offset, err := f.GetOffsetForUUID(uuid, rEntry.StartAddress)
+						if err != nil {
+							return fmt.Errorf("failed to get range entry's file offset: %v", err)
+						}
+						f.Images[rEntry.ImageIndex].RangeEntries = append(f.Images[rEntry.ImageIndex].RangeEntries, rangeEntry{
+							StartAddr:  rEntry.StartAddress,
+							FileOffset: offset,
+							Size:       rEntry.Size,
+						})
+					}
+					// Read dyld trie containing all dylib paths.
+					sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), io.SeekStart)
+					dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
+					if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -570,11 +606,24 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		}
 	}
 
-	if f.Headers[uuid].NumSubCaches > 0 && f.Headers[uuid].SubCachesInfoOffset > 0 {
-		sr.Seek(int64(f.Headers[uuid].SubCachesInfoOffset), io.SeekStart)
-		f.SubCacheInfo = make([]SubCacheInfo, f.Headers[uuid].NumSubCaches)
-		if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
-			return err
+	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset > 0 {
+		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
+		f.SubCacheInfo = make([]SubcacheEntryPageInLink, f.Headers[uuid].SubCacheArrayCount)
+		// TODO: gross hack to read the subcache info for pre iOS 16.
+		endOfSubCacheInfoArray := f.Headers[f.UUID].SubCacheArrayOffset + uint32(binary.Size(SubcacheEntryPageInLink{})*int(f.Headers[f.UUID].SubCacheArrayCount))
+		if endOfSubCacheInfoArray == f.Images[0].PathOffset {
+			if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
+				return err
+			}
+		} else {
+			subCacheInfo := make([]SubcacheEntry, f.Headers[uuid].SubCacheArrayCount)
+			if err := binary.Read(sr, f.ByteOrder, subCacheInfo); err != nil {
+				return err
+			}
+			for idx, susubCacheInfo := range subCacheInfo {
+				f.SubCacheInfo[idx].UUID = susubCacheInfo.UUID
+				f.SubCacheInfo[idx].CacheVMOffset = susubCacheInfo.CacheVMOffset
+			}
 		}
 	}
 
@@ -583,7 +632,7 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 func (f *File) ParseImageArrays() error {
 	// Read dyld image array info
-	if f.Headers[f.UUID].DylibsImageArrayAddr > 0 || f.Headers[f.UUID].DylibsImageArrayWithSubCachesAddr > 0 {
+	if f.Headers[f.UUID].DylibsImageArrayAddr > 0 || f.Headers[f.UUID].DylibsPblSetAddr > 0 {
 		if err := f.GetDylibsImageArray(); err != nil {
 			return fmt.Errorf("failed to parse dylibs image array: %v", err)
 		}
@@ -597,12 +646,34 @@ func (f *File) ParseImageArrays() error {
 	}
 
 	// Read program closure image array info
-	if f.Headers[f.UUID].ProgClosuresTrieAddr > 0 || f.Headers[f.UUID].ProgClosuresTrieWithSubCachesAddr > 0 {
+	if f.Headers[f.UUID].ProgClosuresTrieAddr > 0 || f.Headers[f.UUID].ProgramTrieAddr > 0 {
 		if err := f.GetProgClosureImageArray(); err != nil {
 			return fmt.Errorf("failed to parse program launch closures: %v", err)
 		}
 	}
 
+	return nil
+}
+
+func (f *File) ParseStubIslands() error {
+	for _, sc := range f.SubCacheInfo {
+		if f.Headers[sc.UUID].ImagesCountOld == 0 && f.Headers[sc.UUID].ImagesCount == 0 {
+			// found a stub island
+			dat := make([]byte, f.Headers[sc.UUID].CodeSignatureOffset-0x4000)
+			if _, err := f.r[sc.UUID].ReadAt(dat, 0x4000); err != nil {
+				return fmt.Errorf("failed to read stub island data: %v", err)
+			}
+			stubs, err := disass.ParseStubsASM(dat, f.MappingsWithSlideInfo[sc.UUID][0].Address+0x4000, func(u uint64) (uint64, error) {
+				return f.ReadPointerAtAddress(u)
+			})
+			if err != nil {
+				return err
+			}
+			for k, v := range stubs {
+				f.islandStubs[k] = v
+			}
+		}
+	}
 	return nil
 }
 
@@ -1002,96 +1073,250 @@ func (f *File) parseSlideInfo(uuid mtypes.UUID, mapping *CacheMappingWithSlideIn
 	return rebases, nil
 }
 
-// ParsePatchInfo parses dyld patch info
-func (f *File) ParsePatchInfo() error {
-	if f.Headers[f.UUID].PatchInfoAddr > 0 {
-		// Read dyld patch_info entries.
-		uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr + 8)
+func (f *File) patchInfoVersion() (uint32, error) {
+	if f.IsDyld4 {
+		uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
 		if err != nil {
-			return err
+			return 0, fmt.Errorf("failed to get patch info v2 offset: %v", err)
 		}
 
 		sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-
 		sr.Seek(int64(patchInfoOffset), io.SeekStart)
-		if err := binary.Read(sr, f.ByteOrder, &f.PatchInfo); err != nil {
-			return err
+
+		var pinfo CachePatchInfoV2
+		if err := binary.Read(sr, f.ByteOrder, &pinfo); err != nil {
+			return 0, fmt.Errorf("failed to read patch info v2: %v", err)
 		}
 
-		// Read all the other patch_info structs
-		uuid, patchTableArrayOffset, err := f.GetOffset(f.PatchInfo.PatchTableArrayAddr)
-		if err != nil {
-			return err
-		}
-
-		sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
-		imagePatches := make([]CacheImagePatches, f.PatchInfo.PatchTableArrayCount)
-		if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
-			return err
-		}
-
-		uuid, patchExportNamesOffset, err := f.GetOffset(f.PatchInfo.PatchExportNamesAddr)
-		if err != nil {
-			return err
-		}
-
-		exportNames := io.NewSectionReader(f.r[uuid], int64(patchExportNamesOffset), int64(f.PatchInfo.PatchExportNamesSize))
-
-		uuid, patchExportArrayOffset, err := f.GetOffset(f.PatchInfo.PatchExportArrayAddr)
-		if err != nil {
-			return err
-		}
-
-		sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
-		patchExports := make([]CachePatchableExport, f.PatchInfo.PatchExportArrayCount)
-		if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
-			return err
-		}
-
-		uuid, patchLocationArrayOffset, err := f.GetOffset(f.PatchInfo.PatchLocationArrayAddr)
-		if err != nil {
-			return err
-		}
-
-		sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
-		patchableLocations := make([]CachePatchableLocation, f.PatchInfo.PatchLocationArrayCount)
-		if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
-			return err
-		}
-
-		// Add patchabled export info to images
-		for i, iPatch := range imagePatches {
-			if iPatch.PatchExportsCount > 0 {
-				for exportIndex := uint32(0); exportIndex != iPatch.PatchExportsCount; exportIndex++ {
-					patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
-					var exportName string
-					if uint64(patchExport.ExportNameOffset) < f.PatchInfo.PatchExportNamesSize {
-						exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
-						s, err := bufio.NewReader(exportNames).ReadString('\x00')
-						if err != nil {
-							return errors.Wrapf(err, "failed to read string at: %x", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset)
-						}
-						exportName = strings.Trim(s, "\x00")
-					} else {
-						exportName = ""
-					}
-					plocs := make([]CachePatchableLocation, patchExport.PatchLocationsCount)
-					for locationIndex := uint32(0); locationIndex != patchExport.PatchLocationsCount; locationIndex++ {
-						plocs[locationIndex] = patchableLocations[patchExport.PatchLocationsStartIndex+locationIndex]
-					}
-					f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, patchableExport{
-						Name:           exportName,
-						OffsetOfImpl:   patchExport.CacheOffsetOfImpl,
-						PatchLocations: plocs,
-					})
-				}
-			}
-		}
-
-		return nil
+		return pinfo.TableVersion, nil
 	}
 
+	return 1, nil
+}
+
+// ParsePatchInfo parses dyld patch info
+func (f *File) ParsePatchInfo() error {
+	var err error
+	if f.Headers[f.UUID].PatchInfoAddr > 0 {
+		f.PatchInfoVersion, err = f.patchInfoVersion()
+		if err != nil {
+			return fmt.Errorf("failed to get patch info version: %v", err)
+		}
+		switch f.PatchInfoVersion {
+		case 1:
+			if err := f.parsePatchInfoV1(); err != nil {
+				return fmt.Errorf("failed to parse patch info v1: %v", err)
+			}
+		case 2:
+			if err := f.parsePatchInfoV2(); err != nil {
+				return fmt.Errorf("failed to parse patch info v2: %v", err)
+			}
+		default:
+			return fmt.Errorf("unsupported patch info version: %d", f.PatchInfoVersion)
+		}
+		return nil
+	}
 	return fmt.Errorf("cache does NOT contain patch info")
+}
+
+func (f *File) parsePatchInfoV1() error {
+	// Read dyld patch_info entries.
+	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch info v1 offset: %v", err)
+	}
+
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
+	sr.Seek(int64(patchInfoOffset), io.SeekStart)
+
+	var patchInfo CachePatchInfoV1
+	if err := binary.Read(sr, f.ByteOrder, &patchInfo); err != nil {
+		return fmt.Errorf("failed to read patch info v1: %v", err)
+	}
+
+	// Read all the other patch_info structs
+	uuid, patchTableArrayOffset, err := f.GetOffset(patchInfo.PatchTableArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch table v1 array offset: %v", err)
+	}
+
+	sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
+
+	imagePatches := make([]CacheImagePatchesV1, patchInfo.PatchTableArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &imagePatches); err != nil {
+		return fmt.Errorf("failed to read patch table v1 array: %v", err)
+	}
+
+	uuid, patchExportNamesOffset, err := f.GetOffset(patchInfo.PatchExportNamesAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch export v1 names offset: %v", err)
+	}
+
+	exportNames := io.NewSectionReader(f.r[uuid], int64(patchExportNamesOffset), int64(patchInfo.PatchExportNamesSize))
+
+	uuid, patchExportArrayOffset, err := f.GetOffset(patchInfo.PatchExportArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch export v1 array offset: %v", err)
+	}
+
+	sr.Seek(int64(patchExportArrayOffset), io.SeekStart)
+
+	patchExports := make([]CachePatchableExportV1, patchInfo.PatchExportArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchExports); err != nil {
+		return fmt.Errorf("failed to read patch export v1 array: %v", err)
+	}
+
+	uuid, patchLocationArrayOffset, err := f.GetOffset(patchInfo.PatchLocationArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch location v1 array offset: %v", err)
+	}
+
+	sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
+	patchableLocations := make([]CachePatchableLocationV1, patchInfo.PatchLocationArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchableLocations); err != nil {
+		return fmt.Errorf("failed to read patch location v1 array: %v", err)
+	}
+
+	// Add patchabled export info to images
+	for i, iPatch := range imagePatches {
+		if iPatch.PatchExportsCount > 0 {
+			for exportIndex := uint32(0); exportIndex != iPatch.PatchExportsCount; exportIndex++ {
+				patchExport := patchExports[iPatch.PatchExportsStartIndex+exportIndex]
+				var exportName string
+				if uint64(patchExport.ExportNameOffset) < patchInfo.PatchExportNamesSize {
+					exportNames.Seek(int64(patchExport.ExportNameOffset), io.SeekStart)
+					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					if err != nil {
+						return fmt.Errorf("failed to read patch info v1 export string at %x: %v", uint32(patchExportNamesOffset)+patchExport.ExportNameOffset, err)
+					}
+					exportName = strings.Trim(s, "\x00")
+				} else {
+					exportName = ""
+				}
+				plocs := make([]CachePatchableLocationV1, patchExport.PatchLocationsCount)
+				for locationIndex := uint32(0); locationIndex != patchExport.PatchLocationsCount; locationIndex++ {
+					plocs[locationIndex] = patchableLocations[patchExport.PatchLocationsStartIndex+locationIndex]
+				}
+				f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, PatchableExport{
+					Name:           exportName,
+					OffsetOfImpl:   patchExport.CacheOffsetOfImpl,
+					PatchLocations: plocs,
+				})
+			}
+		}
+	}
+
+	return nil
+}
+
+func (f *File) parsePatchInfoV2() error {
+
+	uuid, patchInfoOffset, err := f.GetOffset(f.Headers[f.UUID].PatchInfoAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch info v1 offset: %v", err)
+	}
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchInfoOffset), io.SeekStart)
+	var patchInfo CachePatchInfoV2
+	if err := binary.Read(sr, f.ByteOrder, &patchInfo); err != nil {
+		return fmt.Errorf("failed to read patch info v2: %v", err)
+	}
+	// patchArray
+	uuid, patchTableArrayOffset, err := f.GetOffset(patchInfo.TableArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch table v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchTableArrayOffset), io.SeekStart)
+	patchArray := make([]CacheImagePatchesV2, patchInfo.TableArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchArray); err != nil {
+		return fmt.Errorf("failed to read patch table v2 array: %v", err)
+	}
+	// imageExports
+	uuid, patchImageExportsOffset, err := f.GetOffset(patchInfo.ImageExportsArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch image exports v2 offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchImageExportsOffset), io.SeekStart)
+	imageExports := make([]CacheImageExportV2, patchInfo.ImageExportsArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &imageExports); err != nil {
+		return fmt.Errorf("failed to read patch image exports v2 array: %v", err)
+	}
+	// clientArray
+	uuid, patchClientsArrayOffset, err := f.GetOffset(patchInfo.ClientsArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch clients v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchClientsArrayOffset), io.SeekStart)
+	clientArray := make([]CacheImageClientsV2, patchInfo.ClientsArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &clientArray); err != nil {
+		return fmt.Errorf("failed to read patch clients v2 array: %v", err)
+	}
+	// clientExports
+	uuid, patchClientExportsArrayOffset, err := f.GetOffset(patchInfo.ClientExportsArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch client exports v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchClientExportsArrayOffset), io.SeekStart)
+	clientExports := make([]CachePatchableExportV2, patchInfo.ClientExportsArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &clientExports); err != nil {
+		return fmt.Errorf("failed to read patch client exports v2 array: %v", err)
+	}
+	// patchLocations
+	uuid, patchLocationArrayOffset, err := f.GetOffset(patchInfo.LocationArrayAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch location v2 array offset: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+	sr.Seek(int64(patchLocationArrayOffset), io.SeekStart)
+	patchLocations := make([]CachePatchableLocationV2, patchInfo.LocationArrayCount)
+	if err := binary.Read(sr, f.ByteOrder, &patchLocations); err != nil {
+		return fmt.Errorf("failed to read patch location v2 array: %v", err)
+	}
+	// exportNames
+	uuid, patchExportNamesOffset, err := f.GetOffset(patchInfo.ExportNamesAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get patch export v2 names offset: %v", err)
+	}
+	exportNames := io.NewSectionReader(f.r[uuid], int64(patchExportNamesOffset), int64(patchInfo.ExportNamesSize))
+
+	// Add patchabled export info to images
+	for i, patch := range patchArray {
+		for clientIndex := uint32(0); clientIndex < patch.ClientsCount; clientIndex++ {
+			client := clientArray[patch.ClientsStartIndex+clientIndex]
+			for exportIndex := uint32(0); exportIndex != client.PatchExportsCount; exportIndex++ {
+				clientExport := clientExports[client.PatchExportsStartIndex+exportIndex]
+				imageExport := imageExports[clientExport.ImageExportIndex]
+				var exportName string
+				if uint64(imageExport.ExportNameOffset) < patchInfo.ExportNamesSize {
+					exportNames.Seek(int64(imageExport.ExportNameOffset), io.SeekStart)
+					s, err := bufio.NewReader(exportNames).ReadString('\x00')
+					if err != nil {
+						return fmt.Errorf("failed to read patch info v1 export string at %x: %v", uint32(patchExportNamesOffset)+imageExport.ExportNameOffset, err)
+					}
+					exportName = strings.Trim(s, "\x00")
+				} else {
+					exportName = ""
+				}
+				plocs := make([]CachePatchableLocationV2, clientExport.PatchLocationsCount)
+				for locationIndex := uint32(0); locationIndex != clientExport.PatchLocationsCount; locationIndex++ {
+					plocs[locationIndex] = patchLocations[clientExport.PatchLocationsStartIndex+locationIndex]
+				}
+				f.Images[i].PatchableExports = append(f.Images[i].PatchableExports, PatchableExport{
+					Name:             exportName,
+					ClientIndex:      client.ClientDylibIndex,
+					OffsetOfImpl:     imageExport.DylibOffsetOfImpl,
+					PatchLocationsV2: plocs,
+				})
+			}
+		}
+	}
+
+	return nil
 }
 
 // Image returns the Image with the given name, or nil if no such image exists.

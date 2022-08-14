@@ -1,64 +1,23 @@
 package dyld
 
 import (
-	"bufio"
 	"fmt"
-	"io"
-	"os"
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
-	"github.com/apex/log"
 	"github.com/gocolly/colly/v2"
 )
 
 const webkitURL = "https://trac.webkit.org/browser/webkit/tags/"
 
-// GetWebKitVersion greps the dyld_shared_cache for the WebKit version string
-func GetWebKitVersion(path string, getRev bool) (string, error) {
-
-	fd, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer fd.Close()
-
-	var re = regexp.MustCompile(`WebKit2-(\d+\.)?(\d+\.)?(\d+\.)?(\d+\.)(\*|\d+)`)
-	var match string
-
-	reader := bufio.NewReader(fd)
-
-	line, err := reader.ReadString('\n')
-	for err == nil {
-		match = re.FindString(line)
-		if len(match) > 0 {
-			break
-		}
-		line, err = reader.ReadString('\n')
-	}
-
-	if err == io.EOF {
-		return match, nil
-	}
-
-	if len(match) > 0 {
-		version := strings.TrimPrefix(match, "WebKit2-")[1:]
-		if getRev {
-			log.Info("Querying https://trac.webkit.org...")
-			rev, err := ScrapeWebKitTRAC(version)
-			if err != nil {
-				return "", err
-			}
-			return fmt.Sprintf("%s (svn rev %s)", version, rev), nil
-		}
-		return version, nil
-	}
-
-	return "", fmt.Errorf("unable to find WebKit version in file: %s", path)
+func trimFirstRune(s string) string {
+	_, i := utf8.DecodeRuneInString(s)
+	return s[i:]
 }
 
-func ScrapeWebKitTRAC(version string) (string, error) {
+func ScrapeWebKitTRAC(version string) (string, string, error) {
 
 	var changeset string
 
@@ -80,8 +39,23 @@ func ScrapeWebKitTRAC(version string) (string, error) {
 				for i, n := range result[0] {
 					m[names[i]] = n
 				}
+
+				if strings.Contains(m["version"], trimFirstRune(version)) {
+					changeset = e.Text
+					version = trimFirstRune(version)
+				}
+			}
+		} else if strings.Contains(link, "/log/webkit/tags/WebKit-") {
+			r := regexp.MustCompile(`\/WebKit-(?P<version>(\d+\.)?(\d+\.)?(\d+\.)?(\d+\.)(\*|\d+))\?rev=(?P<changeset>\d+)$`)
+			names := r.SubexpNames()
+
+			result := r.FindAllStringSubmatch(link, -1)
+			if result != nil {
+				m := map[string]string{}
+				for i, n := range result[0] {
+					m[names[i]] = n
+				}
 				if strings.Contains(m["version"], version) {
-					// changeset = m["changeset"]
 					changeset = e.Text
 				}
 			}
@@ -97,8 +71,8 @@ func ScrapeWebKitTRAC(version string) (string, error) {
 	c.Visit(webkitURL)
 
 	if len(changeset) > 0 {
-		return changeset, nil
+		return version, changeset, nil
 	}
 
-	return "", fmt.Errorf("failed to find svn rev for version: %s", version)
+	return version, "", fmt.Errorf("failed to find svn rev for version: %s", version)
 }

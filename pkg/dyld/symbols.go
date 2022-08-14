@@ -63,6 +63,7 @@ type Symbol struct {
 	Image   string  `json:"image,omitempty"`
 	Type    string  `json:"type,omitempty"`
 	Address uint64  `json:"address,omitempty"`
+	Regex   string  `json:"regex,omitempty"`
 	Kind    symKind `json:"-"`
 }
 
@@ -218,8 +219,10 @@ func (f *File) GetSymbolAddress(name string) (uint64, *CacheImage, error) {
 		if lsym, err := image.GetLocalSymbol(name); err == nil {
 			return lsym.Value, image, nil
 		}
-		if sym, err := image.GetPublicSymbol(name); err != nil {
-			return sym.Address, image, nil
+		if sym, err := image.GetPublicSymbol(name); err == nil {
+			if sym.Address > 0 {
+				return sym.Address, image, nil
+			}
 		}
 	}
 
@@ -279,10 +282,8 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
 		log.Info("parsing public symbols...")
 		if err := f.ParsePublicSymbols(false); err != nil {
-			// return err
 			utils.Indent(log.Warn, 2)(fmt.Sprintf("failed to parse all exported symbols: %v", err))
 		}
-
 		log.Info("parsing private symbols...")
 		if err = f.ParseLocalSyms(false); err != nil {
 			if errors.Is(err, ErrNoLocals) {
@@ -291,10 +292,20 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 				return err
 			}
 		}
-
-		log.Info("parsing objc symbols...")
-		if err := f.ParseAllObjc(); err != nil {
-			return err
+		if f.Headers[f.UUID].CacheType == CacheTypeStubIslands {
+			log.Info("parsing stub islands...")
+			if err := f.ParseStubIslands(); err != nil {
+				return fmt.Errorf("failed to parse stub islands: %v", err)
+			}
+			for stub, target := range f.islandStubs {
+				if symName, ok := f.AddressToSymbol[target]; ok {
+					if !strings.HasPrefix(symName, "j_") {
+						f.AddressToSymbol[stub] = "j_" + strings.TrimPrefix(symName, "__stub_helper.")
+					} else {
+						f.AddressToSymbol[stub] = symName
+					}
+				}
+			}
 		}
 
 		if err := f.SaveAddrToSymMap(cacheFile); err != nil {
