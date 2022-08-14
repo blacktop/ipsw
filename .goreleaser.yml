@@ -32,6 +32,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/opt/homebrew/lib
+      - CGO_CFLAGS=-I/opt/homebrew/include
     goos:
       - darwin
     goarch:
