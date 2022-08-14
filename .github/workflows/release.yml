@@ -11,7 +11,7 @@ jobs:
   goreleaser:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-latest, windows-latest, macos-12]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -27,8 +27,9 @@ jobs:
         name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.18
-      -
+          go-version: 1.19
+
+      - # LINUX ################################################################
         if: matrix.platform == 'ubuntu-latest'
         name: linux-deps
         run: |
@@ -57,6 +58,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       -
+        if: matrix.platform == 'ubuntu-latest'
+        name: Upload assets
+        uses: actions/upload-artifact@v3
+        with:
+          name: ipsw_linux
+          path: dist/*
+
+      -  # WINDOWS ################################################################
+        if: matrix.platform == 'windows-latest'
+        name: windows-deps
+        run: |
+          brew install libusb
+      -
         if: matrix.platform == 'windows-latest'
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
@@ -79,5 +93,30 @@ jobs:
         name: Upload assets
         uses: actions/upload-artifact@v3
         with:
-          name: disass_windows
+          name: ipsw_windows
+          path: dist/*
+
+      -  # MACOS ################################################################
+        if: matrix.platform == 'macos-12'
+        name: macos-deps
+        run: |
+          brew install libusb unicorn
+          arch -arm64 brew install libusb unicorn
+      -
+        if: matrix.platform == 'macos-12'
+        name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v3
+        with:
+          distribution: goreleaser
+          version: latest
+          args: release --rm-dist -f hack/goreleaser/darwin.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
+      -
+        if: matrix.platform == 'macos-12'
+        name: Upload assets
+        uses: actions/upload-artifact@v3
+        with:
+          name: ipsw_macos
           path: dist/*

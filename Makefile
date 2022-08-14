@@ -28,7 +28,7 @@ dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
-	@goreleaser --rm-dist --snapshot
+	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --snapshot
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION

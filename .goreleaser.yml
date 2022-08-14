@@ -1,17 +1,20 @@
-# This is an example goreleaser.yaml file with some sane defaults.
-# Make sure to check the documentation at http://goreleaser.com
 before:
   hooks:
-    # You may remove this if you don't use go modules.
-    - go mod download
-    # you may remove this if you don't need go generate
+    - go mod tidy
     - go generate ./...
     - ./hack/make/completions
     - ./hack/make/manpages
     - ./hack/make/json_mini
+
+snapshot:
+  name_template: '{{ incpatch .Version }}-next'
+
+gomod:
+  proxy: true
+
 builds:
-  - main: ./cmd/ipsw
-    id: darwin
+  - id: darwin
+    main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
@@ -24,8 +27,25 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - main: ./cmd/ipsw
-    id: ios
+  - id: darwin_extras
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - libusb
+      - unicorn
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: ios
+    main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
@@ -40,24 +60,52 @@ builds:
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
     hooks:
       post: ./hack/make/codesign {{ .Path }}
-  # - main: ./cmd/ipsw
-  #   id: "others"
-  #   binary: ipsw
-  #   env:
-  #     - CGO_ENABLED=0
-  #   goos:
-  #     - linux
-  #     - windows
-  #   goarch:
-  #     - amd64
-  #     - arm64
-  #   mod_timestamp: "{{ .CommitTimestamp }}"
-  #   flags:
-  #     - -trimpath
-  #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: linux-amd64
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: linux-arm64
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    goos:
+      - linux
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: windows
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+
 universal_binaries:
   - id: darwin
     replace: false
+
 archives:
   - replacements:
       darwin: macOS
@@ -73,12 +121,13 @@ archives:
       - completions/*
       - manpages/*
     wrap_in_directory: true
-snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+
 brews:
   - tap:
       owner: blacktop
       name: homebrew-tap
+    ids:
+        - darwin_extras
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "iOS/macOS Research Swiss Army Knife"
@@ -86,6 +135,8 @@ brews:
     dependencies:
       - name: bat
         type: optional
+      - name: libusb
+      - name: unicorn
     install: |
       bin.install "ipsw"
       bash_completion.install "completions/_bash" => "ipsw"
@@ -96,10 +147,76 @@ brews:
       system "#{bin}/ipsw --version"
 checksum:
   name_template: "checksums.darwin.txt"
+
+nfpms:
+  - id: packages
+    builds:
+      - linux-amd64
+      - linux-arm64
+    homepage:  https://github.com/blacktop/ipsw
+    description: |-
+      iOS/macOS Research Swiss Army Knife.
+    maintainer: Blacktop <https://github.com/blacktop>
+    license: MIT
+    vendor: Blacktop
+    bindir: /usr/bin
+    section: utils
+    contents:
+      - src: ./completions/_bash
+        dst: /usr/share/bash-completion/completions/ipsw
+        file_info:
+          mode: 0644
+      - src: ./completions/_fish
+        dst: /usr/share/fish/completions/ipsw.fish
+        file_info:
+          mode: 0644
+      - src: ./completions/_zsh
+        dst:  /usr/share/zsh/vendor-completions/_ipsw
+        file_info:
+          mode: 0644
+      - src: ./manpages/ipsw.1.gz
+        dst: /usr/share/man/man1/ipsw.1.gz
+        file_info:
+          mode: 0644
+      - src: ./LICENSE
+        dst: /usr/share/doc/ipsw/copyright
+        file_info:
+          mode: 0644
+    replacements:
+      amd64: x86_64
+    formats:
+    - apk
+    - deb
+    - rpm
+
+snapcrafts:
+  - name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
+    builds:
+    - amd64
+    - arm64
+    summary: iOS/macOS Research Swiss Army Knife.
+    description: |
+      iOS/macOS Research Swiss Army Knife.
+    grade: stable
+    confinement: strict
+    publish: true
+    license: MIT
+
+scoop:
+  bucket:
+    owner: blacktop
+    name: scoop-bucket
+    token: "{{ .Env.SCOOP_TAP_GITHUB_TOKEN }}"
+  homepage:  https://blacktop.github.io/ipsw
+  description: iOS/macOS Research Swiss Army Knife
+  license: MIT
+
 signs:
   - artifacts: checksum
+
 sboms:
   - artifacts: archive
+
 changelog:
   sort: asc
   use: github
@@ -131,6 +248,7 @@ changelog:
       - Merge pull request
       - Merge remote-tracking branch
       - Merge branch
+
 release:
   footer: |
     ### Summary
@@ -139,10 +257,3 @@ release:
     - Read the [documentation](https://blacktop.github.io/ipsw/docs/)
     - Join our [Discord server](https://discord.gg/M5Wqf6JT)
     - Follow us on [Twitter](https://twitter.com/blacktop__)
-
-announce:
-  skip: "{{gt .Patch 0}}"
-
-  twitter:
-    enabled: true
-    message_template: "ipsw {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
