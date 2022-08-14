@@ -44,7 +44,6 @@ func init() {
 	SymAddrCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	SymAddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
 	SymAddrCmd.Flags().String("out", "", "Path to output JSON file")
-	SymAddrCmd.Flags().Bool("color", false, "Colorize output")
 	// SymAddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	SymAddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -61,15 +60,13 @@ var SymAddrCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		imageName, _ := cmd.Flags().GetString("image")
 		symbolFile, _ := cmd.Flags().GetString("in")
 		jsonFile, _ := cmd.Flags().GetString("out")
 		allMatches, _ := cmd.Flags().GetBool("all")
 		showBinds, _ := cmd.Flags().GetBool("binds")
-		forceColor, _ := cmd.Flags().GetBool("color")
-
-		color.NoColor = !forceColor
 
 		dscPath := filepath.Clean(args[0])
 
@@ -257,7 +254,7 @@ var SymAddrCmd = &cobra.Command{
 				}
 
 				if lsym, err := i.GetSymbol(args[1]); err == nil {
-					fmt.Println(lsym.String(forceColor))
+					fmt.Println(lsym.String(viper.GetBool("color")))
 				}
 
 				// if lsym, err := i.GetLocalSymbol(args[1]); err == nil {
@@ -279,7 +276,7 @@ var SymAddrCmd = &cobra.Command{
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				if sym, err := image.GetSymbol(args[1]); err == nil {
 					if (sym.Address > 0 || allMatches) && (sym.Kind != dyld.BIND || showBinds) {
-						fmt.Println(sym.String(forceColor))
+						fmt.Println(sym.String(viper.GetBool("color")))
 						if !allMatches {
 							return nil
 						}

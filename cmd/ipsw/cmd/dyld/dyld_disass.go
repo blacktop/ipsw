@@ -46,7 +46,6 @@ func init() {
 	DisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	DisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	DisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
-	DisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	DisassCmd.Flags().String("input", "", "Input function JSON file")
 	DisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
@@ -80,6 +79,7 @@ var DisassCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		// flags
 		symbolName := viper.GetString("dyld.disass.symbol")
@@ -90,14 +90,9 @@ var DisassCmd = &cobra.Command{
 		demangleFlag := viper.GetBool("dyld.disass.demangle")
 		asJSON := viper.GetBool("dyld.disass.json")
 		quiet := viper.GetBool("dyld.disass.quiet")
-		forceColor := viper.GetBool("dyld.disass.color")
 
 		funcFile := viper.GetString("dyld.disass.input")
 		cacheFile := viper.GetString("dyld.disass.cache")
-
-		if forceColor {
-			color.NoColor = false
-		}
 
 		if len(symbolName) > 0 && startAddr != 0 {
 			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
@@ -198,7 +193,7 @@ var DisassCmd = &cobra.Command{
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
-						Color:        forceColor,
+						Color:        viper.GetBool("color"),
 					})
 
 					if !quiet {
@@ -294,7 +289,7 @@ var DisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
-					Color:        forceColor,
+					Color:        viper.GetBool("color"),
 				})
 
 				if !quiet {
@@ -403,7 +398,7 @@ var DisassCmd = &cobra.Command{
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,
-				Color:        forceColor,
+				Color:        viper.GetBool("color"),
 			})
 
 			if !quiet {

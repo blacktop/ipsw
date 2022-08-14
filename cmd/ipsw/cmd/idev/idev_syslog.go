@@ -46,7 +46,6 @@ func init() {
 	IDevCmd.AddCommand(SyslogCmd)
 
 	SyslogCmd.Flags().Uint64P("timeout", "t", 0, "Log timeout in seconds")
-	SyslogCmd.Flags().Bool("color", false, "Colorize output")
 }
 
 var colorTime = color.New(color.Bold, color.FgHiBlue).SprintFunc()
@@ -101,12 +100,10 @@ var SyslogCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		udid, _ := cmd.Flags().GetString("udid")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
-		forceColor, _ := cmd.Flags().GetBool("color")
-
-		color.NoColor = !forceColor
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()
@@ -133,7 +130,7 @@ var SyslogCmd = &cobra.Command{
 			}
 			defer r.Close()
 
-			if forceColor {
+			if viper.GetBool("color") {
 				br := bufio.NewReader(r)
 				for {
 					line, err := br.ReadString('\x00')
