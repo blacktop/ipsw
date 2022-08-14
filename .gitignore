@@ -51,3 +51,6 @@ www/docs/static/releases*.json
 *.unstripped
 *.bndb
 *.lock
+
+# Unicorn EMU
+unicorn2/
