@@ -45,7 +45,6 @@ func init() {
 	DumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
 	DumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
 	DumpCmd.Flags().StringP("output", "o", "", "Output to a file")
-	DumpCmd.Flags().Bool("color", false, "Force color (for piping to less etc)")
 
 	viper.BindPFlag("dyld.dump.arch", DumpCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("dyld.dump.size", DumpCmd.Flags().Lookup("size"))
@@ -68,6 +67,7 @@ var DumpCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		// flags
 		size := viper.GetUint64("dyld.dump.size")
@@ -75,9 +75,6 @@ var DumpCmd = &cobra.Command{
 		asAddrs := viper.GetBool("dyld.dump.addr")
 		asBytes := viper.GetBool("dyld.dump.bytes")
 		outFile := viper.GetString("dyld.dump.output")
-		forceColor := viper.GetBool("dyld.dump.color")
-
-		color.NoColor = !forceColor
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")

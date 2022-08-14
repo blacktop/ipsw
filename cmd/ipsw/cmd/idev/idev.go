@@ -36,6 +36,7 @@ var IDevCmd = &cobra.Command{
 	Short: "USB connected device commands",
 	Args:  cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
 	},
 	Run: func(cmd *cobra.Command, args []string) {

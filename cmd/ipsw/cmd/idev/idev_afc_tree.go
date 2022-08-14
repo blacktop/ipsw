@@ -39,7 +39,6 @@ func init() {
 	AfcCmd.AddCommand(idevAfcTreeCmd)
 
 	idevAfcTreeCmd.Flags().BoolP("flat", "f", false, "Flat output")
-	idevAfcTreeCmd.Flags().Bool("color", false, "Colorize output")
 }
 
 // idevAfcTreeCmd represents the tree command
@@ -54,12 +53,10 @@ var idevAfcTreeCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		udid, _ := cmd.Flags().GetString("udid")
 		flat, _ := cmd.Flags().GetBool("flat")
-		forceColor, _ := cmd.Flags().GetBool("color")
-
-		color.NoColor = !forceColor
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()
