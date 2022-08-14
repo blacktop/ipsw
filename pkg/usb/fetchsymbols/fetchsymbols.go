@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 )
 
@@ -23,43 +24,39 @@ type ListFilesResponse struct {
 }
 
 type Client struct {
-	udid string
+	c *usb.Client
 }
 
-func NewClient(udid string) *Client {
-	return &Client{
-		udid: udid,
-	}
-}
-
-func (c *Client) ListFiles() ([]string, error) {
-	fc, err := lockdownd.NewClientForService(serviceName, c.udid, false)
+func NewClient(udid string) (*Client, error) {
+	c, err := lockdownd.NewClientForService(serviceName, udid, false)
 	if err != nil {
 		return nil, err
 	}
-	if err := c.sendCommand(fc.Conn(), ListFilesPlistRequest); err != nil {
+	return &Client{
+		c: c,
+	}, nil
+}
+
+func (c *Client) ListFiles() ([]string, error) {
+	if err := c.sendCommand(c.c.Conn(), ListFilesPlistRequest); err != nil {
 		return nil, err
 	}
 	var resp ListFilesResponse
-	if err := fc.Recv(&resp); err != nil {
+	if err := c.c.Recv(&resp); err != nil {
 		return nil, err
 	}
 	return resp.Files, nil
 }
 
 func (c *Client) GetFile(idx uint32) (io.Reader, error) {
-	fc, err := lockdownd.NewClientForService(serviceName, c.udid, false)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.sendCommand(fc.Conn(), GetFileRequest); err != nil {
+	if err := c.sendCommand(c.c.Conn(), GetFileRequest); err != nil {
 		return nil, err
 	}
 	size := uint64(0)
-	if err := c.sendRecv(fc.Conn(), idx, &size); err != nil {
+	if err := c.sendRecv(c.c.Conn(), idx, &size); err != nil {
 		return nil, err
 	}
-	return io.LimitReader(fc.Conn(), int64(size)), nil
+	return io.LimitReader(c.c.Conn(), int64(size)), nil
 }
 
 func (c *Client) sendRecv(rw io.ReadWriter, req, resp any) error {
@@ -76,4 +73,8 @@ func (c *Client) sendCommand(rw io.ReadWriter, cmd uint32) error {
 		return fmt.Errorf("invalid response: wanted %v, got %v", cmd, respCmd)
 	}
 	return nil
+}
+
+func (c *Client) Close() error {
+	return c.c.Close()
 }

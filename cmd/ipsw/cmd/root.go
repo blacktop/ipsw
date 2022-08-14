@@ -45,6 +45,8 @@ var (
 	cfgFile string
 	// Verbose boolean flag for verbose logging
 	Verbose bool
+	// Color boolean flag for colorized output
+	Color bool
 	// AppVersion stores the plugin's version
 	AppVersion string
 	// AppBuildTime stores the plugin's build time
@@ -74,19 +76,23 @@ func init() {
 	// Here you will define your flags and configuration settings.
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
-	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 
 	// Flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
+	rootCmd.PersistentFlags().BoolVar(&Color, "color", false, "colorize output")
 	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
-
+	viper.BindPFlag("color", rootCmd.Flags().Lookup("color"))
+	viper.BindEnv("color", "CLICOLOR")
+	// Add subcommand groups
 	rootCmd.AddCommand(download.DownloadCmd)
 	rootCmd.AddCommand(dyld.DyldCmd)
 	rootCmd.AddCommand(idev.IDevCmd)
 	rootCmd.AddCommand(img4.Img4Cmd)
 	rootCmd.AddCommand(kernel.KernelcacheCmd)
 	rootCmd.AddCommand(macho.MachoCmd)
+	// Settings
+	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
 
 // initConfig reads in config file and ENV variables if set.

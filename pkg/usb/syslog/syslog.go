@@ -6,8 +6,10 @@ import (
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 )
 
+const serviceName = "com.apple.syslog_relay"
+
 func Syslog(udid string) (io.ReadCloser, error) {
-	cli, err := lockdownd.NewClientForService("com.apple.syslog_relay", udid, false)
+	cli, err := lockdownd.NewClientForService(serviceName, udid, false)
 	if err != nil {
 		return nil, err
 	}

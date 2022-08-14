@@ -28,7 +28,7 @@ func TestProcess_Start(t *testing.T) {
 	}
 
 	device := devices[0]
-	cli, err := apps.NewClient(device.UDID)
+	cli, err := apps.NewClient(device.SerialNumber)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestProcess_Start(t *testing.T) {
 	if os.Getenv("IDE_DISABLED_OS_ACTIVITY_DT_MODE") == "" {
 		appEnv = append(appEnv, "OS_ACTIVITY_DT_MODE=enable")
 	}
-	proc, err := NewProcess(device.UDID, []string{path}, appEnv)
+	proc, err := NewProcess(device.SerialNumber, []string{path}, appEnv)
 	if err != nil {
 		t.Fatal(err)
 	}

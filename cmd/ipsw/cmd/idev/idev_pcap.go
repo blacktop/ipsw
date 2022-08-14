@@ -45,7 +45,6 @@ func init() {
 
 	PcapCmd.Flags().StringP("proc", "p", "", "process to get pcap for")
 	PcapCmd.Flags().StringP("output", "o", "", "Folder to save pcap")
-	PcapCmd.Flags().Bool("color", false, "Colorize output")
 }
 
 // PcapCmd represents the pcap command
@@ -59,13 +58,11 @@ var PcapCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		udid, _ := cmd.Flags().GetString("udid")
 		proc, _ := cmd.Flags().GetString("proc")
 		output, _ := cmd.Flags().GetString("output")
-		forceColor, _ := cmd.Flags().GetBool("color")
-
-		color.NoColor = !forceColor
 
 		var err error
 		var dev *lockdownd.DeviceValues
@@ -79,12 +76,11 @@ var PcapCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to connect to lockdownd: %w", err)
 			}
-			defer ldc.Close()
-
 			dev, err = ldc.GetValues()
 			if err != nil {
 				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
 			}
+			ldc.Close()
 		}
 
 		cli, err := pcap.NewClient(dev.UniqueDeviceID)

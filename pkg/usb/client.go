@@ -24,19 +24,14 @@ func NewClient(udid string, port int) (*Client, error) {
 		return nil, err
 	}
 
-	pairRecord, err := conn.ReadPairRecord(udid)
-	if err != nil {
-		return nil, err
-	}
-
 	devices, err := conn.ListDevices()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list devices: %v", err)
 	}
 
 	deviceID := -1
 	for _, device := range devices {
-		if device.UDID == udid {
+		if device.SerialNumber == udid {
 			deviceID = device.DeviceID
 			break
 		}
@@ -46,8 +41,13 @@ func NewClient(udid string, port int) (*Client, error) {
 		return nil, fmt.Errorf("unable to find device with udid: %v", udid)
 	}
 
-	if err := conn.Dial(deviceID, port); err != nil {
+	pairRecord, err := conn.ReadPairRecord(udid)
+	if err != nil {
 		return nil, err
+	}
+
+	if err := conn.Dial(deviceID, port); err != nil {
+		return nil, fmt.Errorf("failed to dial device %d on port %d: %v", deviceID, port, err)
 	}
 
 	return &Client{
@@ -61,7 +61,7 @@ func NewClient(udid string, port int) (*Client, error) {
 func (c *Client) EnableSSL() error {
 	cert, err := tls.X509KeyPair(c.pairRecord.HostCertificate, c.pairRecord.HostPrivateKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load host certificate from pair record: %v", err)
 	}
 
 	c.tlsConn = tls.Client(c.conn, &tls.Config{
@@ -70,7 +70,7 @@ func (c *Client) EnableSSL() error {
 		InsecureSkipVerify: true,
 	})
 	if err := c.tlsConn.Handshake(); err != nil {
-		return err
+		return fmt.Errorf("failed to perform tls handshake: %v", err)
 	}
 
 	return nil
@@ -160,17 +160,20 @@ func (c Client) Close() error {
 	return c.Conn().Close()
 }
 
-func (c *Client) DeviceLinkHandshake() error {
+func (c *Client) DeviceLinkHandshake() ([]any, error) {
 	var versionExchange []any
 	if err := c.Recv(&versionExchange); err != nil {
-		return err
+		return nil, err
 	}
 	reply := []any{"DLMessageVersionExchange", "DLVersionsOk", versionExchange[1]}
 	if err := c.Send(reply); err != nil {
-		return err
+		return nil, err
 	}
 	var ready []any
-	return c.Recv(&ready)
+	if err := c.Recv(&ready); err != nil {
+		return nil, err
+	}
+	return ready, nil
 }
 
 func (c *Client) DeviceLinkSend(msg any) error {

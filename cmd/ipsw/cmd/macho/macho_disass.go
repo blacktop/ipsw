@@ -46,7 +46,6 @@ func init() {
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
-	machoDisassCmd.Flags().Bool("color", false, "Syntax highlight assembly output")
 	// machoDisassCmd.Flags().StringP("input", "i", "", "Input function JSON file")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
@@ -56,7 +55,6 @@ func init() {
 	viper.BindPFlag("macho.disass.demangle", machoDisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.disass.quiet", machoDisassCmd.Flags().Lookup("quiet"))
-	viper.BindPFlag("macho.disass.color", machoDisassCmd.Flags().Lookup("color"))
 	// viper.BindPFlag("macho.disass.input", machoDisassCmd.Flags().Lookup("input"))
 	viper.BindPFlag("macho.disass.cache", machoDisassCmd.Flags().Lookup("cache"))
 
@@ -78,6 +76,7 @@ var machoDisassCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		// flags
 		symbolName := viper.GetString("macho.disass.symbol")
@@ -87,14 +86,9 @@ var machoDisassCmd = &cobra.Command{
 		demangleFlag := viper.GetBool("macho.disass.demangle")
 		asJSON := viper.GetBool("macho.disass.json")
 		quiet := viper.GetBool("macho.disass.quiet")
-		forceColor := viper.GetBool("macho.disass.color")
 
 		// funcFile := viper.GetString("macho.disass.input")
 		cacheFile := viper.GetString("macho.disass.cache")
-
-		if forceColor {
-			color.NoColor = false
-		}
 
 		// funcFile, _ := cmd.Flags().GetString("input")
 		allFuncs := false
@@ -160,7 +154,7 @@ var machoDisassCmd = &cobra.Command{
 					AsJSON:       asJSON,
 					Demangle:     demangleFlag,
 					Quite:        quiet,
-					Color:        forceColor,
+					Color:        viper.GetBool("color"),
 				})
 
 				//***********************
@@ -242,7 +236,7 @@ var machoDisassCmd = &cobra.Command{
 				AsJSON:       asJSON,
 				Demangle:     demangleFlag,
 				Quite:        quiet,
-				Color:        forceColor,
+				Color:        viper.GetBool("color"),
 			})
 
 			//***********************

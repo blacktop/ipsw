@@ -78,11 +78,10 @@ var ListDevicesCmd = &cobra.Command{
 		var dds []*lockdownd.DeviceValues
 
 		for _, device := range devices {
-			cli, err := lockdownd.NewClient(device.UDID)
+			cli, err := lockdownd.NewClient(device.SerialNumber)
 			if err != nil {
 				return err
 			}
-			defer cli.Close()
 
 			values, err := cli.GetValues()
 			if err != nil {
@@ -97,6 +96,8 @@ var ListDevicesCmd = &cobra.Command{
 				fmt.Println(device)
 				fmt.Println(values)
 			}
+
+			cli.Close()
 		}
 
 		if asJSON {

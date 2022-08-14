@@ -3,6 +3,7 @@ package diagnostics
 import (
 	"crypto/md5"
 	"encoding/base64"
+	"fmt"
 	"strings"
 
 	"github.com/blacktop/ipsw/pkg/usb"
@@ -60,8 +61,14 @@ func (c *Client) Diagnostics(diagnosticType string) error {
 	req := &Request{
 		Request: diagnosticType,
 	}
-	resp := &Response{}
-	return c.c.Request(req, resp)
+	var resp Response
+	if err := c.c.Request(req, &resp); err != nil {
+		return err
+	}
+	if status, ok := resp["Status"]; ok && status != "Success" {
+		return fmt.Errorf("failed to perform diagnostic type %s: %s", diagnosticType, status)
+	}
+	return nil
 }
 
 func (c *Client) IORegistry(plane, entryName, entryClass string) (*DiagnosticsResponse, error) {
@@ -99,26 +106,50 @@ func (c *Client) MobileGestalt(keys ...string) (*DiagnosticsResponse, error) {
 
 func (c *Client) Goodbye() error {
 	req := &Request{"Goodbye"}
-	resp := &Response{}
-	return c.c.Request(req, resp)
+	var resp Response
+	if err := c.c.Request(req, &resp); err != nil {
+		return err
+	}
+	if status, ok := resp["Status"]; ok && status != "Success" {
+		return fmt.Errorf("failed to goodbye: %s", status)
+	}
+	return nil
 }
 
 func (c *Client) Sleep() error {
 	req := &Request{"Sleep"}
-	resp := &Response{}
-	return c.c.Request(req, resp)
+	var resp Response
+	if err := c.c.Request(req, &resp); err != nil {
+		return err
+	}
+	if status, ok := resp["Status"]; ok && status != "Success" {
+		return fmt.Errorf("failed to sleep: %s", status)
+	}
+	return nil
 }
 
 func (c *Client) Restart() error {
 	req := &Request{"Restart"}
-	resp := &Response{}
-	return c.c.Request(req, resp)
+	var resp Response
+	if err := c.c.Request(req, &resp); err != nil {
+		return err
+	}
+	if status, ok := resp["Status"]; ok && status != "Success" {
+		return fmt.Errorf("failed to restart: %s", status)
+	}
+	return nil
 }
 
 func (c *Client) Shutdown() error {
 	req := &Request{"Shutdown"}
-	resp := &Response{}
-	return c.c.Request(req, resp)
+	var resp Response
+	if err := c.c.Request(req, &resp); err != nil {
+		return err
+	}
+	if status, ok := resp["Status"]; ok && status != "Success" {
+		return fmt.Errorf("failed to shutdown: %s", status)
+	}
+	return nil
 }
 
 func (c *Client) Close() error {

@@ -63,7 +63,6 @@ var iDevCrashPullCmd = &cobra.Command{
 
 		var err error
 		var dev *lockdownd.DeviceValues
-
 		if len(udid) == 0 {
 			dev, err = utils.PickDevice()
 			if err != nil {
@@ -74,12 +73,11 @@ var iDevCrashPullCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to connect to lockdownd: %w", err)
 			}
-			defer ldc.Close()
-
 			dev, err = ldc.GetValues()
 			if err != nil {
 				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
 			}
+			ldc.Close()
 		}
 
 		cli, err := crashlog.NewClient(dev.UniqueDeviceID)

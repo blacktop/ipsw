@@ -32,6 +32,7 @@ var Img4Cmd = &cobra.Command{
 	Short: "Parse Img4",
 	Args:  cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
 	},
 	Run: func(cmd *cobra.Command, args []string) {

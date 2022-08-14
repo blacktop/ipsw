@@ -6,7 +6,7 @@ require (
 	github.com/AlecAivazis/survey/v2 v2.3.5
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
-	github.com/blacktop/arm64-cgo v1.0.52
+	github.com/blacktop/arm64-cgo v1.0.55
 	github.com/blacktop/go-macho v1.1.93
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
@@ -17,6 +17,7 @@ require (
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20220518085355-d7852edf42fc
 	github.com/gocolly/colly/v2 v2.1.0
+	github.com/google/gousb v1.1.2
 	github.com/hashicorp/go-version v1.6.0
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02 // indirect
 	github.com/jinzhu/gorm v1.9.16
@@ -30,9 +31,10 @@ require (
 	github.com/spf13/cobra v1.5.0
 	github.com/spf13/viper v1.12.0
 	github.com/ulikunitz/xz v0.5.10
+	github.com/unicorn-engine/unicorn v0.0.0-20220707154909-6c1cbef6ac50
 	github.com/vbauerster/mpb/v7 v7.4.2
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
-	golang.org/x/net v0.0.0-20220811182439-13a9a731de15
+	golang.org/x/net v0.0.0-20220812174116-3211cb980234
 	golang.org/x/oauth2 v0.0.0-20220808172628-8227340efae7
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab
@@ -40,6 +42,7 @@ require (
 
 // replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
+// replace github.com/unicorn-engine/unicorn => ./unicorn2
 
 require (
 	github.com/wolever/nfa2regex v0.0.0-20211219155029-4e37010164f4
