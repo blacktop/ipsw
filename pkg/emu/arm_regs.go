@@ -333,7 +333,7 @@ func InitRegisters() Registers {
 
 // GetState refreshes the internal register state
 func (e *Emulation) GetState() error {
-	regs := make([]int, uc.ARM64_REG_ENDING-uc.ARM64_REG_INVALID+1)
+	regs := make([]int, uc.ARM64_REG_ENDING-1)
 	for i := range regs {
 		regs[i] = uc.ARM64_REG_INVALID + i
 

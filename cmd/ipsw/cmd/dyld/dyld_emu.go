@@ -48,7 +48,7 @@ func init() {
 // dyldEmuCmd represents the dyld emu command
 var dyldEmuCmd = &cobra.Command{
 	Use:           "emu",
-	Short:         "🚧 Emulate AARCH64 dyld_shared_cache",
+	Short:         "🚧 Emulate ARM64 dyld_shared_cache",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
