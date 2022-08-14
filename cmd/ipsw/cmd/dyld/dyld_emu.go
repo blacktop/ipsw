@@ -1,3 +1,5 @@
+//go:build unicorn
+
 /*
 Copyright © 2022 blacktop
 
@@ -19,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package dyld
 
 import (
 	"fmt"
@@ -31,10 +33,11 @@ import (
 	"github.com/blacktop/ipsw/pkg/emu"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
-	dyldCmd.AddCommand(dyldEmuCmd)
+	DyldCmd.AddCommand(dyldEmuCmd)
 
 	dyldEmuCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldEmuCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
@@ -52,7 +55,7 @@ var dyldEmuCmd = &cobra.Command{
 	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if Verbose {
+		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
@@ -85,7 +88,7 @@ var dyldEmuCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		mu, err := emu.NewEmulation(f, &emu.Config{Verbose: Verbose})
+		mu, err := emu.NewEmulation(f, &emu.Config{Verbose: viper.GetBool("verbose")})
 		if err != nil {
 			return err
 		}

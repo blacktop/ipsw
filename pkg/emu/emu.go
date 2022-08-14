@@ -1,6 +1,8 @@
+//go:build unicorn
+
 package emu
 
-//go:generate stringer -type=interrupt,branchType,pstateMode -output emu_string.go
+//go:generate stringer -type=interrupt,branchType,pstateMode -tags=unicorn -output emu_string.go
 
 import (
 	"fmt"
@@ -111,7 +113,7 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new unicorn instance: %v", err)
 	}
-	if err := e.mu.SetCPUModel(uc.CPU_AARCH64_MAX); err != nil {
+	if err := e.mu.SetCPUModel(uc.CPU_ARM64_MAX); err != nil {
 		return nil, fmt.Errorf("failed to set cpu model to CPU_AARCH64_MAX: %v", err)
 	}
 	if err := e.mu.RegWrite(uc.ARM64_REG_PSTATE, 0); err != nil {
@@ -148,7 +150,7 @@ func (e *Emulation) InitStack() error {
 		return fmt.Errorf("failed to write random ___stack_chk_guard @ %#x: %v", STACK_GUARD, err)
 	}
 
-	stack_chk_guardAddr, libsystemC, err := e.cache.GetSymbolAddress("___stack_chk_guard", "libsystem_c.dylib")
+	stack_chk_guardAddr, libsystemC, err := e.cache.GetSymbolAddress("___stack_chk_guard") // "libsystem_c.dylib"
 	if err != nil {
 		return fmt.Errorf("failed to get address of ___stack_chk_guard: %v", err)
 	}

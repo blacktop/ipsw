@@ -1,3 +1,5 @@
+//go:build unicorn
+
 package emu
 
 import (
