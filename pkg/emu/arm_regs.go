@@ -327,6 +327,7 @@ func InitRegisters() Registers {
 		uc.ARM64_REG_VBAR_EL1:    {Name: "vbar_el1"},
 		uc.ARM64_REG_VBAR_EL2:    {Name: "vbar_el2"},
 		uc.ARM64_REG_VBAR_EL3:    {Name: "vbar_el3"},
+		uc.ARM64_REG_CP_REG:      {Name: "coprocessor"},
 		uc.ARM64_REG_ENDING:      {Name: "ending"},
 	}
 }
