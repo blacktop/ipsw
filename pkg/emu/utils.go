@@ -10,6 +10,7 @@ import (
 
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/spf13/cast"
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
 )
 
@@ -21,6 +22,71 @@ func (e *Emulation) SetFirstArg(data interface{}) error {
 		return fmt.Errorf("failed to set x0 (arg0) register to %#x: %v", STACK_DATA, err)
 	}
 	return nil
+}
+
+func (e *Emulation) SetState(state *State) error {
+	// write args to stack
+	if len(state.Args) > 8 {
+		return fmt.Errorf("too many args: %d, (max 8)", len(state.Args))
+	}
+	stackArgAddr := uint64(STACK_DATA)
+	for idx, arg := range state.Args {
+		for _, field := range arg {
+			var val any
+			switch field.Type {
+			case "uint64":
+				val = cast.ToUint64(field.Value)
+			case "int64":
+				val = cast.ToInt64(field.Value)
+			case "uint32":
+				val = cast.ToUint32(field.Value)
+			case "int32":
+				val = cast.ToInt32(field.Value)
+			case "uint16":
+				val = cast.ToUint16(field.Value)
+			case "int16":
+				val = cast.ToInt16(field.Value)
+			case "uint8":
+				val = cast.ToUint8(field.Value)
+			}
+			if err := e.WriteData(stackArgAddr, val); err != nil {
+				return fmt.Errorf("failed to write data to %#x: %v", stackArgAddr, err)
+			}
+			stackArgAddr += uint64(binary.Size(val))
+		}
+		if err := e.mu.RegWrite(uc.ARM64_REG_X0+idx, STACK_DATA); err != nil { // x0-x7
+			return fmt.Errorf("failed to set (arg%d) register to %#x: %v", idx, STACK_DATA, err)
+		}
+	}
+
+	// TODO: finish writing stack (need to put args somewhere else?)
+
+	// write registers
+	for regName, regValue := range state.Registers {
+		reg, err := e.GetRegisterByName(regName)
+		if err != nil {
+			return fmt.Errorf("failed to get register %s: %v", regName, err)
+		}
+		if err := e.mu.RegWrite(int(reg), regValue); err != nil {
+			return fmt.Errorf("failed to set %s register to %#x: %v", regName, regValue, err)
+		}
+	}
+
+	return nil
+}
+
+func (e *Emulation) GetRegisterByName(name string) (int, error) {
+	for num, reg := range e.regs {
+		if reg.Name == name || reg.Alias == name {
+			return num, nil
+		}
+	}
+	return uc.ARM64_REG_INVALID, fmt.Errorf("failed to find register %s", name)
+}
+
+func (e *Emulation) ReadSctlrEL1() (uint64, error) {
+	// return e.mu.RegRead(uc.ARM64_REG_CP_REG, 1, 0, 3, 0, 0) // FIXME: when unicorn supports this
+	panic("not implemented")
 }
 
 func (e *Emulation) PutPointer(where uint64, ptr uint64, size uint64) error {
