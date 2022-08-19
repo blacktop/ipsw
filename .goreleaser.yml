@@ -258,5 +258,5 @@ release:
     **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .PreviousTag }}...{{ .Tag }}
     ## What to do next?
     - Read the [documentation](https://blacktop.github.io/ipsw/docs/)
-    - Join our [Discord server](https://discord.gg/M5Wqf6JT)
+    - Join our [Discord server](https://discord.gg/P3ukGGxc)
     - Follow us on [Twitter](https://twitter.com/blacktop__)
