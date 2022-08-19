@@ -42,6 +42,7 @@ func init() {
 
 	dyldEmuCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldEmuCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
+	dyldEmuCmd.Flags().StringP("state", "s", "", "Path to initial state file")
 
 	dyldEmuCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -63,6 +64,7 @@ var dyldEmuCmd = &cobra.Command{
 
 		startAddr, _ := cmd.Flags().GetUint64("vaddr")
 		instructions, _ := cmd.Flags().GetUint64("count")
+		stateFile, _ := cmd.Flags().GetString("state")
 
 		dscPath := filepath.Clean(args[0])
 
@@ -144,6 +146,16 @@ var dyldEmuCmd = &cobra.Command{
 		}
 		if err := mu.InitStack(); err != nil {
 			return fmt.Errorf("failed to setup hooks: %v", err)
+		}
+
+		if len(stateFile) > 0 {
+			state, err := emu.ParseState(stateFile)
+			if err != nil {
+				return fmt.Errorf("failed to parse state file %s: %v", stateFile, err)
+			}
+			if err := mu.SetState(state); err != nil {
+				return fmt.Errorf("failed to set initial state from state file %s: %v", stateFile, err)
+			}
 		}
 
 		//***********
