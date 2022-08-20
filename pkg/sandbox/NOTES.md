@@ -25,3 +25,4 @@
 - [ ] support older versions of the sandbox (iOS13.x, iOS14.x)
 - [ ] document RE in comment strings (for next time that it breaks)
 - [x] also process the sandbox profile (in addition to the sandbox collection)
+- [ ] cleanup decompiled profiles (remove default rules, etc) [detect by compiling my own or detecting the commonalities between all sb profiles]

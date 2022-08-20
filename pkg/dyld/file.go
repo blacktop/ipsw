@@ -141,9 +141,7 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 
-	if ff.Headers[ff.UUID].ImagesOffsetOld == 0 && ff.Headers[ff.UUID].ImagesCountOld == 0 {
-
-		ff.IsDyld4 = true // NEW iOS15 dyld4 style caches
+	if ff.IsDyld4 {
 
 		for i := 1; i <= int(ff.Headers[ff.UUID].SubCacheArrayCount); i++ {
 			subCacheName := fmt.Sprintf("%s.%d", name, i)
@@ -313,6 +311,10 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 		return err
 	}
 	f.Headers[uuid] = hdr
+
+	if f.Headers[f.UUID].ImagesOffsetOld == 0 && f.Headers[f.UUID].ImagesCountOld == 0 {
+		f.IsDyld4 = true // NEW macOS12.5+/iOS15+ dyld4 style caches
+	}
 
 	// Read dyld mappings.
 	sr.Seek(int64(f.Headers[uuid].MappingOffset), io.SeekStart)
@@ -502,15 +504,14 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 
 	if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr != 0 {
-		// iOS16 added dyld to the shared cache and resued these fields to point to the dyld image and _dyld_start
-		if f.IsDyld4 {
+		if f.IsDyld4 { // iOS16 added dyld to the shared cache and resued these fields to point to the dyld image and _dyld_start
 			sr.Seek(int64(f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr), io.SeekStart)
 			if err := binary.Read(sr, f.ByteOrder, &f.dyldImageAddr); err != nil {
-				return err
+				log.Debugf("failed reading dyld image address (probably in subcache): %v", err) // TODO: lazily read this if needed later
 			}
 			sr.Seek(int64(f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr), io.SeekStart)
 			if err := binary.Read(sr, f.ByteOrder, &f.dyldStartFnAddr); err != nil {
-				return err
+				log.Debugf("faile reading dyld start function address (probably in subcache): %v", err)
 			}
 		} else {
 			// Read dyld optimization info.

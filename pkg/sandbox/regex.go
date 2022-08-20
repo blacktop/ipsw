@@ -6,9 +6,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"os"
 	"strconv"
 
-	// n "github.com/wolever/nfa2regex"
 	"github.com/yourbasic/graph"
 )
 
@@ -127,6 +127,22 @@ func NewRegex(data []byte) (*Regex, error) {
 
 func (re *Regex) String() string {
 	return fmt.Sprintf("version: %d, length: %d", re.Version, re.Length)
+}
+
+func (re *Regex) Dump(name string) error {
+	var buff bytes.Buffer
+
+	if err := binary.Write(&buff, binary.BigEndian, uint32(re.Version)); err != nil {
+		return fmt.Errorf("failed to write regex version: %v", err)
+	}
+	if err := binary.Write(&buff, binary.LittleEndian, uint16(re.Length)); err != nil {
+		return fmt.Errorf("failed to write regex data length: %v", err)
+	}
+	if _, err := buff.Write(re.Data); err != nil {
+		return fmt.Errorf("failed to write regex data: %v", err)
+	}
+
+	return os.WriteFile(name, buff.Bytes(), 0644)
 }
 
 func (re *Regex) Parse() (reList, error) {
@@ -416,24 +432,11 @@ func (re *Regex) NFA() (*NFA, error) {
 
 	nfa.Nodes[strconv.Itoa(0)].IsInitial = true
 
-	// if err := nfa.Walk(); err != nil {
-	// 	return nil, err
-	// }
-
-	// rstr, err := n.ToRegexWithConfig(nfa, n.ToRegexConfig{
-	// 	StepCallback: func(nfa *n.NFA, stepName string) error {
-	// 		fmt.Printf("%s\n", stepName)
-	// 		return nil
-	// 	},
-	// })
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// fmt.Println("NFA:", rstr)
-	// os.WriteFile("regex", []byte(rstr), 0644)
-
-	// fmt.Println("Graph:")
-	// fmt.Println("https://dreampuf.github.io/GraphvizOnline/#" + url.PathEscape(n.ToDot(nfa)))
+	r, err := nfa.ToRegex()
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("NFA Regex:\n%s\n", r)
 
 	// f, err := os.Create("nfa.svg")
 	// if err != nil {
