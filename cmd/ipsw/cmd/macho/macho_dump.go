@@ -48,7 +48,6 @@ func init() {
 	machoDumpCmd.Flags().BoolP("addr", "v", false, "Output as addresses/uint64s")
 	machoDumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
 	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
-	machoDumpCmd.Flags().Bool("color", false, "Force color (for piping to less etc)")
 
 	viper.BindPFlag("macho.dump.arch", machoDumpCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.dump.size", machoDumpCmd.Flags().Lookup("size"))
@@ -56,7 +55,6 @@ func init() {
 	viper.BindPFlag("macho.dump.addr", machoDumpCmd.Flags().Lookup("addr"))
 	viper.BindPFlag("macho.dump.bytes", machoDumpCmd.Flags().Lookup("bytes"))
 	viper.BindPFlag("macho.dump.output", machoDumpCmd.Flags().Lookup("output"))
-	viper.BindPFlag("macho.dump.color", machoDumpCmd.Flags().Lookup("color"))
 
 	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -82,9 +80,8 @@ var machoDumpCmd = &cobra.Command{
 		asAddrs := viper.GetBool("macho.dump.addr")
 		asBytes := viper.GetBool("macho.dump.bytes")
 		outFile := viper.GetString("macho.dump.output")
-		forceColor := viper.GetBool("macho.dump.color")
 
-		color.NoColor = !forceColor
+		color.NoColor = !viper.GetBool("color")
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")
