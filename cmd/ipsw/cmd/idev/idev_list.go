@@ -38,7 +38,6 @@ func init() {
 
 	ListDevicesCmd.Flags().BoolP("ipsw", "i", false, "Display devices as ipsw spec names")
 	ListDevicesCmd.Flags().BoolP("json", "j", false, "Display devices as JSON")
-	ListDevicesCmd.Flags().Bool("color", false, "Colorize output")
 }
 
 // listCmd represents the list command
@@ -55,9 +54,8 @@ var ListDevicesCmd = &cobra.Command{
 
 		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
 		asJSON, _ := cmd.Flags().GetBool("json")
-		forceColor, _ := cmd.Flags().GetBool("color")
 
-		color.NoColor = !forceColor
+		color.NoColor = !viper.GetBool("color")
 
 		conn, err := usb.NewConn()
 		if err != nil {
