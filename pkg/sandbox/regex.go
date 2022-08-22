@@ -152,8 +152,9 @@ func (re *Regex) Parse() (reList, error) {
 
 	rlist := make(reList)
 
+	var rl reNode
 	for i := 0; i < len(re.Data); i++ {
-		var rl reNode
+		rl = reNode{}
 
 		if i == 0 {
 			rl.isStart = true
@@ -192,14 +193,14 @@ func (re *Regex) Parse() (reList, error) {
 			// parse jump forward
 			rl.Next = i + 3
 			rl.Type = JumpForward
-			rl.Value = uint16(re.Data[i+1]) + uint16(re.Data[i+2])<<8
+			rl.Value = uint16(re.Data[i+1]) + (uint16(re.Data[i+2]) << 8)
 			rlist[i] = rl
 			i += 2
 		case (re.Data[i] & 0xf) == 0xa:
 			// parse jump backward
 			rl.Next = i + 3
 			rl.Type = JumpBackward
-			rl.Value = uint16(re.Data[i+1]) + uint16(re.Data[i+2])<<8
+			rl.Value = uint16(re.Data[i+1]) + (uint16(re.Data[i+2]) << 8)
 			rlist[i] = rl
 			i += 2
 		case (re.Data[i] & 0xf) == 0xb:
@@ -411,12 +412,11 @@ func (re *Regex) NFA() (*NFA, error) {
 		case ClassExclude:
 			nfa.AddEdge(strconv.Itoa(i), strconv.Itoa(rlist[i].Next), rlist[i].Value.(string))
 		case End:
-			// nfa.AddEdge(strconv.Itoa(i), strconv.Itoa(rlist[i].Next), "")
 			nfa.Nodes[strconv.Itoa(i)].IsTerminal = true
 		case JumpForward:
-			fallthrough
-		case JumpBackward:
 			nfa.AddEdge(strconv.Itoa(i), strconv.Itoa(rlist[i].Next), "")
+			nfa.AddEdge(strconv.Itoa(i), strconv.Itoa(int(rlist[i].Value.(uint16))), "")
+		case JumpBackward:
 			nfa.AddEdge(strconv.Itoa(i), strconv.Itoa(int(rlist[i].Value.(uint16))), "")
 		default:
 			return nil, fmt.Errorf("unsupported regex byte type: %x", rlist[i].Type)
@@ -425,27 +425,11 @@ func (re *Regex) NFA() (*NFA, error) {
 		i = rlist[i].Next
 
 		if rlist[i].isEnd {
-			// nfa.Nodes[strconv.Itoa(i)].IsTerminal = true
 			break
 		}
 	}
 
 	nfa.Nodes[strconv.Itoa(0)].IsInitial = true
-
-	r, err := nfa.ToRegex()
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("NFA Regex:\n%s\n", r)
-
-	// f, err := os.Create("nfa.svg")
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// defer f.Close()
-	// if err := n.ToSVG(nfa, f); err != nil {
-	// 	return nil, err
-	// }
 
 	return nfa, nil
 }
