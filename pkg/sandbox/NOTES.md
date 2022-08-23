@@ -8,12 +8,20 @@
 - [SandBlaster: Reversing the Apple Sandbox](https://arxiv.org/pdf/1608.04303.pdf)
 - https://census-labs.com/media/sandbox-argp-csw2019-public.pdf
 
+### NFA-to-Regex
+
+- [On NFA reductions](https://www.csd.uwo.ca/~ilie/TisF04.pdf)
+
 ### Tools
 
 - https://github.com/malus-security/sandblaster
 - https://github.com/sektioneins/sandbox_toolkit
 - https://github.com/Proteas/ios13-sandbox-profile-format
 - https://github.com/0xbf00/simbple
+
+### Libs
+
+- https://pkg.go.dev/github.com/yourbasic/graph
 
 ## TODO
 
