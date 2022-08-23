@@ -17,7 +17,7 @@
 
 ## TODO
 
-- [ ] parse regex via NDA (simpilify etc)
+- [x] parse regex via NDA (simpilify etc)
 - [x] parse reverse sandbox strings
 - [ ] parse filter types + other fields to parse arguments
 - [ ] parse extra data in terminal nodes op node data

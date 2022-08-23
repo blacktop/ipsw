@@ -40,9 +40,10 @@ func init() {
 
 // decCmd represents the dec command
 var decCmd = &cobra.Command{
-	Use:   "dec <kernelcache>",
-	Short: "Decompress a kernelcache",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "dec <kernelcache>",
+	Short:   "Decompress a kernelcache",
+	Args:    cobra.MinimumNArgs(1),
+	Aliases: []string{"decompress"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

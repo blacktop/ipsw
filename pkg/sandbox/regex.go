@@ -8,8 +8,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/yourbasic/graph"
 )
 
 type reType int
@@ -26,7 +24,6 @@ const (
 
 type reNode struct {
 	Value   any
-	accum   string
 	Next    int
 	Type    reType
 	isStart bool
@@ -265,135 +262,6 @@ func (re *Regex) Parse() (reList, error) {
 	return rlist, nil
 }
 
-func (re *Regex) Graph() (*graph.Mutable, error) {
-	var endNode int
-
-	rlist, err := re.Parse()
-	if err != nil {
-		return nil, err
-	}
-
-	g := graph.New(int(re.Length + 1))
-
-	i := 0
-	for {
-		switch rlist[i].Type {
-		case Character:
-			fallthrough
-		case Class:
-			fallthrough
-		case ClassExclude:
-			fallthrough
-		case End:
-			g.Add(i, rlist[i].Next)
-		case JumpForward:
-			fallthrough
-		case JumpBackward:
-			g.Add(i, rlist[i].Next)
-			g.Add(i, int(rlist[i].Value.(uint16)))
-		default:
-			return nil, fmt.Errorf("unsupported regex byte type: %x", rlist[i].Type)
-		}
-
-		i = rlist[i].Next
-
-		if rlist[i].isEnd {
-			endNode = i
-			break
-		}
-	}
-
-	// fmt.Println(g)
-
-	// needsPlus := func(v int, s string, cycles [][]int) bool {
-	// 	if len(s) == 0 {
-	// 		return false
-	// 	} else if s[len(s)-1] == '^' {
-	// 		return false
-	// 	} else if s[len(s)-1] == '$' {
-	// 		return false
-	// 	} else if len(cycles) == 0 {
-	// 		return false
-	// 	}
-	// 	for _, cc := range cycles {
-	// 		if cc[0] == v {
-	// 			return true
-	// 		}
-	// 	}
-	// 	return false
-	// }
-
-	// p, d := graph.ShortestPath(g, 0, endNode)
-	// fmt.Printf("ShortestPath:\n\tp: %v, d: %v\n", p, d)
-	// for _, x := range p {
-	// 	fmt.Printf("%d) (%s)\t%v\n", x, rlist[x].Type, rlist[x].Value)
-	// }
-
-	// var cycles [][]int
-	// if !graph.Acyclic(g) {
-	// 	for _, cs := range graph.StrongComponents(g) {
-	// 		if len(cs) > 1 {
-	// 			sort.Ints(cs)
-	// 			cycles = append(cycles, cs)
-	// 		}
-	// 	}
-	// }
-
-	var out string
-	var res []string
-
-	for v := 0; v < g.Order(); v++ {
-		// Visiting edge (v, w) of cost c.
-		g.Visit(v, func(w int, c int64) (skip bool) {
-			fmt.Printf("%03d -> %03d => (%s)\t%v\n", v, w, rlist[v].Type, rlist[v].Value)
-			if rlist[v].Type == Character {
-				out += rlist[v].Value.(string)
-			} else if rlist[v].Type == Class || rlist[v].Type == ClassExclude {
-				out += rlist[v].Value.(string)
-				out += "+"
-			} else if rlist[v].Type == JumpBackward || rlist[v].Type == JumpForward {
-				if len(out) > 0 {
-					rl := rlist[v]
-					rl.accum = out
-					res = append(res, out)
-					out = ""
-					rlist[v] = rl
-				}
-			}
-			if rlist[w].Type == End {
-				if len(out) > 0 {
-					rl := rlist[v]
-					rl.accum = out
-					res = append(res, out)
-					out = ""
-					rlist[v] = rl
-				}
-				// res = append(res, out)
-				// if reflect.TypeOf(rlist[v].Value).Kind() == reflect.String {
-				// 	out = strings.TrimSuffix(out, rlist[v].Value.(string))
-				// }
-			}
-			if w == endNode {
-				fmt.Printf("%03d -> 🛑  => (%s)\t%v\n", w, rlist[w].Type, rlist[w].Value)
-			}
-			return
-		})
-	}
-
-	for _, r := range res {
-		fmt.Printf("\t%s\n", r)
-	}
-
-	dist := make([]int, g.Order())
-	graph.BFS(graph.Sort(g), 0, func(v, w int, _ int64) {
-		fmt.Printf("%03d -> %03d => (%s)\t%v\n", v, w, rlist[v].Type, rlist[v].Value)
-		dist[w] = dist[v] + 1
-	})
-	fmt.Println("dist:", dist)
-
-	return g, nil
-}
-
 func (re *Regex) NFA() (*NFA, error) {
 	rlist, err := re.Parse()
 	if err != nil {
@@ -433,57 +301,3 @@ func (re *Regex) NFA() (*NFA, error) {
 
 	return nfa, nil
 }
-
-// func (re *Regex) Graph() (*Graph, error) {
-// 	rlist, err := re.Parse()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	g := NewDirectedGraph()
-
-// 	i := 0
-// 	for {
-// 		switch rlist[i].Type {
-// 		case Character:
-// 			fallthrough
-// 		case Class:
-// 			fallthrough
-// 		case ClassExclude:
-// 			fallthrough
-// 		case End:
-// 			g.AddVertex(i)
-// 			g.AddVertex(rlist[i].Next)
-// 			g.AddEdge(i, rlist[i].Next)
-// 			i = rlist[i].Next
-// 		case JumpForward:
-// 			fallthrough
-// 		case JumpBackward:
-// 			g.AddVertex(i)
-// 			g.AddVertex(rlist[i].Next)
-// 			g.AddEdge(i, rlist[i].Next)
-// 			g.AddVertex(int(rlist[i].Value.(uint16)))
-// 			g.AddEdge(i, int(rlist[i].Value.(uint16)))
-// 			i = int(rlist[i].Value.(uint16))
-// 		default:
-// 			return nil, fmt.Errorf("unsupported regex byte type: %x", rlist[i].Type)
-// 		}
-
-// 		if rlist[i].isEnd {
-// 			break
-// 		}
-// 	}
-
-// 	// var out []string
-// 	g.DFS(g.Vertices[0], func(i int) {
-// 		fmt.Printf("%d) %s\n", i, rlist[i].String(nil))
-// 		if rlist[i].Type == End {
-// 			fmt.Println(rlist[i].String(nil))
-// 		}
-// 		// if rlist[i].Type == Character || rlist[i].Type == Class || rlist[i].Type == ClassExclude {
-// 		// 	out = append(out, rlist[i].Value.(string))
-// 		// }
-// 	})
-
-// 	return g, nil
-// }

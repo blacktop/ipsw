@@ -317,8 +317,7 @@ func (f *FilterInfo) GetArgument(sb *Sandbox, id uint16, alt bool) (any, error) 
 			if err != nil {
 				return nil, err
 			}
-			fmt.Println(rstr)
-			return "regex #\"\"", nil
+			return fmt.Sprintf("regex #\"%s\"", rstr), nil
 		} else {
 			return sb.GetRSStringAtOffset(uint32(id))
 		}

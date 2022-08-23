@@ -51,11 +51,12 @@ func init() {
 
 // dwarfCmd represents the dwarf command
 var dwarfCmd = &cobra.Command{
-	Use:           "dwarfdump",
+	Use:           "dwarf",
 	Short:         "Dump DWARF debug information",
 	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
+	SilenceUsage:  false,
 	SilenceErrors: true,
+	Aliases:       []string{"dwarfdump"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File

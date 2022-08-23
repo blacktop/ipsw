@@ -14,7 +14,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
-// CREDIT: based on https://github.com/wolever/nfa2regex
+// CREDIT: based on https://github.com/wolever/nfa2regex TODO: turn this into a fork (maybe PR)
 
 // nfaNodeName and nfaEdgeValue are type aliases for node name values and edge values.
 type nfaNodeName = string
@@ -120,6 +120,16 @@ func (nfa *NFA) EdgesOut(nodeName nfaNodeName) [](*NFAEdge) {
 		}
 	}
 	return res
+}
+
+func (nfa *NFA) GetEdges(src, dst *NFANode) []*NFAEdge {
+	var edges []*NFAEdge
+	for _, outEdge := range nfa.EdgesOut(src.Name) {
+		if outEdge.DstNode == dst {
+			edges = append(edges, outEdge)
+		}
+	}
+	return edges
 }
 
 // remove edge from nfa
@@ -254,38 +264,13 @@ func (nfa *NFA) ToRegex() (string, error) {
 		return "", errors.New("NFA has no terminal node(s)")
 	}
 
-	// if err := nfa.OpenURL(); err != nil {
-	// 	return "", err
-	// }
-
-	// 2. remove states with one transition in and out
-	// for _, name := range nfa.SortedNodeNames(true) {
-	// 	if len(nfa.EdgesIn(name)) == 1 && len(nfa.EdgesOut(name)) == 1 {
-	// 		inEdge := nfa.EdgesIn(name)[0]
-	// 		outEdge := nfa.EdgesOut(name)[0]
-	// 		nfa.AddEdge(inEdge.SrcNode.Name, outEdge.DstNode.Name, (inEdge.Value + outEdge.Value))
-	// 		nfa.RemoveNode(name)
-	// 		// remove states with one transition out to non-terminal "" node
-	// 	} else if len(nfa.EdgesIn(name)) == 1 && len(nfa.EdgesOut(name)) == 0 && !nfa.Nodes[name].IsTerminal {
-	// 		inEdge := nfa.EdgesIn(name)[0]
-	// 		if inEdge.Value == "" {
-	// 			nfa.RemoveNode(name)
-	// 		}
-	// 		// } else if len(nfa.EdgesIn(name)) == 1 && len(nfa.EdgesOut(name)) == 2 {
-	// 		// 	outEdge1 := nfa.EdgesOut(name)[0]
-	// 		// 	outEdge2 := nfa.EdgesOut(name)[1]
-	// 		// 	loop := nfa.EdgesOut(outEdge2.DstNode.Name)
-	// 		// 	loop2 := nfa.EdgesOut(outEdge1.DstNode.Name)
-	// 		// 	if len(loop) == 1 && outEdge1.DstNode.Name == loop[0].DstNode.Name {
-	// 		// 		nfa.RemoveEdge(outEdge1)
-	// 		// 	} else if len(loop2) == 2 && outEdge2.DstNode.Name == loop2[0].DstNode.Name {
-	// 		// 		nfa.RemoveEdge(outEdge2)
-	// 		// 	}
-	// 	}
-	// }
+	// nfa.OpenURL()
 
 	// 2. remove states with one transition in and out
 	for _, node := range nfa.Nodes {
+		if node == initialNode || node == terminalNode {
+			continue
+		}
 		// combine adjacent edges with onyl one transition
 		if len(nfa.EdgesIn(node.Name)) == 1 && len(nfa.EdgesOut(node.Name)) == 1 {
 			inEdge := nfa.EdgesIn(node.Name)[0]
@@ -301,9 +286,9 @@ func (nfa *NFA) ToRegex() (string, error) {
 		}
 	}
 
-	nfa.GetState(initialNode, terminalNode)
+	// nfa.OpenURL()
 
-	// 2. remove states with one transition in and out
+	// 3. remove loops
 	for _, node := range nfa.Nodes {
 		if node == initialNode || node == terminalNode {
 			continue
@@ -312,122 +297,119 @@ func (nfa *NFA) ToRegex() (string, error) {
 		outNodes := nfa.EdgesOut(node.Name)
 		if len(inNodes) >= 2 && len(outNodes) == 1 {
 			outEdge := outNodes[0]
-			if len(nfa.EdgesOut(outEdge.DstNode.Name)) == 2 {
-				for idx, edge := range nfa.EdgesOut(outEdge.DstNode.Name) {
+			if len(nfa.EdgesOut(outEdge.DstNode.Name)) == 2 { // ([0-9])*[0-9] reduction
+				for _, inEdge := range inNodes {
+					if outEdge.DstNode.Name == inEdge.SrcNode.Name {
+						outEdge.Value += "+"
+						nfa.RemoveEdge(inEdge)
+						break
+					}
+				}
+			}
+		} else { // kleen star
+			for _, inEdge := range inNodes {
+				if inEdge.SrcNode == inEdge.DstNode {
+					kleenStar := addKleenStar(inEdge.Value)
 					for _, inEdge := range inNodes {
-						if edge.DstNode.Name == inEdge.SrcNode.Name {
-							nx := nfa.EdgesOut(outEdge.DstNode.Name)[idx].DstNode.Name
-							nn := nfa.EdgesOut(outEdge.DstNode.Name)[idx+1].DstNode.Name // TODO: fix this (not in a loop)
-							nfa.AddEdge(node.Name, nn, fmt.Sprintf("%s+", inEdge.Value+outEdge.Value))
-							nfa.RemoveNode(outEdge.DstNode.Name)
-							nfa.RemoveNode(nx)
-							break
+						if inEdge.SrcNode == inEdge.DstNode {
+							continue
+						}
+						for _, outEdge := range nfa.EdgesOut(node.Name) {
+							if outEdge.SrcNode == outEdge.DstNode {
+								continue
+							}
+							nfa.AddEdge(
+								inEdge.SrcNode.Name,
+								outEdge.DstNode.Name,
+								inEdge.Value+kleenStar+outEdge.Value,
+							)
 						}
 					}
+					nfa.RemoveNode(node.Name)
 				}
 			}
 		}
 	}
 
-	nfa.GetState(initialNode, terminalNode)
-	_ = nfa
-	// 3. Iteritively remove nodes which aren't the initial or terminal node
-	for len(nfa.Nodes) > 2 {
-		for _, node := range nfa.Nodes {
-			if node == initialNode || node == terminalNode {
-				continue
-			}
-
-			// Collect any loops (ie, where the node references its self) so they
-			// can be converted to kleen star in the middle of new edges
-			inEdges := nfa.EdgesIn(node.Name)
-
-			for _, inEdge := range inEdges {
-				if inEdge.SrcNode == inEdge.DstNode {
-					continue
-				}
-				for _, outEdge := range nfa.EdgesOut(node.Name) {
-					if outEdge.SrcNode == outEdge.DstNode {
-						continue
-					}
-					nfa.AddEdge(
-						inEdge.SrcNode.Name,
-						outEdge.DstNode.Name,
-						inEdge.Value+outEdge.Value,
-					)
-				}
-			}
-
+	// 3.5. remove states with one transition in and out (AGAIN)
+	for _, node := range nfa.Nodes {
+		if node == initialNode || node == terminalNode {
+			continue
+		}
+		// combine adjacent edges with onyl one transition
+		if len(nfa.EdgesIn(node.Name)) == 1 && len(nfa.EdgesOut(node.Name)) == 1 {
+			inEdge := nfa.EdgesIn(node.Name)[0]
+			outEdge := nfa.EdgesOut(node.Name)[0]
+			nfa.AddEdge(inEdge.SrcNode.Name, outEdge.DstNode.Name, (inEdge.Value + outEdge.Value))
 			nfa.RemoveNode(node.Name)
-
+			// remove states with one transition out to non-terminal "" node
+		} else if len(nfa.EdgesIn(node.Name)) == 1 && len(nfa.EdgesOut(node.Name)) == 0 && !node.IsTerminal {
+			inEdge := nfa.EdgesIn(node.Name)[0]
+			if inEdge.Value == "" {
+				nfa.RemoveNode(node.Name)
+			}
 		}
 	}
 
-	// for len(nfa.Nodes) > 2 {
-	// 	for _, node := range nfa.Nodes {
-	// 		if node == initialNode || node == terminalNode {
-	// 			continue
-	// 		}
-	// 		// Collect any loops (ie, where the node references its self) so they
-	// 		// can be converted to kleen star in the middle of new edges
-	// 		kleenStarValues := []string{}
-	// 		inEdges := nfa.EdgesIn(node.Name)
-	// 		for _, inEdge := range inEdges {
-	// 			if inEdge.SrcNode == inEdge.DstNode {
-	// 				kleenStarValues = append(kleenStarValues, inEdge.Value)
-	// 			}
-	// 		}
-	// 		kleenStarMiddle := addKleenStar(orJoin(kleenStarValues), len(kleenStarValues) > 1)
-	// 		for _, inEdge := range inEdges {
-	// 			if inEdge.SrcNode == inEdge.DstNode {
-	// 				continue
-	// 			}
-	// 			for _, outEdge := range nfa.EdgesOut(node.Name) {
-	// 				if outEdge.SrcNode == outEdge.DstNode {
-	// 					continue
-	// 				}
-	// 				nfa.AddEdge(
-	// 					inEdge.SrcNode.Name,
-	// 					outEdge.DstNode.Name,
-	// 					usePlus(inEdge.Value, kleenStarMiddle, outEdge.Value),
-	// 				)
-	// 			}
-	// 		}
-	// 		nfa.RemoveNode(node.Name)
-	// 	}
-	// }
+	// nfa.OpenURL()
 
-	nfa.OpenURL()
+	walks := []string{}
+	nfa.DFS(initialNode, terminalNode, func(path []*NFANode) {
+		walk := nfa.GetPathFromNodes(path)
+		walks = append(walks, strings.Join(walk, ""))
+	})
 
-	// 4. Produce the regular expression
-	hasInitialTerminalEdge := false
-	res := make([]string, 0, len(nfa.Edges))
-	for _, edge := range nfa.Edges {
-		if edge.SrcNode.IsInitial && edge.DstNode.IsTerminal {
-			hasInitialTerminalEdge = true
+	walks = utils.Unique(walks)
+
+	var unifiedRegex string
+	if len(walks) > 1 {
+		unifiedRegex = walks[0]
+		for _, edge := range walks[1:] {
+			unifiedRegex = unifyStrings(unifiedRegex, edge)
 		}
-		res = append(res, edge.Value)
-	}
-	if !hasInitialTerminalEdge {
-		return "", errors.New("NFA has no path between initial and terminal node(s)")
+	} else {
+		return walks[0], nil
 	}
 
-	res = utils.Unique(res)
-	sort.Strings(res)
+	return unifiedRegex, nil
+}
 
-	if len(res) > 1 {
-		current := res[0]
-		for _, edge := range res[1:] {
-			current = unifyStrings(current, edge)
+func (nfa *NFA) GetPathFromNodes(nodes []*NFANode) []string {
+	var nextNode *NFANode
+	res := []string{}
+
+	for idx, node := range nodes {
+		var value string
+
+		nextNode = nodes[idx+1]
+		outEdges := nfa.GetEdges(node, nextNode)
+
+		switch len(outEdges) {
+		case 0:
+			value = ""
+		case 1:
+			value = outEdges[0].Value
+		case 2:
+			if outEdges[0].Value != "" && outEdges[1].Value != "" {
+				value = fmt.Sprintf("(%s|%s)", outEdges[0].Value, outEdges[1].Value)
+			} else if outEdges[0].Value == "" || outEdges[1].Value == "" {
+				if outEdges[0].DstNode == outEdges[1].DstNode {
+					value = fmt.Sprintf("(%s)?", outEdges[0].Value+outEdges[1].Value)
+				}
+			} else {
+				value = outEdges[0].Value + outEdges[1].Value
+			}
+		default:
+			log.Fatalf("unexpected out edge count %d", len(outEdges))
 		}
-		fmt.Printf(
-			"==========\n"+
-				"current: \n"+
-				"%s\n"+
-				"==========\n", current)
+
+		res = append(res, value)
+		if nextNode.IsTerminal {
+			break
+		}
 	}
 
-	return orJoin(res), nil
+	return res
 }
 
 func (nfa *NFA) DFS(src *NFANode, dst *NFANode, visitCb func([]*NFANode)) {
@@ -451,176 +433,8 @@ func (nfa *NFA) dfs(src *NFANode, dst *NFANode, visited map[*NFANode]bool, path 
 		}
 	}
 
-	path = path[:len(path)-1]
+	path = path[:len(path)-1] // nolint:staticcheck
 	visited[src] = false
-}
-
-func (nfa *NFA) GetPathFromNodes(nodes []*NFANode) []string {
-	res := []string{}
-	for idx, node := range nodes {
-		outEdges := nfa.EdgesOut(node.Name)
-		var value string
-		found := false
-		for _, edge := range outEdges {
-			if edge.DstNode == nodes[idx+1] {
-				if found {
-					value = fmt.Sprintf("(%s|%s)", value, edge.Value)
-				} else {
-					found = true
-					value = edge.Value
-				}
-			}
-		}
-		res = append(res, value)
-		if nodes[idx+1].IsTerminal {
-			break
-		}
-	}
-	return res
-}
-
-// ToDot generates a graphviz dot file from a NFA.
-func ToDot(nfa *NFA) string {
-	res := make([]string, 0, len(nfa.Edges)+5)
-
-	res = append(res, "\trankdir = LR;")
-
-	for _, edge := range nfa.Edges {
-		label := edge.Value
-		if len(label) == 0 {
-			label = "''"
-		}
-		res = append(res, fmt.Sprintf(
-			"\t%q -> %q [label=%q];",
-			edge.SrcNode.Name,
-			edge.DstNode.Name,
-			label,
-		))
-	}
-
-	for _, node := range nfa.Nodes {
-		if node.IsInitial {
-			res = append(res, fmt.Sprintf("\t%q [shape=point];", node.Name+"__initial"))
-			res = append(res, fmt.Sprintf("\t%q -> %q;", node.Name+"__initial", node.Name))
-		}
-		if node.IsTerminal {
-			res = append(res, fmt.Sprintf("\t%q [peripheries=2];", node.Name))
-		}
-	}
-
-	return "digraph g {\n" + strings.Join(res, "\n") + "\n}\n"
-}
-
-func (nfa *NFA) OpenURL() error {
-	var err error
-
-	url := "https://edotor.net/?engine=dot#" + url.PathEscape(ToDot(nfa))
-
-	log.Debug("Graph:")
-	log.Debug(url)
-
-	switch runtime.GOOS {
-	case "linux":
-		err = exec.Command("xdg-open", url).Start()
-	case "windows":
-		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
-	case "darwin":
-		err = exec.Command("open", url).Start()
-	default:
-		err = fmt.Errorf("unsupported platform")
-	}
-	return err
-}
-
-func (nfa *NFA) GetState(initialNode, terminalNode *NFANode) error {
-	if err := nfa.OpenURL(); err != nil {
-		return err
-	}
-
-	log.Debug("DFS WALKS:")
-	walks := []string{}
-	nfa.DFS(initialNode, terminalNode, func(path []*NFANode) {
-		walk := nfa.GetPathFromNodes(path)
-		log.Debugf("PATH: %s", strings.Join(walk, ""))
-		walks = append(walks, strings.Join(walk, ""))
-	})
-
-	walks = utils.Unique(walks)
-
-	log.Debugf("LongestCommonSubstring: %s", string(LongestCommonSubstring(walks)))
-
-	if len(walks) > 1 {
-		current := walks[0]
-		for _, edge := range walks[1:] {
-			current = unifyStrings(current, edge)
-		}
-		log.Debugf(
-			"==========\n"+
-				"current: \n"+
-				"%s\n"+
-				"==========\n", current)
-	}
-
-	return nil
-}
-
-func usePlus(partsArg ...string) string {
-	// remove empty strings
-	parts := make([]string, len(partsArg))
-	copy(parts, partsArg)
-	parts = utils.RemoveStrFromSlice(parts, "")
-	hasPlus := false
-	for _, part := range parts { // FIXME: what if more than 1 part has a star?
-		if strings.HasSuffix(part, "+") {
-			hasPlus = true
-			break
-		}
-	}
-	if hasPlus {
-		fmt.Println("WAT")
-	}
-	var star string
-	for idx, part := range parts { // FIXME: what if more than 1 part has a star?
-		if strings.HasSuffix(part, "*") {
-			star = part
-			parts = append(parts[:idx], parts[idx+1:]...)
-			break
-		}
-	}
-	if len(star) == 0 {
-		return strings.Join(parts, "")
-	}
-
-	var actualStr string
-	if strings.HasPrefix(star, "(") && strings.HasSuffix(star[:len(star)-1], ")") {
-		actualStr = star[1 : len(star)-2]
-	} else {
-		actualStr = star[:len(star)-1]
-	}
-
-	if len(parts) == 1 {
-		return parts[0] + "+"
-	}
-	if strings.Contains(parts[0], parts[1]) {
-		fmt.Println("ESCAPE")
-	}
-	if parts[0] == parts[1] {
-		parts = parts[1:]
-	} else if strings.HasPrefix(parts[0], parts[1]) || strings.HasSuffix(parts[0], parts[1]) {
-		fmt.Println("WAT 1")
-		parts = parts[:1]
-	} else if strings.HasPrefix(parts[1], parts[0]) || strings.HasSuffix(parts[1], parts[0]) {
-		fmt.Println("WAT 2")
-		parts = parts[1:]
-	}
-
-	for idx, part := range parts {
-		if strings.HasSuffix(part, actualStr) {
-			parts[idx] += "+"
-		}
-	}
-
-	return strings.Join(parts, "")
 }
 
 func unifyStrings(p1, p2 string) string {
@@ -676,6 +490,87 @@ func unifyStrings(p1, p2 string) string {
 	return lcps + s2 + lcss
 }
 
+// ToDot generates a graphviz dot file from a NFA.
+func (nfa *NFA) ToDot() string {
+	res := make([]string, 0, len(nfa.Edges)+5)
+
+	res = append(res, "\trankdir = LR;")
+
+	for _, edge := range nfa.Edges {
+		label := edge.Value
+		if len(label) == 0 {
+			label = "''"
+		}
+		res = append(res, fmt.Sprintf(
+			"\t%q -> %q [label=%q];",
+			edge.SrcNode.Name,
+			edge.DstNode.Name,
+			label,
+		))
+	}
+
+	for _, node := range nfa.Nodes {
+		if node.IsInitial {
+			res = append(res, fmt.Sprintf("\t%q [shape=point];", node.Name+"__initial"))
+			res = append(res, fmt.Sprintf("\t%q -> %q;", node.Name+"__initial", node.Name))
+		}
+		if node.IsTerminal {
+			res = append(res, fmt.Sprintf("\t%q [peripheries=2];", node.Name))
+		}
+	}
+
+	return "digraph g {\n" + strings.Join(res, "\n") + "\n}\n"
+}
+
+func (nfa *NFA) OpenURL() error {
+	var err error
+
+	url := "https://edotor.net/?engine=dot#" + url.PathEscape(nfa.ToDot())
+
+	log.Debug("Graph:")
+	utils.Indent(log.Debug, 2)(url)
+
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	return err
+}
+
+func (nfa *NFA) GetState(initialNode, terminalNode *NFANode) error {
+	if err := nfa.OpenURL(); err != nil {
+		return err
+	}
+
+	log.Debug("DFS WALKS:")
+	walks := []string{}
+	nfa.DFS(initialNode, terminalNode, func(path []*NFANode) {
+		walk := nfa.GetPathFromNodes(path)
+		utils.Indent(log.Debug, 2)(strings.Join(walk, ""))
+		walks = append(walks, strings.Join(walk, ""))
+	})
+
+	walks = utils.Unique(walks)
+
+	log.Debugf("LongestCommonSubstring: %s", string(LongestCommonSubstring(walks)))
+
+	if len(walks) > 1 {
+		current := walks[0]
+		for _, edge := range walks[1:] {
+			current = unifyStrings(current, edge)
+		}
+		log.Debugf("current: %s\n", current)
+	}
+
+	return nil
+}
+
 // addKleenStar a kleen star to “s“:
 //
 //	addKleenStar("") -> ""
@@ -703,12 +598,6 @@ func addKleenStar(s string, noWrap ...bool) string {
 //	orJoin({"a", "b"}) -> "(a|b)"
 //	orJoin({"", "a", "b"}) -> "(a|b)"
 func orJoin(inputStrs []string) string {
-	// TODO: calculate longest common substring and use it as the common prefix
-	// find longest common prefix
-	if len(inputStrs) > 1 {
-		comm := string(LongestCommonSubstring(inputStrs))
-		fmt.Println(comm)
-	}
 	strs := make([]string, 0, len(inputStrs))
 	for _, s := range inputStrs {
 		if len(s) > 0 {
@@ -724,49 +613,4 @@ func orJoin(inputStrs []string) string {
 	default:
 		return "(" + strings.Join(strs, "|") + ")"
 	}
-}
-
-func Max(more ...int) int {
-	max_num := more[0]
-	for _, elem := range more {
-		if max_num < elem {
-			max_num = elem
-		}
-	}
-	return max_num
-}
-
-func Longest(str1, str2 string) int {
-	len1 := len(str1)
-	len2 := len(str2)
-
-	//in C++,
-	//int tab[m + 1][n + 1];
-	//tab := make([][100]int, len1+1)
-
-	tab := make([][]int, len1+1)
-	for i := range tab {
-		tab[i] = make([]int, len2+1)
-	}
-
-	i, j := 0, 0
-	for i = 0; i <= len1; i++ {
-		for j = 0; j <= len2; j++ {
-			if i == 0 || j == 0 {
-				tab[i][j] = 0
-			} else if str1[i-1] == str2[j-1] {
-				tab[i][j] = tab[i-1][j-1] + 1
-				if i < len1 {
-					fmt.Printf("%c", str1[i])
-					//Move on the the next character in both sequences
-					i++
-					j++
-				}
-			} else {
-				tab[i][j] = Max(tab[i-1][j], tab[i][j-1])
-			}
-		}
-	}
-	fmt.Println()
-	return tab[len1][len2]
 }

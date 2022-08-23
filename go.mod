@@ -7,6 +7,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
+	github.com/blacktop/go-dwarf v1.0.4
 	github.com/blacktop/go-macho v1.1.95
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
@@ -36,7 +37,7 @@ require (
 	github.com/vbauerster/mpb/v7 v7.4.2
 	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234
-	golang.org/x/oauth2 v0.0.0-20220808172628-8227340efae7
+	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 	golang.org/x/sys v0.0.0-20220818161305-2296e01440c6
 	gopkg.in/yaml.v3 v3.0.1
@@ -45,11 +46,6 @@ require (
 // replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 // replace github.com/unicorn-engine/unicorn => ./unicorn2
-
-require (
-	github.com/blacktop/go-dwarf v1.0.4
-	github.com/yourbasic/graph v0.0.0-20210606180040-8ecfec1c2869
-)
 
 require (
 	github.com/VividCortex/ewma v1.2.0 // indirect

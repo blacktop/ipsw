@@ -350,18 +350,38 @@ var sbdecCmd = &cobra.Command{
 				}
 
 				// rindex := 2 // ^gdt-[A-Za-z0-9]+-(c|s)$
-				rindex := 6 // ^/private/var/(((mobile|euser[0-9]+)|[-0-9A-F]+)|Users/[^/]+)/Media/([^/]+/)?iTunes_Control/iTunes$
-				// rindex := 23
+				// rindex := 6 // ^/private/var/(((mobile|euser[0-9]+)|[-0-9A-F]+)|Users/[^/]+)/Media/([^/]+/)?iTunes_Control/iTunes$
+				// rindex := 7
+				// rindex := 229
+				// if err := sb.Regexes[rindex].Dump("/tmp/regex"); err != nil {
+				// 	return fmt.Errorf("failed to dump regex: %v", err)
+				// }
+				// nfa, err := sb.Regexes[rindex].NFA()
+				// if err != nil {
+				// 	return err
+				// }
+				// fmt.Printf("%v\n", sb.Regexes[rindex].Data)
+				// rx, err := nfa.ToRegex()
+				// if err != nil {
+				// 	return err
+				// }
+				// fmt.Println(rx)
 
-				if err := sb.Regexes[rindex].Dump("/tmp/regex"); err != nil {
-					return fmt.Errorf("failed to dump regex: %v", err)
-				}
-
-				rl, err := sb.Regexes[rindex].NFA()
-				if err != nil {
-					return err
-				}
-				fmt.Println(rl)
+				// for idx, re := range sb.Regexes {
+				// 	nfa, err := re.NFA()
+				// 	if err != nil {
+				// 		return err
+				// 	}
+				// 	rx, err := nfa.ToRegex()
+				// 	if err != nil {
+				// 		return err
+				// 	}
+				// 	if len(rx) > 0 {
+				// 		// fmt.Printf("regex %d)\n%s\n", idx, rx)
+				// 	} else {
+				// 		log.Errorf("failed to parse regex %d", idx)
+				// 	}
+				// }
 
 				// if _, err := sb.Regexes[3].NFA(); err != nil {
 				// 	return err
