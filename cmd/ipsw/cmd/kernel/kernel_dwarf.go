@@ -23,17 +23,59 @@ package kernel
 
 import (
 	"fmt"
-	"io"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
 	dwf "github.com/blacktop/go-dwarf"
 	"github.com/blacktop/go-macho"
+	"github.com/sergi/go-diff/diffmatchpatch"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+func getStructType(path, name string) (*dwf.StructType, error) {
+	m, err := macho.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer m.Close()
+
+	df, err := m.DWARF()
+	if err != nil {
+		return nil, err
+	}
+
+	r := df.Reader()
+
+	off, err := df.LookupType(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find type %s: %v", name, err)
+	}
+
+	r.Seek(off)
+
+	entry, err := r.Next()
+	if err != nil {
+		return nil, err
+	}
+
+	var st *dwf.StructType
+	if entry.Tag == dwf.TagStructType {
+		typ, err := df.Type(entry.Offset)
+		if err != nil {
+			return nil, err
+		}
+		st = typ.(*dwf.StructType)
+		if st.Incomplete {
+			return nil, fmt.Errorf("type %s is incomplete", name)
+		}
+	} else {
+		return nil, fmt.Errorf("did not find tag struct type: found %s", entry.Tag)
+	}
+
+	return st, nil
+}
 
 func init() {
 	KernelcacheCmd.AddCommand(dwarfCmd)
@@ -42,10 +84,14 @@ func init() {
 	dwarfCmd.Flags().BoolP("pretty", "", false, "Pretty print JSON")
 	dwarfCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dwarfCmd.Flags().BoolP("diff", "d", false, "Diff two structs")
+	dwarfCmd.Flags().StringP("type", "t", "", "Type to lookup")
+	dwarfCmd.Flags().StringP("name", "n", "", "Name to lookup")
 	viper.BindPFlag("kernel.dwarf.arch", dwarfCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("kernel.dwarf.pretty", dwarfCmd.Flags().Lookup("pretty"))
 	viper.BindPFlag("kernel.dwarf.json", dwarfCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.dwarf.diff", dwarfCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("kernel.dwarf.type", dwarfCmd.Flags().Lookup("type"))
+	viper.BindPFlag("kernel.dwarf.name", dwarfCmd.Flags().Lookup("name"))
 	dwarfCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
@@ -59,9 +105,6 @@ var dwarfCmd = &cobra.Command{
 	Aliases:       []string{"dwarfdump"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var m *macho.File
-		// var m2 *macho.File
-
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -70,151 +113,44 @@ var dwarfCmd = &cobra.Command{
 		// selectedArch := viper.GetString("kernel.dwarf.arch")
 		// prettyJSON := viper.GetBool("kernel.dwarf.pretty")
 		// outAsJSON := viper.GetBool("kernel.dwarf.json")
-		// doDiff := viper.GetBool("kernel.dwarf.diff")
+		doDiff := viper.GetBool("kernel.dwarf.diff")
 
-		machoPath := filepath.Clean(args[0])
-
-		// if _, err := os.Stat(machoPath); os.IsNotExist(err) {
-		// 	return fmt.Errorf("file %s does not exist", machoPath)
-		// }
-
-		// // first check for fat file
-		// fat, err := macho.OpenFat(machoPath)
-		// if err != nil && err != macho.ErrNotFat {
-		// 	return err
-		// }
-
-		// if err == macho.ErrNotFat {
-		// 	m, err = macho.Open(machoPath)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// } else {
-		// 	var options []string
-		// 	var shortOptions []string
-		// 	for _, arch := range fat.Arches {
-		// 		options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
-		// 		shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
-		// 	}
-
-		// 	if len(selectedArch) > 0 {
-		// 		found := false
-		// 		for i, opt := range shortOptions {
-		// 			if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
-		// 				m = fat.Arches[i].File
-		// 				found = true
-		// 				break
-		// 			}
-		// 		}
-		// 		if !found {
-		// 			return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
-		// 		}
-
-		// 	} else {
-		// 		choice := 0
-		// 		prompt := &survey.Select{
-		// 			Message: "Detected a universal MachO file, please select an architecture to analyze:",
-		// 			Options: options,
-		// 		}
-		// 		survey.AskOne(prompt, &choice)
-		// 		m = fat.Arches[choice].File
-		// 	}
-		// }
-
-		// bi := proc.NewBinaryInfo("darwin", "arm64")
-		// bi.LoadBinaryInfo(machoPath, 0, nil)
-
-		// typs, _ := bi.Types()
-		// for _, typ := range typs {
-		// 	fmt.Println(typ)
-		// }
-
-		// str, pos, fn := bi.PCToLine(0xFFFFFE0007434F34)
-		// fmt.Println(str, pos, fn)
-
-		// prettyPrint := func(s string) string {
-		// 	// clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename thread.h | bat -l c --tabs 0 -p --theme Nord --wrap=never --pager "less -S"'
-		// 	cmd := exec.Command("clang-format", "-style='{AlignConsecutiveDeclarations: true}'", "-assume-filename", "thread.h")
-		// 	cmd.Stdin = strings.NewReader(s)
-		// 	var out bytes.Buffer
-		// 	cmd.Stdout = &out
-		// 	if err := cmd.Run(); err != nil {
-		// 		log.Fatal(err.Error())
-		// 	}
-		// 	return out.String()
-		// }
-
-		m, err := macho.Open(machoPath)
+		t1, err := getStructType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
 		if err != nil {
 			return err
 		}
 
-		df, err := m.DWARF()
-		if err != nil {
-			return err
-		}
+		if !doDiff {
+			fmt.Println(t1.Defn())
+		} else {
+			if len(args) < 2 {
+				return fmt.Errorf("you must supply 2 KDK kernelcaches to diff")
+			}
 
-		r := df.Reader()
-
-		for {
-			entry, err := r.Next()
+			t2, err := getStructType(filepath.Clean(args[1]), viper.GetString("kernel.dwarf.type"))
 			if err != nil {
-				if err == io.EOF {
-					break
-				}
 				return err
 			}
 
-			if entry == nil {
-				break
+			if t1 == nil || t2 == nil {
+				return fmt.Errorf("could not find type '%s' in either file", viper.GetString("kernel.dwarf.type"))
 			}
 
-			// if entry.Tag == dwf.TagSubprogram {
-			// 	lr, _ := df.LineReader(entry)
-			// 	fmt.Println(lr)
-			// }
+			dmp := diffmatchpatch.New()
 
-			// if typ, err := df.Type(entry.Offset); err == nil {
-			// 	if fn, ok := typ.(*dwf.FuncType); ok {
-			// 		fmt.Println(fn)
-			// 	}
-			// }
-
-			// Check if this entry is a function
-			// if entry.Tag == dwf.TagSubprogram {
-
-			// 	// Go through fields
-			// 	for _, field := range entry.Field {
-
-			// 		if field.Attr == dwf.AttrName {
-			// 			fmt.Println(field.Val.(string))
-			// 		}
-			// 	}
-			// }
-
-			if entry.Tag == dwf.TagStructType {
-				typ, err := df.Type(entry.Offset)
-				if err != nil {
-					return err
-				}
-				t1 := typ.(*dwf.StructType)
-				if strings.EqualFold(t1.StructName, "thread") {
-					if !t1.Incomplete {
-						fmt.Println(t1.Defn())
-					}
-				}
-				// // Go through fields
-				// for _, field := range entry.Field {
-
-				// 	if field.Attr == dwf.AttrName {
-				// 		if field.Val.(string) == "thread_t" {
-				// 			fmt.Println(field.Val.(string))
-				// 		}
-				// 		fmt.Println(field.Val.(string))
-				// 	}
-				// }
+			diffs := dmp.DiffMain(t1.Defn(), t2.Defn(), false)
+			if len(diffs) > 2 {
+				diffs = dmp.DiffCleanupSemantic(diffs)
+				diffs = dmp.DiffCleanupEfficiency(diffs)
 			}
-
+			if len(diffs) == 1 {
+				if diffs[0].Type == diffmatchpatch.DiffEqual {
+					log.Info("No differences found")
+				}
+			} else {
+				log.Info("Differences found")
+				fmt.Println(dmp.DiffPrettyText(diffs))
+			}
 		}
 
 		return nil
