@@ -33,7 +33,7 @@ require (
 	github.com/spf13/viper v1.12.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/unicorn-engine/unicorn v0.0.0-20220707154909-6c1cbef6ac50
-	github.com/vbauerster/mpb/v7 v7.4.2
+	github.com/vbauerster/mpb/v7 v7.5.0
 	golang.org/x/crypto v0.0.0-20220817201139-bc19a97f63c8
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234
 	golang.org/x/oauth2 v0.0.0-20220808172628-8227340efae7
