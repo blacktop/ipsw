@@ -38,6 +38,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         name: install-unicorn
         run: |
+          cd /tmp
           git clone https://github.com/unicorn-engine/unicorn.git
           cd unicorn
           mkdir build; cd build
