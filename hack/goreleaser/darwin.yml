@@ -7,7 +7,7 @@ before:
     - ./hack/make/manpages
 
 builds:
-  - id: darwin_extras
+  - id: darwin_extras_build
     main: ./cmd/ipsw
     binary: ipsw
     env:
@@ -27,9 +27,9 @@ builds:
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 
 archives:
-  - id : darwin_extras
+  - id : darwin_extras_archive
     builds:
-      - darwin_extras
+      - darwin_extras_build
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
     replacements:
       darwin: macOS
