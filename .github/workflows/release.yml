@@ -44,7 +44,7 @@ jobs:
           # cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-aarch64-linux-gnu -DUNICORN_ARCH=aarch64
           cmake .. -DCMAKE_BUILD_TYPE=Release -DUNICORN_ARCH=aarch64
           make
-          make install
+          sudo make install
       -
         if: matrix.platform == 'ubuntu-latest'
         name: setup-snapcraft
