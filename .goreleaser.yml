@@ -24,7 +24,7 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - id: darwin_extras
+  - id: extras
     main: ./cmd/ipsw
     binary: ipsw
     env:
@@ -81,11 +81,11 @@ archives:
     wrap_in_directory: true
 
 brews:
-  - tap:
+  - ids:
+    - darwin
+    tap:
       owner: blacktop
       name: homebrew-tap
-    ids:
-        - darwin_extras
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "iOS/macOS Research Swiss Army Knife"
