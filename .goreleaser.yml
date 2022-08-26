@@ -64,21 +64,28 @@ builds:
 universal_binaries:
   - ids:
     - darwin_build
-    replace: true
+    replace: false
 
 archives:
   - id : darwin_archive
     builds:
       - darwin_build
-      - darwin_ios_build
     replacements:
       darwin: macOS
-      ios: iOS
       amd64: x86_64
       all: universal
-    format_overrides:
-      - goos: windows
-        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+    allow_different_binary_count: true
+  - id : ios_archive
+    builds:
+      - darwin_ios_build
+    replacements:
+      ios: iOS
     files:
       - README.md
       - LICENSE
