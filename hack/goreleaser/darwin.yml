@@ -2,20 +2,25 @@
 # Make sure to check the documentation at http://goreleaser.com
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
+    - ./hack/make/completions
+    - ./hack/make/manpages
 
 builds:
-  - main: ./cmd/disass
-    binary: disass
+  - id: darwin_extras
+    main: ./cmd/ipsw
+    binary: ipsw
     env:
       - CGO_ENABLED=1
-      - SDKROOT=/Applications/Xcode_12.4.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX11.1.sdk # needed for Github Action CI/CD
+      - CGO_LDFLAGS=-L/opt/homebrew/lib
+      - CGO_CFLAGS=-I/opt/homebrew/include
     goos:
       - darwin
     goarch:
       - amd64
-      - arm64
+    tags:
+      - libusb
+      - unicorn
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -24,24 +29,18 @@ builds:
 archives:
   - replacements:
       darwin: macOS
+      ios: iOS
       amd64: x86_64
-    name_template: "disass_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+      all: universal
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
 
 checksum:
   name_template: 'checksums.darwin.txt'
-
-snapshot:
-  name_template: "{{ .Tag }}-next"
-
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
-      - "^bumping"
-      - "^Update"
-      - "reorg"
-      - "updates"
-      - Merge pull request
-      - Merge branch

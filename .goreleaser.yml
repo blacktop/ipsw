@@ -34,7 +34,7 @@ builds:
     goos:
       - darwin
     goarch:
-      - amd64
+      # - amd64
       - arm64
     tags:
       - libusb
