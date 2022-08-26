@@ -52,6 +52,7 @@ type Sandbox struct {
 	Policies         []uint16
 	sbProtoboxData   []byte
 	Globals          []string
+	Extensions       []string
 	Regexes          []*Regex
 	OpNodes          []Operation
 	config           Config
@@ -100,7 +101,7 @@ type header16 struct {
 	OpNodeCount    uint16
 	OpCount        uint8
 	GlobalVarCount uint8
-	Unknown1       uint8
+	StateFlags     uint8
 	Unknown2       uint8
 	ProfileCount   uint16
 	RegexItemCount uint16
@@ -708,20 +709,21 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		utils.Indent(log.Debug, 3)(sb.Globals[idx])
 	}
 
-	// utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing unknown NEW iOS16 variables (%d)", sb.Hdr.Unknown))
-	// for idx, uoff := range unknownVarOffsets {
-	// 	r.Seek(sb.baseOffset+int64(uoff)*8, io.SeekStart)
-	// 	var size uint16
-	// 	if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-	// 		return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable size: %v", err)
-	// 	}
-	// 	udat := make([]byte, size)
-	// 	if err := binary.Read(r, binary.LittleEndian, &udat); err != nil {
-	// 		return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable data: %v", err)
-	// 	}
-	// 	sb.Entitlements = append(sb.Entitlements, strings.Trim(string(udat[:]), "\x00"))
-	// 	utils.Indent(log.Debug, 3)(sb.Entitlements[idx])
-	// }
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing unknown NEW iOS16 variables (%d)", sb.Hdr.Unknown))
+	for idx, uoff := range sb.Entitlements {
+		r.Seek(sb.baseOffset+int64(uoff)*8, io.SeekStart)
+		// r.Seek(sb.baseOffset+int64(uoff), io.SeekStart)
+		var size uint16
+		if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable size: %v", err)
+		}
+		udat := make([]byte, size)
+		if err := binary.Read(r, binary.LittleEndian, &udat); err != nil {
+			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable data: %v", err)
+		}
+		sb.Extensions = append(sb.Extensions, strings.Trim(string(udat[:]), "\x00"))
+		utils.Indent(log.Debug, 3)(sb.Extensions[idx])
+	}
 
 	return nil
 }
@@ -755,7 +757,7 @@ func (sb *Sandbox) GetStringAtOffset(offset uint32) (string, error) {
 	}
 
 	if size > 0x1000 {
-		return "", fmt.Errorf("string is WAY to long (probably wrong type)")
+		return "", fmt.Errorf("string is WAY too long (probably wrong type)")
 	}
 
 	name := make([]byte, size)
@@ -1116,7 +1118,7 @@ func (sb *Sandbox) parseHdr(hdr any) error {
 		sb.Hdr.ProfileCount = v.ProfileCount
 		sb.Hdr.RegexItemCount = v.RegexItemCount
 		sb.Hdr.PolicyCount = v.PolicyCount
-		sb.Hdr.Unknown = v.Unknown1
+		sb.Hdr.Unknown = v.StateFlags
 		sb.Hdr.Unknown2 = v.Unknown3
 	default:
 		return fmt.Errorf("unknown profile header type: %T", v)

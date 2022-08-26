@@ -170,13 +170,13 @@ var sbdecCmd = &cobra.Command{
 					continue
 				}
 				fmt.Println(sb.OpNodes[op].String(sb.Operations[idx], 0))
-				if sb.OpNodes[op].Match > 0 {
+				if sb.OpNodes[op].Match.Node > 0 {
 					if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].MatchOffset]); err != nil {
 						log.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[op].Match, err)
 					}
 					fmt.Println("MATCH:", sb.OpNodes[sb.OpNodes[op].MatchOffset].String(sb.Operations[idx], 1))
 				}
-				if sb.OpNodes[op].Unmatch > 0 {
+				if sb.OpNodes[op].Unmatch.Node > 0 {
 					if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].UnmatchOffset]); err != nil {
 						log.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[op].Unmatch, err)
 					}
@@ -321,11 +321,11 @@ var sbdecCmd = &cobra.Command{
 				}
 				fmt.Println(prof)
 
-				defaultOp := sandbox.TerminalNode(sb.OpNodes[prof.Operands[0]].Node)
+				defaultOp := sb.OpNodes[prof.Operands[0]]
 
 				for idx, op := range prof.Operands {
 					if sb.Operations[idx] != "default" && sb.OpNodes[op].Node.IsTerminal() {
-						if sandbox.TerminalNode(sb.OpNodes[op].Node).Decision() == defaultOp.Decision() {
+						if sb.OpNodes[op].Allow == defaultOp.Allow {
 							continue
 						}
 					}
@@ -334,16 +334,19 @@ var sbdecCmd = &cobra.Command{
 						log.Errorf("failed to parse operation %s for node %s: %s", sb.Operations[idx], sb.OpNodes[op], err)
 						continue
 					}
+					// if err := sb.CreateOperationGraph(&sb.OpNodes[op], &defaultOp); err != nil {
+					// 	return err
+					// }
 					fmt.Println(sb.OpNodes[op].String(sb.Operations[idx], 0))
-					if sb.OpNodes[op].Match > 0 {
+					if sb.OpNodes[op].MatchOffset > 0 {
 						if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].MatchOffset]); err != nil {
-							log.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[op].Match, err)
+							log.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[op].Match.Node, err)
 						}
 						fmt.Println("MATCH:", sb.OpNodes[sb.OpNodes[op].MatchOffset].String(sb.Operations[idx], 1))
 					}
-					if sb.OpNodes[op].Unmatch > 0 {
+					if sb.OpNodes[op].UnmatchOffset > 0 {
 						if err := sb.ParseOperation(&sb.OpNodes[sb.OpNodes[op].UnmatchOffset]); err != nil {
-							log.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[op].Unmatch, err)
+							log.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[op].Unmatch.Node, err)
 						}
 						fmt.Println("UNMATCH:", sb.OpNodes[sb.OpNodes[op].UnmatchOffset].String(sb.Operations[idx], 1))
 					}

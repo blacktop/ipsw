@@ -152,96 +152,6 @@ func (n NonTerminalNode) String() string {
 		uint64(n))
 }
 
-// FIXME: turn this into an acyclic graph
-type Operation struct {
-	Argument      any
-	Filter        *FilterInfo
-	Modiers       []ModifierInfo
-	Node          OperationNode
-	Match         OperationNode
-	Unmatch       OperationNode
-	UnmatchOffset uint16
-	MatchOffset   uint16
-	Terminal      bool
-	Allow         bool
-	parsed        bool
-}
-
-// type OpVertex struct {
-// 	Filter   *FilterInfo
-// 	Match    *OpVertex
-// 	Unmatch  *OpVertex
-// 	Name     string
-// 	Type     string
-// 	Decision string
-// 	Node     OperationNode
-// }
-
-// func (sb *Sandbox) CreateOperationGraph(name string, op OperationNode) (*OpVertex, error) {
-// 	var err error
-
-// 	ov := &OpVertex{
-// 		Name: name,
-// 		Node: op,
-// 	}
-
-// 	switch op.Type() {
-// 	case OPERATION_NODE_TYPE_NON_TERMINAL:
-// 		ov.Type = "NON_TERMINAL"
-// 		node := NonTerminalNode(op)
-// 		ov.Filter, err = sb.db.GetFilter(node.FilterID())
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to get filter for ID %d: %v", node.FilterID(), err)
-// 		}
-// 		ov.Match, err = sb.CreateOperationGraph(name, sb.OpNodes[node.Match])
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to create vertex for match offset %#x: %v", node.MatchOffset(), err)
-// 		}
-// 		ov.Unmatch, err = sb.CreateOperationGraph(name, sb.OpNodes[node.UnmatchOffset()])
-// 		if err != nil {
-// 			return nil, fmt.Errorf("failed to create vertex for unmatch offset %#x: %v", node.UnmatchOffset(), err)
-// 		}
-// 	case OPERATION_NODE_TYPE_TERMINAL:
-// 		ov.Type = "TERMINAL"
-// 		node := TerminalNode(op)
-// 		ov.Decision = node.Decision()
-// 	}
-
-// 	return ov, nil
-// }
-
-// func (o *OpVertex) Depth() int {
-// 	if o == nil {
-// 		return 0
-// 	}
-// 	if o.Match == nil && o.Unmatch == nil {
-// 		return 1
-// 	}
-// 	lHeight := o.Match.Depth()
-// 	rHeight := o.Unmatch.Depth()
-// 	if lHeight >= rHeight {
-// 		return lHeight + 1
-// 	} else {
-// 		return rHeight + 1
-// 	}
-// }
-
-// func (o *OpVertex) String(indent int) string {
-// 	var out string
-// 	if o.Node.IsTerminal() {
-// 		node := TerminalNode(o.Node)
-// 		out = fmt.Sprintf("(%s %s", node.Decision(), o.Name)
-// 		if o.Match == nil && o.Unmatch == nil {
-// 			out += ")"
-// 		}
-// 	} else {
-// 		out = fmt.Sprintf("(%s %s arg=%#x)", o.Name, o.Filter.Name, NonTerminalNode(o.Node).ArgumentID())
-// 		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(indent+1))
-// 		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String(indent+1))
-// 	}
-// 	return out
-// }
-
 func (sb *Sandbox) ParseOperation(op *Operation) (err error) {
 	if op.parsed {
 		return nil
@@ -252,15 +162,24 @@ func (sb *Sandbox) ParseOperation(op *Operation) (err error) {
 	switch op.Node.Type() {
 	case OPERATION_NODE_TYPE_NON_TERMINAL:
 		node := NonTerminalNode(op.Node)
-		op.Match = sb.OpNodes[op.MatchOffset].Node
-		op.Unmatch = sb.OpNodes[op.UnmatchOffset].Node
+		op.Match = &Operation{
+			Node:          sb.OpNodes[op.MatchOffset].Node,
+			MatchOffset:   NonTerminalNode(sb.OpNodes[op.MatchOffset].Node).MatchOffset(),
+			UnmatchOffset: NonTerminalNode(sb.OpNodes[op.UnmatchOffset].Node).UnmatchOffset(),
+		}
+		op.Unmatch = &Operation{
+			Node:          sb.OpNodes[op.UnmatchOffset].Node,
+			MatchOffset:   NonTerminalNode(sb.OpNodes[op.MatchOffset].Node).MatchOffset(),
+			UnmatchOffset: NonTerminalNode(sb.OpNodes[op.UnmatchOffset].Node).UnmatchOffset(),
+		}
 		op.Filter, err = sb.db.GetFilter(node.FilterID())
 		if err != nil {
 			return fmt.Errorf("failed to get filter for ID %d: %v", node.FilterID(), err)
 		}
 		op.Argument, err = op.Filter.GetArgument(sb, node.ArgumentID(), node.AltArgument())
 		if err != nil {
-			return fmt.Errorf("failed to get argument for ID %d: %v", node.ArgumentID(), err)
+			// return fmt.Errorf("failed to get argument for ID %d: %v", node.ArgumentID(), err)
+			log.Errorf("failed to get filter %s argument for ID %d: %v", op.Filter.Name, node.ArgumentID(), err)
 		}
 		switch v := op.Argument.(type) {
 		default:
@@ -284,6 +203,7 @@ func (sb *Sandbox) ParseOperation(op *Operation) (err error) {
 		op.parsed = true
 	case OPERATION_NODE_TYPE_TERMINAL:
 		node := TerminalNode(op.Node)
+		op.Terminal = true
 		op.Allow = node.IsAllow()
 		// var mods []ModifierInfo
 		// if node.ActionInline() {
@@ -348,54 +268,93 @@ func dedup(args []string) []string {
 	return ret
 }
 
-func (o *Operation) IsNonTerminalDeny() bool {
-	if o.Match.Type() == OPERATION_NODE_TYPE_NON_TERMINAL &&
-		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
-		return TerminalNode(o.Unmatch).IsDeny()
+type opType uint8
+
+const (
+	Normal opType = iota
+	Start
+	Final
+)
+
+// FIXME: turn this into an acyclic graph
+type Operation struct {
+	Argument      any
+	Filter        *FilterInfo
+	Modiers       []ModifierInfo
+	Node          OperationNode
+	Match         *Operation
+	Unmatch       *Operation
+	UnmatchOffset uint16
+	MatchOffset   uint16
+	Terminal      bool
+	Allow         bool
+	not           bool
+	Type          opType
+	parsed        bool
+	List          []*Operation
+}
+
+func (o *Operation) Depth() int {
+	if o == nil {
+		return 0
 	}
-	return false // TODO: should this error?
+	if o.Match == nil && o.Unmatch == nil {
+		return 1
+	}
+	lHeight := o.Match.Depth()
+	rHeight := o.Unmatch.Depth()
+	if lHeight >= rHeight {
+		return lHeight + 1
+	} else {
+		return rHeight + 1
+	}
+}
+
+func (o *Operation) IsNonTerminalDeny() bool {
+	if !o.Match.Terminal && o.Unmatch.Terminal {
+		return !o.Unmatch.Allow
+	}
+	return false
 }
 func (o *Operation) IsNonTerminalAllow() bool {
-	if o.Match.Type() == OPERATION_NODE_TYPE_NON_TERMINAL &&
-		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
-		return TerminalNode(o.Unmatch).IsAllow()
+	if !o.Match.Terminal && o.Unmatch.Terminal {
+		return o.Unmatch.Allow
 	}
-	return false // TODO: should this error?
+	return false
 }
 func (o *Operation) IsNonTerminalNonTerminal() bool {
-	return o.Match.Type() == OPERATION_NODE_TYPE_NON_TERMINAL && o.Unmatch.Type() == OPERATION_NODE_TYPE_NON_TERMINAL
+	return !o.Match.Terminal && !o.Unmatch.Terminal
 }
 func (o *Operation) IsAllowNonTerminal() bool {
-	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
-		o.Unmatch.Type() == OPERATION_NODE_TYPE_NON_TERMINAL {
-		return TerminalNode(o.Match).IsAllow()
+	if o.Match.Terminal && !o.Unmatch.Terminal {
+		return o.Match.Allow
 	}
-	return false // TODO: should this error?
+	return false
 }
 func (o *Operation) IsDenyNonTerminal() bool {
-	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
-		o.Unmatch.Type() == OPERATION_NODE_TYPE_NON_TERMINAL {
-		return TerminalNode(o.Match).IsDeny()
+	if o.Match.Terminal && !o.Unmatch.Terminal {
+		return !o.Match.Allow
 	}
-	return false // TODO: should this error?
+	return false
 }
 func (o *Operation) IsDenyAllow() bool {
-	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
-		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
-		return TerminalNode(o.Match).IsDeny() && TerminalNode(o.Unmatch).IsAllow()
+	if o.Match.Terminal && o.Unmatch.Terminal {
+		return !o.Match.Allow && o.Unmatch.Allow
 	}
-	return false // TODO: should this error?
+	return false
 }
 func (o *Operation) IsAllowDeny() bool {
-	if o.Match.Type() == OPERATION_NODE_TYPE_TERMINAL &&
-		o.Unmatch.Type() == OPERATION_NODE_TYPE_TERMINAL {
-		return TerminalNode(o.Match).IsAllow() && TerminalNode(o.Unmatch).IsDeny()
+	if o.Match.Terminal && o.Unmatch.Terminal {
+		return o.Match.Allow && !o.Unmatch.Allow
 	}
-	return false // TODO: should this error?
+	return false
 }
 
 func (o *Operation) String(name string, indent int) string {
 	var out string
+	if o == nil {
+		return ""
+	}
 	if o.Node.IsTerminal() {
 		node := TerminalNode(o.Node)
 		out = fmt.Sprintf("(%s %s ", node.Decision(), name)
@@ -412,11 +371,19 @@ func (o *Operation) String(name string, indent int) string {
 			}
 		}
 	} else {
-		out = fmt.Sprintf("(%s %s %s)", name, o.Filter.Name, o.Argument)
-		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String())
-		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String())
-		// out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(indent+1))
-		// out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String(indent+1))
+		if o.Filter != nil {
+			out = fmt.Sprintf("(%s %s %s)", name, o.Filter.Name, o.Argument)
+		} else {
+			out = fmt.Sprintf("(%s %s)", name, o.Argument)
+		}
+		// out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String())
+		// out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String())
+		out += fmt.Sprintf("\n\t%s  MATCH: %s", strings.Repeat("  ", indent), o.Match.String(name, indent+1))
+		out += fmt.Sprintf("\n\t%sUNMATCH: %s", strings.Repeat("  ", indent), o.Unmatch.String(name, indent+1))
 	}
 	return out
+}
+
+func (o *Operation) Graph() string {
+	return ""
 }
