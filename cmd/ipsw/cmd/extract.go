@@ -149,24 +149,22 @@ var extractCmd = &cobra.Command{
 				return fmt.Errorf("unable to download remote zip: %v", err)
 			}
 
+			if viper.GetBool("extract.kernel") {
+				log.Info("Extracting remote kernelcache")
+				if err = kernelcache.RemoteParse(zr, filepath.Clean(viper.GetString("extract.output"))); err != nil {
+					return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
+				}
+			}
+
 			i, err := info.ParseZipFiles(zr.File)
 			if err != nil {
 				return fmt.Errorf("failed to parse plists in remote zip: %v", err)
 			}
-
 			folder, err := i.GetFolder()
 			if err != nil {
 				log.Errorf("failed to get folder from remote zip metadata: %v", err)
 			}
 			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), folder)
-
-			if viper.GetBool("extract.kernel") {
-				log.Info("Extracting remote kernelcache")
-				err = kernelcache.RemoteParse(zr, destPath)
-				if err != nil {
-					return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
-				}
-			}
 
 			if viper.GetBool("extract.dyld") {
 				log.Info("Extracting remote dyld_shared_cache(s)")
