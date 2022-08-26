@@ -56,7 +56,13 @@ builds:
 
 archives:
   - replacements:
+      darwin: macOS
+      ios: iOS
       amd64: x86_64
+      all: universal
+    format_overrides:
+      - goos: windows
+        format: zip
     files:
       - README.md
       - LICENSE
