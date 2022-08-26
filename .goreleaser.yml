@@ -24,7 +24,7 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - id: extras
+  - id: darwin_extras
     main: ./cmd/ipsw
     binary: ipsw
     env:
