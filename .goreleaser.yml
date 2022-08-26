@@ -62,7 +62,7 @@ builds:
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 
 universal_binaries:
-  - replace: false
+  - replace: true
 
 archives:
   - id : darwin_archive
