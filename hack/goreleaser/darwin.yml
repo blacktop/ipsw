@@ -45,6 +45,3 @@ archives:
       - completions/*
       - manpages/*
     wrap_in_directory: true
-
-checksum:
-  name_template: 'checksums.darwin.txt'
