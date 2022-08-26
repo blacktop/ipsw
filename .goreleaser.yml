@@ -66,7 +66,29 @@ universal_binaries:
     replace: true
 
 archives:
-  - replacements:
+  - id : darwin
+    builds:
+      - darwin
+      - ios
+    replacements:
+      darwin: macOS
+      ios: iOS
+      amd64: x86_64
+      all: universal
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
+  - id : darwin_extras
+    builds:
+      - darwin_extras
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
+    replacements:
       darwin: macOS
       ios: iOS
       amd64: x86_64
