@@ -9,9 +9,6 @@ before:
 snapshot:
   name_template: '{{ incpatch .Version }}-next'
 
-gomod:
-  proxy: true
-
 builds:
   - id: darwin
     main: ./cmd/ipsw
