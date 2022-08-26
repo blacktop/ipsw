@@ -6,7 +6,8 @@ before:
     - go mod tidy
 
 builds:
-  - main: ./cmd/ipsw
+  - id: windows
+    main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
@@ -14,7 +15,7 @@ builds:
       - windows
     goarch:
       - amd64
-      # - arm64
+      - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -23,6 +24,7 @@ builds:
 archives:
   - replacements:
       darwin: macOS
+      ios: iOS
       amd64: x86_64
       all: universal
     format_overrides:
@@ -33,6 +35,7 @@ archives:
       - LICENSE
       - completions/*
       - manpages/*
+    wrap_in_directory: true
 
 checksum:
   name_template: 'checksums.win.txt'

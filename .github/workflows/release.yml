@@ -33,7 +33,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         name: linux-deps
         run: |
-          sudo apt-get -yq install gcc-aarch64-linux-gnu jq
+          sudo apt-get -yq install gcc-aarch64-linux-gnu jq unicorn libusb-1.0-0-dev
       -
         if: matrix.platform == 'ubuntu-latest'
         name: setup-snapcraft
@@ -66,11 +66,6 @@ jobs:
           path: dist/*
 
       -  # WINDOWS ################################################################
-        if: matrix.platform == 'windows-latest'
-        name: windows-deps
-        run: |
-          brew install libusb
-      -
         if: matrix.platform == 'windows-latest'
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
