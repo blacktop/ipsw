@@ -106,7 +106,7 @@ brews:
       owner: blacktop
       name: homebrew-tap
     ids:
-      - darwin_build
+      - darwin_archive
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "iOS/macOS Research Swiss Army Knife"
