@@ -41,7 +41,7 @@ jobs:
           git clone https://github.com/unicorn-engine/unicorn.git
           cd unicorn
           mkdir build; cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DUNICORN_ARCH=aarch64
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-arm-linux-gnueabihf -DUNICORN_ARCH=aarch64
           make
           make install
       -
