@@ -33,7 +33,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         name: linux-deps
         run: |
-          sudo apt-get -yq install gcc-aarch64-linux-gnu gcc-arm-linux-gnueabihf cmake pkg-config jq libusb-1.0-0-dev
+          sudo apt-get -yq install gcc-aarch64-linux-gnu cmake pkg-config jq libusb-1.0-0-dev
       -
         if: matrix.platform == 'ubuntu-latest'
         name: install-unicorn
@@ -41,7 +41,8 @@ jobs:
           git clone https://github.com/unicorn-engine/unicorn.git
           cd unicorn
           mkdir build; cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-arm-linux-gnueabihf -DUNICORN_ARCH=aarch64
+          # cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc-aarch64-linux-gnu -DUNICORN_ARCH=aarch64
+          cmake .. -DCMAKE_BUILD_TYPE=Release -DUNICORN_ARCH=aarch64
           make
           make install
       -
