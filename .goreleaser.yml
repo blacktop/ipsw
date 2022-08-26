@@ -85,6 +85,7 @@ archives:
       - completions/*
       - manpages/*
     wrap_in_directory: true
+    allow_different_binary_count: true
   - id : extras_archive
     builds:
       - darwin_extras_build
@@ -98,6 +99,7 @@ archives:
       - completions/*
       - manpages/*
     wrap_in_directory: true
+    allow_different_binary_count: true
 
 brews:
   - tap:
