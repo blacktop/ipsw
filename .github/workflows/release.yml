@@ -79,6 +79,11 @@ jobs:
 
       -  # WINDOWS ################################################################
         if: matrix.platform == 'windows-latest'
+        name: windows-deps
+        run: |
+          choco install zig
+      -
+        if: matrix.platform == 'windows-latest'
         name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
         with:
