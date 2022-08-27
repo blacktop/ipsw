@@ -207,7 +207,9 @@ brews:
       - name: bat
         type: optional
       - name: libusb
+        type: optional
       - name: unicorn
+        type: optional
     install: |
       bin.install "ipsw"
       bash_completion.install "completions/_bash" => "ipsw"
