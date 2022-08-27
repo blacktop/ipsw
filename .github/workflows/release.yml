@@ -82,6 +82,8 @@ jobs:
         name: windows-deps
         run: |
           choco install zig
+          dir C:\ProgramData\chocolatey\bin
+          dir C:\ProgramData\chocolatey\lib\zig\tools
       -
         if: matrix.platform == 'windows-latest'
         name: Run GoReleaser
