@@ -11,10 +11,16 @@ export LD="zig cc -target $1-linux-musl"
 
 cd /tmp
 
-git clone https://github.com/unicorn-engine/unicorn.git unicorn_$1
+if [ ! -d "unicorn_$1" ]; then
+    git clone https://github.com/unicorn-engine/unicorn.git unicorn_$1
+    cd unicorn_$1
+else
+    cd "unicorn_$1"
+    git fetch
+    git pull
+fi
 
-cd unicorn_$1
-
+rm -rf build
 mkdir build
 cd build
 

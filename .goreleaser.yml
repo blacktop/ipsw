@@ -63,6 +63,7 @@ builds:
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
+        - strip {{ .Path }}
   - id: darwin_arm64_extras_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -85,6 +86,7 @@ builds:
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
+        - strip {{ .Path }}
   - id: linux_amd64_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -124,6 +126,8 @@ builds:
       pre:
         - hack/make/libusb x86_64
         - hack/make/unicorn x86_64
+      post:
+        - strip {{ .Path }}
     main: ./cmd/ipsw
     binary: ipsw
     env:
@@ -146,6 +150,8 @@ builds:
       pre:
         - hack/make/libusb aarch64
         - hack/make/unicorn aarch64
+      post:
+        - strip {{ .Path }}
     main: ./cmd/ipsw
     binary: ipsw
     env:
@@ -279,6 +285,48 @@ nfpms:
     builds:
       - linux_amd64_build
       - linux_arm64_build
+    homepage:  https://github.com/blacktop/ipsw
+    description: |-
+      iOS/macOS Research Swiss Army Knife.
+    maintainer: Blacktop <https://github.com/blacktop>
+    license: MIT
+    vendor: Blacktop
+    bindir: /usr/bin
+    section: utils
+    contents:
+      - src: ./completions/_bash
+        dst: /usr/share/bash-completion/completions/ipsw
+        file_info:
+          mode: 0644
+      - src: ./completions/_fish
+        dst: /usr/share/fish/completions/ipsw.fish
+        file_info:
+          mode: 0644
+      - src: ./completions/_zsh
+        dst:  /usr/share/zsh/vendor-completions/_ipsw
+        file_info:
+          mode: 0644
+      - src: ./manpages/ipsw.1.gz
+        dst: /usr/share/man/man1/ipsw.1.gz
+        file_info:
+          mode: 0644
+      - src: ./LICENSE
+        dst: /usr/share/doc/ipsw/copyright
+        file_info:
+          mode: 0644
+    replacements:
+      amd64: x86_64
+    formats:
+    - apk
+    - deb
+    - rpm
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
+        - changelog-file-missing-in-native-package
+  - id: packages_extras
+    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
+    builds:
       - linux_amd64_extras_build
       - linux_arm64_extras_build
     homepage:  https://github.com/blacktop/ipsw
@@ -323,26 +371,12 @@ nfpms:
 
 snapcrafts:
   - id: snaps
-    name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-    builds:
-      - linux_amd64_build
-      - linux_arm64_build
-    summary: iOS/macOS Research Swiss Army Knife.
-    description: |
-      iOS/macOS Research Swiss Army Knife.
-    grade: stable
-    confinement: strict
-    publish: true
-    license: MIT
-  - id: snaps_extras
-    name: ipsw-extras
-    name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}_extras_{{ end }}'
     builds:
       - linux_amd64_extras_build
       - linux_arm64_extras_build
-    summary: iOS/macOS Research Swiss Army Knife w/ Extras.
+    summary: iOS/macOS Research Swiss Army Knife.
     description: |
-      iOS/macOS Research Swiss Army Knife w/ Extras.
+      iOS/macOS Research Swiss Army Knife.
     grade: stable
     confinement: strict
     publish: true

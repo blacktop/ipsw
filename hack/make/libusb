@@ -19,7 +19,7 @@ wget -N https://github.com/libusb/libusb/releases/download/v$LIBUSB_VERSION/libu
 mkdir libusb_$1
 tar -xf libusb-$LIBUSB_VERSION.tar.bz2 --strip-components=1 -C /tmp/libusb_$1
 
-cd libusb
+cd libusb_$1
 
 ./configure --host=$1-linux-musl --disable-shared --enable-static -disable-udev
 make -j$(sysctl -n hw.ncpu)
