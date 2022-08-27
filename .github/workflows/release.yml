@@ -112,7 +112,8 @@ jobs:
         if: matrix.platform == 'macos-12'
         name: macos-deps
         run: |
-          brew install libusb unicorn
+          brew tap anchore/syft
+          brew install libusb unicorn syft
           # arch -arch arm64 brew install libusb unicorn
           # arch -arch x86_64 brew install libusb unicorn
       -
