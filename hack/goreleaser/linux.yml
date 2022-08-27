@@ -41,7 +41,7 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CGO_LDFLAGS=-L/usr/local/lib -static
+      - CGO_LDFLAGS=-L/usr/local/lib -ludev -static
       - CGO_CFLAGS=-I/usr/local/include
     goos:
       - linux

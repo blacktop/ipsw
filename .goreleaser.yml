@@ -119,6 +119,50 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: linux_amd64_extras_build
+    hooks:
+      pre:
+        - hack/make/libusb x86_64
+        - hack/make/unicorn x86_64
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-linux-musl
+      - CC=zig c++ -target x86_64-linux-musl
+      - PKG_CONFIG_PATH=/tmp/install/usr/lib/pkgconfig
+    tags:
+      - extended
+    goos:
+      - linux
+    goarch:
+      - amd64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: linux_arm64_extras_build
+    hooks:
+      pre:
+        - hack/make/libusb aarch64
+        - hack/make/unicorn aarch64
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-linux-musl
+      - CC=zig c++ -target aarch64-linux-musl
+      - PKG_CONFIG_PATH=/tmp/install/usr/lib/pkgconfig
+    tags:
+      - extended
+    goos:
+      - linux
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
   - id: windows_amd64_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -182,6 +226,8 @@ archives:
     builds:
       - darwin_amd64_extras_build
       - darwin_arm64_extras_build
+      - linux_amd64_extras_build
+      - linux_arm64_extras_build
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
     replacements:
       darwin: macOS
@@ -233,6 +279,8 @@ nfpms:
     builds:
       - linux_amd64_build
       - linux_arm64_build
+      - linux_amd64_extras_build
+      - linux_arm64_extras_build
     homepage:  https://github.com/blacktop/ipsw
     description: |-
       iOS/macOS Research Swiss Army Knife.
@@ -282,6 +330,19 @@ snapcrafts:
     summary: iOS/macOS Research Swiss Army Knife.
     description: |
       iOS/macOS Research Swiss Army Knife.
+    grade: stable
+    confinement: strict
+    publish: true
+    license: MIT
+  - id: snaps_extras
+    name: ipsw-extras
+    name_template: '{{ .ProjectName }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}_extras_{{ end }}'
+    builds:
+      - linux_amd64_extras_build
+      - linux_arm64_extras_build
+    summary: iOS/macOS Research Swiss Army Knife w/ Extras.
+    description: |
+      iOS/macOS Research Swiss Army Knife w/ Extras.
     grade: stable
     confinement: strict
     publish: true
