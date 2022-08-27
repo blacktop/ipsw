@@ -11,10 +11,6 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC="zig.exe cc -target x86_64-windows-gnu"
-      - CC="zig.exe c++ -target x86_64-windows-gnu"
-    tags:
-      - extended
     goos:
       - windows
     goarch:
@@ -28,8 +24,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC="zig.exe cc -target aarch64-windows-gnu"
-      - CC="zig.exe c++ -target aarch64-windows-gnu"
+      - CC="C:\ProgramData\chocolatey\lib\zig\tools\zig.exe cc -target aarch64-windows-gnu"
+      - CC="C:\ProgramData\chocolatey\lib\zig\tools\zig.exe c++ -target aarch64-windows-gnu"
     tags:
       - extended
     goos:
