@@ -283,7 +283,7 @@ aurs:
     maintainers:
       - 'Blacktop <https://github.com/blacktop>'
     license: MIT
-    private_key: ~/.ssh/aur
+    private_key: /Users/blacktop/.ssh/aur
     git_url: 'ssh://aur@aur.archlinux.org/ipsw.git'
     package: |-
       # bin

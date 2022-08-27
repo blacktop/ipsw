@@ -1,7 +1,7 @@
 ####################################################
 # GOLANG BUILDER
 ####################################################
-FROM golang:1.19.0 as builder
+FROM golang:1.19 as builder
 
 ARG VERSION
 
