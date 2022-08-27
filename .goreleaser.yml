@@ -63,7 +63,7 @@ builds:
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
-        - llvm-strip {{ .Path }}
+        - /opt/homebrew/opt/llvm/bin/llvm-strip {{ .Path }}
   - id: darwin_arm64_extras_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -86,7 +86,7 @@ builds:
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
-        - llvm-strip {{ .Path }}
+        - /opt/homebrew/opt/llvm/bin/llvm-strip {{ .Path }}
   - id: linux_amd64_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -127,7 +127,7 @@ builds:
         - hack/make/libusb x86_64
         - hack/make/unicorn x86_64
       post:
-        - llvm-strip {{ .Path }}
+        - /opt/homebrew/opt/llvm/bin/llvm-strip {{ .Path }}
     main: ./cmd/ipsw
     binary: ipsw
     env:
@@ -151,7 +151,7 @@ builds:
         - hack/make/libusb aarch64
         - hack/make/unicorn aarch64
       post:
-        - llvm-strip {{ .Path }}
+        - /opt/homebrew/opt/llvm/bin/llvm-strip {{ .Path }}
     main: ./cmd/ipsw
     binary: ipsw
     env:
