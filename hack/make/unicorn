@@ -11,13 +11,13 @@ export LD="zig cc -target $1-linux-musl"
 
 cd /tmp
 
-git clone https://github.com/unicorn-engine/unicorn.git
+git clone https://github.com/unicorn-engine/unicorn.git unicorn_$1
 
-cd unicorn
+cd unicorn_$1
 
 mkdir build
 cd build
 
 cmake .. -DCMAKE_BUILD_TYPE=Release -DUNICORN_ARCH=aarch64
 make -j$(sysctl -n hw.ncpu)
-make -j$(sysctl -n hw.ncpu) install DESTDIR=/tmp/install
+make -j$(sysctl -n hw.ncpu) install DESTDIR=/tmp/install_$1

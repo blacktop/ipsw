@@ -130,7 +130,7 @@ builds:
       - CGO_ENABLED=1
       - CC=zig cc -target x86_64-linux-musl
       - CC=zig c++ -target x86_64-linux-musl
-      - PKG_CONFIG_PATH=/tmp/install/usr/lib/pkgconfig
+      - PKG_CONFIG_PATH=/tmp/install_x86_64/usr/lib/pkgconfig
     tags:
       - extended
     goos:
@@ -152,7 +152,7 @@ builds:
       - CGO_ENABLED=1
       - CC=zig cc -target aarch64-linux-musl
       - CC=zig c++ -target aarch64-linux-musl
-      - PKG_CONFIG_PATH=/tmp/install/usr/lib/pkgconfig
+      - PKG_CONFIG_PATH=/tmp/install_aarch64/usr/lib/pkgconfig
     tags:
       - extended
     goos:

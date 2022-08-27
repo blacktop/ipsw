@@ -6,7 +6,7 @@ if [[ $# -eq 0 ]]; then
     exit 1
 fi
 
-rm -rf /tmp/libusb
+rm -rf /tmp/libusb_$1
 
 LIBUSB_VERSION=1.0.26
 
@@ -16,11 +16,11 @@ export LD="zig cc -target $1-linux-musl"
 cd /tmp
 
 wget -N https://github.com/libusb/libusb/releases/download/v$LIBUSB_VERSION/libusb-$LIBUSB_VERSION.tar.bz2
-mkdir libusb
-tar -xf libusb-$LIBUSB_VERSION.tar.bz2 --strip-components=1 -C /tmp/libusb
+mkdir libusb_$1
+tar -xf libusb-$LIBUSB_VERSION.tar.bz2 --strip-components=1 -C /tmp/libusb_$1
 
 cd libusb
 
 ./configure --host=$1-linux-musl --disable-shared --enable-static -disable-udev
 make -j$(sysctl -n hw.ncpu)
-make -j$(sysctl -n hw.ncpu) install DESTDIR=/tmp/install
+make -j$(sysctl -n hw.ncpu) install DESTDIR=/tmp/install_$1
