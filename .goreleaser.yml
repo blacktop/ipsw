@@ -284,7 +284,7 @@ aurs:
       - 'Blacktop <https://github.com/blacktop>'
     license: MIT
     private_key: /Users/blacktop/.ssh/aur
-    git_url: 'ssh://aur@aur.archlinux.org/ipsw.git'
+    git_url: 'ssh://aur@aur.archlinux.org/ipsw-bin.git'
     package: |-
       # bin
       install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
