@@ -11,7 +11,8 @@ jobs:
   goreleaser:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest, macos-12]
+        # platform: [ubuntu-latest, windows-latest, macos-12]
+        platform: [ubuntu-latest]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -46,19 +47,19 @@ jobs:
           cmake .. -DCMAKE_BUILD_TYPE=Release -DUNICORN_ARCH=aarch64
           make
           sudo make install
-      -
-        if: matrix.platform == 'ubuntu-latest'
-        name: setup-snapcraft
-        # FIXME: the mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715
-        run: |
-          sudo apt-get update
-          sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
-          mkdir -p $HOME/.cache/snapcraft/download
-          mkdir -p $HOME/.cache/snapcraft/stage-packages
-      -
-        name: snapcraft-login
-        if: matrix.platform == 'ubuntu-latest'
-        run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
+      # -
+      #   if: matrix.platform == 'ubuntu-latest'
+      #   name: setup-snapcraft
+      #   # FIXME: the mkdirs are a hack for https://github.com/goreleaser/goreleaser/issues/1715
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get -yq --no-install-suggests --no-install-recommends install snapcraft
+      #     mkdir -p $HOME/.cache/snapcraft/download
+      #     mkdir -p $HOME/.cache/snapcraft/stage-packages
+      # -
+      #   name: snapcraft-login
+      #   if: matrix.platform == 'ubuntu-latest'
+      #   run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
       -
         if: matrix.platform == 'ubuntu-latest'
         name: Run GoReleaser
@@ -77,62 +78,62 @@ jobs:
           name: ipsw_linux
           path: dist/*
 
-      -  # WINDOWS ################################################################
-        if: matrix.platform == 'windows-latest'
-        name: windows-deps
-        run: |
-          choco install zig
-          dir C:\ProgramData\chocolatey\bin
-          dir C:\ProgramData\chocolatey\lib\zig\tools
-      -
-        if: matrix.platform == 'windows-latest'
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --rm-dist -f hack/goreleaser/windows.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
-      -
-        if: matrix.platform == 'ubuntu-latest'
-        name: Upload assets
-        uses: actions/upload-artifact@v3
-        with:
-          name: disass_linux
-          path: dist/*
-      -
-        if: matrix.platform == 'windows-latest'
-        name: Upload assets
-        uses: actions/upload-artifact@v3
-        with:
-          name: ipsw_windows
-          path: dist/*
+      # -  # WINDOWS ################################################################
+      #   if: matrix.platform == 'windows-latest'
+      #   name: windows-deps
+      #   run: |
+      #     choco install zig
+      #     dir C:\ProgramData\chocolatey\bin
+      #     dir C:\ProgramData\chocolatey\lib\zig\tools
+      # -
+      #   if: matrix.platform == 'windows-latest'
+      #   name: Run GoReleaser
+      #   uses: goreleaser/goreleaser-action@v3
+      #   with:
+      #     distribution: goreleaser
+      #     version: latest
+      #     args: release --rm-dist -f hack/goreleaser/windows.yml
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
+      # -
+      #   if: matrix.platform == 'ubuntu-latest'
+      #   name: Upload assets
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: disass_linux
+      #     path: dist/*
+      # -
+      #   if: matrix.platform == 'windows-latest'
+      #   name: Upload assets
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: ipsw_windows
+      #     path: dist/*
 
-      -  # MACOS ################################################################
-        if: matrix.platform == 'macos-12'
-        name: macos-deps
-        run: |
-          brew tap anchore/syft
-          brew install libusb unicorn syft
-          # arch -arch arm64 brew install libusb unicorn
-          # arch -arch x86_64 brew install libusb unicorn
-      -
-        if: matrix.platform == 'macos-12'
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --rm-dist -f hack/goreleaser/darwin.yml
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
-      -
-        if: matrix.platform == 'macos-12'
-        name: Upload assets
-        uses: actions/upload-artifact@v3
-        with:
-          name: ipsw_macos
-          path: dist/*
+      # -  # MACOS ################################################################
+      #   if: matrix.platform == 'macos-12'
+      #   name: macos-deps
+      #   run: |
+      #     brew tap anchore/syft
+      #     brew install libusb unicorn syft
+      #     # arch -arch arm64 brew install libusb unicorn
+      #     # arch -arch x86_64 brew install libusb unicorn
+      # -
+      #   if: matrix.platform == 'macos-12'
+      #   name: Run GoReleaser
+      #   uses: goreleaser/goreleaser-action@v3
+      #   with:
+      #     distribution: goreleaser
+      #     version: latest
+      #     args: release --rm-dist -f hack/goreleaser/darwin.yml
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
+      # -
+      #   if: matrix.platform == 'macos-12'
+      #   name: Upload assets
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: ipsw_macos
+      #     path: dist/*
