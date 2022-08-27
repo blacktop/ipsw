@@ -46,13 +46,13 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CGO_LDFLAGS=-L/opt/homebrew/lib
-      - CGO_CFLAGS=-I/opt/homebrew/include
+      - CGO_LDFLAGS=-L/opt/homebrew/lib -L/usr/local/homebrew/lib
+      - CGO_CFLAGS=-I/opt/homebrew/include -I/usr/local/homebrew/include
     goos:
       - darwin
     goarch:
-      # - amd64
       - arm64
+      - amd64
     tags:
       - libusb
       - unicorn
@@ -60,17 +60,34 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - id: windows_arm64_build
+  - id: linux_amd64_build
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-windows-gnu
-      - CC=zig c++ -target aarch64-windows-gnu
+      - CC=zig cc -target x86_64-linux-musl
+      - CC=zig c++ -target x86_64-linux-musl
     tags:
       - extended
     goos:
-      - windows
+      - linux
+    goarch:
+      - amd64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: linux_arm64_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-linux-musl
+      - CC=zig c++ -target aarch64-linux-musl
+    tags:
+      - extended
+    goos:
+      - linux
     goarch:
       - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
@@ -94,17 +111,37 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-
+  - id: windows_arm64_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-windows-gnu
+      - CC=zig c++ -target aarch64-windows-gnu
+    tags:
+      - extended
+    goos:
+      - windows
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 
 universal_binaries:
   - id: darwin_build
     replace: false
 
 archives:
-  - id : darwin_archive
+  - id : default_archive
     builds:
       - darwin_build
       - darwin_universal
+      - linux_amd64_build
+      - linux_arm64_build
+      - windows_amd64_build
+      - windows_arm64_build
     replacements:
       darwin: macOS
       amd64: x86_64
@@ -145,7 +182,7 @@ brews:
       owner: blacktop
       name: homebrew-tap
     ids:
-      - darwin_archive
+      - extras_archive
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
     description: "iOS/macOS Research Swiss Army Knife"
@@ -154,9 +191,7 @@ brews:
       - name: bat
         type: optional
       - name: libusb
-        type: optional
       - name: unicorn
-        type: optional
     install: |
       bin.install "ipsw"
       bash_completion.install "completions/_bash" => "ipsw"
@@ -167,7 +202,7 @@ brews:
       system "#{bin}/ipsw --version"
 
 checksum:
-  name_template: "checksums.darwin.txt"
+  name_template: "checksums.txt"
 
 signs:
   - artifacts: checksum
