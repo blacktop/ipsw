@@ -11,8 +11,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC="zig cc -target x86_64-windows-gnu"
-      - CC="zig c++ -target x86_64-windows-gnu"
+      - CC="zig.exe cc -target x86_64-windows-gnu"
+      - CC="zig.exe c++ -target x86_64-windows-gnu"
     tags:
       - extended
     goos:
@@ -28,8 +28,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC="zig cc -target aarch64-windows-gnu"
-      - CC="zig c++ -target aarch64-windows-gnu"
+      - CC="zig.exe cc -target aarch64-windows-gnu"
+      - CC="zig.exe c++ -target aarch64-windows-gnu"
     tags:
       - extended
     goos:
