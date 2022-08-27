@@ -60,6 +60,41 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: windows_arm64_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-windows-gnu
+      - CC=zig c++ -target aarch64-windows-gnu
+    tags:
+      - extended
+    goos:
+      - windows
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: windows_amd64_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-windows-gnu
+      - CC=zig c++ -target x86_64-windows-gnu
+    tags:
+      - extended
+    goos:
+      - windows
+    goarch:
+      - amd64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+
 
 universal_binaries:
   - id: darwin_build
