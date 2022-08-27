@@ -45,3 +45,9 @@ archives:
       - completions/*
       - manpages/*
     wrap_in_directory: true
+
+checksum:
+  name_template: "checksums.darwin_extras.txt"
+
+sboms:
+  - artifacts: archive

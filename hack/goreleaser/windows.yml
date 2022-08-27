@@ -24,8 +24,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC="C:\ProgramData\chocolatey\lib\zig\tools\zig.exe cc -target aarch64-windows-gnu"
-      - CC="C:\ProgramData\chocolatey\lib\zig\tools\zig.exe c++ -target aarch64-windows-gnu"
+      - CC="C:\ProgramData\chocolatey\bin\zig.exe cc -target aarch64-windows-gnu"
+      - CC="C:\ProgramData\chocolatey\bin\zig.exe c++ -target aarch64-windows-gnu"
     tags:
       - extended
     goos:

@@ -130,6 +130,7 @@ brews:
       man1.install Dir["manpages/*"]
     test: |
       system "#{bin}/ipsw --version"
+
 checksum:
   name_template: "checksums.darwin.txt"
 
