@@ -46,10 +46,10 @@ type Sandbox struct {
 	Profiles         []Profile
 	sbCollectionData []byte
 	Operations       []string
-	Entitlements     []uint16
+	Policies         []string
+	NewPolicies      []string
 	Unknown          []uint16
 	sbProfileData    []byte
-	Policies         []uint16
 	sbProtoboxData   []byte
 	Globals          []string
 	Extensions       []string
@@ -469,9 +469,9 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
-	modifierDescriptorOffsets := make([]uint16, sb.Hdr.PolicyCount)
-	if err := binary.Read(r, binary.LittleEndian, &modifierDescriptorOffsets); err != nil {
-		return fmt.Errorf("failed to read sandbox profile modifier descriptor offets: %v", err)
+	policyOffsets := make([]uint16, sb.Hdr.PolicyCount)
+	if err := binary.Read(r, binary.LittleEndian, &policyOffsets); err != nil {
+		return fmt.Errorf("failed to read sandbox profile policies: %v", err)
 	}
 
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing profile operands (%d)", sb.Hdr.OpCount))
@@ -489,7 +489,7 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 	opNodeStart, _ := r.Seek(0, io.SeekCurrent)
 	opNodes := make([]OperationNode, sb.Hdr.OpNodeCount)
 	if err := binary.Read(r, binary.LittleEndian, opNodes); err != nil {
-		return fmt.Errorf("failed to read sandbox collection operation nodes: %v", err)
+		return fmt.Errorf("failed to read sandbox platform profile operation nodes: %v", err)
 	}
 	for _, opNode := range opNodes {
 		if opNode.IsNonTerminal() {
@@ -519,15 +519,15 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 			loc, _ := r.Seek(sb.baseOffset+int64(roff)*8, io.SeekStart)
 			var size uint16
 			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-				return fmt.Errorf("failed to read sandbox collection regex size: %v", err)
+				return fmt.Errorf("failed to read sandbox platform profile regex size: %v", err)
 			}
 			rdat := make([]byte, size)
 			if err := binary.Read(r, binary.LittleEndian, &rdat); err != nil {
-				return fmt.Errorf("failed to read sandbox collection regex data: %v", err)
+				return fmt.Errorf("failed to read sandbox platform profile regex data: %v", err)
 			}
 			re, err := NewRegex(rdat)
 			if err != nil {
-				return fmt.Errorf("failed to parse sandbox collection regex: %v", err)
+				return fmt.Errorf("failed to parse sandbox platform profile regex: %v", err)
 			}
 			utils.Indent(log.Debug, 3)(fmt.Sprintf("[regex] idx: %d, offset: %#x, version: %d, length: %d\n\n%s", idx+1, loc, re.Version, re.Length, hex.Dump(re.Data)))
 			sb.Regexes = append(sb.Regexes, re)
@@ -540,14 +540,31 @@ func (sb *Sandbox) ParseSandboxProfile() error {
 			r.Seek(sb.baseOffset+int64(goff)*8, io.SeekStart)
 			var size uint16
 			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-				return fmt.Errorf("failed to read sandbox collection global variable size: %v", err)
+				return fmt.Errorf("failed to read sandbox platform profile global variable size: %v", err)
 			}
 			gdat := make([]byte, size)
 			if err := binary.Read(r, binary.LittleEndian, &gdat); err != nil {
-				return fmt.Errorf("failed to read sandbox collection global variable data: %v", err)
+				return fmt.Errorf("failed to read sandbox platform profile global variable data: %v", err)
 			}
 			sb.Globals = append(sb.Globals, strings.Trim(string(gdat[:]), "\x00"))
 			utils.Indent(log.Debug, 3)(sb.Globals[idx])
+		}
+	}
+
+	if sb.Hdr.PolicyCount > 0 {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing policies (%d)", sb.Hdr.PolicyCount))
+		for idx, poff := range policyOffsets {
+			r.Seek(sb.baseOffset+int64(poff)*8, io.SeekStart)
+			var size uint16
+			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+				return fmt.Errorf("failed to read sandbox platform profile policy size: %v", err)
+			}
+			pdat := make([]byte, size)
+			if err := binary.Read(r, binary.LittleEndian, &pdat); err != nil {
+				return fmt.Errorf("failed to read sandbox platform profile policy data: %v", err)
+			}
+			sb.Policies = append(sb.Policies, strings.Trim(string(pdat[:]), "\x00"))
+			utils.Indent(log.Debug, 3)(sb.Policies[idx])
 		}
 	}
 
@@ -581,17 +598,16 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		return fmt.Errorf("failed to read sandbox profile global offets: %v", err)
 	}
 
-	utils.Indent(log.Debug, 2)("Parsing policies")
-	sb.Policies = make([]uint16, sb.Hdr.PolicyCount)
-	if err := binary.Read(r, binary.LittleEndian, &sb.Policies); err != nil {
+	policyOffsets := make([]uint16, sb.Hdr.PolicyCount)
+	if err := binary.Read(r, binary.LittleEndian, &policyOffsets); err != nil {
 		return fmt.Errorf("failed to read sandbox profile policies: %v", err)
 	}
 
-	// var unknownVarOffsets []uint16
+	var unknownVarOffsets []uint16
 
 	if sb.Hdr.Unknown > 0 {
-		sb.Entitlements = make([]uint16, sb.Hdr.Unknown)
-		if err := binary.Read(r, binary.LittleEndian, &sb.Entitlements); err != nil {
+		unknownVarOffsets = make([]uint16, sb.Hdr.Unknown)
+		if err := binary.Read(r, binary.LittleEndian, &unknownVarOffsets); err != nil {
 			return fmt.Errorf("failed to read sandbox profile iOS16.x unknown var offsets: %v", err)
 		}
 	}
@@ -694,35 +710,55 @@ func (sb *Sandbox) ParseSandboxCollection() error {
 		sb.Regexes = append(sb.Regexes, re)
 	}
 
-	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing variables (%d)", sb.Hdr.GlobalVarCount))
-	for idx, goff := range globalOffsets {
-		r.Seek(sb.baseOffset+int64(goff)*8, io.SeekStart)
-		var size uint16
-		if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-			return fmt.Errorf("failed to read sandbox collection global variable size: %v", err)
+	if sb.Hdr.GlobalVarCount > 0 {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing global variables (%d)", sb.Hdr.GlobalVarCount))
+		for idx, goff := range globalOffsets {
+			r.Seek(sb.baseOffset+int64(goff)*8, io.SeekStart)
+			var size uint16
+			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+				return fmt.Errorf("failed to read sandbox collection global variable size: %v", err)
+			}
+			gdat := make([]byte, size)
+			if err := binary.Read(r, binary.LittleEndian, &gdat); err != nil {
+				return fmt.Errorf("failed to read sandbox collection global variable data: %v", err)
+			}
+			sb.Globals = append(sb.Globals, strings.Trim(string(gdat[:]), "\x00"))
+			utils.Indent(log.Debug, 3)(sb.Globals[idx])
 		}
-		gdat := make([]byte, size)
-		if err := binary.Read(r, binary.LittleEndian, &gdat); err != nil {
-			return fmt.Errorf("failed to read sandbox collection global variable data: %v", err)
-		}
-		sb.Globals = append(sb.Globals, strings.Trim(string(gdat[:]), "\x00"))
-		utils.Indent(log.Debug, 3)(sb.Globals[idx])
 	}
 
-	utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing unknown NEW iOS16 variables (%d)", sb.Hdr.Unknown))
-	for idx, uoff := range sb.Entitlements {
-		r.Seek(sb.baseOffset+int64(uoff)*8, io.SeekStart)
-		// r.Seek(sb.baseOffset+int64(uoff), io.SeekStart)
-		var size uint16
-		if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
-			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable size: %v", err)
+	if sb.Hdr.PolicyCount > 0 {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing policies (%d)", sb.Hdr.PolicyCount))
+		for idx, poff := range policyOffsets {
+			r.Seek(sb.baseOffset+int64(poff)*8, io.SeekStart)
+			var size uint16
+			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+				return fmt.Errorf("failed to read sandbox collection policy size: %v", err)
+			}
+			pdat := make([]byte, size)
+			if err := binary.Read(r, binary.LittleEndian, &pdat); err != nil {
+				return fmt.Errorf("failed to read sandbox collection policy data: %v", err)
+			}
+			sb.Policies = append(sb.Policies, strings.Trim(string(pdat[:]), "\x00"))
+			utils.Indent(log.Debug, 3)(sb.Policies[idx])
 		}
-		udat := make([]byte, size)
-		if err := binary.Read(r, binary.LittleEndian, &udat); err != nil {
-			return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable data: %v", err)
+	}
+
+	if sb.Hdr.Unknown > 0 {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Parsing unknown NEW iOS16 NEW Policies (%d)", sb.Hdr.Unknown))
+		for idx, uoff := range unknownVarOffsets {
+			r.Seek(sb.baseOffset+int64(uoff)*8, io.SeekStart)
+			var size uint16
+			if err := binary.Read(r, binary.LittleEndian, &size); err != nil {
+				return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable size: %v", err)
+			}
+			udat := make([]byte, size)
+			if err := binary.Read(r, binary.LittleEndian, &udat); err != nil {
+				return fmt.Errorf("failed to read sandbox collection unknown NEW iOS16 variable data: %v", err)
+			}
+			sb.NewPolicies = append(sb.NewPolicies, strings.Trim(string(udat[:]), "\x00"))
+			utils.Indent(log.Debug, 3)(sb.NewPolicies[idx])
 		}
-		sb.Extensions = append(sb.Extensions, strings.Trim(string(udat[:]), "\x00"))
-		utils.Indent(log.Debug, 3)(sb.Extensions[idx])
 	}
 
 	return nil
