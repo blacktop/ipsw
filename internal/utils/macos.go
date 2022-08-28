@@ -98,7 +98,7 @@ func copyFile(src, dst string, mode os.FileMode) error {
 func CodeSign(filePath, signature string) error {
 	if runtime.GOOS == "darwin" {
 		filePath = filepath.Clean(filePath)
-		cmd := exec.Command("codesign -s - -f", "-s", signature, "-f", filePath)
+		cmd := exec.Command("/usr/bin/codesign", "-s", "-", "-f", "-s", signature, "-f", filePath)
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -114,7 +114,7 @@ func CodeSign(filePath, signature string) error {
 // CodeSignWithEntitlements codesigns a given binary with given entitlements
 func CodeSignWithEntitlements(filePath, entitlementsPath, signature string) error {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
+		cmd := exec.Command("/usr/bin/codesign", "--entitlements", entitlementsPath, "-s", signature, "-f", filepath.Clean(filePath))
 		out, err := cmd.CombinedOutput()
 		if err != nil {
 			return fmt.Errorf("%v: %s", err, out)
