@@ -68,13 +68,17 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 	}
 	defer func() {
 		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-		if err := utils.Unmount(mountPoint, false); err != nil {
+		if err := utils.Unmount(mountPoint, true); err != nil {
 			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
 		}
 	}()
 
 	var files []string
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Errorf("failed to walk mount %s: %v", mountPoint, err)
+			return nil
+		}
 		if !info.IsDir() {
 			files = append(files, path)
 		}
