@@ -34,7 +34,7 @@ require (
 	github.com/ulikunitz/xz v0.5.10
 	github.com/unicorn-engine/unicorn v0.0.0-20220707154909-6c1cbef6ac50
 	github.com/vbauerster/mpb/v7 v7.5.2
-	golang.org/x/crypto v0.0.0-20220824171710-5757bc0c5503
+	golang.org/x/crypto v0.0.0-20220826181053-bd7e27e6170d
 	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b
 	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
