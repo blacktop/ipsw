@@ -246,6 +246,7 @@ func (sb *Sandbox) ParseOperation(op *Operation) (err error) {
 		if err != nil {
 			return err
 		}
+		// }
 		op.parsed = true
 	default:
 		return fmt.Errorf("unknown operation node type: %d", op.Node.Type())
