@@ -4,11 +4,21 @@ import "fmt"
 
 func (sb *Sandbox) CreateOperationGraph(node, defaultNode *Operation) error {
 
-	nodesToProcess := []*Operation{nil, node}
+	var nodesToProcess Stack[*Operation]
 
-	for len(nodesToProcess) > 0 {
-		parent_node, current_node := nodesToProcess[0], nodesToProcess[1]
-		nodesToProcess = nodesToProcess[2:]
+	nodesToProcess.Push(nil)
+	nodesToProcess.Push(node)
+
+	for !nodesToProcess.IsEmpty() {
+		parent_node, ok := nodesToProcess.Pop()
+		if !ok {
+			return fmt.Errorf("failed to pop parent_node from stack")
+		}
+		current_node, _ := nodesToProcess.Pop()
+		if !ok {
+			return fmt.Errorf("failed to pop current_node from stack")
+		}
+
 		current_node.Type = Normal
 		if parent_node == nil {
 			current_node.Type = Start
@@ -28,7 +38,7 @@ func (sb *Sandbox) CreateOperationGraph(node, defaultNode *Operation) error {
 				case current_node.IsNonTerminalDeny(): // In case of non-terminal match and deny as unmatch, add match to path.
 					if !current_node.Match.parsed {
 						current_node.List = append(current_node.List, current_node.Match)
-						nodesToProcess = append(nodesToProcess, current_node, current_node.Match)
+						nodesToProcess.Push(current_node, current_node.Match)
 					}
 				case current_node.IsNonTerminalAllow(): // In case of non-terminal match and allow as unmatch, do a not (reverse), end match path and add unmatch to parent path.
 					current_node.not = true
@@ -37,18 +47,18 @@ func (sb *Sandbox) CreateOperationGraph(node, defaultNode *Operation) error {
 						if parent_node != nil {
 							parent_node.List = append(parent_node.List, current_node.Unmatch)
 						}
-						nodesToProcess = append(nodesToProcess, parent_node, current_node.Unmatch)
+						nodesToProcess.Push(parent_node, current_node.Unmatch)
 					}
 				case current_node.IsNonTerminalNonTerminal(): // In case of non-terminals, add match to path and unmatch to parent path.
 					if !current_node.Match.parsed {
 						current_node.List = append(current_node.List, current_node.Match)
-						nodesToProcess = append(nodesToProcess, current_node, current_node.Match)
+						nodesToProcess.Push(current_node, current_node.Match)
 					}
 					if !current_node.Unmatch.parsed {
 						if parent_node != nil {
 							parent_node.List = append(parent_node.List, current_node.Unmatch)
 						}
-						nodesToProcess = append(nodesToProcess, parent_node, current_node.Unmatch)
+						nodesToProcess.Push(parent_node, current_node.Unmatch)
 					}
 				case current_node.IsAllowNonTerminal(): // In case of allow as match and non-terminal unmatch, end path and add unmatch to parent path.
 					current_node.Type = Final
@@ -56,13 +66,13 @@ func (sb *Sandbox) CreateOperationGraph(node, defaultNode *Operation) error {
 						if parent_node != nil {
 							parent_node.List = append(parent_node.List, current_node.Unmatch)
 						}
-						nodesToProcess = append(nodesToProcess, parent_node, current_node.Unmatch)
+						nodesToProcess.Push(parent_node, current_node.Unmatch)
 					}
 				case current_node.IsDenyNonTerminal(): // In case of deny as match and non-terminal unmatch, do a not (reverse), and add match to path.
 					current_node.not = true
 					if !current_node.Match.parsed {
 						current_node.List = append(current_node.List, current_node.Match)
-						nodesToProcess = append(nodesToProcess, current_node, current_node.Match)
+						nodesToProcess.Push(current_node, current_node.Match)
 					}
 				case current_node.IsDenyAllow(): // In case of deny as match and allow as unmatch, do a not (reverse), and end match path (completely).
 					current_node.not = true
@@ -79,29 +89,29 @@ func (sb *Sandbox) CreateOperationGraph(node, defaultNode *Operation) error {
 						if parent_node != nil {
 							parent_node.List = append(parent_node.List, current_node.Unmatch)
 						}
-						nodesToProcess = append(nodesToProcess, parent_node, current_node.Unmatch)
+						nodesToProcess.Push(parent_node, current_node.Unmatch)
 					}
 				case current_node.IsNonTerminalAllow(): // In case of non-terminal match and allow as unmatch, add match to path.
 					if !current_node.Match.parsed {
 						current_node.List = append(current_node.List, current_node.Match)
-						nodesToProcess = append(nodesToProcess, current_node, current_node.Match)
+						nodesToProcess.Push(current_node, current_node.Match)
 					}
 				case current_node.IsNonTerminalNonTerminal(): // In case of non-terminals, add match to path and unmatch to parent path.
 					if !current_node.Match.parsed {
 						current_node.List = append(current_node.List, current_node.Match)
-						nodesToProcess = append(nodesToProcess, current_node, current_node.Match)
+						nodesToProcess.Push(current_node, current_node.Match)
 					}
 					if !current_node.Unmatch.parsed {
 						if parent_node != nil {
 							parent_node.List = append(parent_node.List, current_node.Unmatch)
 						}
-						nodesToProcess = append(nodesToProcess, parent_node, current_node.Unmatch)
+						nodesToProcess.Push(parent_node, current_node.Unmatch)
 					}
 				case current_node.IsAllowNonTerminal(): // In case of allow as match and non-terminal unmatch, do a not (reverse), and add match to path.
 					current_node.not = true
 					if !current_node.Match.parsed {
 						current_node.List = append(current_node.List, current_node.Match)
-						nodesToProcess = append(nodesToProcess, current_node, current_node.Match)
+						nodesToProcess.Push(current_node, current_node.Match)
 					}
 				case current_node.IsDenyNonTerminal(): // In case of deny as match and non-terminal unmatch, end path and add unmatch to parent path.
 					current_node.Type = Final
@@ -109,7 +119,7 @@ func (sb *Sandbox) CreateOperationGraph(node, defaultNode *Operation) error {
 						if parent_node != nil {
 							parent_node.List = append(parent_node.List, current_node.Unmatch)
 						}
-						nodesToProcess = append(nodesToProcess, parent_node, current_node.Unmatch)
+						nodesToProcess.Push(parent_node, current_node.Unmatch)
 					}
 				case current_node.IsDenyAllow(): // In case of deny as match and allow as unmatch, end match path (completely).
 					current_node.Type = Final

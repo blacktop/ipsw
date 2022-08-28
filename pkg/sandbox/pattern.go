@@ -39,12 +39,12 @@ type Stack[T any] struct {
 	vals []T
 }
 
-func (s *Stack[T]) IsEmpty(val T) bool {
+func (s *Stack[T]) IsEmpty() bool {
 	return len(s.vals) == 0
 }
 
-func (s *Stack[T]) Push(val T) {
-	s.vals = append(s.vals, val)
+func (s *Stack[T]) Push(val ...T) {
+	s.vals = append(s.vals, val...)
 }
 
 func (s *Stack[T]) Pop() (T, bool) {
