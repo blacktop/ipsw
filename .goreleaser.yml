@@ -92,8 +92,6 @@ builds:
       - CGO_ENABLED=1
       - CC=zig cc -target x86_64-linux-musl
       - CC=zig c++ -target x86_64-linux-musl
-    tags:
-      - extended
     goos:
       - linux
     goarch:
@@ -109,8 +107,6 @@ builds:
       - CGO_ENABLED=1
       - CC=zig cc -target aarch64-linux-musl
       - CC=zig c++ -target aarch64-linux-musl
-    tags:
-      - extended
     goos:
       - linux
     goarch:
@@ -134,7 +130,8 @@ builds:
       - CC=zig c++ -target x86_64-linux-musl
       - PKG_CONFIG_PATH=/tmp/install_x86_64/usr/lib/pkgconfig
     tags:
-      - extended
+      - libusb
+      - unicorn
     goos:
       - linux
     goarch:
@@ -158,7 +155,8 @@ builds:
       - CC=zig c++ -target aarch64-linux-musl
       - PKG_CONFIG_PATH=/tmp/install_aarch64/usr/lib/pkgconfig
     tags:
-      - extended
+      - libusb
+      - unicorn
     goos:
       - linux
     goarch:
@@ -174,8 +172,6 @@ builds:
       - CGO_ENABLED=1
       - CC=zig cc -target x86_64-windows-gnu
       - CC=zig c++ -target x86_64-windows-gnu
-    tags:
-      - extended
     goos:
       - windows
     goarch:
@@ -191,8 +187,6 @@ builds:
       - CGO_ENABLED=1
       - CC=zig cc -target aarch64-windows-gnu
       - CC=zig c++ -target aarch64-windows-gnu
-    tags:
-      - extended
     goos:
       - windows
     goarch:
