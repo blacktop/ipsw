@@ -199,26 +199,38 @@ var sbdecCmd = &cobra.Command{
 				return fmt.Errorf("failed parsing sandbox collection: %s", err)
 			}
 
-			// for idx, ent := range sb.Entitlements {
-			// 	o, err := sb.ParseOperation(fmt.Sprintf("ent_%d", idx), sb.OpNodes[ent])
-			// 	if err != nil {
+			// for idx, ent := range sb.Extensions {
+			// 	if err := sb.ParseOperation(&sb.OpNodes[ent]); err != nil {
 			// 		return err
 			// 	}
-			// 	fmt.Println(o.String(0))
-			// 	if o.Match > 0 {
-			// 		match, err := sb.ParseOperation(o.Name, o.Match)
-			// 		if err != nil {
-			// 			log.Errorf("failed to parse match operation node %s: %v", o.Match, err)
+			// 	if sb.OpNodes[ent].MatchOffset > 0 {
+			// 		if err := sb.ParseOperation(sb.OpNodes[ent].Match); err != nil {
+			// 			log.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[ent].Match, err)
 			// 		}
-			// 		fmt.Println("MATCH:", match.String(1))
 			// 	}
-			// 	if o.Unmatch > 0 {
-			// 		unmatch, err := sb.ParseOperation(o.Name, o.Unmatch)
-			// 		if err != nil {
-			// 			log.Errorf("failed to parse unmatch operation node %s: %v", o.Unmatch, err)
+			// 	if sb.OpNodes[ent].UnmatchOffset > 0 {
+			// 		if err := sb.ParseOperation(sb.OpNodes[ent].Unmatch); err != nil {
+			// 			log.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[ent].Unmatch, err)
 			// 		}
-			// 		fmt.Println("UNMATCH:", unmatch.String(1))
 			// 	}
+			// 	fmt.Println(sb.OpNodes[ent].String(fmt.Sprintf("ext_%d", idx), 0))
+			// }
+
+			// for idx, unk := range sb.Unknown2 {
+			// 	if err := sb.ParseOperation(&sb.OpNodes[unk]); err != nil {
+			// 		return err
+			// 	}
+			// 	if sb.OpNodes[unk].MatchOffset > 0 {
+			// 		if err := sb.ParseOperation(sb.OpNodes[unk].Match); err != nil {
+			// 			log.Errorf("failed to parse match operation node %s: %v", sb.OpNodes[unk].Match, err)
+			// 		}
+			// 	}
+			// 	if sb.OpNodes[unk].UnmatchOffset > 0 {
+			// 		if err := sb.ParseOperation(sb.OpNodes[unk].Unmatch); err != nil {
+			// 			log.Errorf("failed to parse unmatch operation node %s: %v", sb.OpNodes[unk].Unmatch, err)
+			// 		}
+			// 	}
+			// 	fmt.Println(sb.OpNodes[unk].String(fmt.Sprintf("unk_%d", idx), 0))
 			// }
 		}
 

@@ -206,47 +206,57 @@ func (sb *Sandbox) ParseOperation(op *Operation) (err error) {
 		op.Terminal = true
 		op.Allow = node.IsAllow()
 		// var mods []ModifierInfo
-		// if node.ActionInline() {
-		// 	mod, err := sb.db.GetModifier(node.InlineModifier().ID)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	fmt.Printf("(apply-%s\n", mod.Name)
-		// 	oper, err := sb.db.GetOperation(node.InlineModifier().PolicyOpIdx)
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	oo, err := sb.ParseOperation(sb.OpNodes[sb.Policies[node.InlineModifier().Argument]])
-		// 	if err != nil {
-		// 		return err
-		// 	}
-		// 	fmt.Println(oo.String(0))
-		// 	if oo.Match > 0 {
-		// 		match, err := sb.ParseOperation(oo.Name, oo.Match)
-		// 		if err != nil {
-		// 			log.Errorf("failed to parse match operation node %s: %v", oo.Match, err)
-		// 		}
-		// 		fmt.Println("MATCH:", match.String(1))
-		// 	}
-		// 	if oo.Unmatch > 0 {
-		// 		unmatch, err := sb.ParseOperation(oo.Name, oo.Unmatch)
-		// 		if err != nil {
-		// 			log.Errorf("failed to parse unmatch operation node %s: %v", oo.Unmatch, err)
-		// 		}
-		// 		fmt.Println("UNMATCH:", unmatch.String(1))
-		// 	}
-		// } else if node.Modifier().Count > 0 {
-		// 	mod := node.Modifier()
-		// 	if mod.Count > 0 {
-		// 		fmt.Println(mod)
-		// 	}
-		// } else {
-		// 	var err error
-		op.Modiers, err = sb.db.GetModifiersFromAction(node.Action())
-		if err != nil {
-			return err
+		if node.ActionInline() {
+			inline := node.InlineModifier()
+			mod, err := sb.db.GetModifier(inline.ID)
+			if err != nil {
+				return err
+			}
+			if inline.PolicyOpIdx == 0 {
+				ss, err := sb.GetStringAtOffset(uint32(inline.Argument))
+				if err != nil {
+					return err
+				}
+				fmt.Printf("(with %s \"%s\"\n", mod.Name, ss)
+			} else {
+				oper, err := sb.db.GetOperation(inline.PolicyOpIdx)
+				if err != nil {
+					return err
+				}
+				oo := sb.OpNodes[sb.Policies[inline.Argument]]
+				if err := sb.ParseOperation(&oo); err != nil {
+					return err
+				}
+				fmt.Println(oo.String(mod.Name, 0))
+				if oo.MatchOffset > 0 {
+					if err := sb.ParseOperation(oo.Match); err != nil {
+						log.Errorf("failed to parse match operation node %s: %v", oo.Match, err)
+					}
+					fmt.Println("MATCH:", oo.Match.String(mod.Name, 1))
+				}
+				if oo.UnmatchOffset > 0 {
+					if err := sb.ParseOperation(oo.Unmatch); err != nil {
+						log.Errorf("failed to parse unmatch operation node %s: %v", oo.Unmatch, err)
+					}
+					fmt.Println("UNMATCH:", oo.Unmatch.String(mod.Name, 1))
+				}
+				fmt.Printf("(apply-%s %s \"%s\"\n", mod.Name, oper.Name, oo.String(oper.Name, 0))
+			}
+		} else if node.Modifier().Count > 0 {
+			mod := node.Modifier()
+			if mod.Count > 0 {
+				fmt.Println(mod)
+			}
+		} else {
+			// 	var err error
+			op.Modiers, err = sb.db.GetModifiersFromAction(node.Action())
+			if err != nil {
+				return err
+			}
+			if len(op.Modiers) > 0 {
+				fmt.Println(op.Modiers)
+			}
 		}
-		// }
 		op.parsed = true
 	default:
 		return fmt.Errorf("unknown operation node type: %d", op.Node.Type())

@@ -20,7 +20,7 @@ typedef struct {
     uint16 OpNodeCount<format = hex>;
     uchar  OpCount<format = decimal>;
     uchar  GlobalVarCount<format = decimal>;
-    uchar  unknown1<format = decimal>;
+    uchar  ExtensionCount<format = decimal>;
     uchar  unknown2<format = decimal>;
     uint16 ProfileCount<format = decimal>;
     uint16 RegexCount<format = decimal>;
@@ -47,24 +47,6 @@ typedef struct {
 string readGlobal(Global &g)
 {
     return ReadString(baseOffset+g.offset*8+2);
-}
-
-typedef struct {
-    uint16 offset<format = hex>;
-} Policy<read = readPolicy, bgcolor = cLtAqua>;
-
-string readPolicy(Policy &p)
-{
-    return ReadString(baseOffset+p.offset*8+2);
-}
-
-typedef struct {
-    uint16 offset<format = hex>;
-} Unknown1<read = readUnknown1, bgcolor = cLtRed>;
-
-string readUnknown1(Unknown1 &u)
-{
-    return ReadString(baseOffset+u.offset*8+2);
 }
 
 typedef struct {
@@ -95,7 +77,7 @@ typedef struct {
 
 typedef struct {
     if ( header.OpNodeCount > 0 ) {
-        local quad opNodeStart = sizeof(header) + (header.RegexCount*sizeof(uint16)) + (header.GlobalVarCount*sizeof(uint16)) + (header.PolicyCount*sizeof(uint16)) + (header.unknown1*sizeof(uint16)) + (header.unknown3*sizeof(uint16));
+        local quad opNodeStart = sizeof(header) + (header.RegexCount*sizeof(uint16)) + (header.GlobalVarCount*sizeof(uint16)) + (header.PolicyCount*sizeof(uint16)) + (header.ExtensionCount*sizeof(uint16)) + (header.unknown3*sizeof(uint16));
         if ( header.Type == 0x8000 ) {
             if ( header.ProfileCount > 0 )
                 opNodeStart += header.ProfileCount * sizeof(profiles[0]);
@@ -117,9 +99,9 @@ typedef struct {
     if ( header.GlobalVarCount > 0 )
         Global globalsOffsets[header.GlobalVarCount];
     if ( header.PolicyCount > 0 )
-        Policy policyOffsets[header.PolicyCount];
-    if ( header.unknown1 > 0 )
-        Unknown1 entitlements[header.unknown1];
+        offset policyOffsets[header.PolicyCount]<format = hex, bgcolor = cLtAqua>;
+    if ( header.ExtensionCount > 0 )
+        offset extensions[header.ExtensionCount]<format = hex, bgcolor = cLtRed>;
     if ( header.unknown3 > 0 )
         offset unknown_iOS16[header.unknown3]<format = hex, bgcolor = cLtGreen>;
     if ( header.Type == 0x8000 ) {
