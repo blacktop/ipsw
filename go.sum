@@ -72,10 +72,10 @@ github.com/aws/aws-sdk-go v1.20.6/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN
 github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59/go.mod h1:q/89r3U2H7sSsE2t6Kca0lfwTK8JdoNGS/yzM/4iH5I=
 github.com/blacktop/arm64-cgo v1.0.55 h1:Ze2bj2iDxr//eUFPoZeA1ph3WFEOeF3ihfv8YfXE9lc=
 github.com/blacktop/arm64-cgo v1.0.55/go.mod h1:+8K+RkaTCC3o3WZme98SiIJuHteOxGoIvuc3WVlHHBI=
-github.com/blacktop/go-dwarf v1.0.6 h1:PIc+OSxWboV2WwDTTXlKpxWzxL/j1uKYWyy/XaIFcSQ=
-github.com/blacktop/go-dwarf v1.0.6/go.mod h1:4W2FKgSFYcZLDwnR7k+apv5i3nrau4NGl9N6VQ9DSTo=
-github.com/blacktop/go-macho v1.1.97 h1:pYuhT+OQNw+kVJe4eoz98JYO0GfxZ4zCANsNHdUHN2c=
-github.com/blacktop/go-macho v1.1.97/go.mod h1:96Pnw92bQGUbyV3CJ3PUvD1C4PjKJM7xAYBnLWsFj0k=
+github.com/blacktop/go-dwarf v1.0.7 h1:EKm86zNKlanwpXwxGkh0kqteN+mYHM0GZWFJSn9cMuc=
+github.com/blacktop/go-dwarf v1.0.7/go.mod h1:4W2FKgSFYcZLDwnR7k+apv5i3nrau4NGl9N6VQ9DSTo=
+github.com/blacktop/go-macho v1.1.98 h1:5ZoEwLgKReJJbhvnvG98rAADvgvbb6Iq1S+208pdSJI=
+github.com/blacktop/go-macho v1.1.98/go.mod h1:I32mDLyphSEj/Bh6SL+au8tsDsDgtL4voQSsK3eCtTw=
 github.com/blacktop/go-plist v1.0.1 h1:cbpYg6OYwSpJPLk8ObZW+norqxG5YInfPXRNcFw6n8I=
 github.com/blacktop/go-plist v1.0.1/go.mod h1:niIOeDMEBISbJ9w0PPuc67iLvLh7Ve0N1gAfxIRWSk4=
 github.com/blacktop/lzss v0.1.1 h1:ADOUgVH3hq2miBfaxhV1GgY97wNSv5fBiXRnUVe8QSg=
