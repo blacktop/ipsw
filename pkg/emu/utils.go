@@ -106,6 +106,40 @@ func (e *Emulation) WriteData(addr uint64, data interface{}) error {
 	return e.mu.MemWrite(addr, buf.Bytes())
 }
 
+func (e *Emulation) ReadData(addr uint64, data interface{}) error {
+	size := binary.Size(data)
+	dat, err := e.mu.MemRead(addr, uint64(size))
+	if err != nil {
+		return err
+	}
+	buf := bytes.NewBuffer(dat)
+	return binary.Read(buf, binary.LittleEndian, data)
+}
+
+func (e *Emulation) ReadDataAt(addr uint64, size uint64) ([]byte, error) {
+	return e.mu.MemRead(addr, size)
+}
+
+func (e *Emulation) WriteDataAt(addr uint64, data []byte) error {
+	return e.mu.MemWrite(addr, data)
+}
+
+func (e *Emulation) ReadDataAtPtr(addr uint64, size uint64) (uint64, error) {
+	dat, err := e.mu.MemRead(addr, size)
+	if err != nil {
+		return 0, err
+	}
+	return binary.LittleEndian.Uint64(dat), nil
+}
+
+func (e *Emulation) MemMap(addr, size uint64) error {
+	a, s, ok := e.mmap.Add(addr, size)
+	if !ok {
+		return fmt.Errorf("failed to map %#x-%#x", addr, addr+size)
+	}
+	return e.mu.MemMap(a, s)
+}
+
 func GetRandomUint64() uint64 {
 	buf := make([]byte, 8)
 	rand.Read(buf)
