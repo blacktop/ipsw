@@ -7,6 +7,7 @@ package emu
 import (
 	"fmt"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	uc "github.com/unicorn-engine/unicorn/bindings/go/unicorn"
@@ -24,7 +25,7 @@ const (
 	STACK_GUARD  = STACK_BASE + 0x1000
 	STACK_DATA   = STACK_GUARD + 0x1000
 	STACK_SIZE   = 0x800000
-	UC_MEM_ALIGN = 0x1000
+	UC_MEM_ALIGN = 0x4000
 )
 
 type branchType uint8
@@ -97,6 +98,7 @@ type Emulation struct {
 	// state
 	regs            Registers
 	stack_chk_guard uint64
+	mmap            *MemMap
 }
 
 // NewEmulation creates a new emuluation instance
@@ -107,6 +109,7 @@ func NewEmulation(cache *dyld.File, conf *Config) (*Emulation, error) {
 		cache: cache,
 		conf:  conf,
 		regs:  InitRegisters(),
+		mmap:  NewMemMap(),
 	}
 
 	e.mu, err = uc.NewUnicorn(uc.ARCH_ARM64, uc.MODE_ARM)
@@ -274,11 +277,17 @@ func (e *Emulation) SetupHooks() error {
 					log.Errorf(err.Error())
 					return false
 				}
-				a, sz := Align(addr, uint64(len(dat)), true)
-				if err := e.mu.MemMap(a, sz); err != nil {
-					log.Errorf("failed to memmap at %#x: %v", a, err)
+				if err := e.MemMap(addr, uint64(len(dat))); err != nil {
+					fmt.Println()
+					fmt.Println(e.mmap)
+					log.Errorf("failed to memmap at %#x (size %#x): %v", addr, len(dat), err)
 					return false
 				}
+				// a, sz := Align(addr, uint64(len(dat)), true)
+				// if err := e.mu.MemMap(a, sz); err != nil {
+				// 	log.Errorf("failed to memmap at %#x: %v", a, err)
+				// 	return false
+				// }
 				if err := e.mu.MemWrite(addr, dat); err != nil {
 					log.Errorf("failed to mem write at %#x: %v", addr, err)
 					return false
@@ -351,18 +360,18 @@ func (e *Emulation) SetupHooks() error {
 			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value-0x50, 0x50)
 			fmt.Printf(colorHook("SP>\n"))
 			e.DumpMem(e.regs[uc.ARM64_REG_SP].Value, min((STACK_BASE+STACK_SIZE)-e.regs[uc.ARM64_REG_SP].Value, 0x50))
-			// cont := false
-			// prompt := &survey.Confirm{
-			// 	Message: "Continue?",
-			// }
-			// survey.AskOne(prompt, &cont)
-			// if cont {
-			// 	if pc, err := e.mu.RegRead(uc.ARM64_REG_PC); err == nil {
-			// 		e.mu.RegWrite(uc.ARM64_REG_PC, pc+4)
-			// 	}
-			// } else {
-			log.Fatal("UNHANDLED INTERRUPT")
-			// }
+			cont := false
+			prompt := &survey.Confirm{
+				Message: "Continue?",
+			}
+			survey.AskOne(prompt, &cont)
+			if cont {
+				if pc, err := e.mu.RegRead(uc.ARM64_REG_PC); err == nil {
+					e.mu.RegWrite(uc.ARM64_REG_PC, pc+4)
+				}
+			} else {
+				log.Fatal("UNHANDLED INTERRUPT")
+			}
 		}
 	}, 1, 0); err != nil {
 		return fmt.Errorf("failed to register interrupt hook: %v", err)
