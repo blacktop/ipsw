@@ -7,7 +7,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
-	github.com/blacktop/go-macho v1.1.97
+	github.com/blacktop/go-macho v1.1.99
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
@@ -34,11 +34,11 @@ require (
 	github.com/ulikunitz/xz v0.5.10
 	github.com/unicorn-engine/unicorn v0.0.0-20220707154909-6c1cbef6ac50
 	github.com/vbauerster/mpb/v7 v7.5.2
-	golang.org/x/crypto v0.0.0-20220826181053-bd7e27e6170d
+	golang.org/x/crypto v0.0.0-20220829220503-c86fa9a7ed90
 	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b
 	golang.org/x/oauth2 v0.0.0-20220822191816-0ebed06d0094
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
-	golang.org/x/sys v0.0.0-20220825204002-c680a09ffe64
+	golang.org/x/sys v0.0.0-20220829200755-d48e67d00261
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -53,7 +53,7 @@ require (
 	github.com/antchfx/htmlquery v1.2.5 // indirect
 	github.com/antchfx/xmlquery v1.3.12 // indirect
 	github.com/antchfx/xpath v1.2.1 // indirect
-	github.com/blacktop/go-dwarf v1.0.6 // indirect
+	github.com/blacktop/go-dwarf v1.0.7 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 // indirect
