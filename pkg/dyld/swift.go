@@ -210,5 +210,5 @@ func (f *File) GetAllSwiftTypes(print bool) (map[string]uint64, error) {
 		f.dumpSwiftOffsets(shash)
 	}
 
-	return f.offsetsToMap(shash.Offsets, int64(shash.CacheOffset)), nil
+	return f.offsetsToMap(shash.Offsets, int64(shash.CacheOffset), f.UUID), nil // FIXME: handle multiple UUIDs
 }
