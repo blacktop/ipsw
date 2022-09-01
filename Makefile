@@ -1,6 +1,7 @@
 REPO=blacktop
 NAME=ipsw
 CUR_VERSION=$(shell gh release view --json tagName -q '.tagName')
+LOCAL_VERSION=$(shell svu current)
 NEXT_VERSION=$(shell svu patch)
 GO_BIN=go
 
