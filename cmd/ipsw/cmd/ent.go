@@ -222,7 +222,7 @@ var entCmd = &cobra.Command{
 		if len(entitlement) > 0 && len(searchFile) > 0 {
 			log.Errorf("you can only use --ent OR --file (not both)")
 			return nil
-		} else if len(entitlement) > 0 && viper.GetBool("diff") {
+		} else if len(entitlement) > 0 && viper.GetBool("ent.diff") {
 			log.Errorf("you can only use --ent OR --diff (not both)")
 			return nil
 		}
@@ -239,13 +239,17 @@ var entCmd = &cobra.Command{
 			return fmt.Errorf("failed to get entitlement database: %v", err)
 		}
 
-		if viper.GetBool("diff") { // DIFF ENTITLEMENTS
+		if viper.GetBool("ent.diff") { // DIFF ENTITLEMENTS
 			if len(args) < 2 {
 				return fmt.Errorf("you must specify two IPSWs to diff")
 			}
 
 			ipswPath2 := filepath.Clean(args[1])
+
 			entDBPath2 := strings.TrimSuffix(ipswPath2, filepath.Ext(ipswPath2)) + ".entDB"
+			if len(viper.GetString("ent.output")) > 0 {
+				entDBPath2 = filepath.Join(viper.GetString("ent.output"), filepath.Base(entDBPath2))
+			}
 
 			entDB2, err := getEntitlementDatabase(ipswPath2, entDBPath2)
 			if err != nil {
@@ -282,6 +286,7 @@ var entCmd = &cobra.Command{
 					}
 				}
 			} else {
+				found := false
 				for f2, e2 := range entDB2 { // DIFF ALL ENTITLEMENTS
 					if e, ok := entDB[f2]; ok {
 						diffs := dmp.DiffMain(e, e2, false)
@@ -295,16 +300,22 @@ var entCmd = &cobra.Command{
 							if diffs[0].Type == diffmatchpatch.DiffEqual {
 								continue
 							} else {
+								found = true
 								fmt.Printf("\n%s\n\n", f2)
 								fmt.Println(dmp.DiffPrettyText(diffs))
 							}
 						} else {
+							found = true
 							fmt.Printf("\n%s\n\n", f2)
 							fmt.Println(dmp.DiffPrettyText(diffs))
 						}
 					} else {
+						found = true
 						fmt.Printf("\n🆕 %s 🆕\n\n%s", f2, e2)
 					}
+				}
+				if !found {
+					log.Warn("No differences found")
 				}
 			}
 			return nil
