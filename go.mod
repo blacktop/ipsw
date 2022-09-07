@@ -30,7 +30,7 @@ require (
 	github.com/shurcooL/githubv4 v0.0.0-20220520033151-0b4e3294ff00
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.5.0
-	github.com/spf13/viper v1.12.0
+	github.com/spf13/viper v1.13.0
 	github.com/ulikunitz/xz v0.5.10
 	github.com/unicorn-engine/unicorn v0.0.0-20220707154909-6c1cbef6ac50
 	github.com/vbauerster/mpb/v7 v7.5.2
