@@ -449,6 +449,7 @@ changelog:
       - Merge branch
 
 release:
+  target_commitish: '{{ .Commit }}'
   footer: |
     ### Summary
     **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .PreviousTag }}...{{ .Tag }}

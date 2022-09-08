@@ -595,15 +595,15 @@ func (i *CacheImage) ParseObjC() error {
 		if err := i.cache.MethodsForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(i.Name), err)
 		}
-		// if strings.Contains(i.Name, "libobjc.A.dylib") {
-		// 	if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
-		// 		return fmt.Errorf("failed to parse objc all selectors: %v", err)
-		// 	}
-		// } else {
-		if err := i.cache.SelectorsForImage(i.Name); err != nil {
-			return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
+		if strings.Contains(i.Name, "libobjc.A.dylib") {
+			if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
+				return fmt.Errorf("failed to parse objc all selectors: %v", err)
+			}
+		} else {
+			if err := i.cache.SelectorsForImage(i.Name); err != nil {
+				return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
+			}
 		}
-		// }
 		if err := i.cache.ClassesForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc classes for image %s: %v", filepath.Base(i.Name), err)
 		}
