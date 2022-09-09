@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/fatih/color"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -144,18 +143,21 @@ var machoDisassCmd = &cobra.Command{
 			return nil
 		}
 
-		if len(cacheFile) > 0 {
-			a2sFile, err := os.Open(cacheFile)
-			if err != nil {
-				return errors.Wrapf(err, "failed to open companion file")
+		symbolMap = make(map[uint64]string)
+
+		if !quiet {
+			if len(cacheFile) == 0 {
+				cacheFile = machoPath + ".a2s"
 			}
-			// Decoding the serialized data
-			err = gob.NewDecoder(a2sFile).Decode(&symbolMap)
-			if err != nil {
-				return err
+			if a2sFile, err := os.Open(cacheFile); err == nil {
+				// Decoding the serialized data
+				log.Infof("Loading symbol cache file...")
+				if err := gob.NewDecoder(a2sFile).Decode(&symbolMap); err != nil {
+					return fmt.Errorf("failed to decode cache file: %v", err)
+				}
+			} else {
+				log.Errorf("failed to open cache file %s: %v", cacheFile, err)
 			}
-		} else {
-			symbolMap = make(map[uint64]string)
 		}
 
 		if allFuncs && len(segmentSection) == 0 {
@@ -186,6 +188,9 @@ var machoDisassCmd = &cobra.Command{
 					if err := engine.Analyze(); err != nil {
 						return fmt.Errorf("MachO analysis failed: %v", err)
 					}
+				}
+				if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+					log.Errorf("failed to save symbol map: %v", err)
 				}
 				//***************
 				//* DISASSEMBLE *
@@ -277,6 +282,9 @@ var machoDisassCmd = &cobra.Command{
 			}
 			if err := engine.Analyze(); err != nil {
 				return fmt.Errorf("MachO analysis failed: %v", err)
+			}
+			if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+				log.Errorf("failed to save symbol map: %v", err)
 			}
 			//***************
 			//* DISASSEMBLE *
