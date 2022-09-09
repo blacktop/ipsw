@@ -3,8 +3,12 @@ package disass
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/apex/log"
@@ -423,6 +427,54 @@ func (d *MachoDisass) parseHelpers() error {
 		} else {
 			d.a2s[start] = fmt.Sprintf("__stub_helper.%x", target)
 		}
+	}
+
+	return nil
+}
+
+func (d *MachoDisass) SaveAddrToSymMap(dest string) error {
+	var err error
+	var of *os.File
+
+	buff := new(bytes.Buffer)
+
+	of, err = os.Create(dest)
+	if errors.Is(err, os.ErrPermission) {
+		var e *os.PathError
+		if errors.As(err, &e) {
+			log.Errorf("failed to create address to symbol cache file %s (%v)", e.Path, e.Err)
+		}
+		tmpDir := os.TempDir()
+		if runtime.GOOS == "darwin" {
+			tmpDir = "/tmp"
+		}
+		tempa2sfile := filepath.Join(tmpDir, dest)
+		of, err = os.Create(tempa2sfile)
+		if err != nil {
+			return err
+		}
+		utils.Indent(log.Warn, 2)("creating in the temp folder")
+		utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future you must supply the flag: --cache %s ", tempa2sfile))
+	} else if err != nil {
+		return err
+	}
+	defer of.Close()
+
+	e := gob.NewEncoder(buff)
+
+	// Encoding the map
+	err = e.Encode(d.a2s)
+	if err != nil {
+		return fmt.Errorf("failed to encode addr2sym map to binary: %v", err)
+	}
+
+	// gzw := gzip.NewWriter(of)
+	// defer gzw.Close()
+
+	// _, err = buff.WriteTo(gzw)
+	_, err = buff.WriteTo(of)
+	if err != nil {
+		return fmt.Errorf("failed to write addr2sym map to gzip file: %v", err)
 	}
 
 	return nil
