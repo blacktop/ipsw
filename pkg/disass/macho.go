@@ -212,7 +212,9 @@ func (d MachoDisass) Analyze() error {
 	}
 
 	if err := d.parseRebaseInfo(); err != nil {
-		return fmt.Errorf("failed to parse slide info: %v", err)
+		if !errors.Is(err, macho.ErrMachODyldInfoNotFound) {
+			return fmt.Errorf("failed to parse rebase info: %v", err)
+		}
 	}
 
 	if err := d.parseHelpers(); err != nil {
