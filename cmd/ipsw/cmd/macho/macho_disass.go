@@ -30,6 +30,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -47,6 +48,8 @@ func init() {
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	machoDisassCmd.Flags().BoolP("quiet", "q", false, "Do NOT markup analysis (Faster)")
 	// machoDisassCmd.Flags().StringP("input", "i", "", "Input function JSON file")
+	machoDisassCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
+	machoDisassCmd.Flags().StringP("section", "x", "", "Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	viper.BindPFlag("macho.disass.symbol", machoDisassCmd.Flags().Lookup("symbol"))
@@ -56,6 +59,8 @@ func init() {
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.disass.quiet", machoDisassCmd.Flags().Lookup("quiet"))
 	// viper.BindPFlag("macho.disass.input", machoDisassCmd.Flags().Lookup("input"))
+	viper.BindPFlag("macho.disass.fileset-entry", machoDisassCmd.Flags().Lookup("fileset-entry"))
+	viper.BindPFlag("macho.disass.section", machoDisassCmd.Flags().Lookup("section"))
 	viper.BindPFlag("macho.disass.cache", machoDisassCmd.Flags().Lookup("cache"))
 
 	machoDisassCmd.MarkZshCompPositionalArgumentFile(1)
@@ -82,12 +87,14 @@ var machoDisassCmd = &cobra.Command{
 		symbolName := viper.GetString("macho.disass.symbol")
 		startAddr := viper.GetUint64("macho.disass.vaddr")
 		instructions := viper.GetUint64("macho.disass.count")
+		segmentSection := viper.GetString("macho.disass.section")
 
 		demangleFlag := viper.GetBool("macho.disass.demangle")
 		asJSON := viper.GetBool("macho.disass.json")
 		quiet := viper.GetBool("macho.disass.quiet")
 
 		// funcFile := viper.GetString("macho.disass.input")
+		filesetEntry := viper.GetString("macho.disass.fileset-entry")
 		cacheFile := viper.GetString("macho.disass.cache")
 
 		// funcFile, _ := cmd.Flags().GetString("input")
@@ -120,6 +127,18 @@ var machoDisassCmd = &cobra.Command{
 			}
 		}
 
+		if len(filesetEntry) > 0 {
+			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+				m, err = m.GetFileSetFileByName(filesetEntry)
+				if err != nil {
+					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
+				}
+			} else {
+				log.Error("MachO type is not FileSet")
+				return nil
+			}
+		}
+
 		if !strings.Contains(strings.ToLower(m.FileHeader.SubCPU.String(m.CPU)), "arm64") {
 			log.Errorf("can only disassemble arm64 binaries")
 			return nil
@@ -139,7 +158,7 @@ var machoDisassCmd = &cobra.Command{
 			symbolMap = make(map[uint64]string)
 		}
 
-		if allFuncs {
+		if allFuncs && len(segmentSection) == 0 {
 			for _, fn := range m.GetFunctions() {
 				data, err := m.GetFunctionData(fn)
 				if err != nil {
@@ -179,11 +198,22 @@ var machoDisassCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-			} else { // startAddr > 0
-				// if slide > 0 {
-				// 	startAddr = startAddr - slide
-				// }
+			} else if len(segmentSection) > 0 {
+				parts := strings.Split(segmentSection, ".")
+				if len(parts) != 2 {
+					return fmt.Errorf("invalid --section format, must be segment.section")
+				}
+				if sec := m.Section(parts[0], parts[1]); sec != nil {
+					startAddr = sec.Addr
+					instructions = sec.Size / 4
+				} else {
+					return fmt.Errorf("failed to find section %s", segmentSection)
+				}
 			}
+			// startAddr > 0 TODO: support slides
+			// if slide > 0 {
+			// 	startAddr = startAddr - slide
+			// }
 
 			/*
 			 * Read in data to disassemble
@@ -225,7 +255,7 @@ var machoDisassCmd = &cobra.Command{
 					}
 				}
 			}
-			if len(data) > 0 {
+			if len(data) == 0 {
 				log.Fatal("failed to disassemble")
 			}
 

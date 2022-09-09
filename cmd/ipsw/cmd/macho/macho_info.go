@@ -224,7 +224,7 @@ var machoInfoCmd = &cobra.Command{
 
 		// Fileset MachO type
 		if len(filesetEntry) > 0 {
-			if m.FileTOC.FileHeader.Type == types.FileSet {
+			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 				var dcf *fixupchains.DyldChainedFixups
 				if m.HasFixups() {
 					dcf, err = m.DyldChainedFixups()

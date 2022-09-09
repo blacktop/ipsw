@@ -453,8 +453,7 @@ func (i *CacheImage) Analyze() error {
 	if !i.Analysis.State.IsGotDone() && i.cache.IsArm64() {
 		log.Debugf("parsing %s global offset table", i.Name)
 		if err := i.ParseGOT(); err != nil {
-			// return fmt.Errorf("failed to parse GOT for %s: %w", i.Name, err)
-			log.Errorf("failed to parse GOT for %s: %v", i.Name, err)
+			return fmt.Errorf("failed to parse GOT for %s: %w", i.Name, err)
 		}
 
 		for entry, target := range i.Analysis.GotPointers {
