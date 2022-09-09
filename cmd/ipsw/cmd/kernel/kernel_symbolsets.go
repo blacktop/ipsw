@@ -77,7 +77,7 @@ var symbolsetsCmd = &cobra.Command{
 			return errors.Wrapf(err, "%s appears to not be a valid MachO", args[0])
 		}
 
-		if m.FileTOC.FileHeader.Type == types.FileSet {
+		if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 			m, err = m.GetFileSetFileByName("com.apple.kernel")
 			if err != nil {
 				return fmt.Errorf("failed to parse entry com.apple.kernel; %v", err)
