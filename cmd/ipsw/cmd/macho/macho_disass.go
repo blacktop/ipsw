@@ -133,8 +133,7 @@ var machoDisassCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
 				}
 			} else {
-				log.Error("MachO type is not FileSet")
-				return nil
+				log.Error("MachO type is not MH_FILESET (cannot use --fileset-entry)")
 			}
 		}
 

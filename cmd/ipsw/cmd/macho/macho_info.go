@@ -246,18 +246,20 @@ var machoInfoCmd = &cobra.Command{
 					}
 					log.Infof("Created %s", filepath.Join(folder, filesetEntry))
 				}
-
 			} else {
-				log.Error("MachO type is not FileSet")
-				return nil
+				log.Error("MachO type is not MH_FILESET (cannot use --fileset-entry)")
 			}
 		} else if viper.GetBool("macho.info.all-fileset-entries") {
-			for _, fe := range m.FileSets() {
-				mfe, err := m.GetFileSetFileByName(fe.EntryID)
-				if err != nil {
-					return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
+			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+				for _, fe := range m.FileSets() {
+					mfe, err := m.GetFileSetFileByName(fe.EntryID)
+					if err != nil {
+						return fmt.Errorf("failed to parse entry %s: %v", filesetEntry, err)
+					}
+					fmt.Printf("\n%s\n\n%s\n", fe.EntryID, mfe.FileTOC.String())
 				}
-				fmt.Printf("\n%s\n\n%s\n", fe.EntryID, mfe.FileTOC.String())
+			} else {
+				return fmt.Errorf("MachO type is not MH_FILESET (cannot use --fileset-entry)")
 			}
 		}
 
