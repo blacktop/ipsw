@@ -148,7 +148,7 @@ var machoDisassCmd = &cobra.Command{
 			if len(cacheFile) == 0 {
 				cacheFile = machoPath + ".a2s"
 			}
-			if a2sFile, err := os.Open(cacheFile); err == nil {
+			if a2sFile, err := os.Create(cacheFile); err == nil {
 				// Decoding the serialized data
 				log.Infof("Loading symbol cache file...")
 				if err := gob.NewDecoder(a2sFile).Decode(&symbolMap); err != nil {
@@ -180,16 +180,18 @@ var machoDisassCmd = &cobra.Command{
 				//***********************
 				//* First pass ANALYSIS *
 				//***********************
-				if err := engine.Triage(); err != nil {
-					return fmt.Errorf("first pass triage failed: %v", err)
-				}
-				if len(symbolMap) == 0 {
-					if err := engine.Analyze(); err != nil {
-						return fmt.Errorf("MachO analysis failed: %v", err)
+				if !quiet {
+					if err := engine.Triage(); err != nil {
+						return fmt.Errorf("first pass triage failed: %v", err)
 					}
-				}
-				if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
-					log.Errorf("failed to save symbol map: %v", err)
+					if len(symbolMap) == 0 {
+						if err := engine.Analyze(); err != nil {
+							return fmt.Errorf("MachO analysis failed: %v", err)
+						}
+					}
+					if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+						log.Errorf("failed to save symbol map: %v", err)
+					}
 				}
 				//***************
 				//* DISASSEMBLE *
@@ -276,14 +278,16 @@ var machoDisassCmd = &cobra.Command{
 			//***********************
 			//* First pass ANALYSIS *
 			//***********************
-			if err := engine.Triage(); err != nil {
-				return fmt.Errorf("first pass triage failed: %v", err)
-			}
-			if err := engine.Analyze(); err != nil {
-				return fmt.Errorf("MachO analysis failed: %v", err)
-			}
-			if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
-				log.Errorf("failed to save symbol map: %v", err)
+			if !quiet {
+				if err := engine.Triage(); err != nil {
+					return fmt.Errorf("first pass triage failed: %v", err)
+				}
+				if err := engine.Analyze(); err != nil {
+					return fmt.Errorf("MachO analysis failed: %v", err)
+				}
+				if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+					log.Errorf("failed to save symbol map: %v", err)
+				}
 			}
 			//***************
 			//* DISASSEMBLE *
