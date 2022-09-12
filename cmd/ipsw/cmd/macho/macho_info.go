@@ -129,6 +129,7 @@ var machoInfoCmd = &cobra.Command{
 		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings
 		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings
 		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings
+		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
 
 		machoPath := filepath.Clean(args[0])
 
@@ -268,6 +269,12 @@ var machoInfoCmd = &cobra.Command{
 		}
 		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings) {
 			fmt.Println(m.FileTOC.String())
+		} else {
+			if len(filesetEntry) == 0 && !viper.GetBool("macho.info.all-fileset-entries") {
+				if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+					log.Warn("detected MH_FILESET MachO, you might want to use '--fileset-entry' to select a specific file-set entry")
+				}
+			}
 		}
 
 		if showSignature {
@@ -455,8 +462,10 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showObjC {
-			fmt.Println("Objective-C")
-			fmt.Println("===========")
+			if !onlyObjC {
+				fmt.Println("Objective-C")
+				fmt.Println("===========")
+			}
 			if m.HasObjC() {
 				if info, err := m.GetObjCImageInfo(); err == nil {
 					fmt.Println(info.Flags)
@@ -546,7 +555,6 @@ var machoInfoCmd = &cobra.Command{
 						log.Error(err.Error())
 					}
 				}
-
 			} else {
 				fmt.Println("  - no objc")
 			}
@@ -566,6 +574,8 @@ var machoInfoCmd = &cobra.Command{
 						fmt.Printf("0x%016X\n", fn.StartAddr)
 					}
 				}
+			} else {
+				fmt.Println("  - no function starts")
 			}
 		}
 
@@ -576,14 +586,18 @@ var machoInfoCmd = &cobra.Command{
 			}
 			var sec string
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-			for _, sym := range m.Symtab.Syms {
-				if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-					sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+			if m.Symtab != nil {
+				for _, sym := range m.Symtab.Syms {
+					if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
+						sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+					}
+					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+					// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
 				}
-				fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
-				// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+				w.Flush()
+			} else {
+				fmt.Println("  - no symbol table")
 			}
-			w.Flush()
 			if binds, err := m.GetBindInfo(); err == nil {
 				fmt.Printf("\nDyld Binds\n")
 				fmt.Println("----------")
