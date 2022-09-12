@@ -456,7 +456,7 @@ func (d *MachoDisass) SaveAddrToSymMap(dest string) error {
 		utils.Indent(log.Warn, 2)("creating in the temp folder")
 		utils.Indent(log.Warn, 3)(fmt.Sprintf("to use in the future you must supply the flag: --cache %s ", tempa2sfile))
 	} else if err != nil {
-		return err
+		return fmt.Errorf("failed to open address to symbol cache file %s: %v", dest, err)
 	}
 	defer of.Close()
 
