@@ -295,7 +295,7 @@ nfpms:
         file_info:
           mode: 0644
       - src: ./completions/_fish
-        dst: /usr/share/fish/completions/ipsw.fish
+        dst: /usr/share/fish/vendor_completions.d/ipsw.fish
         file_info:
           mode: 0644
       - src: ./completions/_zsh
@@ -376,7 +376,7 @@ snapcrafts:
     description: |
       iOS/macOS Research Swiss Army Knife.
     grade: stable
-    confinement: strict
+    confinement: classic
     publish: true
     license: MIT
 
