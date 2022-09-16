@@ -376,9 +376,29 @@ snapcrafts:
     description: |
       iOS/macOS Research Swiss Army Knife.
     grade: stable
-    confinement: classic
+    confinement: strict
     publish: true
     license: MIT
+    extra_files:
+      - source: ./completions/_bash
+        destination: /usr/share/bash-completion/completions/ipsw
+        mode: 0644
+      - source: ./completions/_fish
+        destination: /usr/share/fish/vendor_completions.d/ipsw.fish
+        mode: 0644
+      - source: ./completions/_zsh
+        destination:  /usr/share/zsh/vendor-completions/_ipsw
+        mode: 0644
+      - source: ./manpages/ipsw.1.gz
+        destination: /usr/share/man/man1/ipsw.1.gz
+        mode: 0644
+      - source: ./LICENSE
+        destination: /usr/share/doc/ipsw/copyright
+        mode: 0644
+    apps:
+      ipsw:
+        command: ipsw
+        plugs: ["home", "network"]
 
 aurs:
   - homepage: https://github.com/blacktop/ipsw
