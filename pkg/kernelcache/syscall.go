@@ -134,7 +134,7 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 		}
 	}
 
-	if m.FileTOC.FileHeader.Type == types.FileSet {
+	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 		var err error
 		m, err = m.GetFileSetFileByName("com.apple.kernel")
 		if err != nil {

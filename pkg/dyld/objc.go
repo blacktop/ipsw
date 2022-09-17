@@ -164,27 +164,32 @@ func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
 	return nil, nil, fmt.Errorf("unable to find section __TEXT.__objc_opt_ro in /usr/lib/libobjc.A.dylib")
 }
 
-func (f *File) getSelectorStringHash() (*StringHash, error) {
+func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 
 	sec, opt, err := f.getOptimizations()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if opt.SelectorOptOffset == 0 {
-		return nil, fmt.Errorf("selopt_offset is 0")
+		return nil, nil, fmt.Errorf("selopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.SelectorOptOffset), opt: opt}
-
-	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
-		return nil, err
+	u, off, err := f.GetOffset(sec.Addr)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return &shash, nil
+	shash := StringHash{FileOffset: int64(off) + int64(opt.SelectorOptOffset), opt: opt}
+
+	if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		return nil, nil, err
+	}
+
+	return &shash, &u, nil
 }
 
-// func (f *File) getHeaderRoStringHash() (*StringHash, error) {
+// func (f *File) getHeaderRoStringHash() (*StringHash, *types.UUID, error) {
 
 // 	sec, opt, err := f.getOptimizations()
 // 	if err != nil {
@@ -204,47 +209,57 @@ func (f *File) getSelectorStringHash() (*StringHash, error) {
 // 	return &shash, nil
 // }
 
-func (f *File) getClassStringHash() (*StringHash, error) {
+func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 
 	sec, opt, err := f.getOptimizations()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if opt.GetClassOffset() == 0 {
-		return nil, fmt.Errorf("clsopt_offset is 0")
+		return nil, nil, fmt.Errorf("clsopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.GetClassOffset()), opt: opt}
-
-	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
-		return nil, err
+	u, off, err := f.GetOffset(sec.Addr)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return &shash, nil
+	shash := StringHash{FileOffset: int64(off) + int64(opt.GetClassOffset()), opt: opt}
+
+	if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		return nil, nil, err
+	}
+
+	return &shash, &u, nil
 }
 
-func (f *File) getProtocolStringHash() (*StringHash, error) {
+func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 
 	sec, opt, err := f.getOptimizations()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	if opt.GetProtocolOffset() == 0 {
-		return nil, fmt.Errorf("protocolopt_offset is 0")
+		return nil, nil, fmt.Errorf("protocolopt_offset is 0")
 	}
 
-	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.GetProtocolOffset()), opt: opt}
-
-	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
-		return nil, err
+	u, off, err := f.GetOffset(sec.Addr)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return &shash, nil
+	shash := StringHash{FileOffset: int64(off) + int64(opt.GetProtocolOffset()), opt: opt}
+
+	if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		return nil, nil, err
+	}
+
+	return &shash, &u, nil
 }
 
-// func (f *File) getHeaderRwStringHash() (*StringHash, error) {
+// func (f *File) getHeaderRwStringHash() (*StringHash, *types.UUID, error) {
 
 // 	sec, opt, err := f.getOptimizations()
 // 	if err != nil {
@@ -264,9 +279,9 @@ func (f *File) getProtocolStringHash() (*StringHash, error) {
 // 	return &shash, nil
 // }
 
-func (f *File) dumpOffsets(offsets []int32, fileOffset int64) {
+func (f *File) dumpOffsets(offsets []int32, fileOffset int64, uuid types.UUID) {
 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
-	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 	for _, ptr := range offsets {
 		if ptr != 0 {
 			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
@@ -274,10 +289,9 @@ func (f *File) dumpOffsets(offsets []int32, fileOffset int64) {
 			if err != nil {
 				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
 			}
-			addr, _ := f.GetVMAddressForUUID(f.UUID, uint64(int32(fileOffset)+ptr))
+			addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(fileOffset)+ptr))
 			fmt.Printf("    0x%x: %s\n", addr, strings.Trim(s, "\x00"))
 		}
-
 	}
 }
 
@@ -354,11 +368,12 @@ type header_info_rw struct {
 // 	}
 // }
 
-func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64 {
-	objcMap := make(map[string]uint64)
-
+func (f *File) offsetsToMap(offsets []int32, fileOffset int64, uuid types.UUID) map[string]uint64 {
 	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
-	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
+
+	objcMap := make(map[string]uint64)
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
 	for _, ptr := range offsets {
 		if ptr != 0 {
 			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
@@ -366,13 +381,12 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 			if err != nil {
 				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
 			}
-			addr, _ := f.GetVMAddressForUUID(f.UUID, uint64(int32(fileOffset)+ptr))
+			addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(fileOffset)+ptr))
 			objcMap[strings.Trim(s, "\x00")] = addr
-
 			f.AddressToSymbol[addr] = strings.Trim(s, "\x00")
 		}
-
 	}
+
 	return objcMap
 }
 
@@ -381,21 +395,21 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64) map[string]uint64
 // returns: map[sym]addr
 func (f *File) GetAllObjCSelectors(print bool) (map[string]uint64, error) {
 
-	shash, err := f.getSelectorStringHash()
+	shash, uuid, err := f.getSelectorStringHash()
 	if err != nil {
 		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	if print {
-		f.dumpOffsets(shash.Offsets, shash.FileOffset)
+		f.dumpOffsets(shash.Offsets, shash.FileOffset, *uuid)
 	}
 
-	return f.offsetsToMap(shash.Offsets, shash.FileOffset), nil
+	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
 }
 
 // GetSelectorAddress returns a selector name's address
 func (f *File) GetSelectorAddress(selector string) (uint64, error) {
-	shash, err := f.getSelectorStringHash()
+	shash, uuid, err := f.getSelectorStringHash()
 	if err != nil {
 		return 0, fmt.Errorf("failed get selector objc_stringhash_t for %s: %v", selector, err)
 	}
@@ -405,7 +419,7 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 		return 0, fmt.Errorf("failed get selector address for %s", selector)
 	}
 
-	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
+	ptr, err := f.GetVMAddressForUUID(*uuid, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
 	if err != nil {
 		return 0, fmt.Errorf("failed get selector address for %s: %w", selector, err)
 	}
@@ -415,21 +429,21 @@ func (f *File) GetSelectorAddress(selector string) (uint64, error) {
 
 // GetAllClasses dumps the classes from the optimized string hash
 func (f *File) GetAllObjCClasses(print bool) (map[string]uint64, error) {
-	shash, err := f.getClassStringHash()
+	shash, uuid, err := f.getClassStringHash()
 	if err != nil {
 		return nil, fmt.Errorf("failed read class objc_stringhash_t")
 	}
 
 	if print {
-		f.dumpOffsets(shash.Offsets, shash.FileOffset)
+		f.dumpOffsets(shash.Offsets, shash.FileOffset, *uuid)
 	}
 
-	return f.offsetsToMap(shash.Offsets, shash.FileOffset), nil
+	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
 }
 
 // GetClassAddress returns a class address
 func (f *File) GetClassAddress(class string) (uint64, error) {
-	shash, err := f.getClassStringHash()
+	shash, uuid, err := f.getClassStringHash()
 	if err != nil {
 		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
@@ -439,7 +453,7 @@ func (f *File) GetClassAddress(class string) (uint64, error) {
 		return 0, fmt.Errorf("failed get class address for %s: %v", class, err)
 	}
 
-	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
+	ptr, err := f.GetVMAddressForUUID(*uuid, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
 	if err != nil {
 		return 0, fmt.Errorf("failed get class address for %s: %w", class, err)
 	}
@@ -449,21 +463,21 @@ func (f *File) GetClassAddress(class string) (uint64, error) {
 
 // GetAllProtocols dumps the protols from the optimized string hash
 func (f *File) GetAllObjCProtocols(print bool) (map[string]uint64, error) {
-	shash, err := f.getProtocolStringHash()
+	shash, uuid, err := f.getProtocolStringHash()
 	if err != nil {
 		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
 	if print {
-		f.dumpOffsets(shash.Offsets, shash.FileOffset)
+		f.dumpOffsets(shash.Offsets, shash.FileOffset, *uuid)
 	}
 
-	return f.offsetsToMap(shash.Offsets, shash.FileOffset), nil
+	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
 }
 
 // GetProtocolAddress returns a protocol address
 func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
-	shash, err := f.getProtocolStringHash()
+	shash, uuid, err := f.getProtocolStringHash()
 	if err != nil {
 		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
@@ -473,7 +487,7 @@ func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
 		return 0, fmt.Errorf("failed get protocol address for %s: %v", protocol, err)
 	}
 
-	ptr, err := f.GetVMAddressForUUID(f.UUID, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
+	ptr, err := f.GetVMAddressForUUID(*uuid, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
 	if err != nil {
 		return 0, fmt.Errorf("failed get protocol address for %s: %w", protocol, err)
 	}
@@ -1225,19 +1239,25 @@ func (s StringHash) String() string {
 --------------------------------------------------------------------
 mix -- mix 3 64-bit values reversibly.
 mix() takes 48 machine instructions, but only 24 cycles on a superscalar
-  machine (like Intel's new MMX architecture).  It requires 4 64-bit
-  registers for 4::2 parallelism.
+
+	machine (like Intel's new MMX architecture).  It requires 4 64-bit
+	registers for 4::2 parallelism.
+
 All 1-bit deltas, all 2-bit deltas, all deltas composed of top bits of
-  (a,b,c), and all deltas of bottom bits were tested.  All deltas were
-  tested both on random keys and on keys that were nearly all zero.
-  These deltas all cause every bit of c to change between 1/3 and 2/3
-  of the time (well, only 113/400 to 287/400 of the time for some
-  2-bit delta).  These deltas all cause at least 80 bits to change
-  among (a,b,c) when the mix is run either forward or backward (yes it
-  is reversible).
+
+	(a,b,c), and all deltas of bottom bits were tested.  All deltas were
+	tested both on random keys and on keys that were nearly all zero.
+	These deltas all cause every bit of c to change between 1/3 and 2/3
+	of the time (well, only 113/400 to 287/400 of the time for some
+	2-bit delta).  These deltas all cause at least 80 bits to change
+	among (a,b,c) when the mix is run either forward or backward (yes it
+	is reversible).
+
 This implies that a hash using mix64 has no funnels.  There may be
-  characteristics with 3-bit deltas or bigger, I didn't test for
-  those.
+
+	characteristics with 3-bit deltas or bigger, I didn't test for
+	those.
+
 --------------------------------------------------------------------
 */
 func mix64(a, b, c *uint64) {

@@ -317,7 +317,7 @@ func GetVersion(m *macho.File) (*Version, error) {
 
 	kc := m
 
-	if kc.FileTOC.FileHeader.Type == types.FileSet {
+	if kc.FileTOC.FileHeader.Type == types.MH_FILESET {
 		var err error
 		kc, err = m.GetFileSetFileByName("kernel")
 		if err != nil {

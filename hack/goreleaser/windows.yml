@@ -6,7 +6,8 @@ before:
     - go mod tidy
 
 builds:
-  - main: ./cmd/ipsw
+  - id: windows_amd64
+    main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
@@ -14,7 +15,23 @@ builds:
       - windows
     goarch:
       - amd64
-      # - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  - id: windows_arm64
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CC=zig.exe cc -target aarch64-windows-gnu
+      - CC=zig.exe c++ -target aarch64-windows-gnu
+    tags:
+      - extended
+    goos:
+      - windows
+    goarch:
+      - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -23,6 +40,7 @@ builds:
 archives:
   - replacements:
       darwin: macOS
+      ios: iOS
       amd64: x86_64
       all: universal
     format_overrides:
@@ -33,6 +51,7 @@ archives:
       - LICENSE
       - completions/*
       - manpages/*
+    wrap_in_directory: true
 
 checksum:
   name_template: 'checksums.win.txt'

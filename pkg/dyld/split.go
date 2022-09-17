@@ -4,6 +4,7 @@ package dyld
 
 /*
 #cgo CFLAGS: -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
+#cgo CFLAGS: -Wno-nullability-completeness
 #cgo LDFLAGS: -ldl
 #include <stdio.h>
 #include <string.h>
@@ -14,7 +15,7 @@ int
 dsc_extract(void *f, const char* shared_cache_file_path, const char* extraction_root_path){
     int (*extractor_proc)(const char* shared_cache_file_path, const char* extraction_root_path,
                           void (^progress)(unsigned current, unsigned total));
-    extractor_proc = (int (*)(const char *))f;
+    extractor_proc = f;
     int result = (*extractor_proc)(shared_cache_file_path, extraction_root_path,
                                    ^(unsigned c, unsigned total) { printf("%d/%d\n", c, total); });
     return result;
@@ -25,7 +26,7 @@ import "C"
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -136,7 +137,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		// get XCodeVersion
 		xcodeContentPath := strings.TrimSuffix(dscExtractor.Libname, "/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")
 		xcodeContentPath = filepath.Join(xcodeContentPath, "Info.plist")
-		data, err := ioutil.ReadFile(xcodeContentPath)
+		data, err := os.ReadFile(xcodeContentPath)
 		if err != nil {
 			return fmt.Errorf("failed to read %s: %v", xcodeContentPath, err)
 		}
@@ -157,7 +158,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 			return fmt.Errorf("failed to marshal stop session request: %v", err)
 		}
 		log.Infof("Creating XCode cache %s\n", infoPlistPath)
-		ioutil.WriteFile(infoPlistPath, data, 0644)
+		os.WriteFile(infoPlistPath, data, 0644)
 
 		destinationPath = filepath.Join(destinationPath, "Symbols")
 	}

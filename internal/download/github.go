@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -156,7 +156,7 @@ func GetLatestTag(prod, proxy string, insecure bool, api string) (string, error)
 		return "", fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read github api JSON: %v", err)
 	}
@@ -196,7 +196,7 @@ func queryAppleGithubRepo(prod, proxy string, insecure bool, api string) (*githu
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
 	}
@@ -239,7 +239,7 @@ func queryAppleGithubRepos(proxy string, insecure bool, api string) (GithubRepos
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
 	}
@@ -269,7 +269,7 @@ func queryAppleGithubRepos(proxy string, insecure bool, api string) (GithubRepos
 			return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 		}
 
-		document, err := ioutil.ReadAll(resp.Body)
+		document, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read github api JSON: %v", err)
 		}
@@ -387,7 +387,7 @@ func queryAppleGithubTags(url, proxy string, insecure bool, api string) (GithubT
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
 	}
@@ -430,7 +430,7 @@ func GetGithubIPSWReleases(proxy string, insecure bool, api string) (GithubRelea
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
 	}
@@ -469,7 +469,7 @@ func GetPreprocessedAppleOssTags(proxy string, insecure bool) (map[string]Github
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
 	}
@@ -507,7 +507,7 @@ func GetPreprocessedWebKitTags(proxy string, insecure bool) ([]GithubTag, error)
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read github api JSON: %v", err)
 	}

@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"sort"
@@ -59,6 +58,7 @@ type assetAudienceID string
 
 const ( // CREDIT: Siguza
 	iOSRelease           assetAudienceID = "01c1d682-6e8f-4908-b724-5501fe3f5e5c" // iOS release
+	iOSUnknown           assetAudienceID = "0c88076f-c292-4dad-95e7-304db9d29d34" // iOS unknown
 	iOSInternal          assetAudienceID = "ce9c2203-903b-4fb3-9f03-040dc2202694" // iOS internal (not publicly accessible)
 	iOS11Beta            assetAudienceID = "b7580fda-59d3-43ae-9488-a81b825e3c73" // iOS 11 beta
 	iOS12Beta            assetAudienceID = "ef473147-b8e7-4004-988e-0ae20e2532ef" // iOS 12 beta
@@ -194,7 +194,7 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 		return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 	}
 
-	document, err := ioutil.ReadAll(resp.Body)
+	document, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read OTA plist: %v", err)
 	}
@@ -247,7 +247,7 @@ func (o *Ota) getRequestAudienceIDs() ([]assetAudienceID, error) {
 				}
 				switch segs[0] { // MAJOR
 				case 0: // empty version
-					return []assetAudienceID{iOS16DeveloperBeta, iOS16CustomerBeta}, nil
+					return []assetAudienceID{iOS16DeveloperBeta, iOS16CustomerBeta, iOS16PublicBeta}, nil
 				case 11:
 					return []assetAudienceID{iOS11Beta}, nil
 				case 12:
@@ -420,6 +420,9 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID) (reqs []p
 		req.ProductType = prod
 		reqNEW := req
 		reqs = append(reqs, reqNEW)
+	} else if len(o.Config.Device) > 0 && len(o.Config.Model) > 0 {
+		reqNEW := req
+		reqs = append(reqs, reqNEW)
 	} else {
 		devices, err := o.db.GetDevicesForType(o.Config.Platform)
 		if err != nil {
@@ -517,7 +520,7 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	}()
 
 	for resp := range c {
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("failed to read response body: %v", err)
 			continue

@@ -39,7 +39,10 @@ import (
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+var haveChecked []string
 
 type Entitlements map[string]any
 
@@ -66,13 +69,17 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 	}
 	defer func() {
 		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-		if err := utils.Unmount(mountPoint, false); err != nil {
+		if err := utils.Unmount(mountPoint, true); err != nil {
 			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
 		}
 	}()
 
 	var files []string
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Errorf("failed to walk mount %s: %v", mountPoint, err)
+			return nil
+		}
 		if !info.IsDir() {
 			files = append(files, path)
 		}
@@ -188,9 +195,13 @@ func init() {
 	rootCmd.AddCommand(entCmd)
 
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
-	entCmd.Flags().String("db", "", "Path to entitlement database to use")
-	entCmd.Flags().StringP("file", "f", "", "Output entitlements for file")
+	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO")
+	entCmd.Flags().String("output", "o", "Folder to r/w entitlement databases")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
+	viper.BindPFlag("ent.ent", entCmd.Flags().Lookup("ent"))
+	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
+	viper.BindPFlag("ent.ouput", entCmd.Flags().Lookup("ouput"))
+	viper.BindPFlag("ent.diff", entCmd.Flags().Lookup("diff"))
 }
 
 // entCmd represents the ent command
@@ -205,23 +216,22 @@ var entCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		entitlement, _ := cmd.Flags().GetString("ent")
-		entDBPath, _ := cmd.Flags().GetString("db")
-		searchFile, _ := cmd.Flags().GetString("file")
-		doDiff, _ := cmd.Flags().GetBool("diff")
+		entitlement := viper.GetString("ent.ent")
+		searchFile := viper.GetString("ent.file")
 
 		if len(entitlement) > 0 && len(searchFile) > 0 {
 			log.Errorf("you can only use --ent OR --file (not both)")
 			return nil
-		} else if len(entitlement) > 0 && doDiff {
+		} else if len(entitlement) > 0 && viper.GetBool("ent.diff") {
 			log.Errorf("you can only use --ent OR --diff (not both)")
 			return nil
 		}
 
 		ipswPath := filepath.Clean(args[0])
 
-		if len(entDBPath) == 0 {
-			entDBPath = strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
+		entDBPath := strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
+		if len(viper.GetString("ent.output")) > 0 {
+			entDBPath = filepath.Join(viper.GetString("ent.output"), filepath.Base(entDBPath))
 		}
 
 		entDB, err := getEntitlementDatabase(ipswPath, entDBPath)
@@ -229,9 +239,17 @@ var entCmd = &cobra.Command{
 			return fmt.Errorf("failed to get entitlement database: %v", err)
 		}
 
-		if doDiff {
+		if viper.GetBool("ent.diff") { // DIFF ENTITLEMENTS
+			if len(args) < 2 {
+				return fmt.Errorf("you must specify two IPSWs to diff")
+			}
+
 			ipswPath2 := filepath.Clean(args[1])
+
 			entDBPath2 := strings.TrimSuffix(ipswPath2, filepath.Ext(ipswPath2)) + ".entDB"
+			if len(viper.GetString("ent.output")) > 0 {
+				entDBPath2 = filepath.Join(viper.GetString("ent.output"), filepath.Base(entDBPath2))
+			}
 
 			entDB2, err := getEntitlementDatabase(ipswPath2, entDBPath2)
 			if err != nil {
@@ -240,7 +258,7 @@ var entCmd = &cobra.Command{
 
 			dmp := diffmatchpatch.New()
 
-			if len(searchFile) > 0 {
+			if len(searchFile) > 0 { // DIFF MACHO'S ENTITLEMENTS
 				for f2, ent2 := range entDB2 {
 					if strings.Contains(strings.ToLower(f2), strings.ToLower(searchFile)) {
 						if e, ok := entDB[f2]; ok {
@@ -268,7 +286,8 @@ var entCmd = &cobra.Command{
 					}
 				}
 			} else {
-				for f2, e2 := range entDB2 {
+				found := false
+				for f2, e2 := range entDB2 { // DIFF ALL ENTITLEMENTS
 					if e, ok := entDB[f2]; ok {
 						diffs := dmp.DiffMain(e, e2, false)
 						if len(diffs) > 2 {
@@ -281,20 +300,26 @@ var entCmd = &cobra.Command{
 							if diffs[0].Type == diffmatchpatch.DiffEqual {
 								continue
 							} else {
+								found = true
 								fmt.Printf("\n%s\n\n", f2)
 								fmt.Println(dmp.DiffPrettyText(diffs))
 							}
 						} else {
+							found = true
 							fmt.Printf("\n%s\n\n", f2)
 							fmt.Println(dmp.DiffPrettyText(diffs))
 						}
 					} else {
+						found = true
 						fmt.Printf("\n🆕 %s 🆕\n\n%s", f2, e2)
 					}
 				}
+				if !found {
+					log.Warn("No differences found")
+				}
 			}
 			return nil
-		} else if len(searchFile) > 0 { // DUMP FILE'S ENTITLEMENTS
+		} else if len(searchFile) > 0 { // DUMP MACHO'S ENTITLEMENTS
 			for f, ent := range entDB {
 				if strings.Contains(strings.ToLower(f), strings.ToLower(searchFile)) {
 					log.Infof(f)

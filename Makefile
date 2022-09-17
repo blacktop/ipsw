@@ -1,6 +1,7 @@
 REPO=blacktop
 NAME=ipsw
-CUR_VERSION=$(shell svu current)
+CUR_VERSION=$(shell gh release view --json tagName -q '.tagName')
+LOCAL_VERSION=$(shell svu current)
 NEXT_VERSION=$(shell svu patch)
 GO_BIN=go
 
@@ -15,6 +16,7 @@ dev-deps: ## Install the dev dependencies
 	$(GO_BIN) install golang.org/x/tools/...@latest
 	$(GO_BIN) install github.com/spf13/cobra-cli@latest
 	$(GO_BIN) get -d golang.org/x/tools/cmd/cover
+	$(GO_BIN) get -d golang.org/x/tools/cmd/stringer
 	$(GO_BIN) get -d github.com/caarlos0/svu@v1.4.1
 
 .PHONY: setup
@@ -23,12 +25,12 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin --rm-dist --snapshot --single-target --output dist/ipsw
+	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_arm64_extras_build --rm-dist --snapshot --single-target --output dist/ipsw
 
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
-	@goreleaser --rm-dist --snapshot
+	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --snapshot
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
@@ -90,7 +92,7 @@ update_keys: ## Scrape the iPhoneWiki for AES keys
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"
-	docker build -t $(REPO)/$(NAME):$(NEXT_VERSION) .
+	docker build --build-arg VERSION=$(NEXT_VERSION) -t $(REPO)/$(NAME):$(NEXT_VERSION) .
 
 .PHONY: docker-tag
 docker-tag: docker ## Tag docker image
