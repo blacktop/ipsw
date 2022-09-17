@@ -88,7 +88,7 @@ var sbdecCmd = &cobra.Command{
 			ProfileBinPath: viper.GetString("kernel.sbdec.input"), // supply your own sandbox profile data blob
 		}
 
-		if m.FileTOC.FileHeader.Type == types.FileSet {
+		if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 			fixups := make(map[uint64]uint64)
 			if m.HasFixups() {
 				dcf, err := m.DyldChainedFixups()
