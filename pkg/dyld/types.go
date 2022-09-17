@@ -339,23 +339,24 @@ func (i CacheSlideInfo3) SlidePointer(ptr uint64) uint64 {
 const DYLD_CACHE_SLIDE_V3_PAGE_ATTR_NO_REBASE = 0xFFFF // page has no rebasing
 
 // CacheSlidePointer3 struct
-// {
-//     uint64_t  raw;
-//     struct {
-//         uint64_t    pointerValue        : 51,
-//                     offsetToNextPointer : 11,
-//                     unused              :  2;
-//     }         plain;
-//     struct {
-//         uint64_t    offsetFromSharedCacheBase : 32,
-//                     diversityData             : 16,
-//                     hasAddressDiversity       :  1,
-//                     key                       :  2,
-//                     offsetToNextPointer       : 11,
-//                     unused                    :  1,
-//                     authenticated             :  1; // = 1;
-//     }         auth;
-// };
+//
+//	{
+//	    uint64_t  raw;
+//	    struct {
+//	        uint64_t    pointerValue        : 51,
+//	                    offsetToNextPointer : 11,
+//	                    unused              :  2;
+//	    }         plain;
+//	    struct {
+//	        uint64_t    offsetFromSharedCacheBase : 32,
+//	                    diversityData             : 16,
+//	                    hasAddressDiversity       :  1,
+//	                    key                       :  2,
+//	                    offsetToNextPointer       : 11,
+//	                    unused                    :  1,
+//	                    authenticated             :  1; // = 1;
+//	    }         auth;
+//	};
 type CacheSlidePointer3 uint64
 
 // SignExtend51 returns a regular pointer which needs to fit in 51-bits of value.

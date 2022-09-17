@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -212,7 +212,7 @@ func GetProductInfo() (ProductInfos, error) {
 	var prods ProductInfos
 
 	if runtime.GOOS == "darwin" {
-		data, err := ioutil.ReadFile(seedCatalogsPlist)
+		data, err := os.ReadFile(seedCatalogsPlist)
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +233,7 @@ func GetProductInfo() (ProductInfos, error) {
 			return nil, fmt.Errorf("failed to connect to URL: %s", resp.Status)
 		}
 
-		document, err := ioutil.ReadAll(resp.Body)
+		document, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
 		}
@@ -256,7 +256,7 @@ func GetProductInfo() (ProductInfos, error) {
 			return nil, fmt.Errorf("failed to downoad the sucatalogs: %v", err)
 		}
 
-		catData, err = ioutil.ReadAll(resp.Body)
+		catData, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read sucatalogs data: %v", err)
 		}
@@ -282,7 +282,7 @@ func GetProductInfo() (ProductInfos, error) {
 				return nil, fmt.Errorf("failed to download the server metadata %s: %v", prod.ServerMetadataURL, err)
 			}
 
-			serverMetadata, err := ioutil.ReadAll(resp.Body)
+			serverMetadata, err := io.ReadAll(resp.Body)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read server metadata: %v", err)
 			}
@@ -317,7 +317,7 @@ func GetProductInfo() (ProductInfos, error) {
 			return nil, fmt.Errorf("failed to download the distribution: %v", err)
 		}
 
-		pInfo.distributionData, err = ioutil.ReadAll(resp.Body)
+		pInfo.distributionData, err = io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read distribution data: %v", err)
 		}
@@ -435,7 +435,7 @@ func (i *ProductInfo) DownloadInstaller(workDir, proxy string, insecure, skipAll
 
 	distPath := filepath.Join(folder, getDestName(i.Product.Distributions["English"], false))
 	if _, err := os.Stat(sparseDiskimagePath); os.IsNotExist(err) {
-		if err := ioutil.WriteFile(distPath, i.distributionData, 0660); err != nil {
+		if err := os.WriteFile(distPath, i.distributionData, 0660); err != nil {
 			return err
 		}
 	}

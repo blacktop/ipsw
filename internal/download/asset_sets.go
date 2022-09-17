@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sort"
 
@@ -54,7 +54,7 @@ func GetAssetSets(proxy string, insecure bool) (*AssetSets, error) {
 		return nil, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}

@@ -28,6 +28,12 @@ import (
 
 	"github.com/apex/log"
 	clihander "github.com/apex/log/handlers/cli"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/download"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/dyld"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/idev"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img4"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/kernel"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/macho"
 	"github.com/spf13/cobra"
 
 	// "github.com/spf13/cobra/doc"
@@ -39,6 +45,8 @@ var (
 	cfgFile string
 	// Verbose boolean flag for verbose logging
 	Verbose bool
+	// Color boolean flag for colorized output
+	Color bool
 	// AppVersion stores the plugin's version
 	AppVersion string
 	// AppBuildTime stores the plugin's build time
@@ -48,7 +56,7 @@ var (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "ipsw",
-	Short: "Download and Parse IPSWs",
+	Short: "Download and Parse IPSWs (and SO much more)",
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -69,8 +77,21 @@ func init() {
 	// Cobra supports persistent flags, which, if defined here,
 	// will be global for your application.
 
+	// Flags
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
+	rootCmd.PersistentFlags().BoolVar(&Color, "color", false, "colorize output")
+	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
+	viper.BindPFlag("color", rootCmd.Flags().Lookup("color"))
+	viper.BindEnv("color", "CLICOLOR")
+	// Add subcommand groups
+	rootCmd.AddCommand(download.DownloadCmd)
+	rootCmd.AddCommand(dyld.DyldCmd)
+	rootCmd.AddCommand(idev.IDevCmd)
+	rootCmd.AddCommand(img4.Img4Cmd)
+	rootCmd.AddCommand(kernel.KernelcacheCmd)
+	rootCmd.AddCommand(macho.MachoCmd)
+	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
 

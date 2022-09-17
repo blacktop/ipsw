@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/blacktop/ipsw/internal/utils"
@@ -41,7 +41,7 @@ func GetIpswDB(proxy string, insecure bool) (*info.Devices, error) {
 		return nil, fmt.Errorf("api returned status: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}

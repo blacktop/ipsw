@@ -63,7 +63,7 @@ var deviceListCmd = &cobra.Command{
 			return err
 		}
 
-		sort.Sort(xcode.ByProductType{devices})
+		sort.Sort(xcode.ByProductType{Devices: devices})
 
 		data := [][]string{}
 		for _, device := range devices {

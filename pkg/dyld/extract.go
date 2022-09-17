@@ -120,7 +120,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 	for _, match := range matches {
 		dyldDest := filepath.Join(destPath, filepath.Base(match))
 		utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting %s to %s", filepath.Base(match), dyldDest))
-		if err := utils.Cp(match, dyldDest); err != nil {
+		if err := utils.Copy(match, dyldDest); err != nil {
 			return fmt.Errorf("failed to copy %s to %s: %v", match, dyldDest, err)
 		}
 	}

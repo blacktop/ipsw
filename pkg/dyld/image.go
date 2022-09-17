@@ -313,13 +313,15 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 	}
 
 	var rsBase uint64
-	sec, opt, err := i.cache.getOptimizations()
-	if err != nil {
-		return nil, err
-	}
+	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
+		sec, opt, err := i.cache.getOptimizations()
+		if err != nil {
+			return nil, err
+		}
 
-	if opt.Version == 16 {
-		rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
+		if opt.Version == 16 {
+			rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
+		}
 	}
 
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
@@ -592,15 +594,15 @@ func (i *CacheImage) ParseObjC() error {
 		if err := i.cache.MethodsForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(i.Name), err)
 		}
-		// if strings.Contains(i.Name, "libobjc.A.dylib") {
-		// 	if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
-		// 		return fmt.Errorf("failed to parse objc all selectors: %v", err)
-		// 	}
-		// } else {
-		if err := i.cache.SelectorsForImage(i.Name); err != nil {
-			return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
+		if strings.Contains(i.Name, "libobjc.A.dylib") {
+			if _, err := i.cache.GetAllObjCSelectors(false); err != nil {
+				return fmt.Errorf("failed to parse objc all selectors: %v", err)
+			}
+		} else {
+			if err := i.cache.SelectorsForImage(i.Name); err != nil {
+				return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(i.Name), err)
+			}
 		}
-		// }
 		if err := i.cache.ClassesForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc classes for image %s: %v", filepath.Base(i.Name), err)
 		}
@@ -921,7 +923,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 	return nil
 }
 
-//  returns the public symbol matching the given name
+// returns the public symbol matching the given name
 func (i *CacheImage) GetPublicSymbol(name string) (*Symbol, error) {
 	i.ParsePublicSymbols(false)
 
