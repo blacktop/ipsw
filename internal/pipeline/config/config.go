@@ -14,8 +14,8 @@ import (
 type Job struct {
 	ID            string      `yaml:"id,omitempty" json:"id,omitempty"`
 	Env           []string    `yaml:"env,omitempty" json:"env,omitempty"`
-	Download      Download    `yaml:"download,omitempty" json:"download,omitempty"`
-	Extract       Extract     `yaml:"extract,omitempty" json:"extract,omitempty"`
+	Downloads     Download    `yaml:"download,omitempty" json:"download,omitempty"`
+	Extracts      []Extract   `yaml:"extracts,omitempty" json:"extracts,omitempty"`
 	Dockers       []Docker    `yaml:"dockers,omitempty" json:"dockers,omitempty"`
 	IDA           []IDA       `yaml:"ida,omitempty" json:"ida,omitempty"`
 	Ghidra        []Ghidra    `yaml:"ghidra,omitempty" json:"ghidra,omitempty"`
@@ -39,9 +39,17 @@ type Download struct {
 }
 
 type IPSW struct {
+	ID      string   `yaml:"id,omitempty" json:"id,omitempty"`
+	Devices []string `yaml:"devices,omitempty" json:"devices,omitempty"`
+	Latest  bool     `yaml:"latest,omitempty" json:"latest,omitempty"`
+	Beta    bool     `yaml:"beta,omitempty" json:"beta,omitempty"`
 }
 
 type OTA struct {
+	ID      string   `yaml:"id,omitempty" json:"id,omitempty"`
+	Devices []string `yaml:"devices,omitempty" json:"devices,omitempty"`
+	Latest  bool     `yaml:"latest,omitempty" json:"latest,omitempty"`
+	Beta    bool     `yaml:"beta,omitempty" json:"beta,omitempty"`
 }
 
 // File is a file inside an archive.
@@ -108,10 +116,10 @@ type Archive struct {
 }
 
 type Extract struct {
-	ID          string `yaml:"id,omitempty" json:"id,omitempty"`
-	Kernelcache bool   `yaml:"kernelcache,omitempty" json:"kernelcache,omitempty"`
-	DSC         bool   `yaml:"dyld_share_cache,omitempty" json:"dyld_share_cache,omitempty"`
-	Pattern     string `yaml:"pattern,omitempty" json:"pattern,omitempty"`
+	IDs         []string `yaml:"ids,omitempty" json:"ids,omitempty"`
+	Kernelcache bool     `yaml:"kernelcache,omitempty" json:"kernelcache,omitempty"`
+	DSC         bool     `yaml:"dyld_share_cache,omitempty" json:"dyld_share_cache,omitempty"`
+	Pattern     string   `yaml:"pattern,omitempty" json:"pattern,omitempty"`
 }
 
 type Docker struct {

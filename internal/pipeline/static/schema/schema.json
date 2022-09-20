@@ -1,0 +1,716 @@
+{
+		"$schema": "http://json-schema.org/draft/2020-12/schema",
+		"$id": "https://github.com/blacktop/ipsw/internal/pipeline/config/job",
+		"$ref": "#/$defs/Job",
+		"$defs": {
+			"Announce": {
+				"properties": {
+					"skip": {
+						"type": "string"
+					},
+					"mattermost": {
+						"$ref": "#/$defs/Mattermost"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Archive": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"builds": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"name_template": {
+						"type": "string"
+					},
+					"replacements": {
+						"patternProperties": {
+							".*": {
+								"type": "string"
+							}
+						},
+						"type": "object"
+					},
+					"format": {
+						"type": "string"
+					},
+					"wrap_in_directory": {
+						"oneOf": [
+							{
+								"type": "string"
+							},
+							{
+								"type": "boolean"
+							}
+						]
+					},
+					"strip_parent_binary_folder": {
+						"type": "boolean"
+					},
+					"files": {
+						"items": {
+							"$ref": "#/$defs/File"
+						},
+						"type": "array"
+					},
+					"meta": {
+						"type": "boolean"
+					},
+					"allow_different_binary_count": {
+						"type": "boolean"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Blob": {
+				"properties": {
+					"bucket": {
+						"type": "string"
+					},
+					"provider": {
+						"type": "string"
+					},
+					"region": {
+						"type": "string"
+					},
+					"disableSSL": {
+						"type": "boolean"
+					},
+					"folder": {
+						"type": "string"
+					},
+					"kmskey": {
+						"type": "string"
+					},
+					"ids": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"endpoint": {
+						"type": "string"
+					},
+					"extra_files": {
+						"items": {
+							"$ref": "#/$defs/ExtraFile"
+						},
+						"type": "array"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Diff": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"type": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Docker": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"image": {
+						"type": "string"
+					},
+					"cmd": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Download": {
+				"properties": {
+					"ipsw": {
+						"items": {
+							"$ref": "#/$defs/IPSW"
+						},
+						"type": "array"
+					},
+					"ota": {
+						"items": {
+							"$ref": "#/$defs/OTA"
+						},
+						"type": "array"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"ExtraFile": {
+				"properties": {
+					"glob": {
+						"type": "string"
+					},
+					"name_template": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Extract": {
+				"properties": {
+					"ids": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"kernelcache": {
+						"type": "boolean"
+					},
+					"dyld_share_cache": {
+						"type": "boolean"
+					},
+					"pattern": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"File": {
+				"oneOf": [
+					{
+						"type": "string"
+					},
+					{
+						"$schema": "http://json-schema.org/draft/2020-12/schema",
+						"$id": "https://github.com/blacktop/ipsw/internal/pipeline/config/t",
+						"$defs": {
+							"FileInfo": {
+								"properties": {
+									"owner": {
+										"type": "string"
+									},
+									"group": {
+										"type": "string"
+									},
+									"mode": {
+										"type": "integer"
+									},
+									"mtime": {
+										"type": "string",
+										"format": "date-time"
+									}
+								},
+								"additionalProperties": false,
+								"type": "object"
+							}
+						},
+						"properties": {
+							"src": {
+								"type": "string"
+							},
+							"dst": {
+								"type": "string"
+							},
+							"strip_parent": {
+								"type": "boolean"
+							},
+							"info": {
+								"$ref": "#/$defs/FileInfo"
+							}
+						},
+						"additionalProperties": false,
+						"type": "object"
+					}
+				]
+			},
+			"FileInfo": {
+				"$schema": "http://json-schema.org/draft/2020-12/schema",
+				"$id": "https://github.com/blacktop/ipsw/internal/pipeline/config/file-info",
+				"$ref": "#/$defs/FileInfo",
+				"$defs": {
+					"FileInfo": {
+						"properties": {
+							"owner": {
+								"type": "string"
+							},
+							"group": {
+								"type": "string"
+							},
+							"mode": {
+								"type": "integer"
+							},
+							"mtime": {
+								"type": "string",
+								"format": "date-time"
+							}
+						},
+						"additionalProperties": false,
+						"type": "object"
+					}
+				}
+			},
+			"Ghidra": {
+				"properties": {
+					"path": {
+						"type": "string"
+					},
+					"args": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Header": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"dylib": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"IDA": {
+				"properties": {
+					"AutoAnalyze": {
+						"type": "boolean"
+					},
+					"AutoAccept": {
+						"type": "boolean"
+					},
+					"BatchMode": {
+						"type": "boolean"
+					},
+					"DeleteDB": {
+						"type": "boolean"
+					},
+					"Compiler": {
+						"type": "string"
+					},
+					"Database": {
+						"type": "string"
+					},
+					"CompressDB": {
+						"type": "boolean"
+					},
+					"Processor": {
+						"type": "string"
+					},
+					"ScriptArgs": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"PluginArgs": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"FileType": {
+						"type": "string"
+					},
+					"InputFile": {
+						"type": "string"
+					},
+					"EnableGUI": {
+						"type": "boolean"
+					},
+					"ShowIDALog": {
+						"type": "boolean"
+					},
+					"LogFile": {
+						"type": "string"
+					},
+					"TempDatabase": {
+						"type": "boolean"
+					},
+					"ExtraArgs": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"required": [
+					"AutoAnalyze",
+					"AutoAccept",
+					"BatchMode",
+					"DeleteDB",
+					"Compiler",
+					"Database",
+					"CompressDB",
+					"Processor",
+					"ScriptArgs",
+					"PluginArgs",
+					"FileType",
+					"InputFile",
+					"EnableGUI",
+					"ShowIDALog",
+					"LogFile",
+					"TempDatabase",
+					"ExtraArgs"
+				]
+			},
+			"IPSW": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"devices": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"latest": {
+						"type": "boolean"
+					},
+					"beta": {
+						"type": "boolean"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Job": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"env": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"download": {
+						"$ref": "#/$defs/Download"
+					},
+					"extracts": {
+						"items": {
+							"$ref": "#/$defs/Extract"
+						},
+						"type": "array"
+					},
+					"dockers": {
+						"items": {
+							"$ref": "#/$defs/Docker"
+						},
+						"type": "array"
+					},
+					"ida": {
+						"items": {
+							"$ref": "#/$defs/IDA"
+						},
+						"type": "array"
+					},
+					"ghidra": {
+						"items": {
+							"$ref": "#/$defs/Ghidra"
+						},
+						"type": "array"
+					},
+					"symbols": {
+						"items": {
+							"$ref": "#/$defs/Symbol"
+						},
+						"type": "array"
+					},
+					"strings": {
+						"items": {
+							"$ref": "#/$defs/String"
+						},
+						"type": "array"
+					},
+					"tbds": {
+						"items": {
+							"$ref": "#/$defs/TBD"
+						},
+						"type": "array"
+					},
+					"headers": {
+						"items": {
+							"$ref": "#/$defs/Header"
+						},
+						"type": "array"
+					},
+					"sandboxes": {
+						"items": {
+							"$ref": "#/$defs/Sandbox"
+						},
+						"type": "array"
+					},
+					"diffs": {
+						"items": {
+							"$ref": "#/$defs/Diff"
+						},
+						"type": "array"
+					},
+					"archives": {
+						"items": {
+							"$ref": "#/$defs/Archive"
+						},
+						"type": "array"
+					},
+					"artifactories": {
+						"items": {
+							"$ref": "#/$defs/Upload"
+						},
+						"type": "array"
+					},
+					"uploads": {
+						"items": {
+							"$ref": "#/$defs/Upload"
+						},
+						"type": "array"
+					},
+					"blobs": {
+						"items": {
+							"$ref": "#/$defs/Blob"
+						},
+						"type": "array"
+					},
+					"publishers": {
+						"items": {
+							"$ref": "#/$defs/Publisher"
+						},
+						"type": "array"
+					},
+					"announce": {
+						"$ref": "#/$defs/Announce"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Mattermost": {
+				"properties": {
+					"enabled": {
+						"type": "boolean"
+					},
+					"message_template": {
+						"type": "string"
+					},
+					"title_template": {
+						"type": "string"
+					},
+					"color": {
+						"type": "string"
+					},
+					"channel": {
+						"type": "string"
+					},
+					"username": {
+						"type": "string"
+					},
+					"icon_emoji": {
+						"type": "string"
+					},
+					"icon_url": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"OTA": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"devices": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"latest": {
+						"type": "boolean"
+					},
+					"beta": {
+						"type": "boolean"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Publisher": {
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"ids": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"checksum": {
+						"type": "boolean"
+					},
+					"signature": {
+						"type": "boolean"
+					},
+					"dir": {
+						"type": "string"
+					},
+					"cmd": {
+						"type": "string"
+					},
+					"env": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"extra_files": {
+						"items": {
+							"$ref": "#/$defs/ExtraFile"
+						},
+						"type": "array"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Sandbox": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"profile": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"String": {
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"dylib": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Symbol": {
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"dylib": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"TBD": {
+				"properties": {
+					"id": {
+						"type": "string"
+					},
+					"dylib": {
+						"type": "string"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object"
+			},
+			"Upload": {
+				"properties": {
+					"name": {
+						"type": "string"
+					},
+					"ids": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"exts": {
+						"items": {
+							"type": "string"
+						},
+						"type": "array"
+					},
+					"target": {
+						"type": "string"
+					},
+					"username": {
+						"type": "string"
+					},
+					"mode": {
+						"type": "string"
+					},
+					"method": {
+						"type": "string"
+					},
+					"checksum_header": {
+						"type": "string"
+					},
+					"client_x509_cert": {
+						"type": "string"
+					},
+					"client_x509_key": {
+						"type": "string"
+					},
+					"trusted_certificates": {
+						"type": "string"
+					},
+					"checksum": {
+						"type": "boolean"
+					},
+					"signature": {
+						"type": "boolean"
+					},
+					"custom_artifact_name": {
+						"type": "boolean"
+					},
+					"custom_headers": {
+						"patternProperties": {
+							".*": {
+								"type": "string"
+							}
+						},
+						"type": "object"
+					}
+				},
+				"additionalProperties": false,
+				"type": "object",
+				"required": [
+					"client_x509_cert",
+					"client_x509_key"
+				]
+			}
+		},
+		"description": "ipsw pipeline configuration definition file"
+	}
