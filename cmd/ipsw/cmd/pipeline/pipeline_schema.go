@@ -36,8 +36,8 @@ import (
 func init() {
 	PipelineCmd.AddCommand(schemaCmd)
 
-	schemaCmd.PersistentFlags().String("foo", "", "A help for foo")
-	viper.BindPFlag("pipeline.jsonschema.output", runCmd.Flags().Lookup("output"))
+	schemaCmd.Flags().StringP("output", "o", "-", "where to save the json schema")
+	viper.BindPFlag("pipeline.jsonschema.output", schemaCmd.Flags().Lookup("output"))
 }
 
 // schemaCmd represents the list command
@@ -49,6 +49,7 @@ var schemaCmd = &cobra.Command{
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		schema := jsonschema.Reflect(&config.Job{})
 		schema.Definitions["FileInfo"] = jsonschema.Reflect(&config.FileInfo{})
 		schema.Description = "ipsw pipeline configuration definition file"
@@ -56,16 +57,19 @@ var schemaCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create jsonschema: %w", err)
 		}
+
 		if viper.GetString("pipeline.jsonschema.output") == "-" {
 			fmt.Println(string(bts))
 			return nil
 		}
+
 		if err := os.MkdirAll(filepath.Dir(viper.GetString("pipeline.jsonschema.output")), 0o755); err != nil {
 			return fmt.Errorf("failed to write jsonschema file: %w", err)
 		}
 		if err := os.WriteFile(viper.GetString("pipeline.jsonschema.output"), bts, 0o666); err != nil {
 			return fmt.Errorf("failed to write jsonschema file: %w", err)
 		}
+
 		return nil
 	},
 }

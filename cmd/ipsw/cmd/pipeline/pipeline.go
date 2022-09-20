@@ -34,7 +34,7 @@ var (
 )
 
 func init() {
-	PipelineCmd.PersistentFlags().StringVar(&pipelineConf, "pipeline", "p", "Pipeline file")
+	PipelineCmd.PersistentFlags().StringVarP(&pipelineConf, "pipeline", "f", "pipeline.yaml", "Pipeline file")
 }
 
 // PipelineCmd represents the pipeline command

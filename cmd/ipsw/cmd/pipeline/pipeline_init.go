@@ -37,7 +37,7 @@ func init() {
 var initCmd = &cobra.Command{
 	Use:           "init",
 	Aliases:       []string{"i"},
-	Short:         "Generates a .goreleaser.yaml file",
+	Short:         "Generates a pipeline.yaml file",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,

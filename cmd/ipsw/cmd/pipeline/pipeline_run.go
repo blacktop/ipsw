@@ -22,6 +22,9 @@ THE SOFTWARE.
 package pipeline
 
 import (
+	"time"
+
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/pipeline"
 	"github.com/blacktop/ipsw/internal/pipeline/config"
 	"github.com/blacktop/ipsw/internal/pipeline/context"
@@ -36,7 +39,7 @@ import (
 func init() {
 	PipelineCmd.AddCommand(runCmd)
 
-	runCmd.Flags().DurationP("timeout", "t", 0, "Timeout for pipeline")
+	runCmd.Flags().DurationP("timeout", "t", 30*time.Minute, "Timeout for pipeline")
 	viper.BindPFlag("pipeline.run.timeout", runCmd.Flags().Lookup("timeout"))
 }
 
@@ -47,10 +50,16 @@ var runCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		if viper.GetBool("verbose") {
+			log.SetLevel(log.DebugLevel)
+		}
+
 		cfg, err := config.Load(pipelineConf)
 		if err != nil {
 			return err
 		}
+
 		ctx, cancel := context.NewWithTimeout(cfg, viper.GetDuration("pipeline.run.timeout"))
 		defer cancel()
 		// setupReleaseContext(ctx, options)

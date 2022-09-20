@@ -8,6 +8,7 @@ import (
 	"github.com/blacktop/ipsw/internal/pipeline/pipe/archive"
 	"github.com/blacktop/ipsw/internal/pipeline/pipe/docker"
 	"github.com/blacktop/ipsw/internal/pipeline/pipe/download"
+	"github.com/blacktop/ipsw/internal/pipeline/pipe/extract"
 	"github.com/blacktop/ipsw/internal/pipeline/pipe/publish"
 )
 
@@ -29,6 +30,7 @@ var DownloadPipeline = []Job{
 // nolint: gochecknoglobals
 var Pipeline = append(
 	DownloadPipeline,
+	extract.Pipe{},  // extract firmwares
 	archive.Pipe{},  // archive in tar.gz, zip or binary (which does no archiving at all)
 	docker.Pipe{},   // create and push docker images
 	publish.Pipe{},  // publishes artifacts
