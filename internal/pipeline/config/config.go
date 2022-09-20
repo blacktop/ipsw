@@ -14,7 +14,7 @@ import (
 type Job struct {
 	ID            string      `yaml:"id,omitempty" json:"id,omitempty"`
 	Env           []string    `yaml:"env,omitempty" json:"env,omitempty"`
-	Downloads     Download    `yaml:"download,omitempty" json:"download,omitempty"`
+	Downloads     Download    `yaml:"downloads,omitempty" json:"downloads,omitempty"`
 	Extracts      []Extract   `yaml:"extracts,omitempty" json:"extracts,omitempty"`
 	Dockers       []Docker    `yaml:"dockers,omitempty" json:"dockers,omitempty"`
 	IDA           []IDA       `yaml:"ida,omitempty" json:"ida,omitempty"`
@@ -34,8 +34,8 @@ type Job struct {
 }
 
 type Download struct {
-	IPSW []IPSW `yaml:"ipsw,omitempty" json:"ipsw,omitempty"`
-	OTA  []OTA  `yaml:"ota,omitempty" json:"ota,omitempty"`
+	IPSWs []IPSW `yaml:"ipsws,omitempty" json:"ipsws,omitempty"`
+	OTAs  []OTA  `yaml:"otas,omitempty" json:"otas,omitempty"`
 }
 
 type IPSW struct {
