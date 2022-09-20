@@ -1,3 +1,5 @@
+# This is an example pipeline.yml file with some sensible defaults.
+# Make sure to check the documentation at https://blacktop.github.io/ipsw
 downloads:
   ipsws:
     - id: ipsw
@@ -47,5 +49,6 @@ announce:
   discord:
     enabled: true
     message_template: "`ipsw` completed processing for {{ .Device }} {{ .Version }} {{ .BuildID }}"
-# yaml-language-server: $schema=https://github.com/blacktop/ipsw/schema.json
-# vim: set ts=2 sw=2 tw=0 fo=jcroql
+# modelines, feel free to remove those if you don't want/use them:
+# yaml-language-server: $schema=https://raw.githubusercontent.com/blacktop/ipsw/feature/pipelines/internal/pipeline/static/schema/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
