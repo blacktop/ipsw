@@ -1,0 +1,51 @@
+download:
+  ipsw:
+    - id: ipsw
+      devices:
+        - iPhone14,2
+        - iPhone15,2
+      latest: true
+  ota:
+    - id: ota
+      devices:
+        - iPhone14,2
+        - iPhone15,2
+      beta: true
+
+extract:
+  - ids:
+      - ipsw
+    kernelcache: true
+    dyld_shared_cache: true
+  - ids:
+      - ota
+    kernelcache: true
+    dyld_shared_cache: true
+
+idas:
+  - scripts:
+      - ida_scripts/ida_kernelcache.py
+      - ida_scripts/ida_dyld_shared_cache.py
+
+symbols:
+  - name: _NSLog
+    type: function
+    dylib: Foundation
+
+blobs:
+  - provider: s3
+    endpoint: https://minio.foo.bar
+    bucket: goreleaser-bucket
+    ids:
+      - foo
+      - bar
+    folder: "foo/bar/{{.Version}}"
+    extra_files:
+      - glob: ./path/to/file.txt
+
+announce:
+  discord:
+    enabled: true
+    message_template: "`ipsw` completed processing for {{ .Device }} {{ .Version }} {{ .BuildID }}"
+# yaml-language-server: $schema=https://github.com/blacktop/ipsw/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=jcroql
