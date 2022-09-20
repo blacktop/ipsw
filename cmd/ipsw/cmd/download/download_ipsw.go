@@ -312,8 +312,7 @@ var ipswCmd = &cobra.Command{
 					if err != nil {
 						log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
 					}
-					destPath = filepath.Join(destPath, folder)
-					if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
+					if err := utils.RemoteUnzip(zr.File, dlRE, filepath.Join(destPath, folder), flat); err != nil {
 						return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
 					}
 				}
