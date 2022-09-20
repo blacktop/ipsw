@@ -140,13 +140,13 @@
 			},
 			"Download": {
 				"properties": {
-					"ipsw": {
+					"ipsws": {
 						"items": {
 							"$ref": "#/$defs/IPSW"
 						},
 						"type": "array"
 					},
-					"ota": {
+					"otas": {
 						"items": {
 							"$ref": "#/$defs/OTA"
 						},
@@ -407,7 +407,7 @@
 						},
 						"type": "array"
 					},
-					"download": {
+					"downloads": {
 						"$ref": "#/$defs/Download"
 					},
 					"extracts": {

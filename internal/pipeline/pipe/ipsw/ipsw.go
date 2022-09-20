@@ -11,12 +11,12 @@ type Pipe struct{}
 
 // String returns the description of the pipe.
 func (Pipe) String() string                 { return "download ipsw" }
-func (Pipe) Skip(ctx *context.Context) bool { return len(ctx.Config.Downloads.IPSW) == 0 }
+func (Pipe) Skip(ctx *context.Context) bool { return len(ctx.Config.Downloads.IPSWs) == 0 }
 
 // Download downloads the specified OTA.
 func (Pipe) Download(ctx *context.Context) error {
 	var g errgroup.Group
-	for _, conf := range ctx.Config.Downloads.IPSW {
+	for _, conf := range ctx.Config.Downloads.IPSWs {
 		conf := conf
 		g.Go(func() error {
 			return doDownload(ctx, conf)
