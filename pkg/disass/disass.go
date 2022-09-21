@@ -243,6 +243,14 @@ func Disassemble(d Disass) {
 					} else {
 						fmt.Printf("\n%s:\n", fname)
 					}
+				} else {
+					if name, ok := d.FindSymbol(uint64(instruction.Address)); ok {
+						if d.Color() {
+							fmt.Print(colorOp("\n%s\n", name))
+						} else {
+							fmt.Printf("\n%s\n", name)
+						}
+					}
 				}
 
 				if d.IsLocation(instruction.Address) {
