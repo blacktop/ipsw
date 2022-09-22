@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/pkg/disass"
@@ -104,6 +103,16 @@ func (d DyldDisass) IsData(addr uint64) (bool, *disass.AddrDetails) {
 	if detail, ok := d.tr.Details[addr]; ok {
 		if strings.Contains(strings.ToLower(detail.Segment), "data") {
 			return true, &detail
+		}
+	}
+	return false, nil
+}
+
+// IsPointer returns if given address is a pointer to another address
+func (d DyldDisass) IsPointer(imm uint64) (bool, *disass.AddrDetails) {
+	if deet, ok := d.tr.Details[imm]; ok {
+		if deet.Pointer > 0 {
+			return true, &deet
 		}
 	}
 	return false, nil
@@ -218,11 +227,15 @@ func (d *DyldDisass) Triage() error {
 		d.tr.Details = make(map[uint64]disass.AddrDetails)
 
 		for addr, imm := range d.tr.Addresses {
+			ptr := uint64(0)
 			image, err := d.f.GetImageContainingVMAddr(imm)
 			if err != nil {
-				log.Error(err.Error())
-				continue
-				// return err
+				ptr, _ = d.f.ReadPointerAtAddress(imm)
+				ptr = d.f.SlideInfo.SlidePointer(ptr)
+				image, err = d.f.GetImageContainingVMAddr(ptr)
+				if err != nil {
+					continue
+				}
 			}
 
 			if !d.hasDep(image) {
@@ -243,11 +256,23 @@ func (d *DyldDisass) Triage() error {
 				}
 			}
 
-			if c := m.FindSectionForVMAddr(imm); c != nil {
-				d.tr.Details[imm] = disass.AddrDetails{
-					Image:   filepath.Base(image.Name),
-					Segment: c.Seg,
-					Section: c.Name,
+			if ptr > 0 {
+				if c := m.FindSectionForVMAddr(ptr); c != nil {
+					d.tr.Details[imm] = disass.AddrDetails{
+						Image:   filepath.Base(image.Name),
+						Segment: c.Seg,
+						Section: c.Name,
+						Pointer: ptr,
+					}
+				}
+			} else {
+				if c := m.FindSectionForVMAddr(imm); c != nil {
+					d.tr.Details[imm] = disass.AddrDetails{
+						Image:   filepath.Base(image.Name),
+						Segment: c.Seg,
+						Section: c.Name,
+						Pointer: ptr,
+					}
 				}
 			}
 		}
