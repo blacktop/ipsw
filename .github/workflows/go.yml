@@ -55,20 +55,20 @@ jobs:
       #
       # CACHE
       #
-      - name: Cache beta IPSW
-        id: cache-beta-ipsw
-        if: matrix.platform == 'macos-12'
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/beta
-          key: beta-ipsw
-      - name: Download beta IPSW from Artifacts
-        if: matrix.platform == 'macos-12' && steps.cache-beta-ipsw.outputs.cache-hit != 'true'
-        uses: actions/download-artifact@v3
-        with:
-          name: beta-ipsw
-          path: ~/beta/beta.ipsw
+      # - name: Cache beta IPSW
+      #   id: cache-beta-ipsw
+      #   if: matrix.platform == 'macos-12'
+      #   uses: actions/cache@v3
+      #   with:
+      #     path: |
+      #       ~/beta
+      #     key: beta-ipsw
+      # - name: Download beta IPSW from Artifacts
+      #   if: matrix.platform == 'macos-12' && steps.cache-beta-ipsw.outputs.cache-hit != 'true'
+      #   uses: actions/download-artifact@v3
+      #   with:
+      #     name: beta-ipsw
+      #     path: ~/beta/beta.ipsw
       # - name: Cache Downloaded IPSWs
       #   id: cache-ipsws
       #   if: matrix.platform == 'macos-12'
@@ -217,22 +217,24 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree *.ipsw
-      - name: Run extract BETA - (kernel, dsc and dtree)
-        if: matrix.platform == 'macos-12'
-        run: |
-          export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree ~/beta/beta.ipsw
-          tree ~/.ipsw
+      # - name: Run extract BETA - (kernel, dsc and dtree)
+      #   if: matrix.platform == 'macos-12'
+      #   run: |
+      #     export PATH=$PWD/build/dist:$PATH
+      #     cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw extract --kernel --dyld --dtree ~/beta/beta.ipsw
+      #     tree ~/.ipsw
       #
       # KERNEL CMD (macOS)
       #
       - name: Run kernel kexts
         if: matrix.platform == 'macos-12'
         run: |
+          export PATH=$PWD/build/dist:$PATH        
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel kexts */kernelcache.release.*
       - name: Run kernel sbopts
         if: matrix.platform == 'macos-12'
         run: |
+          export PATH=$PWD/build/dist:$PATH        
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel sbopts */kernelcache.release.*
       #
       # DYLD CMD (macOS)
@@ -240,89 +242,90 @@ jobs:
       - name: Run dyld info
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig -V
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld info ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --dylibs --sig --json
+          export PATH=$PWD/build/dist:$PATH           
+          LD_LIBRARY_PATH=/usr/local/lib ipsw dyld info ~/.ipsw/*/dyld_shared_cache_arm64e
+          LD_LIBRARY_PATH=/usr/local/lib ipsw dyld info ~/.ipsw/*/dyld_shared_cache_arm64e --dylibs
+          LD_LIBRARY_PATH=/usr/local/lib ipsw dyld info ~/.ipsw/*/dyld_shared_cache_arm64e --dylibs --sig -V
+          LD_LIBRARY_PATH=/usr/local/lib ipsw dyld info ~/.ipsw/*/dyld_shared_cache_arm64e --dylibs --sig --json
 
       - name: Run dyld symaddr (img)
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*/dyld_shared_cache_arm64e --image libsystem_c.dylib
       - name: Run dyld symaddr (sym)
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e _memcpy
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*/dyld_shared_cache_arm64e _memcpy
       - name: Run dyld symaddr (img+sym)
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
       - name: Run dyld symaddr (JSON)
         if: matrix.platform == 'macos-12'
         run: |
           echo '[{"regex":".*zero.*", "image":"libsystem_c.dylib"}]' > ~/.ipsw/dyld_symaddr.json
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --in ~/.ipsw/dyld_symaddr.json
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*/dyld_shared_cache_arm64e --in ~/.ipsw/dyld_symaddr.json
       # - name: Run dyld symaddr (ALL)
       #   if: matrix.platform == 'macos-12'
       #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e | grep _memcpy
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld symaddr ~/.ipsw/*/dyld_shared_cache_arm64e | grep _memcpy
 
       - name: Run dyld macho
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld macho ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e JavaScriptCore --loads --objc --objc-refs --strings --symbols --starts --stubs -V
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld macho ~/.ipsw/*/dyld_shared_cache_arm64e JavaScriptCore --loads --objc --objc-refs --strings --symbols --starts --stubs -V
       - name: Run dyld macho (extract)
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld macho ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e JavaScriptCore --extract
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld macho ~/.ipsw/*/dyld_shared_cache_arm64e JavaScriptCore --extract
 
       - name: Run dyld webkit
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --git --api ${{ secrets.GITHUB_TOKEN }}
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld webkit ~/.ipsw/*/dyld_shared_cache_arm64e --git --api ${{ secrets.GITHUB_TOKEN }}
 
       # - name: Run dyld slide
       #   if: matrix.platform == 'macos-12'
       #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --auth
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide ~/.ipsw/*/dyld_shared_cache_arm64e --auth
 
       - name: Run dyld patches
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*/dyld_shared_cache_arm64e
 
       - name: Run dyld imports
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld imports ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e JavaScriptCore
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld imports ~/.ipsw/*/dyld_shared_cache_arm64e JavaScriptCore
 
       - name: Run dyld disass
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld disass ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --demangle --symbol _NSLog
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld disass ~/.ipsw/*/dyld_shared_cache_arm64e --demangle --symbol _NSLog
 
       - name: Run dyld objc sel --image
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc sel ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e --image JavaScriptCore
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc sel ~/.ipsw/*/dyld_shared_cache_arm64e --image JavaScriptCore
       - name: Run dyld objc --class
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --class ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --class ~/.ipsw/*/dyld_shared_cache_arm64e
       # - name: Run dyld objc --imp-cache
       #   if: matrix.platform == 'macos-12'
       #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --imp-cache ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --imp-cache ~/.ipsw/*/dyld_shared_cache_arm64e
       - name: Run dyld objc --proto
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --proto ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld objc --proto ~/.ipsw/*/dyld_shared_cache_arm64e
 
       - name: Run dyld split
         if: matrix.platform == 'macos-12'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw dyld split --xcode /Applications/Xcode_13.4.1.app ~/.ipsw/*iPhone11,8_iPhone12,1/dyld_shared_cache_arm64e ~/.ipsw
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw dyld split --xcode /Applications/Xcode_13.4.1.app ~/.ipsw/*/dyld_shared_cache_arm64e ~/.ipsw
           tree ~/.ipsw
       #
       # MACHO CMD (macOS)
@@ -348,7 +351,7 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw info *.ipsw
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw info ~/beta/beta.ipsw
+        #  cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw info ~/beta/beta.ipsw
       #
       # UPDATE CMD (macOS)
       #
