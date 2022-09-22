@@ -325,7 +325,9 @@ jobs:
         if: matrix.platform == 'macos-12'
         run: |
           export PATH=$PWD/build/dist:$PATH
-          sudo xcode-select -s /Applications/Xcode_14.1.app
+          xcode-select -p
+          sudo xcode-select -s "/Applications/Xcode_14.1.app"
+          xcode-select -p          
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw dyld split --xcode /Applications/Xcode_13.4.1.app ~/.ipsw/*/dyld_shared_cache_arm64e ~/.ipsw
           tree ~/.ipsw
       #
