@@ -1350,10 +1350,10 @@ func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer m.Close()
 		if seg := m.FindSegmentForVMAddr(address); seg != nil {
 			return img, nil
 		}
-		m.Close()
 	}
 	return nil, fmt.Errorf("address %#x not in any dylib", address)
 }
