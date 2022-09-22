@@ -230,12 +230,12 @@ jobs:
         if: matrix.platform == 'macos-12'
         run: |
           export PATH=$PWD/build/dist:$PATH        
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel kexts */kernelcache.release.*
+          cd ~/.ipsw && ipsw kernel kexts */kernelcache.release.*
       - name: Run kernel sbopts
         if: matrix.platform == 'macos-12'
         run: |
           export PATH=$PWD/build/dist:$PATH        
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel sbopts */kernelcache.release.*
+          cd ~/.ipsw && ipsw kernel sbopts */kernelcache.release.*
       #
       # DYLD CMD (macOS)
       #
