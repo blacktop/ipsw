@@ -34,13 +34,11 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      -
-        name: Set up Go
+      - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
@@ -231,6 +229,7 @@ jobs:
       - name: Run kernel kexts
         if: matrix.platform == 'macos-12'
         run: |
+          ls -lah ~/.ipsw
           LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel kexts ~/.ipsw/*iPhone11,8_iPhone12,1/kernelcache.release.iPhone11,8
       - name: Run kernel sbopts
         if: matrix.platform == 'macos-12'
