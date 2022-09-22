@@ -229,12 +229,11 @@ jobs:
       - name: Run kernel kexts
         if: matrix.platform == 'macos-12'
         run: |
-          ls -lah ~/.ipsw
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel kexts ~/.ipsw/*iPhone11,8_iPhone12,1/kernelcache.release.iPhone11,8
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel kexts */kernelcache.release.*
       - name: Run kernel sbopts
         if: matrix.platform == 'macos-12'
         run: |
-          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel sbopts ~/.ipsw/*iPhone11,8_iPhone12,1/kernelcache.release.iPhone11,8
+          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw kernel sbopts */kernelcache.release.*
       #
       # DYLD CMD (macOS)
       #
