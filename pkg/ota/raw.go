@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"runtime"
@@ -29,7 +30,7 @@ type ridiff10 struct {
 type RIDIFF10 struct {
 	ridiff10
 	PatchDataOffset []uint64 // len(Variants)
-	DiffSize        uint64
+	PatchSize       uint64
 	MetaData        []byte
 	Controls        []Control
 	PatchData       [][]byte
@@ -38,6 +39,38 @@ type RIDIFF10 struct {
 type Control struct {
 	Offset uint64
 	Size   uint64
+}
+
+type metadata struct {
+	Digest       [32]byte
+	TotalBytes   uint64
+	UnknownCount uint64
+	ExtentCount  uint64
+	ForkCount    uint64
+}
+
+type MetaData struct {
+	metadata
+	Extents []Extent
+	Forks   []Fork
+}
+
+type Extent struct {
+	Offset uint64
+	Size   uint64
+}
+
+type Fork struct {
+	Size       uint64
+	Compressed uint64
+	V          uint32
+	C          uint32
+	Index      uint64
+	Count      uint64
+	Algorithm  uint8
+	ForkHeader uint64
+	// ForkChunks []uint32
+	// ForkFooter uint32
 }
 
 func ParseRawImageDiff10(r *bytes.Reader) (*RIDIFF10, error) {
@@ -55,7 +88,7 @@ func ParseRawImageDiff10(r *bytes.Reader) (*RIDIFF10, error) {
 		return nil, err
 	}
 
-	if err := binary.Read(r, binary.LittleEndian, &rid.DiffSize); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &rid.PatchSize); err != nil {
 		return nil, err
 	}
 
@@ -76,7 +109,23 @@ func ParseRawImageDiff10(r *bytes.Reader) (*RIDIFF10, error) {
 		return nil, err
 	}
 	rid.MetaData = b.Bytes()
-	os.WriteFile("meta.plist", rid.MetaData, 0644)
+
+	os.WriteFile("metadata.RIDIFF10", rid.MetaData, 0644)
+
+	mr := bytes.NewReader(rid.MetaData)
+
+	var md MetaData
+	if err := binary.Read(mr, binary.LittleEndian, &md.metadata); err != nil {
+		return nil, err
+	}
+	md.Extents = make([]Extent, md.ExtentCount)
+	if err := binary.Read(mr, binary.LittleEndian, &md.Extents); err != nil {
+		return nil, err
+	}
+	md.Forks = make([]Fork, md.ForkCount)
+	if err := binary.Read(mr, binary.LittleEndian, &md.Forks); err != nil {
+		return nil, err
+	}
 
 	b = bytes.Buffer{}
 	if err := pbzx.Extract(context.Background(), bytes.NewReader(ctrldata), &b, runtime.NumCPU()); err != nil {
@@ -90,7 +139,7 @@ func ParseRawImageDiff10(r *bytes.Reader) (*RIDIFF10, error) {
 
 	for idx, offset := range rid.PatchDataOffset {
 		r.Seek(int64(offset), io.SeekStart)
-		rid.PatchData = append(rid.PatchData, make([]byte, rid.DiffSize-offset))
+		rid.PatchData = append(rid.PatchData, make([]byte, rid.PatchSize-offset))
 		if _, err := io.ReadFull(r, rid.PatchData[idx]); err != nil {
 			return nil, err
 		}
@@ -99,6 +148,7 @@ func ParseRawImageDiff10(r *bytes.Reader) (*RIDIFF10, error) {
 			return nil, err
 		}
 		rid.PatchData[idx] = b.Bytes()
+		os.WriteFile(fmt.Sprintf("patchdata_%d.RIDIFF10", idx), rid.PatchData[idx], 0644)
 	}
 
 	return &rid, nil

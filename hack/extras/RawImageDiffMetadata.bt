@@ -1,0 +1,74 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: RawImageDiff.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: Apple Raw Image Diff
+//  Category: Image
+// File Mask: *
+//  ID Bytes:
+//   History:
+//------------------------------------------------
+
+LittleEndian();
+
+typedef struct Header
+{
+	char Digest[32];  
+	uint64 TotalBytes<format = hex>;     
+	uint64 Ratio<format = decimal>;   
+	uint64 Extents<format = decimal>;        
+	uint64 Forks<format = decimal>;             
+};
+
+typedef struct Extent
+{
+    uint64 offset<format = hex>;
+    uint64 size<format = hex>;
+};
+
+typedef struct Chunk
+{
+    uint32 unk1<format = hex>;
+    uint32 unk2<format = hex>;
+    uint32 unk3<format = hex>;
+};
+
+typedef struct Fork
+{
+    uint64 size<format = hex>;
+    uint64 compressed<format = hex>;
+    uint64 variant<format = decimal>;
+    uint64 index<format = decimal>;
+    uint64 flags<format = decimal>;
+    ubyte algorithm<format = decimal>;     
+    uint64 dsize<format = decimal>; 
+    //uint32 data[394];                  
+};
+
+Header header<comment="header">;
+Extent extents[header.Extents]<comment="extents", bgcolor=cBlue>;
+
+Fork forks<comment="forks", bgcolor=cGreen>;
+uint32 data[394];
+
+Fork forks2<comment="forks", bgcolor=cLtBlue>;
+uint32 data2[22];
+
+Fork forks3<comment="forks", bgcolor=cGreen>;
+uint32 data3[4];
+
+Fork forks4<comment="forks", bgcolor=cGreen>;
+uint32 data4[1];
+
+Fork forks5<comment="forks", bgcolor=cGreen>;
+uint32 data5[1];
+
+Fork forks6<comment="forks", bgcolor=cGreen>;
+uint32 data6[1];
+
+Fork forks7<comment="forks", bgcolor=cGreen>;
+uint32 data7[877];
+
+Fork forks8<comment="forks", bgcolor=cGreen>;
