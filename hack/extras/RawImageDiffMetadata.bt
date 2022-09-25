@@ -1,10 +1,10 @@
 //------------------------------------------------
 //--- 010 Editor v12.0.1 Binary Template
 //
-//      File: RawImageDiff.bt
+//      File: RawImageDiffMetadata.bt
 //   Authors: blacktop
 //   Version: 1.0
-//   Purpose: Apple Raw Image Diff
+//   Purpose: Apple Raw Image Diff Metadata
 //  Category: Image
 // File Mask: *
 //  ID Bytes:
