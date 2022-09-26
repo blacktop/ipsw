@@ -22,6 +22,7 @@ THE SOFTWARE.
 package macho
 
 import (
+	"context"
 	"encoding/gob"
 	"fmt"
 	"os"
@@ -32,6 +33,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/disass"
+	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -70,16 +72,18 @@ func init() {
 
 // machoDisassCmd represents the dis command
 var machoDisassCmd = &cobra.Command{
-	Use:          "disass <MACHO>",
-	Short:        "Disassemble ARM64 MachO at symbol/vaddr",
-	Args:         cobra.MinimumNArgs(1),
-	SilenceUsage: true,
+	Use:           "disass <MACHO>",
+	Short:         "Disassemble ARM64 MachO at symbol/vaddr",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File
 		var ms []*macho.File
 		var middleAddr uint64
 		var symbolMap map[uint64]string
+		var engine *disass.MachoDisass
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -163,40 +167,139 @@ var machoDisassCmd = &cobra.Command{
 
 		symbolMap = make(map[uint64]string)
 
-		for _, m := range ms {
-			if !quiet {
-				if len(cacheFile) == 0 {
-					cacheFile = machoPath + ".a2s"
+		if err := ctrlc.Default.Run(context.Background(), func() error {
+			for _, m := range ms {
+				if !quiet {
+					if len(cacheFile) == 0 {
+						cacheFile = machoPath + ".a2s"
+					}
+					if _, err := os.Stat(cacheFile); errors.Is(err, os.ErrNotExist) {
+						if _, err := os.Create(cacheFile); err != nil {
+							return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+						}
+					} else {
+						log.Infof("Loading symbol cache file...")
+						if f, err := os.Open(cacheFile); err != nil {
+							return fmt.Errorf("failed to open address-to-symbol cache file %s: %v", cacheFile, err)
+						} else {
+							if err := gob.NewDecoder(f).Decode(&symbolMap); err != nil {
+								return fmt.Errorf("failed to decode address-to-symbol cache file: %v", err)
+							}
+							f.Close()
+						}
+					}
 				}
-				if _, err := os.Stat(cacheFile); errors.Is(err, os.ErrNotExist) {
-					if _, err := os.Create(cacheFile); err != nil {
-						return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+
+				if allFuncs && len(segmentSection) == 0 {
+					for _, fn := range m.GetFunctions() {
+						data, err := m.GetFunctionData(fn)
+						if err != nil {
+							log.Errorf("failed to get data for function: %v", err)
+							continue
+						}
+
+						engine = disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+							Data:         data,
+							StartAddress: fn.StartAddr,
+							Middle:       0,
+							AsJSON:       asJSON,
+							Demangle:     demangleFlag,
+							Quite:        quiet,
+							Color:        viper.GetBool("color"),
+						})
+
+						//***********************
+						//* First pass ANALYSIS *
+						//***********************
+						if !quiet {
+							if err := engine.Triage(); err != nil {
+								return fmt.Errorf("first pass triage failed: %v", err)
+							}
+							if len(symbolMap) == 0 {
+								if err := engine.Analyze(); err != nil {
+									return fmt.Errorf("MachO analysis failed: %v", err)
+								}
+							}
+							if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+								log.Errorf("failed to save symbol map: %v", err)
+							}
+						}
+						//***************
+						//* DISASSEMBLE *
+						//***************
+						disass.Disassemble(engine)
 					}
 				} else {
-					log.Infof("Loading symbol cache file...")
-					if f, err := os.Open(cacheFile); err != nil {
-						return fmt.Errorf("failed to open address-to-symbol cache file %s: %v", cacheFile, err)
-					} else {
-						if err := gob.NewDecoder(f).Decode(&symbolMap); err != nil {
-							return fmt.Errorf("failed to decode address-to-symbol cache file: %v", err)
+					if len(symbolName) > 0 {
+						startAddr, err = m.FindSymbolAddress(symbolName)
+						if err != nil {
+							return err
 						}
-						f.Close()
+					} else if len(segmentSection) > 0 {
+						parts := strings.Split(segmentSection, ".")
+						if len(parts) != 2 {
+							return fmt.Errorf("invalid --section format, must be segment.section")
+						}
+						if sec := m.Section(parts[0], parts[1]); sec != nil {
+							startAddr = sec.Addr
+							instructions = sec.Size / 4
+						} else {
+							return fmt.Errorf("failed to find section %s", segmentSection)
+						}
 					}
-				}
-			}
+					// startAddr > 0 TODO: support slides
+					// if slide > 0 {
+					// 	startAddr = startAddr - slide
+					// }
 
-			if allFuncs && len(segmentSection) == 0 {
-				for _, fn := range m.GetFunctions() {
-					data, err := m.GetFunctionData(fn)
-					if err != nil {
-						log.Errorf("failed to get data for function: %v", err)
-						continue
+					/*
+					 * Read in data to disassemble
+					 */
+					var data []byte
+					if instructions > 0 {
+						off, err := m.GetOffset(startAddr)
+						if err != nil {
+							return err
+						}
+						data = make([]byte, instructions*4)
+						if _, err := m.ReadAt(data, int64(off)); err != nil {
+							return err
+						}
+					} else {
+						if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
+							soff, err := m.GetOffset(fn.StartAddr)
+							if err != nil {
+								return err
+							}
+							data = make([]byte, uint64(fn.EndAddr-fn.StartAddr))
+							if _, err := m.ReadAt(data, int64(soff)); err != nil {
+								return err
+							}
+							if startAddr != fn.StartAddr {
+								middleAddr = startAddr
+								startAddr = fn.StartAddr
+							}
+						} else {
+							log.Warnf("disassembling 100 instructions at %#x", startAddr)
+							instructions = 100
+							off, err := m.GetOffset(startAddr)
+							if err != nil {
+								return err
+							}
+							data = make([]byte, instructions*4)
+							if _, err := m.ReadAt(data, int64(off)); err != nil {
+								return err
+							}
+						}
+					}
+					if len(data) == 0 {
+						log.Fatal("failed to disassemble")
 					}
 
-					engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+					engine = disass.NewMachoDisass(m, &symbolMap, &disass.Config{
 						Data:         data,
-						StartAddress: fn.StartAddr,
-						Middle:       0,
+						StartAddress: startAddr,
+						Middle:       middleAddr,
 						AsJSON:       asJSON,
 						Demangle:     demangleFlag,
 						Quite:        quiet,
@@ -210,10 +313,8 @@ var machoDisassCmd = &cobra.Command{
 						if err := engine.Triage(); err != nil {
 							return fmt.Errorf("first pass triage failed: %v", err)
 						}
-						if len(symbolMap) == 0 {
-							if err := engine.Analyze(); err != nil {
-								return fmt.Errorf("MachO analysis failed: %v", err)
-							}
+						if err := engine.Analyze(); err != nil {
+							return fmt.Errorf("MachO analysis failed: %v", err)
 						}
 						if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
 							log.Errorf("failed to save symbol map: %v", err)
@@ -224,104 +325,18 @@ var machoDisassCmd = &cobra.Command{
 					//***************
 					disass.Disassemble(engine)
 				}
+			}
+			return nil
+		}); err != nil {
+			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
+				if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+					log.Errorf("failed to save symbol map: %v", err)
+				}
+				log.Warn("exiting...")
 			} else {
-				if len(symbolName) > 0 {
-					startAddr, err = m.FindSymbolAddress(symbolName)
-					if err != nil {
-						return err
-					}
-				} else if len(segmentSection) > 0 {
-					parts := strings.Split(segmentSection, ".")
-					if len(parts) != 2 {
-						return fmt.Errorf("invalid --section format, must be segment.section")
-					}
-					if sec := m.Section(parts[0], parts[1]); sec != nil {
-						startAddr = sec.Addr
-						instructions = sec.Size / 4
-					} else {
-						return fmt.Errorf("failed to find section %s", segmentSection)
-					}
-				}
-				// startAddr > 0 TODO: support slides
-				// if slide > 0 {
-				// 	startAddr = startAddr - slide
-				// }
-
-				/*
-				 * Read in data to disassemble
-				 */
-				var data []byte
-				if instructions > 0 {
-					off, err := m.GetOffset(startAddr)
-					if err != nil {
-						return err
-					}
-					data = make([]byte, instructions*4)
-					if _, err := m.ReadAt(data, int64(off)); err != nil {
-						return err
-					}
-				} else {
-					if fn, err := m.GetFunctionForVMAddr(startAddr); err == nil {
-						soff, err := m.GetOffset(fn.StartAddr)
-						if err != nil {
-							return err
-						}
-						data = make([]byte, uint64(fn.EndAddr-fn.StartAddr))
-						if _, err := m.ReadAt(data, int64(soff)); err != nil {
-							return err
-						}
-						if startAddr != fn.StartAddr {
-							middleAddr = startAddr
-							startAddr = fn.StartAddr
-						}
-					} else {
-						log.Warnf("disassembling 100 instructions at %#x", startAddr)
-						instructions = 100
-						off, err := m.GetOffset(startAddr)
-						if err != nil {
-							return err
-						}
-						data = make([]byte, instructions*4)
-						if _, err := m.ReadAt(data, int64(off)); err != nil {
-							return err
-						}
-					}
-				}
-				if len(data) == 0 {
-					log.Fatal("failed to disassemble")
-				}
-
-				engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
-					Data:         data,
-					StartAddress: startAddr,
-					Middle:       middleAddr,
-					AsJSON:       asJSON,
-					Demangle:     demangleFlag,
-					Quite:        quiet,
-					Color:        viper.GetBool("color"),
-				})
-
-				//***********************
-				//* First pass ANALYSIS *
-				//***********************
-				if !quiet {
-					if err := engine.Triage(); err != nil {
-						return fmt.Errorf("first pass triage failed: %v", err)
-					}
-					if err := engine.Analyze(); err != nil {
-						return fmt.Errorf("MachO analysis failed: %v", err)
-					}
-					if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
-						log.Errorf("failed to save symbol map: %v", err)
-					}
-				}
-				//***************
-				//* DISASSEMBLE *
-				//***************
-				disass.Disassemble(engine)
+				return err
 			}
 		}
-
 		return nil
 	},
 }
