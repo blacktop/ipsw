@@ -27,6 +27,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -296,37 +297,48 @@ var otaDLCmd = &cobra.Command{
 						}
 					}
 					if remoteDyld { // REMOTE DSC MODE
-						var dscRegex string
-						if dyldDriverKit {
-							dscRegex = fmt.Sprintf("%s(%s)%s", dyld.DriverKitCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
-						} else if utils.StrSliceHas([]string{"macos", "recovery"}, strings.ToLower(platform)) {
-							dscRegex = fmt.Sprintf("%s(%s)%s", dyld.MacOSCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
-						} else {
-							dscRegex = fmt.Sprintf("%s(%s)%s", dyld.IPhoneCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
-						}
-						// hack: to get a priori list of files to extract (so we know when to stop)
-						rfiles, err := ota.RemoteList(zr)
-						if err != nil {
-							return fmt.Errorf("failed to list remote OTA files: %v", err)
-						}
-						var matches []string
-						for _, rf := range rfiles {
-							if regexp.MustCompile(dscRegex).MatchString(rf.Name()) {
-								matches = append(matches, rf.Name())
+						found := false
+						if runtime.GOOS == "darwin" { // FIXME: figure out how to do this on all platforms
+							log.Info("Extracting remote dyld_shared_cache")
+							if err := dyld.ExtractFromRemoteCryptex(zr, destPath, dyldArches); err != nil {
+								return fmt.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
 							}
+							found = true
 						}
+						if !found {
+							var dscRegex string
+							if dyldDriverKit {
+								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.DriverKitCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
+							} else if utils.StrSliceHas([]string{"macos", "recovery"}, strings.ToLower(platform)) {
+								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.MacOSCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
+							} else {
+								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.IPhoneCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
+							}
+							// hack: to get a priori list of files to extract (so we know when to stop)
+							rfiles, err := ota.RemoteList(zr)
+							if err != nil {
+								return fmt.Errorf("failed to list remote OTA files: %v", err)
+							}
 
-						log.Info("Extracting remote dyld_shared_cache(s) (can be a bit CPU intensive)")
-						err = ota.RemoteExtract(zr, dscRegex, destPath, func(path string) bool {
-							for i, v := range matches {
-								if strings.HasSuffix(v, filepath.Base(path)) {
-									matches = append(matches[:i], matches[i+1:]...)
+							var matches []string
+							for _, rf := range rfiles {
+								if regexp.MustCompile(dscRegex).MatchString(rf.Name()) {
+									matches = append(matches, rf.Name())
 								}
 							}
-							return len(matches) == 0 // stop if we've extracted all matches
-						})
-						if err != nil {
-							return fmt.Errorf("failed to download dyld_shared_cache(s) from remote OTA: %v", err)
+
+							log.Info("Extracting remote dyld_shared_cache(s) (can be a bit CPU intensive)")
+							err = ota.RemoteExtract(zr, dscRegex, destPath, func(path string) bool {
+								for i, v := range matches {
+									if strings.HasSuffix(v, filepath.Base(path)) {
+										matches = append(matches[:i], matches[i+1:]...)
+									}
+								}
+								return len(matches) == 0 // stop if we've extracted all matches
+							})
+							if err != nil {
+								return fmt.Errorf("failed to download dyld_shared_cache(s) from remote OTA: %v", err)
+							}
 						}
 					}
 					if len(remotePattern) > 0 { // REMOTE PATTERN MATCHING MODE

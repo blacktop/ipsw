@@ -21,6 +21,7 @@ type Disass interface {
 	IsLocation(uint64) bool
 	IsBranchLocation(uint64) (bool, uint64)
 	IsData(uint64) (bool, *AddrDetails)
+	IsPointer(uint64) (bool, *AddrDetails)
 	FindSymbol(uint64) (string, bool)
 	GetCString(uint64) (string, error)
 	// getters
@@ -128,6 +129,7 @@ type AddrDetails struct {
 	Image   string
 	Segment string
 	Section string
+	Pointer uint64
 }
 
 func (d AddrDetails) String() string {
@@ -243,6 +245,14 @@ func Disassemble(d Disass) {
 					} else {
 						fmt.Printf("\n%s:\n", fname)
 					}
+				} else {
+					if name, ok := d.FindSymbol(uint64(instruction.Address)); ok {
+						if d.Color() {
+							fmt.Print(colorOp("\n%s\n", name))
+						} else {
+							fmt.Printf("\n%s\n", name)
+						}
+					}
 				}
 
 				if d.IsLocation(instruction.Address) {
@@ -349,6 +359,12 @@ func Disassemble(d Disass) {
 					}
 					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
 						instrStr += fmt.Sprintf(" ; %s", name)
+					} else if ok, detail := d.IsPointer(adrpImm); ok {
+						if name, ok := d.FindSymbol(uint64(detail.Pointer)); ok {
+							instrStr += fmt.Sprintf(" ; _ptr.%s", name)
+						} else {
+							instrStr += fmt.Sprintf(" ; _ptr.%x (%s)", detail.Pointer, detail)
+						}
 					} else if ok, detail := d.IsData(adrpImm); ok {
 						instrStr += fmt.Sprintf(" ; dat_%x (%s)", adrpImm, detail)
 					} else if cstr, err := d.GetCString(adrpImm); err == nil {

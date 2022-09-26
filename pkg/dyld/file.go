@@ -505,14 +505,8 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr != 0 {
 		if f.IsDyld4 { // iOS16 added dyld to the shared cache and resued these fields to point to the dyld image and _dyld_start
-			sr.Seek(int64(f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr), io.SeekStart)
-			if err := binary.Read(sr, f.ByteOrder, &f.dyldImageAddr); err != nil {
-				log.Debugf("failed reading dyld image address (probably in subcache): %v", err) // TODO: lazily read this if needed later
-			}
-			sr.Seek(int64(f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr), io.SeekStart)
-			if err := binary.Read(sr, f.ByteOrder, &f.dyldStartFnAddr); err != nil {
-				log.Debugf("faile reading dyld start function address (probably in subcache): %v", err)
-			}
+			f.dyldImageAddr = f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr
+			f.dyldStartFnAddr = f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr
 		} else {
 			// Read dyld optimization info.
 			for _, mapping := range f.Mappings[uuid] {
@@ -1356,10 +1350,10 @@ func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
 		if err != nil {
 			return nil, err
 		}
+		defer m.Close()
 		if seg := m.FindSegmentForVMAddr(address); seg != nil {
 			return img, nil
 		}
-		m.Close()
 	}
 	return nil, fmt.Errorf("address %#x not in any dylib", address)
 }
