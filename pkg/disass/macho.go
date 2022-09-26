@@ -129,6 +129,16 @@ func (d *MachoDisass) Triage() error {
 					Segment: c.Seg,
 					Section: c.Name,
 				}
+			} else {
+				ptr, _ := d.f.GetPointerAtAddress(imm)
+				ptr = d.f.SlidePointer(ptr)
+				if c := d.f.FindSectionForVMAddr(ptr); c != nil {
+					d.tr.Details[imm] = AddrDetails{
+						Segment: c.Seg,
+						Section: c.Name,
+						Pointer: ptr,
+					}
+				}
 			}
 		}
 	}
@@ -177,6 +187,16 @@ func (d MachoDisass) IsData(addr uint64) (bool, *AddrDetails) {
 	if detail, ok := d.tr.Details[addr]; ok {
 		if strings.Contains(strings.ToLower(detail.Segment), "data") {
 			return true, &detail
+		}
+	}
+	return false, nil
+}
+
+// IsPointer returns if given address is a pointer to another address
+func (d MachoDisass) IsPointer(imm uint64) (bool, *AddrDetails) {
+	if deet, ok := d.tr.Details[imm]; ok {
+		if deet.Pointer > 0 {
+			return true, &deet
 		}
 	}
 	return false, nil

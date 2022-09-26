@@ -32,6 +32,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/pkg/errors"
@@ -47,6 +48,8 @@ func init() {
 	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
 	ipswCmd.Flags().Bool("ibridge", false, "Download iBridge IPSWs")
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
+	ipswCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote IPSW")
+	ipswCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	// ipswCmd.Flags().BoolP("kernel-spec", "", false, "Download kernels into spec folders")
 	ipswCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
@@ -59,6 +62,8 @@ func init() {
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
 	viper.BindPFlag("download.ipsw.ibridge", ipswCmd.Flags().Lookup("ibridge"))
 	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
+	viper.BindPFlag("download.ipsw.dyld", ipswCmd.Flags().Lookup("dyld"))
+	viper.BindPFlag("download.ipsw.dyld-arch", ipswCmd.Flags().Lookup("dyld-arch"))
 	// viper.BindPFlag("download.ipsw.kernel-spec", ipswCmd.Flags().Lookup("kernel-spec"))
 	viper.BindPFlag("download.ipsw.pattern", ipswCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
@@ -119,7 +124,9 @@ var ipswCmd = &cobra.Command{
 		showLatest := viper.GetBool("download.ipsw.show-latest")
 		macos := viper.GetBool("download.ipsw.macos")
 		ibridge := viper.GetBool("download.ipsw.ibridge")
-		kernel := viper.GetBool("download.ipsw.kernel")
+		remoteKernel := viper.GetBool("download.ipsw.kernel")
+		remoteDSC := viper.GetBool("download.ipsw.dyld")
+		dyldArches := viper.GetStringSlice("download.ipsw.dyld-arch")
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
 		pattern := viper.GetString("download.ipsw.pattern")
 		output := viper.GetString("download.ipsw.output")
@@ -127,8 +134,15 @@ var ipswCmd = &cobra.Command{
 		// beta := viper.GetBool("download.ipsw.beta")
 
 		// verify args
-		if kernel && len(pattern) > 0 {
-			return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
+		if len(dyldArches) > 0 && !remoteDSC {
+			return errors.New("--dyld-arch can only be used with --dyld")
+		}
+		if len(dyldArches) > 0 {
+			for _, arch := range dyldArches {
+				if !utils.StrSliceHas([]string{"arm64", "arm64e", "x86_64", "x86_64h"}, arch) {
+					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
+				}
+			}
 		}
 
 		if viper.GetBool("download.ipsw.usb") {
@@ -263,7 +277,7 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if cont {
-			if kernel { // REMOTE KERNEL MODE
+			if remoteKernel { // REMOTE KERNEL MODE
 				for _, i := range ipsws {
 					log.WithFields(log.Fields{
 						"device":  i.Identifier,
@@ -284,37 +298,85 @@ var ipswCmd = &cobra.Command{
 						return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
 					}
 				}
-			} else if len(pattern) > 0 { // PATTERN MATCHING MODE
-				for _, i := range ipsws {
-					log.WithFields(log.Fields{
-						"device":  i.Identifier,
-						"build":   i.BuildID,
-						"version": i.Version,
-						"signed":  i.Signed,
-					}).Info("Parsing remote IPSW")
-					dlRE, err := regexp.Compile(pattern)
-					if err != nil {
-						return errors.Wrap(err, "failed to compile regexp")
+			}
+			if remoteDSC || len(pattern) > 0 {
+				if remoteDSC { // REMOTE DSC MODE
+					for _, i := range ipsws {
+						log.WithFields(log.Fields{
+							"device":  i.Identifier,
+							"build":   i.BuildID,
+							"version": i.Version,
+							"signed":  i.Signed,
+						}).Info("Parsing remote IPSW")
+
+						log.Info("Extracting remote dyld_shared_cache(s)")
+						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+							Proxy:    proxy,
+							Insecure: insecure,
+						})
+						if err != nil {
+							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+						}
+						i, err := info.ParseZipFiles(zr.File)
+						if err != nil {
+							return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
+						}
+						sysDMG, err := i.GetSystemOsDmg()
+						if err != nil {
+							return fmt.Errorf("only iOS16.x/macOS13.x supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
+						}
+						if len(sysDMG) == 0 {
+							return fmt.Errorf("only iOS16.x/macOS13.x supported: no SystemOS DMG found in remote zip metadata")
+						}
+						tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
+						if err != nil {
+							return fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
+						}
+						defer os.RemoveAll(tmpDIR)
+						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true); err != nil {
+							return fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
+						}
+						folder, err := i.GetFolder()
+						if err != nil {
+							log.Errorf("failed to get folder from remote zip metadata: %v", err)
+						}
+						destPath = filepath.Join(destPath, folder)
+						if err := dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), destPath, viper.GetStringSlice("extract.dyld-arch")); err != nil {
+							return fmt.Errorf("failed to extract dyld_shared_cache(s) from remote IPSW: %v", err)
+						}
 					}
-					log.Infof("Downloading files matching pattern %#v", pattern)
-					zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
-					}
-					iinfo, err := info.ParseZipFiles(zr.File)
-					if err != nil {
-						return errors.Wrap(err, "failed to parse remote ipsw")
-					}
-					folder, err := iinfo.GetFolder()
-					if err != nil {
-						log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
-					}
-					destPath = filepath.Join(destPath, folder)
-					if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
-						return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
+				}
+				if len(pattern) > 0 { // PATTERN MATCHING MODE
+					for _, i := range ipsws {
+						log.WithFields(log.Fields{
+							"device":  i.Identifier,
+							"build":   i.BuildID,
+							"version": i.Version,
+							"signed":  i.Signed,
+						}).Info("Parsing remote IPSW")
+						dlRE, err := regexp.Compile(pattern)
+						if err != nil {
+							return errors.Wrap(err, "failed to compile regexp")
+						}
+						log.Infof("Downloading files matching pattern %#v", pattern)
+						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+							Proxy:    proxy,
+							Insecure: insecure,
+						})
+						if err != nil {
+							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+						}
+						iinfo, err := info.ParseZipFiles(zr.File)
+						if err != nil {
+							return errors.Wrap(err, "failed to parse remote ipsw")
+						}
+						folder, err := iinfo.GetFolder()
+						if err != nil {
+							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
+						}
+						if err := utils.RemoteUnzip(zr.File, dlRE, filepath.Join(destPath, folder), flat); err != nil {
+							return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
+						}
 					}
 				}
 			} else { // NORMAL MODE
@@ -354,6 +416,7 @@ var ipswCmd = &cobra.Command{
 				}
 			}
 		}
+
 		return nil
 	},
 }

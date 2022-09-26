@@ -36,4 +36,10 @@ typedef struct Control
     uint64 size<format = hex>;
 };
 
-Header header<comment = "Raw Image Diff header information">;
+Header header<comment = "header">;
+FSeek(header.meta_data_offset);
+char meta_data[header.controls_offset - header.meta_data_offset]<comment = "pbzx meta data blob">;
+FSeek(header.controls_offset);
+char controls[header.patch_data_offset[0] - header.controls_offset]<comment = "pbzx controls blob">;
+FSeek(header.patch_data_offset[0]);
+char patch_data[header.diff_size-header.patch_data_offset[0]]<comment = "pbzx patch data blob">;
