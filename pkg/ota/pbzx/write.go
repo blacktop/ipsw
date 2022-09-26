@@ -3,16 +3,15 @@ package pbzx
 import (
 	"container/heap"
 	"context"
+	"fmt"
 	"io"
-
-	"github.com/palantir/stacktrace"
 )
 
 func write(ctx context.Context, writeCh <-chan _Chunk, dst io.Writer) error {
 	next := 0
 	write := func(c _Chunk) error {
 		if _, err := dst.Write(c.data); err != nil {
-			return stacktrace.Propagate(err, "write error")
+			return fmt.Errorf("write error: %w", err)
 		}
 		next += 1
 		return nil
