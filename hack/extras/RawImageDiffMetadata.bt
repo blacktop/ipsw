@@ -30,9 +30,8 @@ typedef struct Extent
 
 typedef struct Chunk
 {
-    uint32 unk1<format = hex>;
-    uint32 unk2<format = hex>;
-    uint32 unk3<format = hex>;
+    uint32 size<format = hex>;
+    uint64 total<format = hex>;
 };
 
 typedef struct Fork
@@ -43,7 +42,7 @@ typedef struct Fork
     uint64 index<format = decimal>;
     uint64 flags<format = decimal>;
     ubyte algorithm<format = decimal>;     
-    uint64 dsize<format = decimal>; 
+    uint64 fork_header<format = decimal>; // all zeros I think
     //uint32 data[394];                  
 };
 
