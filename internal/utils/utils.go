@@ -245,8 +245,10 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 		return fmt.Errorf("failed to get current working directory: %v", err)
 	}
 
+	found := false
 	for _, f := range files {
 		if pattern.MatchString(f.Name) {
+			found = true
 			if flat {
 				fname = filepath.Join(folder, filepath.Base(f.Name))
 			} else {
@@ -301,6 +303,10 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				log.Warnf("%s already exists", fname)
 			}
 		}
+	}
+
+	if !found {
+		return fmt.Errorf("no files found matching %s", pattern.String())
 	}
 
 	return nil

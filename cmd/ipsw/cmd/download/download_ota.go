@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
@@ -56,6 +57,7 @@ func init() {
 	otaDLCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	otaDLCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().String("pattern", "", "Download remote files that match regex")
+	otaDLCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
 	otaDLCmd.Flags().String("info-type", "", "OS type to show OTAs for")
 	otaDLCmd.Flags().StringP("output", "o", "", "Folder to download files to")
@@ -68,6 +70,7 @@ func init() {
 	viper.BindPFlag("download.ota.driver-kit", otaDLCmd.Flags().Lookup("driver-kit"))
 	viper.BindPFlag("download.ota.kernel", otaDLCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.ota.pattern", otaDLCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("download.ota.flat", otaDLCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.ota.info", otaDLCmd.Flags().Lookup("info"))
 	viper.BindPFlag("download.ota.info-type", otaDLCmd.Flags().Lookup("info-type"))
 	viper.BindPFlag("download.ota.output", otaDLCmd.Flags().Lookup("output"))
@@ -77,7 +80,7 @@ func init() {
 var otaDLCmd = &cobra.Command{
 	Use:           "ota [options]",
 	Short:         "Download OTAs",
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -125,6 +128,7 @@ var otaDLCmd = &cobra.Command{
 		dyldDriverKit := viper.GetBool("download.ota.driver-kit")
 		remoteKernel := viper.GetBool("download.ota.kernel")
 		remotePattern := viper.GetString("download.ota.pattern")
+		flat := viper.GetBool("download.ota.flat")
 		otaInfo := viper.GetBool("download.ota.info")
 		otaInfoType := viper.GetString("download.ota.info-type")
 		output := viper.GetString("download.ota.output")
@@ -342,26 +346,41 @@ var otaDLCmd = &cobra.Command{
 						}
 					}
 					if len(remotePattern) > 0 { // REMOTE PATTERN MATCHING MODE
-						rfiles, err := ota.RemoteList(zr)
+						log.Infof("Downloading files matching pattern %#v", remotePattern)
+						iinfo, err := info.ParseZipFiles(zr.File)
 						if err != nil {
-							return fmt.Errorf("failed to list remote OTA files: %v", err)
+							return errors.Wrap(err, "failed to parse remote ipsw")
 						}
-						var matches []string
-						for _, rf := range rfiles {
-							if regexp.MustCompile(remotePattern).MatchString(rf.Name()) {
-								matches = append(matches, rf.Name())
+						folder, err := iinfo.GetFolder()
+						if err != nil {
+							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
+						}
+						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(remotePattern), filepath.Join(destPath, folder), flat); err != nil {
+							utils.Indent(log.Warn, 2)("0 files matched pattern in remote OTA zip. Now checking payloadv2 payloads...")
+							rfiles, err := ota.RemoteList(zr)
+							if err != nil {
+								return fmt.Errorf("failed to list remote OTA files: %v", err)
 							}
-						}
-						err = ota.RemoteExtract(zr, remotePattern, destPath, func(path string) bool {
-							for i, v := range matches {
-								if strings.HasSuffix(v, filepath.Base(path)) {
-									matches = append(matches[:i], matches[i+1:]...)
+							var matches []string
+							for _, rf := range rfiles {
+								if regexp.MustCompile(remotePattern).MatchString(rf.Name()) {
+									matches = append(matches, rf.Name())
 								}
 							}
-							return len(matches) == 0 // stop if we've extracted all matches
-						})
-						if err != nil {
-							return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
+							if len(matches) == 0 {
+								return fmt.Errorf("no files matched pattern %#v in remote OTA zip", remotePattern)
+							}
+							err = ota.RemoteExtract(zr, remotePattern, destPath, func(path string) bool {
+								for i, v := range matches {
+									if strings.HasSuffix(v, filepath.Base(path)) {
+										matches = append(matches[:i], matches[i+1:]...)
+									}
+								}
+								return len(matches) == 0 // stop if we've extracted all matches
+							})
+							if err != nil {
+								return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
+							}
 						}
 					}
 				}
