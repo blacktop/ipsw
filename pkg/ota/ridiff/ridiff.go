@@ -20,6 +20,7 @@ typedef struct
 } RawImage;
 
 typedef int64_t RawImagePatch(RawImage *);
+
 int ParseRawImage(char *output, char *patch);
 
 int ParseRawImage(char *output, char *patch) {
@@ -49,7 +50,7 @@ int ParseRawImage(char *output, char *patch) {
 	int64_t ret = RawImagePatch(&ri);
 	if (ret != 0) {
 		fprintf(stderr, "RawImagePatch returned %lld", ret);
-		return 1;
+		return ret;
 	}
 
 	if (dlclose(handle) != 0) {
@@ -59,7 +60,6 @@ int ParseRawImage(char *output, char *patch) {
 
 	return 0;
 }
-
 */
 import "C"
 import (
@@ -68,7 +68,7 @@ import (
 	"unsafe"
 )
 
-// RawImagePatch takes a RawImage struct and returns a pointer to the symbol.
+// RawImagePatch takes a Raw Image Diff and converts it to an APFS volume.
 func RawImagePatch(patch, output string) error {
 
 	p := C.CString(patch)
