@@ -61,16 +61,20 @@ type Extent struct {
 }
 
 type Fork struct {
-	Size       uint64
-	Compressed uint64
-	V          uint32
-	C          uint32
-	Index      uint64
-	Count      uint64
-	Algorithm  uint8
-	ForkHeader uint64
-	// ForkChunks []uint32
+	Size        uint64
+	Compressed  uint64
+	Variant     uint64
+	ExtentIndex uint64 // I think
+	ExtentCount uint64
+	Algorithm   uint8
+	ForkHeader  uint64 // all zeros
+	// ForkChunks []ForkChunk
 	// ForkFooter uint32
+}
+
+type ForkChunk struct {
+	Size  uint32
+	Total uint64
 }
 
 func ParseRawImageDiff10(r *bytes.Reader) (*RIDIFF10, error) {
@@ -122,10 +126,11 @@ func ParseRawImageDiff10(r *bytes.Reader) (*RIDIFF10, error) {
 	if err := binary.Read(mr, binary.LittleEndian, &md.Extents); err != nil {
 		return nil, err
 	}
-	md.Forks = make([]Fork, md.ForkCount)
-	if err := binary.Read(mr, binary.LittleEndian, &md.Forks); err != nil {
-		return nil, err
-	}
+	// FIXME: figure out how many chunks there are in a Fork
+	// md.Forks = make([]Fork, md.ForkCount)
+	// if err := binary.Read(mr, binary.LittleEndian, &md.Forks); err != nil {
+	// 	return nil, err
+	// }
 
 	b = bytes.Buffer{}
 	if err := pbzx.Extract(context.Background(), bytes.NewReader(ctrldata), &b, runtime.NumCPU()); err != nil {
