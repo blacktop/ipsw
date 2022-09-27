@@ -38,12 +38,12 @@ func init() {
 	AddrToSymCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	AddrToSymCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
 	AddrToSymCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
-	// AddrToSymCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	AddrToSymCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	viper.BindPFlag("dyld.a2s.slide", AddrToSymCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.a2s.image", AddrToSymCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.a2s.mapping", AddrToSymCmd.Flags().Lookup("mapping"))
-	// viper.BindPFlag("dyld.a2s.cache", AddrToSymCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("dyld.a2s.cache", AddrToSymCmd.Flags().Lookup("cache"))
 
 	AddrToSymCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -65,7 +65,7 @@ var AddrToSymCmd = &cobra.Command{
 		slide := viper.GetUint64("dyld.a2s.slide")
 		showImage := viper.GetBool("dyld.a2s.image")
 		showMapping := viper.GetBool("dyld.a2s.mapping")
-		// cacheFile := viper.GetString("dyld.a2s.cache")
+		cacheFile := viper.GetString("dyld.a2s.cache")
 
 		secondAttempt := false
 
@@ -105,15 +105,12 @@ var AddrToSymCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if err := f.ParseStubIslands(); err != nil {
-			return fmt.Errorf("failed to parse stub islands: %v", err)
+		if len(cacheFile) == 0 {
+			cacheFile = dscPath + ".a2s"
 		}
-		// if len(cacheFile) == 0 {
-		// 	cacheFile = dscPath + ".a2s"
-		// }
-		// if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
-		// 	return err
-		// }
+		if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+			return err
+		}
 
 	retry:
 		if showMapping {
