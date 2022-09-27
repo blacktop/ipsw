@@ -80,6 +80,7 @@ type File struct {
 	AddressToSymbol map[uint64]string
 
 	IsDyld4         bool
+	symCacheLoaded  bool
 	SubCacheInfo    []SubcacheEntryPageInLink
 	symUUID         mtypes.UUID
 	dyldImageAddr   uint64
