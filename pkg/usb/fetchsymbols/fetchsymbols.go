@@ -30,7 +30,7 @@ type Client struct {
 func NewClient(udid string) (*Client, error) {
 	c, err := lockdownd.NewClientForService(serviceName, udid, false)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("you might need to enable Developer Mode in your device Settings app: %v", err)
 	}
 	return &Client{
 		c: c,
@@ -68,7 +68,9 @@ func (c *Client) sendRecv(rw io.ReadWriter, req, resp any) error {
 
 func (c *Client) sendCommand(rw io.ReadWriter, cmd uint32) error {
 	respCmd := uint32(0)
-	_ = c.sendRecv(rw, cmd, &respCmd)
+	if err := c.sendRecv(rw, cmd, &respCmd); err != nil {
+		return fmt.Errorf("failed to send fetchsymbols command: %v", err)
+	}
 	if respCmd != cmd {
 		return fmt.Errorf("invalid response: wanted %v, got %v", cmd, respCmd)
 	}
