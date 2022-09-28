@@ -46,10 +46,10 @@ release-minor: ## Create a new minor semver release
 
 .PHONY: destroy
 destroy: ## Remove release from the CUR_VERSION
-	@echo " > Deleting Release ${CUR_VERSION}"
+	@echo " > Deleting Release ${LOCAL_VERSION}"
 	rm -rf dist
-	git tag -d ${CUR_VERSION}
-	git push origin :refs/tags/${CUR_VERSION}
+	git tag -d ${LOCAL_VERSION}
+	git push origin :refs/tags/${LOCAL_VERSION}
 
 build: ## Build ipsw
 	@echo " > Building ipsw"
