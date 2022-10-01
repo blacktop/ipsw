@@ -208,25 +208,27 @@ var XrefCmd = &cobra.Command{
 				}
 			}
 
-			msg := "XREFS"
 			if len(xrefs) == 0 {
-				msg = "No XREFS found"
-			}
-			if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 				log.WithFields(log.Fields{
-					"sym":   symName,
 					"dylib": img.Name,
-					"xrefs": len(xrefs),
-				}).Info(msg)
+				}).Debug("No XREFS found")
 			} else {
-				log.WithFields(log.Fields{
-					"dylib": img.Name,
-					"xrefs": len(xrefs),
-				}).Info(msg)
-			}
-			if len(xrefs) > 0 {
-				for addr, sym := range xrefs {
-					fmt.Printf("%#x: %s\n", addr, sym)
+				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+					log.WithFields(log.Fields{
+						"sym":   symName,
+						"dylib": img.Name,
+						"xrefs": len(xrefs),
+					}).Info("XREFS")
+				} else {
+					log.WithFields(log.Fields{
+						"dylib": img.Name,
+						"xrefs": len(xrefs),
+					}).Info("XREFS")
+				}
+				if len(xrefs) > 0 {
+					for addr, sym := range xrefs {
+						fmt.Printf("%#x: %s\n", addr, sym)
+					}
 				}
 			}
 		}
