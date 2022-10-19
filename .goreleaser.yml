@@ -281,6 +281,7 @@ nfpms:
     builds:
       - linux_amd64_build
       - linux_arm64_build
+      - darwin_ios_build
     homepage:  https://github.com/blacktop/ipsw
     description: |-
       iOS/macOS Research Swiss Army Knife.
