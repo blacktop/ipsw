@@ -46,8 +46,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CGO_LDFLAGS=-L/usr/local/homebrew/lib -framework IOKit
-      - CGO_CFLAGS=-I/usr/local/homebrew/include
+      - CGO_LDFLAGS=-L/opt/homebrew/lib -framework IOKit
+      - CGO_CFLAGS=-I/opt/homebrew/include
       - CC=sandbox-exec -f $PWD/hack/goreleaser/profile.sb cc
     goos:
       - darwin
