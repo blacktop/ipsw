@@ -706,7 +706,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 		stringPool := io.NewSectionReader(sr, int64(i.cache.LocalSymInfo.StringsFileOffset), int64(i.cache.LocalSymInfo.StringsSize))
 		sr.Seek(int64(i.cache.LocalSymInfo.NListFileOffset), io.SeekStart)
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
 		for idx := uint32(0); idx < i.cache.LocalSymInfo.EntriesCount; idx++ {
 			// skip over other images
@@ -741,7 +741,12 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					if err != nil {
 						return err
 					}
-					fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
+					// fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
+					// 	Name:    s,
+					// 	Nlist64: nlist,
+					// 	Macho:   m,
+					// }.String(true))
+					fmt.Println(CacheLocalSymbol64{
 						Name:    s,
 						Nlist64: nlist,
 						Macho:   m,
@@ -749,7 +754,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 				}
 			}
 
-			w.Flush()
+			// w.Flush()
 
 			sort.Slice(i.LocalSymbols, func(j, k int) bool {
 				return i.LocalSymbols[j].Name <= i.LocalSymbols[k].Name
