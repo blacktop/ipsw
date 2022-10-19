@@ -6,9 +6,9 @@ NEXT_VERSION=$(shell svu patch)
 GO_BIN=go
 
 .PHONY: build-deps
-build-deps: ## Install the build dependencies
+build-deps: x86-brew ## Install the build dependencies
 	@echo " > Installing build deps"
-	brew install $(GO_BIN) goreleaser
+	brew install $(GO_BIN) goreleaser unicorn libusb
 
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
@@ -18,6 +18,13 @@ dev-deps: ## Install the dev dependencies
 	$(GO_BIN) get -d golang.org/x/tools/cmd/cover
 	$(GO_BIN) get -d golang.org/x/tools/cmd/stringer
 	$(GO_BIN) get -d github.com/caarlos0/svu@v1.4.1
+
+.PHONY: x86-brew
+x86-brew: ## Install the x86_64 homebrew on Apple Silicon
+	cd ~/Downloads; mkdir homebrew
+	cd ~/Downloads; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
+	sudo mv ~/Downloads/homebrew /usr/local/homebrew
+	arch -x86_64 /usr/local/homebrew/bin/brew install unicorn libusb
 
 .PHONY: setup
 setup: build-deps dev-deps ## Install all the build and dev dependencies
