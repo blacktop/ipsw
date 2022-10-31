@@ -75,6 +75,10 @@ var FetchsymsCmd = &cobra.Command{
 			ldc.Close()
 		}
 
+		if err := utils.IsDeveloperImageMounted(dev.UniqueDeviceID); err != nil {
+			return fmt.Errorf("for device %s: %w", dev.UniqueDeviceID, err)
+		}
+
 		cli, err := fetchsymbols.NewClient(dev.UniqueDeviceID)
 		if err != nil {
 			return fmt.Errorf("failed to connect to fetchsymbols service: %w", err)

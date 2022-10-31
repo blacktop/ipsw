@@ -9,6 +9,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/blacktop/ipsw/pkg/usb/mount"
 )
 
 func PickDevice() (*lockdownd.DeviceValues, error) {
@@ -130,4 +131,23 @@ func PickDevices() ([]*lockdownd.DeviceValues, error) {
 
 		return picked, nil
 	}
+}
+
+func IsDeveloperImageMounted(udid string) error {
+	cli, err := mount.NewClient(udid)
+	if err != nil {
+		return fmt.Errorf("failed to connect to mobile_image_mounter: %w", err)
+	}
+	defer cli.Close()
+
+	images, err := cli.ListImages(mount.ImageTypeDeveloper)
+	if err != nil {
+		return fmt.Errorf("failed to list images: %w", err)
+	}
+
+	if len(images) == 0 {
+		return fmt.Errorf("mount the Developer image with the `ipsw idev img mount` command or by opening Xcode")
+	}
+
+	return nil
 }
