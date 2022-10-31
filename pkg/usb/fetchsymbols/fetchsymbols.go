@@ -30,7 +30,7 @@ type Client struct {
 func NewClient(udid string) (*Client, error) {
 	c, err := lockdownd.NewClientForService(serviceName, udid, false)
 	if err != nil {
-		return nil, fmt.Errorf("you might need to enable Developer Mode in your device Settings app OR mount the Developer image with `ipsw idev img mount`: %v", err)
+		return nil, fmt.Errorf("you might need to enable Developer Mode in your device Settings app: %v", err)
 	}
 	return &Client{
 		c: c,

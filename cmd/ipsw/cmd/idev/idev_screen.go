@@ -88,6 +88,11 @@ var ScreenCmd = &cobra.Command{
 				return err
 			}
 			ldc.Close()
+
+			if err := utils.IsDeveloperImageMounted(dev.UniqueDeviceID); err != nil {
+				return fmt.Errorf("for device %s: ensure Developer Mode is enabled on iOS16+ AND %w", dev.UniqueDeviceID, err)
+			}
+
 			return saveScreenshot(dev, output)
 		} else {
 			devs, err := utils.PickDevices()
@@ -96,6 +101,10 @@ var ScreenCmd = &cobra.Command{
 			}
 
 			for _, dev := range devs {
+				if err := utils.IsDeveloperImageMounted(dev.UniqueDeviceID); err != nil {
+					return fmt.Errorf("for device %s: ensure Developer Mode is enabled on iOS16+ AND %w", dev.UniqueDeviceID, err)
+				}
+
 				if err := saveScreenshot(dev, output); err != nil {
 					return fmt.Errorf("failed to save screenshot: %w", err)
 				}
