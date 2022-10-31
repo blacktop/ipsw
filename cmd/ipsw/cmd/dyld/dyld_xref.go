@@ -151,6 +151,8 @@ var XrefCmd = &cobra.Command{
 			return err
 		}
 
+		log.Info("Searching for xrefs (use -V for more progess output)")
+
 		for _, img := range images {
 			xrefs := make(map[uint64]string)
 
