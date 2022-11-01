@@ -361,7 +361,7 @@ func Mount(image, mountPoint string) error {
 func MountFS(image string) (string, error) {
 	var mountPoint string
 	if runtime.GOOS == "darwin" {
-		mountPoint = "/tmp/ios"
+		mountPoint = fmt.Sprintf("/tmp/%s.mount", image)
 	} else {
 		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
 			// Create in-docker mount point
