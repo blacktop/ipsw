@@ -34,7 +34,6 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img4"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/kernel"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/macho"
-	"github.com/blacktop/ipsw/cmd/ipsw/cmd/mount"
 	"github.com/spf13/cobra"
 
 	// "github.com/spf13/cobra/doc"
@@ -92,7 +91,6 @@ func init() {
 	rootCmd.AddCommand(img4.Img4Cmd)
 	rootCmd.AddCommand(kernel.KernelcacheCmd)
 	rootCmd.AddCommand(macho.MachoCmd)
-	rootCmd.AddCommand(mount.MountCmd)
 	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
