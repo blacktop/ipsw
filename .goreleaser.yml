@@ -7,7 +7,7 @@ before:
     - ./hack/make/json_mini
 
 snapshot:
-  name_template: '{{ incpatch .Version }}-next'
+  name_template: "{{ incpatch .Version }}-next"
 
 builds:
   - id: darwin_build
@@ -205,7 +205,7 @@ universal_binaries:
     replace: false
 
 archives:
-  - id : default_archive
+  - id: default_archive
     builds:
       - darwin_build
       - darwin_ios_build
@@ -224,7 +224,7 @@ archives:
       - completions/*
       - manpages/*
     wrap_in_directory: true
-  - id : extras_archive
+  - id: extras_archive
     builds:
       - darwin_amd64_extras_build
       - darwin_arm64_extras_build
@@ -281,8 +281,7 @@ nfpms:
     builds:
       - linux_amd64_build
       - linux_arm64_build
-      - darwin_ios_build
-    homepage:  https://github.com/blacktop/ipsw
+    homepage: https://github.com/blacktop/ipsw
     description: |-
       iOS/macOS Research Swiss Army Knife.
     maintainer: Blacktop <https://github.com/blacktop>
@@ -300,7 +299,7 @@ nfpms:
         file_info:
           mode: 0644
       - src: ./completions/_zsh
-        dst:  /usr/share/zsh/vendor-completions/_ipsw
+        dst: /usr/share/zsh/vendor-completions/_ipsw
         file_info:
           mode: 0644
       - src: ./manpages/ipsw.1.gz
@@ -314,9 +313,9 @@ nfpms:
     replacements:
       amd64: x86_64
     formats:
-    - apk
-    - deb
-    - rpm
+      - apk
+      - deb
+      - rpm
     deb:
       lintian_overrides:
         - statically-linked-binary
@@ -388,7 +387,7 @@ snapcrafts:
         destination: /usr/share/fish/vendor_completions.d/ipsw.fish
         mode: 0644
       - source: ./completions/_zsh
-        destination:  /usr/share/zsh/vendor-completions/_ipsw
+        destination: /usr/share/zsh/vendor-completions/_ipsw
         mode: 0644
       - source: ./manpages/ipsw.1.gz
         destination: /usr/share/man/man1/ipsw.1.gz
@@ -405,10 +404,10 @@ aurs:
   - homepage: https://github.com/blacktop/ipsw
     description: iOS/macOS Research Swiss Army Knife
     maintainers:
-      - 'Blacktop <https://github.com/blacktop>'
+      - "Blacktop <https://github.com/blacktop>"
     license: MIT
     private_key: /Users/blacktop/.ssh/aur
-    git_url: 'ssh://aur@aur.archlinux.org/ipsw-bin.git'
+    git_url: "ssh://aur@aur.archlinux.org/ipsw-bin.git"
     package: |-
       # bin
       install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
@@ -431,7 +430,7 @@ scoop:
   bucket:
     owner: blacktop
     name: scoop-bucket
-  homepage:  https://blacktop.github.io/ipsw
+  homepage: https://blacktop.github.io/ipsw
   description: iOS/macOS Research Swiss Army Knife
   license: MIT
 
@@ -439,16 +438,16 @@ changelog:
   sort: asc
   use: github
   groups:
-    - title: 'New Features'
+    - title: "New Features"
       regexp: "^.*feat[(\\w)]*:+.*$"
       order: 100
-    - title: 'Bug fixes'
+    - title: "Bug fixes"
       regexp: "^.*fix[(\\w)]*:+.*$"
       order: 200
     - title: Dependency updates
       regexp: "^.*chore\\(deps\\)*:+.*$"
       order: 300
-    - title: 'Documentation updates'
+    - title: "Documentation updates"
       regexp: "^.*docs[(\\w)]*:+.*$"
       order: 400
     - title: Other work
@@ -468,7 +467,7 @@ changelog:
       - Merge branch
 
 release:
-  target_commitish: '{{ .Commit }}'
+  target_commitish: "{{ .Commit }}"
   footer: |
     ### Summary
     **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .PreviousTag }}...{{ .Tag }}
@@ -480,4 +479,4 @@ release:
 announce:
   discord:
     enabled: true
-    message_template: '`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}'
+    message_template: "`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
