@@ -83,23 +83,23 @@ func (f *File) GetVMAddressForUUID(uuid types.UUID, offset uint64) (uint64, erro
 	return 0, fmt.Errorf("offset %#x not within any mappings file offset range", offset)
 }
 
-func (f *File) GetCacheOffset(offset uint64) (types.UUID, uint32, error) {
+func (f *File) GetCacheOffset(offset uint64) (types.UUID, uint64, error) {
 	if offset < f.SubCacheInfo[0].CacheVMOffset {
-		return f.UUID, uint32(offset), nil // vm offset in primary subcache
+		return f.UUID, offset, nil // vm offset in primary subcache
 	}
 	for idx, scinfo := range f.SubCacheInfo { // check the sub subcaches
 		if idx < len(f.SubCacheInfo)-1 {
 			if scinfo.CacheVMOffset <= offset && offset < f.SubCacheInfo[idx+1].CacheVMOffset {
-				return scinfo.UUID, uint32(offset - scinfo.CacheVMOffset), nil
+				return scinfo.UUID, offset - scinfo.CacheVMOffset, nil
 			}
 		} else {
 			if scinfo.CacheVMOffset <= offset {
-				return scinfo.UUID, uint32(offset - scinfo.CacheVMOffset), nil
+				return scinfo.UUID, offset - scinfo.CacheVMOffset, nil
 			}
 		}
 	}
-	// FIXME: what if the offset is in the .symbols subcache?
-	return types.UUID{}, 0, fmt.Errorf("offset %#x not within any sub cache info offset range", offset)
+	// NOTE: via the dyld src comments; the .symbols subcache is unmmapped
+	return types.UUID{}, 0, fmt.Errorf("offset %#x not within any sub cache VM offset range", offset)
 }
 
 // GetMappingForOffsetForUUID returns the mapping containing a given file offset for a given cache UUID
