@@ -92,7 +92,7 @@ var OffsetToAddrCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if f.Headers[f.UUID].CacheType == dyld.CacheTypeStubIslands {
+		if f.Headers[f.UUID].CacheType == dyld.CacheTypeUniversal {
 			log.Warn("dyld4 cache with stub islands detected (will search within dyld_subcache_entry's cacheVMOffsets)")
 			var uuid types.UUID
 			var delta uint64

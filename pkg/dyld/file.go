@@ -81,7 +81,7 @@ type File struct {
 
 	IsDyld4         bool
 	symCacheLoaded  bool
-	SubCacheInfo    []SubcacheEntryPageInLink
+	SubCacheInfo    []SubcacheEntry
 	symUUID         mtypes.UUID
 	dyldImageAddr   uint64
 	dyldStartFnAddr uint64
@@ -146,8 +146,8 @@ func Open(name string) (*File, error) {
 
 		for i := 1; i <= int(ff.Headers[ff.UUID].SubCacheArrayCount); i++ {
 			subCacheName := fmt.Sprintf("%s.%d", name, i)
-			if len(string(bytes.Trim(ff.SubCacheInfo[i-1].Extention[:], "\x00"))) > 0 {
-				subCacheName = fmt.Sprintf("%s%s", name, string(bytes.Trim(ff.SubCacheInfo[i-1].Extention[:], "\x00")))
+			if len(ff.SubCacheInfo[i-1].Extention) > 0 {
+				subCacheName = fmt.Sprintf("%s%s", name, ff.SubCacheInfo[i-1].Extention)
 			}
 			log.WithFields(log.Fields{
 				"cache": subCacheName,
@@ -368,10 +368,17 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 				} else {
 					cm.Name = "__DATA"
 				}
-				if cm.Flags.IsDirtyData() {
-					cm.Name += "_DIRTY"
-				} else if cm.Flags.IsConstData() {
-					cm.Name += "_CONST"
+				switch {
+				case cm.Flags.IsDirtyData():
+					cm.Name = "__DIRTY"
+				case cm.Flags.IsConstData():
+					cm.Name = "__CONST"
+				case cm.Flags.IsTextStubs():
+					cm.Name = "__STUBS"
+				case cm.Flags.IsConfigData():
+					cm.Name = "__CONFIG"
+				default:
+					cm.Name = "__UNKNOWN"
 				}
 			} else if cxmInfo.InitProt.Read() {
 				cm.Name = "__LINKEDIT"
@@ -604,25 +611,53 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 
 	if f.Headers[uuid].SubCacheArrayCount > 0 && f.Headers[uuid].SubCacheArrayOffset > 0 {
 		sr.Seek(int64(f.Headers[uuid].SubCacheArrayOffset), io.SeekStart)
-		f.SubCacheInfo = make([]SubcacheEntryPageInLink, f.Headers[uuid].SubCacheArrayCount)
+		f.SubCacheInfo = make([]SubcacheEntry, f.Headers[uuid].SubCacheArrayCount)
 		// TODO: gross hack to read the subcache info for pre iOS 16.
-		endOfSubCacheInfoArray := f.Headers[f.UUID].SubCacheArrayOffset + uint32(binary.Size(SubcacheEntryPageInLink{})*int(f.Headers[f.UUID].SubCacheArrayCount))
+		endOfSubCacheInfoArray := f.Headers[f.UUID].SubCacheArrayOffset + uint32(binary.Size(subcacheEntry{})*int(f.Headers[f.UUID].SubCacheArrayCount))
 		if endOfSubCacheInfoArray == f.Images[0].PathOffset {
-			if err := binary.Read(sr, f.ByteOrder, f.SubCacheInfo); err != nil {
-				return err
-			}
-		} else {
-			subCacheInfo := make([]SubcacheEntry, f.Headers[uuid].SubCacheArrayCount)
+			subCacheInfo := make([]subcacheEntry, f.Headers[uuid].SubCacheArrayCount)
 			if err := binary.Read(sr, f.ByteOrder, subCacheInfo); err != nil {
 				return err
 			}
-			for idx, susubCacheInfo := range subCacheInfo {
-				f.SubCacheInfo[idx].UUID = susubCacheInfo.UUID
-				f.SubCacheInfo[idx].CacheVMOffset = susubCacheInfo.CacheVMOffset
+			for idx, scinfo := range subCacheInfo {
+				f.SubCacheInfo[idx].UUID = scinfo.UUID
+				f.SubCacheInfo[idx].CacheVMOffset = scinfo.CacheVMOffset
+				f.SubCacheInfo[idx].Extention = string(bytes.Trim(scinfo.FileSuffix[:], "\x00"))
+			}
+		} else {
+			subCacheInfo := make([]subcacheEntry, f.Headers[uuid].SubCacheArrayCount)
+			if err := binary.Read(sr, f.ByteOrder, subCacheInfo); err != nil {
+				return err
+			}
+			for idx, scinfo := range subCacheInfo {
+				f.SubCacheInfo[idx].UUID = scinfo.UUID
+				f.SubCacheInfo[idx].CacheVMOffset = scinfo.CacheVMOffset
 			}
 		}
 	}
 
+	return nil
+}
+
+// GetSubCacheInfo returns the subcache info for the given UUID.
+func (f *File) GetSubCacheInfo(uuid mtypes.UUID) *SubcacheEntry {
+	for _, info := range f.SubCacheInfo {
+		if info.UUID == uuid {
+			return &info
+		}
+	}
+	return nil
+}
+
+// GetNextSubCacheInfo returns the subcache info after the given UUID.
+func (f *File) GetNextSubCacheInfo(uuid mtypes.UUID) *SubcacheEntry {
+	for idx, info := range f.SubCacheInfo {
+		if info.UUID == uuid {
+			if idx+1 < len(f.SubCacheInfo) {
+				return &f.SubCacheInfo[idx+1]
+			}
+		}
+	}
 	return nil
 }
 
