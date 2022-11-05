@@ -308,7 +308,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 				return err
 			}
 		}
-		if f.Headers[f.UUID].CacheType == CacheTypeStubIslands {
+		if f.Headers[f.UUID].CacheType == CacheTypeUniversal {
 			log.Info("parsing stub islands...")
 			if err := f.ParseStubIslands(); err != nil {
 				return fmt.Errorf("failed to parse stub islands: %v", err)

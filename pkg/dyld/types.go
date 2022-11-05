@@ -16,11 +16,18 @@ const (
 	IPhoneCacheFolder    = "System/Library/Caches/com.apple.dyld/"
 	DriverKitCacheFolder = "System/DriverKit/System/Library/dyld/"
 
-	MacOSCacheRegex     = `System/Library/dyld/dyld_shared_cache_`
-	IPhoneCacheRegex    = `System/Library/Caches/com\.apple\.dyld/dyld_shared_cache_`
-	DriverKitCacheRegex = `System/DriverKit/System/Library/dyld/dyld_shared_cache_`
-	CacheRegexEnding    = `(\..*)?$`
+	MacOSCacheRegex                      = `System/Library/dyld/dyld_shared_cache_`
+	IPhoneCacheRegex                     = `System/Library/Caches/com\.apple\.dyld/dyld_shared_cache_`
+	DriverKitCacheRegex                  = `System/DriverKit/System/Library/dyld/dyld_shared_cache_`
+	CacheRegexEnding                     = `(\..*)?$`
+	DYLD_SHARED_CACHE_DYNAMIC_DATA_MAGIC = "dyld_data    v0"
 )
+
+var cryptexPrefixes = []string{
+	"/System/Volumes/Preboot/Cryptexes/OS/",
+	"/private/preboot/Cryptexes/OS/",
+	"/System/Cryptexes/OS",
+}
 
 type formatVersion uint32
 
@@ -36,7 +43,7 @@ type cacheType uint64
 const (
 	CacheTypeDevelopment cacheType = 0
 	CacheTypeProduction  cacheType = 1
-	CacheTypeStubIslands cacheType = 2 // FIXME: what is this? check NEW dyld src in the `cache-builder/dyld_cache_format.h` file
+	CacheTypeUniversal   cacheType = 2
 )
 
 func (f formatVersion) Version() uint8 {
@@ -122,8 +129,8 @@ type CacheHeader struct {
 	CacheType                                   cacheType      // 0 for development, 1 for production
 	BranchPoolsOffset                           uint32         // file offset to table of uint64_t pool addresses
 	BranchPoolsCount                            uint32         // number of uint64_t entries
-	AccelerateInfoAddrUnusedOrDyldAddr          uint64         // unused. (unslid) address of optimization info NOTE: when cacheType=2 this is the address of the dylb macho in the cache
-	AccelerateInfoSizeUnusedOrDyldStartFuncAddr uint64         // unused. size of optimization info             NOTE: when cacheType=2 this is the address of the function _dyld_start
+	AccelerateInfoAddrUnusedOrDyldAddr          uint64         // unused. (unslid) address of optimization info NOTE: when cacheType=2 (unslid) address of mach_header of dyld in cache
+	AccelerateInfoSizeUnusedOrDyldStartFuncAddr uint64         // unused. size of optimization info             NOTE: when cacheType=2 (unslid) address of entry point (_dyld_start) of dyld in cache
 	ImagesTextOffset                            uint64         // file offset to first dyld_cache_image_text_info
 	ImagesTextCount                             uint64         // number of dyld_cache_image_text_info entries
 	PatchInfoAddr                               uint64         // (unslid) address of dyld_cache_patch_info
@@ -164,7 +171,7 @@ type CacheHeader struct {
 	OsVersion                     types.Version  // OS Version of dylibs in this cache for the main platform
 	AltPlatform                   types.Platform // e.g. iOSMac on macOS
 	AltOsVersion                  types.Version  // e.g. 14.0 for iOSMac
-	SwiftOptsOffset               uint64         // file offset to Swift optimizations header
+	SwiftOptsOffset               uint64         // VM offset from cache_header* to Swift optimizations header
 	SwiftOptsSize                 uint64         // size of Swift optimizations header
 	SubCacheArrayOffset           uint32         // file offset to first dyld_subcache_entry
 	SubCacheArrayCount            uint32         // number of subCache entries
@@ -175,6 +182,14 @@ type CacheHeader struct {
 	RosettaReadWriteSize          uint64         // maximum size of the Rosetta read-write region
 	ImagesOffset                  uint32         // file offset to first dyld_cache_image_info
 	ImagesCount                   uint32         // number of dyld_cache_image_info entries
+	CacheSubType                  uint32         // 0 for development, 1 for production, when cacheType is multi-cache(2)
+	_                             uint32         // padding
+	ObjcOptsOffset                uint64         // VM offset from cache_header* to ObjC optimizations header
+	ObjcOptsSize                  uint64         // size of ObjC optimizations header
+	CacheAtlasOffset              uint64         // VM offset from cache_header* to embedded cache atlas for process introspection
+	CacheAtlasSize                uint64         // size of embedded cache atlas
+	DynamicDataOffset             uint64         // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
+	DynamicDataMaxSize            uint64         // maximum size of space reserved from dynamic data
 }
 
 type CacheMappingInfo struct {
@@ -188,10 +203,12 @@ type CacheMappingInfo struct {
 type CacheMappingFlag uint64
 
 const (
-	DYLD_CACHE_MAPPING_NONE       CacheMappingFlag = 0
-	DYLD_CACHE_MAPPING_AUTH_DATA  CacheMappingFlag = 1
-	DYLD_CACHE_MAPPING_DIRTY_DATA CacheMappingFlag = 2
-	DYLD_CACHE_MAPPING_CONST_DATA CacheMappingFlag = 4
+	DYLD_CACHE_MAPPING_NONE        CacheMappingFlag = 0
+	DYLD_CACHE_MAPPING_AUTH_DATA   CacheMappingFlag = 1 << 0
+	DYLD_CACHE_MAPPING_DIRTY_DATA  CacheMappingFlag = 1 << 1
+	DYLD_CACHE_MAPPING_CONST_DATA  CacheMappingFlag = 1 << 2
+	DYLD_CACHE_MAPPING_TEXT_STUBS  CacheMappingFlag = 1 << 3
+	DYLD_CACHE_DYNAMIC_CONFIG_DATA CacheMappingFlag = 1 << 4
 )
 
 func (f CacheMappingFlag) IsNone() bool {
@@ -205,6 +222,12 @@ func (f CacheMappingFlag) IsDirtyData() bool {
 }
 func (f CacheMappingFlag) IsConstData() bool {
 	return (f & DYLD_CACHE_MAPPING_CONST_DATA) != 0
+}
+func (f CacheMappingFlag) IsTextStubs() bool {
+	return (f & DYLD_CACHE_MAPPING_TEXT_STUBS) != 0
+}
+func (f CacheMappingFlag) IsConfigData() bool {
+	return (f & DYLD_CACHE_DYNAMIC_CONFIG_DATA) != 0
 }
 
 type CacheMappingAndSlideInfo struct {
@@ -760,12 +783,26 @@ func (p patchableLocationV2) Discriminator() uint32 {
 type SubcacheEntry struct {
 	UUID          types.UUID
 	CacheVMOffset uint64
+	Extention     string
 }
 
-type SubcacheEntryPageInLink struct {
+type subcacheEntryV1 struct {
 	UUID          types.UUID
 	CacheVMOffset uint64
-	Extention     [32]byte
+}
+
+type subcacheEntry struct {
+	UUID          types.UUID
+	CacheVMOffset uint64
+	FileSuffix    [32]byte
+}
+
+// This struct is a small piece of dynamic data that can be included in the shared region, and contains configuration
+// data about the shared cache in use by the process. It is located
+type CacheDynamicDataHeader struct {
+	Magic   [16]uint8 // e.g. "dyld_data    v0"
+	FsID    uint64    // The fsid_t of the shared cache being used by a process
+	FsObjID uint64    // The fs_obj_id_t of the shared cache being used by a process
 }
 
 type CacheExportFlag int
