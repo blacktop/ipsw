@@ -61,6 +61,13 @@ typedef enum<uint>
     driverKit = 10,        // PLATFORM_DRIVERKIT
 } Platform<format = hex>;
 
+typedef enum<uint>
+{
+    kDyldSharedCacheTypeDevelopment = 0,
+    kDyldSharedCacheTypeProduction = 1,
+    kDyldSharedCacheTypeUniversal = 2,
+} CacheType<format = decimal>;
+
 typedef struct
 {
     uint32 version;
@@ -96,11 +103,11 @@ typedef struct
     uint64 localSymbolsOffset;            // file offset of where local symbols are stored
     uint64 localSymbolsSize;              // size of local symbols information
     Uuid uuid;                            // unique value for each shared cache file
-    uint64 cacheType;                     // 0 for development, 1 for production
+    uint64 cacheType;                     // 0 for development, 1 for production, 2 for multi-cache
     uint branchPoolsOffset;               // file offset to table of uint64 pool addresses
     uint branchPoolsCount;                // number of uint64 entries
-    uint64 dyldImageAddr;                 // (unslid) address of optimization info
-    uint64 dyldStartAddr;                 // size of optimization info
+    uint64 dyldInCacheMH;                 // (unslid) address of mach_header of dyld in cache
+    uint64 dyldInCacheEntry;              // (unslid) address of entry point (_dyld_start) of dyld in cache
     uint64 imagesTextOffset;              // file offset to first dyld_cache_image_text_info
     uint64 imagesTextCount;               // number of dyld_cache_image_text_info entries
     uint64 patchInfoAddr;                 // (unslid) address of dyld_cache_patch_info
@@ -151,9 +158,14 @@ typedef struct
     uint64 rosettaReadWriteSize; // maximum size of the Rosetta read-write region
     uint32 imagesOffset;         // file offset to first dyld_cache_image_info
     uint32 imagesCount;          // number of dyld_cache_image_info entries
-    uint64 pageInLinkType;
-    uint64 unknwon;
-    uint64 unknown2;
+    uint32 cacheSubType;         // 0 for development, 1 for production, when cacheType is multi-cache(2)
+    uint32 padding;
+    uint64 objcOptsOffset;       // VM offset from cache_header* to ObjC optimizations header
+    uint64 objcOptsSize;         // size of ObjC optimizations header
+    uint64 cacheAtlasOffset;     // VM offset from cache_header* to embedded cache atlas for process introspection
+    uint64 cacheAtlasSize;       // size of embedded cache atlas
+    uint64 dynamicDataOffset;    // VM offset from cache_header* to the location of dyld_cache_dynamic_data_header
+    uint64 dynamicDataMaxSize;   // maximum size of space reserved from dynamic dataz
 } dyld_cache_header;
 
 typedef struct
