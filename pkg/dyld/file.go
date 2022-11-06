@@ -85,6 +85,7 @@ type File struct {
 	symUUID         mtypes.UUID
 	dyldImageAddr   uint64
 	dyldStartFnAddr uint64
+	objcOptRoAddr   uint64
 	islandStubs     map[uint64]uint64
 
 	r       map[mtypes.UUID]io.ReaderAt

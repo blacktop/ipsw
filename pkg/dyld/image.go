@@ -229,9 +229,22 @@ func (i *CacheImage) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		offset += i.limit
 	}
+	// if scinfo := i.cache.GetSubCacheInfo(i.ruuid); scinfo != nil {
+	// 	if offset > int64(scinfo.CacheVMOffset) {
+	// 		if next := i.cache.GetNextSubCacheInfo(i.ruuid); next != nil {
+	// 			if offset <= int64(next.CacheVMOffset) {
+	// 				i.ruuid = next.UUID
+	// 				offset = offset - int64(scinfo.CacheVMOffset)
+	// 			}
+	// 		} else {
+	// 			return 0, fmt.Errorf("Seek: invalid offset")
+	// 		}
+	// 	}
+	// } else {
 	if offset < i.base {
 		return 0, fmt.Errorf("Seek: invalid offset")
 	}
+	// }
 	i.off = offset
 	return offset - i.base, nil
 }
@@ -314,13 +327,13 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 
 	var rsBase uint64
 	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
-		sec, opt, err := i.cache.getOptimizations()
+		opt, err := i.cache.GetOptimizations()
 		if err != nil {
 			return nil, err
 		}
 
-		if opt.Version == 16 {
-			rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
+		if opt.GetVersion() == 16 {
+			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
 		}
 	}
 
