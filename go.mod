@@ -33,14 +33,14 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/ulikunitz/xz v0.5.10
-	github.com/unicorn-engine/unicorn v0.0.0-20221028173205-896416b3505c
+	github.com/unicorn-engine/unicorn v0.0.0-20221101153654-241a391cecac
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.1.0
-	golang.org/x/net v0.1.0
+	golang.org/x/net v0.2.0
 	golang.org/x/oauth2 v0.1.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.1.0
+	golang.org/x/sys v0.2.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -86,7 +86,7 @@ require (
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	golang.org/x/term v0.1.0 // indirect
+	golang.org/x/term v0.2.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
