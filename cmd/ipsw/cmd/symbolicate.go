@@ -142,11 +142,11 @@ var symbolicateCmd = &cobra.Command{
 				}
 
 				for _, patch := range image.PatchableExports {
-					addr, err := image.GetVMAddress(uint64(patch.OffsetOfImpl))
+					addr, err := image.GetVMAddress(uint64(patch.GetImplOffset()))
 					if err != nil {
 						return err
 					}
-					f.AddressToSymbol[addr] = patch.Name
+					f.AddressToSymbol[addr] = patch.GetName()
 				}
 
 				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {

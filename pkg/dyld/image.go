@@ -28,12 +28,71 @@ type rangeEntry struct {
 	Size       uint32
 }
 
+type Patch interface {
+	GetName() string
+	GetKind() string
+	GetImplOffset() uint64
+	GetClientIndex() uint32
+	GetPatchLocations() any
+	GetGotLocations() []CachePatchableLocationV3
+}
+
 type PatchableExport struct {
 	Name             string
+	Kind             string
 	OffsetOfImpl     uint32
 	ClientIndex      uint32
 	PatchLocations   []CachePatchableLocationV1
 	PatchLocationsV2 []CachePatchableLocationV2
+}
+
+func (pe PatchableExport) GetName() string {
+	return pe.Name
+}
+func (pe PatchableExport) GetKind() string {
+	return pe.Kind
+}
+func (pe PatchableExport) GetImplOffset() uint64 {
+	return uint64(pe.OffsetOfImpl)
+}
+func (pe PatchableExport) GetClientIndex() uint32 {
+	return pe.ClientIndex
+}
+func (pe PatchableExport) GetPatchLocations() any {
+	if len(pe.PatchLocations) > 0 {
+		return pe.PatchLocations
+	}
+	return pe.PatchLocationsV2
+}
+func (pe PatchableExport) GetGotLocations() []CachePatchableLocationV3 {
+	return nil
+}
+
+type PatchableGotExport struct {
+	Name           string
+	Kind           string
+	OffsetOfImpl   uint32
+	GotLocationsV3 []CachePatchableLocationV3
+}
+
+func (pg PatchableGotExport) GetName() string {
+	return pg.Name
+}
+
+func (pg PatchableGotExport) GetKind() string {
+	return pg.Kind
+}
+func (pg PatchableGotExport) GetImplOffset() uint64 {
+	return uint64(pg.OffsetOfImpl)
+}
+func (pg PatchableGotExport) GetClientIndex() uint32 {
+	return 0
+}
+func (pg PatchableGotExport) GetPatchLocations() any {
+	return nil
+}
+func (pg PatchableGotExport) GetGotLocations() []CachePatchableLocationV3 {
+	return pg.GotLocationsV3
 }
 
 type astate struct {
@@ -175,7 +234,8 @@ type CacheImage struct {
 
 	SlideInfo        slideInfo
 	RangeEntries     []rangeEntry
-	PatchableExports []PatchableExport
+	PatchableExports []Patch
+	PatchableGOTs    []Patch
 	LocalSymbols     []*CacheLocalSymbol64
 	PublicSymbols    []*Symbol
 	ObjC             objcInfo
