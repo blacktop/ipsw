@@ -106,8 +106,14 @@ var OffsetToAddrCmd = &cobra.Command{
 			}
 			address := f.MappingsWithSlideInfo[uuid][0].Address + delta
 			if f.IsDyld4 {
-				ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
-				_, m, _ := f.GetMappingForVMAddress(address)
+				ext, err := f.GetSubCacheExtensionFromUUID(uuid)
+				if err != nil {
+					return err
+				}
+				_, m, err := f.GetMappingForVMAddress(address)
+				if err != nil {
+					return err
+				}
 				var stubs bool
 				if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
 					stubs = true
