@@ -36,9 +36,9 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20221101153654-241a391cecac
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.1.0
+	golang.org/x/crypto v0.2.0
 	golang.org/x/net v0.2.0
-	golang.org/x/oauth2 v0.1.0
+	golang.org/x/oauth2 v0.2.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.2.0
 	gopkg.in/yaml.v3 v3.0.1
