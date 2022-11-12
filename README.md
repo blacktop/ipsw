@@ -45,7 +45,7 @@ sudo snap install ipsw
 ### Windows
 
 ```bash
-scoop bucket add org https://github.com/blacktop/scoop-bucket.git
+scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git 
 scoop install blacktop/ipsw
 ```
 
@@ -91,6 +91,15 @@ Use "ipsw [command] --help" for more information about a command.
 ## Documentation
 
 - [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/docs/)
+
+```mermaid
+graph TD
+A[Download] --> B[Extract]
+B --> C[Parse]
+C --> D[Dump]
+D --> E[Search]
+E --> F[Symbolicate]
+```
 
 ## Community
 
