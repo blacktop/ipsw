@@ -57,6 +57,7 @@ jobs:
         run: |
           iwr get.scoop.sh -outfile 'install.ps1'
           .\install.ps1 -RunAsAdmin
+          Join-Path (Resolve-Path ~).Path "scoop\shims" >> $Env:GITHUB_PATH
       #
       # CACHE
       #
