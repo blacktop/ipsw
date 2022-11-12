@@ -137,6 +137,26 @@ jobs:
           dir
 
       #
+      # Package Installers
+      #
+      - name: Package Installers (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git 
+          scoop install blacktop/ipsw 
+          ipsw --help
+      - name: Package Installers (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo snap install ipsw
+          ipsw --help
+      - name: Package Installers (macOS)
+        if: matrix.platform == 'macos-12'
+        run: |
+          brew install blacktop/tap/ipsw
+          ipsw --help
+
+      #
       # (Windows)
       #
       - name: Run Device List (Windows)
