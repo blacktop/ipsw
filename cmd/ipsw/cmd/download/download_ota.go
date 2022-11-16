@@ -50,6 +50,7 @@ func init() {
 
 	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
+	otaDLCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
@@ -63,6 +64,7 @@ func init() {
 	otaDLCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.ota.rsr", otaDLCmd.Flags().Lookup("rsr"))
 	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("download.ota.urls", otaDLCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.ota.json", otaDLCmd.Flags().Lookup("json"))
@@ -123,6 +125,7 @@ var otaDLCmd = &cobra.Command{
 		// flags
 		platform := viper.GetString("download.ota.platform")
 		getBeta := viper.GetBool("download.ota.beta")
+		getRSR := viper.GetBool("download.ota.rsr")
 		remoteDyld := viper.GetBool("download.ota.dyld")
 		dyldArches := viper.GetStringSlice("download.ota.dyld-arch")
 		dyldDriverKit := viper.GetBool("download.ota.driver-kit")
@@ -148,6 +151,9 @@ var otaDLCmd = &cobra.Command{
 		}
 		if len(version) == 0 {
 			version = "0"
+		}
+		if getRSR && len(build) == 0 {
+			return fmt.Errorf("for now you will need to supply a --build number when using --rsr")
 		}
 		if len(build) == 0 {
 			build = "0"
@@ -212,6 +218,7 @@ var otaDLCmd = &cobra.Command{
 		otaXML, err := download.NewOTA(as, download.OtaConf{
 			Platform:        strings.ToLower(platform),
 			Beta:            getBeta,
+			RSR:             getRSR,
 			Device:          device,
 			Model:           model,
 			Version:         ver,
