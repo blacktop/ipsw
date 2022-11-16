@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -45,9 +44,11 @@ func init() {
 
 // OffsetToAddrCmd represents the o2a command
 var OffsetToAddrCmd = &cobra.Command{
-	Use:   "o2a <dyld_shared_cache> <offset>",
-	Short: "Convert dyld_shared_cache offset to address",
-	Args:  cobra.MinimumNArgs(2),
+	Use:           "o2a <dyld_shared_cache> <offset>",
+	Short:         "Convert dyld_shared_cache offset to address",
+	Args:          cobra.MinimumNArgs(2),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -94,17 +95,10 @@ var OffsetToAddrCmd = &cobra.Command{
 
 		if f.Headers[f.UUID].CacheType == dyld.CacheTypeUniversal {
 			log.Warn("dyld4 cache with stub islands detected (will search within dyld_subcache_entry's cacheVMOffsets)")
-			var uuid types.UUID
-			var delta uint64
-			for _, subcache := range f.SubCacheInfo {
-				if subcache.CacheVMOffset <= offset {
-					uuid = subcache.UUID
-					delta = offset - subcache.CacheVMOffset
-				} else {
-					break
-				}
+			uuid, address, err := f.GetCacheVMAddress(offset)
+			if err != nil {
+				return err
 			}
-			address := f.MappingsWithSlideInfo[uuid][0].Address + delta
 			if f.IsDyld4 {
 				ext, err := f.GetSubCacheExtensionFromUUID(uuid)
 				if err != nil {
