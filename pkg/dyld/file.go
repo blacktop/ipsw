@@ -360,9 +360,12 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 			}
 
 			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: cxmInfo, Name: "UNKNOWN"}
-
 			if cxmInfo.MaxProt.Execute() {
-				cm.Name = "__TEXT"
+				if cm.Flags.IsTextStubs() {
+					cm.Name = "__TEXT_STUBS"
+				} else {
+					cm.Name = "__TEXT"
+				}
 			} else if cxmInfo.MaxProt.Write() {
 				if cm.Flags.IsAuthData() {
 					cm.Name = "__AUTH"
@@ -371,15 +374,11 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 				}
 				switch {
 				case cm.Flags.IsDirtyData():
-					cm.Name = "__DIRTY"
+					cm.Name += "_DIRTY"
 				case cm.Flags.IsConstData():
-					cm.Name = "__CONST"
-				case cm.Flags.IsTextStubs():
-					cm.Name = "__STUBS"
+					cm.Name += "_CONST"
 				case cm.Flags.IsConfigData():
-					cm.Name = "__CONFIG"
-				default:
-					cm.Name = "__UNKNOWN"
+					cm.Name += "_CONFIG"
 				}
 			} else if cxmInfo.InitProt.Read() {
 				cm.Name = "__LINKEDIT"
