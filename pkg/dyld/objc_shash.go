@@ -386,6 +386,9 @@ func lookup8(k []byte, level uint64) uint64 {
 
 func (s StringHash) hash(key []byte) uint32 {
 	val := lookup8(key, s.Salt())
+	if s.Shift() == 64 {
+		return uint32(0)
+	}
 	index := (val >> uint64(s.Shift())) ^ uint64(s.Scramble()[s.Tab[(val&uint64(s.Mask()))]])
 	return uint32(index)
 }
