@@ -47,6 +47,7 @@ type assetType string
 
 const (
 	softwareUpdate      assetType = "com.apple.MobileAsset.SoftwareUpdate"
+	rsrUpdate           assetType = "com.apple.MobileAsset.SplatSoftwareUpdate"
 	watchSoftwareUpdate assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
 	// For macOS devices
 	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
@@ -121,6 +122,7 @@ type Ota struct {
 type OtaConf struct {
 	Platform        string
 	Beta            bool
+	RSR             bool
 	Device          string
 	Model           string
 	Version         *version.Version
@@ -141,11 +143,13 @@ type pallasRequest struct {
 	HWModelStr              string          `json:"HWModelStr"`
 	ProductVersion          string          `json:"ProductVersion"`
 	BuildVersion            string          `json:"BuildVersion"`
+	Build                   string          `json:"Build"`
 	RequestedProductVersion string          `json:"RequestedProductVersion,omitempty"`
 	Supervised              bool            `json:"Supervised,omitempty"`
 	DelayRequested          bool            `json:"DelayRequested,omitempty"`
 	CompatibilityVersion    int             `json:"CompatibilityVersion,omitempty"`
 	ReleaseType             string          `json:"ReleaseType,omitempty"`
+	RestoreVersion          string          `json:"RestoreVersion,omitempty"`
 }
 
 type ota struct {
@@ -225,7 +229,7 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "audioos":
 		fallthrough
 	case "tvos":
-		return []assetType{softwareUpdate}, nil
+		return []assetType{softwareUpdate, rsrUpdate}, nil
 	case "accessory":
 		return []assetType{accessorySoftwareUpdate}, nil
 	case "macos":
@@ -382,11 +386,11 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID) (reqs []p
 		AssetType:     atype,
 		AssetAudience: audienceID,
 		// CertIssuanceDay:      certIssuanceDay,
-		ProductVersion:       o.Config.Version.Original(),
-		BuildVersion:         o.Config.Build,
-		ProductType:          o.Config.Device,
-		HWModelStr:           o.Config.Model,
-		CompatibilityVersion: 20,
+		ProductVersion: o.Config.Version.Original(),
+		BuildVersion:   o.Config.Build,
+		// ProductType:          o.Config.Device,
+		HWModelStr: o.Config.Model,
+		// CompatibilityVersion: 20,
 	}
 
 	if o.Config.Version.Original() != "0" {
@@ -400,6 +404,11 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID) (reqs []p
 		case "ios", "audioos", "tvos":
 			req.ReleaseType = "Beta"
 		}
+	}
+
+	if o.Config.RSR {
+		req.RestoreVersion = "0.0.0.0.0,0"
+		req.Build = o.Config.Build
 	}
 
 	if len(o.Config.Device) > 0 && len(o.Config.Model) == 0 {
