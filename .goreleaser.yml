@@ -90,8 +90,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-linux-musl
-      - CC=zig c++ -target x86_64-linux-musl
+      - CC=zig cc -target x86_64-linux-gnu
+      - CC=zig c++ -target x86_64-linux-gnu
     goos:
       - linux
     goarch:
@@ -105,8 +105,8 @@ builds:
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-linux-musl
-      - CC=zig c++ -target aarch64-linux-musl
+      - CC=zig cc -target aarch64-linux-gnu
+      - CC=zig c++ -target aarch64-linux-gnu
     goos:
       - linux
     goarch:
