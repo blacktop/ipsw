@@ -296,11 +296,11 @@ func (f *File) getHeaderInfoRO() (*objc_headeropt_ro_t, error) {
 			return nil, err
 		}
 	case *ObjcOptT:
-		u, off, err = f.GetOffset(f.objcOptRoAddr)
+		u, off, err = f.GetOffset(f.objcOptRoAddr + uint64(o.HeaderOptRoOffset))
 		if err != nil {
 			return nil, err
 		}
-		hdr.offset = off // FIXME: this is not the correct offset (cache vmoffset or subcache offset)
+		hdr.offset = off
 		sr := io.NewSectionReader(f.r[u], 0, 1<<63-1)
 		sr.Seek(int64(off), io.SeekStart)
 		if err := binary.Read(sr, f.ByteOrder, &hdr.Count); err != nil {
@@ -349,7 +349,7 @@ func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.SelectorHashTableOffset(off)), opt: opt}
+		shash = StringHash{FileOffset: int64(opt.SelectorHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -389,7 +389,7 @@ func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.ClassHashTableOffset(off)), opt: opt}
+		shash = StringHash{FileOffset: int64(opt.ClassHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -429,7 +429,7 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.ProtocolHashTableOffset(off)), opt: opt}
+		shash = StringHash{FileOffset: int64(opt.ProtocolHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -454,14 +454,22 @@ func (f *File) dumpOffsets(shash *StringHash, fileOffset int64, uuid types.UUID)
 					if err != nil {
 						log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
 					}
-					fmt.Printf("%s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.ObjectOffsets[idx].DylibObjCIndex()])))
+					if len(shash.dylibMap) > 0 {
+						fmt.Printf("%s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.ObjectOffsets[idx].DylibObjCIndex()])))
+					} else {
+						fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+					}
 				} else {
 					for i := uint16(0); i < shash.ObjectOffsets[idx].DuplicateCount(); i++ {
 						_, addr, err := f.GetCacheVMAddress(shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].ObjectCacheOffset())
 						if err != nil {
 							log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
 						}
-						fmt.Printf("    %s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].DylibObjCIndex()])))
+						if len(shash.dylibMap) > 0 {
+							fmt.Printf("    %s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].DylibObjCIndex()])))
+						} else {
+							fmt.Printf("    %s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+						}
 					}
 				}
 			} else {
@@ -505,12 +513,18 @@ type header_info_ro struct {
 }
 
 func (h *objc_headeropt_ro_t) GetMachoHdrOffset(index int) (uint64, error) {
+	if h == nil {
+		return 0, fmt.Errorf("headeropt_ro is nil")
+	}
 	if index > len(h.Headers) {
 		return 0, fmt.Errorf("index out of range")
 	}
 	return h.offset + 8 + uint64(index*binary.Size(header_info_ro{})) + uint64(h.Headers[index].MhdrOffset), nil
 }
 func (h *objc_headeropt_ro_t) FindElement(addr uint64) (uint16, error) {
+	if h == nil {
+		return 0, fmt.Errorf("headeropt_ro is nil")
+	}
 	for idx, hdr := range h.Headers {
 		calcAddr := h.offset + 8 + uint64(idx*binary.Size(header_info_ro{})) + uint64(hdr.MhdrOffset)
 		if 0x180000000+calcAddr == addr {
@@ -520,6 +534,9 @@ func (h *objc_headeropt_ro_t) FindElement(addr uint64) (uint16, error) {
 	return 0, fmt.Errorf("could not find element")
 }
 func (h *objc_headeropt_ro_t) GetObjcInfoOffset(index int) (uint64, error) {
+	if h == nil {
+		return 0, fmt.Errorf("headeropt_ro is nil")
+	}
 	if index > len(h.Headers) {
 		return 0, fmt.Errorf("index out of range")
 	}
