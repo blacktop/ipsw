@@ -19,7 +19,7 @@ typedef struct
     uint32_t verbose;
 } RawImage;
 
-typedef int64_t RawImagePatch(RawImage *);
+typedef int32_t RawImagePatch(RawImage *);
 
 int ParseRawImage(char *output, char *patch);
 
@@ -47,9 +47,9 @@ int ParseRawImage(char *output, char *patch) {
         .verbose = 0,
     };
 
-	int64_t ret = RawImagePatch(&ri);
+	int32_t ret = RawImagePatch(&ri);
 	if (ret != 0) {
-		fprintf(stderr, "RawImagePatch returned %lld", ret);
+		fprintf(stderr, "RawImagePatch returned %d\n", ret);
 		return ret;
 	}
 

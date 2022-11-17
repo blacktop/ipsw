@@ -167,7 +167,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 	found := false
 
 	for _, zf := range zr.File {
-		if regexp.MustCompile(`cryptex-system-arm64e$`).MatchString(zf.Name) {
+		if regexp.MustCompile(`cryptex-system-arm64?e$`).MatchString(zf.Name) {
 			found = true
 			rc, err := zf.Open()
 			if err != nil {

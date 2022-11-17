@@ -73,7 +73,9 @@ Available Commands:
   info            Display IPSW/OTA Info
   kernel          Parse kernelcache
   macho           Parse MachO
-  ota             Extract file(s) from OTA
+  mdevs           List all MobileDevices in IPSW
+  mount           Mount DMG from IPSW
+  ota             Parse OTAs
   sepfw           Dump MachOs
   shsh            Get shsh blobs from device
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
@@ -81,6 +83,7 @@ Available Commands:
   version         Print the version number of ipsw
 
 Flags:
+      --color           colorize output
       --config string   config file (default is $HOME/.ipsw.yaml)
   -h, --help            help for ipsw
   -V, --verbose         verbose output

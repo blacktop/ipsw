@@ -169,24 +169,44 @@ func getApFirmwareKey(device, build, filename string) (string, string, error) {
 
 func (i *Info) String() string {
 	var iStr string
+	var verextra string
+	if i.Plists.OTAInfo != nil {
+		verextra = fmt.Sprintf(" %s", i.Plists.OTAInfo.MobileAssetProperties.ProductVersionExtra)
+	}
 	iStr += fmt.Sprintf(
 		"Version        = %s\n"+
 			"BuildVersion   = %s\n"+
 			"OS Type        = %s\n",
-		i.Plists.BuildManifest.ProductVersion,
+		i.Plists.BuildManifest.ProductVersion+verextra,
 		i.Plists.BuildManifest.ProductBuildVersion,
 		i.Plists.GetOSType(),
 	)
 	if i.Plists.Restore != nil {
-		iStr += "FileSystem     = "
 		if len(i.Plists.Restore.SystemRestoreImageFileSystems) > 0 {
 			for file, fsType := range i.Plists.Restore.SystemRestoreImageFileSystems {
-				iStr += fmt.Sprintf("%s (Type: %s)\n", file, fsType)
+				iStr += fmt.Sprintf("FileSystem     = %s (Type: %s)\n", file, fsType)
 			}
 		} else {
-			if fsDMG, err := i.GetSystemOsDmg(); err == nil {
-				iStr += fsDMG
+			if fsDMG, err := i.GetFileSystemOsDmg(); err == nil {
+				iStr += fmt.Sprintf("FileSystem     = %s\n", fsDMG)
 			}
+			if fsDMG, err := i.GetSystemOsDmg(); err == nil {
+				iStr += fmt.Sprintf("SystemOS       = %s\n", fsDMG)
+			}
+			if fsDMG, err := i.GetAppOsDmg(); err == nil {
+				iStr += fmt.Sprintf("AppOS          = %s\n", fsDMG)
+			}
+		}
+	}
+	if i.Plists.OTAInfo != nil {
+		if len(i.Plists.OTAInfo.MobileAssetProperties.RestoreVersion) > 0 {
+			iStr += fmt.Sprintf("RestoreVersion = %s\n", i.Plists.OTAInfo.MobileAssetProperties.RestoreVersion)
+		}
+		if len(i.Plists.OTAInfo.MobileAssetProperties.PrerequisiteBuild) > 0 {
+			iStr += fmt.Sprintf("PrereqBuild    = %s\n", i.Plists.OTAInfo.MobileAssetProperties.PrerequisiteBuild)
+		}
+		if i.Plists.OTAInfo.MobileAssetProperties.SplatOnly {
+			iStr += "IsRSR          = ✅\n"
 		}
 	}
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
@@ -398,8 +418,10 @@ func (i *Info) GetFolder() (string, error) {
 		}
 		devs = utils.SortDevices(utils.Unique(devs))
 		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs)), nil
+	} else {
+		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(i.Plists.BuildManifest.SupportedProductTypes)), nil
 	}
-	return "", fmt.Errorf("no devices found")
+	// return "", fmt.Errorf("no devices found")
 }
 
 // GetFolders returns a list of the IPSW name folders

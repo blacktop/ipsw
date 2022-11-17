@@ -51,6 +51,7 @@ type Asset struct {
 	RestoreVersionInfo                    restoreVersionInfo `json:"RestoreVersionInfo,omitempty" plist:"RestoreVersionInfo,omitempty"`
 	PrerequisiteBuild                     string             `json:"PrerequisiteBuild" plist:"PrerequisiteBuild,omitempty"`
 	PrerequisiteOSVersion                 string             `json:"PrerequisiteOSVersion" plist:"PrerequisiteOSVersion,omitempty"`
+	ProductVersionExtra                   string             `json:"ProductVersionExtra" plist:"ProductVersionExtra,omitempty"`
 	RSEPDigest                            []byte             `json:"RSEPDigest" plist:"RSEPDigest,omitempty"`
 	Ramp                                  bool               `json:"Ramp" plist:"Ramp,omitempty"`
 	RescueMinimumSystemPartition          int                `json:"RescueMinimumSystemPartition" plist:"RescueMinimumSystemPartition,omitempty"`
@@ -62,6 +63,7 @@ type Asset struct {
 	MultiPassEnabled                      bool               `json:"SUMultiPassEnabled" plist:"SUMultiPassEnabled,omitempty"`
 	ProductSystemName                     string             `json:"SUProductSystemName" plist:"SUProductSystemName,omitempty"`
 	Publisher                             string             `json:"SUPublisher" plist:"SUPublisher,omitempty"`
+	SplatOnly                             bool               `json:"SplatOnly" plist:"SplatOnly,omitempty"`
 	SupportedDeviceModels                 []string           `json:"SupportedDeviceModels" plist:"SupportedDeviceModels,omitempty"`
 	SupportedDevices                      []string           `json:"SupportedDevices" plist:"SupportedDevices,omitempty"`
 	SystemPartitionPadding                map[string]int     `json:"SystemPartitionPadding" plist:"SystemPartitionPadding,omitempty"`
