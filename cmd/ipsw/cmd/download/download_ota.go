@@ -312,7 +312,7 @@ var otaDLCmd = &cobra.Command{
 						if runtime.GOOS == "darwin" { // FIXME: figure out how to do this on all platforms
 							log.Info("Extracting remote dyld_shared_cache")
 							if err := dyld.ExtractFromRemoteCryptex(zr, destPath, dyldArches); err != nil {
-								return fmt.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
+								log.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
 							}
 							found = true
 						}
