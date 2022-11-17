@@ -143,7 +143,7 @@ type pallasRequest struct {
 	HWModelStr              string          `json:"HWModelStr"`
 	ProductVersion          string          `json:"ProductVersion"`
 	BuildVersion            string          `json:"BuildVersion"`
-	Build                   string          `json:"Build"`
+	Build                   string          `json:"Build,omitempty"`
 	RequestedProductVersion string          `json:"RequestedProductVersion,omitempty"`
 	Supervised              bool            `json:"Supervised,omitempty"`
 	DelayRequested          bool            `json:"DelayRequested,omitempty"`
@@ -386,11 +386,11 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID) (reqs []p
 		AssetType:     atype,
 		AssetAudience: audienceID,
 		// CertIssuanceDay:      certIssuanceDay,
-		ProductVersion: o.Config.Version.Original(),
-		BuildVersion:   o.Config.Build,
-		// ProductType:          o.Config.Device,
-		HWModelStr: o.Config.Model,
-		// CompatibilityVersion: 20,
+		ProductVersion:       o.Config.Version.Original(),
+		BuildVersion:         o.Config.Build,
+		ProductType:          o.Config.Device,
+		HWModelStr:           o.Config.Model,
+		CompatibilityVersion: 20,
 	}
 
 	if o.Config.Version.Original() != "0" {
