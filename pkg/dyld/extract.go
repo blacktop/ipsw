@@ -173,7 +173,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 			if err != nil {
 				return fmt.Errorf("failed to open cryptex-system-arm64e: %v", err)
 			}
-
+			defer rc.Close()
 			// setup progress bar
 			var total int64 = int64(zf.UncompressedSize64)
 			p := mpb.New(
@@ -205,7 +205,6 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 			io.Copy(in, proxyReader)
 			// wait for our bar to complete and flush and close remote zip and temp file
 			p.Wait()
-			rc.Close()
 			in.Close()
 
 			out, err := os.CreateTemp("", "cryptex-system-arm64e.decrypted.*.dmg")
@@ -236,7 +235,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 				return fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
 			}
 
-			break
+			return nil
 		}
 	}
 
