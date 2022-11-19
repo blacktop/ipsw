@@ -186,20 +186,54 @@ func Uint64SliceContains(slice []uint64, item uint64) bool {
 	return false
 }
 
-// Unique returns a slice with only unique strings
-func Unique(s []string) []string {
-	unique := make(map[string]bool, len(s))
-	us := make([]string, len(unique))
-	for _, elem := range s {
-		if len(elem) != 0 {
-			if !unique[elem] {
-				us = append(us, elem)
-				unique[elem] = true
-			}
+// Unique returns a slice with only unique elements
+func Unique[T comparable](s []T) []T {
+	inResult := make(map[T]bool)
+	var result []T
+	for _, str := range s {
+		if _, ok := inResult[str]; !ok {
+			inResult[str] = true
+			result = append(result, str)
 		}
 	}
+	return result
+}
 
-	return us
+func UniqueAppend[T comparable](slice []T, i T) []T {
+	for _, ele := range slice {
+		if ele == i {
+			return slice
+		}
+	}
+	return append(slice, i)
+}
+
+func UniqueConcat[T comparable](slice []T, in []T) []T {
+	for _, i := range in {
+		for _, ele := range slice {
+			if ele == i {
+				return slice
+			}
+		}
+		slice = append(slice, i)
+	}
+	return slice
+}
+
+type Pair[D, M any] struct {
+	Device D
+	Model  M
+}
+
+func Zip[D, M any](ds []D, ms []M) ([]Pair[D, M], error) {
+	if len(ds) != len(ms) {
+		return nil, fmt.Errorf("lengths of slices must be equal")
+	}
+	pairs := make([]Pair[D, M], len(ds))
+	for i := 0; i < len(ds); i++ {
+		pairs[i] = Pair[D, M]{ds[i], ms[i]}
+	}
+	return pairs, nil
 }
 
 // ReverseBytes reverse byte array order

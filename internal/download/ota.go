@@ -529,6 +529,12 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	}()
 
 	for resp := range c {
+
+		if resp.StatusCode >= 500 {
+			log.Debugf("[ERROR]\n%s", resp.Status)
+			continue
+		}
+
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("failed to read response body: %v", err)
@@ -610,6 +616,21 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 			}
 		}
 	}
+	for idx, o := range os {
+		for _, elem := range otas {
+			if len(elem.BaseURL+elem.RelativePath) != 0 {
+				if o.BaseURL+o.RelativePath == elem.BaseURL+elem.RelativePath {
+					os[idx].SupportedDevices = utils.UniqueConcat(os[idx].SupportedDevices, elem.SupportedDevices)
+					os[idx].SupportedDeviceModels = utils.UniqueConcat(os[idx].SupportedDeviceModels, elem.SupportedDeviceModels)
+					if devs, err := utils.Zip(elem.SupportedDevices, elem.SupportedDeviceModels); err == nil {
+						for _, dev := range devs {
+							os[idx].Devices = utils.UniqueAppend(os[idx].Devices, fmt.Sprintf("%s_%s", dev.Device, dev.Model))
+						}
+					}
+				}
+			}
+		}
+	}
 	return os
 }
 
@@ -622,8 +643,8 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 		return otas
 	}
 
-	for _, ota := range otas {
-		devices = append(devices, ota.SupportedDevices...)
+	for _, o := range otas {
+		devices = append(devices, o.SupportedDevices...)
 	}
 
 	devices = utils.Unique(devices)
@@ -643,19 +664,11 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 	}
 
 	for _, device := range filteredDevices {
-		var devOTA types.Asset
 		for _, ota := range otas {
 			if utils.StrSliceHas(ota.SupportedDevices, device) {
-				if devOTA.SupportedDevices == nil {
-					if ota.DownloadSize > devOTA.DownloadSize {
-						devOTA = ota
-					}
-				} else {
-					devOTA = ota
-				}
+				filteredOtas = append(filteredOtas, ota)
 			}
 		}
-		filteredOtas = append(filteredOtas, devOTA)
 	}
 
 	return uniqueOTAs(filteredOtas)
