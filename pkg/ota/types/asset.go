@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -90,6 +91,14 @@ type Asset struct {
 	FirmwareVersionMajor   int    `plist:"FirmwareVersionMajor,omitempty"`
 	FirmwareVersionMinor   int    `plist:"FirmwareVersionMinor,omitempty"`
 	FirmwareVersionRelease int    `plist:"FirmwareVersionRelease,omitempty"`
+	Devices                []string
+}
+
+func (a Asset) Version() string {
+	if len(a.ProductVersionExtra) > 0 {
+		return fmt.Sprintf("%s %s", strings.TrimPrefix(a.OSVersion, "9.9."), a.ProductVersionExtra)
+	}
+	return strings.TrimPrefix(a.OSVersion, "9.9.")
 }
 
 func (a Asset) String() string {
@@ -101,7 +110,7 @@ func (a Asset) String() string {
 	if len(a.RestoreVersion) > 0 {
 		version = fmt.Sprintf(", version: %s", a.RestoreVersion)
 	}
-	return fmt.Sprintf("name: %s%s, build: %s, os: %s, asset_type: %s%s, devices: %d, model: %s, size: %s, zip: %s",
+	return fmt.Sprintf("name: %s%s, build: %s, os: %s, asset_type: %s%s, devices: %d, models: %d, size: %s, zip: %s",
 		a.DocumentationID,
 		version,
 		a.Build,
@@ -109,7 +118,7 @@ func (a Asset) String() string {
 		a.AssetType,
 		prereq,
 		len(a.SupportedDevices),
-		strings.Join(a.SupportedDeviceModels, ","),
+		len(a.SupportedDeviceModels),
 		humanize.Bytes(uint64(a.UnarchivedSize)),
 		filepath.Base(a.RelativePath),
 	)
@@ -117,20 +126,26 @@ func (a Asset) String() string {
 
 func (a Asset) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
-		URL         string   `json:"url,omitempty"`
-		Description string   `json:"description,omitempty"`
-		Product     string   `json:"product,omitempty"`
-		Devices     []string `json:"devices,omitempty"`
-		Version     string   `json:"version,omitempty"`
-		Build       string   `json:"build,omitempty"`
-		Size        string   `json:"size,omitempty"`
+		URL           string   `json:"url,omitempty"`
+		Description   string   `json:"description,omitempty"`
+		Product       string   `json:"product,omitempty"`
+		Devices       []string `json:"devices,omitempty"`
+		Version       string   `json:"version,omitempty"`
+		Build         string   `json:"build,omitempty"`
+		Size          string   `json:"size,omitempty"`
+		Type          string   `json:"type,omitempty"`
+		Hash          string   `json:"hash,omitempty"`
+		HashAlgorithm string   `json:"hash_algorithm,omitempty"`
 	}{
-		URL:         a.BaseURL + a.RelativePath,
-		Description: a.DocumentationID,
-		Product:     a.ProductSystemName,
-		Devices:     a.SupportedDevices,
-		Version:     strings.TrimPrefix(a.OSVersion, "9.9."),
-		Build:       a.Build,
-		Size:        humanize.Bytes(uint64(a.DownloadSize)),
+		URL:           a.BaseURL + a.RelativePath,
+		Description:   a.DocumentationID,
+		Product:       a.ProductSystemName,
+		Devices:       a.Devices,
+		Version:       a.Version(),
+		Build:         a.Build,
+		Size:          humanize.Bytes(uint64(a.DownloadSize)),
+		Type:          a.ReleaseType,
+		Hash:          hex.EncodeToString(a.Hash),
+		HashAlgorithm: a.HashAlgorithm,
 	})
 }
