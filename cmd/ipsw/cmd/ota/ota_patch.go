@@ -1,3 +1,5 @@
+//go:build darwin && cgo
+
 /*
 Copyright © 2022 blacktop
 
