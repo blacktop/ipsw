@@ -65,6 +65,10 @@ var patchCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to parse IPSW: %v", err)
 		}
+		infoFolder, err := i.GetFolder()
+		if err != nil {
+			return fmt.Errorf("failed to get OTA folder: %v", err)
+		}
 
 		zr, err := zip.OpenReader(otaPath)
 		if err != nil {
@@ -73,7 +77,9 @@ var patchCmd = &cobra.Command{
 		defer zr.Close()
 
 		if len(outFolder) > 0 {
-			os.MkdirAll(outFolder, 0750)
+			outFolder = filepath.Join(outFolder, infoFolder)
+		} else {
+			outFolder = infoFolder
 		}
 
 		for _, zf := range zr.File {
@@ -97,10 +103,12 @@ var patchCmd = &cobra.Command{
 
 				io.Copy(in, f)
 
-				os.Create(filepath.Join(outFolder, appDMG))
+				dst := filepath.Join(outFolder, "AppOS", appDMG)
+				os.MkdirAll(filepath.Dir(dst), 0750)
+				os.Create(dst)
 
-				log.Infof("Patching cryptex-app to %s", appDMG)
-				if err := ridiff.RawImagePatch(in.Name(), filepath.Join(outFolder, appDMG)); err != nil {
+				log.Infof("Patching cryptex-app to %s", dst)
+				if err := ridiff.RawImagePatch(in.Name(), dst); err != nil {
 					return fmt.Errorf("failed to patch cryptex-app: %v", err)
 				}
 			}
@@ -124,10 +132,12 @@ var patchCmd = &cobra.Command{
 
 				io.Copy(in, f)
 
-				os.Create(filepath.Join(outFolder, systemDMG))
+				dst := filepath.Join(outFolder, "SystemOS", systemDMG)
+				os.MkdirAll(filepath.Dir(dst), 0750)
+				os.Create(dst)
 
-				log.Infof("Patching cryptex-system-arm64e to %s", systemDMG)
-				if err := ridiff.RawImagePatch(in.Name(), filepath.Join(outFolder, systemDMG)); err != nil {
+				log.Infof("Patching cryptex-system-arm64e to %s", dst)
+				if err := ridiff.RawImagePatch(in.Name(), dst); err != nil {
 					return fmt.Errorf("failed to patch cryptex-system-arm64e: %v", err)
 				}
 			}
