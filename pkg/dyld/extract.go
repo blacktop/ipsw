@@ -215,7 +215,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 			out.Close()
 
 			log.Info("Patching cryptex-system-arm64e")
-			if err := ridiff.RawImagePatch(in.Name(), out.Name()); err != nil {
+			if err := ridiff.RawImagePatch("", in.Name(), out.Name(), 0); err != nil {
 				return fmt.Errorf("failed to patch cryptex-system-arm64e: %v", err)
 
 			}
