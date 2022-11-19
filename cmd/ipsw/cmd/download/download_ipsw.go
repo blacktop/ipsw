@@ -128,7 +128,7 @@ var ipswCmd = &cobra.Command{
 		remoteDSC := viper.GetBool("download.ipsw.dyld")
 		dyldArches := viper.GetStringSlice("download.ipsw.dyld-arch")
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
-		pattern := viper.GetString("download.ipsw.pattern")
+		remotePattern := viper.GetString("download.ipsw.pattern")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
 		// beta := viper.GetBool("download.ipsw.beta")
@@ -277,29 +277,29 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if cont {
-			if remoteKernel { // REMOTE KERNEL MODE
-				for _, i := range ipsws {
-					log.WithFields(log.Fields{
-						"device":  i.Identifier,
-						"build":   i.BuildID,
-						"version": i.Version,
-						"signed":  i.Signed,
-					}).Info("Parsing remote IPSW")
+			if remoteKernel || remoteDSC || len(remotePattern) > 0 {
+				if remoteKernel { // REMOTE KERNEL MODE
+					for _, i := range ipsws {
+						log.WithFields(log.Fields{
+							"device":  i.Identifier,
+							"build":   i.BuildID,
+							"version": i.Version,
+							"signed":  i.Signed,
+						}).Info("Parsing remote IPSW")
 
-					log.Info("Extracting remote kernelcache")
-					zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
-					}
-					if err := kernelcache.RemoteParse(zr, destPath); err != nil {
-						return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+						log.Info("Extracting remote kernelcache")
+						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+							Proxy:    proxy,
+							Insecure: insecure,
+						})
+						if err != nil {
+							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+						}
+						if err := kernelcache.RemoteParse(zr, destPath); err != nil {
+							return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+						}
 					}
 				}
-			}
-			if remoteDSC || len(pattern) > 0 {
 				if remoteDSC { // REMOTE DSC MODE
 					for _, i := range ipsws {
 						log.WithFields(log.Fields{
@@ -346,7 +346,7 @@ var ipswCmd = &cobra.Command{
 						}
 					}
 				}
-				if len(pattern) > 0 { // PATTERN MATCHING MODE
+				if len(remotePattern) > 0 { // PATTERN MATCHING MODE
 					for _, i := range ipsws {
 						log.WithFields(log.Fields{
 							"device":  i.Identifier,
@@ -354,11 +354,11 @@ var ipswCmd = &cobra.Command{
 							"version": i.Version,
 							"signed":  i.Signed,
 						}).Info("Parsing remote IPSW")
-						dlRE, err := regexp.Compile(pattern)
+						dlRE, err := regexp.Compile(remotePattern)
 						if err != nil {
 							return errors.Wrap(err, "failed to compile regexp")
 						}
-						log.Infof("Downloading files matching pattern %#v", pattern)
+						log.Infof("Downloading files matching pattern %#v", remotePattern)
 						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
 							Proxy:    proxy,
 							Insecure: insecure,
