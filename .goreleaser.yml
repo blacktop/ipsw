@@ -276,11 +276,35 @@ signs:
 sboms:
   - artifacts: archive
 
+aurs:
+  - homepage: https://github.com/blacktop/ipsw
+    description: iOS/macOS Research Swiss Army Knife
+    maintainers:
+      - "Blacktop <https://github.com/blacktop>"
+    license: MIT
+    private_key: /Users/blacktop/.ssh/aur
+    git_url: "ssh://aur@aur.archlinux.org/ipsw-bin.git"
+    package: |-
+      # bin
+      install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
+
+      # license
+      install -Dm644 "./LICENSE.md" "${pkgdir}/usr/share/licenses/ipsw/LICENSE"
+
+      # completions
+      mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+      mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+      mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
+      install -Dm644 "./completions/ipsw" "${pkgdir}/usr/share/bash-completion/completions/ipsw"
+      install -Dm644 "./completions/_ipsw" "${pkgdir}/usr/share/zsh/site-functions/_ipsw"
+      install -Dm644 "./completions/ipsw.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/ipsw.fish"
+
+      # man pages
+      install -Dm644 "./manpages/ipsw.1.gz" "${pkgdir}/usr/share/man/man1/ipsw.1.gz"
+
 nfpms:
-  - id: packages
-    builds:
-      - linux_amd64_build
-      - linux_arm64_build
+  - file_name_template: "{{ .ConventionalFileName }}"
+    id: packages
     homepage: https://github.com/blacktop/ipsw
     description: |-
       iOS/macOS Research Swiss Army Knife.
@@ -316,6 +340,7 @@ nfpms:
       - apk
       - deb
       - rpm
+      - archlinux
     deb:
       lintian_overrides:
         - statically-linked-binary
@@ -400,32 +425,6 @@ snapcrafts:
         command: ipsw
         plugs: ["home", "network"]
 
-aurs:
-  - homepage: https://github.com/blacktop/ipsw
-    description: iOS/macOS Research Swiss Army Knife
-    maintainers:
-      - "Blacktop <https://github.com/blacktop>"
-    license: MIT
-    private_key: /Users/blacktop/.ssh/aur
-    git_url: "ssh://aur@aur.archlinux.org/ipsw-bin.git"
-    package: |-
-      # bin
-      install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
-
-      # license
-      install -Dm644 "./LICENSE.md" "${pkgdir}/usr/share/licenses/ipsw/LICENSE"
-
-      # completions
-      mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
-      mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
-      mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
-      install -Dm644 "./completions/ipsw" "${pkgdir}/usr/share/bash-completion/completions/ipsw"
-      install -Dm644 "./completions/_ipsw" "${pkgdir}/usr/share/zsh/site-functions/_ipsw"
-      install -Dm644 "./completions/ipsw.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/ipsw.fish"
-
-      # man pages
-      install -Dm644 "./manpages/ipsw.1.gz" "${pkgdir}/usr/share/man/man1/ipsw.1.gz"
-
 scoop:
   bucket:
     owner: blacktop
@@ -433,6 +432,19 @@ scoop:
   homepage: https://blacktop.github.io/ipsw
   description: iOS/macOS Research Swiss Army Knife
   license: MIT
+
+chocolatey:
+  - project_url: https://github.com/blacktop/ipsw
+    icon_url: https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png
+    license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
+    authors: blacktop
+    release_notes: "https://github.com/blacktop/ipsw/releases/tag/v{{ .Version }}"
+    copyright: 2018-2022 blacktop
+    project_source_url: https://github.com/blacktop/ipsw
+    docs_url: https://blacktop.github.io/ipsw/
+    summary: iOS/macOS Research Swiss Army Knife
+    description: Everything you need to do security research on iOS and macOS.
+    tags: "iOS macOS security research swiss-army-knife"
 
 changelog:
   sort: asc
@@ -480,3 +492,7 @@ announce:
   discord:
     enabled: true
     message_template: "`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
+  mastodon:
+    enabled: false
+    message_template: "`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
+    server: https://mastodon.social
