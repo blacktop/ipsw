@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -68,27 +69,52 @@ var docsCmd = &cobra.Command{
 			url := "/commands/" + strings.ToLower(base) + "/"
 			return fmt.Sprintf(fmTemplate, now, strings.Replace(base, "_", " ", -1), base, url)
 		}
-		doc.GenMarkdownTreeCustom(download.DownloadCmd, "www/docs/cmd/download", filePrepender, func(s string) string {
+		os.MkdirAll("www/docs/cmd/download", 0750)
+		if err := doc.GenMarkdownTreeCustom(download.DownloadCmd, "www/docs/cmd/download", filePrepender, func(s string) string {
+			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
+		}); err != nil {
+			return err
+		}
+		os.MkdirAll("www/docs/cmd/dyld", 0750)
+		if err := doc.GenMarkdownTreeCustom(dyld.DyldCmd, "www/docs/cmd/dyld", filePrepender, func(s string) string {
+			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
+		}); err != nil {
+			return err
+		}
+		os.MkdirAll("www/docs/cmd/idev", 0750)
+		if err := doc.GenMarkdownTreeCustom(idev.IDevCmd, "www/docs/cmd/idev", filePrepender, func(s string) string {
+			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
+		}); err != nil {
+			return err
+		}
+		os.MkdirAll("www/docs/cmd/img4", 0750)
+		if err := doc.GenMarkdownTreeCustom(img4.Img4Cmd, "www/docs/cmd/img4", filePrepender, func(s string) string {
+			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
+		}); err != nil {
+			return err
+		}
+		os.MkdirAll("www/docs/cmd/kernel", 0750)
+		if err := doc.GenMarkdownTreeCustom(kernel.KernelcacheCmd, "www/docs/cmd/kernel", filePrepender, func(s string) string {
+			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
+		}); err != nil {
+			return err
+		}
+		os.MkdirAll("www/docs/cmd/macho", 0750)
+		if err := doc.GenMarkdownTreeCustom(macho.MachoCmd, "www/docs/cmd/macho", filePrepender, func(s string) string {
+			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
+		}); err != nil {
+			return err
+		}
+		os.MkdirAll("www/docs/cmd/ota", 0750)
+		if err := doc.GenMarkdownTreeCustom(ota.OtaCmd, "www/docs/cmd/ota", filePrepender, func(s string) string {
+			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
+		}); err != nil {
+			return err
+		}
+		return doc.GenMarkdownTreeCustom(cmd.Root(), "www/docs/cmd", func(_ string) string {
+			return ""
+		}, func(s string) string {
 			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
 		})
-		doc.GenMarkdownTreeCustom(dyld.DyldCmd, "www/docs/cmd/dyld", filePrepender, func(s string) string {
-			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
-		})
-		doc.GenMarkdownTreeCustom(idev.IDevCmd, "www/docs/cmd/idev", filePrepender, func(s string) string {
-			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
-		})
-		doc.GenMarkdownTreeCustom(img4.Img4Cmd, "www/docs/cmd/img4", filePrepender, func(s string) string {
-			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
-		})
-		doc.GenMarkdownTreeCustom(kernel.KernelcacheCmd, "www/docs/cmd/kernel", filePrepender, func(s string) string {
-			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
-		})
-		doc.GenMarkdownTreeCustom(macho.MachoCmd, "www/docs/cmd/macho", filePrepender, func(s string) string {
-			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
-		})
-		doc.GenMarkdownTreeCustom(ota.OtaCmd, "www/docs/cmd/ota", filePrepender, func(s string) string {
-			return "/cmd/" + strings.TrimSuffix(s, ".md") + "/"
-		})
-		return nil
 	},
 }
