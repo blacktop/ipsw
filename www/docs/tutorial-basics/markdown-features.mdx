@@ -1,0 +1,176 @@
+---
+sidebar_position: 4
+---
+
+# Markdown Features
+
+Docusaurus supports **[Markdown](https://daringfireball.net/projects/markdown/syntax)** and a few **additional features**.
+
+## Front Matter
+
+Markdown documents have metadata at the top called [Front Matter](https://jekyllrb.com/docs/front-matter/):
+
+```text title="my-doc.md"
+// highlight-start
+---
+id: my-doc-id
+title: My document title
+description: My document description
+slug: /my-custom-url
+---
+// highlight-end
+
+## Markdown heading
+
+Markdown text with [links](./hello.md)
+```
+
+## Links
+
+Regular Markdown links are supported, using url paths or relative file paths.
+
+```md
+Let's see how to [Create a page](/create-a-page).
+```
+
+```md
+Let's see how to [Create a page](./create-a-page.md).
+```
+
+**Result:** Let's see how to [Create a page](./create-a-page.md).
+
+## Images
+
+Regular Markdown images are supported.
+
+You can use absolute paths to reference images in the static directory (`static/img/docusaurus.png`):
+
+```md
+![Docusaurus logo](/img/docusaurus.png)
+```
+
+![Docusaurus logo](/img/docusaurus.png)
+
+You can reference images relative to the current file as well, as shown in [the extra guides](../tutorial-extras/manage-docs-versions.md).
+
+## Code Blocks
+
+Markdown code blocks are supported with Syntax highlighting.
+
+    ```jsx title="src/components/HelloDocusaurus.js"
+    function HelloDocusaurus() {
+        return (
+            <h1>Hello, Docusaurus!</h1>
+        )
+    }
+    ```
+
+```jsx title="src/components/HelloDocusaurus.js"
+function HelloDocusaurus() {
+  return <h1>Hello, Docusaurus!</h1>;
+}
+```
+
+## Admonitions
+
+Docusaurus has a special syntax to create admonitions and callouts:
+
+    :::tip My tip
+
+    Use this awesome feature option
+
+    :::
+
+    :::danger Take care
+
+    This action is dangerous
+
+    :::
+
+:::tip My tip
+
+Use this awesome feature option
+
+:::
+
+:::danger Take care
+
+This action is dangerous
+
+:::
+
+## MDX and React Components
+
+[MDX](https://mdxjs.com/) can make your documentation more **interactive** and allows using any **React components inside Markdown**:
+
+Got sum @$$
+
+```armasm
+bl       j__objc_release_x27
+bl       j__objc_release_x27
+ldr      x8, [x19, #0x8]!
+mov      x0, x21
+mov      x1, x28
+mov      x17, x19
+movk     x17, #0x4f8, lsl #0x30
+blraa    x8, x17
+bl       j__objc_release_x22
+sub      sp, x29, #0x50
+ldp      x29, x30, [sp, #0x50]
+ldp      x20, x19, [sp, #0x40]
+ldp      x22, x21, [sp, #0x30]
+ldp      x24, x23, [sp, #0x20]
+ldp      x26, x25, [sp, #0x10]
+ldp      x28, x27, [sp], #0x60
+retab
+adrp     x0, 0x1dd617000
+add      x0, x0, #0x5c0 ; dat_1dd6175c0 (SiriTTSService/__DATA_DIRTY.__data)
+adrp     x16, 0x19d1e3000
+add      x16, x16, #0xc70 ; sub_19d1e3c70
+paciza   x16
+mov      x1, x16
+bl       j__swift_once
+b        loc_19d15d988 ; ⤴ -0x22c
+```
+
+```jsx
+export const Highlight = ({children, color}) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: '20px',
+      color: '#fff',
+      padding: '10px',
+      cursor: 'pointer',
+    }}
+    onClick={() => {
+      alert(`You clicked the color ${color} with label ${children}`)
+    }}>
+    {children}
+  </span>
+);
+
+This is <Highlight color="#25c2a0">Docusaurus green</Highlight> !
+
+This is <Highlight color="#1877F2">Facebook blue</Highlight> !
+```
+
+export const Highlight = ({children, color}) => (
+  <span
+    style={{
+      backgroundColor: color,
+      borderRadius: "20px",
+      color: "#fff",
+      padding: "10px",
+      cursor: "pointer",
+    }}
+    onClick={() => {
+      alert(`You clicked the color ${color} with label ${children}`);
+    }}>
+    {children}
+  </span>
+);
+
+This is <Highlight color="#25c2a0">Docusaurus green</Highlight> !
+
+This is <Highlight color="#1877F2">Facebook blue</Highlight> !
