@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+if [[ "${TRACE-0}" == "1" ]]; then
+    set -o xtrace
+fi
+
+if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+    echo 'Usage: hack/make/docs
+
+This script generates markdown docs from cli.
+
+'
+    exit
+fi
+
+main() {
+    SED="sed"
+    if which gsed >/dev/null 2>&1; then
+        SED="gsed"
+    fi
+
+    rm -rf www/docs/cmd/*.md
+    go run ./cmd/ipsw/main.go docs
+    # go run . schema -o ./www/docs/static/schema.json
+    "$SED" \
+        -i'' \
+        -e 's/SEE ALSO/See also/g' \
+        -e 's/^## /# /g' \
+        -e 's/^### /## /g' \
+        -e 's/^#### /### /g' \
+        -e 's/^##### /#### /g' \
+        ./www/docs/cmd/*.md
+}
+
+main "$@"
