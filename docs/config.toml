@@ -1,10 +1,7 @@
 baseURL = "https://blacktop.github.io/ipsw/"
 languageCode = "en-us"
 title = "ipsw"
-
-enableRobotsTXT = true
-
-theme = ["hugo-whisper-theme"]
+theme = "hugo-whisper-theme"
 
 pygmentsCodeFences = true
 pygmentsCodefencesGuessSyntax = true
@@ -34,7 +31,7 @@ google_analytics_id = ""
 homepage_button_link = '/ipsw/docs'
 homepage_button_text = 'Read The Docs'
 homepage_intro = 'Download and parse iOS ipsws.'
-homepage_image = '/images/ipsw.gif'
+homepage_image = '/ipsw/images/ipsw.gif'
 #homepage_image = '/images/terminal.svg'
 
 ## You can enable to add anchor links to header elements
@@ -52,5 +49,5 @@ meta_twitter_site = "@blacktop__"
 meta_twitter_creator = "@blacktop__"
 
 [params.logo]
-mobile = "/images/ipsw.png"
-standard = "/images/ipsw.png"
+mobile = "/ipsw/images/ipsw.png"
+standard = "/ipsw/images/ipsw.png"
