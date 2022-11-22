@@ -37,41 +37,30 @@ $desktop-xl-width: 1160px;
 /* You can override the default Infima variables here. */
 :root {
   --ifm-color-primary: #503B9F;
-  --ifm-color-primary-dark: #7E88D2;
-  --ifm-color-primary-darker: #503B9F;
-  --ifm-color-primary-darkest: #7E88D2;
-  /* --ifm-color-primary-darkest: #453384; */
-  --ifm-color-primary-light: rgb(45, 154, 255);
-  --ifm-color-primary-lighter: rgb(62, 162, 255);
-  --ifm-color-primary-lightest: rgb(105, 183, 255);
-  /* --ifm-color-primary: rgb(37, 194, 160);
-  --ifm-color-primary-dark: rgb(33, 175, 144);
-  --ifm-color-primary-darker: rgb(31, 165, 136);
-  --ifm-color-primary-darkest: rgb(26, 136, 112);
-  --ifm-color-primary-light: rgb(70, 203, 174);
-  --ifm-color-primary-lighter: rgb(102, 212, 189);
-  --ifm-color-primary-lightest: rgb(146, 224, 208); */
+  --ifm-color-primary-dark: #29784c;
+  --ifm-color-primary-darker: #277148;
+  --ifm-color-primary-darkest: #205d3b;
+  --ifm-color-primary-light: #7E88D2;
+  --ifm-color-primary-lighter: #359962;
+  --ifm-color-primary-lightest: #3cad6e;
   --ifm-code-font-size: 95%;
-  /* --ifm-navbar-background-color: var(--color-purple); */
-  --ifm-navbar-height: 64px;
-  --ifm-menu-color-background-active: rgba(255, 255, 255, 0.05);
-  --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.05);
-  --color-purple: #331049;
-  --color-turquoise: #0ccee9;
-  --color-blue: #0b82f0;
-  --color-text-white: white;
-  --color-text-black: #1c1e21;
-  --color-bg-white: white;
-  --ifm-navbar-sidebar-width: 100%;
-  --ifm-table-cell-padding: 6px 8px;
-  --tutorial-card-bg: var(--ifm-card-background-color);
-  ---tutorial-card-bg-hover: var(--ifm-card-background-color);
+  --ifm-navbar-background-color: #503B9F;  
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
-  --tutorial-card-bg: #252527;
-  --tutorial-card-bg-hover: #2c2e33;
+  --ifm-color-primary: #7E88D2;
+  --ifm-color-primary-dark: #503B9F;
+  --ifm-color-primary-darker: #503B9F;
+  --ifm-color-primary-darkest: #503B9F;
+  --ifm-color-primary-light: #7E88D2;
+  --ifm-color-primary-lighter: #7E88D2;
+  --ifm-color-primary-lightest: #7E88D2;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+
+  --ifm-menu-color-background-active: rgba(255, 255, 255, 0.05);
+  --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.05);
 }
 
 /* Common */
@@ -112,6 +101,13 @@ $desktop-xl-width: 1160px;
 
 .navbar-sidebar__back {
   color: var(--color-text-white);
+}
+
+.navbar-items-separator {
+  margin: 0 !important;
+  border-left: 1px solid #7E88D2;
+  height: 2rem;
+  padding: 0.5;
 }
 
 .header-last-nav-item {

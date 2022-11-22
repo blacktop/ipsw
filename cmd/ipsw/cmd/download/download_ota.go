@@ -80,8 +80,13 @@ func init() {
 
 // otaDLCmd represents the ota download command
 var otaDLCmd = &cobra.Command{
-	Use:           "ota [options]",
-	Short:         "Download OTAs",
+	Use:   "ota [options]",
+	Short: "Download OTAs",
+	Example: `❯ ipsw download ota --version 14.8.1 --device iPhone10,1
+
+	? You are about to download 1 OTA files. Continue? Yes
+	   • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
+		280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

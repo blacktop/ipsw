@@ -8,7 +8,7 @@ GO_BIN=go
 .PHONY: build-deps
 build-deps: x86-brew ## Install the build dependencies
 	@echo " > Installing build deps"
-	brew install $(GO_BIN) goreleaser unicorn libusb
+	brew install $(GO_BIN) goreleaser zig unicorn libusb
 
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
