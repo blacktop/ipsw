@@ -37,8 +37,7 @@ const config = {
           sidebarPath: require.resolve("./sidebars.js"),
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl:
-            "https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/",
+          editUrl: "https://github.com/blacktop/ipsw/tree/master/www/",
         },
         // blog: {
         //   showReadingTime: true,
@@ -60,43 +59,75 @@ const config = {
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
+      docs: {
+        sidebar: {
+          hideable: true,
+          autoCollapseCategories: true,
+        },
+      },
+      colorMode: {
+        defaultMode: "dark",
+        disableSwitch: false,
+        respectPrefersColorScheme: true,
+      },
+      announcementBar: {
+        id: "announcementBar-1", // Increment on change
+        content: `⭐️ If you like ipsw, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/blacktop/ipsw">GitHub</a>`,
+      },
+      prism: {
+        theme: lightCodeTheme,
+        darkTheme: darkCodeTheme,
+        themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
+        additionalLanguages: ["armasm"],
+      },
+      // algolia: {
+      //   appId: 'X1Z85QJPUV',
+      //   apiKey: 'bf7211c161e8205da2f933a02534105a',
+      //   indexName: 'docusaurus-2',
+      // },
       navbar: {
+        hideOnScroll: true,
         title: "ipsw",
         logo: {
           alt: "ipsw logo",
           src: "img/icon.svg",
+          // srcDark: "img/icon-dark.svg",
+          width: 32,
+          height: 32,
         },
         items: [
           {
-            to: "docs/getting-started/overview/",
+            type: "doc",
+            position: "left",
+            docId: "introduction",
             label: "Docs",
+          },
+          {
+            type: "docSidebar",
             position: "left",
+            sidebarId: "api",
+            label: "API",
           },
-          {
-            to: "docs",
-            label: "Tutorial",
-            position: "left",
-            activeBaseRegex: "/^/docs(/)?$/",
-          },
-          // {to: "/blog", label: "Blog", position: "left"},
-          {
-            href: "https://github.com/blacktop/ipsw",
-            position: "right",
-            className: "header-github-link",
-            "aria-label": "GitHub repository",
-          },
-          {
-            href: "https://discord.gg/xx2y9yrcgs",
-            position: "right",
-            className: "header-discord-link",
-            "aria-label": "GitHub repository",
-          },
-
-          {
-            type: "docsVersionDropdown",
-            position: "right",
-            dropdownActiveClassDisabled: true,
-          },
+          // Right
+          // {
+          //   type: "localeDropdown",
+          //   position: "right",
+          //   dropdownItemsAfter: [
+          //     {
+          //       type: "html",
+          //       value: '<hr style="margin: 0.3rem 0;">',
+          //     },
+          //     {
+          //       href: "https://github.com/facebook/docusaurus/issues/3526",
+          //       label: "Help Us Translate",
+          //     },
+          //   ],
+          // },
+          // {
+          //   type: "docsVersionDropdown",
+          //   position: "right",
+          //   dropdownActiveClassDisabled: true,
+          // },
           {
             href: "https://github.com/blacktop/ipsw",
             position: "right",
@@ -117,6 +148,12 @@ const config = {
             position: "right",
             className: "header-icon-link header-mastodon-link",
           },
+          {
+            position: "right",
+            type: "html",
+            value: "<span></span>",
+            className: "navbar-items-separator",
+          },
         ],
       },
       footer: {
@@ -126,18 +163,18 @@ const config = {
             title: "Docs",
             items: [
               {
-                label: "Tutorial",
-                to: "/docs/intro",
+                label: "Guides",
+                to: "/docs/category/guides",
+              },
+              {
+                label: "CLI",
+                to: "/docs/category/completion",
               },
             ],
           },
           {
             title: "Community",
             items: [
-              {
-                label: "Stack Overflow",
-                href: "https://stackoverflow.com/questions/tagged/docusaurus",
-              },
               {
                 label: "Discord",
                 href: "https://discordapp.com/invite/docusaurus",
@@ -147,11 +184,8 @@ const config = {
                 href: "https://twitter.com/docusaurus",
               },
               {
-                html: `
-                    <a href="https://www.netlify.com" target="_blank" rel="noreferrer noopener" aria-label="Deploys by Netlify">
-                      <img src="https://www.netlify.com/img/global/badges/netlify-color-accent.svg" alt="Deploys by Netlify" width="114" height="51" />
-                    </a>
-                  `,
+                label: "Mastodon",
+                href: "https://mastodon.social/@blacktop",
               },
             ],
           },
@@ -160,7 +194,7 @@ const config = {
             items: [
               {
                 label: "Blog",
-                to: "/blog",
+                href: "https://blog.blacktop.io",
               },
               {
                 label: "GitHub",
@@ -169,19 +203,8 @@ const config = {
             ],
           },
         ],
-        copyright: `Copyright © ${new Date().getFullYear()} ipsw. Built with Go.`,
+        copyright: `Copyright © ${new Date().getFullYear()} ipsw. Built with Go and ❤️`,
       },
-      prism: {
-        theme: lightCodeTheme,
-        darkTheme: darkCodeTheme,
-        // themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
-        additionalLanguages: ["armasm"],
-      },
-      // colorMode: {
-      //   defaultMode: "light",
-      //   disableSwitch: true,
-      //   respectPrefersColorScheme: true,
-      // },
     }),
 };
 
