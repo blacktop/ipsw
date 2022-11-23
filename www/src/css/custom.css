@@ -37,31 +37,49 @@ $desktop-xl-width: 1160px;
 /* You can override the default Infima variables here. */
 :root {
   --ifm-color-primary: #503B9F;
-  --ifm-color-primary-dark: #29784c;
-  --ifm-color-primary-darker: #277148;
-  --ifm-color-primary-darkest: #205d3b;
+  --ifm-color-primary-dark: #453384;
+  --ifm-color-primary-darker: #453384;
+  --ifm-color-primary-darkest: #3c2d72;
   --ifm-color-primary-light: #7E88D2;
-  --ifm-color-primary-lighter: #359962;
-  --ifm-color-primary-lightest: #3cad6e;
+  --ifm-color-primary-lighter: #8DB5CD;
+  --ifm-color-primary-lightest: #FFFFFF;
   --ifm-code-font-size: 95%;
   --ifm-navbar-background-color: #503B9F;  
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --ifm-navbar-link-hover-color: #ffffff;  
+  --ifm-navbar-link-color: #ffffff;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
 [data-theme='dark'] {
   --ifm-color-primary: #7E88D2;
-  --ifm-color-primary-dark: #503B9F;
-  --ifm-color-primary-darker: #503B9F;
-  --ifm-color-primary-darkest: #503B9F;
+  --ifm-color-primary-dark: #453384;
+  --ifm-color-primary-darker: #453384;
+  --ifm-color-primary-darkest: #3c2d72;
   --ifm-color-primary-light: #7E88D2;
   --ifm-color-primary-lighter: #7E88D2;
   --ifm-color-primary-lightest: #7E88D2;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
-
+  --ifm-navbar-background-color: #453384;  
   --ifm-menu-color-background-active: rgba(255, 255, 255, 0.05);
   --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.05);
+  --ifm-navbar-link-hover-color: #ffffff;
+  --ifm-navbar-link-color: #ffffff;
+
+  --ifm-font-color-base-inverse: #ffffff;
 }
+
+.hero--primary {
+  --ifm-hero-background-color: #503B9F;
+  --ifm-hero-text-color: var(--ifm-font-color-base-inverse);
+}
+
+.navbar__link:hover,
+    .navbar__link--active {
+      color: var(--ifm-navbar-link-hover-color);
+      text-decoration: underline;
+      text-underline-position: under;
+    }
 
 /* Common */
 .row--justify--center {
@@ -147,4 +165,18 @@ $desktop-xl-width: 1160px;
 .header-mastodon-link::before {
   background: url("/icons/mastodon.svg");
   background-size: contain;
+}
+
+.with-hoverline .hoverline-link {
+  @apply relative;
+}
+
+.with-hoverline .hoverline-link:hover::after,
+.with-hoverline .navbar__link--active::after {
+  content: "";
+  @apply absolute bottom-[-5px] left-[calc(50%-12px)] h-1 w-6 rounded-sm bg-[#1890ff] transition-opacity duration-200 ease-in-out;
+}
+
+.footer--dark {
+  --ifm-footer-background-color: #2b3137;
 }

@@ -17,3 +17,12 @@ sidebar_position: 1
 - device-tree parser
 - ARM v9-a disassember
 - research tool
+
+```mermaid
+graph TD
+A[Download] --> B[Extract]
+B --> C[Parse]
+C --> D[Dump]
+D --> E[Search]
+E --> F[Symbolicate]
+```

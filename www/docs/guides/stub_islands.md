@@ -1,4 +1,4 @@
-# Stub Islands *iOS16.x*
+# Stub Islands
 
 > iOS16 added a NEW concept to dyld4 and the dyld_shared_cache sub-caches called **Stub Islands**.  
 
@@ -23,9 +23,10 @@ We've introduced a 🆕 `ipsw dyld stubs` command to dump them all out and the s
 Disassemble the *stub*
 
 ```bash
-❯ ipsw dyld disass 20B5050f__iPhone15,2/dyld_shared_cache_arm64e-a 0x1bb220d70 --count 5
+❯ ipsw dyld disass 20B5050f__iPhone15,2/dyld_shared_cache_arm64e -a "0x1bb220d70" --count 5
    • Loading symbol cache file...
 ```
+
 ```armasm
 j__fcntl
 0x1bb220d70:  30 7b 04 b0   adrp     x16, 0x1c4185000
@@ -37,7 +38,7 @@ j__fcntl
 Lookup the address
 
 ```bash
-❯ ipsw dyld a2s 20B5050f__iPhone15,2/dyld_shared_cache_arm64e 0x1bb220d70 --mapping --image
+❯ ipsw dyld a2s 20B5050f__iPhone15,2/dyld_shared_cache_arm64e "0x1bb220d70" --mapping --image
    • Loading symbol cache file...
 
 MAPPING
