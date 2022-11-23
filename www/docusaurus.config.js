@@ -13,7 +13,7 @@ const config = {
   baseUrl: "/ipsw",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
-  favicon: "img/favicon.png",
+  favicon: "img/ipsw.ico",
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -77,8 +77,9 @@ const config = {
         respectPrefersColorScheme: true,
       },
       announcementBar: {
-        id: "announcementBar-1", // Increment on change
         content: `⭐️ If you like ipsw, give it a star on <a target="_blank" rel="noopener noreferrer" href="https://github.com/blacktop/ipsw">GitHub</a>`,
+        backgroundColor: "#2b3137",
+        textColor: "#ffffff", //
       },
       prism: {
         theme: lightCodeTheme,
@@ -96,7 +97,7 @@ const config = {
         title: "ipsw",
         logo: {
           alt: "ipsw logo",
-          src: "img/icon.svg",
+          src: "img/logo/ipsw.svg",
           // srcDark: "img/icon-dark.svg",
           width: 32,
           height: 32,

@@ -11,21 +11,20 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     title: 'Easy to Use',
-    Svg: require('@site/static/img/undraw_docusaurus_mountain.svg').default,
+    Svg: require('@site/static/img/terminal.svg').default,
     description: (
       <>
-        Docusaurus was designed from the ground up to be easily installed and
-        used to get your website up and running quickly.
+        <code>ipsw</code> was designed from the ground up to be easily installed and
+        used to get you up and running quickly with an intuitive CLI.
       </>
     ),
   },
   {
-    title: 'Focus on What Matters',
-    Svg: require('@site/static/img/undraw_docusaurus_tree.svg').default,
+    title: 'Unparalleled Flexibility and Power',
+    Svg: require('@site/static/img/apple.svg').default,
     description: (
       <>
-        Docusaurus lets you focus on your docs, and we&apos;ll do the chores. Go
-        ahead and move your docs into the <code>docs</code> directory.
+        Simply the best tool to use when digging into Apple internals.
       </>
     ),
   },
@@ -34,7 +33,7 @@ const FeatureList: FeatureItem[] = [
     Svg: require('@site/static/img/golang.svg').default,
     description: (
       <>
-        Built in a memory safe modern language with a huge community and mature standard lib.
+        Built in a fast and memory safe modern language with a huge community and mature standard lib.
       </>
     ),
   },

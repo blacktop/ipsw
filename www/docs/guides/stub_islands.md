@@ -1,8 +1,8 @@
 # Stub Islands
 
-> iOS16 added a NEW concept to dyld4 and the dyld_shared_cache sub-caches called **Stub Islands**.  
+> iOS16 added a NEW concept to dyld4 and the `dyld_shared_cache` sub-caches called **Stub Islands**.  
 
-We've introduced a 🆕 `ipsw dyld stubs` command to dump them all out and the symbol they *stub* to
+### We've introduced a `ipsw dyld stubs` command to dump them all out and the symbol they *stub* to
 
 ```bash
 ❯ ipsw dyld stubs 20B5050f__iPhone15,2/dyld_shared_cache_arm64e | head
@@ -20,7 +20,7 @@ We've introduced a 🆕 `ipsw dyld stubs` command to dump them all out and the s
 "0x1bb220d70: _fcntl"
 ```
 
-Disassemble the *stub*
+### Disassemble the *stub*
 
 ```bash
 ❯ ipsw dyld disass 20B5050f__iPhone15,2/dyld_shared_cache_arm64e -a "0x1bb220d70" --count 5
@@ -35,26 +35,28 @@ j__fcntl
 0x1bb220d7c:  20 00 20 d4   brk      #0x1
 ```
 
-Lookup the address
+### Lookup the address
 
 ```bash
 ❯ ipsw dyld a2s 20B5050f__iPhone15,2/dyld_shared_cache_arm64e "0x1bb220d70" --mapping --image
    • Loading symbol cache file...
+```
 
 MAPPING
-=======
-  > "STUB Island" (dsc.18) UUID: 7623C890-8F05-3DFD-AADF-CE765217C572
+-------
+  > STUB Island *(dsc.18)* UUID: `7623C890-8F05-3DFD-AADF-CE765217C572`
 
-|  SEG   | INITPROT | MAXPROT |        SIZE         |   ADDRESS   | FILE OFFSET | SLIDE INFO OFFSET | FLAGS |
-|--------|----------|---------|---------------------|-------------|-------------|-------------------|-------|
-| __TEXT | r-x      | r-x     | 0x00080000 (524 kB) | 0x1bb1b4000 | 0x00000000  | 0x00000000        | 8     |
-
+| SEG          | INITPROT | MAXPROT | SIZE                | ADDRESS     | FILE OFFSET | SLIDE INFO OFFSET | FLAGS |
+| ------------ | -------- | ------- | ------------------- | ----------- | ----------- | ----------------- | ----- |
+| __TEXT_STUBS | r-x      | r-x     | 0x00080000 (524 kB) | 0x1bb1b4000 | 0x00000000  | 0x00000000        | 8     |
+   
+```bash
    ⨯ address 0x1bb220d70 not in any dylib
 
 0x1bb220d70: "j__fcntl"
 ```
 
-Locate any `xrefs`
+### Locate any `xrefs`
 
 ```bash
 ❯ ipsw dyld xref 20B5050f__iPhone15,2/dyld_shared_cache_arm64e 0x1bb220d70 --all
