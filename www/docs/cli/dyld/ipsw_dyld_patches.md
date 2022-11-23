@@ -5,7 +5,7 @@ hide_title: true
 sidebar_label: patches
 description: Dump dyld patch info
 last_update:
-  date: 2022-11-21T19:10:35-07:00
+  date: 2022-11-23T16:33:46-07:00
   author: blacktop
 ---
 # ipsw dyld patches

@@ -5,34 +5,12 @@ hide_title: true
 sidebar_label: ota
 description: Download OTAs
 last_update:
-  date: 2022-11-21T19:10:35-07:00
+  date: 2022-11-23T16:33:46-07:00
   author: blacktop
 ---
 # ipsw download ota
 
 Download OTAs
-
-## Synopsis
-
-
-Download OTAs from Apple's OTA server.
-
-Examples:
-
-  $ ipsw download ota -p ios -k
-  $ ipsw download ota -p ios -k -o ~/Downloads
-  $ ipsw download ota -p ios -k -o ~/Downloads --beta
-  $ ipsw download ota -p ios -k -o ~/Downloads --rsr
-  $ ipsw download ota -p ios -k -o ~/Downloads --beta --rsr
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*"
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*" --flat
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*" --flat --beta
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*" --flat --rsr
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*" --flat --beta --rsr
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*" --flat --beta --rsr --urls
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*" --flat --beta --rsr --json
-  $ ipsw download ota -p ios -k -o ~/Downloads --pattern ".*iPhone.*" --flat --beta --rsr --json | jq
-
 
 ```
 ipsw download ota [options] [flags]
