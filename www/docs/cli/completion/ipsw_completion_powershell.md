@@ -5,7 +5,7 @@ hide_title: true
 sidebar_label: powershell
 description: Generate the autocompletion script for powershell
 last_update:
-  date: 2022-11-21T19:10:35-07:00
+  date: 2022-11-23T16:33:46-07:00
   author: blacktop
 ---
 # ipsw completion powershell
