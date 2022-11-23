@@ -23,7 +23,7 @@ brew install blacktop/tap/ipsw
 Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
-https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_macOS_universal.tar.gz
+wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_macOS_universal.tar.gz
 tar xzf ipsw_3.1.199_macOS_universal.tar.gz
 ```
 
@@ -49,6 +49,13 @@ Install [archlinux](https://aur.archlinux.org/packages/ipsw-bin/) package from A
 
 ```bash
 pacman -U ipsw-bin
+```
+
+Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
+
+```bash
+wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_linux_x86_64.tar.gz
+tar xzf ipsw_3.1.199_linux_x86_64.tar.gz
 ```
 
 ```mdx-code-block
@@ -89,6 +96,13 @@ Via [chocolatey](https://chocolatey.org)
 ```bash
 choco install ipsw
 ``` 
+
+Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
+
+```bash
+wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_windows_x86_64.tar.gz
+tar xzf ipsw_3.1.199_windows_x86_64.tar.gz
+```
 
 ```mdx-code-block
 </TabItem>
