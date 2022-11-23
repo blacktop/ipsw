@@ -153,7 +153,7 @@ $desktop-xl-width: 1160px;
 }
 
 .header-discord-link::before {
-  background: url("/icons/discord.svg");
+  background: url("/icons/discord-mark-white.svg");
   background-size: contain;
 }
 
@@ -167,14 +167,8 @@ $desktop-xl-width: 1160px;
   background-size: contain;
 }
 
-.with-hoverline .hoverline-link {
-  @apply relative;
-}
-
-.with-hoverline .hoverline-link:hover::after,
-.with-hoverline .navbar__link--active::after {
-  content: "";
-  @apply absolute bottom-[-5px] left-[calc(50%-12px)] h-1 w-6 rounded-sm bg-[#1890ff] transition-opacity duration-200 ease-in-out;
+.close {
+  color: var(--ifm-color-white);
 }
 
 .footer--dark {
