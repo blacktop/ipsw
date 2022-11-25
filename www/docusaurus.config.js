@@ -13,7 +13,7 @@ const config = {
   baseUrl: "/",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
-  favicon: "img/ipsw.ico",
+  favicon: "img/logo/ipsw.ico",
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
@@ -86,6 +86,16 @@ const config = {
         darkTheme: darkCodeTheme,
         themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
         additionalLanguages: ["armasm"],
+      },
+      zoom: {
+        selector: ".markdown img:not(.not-zoom)",
+        background: {
+          light: "rgb(255, 255, 255)",
+          dark: "rgb(50, 50, 50)",
+        },
+        // medium-zoom configuration options
+        // Refer to https://github.com/francoischalifour/medium-zoom#options
+        config: {},
       },
       // algolia: {
       //   appId: 'X1Z85QJPUV',
@@ -213,6 +223,8 @@ const config = {
         copyright: `Copyright © ${new Date().getFullYear()} ipsw. Built with Go and ❤️`,
       },
     }),
+
+  plugins: ["docusaurus-plugin-image-zoom"],
 };
 
 module.exports = config;
