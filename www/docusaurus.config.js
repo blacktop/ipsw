@@ -10,7 +10,7 @@ const config = {
   title: "ipsw",
   tagline: "iOS/macOS Research Swiss Army Knife",
   url: "https://blacktop.github.io",
-  baseUrl: "/",
+  baseUrl: "/ipsw",
   onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
   favicon: "img/logo/ipsw.ico",
