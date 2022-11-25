@@ -3,7 +3,8 @@
 > Search for byte patterns *(gadgets)* in DSC dylibs
 
 ```bash
-❯ ipsw dyld macho 20A5339d__iPhone14,2/dyld_shared_cache_arm64e JavaScriptCore --search "7f 23 03 d5 * * * * f6 57 01 a9" | head
+❯ ipsw dyld macho 20A5339d__iPhone14,2/dyld_shared_cache_arm64e JavaScriptCore \
+                  --search "7f 23 03 d5 * * * * f6 57 01 a9"
 
 Search Results
 --------------
