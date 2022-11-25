@@ -29,7 +29,7 @@ tar xzf ipsw_3.1.199_macOS_universal.tar.gz
 
 ```mdx-code-block
 </TabItem>
-<TabItem value="linux">
+<TabItem value="Linux">
 ```
 
 Via [snapcraft](https://snapcraft.io/ipsw)
@@ -60,7 +60,7 @@ tar xzf ipsw_3.1.199_linux_x86_64.tar.gz
 
 ```mdx-code-block
 </TabItem>
-<TabItem value="docker">
+<TabItem value="Docker">
 ```
 
 [![Docker Stars](https://img.shields.io/docker/stars/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Pulls](https://img.shields.io/docker/pulls/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Image](https://img.shields.io/badge/docker%20image-114MB-blue.svg)](https://hub.docker.com/r/blacktop/ipsw/)
@@ -81,7 +81,7 @@ $ alias ipsw='docker run -it --rm -v $(pwd):/data blacktop/ipsw'
 
 ```mdx-code-block
 </TabItem>
-<TabItem value="windows">
+<TabItem value="Windows">
 ```
 
 Via [scoop](https://scoop.sh)
