@@ -185,7 +185,7 @@ const config = {
               },
               {
                 label: "CLI",
-                to: "/docs/category/completion",
+                to: "/docs/cli/ipsw",
               },
             ],
           },
