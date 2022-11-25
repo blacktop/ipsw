@@ -25,13 +25,12 @@ main() {
     rm -rf www/docs/cli/**/*.md
     go run ./cmd/ipsw/main.go docs
     # go run . schema -o ./www/docs/static/schema.json
-    $SED -i'' \
-        -e 's/SEE ALSO/See also/g' \
-        -e 's/^## /# /g' \
-        -e 's/^### /## /g' \
-        -e 's/^#### /### /g' \
-        -e 's/^##### /#### /g' \
-        www/docs/cli/**/*.md
+    # fd .md www/docs/cli/ | xargs $SED -i'' \
+    #     -e 's/SEE ALSO/See also/g' \
+    #     -e 's/^## /# /g' \
+    #     -e 's/^### /## /g' \
+    #     -e 's/^#### /### /g' \
+    #     -e 's/^##### /#### /g'
 }
 
 main "$@"
