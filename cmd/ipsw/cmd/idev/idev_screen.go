@@ -89,6 +89,11 @@ var ScreenCmd = &cobra.Command{
 			}
 			ldc.Close()
 
+			if ok, err := utils.IsDeveloperModeEnabled(dev.UniqueDeviceID); !ok && err == nil {
+				return fmt.Errorf("you must enable Developer Mode in your device Settings app for %s", dev.DeviceName)
+			} else if err != nil {
+				return fmt.Errorf("failed to check if developer mode is enabled for device %s: %w", dev.UniqueDeviceID, err)
+			}
 			if err := utils.IsDeveloperImageMounted(dev.UniqueDeviceID); err != nil {
 				return fmt.Errorf("for device %s: ensure Developer Mode is enabled on iOS16+ AND %w", dev.UniqueDeviceID, err)
 			}
@@ -101,6 +106,11 @@ var ScreenCmd = &cobra.Command{
 			}
 
 			for _, dev := range devs {
+				if ok, err := utils.IsDeveloperModeEnabled(dev.UniqueDeviceID); !ok && err == nil {
+					return fmt.Errorf("you must enable Developer Mode in your device Settings app for %s", dev.DeviceName)
+				} else if err != nil {
+					return fmt.Errorf("failed to check if developer mode is enabled for device %s: %w", dev.UniqueDeviceID, err)
+				}
 				if err := utils.IsDeveloperImageMounted(dev.UniqueDeviceID); err != nil {
 					return fmt.Errorf("for device %s: ensure Developer Mode is enabled on iOS16+ AND %w", dev.UniqueDeviceID, err)
 				}

@@ -117,10 +117,12 @@ func (lc *Client) StartService(service string, withEscrowBag bool) (*StartServic
 }
 
 type DeviceValues struct {
-	ActivationState             string `plist:"ActivationState,omitempty" json:"activation_state,omitempty"`
-	ActivationStateAcknowledged bool   `plist:"ActivationStateAcknowledged,omitempty" json:"activation_state_acknowledged,omitempty"`
-	BasebandCertId              int    `plist:"BasebandCertId,omitempty" json:"baseband_cert_id,omitempty"`
-	BasebandKeyHashInformation  struct {
+	ActivationState                 string `plist:"ActivationState,omitempty" json:"activation_state,omitempty"`
+	ActivationStateAcknowledged     bool   `plist:"ActivationStateAcknowledged,omitempty" json:"activation_state_acknowledged,omitempty"`
+	BasebandActivationTicketVersion string `plist:"BasebandActivationTicketVersion,omitempty" json:"baseband_activation_ticket_version,omitempty"`
+	BasebandCertID                  int    `plist:"BasebandCertId,omitempty" json:"baseband_cert_id,omitempty"`
+	BasebandChipID                  int    `plist:"BasebandChipID,omitempty" json:"baseband_chip_id,omitempty"`
+	BasebandKeyHashInformation      struct {
 		AKeyStatus int    `plist:"AKeyStatus,omitempty" json:"a_key_status,omitempty"`
 		SKeyHash   []byte `plist:"SKeyHash,omitempty" json:"s_key_hash,omitempty"`
 		SKeyStatus int    `plist:"SKeyStatus,omitempty" json:"s_key_status,omitempty"`
@@ -131,8 +133,9 @@ type DeviceValues struct {
 	BasebandStatus                                string           `plist:"BasebandStatus,omitempty" json:"baseband_status,omitempty"`
 	BasebandVersion                               string           `plist:"BasebandVersion,omitempty" json:"baseband_version,omitempty"`
 	BluetoothAddress                              string           `plist:"BluetoothAddress,omitempty" json:"bluetooth_address,omitempty"`
-	BoardId                                       int              `plist:"BoardId,omitempty" json:"board_id,omitempty"`
+	BoardID                                       int              `plist:"BoardId,omitempty" json:"board_id,omitempty"`
 	BootSessionID                                 string           `plist:"BootSessionID,omitempty" json:"boot_session_id,omitempty"`
+	BootstrapVersion                              string           `plist:"BootstrapVersion,omitempty" json:"bootstrap_version,omitempty"`
 	BrickState                                    bool             `plist:"BrickState,omitempty" json:"brick_state"`
 	BuildVersion                                  string           `plist:"BuildVersion,omitempty" json:"build_version,omitempty"`
 	CertID                                        int              `plist:"CertID,omitempty" json:"cert_id,omitempty"`
@@ -180,6 +183,7 @@ type DeviceValues struct {
 	ProximitySensorCalibration                    []byte           `plist:"ProximitySensorCalibration,omitempty" json:"proximity_sensor_calibration,omitempty"`
 	RegionInfo                                    string           `plist:"RegionInfo,omitempty" json:"region_info,omitempty"`
 	ReleaseType                                   string           `plist:"ReleaseType,omitempty" json:"release_type,omitempty"`
+	SIM1IsBootstrap                               bool             `plist:"SIM1IsBootstrap,omitempty" json:"sim1_is_bootstrap"`
 	SIM1IsEmbedded                                bool             `plist:"SIM1IsEmbedded,omitempty" json:"sim_1_is_embedded"`
 	SIMGID1                                       []byte           `plist:"SIMGID1,omitempty" json:"simgid_1,omitempty"`
 	SIMGID2                                       []byte           `plist:"SIMGID2,omitempty" json:"simgid_2,omitempty"`
@@ -247,7 +251,7 @@ func (dv DeviceValues) String() string {
 		dv.ProductName,
 		dv.ProductType,
 		dv.HardwareModel,
-		dv.BoardId,
+		dv.BoardID,
 		dv.BuildVersion,
 		dv.ProductVersion,
 		dv.ChipID,
@@ -286,6 +290,11 @@ type getValueResponse struct {
 	Value   *DeviceValues
 }
 
+type getBoolResponse struct {
+	Request string
+	Value   bool
+}
+
 func (lc *Client) GetValues() (*DeviceValues, error) {
 	req := &getValueRequest{
 		Request: "GetValue",
@@ -298,6 +307,20 @@ func (lc *Client) GetValues() (*DeviceValues, error) {
 		return nil, err
 	}
 
+	return resp.Value, nil
+}
+
+func (lc *Client) DeveloperModeEnabled() (bool, error) {
+	req := &getValueRequest{
+		Request: "GetValue",
+		Label:   usb.BundleID,
+		Domain:  "com.apple.security.mac.amfi",
+		Key:     "DeveloperModeStatus",
+	}
+	var resp getBoolResponse
+	if err := lc.Request(req, &resp); err != nil {
+		return false, err
+	}
 	return resp.Value, nil
 }
 

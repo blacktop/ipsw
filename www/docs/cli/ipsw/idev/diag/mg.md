@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: mg
 description: Query MobileGestalt
 last_update:
-  date: 2022-11-25T18:20:31-07:00
+  date: 2022-11-25T23:22:40-07:00
   author: blacktop
 ---
 ## ipsw idev diag mg
@@ -15,6 +15,23 @@ Query MobileGestalt
 
 ```
 ipsw idev diag mg [flags]
+```
+
+### Examples
+
+```
+❯ ipsw idev diag mg -k SupplementalBuildVersion,ProductVersionExtra | jq .
+
+	{
+		"status": "Success",
+		"diagnostics": {
+		  "MobileGestalt": {
+			"ProductVersionExtra": "(a)",
+			"Status": "Success",
+			"SupplementalBuildVersion": "20C7750490e"
+		  }
+		}
+	  }
 ```
 
 ### Options

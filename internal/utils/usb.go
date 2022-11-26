@@ -133,6 +133,15 @@ func PickDevices() ([]*lockdownd.DeviceValues, error) {
 	}
 }
 
+func IsDeveloperModeEnabled(udid string) (bool, error) {
+	cli, err := lockdownd.NewClient(udid)
+	if err != nil {
+		return false, fmt.Errorf("failed to connect to lockdownd: %w", err)
+	}
+	defer cli.Close()
+	return cli.DeveloperModeEnabled()
+}
+
 func IsDeveloperImageMounted(udid string) error {
 	cli, err := mount.NewClient(udid)
 	if err != nil {

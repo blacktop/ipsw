@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: pull
 description: Pull all crashlogs
 last_update:
-  date: 2022-11-25T18:20:31-07:00
+  date: 2022-11-25T23:22:40-07:00
   author: blacktop
 ---
 ## ipsw idev crash pull
