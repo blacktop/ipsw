@@ -39,6 +39,7 @@ const fmTemplate = `---
 id: %s
 title: %s
 hide_title: true
+hide_table_of_contents: true
 sidebar_label: %s
 description: %s
 last_update:

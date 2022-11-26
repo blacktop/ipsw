@@ -1,3 +1,7 @@
+---
+hide_table_of_contents: true
+---
+
 # Gadget Search
 
 > Search for byte patterns *(gadgets)* in DSC dylibs

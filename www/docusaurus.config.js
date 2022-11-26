@@ -165,12 +165,6 @@ const config = {
             position: "right",
             className: "header-icon-link header-mastodon-link",
           },
-          {
-            position: "right",
-            type: "html",
-            value: "<span></span>",
-            className: "navbar-items-separator",
-          },
         ],
       },
       footer: {
