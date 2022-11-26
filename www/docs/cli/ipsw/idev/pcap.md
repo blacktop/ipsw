@@ -2,10 +2,11 @@
 id: pcap
 title: pcap
 hide_title: true
+hide_table_of_contents: true
 sidebar_label: pcap
 description: Dump network traffic
 last_update:
-  date: 2022-11-24T13:58:11-07:00
+  date: 2022-11-25T18:20:31-07:00
   author: blacktop
 ---
 ## ipsw idev pcap

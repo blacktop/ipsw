@@ -2,10 +2,11 @@
 id: list
 title: list
 hide_title: true
+hide_table_of_contents: true
 sidebar_label: list
 description: Dump info about USB connected iDevices
 last_update:
-  date: 2022-11-24T13:58:11-07:00
+  date: 2022-11-25T18:20:31-07:00
   author: blacktop
 ---
 ## ipsw idev list
