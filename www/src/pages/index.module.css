@@ -20,6 +20,12 @@
   }
 }
 
+@media screen and (max-width: 480px) {
+  .heroLogo {
+    padding: 1rem;
+  }
+}
+
 .buttons {
   display: flex;
   align-items: center;
