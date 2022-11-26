@@ -150,7 +150,7 @@ $desktop-xl-width: 1160px;
 }
 
 .header-github-link::before {
-  background: url("/icons/github.svg");
+  background: url("/icons/github-white.svg");
   background-size: contain;
 }
 
@@ -160,12 +160,12 @@ $desktop-xl-width: 1160px;
 }
 
 .header-twitter-link::before {
-  background: url("/icons/twitter.svg");
+  background: url("/icons/twitter-white.svg");
   background-size: contain;
 }
 
 .header-mastodon-link::before {
-  background: url("/icons/mastodon.svg");
+  background: url("/icons/mastodon-white.svg");
   background-size: contain;
 }
 
