@@ -1,5 +1,6 @@
 ---
 hide_table_of_contents: true
+description: How to dump the syscall table of a kernelcache
 ---
 
 # Dump Syscalls

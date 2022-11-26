@@ -1,4 +1,4 @@
-/* @use "sass:meta";
+@use "sass:meta";
 $mobile-width: 480px;
 $tablet-width: 996px;
 $desktop-width: 997px;
@@ -26,7 +26,7 @@ $desktop-xl-width: 1160px;
   @media (min-width: #{$desktop-xl-width}) {
     @content;
   }
-} */
+}
 
 /**
  * Any CSS included here will be global. The classic template
@@ -74,64 +74,6 @@ $desktop-xl-width: 1160px;
 .hero--primary {
   --ifm-hero-background-color: #503B9F;
   --ifm-hero-text-color: var(--ifm-font-color-base-inverse);
-}
-
-.navbar__link:hover,
-    .navbar__link--active {
-      color: var(--ifm-navbar-link-hover-color);
-      text-decoration: underline;
-      text-underline-position: under;
-    }
-
-/* Common */
-.row--justify--center {
-  justify-content: center;
-}
-
-.row--align--center {
-  align-items: center;
-}
-
-/* Header classes */
-.navbar__brand {
-  margin-left: 8px;
-}
-
-.navbar__link {
-  font-weight: 600;
-}
-
-.navbar__toggle {
-  color: var(--color-text-white);
-}
-
-.navbar-sidebar__brand {
-  justify-content: space-between;
-  box-shadow: none;
-}
-
-.navbar-sidebar__items .menu__list .menu__link {
-  color: var(--color-text-white);
-}
-
-.navbar-sidebar__items .menu__list .menu__link.menu__link--sublist::after {
-  filter: invert(100%) sepia(94%) saturate(17%) hue-rotate(223deg)
-      brightness(104%) contrast(98%);
-}
-
-.navbar-sidebar__back {
-  color: var(--color-text-white);
-}
-
-.navbar-items-separator {
-  margin: 0 !important;
-  border-left: 1px solid #7E88D2;
-  height: 2rem;
-  padding: 0.5;
-}
-
-.header-last-nav-item {
-  margin-right: 30px;
 }
 
 .header-icon-link {

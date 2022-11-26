@@ -1,8 +1,10 @@
 ---
-description: How to install ipsw locally, and start a parsing IPSWs in no time.
+description: How to install ipsw locally.
 ---
 
 # Installation
+
+> How to install ipsw locally, and start a parsing IPSWs in no time.
 
 ```mdx-code-block
 import Tabs from '@theme/Tabs';

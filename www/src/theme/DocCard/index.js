@@ -1,3 +1,9 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 import React from "react";
 import clsx from "clsx";
 import Link from "@docusaurus/Link";
@@ -12,7 +18,7 @@ function CardContainer({href, children}) {
   return (
     <Link
       href={href}
-      className={clsx("card margin--sm padding--sm", styles.cardContainer)}>
+      className={clsx("card padding--lg", styles.cardContainer)}>
       {children}
     </Link>
   );
@@ -42,7 +48,7 @@ function CardCategory({item}) {
   return (
     <CardLayout
       href={href}
-      icon="🗃️"
+      // icon="🗃️"
       title={item.label}
       description={translate(
         {

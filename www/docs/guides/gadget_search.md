@@ -1,5 +1,6 @@
 ---
 hide_table_of_contents: true
+description: Search for byte patterns gadgets
 ---
 
 # Gadget Search
