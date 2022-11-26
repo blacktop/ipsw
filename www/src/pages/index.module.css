@@ -12,6 +12,7 @@
 
 .heroLogo {
   display: flex;
+  padding: 1rem 0;
 }
 
 @media screen and (max-width: 996px) {
