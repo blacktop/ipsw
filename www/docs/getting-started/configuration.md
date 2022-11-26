@@ -1,5 +1,5 @@
 ---
-description: How to configure ipsw with $HOME/.ipsw.yaml
+description: How to configure ipsw with ~/.ipsw.yaml
 ---
 
 # Configuration

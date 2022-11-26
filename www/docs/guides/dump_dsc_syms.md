@@ -1,11 +1,14 @@
 ---
 hide_table_of_contents: true
+description: How to use lookup JSON files
 ---
 
 # Lookup DSC Symbols
 
 ```bash
 ❯ jq . sym_lookup.json
+```
+```json
 [
   {
     "regex": ".*zero.*",
@@ -16,6 +19,8 @@ hide_table_of_contents: true
 
 ```bash
 ❯ ipsw dyld symaddr dyld_shared_cache_arm64e --in sym_lookup.json | jq .
+```
+```json
 [
   {
     "name": "__utmpx_working_copy.idzero",

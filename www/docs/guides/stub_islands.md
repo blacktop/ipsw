@@ -1,3 +1,7 @@
+---
+description: How to find stub island xrefs
+---
+
 # Stub Islands
 
 > iOS16 added a NEW concept to dyld4 and the `dyld_shared_cache` sub-caches called **Stub Islands**.  
