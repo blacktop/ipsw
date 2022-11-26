@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: o2a
 description: Convert MachO offset to address
 last_update:
-  date: 2022-11-25T18:20:31-07:00
+  date: 2022-11-25T23:22:40-07:00
   author: blacktop
 ---
 ## ipsw macho o2a

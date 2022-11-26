@@ -80,4 +80,16 @@ var idevDiagMobileGestaltCmd = &cobra.Command{
 
 		return nil
 	},
+	Example: `❯ ipsw idev diag mg -k SupplementalBuildVersion,ProductVersionExtra | jq .
+
+	{
+		"status": "Success",
+		"diagnostics": {
+		  "MobileGestalt": {
+			"ProductVersionExtra": "(a)",
+			"Status": "Success",
+			"SupplementalBuildVersion": "20C7750490e"
+		  }
+		}
+	  }`,
 }
