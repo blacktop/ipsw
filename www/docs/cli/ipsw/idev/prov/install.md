@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: install
 description: Install a provision profile (.mobileprovision file)
 last_update:
-  date: 2022-11-26T17:29:41-07:00
+  date: 2022-11-26T17:36:57-07:00
   author: blacktop
 ---
 ## ipsw idev prov install
@@ -14,7 +14,7 @@ last_update:
 Install a provision profile (.mobileprovision file)
 
 ```
-ipsw idev prov install [flags]
+ipsw idev prov install <PROV> [flags]
 ```
 
 ### Options

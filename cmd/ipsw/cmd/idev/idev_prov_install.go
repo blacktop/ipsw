@@ -37,7 +37,7 @@ func init() {
 
 // provInstallCmd represents the install command
 var provInstallCmd = &cobra.Command{
-	Use:           "install",
+	Use:           "install <PROV>",
 	Short:         "Install a provision profile (.mobileprovision file)",
 	SilenceUsage:  true,
 	SilenceErrors: true,

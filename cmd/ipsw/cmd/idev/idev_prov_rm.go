@@ -37,7 +37,7 @@ func init() {
 
 // provRmCmd represents the rm command
 var provRmCmd = &cobra.Command{
-	Use:           "rm",
+	Use:           "rm <PROV>",
 	Short:         "Remove a provision profile",
 	SilenceUsage:  true,
 	SilenceErrors: true,

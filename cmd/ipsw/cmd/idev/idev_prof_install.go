@@ -37,7 +37,7 @@ func init() {
 
 // profInstallCmd represents the install command
 var profInstallCmd = &cobra.Command{
-	Use:           "install",
+	Use:           "install <PROF_FILE>",
 	Aliases:       []string{"i"},
 	Short:         "Install profile",
 	SilenceUsage:  true,
