@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: rm
 description: Remove profile by name
 last_update:
-  date: 2022-11-26T17:36:57-07:00
+  date: 2022-11-27T12:58:11-07:00
   author: blacktop
 ---
 ## ipsw idev prof rm

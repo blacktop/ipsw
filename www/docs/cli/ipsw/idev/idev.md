@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: idev
 description: USB connected device commands
 last_update:
-  date: 2022-11-26T17:36:57-07:00
+  date: 2022-11-27T12:58:11-07:00
   author: blacktop
 ---
 ## ipsw idev
@@ -37,6 +37,7 @@ ipsw idev [flags]
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw idev afc](/docs/cli/ipsw/idev/afc)	 - FileSystem commands
 * [ipsw idev apps](/docs/cli/ipsw/idev/apps)	 - Application commands
+* [ipsw idev comp](/docs/cli/ipsw/idev/comp)	 - List all paired companion devices
 * [ipsw idev crash](/docs/cli/ipsw/idev/crash)	 - Crashlog commands
 * [ipsw idev diag](/docs/cli/ipsw/idev/diag)	 - Diagnostics commands
 * [ipsw idev fsyms](/docs/cli/ipsw/idev/fsyms)	 - Dump device linker and dyld_shared_cache file
@@ -49,7 +50,7 @@ ipsw idev [flags]
 * [ipsw idev prov](/docs/cli/ipsw/idev/prov)	 - Provision commands
 * [ipsw idev proxy](/docs/cli/ipsw/idev/proxy)	 - Create a TCP proxy (for ssh/debugging)
 * [ipsw idev ps](/docs/cli/ipsw/idev/ps)	 - Process list
-* [ipsw idev restore](/docs/cli/ipsw/idev/restore)	 - Restore commands
+* [ipsw idev restore](/docs/cli/ipsw/idev/restore)	 - A brief description of your command
 * [ipsw idev screen](/docs/cli/ipsw/idev/screen)	 - Dump screenshot as a PNG
 * [ipsw idev springb](/docs/cli/ipsw/idev/springb)	 - SpringBoard commands
 * [ipsw idev syslog](/docs/cli/ipsw/idev/syslog)	 - Dump syslog lines

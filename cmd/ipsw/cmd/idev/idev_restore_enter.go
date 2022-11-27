@@ -32,7 +32,7 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(enterCmd)
+	backupRestoreCmd.AddCommand(enterCmd)
 }
 
 // enterCmd represents the enter command

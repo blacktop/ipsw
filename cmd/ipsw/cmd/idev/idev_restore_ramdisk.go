@@ -28,7 +28,7 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(ramdiskCmd)
+	backupRestoreCmd.AddCommand(ramdiskCmd)
 }
 
 // ramdiskCmd represents the ramdisk command

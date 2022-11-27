@@ -26,7 +26,7 @@ import (
 )
 
 func init() {
-	IDevCmd.AddCommand(restoreCmd)
+	IDevCmd.AddCommand(backupRestoreCmd)
 }
 
 // restoreCmd represents the restore command

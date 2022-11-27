@@ -28,12 +28,12 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.2.0
-	github.com/shurcooL/githubv4 v0.0.0-20221021030919-a134b1472cc7
+	github.com/shurcooL/githubv4 v0.0.0-20221126192849-0b5c4c7994eb
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/ulikunitz/xz v0.5.10
-	github.com/unicorn-engine/unicorn v0.0.0-20221101153654-241a391cecac
+	github.com/unicorn-engine/unicorn v0.0.0-20221122205502-56f3bdedb42d
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.3.0
@@ -53,7 +53,7 @@ require (
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/antchfx/htmlquery v1.2.5 // indirect
-	github.com/antchfx/xmlquery v1.3.12 // indirect
+	github.com/antchfx/xmlquery v1.3.13 // indirect
 	github.com/antchfx/xpath v1.2.1 // indirect
 	github.com/blacktop/go-dwarf v1.0.7 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect

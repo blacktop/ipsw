@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: diag
 description: Diagnostics commands
 last_update:
-  date: 2022-11-26T17:36:57-07:00
+  date: 2022-11-27T12:58:11-07:00
   author: blacktop
 ---
 ## ipsw idev diag
@@ -35,6 +35,8 @@ ipsw idev diag [flags]
 ### SEE ALSO
 
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
+* [ipsw idev diag bat](/docs/cli/ipsw/idev/diag/bat)	 - Get snapshot of battery data
+* [ipsw idev diag info](/docs/cli/ipsw/idev/diag/info)	 - Diagnostics info
 * [ipsw idev diag ioreg](/docs/cli/ipsw/idev/diag/ioreg)	 - Query IORegistry
 * [ipsw idev diag mg](/docs/cli/ipsw/idev/diag/mg)	 - Query MobileGestalt
 * [ipsw idev diag restart](/docs/cli/ipsw/idev/diag/restart)	 - Restart the device

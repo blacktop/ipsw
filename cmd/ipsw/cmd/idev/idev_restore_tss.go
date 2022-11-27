@@ -28,7 +28,7 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(tssCmd)
+	backupRestoreCmd.AddCommand(tssCmd)
 }
 
 // tssCmd represents the tss command

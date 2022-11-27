@@ -4,6 +4,8 @@ description: How to configure ipsw with ~/.ipsw.yaml
 
 # Configuration
 
+> How to configure ipsw with ~/.ipsw.yaml
+
 ## `ipsw` config
 
 You can also use a config file with `ipsw` so you don't have to use the flags

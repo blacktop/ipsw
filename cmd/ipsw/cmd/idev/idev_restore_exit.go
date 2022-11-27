@@ -33,7 +33,7 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(exitCmd)
+	backupRestoreCmd.AddCommand(exitCmd)
 }
 
 // exitCmd represents the exit command
