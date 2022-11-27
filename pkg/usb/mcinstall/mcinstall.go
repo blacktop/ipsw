@@ -37,6 +37,7 @@ func (c *Client) Close() error {
 }
 
 type ProfileInfo struct {
+	profileSendResponse
 	IDs       []string                   `plist:"OrderedIdentifiers,omitempty" json:"ids,omitempty"`
 	Manifests map[string]ProfileManifest `plist:"ProfileManifest,omitempty" json:"manifests,omitempty"`
 	Metadatas map[string]ProfileMetadata `plist:"ProfileMetadata,omitempty" json:"metadatas,omitempty"`
@@ -77,7 +78,7 @@ type ProfileManifest struct {
 
 type profileSendResponse struct {
 	CommandErrorArchive []byte `plist:"CommandErrorArchive,omitempty" json:"command_error_archive,omitempty"`
-	ErrorChain          struct {
+	ErrorChain          []struct {
 		ErrorCode            int    `plist:"ErrorCode,omitempty" json:"error_code,omitempty"`
 		ErrorDomain          string `plist:"ErrorDomain,omitempty" json:"error_domain,omitempty"`
 		LocalizedDescription string `plist:"LocalizedDescription,omitempty" json:"localized_description,omitempty"`

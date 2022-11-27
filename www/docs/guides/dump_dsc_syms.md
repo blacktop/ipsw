@@ -5,6 +5,8 @@ description: How to use lookup JSON files
 
 # Lookup DSC Symbols
 
+> How to use lookup JSON files.
+
 ```bash
 ❯ jq . sym_lookup.json
 ```

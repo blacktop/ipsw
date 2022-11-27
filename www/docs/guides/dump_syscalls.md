@@ -5,6 +5,8 @@ description: How to dump the syscall table of a kernelcache
 
 # Dump Syscalls
 
+> How to dump the syscall table of a kernelcache.
+
 ```bash
 ❯ ipsw kernel syscall 20A5312j__iPhone14,2/kernelcache.release.iPhone14,2 | head
 0:   syscall call=0xfffffff0081f28f4 munge=0x0                ret=int      narg=0 (bytes=0)  { int nosys(void); }   { indirect syscall }

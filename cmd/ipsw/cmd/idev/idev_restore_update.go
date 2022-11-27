@@ -28,7 +28,7 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(updateCmd)
+	backupRestoreCmd.AddCommand(updateCmd)
 }
 
 // updateCmd represents the update command
