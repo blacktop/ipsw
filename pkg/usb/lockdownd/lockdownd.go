@@ -277,6 +277,14 @@ func (dv DeviceValues) String() string {
 	)
 }
 
+type setValueRequest struct {
+	Request string
+	Label   string
+	Domain  string `plist:"Domain,omitempty"`
+	Key     string `plist:"Key,omitempty"`
+	Value   any    `plist:"Value,omitempty"`
+}
+
 type getValueRequest struct {
 	Request string
 	Label   string
@@ -293,6 +301,80 @@ type getValueResponse struct {
 type getBoolResponse struct {
 	Request string
 	Value   bool
+}
+
+type wifiConnections struct {
+	BonjourFullServiceName string `plist:"BonjourFullServiceName,omitempty"`
+	EnableWifiConnections  bool   `plist:"EnableWifiConnections,omitempty"`
+	EnableWifiDebugging    bool   `plist:"EnableWifiDebugging,omitempty"`
+	EnableWifiPairing      bool   `plist:"EnableWifiPairing,omitempty"`
+	SupportsWifi           bool   `plist:"SupportsWifi,omitempty"`
+	SupportsWifiSyncing    bool   `plist:"SupportsWifiSyncing,omitempty"`
+}
+
+func (w wifiConnections) String() string {
+	return fmt.Sprintf(
+		colorFaint("BonjourFullServiceName: ")+colorBold("%s\n")+
+			colorFaint("EnableWifiConnections:  ")+colorBold("%t\n")+
+			colorFaint("EnableWifiDebugging:    ")+colorBold("%t\n")+
+			colorFaint("EnableWifiPairing:      ")+colorBold("%t\n")+
+			colorFaint("SupportsWifi:           ")+colorBold("%t\n")+
+			colorFaint("SupportsWifiSyncing:    ")+colorBold("%t\n"),
+		w.BonjourFullServiceName,
+		w.EnableWifiConnections,
+		w.EnableWifiDebugging,
+		w.EnableWifiPairing,
+		w.SupportsWifi,
+		w.SupportsWifiSyncing,
+	)
+}
+
+type getWifiConnectionsResponse struct {
+	Request string
+	Value   wifiConnections
+}
+
+func (lc *Client) getValues(domain, key string) (any, error) {
+	req := &getValueRequest{
+		Request: "GetValue",
+		Label:   usb.BundleID,
+		Domain:  domain,
+		Key:     key,
+	}
+	var resp any
+	if err := lc.Request(req, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (lc *Client) setValues(domain, key string, value any) (any, error) {
+	req := &setValueRequest{
+		Request: "SetValue",
+		Label:   usb.BundleID,
+		Domain:  domain,
+		Key:     key,
+		Value:   value,
+	}
+	var resp any
+	if err := lc.Request(req, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (lc *Client) removeValues(domain, key string) (any, error) {
+	req := &getValueRequest{
+		Request: "RemoveValue",
+		Label:   usb.BundleID,
+		Domain:  domain,
+		Key:     key,
+	}
+	var resp any
+	if err := lc.Request(req, &resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 func (lc *Client) GetValues() (*DeviceValues, error) {
@@ -322,6 +404,45 @@ func (lc *Client) DeveloperModeEnabled() (bool, error) {
 		return false, err
 	}
 	return resp.Value, nil
+}
+
+func (lc *Client) WifiConnections() (*wifiConnections, error) {
+	req := &getValueRequest{
+		Request: "GetValue",
+		Label:   usb.BundleID,
+		Domain:  "com.apple.mobile.wireless_lockdown",
+		Key:     "",
+	}
+	var resp getWifiConnectionsResponse
+	if err := lc.Request(req, &resp); err != nil {
+		return nil, err
+	}
+	return &resp.Value, nil
+}
+
+func (lc *Client) SetWifiConnections(on bool) error {
+	req := &setValueRequest{
+		Request: "SetValue",
+		Label:   usb.BundleID,
+		Domain:  "com.apple.mobile.wireless_lockdown",
+		Key:     "EnableWifiPairing",
+		Value:   on,
+	}
+	var resp any
+	if err := lc.Request(req, &resp); err != nil {
+		return err
+	}
+	req = &setValueRequest{
+		Request: "SetValue",
+		Label:   usb.BundleID,
+		Domain:  "com.apple.mobile.wireless_lockdown",
+		Key:     "EnableWifiConnections",
+		Value:   on,
+	}
+	if err := lc.Request(req, &resp); err != nil {
+		return err
+	}
+	return nil
 }
 
 type queryTypeRequest struct {

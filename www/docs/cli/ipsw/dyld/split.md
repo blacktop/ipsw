@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: split
 description: Extracts all the dyld_shared_cache libraries
 last_update:
-  date: 2022-11-25T23:22:40-07:00
+  date: 2022-11-26T17:29:41-07:00
   author: blacktop
 ---
 ## ipsw dyld split
