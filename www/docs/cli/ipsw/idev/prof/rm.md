@@ -1,26 +1,26 @@
 ---
-id: sepfw
-title: sepfw
+id: rm
+title: rm
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: sepfw
-description: Dump MachOs
+sidebar_label: rm
+description: Remove profile by name
 last_update:
-  date: 2022-11-25T23:22:40-07:00
+  date: 2022-11-26T17:29:41-07:00
   author: blacktop
 ---
-## ipsw sepfw
+## ipsw idev prof rm
 
-Dump MachOs
+Remove profile by name
 
 ```
-ipsw sepfw <SEP_FIRMWARE> [flags]
+ipsw idev prof rm [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for sepfw
+  -h, --help   help for rm
 ```
 
 ### Options inherited from parent commands
@@ -28,10 +28,11 @@ ipsw sepfw <SEP_FIRMWARE> [flags]
 ```
       --color           colorize output
       --config string   config file (default is $HOME/.ipsw.yaml)
+  -u, --udid string     Device UniqueDeviceID to connect to
   -V, --verbose         verbose output
 ```
 
 ### SEE ALSO
 
-* [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw idev prof](/docs/cli/ipsw/idev/prof)	 - Profile commands
 

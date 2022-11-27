@@ -433,7 +433,7 @@ scoop:
   description: iOS/macOS Research Swiss Army Knife
   license: MIT
 
-chocolatey:
+chocolateys:
   - project_url: https://github.com/blacktop/ipsw
     icon_url: https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png
     license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
