@@ -37,7 +37,7 @@ func init() {
 
 // profRmCmd represents the rm command
 var profRmCmd = &cobra.Command{
-	Use:           "rm",
+	Use:           "rm <PROF>",
 	Short:         "Remove profile by name",
 	SilenceUsage:  true,
 	SilenceErrors: true,

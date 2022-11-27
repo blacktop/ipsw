@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: wiki
 description: Download old(er) IPSWs from theiphonewiki.com
 last_update:
-  date: 2022-11-26T17:29:41-07:00
+  date: 2022-11-26T17:36:57-07:00
   author: blacktop
 ---
 ## ipsw download wiki

@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: install
 description: Install profile
 last_update:
-  date: 2022-11-26T17:29:41-07:00
+  date: 2022-11-26T17:36:57-07:00
   author: blacktop
 ---
 ## ipsw idev prof install
@@ -14,7 +14,7 @@ last_update:
 Install profile
 
 ```
-ipsw idev prof install [flags]
+ipsw idev prof install <PROF_FILE> [flags]
 ```
 
 ### Options
