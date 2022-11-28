@@ -433,18 +433,18 @@ scoop:
   description: iOS/macOS Research Swiss Army Knife
   license: MIT
 
-chocolateys:
-  - project_url: https://github.com/blacktop/ipsw
-    icon_url: https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png
-    license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
-    authors: blacktop
-    release_notes: "https://github.com/blacktop/ipsw/releases/tag/v{{ .Version }}"
-    copyright: 2018-2022 blacktop
-    project_source_url: https://github.com/blacktop/ipsw
-    docs_url: https://blacktop.github.io/ipsw/
-    summary: iOS/macOS Research Swiss Army Knife
-    description: Everything you need to do security research on iOS and macOS.
-    tags: "iOS macOS security research swiss-army-knife"
+# chocolateys:
+#   - project_url: https://github.com/blacktop/ipsw
+#     icon_url: https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png
+#     license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
+#     authors: blacktop
+#     release_notes: "https://github.com/blacktop/ipsw/releases/tag/v{{ .Version }}"
+#     copyright: 2018-2022 blacktop
+#     project_source_url: https://github.com/blacktop/ipsw
+#     docs_url: https://blacktop.github.io/ipsw/
+#     summary: iOS/macOS Research Swiss Army Knife
+#     description: Everything you need to do security research on iOS and macOS.
+#     tags: "iOS macOS security research swiss-army-knife"
 
 changelog:
   sort: asc
