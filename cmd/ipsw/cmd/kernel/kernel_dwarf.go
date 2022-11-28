@@ -128,15 +128,15 @@ func getName(path, name string) (*dwf.FuncType, error) {
 func init() {
 	KernelcacheCmd.AddCommand(dwarfCmd)
 
-	dwarfCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
-	dwarfCmd.Flags().BoolP("pretty", "", false, "Pretty print JSON")
-	dwarfCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	// dwarfCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
+	// dwarfCmd.Flags().BoolP("pretty", "", false, "Pretty print JSON")
+	// dwarfCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dwarfCmd.Flags().BoolP("diff", "d", false, "Diff two structs")
 	dwarfCmd.Flags().StringP("type", "t", "", "Type to lookup")
 	dwarfCmd.Flags().StringP("name", "n", "", "Name to lookup")
-	viper.BindPFlag("kernel.dwarf.arch", dwarfCmd.Flags().Lookup("arch"))
-	viper.BindPFlag("kernel.dwarf.pretty", dwarfCmd.Flags().Lookup("pretty"))
-	viper.BindPFlag("kernel.dwarf.json", dwarfCmd.Flags().Lookup("json"))
+	// viper.BindPFlag("kernel.dwarf.arch", dwarfCmd.Flags().Lookup("arch"))
+	// viper.BindPFlag("kernel.dwarf.pretty", dwarfCmd.Flags().Lookup("pretty"))
+	// viper.BindPFlag("kernel.dwarf.json", dwarfCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.dwarf.diff", dwarfCmd.Flags().Lookup("diff"))
 	viper.BindPFlag("kernel.dwarf.type", dwarfCmd.Flags().Lookup("type"))
 	viper.BindPFlag("kernel.dwarf.name", dwarfCmd.Flags().Lookup("name"))
@@ -146,11 +146,11 @@ func init() {
 // dwarfCmd represents the dwarf command
 var dwarfCmd = &cobra.Command{
 	Use:           "dwarf",
-	Short:         "Dump DWARF debug information",
+	Aliases:       []string{"dwarfdump", "dd"},
+	Short:         "🚧 Dump DWARF debug information",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  false,
 	SilenceErrors: true,
-	Aliases:       []string{"dwarfdump"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -216,4 +216,9 @@ var dwarfCmd = &cobra.Command{
 
 		return nil
 	},
+	Example: `# Dump the task struct (and pretty print with clang-format)
+❯ ipsw kernel dwarf KDK_13.0_22A5342f.kdk/kernel.development.t6000 --type task \
+											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename thread.h
+# Diff two versions of a struct
+❯ ipsw kernel dwarf --type task --diff KDK_13.0_22A5342f.kdk/kernel.development.t6000 KDK_13.0_22A5352e.kdk/kernel.development.t6000`,
 }
