@@ -54,10 +54,10 @@ func init() {
 
 // updateCmd represents the update command
 var updateCmd = &cobra.Command{
-	Use:          "update",
-	Short:        "Download an ipsw update if one exists",
-	SilenceUsage: true,
-	Hidden:       true,
+	Use:           "update",
+	Short:         "Download an ipsw update if one exists",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	Example: `# Grab an update for your platform
 ❯ ipsw update --detect
 # Grab an update for another platform

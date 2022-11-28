@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: shsh
 description: Get shsh blobs from device
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-11-28T12:49:26-07:00
   author: blacktop
 ---
 ## ipsw shsh
