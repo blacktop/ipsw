@@ -93,11 +93,11 @@ scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git
 scoop install blacktop/ipsw
 ```
 
-Via [chocolatey](https://chocolatey.org)
+<!-- Via [chocolatey](https://chocolatey.org)
 
 ```bash
 choco install ipsw
-``` 
+```  -->
 
 Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
