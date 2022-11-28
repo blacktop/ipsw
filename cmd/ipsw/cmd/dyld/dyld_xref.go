@@ -36,9 +36,17 @@ import (
 
 func init() {
 	DyldCmd.AddCommand(XrefCmd)
-	XrefCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	XrefCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
+	XrefCmd.Flags().StringP("image", "i", "", "Dylib image to search")
 	XrefCmd.Flags().BoolP("imports", "", false, "Search all other dylibs that import the dylib containing the xref src")
+	XrefCmd.Flags().BoolP("all", "a", false, "Search all images")
+	XrefCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply (not supported yet)")
+	XrefCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+
+	viper.BindPFlag("dyld.xref.image", XrefCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.xref.imports", XrefCmd.Flags().Lookup("imports"))
+	viper.BindPFlag("dyld.xref.all", XrefCmd.Flags().Lookup("all"))
+	viper.BindPFlag("dyld.xref.slide", XrefCmd.Flags().Lookup("slide"))
+	viper.BindPFlag("dyld.xref.cache", XrefCmd.Flags().Lookup("cache"))
 
 	XrefCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -56,11 +64,12 @@ var XrefCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		imageName, _ := cmd.Flags().GetString("image")
-
+		imageName := viper.GetString("dyld.xref.image")
 		// TODO: add slide support (add to output addrs)
-		slide, _ := cmd.Flags().GetUint64("slide")
-		searchImports, _ := cmd.Flags().GetBool("imports")
+		slide := viper.GetUint64("dyld.xref.slide")
+		searchImports := viper.GetBool("dyld.xref.imports")
+		allImages := viper.GetBool("dyld.xref.all")
+		cacheFile := viper.GetString("dyld.xref.cache")
 
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
@@ -111,6 +120,8 @@ var XrefCmd = &cobra.Command{
 				return fmt.Errorf("image not in %s: %v", dscPath, err)
 			}
 			images = append(images, srcImage)
+		} else if allImages {
+			images = f.Images
 		} else {
 			srcImage, err = f.GetImageContainingVMAddr(unslidAddr)
 			if err != nil {
@@ -132,6 +143,15 @@ var XrefCmd = &cobra.Command{
 				m.Close()
 			}
 		}
+
+		if len(cacheFile) == 0 {
+			cacheFile = dscPath + ".a2s"
+		}
+		if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+			return err
+		}
+
+		log.Info("Searching for xrefs (use -V for more progess output)")
 
 		for _, img := range images {
 			xrefs := make(map[uint64]string)
@@ -190,25 +210,27 @@ var XrefCmd = &cobra.Command{
 				}
 			}
 
-			msg := "XREFS"
 			if len(xrefs) == 0 {
-				msg = "No XREFS found"
-			}
-			if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
 				log.WithFields(log.Fields{
-					"sym":   symName,
 					"dylib": img.Name,
-					"xrefs": len(xrefs),
-				}).Info(msg)
+				}).Debug("No XREFS found")
 			} else {
-				log.WithFields(log.Fields{
-					"dylib": img.Name,
-					"xrefs": len(xrefs),
-				}).Info(msg)
-			}
-			if len(xrefs) > 0 {
-				for addr, sym := range xrefs {
-					fmt.Printf("%#x: %s\n", addr, sym)
+				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
+					log.WithFields(log.Fields{
+						"sym":   symName,
+						"dylib": img.Name,
+						"xrefs": len(xrefs),
+					}).Info("XREFS")
+				} else {
+					log.WithFields(log.Fields{
+						"dylib": img.Name,
+						"xrefs": len(xrefs),
+					}).Info("XREFS")
+				}
+				if len(xrefs) > 0 {
+					for addr, sym := range xrefs {
+						fmt.Printf("%#x: %s\n", addr, sym)
+					}
 				}
 			}
 		}

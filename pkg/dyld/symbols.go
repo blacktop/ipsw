@@ -277,6 +277,22 @@ func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieExport, error) {
 	return nil, fmt.Errorf("symbol was not found in exports")
 }
 
+func (f *File) DumpStubIslands() error {
+	if len(f.islandStubs) == 0 {
+		if err := f.ParseStubIslands(); err != nil {
+			return fmt.Errorf("failed to parse stub islands: %v", err)
+		}
+	}
+	for stub, target := range f.islandStubs {
+		if symName, ok := f.AddressToSymbol[target]; ok {
+			fmt.Printf("%#x: %s\n", stub, symName)
+		} else {
+			fmt.Printf("%#x: %#x\n", stub, target)
+		}
+	}
+	return nil
+}
+
 // OpenOrCreateA2SCache returns an address to symbol map if the cache file exists otherwise it will create a NEW one
 func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
@@ -292,7 +308,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 				return err
 			}
 		}
-		if f.Headers[f.UUID].CacheType == CacheTypeStubIslands {
+		if f.Headers[f.UUID].CacheType == CacheTypeUniversal {
 			log.Info("parsing stub islands...")
 			if err := f.ParseStubIslands(); err != nil {
 				return fmt.Errorf("failed to parse stub islands: %v", err)
@@ -333,6 +349,8 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	}
 	// gzr.Close()
 	a2sFile.Close()
+
+	f.symCacheLoaded = true
 
 	return nil
 }

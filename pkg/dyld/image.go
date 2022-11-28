@@ -28,12 +28,71 @@ type rangeEntry struct {
 	Size       uint32
 }
 
+type Patch interface {
+	GetName() string
+	GetKind() string
+	GetImplOffset() uint64
+	GetClientIndex() uint32
+	GetPatchLocations() any
+	GetGotLocations() []CachePatchableLocationV3
+}
+
 type PatchableExport struct {
 	Name             string
+	Kind             string
 	OffsetOfImpl     uint32
 	ClientIndex      uint32
 	PatchLocations   []CachePatchableLocationV1
 	PatchLocationsV2 []CachePatchableLocationV2
+}
+
+func (pe PatchableExport) GetName() string {
+	return pe.Name
+}
+func (pe PatchableExport) GetKind() string {
+	return pe.Kind
+}
+func (pe PatchableExport) GetImplOffset() uint64 {
+	return uint64(pe.OffsetOfImpl)
+}
+func (pe PatchableExport) GetClientIndex() uint32 {
+	return pe.ClientIndex
+}
+func (pe PatchableExport) GetPatchLocations() any {
+	if len(pe.PatchLocations) > 0 {
+		return pe.PatchLocations
+	}
+	return pe.PatchLocationsV2
+}
+func (pe PatchableExport) GetGotLocations() []CachePatchableLocationV3 {
+	return nil
+}
+
+type PatchableGotExport struct {
+	Name           string
+	Kind           string
+	OffsetOfImpl   uint32
+	GotLocationsV3 []CachePatchableLocationV3
+}
+
+func (pg PatchableGotExport) GetName() string {
+	return pg.Name
+}
+
+func (pg PatchableGotExport) GetKind() string {
+	return pg.Kind
+}
+func (pg PatchableGotExport) GetImplOffset() uint64 {
+	return uint64(pg.OffsetOfImpl)
+}
+func (pg PatchableGotExport) GetClientIndex() uint32 {
+	return 0
+}
+func (pg PatchableGotExport) GetPatchLocations() any {
+	return nil
+}
+func (pg PatchableGotExport) GetGotLocations() []CachePatchableLocationV3 {
+	return pg.GotLocationsV3
 }
 
 type astate struct {
@@ -175,7 +234,8 @@ type CacheImage struct {
 
 	SlideInfo        slideInfo
 	RangeEntries     []rangeEntry
-	PatchableExports []PatchableExport
+	PatchableExports []Patch
+	PatchableGOTs    []Patch
 	LocalSymbols     []*CacheLocalSymbol64
 	PublicSymbols    []*Symbol
 	ObjC             objcInfo
@@ -229,9 +289,22 @@ func (i *CacheImage) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		offset += i.limit
 	}
+	// if scinfo := i.cache.GetSubCacheInfo(i.ruuid); scinfo != nil {
+	// 	if offset > int64(scinfo.CacheVMOffset) {
+	// 		if next := i.cache.GetNextSubCacheInfo(i.ruuid); next != nil {
+	// 			if offset <= int64(next.CacheVMOffset) {
+	// 				i.ruuid = next.UUID
+	// 				offset = offset - int64(scinfo.CacheVMOffset)
+	// 			}
+	// 		} else {
+	// 			return 0, fmt.Errorf("Seek: invalid offset")
+	// 		}
+	// 	}
+	// } else {
 	if offset < i.base {
 		return 0, fmt.Errorf("Seek: invalid offset")
 	}
+	// }
 	i.off = offset
 	return offset - i.base, nil
 }
@@ -314,13 +387,13 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 
 	var rsBase uint64
 	if _, err := i.cache.Image("/usr/lib/libobjc.A.dylib"); err == nil {
-		sec, opt, err := i.cache.getOptimizations()
+		opt, err := i.cache.GetOptimizations()
 		if err != nil {
 			return nil, err
 		}
 
-		if opt.Version == 16 {
-			rsBase = sec.Addr + opt.RelativeMethodSelectorBaseAddressCacheOffset
+		if opt.GetVersion() == 16 {
+			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
 		}
 	}
 
@@ -706,7 +779,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 		stringPool := io.NewSectionReader(sr, int64(i.cache.LocalSymInfo.StringsFileOffset), int64(i.cache.LocalSymInfo.StringsSize))
 		sr.Seek(int64(i.cache.LocalSymInfo.NListFileOffset), io.SeekStart)
 
-		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+		// w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 
 		for idx := uint32(0); idx < i.cache.LocalSymInfo.EntriesCount; idx++ {
 			// skip over other images
@@ -741,7 +814,12 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					if err != nil {
 						return err
 					}
-					fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
+					// fmt.Fprintf(w, "%s\n", CacheLocalSymbol64{
+					// 	Name:    s,
+					// 	Nlist64: nlist,
+					// 	Macho:   m,
+					// }.String(true))
+					fmt.Println(CacheLocalSymbol64{
 						Name:    s,
 						Nlist64: nlist,
 						Macho:   m,
@@ -749,7 +827,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 				}
 			}
 
-			w.Flush()
+			// w.Flush()
 
 			sort.Slice(i.LocalSymbols, func(j, k int) bool {
 				return i.LocalSymbols[j].Name <= i.LocalSymbols[k].Name

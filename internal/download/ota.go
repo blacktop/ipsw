@@ -47,6 +47,7 @@ type assetType string
 
 const (
 	softwareUpdate      assetType = "com.apple.MobileAsset.SoftwareUpdate"
+	rsrUpdate           assetType = "com.apple.MobileAsset.SplatSoftwareUpdate"
 	watchSoftwareUpdate assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
 	// For macOS devices
 	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
@@ -121,6 +122,7 @@ type Ota struct {
 type OtaConf struct {
 	Platform        string
 	Beta            bool
+	RSR             bool
 	Device          string
 	Model           string
 	Version         *version.Version
@@ -141,11 +143,13 @@ type pallasRequest struct {
 	HWModelStr              string          `json:"HWModelStr"`
 	ProductVersion          string          `json:"ProductVersion"`
 	BuildVersion            string          `json:"BuildVersion"`
+	Build                   string          `json:"Build,omitempty"`
 	RequestedProductVersion string          `json:"RequestedProductVersion,omitempty"`
 	Supervised              bool            `json:"Supervised,omitempty"`
 	DelayRequested          bool            `json:"DelayRequested,omitempty"`
 	CompatibilityVersion    int             `json:"CompatibilityVersion,omitempty"`
 	ReleaseType             string          `json:"ReleaseType,omitempty"`
+	RestoreVersion          string          `json:"RestoreVersion,omitempty"`
 }
 
 type ota struct {
@@ -225,7 +229,7 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "audioos":
 		fallthrough
 	case "tvos":
-		return []assetType{softwareUpdate}, nil
+		return []assetType{softwareUpdate, rsrUpdate}, nil
 	case "accessory":
 		return []assetType{accessorySoftwareUpdate}, nil
 	case "macos":
@@ -402,6 +406,11 @@ func (o *Ota) getRequests(atype assetType, audienceID assetAudienceID) (reqs []p
 		}
 	}
 
+	if o.Config.RSR {
+		req.RestoreVersion = "0.0.0.0.0,0"
+		req.Build = o.Config.Build
+	}
+
 	if len(o.Config.Device) > 0 && len(o.Config.Model) == 0 {
 		dev, err := o.db.LookupDevice(o.Config.Device)
 		if err != nil {
@@ -520,6 +529,12 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	}()
 
 	for resp := range c {
+
+		if resp.StatusCode >= 500 {
+			log.Debugf("[ERROR]\n%s", resp.Status)
+			continue
+		}
+
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			log.Errorf("failed to read response body: %v", err)
@@ -601,6 +616,21 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 			}
 		}
 	}
+	for idx, o := range os {
+		for _, elem := range otas {
+			if len(elem.BaseURL+elem.RelativePath) != 0 {
+				if o.BaseURL+o.RelativePath == elem.BaseURL+elem.RelativePath {
+					os[idx].SupportedDevices = utils.UniqueConcat(os[idx].SupportedDevices, elem.SupportedDevices)
+					os[idx].SupportedDeviceModels = utils.UniqueConcat(os[idx].SupportedDeviceModels, elem.SupportedDeviceModels)
+					if devs, err := utils.Zip(elem.SupportedDevices, elem.SupportedDeviceModels); err == nil {
+						for _, dev := range devs {
+							os[idx].Devices = utils.UniqueAppend(os[idx].Devices, fmt.Sprintf("%s_%s", dev.Device, dev.Model))
+						}
+					}
+				}
+			}
+		}
+	}
 	return os
 }
 
@@ -613,8 +643,8 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 		return otas
 	}
 
-	for _, ota := range otas {
-		devices = append(devices, ota.SupportedDevices...)
+	for _, o := range otas {
+		devices = append(devices, o.SupportedDevices...)
 	}
 
 	devices = utils.Unique(devices)
@@ -634,19 +664,11 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 	}
 
 	for _, device := range filteredDevices {
-		var devOTA types.Asset
 		for _, ota := range otas {
 			if utils.StrSliceHas(ota.SupportedDevices, device) {
-				if devOTA.SupportedDevices == nil {
-					if ota.DownloadSize > devOTA.DownloadSize {
-						devOTA = ota
-					}
-				} else {
-					devOTA = ota
-				}
+				filteredOtas = append(filteredOtas, ota)
 			}
 		}
-		filteredOtas = append(filteredOtas, devOTA)
 	}
 
 	return uniqueOTAs(filteredOtas)

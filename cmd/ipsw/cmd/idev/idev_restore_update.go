@@ -28,7 +28,7 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(updateCmd)
+	backupRestoreCmd.AddCommand(updateCmd)
 }
 
 // updateCmd represents the update command
@@ -38,13 +38,14 @@ var updateCmd = &cobra.Command{
 	Args:          cobra.MaximumNArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		panic("not implemented")
+		panic("not implemented") // TODO: implement
 
 		return nil
 	},

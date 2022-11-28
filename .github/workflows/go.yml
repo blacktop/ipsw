@@ -51,7 +51,13 @@ jobs:
         if: matrix.platform == 'macos-12'
         run: |
           brew install tree
-
+      - name: Build Dependencies (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          iwr get.scoop.sh -outfile 'install.ps1'
+          .\install.ps1 -RunAsAdmin
+          Join-Path (Resolve-Path ~).Path "scoop\shims" >> $Env:GITHUB_PATH
       #
       # CACHE
       #
@@ -137,6 +143,26 @@ jobs:
           dir
 
       #
+      # Package Installers
+      #
+      - name: Package Installers (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git 
+          scoop install blacktop/ipsw 
+          ipsw --help
+      - name: Package Installers (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo snap install ipsw
+          ipsw --help
+      - name: Package Installers (macOS)
+        if: matrix.platform == 'macos-12'
+        run: |
+          brew install blacktop/tap/ipsw
+          ipsw --help
+
+      #
       # (Windows)
       #
       - name: Run Device List (Windows)
@@ -194,11 +220,6 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH
           cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download ota --platform ios --device iPhone12,3 --beta --kernel
-      - name: Run download oss
-        if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
-        run: |
-          export PATH=$PWD/build/dist:$PATH
-          cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw download oss --macos 11.5
       - name: Run download tss
         if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
         run: |
@@ -289,10 +310,10 @@ jobs:
       #   run: |
       #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld slide ~/.ipsw/*/dyld_shared_cache_arm64e --auth
 
-      # - name: Run dyld patches FIXME: when dyld src is available
-      #   if: matrix.platform == 'macos-12'
-      #   run: |
-      #     LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*/dyld_shared_cache_arm64e
+      - name: Run dyld patches
+        if: matrix.platform == 'macos-12'
+        run: |
+          LD_LIBRARY_PATH=/usr/local/lib build/dist/ipsw dyld patches ~/.ipsw/*/dyld_shared_cache_arm64e
 
       - name: Run dyld imports
         if: matrix.platform == 'macos-12'

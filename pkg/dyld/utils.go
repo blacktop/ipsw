@@ -1,7 +1,6 @@
 package dyld
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"strings"
@@ -76,12 +75,51 @@ func (f *File) GetVMAddress(offset uint64) (map[types.UUID]uint64, error) {
 
 // GetVMAddressForUUID returns the virtual address for a given offset for a given cache UUID
 func (f *File) GetVMAddressForUUID(uuid types.UUID, offset uint64) (uint64, error) {
-	for _, mapping := range f.Mappings[uuid] {
+	for _, mapping := range f.MappingsWithSlideInfo[uuid] {
 		if mapping.FileOffset <= offset && offset < mapping.FileOffset+mapping.Size {
 			return (offset - mapping.FileOffset) + mapping.Address, nil
 		}
 	}
 	return 0, fmt.Errorf("offset %#x not within any mappings file offset range", offset)
+}
+
+func (f *File) GetCacheOffset(vmoffset uint64) (types.UUID, uint64, error) {
+	if vmoffset < f.SubCacheInfo[0].CacheVMOffset {
+		return f.UUID, vmoffset, nil // vm offset in primary subcache
+	}
+	for idx, scinfo := range f.SubCacheInfo { // check the sub subcaches
+		if idx < len(f.SubCacheInfo)-1 {
+			if scinfo.CacheVMOffset <= vmoffset && vmoffset < f.SubCacheInfo[idx+1].CacheVMOffset {
+				return scinfo.UUID, vmoffset - scinfo.CacheVMOffset, nil
+			}
+		} else {
+			if scinfo.CacheVMOffset <= vmoffset {
+				return scinfo.UUID, vmoffset - scinfo.CacheVMOffset, nil
+			}
+		}
+	}
+	// NOTE: via the dyld src comments; the .symbols subcache is unmmapped
+	return types.UUID{}, 0, fmt.Errorf("offset %#x not within any sub cache VM offset range", vmoffset)
+}
+
+func (f *File) GetCacheVMAddress(offset uint64) (types.UUID, uint64, error) {
+	if offset < f.SubCacheInfo[0].CacheVMOffset {
+		return f.UUID, f.MappingsWithSlideInfo[f.UUID][0].Address + offset, nil // vm addr in primary subcache
+	}
+	for idx, scinfo := range f.SubCacheInfo { // check the sub subcaches
+		if idx < len(f.SubCacheInfo)-1 {
+			if scinfo.CacheVMOffset <= offset && offset < f.SubCacheInfo[idx+1].CacheVMOffset {
+
+				return scinfo.UUID, f.MappingsWithSlideInfo[scinfo.UUID][0].Address + (offset - scinfo.CacheVMOffset), nil
+			}
+		} else {
+			if scinfo.CacheVMOffset <= offset {
+				return scinfo.UUID, f.MappingsWithSlideInfo[scinfo.UUID][0].Address + (offset - scinfo.CacheVMOffset), nil
+			}
+		}
+	}
+	// NOTE: via the dyld src comments; the .symbols subcache is unmmapped
+	return types.UUID{}, 0, fmt.Errorf("offset %#x not within any sub cache VM offset range", offset)
 }
 
 // GetMappingForOffsetForUUID returns the mapping containing a given file offset for a given cache UUID
@@ -136,10 +174,10 @@ func (f *File) ReadPointerAtAddress(address uint64) (uint64, error) {
 func (f *File) GetSubCacheExtensionFromUUID(uuid types.UUID) (string, error) {
 	for idx, sc := range f.SubCacheInfo {
 		if sc.UUID == uuid {
-			if len(string(bytes.Trim(sc.Extention[:], "\x00"))) == 0 {
+			if len(sc.Extention) == 0 {
 				return fmt.Sprintf(".%d", idx), nil
 			}
-			return string(bytes.Trim(sc.Extention[:], "\x00")), nil
+			return sc.Extention, nil
 		}
 	}
 	return "", fmt.Errorf("failed to find subcache extension for uuid %s", uuid.String())

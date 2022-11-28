@@ -68,7 +68,6 @@ var FetchsymsCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to connect to lockdownd: %w", err)
 			}
-
 			dev, err = ldc.GetValues()
 			if err != nil {
 				return fmt.Errorf("failed to get device values for %s: %w", udid, err)
@@ -76,16 +75,25 @@ var FetchsymsCmd = &cobra.Command{
 			ldc.Close()
 		}
 
+		if ok, err := utils.IsDeveloperModeEnabled(dev.UniqueDeviceID); !ok && err == nil {
+			return fmt.Errorf("you must enable Developer Mode in your device Settings app for %s", dev.DeviceName)
+		} else if err != nil {
+			return fmt.Errorf("failed to check if developer mode is enabled for device %s: %w", dev.UniqueDeviceID, err)
+		}
+		if err := utils.IsDeveloperImageMounted(dev.UniqueDeviceID); err != nil {
+			return fmt.Errorf("for device %s: %w", dev.UniqueDeviceID, err)
+		}
+
 		cli, err := fetchsymbols.NewClient(dev.UniqueDeviceID)
 		if err != nil {
 			return fmt.Errorf("failed to connect to fetchsymbols service: %w", err)
 		}
-		defer cli.Close()
 
 		files, err := cli.ListFiles()
 		if err != nil {
 			return fmt.Errorf("failed to list files: %w", err)
 		}
+		cli.Close()
 
 		for idx, file := range files {
 			fname := filepath.Join(output, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion), file)
@@ -94,6 +102,10 @@ var FetchsymsCmd = &cobra.Command{
 			}
 
 			log.Infof("Copying %s", fname)
+			cli, err := fetchsymbols.NewClient(dev.UniqueDeviceID)
+			if err != nil {
+				return fmt.Errorf("failed to connect to fetchsymbols service: %w", err)
+			}
 			fr, err := cli.GetFile(uint32(idx))
 			if err != nil {
 				return fmt.Errorf("failed to get file %s from device: %w", file, err)
@@ -107,6 +119,7 @@ var FetchsymsCmd = &cobra.Command{
 			if err := os.WriteFile(fname, buf.Bytes(), 0660); err != nil {
 				return fmt.Errorf("failed to write file %s: %w", fname, err)
 			}
+			cli.Close()
 		}
 
 		return nil

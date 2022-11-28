@@ -1,5 +1,5 @@
 <p align="center">
-  <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png" height="140" /></a>
+  <a href="https://github.com/blacktop/ipsw"><img alt="IPSW Logo" src="https://github.com/blacktop/ipsw/raw/master/www/static/img/logo/ipsw.svg" height="140" /></a>
   <h1 align="center">ipsw</h1>
   <h4><p align="center">iOS/macOS Research Swiss Army Knife</p></h4>
   <p align="center">
@@ -45,7 +45,7 @@ sudo snap install ipsw
 ### Windows
 
 ```bash
-scoop bucket add org https://github.com/blacktop/scoop-bucket.git
+scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git 
 scoop install blacktop/ipsw
 ```
 
@@ -73,7 +73,9 @@ Available Commands:
   info            Display IPSW/OTA Info
   kernel          Parse kernelcache
   macho           Parse MachO
-  ota             Extract file(s) from OTA
+  mdevs           List all MobileDevices in IPSW
+  mount           Mount DMG from IPSW
+  ota             Parse OTAs
   sepfw           Dump MachOs
   shsh            Get shsh blobs from device
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
@@ -81,6 +83,7 @@ Available Commands:
   version         Print the version number of ipsw
 
 Flags:
+      --color           colorize output
       --config string   config file (default is $HOME/.ipsw.yaml)
   -h, --help            help for ipsw
   -V, --verbose         verbose output
@@ -91,6 +94,15 @@ Use "ipsw [command] --help" for more information about a command.
 ## Documentation
 
 - [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/docs/)
+
+```mermaid
+graph TD
+A[Download] --> B[Extract]
+B --> C[Parse]
+C --> D[Dump]
+D --> E[Search]
+E --> F[Symbolicate]
+```
 
 ## Community
 

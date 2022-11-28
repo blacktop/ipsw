@@ -6,8 +6,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"path/filepath"
 	"sort"
 	"strings"
+	"unsafe"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -16,12 +18,16 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	mask uint64 = (1 << 40) - 1 // 40bit mask
+)
+
 type optFlags uint32
 
 const (
-	isProduction              optFlags = (1 << 0)      // never set in development cache
-	noMissingWeakSuperclasses optFlags = (1 << 1)      // never set in development cache
-	mask                      uint64   = (1 << 40) - 1 // 40bit mask
+	IsProduction              optFlags = (1 << 0) // never set in development cache
+	NoMissingWeakSuperclasses optFlags = (1 << 1) // set in development cache and customer
+	LargeSharedCache          optFlags = (1 << 2) // Shared cache was built with the new Large format
 )
 
 // objcInfo is the dyld_shared_cache dylib objc object
@@ -53,14 +59,23 @@ func (h ClassHeaderV16T) DylibObjCIndex() uint16 {
 	return uint16(types.ExtractBits(uint64(h), 48, 16))
 }
 
+type Optimization interface {
+	GetVersion() uint32
+	GetFlags() optFlags
+	// HeaderInfoRO() uint64
+	// HeaderInfoRW() uint64
+	SelectorHashTableOffset(uint64) uint64
+	ClassHashTableOffset(uint64) uint64
+	ProtocolHashTableOffset(uint64) uint64
+	RelativeMethodListsBaseAddress(uint64) uint64
+}
+
 /*
- * objc_opt_t - dyld/include/objc-shared-cache.h
- *
- *  Top-level optimization structure.
+ * objc_opt_t - op-level optimization structure. <dyld/include/objc-shared-cache.h>
  */
 
-// Optimization structure
-type Optimization struct {
+// ObjcOptT is a objc_opt_t structure
+type ObjcOptT struct {
 	Version                                      uint32
 	Flags                                        optFlags
 	SelectorOptOffset                            int32
@@ -71,14 +86,45 @@ type Optimization struct {
 	UnusedProtocolOpt2Offset                     int32
 	LargeSharedCachesClassOffset                 int32
 	LargeSharedCachesProtocolOffset              int32
-	RelativeMethodSelectorBaseAddressCacheOffset uint64
+	RelativeMethodSelectorBaseAddressCacheOffset int64
 }
 
-func (o Optimization) isPointerAligned() bool {
+func (o *ObjcOptT) GetVersion() uint32 {
+	return o.Version
+}
+func (o *ObjcOptT) GetFlags() optFlags {
+	return o.Flags
+}
+func (o *ObjcOptT) SelectorHashTableOffset(base uint64) uint64 {
+	return uint64(int64(base) + int64(o.SelectorOptOffset))
+}
+func (o *ObjcOptT) ClassHashTableOffset(base uint64) uint64 {
+	switch o.Version {
+	case 16:
+		return uint64(int64(base) + int64(o.LargeSharedCachesClassOffset))
+	default:
+		return uint64(int64(base) + int64(o.UnusedClassOptOffset))
+	}
+}
+func (o *ObjcOptT) ProtocolHashTableOffset(base uint64) uint64 {
+	switch o.Version {
+	case 16:
+		return uint64(int64(base) + int64(o.LargeSharedCachesProtocolOffset))
+	case 15:
+		return uint64(int64(base) + int64(o.UnusedProtocolOpt2Offset))
+	default:
+		return uint64(int64(base) + int64(o.UnusedProtocolOptOffset))
+	}
+}
+func (o *ObjcOptT) RelativeMethodListsBaseAddress(base uint64) uint64 {
+	return uint64(int64(base) + int64(o.RelativeMethodSelectorBaseAddressCacheOffset))
+}
+
+func (o *ObjcOptT) isPointerAligned() bool {
 	return (binary.Size(o) % 8) == 0
 }
 
-func (o Optimization) GetClassOffset() int32 {
+func (o ObjcOptT) GetClassOffset() int32 {
 	if o.Version >= 16 {
 		return o.LargeSharedCachesClassOffset
 	} else {
@@ -86,42 +132,41 @@ func (o Optimization) GetClassOffset() int32 {
 	}
 }
 
-func (o Optimization) GetProtocolOffset() int32 {
-	if o.Version >= 16 {
-		return o.LargeSharedCachesProtocolOffset
-	} else if o.Version >= 15 {
-		return o.UnusedProtocolOpt2Offset
-	} else {
-		return o.UnusedProtocolOptOffset
-	}
+// ObjCOptimizationHeader is the NEW LargeSharedCache objc optimization header
+type ObjCOptimizationHeader struct {
+	Version                                 uint32
+	Flags                                   optFlags
+	HeaderInfoRoCacheOffset                 uint64
+	HeaderInfoRwCacheOffset                 uint64
+	SelectorHashTableCacheOffset            uint64
+	ClassHashTableCacheOffset               uint64
+	ProtocolHashTableCacheOffset            uint64
+	RelativeMethodSelectorBaseAddressOffset uint64
 }
 
-func (o Optimization) String() string {
-	return fmt.Sprintf(
-		"Version                                      = %d\n"+
-			"Flags                                        = %d\n"+
-			"SelectorOptOffset                            = %#x\n"+
-			"HeaderOptRoOffset                            = %#x\n"+
-			"ClassOptOffset                               = %#x\n"+
-			"ProtocolOptOffset                            = %#x\n"+
-			"HeaderOptRwOffset                            = %#x\n"+
-			"ProtocolOpt2Offset                           = %#x\n"+
-			"LargeSharedCachesClassOffset                 = %#x\n"+
-			"LargeSharedCachesProtocolOffset              = %#x\n"+
-			"RelativeMethodSelectorBaseAddressCacheOffset = %#x\n"+
-			"isPointerAligned                             = %t\n",
-		o.Version,
-		o.Flags,
-		o.SelectorOptOffset,
-		o.HeaderOptRoOffset,
-		o.UnusedClassOptOffset,
-		o.UnusedProtocolOptOffset,
-		o.HeaderoptRwOffset,
-		o.UnusedProtocolOpt2Offset,
-		o.LargeSharedCachesClassOffset,
-		o.LargeSharedCachesProtocolOffset,
-		o.RelativeMethodSelectorBaseAddressCacheOffset,
-		o.isPointerAligned())
+func (o *ObjCOptimizationHeader) GetVersion() uint32 {
+	if o.Version == 1 {
+		return 16
+	}
+	return o.Version
+}
+func (o *ObjCOptimizationHeader) GetFlags() optFlags {
+	return o.Flags
+}
+func (o *ObjCOptimizationHeader) GetHeaderInfoRoCacheOffset() uint64 {
+	return o.HeaderInfoRoCacheOffset
+}
+func (o *ObjCOptimizationHeader) SelectorHashTableOffset(base uint64) uint64 {
+	return o.SelectorHashTableCacheOffset
+}
+func (o *ObjCOptimizationHeader) ClassHashTableOffset(base uint64) uint64 {
+	return o.ClassHashTableCacheOffset
+}
+func (o *ObjCOptimizationHeader) ProtocolHashTableOffset(base uint64) uint64 {
+	return o.ProtocolHashTableCacheOffset
+}
+func (o *ObjCOptimizationHeader) RelativeMethodListsBaseAddress(base uint64) uint64 {
+	return o.RelativeMethodSelectorBaseAddressOffset
 }
 
 func (f *File) getLibObjC() (*macho.File, error) {
@@ -130,15 +175,22 @@ func (f *File) getLibObjC() (*macho.File, error) {
 		return nil, err
 	}
 
-	m, err := image.GetPartialMacho()
-	if err != nil {
-		return nil, err
+	if image.pm == nil {
+		image.pm, err = image.GetPartialMacho()
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	return m, nil
+	return image.pm, nil
 }
 
-func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
+func offsetOfObjcOptsSizeField() uint32 {
+	var t CacheHeader
+	return uint32(unsafe.Offsetof(t.ObjcOptsSize))
+}
+
+func (f *File) getOptimizationsOld() (*macho.Section, *ObjcOptT, error) {
 
 	libObjC, err := f.getLibObjC()
 	if err != nil {
@@ -150,7 +202,7 @@ func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to read __TEXT.__objc_opt_ro data")
 		}
-		opt := Optimization{}
+		opt := ObjcOptT{}
 		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &opt); err != nil {
 			return nil, nil, err
 		}
@@ -164,71 +216,183 @@ func (f *File) getOptimizations() (*macho.Section, *Optimization, error) {
 	return nil, nil, fmt.Errorf("unable to find section __TEXT.__objc_opt_ro in /usr/lib/libobjc.A.dylib")
 }
 
+func (f *File) GetOptimizations() (Optimization, error) {
+	if f.Headers[f.UUID].MappingOffset > offsetOfObjcOptsSizeField() { // check for NEW objc optimizations
+		if f.Headers[f.UUID].ObjcOptsOffset > 0 && f.Headers[f.UUID].ObjcOptsSize > 0 {
+			uuid, off, err := f.GetCacheOffset(f.Headers[f.UUID].ObjcOptsOffset)
+			if err != nil {
+				return nil, err
+			}
+
+			sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+			sr.Seek(int64(off), io.SeekStart)
+
+			var o ObjCOptimizationHeader
+			if err := binary.Read(sr, f.ByteOrder, &o); err != nil {
+				return nil, err
+			}
+
+			return &o, nil
+		}
+	} else { // check for OLD objc optimizations
+		libObjC, err := f.getLibObjC()
+		if err != nil {
+			return nil, err
+		}
+
+		if s := libObjC.Section("__TEXT", "__objc_opt_ro"); s != nil {
+			dat, err := s.Data()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read __TEXT.__objc_opt_ro data: %v", err)
+			}
+
+			var opt ObjcOptT
+			if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &opt); err != nil {
+				return nil, err
+			}
+
+			if opt.Version > 16 {
+				return nil, fmt.Errorf("objc optimization version should be 16 or less, but found %d", opt.Version)
+			}
+
+			f.objcOptRoAddr = s.Addr
+
+			return &opt, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no ObjC optimizations found")
+}
+
+// GetAllHeaderRO dumps the header_ro from the optimized string hash
+func (f *File) getHeaderInfoRO() (*objc_headeropt_ro_t, error) {
+
+	var off uint64
+	var u types.UUID
+	var hdr objc_headeropt_ro_t
+
+	opt, err := f.GetOptimizations()
+	if err != nil {
+		return nil, err
+	}
+
+	switch o := opt.(type) {
+	case *ObjCOptimizationHeader:
+		hdr.offset = o.GetHeaderInfoRoCacheOffset()
+		u, off, err = f.GetCacheOffset(o.GetHeaderInfoRoCacheOffset())
+		if err != nil {
+			return nil, err
+		}
+		sr := io.NewSectionReader(f.r[u], 0, 1<<63-1)
+		sr.Seek(int64(off), io.SeekStart)
+		if err := binary.Read(sr, f.ByteOrder, &hdr.Count); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(sr, f.ByteOrder, &hdr.Entsize); err != nil {
+			return nil, err
+		}
+		hdr.Headers = make([]header_info_ro, hdr.Count)
+		if err := binary.Read(sr, f.ByteOrder, &hdr.Headers); err != nil {
+			return nil, err
+		}
+	case *ObjcOptT:
+		u, off, err = f.GetOffset(f.objcOptRoAddr + uint64(o.HeaderOptRoOffset))
+		if err != nil {
+			return nil, err
+		}
+		hdr.offset = off
+		sr := io.NewSectionReader(f.r[u], 0, 1<<63-1)
+		sr.Seek(int64(off), io.SeekStart)
+		if err := binary.Read(sr, f.ByteOrder, &hdr.Count); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(sr, f.ByteOrder, &hdr.Entsize); err != nil {
+			return nil, err
+		}
+		hdr.Headers = make([]header_info_ro, hdr.Count)
+		if err := binary.Read(sr, f.ByteOrder, &hdr.Headers); err != nil {
+			return nil, err
+		}
+	}
+
+	return &hdr, nil
+}
+
 func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 
-	sec, opt, err := f.getOptimizations()
+	var off uint64
+	var u types.UUID
+	var shash StringHash
+
+	opt, err := f.GetOptimizations()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if opt.SelectorOptOffset == 0 {
-		return nil, nil, fmt.Errorf("selopt_offset is 0")
-	}
-
-	u, off, err := f.GetOffset(sec.Addr)
+	hdr, err := f.getHeaderInfoRO()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	shash := StringHash{FileOffset: int64(off) + int64(opt.SelectorOptOffset), opt: opt}
-
-	if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
-		return nil, nil, err
+	switch o := opt.(type) {
+	case *ObjCOptimizationHeader:
+		u, off, err = f.GetCacheOffset(o.SelectorHashTableOffset(0))
+		if err != nil {
+			return nil, nil, err
+		}
+		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+			return nil, nil, err
+		}
+	case *ObjcOptT:
+		u, off, err = f.GetOffset(f.objcOptRoAddr)
+		if err != nil {
+			return nil, nil, err
+		}
+		shash = StringHash{FileOffset: int64(opt.SelectorHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return &shash, &u, nil
 }
 
-// func (f *File) getHeaderRoStringHash() (*StringHash, *types.UUID, error) {
-
-// 	sec, opt, err := f.getOptimizations()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if opt.HeaderOptRoOffset == 0 {
-// 		return nil, fmt.Errorf("headeropt_ro_offset is 0")
-// 	}
-
-// 	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.HeaderOptRoOffset)}
-
-// 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &shash, nil
-// }
-
 func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 
-	sec, opt, err := f.getOptimizations()
+	var off uint64
+	var u types.UUID
+	var shash StringHash
+
+	opt, err := f.GetOptimizations()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if opt.GetClassOffset() == 0 {
-		return nil, nil, fmt.Errorf("clsopt_offset is 0")
-	}
-
-	u, off, err := f.GetOffset(sec.Addr)
+	hdr, err := f.getHeaderInfoRO()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	shash := StringHash{FileOffset: int64(off) + int64(opt.GetClassOffset()), opt: opt}
-
-	if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
-		return nil, nil, err
+	switch o := opt.(type) {
+	case *ObjCOptimizationHeader:
+		u, off, err = f.GetCacheOffset(o.ClassHashTableOffset(0))
+		if err != nil {
+			return nil, nil, err
+		}
+		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+			return nil, nil, err
+		}
+	case *ObjcOptT:
+		u, off, err = f.GetOffset(f.objcOptRoAddr)
+		if err != nil {
+			return nil, nil, err
+		}
+		shash = StringHash{FileOffset: int64(opt.ClassHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return &shash, &u, nil
@@ -236,71 +400,93 @@ func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 
 func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 
-	sec, opt, err := f.getOptimizations()
+	var off uint64
+	var u types.UUID
+	var shash StringHash
+
+	opt, err := f.GetOptimizations()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if opt.GetProtocolOffset() == 0 {
-		return nil, nil, fmt.Errorf("protocolopt_offset is 0")
-	}
-
-	u, off, err := f.GetOffset(sec.Addr)
+	hdr, err := f.getHeaderInfoRO()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	shash := StringHash{FileOffset: int64(off) + int64(opt.GetProtocolOffset()), opt: opt}
-
-	if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
-		return nil, nil, err
+	switch o := opt.(type) {
+	case *ObjCOptimizationHeader:
+		u, off, err = f.GetCacheOffset(o.ProtocolHashTableOffset(0))
+		if err != nil {
+			return nil, nil, err
+		}
+		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+			return nil, nil, err
+		}
+	case *ObjcOptT:
+		u, off, err = f.GetOffset(f.objcOptRoAddr)
+		if err != nil {
+			return nil, nil, err
+		}
+		shash = StringHash{FileOffset: int64(opt.ProtocolHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	return &shash, &u, nil
 }
 
-// func (f *File) getHeaderRwStringHash() (*StringHash, *types.UUID, error) {
-
-// 	sec, opt, err := f.getOptimizations()
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	if opt.HeaderOptRwOffset == 0 {
-// 		return nil, fmt.Errorf("headeropt_rw_offset is 0")
-// 	}
-
-// 	shash := StringHash{FileOffset: int64(sec.Offset) + int64(opt.HeaderOptRwOffset)}
-
-// 	if err = shash.Read(io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)); err != nil {
-// 		return nil, err
-// 	}
-
-// 	return &shash, nil
-// }
-
-func (f *File) dumpOffsets(offsets []int32, fileOffset int64, uuid types.UUID) {
-	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
+func (f *File) dumpOffsets(shash *StringHash, fileOffset int64, uuid types.UUID) {
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
-	for _, ptr := range offsets {
+	for idx, ptr := range shash.Offsets {
 		if ptr != 0 {
 			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
 				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
 			}
-			addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(fileOffset)+ptr))
-			fmt.Printf("    0x%x: %s\n", addr, strings.Trim(s, "\x00"))
+			if len(shash.ObjectOffsets) > 0 {
+				log.Debug(shash.ObjectOffsets[idx].String())
+				if !shash.ObjectOffsets[idx].IsDuplicate() {
+					_, addr, err := f.GetCacheVMAddress(shash.ObjectOffsets[idx].ObjectCacheOffset())
+					if err != nil {
+						log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
+					}
+					if len(shash.dylibMap) > 0 {
+						fmt.Printf("%s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.ObjectOffsets[idx].DylibObjCIndex()])))
+					} else {
+						fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+					}
+				} else {
+					for i := uint16(0); i < shash.ObjectOffsets[idx].DuplicateCount(); i++ {
+						_, addr, err := f.GetCacheVMAddress(shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].ObjectCacheOffset())
+						if err != nil {
+							log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
+						}
+						if len(shash.dylibMap) > 0 {
+							fmt.Printf("    %s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].DylibObjCIndex()])))
+						} else {
+							fmt.Printf("    %s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+						}
+					}
+				}
+			} else {
+				addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(fileOffset)+ptr))
+				fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
+			}
 		}
 	}
 }
 
 type objc_headeropt_ro_t struct {
+	offset  uint64
 	Count   uint32
 	Entsize uint32
-	Headers []header_info
+	Headers []header_info_ro
 }
-type header_info struct {
+type header_info_ro struct {
 	// Note, this is no longer a pointer, but instead an offset to a pointer
 	// from this location.
 	MhdrOffset int64
@@ -309,21 +495,52 @@ type header_info struct {
 	// from this location.
 	InfoOffset int64
 
-	// Offset from this location to the non-lazy class list
-	NlclslistOffset int64
-	NlclslistCount  uint64
+	// // Offset from this location to the non-lazy class list
+	// NlclslistOffset int64
+	// NlclslistCount  uint64
 
-	// Offset from this location to the non-lazy category list
-	NlcatlistOffset int64
-	NlcatlistCount  uint64
+	// // Offset from this location to the non-lazy category list
+	// NlcatlistOffset int64
+	// NlcatlistCount  uint64
 
-	// Offset from this location to the category list
-	CatlistOffset int64
-	CatlistCount  uint64
+	// // Offset from this location to the category list
+	// CatlistOffset int64
+	// CatlistCount  uint64
 
-	// Offset from this location to the category list 2
-	Catlist2Offset int64
-	Catlist2Count  uint64
+	// // Offset from this location to the category list 2
+	// Catlist2Offset int64
+	// Catlist2Count  uint64
+}
+
+func (h *objc_headeropt_ro_t) GetMachoHdrOffset(index int) (uint64, error) {
+	if h == nil {
+		return 0, fmt.Errorf("headeropt_ro is nil")
+	}
+	if index > len(h.Headers) {
+		return 0, fmt.Errorf("index out of range")
+	}
+	return h.offset + 8 + uint64(index*binary.Size(header_info_ro{})) + uint64(h.Headers[index].MhdrOffset), nil
+}
+func (h *objc_headeropt_ro_t) FindElement(addr uint64) (uint16, error) {
+	if h == nil {
+		return 0, fmt.Errorf("headeropt_ro is nil")
+	}
+	for idx, hdr := range h.Headers {
+		calcAddr := h.offset + 8 + uint64(idx*binary.Size(header_info_ro{})) + uint64(hdr.MhdrOffset)
+		if 0x180000000+calcAddr == addr {
+			return uint16(idx), nil
+		}
+	}
+	return 0, fmt.Errorf("could not find element")
+}
+func (h *objc_headeropt_ro_t) GetObjcInfoOffset(index int) (uint64, error) {
+	if h == nil {
+		return 0, fmt.Errorf("headeropt_ro is nil")
+	}
+	if index > len(h.Headers) {
+		return 0, fmt.Errorf("index out of range")
+	}
+	return h.offset + 8 + 4 + uint64(index*binary.Size(header_info_ro{})) + uint64(h.Headers[index].InfoOffset), nil
 }
 
 type objc_headeropt_rw_t struct {
@@ -401,7 +618,7 @@ func (f *File) GetAllObjCSelectors(print bool) (map[string]uint64, error) {
 	}
 
 	if print {
-		f.dumpOffsets(shash.Offsets, shash.FileOffset, *uuid)
+		f.dumpOffsets(shash, shash.FileOffset, *uuid)
 	}
 
 	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
@@ -434,8 +651,15 @@ func (f *File) GetAllObjCClasses(print bool) (map[string]uint64, error) {
 		return nil, fmt.Errorf("failed read class objc_stringhash_t")
 	}
 
+	shash.dylibMap = make(map[uint16]string)
+	for _, image := range f.Images {
+		if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
+			shash.dylibMap[idx] = image.Name
+		}
+	}
+
 	if print {
-		f.dumpOffsets(shash.Offsets, shash.FileOffset, *uuid)
+		f.dumpOffsets(shash, shash.FileOffset, *uuid)
 	}
 
 	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
@@ -468,8 +692,15 @@ func (f *File) GetAllObjCProtocols(print bool) (map[string]uint64, error) {
 		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
+	shash.dylibMap = make(map[uint16]string)
+	for _, image := range f.Images {
+		if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
+			shash.dylibMap[idx] = image.Name
+		}
+	}
+
 	if print {
-		f.dumpOffsets(shash.Offsets, shash.FileOffset, *uuid)
+		f.dumpOffsets(shash, shash.FileOffset, *uuid)
 	}
 
 	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
@@ -494,36 +725,6 @@ func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
 
 	return ptr, nil
 }
-
-// // GetAllHeaderRO dumps the header_ro from the optimized string hash
-// func (f *File) GetAllHeaderRO(print bool) (map[string]uint64, error) {
-
-// 	shash, err := f.getHeaderRoStringHash()
-// 	if err != nil {
-// 		return nil, errors.Wrapf(err, "failed read header_ro objc_stringhash_t")
-// 	}
-
-// 	if print {
-// 		f.dumpHeaderROOffsets(shash.Offsets, shash.FileOffset)
-// 	}
-
-// 	return f.offsetsToMap(shash.Offsets, shash.FileOffset), nil
-// }
-
-// // GetAllHeaderRW dumps the header_ro from the optimized string hash
-// func (f *File) GetAllHeaderRW(print bool) (map[string]uint64, error) {
-
-// 	shash, err := f.getHeaderRwStringHash()
-// 	if err != nil {
-// 		return nil, errors.Wrapf(err, "failed read header_rw objc_stringhash_t")
-// 	}
-
-// 	if print {
-// 		f.dumpHeaderROOffsets(shash.Offsets, shash.FileOffset)
-// 	}
-
-// 	return f.offsetsToMap(shash.Offsets, shash.FileOffset), nil
-// }
 
 // ClassesForImage returns all of the Objective-C classes for a given image
 func (f *File) ClassesForImage(imageNames ...string) error {
@@ -725,7 +926,7 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	var selectorStringVMAddrStart uint64
 	var selectorStringVMAddrEnd uint64
 
-	_, opt, err := f.getOptimizations()
+	_, opt, err := f.getOptimizationsOld()
 	if err != nil {
 		return err
 	}
@@ -1056,392 +1257,4 @@ func (f *File) ParseObjcForImage(imageNames ...string) error {
 	}
 
 	return nil
-}
-
-/*
- * objc_stringhash_t - dyld/include/objc-shared-cache.h
- *
- * Precomputed perfect hash table of strings.
- * Base class for precomputed selector table and class table.
- */
-
-type stringHash struct {
-	Capacity uint32
-	Occupied uint32
-	Shift    uint32
-	Mask     uint32
-	_        uint32 // was zero
-	_        uint32 // alignment pad
-	Salt     uint64
-	Scramble [256]uint32
-}
-
-type stringHashV16 struct {
-	Version  uint32
-	Capacity uint32
-	Occupied uint32
-	Shift    uint32
-	Mask     uint32
-	_        uint32 // was zero
-	Salt     uint64
-	Scramble [256]uint32
-}
-
-// StringHash struct
-type StringHash struct {
-	FileOffset       int64
-	shash            interface{}
-	Tab              []byte   /* tab[mask+1] (always power-of-2) */
-	CheckBytes       []byte   /* check byte for each string */
-	Offsets          []int32  /* offsets from &capacity to cstrings */
-	ClassOffsets     []uint64 /* offsets from &capacity to cstrings */
-	DuplicateCount   uint32
-	DuplicateOffsets []uint64
-
-	opt *Optimization
-}
-
-// Capacity returns the Capacity
-func (s *StringHash) Capacity() uint32 {
-	switch h := s.shash.(type) {
-	case stringHash:
-		return h.Capacity
-	case stringHashV16:
-		return h.Capacity
-	}
-	return 0
-}
-
-// Occupied returns the Occupied
-func (s *StringHash) Occupied() uint32 {
-	switch h := s.shash.(type) {
-	case stringHash:
-		return h.Occupied
-	case stringHashV16:
-		return h.Occupied
-	}
-	return 0
-}
-
-// Shift returns the Shift
-func (s *StringHash) Shift() uint32 {
-	switch h := s.shash.(type) {
-	case stringHash:
-		return h.Shift
-	case stringHashV16:
-		return h.Shift
-	}
-	return 0
-}
-
-// Mask returns the Mask
-func (s *StringHash) Mask() uint32 {
-	switch h := s.shash.(type) {
-	case stringHash:
-		return h.Mask
-	case stringHashV16:
-		return h.Mask
-	}
-	return 0
-}
-
-// Salt returns the Salt
-func (s *StringHash) Salt() uint64 {
-	switch h := s.shash.(type) {
-	case stringHash:
-		return h.Salt
-	case stringHashV16:
-		return h.Salt
-	}
-	return 0
-}
-
-// Scramble returns the Scramble
-func (s *StringHash) Scramble() [256]uint32 {
-	switch h := s.shash.(type) {
-	case stringHash:
-		return h.Scramble
-	case stringHashV16:
-		return h.Scramble
-	}
-	return [256]uint32{0}
-}
-
-func (s *StringHash) Read(r *io.SectionReader) error {
-
-	r.Seek(int64(s.FileOffset), io.SeekStart)
-
-	if s.opt.Version >= 16 {
-		var sh stringHashV16
-		if err := binary.Read(r, binary.LittleEndian, &sh); err != nil {
-			return fmt.Errorf("failed to read %T: %v", sh, err)
-		}
-		s.shash = sh
-	} else {
-		var sh stringHash
-		if err := binary.Read(r, binary.LittleEndian, &sh); err != nil {
-			return fmt.Errorf("failed to read %T: %v", sh, err)
-		}
-		s.shash = sh
-	}
-
-	// log.Debugf("Objective-C StringHash:\n%s", s)
-
-	s.Tab = make([]byte, s.Mask()+1)
-	if err := binary.Read(r, binary.LittleEndian, &s.Tab); err != nil {
-		return err
-	}
-
-	s.CheckBytes = make([]byte, s.Capacity())
-	if err := binary.Read(r, binary.LittleEndian, &s.CheckBytes); err != nil {
-		return err
-	}
-
-	s.Offsets = make([]int32, s.Capacity())
-	if err := binary.Read(r, binary.LittleEndian, &s.Offsets); err != nil {
-		return err
-	}
-
-	// s.ClassOffsets = make([]uint64, s.Capacity())
-	// if err := binary.Read(r, binary.LittleEndian, &s.Offsets); err != nil {
-	// 	return err
-	// }
-
-	// if err := binary.Read(r, binary.LittleEndian, &s.DuplicateCount); err != nil {
-	// 	return err
-	// }
-
-	// s.DuplicateOffsets = make([]uint64, s.DuplicateCount)
-	// if err := binary.Read(r, binary.LittleEndian, &s.DuplicateOffsets); err != nil {
-	// 	return err
-	// }
-
-	return nil
-}
-
-func (s StringHash) String() string {
-	return fmt.Sprintf(
-		"FileOffset = %X\n"+
-			"Capacity   = %X\n"+
-			"Occupied   = %X\n"+
-			"Shift      = %X\n"+
-			"Mask       = %X\n"+
-			"Salt       = %016X\n",
-		s.FileOffset,
-		s.Capacity(),
-		s.Occupied(),
-		s.Shift(),
-		s.Mask(),
-		s.Salt())
-}
-
-/*
---------------------------------------------------------------------
-mix -- mix 3 64-bit values reversibly.
-mix() takes 48 machine instructions, but only 24 cycles on a superscalar
-
-	machine (like Intel's new MMX architecture).  It requires 4 64-bit
-	registers for 4::2 parallelism.
-
-All 1-bit deltas, all 2-bit deltas, all deltas composed of top bits of
-
-	(a,b,c), and all deltas of bottom bits were tested.  All deltas were
-	tested both on random keys and on keys that were nearly all zero.
-	These deltas all cause every bit of c to change between 1/3 and 2/3
-	of the time (well, only 113/400 to 287/400 of the time for some
-	2-bit delta).  These deltas all cause at least 80 bits to change
-	among (a,b,c) when the mix is run either forward or backward (yes it
-	is reversible).
-
-This implies that a hash using mix64 has no funnels.  There may be
-
-	characteristics with 3-bit deltas or bigger, I didn't test for
-	those.
-
---------------------------------------------------------------------
-*/
-func mix64(a, b, c *uint64) {
-	*a = (*a - *b - *c) ^ (*c >> 43)
-	*b = (*b - *c - *a) ^ (*a << 9)
-	*c = (*c - *a - *b) ^ (*b >> 8)
-	*a = (*a - *b - *c) ^ (*c >> 38)
-	*b = (*b - *c - *a) ^ (*a << 23)
-	*c = (*c - *a - *b) ^ (*b >> 5)
-	*a = (*a - *b - *c) ^ (*c >> 35)
-	*b = (*b - *c - *a) ^ (*a << 49)
-	*c = (*c - *a - *b) ^ (*b >> 11)
-	*a = (*a - *b - *c) ^ (*c >> 12)
-	*b = (*b - *c - *a) ^ (*a << 18)
-	*c = (*c - *a - *b) ^ (*b >> 22)
-}
-
-/*
---------------------------------------------------------------------
-hash() -- hash a variable-length key into a 64-bit value
-  k     : the key (the unaligned variable-length array of bytes)
-  len   : the length of the key, counting by bytes
-  level : can be any 8-byte value
-Returns a 64-bit value.  Every bit of the key affects every bit of
-the return value.  No funnels.  Every 1-bit and 2-bit delta achieves
-avalanche.  About 41+5len instructions.
-
-The best hash table sizes are powers of 2.  There is no need to do
-mod a prime (mod is sooo slow!).  If you need less than 64 bits,
-use a bitmask.  For example, if you need only 10 bits, do
-  h = (h & hashmask(10));
-In which case, the hash table should have hashsize(10) elements.
-
-If you are hashing n strings (uint8_t **)k, do it like this:
-  for (i=0, h=0; i<n; ++i) h = hash( k[i], len[i], h);
-
-By Bob Jenkins, Jan 4 1997.  bob_jenkins@burtleburtle.net.  You may
-use this code any way you wish, private, educational, or commercial,
-but I would appreciate if you give me credit.
-
-See http://burtleburtle.net/bob/hash/evahash.html
-Use for hash table lookup, or anything where one collision in 2^^64
-is acceptable.  Do NOT use for cryptographic purposes.
---------------------------------------------------------------------
-*/
-
-func lookup8(k []byte, level uint64) uint64 {
-	// uint8_t *k;        /* the key */
-	// uint64_t  length;   /* the length of the key */
-	// uint64_t  level;    /* the previous hash, or an arbitrary value */
-	var a, b, c uint64
-	var length int
-
-	/* Set up the internal state */
-	length = len(k)
-	a = level
-	b = level              /* the previous hash value */
-	c = 0x9e3779b97f4a7c13 /* the golden ratio; an arbitrary value */
-	p := 0
-	/*---------------------------------------- handle most of the key */
-	for length >= 24 {
-		a += uint64(k[p+0]) + (uint64(k[p+1]) << 8) + (uint64(k[p+2]) << 16) + (uint64(k[p+3]) << 24) + (uint64(k[p+4]) << 32) + (uint64(k[p+5]) << 40) + (uint64(k[p+6]) << 48) + (uint64(k[p+7]) << 56)
-		b += uint64(k[p+8]) + (uint64(k[p+9]) << 8) + (uint64(k[p+10]) << 16) + (uint64(k[p+11]) << 24) + (uint64(k[p+12]) << 32) + (uint64(k[p+13]) << 40) + (uint64(k[p+14]) << 48) + (uint64(k[p+15]) << 56)
-		c += uint64(k[p+16]) + (uint64(k[p+17]) << 8) + (uint64(k[p+18]) << 16) + (uint64(k[p+19]) << 24) + (uint64(k[p+20]) << 32) + (uint64(k[p+21]) << 40) + (uint64(k[p+22]) << 48) + (uint64(k[p+23]) << 56)
-		mix64(&a, &b, &c)
-		p += 24
-		length -= 24
-	}
-
-	/*------------------------------------- handle the last 23 bytes */
-	c += uint64(len(k))
-	switch length { /* all the case statements fall through */
-	case 23:
-		c += (uint64(k[p+22]) << 56)
-		fallthrough
-	case 22:
-		c += (uint64(k[p+21]) << 48)
-		fallthrough
-	case 21:
-		c += (uint64(k[p+20]) << 40)
-		fallthrough
-	case 20:
-		c += (uint64(k[p+19]) << 32)
-		fallthrough
-	case 19:
-		c += (uint64(k[p+18]) << 24)
-		fallthrough
-	case 18:
-		c += (uint64(k[p+17]) << 16)
-		fallthrough
-	case 17:
-		c += (uint64(k[p+16]) << 8)
-		fallthrough
-	/* the first byte of c is reserved for the length */
-	case 16:
-		b += (uint64(k[p+15]) << 56)
-		fallthrough
-	case 15:
-		b += (uint64(k[p+14]) << 48)
-		fallthrough
-	case 14:
-		b += (uint64(k[p+13]) << 40)
-		fallthrough
-	case 13:
-		b += (uint64(k[p+12]) << 32)
-		fallthrough
-	case 12:
-		b += (uint64(k[p+11]) << 24)
-		fallthrough
-	case 11:
-		b += (uint64(k[p+10]) << 16)
-		fallthrough
-	case 10:
-		b += (uint64(k[p+9]) << 8)
-		fallthrough
-	case 9:
-		b += (uint64(k[p+8]))
-		fallthrough
-	case 8:
-		a += (uint64(k[p+7]) << 56)
-		fallthrough
-	case 7:
-		a += (uint64(k[p+6]) << 48)
-		fallthrough
-	case 6:
-		a += (uint64(k[p+5]) << 40)
-		fallthrough
-	case 5:
-		a += (uint64(k[p+4]) << 32)
-		fallthrough
-	case 4:
-		a += (uint64(k[p+3]) << 24)
-		fallthrough
-	case 3:
-		a += (uint64(k[p+2]) << 16)
-		fallthrough
-	case 2:
-		a += (uint64(k[p+1]) << 8)
-		fallthrough
-	case 1:
-		a += uint64(k[p+0])
-		/* case 0: nothing left to add */
-	}
-	mix64(&a, &b, &c)
-	/*-------------------------------------------- report the result */
-	return c
-}
-
-func (s StringHash) hash(key []byte) uint32 {
-	val := lookup8(key, s.Salt())
-	index := (val >> uint64(s.Shift())) ^ uint64(s.Scramble()[s.Tab[(val&uint64(s.Mask()))]])
-	return uint32(index)
-}
-
-// The check bytes are used to reject strings that aren't in the table
-// without paging in the table's cstring data. This checkbyte calculation
-// catches 4785/4815 rejects when launching Safari; a perfect checkbyte
-// would catch 4796/4815.
-func checkbyte(key []byte) uint8 {
-	return ((key[0] & 0x7) << 5) | (uint8(len(key)) & 0x1f)
-}
-
-func (s StringHash) getIndex(keyStr string) (uint32, error) {
-	key := []byte(keyStr)
-
-	h := s.hash(key)
-
-	// Use check byte to reject without paging in the table's cstrings
-	hCheck := s.CheckBytes[h]
-	keyCheck := checkbyte(key)
-	if hCheck != keyCheck {
-		return 0, fmt.Errorf("INDEX_NOT_FOUND")
-	}
-
-	offset := s.Offsets[h]
-	if offset == 0 {
-		return 0, fmt.Errorf("INDEX_NOT_FOUND")
-	}
-	// result = (const char *)this + offset
-	// TODO: fix me
-	// result := "FIX ME"
-	// if result != string(key) {
-	// 	return 0, fmt.Errorf("INDEX_NOT_FOUND")
-	// }
-
-	return h, nil
 }

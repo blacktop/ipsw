@@ -335,7 +335,7 @@ func GetBuildInfo() (*BuildInfo, error) {
 // Mount mounts a DMG with hdiutil
 func Mount(image, mountPoint string) error {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
+		cmd := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -361,7 +361,7 @@ func Mount(image, mountPoint string) error {
 func MountFS(image string) (string, error) {
 	var mountPoint string
 	if runtime.GOOS == "darwin" {
-		mountPoint = "/tmp/ios"
+		mountPoint = fmt.Sprintf("/tmp/%s.mount", filepath.Base(image))
 	} else {
 		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
 			// Create in-docker mount point

@@ -28,7 +28,7 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(tssCmd)
+	backupRestoreCmd.AddCommand(tssCmd)
 }
 
 // tssCmd represents the tss command
@@ -38,13 +38,14 @@ var tssCmd = &cobra.Command{
 	Args:          cobra.MaximumNArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		panic("not implemented")
+		panic("not implemented") // TODO: implement
 
 		return nil
 	},

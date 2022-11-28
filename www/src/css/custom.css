@@ -1,0 +1,120 @@
+@use "sass:meta";
+$mobile-width: 480px;
+$tablet-width: 996px;
+$desktop-width: 997px;
+$desktop-xl-width: 1160px;
+
+@mixin mobile {
+  @media (max-width: #{$mobile-width}) {
+    @content;
+  }
+}
+
+@mixin tablet {
+  @media (max-width: #{$tablet-width}) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: #{$desktop-width}) {
+    @content;
+  }
+}
+
+@mixin desktopWide {
+  @media (min-width: #{$desktop-xl-width}) {
+    @content;
+  }
+}
+
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #503B9F;
+  --ifm-color-primary-dark: #453384;
+  --ifm-color-primary-darker: #453384;
+  --ifm-color-primary-darkest: #3c2d72;
+  --ifm-color-primary-light: #7E88D2;
+  --ifm-color-primary-lighter: #8DB5CD;
+  --ifm-color-primary-lightest: #FFFFFF;
+  --ifm-code-font-size: 95%;
+  --ifm-navbar-background-color: #503B9F;  
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  --ifm-navbar-link-hover-color: #ffffff;  
+  --ifm-navbar-link-color: #ffffff;
+  --color-svg-fill: #2b3137;
+}
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #7E88D2;
+  --ifm-color-primary-dark: #453384;
+  --ifm-color-primary-darker: #453384;
+  --ifm-color-primary-darkest: #3c2d72;
+  --ifm-color-primary-light: #7E88D2;
+  --ifm-color-primary-lighter: #7E88D2;
+  --ifm-color-primary-lightest: #7E88D2;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+  --ifm-navbar-background-color: #453384;  
+  --ifm-menu-color-background-active: rgba(255, 255, 255, 0.05);
+  --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.05);
+  --ifm-navbar-link-hover-color: #ffffff;
+  --ifm-navbar-link-color: #ffffff;
+
+  --ifm-font-color-base-inverse: #ffffff;
+  --color-svg-fill: #ffffff;
+}
+
+.hero--primary {
+  --ifm-hero-background-color: #503B9F;
+  --ifm-hero-text-color: var(--ifm-font-color-base-inverse);
+}
+
+.header-icon-link {
+  transition: 0.5s;
+}
+
+.header-icon-link:hover {
+  filter: brightness(2);
+}
+
+.header-icon-link::before {
+  content: "";
+  display: flex;
+  height: 24px;
+  width: 24px;
+}
+
+.header-github-link::before {
+  background: url("/icons/github-white.svg");
+  background-size: contain;
+}
+
+.header-discord-link::before {
+  background: url("/icons/discord-white.svg");
+  background-size: contain;
+}
+
+.header-twitter-link::before {
+  background: url("/icons/twitter-white.svg");
+  background-size: contain;
+}
+
+.header-mastodon-link::before {
+  background: url("/icons/mastodon-white.svg");
+  background-size: contain;
+}
+
+.close {
+  color: var(--ifm-color-white);
+}
+
+.footer--dark {
+  --ifm-footer-background-color: #2b3137;
+}

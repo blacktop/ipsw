@@ -406,7 +406,8 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 		regexp.MustCompile(extractPattern),
 		filepath.Join(folder, "_OTAZIP"),
 		false); err != nil {
-		return fmt.Errorf("failed to extract OTA zip files: %v", err)
+		log.Errorf("Failed to find in OTA zip: %v", err)
+		log.Info("Checking for payload files...")
 	}
 
 	// hack: to get a priori list of files to extract (so we know when to stop)
