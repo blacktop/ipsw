@@ -336,11 +336,10 @@ nfpms:
           mode: 0644
     replacements:
       amd64: x86_64
-      aarch64: arm64
     formats:
-      - apk
       - deb
       - rpm
+      # - apk
     deb:
       lintian_overrides:
         - statically-linked-binary
