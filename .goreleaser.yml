@@ -491,6 +491,6 @@ announce:
     enabled: true
     message_template: "`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
   mastodon:
-    enabled: true
+    enabled: false
     message_template: "`ipsw` {{ .Tag }} is out! Check it out: https://github.com/blacktop/ipsw/releases/tag/{{ .Tag }}"
     server: https://mastodon.social
