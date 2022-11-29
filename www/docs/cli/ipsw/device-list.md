@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: device-list
 description: List all iOS devices
 last_update:
-  date: 2022-11-28T12:49:26-07:00
+  date: 2022-11-29T11:50:35-07:00
   author: blacktop
 ---
 ## ipsw device-list

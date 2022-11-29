@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: ota
 description: Download OTAs
 last_update:
-  date: 2022-11-28T12:49:26-07:00
+  date: 2022-11-29T11:50:35-07:00
   author: blacktop
 ---
 ## ipsw download ota
@@ -19,7 +19,7 @@ ipsw download ota [options] [flags]
 
 ### Examples
 
-```
+```bash
 ❯ ipsw download ota --version 14.8.1 --device iPhone10,1
 
 	? You are about to download 1 OTA files. Continue? Yes

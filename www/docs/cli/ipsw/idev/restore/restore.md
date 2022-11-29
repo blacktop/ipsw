@@ -4,23 +4,14 @@ title: restore
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: restore
-description: A brief description of your command
+description: Restore commands
 last_update:
-  date: 2022-11-28T12:49:26-07:00
+  date: 2022-11-29T11:50:35-07:00
   author: blacktop
 ---
 ## ipsw idev restore
 
-A brief description of your command
-
-### Synopsis
-
-A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.
+Restore commands
 
 ```
 ipsw idev restore [flags]

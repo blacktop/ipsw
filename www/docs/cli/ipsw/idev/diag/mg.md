@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: mg
 description: Query MobileGestalt
 last_update:
-  date: 2022-11-28T12:49:26-07:00
+  date: 2022-11-29T11:50:35-07:00
   author: blacktop
 ---
 ## ipsw idev diag mg
@@ -19,7 +19,7 @@ ipsw idev diag mg [flags]
 
 ### Examples
 
-```
+```bash
 ❯ ipsw idev diag mg -k SupplementalBuildVersion,ProductVersionExtra | jq .
 
 	{

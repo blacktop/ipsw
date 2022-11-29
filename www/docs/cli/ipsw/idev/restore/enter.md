@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: enter
 description: Enter recovery mode
 last_update:
-  date: 2022-11-28T12:49:26-07:00
+  date: 2022-11-29T11:50:35-07:00
   author: blacktop
 ---
 ## ipsw idev restore enter
@@ -34,5 +34,5 @@ ipsw idev restore enter [flags]
 
 ### SEE ALSO
 
-* [ipsw idev restore](/docs/cli/ipsw/idev/restore)	 - A brief description of your command
+* [ipsw idev restore](/docs/cli/ipsw/idev/restore)	 - Restore commands
 

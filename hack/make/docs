@@ -25,8 +25,8 @@ main() {
     rm -rf www/docs/cli/**/*.md
     go run ./cmd/ipsw/main.go docs
     # go run . schema -o ./www/docs/static/schema.json
-    # fd .md www/docs/cli/ | xargs $SED -i'' \
-    #     -e 's/SEE ALSO/See also/g' \
+    fd .md www/docs/cli/ | xargs $SED -i'' \
+        -e ':a' -e 'N' -e '$!ba' -e 's/### Examples\n\n```/### Examples\n\n```bash/g'
     #     -e 's/^## /# /g' \
     #     -e 's/^### /## /g' \
     #     -e 's/^#### /### /g' \
