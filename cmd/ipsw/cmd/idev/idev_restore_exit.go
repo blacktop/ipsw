@@ -33,11 +33,11 @@ import (
 )
 
 func init() {
-	backupRestoreCmd.AddCommand(exitCmd)
+	RestoreCmd.AddCommand(restoreExitCmd)
 }
 
-// exitCmd represents the exit command
-var exitCmd = &cobra.Command{
+// restoreExitCmd represents the exit command
+var restoreExitCmd = &cobra.Command{
 	Use:           "exit",
 	Short:         "Exit recovery mode",
 	Args:          cobra.MaximumNArgs(2),
