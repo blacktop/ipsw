@@ -45,12 +45,6 @@ release: ## Create a new release from the NEXT_VERSION
 	@hack/make/release ${NEXT_VERSION}
 	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
 
-.PHONY: release-commitish
-release-commitish: ## Create a new release from the NEXT_VERSION
-	@echo " > Creating Release ${NEXT_VERSION}"
-	git tag -a ${NEXT_VERSION} -m "Release ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
-
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
 	@echo " > Creating Release $(shell svu minor)"
