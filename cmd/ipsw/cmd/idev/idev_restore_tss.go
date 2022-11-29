@@ -28,11 +28,11 @@ import (
 )
 
 func init() {
-	backupRestoreCmd.AddCommand(tssCmd)
+	RestoreCmd.AddCommand(restoreTssCmd)
 }
 
-// tssCmd represents the tss command
-var tssCmd = &cobra.Command{
+// restoreTssCmd represents the tss command
+var restoreTssCmd = &cobra.Command{
 	Use:           "tss",
 	Short:         "Get SHSH blobs",
 	Args:          cobra.MaximumNArgs(2),

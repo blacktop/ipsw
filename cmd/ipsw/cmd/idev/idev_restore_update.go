@@ -28,11 +28,11 @@ import (
 )
 
 func init() {
-	backupRestoreCmd.AddCommand(updateCmd)
+	RestoreCmd.AddCommand(restoreUpdateCmd)
 }
 
-// updateCmd represents the update command
-var updateCmd = &cobra.Command{
+// restoreUpdateCmd represents the update command
+var restoreUpdateCmd = &cobra.Command{
 	Use:           "update",
 	Short:         "Update device",
 	Args:          cobra.MaximumNArgs(2),

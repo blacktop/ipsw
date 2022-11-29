@@ -32,11 +32,11 @@ import (
 )
 
 func init() {
-	backupRestoreCmd.AddCommand(enterCmd)
+	RestoreCmd.AddCommand(restoreEnterCmd)
 }
 
-// enterCmd represents the enter command
-var enterCmd = &cobra.Command{
+// restoreEnterCmd represents the enter command
+var restoreEnterCmd = &cobra.Command{
 	Use:           "enter",
 	Short:         "Enter recovery mode",
 	Args:          cobra.MaximumNArgs(2),
