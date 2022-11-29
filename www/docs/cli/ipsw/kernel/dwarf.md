@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: dwarf
 description: 🚧 Dump DWARF debug information
 last_update:
-  date: 2022-11-28T12:49:26-07:00
+  date: 2022-11-29T11:50:35-07:00
   author: blacktop
 ---
 ## ipsw kernel dwarf
@@ -19,7 +19,7 @@ ipsw kernel dwarf [flags]
 
 ### Examples
 
-```
+```bash
 # Dump the task struct (and pretty print with clang-format)
 ❯ ipsw kernel dwarf KDK_13.0_22A5342f.kdk/kernel.development.t6000 --type task \
 											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename thread.h

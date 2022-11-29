@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: set
 description: Simulate Location
 last_update:
-  date: 2022-11-28T12:49:26-07:00
+  date: 2022-11-29T11:50:35-07:00
   author: blacktop
 ---
 ## ipsw idev loc set
@@ -19,7 +19,7 @@ ipsw idev loc set -- <LAT> <LON> [flags]
 
 ### Examples
 
-```
+```bash
 ❯ ipsw idev loc set -- -33.892117 151.275888
 ```
 
