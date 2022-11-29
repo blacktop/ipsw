@@ -478,6 +478,8 @@ changelog:
       - Merge branch
 
 release:
+  draft: true
+  replace_existing_draft: true
   target_commitish: "{{ .Commit }}"
   footer: |
     ### Summary
