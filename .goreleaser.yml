@@ -340,7 +340,6 @@ nfpms:
       - apk
       - deb
       - rpm
-      - archlinux
     deb:
       lintian_overrides:
         - statically-linked-binary
