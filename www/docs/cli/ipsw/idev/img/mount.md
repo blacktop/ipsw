@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: mount
 description: Mount an image
 last_update:
-  date: 2022-11-29T11:50:35-07:00
+  date: 2022-11-30T12:14:58-07:00
   author: blacktop
 ---
 ## ipsw idev img mount
@@ -20,9 +20,11 @@ ipsw idev img mount <image> <signature> [flags]
 ### Options
 
 ```
-  -h, --help                help for mount
-  -t, --image-type string   Image type to mount (default "Developer")
-  -x, --xcode string        Path to Xcode.app (default "/Applications/Xcode.app")
+  -h, --help                 help for mount
+  -t, --image-type string    Image type to mount (default "Developer")
+  -i, --info-plist string    Cryptex Info.plist to use
+  -c, --trust-cache string   Cryptex trust cache to use
+  -x, --xcode string         Path to Xcode.app (default "/Applications/Xcode.app")
 ```
 
 ### Options inherited from parent commands

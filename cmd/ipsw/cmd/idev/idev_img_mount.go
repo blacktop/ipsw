@@ -38,9 +38,15 @@ import (
 func init() {
 	ImgCmd.AddCommand(idevImgMountCmd)
 
-	idevImgMountCmd.Flags().StringP("image-type", "t", "Developer", "Image type to mount")
 	idevImgMountCmd.Flags().StringP("xcode", "x", "/Applications/Xcode.app", "Path to Xcode.app")
+	idevImgMountCmd.Flags().StringP("image-type", "t", "Developer", "Image type to mount")
+	idevImgMountCmd.Flags().StringP("trust-cache", "c", "", "Cryptex trust cache to use")
+	idevImgMountCmd.Flags().StringP("info-plist", "i", "", "Cryptex Info.plist to use")
 
+	viper.BindPFlag("idev.img.mount.xcode", idevImgMountCmd.Flags().Lookup("xcode"))
+	viper.BindPFlag("idev.img.mount.image-type", idevImgMountCmd.Flags().Lookup("image-type"))
+	viper.BindPFlag("idev.img.mount.trust-cache", idevImgMountCmd.Flags().Lookup("trust-cache"))
+	viper.BindPFlag("idev.img.mount.info-plist", idevImgMountCmd.Flags().Lookup("info-plist"))
 }
 
 // idevImgMountCmd represents the mount command
@@ -57,8 +63,17 @@ var idevImgMountCmd = &cobra.Command{
 		}
 
 		udid, _ := cmd.Flags().GetString("udid")
-		imageType, _ := cmd.Flags().GetString("image-type")
-		xcode, _ := cmd.Flags().GetString("xcode")
+		xcode := viper.GetString("idev.img.mount.xcode")
+		imageType := viper.GetString("idev.img.mount.image-type")
+		trustCache := viper.GetString("idev.img.mount.trust-cache")
+		infoPlist := viper.GetString("idev.img.mount.info-plist")
+
+		if !utils.StrSliceContains([]string{"Developer", "Cryptex"}, imageType) {
+			return fmt.Errorf("invalid --image-type: %s (must be Developer or Cryptex)", imageType)
+		}
+		if imageType == "Developer" && (len(trustCache) > 0 || len(infoPlist) > 0) {
+			return fmt.Errorf("invalid flags --trust-cache or --info-plist (not allowed when --image-type=Developer)")
+		}
 
 		var err error
 		var dev *lockdownd.DeviceValues
@@ -132,7 +147,7 @@ var idevImgMountCmd = &cobra.Command{
 			return fmt.Errorf("failed to upload image: %w", err)
 		}
 		log.Infof("Mounting %s image", imageType)
-		if err := cli.Mount(imageType, sigData); err != nil {
+		if err := cli.Mount(imageType, sigData, trustCache, infoPlist); err != nil {
 			return fmt.Errorf("failed to mount image: %w", err)
 		}
 

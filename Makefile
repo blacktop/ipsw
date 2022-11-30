@@ -70,14 +70,14 @@ build-ios: ## Build ipsw for iOS
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
 .PHONY: docs
-docs: ## Build the hugo docs
-	@echo " > Building Docs"
-	hack/publish/gh-pages
+docs: ## Build the cli docs
+	@echo " > Updating CLI Docs"
+	hack/make/docs
 
 .PHONY: test-docs
-test-docs: ## Start local server hosting hugo docs
+test-docs: ## Start local server hosting docusaurus docs
 	@echo " > Testing Docs"
-	cd docs; hugo server -D
+	cd www; npm start
 
 .PHONY: update_mod
 update_mod: ## Update go.mod file

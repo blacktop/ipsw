@@ -384,6 +384,14 @@ func lookup8(k []byte, level uint64) uint64 {
 	return c
 }
 
+// The check bytes are used to reject strings that aren't in the table
+// without paging in the table's cstring data. This checkbyte calculation
+// catches 4785/4815 rejects when launching Safari; a perfect checkbyte
+// would catch 4796/4815.
+func checkbyte(key []byte) uint8 {
+	return ((key[0] & 0x7) << 5) | (uint8(len(key)) & 0x1f)
+}
+
 func (s StringHash) hash(key []byte) uint32 {
 	val := lookup8(key, s.Salt())
 	if s.Shift() == 64 {
@@ -391,14 +399,6 @@ func (s StringHash) hash(key []byte) uint32 {
 	}
 	index := (val >> uint64(s.Shift())) ^ uint64(s.Scramble()[s.Tab[(val&uint64(s.Mask()))]])
 	return uint32(index)
-}
-
-// The check bytes are used to reject strings that aren't in the table
-// without paging in the table's cstring data. This checkbyte calculation
-// catches 4785/4815 rejects when launching Safari; a perfect checkbyte
-// would catch 4796/4815.
-func checkbyte(key []byte) uint8 {
-	return ((key[0] & 0x7) << 5) | (uint8(len(key)) & 0x1f)
 }
 
 func (s StringHash) getIndex(keyStr string) (uint32, error) {

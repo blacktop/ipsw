@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"os"
 
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
@@ -15,6 +16,7 @@ const (
 
 const (
 	ImageTypeDeveloper = "Developer"
+	ImageTypeCryptex   = "Cryptex"
 )
 
 type LookupImageRequest struct {
@@ -84,7 +86,7 @@ func (e ListImageEntryList) String() string {
 	)
 }
 
-func (c *Client) ListImages(imageType string) ([]ListImageEntryList, error) {
+func (c *Client) ListImages() ([]ListImageEntryList, error) {
 	req := &LookupImageRequest{Command: "CopyDevices"}
 	resp := &ListImageResponse{}
 	if err := c.c.Request(req, resp); err != nil {
@@ -111,11 +113,13 @@ func (c *Client) LookupImage(imageType string) (*LookupImageResponse, error) {
 }
 
 type MountRequest struct {
-	Command        string `plist:"Command,omitempty"`
-	ImageType      string `plist:"ImageType,omitempty"`
-	ImageSize      int    `plist:"ImageSize,omitempty"`
-	MountPath      string `plist:"MountPath,omitempty"`
-	ImageSignature []byte `plist:"ImageSignature,omitempty"`
+	Command         string `plist:"Command,omitempty"`
+	ImageType       string `plist:"ImageType,omitempty"`
+	ImageSize       int    `plist:"ImageSize,omitempty"`
+	MountPath       string `plist:"MountPath,omitempty"`
+	ImageSignature  []byte `plist:"ImageSignature,omitempty"`
+	ImageTrustCache []byte `plist:"ImageTrustCache,omitempty"`
+	ImageInfoPlist  []byte `plist:"ImageInfoPlist,omitempty"`
 }
 
 type MountResponse struct {
@@ -159,7 +163,7 @@ func (c *Client) Upload(imageType string, imageData []byte, signature []byte) er
 	return nil
 }
 
-func (c *Client) Mount(imageType string, signature []byte) error {
+func (c *Client) Mount(imageType string, signature []byte, trustCachePath, infoPlistPath string) error {
 	if _, err := c.LookupImage(imageType); err == nil {
 		return fmt.Errorf("image already mounted")
 	}
@@ -168,6 +172,18 @@ func (c *Client) Mount(imageType string, signature []byte) error {
 		Command:        "MountImage",
 		ImageType:      imageType,
 		ImageSignature: signature,
+	}
+	if imageType == ImageTypeCryptex {
+		trustCache, err := os.ReadFile(trustCachePath)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %v", trustCachePath, err)
+		}
+		req.ImageTrustCache = trustCache
+		infoPlist, err := os.ReadFile(infoPlistPath)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %v", infoPlistPath, err)
+		}
+		req.ImageInfoPlist = infoPlist
 	}
 	resp := &MountResponse{}
 	if err := c.c.Request(req, resp); err != nil {
@@ -197,6 +213,102 @@ func (c *Client) Unmount(imageType, mountPath string, signature []byte) error {
 		return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
 	}
 
+	return nil
+}
+
+func (c *Client) DeveloperModeStatus() (bool, error) {
+	req := &MountRequest{Command: "QueryDeveloperModeStatus"}
+	var resp map[string]any
+	if err := c.c.Request(req, &resp); err != nil {
+		return false, err
+	}
+
+	status, ok := resp["DeveloperModeStatus"]
+	if !ok {
+		return false, fmt.Errorf("device does not support developer mode")
+	}
+
+	return status.(bool), nil
+}
+
+func (c *Client) Nonce() (string, error) {
+	req := &MountRequest{Command: "QueryNonce"}
+	var resp map[string]any
+	if err := c.c.Request(req, &resp); err != nil {
+		return "", err
+	}
+
+	nonce, ok := resp["PersonalizationNonce"]
+	if !ok {
+		return "", fmt.Errorf("device does not support QueryNonce")
+	}
+
+	return hex.EncodeToString(nonce.([]byte)), nil
+}
+
+func (c *Client) PersonalizationIdentifiers(imageType string) (map[string]any, error) {
+	var resp map[string]any
+	if err := c.c.Request(&map[string]any{
+		"Command":               "QueryPersonalizationIdentifiers",
+		"PersonalizedImageType": imageType,
+	}, &resp); err != nil {
+		return nil, err
+	}
+	if err, ok := resp["Error"]; ok {
+		return nil, fmt.Errorf("%s: %s", err, resp["DetailedError"])
+	}
+	ids, ok := resp["PersonalizationIdentifiers"]
+	if !ok {
+		return nil, fmt.Errorf("device does not support QueryPersonalizationIdentifiers")
+	}
+
+	return ids.(map[string]any), nil
+}
+
+func (c *Client) PersonalizationManifest(imageType string, signature []byte) (map[string]any, error) {
+	var resp map[string]any
+	if err := c.c.Request(&map[string]any{
+		"Command":               "QueryPersonalizationManifest",
+		"PersonalizedImageType": imageType,
+		"ImageType":             imageType,
+		"ImageSignature":        signature,
+	}, &resp); err != nil {
+		return nil, err
+	}
+	if err, ok := resp["Error"]; ok {
+		return nil, fmt.Errorf("%s: %s", err, resp["DetailedError"])
+	}
+	manifest, ok := resp["ImageSignature"]
+	if !ok {
+		return nil, fmt.Errorf("device does not support QueryPersonalizationManifest")
+	}
+
+	return manifest.(map[string]any), nil
+}
+
+func (c *Client) RollPersonalizationNonce() error {
+	var resp map[string]any
+	if err := c.c.Request(&map[string]any{
+		"Command": "RollPersonalizationNonce",
+	}, &resp); err != nil {
+		return err
+	}
+	if err, ok := resp["Error"]; ok {
+		return fmt.Errorf("failed to roll personalization nonce: %s", err)
+	}
+	return nil
+}
+
+func (c *Client) RollCryptexNonce() error {
+	var resp map[string]any
+	if err := c.c.Request(&map[string]any{
+		"Command": "RollCryptexNonce",
+	}, &resp); err != nil {
+		return err
+	}
+	if err, ok := resp["Error"]; ok {
+		return fmt.Errorf("failed to roll cryptex nonce: %s", err)
+	}
 	return nil
 }
 
