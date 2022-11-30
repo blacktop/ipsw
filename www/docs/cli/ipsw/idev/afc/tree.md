@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: tree
 description: List contents of directories in a tree-like format rooted at /var/mobile/Media
 last_update:
-  date: 2022-11-29T11:50:35-07:00
+  date: 2022-11-30T12:14:58-07:00
   author: blacktop
 ---
 ## ipsw idev afc tree

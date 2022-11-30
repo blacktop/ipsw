@@ -1,30 +1,30 @@
 ---
-id: a2s
-title: a2s
+id: swift
+title: swift
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: a2s
-description: Lookup symbol at unslid address
+sidebar_label: swift
+description: Dump Swift Optimizations Info
 last_update:
   date: 2022-11-30T12:14:58-07:00
   author: blacktop
 ---
-## ipsw dyld a2s
+## ipsw dyld swift
 
-Lookup symbol at unslid address
+Dump Swift Optimizations Info
 
 ```
-ipsw dyld a2s <dyld_shared_cache> <vaddr> [flags]
+ipsw dyld swift [flags]
 ```
 
 ### Options
 
 ```
       --cache string   Path to .a2s addr to sym cache file (speeds up analysis)
-  -h, --help           help for a2s
-  -i, --image          Only lookup address's dyld_shared_cache mapping
-  -m, --mapping        Only lookup address's image segment/section
-  -s, --slide uint     dyld_shared_cache slide to apply
+  -f, --foreign        Print the foreign type conformances
+  -h, --help           help for swift
+  -m, --metadata       Print the metadata conformances
+  -t, --types          Print the type conformances
 ```
 
 ### Options inherited from parent commands

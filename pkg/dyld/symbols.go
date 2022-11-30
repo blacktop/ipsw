@@ -67,8 +67,9 @@ type Symbol struct {
 	Kind    symKind `json:"-"`
 }
 
+var symDarkAddrColor = color.New(color.Bold, color.FgBlue).SprintfFunc()
 var symAddrColor = color.New(color.Bold, color.FgMagenta).SprintfFunc()
-var symTypeColor = color.New(color.FgCyan).SprintfFunc()
+var symTypeColor = color.New(color.FgGreen).SprintfFunc()
 var symNameColor = color.New(color.Bold).SprintFunc()
 var symImageColor = color.New(color.Faint, color.FgHiWhite).SprintfFunc()
 

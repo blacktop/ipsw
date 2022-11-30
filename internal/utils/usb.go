@@ -149,7 +149,7 @@ func IsDeveloperImageMounted(udid string) error {
 	}
 	defer cli.Close()
 
-	images, err := cli.ListImages(mount.ImageTypeDeveloper)
+	images, err := cli.ListImages()
 	if err != nil {
 		return fmt.Errorf("failed to list images: %w", err)
 	}
