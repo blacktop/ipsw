@@ -10,6 +10,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
+	iswift "github.com/blacktop/ipsw/internal/swiftt"
 )
 
 type SwiftOptimizationHeader struct {
@@ -332,15 +333,21 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 					log.Errorf("failed to get vm address: %v", err)
 					continue
 				}
-				typeName, ok := f.AddressToSymbol[addr]
-				if !ok {
-					typeName = "n/a"
-				}
 				i, err := f.GetImageContainingVMAddr(addr)
 				if err == nil {
 					imgName = filepath.Base(i.Name)
 				} else {
 					imgName = ""
+				}
+				var typeName string
+				if sym, ok := f.AddressToSymbol[addr]; !ok {
+					typeName = "n/a"
+				} else {
+					out, err := iswift.DemangleSimple(sym) // NOTE: only works on darwin for now
+					if err != nil {
+						log.Errorf("failed to demangle: %v", err)
+					}
+					typeName = out
 				}
 				sType := "T"
 				if h.Type == MetadataConformance {
@@ -374,13 +381,18 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				if err != nil {
 					log.Errorf("failed to read bytes: %v", err)
 				}
+
 				var names []string
 				words := bytes.Split(dat, []byte{0x00})
 				for _, w := range words {
 					names = append(names, string(w))
 				}
+				out, err := iswift.DemangleSimple(strings.Join(names, " "))
+				if err != nil {
+					log.Errorf("failed to demangle: %v", err)
+				}
 
-				fmt.Printf("    %s: %s %s\n", symAddrColor("%#x", addr), symTypeColor("T"), symNameColor(strings.Join(names, " ")))
+				fmt.Printf("    %s: %s %s\n", symAddrColor("%#x", addr), symTypeColor("T"), symNameColor(out))
 			}
 
 			_, addr, err := f.GetCacheVMAddress(protocolCacheOffset)
@@ -388,15 +400,20 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				log.Errorf("failed to get vm address: %v", err)
 				continue
 			}
-			protoName, ok := f.AddressToSymbol[addr]
-			if !ok {
-				protoName = "n/a"
-			}
 			i, err := f.GetImageContainingVMAddr(addr)
 			if err == nil {
 				imgName = filepath.Base(i.Name)
 			} else {
 				imgName = ""
+			}
+			var protoName string
+			if sym, ok := f.AddressToSymbol[addr]; !ok {
+				protoName = "n/a"
+			} else {
+				protoName, err = iswift.DemangleSimple(sym)
+				if err != nil {
+					log.Errorf("failed to demangle: %v", err)
+				}
 			}
 
 			fmt.Printf("    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor("P"), symNameColor(strings.Trim(protoName, "\x00")), symImageColor(imgName))
@@ -406,15 +423,20 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				log.Errorf("failed to get vm address: %v", err)
 				continue
 			}
-			protoConfName, ok := f.AddressToSymbol[addr]
-			if !ok {
-				protoConfName = "n/a"
-			}
 			i, err = f.GetImageContainingVMAddr(addr)
 			if err == nil {
 				imgName = filepath.Base(i.Name)
 			} else {
 				imgName = ""
+			}
+			var protoConfName string
+			if sym, ok := f.AddressToSymbol[addr]; !ok {
+				protoConfName = "n/a"
+			} else {
+				protoConfName, err = iswift.DemangleSimple(sym)
+				if err != nil {
+					log.Errorf("failed to demangle: %v", err)
+				}
 			}
 
 			fmt.Printf("    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor("C"), symNameColor(strings.Trim(protoConfName, "\x00")), symImageColor(imgName))
