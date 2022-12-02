@@ -97,11 +97,11 @@ const config = {
         // Refer to https://github.com/francoischalifour/medium-zoom#options
         config: {},
       },
-      // algolia: {
-      //   appId: 'X1Z85QJPUV',
-      //   apiKey: 'bf7211c161e8205da2f933a02534105a',
-      //   indexName: 'docusaurus-2',
-      // },
+      algolia: {
+        appId: "KYIBYORJ9P",
+        apiKey: "37e8a5c2e6b377af1d2193193bfb17c7",
+        indexName: "ipsw",
+      },
       navbar: {
         hideOnScroll: true,
         title: "ipsw",
