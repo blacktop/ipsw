@@ -99,7 +99,7 @@ const config = {
       },
       algolia: {
         appId: "KYIBYORJ9P",
-        apiKey: "37e8a5c2e6b377af1d2193193bfb17c7",
+        apiKey: "ddaac83aaf4c488e3b0c51dc7993975b",
         indexName: "ipsw",
       },
       navbar: {
