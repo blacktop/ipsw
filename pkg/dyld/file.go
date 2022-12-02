@@ -14,6 +14,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
+	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
@@ -1459,28 +1460,33 @@ func (f *File) GetImageContainingVMAddr(address uint64) (*CacheImage, error) {
 	return nil, fmt.Errorf("address %#x not in any dylib", address)
 }
 
-// // HasImagePath returns the index of a given image path
-// func (f *File) HasImagePath(path string) (int, bool, error) {
-// 	sr := io.NewSectionReader(f.r[f.UUID], 0, 1<<63-1)
-// 	var imageIndex uint64
-// 	for _, mapping := range f.Mappings[f.UUID] {
-// 		if mapping.Address <= f.Headers[].AccelerateInfoAddr && f.AccelerateInfoAddr < mapping.Address+mapping.Size {
-// 			accelInfoPtr := int64(f.AccelerateInfoAddr - mapping.Address + mapping.FileOffset)
-// 			// Read dyld trie containing all dylib paths.
-// 			sr.Seek(accelInfoPtr+int64(f.AcceleratorInfo.DylibTrieOffset), io.SeekStart)
-// 			dylibTrie := make([]byte, f.AcceleratorInfo.DylibTrieSize)
-// 			if err := binary.Read(sr, f.ByteOrder, &dylibTrie); err != nil {
-// 				return 0, false, err
-// 			}
-// 			imageNode, err := trie.WalkTrie(dylibTrie, path)
-// 			if err != nil {
-// 				return 0, false, err
-// 			}
-// 			imageIndex, _, err = trie.ReadUleb128FromBuffer(bytes.NewBuffer(dylibTrie[imageNode:]))
-// 			if err != nil {
-// 				return 0, false, err
-// 			}
-// 		}
-// 	}
-// 	return int(imageIndex), true, nil
-// }
+// HasImagePath returns the index of a given image path
+func (f *File) HasImagePath(path string) (int, error) {
+	var imageIndex uint64
+	if f.Headers[f.UUID].MappingOffset >= 0x118 {
+		uuid, off, err := f.GetOffset(f.Headers[f.UUID].DylibsTrieAddr)
+		if err != nil {
+			return -1, fmt.Errorf("failed to get dylibs trie offset: %v", err)
+		}
+		dylibTrie, err := f.ReadBytesForUUID(uuid, int64(off), f.Headers[f.UUID].DylibsTrieSize)
+		if err != nil {
+			return -1, fmt.Errorf("failed to read dylibs trie: %v", err)
+		}
+		imageNode, err := trie.WalkTrie(bytes.NewReader(dylibTrie), path)
+		if err != nil {
+			return -1, err
+		}
+		imageIndex, _, err = trie.ReadUleb128FromBuffer(bytes.NewBuffer(dylibTrie[imageNode:]))
+		if err != nil {
+			return -1, err
+		}
+	} else {
+		img, err := f.Image(path)
+		if err != nil {
+			return -1, err
+		}
+		imageIndex = uint64(img.Index)
+	}
+
+	return int(imageIndex), nil
+}
