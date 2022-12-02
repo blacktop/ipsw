@@ -16,32 +16,26 @@ int SwiftDemangleSimple(char *input, char *output, size_t length);
 int SwiftDemangle(char *input, char *output, size_t length) {
     if (input == NULL || input[0] == '\0') {
         fprintf(stderr, "input string is NULL\n");
-        return -1;
+        return -3;
     }
     if (output == NULL) {
         fprintf(stderr, "output string is NULL\n");
-        return -1;
+        return -3;
     }
 
-    void *handle = dlopen("/Applications/Xcode.app/Contents/Frameworks/libswiftDemangle.dylib", RTLD_LAZY);
+    void *handle = dlopen("/usr/lib/swift/libswiftDemangle.dylib", RTLD_LAZY);
     if (!handle) {
-        handle = dlopen("/Library/Developer/CommandLineTools/usr/lib/libswiftDemangle.dylib", RTLD_LAZY);
-        if (!handle) {
-            fprintf(stderr, "%s\n", dlerror());
-            return -1;
-        }
+        return -2;
     }
 
     swift_demangle_getDemangledName *swift_demangle_getDemangledName = dlsym(handle, "swift_demangle_getDemangledName");
     if (!swift_demangle_getDemangledName) {
-        fprintf(stderr, "%s\n", dlerror());
         return -1;
     }
 
     swift_demangle_getDemangledName(input, output, length);
 
     if (dlclose(handle) != 0) {
-        fprintf(stderr, "dlclose failed: %s\n", dlerror());
         return -1;
     }
 
@@ -51,36 +45,30 @@ int SwiftDemangle(char *input, char *output, size_t length) {
 int SwiftDemangleSimple(char *input, char *output, size_t length) {
     if (input == NULL || input[0] == '\0') {
         fprintf(stderr, "input string is NULL\n");
-        return -1;
+        return -3;
     }
     if (output == NULL) {
         fprintf(stderr, "output string is NULL\n");
-        return -1;
+        return -3;
     }
 
-    void *handle = dlopen("/Applications/Xcode.app/Contents/Frameworks/libswiftDemangle.dylib2", RTLD_LAZY);
+    void *handle = dlopen("/usr/lib/swift/libswiftDemangle.dylib", RTLD_LAZY);
     if (!handle) {
-        handle = dlopen("/Library/Developer/CommandLineTools/usr/lib/libswiftDemangle.dylib", RTLD_LAZY);
-        if (!handle) {
-            fprintf(stderr, "%s\n", dlerror());
-            return -1;
-        }
+        return -2;
     }
 
     swift_demangle_getSimplifiedDemangledName *swift_demangle_getSimplifiedDemangledName = dlsym(handle, "swift_demangle_getSimplifiedDemangledName");
     if (!swift_demangle_getSimplifiedDemangledName) {
-        fprintf(stderr, "%s\n", dlerror());
         return -1;
     }
 
-    swift_demangle_getSimplifiedDemangledName(input, output, length);
+    size_t ret = swift_demangle_getSimplifiedDemangledName(input, output, length);
 
     if (dlclose(handle) != 0) {
-        fprintf(stderr, "dlclose failed: %s\n", dlerror());
         return -1;
     }
 
-    return 0;
+    return ret;
 }
 */
 import "C"
@@ -90,6 +78,15 @@ import (
 	"unsafe"
 )
 
+type errType int
+
+const (
+	NOOP    = 0
+	ERROR   = -1
+	NODYLIB = -2
+	BADARGS = -3
+)
+
 func Demangle(input string) (string, error) {
 	output := (*C.char)(C.malloc(2048))
 	defer C.free(unsafe.Pointer(output))
@@ -97,8 +94,19 @@ func Demangle(input string) (string, error) {
 	i := C.CString(input)
 	defer C.free(unsafe.Pointer(i))
 
-	if ret := C.SwiftDemangle(i, output, C.size_t(2048)); ret != 0 {
-		return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New(C.GoString(C.dlerror())))
+	if ret := C.SwiftDemangle(i, output, C.size_t(2048)); ret <= NOOP {
+		switch ret {
+		case BADARGS:
+			return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New("bad arguments (one or more arguments are NULL)"))
+		case NODYLIB:
+			return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New("libswiftDemangle.dylib not found"))
+		case NOOP:
+			return input, nil
+		case ERROR:
+			fallthrough
+		default:
+			return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New(C.GoString(C.dlerror())))
+		}
 	}
 
 	return C.GoString(output), nil
@@ -111,8 +119,19 @@ func DemangleSimple(input string) (string, error) {
 	i := C.CString(input)
 	defer func() { C.free(unsafe.Pointer(i)) }()
 
-	if ret := C.SwiftDemangleSimple(i, output, C.size_t(2048)); ret != 0 {
-		return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New(C.GoString(C.dlerror())))
+	if ret := C.SwiftDemangleSimple(i, output, C.size_t(2048)); ret <= NOOP {
+		switch ret {
+		case BADARGS:
+			return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New("bad arguments (one or more arguments are NULL)"))
+		case NODYLIB:
+			return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New("libswiftDemangle.dylib not found"))
+		case NOOP:
+			return input, nil
+		case ERROR:
+			fallthrough
+		default:
+			return "", fmt.Errorf("error parsing mangled symbol: %v", errors.New(C.GoString(C.dlerror())))
+		}
 	}
 
 	return C.GoString(output), nil
