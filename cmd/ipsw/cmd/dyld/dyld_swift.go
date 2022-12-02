@@ -38,11 +38,13 @@ func init() {
 	SwiftCmd.Flags().BoolP("types", "t", false, "Print the type conformances")
 	SwiftCmd.Flags().BoolP("metadata", "m", false, "Print the metadata conformances")
 	SwiftCmd.Flags().BoolP("foreign", "f", false, "Print the foreign type conformances")
+	SwiftCmd.Flags().BoolP("demangle", "d", false, "Demangle the Swift symbols")
 	SwiftCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	viper.BindPFlag("dyld.swift.types", SwiftCmd.Flags().Lookup("types"))
 	viper.BindPFlag("dyld.swift.metadata", SwiftCmd.Flags().Lookup("metadata"))
 	viper.BindPFlag("dyld.swift.foreign", SwiftCmd.Flags().Lookup("foreign"))
+	viper.BindPFlag("dyld.swift.demangle", SwiftCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("dyld.swift.cache", SwiftCmd.Flags().Lookup("cache"))
 
 	SwiftCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
@@ -97,17 +99,17 @@ var SwiftCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("dyld.swift.types") {
-			if _, err := f.GetAllSwiftTypes(true); err != nil {
+			if err := f.GetAllSwiftTypes(true, viper.GetBool("dyld.swift.demangle")); err != nil {
 				return fmt.Errorf("failed to get swift types: %w", err)
 			}
 		}
 		if viper.GetBool("dyld.swift.metadata") {
-			if _, err := f.GetAllSwiftMetadatas(true); err != nil {
+			if err := f.GetAllSwiftMetadatas(true, viper.GetBool("dyld.swift.demangle")); err != nil {
 				return fmt.Errorf("failed to get swift types: %w", err)
 			}
 		}
 		if viper.GetBool("dyld.swift.foreign") {
-			if _, err := f.GetAllSwiftForeignTypes(true); err != nil {
+			if err := f.GetAllSwiftForeignTypes(true, viper.GetBool("dyld.swift.demangle")); err != nil {
 				return fmt.Errorf("failed to get swift types: %w", err)
 			}
 		}

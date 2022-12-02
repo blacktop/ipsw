@@ -5,8 +5,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
@@ -101,46 +103,55 @@ func (k SwiftForeignTypeProtocolConformanceLocationKey) String() string {
 		k.ProtocolCacheOffset)
 }
 
-func (f *File) GetAllSwiftTypes(print bool) (map[string]uint64, error) {
+func (f *File) GetAllSwiftTypes(print, demangle bool) error {
 
 	shash, err := f.getSwiftTypeHashTable()
 	if err != nil {
-		return nil, fmt.Errorf("failed read type conformance SwiftHashTable: %v", err)
+		return fmt.Errorf("failed read type conformance SwiftHashTable: %v", err)
 	}
+
+	shash.Demangle = demangle
 
 	if print {
 		f.dumpSwiftOffsets(shash)
+		return nil
 	}
 
-	return f.offsetsToMap(shash.Offsets, int64(shash.CacheOffset), f.UUID), nil // FIXME: handle multiple UUIDs
+	return f.swiftOffsetsToMap(shash)
 }
 
-func (f *File) GetAllSwiftMetadatas(print bool) (map[string]uint64, error) {
+func (f *File) GetAllSwiftMetadatas(print, demangle bool) error {
 
 	shash, err := f.getSwiftMetadataTable()
 	if err != nil {
-		return nil, fmt.Errorf("failed read metadata conformance SwiftHashTable: %v", err)
+		return fmt.Errorf("failed read metadata conformance SwiftHashTable: %v", err)
 	}
+
+	shash.Demangle = demangle
 
 	if print {
 		f.dumpSwiftOffsets(shash)
+		return nil
 	}
 
-	return f.offsetsToMap(shash.Offsets, int64(shash.CacheOffset), f.UUID), nil // FIXME: handle multiple UUIDs
+	return f.swiftOffsetsToMap(shash)
 }
 
-func (f *File) GetAllSwiftForeignTypes(print bool) (map[string]uint64, error) {
+func (f *File) GetAllSwiftForeignTypes(print, demangle bool) error {
 
 	shash, err := f.getSwiftForeignTypeHashTable()
 	if err != nil {
-		return nil, fmt.Errorf("failed read foreign type conformance SwiftHashTable: %v", err)
+		return fmt.Errorf("failed read foreign type conformance SwiftHashTable: %v", err)
 	}
+
+	shash.Demangle = demangle
 
 	if print {
 		f.dumpSwiftOffsets(shash)
+		return nil
 	}
 
-	return f.offsetsToMap(shash.Offsets, int64(shash.CacheOffset), f.UUID), nil // FIXME: handle multiple UUIDs
+	return f.swiftOffsetsToMap(shash)
 }
 
 type swiftHashTable struct {
@@ -166,6 +177,7 @@ type SwiftHashTable struct {
 	CacheOffset uint64
 	UUID        types.UUID
 	Type        swiftHashTableType
+	Demangle    bool
 	swiftHashTable
 	Tab        []byte  /* tab[mask+1] (always power-of-2). Rounded up to roundedTabSize */
 	CheckBytes []byte  /* check byte for each string */
@@ -308,6 +320,7 @@ func (f *File) getSwiftForeignTypeHashTable() (*SwiftHashTable, error) {
 func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 	var imgName string
 	sr := io.NewSectionReader(f.r[h.UUID], 0, 1<<63-1)
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 	for _, ptr := range h.Offsets {
 		if ptr != int32(h.SentinelTarget) {
 			var protocolCacheOffset uint64
@@ -343,18 +356,21 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				if sym, ok := f.AddressToSymbol[addr]; !ok {
 					typeName = "n/a"
 				} else {
-					out, err := iswift.DemangleSimple(sym) // NOTE: only works on darwin for now
-					if err != nil {
-						log.Errorf("failed to demangle: %v", err)
+					if h.Demangle {
+						typeName, err = iswift.DemangleSimple(sym) // NOTE: only works on darwin for now
+						if err != nil {
+							log.Errorf("failed to demangle %s: %v", sym, err)
+						}
+					} else {
+						typeName = sym
 					}
-					typeName = out
 				}
 				sType := "T"
 				if h.Type == MetadataConformance {
 					sType = "M"
 				}
 
-				fmt.Printf("    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor(sType), symNameColor(strings.Trim(typeName, "\x00")), symImageColor(imgName))
+				fmt.Fprintf(w, "    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor(sType), symNameColor(strings.Trim(typeName, "\x00")), symImageColor(imgName))
 			case ForeignTypeConformance:
 				var pconf SwiftForeignTypeProtocolConformance
 				if err := binary.Read(sr, binary.LittleEndian, &pconf); err != nil {
@@ -387,12 +403,16 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				for _, w := range words {
 					names = append(names, string(w))
 				}
-				out, err := iswift.DemangleSimple(strings.Join(names, " "))
-				if err != nil {
-					log.Errorf("failed to demangle: %v", err)
+				var out string
+				if h.Demangle {
+					out, err = iswift.DemangleSimple(strings.Join(names, " "))
+					if err != nil {
+						log.Errorf("failed to demangle %s: %v", strings.Join(names, " "), err)
+					}
+				} else {
+					out = strings.Join(names, " ")
 				}
-
-				fmt.Printf("    %s: %s %s\n", symAddrColor("%#x", addr), symTypeColor("T"), symNameColor(out))
+				fmt.Fprintf(w, "    %s: %s %s\n", symAddrColor("%#x", addr), symTypeColor("T"), symNameColor(out))
 			}
 
 			_, addr, err := f.GetCacheVMAddress(protocolCacheOffset)
@@ -410,13 +430,17 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 			if sym, ok := f.AddressToSymbol[addr]; !ok {
 				protoName = "n/a"
 			} else {
-				protoName, err = iswift.DemangleSimple(sym)
-				if err != nil {
-					log.Errorf("failed to demangle: %v", err)
+				if h.Demangle {
+					protoName, err = iswift.DemangleSimple(sym)
+					if err != nil {
+						log.Errorf("failed to demangle %s: %v", sym, err)
+					}
+				} else {
+					protoName = sym
 				}
 			}
 
-			fmt.Printf("    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor("P"), symNameColor(strings.Trim(protoName, "\x00")), symImageColor(imgName))
+			fmt.Fprintf(w, "    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor("P"), symNameColor(strings.Trim(protoName, "\x00")), symImageColor(imgName))
 
 			_, addr, err = f.GetCacheVMAddress(protocolConformanceCacheOffset)
 			if err != nil {
@@ -433,14 +457,130 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 			if sym, ok := f.AddressToSymbol[addr]; !ok {
 				protoConfName = "n/a"
 			} else {
-				protoConfName, err = iswift.DemangleSimple(sym)
-				if err != nil {
-					log.Errorf("failed to demangle: %v", err)
+				if h.Demangle {
+					protoConfName, err = iswift.DemangleSimple(sym)
+					if err != nil {
+						log.Errorf("failed to demangle %s: %v", sym, err)
+					}
+				} else {
+					protoConfName = sym
 				}
 			}
 
-			fmt.Printf("    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor("C"), symNameColor(strings.Trim(protoConfName, "\x00")), symImageColor(imgName))
+			fmt.Fprintf(w, "    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor("C"), symNameColor(strings.Trim(protoConfName, "\x00")), symImageColor(imgName))
 		}
-
+		w.Flush()
 	}
+}
+
+func (f *File) swiftOffsetsToMap(h *SwiftHashTable) error {
+	sr := io.NewSectionReader(f.r[h.UUID], 0, 1<<63-1)
+	for _, ptr := range h.Offsets {
+		if ptr != int32(h.SentinelTarget) {
+			var protocolCacheOffset uint64
+			var protocolConformanceCacheOffset uint64
+
+			sr.Seek(int64(int32(h.CacheOffset)+ptr), io.SeekStart)
+
+			switch h.Type {
+			case TypeConformance, MetadataConformance:
+				var pconf SwiftProtocolConformance
+				if err := binary.Read(sr, binary.LittleEndian, &pconf); err != nil {
+					log.Errorf("failed to read %T: %v\n", pconf, err)
+					continue
+				}
+
+				protocolCacheOffset = pconf.Key.ProtocolCacheOffset
+				protocolConformanceCacheOffset = pconf.Location.ProtocolConformanceCacheOffset()
+
+				_, addr, err := f.GetCacheVMAddress(pconf.Key.TypeDescriptorCacheOffset)
+				if err != nil {
+					log.Errorf("failed to get vm address: %v", err)
+					continue
+				}
+
+				if sym, ok := f.AddressToSymbol[addr]; ok {
+					out, err := iswift.DemangleSimple(sym) // NOTE: only works on darwin for now
+					if err != nil {
+						log.Errorf("failed to demangle: %v", err)
+						f.AddressToSymbol[addr] = sym
+					} else {
+						f.AddressToSymbol[addr] = out
+					}
+				}
+			case ForeignTypeConformance:
+				var pconf SwiftForeignTypeProtocolConformance
+				if err := binary.Read(sr, binary.LittleEndian, &pconf); err != nil {
+					log.Errorf("failed to read %T: %v\n", pconf, err)
+					continue
+				}
+
+				protocolCacheOffset = pconf.Key.ProtocolCacheOffset
+				protocolConformanceCacheOffset = pconf.Location.ProtocolConformanceCacheOffset()
+
+				_, addr, err := f.GetCacheVMAddress(pconf.Key.RawForeignDescriptor.ForeignDescriptorNameCacheOffset())
+				if err != nil {
+					log.Errorf("failed to get vm address: %v", err)
+					continue
+				}
+				uuid, off, err := f.GetCacheOffset(pconf.Key.RawForeignDescriptor.ForeignDescriptorNameCacheOffset())
+				if err != nil {
+					log.Errorf("failed to get vm address: %v", err)
+					continue
+				}
+				dat, err := f.ReadBytesForUUID(uuid, int64(off), uint64(pconf.Key.RawForeignDescriptor.ForeignDescriptorNameLength()))
+				if err != nil {
+					log.Errorf("failed to read bytes: %v", err)
+				}
+
+				var names []string
+				words := bytes.Split(dat, []byte{0x00})
+				for _, w := range words {
+					names = append(names, string(w))
+				}
+				out, err := iswift.DemangleSimple(strings.Join(names, " "))
+				if err != nil {
+					log.Errorf("failed to demangle: %v", err)
+					f.AddressToSymbol[addr] = strings.Join(names, " ")
+				} else {
+					f.AddressToSymbol[addr] = out
+				}
+			}
+
+			_, addr, err := f.GetCacheVMAddress(protocolCacheOffset)
+			if err != nil {
+				log.Errorf("failed to get vm address: %v", err)
+				continue
+			}
+			var protoName string
+			if sym, ok := f.AddressToSymbol[addr]; ok {
+				protoName, err = iswift.DemangleSimple(sym)
+				if err != nil {
+					log.Errorf("failed to demangle: %v", err)
+					f.AddressToSymbol[addr] = sym
+				} else {
+					f.AddressToSymbol[addr] = protoName
+				}
+			}
+
+			_, addr, err = f.GetCacheVMAddress(protocolConformanceCacheOffset)
+			if err != nil {
+				log.Errorf("failed to get vm address: %v", err)
+				continue
+			}
+
+			if sym, ok := f.AddressToSymbol[addr]; ok {
+				protoConfName, err := iswift.DemangleSimple(sym)
+				if err != nil {
+					log.Errorf("failed to demangle: %v", err)
+					f.AddressToSymbol[addr] = sym
+				} else {
+					f.AddressToSymbol[addr] = protoConfName
+				}
+			}
+
+		}
+	}
+
+	return nil
 }
