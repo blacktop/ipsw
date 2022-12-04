@@ -26,10 +26,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Img4 Kernelcache object
-type Img4 struct {
-	IMG4    string
-	IM4P    string `asn1:"optional"`
+// Im4p Kernelcache object
+type Im4p struct {
+	IM4P    string
 	Name    string
 	Version string
 	Data    []byte
@@ -76,7 +75,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10 | less (to get offset)
 	//       openssl asn1parse -i -inform DER -in kernelcache.iphone10 -strparse OFFSET -noout -out lzfse.bin
 
-	var i Img4
+	var i Im4p
 	if _, err := asn1.Unmarshal(data, &i); err != nil {
 		return nil, errors.Wrap(err, "failed to ASN.1 parse kernelcache")
 	}
