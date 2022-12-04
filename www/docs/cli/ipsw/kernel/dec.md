@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: dec
 description: Decompress a kernelcache
 last_update:
-  date: 2022-11-30T12:14:58-07:00
+  date: 2022-12-03T18:41:04-07:00
   author: blacktop
 ---
 ## ipsw kernel dec
@@ -20,7 +20,9 @@ ipsw kernel dec <kernelcache> [flags]
 ### Options
 
 ```
-  -h, --help   help for dec
+  -h, --help            help for dec
+  -m, --km              Decompress KernelManagement host file (found on macOS 13.x filesystem)
+  -o, --output string   Output file
 ```
 
 ### Options inherited from parent commands

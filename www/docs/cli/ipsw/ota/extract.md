@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: extract
 description: Extract OTA payload files
 last_update:
-  date: 2022-11-30T12:14:58-07:00
+  date: 2022-12-03T18:41:04-07:00
   author: blacktop
 ---
 ## ipsw ota extract

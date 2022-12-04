@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: img4
 description: Parse Img4
 last_update:
-  date: 2022-11-30T12:14:58-07:00
+  date: 2022-12-03T18:41:04-07:00
   author: blacktop
 ---
 ## ipsw img4
@@ -35,6 +35,6 @@ ipsw img4 [flags]
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw img4 dec](/docs/cli/ipsw/img4/dec)	 - Decrypt img4 payloads
-* [ipsw img4 extract](/docs/cli/ipsw/img4/extract)	 - Extract img4 payloads
+* [ipsw img4 extract](/docs/cli/ipsw/img4/extract)	 - Extract im4p payloads
 * [ipsw img4 kbag](/docs/cli/ipsw/img4/kbag)	 - Extract kbag from img4
 
