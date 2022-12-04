@@ -33,13 +33,14 @@ import (
 )
 
 func init() {
-	KernelcacheCmd.AddCommand(decCmd)
-
-	decCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+	KernelcacheCmd.AddCommand(kernelDecCmd)
+	kernelDecCmd.Flags().BoolP("km", "m", false, "Decompress KernelManagement host file (found on macOS 13.x filesystem)")
+	kernelDecCmd.Flags().StringP("output", "o", "", "Output file")
+	kernelDecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
-// decCmd represents the dec command
-var decCmd = &cobra.Command{
+// kernelDecCmd represents the dec command
+var kernelDecCmd = &cobra.Command{
 	Use:   "dec <kernelcache>",
 	Short: "Decompress a kernelcache",
 	Args:  cobra.MinimumNArgs(1),
@@ -49,13 +50,21 @@ var decCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		km, _ := cmd.Flags().GetBool("km")
+		outputDir, _ := cmd.Flags().GetString("output")
+
 		kcpath := filepath.Clean(args[0])
 
 		if _, err := os.Stat(kcpath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", kcpath)
 		}
 
+		if km {
+			log.Info("Decompressing KernelManagement kernelcache")
+			return kernelcache.DecompressKernelManagement(kcpath, outputDir)
+		}
+
 		log.Info("Decompressing kernelcache")
-		return kernelcache.Decompress(kcpath)
+		return kernelcache.Decompress(kcpath, outputDir)
 	},
 }

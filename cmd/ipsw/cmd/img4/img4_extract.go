@@ -25,12 +25,12 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/lzfse"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -38,13 +38,15 @@ import (
 func init() {
 	Img4Cmd.AddCommand(img4ExtractCmd)
 
+	img4ExtractCmd.Flags().Bool("img4", false, "Input file is an IMG4")
+	img4ExtractCmd.Flags().StringP("output", "o", "", "Output file")
 	img4ExtractCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // img4ExtractCmd represents the extract command
 var img4ExtractCmd = &cobra.Command{
-	Use:   "extract <img4>",
-	Short: "Extract img4 payloads",
+	Use:   "extract <im4p>",
+	Short: "Extract im4p payloads",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -52,35 +54,51 @@ var img4ExtractCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		isImg4, _ := cmd.Flags().GetBool("img4")
+		outputDir, _ := cmd.Flags().GetString("output")
+
 		f, err := os.Open(args[0])
 		if err != nil {
-			return errors.Wrapf(err, "unabled to open file: %s", args[0])
+			return fmt.Errorf("failed to open file: %s", err)
 		}
 		defer f.Close()
 
-		i, err := img4.ParseIm4p(f)
-		if err != nil {
-			return errors.Wrap(err, "unabled to parse Im4p")
+		var dat []byte
+
+		if isImg4 {
+			i, err := img4.ParseImg4(f)
+			if err != nil {
+				return fmt.Errorf("failed to parse IMG4: %s", err)
+			}
+			dat = i.IM4P.Data
+		} else {
+			i, err := img4.ParseIm4p(f)
+			if err != nil {
+				return fmt.Errorf("failed to parse IM4P: %s", err)
+			}
+			dat = i.Data
 		}
 
-		outFile := args[0] + ".payload"
+		outFile := filepath.Join(outputDir, args[0]+".payload")
+		os.MkdirAll(filepath.Dir(outFile), 0755)
+
 		utils.Indent(log.Info, 2)(fmt.Sprintf("Exracting payload to file %s", outFile))
 
-		if bytes.Contains(i.Data[:4], []byte("bvx2")) {
+		if bytes.Contains(dat[:4], []byte("bvx2")) {
 			utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-			dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
+			dat, err := lzfse.NewDecoder(dat).DecodeBuffer()
 			if err != nil {
 				return fmt.Errorf("failed to lzfse decompress %s: %v", args[0], err)
 			}
 
 			err = os.WriteFile(outFile, dat, 0660)
 			if err != nil {
-				return errors.Wrapf(err, "failed to write file: ", outFile)
+				return fmt.Errorf("failed to write file %s: %v", outFile, err)
 			}
 		} else {
-			err = os.WriteFile(outFile, i.Data, 0660)
+			err = os.WriteFile(outFile, dat, 0660)
 			if err != nil {
-				return errors.Wrapf(err, "failed to write file: ", outFile)
+				return fmt.Errorf("failed to write file %s: %v", outFile, err)
 			}
 		}
 

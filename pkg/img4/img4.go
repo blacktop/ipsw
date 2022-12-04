@@ -39,8 +39,8 @@ type img4 struct {
 	Raw         asn1.RawContent
 	Name        string // IMG4
 	IM4P        im4p
-	Manifest    asn1.RawValue   `asn1:"explicit,tag:0"`
-	RestoreInfo img4RestoreInfo `asn1:"explicit,tag:1"`
+	Manifest    asn1.RawValue   `asn1:"explicit,tag:0,optional"`
+	RestoreInfo img4RestoreInfo `asn1:"explicit,tag:1,optional"`
 }
 
 type Im4p struct {
@@ -405,6 +405,20 @@ func ParseIm4p(r io.Reader) (*Im4p, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to ASN.1 parse Im4p KBAG: %v", err)
 		}
+	}
+
+	return &i, nil
+}
+
+func ParseImg4(r io.Reader) (*img4, error) {
+
+	data := new(bytes.Buffer)
+	data.ReadFrom(r)
+
+	var i img4
+
+	if _, err := asn1.Unmarshal(data.Bytes(), &i); err != nil {
+		return nil, fmt.Errorf("failed to ASN.1 parse Img4: %v", err)
 	}
 
 	return &i, nil
