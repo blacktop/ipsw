@@ -475,7 +475,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 func (i *CacheImage) Analyze() error {
 
 	if err := i.ParsePublicSymbols(false); err != nil {
-		log.Errorf("failed to parse exported symbols for %s", i.Name)
+		log.Errorf("failed to parse exported symbols for %s: %w", i.Name, err)
 	}
 
 	if !i.Analysis.State.IsStartsDone() {
