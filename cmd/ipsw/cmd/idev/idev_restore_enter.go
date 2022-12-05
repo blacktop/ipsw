@@ -39,7 +39,7 @@ func init() {
 var restoreEnterCmd = &cobra.Command{
 	Use:           "enter",
 	Short:         "Enter recovery mode",
-	Args:          cobra.MaximumNArgs(2),
+	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -50,10 +50,8 @@ var restoreEnterCmd = &cobra.Command{
 
 		udid, _ := cmd.Flags().GetString("udid")
 
-		var err error
-		var dev *lockdownd.DeviceValues
 		if len(udid) == 0 {
-			dev, err = utils.PickDevice()
+			dev, err := utils.PickDevice()
 			if err != nil {
 				return fmt.Errorf("failed to pick USB connected devices: %w", err)
 			}

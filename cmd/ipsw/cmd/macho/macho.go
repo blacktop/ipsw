@@ -28,9 +28,10 @@ import (
 
 // MachoCmd represents the macho command
 var MachoCmd = &cobra.Command{
-	Use:   "macho",
-	Short: "Parse MachO",
-	Args:  cobra.NoArgs,
+	Use:     "macho",
+	Aliases: []string{"m"},
+	Short:   "Parse MachO",
+	Args:    cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))

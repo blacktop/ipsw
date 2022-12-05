@@ -1,4 +1,4 @@
-package instruments
+package dvt
 
 import (
 	"github.com/blacktop/ipsw/pkg/usb"
@@ -11,22 +11,22 @@ const (
 )
 
 const (
+	activityTraceTapChannel      = "com.apple.instruments.server.services.activitytracetap"
+	assetsChannel                = "com.apple.instruments.server.services.assets"
+	appListingChannel            = "com.apple.instruments.server.services.device.applictionListing"
 	deviceInfoChannel            = "com.apple.instruments.server.services.deviceinfo"
 	xpcControlChannel            = "com.apple.instruments.server.services.device.xpccontrol"
+	mobileNotificationsChannel   = "com.apple.instruments.server.services.mobilenotifications"
 	procControlChannel           = "com.apple.instruments.server.services.processcontrol"
 	procControlPosixSpawnChannel = "com.apple.instruments.server.services.processcontrol.posixspawn"
-	mobileNotificationsChannel   = "com.apple.instruments.server.services.mobilenotifications"
-	appListingChannel            = "com.apple.instruments.server.services.device.applictionListing"
 	watchProcessControlChannel   = "com.apple.dt.Xcode.WatchProcessControl"
-	assetsChannel                = "com.apple.instruments.server.services.assets"
-	activityTraceTapChannel      = "com.apple.instruments.server.services.activitytracetap"
 )
 
 type Client struct {
 	c *usb.Client
 }
 
-func NewClient(udid string) (*Client, error) {
+func NewSecureSocketProxy(udid string) (*Client, error) {
 	c, err := lockdownd.NewClientForService(serviceName, udid, false)
 	if err != nil {
 		return nil, err
