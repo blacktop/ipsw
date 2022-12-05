@@ -85,6 +85,7 @@ const config = {
         appId: "KYIBYORJ9P",
         apiKey: "3affebe656f9ea5ea2f830e2747f5afc",
         indexName: "ipsw",
+        contextualSearch: false,
       },
       navbar: {
         hideOnScroll: true,
