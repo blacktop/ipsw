@@ -185,43 +185,39 @@ func (f *File) getLibObjC() (*macho.File, error) {
 	return image.pm, nil
 }
 
-func offsetOfObjcOptsSizeField() uint32 {
-	var t CacheHeader
-	return uint32(unsafe.Offsetof(t.ObjcOptsSize))
-}
-
-func (f *File) getOptimizationsOld() (*macho.Section, *ObjcOptT, error) {
+func (f *File) getOptimizationsOld() (Optimization, error) {
 
 	libObjC, err := f.getLibObjC()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	if s := libObjC.Section("__TEXT", "__objc_opt_ro"); s != nil {
 		dat, err := s.Data()
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to read __TEXT.__objc_opt_ro data")
+			return nil, fmt.Errorf("failed to read __TEXT.__objc_opt_ro data")
 		}
 		opt := ObjcOptT{}
 		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &opt); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		if opt.Version > 16 {
-			return nil, nil, fmt.Errorf("objc optimization version should be 16 or less, but found %d", opt.Version)
+			return nil, fmt.Errorf("objc optimization version should be 16 or less, but found %d", opt.Version)
 		}
 		// log.Debugf("Objective-C Optimizations:\n%s", opt)
-		return s, &opt, nil
+		return &opt, nil
 	}
 
-	return nil, nil, fmt.Errorf("unable to find section __TEXT.__objc_opt_ro in /usr/lib/libobjc.A.dylib")
+	return nil, fmt.Errorf("unable to find section __TEXT.__objc_opt_ro in /usr/lib/libobjc.A.dylib")
 }
 
 func (f *File) GetOptimizations() (Optimization, error) {
-	if f.Headers[f.UUID].MappingOffset > offsetOfObjcOptsSizeField() { // check for NEW objc optimizations
+	if f.Headers[f.UUID].MappingOffset > uint32(unsafe.Offsetof(f.Headers[f.UUID].ObjcOptsSize)) { // check for NEW objc optimizations
 		if f.Headers[f.UUID].ObjcOptsOffset > 0 && f.Headers[f.UUID].ObjcOptsSize > 0 {
-			uuid, off, err := f.GetCacheOffset(f.Headers[f.UUID].ObjcOptsOffset)
+			uuid, off, err := f.GetOffset(f.Headers[f.UUID].SharedRegionStart + f.Headers[f.UUID].ObjcOptsOffset)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to get offset for NEW objc optimization header at addr %#x: %v",
+					f.Headers[f.UUID].SharedRegionStart+f.Headers[f.UUID].ObjcOptsOffset, err)
 			}
 
 			sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
@@ -229,39 +225,14 @@ func (f *File) GetOptimizations() (Optimization, error) {
 
 			var o ObjCOptimizationHeader
 			if err := binary.Read(sr, f.ByteOrder, &o); err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to read NEW objc optimization header: %v", err)
 			}
 
 			return &o, nil
 		}
-	} else { // check for OLD objc optimizations
-		libObjC, err := f.getLibObjC()
-		if err != nil {
-			return nil, err
-		}
-
-		if s := libObjC.Section("__TEXT", "__objc_opt_ro"); s != nil {
-			dat, err := s.Data()
-			if err != nil {
-				return nil, fmt.Errorf("failed to read __TEXT.__objc_opt_ro data: %v", err)
-			}
-
-			var opt ObjcOptT
-			if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &opt); err != nil {
-				return nil, err
-			}
-
-			if opt.Version > 16 {
-				return nil, fmt.Errorf("objc optimization version should be 16 or less, but found %d", opt.Version)
-			}
-
-			f.objcOptRoAddr = s.Addr
-
-			return &opt, nil
-		}
 	}
-
-	return nil, fmt.Errorf("no ObjC optimizations found")
+	// check for OLD objc optimizations
+	return f.getOptimizationsOld()
 }
 
 // GetAllHeaderRO dumps the header_ro from the optimized string hash
@@ -926,12 +897,12 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	var selectorStringVMAddrStart uint64
 	var selectorStringVMAddrEnd uint64
 
-	_, opt, err := f.getOptimizationsOld()
+	opt, err := f.GetOptimizations()
 	if err != nil {
 		return err
 	}
 
-	if f.IsDyld4 || opt.Version >= 16 {
+	if f.IsDyld4 || opt.GetVersion() >= 16 {
 		return fmt.Errorf("imp-cache dumping is NOT supported on macOS12/iOS15+ (yet)")
 	}
 
