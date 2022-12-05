@@ -8,7 +8,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
 	github.com/blacktop/go-dwarf v1.0.7
-	github.com/blacktop/go-macho v1.1.102
+	github.com/blacktop/go-macho v1.1.103
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.18
 	github.com/blacktop/lzss v0.1.1
