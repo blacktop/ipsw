@@ -40,7 +40,7 @@ func init() {
 var restoreExitCmd = &cobra.Command{
 	Use:           "exit",
 	Short:         "Exit recovery mode",
-	Args:          cobra.MaximumNArgs(2),
+	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

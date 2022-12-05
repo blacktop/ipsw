@@ -90,6 +90,7 @@ func init() {
 // machoInfoCmd represents the macho command
 var machoInfoCmd = &cobra.Command{
 	Use:          "info <macho>",
+	Aliases:      []string{"i"},
 	Short:        "Explore a MachO file",
 	Args:         cobra.MinimumNArgs(1),
 	SilenceUsage: true,
