@@ -28,12 +28,6 @@ const config = {
     locales: ["en"],
   },
 
-  markdown: {
-    mermaid: true,
-  },
-
-  themes: ["@docusaurus/theme-mermaid"],
-
   presets: [
     [
       "classic",
@@ -87,19 +81,9 @@ const config = {
         themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
         additionalLanguages: ["armasm"],
       },
-      zoom: {
-        selector: ".markdown img:not(.not-zoom)",
-        background: {
-          light: "rgb(255, 255, 255)",
-          dark: "rgb(50, 50, 50)",
-        },
-        // medium-zoom configuration options
-        // Refer to https://github.com/francoischalifour/medium-zoom#options
-        config: {},
-      },
       algolia: {
         appId: "KYIBYORJ9P",
-        apiKey: "ddaac83aaf4c488e3b0c51dc7993975b",
+        apiKey: "3affebe656f9ea5ea2f830e2747f5afc",
         indexName: "ipsw",
       },
       navbar: {
@@ -126,25 +110,6 @@ const config = {
             label: "CLI",
           },
           // Right
-          // {
-          //   type: "localeDropdown",
-          //   position: "right",
-          //   dropdownItemsAfter: [
-          //     {
-          //       type: "html",
-          //       value: '<hr style="margin: 0.3rem 0;">',
-          //     },
-          //     {
-          //       href: "https://github.com/facebook/docusaurus/issues/3526",
-          //       label: "Help Us Translate",
-          //     },
-          //   ],
-          // },
-          // {
-          //   type: "docsVersionDropdown",
-          //   position: "right",
-          //   dropdownActiveClassDisabled: true,
-          // },
           {
             href: "https://github.com/blacktop/ipsw",
             position: "right",
@@ -217,8 +182,6 @@ const config = {
         copyright: `Copyright © ${new Date().getFullYear()} ipsw. Built with Go and ❤️`,
       },
     }),
-
-  plugins: ["docusaurus-plugin-image-zoom"],
 };
 
 module.exports = config;
