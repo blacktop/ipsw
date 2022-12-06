@@ -342,15 +342,21 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	 * Read dyld slide info
 	 ***********************/
 	if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
-		cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
-			Address:         f.Mappings[uuid][1].Address,    // __DATA
-			Size:            f.Mappings[uuid][1].Size,       // __DATA
-			FileOffset:      f.Mappings[uuid][1].FileOffset, // __DATA
-			SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
-			SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
-		}, Name: "__DATA"}
-		f.GetSlideInfo(uuid, cm)
-		f.MappingsWithSlideInfo[uuid] = append(f.MappingsWithSlideInfo[uuid], cm)
+		for _, m := range f.Mappings[uuid] {
+			cm := &CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: CacheMappingAndSlideInfo{
+				Address:    m.Address,
+				Size:       m.Size,
+				FileOffset: m.FileOffset,
+				MaxProt:    m.MaxProt,
+				InitProt:   m.InitProt,
+			}, Name: m.Name}
+			if m.Name == "__DATA" {
+				cm.SlideInfoOffset = f.Headers[uuid].SlideInfoOffsetUnused
+				cm.SlideInfoSize = f.Headers[uuid].SlideInfoSizeUnused
+				f.GetSlideInfo(uuid, cm)
+			}
+			f.MappingsWithSlideInfo[uuid] = append(f.MappingsWithSlideInfo[uuid], cm)
+		}
 	} else {
 		// Read NEW (in iOS 14) dyld mappings with slide info.
 		sr.Seek(int64(f.Headers[uuid].MappingWithSlideOffset), io.SeekStart)
