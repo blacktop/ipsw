@@ -871,6 +871,9 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 		image.ObjC.Methods, err = m.GetObjCMethodLists()
 		if err != nil {
+			if errors.Is(err, macho.ErrObjcSectionNotFound) {
+				return nil
+			}
 			return fmt.Errorf("failed to get objc methods for %s: %v", image.Name, err)
 		}
 
@@ -1204,11 +1207,13 @@ func (f *File) ParseObjcForImage(imageNames ...string) error {
 
 	for _, image := range images {
 		if err := f.CFStringsForImage(image.Name); err != nil {
-			return fmt.Errorf("failed to parse objc cfstrings for image %s: %v", image.Name, err)
+			return fmt.Errorf("failed to parse objc cfstrings for image %s: %v", filepath.Base(image.Name), err)
 		}
 		// TODO: add objc methods in the -[Class sel:] form
 		if err := f.MethodsForImage(image.Name); err != nil {
-			return fmt.Errorf("failed to parse objc methods for image %s: %v", image.Name, err)
+			if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+				return fmt.Errorf("failed to parse objc methods for image %s: %v", filepath.Base(image.Name), err)
+			}
 		}
 		if strings.Contains(image.Name, "libobjc.A.dylib") {
 			if _, err := f.GetAllObjCSelectors(false); err != nil {
@@ -1216,14 +1221,14 @@ func (f *File) ParseObjcForImage(imageNames ...string) error {
 			}
 		} else {
 			if err := f.SelectorsForImage(image.Name); err != nil {
-				return fmt.Errorf("failed to parse objc selectors for image %s: %v", image.Name, err)
+				return fmt.Errorf("failed to parse objc selectors for image %s: %v", filepath.Base(image.Name), err)
 			}
 		}
 		if err := f.ClassesForImage(image.Name); err != nil {
-			return fmt.Errorf("failed to parse objc classes for image %s: %v", image.Name, err)
+			return fmt.Errorf("failed to parse objc classes for image %s: %v", filepath.Base(image.Name), err)
 		}
 		if err := f.ProtocolsForImage(image.Name); err != nil {
-			return fmt.Errorf("failed to parse objc protocols for image %s: %v", image.Name, err)
+			return fmt.Errorf("failed to parse objc protocols for image %s: %v", filepath.Base(image.Name), err)
 		}
 	}
 
