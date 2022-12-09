@@ -394,6 +394,7 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 
 		if opt.GetVersion() == 16 {
 			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
+			rsBase += i.cache.Headers[i.cache.UUID].SharedRegionStart // TODO: can I trust SharedRegionStart? should this be Mapping[0].Address?
 		}
 	}
 

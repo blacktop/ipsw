@@ -338,13 +338,23 @@ var MachoCmd = &cobra.Command{
 							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 								log.Error(err.Error())
 							}
-							if methods, err := m.GetObjCMethodNames(); err == nil {
-								fmt.Printf("\n@methods\n")
-								for method, vmaddr := range methods {
-									fmt.Printf("0x%011x: %s\n", vmaddr, method)
+							if viper.GetBool("verbose") {
+								if classes, err := m.GetObjCClassNames(); err == nil {
+									fmt.Printf("\n@objc_classname\n")
+									for vmaddr, className := range classes {
+										fmt.Printf("0x%011x: %s\n", vmaddr, className)
+									}
+								} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+									log.Error(err.Error())
 								}
-							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-								log.Error(err.Error())
+								if methods, err := m.GetObjCMethodNames(); err == nil {
+									fmt.Printf("\n@objc_methname\n")
+									for vmaddr, method := range methods {
+										fmt.Printf("0x%011x: %s\n", vmaddr, method)
+									}
+								} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+									log.Error(err.Error())
+								}
 							}
 						}
 

@@ -242,8 +242,7 @@ var machoInfoCmd = &cobra.Command{
 				}
 
 				if extractfilesetEntry {
-					err = m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil) // TODO: do I want to add any extra syms?
-					if err != nil {
+					if err := m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
 					log.Infof("Created %s", filepath.Join(folder, filesetEntry))
@@ -547,13 +546,23 @@ var machoInfoCmd = &cobra.Command{
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 						log.Error(err.Error())
 					}
-					if methods, err := m.GetObjCMethodNames(); err == nil {
-						fmt.Printf("\n@methods\n")
-						for method, vmaddr := range methods {
-							fmt.Printf("0x%011x: %s\n", vmaddr, method)
+					if viper.GetBool("verbose") {
+						if classes, err := m.GetObjCClassNames(); err == nil {
+							fmt.Printf("\n@objc_classname\n")
+							for vmaddr, className := range classes {
+								fmt.Printf("0x%011x: %s\n", vmaddr, className)
+							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
 						}
-					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
+						if methods, err := m.GetObjCMethodNames(); err == nil {
+							fmt.Printf("\n@objc_methname\n")
+							for vmaddr, method := range methods {
+								fmt.Printf("0x%011x: %s\n", vmaddr, method)
+							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
+						}
 					}
 				}
 			} else {
