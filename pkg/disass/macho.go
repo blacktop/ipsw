@@ -322,11 +322,6 @@ func (d *MachoDisass) parseObjC() error {
 				d.a2s[d.f.GetBaseAddress()+sel.VMAddr] = sel.Name
 			}
 		}
-		if methods, err := d.f.GetObjCMethodNames(); err == nil {
-			for method, vmaddr := range methods {
-				d.a2s[vmaddr] = method
-			}
-		}
 		if classRefs, err := d.f.GetObjCClassReferences(); err == nil {
 			for off, class := range classRefs {
 				d.a2s[off] = fmt.Sprintf("class_%s", class.Name)

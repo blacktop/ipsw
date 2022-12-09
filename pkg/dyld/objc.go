@@ -869,7 +869,7 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
 		}
 
-		image.ObjC.Methods, err = m.GetObjCMethodList()
+		image.ObjC.Methods, err = m.GetObjCMethodLists()
 		if err != nil {
 			return fmt.Errorf("failed to get objc methods for %s: %v", image.Name, err)
 		}
