@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: ipsw
 description: Download and parse IPSW(s) from the internets
 last_update:
-  date: 2022-12-10T00:43:42-07:00
+  date: 2022-12-10T13:19:31-07:00
   author: blacktop
 ---
 ## ipsw download ipsw
@@ -31,7 +31,8 @@ ipsw download ipsw [flags]
       --macos                   Download macOS IPSWs
   -o, --output string           Folder to download files to
       --pattern string          Download remote files that match regex
-      --show-latest             Show latest iOS version
+      --show-latest-build       Show latest iOS build
+      --show-latest-version     Show latest iOS version
   -u, --usb                     Download IPSWs for USB attached iDevices
 ```
 

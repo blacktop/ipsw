@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: ota
 description: Download OTAs
 last_update:
-  date: 2022-12-10T00:43:42-07:00
+  date: 2022-12-10T13:19:31-07:00
   author: blacktop
 ---
 ## ipsw download ota
@@ -20,11 +20,13 @@ ipsw download ota [options] [flags]
 ### Examples
 
 ```bash
-❯ ipsw download ota --version 14.8.1 --device iPhone10,1
-
-	? You are about to download 1 OTA files. Continue? Yes
-	   • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
-		280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s
+  # Download the iOS 14.8.1 OTA for the iPhone10,1
+  ❯ ipsw download ota --platform ios --version 14.8.1 --device iPhone10,1
+    ? You are about to download 1 OTA files. Continue? Yes
+	  • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
+	  280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s
+  # Get all the latest BETA iOS OTAs URLs as JSON
+  ❯ ipsw download ota --platform ios --beta --urls --json
 ```
 
 ### Options
@@ -37,13 +39,14 @@ ipsw download ota [options] [flags]
   -f, --flat                    Do NOT perserve directory structure when downloading with --pattern
   -h, --help                    help for ota
       --info                    Show all the latest OTAs available
-      --info-type string        OS type to show OTAs for
   -j, --json                    Dump URLs as JSON only
   -k, --kernel                  Extract kernelcache from remote OTA zip
   -o, --output string           Folder to download files to
       --pattern string          Download remote files that match regex
   -p, --platform string         Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)
       --rsr                     Download Rapid Security Response OTAs
+      --show-latest-build       Show latest iOS build
+      --show-latest-version     Show latest iOS version
   -u, --urls                    Dump URLs only
 ```
 
