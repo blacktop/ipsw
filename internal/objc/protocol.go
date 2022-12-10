@@ -150,7 +150,7 @@ func (p Protocol) CopyProtocolList() (protocols []Protocol) {
 }
 
 func (p Protocol) ConformsToProtocol(other Protocol) bool {
-	return C.protocol_conformsToProtocol(p.cprot(), other.cprot()) != C.BOOL(0)
+	return bool(C.protocol_conformsToProtocol(p.cprot(), other.cprot()))
 }
 
 func nextProtocol(list **C.Protocol) **C.Protocol {
