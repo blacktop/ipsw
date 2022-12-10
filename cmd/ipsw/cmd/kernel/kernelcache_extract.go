@@ -23,12 +23,13 @@ package kernel
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -36,42 +37,79 @@ import (
 func init() {
 	KernelcacheCmd.AddCommand(kerExtractCmd)
 
-	kerExtractCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
+	kerExtractCmd.Flags().BoolP("all", "a", false, "Extract all KEXTs")
+	kerExtractCmd.Flags().String("output", "", "Directory to extract KEXTs to")
+
+	viper.BindPFlag("kernel.extract.all", kerExtractCmd.Flags().Lookup("all"))
+	viper.BindPFlag("kernel.extract.output", kerExtractCmd.Flags().Lookup("output"))
 }
 
 // kerExtractCmd represents the kerExtract command
 var kerExtractCmd = &cobra.Command{
-	Use:   "extract <IPSW> [DEST]",
-	Short: "Extract and decompress a kernelcache from IPSW",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "extract <KEXT>",
+	Short:         "Extract KEXT(s) from kernelcache",
+	Args:          cobra.ExactArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		ipswPath := filepath.Clean(args[0])
+		dumpAll := viper.GetBool("kernel.extract.all")
+		extractPath := viper.GetString("kernel.extract.output")
 
-		var destPath string
-		if len(args) > 1 {
-			destPath = filepath.Clean(args[1])
+		kernPath := filepath.Clean(args[0])
+
+		folder := filepath.Dir(kernPath)
+		if len(extractPath) > 0 {
+			folder = extractPath
 		}
 
-		if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", ipswPath)
-		}
-
-		i, err := info.Parse(ipswPath)
+		m, err := macho.Open(kernPath)
 		if err != nil {
-			return fmt.Errorf("failed to parse ipsw info: %v", err)
+			return err
 		}
 
-		folder, err := i.GetFolder()
-		if err != nil {
-			log.Errorf("failed to get IPSW spec folder: %v", err)
+		if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+			return fmt.Errorf("kernelcache type is not MH_FILESET (KEXT-xtraction not supported yet)")
 		}
-		destPath = filepath.Join(destPath, folder)
 
-		log.Info("Extracting kernelcaches")
-		return kernelcache.Extract(ipswPath, destPath)
+		var dcf *fixupchains.DyldChainedFixups
+		if m.HasFixups() {
+			dcf, err = m.DyldChainedFixups()
+			if err != nil {
+				return fmt.Errorf("failed to parse fixups from in memory MachO: %v", err)
+			}
+		}
+
+		baseAddress := m.GetBaseAddress()
+
+		if dumpAll {
+			log.Info("Extracting all KEXTs...")
+			for _, fse := range m.FileSets() {
+				mfse, err := m.GetFileSetFileByName(fse.EntryID)
+				if err != nil {
+					return fmt.Errorf("failed to parse entry %s: %v", fse.EntryID, err)
+				}
+				if err := mfse.Export(filepath.Join(folder, fse.EntryID), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
+					return fmt.Errorf("failed to export entry MachO %s; %v", fse.EntryID, err)
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", filepath.Join(folder, fse.EntryID)))
+			}
+		} else {
+			m, err = m.GetFileSetFileByName(args[0])
+			if err != nil {
+				return fmt.Errorf("failed to parse kext %s: %v", args[0], err)
+			}
+
+			if err := m.Export(filepath.Join(folder, args[0]), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
+				return fmt.Errorf("failed to export entry MachO %s; %v", args[0], err)
+			}
+			log.Infof("Created %s", filepath.Join(folder, args[0]))
+		}
+
+		return nil
 	},
 }
