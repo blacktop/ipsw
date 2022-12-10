@@ -180,6 +180,8 @@ jobs:
         run: |
           mkdir -p ~/.ipsw
           mkdir -p ~/.ipsw-beta
+          ls -lah
+          ls -lah ~/.ipsw
 
       #
       # DEVICE LIST
@@ -389,14 +391,14 @@ jobs:
         if: matrix.platform == 'macos-12'
         working-directory: ~/.ipsw
         run: ipsw macho lipo /bin/ls --output /tmp --arch x86_64
-      # #
-      # # ENT CMD (macOS)
-      # #
+
+      #
+      # ENT CMD (macOS)
+      #
       # - name: Run ents
       #   if: matrix.platform == 'macos-12'
-      #   run: |
-      #     export PATH=$PWD/build/dist:$PATH
-      #     cd ~/.ipsw && LD_LIBRARY_PATH=/usr/local/lib ipsw ent *.ipsw --ent platform-application
+      #   working-directory: ~/.ipsw
+      #   run: ipsw ent *.ipsw --ent platform-application
 
       #
       # UPDATE CMD (macOS)
