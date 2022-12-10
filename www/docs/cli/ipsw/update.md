@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: update
 description: Download an ipsw update if one exists
 last_update:
-  date: 2022-12-03T18:41:04-07:00
+  date: 2022-12-10T00:43:42-07:00
   author: blacktop
 ---
 ## ipsw update

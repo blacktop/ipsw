@@ -4,23 +4,25 @@ title: extract
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: extract
-description: Extract and decompress a kernelcache from IPSW
+description: Extract KEXT(s) from kernelcache
 last_update:
-  date: 2022-12-03T18:41:04-07:00
+  date: 2022-12-10T00:43:42-07:00
   author: blacktop
 ---
 ## ipsw kernel extract
 
-Extract and decompress a kernelcache from IPSW
+Extract KEXT(s) from kernelcache
 
 ```
-ipsw kernel extract <IPSW> [DEST] [flags]
+ipsw kernel extract <KEXT> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for extract
+  -a, --all             Extract all KEXTs
+  -h, --help            help for extract
+      --output string   Directory to extract KEXTs to
 ```
 
 ### Options inherited from parent commands
