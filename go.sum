@@ -74,8 +74,6 @@ github.com/blacktop/arm64-cgo v1.0.55 h1:Ze2bj2iDxr//eUFPoZeA1ph3WFEOeF3ihfv8YfX
 github.com/blacktop/arm64-cgo v1.0.55/go.mod h1:+8K+RkaTCC3o3WZme98SiIJuHteOxGoIvuc3WVlHHBI=
 github.com/blacktop/go-dwarf v1.0.7 h1:EKm86zNKlanwpXwxGkh0kqteN+mYHM0GZWFJSn9cMuc=
 github.com/blacktop/go-dwarf v1.0.7/go.mod h1:4W2FKgSFYcZLDwnR7k+apv5i3nrau4NGl9N6VQ9DSTo=
-github.com/blacktop/go-macho v1.1.110 h1:YOjbgXe4lp0pT1QlhydwClrE4JKoxbJ3ab4qsGqxaFI=
-github.com/blacktop/go-macho v1.1.110/go.mod h1:I32mDLyphSEj/Bh6SL+au8tsDsDgtL4voQSsK3eCtTw=
 github.com/blacktop/go-macho v1.1.111 h1:URkaNm8qjhxVDqyYeCBARp/ABRIJHyeR7kb8S5uzvII=
 github.com/blacktop/go-macho v1.1.111/go.mod h1:I32mDLyphSEj/Bh6SL+au8tsDsDgtL4voQSsK3eCtTw=
 github.com/blacktop/go-plist v1.0.1 h1:cbpYg6OYwSpJPLk8ObZW+norqxG5YInfPXRNcFw6n8I=
@@ -136,7 +134,6 @@ github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4 h1:qZNfIGkIANxGv/Oq
 github.com/go-toast/toast v0.0.0-20190211030409-01e6764cf0a4/go.mod h1:kW3HQ4UdaAyrUCSSDR4xUzBKW6O2iA4uHhk7AtyYp10=
 github.com/gobwas/glob v0.2.3 h1:A4xDbljILXROh+kObIiy5kIaPYD8e96x1tgBhUI5J+Y=
 github.com/gobwas/glob v0.2.3/go.mod h1:d3Ez4x06l9bZtSvzIay5+Yzi0fmZzPgnTbPcKjJAkT8=
-github.com/gocolly/colly v1.2.0 h1:qRz9YAn8FIH0qzgNUw+HT9UN7wm1oF9OBAilwEWpyrI=
 github.com/gocolly/colly v1.2.0/go.mod h1:Hof5T3ZswNVsOHYmba1u03W65HDWgpV5HifSuueE0EA=
 github.com/gocolly/colly/v2 v2.1.0 h1:k0DuZkDoCsx51bKpRJNEmcxcp+W5N8ziuwGaSDuFoGs=
 github.com/gocolly/colly/v2 v2.1.0/go.mod h1:I2MuhsLjQ+Ex+IzK3afNS8/1qP3AedHOusRPcRdC5o0=

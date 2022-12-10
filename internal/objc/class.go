@@ -53,7 +53,7 @@ func (cls Class) Super() Class {
 }
 
 func (cls Class) IsMetaClass() bool {
-	return C.class_isMetaClass(cls.cclass()) != C.BOOL(false)
+	return C.class_isMetaClass(cls.cclass()) != C.BOOL(0)
 }
 
 func (cls Class) InstanceSize() int {
@@ -110,7 +110,7 @@ func (cls Class) GetMethodImplementation(name Sel) C.IMP {
 }
 
 func (cls Class) RespondsToSelector(sel Sel) bool {
-	return C.class_respondsToSelector(cls.cclass(), sel.csel()) != C.BOOL(false)
+	return C.class_respondsToSelector(cls.cclass(), sel.csel()) != C.BOOL(0)
 }
 
 func (cls Class) Methods() []Method {
@@ -234,7 +234,7 @@ func (cls Class) Properties() []Property {
 // }
 
 func (cls Class) ConformsToProtocol(prot Protocol) bool {
-	return C.class_conformsToProtocol(cls.cclass(), prot.cprot()) != C.BOOL(false)
+	return C.class_conformsToProtocol(cls.cclass(), prot.cprot()) != C.BOOL(0)
 }
 
 func (cls Class) Version() int {
