@@ -260,7 +260,8 @@ jobs:
       - name: Run kernel extract
         if: matrix.platform == 'macos-12'
         run: |
-          export PATH=$PWD/build/dist:$PATH        
+          export PATH=$PWD/build/dist:$PATH   
+          ls -lah ~/.ipsw     
           cd ~/.ipsw && ipsw kernel extract */kernelcache.release.iphone12b --all --output /tmp/KEXTS
           cd /tmp/KEXTS && ls -1 | xargs codesign -s - -f
       #
