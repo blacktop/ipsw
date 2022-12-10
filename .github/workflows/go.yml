@@ -261,23 +261,23 @@ jobs:
       - name: Run kernel version
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw ipsw kernel version "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --json | jq .
+        run: ipsw kernel version "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --json | jq .
       - name: Run kernel symbolsets
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw ipsw kernel symbolsets "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+        run: ipsw kernel symbolsets "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       - name: Run kernel syscall
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw ipsw kernel syscall "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+        run: ipsw kernel syscall "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       - name: Run kernel kexts
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw ipsw kernel kexts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+        run: ipsw kernel kexts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       - name: Run kernel sbopts
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw ipsw kernel sbopts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+        run: ipsw kernel sbopts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       - name: Run kernel extract (KEXTs)
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
@@ -368,14 +368,18 @@ jobs:
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: ipsw dyld swift "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --types --demangle
-      - name: Run dyld str (beta)
+      - name: Run dyld str
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw dyld str "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
-      - name: Run dyld image (beta)
+        run: |
+          ipsw dyld str "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
+          ipsw dyld str "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
+      - name: Run dyld image
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw dyld image "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e
+        run: |
+          ipsw dyld image "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+          ipsw dyld image "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e
 
       #
       # MACHO CMD (macOS)
