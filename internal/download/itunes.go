@@ -301,6 +301,19 @@ func (vm *ITunesVersionMaster) GetLatestVersion() (string, error) {
 	return newestVersion.Original(), nil
 }
 
+// GetLatestBuild gets the latest iOS build
+func (vm *ITunesVersionMaster) GetLatestBuild() (string, error) {
+	version, err := vm.GetLatestVersion()
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest version: %s", err)
+	}
+	builds := UniqueBuilds(vm.GetBuildsForVersion(version))
+	sort.Slice(builds, func(i, j int) bool {
+		return builds[i].BuildID > builds[j].BuildID
+	})
+	return builds[0].BuildID, nil
+}
+
 // GetSoftwareURLsForBuildID gets all the ipsw URLs for an iOS Build ID
 func (vm *ITunesVersionMaster) GetSoftwareURLsForBuildID(buildID string) ([]string, error) {
 	var urls []string
