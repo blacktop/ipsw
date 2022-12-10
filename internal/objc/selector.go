@@ -1,3 +1,5 @@
+//go:build darwin && cgo && objc
+
 package objc
 
 // #include <stdlib.h>
