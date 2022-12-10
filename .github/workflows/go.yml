@@ -261,7 +261,7 @@ jobs:
         if: matrix.platform == 'macos-12'
         run: |
           export PATH=$PWD/build/dist:$PATH        
-          cd ~/.ipsw && ipsw kernel extract */kernelcache.release.* --all --output /tmp/KEXTS
+          cd ~/.ipsw && ipsw kernel extract */kernelcache.release.iphone12b --all --output /tmp/KEXTS
           cd /tmp/KEXTS && ls -1 | xargs codesign -s - -f
       #
       # DYLD CMD (macOS)
