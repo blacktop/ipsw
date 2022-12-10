@@ -350,20 +350,32 @@ jobs:
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: ipsw dyld objc --class "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
-      # - name: Run dyld objc --imp-cache
-      #   if: matrix.platform == 'macos-12'
-      #   run: |
-      #     ipsw dyld objc --imp-cache "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       - name: Run dyld objc --proto
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: ipsw dyld objc --proto "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+      # - name: Run dyld objc --imp-cache
+      #   if: matrix.platform == 'macos-12'
+      #   run: |
+      #     ipsw dyld objc --imp-cache "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       - name: Run dyld split (Xcode)
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: |
           ipsw dyld split --xcode /Applications/Xcode_14.1.app "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e /tmp/ipsw
           tree /tmp/ipsw
+      - name: Run dyld swfit
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: ipsw dyld swift "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --types --demangle
+      - name: Run dyld str (beta)
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: ipsw dyld str "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
+      - name: Run dyld image (beta)
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: ipsw dyld image "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e
 
       #
       # MACHO CMD (macOS)
