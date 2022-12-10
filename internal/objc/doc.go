@@ -1,3 +1,5 @@
+//go:build darwin && cgo && objc
+
 /*
 objc impiments the Objective-C runtime API for Go.
 */
