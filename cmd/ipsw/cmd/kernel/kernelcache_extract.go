@@ -72,7 +72,7 @@ var kerExtractCmd = &cobra.Command{
 			return err
 		}
 
-		if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+		if m.FileTOC.FileHeader.Type != types.MH_FILESET {
 			return fmt.Errorf("kernelcache type is not MH_FILESET (KEXT-xtraction not supported yet)")
 		}
 
