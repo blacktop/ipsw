@@ -3,10 +3,18 @@
 package objc
 
 /*
+// #cgo CFLAGS: -Dqqq
+// #cgo LDFLAGS: -lobjc -framework Foundation
+
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <dlfcn.h>
 #include <objc/objc-runtime.h>
+
+static int objcBOOL2int(BOOL b) {
+	return (int)b;
+}
 */
 import "C"
 import (
@@ -55,7 +63,7 @@ func (cls Class) Super() Class {
 }
 
 func (cls Class) IsMetaClass() bool {
-	return bool(C.class_isMetaClass(cls.cclass()))
+	return C.objcBOOL2int(C.class_isMetaClass(cls.cclass())) != 0
 }
 
 func (cls Class) InstanceSize() int {
@@ -112,7 +120,7 @@ func (cls Class) GetMethodImplementation(name Sel) C.IMP {
 }
 
 func (cls Class) RespondsToSelector(sel Sel) bool {
-	return bool(C.class_respondsToSelector(cls.cclass(), sel.csel()))
+	return C.objcBOOL2int(C.class_respondsToSelector(cls.cclass(), sel.csel())) != 0
 }
 
 func (cls Class) Methods() []Method {
@@ -236,7 +244,7 @@ func (cls Class) Properties() []Property {
 // }
 
 func (cls Class) ConformsToProtocol(prot Protocol) bool {
-	return bool(C.class_conformsToProtocol(cls.cclass(), prot.cprot()))
+	return C.objcBOOL2int(C.class_conformsToProtocol(cls.cclass(), prot.cprot())) != 0
 }
 
 func (cls Class) Version() int {
