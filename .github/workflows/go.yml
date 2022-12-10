@@ -257,6 +257,12 @@ jobs:
         run: |
           export PATH=$PWD/build/dist:$PATH        
           cd ~/.ipsw && ipsw kernel sbopts */kernelcache.release.*
+      - name: Run kernel extract
+        if: matrix.platform == 'macos-12'
+        run: |
+          export PATH=$PWD/build/dist:$PATH        
+          cd ~/.ipsw && ipsw kernel extract */kernelcache.release.* --all --output KEXTS
+          cd KEXTS && ls -1 | xargs codesign -s - -f
       #
       # DYLD CMD (macOS)
       #
