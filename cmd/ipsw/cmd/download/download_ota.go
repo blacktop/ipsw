@@ -60,8 +60,9 @@ func init() {
 	otaDLCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	otaDLCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
-	otaDLCmd.Flags().String("info-type", "", "OS type to show OTAs for")
 	otaDLCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	otaDLCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
+	otaDLCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ota.rsr", otaDLCmd.Flags().Lookup("rsr"))
@@ -74,19 +75,24 @@ func init() {
 	viper.BindPFlag("download.ota.pattern", otaDLCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.ota.flat", otaDLCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.ota.info", otaDLCmd.Flags().Lookup("info"))
-	viper.BindPFlag("download.ota.info-type", otaDLCmd.Flags().Lookup("info-type"))
 	viper.BindPFlag("download.ota.output", otaDLCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.ota.show-latest-version", otaDLCmd.Flags().Lookup("show-latest-version"))
+	viper.BindPFlag("download.ota.show-latest-build", otaDLCmd.Flags().Lookup("show-latest-build"))
+
+	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta")
 }
 
 // otaDLCmd represents the ota download command
 var otaDLCmd = &cobra.Command{
 	Use:   "ota [options]",
 	Short: "Download OTAs",
-	Example: `❯ ipsw download ota --version 14.8.1 --device iPhone10,1
-
-	? You are about to download 1 OTA files. Continue? Yes
-	   • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
-		280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s`,
+	Example: `  # Download the iOS 14.8.1 OTA for the iPhone10,1
+  ❯ ipsw download ota --platform ios --version 14.8.1 --device iPhone10,1
+    ? You are about to download 1 OTA files. Continue? Yes
+	  • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
+	  280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s
+  # Get all the latest BETA iOS OTAs URLs as JSON
+  ❯ ipsw download ota --platform ios --beta --urls --json`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -138,8 +144,9 @@ var otaDLCmd = &cobra.Command{
 		remotePattern := viper.GetString("download.ota.pattern")
 		flat := viper.GetBool("download.ota.flat")
 		otaInfo := viper.GetBool("download.ota.info")
-		otaInfoType := viper.GetString("download.ota.info-type")
 		output := viper.GetString("download.ota.output")
+		showLatestVersion := viper.GetBool("download.ota.show-latest-version")
+		showLatestBuild := viper.GetBool("download.ota.show-latest-build")
 		// verify args
 		if len(dyldArches) > 0 && !remoteDyld {
 			return errors.New("--dyld-arch || -a can only be used with --dyld || -d")
@@ -151,8 +158,15 @@ var otaDLCmd = &cobra.Command{
 				}
 			}
 		}
-		if len(platform) == 0 || !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory"}, platform) {
+		if len(platform) == 0 {
 			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos || accessory, macos, recovery")
+		} else {
+			if !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory"}, platform) {
+				return fmt.Errorf("valid --platform flag choices are: ios, watchos, tvos, audioos || accessory, macos, recovery")
+			}
+		}
+		if (showLatestVersion || showLatestBuild) && len(device) == 0 {
+			return fmt.Errorf("you must supply a --device when using --show-latest-version or --show-latest-build")
 		}
 		if len(version) == 0 {
 			version = "0"
@@ -183,16 +197,13 @@ var otaDLCmd = &cobra.Command{
 					}).Info, 2)(asset.ProductVersion)
 				}
 			} else {
-				if len(otaInfoType) == 0 {
-					prompt := &survey.Select{
-						Message: "Choose an OS type:",
-						Options: []string{"iOS", "macOS"},
-					}
-					survey.AskOne(prompt, &otaInfoType)
+				var otaInfoType string
+				if utils.StrSliceHas([]string{"ios", "watchos", "tvos", "audioos"}, platform) {
+					otaInfoType = "iOS"
+				} else if utils.StrSliceHas([]string{"macos", "recovery"}, platform) {
+					otaInfoType = "macOS"
 				} else {
-					if !utils.StrSliceHas([]string{"iOS", "macOS"}, otaInfoType) {
-						log.Fatal("you must supply a valid --info-type flag: (iOS, macOS)")
-					}
+					log.Errorf("--info flag does not support platform '%s'", platform)
 				}
 				log.WithField("type", otaInfoType).Info("OTAs")
 				if otaInfoType == "iOS" {
@@ -241,6 +252,20 @@ var otaDLCmd = &cobra.Command{
 		otas, err := otaXML.GetPallasOTAs()
 		if err != nil {
 			return err
+		}
+
+		if showLatestVersion {
+			if len(otas) > 0 {
+				fmt.Println(strings.TrimPrefix(otas[0].OSVersion, "9.9."))
+				return nil
+			}
+			return fmt.Errorf("no OTA found")
+		} else if showLatestBuild {
+			if len(otas) > 0 {
+				fmt.Println(otas[0].Build)
+				return nil
+			}
+			return fmt.Errorf("no OTA found")
 		}
 
 		if viper.GetBool("download.ota.urls") || viper.GetBool("download.ota.json") {
