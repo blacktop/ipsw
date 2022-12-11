@@ -78,8 +78,8 @@ github.com/blacktop/go-macho v1.1.112 h1:n4RfbQhi7C+mxlP6XzTCVrfGJmJhsSW/Wlo/Eed
 github.com/blacktop/go-macho v1.1.112/go.mod h1:I32mDLyphSEj/Bh6SL+au8tsDsDgtL4voQSsK3eCtTw=
 github.com/blacktop/go-plist v1.0.1 h1:cbpYg6OYwSpJPLk8ObZW+norqxG5YInfPXRNcFw6n8I=
 github.com/blacktop/go-plist v1.0.1/go.mod h1:niIOeDMEBISbJ9w0PPuc67iLvLh7Ve0N1gAfxIRWSk4=
-github.com/blacktop/lzfse-cgo v1.1.18 h1:mc/mHexTNgLVHAozlbM84B0ywPy470mQQWEeEw6QMcI=
-github.com/blacktop/lzfse-cgo v1.1.18/go.mod h1:VoBC8Nle73KZg/4X9NW94jkFrQkNwQ18SMMu5ev8zSA=
+github.com/blacktop/lzfse-cgo v1.1.19 h1:1I/1y9/sjyDLomACLrR4f7GFJ1fTaIjhWb1PQrEtKiw=
+github.com/blacktop/lzfse-cgo v1.1.19/go.mod h1:VoBC8Nle73KZg/4X9NW94jkFrQkNwQ18SMMu5ev8zSA=
 github.com/blacktop/lzss v0.1.1 h1:ADOUgVH3hq2miBfaxhV1GgY97wNSv5fBiXRnUVe8QSg=
 github.com/blacktop/lzss v0.1.1/go.mod h1:eWPx0Tq21QndictvoAb20bFvvhDDbZ3mkcZ/mDHkwBk=
 github.com/blacktop/ranger v1.0.3 h1:uIWlR8chK6AtNNPZz67+cwibOe8T5XnYyQfkk04ueZA=
@@ -117,6 +117,8 @@ github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5Kwzbycv
 github.com/fatih/color v1.13.0 h1:8LOYc1KYPPmyKMuN8QV2DNRWNbLo6LZ0iLs8+mlH53w=
 github.com/fatih/color v1.13.0/go.mod h1:kLAiJbzzSOZDVNGyDpeOxJ47H46qBXwg5ILebYFFOfk=
 github.com/frankban/quicktest v1.14.3 h1:FJKSZTDHjyhriyC81FLQ0LY93eSai0ZyR/ZIkd3ZUKE=
+github.com/frida/frida-go v0.3.1 h1:QyqWDo0aHWN96h6QHpq98Mi1Mk/X6+uYz/46lf/FuYw=
+github.com/frida/frida-go v0.3.1/go.mod h1:OyRIp58wuTcGggI6ztakXcHkTXrt5WfD9yi3pq6QyGw=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=
 github.com/fsnotify/fsnotify v1.6.0 h1:n+5WquG0fcWoWp6xPWfHdbskMCQaFnG6PfBrh1Ky4HY=
 github.com/fsnotify/fsnotify v1.6.0/go.mod h1:sl3t1tCWJFWoRz9R8WJCbQihKKwmorjAbSClcnxKAGw=
@@ -202,6 +204,8 @@ github.com/google/pprof v0.0.0-20201218002935-b9804c9f04c2/go.mod h1:kpwsk12EmLe
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
 github.com/google/uuid v1.1.1/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/google/uuid v1.1.2/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+vpHVxEJEs9eg=
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
 github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8/go.mod h1:dvDLG8qkwmyD9a/MJJN3XJcT3xFxOKAvTZGvuZmac9g=
