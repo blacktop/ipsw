@@ -288,7 +288,7 @@ var ipswCmd = &cobra.Command{
 				})
 			}
 		} else {
-			ipsws, err = filterIPSWs(cmd)
+			ipsws, err = filterIPSWs(cmd, macos)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
