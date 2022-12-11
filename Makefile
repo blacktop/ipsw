@@ -96,6 +96,11 @@ update_keys: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating firmware_keys.json"
 	CGO_ENABLED=0 $(GO_BIN) run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
 
+.PHONY: update_frida
+update_frida: ## Updates the frida-core-devkits used in the frida cmd
+	@echo " > Updating frida-core-devkits"
+	@hack/make/frida-deps
+
 .PHONY: docker
 docker: ## Build docker image
 	@echo " > Building Docker Image"

@@ -27,8 +27,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/objc"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -45,12 +47,18 @@ var objcCmd = &cobra.Command{
 	Hidden:        true,
 	Run: func(cmd *cobra.Command, args []string) {
 
+		if viper.GetBool("verbose") {
+			log.SetLevel(log.DebugLevel)
+		}
+
 		// BlastDoor, err := objc.LoadImage("/System/Library/PrivateFrameworks/BlastDoor.framework/BlastDoor")
 		// if err != nil {
 		// 	log.Error(err.Error())
 		// 	return
 		// }
 		// defer BlastDoor.Close()
+
+		log.Infof("Dumping Objective-C info in running `ipsw` process for class: %s", args[0])
 
 		for _, img := range objc.ImageNames() {
 			fmt.Println(img)
