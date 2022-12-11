@@ -29,13 +29,14 @@ change_version() {
 }
 
 update_frida() {
-    echo "  [!] Updating frida-core-devkit"
+    echo "  [!] Updating frida-core-devkit (ARM64)"
     gh release download --pattern 'frida-core-devkit-*-macos-arm64.tar.xz' --repo frida/frida --dir /tmp --skip-existing
+    gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /opt/homebrew/lib libfrida-core.a
+    gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /opt/homebrew/include frida-core.h
+    echo "  [!] Updating frida-core-devkit (x86_64)"
     gh release download --pattern 'frida-core-devkit-*-macos-x86_64.tar.xz' --repo frida/frida --dir /tmp --skip-existing
     gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /usr/local/homebrew/lib libfrida-core.a
     gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /usr/local/homebrew/include frida-core.h
-    gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /opt/homebrew/lib libfrida-core.a
-    gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /opt/homebrew/include frida-core.h
 }
 
 main() {
