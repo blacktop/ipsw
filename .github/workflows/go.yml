@@ -402,6 +402,10 @@ jobs:
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: ipsw macho disass ./System/Library/Frameworks/Foundation.framework/Foundation --symbol _NSLog
+      - name: Run macho disass (MTE)
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: ipsw macho disass "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --all-fileset-entries  --quiet --section __TEXT_EXEC.__text | grep 'addg\|cmpp\|gmi\|irg\|ldg\|ldgv\|st2g\|stg\|stgp\|stgv\|stz2g\|stzg\|subg\|subp\|subps'
       - name: Run lipo
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
