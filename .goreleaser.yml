@@ -99,7 +99,6 @@ builds:
     goarch:
       - amd64
     tags:
-      - libusb
       - frida
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
@@ -120,7 +119,6 @@ builds:
     goarch:
       - arm64
     tags:
-      - libusb
       - frida
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
