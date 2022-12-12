@@ -1,4 +1,4 @@
-//go:build darwin && cgo && frida
+//go:build darwin && frida
 
 /*
 Copyright © 2022 blacktop
@@ -26,10 +26,15 @@ package cmd
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
 	"github.com/frida/frida-go/frida"
 	"github.com/spf13/cobra"
@@ -209,13 +214,53 @@ const hookMethods = (selector) => {
 rpc.exports.hook = hookMethods;
 `
 
+type arg struct {
+	TypeString        string `json:"typeString,omitempty"`
+	TypeDescription   string `json:"typeDescription,omitempty"`
+	Object            string `json:"object,omitempty"`
+	ObjectDescription string `json:"objectDescription,omitempty"`
+}
+
+type payload struct {
+	TargetType         string `json:"targetType,omitempty"`
+	TargetClass        string `json:"targetClass,omitempty"`
+	TargetMethod       string `json:"targetMethod,omitempty"`
+	Args               []arg  `json:"args,omitempty"`
+	ReturnType         string `json:"returnType,omitempty"`
+	RetTypeDescription string `json:"retTypeDescription,omitempty"`
+	ReturnDescription  string `json:"returnDescription,omitempty"`
+}
+
+type message struct {
+	Type         string  `json:"type,omitempty"`
+	Payload      payload `json:"payload,omitempty"`
+	Description  string  `json:"description,omitempty"`
+	Stack        string  `json:"stack,omitempty"`
+	FileName     string  `json:"fileName,omitempty"`
+	LineNumber   int     `json:"lineNumber,omitempty"`
+	ColumnNumber int     `json:"columnNumber,omitempty"`
+}
+
+type outterMsg struct {
+	Type         string `json:"type,omitempty"`
+	Payload      string `json:"payload,omitempty"`
+	Description  string `json:"description,omitempty"`
+	Stack        string `json:"stack,omitempty"`
+	FileName     string `json:"fileName,omitempty"`
+	LineNumber   int    `json:"lineNumber,omitempty"`
+	ColumnNumber int    `json:"columnNumber,omitempty"`
+}
+
 func init() {
 	rootCmd.AddCommand(fridaCmd)
 
+	fridaCmd.Flags().StringP("udid", "u", "", "Device UniqueDeviceID to connect to")
 	fridaCmd.Flags().BoolP("spawn", "s", false, "Spawn process")
 	fridaCmd.Flags().StringP("name", "n", "", "Name of process")
 	fridaCmd.Flags().StringArray("methods", []string{}, "Method selector like \"*[NSMutable* initWith*]\"")
-
+	fridaCmd.MarkFlagRequired("name")
+	fridaCmd.MarkFlagRequired("methods")
+	viper.BindPFlag("frida.udid", fridaCmd.Flags().Lookup("udid"))
 	viper.BindPFlag("frida.spawn", fridaCmd.Flags().Lookup("spawn"))
 	viper.BindPFlag("frida.name", fridaCmd.Flags().Lookup("name"))
 	viper.BindPFlag("frida.methods", fridaCmd.Flags().Lookup("methods"))
@@ -233,46 +278,64 @@ var fridaCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		udid := viper.GetString("frida.udid")
 		shouldSpawn := viper.GetBool("frida.spawn")
 		procName := viper.GetString("frida.name")
 		methods := viper.GetStringSlice("frida.methods")
 
-		log.Info("[*] Frida Version: " + fridaVersion)
+		log.WithField("version", fridaVersion).Info("Frida")
 
 		mgr := frida.NewDeviceManager()
 
-		devices, err := mgr.EnumerateDevices()
-		if err != nil {
-			return fmt.Errorf("failed to enumerate devices: %v", err)
+		var err error
+		var dev *frida.Device
+
+		if len(udid) > 0 {
+			dev, err = mgr.DeviceByID(udid)
+			if err != nil {
+				return fmt.Errorf("failed to get device by id %s: %v", udid, err)
+			}
+		} else {
+			devices, err := mgr.EnumerateDevices()
+			if err != nil {
+				return fmt.Errorf("failed to enumerate devices: %v", err)
+			}
+
+			var choices []string
+			for _, d := range devices {
+				choices = append(choices, fmt.Sprintf("[%-6s] %s (%s)", strings.ToUpper(d.DeviceType().String()), d.Name(), d.ID()))
+			}
+			var selected int
+			prompt := &survey.Select{
+				Message: "Select what device to connect to:",
+				Options: choices,
+			}
+			if err := survey.AskOne(prompt, &selected); err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				os.Exit(0)
+			}
+
+			dev = devices[selected]
 		}
 
-		for _, d := range devices {
-			log.Infof("[*] Found device with id: %d", d.ID())
-		}
-
-		localDev, err := mgr.LocalDevice()
-		if err != nil {
-			return fmt.Errorf("failed to get local device: %v", err)
-		}
-
-		log.Infof("[*] Chosen device: %s", localDev.Name())
+		log.Infof("Chosen device: %s", dev.Name())
 
 		var session *frida.Session
 		if shouldSpawn {
-			log.Infof("[*] Spawning process %s", procName)
-			pid, err := localDev.Spawn(procName, nil)
+			log.Infof("Spawning process %s", procName)
+			pid, err := dev.Spawn(procName, nil)
 			if err != nil {
 				return fmt.Errorf("failed to spawn process: %v", err)
 			}
-			log.Infof("[*] Attaching to PID %d", pid)
-			session, err = localDev.Attach(pid, nil)
+			log.Infof("Attaching to PID %d", pid)
+			session, err = dev.Attach(pid, nil)
 			if err != nil {
 				return fmt.Errorf("failed to attach to PID: %v", err)
 			}
 			defer session.Detach()
 		} else {
-			log.Infof("[*] Attaching to %s", procName)
-			session, err = localDev.Attach(procName, nil)
+			log.WithField("proc", procName).Info("Attaching")
+			session, err = dev.Attach(procName, nil)
 			if err != nil {
 				return fmt.Errorf("failed to attach to process: %v", err)
 			}
@@ -284,8 +347,23 @@ var fridaCmd = &cobra.Command{
 			return fmt.Errorf("error ocurred creating script: %v", err)
 		}
 
-		script.On("message", func(msg string) {
-			log.Infof("[*] Received %s", msg)
+		script.On("message", func(data string) {
+			log.Debug(data)
+			var m outterMsg
+			var p payload
+			if err := json.Unmarshal([]byte(data), &m); err != nil {
+				log.Warnf("Error parsing message: %v", err)
+			}
+			if len(m.Payload) > 0 {
+				if err := json.Unmarshal([]byte(m.Payload), &p); err != nil {
+					log.Warnf("Error parsing message: %v", err)
+				}
+			}
+			if m.Type == "error" {
+				log.Errorf("Error: %v", m)
+			} else {
+				log.Infof("Received '%s' - %v", m.Type, p)
+			}
 		})
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -297,16 +375,20 @@ var fridaCmd = &cobra.Command{
 			}
 
 			for _, m := range methods {
-				log.Infof("[*] Hooking %s", m)
+				utils.Indent(log.WithFields(log.Fields{
+					"method": fmt.Sprintf("'%s'", m),
+				}).Info, 2)("Hooking")
 				script.ExportsCall("hook", m)
 			}
 
-			r := bufio.NewReader(os.Stdin)
-			r.ReadLine()
+			s := bufio.NewScanner(os.Stdin)
+			for s.Scan() {
+				fmt.Println(s.Text())
+			}
 
 			return nil
 		}); err != nil {
-			log.Warn("Exiting...")
+			log.Warn("Detaching Session...")
 		}
 
 		return nil
