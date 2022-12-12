@@ -29,6 +29,26 @@ wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_ma
 tar xzf ipsw_3.1.199_macOS_universal.tar.gz
 ```
 
+Want to use the `ipsw dyld emu` *(w/ [unicorn](https://www.unicorn-engine.org) emulator)* or the `ipsw idev` cmds that require `libusb` ? *(grab the **extras** version from the [releases](https://github.com/blacktop/ipsw/releases) page)*
+
+```bash
+wget https://github.com/blacktop/ipsw/releases/download/v3.1.220/ipsw_3.1.221_macOS_arm64_extras.tar.gz
+tar xzf ipsw_3.1.221_macOS_arm64_extras.tar.gz
+```
+
+Want to use the `ipsw frida` cmd to trace ObjC methods ? *(grab the **frida** version from the [releases](https://github.com/blacktop/ipsw/releases) page)*
+
+```bash
+wget https://github.com/blacktop/ipsw/releases/download/v3.1.221/ipsw_3.1.221_macOS_arm64_frida.tar.gz
+tar xzf ipsw_3.1.221_macOS_arm64_frida.tar.gz
+```
+
+:::info 
+
+The **extras** and **frida** versions or `ipsw` only support macOS for now. *(Please let the author know if you want them supported on your platform)*
+
+:::
+
 ```mdx-code-block
 </TabItem>
 <TabItem value="Linux">
