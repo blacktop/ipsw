@@ -26,7 +26,7 @@ package cmd
 import (
 	"bufio"
 	"context"
-	"encoding/json"
+	_ "embed"
 	"fmt"
 	"os"
 	"strings"
@@ -36,219 +36,51 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
+	"github.com/fatih/color"
 	"github.com/frida/frida-go/frida"
+	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 const fridaVersion = "16.0.7"
 
-// CREDIT: https://gist.github.com/aemmitt-ns/457f44bccac1eefc32e77e812fe27aff
-var script = `
-const typeMap = {
-    "c": "char",
-    "i": "int",
-    "s": "short",
-    "l": "long",
-    "q": "long long",
-    "C": "unsigned char",
-    "I": "unsigned int",
-    "S": "unsigned short",
-    "L": "unsigned long",
-    "Q": "unsigned long long",
-    "f": "float",
-    "d": "double",
-    "B": "bool",
-    "v": "void",
-    "*": "char *",
-    "@": "id",
-    "#": "Class",
-    ":": "SEL",
-    "[": "Array",
-    "{": "struct",
-    "(": "union",
-    "b": "Bitfield",
-    "^": "*",
-    "r": "char *",
-    "?": "void *" // just so it works
-};
+var (
+	//go:embed data/frida-objc.js
+	scriptData []byte // CREDIT: https://gist.github.com/aemmitt-ns/457f44bccac1eefc32e77e812fe27aff
+)
 
-const descMap = {
-    "NSXPCConnection": (obj) => {
-        return "service name: " + obj.serviceName();
-    },
-    "Protocol": (obj) => {
-        return obj.description() + " " + object.name();
-    },
-    "NSString": (obj) => {
-        return '@"' + obj.description() + '"';
-    }
-};
+var colorHeader = color.New(color.FgHiBlue).SprintFunc()
+var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+var colorBold = color.New(color.Bold).SprintFunc()
 
-const descCache = {};
-
-function getClassName(obj) {
-    const object = new ObjC.Object(obj);
-    if (object.$methods.indexOf("- className") != -1) {
-        return object.className();
-    } else {
-        return "id"
-    }
-}
-
-function getDescription(object) {
-    const klass = object.class();
-    const name = "" + object.className();
-    if (!descCache[name]) {
-        const klasses = Object.keys(descMap);
-        for(let i = 0; i < klasses.length; i++) {
-            let k = klasses[i];
-            if (klass["+ isSubclassOfClass:"](ObjC.classes[k])) {
-                return descMap[k](object);
-            }
-        }
-    }
-    descCache[name] = 1;
-    if (object.$methods.indexOf("- description") != -1) {
-        return "/* " + object.description() + " */ " + ptr(object);
-    } else {
-        return "" + ptr(object);
-    }
-}
-
-function typeDescription(t, obj) {
-    if (t != "@") {
-        let p = "";
-        let nt = t;
-        if (t[0] == "^") {
-            nt = t.substring(1);
-            p = " *";
-        }
-        return typeMap[nt[0]] + p;
-    } else {
-        return getClassName(obj) + " *";
-    }
-}
-
-function objectDescription(t, obj) {
-    if (t == "@") {
-        const object = new ObjC.Object(obj);
-        return getDescription(object);
-    } else if (t == "#") {
-        const object = new ObjC.Object(obj);
-        return "/* " + obj + " */ " + object.description();
-    } else if (t == ":") {
-        // const object = new ObjC.Object(obj);
-        const description = "" + obj.readCString(); 
-        return "/* " + description + " */ " + obj;
-    } else if (t == "*" || t == "r*") {
-        return '"' + obj.readCString() + '"';
-    } else if ("ilsILS".indexOf(t) != -1) {
-        return "" + obj.toInt32();
-    } else {
-        return "" + obj;
-    }
-}
-
-const hookMethods = (selector) => {
-    if(ObjC.available) {
-        const resolver = new ApiResolver('objc');
-        const matches = resolver.enumerateMatches(selector);
-
-        matches.forEach(m => {
-            // console.log(JSON.stringify(element));
-            const name = m.name;
-            const t = name[0];
-            const klass = name.substring(2, name.length-1).split(" ")[0];
-            const method = name.substring(2, name.length-1).split(" ")[1];
-            const mparts = method.split(":");
-
-            try {
-                Interceptor.attach(m.address, {
-                    onEnter(args)  {
-                        const obj = new ObjC.Object(args[0]);
-                        const sel = args[1];
-                        const sig = obj["- methodSignatureForSelector:"](sel);
-                        this.invocation = null;
-
-                        if (sig !== null) {
-                            this.invocation = {
-                                "targetType": t,
-                                "targetClass": klass,
-                                "targetMethod": method,
-                                "args": []
-                            };
-
-                            const nargs = sig["- numberOfArguments"]();
-                            this.invocation.returnType = sig["- methodReturnType"]();
-                            for(let i = 0; i < nargs; i++) {
-                                // console.log(sig["- getArgumentTypeAtIndex:"](i));
-                                const argtype = sig["- getArgumentTypeAtIndex:"](i);
-                                this.invocation.args.push({
-                                    "typeString": argtype,
-                                    "typeDescription": typeDescription(argtype, args[i]),
-                                    "object": args[i],
-                                    "objectDescription": objectDescription(argtype, args[i])
-                                });
-                            }
-                        }
-                    },
-                    onLeave(ret) {
-                        if (this.invocation !== null) {
-                            this.invocation.retTypeDescription = typeDescription(this.invocation.returnType, ret);
-                            this.invocation.returnDescription = objectDescription(this.invocation.returnType, ret);
-                            send(JSON.stringify(this.invocation));
-                        }
-                    }
-                });
-            } catch (err) {
-                // sometimes it cant hook copyWithZone? dunno but its not good to hook it anyway.
-                if (method != "copyWithZone:") {
-                    console.log(` + "`" + `Could not hook [${klass} ${method}] : ${err}` + "`" + `);
-                }
-            }
-        });
-    }
-}
-
-rpc.exports.hook = hookMethods;
-`
-
-type arg struct {
+type argument struct {
 	TypeString        string `json:"typeString,omitempty"`
 	TypeDescription   string `json:"typeDescription,omitempty"`
 	Object            string `json:"object,omitempty"`
 	ObjectDescription string `json:"objectDescription,omitempty"`
 }
 
+func (a argument) String() string {
+	return fmt.Sprintf("\t\t%s (%s)", colorBold(a.TypeDescription), colorFaint(a.ObjectDescription))
+}
+
 type payload struct {
-	TargetType         string `json:"targetType,omitempty"`
-	TargetClass        string `json:"targetClass,omitempty"`
-	TargetMethod       string `json:"targetMethod,omitempty"`
-	Args               []arg  `json:"args,omitempty"`
-	ReturnType         string `json:"returnType,omitempty"`
-	RetTypeDescription string `json:"retTypeDescription,omitempty"`
-	ReturnDescription  string `json:"returnDescription,omitempty"`
+	TargetType         string     `json:"targetType,omitempty"`
+	TargetClass        string     `json:"targetClass,omitempty"`
+	TargetMethod       string     `json:"targetMethod,omitempty"`
+	Args               []argument `json:"args,omitempty"`
+	ReturnType         string     `json:"returnType,omitempty"`
+	RetTypeDescription string     `json:"retTypeDescription,omitempty"`
+	ReturnDescription  string     `json:"returnDescription,omitempty"`
 }
 
-type message struct {
-	Type         string  `json:"type,omitempty"`
-	Payload      payload `json:"payload,omitempty"`
-	Description  string  `json:"description,omitempty"`
-	Stack        string  `json:"stack,omitempty"`
-	FileName     string  `json:"fileName,omitempty"`
-	LineNumber   int     `json:"lineNumber,omitempty"`
-	ColumnNumber int     `json:"columnNumber,omitempty"`
-}
-
-type outterMsg struct {
-	Type         string `json:"type,omitempty"`
-	Payload      string `json:"payload,omitempty"`
-	Description  string `json:"description,omitempty"`
-	Stack        string `json:"stack,omitempty"`
-	FileName     string `json:"fileName,omitempty"`
-	LineNumber   int    `json:"lineNumber,omitempty"`
-	ColumnNumber int    `json:"columnNumber,omitempty"`
+func (p payload) String() string {
+	var args []string
+	for _, arg := range p.Args {
+		args = append(args, arg.String())
+	}
+	return fmt.Sprintf("\t%s %s(\n%s\n\t) -> %s (%s)\n", colorBold(p.TargetType), colorHeader(p.TargetClass), strings.Join(args, ",\n"), colorBold(p.RetTypeDescription), colorFaint(p.ReturnDescription))
 }
 
 func init() {
@@ -286,6 +118,7 @@ var fridaCmd = &cobra.Command{
 		log.WithField("version", fridaVersion).Info("Frida")
 
 		mgr := frida.NewDeviceManager()
+		mgr.EnumerateDevices()
 
 		var err error
 		var dev *frida.Device
@@ -301,11 +134,11 @@ var fridaCmd = &cobra.Command{
 				return fmt.Errorf("failed to enumerate devices: %v", err)
 			}
 
+			var selected int
 			var choices []string
 			for _, d := range devices {
 				choices = append(choices, fmt.Sprintf("[%-6s] %s (%s)", strings.ToUpper(d.DeviceType().String()), d.Name(), d.ID()))
 			}
-			var selected int
 			prompt := &survey.Select{
 				Message: "Select what device to connect to:",
 				Options: choices,
@@ -314,7 +147,6 @@ var fridaCmd = &cobra.Command{
 				log.Warn("Exiting...")
 				os.Exit(0)
 			}
-
 			dev = devices[selected]
 		}
 
@@ -342,27 +174,41 @@ var fridaCmd = &cobra.Command{
 			defer session.Detach()
 		}
 
-		script, err := session.CreateScript(script)
+		script, err := session.CreateScript(string(scriptData))
 		if err != nil {
 			return fmt.Errorf("error ocurred creating script: %v", err)
 		}
 
 		script.On("message", func(data string) {
-			log.Debug(data)
-			var m outterMsg
-			var p payload
-			if err := json.Unmarshal([]byte(data), &m); err != nil {
-				log.Warnf("Error parsing message: %v", err)
+			msg, err := frida.ScriptMessageToMessage(data)
+			if err != nil {
+				log.Errorf("error parsing script message: %v", err)
 			}
-			if len(m.Payload) > 0 {
-				if err := json.Unmarshal([]byte(m.Payload), &p); err != nil {
-					log.Warnf("Error parsing message: %v", err)
+			switch msg.Type {
+			case frida.MessageTypeError:
+				log.WithFields(log.Fields{
+					"line":   msg.LineNumber,
+					"column": msg.ColumnNumber,
+				}).Errorf("Received '%s' - %v", msg.Type, msg.Description)
+			case frida.MessageTypeSend:
+				if msg.IsPayloadMap {
+					var p payload
+					if err := mapstructure.Decode(msg.Payload, &p); err != nil {
+						log.Errorf("error decoding payload: %v", err)
+					}
+					log.Infof("Received '%s':\n%s", msg.Type, p)
+				} else {
+					log.Infof("Received '%s' - %s", msg.Type, msg.Payload)
 				}
-			}
-			if m.Type == "error" {
-				log.Errorf("Error: %v", m)
-			} else {
-				log.Infof("Received '%s' - %v", m.Type, p)
+			case frida.MessageTypeLog:
+				switch msg.Level {
+				case frida.LevelTypeLog:
+					log.Infof("Received '%s' - %v", msg.Type, msg.Payload)
+				case frida.LevelTypeWarn:
+					log.Warnf("Received '%s' - %v", msg.Type, msg.Payload)
+				case frida.LevelTypeError:
+					log.Errorf("Received '%s' - %v", msg.Type, msg.Payload)
+				}
 			}
 		})
 
