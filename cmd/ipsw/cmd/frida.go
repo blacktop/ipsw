@@ -80,7 +80,7 @@ func (p payload) String() string {
 	for _, arg := range p.Args {
 		args = append(args, arg.String())
 	}
-	return fmt.Sprintf("\t%s %s(\n%s\n\t) -> %s (%s)\n", colorBold(p.TargetType), colorHeader(p.TargetClass), strings.Join(args, ",\n"), colorBold(p.RetTypeDescription), colorFaint(p.ReturnDescription))
+	return fmt.Sprintf("\t%s %s(\n%s\n\t) -> %s (%s)", colorBold(p.TargetType), colorHeader(p.TargetClass), strings.Join(args, ",\n"), colorBold(p.RetTypeDescription), colorFaint(p.ReturnDescription))
 }
 
 func init() {
