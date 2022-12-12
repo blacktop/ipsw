@@ -1,4 +1,5 @@
 ---
+hide_table_of_contents: true
 description: How to install ipsw locally.
 ---
 
