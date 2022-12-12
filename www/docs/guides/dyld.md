@@ -616,7 +616,7 @@ Disassemble a function in the _dyld_shared_cache_
 
 > **NOTE:** You can speed up symbol lookups by supplying the `--image` flag or you can use the `--vaddr` flag
 
-```s
+```armasm
 _NSLog:
 0x181bac214:  7f 23 03 d5	pacibsp
 0x181bac218:  ff 83 00 d1	sub	sp, sp, #0x20
