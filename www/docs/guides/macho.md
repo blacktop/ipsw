@@ -811,7 +811,7 @@ Disassemble ARMv9 binaries
 ❯ ipsw disass --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
 ```
 
-```s
+```
 0xfffffff007b7c05c:	pacibsp
 0xfffffff007b7c060:	stp		x24, x23, [sp, #-0x40]!
 0xfffffff007b7c064:	stp		x22, x21, [sp, #0x10]
@@ -847,7 +847,7 @@ Make it pretty 💄🐷 using `--color` flag
 ❯ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed --color
 ```
 
-```s
+```armasm
 func_fffffff007b44000:
 0xfffffff007b44000:  5f 24 03 d5        bti             c
 0xfffffff007b44004:  01 00 00 14        b               #0xfffffff007b44008
