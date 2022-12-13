@@ -43,7 +43,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const fridaVersion = "16.0.7"
+const fridaVersion = "16.0.8"
 
 var (
 	//go:embed data/frida-objc.js
