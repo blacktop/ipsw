@@ -821,9 +821,10 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					// 	Macho:   m,
 					// }.String(true))
 					fmt.Println(CacheLocalSymbol64{
-						Name:    s,
-						Nlist64: nlist,
-						Macho:   m,
+						Name:         s,
+						Nlist64:      nlist,
+						Macho:        m,
+						FoundInDylib: filepath.Base(i.Name),
 					}.String(true))
 				}
 			}
