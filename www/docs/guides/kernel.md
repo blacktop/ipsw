@@ -78,7 +78,7 @@ Dump them all
       <SNIP>
 ```      
 
-info:::
+:::info
 This only works on the modern `MH_FILESET` kernelcaches
 :::
 
