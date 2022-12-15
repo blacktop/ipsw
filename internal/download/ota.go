@@ -51,6 +51,7 @@ const (
 	watchSoftwareUpdate assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
 	// For macOS devices
 	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
+	macRsrUpdate             assetType = "com.apple.MobileAsset.MacSplatSoftwareUpdate"
 	recoveryOsSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
 	accessorySoftwareUpdate  assetType = "com.apple.MobileAsset.DarwinAccessoryUpdate.A2525"
 )
@@ -233,7 +234,7 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "accessory":
 		return []assetType{accessorySoftwareUpdate}, nil
 	case "macos":
-		return []assetType{macSoftwareUpdate}, nil
+		return []assetType{macSoftwareUpdate, macRsrUpdate}, nil
 	case "recovery":
 		return []assetType{recoveryOsSoftwareUpdate}, nil
 	}
