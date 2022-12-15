@@ -122,28 +122,31 @@ const hookMethods = (selector) => {
           onEnter(args) {
             const obj = new ObjC.Object(args[0]);
             const sel = args[1];
-            const sig = obj["- methodSignatureForSelector:"](sel);
-            this.invocation = null;
+            console.log(`obj: ${obj}, sel: ${sel}`);
+            if (obj !== null && sel !== null) {
+              const sig = obj["- methodSignatureForSelector:"](sel);
+              this.invocation = null;
 
-            if (sig !== null) {
-              this.invocation = {
-                targetType: t,
-                targetClass: klass,
-                targetMethod: method,
-                args: [],
-              };
+              if (sig !== null) {
+                this.invocation = {
+                  targetType: t,
+                  targetClass: klass,
+                  targetMethod: method,
+                  args: [],
+                };
 
-              const nargs = sig["- numberOfArguments"]();
-              this.invocation.returnType = sig["- methodReturnType"]();
-              for (let i = 0; i < nargs; i++) {
-                // console.log(sig["- getArgumentTypeAtIndex:"](i));
-                const argtype = sig["- getArgumentTypeAtIndex:"](i);
-                this.invocation.args.push({
-                  typeString: argtype,
-                  typeDescription: typeDescription(argtype, args[i]),
-                  object: args[i],
-                  objectDescription: objectDescription(argtype, args[i]),
-                });
+                const nargs = sig["- numberOfArguments"]();
+                this.invocation.returnType = sig["- methodReturnType"]();
+                for (let i = 0; i < nargs; i++) {
+                  // console.log(sig["- getArgumentTypeAtIndex:"](i));
+                  const argtype = sig["- getArgumentTypeAtIndex:"](i);
+                  this.invocation.args.push({
+                    typeString: argtype,
+                    typeDescription: typeDescription(argtype, args[i]),
+                    object: args[i],
+                    objectDescription: objectDescription(argtype, args[i]),
+                  });
+                }
               }
             }
           },

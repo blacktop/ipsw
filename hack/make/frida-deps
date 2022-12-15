@@ -24,8 +24,8 @@ get_version() {
 }
 
 change_version() {
-    echo "  [!] Updating version in cmd/ipsw/cmd/frida.go"
-    sed -i '' "s/const fridaVersion = \".*\"/const fridaVersion = \"$FRIDA_VERSION\"/" cmd/ipsw/cmd/frida.go
+    echo "  [!] Updating version in cmd/ipsw/cmd/frida/frida.go"
+    sed -i '' "s/const fridaVersion = \".*\"/const fridaVersion = \"$FRIDA_VERSION\"/" cmd/ipsw/cmd/frida/frida.go
 }
 
 update_frida() {
