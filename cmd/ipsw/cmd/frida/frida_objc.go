@@ -87,11 +87,13 @@ func init() {
 	fridaObjcCmd.Flags().BoolP("spawn", "s", false, "Spawn process")
 	fridaObjcCmd.Flags().StringP("name", "n", "", "Name of process")
 	fridaObjcCmd.Flags().StringArray("methods", []string{}, "Method selector like \"*[NSMutable* initWith*]\"")
+	fridaObjcCmd.Flags().StringP("watch", "w", "", "Watch a script for changes and reload it automatically")
 	fridaObjcCmd.MarkFlagRequired("name")
 	fridaObjcCmd.MarkFlagRequired("methods")
-	viper.BindPFlag("frida.spawn", fridaObjcCmd.Flags().Lookup("spawn"))
-	viper.BindPFlag("frida.name", fridaObjcCmd.Flags().Lookup("name"))
-	viper.BindPFlag("frida.methods", fridaObjcCmd.Flags().Lookup("methods"))
+	viper.BindPFlag("frida.objc.spawn", fridaObjcCmd.Flags().Lookup("spawn"))
+	viper.BindPFlag("frida.objc.name", fridaObjcCmd.Flags().Lookup("name"))
+	viper.BindPFlag("frida.objc.methods", fridaObjcCmd.Flags().Lookup("methods"))
+	viper.BindPFlag("frida.objc.watch", fridaObjcCmd.Flags().Lookup("watch"))
 }
 
 // fridaObjcCmd represents the frida command
@@ -107,9 +109,10 @@ var fridaObjcCmd = &cobra.Command{
 		}
 
 		udid := viper.GetString("frida.udid")
-		shouldSpawn := viper.GetBool("frida.spawn")
-		procName := viper.GetString("frida.name")
-		methods := viper.GetStringSlice("frida.methods")
+		shouldSpawn := viper.GetBool("frida.objc.spawn")
+		procName := viper.GetString("frida.objc.name")
+		methods := viper.GetStringSlice("frida.objc.methods")
+		watch := viper.GetString("frida.objc.watch")
 
 		log.WithField("version", fridaVersion).Info("Frida")
 
@@ -170,12 +173,7 @@ var fridaObjcCmd = &cobra.Command{
 			defer session.Detach()
 		}
 
-		script, err := session.CreateScript(string(scriptData))
-		if err != nil {
-			return fmt.Errorf("error ocurred creating script: %v", err)
-		}
-
-		script.On("message", func(data string) {
+		onMessage := func(data string) {
 			msg, err := frida.ScriptMessageToMessage(data)
 			if err != nil {
 				log.Errorf("error parsing script message: %v", err)
@@ -206,7 +204,51 @@ var fridaObjcCmd = &cobra.Command{
 					log.Errorf("Received '%s' - %v", msg.Type, msg.Payload)
 				}
 			}
-		})
+		}
+
+		var script *frida.Script
+		if len(watch) > 0 {
+			compiler := frida.NewCompiler()
+			compiler.On("output", func(bundle string) {
+				if script != nil {
+					log.Info("Unloading old bundle")
+					if err := script.Unload(); err != nil {
+						log.Errorf("error unloading script: %v", err)
+					}
+					script = nil
+				}
+
+				log.Info("Compiling bundle...")
+				script, err = session.CreateScript(bundle)
+				if err != nil {
+					log.Errorf("error ocurred creating script: %v", err)
+					return
+				}
+
+				script.On("message", onMessage)
+
+				log.Info("Loading new bundle")
+				if err := script.Load(); err != nil {
+					log.Errorf("error loading script: %v", err)
+				}
+			})
+
+			if err := compiler.Watch(watch); err != nil {
+				return fmt.Errorf("error watching file: %v", err)
+			}
+			log.Infof("Watching %s for changes", watch)
+		} else {
+			script, err := session.CreateScript(string(scriptData))
+			if err != nil {
+				return fmt.Errorf("error ocurred creating script: %v", err)
+			}
+
+			script.On("message", onMessage)
+
+			if err := script.Load(); err != nil {
+				return fmt.Errorf("error loading script: %v", err)
+			}
+		}
 
 		session.On("detached", func(reason frida.SessionDetachReason) {
 			log.Infof("session detached: reason='{%s}'", frida.SessionDetachReason(reason))
@@ -216,9 +258,6 @@ var fridaObjcCmd = &cobra.Command{
 		defer cancel()
 
 		if err := ctrlc.Default.Run(ctx, func() error {
-			if err := script.Load(); err != nil {
-				return fmt.Errorf("error loading script: %v", err)
-			}
 
 			for _, m := range methods {
 				utils.Indent(log.WithFields(log.Fields{
