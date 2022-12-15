@@ -137,24 +137,24 @@ var StrSearchCmd = &cobra.Command{
 							}
 							if len(pattern) > 0 {
 								if strRE.MatchString(s) {
-									fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+									fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 								}
 							} else {
 								if contains && insensitive {
 									if strings.Contains(strings.ToLower(s), strings.ToLower(args[1])) {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
 								} else if contains {
 									if strings.Contains(s, args[1]) {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
 								} else if insensitive {
 									if len(s) == len(args[1]) && strings.EqualFold(s, args[1]) {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
 								} else {
 									if len(s) == len(args[1]) && s == args[1] {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
 								}
 							}
@@ -169,24 +169,24 @@ var StrSearchCmd = &cobra.Command{
 					for _, cfstr := range cfstrs {
 						if len(pattern) > 0 {
 							if strRE.MatchString(cfstr.Name) {
-								fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+								fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 							}
 						} else {
 							if contains && insensitive {
 								if strings.Contains(strings.ToLower(cfstr.Name), strings.ToLower(args[1])) {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
 							} else if contains {
 								if strings.Contains(cfstr.Name, args[1]) {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
 							} else if insensitive {
 								if len(cfstr.Name) == len(args[1]) && strings.EqualFold(cfstr.Name, args[1]) {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
 							} else {
 								if len(cfstr.Name) == len(args[1]) && cfstr.Name == args[1] {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
 							}
 						}
