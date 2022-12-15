@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: dev
 description: Download IPSWs (and more) from https://developer.apple.com/download
 last_update:
-  date: 2022-12-10T13:19:31-07:00
+  date: 2022-12-14T18:21:18-07:00
   author: blacktop
 ---
 ## ipsw download dev

@@ -38,20 +38,6 @@ Dump as JSON
 }
 ```
 
-### **kernel extract**
-
-Extract and decompress a kernelcache from IPSW
-
-```bash
-❯ ipsw kernel extract iPodtouch_7_13.3.1_17D5050a_Restore.ipsw
-   • Extracting kernelcaches
-   • Extracting Kernelcache from IPSW
-      • Parsing Kernelcache IMG4
-      • Decompressing Kernelcache
-      • Kernelcache is LZFSE compressed
-      • Created iPod9,1_N112AP_17D5050a/kernelcache.development
-```
-
 ### **kernel dec**
 
 Decompress a previously extracted **kernelcache**
@@ -59,6 +45,38 @@ Decompress a previously extracted **kernelcache**
 ```bash
 ❯ ipsw kernel dec kernelcache.release.iphone11
 ```
+
+### **kernel extract**
+
+Extract KEXT(s) from kernelcache
+
+```bash
+❯ ipsw kernel extract kernelcache.release.iPhone15,2 sandbox
+   • Created sandbox
+```
+
+Dump them all
+
+```bash
+❯ ipsw kernel extract kernelcache.release.iPhone15,2 --all --output /tmp/KEXTs
+   • Extracting all KEXTs...
+      • Created /tmp/KEXTs/com.apple.kernel
+      • Created /tmp/KEXTs/com.apple.AGXFirmwareKextG15P_A0RTBuddy
+      • Created /tmp/KEXTs/com.apple.AGXFirmwareKextRTBuddy64
+      • Created /tmp/KEXTs/com.apple.AGXG15P_A0
+      • Created /tmp/KEXTs/com.apple.driver.AOPTouchKext
+      • Created /tmp/KEXTs/com.apple.driver.ASIOKit
+      • Created /tmp/KEXTs/com.apple.AUC
+      • Created /tmp/KEXTs/com.apple.driver.AppleA7IOP
+      • Created /tmp/KEXTs/com.apple.driver.AppleALSColorSensor
+      • Created /tmp/KEXTs/com.apple.driver.AppleAOPAudio
+      • Created /tmp/KEXTs/com.apple.driver.AppleAOPVoiceTrigger
+      • Created /tmp/KEXTs/com.apple.iokit.AppleARMIISAudio
+      • Created /tmp/KEXTs/com.apple.driver.AppleARMPMU
+      • Created /tmp/KEXTs/com.apple.driver.AppleARMPlatform
+      • Created /tmp/KEXTs/com.apple.driver.AppleARMWatchdogTimer
+      <SNIP>
+```      
 
 ### **kernel kexts**
 
@@ -452,3 +470,197 @@ struct task
     uint64_t corpse_vmobject_list_size;                           // off=0x35c0
 };
 ```
+
+Diff two versions of the same struct
+
+```bash
+❯ ipsw kernel ctfdump /Library/Developer/KDKs/KDK_13.0_22A5352e.kdk/System/Library/Kernels/kernel.development.t6000 /Library/Developer/KDKs/KDK_13.1_22C65.kdk/System/Library/Kernels/kernel.development.t6000 --diff task
+   • Differences found
+```
+```cpp
+❌ removed:
+    task_control_port_options_t                  task_control_port_options;          // off=0x620
+```
+
+### **kernel dwarf**
+
+#### 🚧 Dump DWARF debug information
+
+Dump the task struct *(and pretty print with clang-format)*
+
+```bash
+❯ ipsw kernel dwarf KDK_13.1_22C65.kdk/**/kernel.development.t6000.dSYM/**/kernel.development.t6000 --type task \
+                                            | clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
+```
+```cpp
+struct task {
+  lck_mtx_t         lock;                                             // @ 0x0
+  os_refcnt_t       ref_count;                                        // @ 0x10
+  struct os_refgrp *ref_group;                                        // @ 0x20
+  lck_spin_t        ref_group_lock;                                   // @ 0x28
+  _Bool             active;                                           // @ 0x38
+  _Bool             ipc_active;                                       // @ 0x39
+  _Bool             halting;                                          // @ 0x3a
+  _Bool             message_app_suspended;                            // @ 0x3b
+  uint32_t          vtimers;                                          // @ 0x3c
+  uint32_t          loadTag;                                          // @ 0x40
+  uint64_t          task_uniqueid;                                    // @ 0x48
+  __ptrauth(DA, true, 5ef8) map;                                      // @ 0x50
+  queue_chain_t              tasks;                                   // @ 0x58
+  struct task_watchports    *watchports;                              // @ 0x68
+  turnstile_inheritor_t      returnwait_inheritor;                    // @ 0x70
+  sched_group_t              sched_group;                             // @ 0x78
+  queue_head_t               threads;                                 // @ 0x80
+  struct restartable_ranges *t_rr_ranges;                             // @ 0x90
+  processor_set_t            pset_hint;                               // @ 0x98
+  struct affinity_space     *affinity_space;                          // @ 0xa0
+  int                        thread_count;                            // @ 0xa8
+  uint32_t                   active_thread_count;                     // @ 0xac
+  int                        suspend_count;                           // @ 0xb0
+  integer_t                  user_stop_count;                         // @ 0xb4
+  integer_t                  legacy_stop_count;                       // @ 0xb8
+  int16_t                    priority;                                // @ 0xbc
+  int16_t                    max_priority;                            // @ 0xbe
+  integer_t                  importance;                              // @ 0xc0
+  uint64_t                   total_runnable_time;                     // @ 0xc8
+  struct recount_task        tk_recount;                              // @ 0xd0
+  lck_mtx_t                  itk_lock_data;                           // @ 0xe0
+  __ptrauth(DA, true, 68c5) itk_task_ports[4];                        // @ 0xf0
+  __ptrauth(DA, true, 4447) itk_settable_self;                        // @ 0x110
+  __ptrauth(DA, true, 58ef) itk_self;                                 // @ 0x118
+  struct exception_action exc_actions[14];                            // @ 0x120
+  __ptrauth(DA, true, bb51) itk_host;                                 // @ 0x2e0
+  __ptrauth(DA, true, e868) itk_bootstrap;                            // @ 0x2e8
+  __ptrauth(DA, true, b8b1) itk_debug_control;                        // @ 0x2f0
+  __ptrauth(DA, true, ba93) itk_task_access;                          // @ 0x2f8
+  __ptrauth(DA, true, ecf) itk_resume;                                // @ 0x300
+  __ptrauth(DA, true, a454) itk_registered[3];                        // @ 0x308
+  __ptrauth(DA, true, ec7b) itk_dyld_notify;                          // @ 0x320
+  __ptrauth(DA, true, 46e7) itk_resource_notify;                      // @ 0x328
+  __ptrauth(DA, true, 8280) itk_space;                                // @ 0x330
+  ledger_t     ledger;                                                // @ 0x338
+  queue_head_t semaphore_list;                                        // @ 0x340
+  int          semaphores_owned;                                      // @ 0x350
+  unsigned int priv_flags;                                            // @ 0x354
+  __ptrauth(DA, true, 1d9a) task_debug;                               // @ 0x358
+  uint64_t                     rop_pid;                               // @ 0x360
+  uint64_t                     jop_pid;                               // @ 0x368
+  uint8_t                      disable_user_jop;                      // @ 0x370
+  arm64_uexc_region_t          uexc;                                  // @ 0x378
+  _Bool                        preserve_x18;                          // @ 0x398
+  counter_t                    faults;                                // @ 0x3a0
+  counter_t                    pageins;                               // @ 0x3a8
+  counter_t                    cow_faults;                            // @ 0x3b0
+  counter_t                    messages_sent;                         // @ 0x3b8
+  counter_t                    messages_received;                     // @ 0x3c0
+  uint32_t                     decompressions;                        // @ 0x3c8
+  uint32_t                     syscalls_mach;                         // @ 0x3cc
+  uint32_t                     syscalls_unix;                         // @ 0x3d0
+  uint32_t                     c_switch;                              // @ 0x3d4
+  uint32_t                     p_switch;                              // @ 0x3d8
+  uint32_t                     ps_switch;                             // @ 0x3dc
+  struct proc_ro              *bsd_info_ro;                           // @ 0x3e0
+  kcdata_descriptor_t          corpse_info;                           // @ 0x3e8
+  uint64_t                     crashed_thread_id;                     // @ 0x3f0
+  queue_chain_t                corpse_tasks;                          // @ 0x3f8
+  struct label                *crash_label;                           // @ 0x408
+  volatile uint32_t            t_flags;                               // @ 0x410
+  uint32_t                     t_procflags;                           // @ 0x414
+  mach_vm_address_t            all_image_info_addr;                   // @ 0x418
+  mach_vm_size_t               all_image_info_size;                   // @ 0x420
+  uint32_t                     t_kpc;                                 // @ 0x428
+  _Bool                        pidsuspended;                          // @ 0x42c
+  _Bool                        frozen;                                // @ 0x42d
+  _Bool                        changing_freeze_state;                 // @ 0x42e
+  _Bool                        is_large_corpse;                       // @ 0x42f
+  uint16_t                     policy_ru_cpu : 4 @8576;               // @ 0x0
+  uint16_t                     policy_ru_cpu_ext : 4 @8580;           // @ 0x0
+  uint16_t                     applied_ru_cpu : 4 @8584;              // @ 0x0
+  uint16_t                     applied_ru_cpu_ext : 4 @8588;          // @ 0x0
+  uint8_t                      rusage_cpu_flags;                      // @ 0x432
+  uint8_t                      rusage_cpu_percentage;                 // @ 0x433
+  uint8_t                      rusage_cpu_perthr_percentage;          // @ 0x434
+  int8_t                       suspends_outstanding;                  // @ 0x435
+  uint8_t                      t_returnwaitflags;                     // @ 0x436
+  _Bool                        shared_region_auth_remapped;           // @ 0x437
+  char                        *shared_region_id;                      // @ 0x438
+  struct vm_shared_region     *shared_region;                         // @ 0x440
+  uint64_t                     rusage_cpu_interval;                   // @ 0x448
+  uint64_t                     rusage_cpu_perthr_interval;            // @ 0x450
+  uint64_t                     rusage_cpu_deadline;                   // @ 0x458
+  thread_call_t                rusage_cpu_callt;                      // @ 0x460
+  queue_head_t                 task_watchers;                         // @ 0x468
+  int                          num_taskwatchers;                      // @ 0x478
+  int                          watchapplying;                         // @ 0x47c
+  struct bank_task            *bank_context;                          // @ 0x480
+  struct ipc_importance_task  *task_imp_base;                         // @ 0x488
+  vm_extmod_statistics_data_t  extmod_statistics;                     // @ 0x490
+  struct task_requested_policy requested_policy;                      // @ 0x4c0
+  struct task_effective_policy effective_policy;                      // @ 0x4c8
+  uint32_t                     low_mem_notified_warn : 1 @9856;       // @ 0x0
+  uint32_t                     low_mem_notified_critical : 1 @9857;   // @ 0x0
+  uint32_t                     purged_memory_warn : 1 @9858;          // @ 0x0
+  uint32_t                     purged_memory_critical : 1 @9859;      // @ 0x0
+  uint32_t                     low_mem_privileged_listener : 1 @9860; // @ 0x0
+  uint32_t                     mem_notify_reserved : 27 @9861;        // @ 0x0
+  uint32_t                     memlimit_is_active : 1 @9888;          // @ 0x0
+  uint32_t                     memlimit_is_fatal : 1 @9889;           // @ 0x0
+  uint32_t                     memlimit_active_exc_resource : 1 @9890;  // @ 0x0
+  uint32_t                    memlimit_inactive_exc_resource : 1 @9891; // @ 0x0
+  uint32_t                    memlimit_attrs_reserved : 28 @9892;       // @ 0x0
+  io_stat_info_t              task_io_stats;                         // @ 0x4d8
+  struct task_writes_counters task_writes_counters_internal;         // @ 0x4e0
+  struct task_writes_counters task_writes_counters_external;         // @ 0x500
+  struct _cpu_time_qos_stats  cpu_time_eqos_stats;                   // @ 0x520
+  struct _cpu_time_qos_stats  cpu_time_rqos_stats;                   // @ 0x558
+  uint32_t                    task_timer_wakeups_bin_1;              // @ 0x590
+  uint32_t                    task_timer_wakeups_bin_2;              // @ 0x594
+  uint64_t                    task_gpu_ns;                           // @ 0x598
+  uint8_t                     task_can_transfer_memory_ownership;    // @ 0x5a0
+  uint8_t                     task_no_footprint_for_debug;           // @ 0x5a1
+  uint8_t                     task_objects_disowning;                // @ 0x5a2
+  uint8_t                     task_objects_disowned;                 // @ 0x5a3
+  int                         task_volatile_objects;                 // @ 0x5a4
+  int                         task_nonvolatile_objects;              // @ 0x5a8
+  int                         task_owned_objects;                    // @ 0x5ac
+  queue_head_t                task_objq;                             // @ 0x5b0
+  lck_mtx_t                   task_objq_lock;                        // @ 0x5c0
+  unsigned int                task_thread_limit : 16 @11904;         // @ 0x0
+  unsigned int                task_legacy_footprint : 1 @11920;      // @ 0x0
+  unsigned int                task_extra_footprint_limit : 1 @11921; // @ 0x0
+  unsigned int  task_ios13extended_footprint_limit : 1 @11922;       // @ 0x0
+  unsigned int  task_region_footprint : 1 @11923;                    // @ 0x0
+  unsigned int  task_has_crossed_thread_limit : 1 @11924;            // @ 0x0
+  unsigned int  task_rr_in_flight : 1 @11925;                        // @ 0x0
+  uint32_t      exec_token;                                          // @ 0x5d4
+  coalition_t   coalition[2];                                        // @ 0x5d8
+  queue_chain_t task_coalition[2];                                   // @ 0x5e8
+  uint64_t      dispatchqueue_offset;                                // @ 0x608
+  boolean_t     task_unnested;                                       // @ 0x610
+  int           task_disconnected_count;                             // @ 0x614
+  __ptrauth(DA, true, 1f57) hv_task_target;                          // @ 0x618
+  task_exc_guard_behavior_t          task_exc_guard;                 // @ 0x620
+  mach_vm_address_t                  mach_header_vm_address;         // @ 0x628
+  queue_head_t                       io_user_clients;                // @ 0x630
+  boolean_t                          donates_own_pages;              // @ 0x640
+  uint32_t                           task_shared_region_slide;       // @ 0x644
+  uint64_t                           task_fs_metadata_writes;        // @ 0x648
+  uuid_t                             task_shared_region_uuid;        // @ 0x650
+  uint64_t                           memstat_dirty_start;            // @ 0x660
+  vmobject_list_output_t             corpse_vmobject_list;           // @ 0x668
+  uint64_t                           corpse_vmobject_list_size;      // @ 0x670
+  vm_deferred_reclamation_metadata_t deferred_reclamation_metadata;  // @ 0x678
+}
+```
+
+Diff two versions of a struct
+
+```bash
+❯ ipsw kernel dwarf KDK_13.0_22A5352e.kdk/**/kernel.development.t6000 KDK_13.1_22C65.kdk/**/kernel.development.t6000 --diff --type task
+   • Differences found
+```
+```cpp
+❌ removed:
+    task_control_port_options_t task_control_port_options;	// @ 0xc4
+```   
+
