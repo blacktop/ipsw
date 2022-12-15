@@ -253,7 +253,7 @@ Str Len      = 0x763dc
 0xfffffe000748eb2c: kern_return_t IOMapPages(vm_map_t, mach_vm_address_t, mach_vm_address_t, mach_vm_size_t, unsigned int);
 ```
 
-### Dump as JSON
+#### Dump as JSON
 
 ```bash
 ❯ ipsw ctfdump KDK --json
@@ -300,7 +300,7 @@ Str Len      = 0x763dc
 <SNIP>
 ```
 
-### Dump a single `type`
+#### Dump a single `type`
 
 ```bash
 ❯ ipsw ctfdump KDK/macOS12beta/kernel.development.t8101 task > task.h
