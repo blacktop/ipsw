@@ -230,11 +230,17 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "audioos":
 		fallthrough
 	case "tvos":
-		return []assetType{softwareUpdate, rsrUpdate}, nil
+		if o.Config.RSR {
+			return []assetType{rsrUpdate}, nil
+		}
+		return []assetType{softwareUpdate}, nil
 	case "accessory":
 		return []assetType{accessorySoftwareUpdate}, nil
 	case "macos":
-		return []assetType{macSoftwareUpdate, macRsrUpdate}, nil
+		if o.Config.RSR {
+			return []assetType{macRsrUpdate}, nil
+		}
+		return []assetType{macSoftwareUpdate}, nil
 	case "recovery":
 		return []assetType{recoveryOsSoftwareUpdate}, nil
 	}
