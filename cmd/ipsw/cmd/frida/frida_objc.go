@@ -21,7 +21,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package cmd
+package frida
 
 import (
 	"bufio"
@@ -43,10 +43,8 @@ import (
 	"github.com/spf13/viper"
 )
 
-const fridaVersion = "16.0.8"
-
 var (
-	//go:embed data/frida-objc.js
+	//go:embed scripts/frida-objc.js
 	scriptData []byte // CREDIT: https://gist.github.com/aemmitt-ns/457f44bccac1eefc32e77e812fe27aff
 )
 
@@ -84,24 +82,22 @@ func (p payload) String() string {
 }
 
 func init() {
-	rootCmd.AddCommand(fridaCmd)
+	FridaCmd.AddCommand(fridaObjcCmd)
 
-	fridaCmd.Flags().StringP("udid", "u", "", "Device UniqueDeviceID to connect to")
-	fridaCmd.Flags().BoolP("spawn", "s", false, "Spawn process")
-	fridaCmd.Flags().StringP("name", "n", "", "Name of process")
-	fridaCmd.Flags().StringArray("methods", []string{}, "Method selector like \"*[NSMutable* initWith*]\"")
-	fridaCmd.MarkFlagRequired("name")
-	fridaCmd.MarkFlagRequired("methods")
-	viper.BindPFlag("frida.udid", fridaCmd.Flags().Lookup("udid"))
-	viper.BindPFlag("frida.spawn", fridaCmd.Flags().Lookup("spawn"))
-	viper.BindPFlag("frida.name", fridaCmd.Flags().Lookup("name"))
-	viper.BindPFlag("frida.methods", fridaCmd.Flags().Lookup("methods"))
+	fridaObjcCmd.Flags().BoolP("spawn", "s", false, "Spawn process")
+	fridaObjcCmd.Flags().StringP("name", "n", "", "Name of process")
+	fridaObjcCmd.Flags().StringArray("methods", []string{}, "Method selector like \"*[NSMutable* initWith*]\"")
+	fridaObjcCmd.MarkFlagRequired("name")
+	fridaObjcCmd.MarkFlagRequired("methods")
+	viper.BindPFlag("frida.spawn", fridaObjcCmd.Flags().Lookup("spawn"))
+	viper.BindPFlag("frida.name", fridaObjcCmd.Flags().Lookup("name"))
+	viper.BindPFlag("frida.methods", fridaObjcCmd.Flags().Lookup("methods"))
 }
 
-// fridaCmd represents the frida command
-var fridaCmd = &cobra.Command{
+// fridaObjcCmd represents the frida command
+var fridaObjcCmd = &cobra.Command{
 	Use:           "frida",
-	Short:         "Trace ObjC methods using Frida",
+	Short:         "Trace ObjC methods",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -210,6 +206,10 @@ var fridaCmd = &cobra.Command{
 					log.Errorf("Received '%s' - %v", msg.Type, msg.Payload)
 				}
 			}
+		})
+
+		session.On("detached", func(reason frida.SessionDetachReason) {
+			log.Infof("session detached: reason='{%s}'", frida.SessionDetachReason(reason))
 		})
 
 		ctx, cancel := context.WithCancel(context.Background())
