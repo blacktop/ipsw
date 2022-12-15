@@ -180,7 +180,7 @@ func DecompressKernelManagement(kcache, outputDir string) error {
 
 	km, err := img4.ParseImg4(bytes.NewReader(content))
 	if err != nil {
-		return errors.Wrap(err, "failed parse compressed kernelcache Img4")
+		return fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
 	}
 
 	kcache = filepath.Join(outputDir, kcache+".decompressed")
