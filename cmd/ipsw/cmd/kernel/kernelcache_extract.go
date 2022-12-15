@@ -29,6 +29,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -46,9 +47,9 @@ func init() {
 
 // kerExtractCmd represents the kerExtract command
 var kerExtractCmd = &cobra.Command{
-	Use:           "extract <KEXT>",
+	Use:           "extract <KERNELCACHE> <KEXT>",
 	Short:         "Extract KEXT(s) from kernelcache",
-	Args:          cobra.ExactArgs(1),
+	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,6 +62,10 @@ var kerExtractCmd = &cobra.Command{
 		extractPath := viper.GetString("kernel.extract.output")
 
 		kernPath := filepath.Clean(args[0])
+
+		if ok, err := magic.IsMachO(kernPath); !ok {
+			return fmt.Errorf(err.Error())
+		}
 
 		folder := filepath.Dir(kernPath)
 		if len(extractPath) > 0 {
@@ -91,23 +96,23 @@ var kerExtractCmd = &cobra.Command{
 			for _, fse := range m.FileSets() {
 				mfse, err := m.GetFileSetFileByName(fse.EntryID)
 				if err != nil {
-					return fmt.Errorf("failed to parse entry %s: %v", fse.EntryID, err)
+					return fmt.Errorf("failed to parse kext %s: %v", fse.EntryID, err)
 				}
 				if err := mfse.Export(filepath.Join(folder, fse.EntryID), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
-					return fmt.Errorf("failed to export entry MachO %s; %v", fse.EntryID, err)
+					return fmt.Errorf("failed to export KEXT %s; %v", fse.EntryID, err)
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Created %s", filepath.Join(folder, fse.EntryID)))
 			}
 		} else {
-			m, err = m.GetFileSetFileByName(args[0])
+			m, err = m.GetFileSetFileByName(args[1])
 			if err != nil {
 				return fmt.Errorf("failed to parse kext %s: %v", args[0], err)
 			}
 
-			if err := m.Export(filepath.Join(folder, args[0]), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
-				return fmt.Errorf("failed to export entry MachO %s; %v", args[0], err)
+			if err := m.Export(filepath.Join(folder, args[1]), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
+				return fmt.Errorf("failed to export KEXT %s; %v", args[0], err)
 			}
-			log.Infof("Created %s", filepath.Join(folder, args[0]))
+			log.Infof("Created %s", filepath.Join(folder, args[1]))
 		}
 
 		return nil
