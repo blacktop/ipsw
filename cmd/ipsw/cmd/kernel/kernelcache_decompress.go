@@ -27,30 +27,43 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
+func isImg4(kcpath string) bool {
+	f, err := os.Open(kcpath)
+	if err != nil {
+		log.Fatalf("failed to open kernelcache %s: %w", kcpath, err)
+	}
+	defer f.Close()
+	if _, err := img4.ParseImg4(f); err == nil {
+		return true
+	}
+	return false
+}
+
 func init() {
 	KernelcacheCmd.AddCommand(kernelDecCmd)
-	kernelDecCmd.Flags().BoolP("km", "m", false, "Decompress KernelManagement host file (found on macOS 13.x filesystem)")
 	kernelDecCmd.Flags().StringP("output", "o", "", "Output file")
 	kernelDecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
 // kernelDecCmd represents the dec command
 var kernelDecCmd = &cobra.Command{
-	Use:   "dec <kernelcache>",
-	Short: "Decompress a kernelcache",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "dec <kernelcache>",
+	Short:         "Decompress a kernelcache",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		km, _ := cmd.Flags().GetBool("km")
 		outputDir, _ := cmd.Flags().GetString("output")
 
 		kcpath := filepath.Clean(args[0])
@@ -59,7 +72,7 @@ var kernelDecCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", kcpath)
 		}
 
-		if km {
+		if isImg4(kcpath) {
 			log.Info("Decompressing KernelManagement kernelcache")
 			return kernelcache.DecompressKernelManagement(kcpath, outputDir)
 		}
