@@ -32,6 +32,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
@@ -119,6 +120,10 @@ var machoDisassCmd = &cobra.Command{
 		}
 
 		machoPath := filepath.Clean(args[0])
+
+		if ok, err := magic.IsMachO(machoPath); !ok {
+			return fmt.Errorf(err.Error())
+		}
 
 		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {

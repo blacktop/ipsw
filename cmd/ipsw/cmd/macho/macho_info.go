@@ -39,6 +39,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fullsailor/pkcs7"
@@ -141,6 +142,10 @@ var machoInfoCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+		}
+
+		if ok, err := magic.IsMachO(machoPath); !ok {
+			return fmt.Errorf(err.Error())
 		}
 
 		// first check for fat file
