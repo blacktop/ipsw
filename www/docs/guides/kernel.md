@@ -10,8 +10,8 @@ Dump kernelcache version
 
 ```bash
 ❯ ipsw kernel version kernelcache.release.iPhone14,2
-0xfffffff00703e0ca: "Darwin Kernel Version 21.5.0: Mon Mar 28 22:30:10 PDT 2022; root:xnu-8020.120.43.112.1~1/RELEASE_ARM64_T8110"
-0xfffffff00703e169: "Apple LLVM 13.1.6 (clang-1316.0.21.3) [+internal-os, ptrauth-isa=deployment-target-based]"
+"Darwin Kernel Version 21.5.0: Mon Mar 28 22:30:10 PDT 2022; root:xnu-8020.120.43.112.1~1/RELEASE_ARM64_T8110"
+"Apple LLVM 13.1.6 (clang-1316.0.21.3) [+internal-os, ptrauth-isa=deployment-target-based]"
 ```
 
 Dump as JSON
@@ -77,6 +77,10 @@ Dump them all
       • Created /tmp/KEXTs/com.apple.driver.AppleARMWatchdogTimer
       <SNIP>
 ```      
+
+info:::
+This only works on the modern `MH_FILESET` kernelcaches
+:::
 
 ### **kernel kexts**
 
@@ -474,7 +478,9 @@ struct task
 Diff two versions of the same struct
 
 ```bash
-❯ ipsw kernel ctfdump /Library/Developer/KDKs/KDK_13.0_22A5352e.kdk/System/Library/Kernels/kernel.development.t6000 /Library/Developer/KDKs/KDK_13.1_22C65.kdk/System/Library/Kernels/kernel.development.t6000 --diff task
+❯ ipsw kernel ctfdump --diff task \
+    /Library/Developer/KDKs/KDK_13.0_22A5352e.kdk/System/Library/Kernels/kernel.development.t6000 \
+    /Library/Developer/KDKs/KDK_13.1_22C65.kdk/System/Library/Kernels/kernel.development.t6000
    • Differences found
 ```
 ```cpp
@@ -489,8 +495,9 @@ Diff two versions of the same struct
 Dump the task struct *(and pretty print with clang-format)*
 
 ```bash
-❯ ipsw kernel dwarf KDK_13.1_22C65.kdk/**/kernel.development.t6000.dSYM/**/kernel.development.t6000 --type task \
-                                            | clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
+❯ ipsw kernel dwarf --type task \
+    KDK_13.1_22C65.kdk/**/kernel.development.t6000.dSYM/**/kernel.development.t6000 \
+        | clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
 ```
 ```cpp
 struct task {
@@ -656,7 +663,9 @@ struct task {
 Diff two versions of a struct
 
 ```bash
-❯ ipsw kernel dwarf KDK_13.0_22A5352e.kdk/**/kernel.development.t6000 KDK_13.1_22C65.kdk/**/kernel.development.t6000 --diff --type task
+❯ ipsw kernel dwarf --diff --type task \
+    KDK_13.0_22A5352e.kdk/**/kernel.development.t6000 \
+    KDK_13.1_22C65.kdk/**/kernel.development.t6000
    • Differences found
 ```
 ```cpp
