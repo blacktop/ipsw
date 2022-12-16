@@ -128,14 +128,24 @@ var machoA2oCmd = &cobra.Command{
 			} else {
 				sec := m.FindSectionForVMAddr(addr)
 				if sec == nil {
-					return fmt.Errorf("failed to find a section containing address %#x", addr)
+					seg := m.FindSegmentForVMAddr(addr)
+					if seg == nil {
+						return fmt.Errorf("failed to find a segment or section containing address %#x", addr)
+					} else {
+						log.WithFields(log.Fields{
+							"hex":     fmt.Sprintf("%#x", off),
+							"dec":     fmt.Sprintf("%d", off),
+							"segment": seg.Name,
+						}).Info("Offset")
+					}
+				} else {
+					log.WithFields(log.Fields{
+						"hex":     fmt.Sprintf("%#x", off),
+						"dec":     fmt.Sprintf("%d", off),
+						"segment": sec.Seg,
+						"section": sec.Name,
+					}).Info("Offset")
 				}
-				log.WithFields(log.Fields{
-					"hex":     fmt.Sprintf("%#x", off),
-					"dec":     fmt.Sprintf("%d", off),
-					"segment": sec.Seg,
-					"section": sec.Name,
-				}).Info("Offset")
 			}
 		}
 
