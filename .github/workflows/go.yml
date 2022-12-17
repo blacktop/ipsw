@@ -175,6 +175,8 @@ jobs:
           echo "latest_macos_build=$(ipsw download ipsw --show-latest-build --macos --insecure)" >> $GITHUB_ENV
           echo "beta_macos_version=$(ipsw download ota --platform macos --beta --show-latest-version --device Mac14,7 --insecure)" >> $GITHUB_ENV
           echo "beta_macos_build=$(ipsw download ota --platform macos --beta --show-latest-build --device Mac14,7 --insecure)" >> $GITHUB_ENV
+          echo "macos_runner_version=$(sw_vers -productVersion)" >> $GITHUB_ENV
+          echo "macos_runner_build=$(sw_vers -buildVersion)" >> $GITHUB_ENV
       - name: Make cache folders
         if: matrix.platform == 'macos-12'
         run: |
