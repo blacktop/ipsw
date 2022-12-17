@@ -77,40 +77,76 @@ var ImageCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if err := f.ParseImageArrays(); err != nil {
-			return fmt.Errorf("failed parsing image arrays: %v", err)
-		}
+		// if err := f.ForEachLaunchLoaderSet(func(execPath string, pset *dyld.PrebuiltLoaderSet) {
+		// 	fmt.Println(pset.String(f))
+		// }); err != nil {
+		// 	if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+		// 		log.Errorf("failed parsing launch loader sets: %v", err)
+		// 	}
+		// }
 
 		if len(args) > 1 {
-			imgName := args[1]
-			if image, err := f.Image(imgName); err == nil {
-				idx, err := f.GetDylibIndex(image.Name)
-				if err != nil {
-					return err
+			if image, err := f.Image(args[1]); err == nil {
+				if pbl, err := f.GetDylibPrebuiltLoader(image.Name); err == nil {
+					fmt.Println(pbl.String(f))
+				} else {
+					if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+						return fmt.Errorf("failed parsing launch loader sets: %v", err)
+					}
+					// try to parse the dylib closures using the old iOS14.x method
+					idx, err := f.GetDylibIndex(image.Name)
+					if err != nil {
+						return err
+					}
+					if err := f.ParseImageArrays(); err != nil {
+						return fmt.Errorf("failed parsing image arrays: %v", err)
+					}
+					ci := f.ImageArray[uint32(idx+1)]
+					fmt.Println(ci.String(f, viper.GetBool("verbose")))
 				}
-				ci := f.ImageArray[uint32(idx+1)]
-				fmt.Println(ci.String(f, viper.GetBool("verbose")))
 				return nil
 			} else {
-				if id, err := f.GetDlopenOtherImageIndex(imgName); err == nil {
-					ci := f.ImageArray[uint32(id)]
-					fmt.Println(ci.String(f, viper.GetBool("verbose")))
-					return nil
+				if pset, err := f.GetLaunchLoaderSet(args[1]); err == nil {
+					fmt.Println(pset.String(f))
 				} else {
-					for _, clos := range f.Closures {
-						for _, img := range clos.Images {
-							if img.Name == imgName {
-								fmt.Println(img.String(f, viper.GetBool("verbose")))
-								return nil
+					if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+						return fmt.Errorf("failed parsing launch loader sets: %v", err)
+					}
+					// try to parse the app closures using the old iOS14.x method
+					if id, err := f.GetDlopenOtherImageIndex(args[1]); err == nil {
+						if err := f.ParseImageArrays(); err != nil {
+							return fmt.Errorf("failed parsing image arrays: %v", err)
+						}
+						ci := f.ImageArray[uint32(id)]
+						fmt.Println(ci.String(f, viper.GetBool("verbose")))
+						return nil
+					} else {
+						for _, clos := range f.Closures {
+							for _, img := range clos.Images {
+								if img.Name == args[1] {
+									fmt.Println(img.String(f, viper.GetBool("verbose")))
+									return nil
+								}
 							}
 						}
 					}
+					return fmt.Errorf("image %s not found (maybe try the FULL path)", args[1])
 				}
-				return fmt.Errorf("image %s not found (maybe try the FULL path)", imgName)
 			}
 		} else {
-			for _, img := range f.ImageArray {
-				fmt.Printf("%s\n", img.Name)
+			if err := f.ForEachLaunchLoaderSetPath(func(execPath string) {
+				fmt.Println(execPath)
+			}); err != nil {
+				if !errors.Is(err, dyld.ErrPrebuiltLoaderSetNotSupported) {
+					return fmt.Errorf("failed parsing launch loader sets: %v", err)
+				}
+				// try to parse the image array using the old iOS14.x method
+				if err := f.ParseImageArrays(); err != nil {
+					return fmt.Errorf("failed parsing image arrays: %v", err)
+				}
+				for _, img := range f.ImageArray {
+					fmt.Printf("%s\n", img.Name)
+				}
 			}
 		}
 
