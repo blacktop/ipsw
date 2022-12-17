@@ -1,16 +1,10 @@
 package dyld
 
 import (
-	"bufio"
-	"bytes"
 	"crypto/sha1"
-	"encoding/binary"
 	"fmt"
-	"io"
 	"strings"
-	"unsafe"
 
-	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
 	"github.com/olekukonko/tablewriter"
 )
@@ -634,6 +628,9 @@ type PrebuiltLoaderSet struct {
 	Patches            []CachePatch
 	DyldCacheUUID      types.UUID
 	MustBeMissingPaths []string
+	SelectorTable      *ObjCSelectorOpt
+	ClassTable         *ObjCClassOpt
+	ProtocolTable      *ObjCClassOpt
 }
 
 func (pls PrebuiltLoaderSet) HasOptimizedSwift() bool {
@@ -652,17 +649,51 @@ func (pls PrebuiltLoaderSet) String(f *File) string {
 			if len(pls.Loaders) > 1 {
 				out += "---\n"
 			}
-			out += fmt.Sprintln(pl.String(f))
+			out += pl.String(f)
 		}
 	}
+	if pls.SelectorTable != nil {
+		out += "\nObjC Selector Table:\n"
+		for _, bt := range pls.SelectorTable.Offsets {
+			if bt.IsAbsolute() {
+				continue
+			}
+			out += fmt.Sprintf("  %s\n", bt.String(f))
+		}
+	}
+	if pls.ClassTable != nil {
+		out += "\nObjC Class Table:\n"
+		for idx, bt := range pls.ClassTable.Offsets {
+			if bt.IsAbsolute() {
+				continue
+			}
+			out += "  -\n"
+			out += fmt.Sprintf("  %s name\n", bt.String(f))
+			out += fmt.Sprintf("  %s impl\n", pls.ClassTable.Classes[idx].String(f))
+		}
+	}
+	if pls.ProtocolTable != nil {
+		out += "\nObjC Protocol Table:\n"
+		for idx, bt := range pls.ProtocolTable.Offsets {
+			if bt.IsAbsolute() {
+				continue
+			}
+			out += "  -\n"
+			out += fmt.Sprintf("  %s name\n", bt.String(f))
+			out += fmt.Sprintf("  %s impl\n", pls.ProtocolTable.Classes[idx].String(f))
+		}
+	}
+	if pls.ObjcProtocolClassCacheOffset != 0 {
+		out += fmt.Sprintf("\nObjC Protocol Class Cache Address: %#x\n", f.Headers[f.UUID].SharedRegionStart+pls.ObjcProtocolClassCacheOffset)
+	}
 	if len(pls.MustBeMissingPaths) > 0 {
-		out += "MustBeMissing:\n"
+		out += "\nMustBeMissing:\n"
 		for _, path := range pls.MustBeMissingPaths {
 			out += fmt.Sprintf("    %s\n", path)
 		}
 	}
 	if len(pls.Patches) > 0 {
-		out += "Cache Overrides:\n"
+		out += "\nCache Overrides:\n"
 		for _, patch := range pls.Patches {
 			if len(pls.Patches) > 1 {
 				out += "---\n"
@@ -682,418 +713,42 @@ func (pls PrebuiltLoaderSet) String(f *File) string {
 			out += fmt.Sprintf("  replace-offset: %#08x\n", patch.PatchTo.Offset())
 		}
 	}
+
 	return out
 }
 
-func (f *File) ForEachLaunchLoaderSet(handler func(execPath string, pset *PrebuiltLoaderSet)) error {
-	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
-		return ErrPrebuiltLoaderSetNotSupported
-	}
-	if f.Headers[f.UUID].ProgramTrieAddr == 0 {
-		return ErrPrebuiltLoaderSetNotSupported
-	}
+type objCStringTable struct {
+	Capacity              uint32
+	Occupied              uint32
+	Shift                 uint32
+	Mask                  uint32
+	RoundedTabSize        uint32
+	RoundedCheckBytesSize uint32
+	Salt                  uint64
 
-	uuid, off, err := f.GetOffset(f.Headers[f.UUID].ProgramTrieAddr)
-	if err != nil {
-		return err
-	}
+	Scramble [256]uint32
+	// uint8_t tab[0];                     /* tab[mask+1] (always power-of-2). Rounded up to roundedTabSize */
+	// uint8_t checkbytes[capacity];    /* check byte for each string. Rounded up to roundedCheckBytesSize */
+	// BindTargetRef offsets[capacity]; /* offsets from &capacity to cstrings */
+}
 
-	dat, err := f.ReadBytesForUUID(uuid, int64(off), uint64(f.Headers[f.UUID].ProgramTrieSize))
-	if err != nil {
-		return err
-	}
+type ObjCSelectorOpt struct {
+	objCStringTable
+	Tab        []byte          /* tab[mask+1] (always power-of-2). Rounded up to roundedTabSize */
+	Checkbytes []byte          /* check byte for each string. Rounded up to roundedCheckBytesSize */
+	Offsets    []BindTargetRef /* offsets from &capacity to cstrings */
+}
 
-	r := bytes.NewReader(dat)
-
-	nodes, err := trie.ParseTrie(r)
-	if err != nil {
-		return err
-	}
-
-	for _, node := range nodes {
-		r.Seek(int64(node.Offset), io.SeekStart)
-
-		pblsOff, err := trie.ReadUleb128(r)
-		if err != nil {
-			return err
-		}
-
-		uuid, psetOffset, err := f.GetOffset(f.Headers[f.UUID].ProgramsPblSetPoolAddr + uint64(pblsOff))
-		if err != nil {
-			return err
-		}
-
-		sr := io.NewSectionReader(f.r[uuid], int64(psetOffset), 1<<63-1)
-
-		var pset PrebuiltLoaderSet
-		if err := binary.Read(sr, binary.LittleEndian, &pset.prebuiltLoaderSetHeader); err != nil {
-			return err
-		}
-
-		if pset.Magic != PrebuiltLoaderSetMagic {
-			return fmt.Errorf("invalid magic for PrebuiltLoader at %#x: expected %x got %x", psetOffset, PrebuiltLoaderSetMagic, pset.Magic)
-		}
-
-		sr.Seek(int64(pset.LoadersArrayOffset), io.SeekStart)
-
-		loaderOffsets := make([]uint32, pset.LoadersArrayCount)
-		if err := binary.Read(sr, binary.LittleEndian, &loaderOffsets); err != nil {
-			return err
-		}
-
-		for _, loaderOffset := range loaderOffsets {
-			pbl, err := f.parsePrebuiltLoader(io.NewSectionReader(f.r[uuid], int64(psetOffset)+int64(loaderOffset), 1<<63-1))
-			if err != nil {
-				return err
-			}
-			pset.Loaders = append(pset.Loaders, *pbl)
-		}
-
-		if pset.CachePatchCount > 0 { // FIXME: this is in "/usr/bin/abmlite" but the values don't make sense (dyld_closure_util gets the same values)
-			sr.Seek(int64(pset.CachePatchOffset), io.SeekStart)
-			pset.Patches = make([]CachePatch, pset.CachePatchCount)
-			if err := binary.Read(sr, binary.LittleEndian, &pset.Patches); err != nil {
-				return err
-			}
-		}
-		if pset.DyldCacheUuidOffset > 0 {
-			sr.Seek(int64(pset.DyldCacheUuidOffset), io.SeekStart)
-			var dcUUID types.UUID
-			if err := binary.Read(sr, binary.LittleEndian, &dcUUID); err != nil {
-				return err
-			}
-		}
-		if pset.MustBeMissingPathsCount > 0 {
-			sr.Seek(int64(pset.MustBeMissingPathsOffset), io.SeekStart)
-			br := bufio.NewReader(sr)
-			for i := 0; i < int(pset.MustBeMissingPathsCount); i++ {
-				s, err := br.ReadString('\x00')
-				if err != nil {
-					return err
-				}
-				pset.MustBeMissingPaths = append(pset.MustBeMissingPaths, strings.TrimSuffix(s, "\x00"))
-			}
-		}
-		if pset.ObjcSelectorHashTableOffset > 0 {
-
-		}
-		if pset.ObjcClassHashTableOffset > 0 {
-
-		}
-		if pset.ObjcProtocolHashTableOffset > 0 {
-
-		}
-		if pset.ObjcProtocolClassCacheOffset > 0 {
-
-		}
-		if pset.HasOptimizedSwift() {
-
-		}
-
-		handler(string(node.Data), &pset)
-	}
-
+func (o ObjCSelectorOpt) Targets() []BindTargetRef {
+	// return o.Tab[o.RoundedTabSize] + byte(o.RoundedCheckBytesSize)
 	return nil
 }
 
-func (f *File) ForEachLaunchLoaderSetPath(handler func(execPath string)) error {
-	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
-		return ErrPrebuiltLoaderSetNotSupported
-	}
-	if f.Headers[f.UUID].ProgramTrieAddr == 0 {
-		return ErrPrebuiltLoaderSetNotSupported
-	}
-
-	uuid, off, err := f.GetOffset(f.Headers[f.UUID].ProgramTrieAddr)
-	if err != nil {
-		return err
-	}
-
-	dat, err := f.ReadBytesForUUID(uuid, int64(off), uint64(f.Headers[f.UUID].ProgramTrieSize))
-	if err != nil {
-		return err
-	}
-
-	r := bytes.NewReader(dat)
-
-	nodes, err := trie.ParseTrie(r)
-	if err != nil {
-		return err
-	}
-
-	for _, node := range nodes {
-		handler(string(node.Data))
-	}
-
-	return nil
-}
-
-// GetLaunchLoaderSet returns the PrebuiltLoaderSet for the given executable app path.
-func (f *File) GetLaunchLoaderSet(executablePath string) (*PrebuiltLoaderSet, error) {
-	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
-		return nil, ErrPrebuiltLoaderSetNotSupported
-	}
-	if f.Headers[f.UUID].ProgramTrieAddr == 0 {
-		return nil, ErrPrebuiltLoaderSetNotSupported
-	}
-
-	var psetOffset uint64
-
-	uuid, off, err := f.GetOffset(f.Headers[f.UUID].ProgramTrieAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	dat, err := f.ReadBytesForUUID(uuid, int64(off), uint64(f.Headers[f.UUID].ProgramTrieSize))
-	if err != nil {
-		return nil, err
-	}
-
-	r := bytes.NewReader(dat)
-
-	if _, err = trie.WalkTrie(r, executablePath); err != nil {
-		return nil, fmt.Errorf("could not find executable %s in the ProgramTrie: %w", executablePath, err)
-	}
-
-	poolOffset, err := trie.ReadUleb128(r)
-	if err != nil {
-		return nil, err
-	}
-
-	uuid, psetOffset, err = f.GetOffset(f.Headers[f.UUID].ProgramsPblSetPoolAddr + uint64(poolOffset))
-	if err != nil {
-		return nil, err
-	}
-
-	sr := io.NewSectionReader(f.r[uuid], int64(psetOffset), 1<<63-1)
-
-	var pset PrebuiltLoaderSet
-	if err := binary.Read(sr, binary.LittleEndian, &pset.prebuiltLoaderSetHeader); err != nil {
-		return nil, err
-	}
-
-	if pset.Magic != PrebuiltLoaderSetMagic {
-		return nil, fmt.Errorf("invalid magic for PrebuiltLoader at %#x: expected %x got %x", psetOffset, PrebuiltLoaderSetMagic, pset.Magic)
-	}
-
-	sr.Seek(int64(pset.LoadersArrayOffset), io.SeekStart)
-
-	loaderOffsets := make([]uint32, pset.LoadersArrayCount)
-	if err := binary.Read(sr, binary.LittleEndian, &loaderOffsets); err != nil {
-		return nil, err
-	}
-
-	for _, loaderOffset := range loaderOffsets {
-		pbl, err := f.parsePrebuiltLoader(io.NewSectionReader(f.r[uuid], int64(psetOffset)+int64(loaderOffset), 1<<63-1))
-		if err != nil {
-			return nil, err
-		}
-		pset.Loaders = append(pset.Loaders, *pbl)
-	}
-
-	if pset.CachePatchCount > 0 {
-		sr.Seek(int64(pset.CachePatchOffset), io.SeekStart)
-		pset.Patches = make([]CachePatch, pset.CachePatchCount)
-		if err := binary.Read(sr, binary.LittleEndian, &pset.Patches); err != nil {
-			return nil, err
-		}
-	}
-	if pset.DyldCacheUuidOffset > 0 {
-		sr.Seek(int64(pset.DyldCacheUuidOffset), io.SeekStart)
-		var dcUUID types.UUID
-		if err := binary.Read(sr, binary.LittleEndian, &dcUUID); err != nil {
-			return nil, err
-		}
-	}
-	if pset.MustBeMissingPathsCount > 0 {
-		sr.Seek(int64(pset.MustBeMissingPathsOffset), io.SeekStart)
-		br := bufio.NewReader(sr)
-		for i := 0; i < int(pset.MustBeMissingPathsCount); i++ {
-			s, err := br.ReadString('\x00')
-			if err != nil {
-				return nil, err
-			}
-			pset.MustBeMissingPaths = append(pset.MustBeMissingPaths, strings.TrimSuffix(s, "\x00"))
-		}
-	}
-	if pset.ObjcSelectorHashTableOffset > 0 {
-
-	}
-	if pset.ObjcClassHashTableOffset > 0 {
-
-	}
-	if pset.ObjcProtocolHashTableOffset > 0 {
-
-	}
-	if pset.ObjcProtocolClassCacheOffset > 0 {
-
-	}
-	if pset.HasOptimizedSwift() {
-
-	}
-
-	return &pset, nil
-}
-
-func (f *File) GetDylibPrebuiltLoader(executablePath string) (*PrebuiltLoader, error) {
-
-	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
-		return nil, ErrPrebuiltLoaderSetNotSupported
-	}
-	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].DylibsPblSetAddr)) {
-		return nil, ErrPrebuiltLoaderSetNotSupported
-	}
-	if f.Headers[f.UUID].DylibsPblSetAddr == 0 {
-		return nil, ErrPrebuiltLoaderSetNotSupported
-	}
-
-	uuid, off, err := f.GetOffset(f.Headers[f.UUID].DylibsPblSetAddr)
-	if err != nil {
-		return nil, err
-	}
-
-	sr := io.NewSectionReader(f.r[uuid], int64(off), 1<<63-1)
-
-	var pset PrebuiltLoaderSet
-	if err := binary.Read(sr, binary.LittleEndian, &pset.prebuiltLoaderSetHeader); err != nil {
-		return nil, err
-	}
-
-	sr.Seek(int64(pset.LoadersArrayOffset), io.SeekStart)
-
-	loaderOffsets := make([]uint32, pset.LoadersArrayCount)
-	if err := binary.Read(sr, binary.LittleEndian, &loaderOffsets); err != nil {
-		return nil, err
-	}
-
-	imgIdx, err := f.HasImagePath(executablePath)
-	if err != nil {
-		return nil, err
-	} else if imgIdx < 0 {
-		return nil, fmt.Errorf("image not found")
-	}
-
-	sr.Seek(int64(loaderOffsets[imgIdx]), io.SeekStart)
-
-	return f.parsePrebuiltLoader(io.NewSectionReader(f.r[uuid], int64(off)+int64(loaderOffsets[imgIdx]), 1<<63-1))
-}
-
-// parsePrebuiltLoader parses a prebuilt loader from a section reader.
-func (f *File) parsePrebuiltLoader(sr *io.SectionReader) (*PrebuiltLoader, error) {
-	var pbl PrebuiltLoader
-	if err := binary.Read(sr, binary.LittleEndian, &pbl.prebuiltLoaderHeader); err != nil {
-		return nil, err
-	}
-
-	if pbl.Magic != LoaderMagic {
-		return nil, fmt.Errorf("invalid magic for prebuilt loader: expected %x got %x", LoaderMagic, pbl.Magic)
-	}
-
-	if pbl.PathOffset > 0 {
-		sr.Seek(int64(pbl.PathOffset), io.SeekStart)
-		br := bufio.NewReader(sr)
-		path, err := br.ReadString('\x00')
-		if err != nil {
-			return nil, err
-		}
-		pbl.Path = strings.TrimSuffix(path, "\x00")
-	}
-	if pbl.AltPathOffset > 0 {
-		sr.Seek(int64(pbl.AltPathOffset), io.SeekStart)
-		br := bufio.NewReader(sr)
-		path, err := br.ReadString('\x00')
-		if err != nil {
-			return nil, err
-		}
-		pbl.AltPath = strings.TrimSuffix(path, "\x00")
-	}
-	if pbl.FileValidationOffset > 0 {
-		sr.Seek(int64(pbl.FileValidationOffset), io.SeekStart)
-		var fv fileValidation
-		if err := binary.Read(sr, binary.LittleEndian, &fv); err != nil {
-			return nil, err
-		}
-		pbl.FileValidation = &fv
-	}
-	if pbl.RegionsCount() > 0 {
-		sr.Seek(int64(pbl.RegionsOffset), io.SeekStart)
-		pbl.Regions = make([]Region, pbl.RegionsCount())
-		if err := binary.Read(sr, binary.LittleEndian, &pbl.Regions); err != nil {
-			return nil, err
-		}
-	}
-	if pbl.DependentLoaderRefsArrayOffset > 0 {
-		sr.Seek(int64(pbl.DependentLoaderRefsArrayOffset), io.SeekStart)
-		depsArray := make([]LoaderRef, pbl.DepCount)
-		if err := binary.Read(sr, binary.LittleEndian, &depsArray); err != nil {
-			return nil, err
-		}
-		kindsArray := make([]DependentKind, pbl.DepCount)
-		if pbl.DependentKindArrayOffset > 0 {
-			sr.Seek(int64(pbl.DependentKindArrayOffset), io.SeekStart)
-			if err := binary.Read(sr, binary.LittleEndian, &kindsArray); err != nil {
-				return nil, err
-			}
-		}
-		for idx, dep := range depsArray {
-			img := dep.String()
-			if dep.Index() < uint16(len(f.Images)) {
-				img = f.Images[dep.Index()].Name
-			}
-			pbl.Dependents = append(pbl.Dependents, dependent{
-				Name: img,
-				Kind: kindsArray[idx],
-			})
-		}
-	}
-	if pbl.BindTargetRefsCount > 0 {
-		sr.Seek(int64(pbl.BindTargetRefsOffset), io.SeekStart)
-		pbl.BindTargets = make([]BindTargetRef, pbl.BindTargetRefsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &pbl.BindTargets); err != nil {
-			return nil, err
-		}
-	}
-	if pbl.OverrideBindTargetRefsCount > 0 {
-		sr.Seek(int64(pbl.OverrideBindTargetRefsOffset), io.SeekStart)
-		pbl.OverrideBindTargets = make([]BindTargetRef, pbl.OverrideBindTargetRefsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &pbl.OverrideBindTargets); err != nil {
-			return nil, err
-		}
-	}
-	if pbl.ObjcBinaryInfoOffset > 0 {
-		sr.Seek(int64(pbl.ObjcBinaryInfoOffset), io.SeekStart)
-		var ofi ObjCBinaryInfo
-		if err := binary.Read(sr, binary.LittleEndian, &ofi); err != nil {
-			return nil, err
-		}
-		pbl.ObjcFixupInfo = &ofi
-		sr.Seek(int64(pbl.ObjcBinaryInfoOffset)+int64(pbl.ObjcFixupInfo.ProtocolFixupsOffset), io.SeekStart)
-		pbl.ObjcCanonicalProtocolFixups = make([]bool, pbl.ObjcFixupInfo.ProtocolListCount)
-		if err := binary.Read(sr, binary.LittleEndian, &pbl.ObjcCanonicalProtocolFixups); err != nil {
-			return nil, err
-		}
-		sr.Seek(int64(pbl.ObjcBinaryInfoOffset)+int64(pbl.ObjcFixupInfo.SelectorReferencesFixupsOffset), io.SeekStart)
-		pbl.ObjcSelectorFixups = make([]BindTargetRef, pbl.ObjcFixupInfo.SelectorReferencesFixupsCount)
-		if err := binary.Read(sr, binary.LittleEndian, &pbl.ObjcSelectorFixups); err != nil {
-			return nil, err
-		}
-	}
-	if pbl.IndexOfTwin != NoUnzipperedTwin {
-		pbl.Twin = f.Images[pbl.IndexOfTwin].Name
-	}
-	if pbl.PatchTableOffset > 0 {
-		sr.Seek(int64(pbl.PatchTableOffset), io.SeekStart)
-		for {
-			var patch DylibPatch
-			if err := binary.Read(sr, binary.LittleEndian, &patch); err != nil {
-				return nil, err
-			}
-			pbl.DylibPatches = append(pbl.DylibPatches, patch)
-			if patch.Kind == endOfPatchTable {
-				break
-			}
-		}
-	}
-
-	return &pbl, nil
+type ObjCClassOpt struct {
+	objCStringTable
+	Tab        []byte          /* tab[mask+1] (always power-of-2). Rounded up to roundedTabSize */
+	Checkbytes []byte          /* check byte for each string. Rounded up to roundedCheckBytesSize */
+	Offsets    []BindTargetRef /* offsets from &capacity to cstrings */
+	Classes    []BindTargetRef /* offsets from &capacity to cstrings */
+	Duplicates []BindTargetRef /* offsets from &capacity to cstrings */
 }
