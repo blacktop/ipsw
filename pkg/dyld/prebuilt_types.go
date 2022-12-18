@@ -182,7 +182,7 @@ func (b BindTargetRef) String(f *File) string {
 	if b.IsAbsolute() {
 		return fmt.Sprintf("%#08x: (absolue)", b.Offset())
 	}
-	if b.LoaderRef().IsApp() {
+	if b.LoaderRef().IsApp() || int(b.LoaderRef().Index()) >= len(f.Images) {
 		return fmt.Sprintf("%#08x: (%s)", b.Offset(), b.LoaderRef())
 	}
 	return fmt.Sprintf("%#08x: %s", b.Offset(), f.Images[b.LoaderRef().Index()].Name)
@@ -624,13 +624,16 @@ type prebuiltLoaderSetHeader struct {
 
 type PrebuiltLoaderSet struct {
 	prebuiltLoaderSetHeader
-	Loaders            []PrebuiltLoader
-	Patches            []CachePatch
-	DyldCacheUUID      types.UUID
-	MustBeMissingPaths []string
-	SelectorTable      *ObjCSelectorOpt
-	ClassTable         *ObjCClassOpt
-	ProtocolTable      *ObjCClassOpt
+	Loaders                       []PrebuiltLoader
+	Patches                       []CachePatch
+	DyldCacheUUID                 types.UUID
+	MustBeMissingPaths            []string
+	SelectorTable                 *ObjCSelectorOpt
+	ClassTable                    *ObjCClassOpt
+	ProtocolTable                 *ObjCClassOpt
+	SwiftTypeProtocolTable        SwiftTypeConformanceEntries
+	SwiftMetadataProtocolTable    SwiftMetadataConformanceEntries
+	SwiftForeignTypeProtocolTable SwiftForeignTypeConformanceEntries
 }
 
 func (pls PrebuiltLoaderSet) HasOptimizedSwift() bool {
@@ -667,9 +670,8 @@ func (pls PrebuiltLoaderSet) String(f *File) string {
 			if bt.IsAbsolute() {
 				continue
 			}
-			out += "  -\n"
 			out += fmt.Sprintf("  %s name\n", bt.String(f))
-			out += fmt.Sprintf("  %s impl\n", pls.ClassTable.Classes[idx].String(f))
+			out += fmt.Sprintf("    %s impl\n", pls.ClassTable.Classes[idx].String(f))
 		}
 	}
 	if pls.ProtocolTable != nil {
@@ -678,13 +680,45 @@ func (pls PrebuiltLoaderSet) String(f *File) string {
 			if bt.IsAbsolute() {
 				continue
 			}
-			out += "  -\n"
 			out += fmt.Sprintf("  %s name\n", bt.String(f))
-			out += fmt.Sprintf("  %s impl\n", pls.ProtocolTable.Classes[idx].String(f))
+			out += fmt.Sprintf("    %s impl\n", pls.ProtocolTable.Classes[idx].String(f))
 		}
 	}
 	if pls.ObjcProtocolClassCacheOffset != 0 {
 		out += fmt.Sprintf("\nObjC Protocol Class Cache Address: %#x\n", f.Headers[f.UUID].SharedRegionStart+pls.ObjcProtocolClassCacheOffset)
+	}
+	if len(pls.SwiftTypeProtocolTable) > 0 {
+		out += "\nSwift Type Protocol Table\n"
+		out += "-------------------------\n"
+		pls.SwiftTypeProtocolTable.ForEachEntry(func(key SwiftTypeProtocolConformanceDiskLocationKey, values []SwiftTypeProtocolConformanceDiskLocation) {
+			out += fmt.Sprintf("  %s type descriptor\n", key.TypeDescriptor.String(f))
+			out += fmt.Sprintf("    %s protocol\n", key.Protocol.String(f))
+			for _, v := range values {
+				out += fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f))
+			}
+		})
+	}
+	if len(pls.SwiftMetadataProtocolTable) > 0 {
+		out += "\nSwift Metadata Protocol Table\n"
+		out += "-----------------------------\n"
+		pls.SwiftMetadataProtocolTable.ForEachEntry(func(key SwiftMetadataProtocolConformanceDiskLocationKey, values []SwiftMetadataProtocolConformanceDiskLocation) {
+			out += fmt.Sprintf("  %s metadata descriptor\n", key.MetadataDescriptor.String(f))
+			out += fmt.Sprintf("    %s protocol\n", key.Protocol.String(f))
+			for _, v := range values {
+				out += fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f))
+			}
+		})
+	}
+	if len(pls.SwiftForeignTypeProtocolTable) > 0 {
+		out += "\nSwift Foreign Protocol Table\n"
+		out += "----------------------------\n"
+		pls.SwiftForeignTypeProtocolTable.ForEachEntry(func(key SwiftForeignTypeProtocolConformanceDiskLocationKey, values []SwiftForeignTypeProtocolConformanceDiskLocation) {
+			out += fmt.Sprintf("  %s foreign descriptor\n", key.ForeignDescriptor.String(f))
+			out += fmt.Sprintf("    %s protocol\n", key.Protocol.String(f))
+			for _, v := range values {
+				out += fmt.Sprintf("      %s conformance\n", v.ProtocolConformance.String(f))
+			}
+		})
 	}
 	if len(pls.MustBeMissingPaths) > 0 {
 		out += "\nMustBeMissing:\n"
@@ -739,11 +773,6 @@ type ObjCSelectorOpt struct {
 	Offsets    []BindTargetRef /* offsets from &capacity to cstrings */
 }
 
-func (o ObjCSelectorOpt) Targets() []BindTargetRef {
-	// return o.Tab[o.RoundedTabSize] + byte(o.RoundedCheckBytesSize)
-	return nil
-}
-
 type ObjCClassOpt struct {
 	objCStringTable
 	Tab        []byte          /* tab[mask+1] (always power-of-2). Rounded up to roundedTabSize */
@@ -752,3 +781,157 @@ type ObjCClassOpt struct {
 	Classes    []BindTargetRef /* offsets from &capacity to cstrings */
 	Duplicates []BindTargetRef /* offsets from &capacity to cstrings */
 }
+
+const MapSentinelHash = ^uint64(0)
+
+type SwiftConformanceMultiMap struct {
+	NextHashBufferGrowth uint64
+	HashBufferUseCount   uint64
+	// hashBufferCount 	uint64
+	// hashBuffer [hashBufferCount]uint64
+	// nodeBufferCount 	uint64
+	// hashBuffer [nodeBufferCount]NodeEntryT
+}
+
+type SwiftTypeConformanceEntries []SwiftTypeProtocolNodeEntryT
+
+func (ents SwiftTypeConformanceEntries) ForEachEntry(handler func(SwiftTypeProtocolConformanceDiskLocationKey, []SwiftTypeProtocolConformanceDiskLocation)) {
+	var vals []SwiftTypeProtocolConformanceDiskLocation
+	for _, head := range ents {
+		nextNode := head.Next
+		if !nextNode.HasAnyDuplicates() {
+			handler(head.Key, []SwiftTypeProtocolConformanceDiskLocation{head.Value})
+		}
+		if !nextNode.IsDuplicateHead() {
+			continue
+		}
+		vals = append(vals, head.Value) // add head node
+		for ents[nextNode.NextIndex()].Next.HasMoreDuplicates() {
+			vals = append(vals, ents[nextNode.NextIndex()].Value)
+			nextNode = ents[nextNode.NextIndex()].Next
+		}
+		vals = append(vals, ents[nextNode.NextIndex()].Value) // add last node
+		handler(head.Key, vals)
+	}
+}
+
+type SwiftTypeProtocolNodeEntryT struct {
+	Key   SwiftTypeProtocolConformanceDiskLocationKey
+	Value SwiftTypeProtocolConformanceDiskLocation
+	Next  NextNode
+	_     uint32
+}
+
+type SwiftTypeProtocolConformanceDiskLocationKey struct {
+	TypeDescriptor BindTargetRef
+	Protocol       BindTargetRef
+}
+
+type SwiftTypeProtocolConformanceDiskLocation struct {
+	ProtocolConformance BindTargetRef
+}
+
+type SwiftMetadataConformanceEntries []SwiftMetadataConformanceNodeEntryT
+
+func (ents SwiftMetadataConformanceEntries) ForEachEntry(handler func(SwiftMetadataProtocolConformanceDiskLocationKey, []SwiftMetadataProtocolConformanceDiskLocation)) {
+	var vals []SwiftMetadataProtocolConformanceDiskLocation
+	for _, head := range ents {
+		nextNode := head.Next
+		if !nextNode.HasAnyDuplicates() {
+			handler(head.Key, []SwiftMetadataProtocolConformanceDiskLocation{head.Value})
+		}
+		if !nextNode.IsDuplicateHead() {
+			continue
+		}
+		vals = append(vals, head.Value) // add head node
+		for ents[nextNode.NextIndex()].Next.HasMoreDuplicates() {
+			vals = append(vals, ents[nextNode.NextIndex()].Value)
+			nextNode = ents[nextNode.NextIndex()].Next
+		}
+		vals = append(vals, ents[nextNode.NextIndex()].Value) // add last node
+		handler(head.Key, vals)
+	}
+}
+
+type SwiftMetadataConformanceNodeEntryT struct {
+	Key   SwiftMetadataProtocolConformanceDiskLocationKey
+	Value SwiftMetadataProtocolConformanceDiskLocation
+	Next  NextNode
+	_     uint32
+}
+
+type SwiftMetadataProtocolConformanceDiskLocationKey struct {
+	MetadataDescriptor BindTargetRef
+	Protocol           BindTargetRef
+}
+
+type SwiftMetadataProtocolConformanceDiskLocation struct {
+	ProtocolConformance BindTargetRef
+}
+
+type SwiftForeignTypeConformanceEntries []SwiftForeignTypeConformanceNodeEntryT
+
+func (ents SwiftForeignTypeConformanceEntries) ForEachEntry(handler func(SwiftForeignTypeProtocolConformanceDiskLocationKey, []SwiftForeignTypeProtocolConformanceDiskLocation)) {
+	var vals []SwiftForeignTypeProtocolConformanceDiskLocation
+	for _, head := range ents {
+		nextNode := head.Next
+		if !nextNode.HasAnyDuplicates() {
+			handler(head.Key, []SwiftForeignTypeProtocolConformanceDiskLocation{head.Value})
+		}
+		if !nextNode.IsDuplicateHead() {
+			continue
+		}
+		vals = append(vals, head.Value) // add head node
+		for ents[nextNode.NextIndex()].Next.HasMoreDuplicates() {
+			vals = append(vals, ents[nextNode.NextIndex()].Value)
+			nextNode = ents[nextNode.NextIndex()].Next
+		}
+		vals = append(vals, ents[nextNode.NextIndex()].Value) // add last node
+		handler(head.Key, vals)
+	}
+}
+
+type SwiftForeignTypeConformanceNodeEntryT struct {
+	Key   SwiftForeignTypeProtocolConformanceDiskLocationKey
+	Value SwiftForeignTypeProtocolConformanceDiskLocation
+	Next  NextNode
+	_     uint32
+}
+
+type SwiftForeignTypeProtocolConformanceDiskLocationKey struct {
+	OriginalPointer             uint64
+	ForeignDescriptor           BindTargetRef
+	ForeignDescriptorNameLength uint64
+	Protocol                    BindTargetRef
+}
+
+type SwiftForeignTypeProtocolConformanceDiskLocation struct {
+	ProtocolConformance BindTargetRef
+}
+
+type NextNode uint32
+
+func (nn NextNode) IsDuplicateHead() bool {
+	return types.ExtractBits(uint64(nn), 0, 1) != 0
+}
+func (nn NextNode) IsDuplicateEntry() bool {
+	return types.ExtractBits(uint64(nn), 1, 1) != 0
+}
+func (nn NextNode) IsDuplicateTail() bool {
+	return types.ExtractBits(uint64(nn), 2, 1) != 0
+}
+func (nn NextNode) NextIndex() uint32 {
+	return uint32(types.ExtractBits(uint64(nn), 3, 29))
+}
+func (nn NextNode) HasAnyDuplicates() bool {
+	return nn.IsDuplicateHead() || nn.IsDuplicateEntry() || nn.IsDuplicateTail()
+}
+func (nn NextNode) HasMoreDuplicates() bool {
+	return nn.IsDuplicateHead() || nn.IsDuplicateEntry()
+}
+
+// type NodeEntryT struct {
+// 	Key   BindTargetRef
+// 	Value BindTargetRef
+// 	Next  NextNode
+// }
