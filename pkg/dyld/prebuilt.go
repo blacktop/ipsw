@@ -9,7 +9,6 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/trie"
 	"github.com/blacktop/go-macho/types"
 )
@@ -126,7 +125,7 @@ func (f *File) GetLaunchLoaderSet(executablePath string) (*PrebuiltLoaderSet, er
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("psetOffset addr: %#x", f.Headers[f.UUID].ProgramsPblSetPoolAddr+uint64(poolOffset))
+
 	uuid, psetOffset, err = f.GetOffset(f.Headers[f.UUID].ProgramsPblSetPoolAddr + uint64(poolOffset))
 	if err != nil {
 		return nil, err
@@ -135,6 +134,7 @@ func (f *File) GetLaunchLoaderSet(executablePath string) (*PrebuiltLoaderSet, er
 	return f.parsePrebuiltLoaderSet(io.NewSectionReader(f.r[uuid], int64(psetOffset), 1<<63-1))
 }
 
+// GetLaunchLoader returns the PrebuiltLoader for the given executable in-cache dylib path.
 func (f *File) GetDylibPrebuiltLoader(executablePath string) (*PrebuiltLoader, error) {
 
 	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
@@ -319,7 +319,75 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		pset.ProtocolTable = &o
 	}
 	if pset.HasOptimizedSwift() {
-		log.Warn("[WARNING] optimized swift not supported yet")
+		if pset.SwiftTypeConformanceTableOffset > 0 {
+			sr.Seek(int64(pset.SwiftTypeConformanceTableOffset), io.SeekStart)
+			var mmap SwiftConformanceMultiMap
+			if err := binary.Read(sr, f.ByteOrder, &mmap); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift type conformance map: %v", err)
+			}
+			var hashBufferCount uint64
+			if err := binary.Read(sr, f.ByteOrder, &hashBufferCount); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift type conformance hashBufferCount: %v", err)
+			}
+			hashBuffer := make([]uint64, hashBufferCount)
+			if err := binary.Read(sr, f.ByteOrder, &hashBuffer); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift type conformance hashBuffer: %v", err)
+			}
+			var nodeBufferCount uint64
+			if err := binary.Read(sr, f.ByteOrder, &nodeBufferCount); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift type conformance nodeBufferCount: %v", err)
+			}
+			pset.SwiftTypeProtocolTable = make([]SwiftTypeProtocolNodeEntryT, nodeBufferCount)
+			if err := binary.Read(sr, f.ByteOrder, &pset.SwiftTypeProtocolTable); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift type conformance nodeBuffer: %v", err)
+			}
+		}
+		if pset.SwiftMetadataConformanceTableOffset > 0 {
+			sr.Seek(int64(pset.SwiftMetadataConformanceTableOffset), io.SeekStart)
+			var mmap SwiftConformanceMultiMap
+			if err := binary.Read(sr, f.ByteOrder, &mmap); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance map: %v", err)
+			}
+			var hashBufferCount uint64
+			if err := binary.Read(sr, f.ByteOrder, &hashBufferCount); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance hashBufferCount: %v", err)
+			}
+			hashBuffer := make([]uint64, hashBufferCount)
+			if err := binary.Read(sr, f.ByteOrder, &hashBuffer); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance hashBuffer: %v", err)
+			}
+			var nodeBufferCount uint64
+			if err := binary.Read(sr, f.ByteOrder, &nodeBufferCount); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance nodeBufferCount: %v", err)
+			}
+			pset.SwiftMetadataProtocolTable = make([]SwiftMetadataConformanceNodeEntryT, nodeBufferCount)
+			if err := binary.Read(sr, f.ByteOrder, &pset.SwiftMetadataProtocolTable); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift metadata conformance nodeBuffer: %v", err)
+			}
+		}
+		if pset.SwiftForeignTypeConformanceTableOffset > 0 {
+			sr.Seek(int64(pset.SwiftForeignTypeConformanceTableOffset), io.SeekStart)
+			var mmap SwiftConformanceMultiMap
+			if err := binary.Read(sr, f.ByteOrder, &mmap); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift foreign type conformance map: %v", err)
+			}
+			var hashBufferCount uint64
+			if err := binary.Read(sr, f.ByteOrder, &hashBufferCount); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift foreign type  conformance hashBufferCount: %v", err)
+			}
+			hashBuffer := make([]uint64, hashBufferCount)
+			if err := binary.Read(sr, f.ByteOrder, &hashBuffer); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift foreign type  conformance hashBuffer: %v", err)
+			}
+			var nodeBufferCount uint64
+			if err := binary.Read(sr, f.ByteOrder, &nodeBufferCount); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift foreign type  conformance nodeBufferCount: %v", err)
+			}
+			pset.SwiftForeignTypeProtocolTable = make([]SwiftForeignTypeConformanceNodeEntryT, nodeBufferCount)
+			if err := binary.Read(sr, f.ByteOrder, &pset.SwiftForeignTypeProtocolTable); err != nil {
+				return nil, fmt.Errorf("failed to read prebuilt swift foreign type  conformance nodeBuffer: %v", err)
+			}
+		}
 	}
 
 	return &pset, nil
