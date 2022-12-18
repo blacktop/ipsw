@@ -62,6 +62,7 @@ func init() {
 	machoInfoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
 	machoInfoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	machoInfoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
+	machoInfoCmd.Flags().BoolP("split-seg", "g", false, "Print split seg info")
 	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
 	machoInfoCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
@@ -79,6 +80,7 @@ func init() {
 	viper.BindPFlag("macho.info.starts", machoInfoCmd.Flags().Lookup("starts"))
 	viper.BindPFlag("macho.info.strings", machoInfoCmd.Flags().Lookup("strings"))
 	viper.BindPFlag("macho.info.fixups", machoInfoCmd.Flags().Lookup("fixups"))
+	viper.BindPFlag("macho.info.split-seg", machoInfoCmd.Flags().Lookup("split-seg"))
 	viper.BindPFlag("macho.info.fileset-entry", machoInfoCmd.Flags().Lookup("fileset-entry"))
 	viper.BindPFlag("macho.info.extract-fileset-entry", machoInfoCmd.Flags().Lookup("extract-fileset-entry"))
 	viper.BindPFlag("macho.info.all-fileset-entries", machoInfoCmd.Flags().Lookup("all-fileset-entries"))
@@ -117,6 +119,7 @@ var machoInfoCmd = &cobra.Command{
 		showFuncStarts := viper.GetBool("macho.info.starts")
 		dumpStrings := viper.GetBool("macho.info.strings")
 		showFixups := viper.GetBool("macho.info.fixups")
+		showSplitSeg := viper.GetBool("macho.info.split-seg")
 		filesetEntry := viper.GetString("macho.info.fileset-entry")
 		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
 		dumpCert := viper.GetBool("macho.info.dump-cert")
@@ -126,13 +129,14 @@ var machoInfoCmd = &cobra.Command{
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
 		}
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
-		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings
-		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings
-		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings
-		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings
-		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings && !showSplitSeg
+		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlySplitSegs := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && showSplitSeg
 
 		machoPath := filepath.Clean(args[0])
 
@@ -273,7 +277,7 @@ var machoInfoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings) {
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg) {
 			fmt.Println(m.FileTOC.String())
 		} else {
 			if len(filesetEntry) == 0 && !viper.GetBool("macho.info.all-fileset-entries") {
@@ -683,6 +687,31 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				fmt.Println("  - no fixups")
 			}
+		}
+
+		if showSplitSeg {
+			if !onlySplitSegs {
+				fmt.Println("SEGMENT_SPLIT_INFO")
+				fmt.Println("==================")
+			}
+			var sections []macho.Section
+			for _, l := range m.Loads {
+				if s, ok := l.(*macho.Segment); ok {
+					for j := uint32(0); j < s.Nsect; j++ {
+						sections = append(sections, *m.Sections[j+s.Firstsect])
+					}
+				}
+			}
+			m.ForEachV2SplitSegReference(func(fromSectionIndex, fromSectionOffset, toSectionIndex, toSectionOffset uint64, kind types.SplitInfoKind) {
+				fmt.Printf("%16s.%-16s %#08x  =>  %16s.%-16s %#08x\tkind(%s)\n",
+					sections[fromSectionIndex-1].Seg,
+					sections[fromSectionIndex-1].Name,
+					sections[fromSectionIndex-1].Addr+fromSectionOffset,
+					sections[toSectionIndex-1].Seg,
+					sections[toSectionIndex-1].Name,
+					sections[toSectionIndex-1].Addr+toSectionOffset,
+					kind)
+			})
 		}
 
 		if dumpStrings {
