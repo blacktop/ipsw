@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: image
 description: Dump image array info
 last_update:
-  date: 2022-12-14T18:21:18-07:00
+  date: 2022-12-17T17:42:11-07:00
   author: blacktop
 ---
 ## ipsw dyld image
@@ -15,6 +15,17 @@ Dump image array info
 
 ```
 ipsw dyld image <dyld_shared_cache> <IMAGE> [flags]
+```
+
+### Examples
+
+```bash
+  # List all the apps
+  ❯ ipsw dyld image <dyld_shared_cache>
+  # Dump the closure info for a in-cache dylib
+  ❯ ipsw dyld image <dyld_shared_cache> Foundation
+  # Dump the closure info for an app
+  ❯ ipsw dyld image <dyld_shared_cache> /usr/libexec/timed"
 ```
 
 ### Options
