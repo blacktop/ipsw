@@ -45,6 +45,12 @@ var ImageCmd = &cobra.Command{
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Example: `  # List all the apps
+  ❯ ipsw dyld image <dyld_shared_cache>
+  # Dump the closure info for a in-cache dylib
+  ❯ ipsw dyld image <dyld_shared_cache> Foundation
+  # Dump the closure info for an app
+  ❯ ipsw dyld image <dyld_shared_cache> /usr/libexec/timed"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
