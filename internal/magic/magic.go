@@ -13,9 +13,10 @@ import (
 type Magic uint32
 
 const (
-	Magic32  Magic = 0xfeedface
-	Magic64  Magic = 0xfeedfacf
-	MagicFat Magic = 0xcafebabe
+	Magic32    Magic = 0xfeedface
+	Magic64    Magic = 0xfeedfacf
+	MagicFatBE Magic = 0xcafebabe
+	MagicFatLE Magic = 0xbebafeca
 )
 
 func IsMachO(filePath string) (bool, error) {
@@ -31,11 +32,7 @@ func IsMachO(filePath string) (bool, error) {
 	}
 
 	switch Magic(binary.LittleEndian.Uint32(magic[:])) {
-	case Magic32:
-		fallthrough
-	case Magic64:
-		fallthrough
-	case MagicFat:
+	case Magic32, Magic64, MagicFatBE, MagicFatLE:
 		return true, nil
 	default:
 		f.Seek(0, io.SeekStart)
