@@ -154,11 +154,11 @@ const config = {
             items: [
               {
                 label: "Discord",
-                href: "https://discordapp.com/invite/docusaurus",
+                href: "https://discord.gg/xx2y9yrcgs",
               },
               {
                 label: "Twitter",
-                href: "https://twitter.com/docusaurus",
+                href: "https://twitter.com/blacktop__",
               },
               {
                 label: "Mastodon",
@@ -175,7 +175,7 @@ const config = {
               },
               {
                 label: "GitHub",
-                href: "https://github.com/facebook/docusaurus",
+                href: "https://github.com/blacktop/ipsw",
               },
             ],
           },
