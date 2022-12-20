@@ -13,6 +13,16 @@ import (
 	"github.com/blacktop/go-macho/types"
 )
 
+func (f *File) SupportsPrebuiltLoaderSet() bool {
+	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
+		return false
+	}
+	if f.Headers[f.UUID].ProgramTrieAddr == 0 {
+		return false
+	}
+	return true
+}
+
 func (f *File) ForEachLaunchLoaderSet(handler func(execPath string, pset *PrebuiltLoaderSet)) error {
 	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
 		return ErrPrebuiltLoaderSetNotSupported
@@ -132,6 +142,19 @@ func (f *File) GetLaunchLoaderSet(executablePath string) (*PrebuiltLoaderSet, er
 	}
 
 	return f.parsePrebuiltLoaderSet(io.NewSectionReader(f.r[uuid], int64(psetOffset), 1<<63-1))
+}
+
+func (f *File) SupportsDylibPrebuiltLoader() bool {
+	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].ProgramTrieSize)) {
+		return false
+	}
+	if f.Headers[f.UUID].MappingOffset < uint32(unsafe.Offsetof(f.Headers[f.UUID].DylibsPblSetAddr)) {
+		return false
+	}
+	if f.Headers[f.UUID].DylibsPblSetAddr == 0 {
+		return false
+	}
+	return true
 }
 
 // GetLaunchLoader returns the PrebuiltLoader for the given executable in-cache dylib path.
