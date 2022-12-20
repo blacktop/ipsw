@@ -342,7 +342,7 @@ func (f *File) parsePrebuiltLoaderSet(sr *io.SectionReader) (*PrebuiltLoaderSet,
 		pset.ProtocolTable = &o
 	}
 	if !pset.HasOptimizedObjC() && pset.ObjcProtocolClassCacheOffset > 0 { // FIXME: this is a hack to support old prebuilts (would have panic'ed while parsing macOS 12.6.1 DSC prebuilt for /bin/ls)
-		return nil, fmt.Errorf("possible corrupted prebuilt cache: objc protocol class cache offset is set but loader has NO objc optimizations")
+		return nil, fmt.Errorf("possible corrupted prebuilt loader set: objc protocol class cache offset is set but loader has NO objc optimizations")
 	}
 	if pset.HasOptimizedSwift() {
 		if pset.SwiftTypeConformanceTableOffset > 0 {
