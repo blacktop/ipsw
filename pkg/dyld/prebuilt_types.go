@@ -636,6 +636,9 @@ type PrebuiltLoaderSet struct {
 	SwiftForeignTypeProtocolTable SwiftForeignTypeConformanceEntries
 }
 
+func (pls PrebuiltLoaderSet) HasOptimizedObjC() bool {
+	return (pls.ObjcSelectorHashTableOffset != 0) || (pls.ObjcClassHashTableOffset != 0) || (pls.ObjcProtocolHashTableOffset != 0)
+}
 func (pls PrebuiltLoaderSet) HasOptimizedSwift() bool {
 	return (pls.SwiftForeignTypeConformanceTableOffset != 0) || (pls.SwiftMetadataConformanceTableOffset != 0) || (pls.SwiftTypeConformanceTableOffset != 0)
 }
@@ -684,7 +687,7 @@ func (pls PrebuiltLoaderSet) String(f *File) string {
 			out += fmt.Sprintf("    %s impl\n", pls.ProtocolTable.Classes[idx].String(f))
 		}
 	}
-	if pls.ObjcProtocolClassCacheOffset != 0 {
+	if pls.HasOptimizedObjC() && pls.ObjcProtocolClassCacheOffset != 0 {
 		out += fmt.Sprintf("\nObjC Protocol Class Cache Address: %#x\n", f.Headers[f.UUID].SharedRegionStart+pls.ObjcProtocolClassCacheOffset)
 	}
 	if len(pls.SwiftTypeProtocolTable) > 0 {
