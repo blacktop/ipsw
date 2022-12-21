@@ -100,6 +100,7 @@ builds:
       - amd64
     tags:
       - frida
+      - libusb
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -120,6 +121,7 @@ builds:
       - arm64
     tags:
       - frida
+      - libusb
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -314,6 +316,33 @@ brews:
         type: optional
       - name: unicorn
         type: optional
+    conflicts:
+      - ipsw-frida
+    install: |
+      bin.install "ipsw"
+      bash_completion.install "completions/_bash" => "ipsw"
+      zsh_completion.install "completions/_zsh" => "_ipsw"
+      fish_completion.install "completions/_fish" => "ipsw.fish"
+      man1.install Dir["manpages/*"]
+    test: |
+      system "#{bin}/ipsw --version"
+  - name: ipsw-frida
+    tap:
+      owner: blacktop
+      name: homebrew-tap
+    ids:
+      - frida_archive
+    folder: Formula
+    homepage: "https://github.com/blacktop/ipsw"
+    description: "iOS/macOS Research Swiss Army Knife"
+    license: MIT
+    dependencies:
+      - name: bat
+        type: optional
+      - name: libusb
+        type: optional
+    conflicts:
+      - ipsw
     install: |
       bin.install "ipsw"
       bash_completion.install "completions/_bash" => "ipsw"
