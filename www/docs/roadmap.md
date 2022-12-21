@@ -11,7 +11,7 @@ My strech goal is to make the worlds first _dyld_shared_cache_ disassembler that
 - [ ] MachO read/write
 - [ ] pure Go dyld splitter
 - [ ] APFS/HFS parsing to pull dyld without mounting
-- [ ] (jtool) -K Kextract™ a kernel extension by its bundle ID
+- [x] (jtool) -K Kextract™ a kernel extension by its bundle ID *(only MH_FILESETS for now)*
 - [ ] watch for new IPSW files with https://github.com/radovskyb/watcher
 - [ ] https://github.com/xerub/img4lib and https://github.com/tihmstar/img4tool
 - [ ] devicetree read/write
@@ -19,8 +19,8 @@ My strech goal is to make the worlds first _dyld_shared_cache_ disassembler that
 - [ ] maybe use https://github.com/AllenDang/giu for disassembler
 - [x] add https://github.com/mermaid-js/mermaid to docs
 - [ ] API maybe use (github.com/minio/simdjson-go)
-- [ ] Switch docs to https://squidfunk.github.io/mkdocs-material/getting-started/
-- [ ] store download dev session or creds using - https://github.com/keybase/go-keychain
+- [x] Switch docs to https://squidfunk.github.io/mkdocs-material/getting-started/ *(used docusaurus)*
+- [x] store download dev session or creds using - https://github.com/keybase/go-keychain *(used github.com/99designs/keyring as it offers multi-arch solutions)*
 - [ ] speed up downloads w/ https://github.com/ynsgnr/aria2go
 - [ ] make a color syntax highlighter like https://github.com/trishume/syntect but for Golang
 - [x] use https://github.com/google/gousb to detect what device(s) are connected (maybe filter downloads?)
