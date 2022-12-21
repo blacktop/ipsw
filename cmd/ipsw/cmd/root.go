@@ -24,6 +24,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
@@ -79,7 +80,7 @@ func init() {
 	// will be global for your application.
 
 	// Flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw/config.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&Color, "color", false, "colorize output")
 	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
@@ -108,9 +109,9 @@ func initConfig() {
 		cobra.CheckErr(err)
 
 		// Search config in home directory with name ".ipsw" (without extension).
-		viper.AddConfigPath(home)
+		viper.AddConfigPath(filepath.Join(home, ".ipsw"))
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".ipsw")
+		viper.SetConfigName("config")
 	}
 
 	viper.SetEnvPrefix("ipsw")

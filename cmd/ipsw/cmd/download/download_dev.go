@@ -22,11 +22,14 @@ THE SOFTWARE.
 package download
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/99designs/keyring"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
@@ -37,8 +40,6 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(devCmd)
-
 	devCmd.Flags().StringArray("watch", []string{}, "dev portal type to watch")
 	devCmd.Flags().Bool("more", false, "Download 'More' OSs/Apps")
 	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
@@ -46,6 +47,7 @@ func init() {
 	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	devCmd.Flags().StringP("keychain", "k", "", "Keychain password to unlock credential vault")
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
 	viper.BindPFlag("download.dev.more", devCmd.Flags().Lookup("more"))
 	viper.BindPFlag("download.dev.page", devCmd.Flags().Lookup("page"))
@@ -53,6 +55,17 @@ func init() {
 	viper.BindPFlag("download.dev.json", devCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.dev.pretty", devCmd.Flags().Lookup("pretty"))
 	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.dev.keychain", devCmd.Flags().Lookup("keychain"))
+	devCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("device")
+		DownloadCmd.PersistentFlags().MarkHidden("model")
+		DownloadCmd.PersistentFlags().MarkHidden("version")
+		DownloadCmd.PersistentFlags().MarkHidden("build")
+		c.Parent().HelpFunc()(c, s)
+	})
+	DownloadCmd.AddCommand(devCmd)
 }
 
 // devCmd represents the dev command
@@ -74,12 +87,6 @@ var devCmd = &cobra.Command{
 		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
 		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
 		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
-		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
-		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 
 		// settings
 		proxy := viper.GetString("download.proxy")
@@ -98,6 +105,46 @@ var devCmd = &cobra.Command{
 		prettyJSON := viper.GetBool("download.dev.pretty")
 		output := viper.GetString("download.dev.output")
 
+		username := viper.GetString("download.dev.username")
+		password := viper.GetString("download.dev.password")
+		keychain := viper.GetString("download.dev.keychain")
+
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+
+		// create credential vault (if it doesn't exist)
+		ring, err := keyring.Open(keyring.Config{
+			ServiceName:                    download.KeychainServiceName,
+			KeychainSynchronizable:         false,
+			KeychainAccessibleWhenUnlocked: true,
+			FileDir:                        filepath.Join(home, ".ipsw"),
+			FilePasswordFunc: func(msg string) (string, error) {
+				if len(keychain) == 0 {
+					msg = "Enter a password to decrypt your credentials vault: " + filepath.Join(home, ".ipsw", download.VaultName)
+					if _, err := os.Stat(filepath.Join(home, ".ipsw", download.VaultName)); errors.Is(err, os.ErrNotExist) {
+						msg = "Enter a password to encrypt your credentials to vault: " + filepath.Join(home, ".ipsw", download.VaultName)
+					}
+					prompt := &survey.Password{
+						Message: msg,
+					}
+					if err := survey.AskOne(prompt, &keychain); err != nil {
+						if err == terminal.InterruptErr {
+							log.Warn("Exiting...")
+							os.Exit(0)
+						}
+						return "", err
+					}
+				}
+
+				return keychain, nil
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("failed to open keyring: %s", err)
+		}
+
 		app := download.NewDevPortal(&download.DevConfig{
 			Proxy:        proxy,
 			Insecure:     insecure,
@@ -111,35 +158,58 @@ var devCmd = &cobra.Command{
 			Verbose:      viper.GetBool("verbose"),
 		})
 
-		username := viper.GetString("download.dev.username")
-		password := viper.GetString("download.dev.password")
-
-		if len(viper.GetString("download.dev.session_id")) == 0 {
-			// get username
-			if len(username) == 0 {
-				prompt := &survey.Input{
-					Message: "Please type your username:",
-				}
-				if err := survey.AskOne(prompt, &username); err != nil {
-					if err == terminal.InterruptErr {
-						log.Warn("Exiting...")
-						os.Exit(0)
+		if len(username) == 0 || len(password) == 0 {
+			creds, err := ring.Get(download.VaultName)
+			if err != nil { // failed to get credentials from vault (prompt user for credentials)
+				log.Errorf("failed to get credentials from vault: %v", err)
+				// get username
+				if len(username) == 0 {
+					prompt := &survey.Input{
+						Message: "Please type your username:",
 					}
+					if err := survey.AskOne(prompt, &username); err != nil {
+						if err == terminal.InterruptErr {
+							log.Warn("Exiting...")
+							os.Exit(0)
+						}
+						return err
+					}
+				}
+				// get password
+				if len(password) == 0 {
+					prompt := &survey.Password{
+						Message: "Please type your password:",
+					}
+					if err := survey.AskOne(prompt, &password); err != nil {
+						if err == terminal.InterruptErr {
+							log.Warn("Exiting...")
+							os.Exit(0)
+						}
+						return err
+					}
+				}
+				// save credentials to vault
+				dat, err := json.Marshal(&download.DevCreds{
+					Username: username,
+					Password: password,
+				})
+				if err != nil {
 					return err
 				}
-			}
-			// get password
-			if len(password) == 0 {
-				prompt := &survey.Password{
-					Message: "Please type your password:",
-				}
-				if err := survey.AskOne(prompt, &password); err != nil {
-					if err == terminal.InterruptErr {
-						log.Warn("Exiting...")
-						os.Exit(0)
-					}
+				ring.Set(keyring.Item{
+					Key:         download.VaultName,
+					Data:        dat,
+					Label:       download.AppName,
+					Description: "application password",
+				})
+			} else { // credentials found in vault
+				var dcreds download.DevCreds
+				if err := json.Unmarshal(creds.Data, &dcreds); err != nil {
 					return err
 				}
+				username = dcreds.Username
+				password = dcreds.Password
+				dcreds = download.DevCreds{}
 			}
 		}
 

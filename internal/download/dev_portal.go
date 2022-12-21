@@ -40,7 +40,7 @@ const (
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
 	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
 
-	userAgent = "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8"
+	userAgent = "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8"
 )
 
 const (
@@ -49,6 +49,12 @@ const (
 	ERROR_CODE_FAILED_TO_UPDATE_SESSION = -20528 // Error Description not available
 	ERROR_CODE_BAD_VERIFICATION         = -21669 // Incorrect verification code.
 	// TODO: flesh out the rest of the error codes
+)
+
+const (
+	VaultName           = "ipsw-vault"
+	AppName             = "io.blacktop.ipsw"
+	KeychainServiceName = "ipsw-auth.service"
 )
 
 type DevConfig struct {
@@ -82,6 +88,11 @@ type App struct {
 	codeRequest authOptions
 	// header values
 	xAppleIDAccountCountry string
+}
+
+type DevCreds struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // DevDownload are all the downloads from https://developer.apple.com/download/
