@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
@@ -161,8 +160,6 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 	sort.Sort(version.Collection(versions))
 
 	newestVersion := versions[len(versions)-1]
-
-	utils.Indent(log.Info, 1)(fmt.Sprintf("Latest release found is: %s", newestVersion.Original()))
 
 	// // check canijailbreak.com
 	// jbs, _ := GetJailbreaks()
