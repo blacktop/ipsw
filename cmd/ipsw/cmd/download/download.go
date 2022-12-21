@@ -129,6 +129,13 @@ func filterIPSWs(cmd *cobra.Command, macos bool) ([]download.IPSW, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
 		}
+		var buildFiltered []download.IPSW
+		for _, i := range ipsws {
+			if strings.EqualFold(build, i.BuildID) {
+				buildFiltered = append(buildFiltered, i)
+			}
+		}
+		ipsws = buildFiltered
 	} else if len(device) > 0 {
 		ipsws, err = download.GetDeviceIPSWs(device)
 		if err != nil {
