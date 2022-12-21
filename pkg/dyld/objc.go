@@ -15,6 +15,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-macho/types/objc"
+	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/pkg/errors"
 )
 
@@ -38,6 +39,7 @@ type objcInfo struct {
 	SelRefs   map[uint64]*objc.Selector
 	ProtoRefs map[uint64]*objc.Protocol
 	CFStrings []objc.CFString
+	Stubs     map[uint64]*objc.Stub
 }
 
 type ObjcClassheaderT struct {
@@ -1170,6 +1172,63 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 		IsSwiftStable:         (classPtr.DataVMAddrAndFastFlags&objc.FAST_IS_SWIFT_STABLE == 1),
 		ReadOnlyData:          info,
 	}, nil
+}
+
+func (f *File) GetObjCStubsForImage(imageNames ...string) error {
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
+		}
+	} else {
+		images = f.Images
+	}
+
+	for _, image := range images {
+		m, err := image.GetMacho()
+		if err != nil {
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
+		}
+
+		image.ObjC.Stubs, err = m.GetObjCStubs(func(addr uint64, data []byte) (map[uint64]*objc.Stub, error) {
+			stubs := make(map[uint64]*objc.Stub)
+			addr2sel, err := disass.ParseStubsASM(data, addr, func(u uint64) (uint64, error) {
+				ptr, err := f.ReadPointerAtAddress(u)
+				if err != nil {
+					return 0, err
+				}
+				return f.SlideInfo.SlidePointer(ptr), nil
+			})
+			if err != nil {
+				return nil, err
+			}
+			for addr, sel := range addr2sel {
+				if f.AddressToSymbol[sel] != "_objc_msgSend" {
+					stubs[addr] = &objc.Stub{
+						Name:        f.AddressToSymbol[sel],
+						SelectorRef: sel,
+					}
+				}
+			}
+			return stubs, nil
+		})
+		if err != nil {
+			return err
+		}
+
+		for addr, stub := range image.ObjC.Stubs {
+			if len(stub.Name) > 0 {
+				f.AddressToSymbol[addr] = fmt.Sprintf("__objc_stub_%s", stub.Name)
+			}
+		}
+	}
+
+	return nil
 }
 
 // ParseAllObjc parses all the ObjC data in the cache and loads it into the symbol table
