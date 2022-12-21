@@ -208,7 +208,9 @@ var ImportsCmd = &cobra.Command{
 					for _, loader := range pset.Loaders {
 						for _, dep := range loader.Dependents {
 							if strings.EqualFold(dep.Name, image.Name) {
-								if !strings.HasPrefix(execPath, "/cdhash/") {
+								if execPath != loader.Path {
+									fmt.Printf("%s (%s)\n", execPath, loader.Path)
+								} else {
 									fmt.Println(execPath)
 								}
 							}
