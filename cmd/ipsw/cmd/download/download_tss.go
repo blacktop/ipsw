@@ -34,6 +34,21 @@ func init() {
 	DownloadCmd.AddCommand(tssCmd)
 
 	tssCmd.Flags().StringP("signed", "s", "", "Check if iOS version is still being signed")
+	tssCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("device")
+		DownloadCmd.PersistentFlags().MarkHidden("model")
+		DownloadCmd.PersistentFlags().MarkHidden("version")
+		DownloadCmd.PersistentFlags().MarkHidden("build")
+		DownloadCmd.PersistentFlags().MarkHidden("confirm")
+		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
+		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
+		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
+		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
+		c.Parent().HelpFunc()(c, s)
+	})
+
 	viper.BindPFlag("download.tss.signed", tssCmd.Flags().Lookup("signed"))
 }
 
