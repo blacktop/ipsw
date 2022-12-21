@@ -22,6 +22,7 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -272,6 +273,18 @@ var SymAddrCmd = &cobra.Command{
 			/**********************************
 			 * Search ALL dylibs for a symbol *
 			 **********************************/
+			symChan, err := f.GetExportedSymbols(context.Background(), args[1])
+			if err != nil {
+				return err
+			}
+			for {
+				sym, ok := <-symChan
+				if !ok {
+					break
+				}
+				fmt.Println(sym.String(viper.GetBool("color")))
+			}
+
 			for _, image := range f.Images {
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				if sym, err := image.GetSymbol(args[1]); err == nil {
