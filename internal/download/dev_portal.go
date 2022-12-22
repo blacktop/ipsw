@@ -12,7 +12,9 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
+	"strings"
 
 	"time"
 
@@ -21,7 +23,6 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -362,14 +363,64 @@ func (app *App) GetWidgetKey() string {
 
 // Login to Apple
 func (app *App) Login(username, password string) error {
+	if len(username) == 0 || len(password) == 0 {
+		creds, err := app.Vault.Get(VaultName)
+		if err != nil { // failed to get credentials from vault (prompt user for credentials)
+			log.Errorf("failed to get credentials from vault: %v", err)
+			// get username
+			if len(username) == 0 {
+				prompt := &survey.Input{
+					Message: "Please type your username:",
+				}
+				if err := survey.AskOne(prompt, &username); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					return err
+				}
+			}
+			// get password
+			if len(password) == 0 {
+				prompt := &survey.Password{
+					Message: "Please type your password:",
+				}
+				if err := survey.AskOne(prompt, &password); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					return err
+				}
+			}
+			// save credentials to vault
+			dat, err := json.Marshal(&DevCreds{
+				Username: username,
+				Password: password,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to marshal keychain credentials: %v", err)
+			}
+			app.Vault.Set(keyring.Item{
+				Key:         VaultName,
+				Data:        dat,
+				Label:       AppName,
+				Description: "application password",
+			})
+		} else { // credentials found in vault
+			var dcreds DevCreds
+			if err := json.Unmarshal(creds.Data, &dcreds); err != nil {
+				return fmt.Errorf("failed to unmarshal keychain credentials: %v", err)
+			}
+			username = dcreds.Username
+			password = dcreds.Password
+			dcreds = DevCreds{}
+		}
+	}
 
 	if err := app.loadSession(); err != nil { // load previous session (if error, login)
 		if err := app.getITCServiceKey(); err != nil {
 			return err
-		}
-
-		if len(app.config.SessionID) > 0 {
-			return app.updateSession()
 		}
 
 		return app.signIn(username, password)
@@ -546,16 +597,12 @@ func (app *App) signIn(username, password string) error {
 			return err
 		}
 
-		if err := app.updateSession(); err != nil {
+		if err := app.trustSession(); err != nil {
 			return err
 		}
 
 	} else if response.StatusCode != 200 {
 		return fmt.Errorf("failed to sign in; expected status code 409 (for two factor auth): response received %s", response.Status)
-	}
-
-	if err := app.getOlympusSession(); err != nil {
-		return err
 	}
 
 	if err := app.storeSession(response); err != nil {
@@ -701,7 +748,7 @@ func (app *App) verifyCode(codeType, code string, phoneID int) error {
 				for _, svcErr := range svcErr.Errors {
 					errStr += fmt.Sprintf(": %s", svcErr.Message)
 				}
-				return fmt.Errorf("failed to update to trusted session: response received %s%s", response.Status, errStr)
+				return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
 			}
 		}
 
@@ -711,7 +758,8 @@ func (app *App) verifyCode(codeType, code string, phoneID int) error {
 	return nil
 }
 
-func (app *App) updateSession() error {
+// trustSession tells Apple to trust computer for 2FA
+func (app *App) trustSession() error {
 
 	req, err := http.NewRequest("GET", trustURL, nil)
 	if err != nil {
@@ -730,7 +778,7 @@ func (app *App) updateSession() error {
 		return err
 	}
 
-	log.Debugf("GET updateSession: (%d):\n%s\n", response.StatusCode, string(body))
+	log.Debugf("GET trustSession: (%d):\n%s\n", response.StatusCode, string(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		if len(body) > 0 {
@@ -749,6 +797,15 @@ func (app *App) updateSession() error {
 		return fmt.Errorf("failed to update to trusted session: response received %s", response.Status)
 	}
 
+	return nil
+}
+
+func (app *App) refreshSession() error {
+	// check if olympus session is expired (prevents login rate limiting)
+	if err := app.getOlympusSession(); err != nil {
+		// if olympus session is expired, we need to login again
+		return app.Login("", "")
+	}
 	return nil
 }
 
@@ -823,6 +880,8 @@ func (app *App) loadSession() error {
 	app.config.SCNT = s.SCNT
 	app.config.WidgetKey = s.WidgetKey
 	app.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, s.Cookies)
+	// clear session instance
+	s = session{}
 
 	if err := app.getOlympusSession(); err != nil {
 		return err
@@ -847,7 +906,7 @@ func (app *App) Watch() error {
 		if reflect.DeepEqual(prevIPSWs, ipsws) {
 			time.Sleep(5 * time.Minute)
 
-			if err := app.updateSession(); err != nil {
+			if err := app.refreshSession(); err != nil {
 				return err
 			}
 
@@ -858,10 +917,16 @@ func (app *App) Watch() error {
 		}
 
 		for version := range ipsws {
-			if utils.StrContainsStrSliceItem(version, app.config.WatchList) {
-				for _, ipsw := range ipsws[version] {
-					if err := app.Download(ipsw.URL); err != nil {
-						log.Error(err.Error())
+			for _, watchPattern := range app.config.WatchList {
+				re, err := regexp.Compile(watchPattern)
+				if err != nil {
+					return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+				}
+				if re.MatchString(version) {
+					for _, ipsw := range ipsws[version] {
+						if err := app.Download(ipsw.URL); err != nil {
+							log.Errorf("failed to download %s: %v", ipsw.URL, err)
+						}
 					}
 				}
 			}
@@ -1096,7 +1161,7 @@ func (app *App) getDevDownloads() (map[string][]DevDownload, error) {
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
-						Title: a.Text(),
+						Title: strings.ReplaceAll(a.Text(), "\u00a0", " "),
 						Build: p.Text(),
 						URL:   href,
 						Type:  "ios",
@@ -1112,7 +1177,7 @@ func (app *App) getDevDownloads() (map[string][]DevDownload, error) {
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
-						Title: a.Text(),
+						Title: strings.ReplaceAll(a.Text(), "\u00a0", " "),
 						Build: p.Text(),
 						URL:   href,
 						// Type:  "tvos", TODO: this is commented out because macOS is also labeled as tvos
