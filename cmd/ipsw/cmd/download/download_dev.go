@@ -25,7 +25,6 @@ package download
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +48,7 @@ func init() {
 	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
-	devCmd.Flags().StringP("keychain", "k", "", "Keychain password to unlock credential vault")
+	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vault)")
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
 	viper.BindPFlag("download.dev.more", devCmd.Flags().Lookup("more"))
 	viper.BindPFlag("download.dev.page", devCmd.Flags().Lookup("page"))
@@ -57,7 +56,7 @@ func init() {
 	viper.BindPFlag("download.dev.json", devCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.dev.pretty", devCmd.Flags().Lookup("pretty"))
 	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
-	viper.BindPFlag("download.dev.keychain", devCmd.Flags().Lookup("keychain"))
+	viper.BindPFlag("download.dev.vault-password", devCmd.Flags().Lookup("vault-password"))
 	devCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")
@@ -109,59 +108,33 @@ var devCmd = &cobra.Command{
 
 		username := viper.GetString("download.dev.username")
 		password := viper.GetString("download.dev.password")
-		keychain := viper.GetString("download.dev.keychain")
 
 		home, err := os.UserHomeDir()
 		if err != nil {
-			return err
-		}
-
-		// create credential vault (if it doesn't exist)
-		ring, err := keyring.Open(keyring.Config{
-			ServiceName:                    download.KeychainServiceName,
-			KeychainSynchronizable:         false,
-			KeychainAccessibleWhenUnlocked: true,
-			FileDir:                        filepath.Join(home, ".ipsw"),
-			FilePasswordFunc: func(msg string) (string, error) {
-				if len(keychain) == 0 {
-					msg = "Enter a password to decrypt your credentials vault: " + filepath.Join(home, ".ipsw", download.VaultName)
-					if _, err := os.Stat(filepath.Join(home, ".ipsw", download.VaultName)); errors.Is(err, os.ErrNotExist) {
-						msg = "Enter a password to encrypt your credentials to vault: " + filepath.Join(home, ".ipsw", download.VaultName)
-					}
-					prompt := &survey.Password{
-						Message: msg,
-					}
-					if err := survey.AskOne(prompt, &keychain); err != nil {
-						if err == terminal.InterruptErr {
-							log.Warn("Exiting...")
-							os.Exit(0)
-						}
-						return "", err
-					}
-				}
-
-				return keychain, nil
-			},
-		})
-		if err != nil {
-			return fmt.Errorf("failed to open keyring: %s", err)
+			return fmt.Errorf("failed to get user home directory: %v", err)
 		}
 
 		app := download.NewDevPortal(&download.DevConfig{
-			Proxy:        proxy,
-			Insecure:     insecure,
-			SkipAll:      skipAll,
-			ResumeAll:    resumeAll,
-			RestartAll:   restartAll,
-			RemoveCommas: removeCommas,
-			PreferSMS:    sms,
-			PageSize:     pageSize,
-			WatchList:    watchList,
-			Verbose:      viper.GetBool("verbose"),
+			Proxy:         proxy,
+			Insecure:      insecure,
+			SkipAll:       skipAll,
+			ResumeAll:     resumeAll,
+			RestartAll:    restartAll,
+			RemoveCommas:  removeCommas,
+			PreferSMS:     sms,
+			PageSize:      pageSize,
+			WatchList:     watchList,
+			ConfigDir:     filepath.Join(home, ".ipsw"),
+			VaultPassword: viper.GetString("download.dev.vault-password"),
+			Verbose:       viper.GetBool("verbose"),
 		})
 
+		if err := app.Init(); err != nil {
+			return fmt.Errorf("failed to initialize app: %v", err)
+		}
+
 		if len(username) == 0 || len(password) == 0 {
-			creds, err := ring.Get(download.VaultName)
+			creds, err := app.Vault.Get(download.VaultName)
 			if err != nil { // failed to get credentials from vault (prompt user for credentials)
 				log.Errorf("failed to get credentials from vault: %v", err)
 				// get username
@@ -196,9 +169,9 @@ var devCmd = &cobra.Command{
 					Password: password,
 				})
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to marshal keychain credentials: %v", err)
 				}
-				ring.Set(keyring.Item{
+				app.Vault.Set(keyring.Item{
 					Key:         download.VaultName,
 					Data:        dat,
 					Label:       download.AppName,
@@ -207,7 +180,7 @@ var devCmd = &cobra.Command{
 			} else { // credentials found in vault
 				var dcreds download.DevCreds
 				if err := json.Unmarshal(creds.Data, &dcreds); err != nil {
-					return err
+					return fmt.Errorf("failed to unmarshal keychain credentials: %v", err)
 				}
 				username = dcreds.Username
 				password = dcreds.Password
@@ -216,12 +189,12 @@ var devCmd = &cobra.Command{
 		}
 
 		if err := app.Login(username, password); err != nil {
-			return err
+			return fmt.Errorf("failed to login: %v", err)
 		}
 
 		if len(watchList) > 0 {
 			if err := app.Watch(); err != nil {
-				return err
+				return fmt.Errorf("failed to watch: %v", err)
 			}
 		}
 
@@ -247,13 +220,13 @@ var devCmd = &cobra.Command{
 
 		if asJSON {
 			if dat, err := app.GetDownloadsAsJSON(dlType, prettyJSON); err != nil {
-				return err
+				return fmt.Errorf("failed to get downloads as JSON: %v", err)
 			} else {
 				if len(output) > 0 {
 					fpath := filepath.Join(output, fmt.Sprintf("dev_portal_%s.json", dlType))
 					log.Infof("Creating %s", fpath)
 					if err := os.WriteFile(fpath, dat, 0660); err != nil {
-						return err
+						return fmt.Errorf("failed to write file %s: %v", fpath, err)
 					}
 				} else {
 					fmt.Println(string(dat))
@@ -261,7 +234,7 @@ var devCmd = &cobra.Command{
 			}
 		} else {
 			if err := app.DownloadPrompt(dlType); err != nil {
-				return err
+				return fmt.Errorf("failed to download: %v", err)
 			}
 		}
 		return nil
