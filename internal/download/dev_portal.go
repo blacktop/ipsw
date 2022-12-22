@@ -8,17 +8,21 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 
 	"time"
 
+	"github.com/99designs/keyring"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/pkg/errors"
 )
 
 /*
@@ -26,7 +30,7 @@ import (
 		- https://github.com/picklepete/pyicloud
 		- https://github.com/michaljirman/fmidevice
 		- https://github.com/majd/ipatool
-		- https://jpmens.net/2021/04/18/storing-passwords-in-macos-keychain/
+		- https://github.com/fastlane/fastlane
 */
 
 const (
@@ -35,10 +39,13 @@ const (
 
 	downloadActionURL      = "https://developer.apple.com/devcenter/download.action"
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
+	adcDownloadURL         = "https://developerservices2.apple.com/services/download"
 
 	loginURL      = "https://idmsa.apple.com/appleauth/auth/signin"
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
 	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
+
+	olympusSessionURL = "https://appstoreconnect.apple.com/olympus/v1/session"
 
 	userAgent = "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8"
 )
@@ -53,6 +60,7 @@ const (
 
 const (
 	VaultName           = "ipsw-vault"
+	VaultSession        = "ipsw-session"
 	AppName             = "io.blacktop.ipsw"
 	KeychainServiceName = "ipsw-auth.service"
 )
@@ -68,24 +76,29 @@ type DevConfig struct {
 	// download type config
 	WatchList []string
 	// behavior config
-	SkipAll      bool
-	ResumeAll    bool
-	RestartAll   bool
-	RemoveCommas bool
-	PreferSMS    bool
-	PageSize     int
-	Verbose      bool
+	SkipAll       bool
+	ResumeAll     bool
+	RestartAll    bool
+	RemoveCommas  bool
+	PreferSMS     bool
+	PageSize      int
+	Verbose       bool
+	VaultPassword string
+	ConfigDir     string
 }
 
 // App is the app object
 type App struct {
 	Client *http.Client
 
+	Vault keyring.Keyring
+
 	config *DevConfig
 
-	authService authService
-	authOptions authOptions
-	codeRequest authOptions
+	authService    authService
+	authOptions    authOptions
+	codeRequest    authOptions
+	olympusSession olympusResponse
 	// header values
 	xAppleIDAccountCountry string
 }
@@ -203,6 +216,50 @@ type serviceErrorsResponse struct {
 	HasError bool           `json:"hasError,omitempty"`
 }
 
+type olympusProvider struct {
+	ID           int      `json:"providerId,omitempty"`
+	PublicID     string   `json:"publicProviderId,omitempty"`
+	Name         string   `json:"name,omitempty"`
+	ContentTypes []string `json:"contentTypes,omitempty"`
+	SubType      string   `json:"subType,omitempty"`
+	PLA          []struct {
+		ID                       string   `json:"id,omitempty"`
+		Version                  string   `json:"version,omitempty"`
+		Types                    []string `json:"types,omitempty"`
+		ContractCountryOfOrigins []string `json:"contractCountryOfOrigins,omitempty"`
+	} `json:"pla,omitempty"`
+}
+
+type olympusResponse struct {
+	User struct {
+		FullNAme  string `json:"fullName,omitempty"`
+		FirstName string `json:"firstName,omitempty"`
+		LastName  string `json:"lastName,omitempty"`
+		Email     string `json:"emailAddress,omitempty"`
+		PrsID     string `json:"prsId,omitempty"`
+	} `json:"user,omitempty"`
+	Provider           olympusProvider   `json:"provider,omitempty"`
+	Theme              string            `json:"theme,omitempty"`
+	AvailableProviders []olympusProvider `json:"availableProviders,omitempty"`
+	BackingType        string            `json:"backingType,omitempty"`
+	BackingTypes       []string          `json:"backingTypes,omitempty"`
+	Roles              []string          `json:"roles,omitempty"`
+	UnverifiedRoles    []string          `json:"unverifiedRoles,omitempty"`
+	FeatureFlags       []string          `json:"featureFlags,omitempty"`
+	AgreeToTerms       bool              `json:"agreeToTerms,omitempty"`
+	TermsSignatures    []string          `json:"termsSignatures,omitempty"`
+	PublicUserID       string            `json:"publicUserId,omitempty"`
+	OfacState          any               `json:"ofacState,omitempty"`
+	CreationDate       int               `json:"creationDate,omitempty"`
+}
+
+type session struct {
+	SessionID string
+	SCNT      string
+	WidgetKey string
+	Cookies   []*http.Cookie
+}
+
 type category struct {
 	ID        int    `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
@@ -258,6 +315,41 @@ func NewDevPortal(config *DevConfig) *App {
 	return &app
 }
 
+// Init app
+func (app *App) Init() (err error) {
+	// create credential vault (if it doesn't exist)
+	app.Vault, err = keyring.Open(keyring.Config{
+		ServiceName:                    KeychainServiceName,
+		KeychainSynchronizable:         false,
+		KeychainAccessibleWhenUnlocked: true,
+		FileDir:                        app.config.ConfigDir,
+		FilePasswordFunc: func(string) (string, error) {
+			if len(app.config.VaultPassword) == 0 {
+				msg := "Enter a password to decrypt your credentials vault: " + filepath.Join(app.config.ConfigDir, VaultName)
+				if _, err := os.Stat(filepath.Join(app.config.ConfigDir, VaultName)); errors.Is(err, os.ErrNotExist) {
+					msg = "Enter a password to encrypt your credentials to vault: " + filepath.Join(app.config.ConfigDir, VaultName)
+				}
+				prompt := &survey.Password{
+					Message: msg,
+				}
+				if err := survey.AskOne(prompt, &app.config.VaultPassword); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					return "", err
+				}
+			}
+			return app.config.VaultPassword, nil
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to open vault: %s", err)
+	}
+
+	return nil
+}
+
 func (app *App) GetSessionID() string {
 	return app.config.SessionID
 }
@@ -271,15 +363,19 @@ func (app *App) GetWidgetKey() string {
 // Login to Apple
 func (app *App) Login(username, password string) error {
 
-	if err := app.getITCServiceKey(); err != nil {
-		return err
+	if err := app.loadSession(); err != nil { // load previous session (if error, login)
+		if err := app.getITCServiceKey(); err != nil {
+			return err
+		}
+
+		if len(app.config.SessionID) > 0 {
+			return app.updateSession()
+		}
+
+		return app.signIn(username, password)
 	}
 
-	if len(app.config.SessionID) > 0 {
-		return app.updateSession()
-	}
-
-	return app.signIn(username, password)
+	return nil
 }
 
 func (app *App) updateRequestHeaders(req *http.Request) {
@@ -454,10 +550,16 @@ func (app *App) signIn(username, password string) error {
 			return err
 		}
 
-	} else if response.StatusCode == 200 {
-		log.Warn("not tested with (non-two-factor enabled accounts) if fails; please let author know")
-	} else {
+	} else if response.StatusCode != 200 {
 		return fmt.Errorf("failed to sign in; expected status code 409 (for two factor auth): response received %s", response.Status)
+	}
+
+	if err := app.getOlympusSession(); err != nil {
+		return err
+	}
+
+	if err := app.storeSession(response); err != nil {
+		return err
 	}
 
 	return nil
@@ -645,6 +747,85 @@ func (app *App) updateSession() error {
 			}
 		}
 		return fmt.Errorf("failed to update to trusted session: response received %s", response.Status)
+	}
+
+	return nil
+}
+
+func (app *App) getOlympusSession() error {
+
+	req, err := http.NewRequest("GET", olympusSessionURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create http GET request: %v", err)
+	}
+	app.updateRequestHeaders(req)
+
+	response, err := app.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("GET getOlympusSession (%d):\n%s\n", response.StatusCode, string(body))
+
+	if 200 > response.StatusCode || 300 <= response.StatusCode {
+		return fmt.Errorf("failed to get auth options: response received %s", response.Status)
+	}
+
+	if err := json.Unmarshal(body, &app.olympusSession); err != nil {
+		var wat any
+		json.Unmarshal(body, &wat)
+		log.Errorf("%#v", wat)
+		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	}
+
+	return nil
+}
+
+func (app *App) storeSession(response *http.Response) error {
+	// save session to vault
+	data, err := json.Marshal(&session{
+		SessionID: app.GetSessionID(),
+		SCNT:      app.GetSCNT(),
+		WidgetKey: app.GetWidgetKey(),
+		Cookies:   app.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to marshal session: %v", err)
+	}
+	app.Vault.Set(keyring.Item{
+		Key:         VaultSession,
+		Data:        data,
+		Label:       AppName,
+		Description: "application session",
+	})
+
+	return nil
+}
+
+func (app *App) loadSession() error {
+	sess, err := app.Vault.Get(VaultSession)
+	if err != nil {
+		return fmt.Errorf("failed to get session from vault: %v", err)
+	}
+
+	var s session
+	if err := json.Unmarshal(sess.Data, &s); err != nil {
+		return fmt.Errorf("failed to unmarshal session: %v", err)
+	}
+
+	app.config.SessionID = s.SessionID
+	app.config.SCNT = s.SCNT
+	app.config.WidgetKey = s.WidgetKey
+	app.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, s.Cookies)
+
+	if err := app.getOlympusSession(); err != nil {
+		return err
 	}
 
 	return nil
