@@ -24,13 +24,11 @@ THE SOFTWARE.
 package download
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/99designs/keyring"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
@@ -41,15 +39,17 @@ import (
 )
 
 func init() {
-	devCmd.Flags().StringArray("watch", []string{}, "dev portal type to watch")
-	devCmd.Flags().Bool("more", false, "Download 'More' OSs/Apps")
+	devCmd.Flags().StringArrayP("watch", "w", []string{}, "Developer portal group pattern to watch (i.e. '^iOS.*beta$')")
+	devCmd.Flags().Bool("os", false, "Download '*OS' OSes/Apps")
+	devCmd.Flags().Bool("more", false, "Download 'More' OSes/Apps")
 	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
 	devCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
 	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
-	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vault)")
+	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
+	viper.BindPFlag("download.dev.os", devCmd.Flags().Lookup("os"))
 	viper.BindPFlag("download.dev.more", devCmd.Flags().Lookup("more"))
 	viper.BindPFlag("download.dev.page", devCmd.Flags().Lookup("page"))
 	viper.BindPFlag("download.dev.sms", devCmd.Flags().Lookup("sms"))
@@ -99,7 +99,6 @@ var devCmd = &cobra.Command{
 		removeCommas := viper.GetBool("download.remove-commas")
 		// flags
 		watchList := viper.GetStringSlice("download.dev.watch")
-		more := viper.GetBool("download.dev.more")
 		pageSize := viper.GetInt("download.dev.page")
 		sms := viper.GetBool("download.dev.sms")
 		asJSON := viper.GetBool("download.dev.json")
@@ -133,61 +132,6 @@ var devCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize app: %v", err)
 		}
 
-		if len(username) == 0 || len(password) == 0 {
-			creds, err := app.Vault.Get(download.VaultName)
-			if err != nil { // failed to get credentials from vault (prompt user for credentials)
-				log.Errorf("failed to get credentials from vault: %v", err)
-				// get username
-				if len(username) == 0 {
-					prompt := &survey.Input{
-						Message: "Please type your username:",
-					}
-					if err := survey.AskOne(prompt, &username); err != nil {
-						if err == terminal.InterruptErr {
-							log.Warn("Exiting...")
-							os.Exit(0)
-						}
-						return err
-					}
-				}
-				// get password
-				if len(password) == 0 {
-					prompt := &survey.Password{
-						Message: "Please type your password:",
-					}
-					if err := survey.AskOne(prompt, &password); err != nil {
-						if err == terminal.InterruptErr {
-							log.Warn("Exiting...")
-							os.Exit(0)
-						}
-						return err
-					}
-				}
-				// save credentials to vault
-				dat, err := json.Marshal(&download.DevCreds{
-					Username: username,
-					Password: password,
-				})
-				if err != nil {
-					return fmt.Errorf("failed to marshal keychain credentials: %v", err)
-				}
-				app.Vault.Set(keyring.Item{
-					Key:         download.VaultName,
-					Data:        dat,
-					Label:       download.AppName,
-					Description: "application password",
-				})
-			} else { // credentials found in vault
-				var dcreds download.DevCreds
-				if err := json.Unmarshal(creds.Data, &dcreds); err != nil {
-					return fmt.Errorf("failed to unmarshal keychain credentials: %v", err)
-				}
-				username = dcreds.Username
-				password = dcreds.Password
-				dcreds = download.DevCreds{}
-			}
-		}
-
 		if err := app.Login(username, password); err != nil {
 			return fmt.Errorf("failed to login: %v", err)
 		}
@@ -199,7 +143,9 @@ var devCmd = &cobra.Command{
 		}
 
 		dlType := ""
-		if more {
+		if viper.GetBool("download.dev.os") {
+			dlType = "os"
+		} else if viper.GetBool("download.dev.more") {
 			dlType = "more"
 		} else {
 			prompt := &survey.Select{
