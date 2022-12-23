@@ -40,7 +40,7 @@ const (
 
 	downloadActionURL      = "https://developer.apple.com/devcenter/download.action"
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
-	adcDownloadURL         = "https://developerservices2.apple.com/services/download"
+	adcDownloadURL         = "https://developerservices2.apple.com/services/download?path="
 
 	loginURL      = "https://idmsa.apple.com/appleauth/auth/signin"
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
@@ -1072,6 +1072,66 @@ func (app *App) Download(url string) error {
 
 		// download file
 		downloader.URL = url
+		downloader.DestName = destName
+
+		err = downloader.Do()
+		if err != nil {
+			return fmt.Errorf("failed to download file: %v", err)
+		}
+
+	} else {
+		log.Warnf("file already exists: %s", destName)
+	}
+
+	return nil
+}
+
+func (app *App) DownloadADC(path string) error {
+	var adcDownloadAuth string
+
+	req, err := http.NewRequest("GET", adcDownloadURL+path, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create http GET request: %v", err)
+	}
+	req.Header.Set("Content-Type", "*/*")
+
+	response, err := app.Client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	for _, cookie := range response.Cookies() {
+		if cookie.Name == "Set-Cookie" {
+			_, adcDownloadAuth, _ = strings.Cut(cookie.Value, "ADCDownloadAuth=")
+			break
+		}
+	}
+
+	// proxy, insecure are null because we override the client below
+	downloader := NewDownload(
+		app.config.Proxy,
+		app.config.Insecure,
+		app.config.SkipAll,
+		app.config.ResumeAll,
+		app.config.RestartAll,
+		false,
+		app.config.Verbose,
+	)
+	downloader.Headers = make(map[string]string)
+	// use authenticated client
+	downloader.client = app.Client
+	// set auth cookie (for authless downloads)
+	downloader.Headers["Cookie"] = "ADCDownloadAuth=" + adcDownloadAuth
+
+	destName := getDestName(adcDownloadURL+path, app.config.RemoveCommas)
+	if _, err := os.Stat(destName); os.IsNotExist(err) {
+
+		log.WithFields(log.Fields{
+			"file": destName,
+		}).Info("Downloading")
+
+		// download file
+		downloader.URL = adcDownloadURL + path
 		downloader.DestName = destName
 
 		err = downloader.Do()
