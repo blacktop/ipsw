@@ -418,12 +418,11 @@ Download IPSWs (and more) from https://developer.apple.com/download
 ? Please type your username: blacktop
 ? Please type your password: ***********************************
 ? Please type your verification code: ******
-? Choose a download type: "beta"
-? Choose an OS version: "macOS Monterey beta 2"
-? Select what file(s) to download: "Mac computers with the M1 chip"
-
-   • Downloading               file="UniversalMac_12.0_21A5268h_Restore.ipsw"
-        65.9 MiB / 12.8 GiB [----------------------------------------------------------| 2h20m56s ]  1.54 MiB/s
+? Choose a download type: OSes (iOS, macOS, tvOS...)
+? Choose an OS version: iOS 16.3 beta
+? Select what file(s) to download: ✅
+   • Downloading               file=iPhone15,2_16.3_20D5024e_Restore.ipsw
+        42.11 MiB / 6.27 GiB [----------------------------------------------------------| 20m56s ]  1.54 MiB/s
 ```
 
 :::info vault
