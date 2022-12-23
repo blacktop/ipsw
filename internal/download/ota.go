@@ -631,7 +631,7 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 					os[idx].SupportedDeviceModels = utils.UniqueConcat(os[idx].SupportedDeviceModels, elem.SupportedDeviceModels)
 					if devs, err := utils.Zip(elem.SupportedDevices, elem.SupportedDeviceModels); err == nil {
 						for _, dev := range devs {
-							os[idx].Devices = utils.UniqueAppend(os[idx].Devices, fmt.Sprintf("%s_%s", dev.Device, dev.Model))
+							os[idx].Devices = utils.UniqueAppend(os[idx].Devices, fmt.Sprintf("%s_%s", dev.First, dev.Second))
 						}
 					}
 				}

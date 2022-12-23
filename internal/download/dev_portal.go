@@ -104,20 +104,23 @@ type DevPortal struct {
 }
 
 type credentials struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username      string `json:"username,omitempty"`
+	Password      string `json:"password,omitempty"`
+	DsPersonID    string `json:"directory_services_id,omitempty"`
+	PasswordToken string `json:"password_token,omitempty"`
 }
 
 type session struct {
-	SessionID string
-	SCNT      string
-	WidgetKey string
-	Cookies   []*http.Cookie
+	SessionID string         `json:"session_id,omitempty"`
+	SCNT      string         `json:"scnt,omitempty"`
+	WidgetKey string         `json:"widget_key,omitempty"`
+	Cookies   []*http.Cookie `json:"cookies,omitempty"`
 }
 
-type DevPortalAuth struct {
-	Credentials credentials `json:"credentials"`
-	Session     session     `json:"session"`
+type AppleAccountAuth struct {
+	Credentials      credentials `json:"credentials,omitempty"`
+	DevPortalSession session     `json:"devport_session,omitempty"`
+	AppStoreSession  session     `json:"appstore_session,omitempty"`
 }
 
 // DevDownload are all the downloads from https://developer.apple.com/download/
@@ -399,7 +402,7 @@ func (dp *DevPortal) Login(username, password string) error {
 				}
 			}
 			// save credentials to vault
-			dat, err := json.Marshal(&DevPortalAuth{
+			dat, err := json.Marshal(&AppleAccountAuth{
 				Credentials: credentials{
 					Username: username,
 					Password: password,
@@ -415,13 +418,13 @@ func (dp *DevPortal) Login(username, password string) error {
 				Description: "application password",
 			})
 		} else { // credentials found in vault
-			var auth DevPortalAuth
+			var auth AppleAccountAuth
 			if err := json.Unmarshal(creds.Data, &auth); err != nil {
 				return fmt.Errorf("failed to unmarshal keychain credentials: %v", err)
 			}
 			username = auth.Credentials.Username
 			password = auth.Credentials.Password
-			auth = DevPortalAuth{}
+			auth = AppleAccountAuth{}
 		}
 	}
 
@@ -612,7 +615,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 		return fmt.Errorf("failed to sign in; expected status code 409 (for two factor auth): response received %s", response.Status)
 	}
 
-	if err := dp.storeSession(response); err != nil {
+	if err := dp.storeSession(); err != nil {
 		return err
 	}
 
@@ -851,19 +854,19 @@ func (dp *DevPortal) getOlympusSession() error {
 	return nil
 }
 
-func (dp *DevPortal) storeSession(response *http.Response) error {
+func (dp *DevPortal) storeSession() error {
 	// get dev auth from vault
 	sess, err := dp.Vault.Get(VaultName)
 	if err != nil {
 		return fmt.Errorf("failed to get dev auth from vault: %v", err)
 	}
 
-	var auth DevPortalAuth
+	var auth AppleAccountAuth
 	if err := json.Unmarshal(sess.Data, &auth); err != nil {
 		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
 	}
 
-	auth.Session = session{
+	auth.DevPortalSession = session{
 		SessionID: dp.GetSessionID(),
 		SCNT:      dp.GetSCNT(),
 		WidgetKey: dp.GetWidgetKey(),
@@ -877,7 +880,7 @@ func (dp *DevPortal) storeSession(response *http.Response) error {
 	}
 
 	// clear dev auth mem
-	auth = DevPortalAuth{}
+	auth = AppleAccountAuth{}
 
 	dp.Vault.Set(keyring.Item{
 		Key:         VaultName,
@@ -896,18 +899,18 @@ func (dp *DevPortal) loadSession() error {
 		return fmt.Errorf("failed to get dev auth from vault: %v", err)
 	}
 
-	var auth DevPortalAuth
+	var auth AppleAccountAuth
 	if err := json.Unmarshal(sess.Data, &auth); err != nil {
 		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
 	}
 
-	dp.config.SessionID = auth.Session.SessionID
-	dp.config.SCNT = auth.Session.SCNT
-	dp.config.WidgetKey = auth.Session.WidgetKey
-	dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.Session.Cookies)
+	dp.config.SessionID = auth.DevPortalSession.SessionID
+	dp.config.SCNT = auth.DevPortalSession.SCNT
+	dp.config.WidgetKey = auth.DevPortalSession.WidgetKey
+	dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.DevPortalSession.Cookies)
 
 	// clear dev auth mem
-	auth = DevPortalAuth{}
+	auth = AppleAccountAuth{}
 
 	if err := dp.getOlympusSession(); err != nil {
 		return err
