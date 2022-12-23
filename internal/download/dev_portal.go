@@ -61,7 +61,6 @@ const (
 
 const (
 	VaultName           = "ipsw-vault"
-	VaultSession        = "ipsw-session"
 	AppName             = "io.blacktop.ipsw"
 	KeychainServiceName = "ipsw-auth.service"
 )
@@ -104,9 +103,21 @@ type App struct {
 	xAppleIDAccountCountry string
 }
 
-type DevCreds struct {
+type credentials struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+type session struct {
+	SessionID string
+	SCNT      string
+	WidgetKey string
+	Cookies   []*http.Cookie
+}
+
+type DevPortalAuth struct {
+	Credentials credentials `json:"credentials"`
+	Session     session     `json:"session"`
 }
 
 // DevDownload are all the downloads from https://developer.apple.com/download/
@@ -254,13 +265,6 @@ type olympusResponse struct {
 	CreationDate       int               `json:"creationDate,omitempty"`
 }
 
-type session struct {
-	SessionID string
-	SCNT      string
-	WidgetKey string
-	Cookies   []*http.Cookie
-}
-
 type category struct {
 	ID        int    `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
@@ -323,6 +327,7 @@ func (app *App) Init() (err error) {
 		ServiceName:                    KeychainServiceName,
 		KeychainSynchronizable:         false,
 		KeychainAccessibleWhenUnlocked: true,
+		KeychainTrustApplication:       true,
 		FileDir:                        app.config.ConfigDir,
 		FilePasswordFunc: func(string) (string, error) {
 			if len(app.config.VaultPassword) == 0 {
@@ -394,9 +399,11 @@ func (app *App) Login(username, password string) error {
 				}
 			}
 			// save credentials to vault
-			dat, err := json.Marshal(&DevCreds{
-				Username: username,
-				Password: password,
+			dat, err := json.Marshal(&DevPortalAuth{
+				Credentials: credentials{
+					Username: username,
+					Password: password,
+				},
 			})
 			if err != nil {
 				return fmt.Errorf("failed to marshal keychain credentials: %v", err)
@@ -408,13 +415,13 @@ func (app *App) Login(username, password string) error {
 				Description: "application password",
 			})
 		} else { // credentials found in vault
-			var dcreds DevCreds
-			if err := json.Unmarshal(creds.Data, &dcreds); err != nil {
+			var auth DevPortalAuth
+			if err := json.Unmarshal(creds.Data, &auth); err != nil {
 				return fmt.Errorf("failed to unmarshal keychain credentials: %v", err)
 			}
-			username = dcreds.Username
-			password = dcreds.Password
-			dcreds = DevCreds{}
+			username = auth.Credentials.Username
+			password = auth.Credentials.Password
+			auth = DevPortalAuth{}
 		}
 	}
 
@@ -845,43 +852,62 @@ func (app *App) getOlympusSession() error {
 }
 
 func (app *App) storeSession(response *http.Response) error {
-	// save session to vault
-	data, err := json.Marshal(&session{
+	// get dev auth from vault
+	sess, err := app.Vault.Get(VaultName)
+	if err != nil {
+		return fmt.Errorf("failed to get dev auth from vault: %v", err)
+	}
+
+	var auth DevPortalAuth
+	if err := json.Unmarshal(sess.Data, &auth); err != nil {
+		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
+	}
+
+	auth.Session = session{
 		SessionID: app.GetSessionID(),
 		SCNT:      app.GetSCNT(),
 		WidgetKey: app.GetWidgetKey(),
 		Cookies:   app.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}),
-	})
+	}
+
+	// save dev auth to vault
+	data, err := json.Marshal(&auth)
 	if err != nil {
 		return fmt.Errorf("failed to marshal session: %v", err)
 	}
+
+	// clear dev auth mem
+	auth = DevPortalAuth{}
+
 	app.Vault.Set(keyring.Item{
-		Key:         VaultSession,
+		Key:         VaultName,
 		Data:        data,
 		Label:       AppName,
-		Description: "application session",
+		Description: "application password",
 	})
 
 	return nil
 }
 
 func (app *App) loadSession() error {
-	sess, err := app.Vault.Get(VaultSession)
+	// get dev auth from vault
+	sess, err := app.Vault.Get(VaultName)
 	if err != nil {
-		return fmt.Errorf("failed to get session from vault: %v", err)
+		return fmt.Errorf("failed to get dev auth from vault: %v", err)
 	}
 
-	var s session
-	if err := json.Unmarshal(sess.Data, &s); err != nil {
-		return fmt.Errorf("failed to unmarshal session: %v", err)
+	var auth DevPortalAuth
+	if err := json.Unmarshal(sess.Data, &auth); err != nil {
+		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
 	}
 
-	app.config.SessionID = s.SessionID
-	app.config.SCNT = s.SCNT
-	app.config.WidgetKey = s.WidgetKey
-	app.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, s.Cookies)
-	// clear session instance
-	s = session{}
+	app.config.SessionID = auth.Session.SessionID
+	app.config.SCNT = auth.Session.SCNT
+	app.config.WidgetKey = auth.Session.WidgetKey
+	app.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.Session.Cookies)
+
+	// clear dev auth mem
+	auth = DevPortalAuth{}
 
 	if err := app.getOlympusSession(); err != nil {
 		return err
