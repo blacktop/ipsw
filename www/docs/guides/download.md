@@ -426,13 +426,20 @@ Download IPSWs (and more) from https://developer.apple.com/download
         65.9 MiB / 12.8 GiB [----------------------------------------------------------| 2h20m56s ]  1.54 MiB/s
 ```
 
+:::info vault
+Your Developer Portal credentials and session are stored securely in your Keychain on macOS; in your Windows Credential Manager on Windows and in your Linux Keyring on Linux.
+:::
+
+:::caution
+The `--vault-password` flag is the encryption password for the **file** based vaults that will be placed encrypted in the `~/.ipsw` directory. This is **NOT** for your Developer Portal credentials.  
+
+This is when ran on an OS that does not have a native Keychain, Credential Manager or Keyring etc.
+:::
+
 Watch for 🆕 **beta** IPSWs
 
 ```bash
-❯ ipsw download dev  --watch iOS --watch macOS
-? Please type your username: blacktop
-? Please type your password: ***********************************
-? Please type your verification code: ******
+❯ ipsw download dev  --watch 'iOS.*beta'
    • Downloading               file=iPhone11,8,iPhone12,1_15.0_19A5307g_Restore.ipsw
 	6.1 GiB / 6.1 GiB [==========================================================| ✅  ]  4.15 MiB/s
    <SNIP>
@@ -443,11 +450,12 @@ Watch for 🆕 **beta** IPSWs
 Output downloadable items as JSON
 
 ```bash
-❯ ipsw download dev  --json --pretty --output .
-? Please type your username: blacktop
-? Please type your password: ***********************************
-? Please type your verification code: ******
-   • Creating dev_portal_beta.json
+❯ ipsw download dev --os --json --pretty --output .
+   • Creating dev_portal_os.json
+```
+
+```bash
+❯ cat dev_portal_os.json | jq .
 ```
 
 ```json
