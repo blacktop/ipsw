@@ -469,6 +469,18 @@ Output downloadable items as JSON
 <SNIP>
 ```
 
+## **download ipa**
+
+Download App Packages from the iOS App Store
+
+```bash
+❯ ipsw download ipa --search TikTok
+? Select what app(s) to download: ✅
+   • Downloading               file=/var/folders/5q/g6x_p_yn113dpvwd1tm2kjzc0000gn/T/appstore.ipa2930715700
+	197.74 MiB / 197.74 MiB [==========================================================| ✅  ] 11.68 MiB/s
+   • Created com.zhiliaoapp.musically_835599320.v27.4.0.ipa
+```   
+
 ## **download oss**
 
 > Download [opensource.apple.com](https://opensource.apple.com) file for macOS version

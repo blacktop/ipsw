@@ -1,28 +1,31 @@
 ---
-id: rss
-title: rss
+id: ipa
+title: ipa
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: rss
-description: Read Releases - Apple Developer RSS Feed
+sidebar_label: ipa
+description: Download App Packages from the iOS App Store
 last_update:
   date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
-## ipsw download rss
+## ipsw download ipa
 
-Read Releases - Apple Developer RSS Feed
+Download App Packages from the iOS App Store
 
 ```
-ipsw download rss [flags]
+ipsw download ipa [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help    help for rss
-  -j, --json    Output as JSON
-  -w, --watch   Watch for NEW releases
+  -h, --help                    help for ipa
+  -o, --output string           Folder to download files to
+      --search                  Search for app to download
+      --sms                     Prefer SMS Two-factor authentication
+  -s, --store-front string      The country code for the App Store to download from (default "US")
+  -k, --vault-password string   Password to unlock credential vault (only for file vaults)
 ```
 
 ### Options inherited from parent commands

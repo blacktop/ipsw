@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: a2s
 description: Lookup symbol at unslid address
 last_update:
-  date: 2022-12-17T17:42:11-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw dyld a2s
@@ -31,7 +31,7 @@ ipsw dyld a2s <dyld_shared_cache> <vaddr> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 

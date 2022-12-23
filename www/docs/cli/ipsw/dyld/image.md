@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: image
 description: Dump image array info
 last_update:
-  date: 2022-12-17T17:42:11-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw dyld image
@@ -25,7 +25,7 @@ ipsw dyld image <dyld_shared_cache> <IMAGE> [flags]
   # Dump the closure info for a in-cache dylib
   ❯ ipsw dyld image <dyld_shared_cache> Foundation
   # Dump the closure info for an app
-  ❯ ipsw dyld image <dyld_shared_cache> /usr/libexec/timed"
+  ❯ ipsw dyld image <dyld_shared_cache> /usr/libexec/timed
 ```
 
 ### Options
@@ -38,7 +38,7 @@ ipsw dyld image <dyld_shared_cache> <IMAGE> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 
