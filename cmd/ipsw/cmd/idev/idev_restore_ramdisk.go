@@ -28,11 +28,11 @@ import (
 )
 
 func init() {
-	backupRestoreCmd.AddCommand(ramdiskCmd)
+	RestoreCmd.AddCommand(restoreRamdiskCmd)
 }
 
-// ramdiskCmd represents the ramdisk command
-var ramdiskCmd = &cobra.Command{
+// restoreRamdiskCmd represents the ramdisk command
+var restoreRamdiskCmd = &cobra.Command{
 	Use:           "ramdisk",
 	Short:         "Enter ramdisk",
 	Args:          cobra.MaximumNArgs(2),

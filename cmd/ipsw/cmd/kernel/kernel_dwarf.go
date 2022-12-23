@@ -218,7 +218,7 @@ var dwarfCmd = &cobra.Command{
 	},
 	Example: `# Dump the task struct (and pretty print with clang-format)
 ❯ ipsw kernel dwarf KDK_13.0_22A5342f.kdk/kernel.development.t6000 --type task \
-											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename thread.h
+											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
 # Diff two versions of a struct
 ❯ ipsw kernel dwarf --type task --diff KDK_13.0_22A5342f.kdk/kernel.development.t6000 KDK_13.0_22A5352e.kdk/kernel.development.t6000`,
 }

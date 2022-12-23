@@ -50,6 +50,12 @@ func init() {
 	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	wikiCmd.Flags().String("db", "wiki_db.json", "Path to local JSON database (will use CWD by default)")
 	wikiCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	wikiCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("model") // TODO: remove this?
+		c.Parent().HelpFunc()(c, s)
+	})
 	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.wiki.pattern", wikiCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.wiki.beta", wikiCmd.Flags().Lookup("beta"))

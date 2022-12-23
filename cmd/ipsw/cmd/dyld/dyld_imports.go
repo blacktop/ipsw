@@ -170,18 +170,55 @@ var ImportsCmd = &cobra.Command{
 
 			title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(image.Name))
 			fmt.Print(title)
-			fmt.Println(strings.Repeat("=", len(title)-1))
-			for _, img := range f.Images {
-				m, err := img.GetPartialMacho()
-				if err != nil {
-					return err
-				}
-				for _, imp := range m.ImportedLibraries() {
-					if strings.EqualFold(imp, image.Name) {
-						fmt.Printf("%s\n", img.Name)
+			fmt.Println(strings.Repeat("=", len(title)-2))
+
+			if f.SupportsDylibPrebuiltLoader() {
+				fmt.Println("\nIn DSC (Dylibs)")
+				fmt.Println("---------------")
+				for _, img := range f.Images {
+					pbl, err := f.GetDylibPrebuiltLoader(img.Name)
+					if err != nil {
+						return err
+					}
+					for _, dep := range pbl.Dependents {
+						if strings.EqualFold(dep.Name, image.Name) {
+							fmt.Println(img.Name)
+						}
 					}
 				}
-				m.Close()
+			} else {
+				for _, img := range f.Images {
+					m, err := img.GetPartialMacho()
+					if err != nil {
+						return err
+					}
+					for _, imp := range m.ImportedLibraries() {
+						if strings.EqualFold(imp, image.Name) {
+							fmt.Println(img.Name)
+						}
+					}
+					m.Close()
+				}
+			}
+
+			if f.SupportsPrebuiltLoaderSet() {
+				fmt.Println("\nIn FileSystem DMG (Apps)")
+				fmt.Println("------------------------")
+				if err := f.ForEachLaunchLoaderSet(func(execPath string, pset *dyld.PrebuiltLoaderSet) {
+					for _, loader := range pset.Loaders {
+						for _, dep := range loader.Dependents {
+							if strings.EqualFold(dep.Name, image.Name) {
+								if execPath != loader.Path {
+									fmt.Printf("%s (%s)\n", execPath, loader.Path)
+								} else {
+									fmt.Println(execPath)
+								}
+							}
+						}
+					}
+				}); err != nil {
+					return err
+				}
 			}
 		}
 

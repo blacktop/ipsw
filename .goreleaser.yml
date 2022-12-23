@@ -56,6 +56,7 @@ builds:
     tags:
       - libusb
       - unicorn
+      - objc
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -78,6 +79,49 @@ builds:
     tags:
       - libusb
       - unicorn
+      - objc
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    hooks:
+      post:
+        - ./hack/make/delete-all-rpaths {{ .Path }}
+  - id: darwin_amd64_frida_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/usr/local/homebrew/lib
+      - CGO_CFLAGS=-I/usr/local/homebrew/include
+    goos:
+      - darwin
+    goarch:
+      - amd64
+    tags:
+      - frida
+      - libusb
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+    hooks:
+      post:
+        - ./hack/make/delete-all-rpaths {{ .Path }}
+  - id: darwin_arm64_frida_build
+    main: ./cmd/ipsw
+    binary: ipsw
+    env:
+      - CGO_ENABLED=1
+      - CGO_LDFLAGS=-L/opt/homebrew/lib
+      - CGO_CFLAGS=-I/opt/homebrew/include
+    goos:
+      - darwin
+    goarch:
+      - arm64
+    tags:
+      - frida
+      - libusb
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -240,6 +284,20 @@ archives:
       - completions/*
       - manpages/*
     wrap_in_directory: true
+  - id: frida_archive
+    builds:
+      - darwin_amd64_frida_build
+      - darwin_arm64_frida_build
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_frida"
+    replacements:
+      darwin: macOS
+      amd64: x86_64
+    files:
+      - README.md
+      - LICENSE
+      - completions/*
+      - manpages/*
+    wrap_in_directory: true
 
 brews:
   - tap:
@@ -258,6 +316,33 @@ brews:
         type: optional
       - name: unicorn
         type: optional
+    conflicts:
+      - ipsw-frida
+    install: |
+      bin.install "ipsw"
+      bash_completion.install "completions/_bash" => "ipsw"
+      zsh_completion.install "completions/_zsh" => "_ipsw"
+      fish_completion.install "completions/_fish" => "ipsw.fish"
+      man1.install Dir["manpages/*"]
+    test: |
+      system "#{bin}/ipsw --version"
+  - name: ipsw-frida
+    tap:
+      owner: blacktop
+      name: homebrew-tap
+    ids:
+      - frida_archive
+    folder: Formula
+    homepage: "https://github.com/blacktop/ipsw"
+    description: "iOS/macOS Research Swiss Army Knife"
+    license: MIT
+    dependencies:
+      - name: bat
+        type: optional
+      - name: libusb
+        type: optional
+    conflicts:
+      - ipsw
     install: |
       bin.install "ipsw"
       bash_completion.install "completions/_bash" => "ipsw"
@@ -303,8 +388,10 @@ aurs:
       install -Dm644 "./manpages/ipsw.1.gz" "${pkgdir}/usr/share/man/man1/ipsw.1.gz"
 
 nfpms:
-  - file_name_template: "{{ .ConventionalFileName }}"
-    id: packages
+  - id: packages
+    builds:
+      - linux_amd64_build
+      - linux_arm64_build
     homepage: https://github.com/blacktop/ipsw
     description: |-
       iOS/macOS Research Swiss Army Knife.
@@ -337,58 +424,58 @@ nfpms:
     replacements:
       amd64: x86_64
     formats:
-      - apk
       - deb
       - rpm
+      - apk
       - archlinux
     deb:
       lintian_overrides:
         - statically-linked-binary
         - changelog-file-missing-in-native-package
-  # - id: packages_extras
-  #   file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
-  #   builds:
-  #     - linux_amd64_extras_build
-  #     - linux_arm64_extras_build
-  #   homepage:  https://github.com/blacktop/ipsw
-  #   description: |-
-  #     iOS/macOS Research Swiss Army Knife.
-  #   maintainer: Blacktop <https://github.com/blacktop>
-  #   license: MIT
-  #   vendor: Blacktop
-  #   bindir: /usr/bin
-  #   section: utils
-  #   contents:
-  #     - src: ./completions/_bash
-  #       dst: /usr/share/bash-completion/completions/ipsw
-  #       file_info:
-  #         mode: 0644
-  #     - src: ./completions/_fish
-  #       dst: /usr/share/fish/completions/ipsw.fish
-  #       file_info:
-  #         mode: 0644
-  #     - src: ./completions/_zsh
-  #       dst:  /usr/share/zsh/vendor-completions/_ipsw
-  #       file_info:
-  #         mode: 0644
-  #     - src: ./manpages/ipsw.1.gz
-  #       dst: /usr/share/man/man1/ipsw.1.gz
-  #       file_info:
-  #         mode: 0644
-  #     - src: ./LICENSE
-  #       dst: /usr/share/doc/ipsw/copyright
-  #       file_info:
-  #         mode: 0644
-  #   replacements:
-  #     amd64: x86_64
-  #   formats:
-  #   - apk
-  #   - deb
-  #   - rpm
-  #   deb:
-  #     lintian_overrides:
-  #       - statically-linked-binary
-  #       - changelog-file-missing-in-native-package
+# - id: packages_extras
+#   file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
+#   builds:
+#     - linux_amd64_extras_build
+#     - linux_arm64_extras_build
+#   homepage:  https://github.com/blacktop/ipsw
+#   description: |-
+#     iOS/macOS Research Swiss Army Knife.
+#   maintainer: Blacktop <https://github.com/blacktop>
+#   license: MIT
+#   vendor: Blacktop
+#   bindir: /usr/bin
+#   section: utils
+#   contents:
+#     - src: ./completions/_bash
+#       dst: /usr/share/bash-completion/completions/ipsw
+#       file_info:
+#         mode: 0644
+#     - src: ./completions/_fish
+#       dst: /usr/share/fish/completions/ipsw.fish
+#       file_info:
+#         mode: 0644
+#     - src: ./completions/_zsh
+#       dst:  /usr/share/zsh/vendor-completions/_ipsw
+#       file_info:
+#         mode: 0644
+#     - src: ./manpages/ipsw.1.gz
+#       dst: /usr/share/man/man1/ipsw.1.gz
+#       file_info:
+#         mode: 0644
+#     - src: ./LICENSE
+#       dst: /usr/share/doc/ipsw/copyright
+#       file_info:
+#         mode: 0644
+#   replacements:
+#     amd64: x86_64
+#   formats:
+#   - apk
+#   - deb
+#   - rpm
+#   deb:
+#     lintian_overrides:
+#       - statically-linked-binary
+#       - changelog-file-missing-in-native-package
 
 snapcrafts:
   - id: snaps
@@ -433,18 +520,18 @@ scoop:
   description: iOS/macOS Research Swiss Army Knife
   license: MIT
 
-chocolateys:
-  - project_url: https://github.com/blacktop/ipsw
-    icon_url: https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png
-    license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
-    authors: blacktop
-    release_notes: "https://github.com/blacktop/ipsw/releases/tag/v{{ .Version }}"
-    copyright: 2018-2022 blacktop
-    project_source_url: https://github.com/blacktop/ipsw
-    docs_url: https://blacktop.github.io/ipsw/
-    summary: iOS/macOS Research Swiss Army Knife
-    description: Everything you need to do security research on iOS and macOS.
-    tags: "iOS macOS security research swiss-army-knife"
+# chocolateys:
+#   - project_url: https://github.com/blacktop/ipsw
+#     icon_url: https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png
+#     license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
+#     authors: blacktop
+#     release_notes: "https://github.com/blacktop/ipsw/releases/tag/v{{ .Version }}"
+#     copyright: 2018-2022 blacktop
+#     project_source_url: https://github.com/blacktop/ipsw
+#     docs_url: https://blacktop.github.io/ipsw/
+#     summary: iOS/macOS Research Swiss Army Knife
+#     description: Everything you need to do security research on iOS and macOS.
+#     tags: "iOS macOS security research swiss-army-knife"
 
 changelog:
   sort: asc
@@ -481,7 +568,6 @@ changelog:
       - Merge branch
 
 release:
-  target_commitish: "{{ .Commit }}"
   footer: |
     ### Summary
     **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .PreviousTag }}...{{ .Tag }}

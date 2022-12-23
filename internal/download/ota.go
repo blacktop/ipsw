@@ -51,6 +51,7 @@ const (
 	watchSoftwareUpdate assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
 	// For macOS devices
 	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
+	macRsrUpdate             assetType = "com.apple.MobileAsset.MacSplatSoftwareUpdate"
 	recoveryOsSoftwareUpdate assetType = "com.apple.MobileAsset.SFRSoftwareUpdate"
 	accessorySoftwareUpdate  assetType = "com.apple.MobileAsset.DarwinAccessoryUpdate.A2525"
 )
@@ -229,10 +230,16 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	case "audioos":
 		fallthrough
 	case "tvos":
-		return []assetType{softwareUpdate, rsrUpdate}, nil
+		if o.Config.RSR {
+			return []assetType{rsrUpdate}, nil
+		}
+		return []assetType{softwareUpdate}, nil
 	case "accessory":
 		return []assetType{accessorySoftwareUpdate}, nil
 	case "macos":
+		if o.Config.RSR {
+			return []assetType{macRsrUpdate}, nil
+		}
 		return []assetType{macSoftwareUpdate}, nil
 	case "recovery":
 		return []assetType{recoveryOsSoftwareUpdate}, nil
@@ -624,7 +631,7 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 					os[idx].SupportedDeviceModels = utils.UniqueConcat(os[idx].SupportedDeviceModels, elem.SupportedDeviceModels)
 					if devs, err := utils.Zip(elem.SupportedDevices, elem.SupportedDeviceModels); err == nil {
 						for _, dev := range devs {
-							os[idx].Devices = utils.UniqueAppend(os[idx].Devices, fmt.Sprintf("%s_%s", dev.Device, dev.Model))
+							os[idx].Devices = utils.UniqueAppend(os[idx].Devices, fmt.Sprintf("%s_%s", dev.First, dev.Second))
 						}
 					}
 				}

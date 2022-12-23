@@ -18,14 +18,15 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/lzfse"
 	"github.com/blacktop/lzss"
 	"github.com/pkg/errors"
 )
 
-// Img4 Kernelcache object
-type Img4 struct {
+// Im4p Kernelcache object
+type Im4p struct {
 	IM4P    string
 	Name    string
 	Version string
@@ -73,7 +74,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 	// NOTE: openssl asn1parse -i -inform DER -in kernelcache.iphone10 | less (to get offset)
 	//       openssl asn1parse -i -inform DER -in kernelcache.iphone10 -strparse OFFSET -noout -out lzfse.bin
 
-	var i Img4
+	var i Im4p
 	if _, err := asn1.Unmarshal(data, &i); err != nil {
 		return nil, errors.Wrap(err, "failed to ASN.1 parse kernelcache")
 	}
@@ -141,7 +142,7 @@ func Extract(ipsw, destPath string) error {
 }
 
 // Decompress decompresses a compressed kernelcache
-func Decompress(kcache string) error {
+func Decompress(kcache, outputDir string) error {
 	content, err := os.ReadFile(kcache)
 	if err != nil {
 		return errors.Wrap(err, "failed to read Kernelcache")
@@ -151,7 +152,6 @@ func Decompress(kcache string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed parse compressed kernelcache Img4")
 	}
-	// defer os.Remove(kcache)
 
 	utils.Indent(log.Debug, 2)("Decompressing Kernelcache")
 	dec, err := DecompressData(kc)
@@ -159,11 +159,48 @@ func Decompress(kcache string) error {
 		return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
 	}
 
-	err = os.WriteFile(kcache+".decompressed", dec, 0660)
+	kcache = filepath.Join(outputDir, kcache+".decompressed")
+	os.MkdirAll(filepath.Dir(kcache), 0755)
+
+	err = os.WriteFile(kcache, dec, 0660)
 	if err != nil {
 		return errors.Wrap(err, "failed to write kernelcache")
 	}
-	utils.Indent(log.Info, 2)("Created " + kcache + ".decompressed")
+	utils.Indent(log.Info, 2)("Created " + kcache)
+	return nil
+}
+
+// DecompressKernelManagement decompresses a compressed KernelManagement_host kernelcache
+func DecompressKernelManagement(kcache, outputDir string) error {
+	content, err := os.ReadFile(kcache)
+	if err != nil {
+		return errors.Wrap(err, "failed to read Kernelcache")
+	}
+
+	km, err := img4.ParseImg4(bytes.NewReader(content))
+	if err != nil {
+		return fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
+	}
+
+	kcache = filepath.Join(outputDir, kcache+".decompressed")
+	os.MkdirAll(filepath.Dir(kcache), 0755)
+
+	if bytes.Contains(km.IM4P.Data[:4], []byte("bvx2")) {
+		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
+		dat, err := lzfse.NewDecoder(km.IM4P.Data).DecodeBuffer()
+		if err != nil {
+			return fmt.Errorf("failed to decompress kernelcache %s: %v", kcache, err)
+		}
+
+		if err = os.WriteFile(kcache, dat, 0660); err != nil {
+			return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
+		}
+	} else {
+		if err = os.WriteFile(kcache, km.IM4P.Data, 0660); err != nil {
+			return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
+		}
+	}
+
 	return nil
 }
 

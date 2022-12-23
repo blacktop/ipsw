@@ -1,3 +1,5 @@
+//go:build !ios
+
 package download
 
 import (
@@ -8,17 +10,22 @@ import (
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
+	"strings"
 
 	"time"
 
+	"github.com/99designs/keyring"
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/pkg/errors"
 )
 
 /*
@@ -26,7 +33,7 @@ import (
 		- https://github.com/picklepete/pyicloud
 		- https://github.com/michaljirman/fmidevice
 		- https://github.com/majd/ipatool
-		- https://jpmens.net/2021/04/18/storing-passwords-in-macos-keychain/
+		- https://github.com/fastlane/fastlane
 */
 
 const (
@@ -35,12 +42,15 @@ const (
 
 	downloadActionURL      = "https://developer.apple.com/devcenter/download.action"
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
+	adcDownloadURL         = "https://developerservices2.apple.com/services/download?path="
 
 	loginURL      = "https://idmsa.apple.com/appleauth/auth/signin"
 	trustURL      = "https://idmsa.apple.com/appleauth/auth/2sv/trust"
 	itcServiceKey = "https://appstoreconnect.apple.com/olympus/v1/app/config?hostname=itunesconnect.apple.com"
 
-	userAgent = "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8"
+	olympusSessionURL = "https://appstoreconnect.apple.com/olympus/v1/session"
+
+	userAgent = "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8"
 )
 
 const (
@@ -49,6 +59,12 @@ const (
 	ERROR_CODE_FAILED_TO_UPDATE_SESSION = -20528 // Error Description not available
 	ERROR_CODE_BAD_VERIFICATION         = -21669 // Incorrect verification code.
 	// TODO: flesh out the rest of the error codes
+)
+
+const (
+	VaultName           = "ipsw-vault"
+	AppName             = "io.blacktop.ipsw"
+	KeychainServiceName = "ipsw-auth.service"
 )
 
 type DevConfig struct {
@@ -62,26 +78,51 @@ type DevConfig struct {
 	// download type config
 	WatchList []string
 	// behavior config
-	SkipAll      bool
-	ResumeAll    bool
-	RestartAll   bool
-	RemoveCommas bool
-	PreferSMS    bool
-	PageSize     int
-	Verbose      bool
+	SkipAll       bool
+	ResumeAll     bool
+	RestartAll    bool
+	RemoveCommas  bool
+	PreferSMS     bool
+	PageSize      int
+	Verbose       bool
+	VaultPassword string
+	ConfigDir     string
 }
 
-// App is the app object
-type App struct {
+// DevPortal is the dev portal object
+type DevPortal struct {
 	Client *http.Client
+
+	Vault keyring.Keyring
 
 	config *DevConfig
 
-	authService authService
-	authOptions authOptions
-	codeRequest authOptions
+	authService    authService
+	authOptions    authOptions
+	codeRequest    authOptions
+	olympusSession olympusResponse
 	// header values
 	xAppleIDAccountCountry string
+}
+
+type credentials struct {
+	Username      string `json:"username,omitempty"`
+	Password      string `json:"password,omitempty"`
+	DsPersonID    string `json:"directory_services_id,omitempty"`
+	PasswordToken string `json:"password_token,omitempty"`
+}
+
+type session struct {
+	SessionID string         `json:"session_id,omitempty"`
+	SCNT      string         `json:"scnt,omitempty"`
+	WidgetKey string         `json:"widget_key,omitempty"`
+	Cookies   []*http.Cookie `json:"cookies,omitempty"`
+}
+
+type AppleAccountAuth struct {
+	Credentials      credentials `json:"credentials,omitempty"`
+	DevPortalSession session     `json:"devport_session,omitempty"`
+	AppStoreSession  session     `json:"appstore_session,omitempty"`
 }
 
 // DevDownload are all the downloads from https://developer.apple.com/download/
@@ -192,6 +233,43 @@ type serviceErrorsResponse struct {
 	HasError bool           `json:"hasError,omitempty"`
 }
 
+type olympusProvider struct {
+	ID           int      `json:"providerId,omitempty"`
+	PublicID     string   `json:"publicProviderId,omitempty"`
+	Name         string   `json:"name,omitempty"`
+	ContentTypes []string `json:"contentTypes,omitempty"`
+	SubType      string   `json:"subType,omitempty"`
+	PLA          []struct {
+		ID                       string   `json:"id,omitempty"`
+		Version                  string   `json:"version,omitempty"`
+		Types                    []string `json:"types,omitempty"`
+		ContractCountryOfOrigins []string `json:"contractCountryOfOrigins,omitempty"`
+	} `json:"pla,omitempty"`
+}
+
+type olympusResponse struct {
+	User struct {
+		FullNAme  string `json:"fullName,omitempty"`
+		FirstName string `json:"firstName,omitempty"`
+		LastName  string `json:"lastName,omitempty"`
+		Email     string `json:"emailAddress,omitempty"`
+		PrsID     string `json:"prsId,omitempty"`
+	} `json:"user,omitempty"`
+	Provider           olympusProvider   `json:"provider,omitempty"`
+	Theme              string            `json:"theme,omitempty"`
+	AvailableProviders []olympusProvider `json:"availableProviders,omitempty"`
+	BackingType        string            `json:"backingType,omitempty"`
+	BackingTypes       []string          `json:"backingTypes,omitempty"`
+	Roles              []string          `json:"roles,omitempty"`
+	UnverifiedRoles    []string          `json:"unverifiedRoles,omitempty"`
+	FeatureFlags       []string          `json:"featureFlags,omitempty"`
+	AgreeToTerms       bool              `json:"agreeToTerms,omitempty"`
+	TermsSignatures    []string          `json:"termsSignatures,omitempty"`
+	PublicUserID       string            `json:"publicUserId,omitempty"`
+	OfacState          any               `json:"ofacState,omitempty"`
+	CreationDate       int               `json:"creationDate,omitempty"`
+}
+
 type category struct {
 	ID        int    `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
@@ -229,11 +307,11 @@ type dload struct {
 	Files         []dfile    `json:"files,omitempty"`
 }
 
-// NewDevPortal returns a new instance of teh dev portal app
-func NewDevPortal(config *DevConfig) *App {
+// NewDevPortal returns a new DevPortal instance
+func NewDevPortal(config *DevConfig) *DevPortal {
 	jar, _ := cookiejar.New(nil)
 
-	app := App{
+	dp := DevPortal{
 		Client: &http.Client{
 			Jar: jar,
 			Transport: &http.Transport{
@@ -244,48 +322,140 @@ func NewDevPortal(config *DevConfig) *App {
 		config: config,
 	}
 
-	return &app
+	return &dp
 }
 
-func (app *App) GetSessionID() string {
-	return app.config.SessionID
+// Init DevPortal sets up the DevPortal vault
+func (dp *DevPortal) Init() (err error) {
+	// create credential vault (if it doesn't exist)
+	dp.Vault, err = keyring.Open(keyring.Config{
+		ServiceName:                    KeychainServiceName,
+		KeychainSynchronizable:         false,
+		KeychainAccessibleWhenUnlocked: true,
+		KeychainTrustApplication:       true,
+		FileDir:                        dp.config.ConfigDir,
+		FilePasswordFunc: func(string) (string, error) {
+			if len(dp.config.VaultPassword) == 0 {
+				msg := "Enter a password to decrypt your credentials vault: " + filepath.Join(dp.config.ConfigDir, VaultName)
+				if _, err := os.Stat(filepath.Join(dp.config.ConfigDir, VaultName)); errors.Is(err, os.ErrNotExist) {
+					msg = "Enter a password to encrypt your credentials to vault: " + filepath.Join(dp.config.ConfigDir, VaultName)
+				}
+				prompt := &survey.Password{
+					Message: msg,
+				}
+				if err := survey.AskOne(prompt, &dp.config.VaultPassword); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					return "", err
+				}
+			}
+			return dp.config.VaultPassword, nil
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to open vault: %s", err)
+	}
+
+	return nil
 }
-func (app *App) GetSCNT() string {
-	return app.config.SCNT
+
+func (dp *DevPortal) GetSessionID() string {
+	return dp.config.SessionID
 }
-func (app *App) GetWidgetKey() string {
-	return app.config.WidgetKey
+func (dp *DevPortal) GetSCNT() string {
+	return dp.config.SCNT
+}
+func (dp *DevPortal) GetWidgetKey() string {
+	return dp.config.WidgetKey
 }
 
 // Login to Apple
-func (app *App) Login(username, password string) error {
-
-	if err := app.getITCServiceKey(); err != nil {
-		return err
+func (dp *DevPortal) Login(username, password string) error {
+	if len(username) == 0 || len(password) == 0 {
+		creds, err := dp.Vault.Get(VaultName)
+		if err != nil { // failed to get credentials from vault (prompt user for credentials)
+			log.Errorf("failed to get credentials from vault: %v", err)
+			// get username
+			if len(username) == 0 {
+				prompt := &survey.Input{
+					Message: "Please type your username:",
+				}
+				if err := survey.AskOne(prompt, &username); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					return err
+				}
+			}
+			// get password
+			if len(password) == 0 {
+				prompt := &survey.Password{
+					Message: "Please type your password:",
+				}
+				if err := survey.AskOne(prompt, &password); err != nil {
+					if err == terminal.InterruptErr {
+						log.Warn("Exiting...")
+						os.Exit(0)
+					}
+					return err
+				}
+			}
+			// save credentials to vault
+			dat, err := json.Marshal(&AppleAccountAuth{
+				Credentials: credentials{
+					Username: username,
+					Password: password,
+				},
+			})
+			if err != nil {
+				return fmt.Errorf("failed to marshal keychain credentials: %v", err)
+			}
+			dp.Vault.Set(keyring.Item{
+				Key:         VaultName,
+				Data:        dat,
+				Label:       AppName,
+				Description: "application password",
+			})
+		} else { // credentials found in vault
+			var auth AppleAccountAuth
+			if err := json.Unmarshal(creds.Data, &auth); err != nil {
+				return fmt.Errorf("failed to unmarshal keychain credentials: %v", err)
+			}
+			username = auth.Credentials.Username
+			password = auth.Credentials.Password
+			auth = AppleAccountAuth{}
+		}
 	}
 
-	if len(app.config.SessionID) > 0 {
-		return app.updateSession()
+	if err := dp.loadSession(); err != nil { // load previous session (if error, login)
+		if err := dp.getITCServiceKey(); err != nil {
+			return err
+		}
+
+		return dp.signIn(username, password)
 	}
 
-	return app.signIn(username, password)
+	return nil
 }
 
-func (app *App) updateRequestHeaders(req *http.Request) {
+func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 
-	req.Header.Set("X-Apple-Id-Session-Id", app.config.SessionID)
-	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
-	req.Header.Set("Scnt", app.config.SCNT)
+	req.Header.Set("X-Apple-Id-Session-Id", dp.config.SessionID)
+	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
+	req.Header.Set("Scnt", dp.config.SCNT)
 
 	req.Header.Add("User-Agent", userAgent)
 }
 
-func (app *App) getITCServiceKey() error {
+func (dp *DevPortal) getITCServiceKey() error {
 
-	response, err := app.Client.Get(itcServiceKey)
+	response, err := dp.Client.Get(itcServiceKey)
 	if err != nil {
 		return err
 	}
@@ -296,7 +466,7 @@ func (app *App) getITCServiceKey() error {
 		return err
 	}
 
-	if err := json.Unmarshal(body, &app.authService); err != nil {
+	if err := json.Unmarshal(body, &dp.authService); err != nil {
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
@@ -306,12 +476,12 @@ func (app *App) getITCServiceKey() error {
 		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
 	}
 
-	app.config.WidgetKey = app.authService.Key
+	dp.config.WidgetKey = dp.authService.Key
 
 	return nil
 }
 
-func (app *App) signIn(username, password string) error {
+func (dp *DevPortal) signIn(username, password string) error {
 	buf := new(bytes.Buffer)
 
 	json.NewEncoder(buf).Encode(&auth{
@@ -327,11 +497,11 @@ func (app *App) signIn(username, password string) error {
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	req.Header.Set("X-Apple-Widget-Key", app.config.WidgetKey)
+	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
 	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json, text/javascript")
 
-	response, err := app.Client.Do(req)
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -345,11 +515,11 @@ func (app *App) signIn(username, password string) error {
 	log.Debugf("POST Login: (%d):\n%s\n", response.StatusCode, string(body))
 
 	if response.StatusCode == 409 {
-		app.xAppleIDAccountCountry = response.Header.Get("X-Apple-Id-Account-Country")
-		app.config.SessionID = response.Header.Get("X-Apple-Id-Session-Id")
-		app.config.SCNT = response.Header.Get("Scnt")
+		dp.xAppleIDAccountCountry = response.Header.Get("X-Apple-Id-Account-Country")
+		dp.config.SessionID = response.Header.Get("X-Apple-Id-Session-Id")
+		dp.config.SCNT = response.Header.Get("Scnt")
 
-		if err := app.getAuthOptions(); err != nil {
+		if err := dp.getAuthOptions(); err != nil {
 			return err
 		}
 
@@ -357,14 +527,14 @@ func (app *App) signIn(username, password string) error {
 		codeType := "phone"
 
 		// SMS was sent automatically
-		if app.authOptions.NoTrustedDevices && len(app.authOptions.TrustedPhoneNumbers) == 1 {
+		if dp.authOptions.NoTrustedDevices && len(dp.authOptions.TrustedPhoneNumbers) == 1 {
 			codeType = "phone"
 			// User needs to choose a phone to send to
-		} else if app.authOptions.NoTrustedDevices && len(app.authOptions.TrustedPhoneNumbers) > 1 {
+		} else if dp.authOptions.NoTrustedDevices && len(dp.authOptions.TrustedPhoneNumbers) > 1 {
 			codeType = "phone"
 			phoneNumber := 0
 			var choices []string
-			for _, num := range app.authOptions.TrustedPhoneNumbers {
+			for _, num := range dp.authOptions.TrustedPhoneNumbers {
 				choices = append(choices, num.NumberWithDialCode)
 			}
 			prompt := &survey.Select{
@@ -378,17 +548,17 @@ func (app *App) signIn(username, password string) error {
 				}
 				return err
 			}
-			phoneID = app.authOptions.TrustedPhoneNumbers[phoneNumber].ID
-			if err := app.requestCode(phoneID); err != nil {
+			phoneID = dp.authOptions.TrustedPhoneNumbers[phoneNumber].ID
+			if err := dp.requestCode(phoneID); err != nil {
 				return err
 			}
 
 		} else { // Code is shown on trusted devices
 			codeType = "trusteddevice"
-			if app.config.PreferSMS {
+			if dp.config.PreferSMS {
 				codeType = "phone"
-				if err := app.requestCode(1); err != nil {
-					if app.codeRequest.SecurityCode.TooManyCodesSent {
+				if err := dp.requestCode(1); err != nil {
+					if dp.codeRequest.SecurityCode.TooManyCodesSent {
 						codeType = "trusteddevice"
 						log.Warn("you must use the trusted device code (SMS codes have been disabled on your account)")
 					} else {
@@ -435,32 +605,34 @@ func (app *App) signIn(username, password string) error {
 			}
 		}
 
-		if err := app.verifyCode(codeType, code, phoneID); err != nil {
+		if err := dp.verifyCode(codeType, code, phoneID); err != nil {
 			return err
 		}
 
-		if err := app.updateSession(); err != nil {
+		if err := dp.trustSession(); err != nil {
 			return err
 		}
 
-	} else if response.StatusCode == 200 {
-		log.Warn("not tested with (non-two-factor enabled accounts) if fails; please let author know")
-	} else {
+	} else if response.StatusCode != 200 {
 		return fmt.Errorf("failed to sign in; expected status code 409 (for two factor auth): response received %s", response.Status)
+	}
+
+	if err := dp.storeSession(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (app *App) getAuthOptions() error {
+func (dp *DevPortal) getAuthOptions() error {
 
 	req, err := http.NewRequest("GET", "https://idmsa.apple.com/appleauth/auth", nil)
 	if err != nil {
 		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
-	app.updateRequestHeaders(req)
+	dp.updateRequestHeaders(req)
 
-	response, err := app.Client.Do(req)
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -473,7 +645,7 @@ func (app *App) getAuthOptions() error {
 
 	log.Debugf("GET getAuthOptions (%d):\n%s\n", response.StatusCode, string(body))
 
-	if err := json.Unmarshal(body, &app.authOptions); err != nil {
+	if err := json.Unmarshal(body, &dp.authOptions); err != nil {
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
@@ -484,7 +656,7 @@ func (app *App) getAuthOptions() error {
 	return nil
 }
 
-func (app *App) requestCode(phoneID int) error {
+func (dp *DevPortal) requestCode(phoneID int) error {
 	buf := new(bytes.Buffer)
 
 	json.NewEncoder(buf).Encode(&phone{
@@ -498,9 +670,9 @@ func (app *App) requestCode(phoneID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to create http PUT request: %v", err)
 	}
-	app.updateRequestHeaders(req)
+	dp.updateRequestHeaders(req)
 
-	response, err := app.Client.Do(req)
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -513,14 +685,14 @@ func (app *App) requestCode(phoneID int) error {
 
 	log.Debugf("PUT requestCode (%d):\n%s\n", response.StatusCode, string(body))
 
-	if err := json.Unmarshal(body, &app.codeRequest); err != nil {
+	if err := json.Unmarshal(body, &dp.codeRequest); err != nil {
 		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
 	}
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		var errStr string
-		if app.codeRequest.ServiceErrors != nil {
-			for _, svcErr := range app.codeRequest.ServiceErrors {
+		if dp.codeRequest.ServiceErrors != nil {
+			for _, svcErr := range dp.codeRequest.ServiceErrors {
 				errStr += fmt.Sprintf(": %s", svcErr.Message)
 			}
 			return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
@@ -537,7 +709,7 @@ func (app *App) requestCode(phoneID int) error {
 	return nil
 }
 
-func (app *App) verifyCode(codeType, code string, phoneID int) error {
+func (dp *DevPortal) verifyCode(codeType, code string, phoneID int) error {
 	buf := new(bytes.Buffer)
 
 	if codeType == "phone" {
@@ -562,9 +734,9 @@ func (app *App) verifyCode(codeType, code string, phoneID int) error {
 	if err != nil {
 		return fmt.Errorf("failed to create http POST request: %v", err)
 	}
-	app.updateRequestHeaders(req)
+	dp.updateRequestHeaders(req)
 
-	response, err := app.Client.Do(req)
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -588,7 +760,7 @@ func (app *App) verifyCode(codeType, code string, phoneID int) error {
 				for _, svcErr := range svcErr.Errors {
 					errStr += fmt.Sprintf(": %s", svcErr.Message)
 				}
-				return fmt.Errorf("failed to update to trusted session: response received %s%s", response.Status, errStr)
+				return fmt.Errorf("failed to verify code: response received %s%s", response.Status, errStr)
 			}
 		}
 
@@ -598,15 +770,16 @@ func (app *App) verifyCode(codeType, code string, phoneID int) error {
 	return nil
 }
 
-func (app *App) updateSession() error {
+// trustSession tells Apple to trust computer for 2FA
+func (dp *DevPortal) trustSession() error {
 
 	req, err := http.NewRequest("GET", trustURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
-	app.updateRequestHeaders(req)
+	dp.updateRequestHeaders(req)
 
-	response, err := app.Client.Do(req)
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -617,7 +790,7 @@ func (app *App) updateSession() error {
 		return err
 	}
 
-	log.Debugf("GET updateSession: (%d):\n%s\n", response.StatusCode, string(body))
+	log.Debugf("GET trustSession: (%d):\n%s\n", response.StatusCode, string(body))
 
 	if 200 > response.StatusCode || 300 <= response.StatusCode {
 		if len(body) > 0 {
@@ -639,14 +812,123 @@ func (app *App) updateSession() error {
 	return nil
 }
 
+func (dp *DevPortal) refreshSession() error {
+	// check if olympus session is expired (prevents login rate limiting)
+	if err := dp.getOlympusSession(); err != nil {
+		// if olympus session is expired, we need to login again
+		return dp.Login("", "")
+	}
+	return nil
+}
+
+func (dp *DevPortal) getOlympusSession() error {
+
+	req, err := http.NewRequest("GET", olympusSessionURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create http GET request: %v", err)
+	}
+	dp.updateRequestHeaders(req)
+
+	response, err := dp.Client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("GET getOlympusSession (%d):\n%s\n", response.StatusCode, string(body))
+
+	if 200 > response.StatusCode || 300 <= response.StatusCode {
+		return fmt.Errorf("failed to get auth options: response received %s", response.Status)
+	}
+
+	if err := json.Unmarshal(body, &dp.olympusSession); err != nil {
+		var wat any
+		json.Unmarshal(body, &wat)
+		log.Errorf("%#v", wat)
+		return fmt.Errorf("failed to deserialize response body JSON: %v", err)
+	}
+
+	return nil
+}
+
+func (dp *DevPortal) storeSession() error {
+	// get dev auth from vault
+	sess, err := dp.Vault.Get(VaultName)
+	if err != nil {
+		return fmt.Errorf("failed to get dev auth from vault: %v", err)
+	}
+
+	var auth AppleAccountAuth
+	if err := json.Unmarshal(sess.Data, &auth); err != nil {
+		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
+	}
+
+	auth.DevPortalSession = session{
+		SessionID: dp.GetSessionID(),
+		SCNT:      dp.GetSCNT(),
+		WidgetKey: dp.GetWidgetKey(),
+		Cookies:   dp.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}),
+	}
+
+	// save dev auth to vault
+	data, err := json.Marshal(&auth)
+	if err != nil {
+		return fmt.Errorf("failed to marshal session: %v", err)
+	}
+
+	// clear dev auth mem
+	auth = AppleAccountAuth{}
+
+	dp.Vault.Set(keyring.Item{
+		Key:         VaultName,
+		Data:        data,
+		Label:       AppName,
+		Description: "application password",
+	})
+
+	return nil
+}
+
+func (dp *DevPortal) loadSession() error {
+	// get dev auth from vault
+	sess, err := dp.Vault.Get(VaultName)
+	if err != nil {
+		return fmt.Errorf("failed to get dev auth from vault: %v", err)
+	}
+
+	var auth AppleAccountAuth
+	if err := json.Unmarshal(sess.Data, &auth); err != nil {
+		return fmt.Errorf("failed to unmarshal dev auth: %v", err)
+	}
+
+	dp.config.SessionID = auth.DevPortalSession.SessionID
+	dp.config.SCNT = auth.DevPortalSession.SCNT
+	dp.config.WidgetKey = auth.DevPortalSession.WidgetKey
+	dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.DevPortalSession.Cookies)
+
+	// clear dev auth mem
+	auth = AppleAccountAuth{}
+
+	if err := dp.getOlympusSession(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Watch watches for NEW downloads
-func (app *App) Watch() error {
+func (dp *DevPortal) Watch() error {
 
 	var prevIPSWs map[string][]DevDownload
 
 	for {
 		// scrape dev portal
-		ipsws, err := app.getDevDownloads()
+		ipsws, err := dp.getDevDownloads()
 		if err != nil {
 			return err
 		}
@@ -655,7 +937,7 @@ func (app *App) Watch() error {
 		if reflect.DeepEqual(prevIPSWs, ipsws) {
 			time.Sleep(5 * time.Minute)
 
-			if err := app.updateSession(); err != nil {
+			if err := dp.refreshSession(); err != nil {
 				return err
 			}
 
@@ -666,10 +948,16 @@ func (app *App) Watch() error {
 		}
 
 		for version := range ipsws {
-			if utils.StrContainsStrSliceItem(version, app.config.WatchList) {
-				for _, ipsw := range ipsws[version] {
-					if err := app.Download(ipsw.URL); err != nil {
-						log.Error(err.Error())
+			for _, watchPattern := range dp.config.WatchList {
+				re, err := regexp.Compile(watchPattern)
+				if err != nil {
+					return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+				}
+				if re.MatchString(version) {
+					for _, ipsw := range ipsws[version] {
+						if err := dp.Download(ipsw.URL); err != nil {
+							log.Errorf("failed to download %s: %v", ipsw.URL, err)
+						}
 					}
 				}
 			}
@@ -678,10 +966,10 @@ func (app *App) Watch() error {
 }
 
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
-func (app *App) DownloadPrompt(downloadType string) error {
+func (dp *DevPortal) DownloadPrompt(downloadType string) error {
 	switch downloadType {
 	case "more":
-		dloads, err := app.getDownloads()
+		dloads, err := dp.getDownloads()
 		if err != nil {
 			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 		}
@@ -695,7 +983,7 @@ func (app *App) DownloadPrompt(downloadType string) error {
 		prompt := &survey.MultiSelect{
 			Message:  "Select what file(s) to download:",
 			Options:  choices,
-			PageSize: app.config.PageSize,
+			PageSize: dp.config.PageSize,
 		}
 		if err := survey.AskOne(prompt, &dfiles); err == terminal.InterruptErr {
 			log.Warn("Exiting...")
@@ -704,11 +992,11 @@ func (app *App) DownloadPrompt(downloadType string) error {
 
 		for _, idx := range dfiles {
 			for _, f := range dloads.Downloads[idx].Files {
-				app.Download(f.URL())
+				dp.Download(f.URL())
 			}
 		}
 	default:
-		ipsws, err := app.getDevDownloads()
+		ipsws, err := dp.getDevDownloads()
 		if err != nil {
 			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 		}
@@ -743,7 +1031,7 @@ func (app *App) DownloadPrompt(downloadType string) error {
 			prompt := &survey.MultiSelect{
 				Message:  "Select what file(s) to download:",
 				Options:  choices,
-				PageSize: app.config.PageSize,
+				PageSize: dp.config.PageSize,
 			}
 			if err := survey.AskOne(prompt, &dfiles); err != nil {
 				if err == terminal.InterruptErr {
@@ -754,10 +1042,10 @@ func (app *App) DownloadPrompt(downloadType string) error {
 			}
 
 			for _, df := range dfiles {
-				app.Download(ipsws[version][df].URL)
+				dp.Download(ipsws[version][df].URL)
 			}
 		} else {
-			app.Download(ipsws[version][0].URL)
+			dp.Download(ipsws[version][0].URL)
 		}
 	}
 
@@ -765,22 +1053,22 @@ func (app *App) DownloadPrompt(downloadType string) error {
 }
 
 // Download downloads a file that requires a valid dev portal session
-func (app *App) Download(url string) error {
+func (dp *DevPortal) Download(url string) error {
 
 	// proxy, insecure are null because we override the client below
 	downloader := NewDownload(
-		app.config.Proxy,
-		app.config.Insecure,
-		app.config.SkipAll,
-		app.config.ResumeAll,
-		app.config.RestartAll,
+		dp.config.Proxy,
+		dp.config.Insecure,
+		dp.config.SkipAll,
+		dp.config.ResumeAll,
+		dp.config.RestartAll,
 		false,
-		app.config.Verbose,
+		dp.config.Verbose,
 	)
 	// use authenticated client
-	downloader.client = app.Client
+	downloader.client = dp.Client
 
-	destName := getDestName(url, app.config.RemoveCommas)
+	destName := getDestName(url, dp.config.RemoveCommas)
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
 
 		log.WithFields(log.Fields{
@@ -803,10 +1091,70 @@ func (app *App) Download(url string) error {
 	return nil
 }
 
-func (app *App) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
+func (dp *DevPortal) DownloadADC(path string) error {
+	var adcDownloadAuth string
+
+	req, err := http.NewRequest("GET", adcDownloadURL+path, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create http GET request: %v", err)
+	}
+	req.Header.Set("Content-Type", "*/*")
+
+	response, err := dp.Client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	for _, cookie := range response.Cookies() {
+		if cookie.Name == "Set-Cookie" {
+			_, adcDownloadAuth, _ = strings.Cut(cookie.Value, "ADCDownloadAuth=")
+			break
+		}
+	}
+
+	// proxy, insecure are null because we override the client below
+	downloader := NewDownload(
+		dp.config.Proxy,
+		dp.config.Insecure,
+		dp.config.SkipAll,
+		dp.config.ResumeAll,
+		dp.config.RestartAll,
+		false,
+		dp.config.Verbose,
+	)
+	downloader.Headers = make(map[string]string)
+	// use authenticated client
+	downloader.client = dp.Client
+	// set auth cookie (for authless downloads)
+	downloader.Headers["Cookie"] = "ADCDownloadAuth=" + adcDownloadAuth
+
+	destName := getDestName(adcDownloadURL+path, dp.config.RemoveCommas)
+	if _, err := os.Stat(destName); os.IsNotExist(err) {
+
+		log.WithFields(log.Fields{
+			"file": destName,
+		}).Info("Downloading")
+
+		// download file
+		downloader.URL = adcDownloadURL + path
+		downloader.DestName = destName
+
+		err = downloader.Do()
+		if err != nil {
+			return fmt.Errorf("failed to download file: %v", err)
+		}
+
+	} else {
+		log.Warnf("file already exists: %s", destName)
+	}
+
+	return nil
+}
+
+func (dp *DevPortal) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
 	switch downloadType {
 	case "more":
-		dloads, err := app.getDownloads()
+		dloads, err := dp.getDownloads()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 		}
@@ -815,7 +1163,7 @@ func (app *App) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, er
 		}
 		return json.Marshal(dloads)
 	default:
-		ipsws, err := app.getDevDownloads()
+		ipsws, err := dp.getDevDownloads()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get developer downloads: %v", err)
 		}
@@ -827,7 +1175,7 @@ func (app *App) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, er
 }
 
 // getDownloads returns all the downloads in "More Downloads" - https://developer.apple.com/download/all/
-func (app *App) getDownloads() (*Downloads, error) {
+func (dp *DevPortal) getDownloads() (*Downloads, error) {
 	var downloads Downloads
 
 	req, err := http.NewRequest("POST", listDownloadsActionURL, nil)
@@ -836,7 +1184,7 @@ func (app *App) getDownloads() (*Downloads, error) {
 	}
 	req.Header.Set("Accept", "application/json")
 
-	response, err := app.Client.Do(req)
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -870,7 +1218,7 @@ func (app *App) getDownloads() (*Downloads, error) {
 }
 
 // getDevDownloads scrapes the https://developer.apple.com/download/ page for links
-func (app *App) getDevDownloads() (map[string][]DevDownload, error) {
+func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 	ipsws := make(map[string][]DevDownload)
 
 	req, err := http.NewRequest("GET", downloadURL, nil)
@@ -878,7 +1226,7 @@ func (app *App) getDevDownloads() (map[string][]DevDownload, error) {
 		return nil, fmt.Errorf("failed to create http GET request: %v", err)
 	}
 
-	response, err := app.Client.Do(req)
+	response, err := dp.Client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to do GET request: %v", err)
 	}
@@ -904,7 +1252,7 @@ func (app *App) getDevDownloads() (map[string][]DevDownload, error) {
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
-						Title: a.Text(),
+						Title: strings.ReplaceAll(a.Text(), "\u00a0", " "),
 						Build: p.Text(),
 						URL:   href,
 						Type:  "ios",
@@ -920,7 +1268,7 @@ func (app *App) getDevDownloads() (map[string][]DevDownload, error) {
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
-						Title: a.Text(),
+						Title: strings.ReplaceAll(a.Text(), "\u00a0", " "),
 						Build: p.Text(),
 						URL:   href,
 						// Type:  "tvos", TODO: this is commented out because macOS is also labeled as tvos

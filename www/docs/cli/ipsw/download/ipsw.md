@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: ipsw
 description: Download and parse IPSW(s) from the internets
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw download ipsw
@@ -31,7 +31,8 @@ ipsw download ipsw [flags]
       --macos                   Download macOS IPSWs
   -o, --output string           Folder to download files to
       --pattern string          Download remote files that match regex
-      --show-latest             Show latest iOS version
+      --show-latest-build       Show latest iOS build
+      --show-latest-version     Show latest iOS version
   -u, --usb                     Download IPSWs for USB attached iDevices
 ```
 
@@ -41,7 +42,7 @@ ipsw download ipsw [flags]
       --black-list stringArray   iOS device black list
   -b, --build string             iOS BuildID (i.e. 16F203)
       --color                    colorize output
-      --config string            config file (default is $HOME/.ipsw.yaml)
+      --config string            config file (default is $HOME/.ipsw/config.yaml)
   -y, --confirm                  do not prompt user for confirmation
   -d, --device string            iOS Device (i.e. iPhone11,2)
       --insecure                 do not verify ssl certs

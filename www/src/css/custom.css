@@ -1,33 +1,3 @@
-@use "sass:meta";
-$mobile-width: 480px;
-$tablet-width: 996px;
-$desktop-width: 997px;
-$desktop-xl-width: 1160px;
-
-@mixin mobile {
-  @media (max-width: #{$mobile-width}) {
-    @content;
-  }
-}
-
-@mixin tablet {
-  @media (max-width: #{$tablet-width}) {
-    @content;
-  }
-}
-
-@mixin desktop {
-  @media (min-width: #{$desktop-width}) {
-    @content;
-  }
-}
-
-@mixin desktopWide {
-  @media (min-width: #{$desktop-xl-width}) {
-    @content;
-  }
-}
-
 /**
  * Any CSS included here will be global. The classic template
  * bundles Infima by default. Infima is a CSS framework designed to
@@ -44,10 +14,15 @@ $desktop-xl-width: 1160px;
   --ifm-color-primary-lighter: #8DB5CD;
   --ifm-color-primary-lightest: #FFFFFF;
   --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);  
+
   --ifm-navbar-background-color: #503B9F;  
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
   --ifm-navbar-link-hover-color: #ffffff;  
   --ifm-navbar-link-color: #ffffff;
+
+  --ifm-menu-color-background-active: rgba(255, 255, 255, 0.05);
+  --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.05);
+
   --color-svg-fill: #2b3137;
 }
 
@@ -58,22 +33,64 @@ $desktop-xl-width: 1160px;
   --ifm-color-primary-darker: #453384;
   --ifm-color-primary-darkest: #3c2d72;
   --ifm-color-primary-light: #7E88D2;
-  --ifm-color-primary-lighter: #7E88D2;
-  --ifm-color-primary-lightest: #7E88D2;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
-  --ifm-navbar-background-color: #453384;  
-  --ifm-menu-color-background-active: rgba(255, 255, 255, 0.05);
-  --ifm-menu-color-background-hover: rgba(255, 255, 255, 0.05);
-  --ifm-navbar-link-hover-color: #ffffff;
-  --ifm-navbar-link-color: #ffffff;
+  --ifm-color-primary-lighter: #8DB5CD;
+  --ifm-color-primary-lightest: #FFFFFF;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);  
 
-  --ifm-font-color-base-inverse: #ffffff;
+  --ifm-navbar-background-color: #453384;  
+
   --color-svg-fill: #ffffff;
+}
+
+[data-theme='light'] .DocSearch {
+  /* --docsearch-primary-color: var(--ifm-color-primary); */
+  /* --docsearch-text-color: var(--ifm-font-color-base); */
+  --docsearch-muted-color: var(--ifm-color-secondary-darkest);
+  --docsearch-container-background: rgba(94, 100, 112, 0.7);
+  /* Modal */
+  --docsearch-modal-background: var(--ifm-color-secondary-lighter);
+  /* Search box */
+  --docsearch-searchbox-background: var(--ifm-color-secondary);
+  --docsearch-searchbox-focus-background: var(--ifm-color-white);
+  /* Hit */
+  --docsearch-hit-color: var(--ifm-font-color-base);
+  --docsearch-hit-active-color: var(--ifm-color-white);
+  --docsearch-hit-background: var(--ifm-color-white);
+  /* Footer */
+  --docsearch-footer-background: var(--ifm-color-white);
+}
+
+[data-theme='dark'] .DocSearch {
+  --docsearch-text-color: var(--ifm-font-color-base);
+  --docsearch-muted-color: var(--ifm-color-secondary-darkest);
+  --docsearch-container-background: rgba(47, 55, 69, 0.7);
+  /* Modal */
+  --docsearch-modal-background: var(--ifm-background-color);
+  /* Search box */
+  --docsearch-searchbox-background: var(--ifm-background-color);
+  --docsearch-searchbox-focus-background: var(--ifm-color-black);
+  /* Hit */
+  --docsearch-hit-color: var(--ifm-font-color-base);
+  --docsearch-hit-active-color: var(--ifm-color-white);
+  --docsearch-hit-background: var(--ifm-color-emphasis-100);
+  /* Footer */
+  --docsearch-footer-background: var(--ifm-background-surface-color);
+  --docsearch-key-gradient: linear-gradient(
+    -26.5deg,
+    var(--ifm-color-emphasis-200) 0%,
+    var(--ifm-color-emphasis-100) 100%
+  );
+}
+
+.navbar__link--active {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 0.1rem;
 }
 
 .hero--primary {
   --ifm-hero-background-color: #503B9F;
-  --ifm-hero-text-color: var(--ifm-font-color-base-inverse);
+  --ifm-hero-text-color:  #FFFFFF;
 }
 
 .header-icon-link {
@@ -81,7 +98,7 @@ $desktop-xl-width: 1160px;
 }
 
 .header-icon-link:hover {
-  filter: brightness(2);
+  filter: invert(60%)
 }
 
 .header-icon-link::before {

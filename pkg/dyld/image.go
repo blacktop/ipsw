@@ -394,6 +394,7 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 
 		if opt.GetVersion() == 16 {
 			rsBase = opt.RelativeMethodListsBaseAddress(i.cache.objcOptRoAddr)
+			rsBase += i.cache.Headers[i.cache.UUID].SharedRegionStart // TODO: can I trust SharedRegionStart? should this be Mapping[0].Address?
 		}
 	}
 
@@ -475,7 +476,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 func (i *CacheImage) Analyze() error {
 
 	if err := i.ParsePublicSymbols(false); err != nil {
-		log.Errorf("failed to parse exported symbols for %s", i.Name)
+		log.Errorf("failed to parse exported symbols for %s: %w", i.Name, err)
 	}
 
 	if !i.Analysis.State.IsStartsDone() {
@@ -820,9 +821,10 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 					// 	Macho:   m,
 					// }.String(true))
 					fmt.Println(CacheLocalSymbol64{
-						Name:    s,
-						Nlist64: nlist,
-						Macho:   m,
+						Name:         s,
+						Nlist64:      nlist,
+						Macho:        m,
+						FoundInDylib: filepath.Base(i.Name),
 					}.String(true))
 				}
 			}

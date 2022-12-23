@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: kernel
 description: Parse kernelcache
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw kernel
@@ -27,7 +27,7 @@ ipsw kernel [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 
@@ -37,7 +37,7 @@ ipsw kernel [flags]
 * [ipsw kernel ctfdump](/docs/cli/ipsw/kernel/ctfdump)	 - Dump CTF info
 * [ipsw kernel dec](/docs/cli/ipsw/kernel/dec)	 - Decompress a kernelcache
 * [ipsw kernel dwarf](/docs/cli/ipsw/kernel/dwarf)	 - 🚧 Dump DWARF debug information
-* [ipsw kernel extract](/docs/cli/ipsw/kernel/extract)	 - Extract and decompress a kernelcache from IPSW
+* [ipsw kernel extract](/docs/cli/ipsw/kernel/extract)	 - Extract KEXT(s) from kernelcache
 * [ipsw kernel kexts](/docs/cli/ipsw/kernel/kexts)	 - List kernel extentions
 * [ipsw kernel sbopts](/docs/cli/ipsw/kernel/sbopts)	 - List kernel sandbox operations
 * [ipsw kernel symbolsets](/docs/cli/ipsw/kernel/symbolsets)	 - Dump kernel symbolsets

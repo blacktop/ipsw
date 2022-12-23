@@ -1,3 +1,5 @@
+//go:build !ios
+
 /*
 Copyright © 2018-2022 blacktop
 
@@ -37,22 +39,34 @@ import (
 )
 
 func init() {
-	DownloadCmd.AddCommand(devCmd)
-
-	devCmd.Flags().StringArray("watch", []string{}, "dev portal type to watch")
-	devCmd.Flags().Bool("more", false, "Download 'More' OSs/Apps")
+	devCmd.Flags().StringArrayP("watch", "w", []string{}, "Developer portal group pattern to watch (i.e. '^iOS.*beta$')")
+	devCmd.Flags().Bool("os", false, "Download '*OS' OSes/Apps")
+	devCmd.Flags().Bool("more", false, "Download 'More' OSes/Apps")
 	devCmd.Flags().IntP("page", "p", 20, "Page size for file lists")
 	devCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
 	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
+	viper.BindPFlag("download.dev.os", devCmd.Flags().Lookup("os"))
 	viper.BindPFlag("download.dev.more", devCmd.Flags().Lookup("more"))
 	viper.BindPFlag("download.dev.page", devCmd.Flags().Lookup("page"))
 	viper.BindPFlag("download.dev.sms", devCmd.Flags().Lookup("sms"))
 	viper.BindPFlag("download.dev.json", devCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.dev.pretty", devCmd.Flags().Lookup("pretty"))
 	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.dev.vault-password", devCmd.Flags().Lookup("vault-password"))
+	devCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("device")
+		DownloadCmd.PersistentFlags().MarkHidden("model")
+		DownloadCmd.PersistentFlags().MarkHidden("version")
+		DownloadCmd.PersistentFlags().MarkHidden("build")
+		c.Parent().HelpFunc()(c, s)
+	})
+	DownloadCmd.AddCommand(devCmd)
 }
 
 // devCmd represents the dev command
@@ -74,12 +88,6 @@ var devCmd = &cobra.Command{
 		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
 		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
 		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
-		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
-		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
-		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
-		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 
 		// settings
 		proxy := viper.GetString("download.proxy")
@@ -91,70 +99,53 @@ var devCmd = &cobra.Command{
 		removeCommas := viper.GetBool("download.remove-commas")
 		// flags
 		watchList := viper.GetStringSlice("download.dev.watch")
-		more := viper.GetBool("download.dev.more")
 		pageSize := viper.GetInt("download.dev.page")
 		sms := viper.GetBool("download.dev.sms")
 		asJSON := viper.GetBool("download.dev.json")
 		prettyJSON := viper.GetBool("download.dev.pretty")
 		output := viper.GetString("download.dev.output")
 
-		app := download.NewDevPortal(&download.DevConfig{
-			Proxy:        proxy,
-			Insecure:     insecure,
-			SkipAll:      skipAll,
-			ResumeAll:    resumeAll,
-			RestartAll:   restartAll,
-			RemoveCommas: removeCommas,
-			PreferSMS:    sms,
-			PageSize:     pageSize,
-			WatchList:    watchList,
-			Verbose:      viper.GetBool("verbose"),
-		})
-
 		username := viper.GetString("download.dev.username")
 		password := viper.GetString("download.dev.password")
 
-		if len(viper.GetString("download.dev.session_id")) == 0 {
-			// get username
-			if len(username) == 0 {
-				prompt := &survey.Input{
-					Message: "Please type your username:",
-				}
-				if err := survey.AskOne(prompt, &username); err != nil {
-					if err == terminal.InterruptErr {
-						log.Warn("Exiting...")
-						os.Exit(0)
-					}
-					return err
-				}
-			}
-			// get password
-			if len(password) == 0 {
-				prompt := &survey.Password{
-					Message: "Please type your password:",
-				}
-				if err := survey.AskOne(prompt, &password); err != nil {
-					if err == terminal.InterruptErr {
-						log.Warn("Exiting...")
-						os.Exit(0)
-					}
-					return err
-				}
-			}
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get user home directory: %v", err)
+		}
+
+		app := download.NewDevPortal(&download.DevConfig{
+			Proxy:         proxy,
+			Insecure:      insecure,
+			SkipAll:       skipAll,
+			ResumeAll:     resumeAll,
+			RestartAll:    restartAll,
+			RemoveCommas:  removeCommas,
+			PreferSMS:     sms,
+			PageSize:      pageSize,
+			WatchList:     watchList,
+			ConfigDir:     filepath.Join(home, ".ipsw"),
+			VaultPassword: viper.GetString("download.dev.vault-password"),
+			Verbose:       viper.GetBool("verbose"),
+		})
+
+		if err := app.Init(); err != nil {
+			return fmt.Errorf("failed to initialize app: %v", err)
 		}
 
 		if err := app.Login(username, password); err != nil {
-			return err
+			return fmt.Errorf("failed to login: %v", err)
 		}
 
 		if len(watchList) > 0 {
 			if err := app.Watch(); err != nil {
-				return err
+				return fmt.Errorf("failed to watch: %v", err)
 			}
 		}
 
 		dlType := ""
-		if more {
+		if viper.GetBool("download.dev.os") {
+			dlType = "os"
+		} else if viper.GetBool("download.dev.more") {
 			dlType = "more"
 		} else {
 			prompt := &survey.Select{
@@ -175,13 +166,13 @@ var devCmd = &cobra.Command{
 
 		if asJSON {
 			if dat, err := app.GetDownloadsAsJSON(dlType, prettyJSON); err != nil {
-				return err
+				return fmt.Errorf("failed to get downloads as JSON: %v", err)
 			} else {
 				if len(output) > 0 {
 					fpath := filepath.Join(output, fmt.Sprintf("dev_portal_%s.json", dlType))
 					log.Infof("Creating %s", fpath)
 					if err := os.WriteFile(fpath, dat, 0660); err != nil {
-						return err
+						return fmt.Errorf("failed to write file %s: %v", fpath, err)
 					}
 				} else {
 					fmt.Println(string(dat))
@@ -189,7 +180,7 @@ var devCmd = &cobra.Command{
 			}
 		} else {
 			if err := app.DownloadPrompt(dlType); err != nil {
-				return err
+				return fmt.Errorf("failed to download: %v", err)
 			}
 		}
 		return nil

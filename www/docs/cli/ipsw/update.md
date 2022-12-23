@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: update
 description: Download an ipsw update if one exists
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw update
@@ -15,6 +15,17 @@ Download an ipsw update if one exists
 
 ```
 ipsw update [flags]
+```
+
+### Examples
+
+```bash
+# Grab an update for your platform
+❯ ipsw update --detect
+# Grab an update for another platform
+❯ ipsw update --platform windows_x86_64
+# Grab an update for your platform and overwrite the current one
+❯ ipsw update --detect --replace
 ```
 
 ### Options
@@ -33,7 +44,7 @@ ipsw update [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 

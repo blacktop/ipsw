@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/hashicorp/go-version"
@@ -162,8 +161,6 @@ func (vm *ITunesVersionMaster) GetLatestBuilds(device string) ([]Build, error) {
 
 	newestVersion := versions[len(versions)-1]
 
-	utils.Indent(log.Info, 1)(fmt.Sprintf("Latest release found is: %s", newestVersion.Original()))
-
 	// // check canijailbreak.com
 	// jbs, _ := GetJailbreaks()
 	// if iCan, index, err := jbs.CanIBreak(newestVersion.Original()); err != nil {
@@ -299,6 +296,19 @@ func (vm *ITunesVersionMaster) GetLatestVersion() (string, error) {
 	newestVersion := versions[len(versions)-1]
 
 	return newestVersion.Original(), nil
+}
+
+// GetLatestBuild gets the latest iOS build
+func (vm *ITunesVersionMaster) GetLatestBuild() (string, error) {
+	version, err := vm.GetLatestVersion()
+	if err != nil {
+		return "", fmt.Errorf("failed to get latest version: %s", err)
+	}
+	builds := UniqueBuilds(vm.GetBuildsForVersion(version))
+	sort.Slice(builds, func(i, j int) bool {
+		return builds[i].BuildID > builds[j].BuildID
+	})
+	return builds[0].BuildID, nil
 }
 
 // GetSoftwareURLsForBuildID gets all the ipsw URLs for an iOS Build ID

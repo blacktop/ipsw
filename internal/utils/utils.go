@@ -220,18 +220,18 @@ func UniqueConcat[T comparable](slice []T, in []T) []T {
 	return slice
 }
 
-type Pair[D, M any] struct {
-	Device D
-	Model  M
+type Pair[T, U any] struct {
+	First  T
+	Second U
 }
 
-func Zip[D, M any](ds []D, ms []M) ([]Pair[D, M], error) {
-	if len(ds) != len(ms) {
-		return nil, fmt.Errorf("lengths of slices must be equal")
+func Zip[T, U any](ts []T, us []U) ([]Pair[T, U], error) {
+	if len(ts) != len(us) {
+		return nil, fmt.Errorf("slices have different lengths")
 	}
-	pairs := make([]Pair[D, M], len(ds))
-	for i := 0; i < len(ds); i++ {
-		pairs[i] = Pair[D, M]{ds[i], ms[i]}
+	pairs := make([]Pair[T, U], len(ts))
+	for i := 0; i < len(ts); i++ {
+		pairs[i] = Pair[T, U]{ts[i], us[i]}
 	}
 	return pairs, nil
 }

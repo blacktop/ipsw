@@ -27,28 +27,44 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-func init() {
-	KernelcacheCmd.AddCommand(decCmd)
-
-	decCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+func isImg4(kcpath string) bool {
+	f, err := os.Open(kcpath)
+	if err != nil {
+		log.Fatalf("failed to open kernelcache %s: %w", kcpath, err)
+	}
+	defer f.Close()
+	if _, err := img4.ParseImg4(f); err == nil {
+		return true
+	}
+	return false
 }
 
-// decCmd represents the dec command
-var decCmd = &cobra.Command{
-	Use:     "dec <kernelcache>",
-	Short:   "Decompress a kernelcache",
-	Args:    cobra.MinimumNArgs(1),
-	Aliases: []string{"decompress"},
+func init() {
+	KernelcacheCmd.AddCommand(kernelDecCmd)
+	kernelDecCmd.Flags().StringP("output", "o", "", "Output file")
+	kernelDecCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
+}
+
+// kernelDecCmd represents the dec command
+var kernelDecCmd = &cobra.Command{
+	Use:           "dec <kernelcache>",
+	Short:         "Decompress a kernelcache",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		outputDir, _ := cmd.Flags().GetString("output")
 
 		kcpath := filepath.Clean(args[0])
 
@@ -56,7 +72,12 @@ var decCmd = &cobra.Command{
 			return fmt.Errorf("file %s does not exist", kcpath)
 		}
 
+		if isImg4(kcpath) {
+			log.Info("Decompressing KernelManagement kernelcache")
+			return kernelcache.DecompressKernelManagement(kcpath, outputDir)
+		}
+
 		log.Info("Decompressing kernelcache")
-		return kernelcache.Decompress(kcpath)
+		return kernelcache.Decompress(kcpath, outputDir)
 	},
 }

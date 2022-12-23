@@ -81,7 +81,7 @@ func init() {
 	viper.BindPFlag("download.build", DownloadCmd.Flags().Lookup("build"))
 }
 
-func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
+func filterIPSWs(cmd *cobra.Command, macos bool) ([]download.IPSW, error) {
 
 	var err error
 	var ipsws []download.IPSW
@@ -129,6 +129,13 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to query ipsw.me api for ALL ipsws for version %s: %v", version, err)
 		}
+		var buildFiltered []download.IPSW
+		for _, i := range ipsws {
+			if strings.EqualFold(build, i.BuildID) {
+				buildFiltered = append(buildFiltered, i)
+			}
+		}
+		ipsws = buildFiltered
 	} else if len(device) > 0 {
 		ipsws, err = download.GetDeviceIPSWs(device)
 		if err != nil {
@@ -158,6 +165,16 @@ func filterIPSWs(cmd *cobra.Command) ([]download.IPSW, error) {
 				filteredIPSWs = append(filteredIPSWs, i)
 			}
 		}
+	}
+
+	if macos {
+		var furtherFilteredIPSWs []download.IPSW
+		for _, i := range filteredIPSWs {
+			if strings.Contains(i.Identifier, "Mac") {
+				furtherFilteredIPSWs = append(furtherFilteredIPSWs, i)
+			}
+		}
+		filteredIPSWs = furtherFilteredIPSWs
 	}
 
 	unique := make(map[string]bool, len(filteredIPSWs))

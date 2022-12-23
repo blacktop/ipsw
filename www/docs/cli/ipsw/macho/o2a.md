@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: o2a
 description: Convert MachO offset to address
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw macho o2a
@@ -30,7 +30,7 @@ ipsw macho o2a <macho> <offset> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 

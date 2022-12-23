@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: kexts
 description: List kernel extentions
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw kernel kexts
@@ -28,7 +28,7 @@ ipsw kernel kexts <kernelcache> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 

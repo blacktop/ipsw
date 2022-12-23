@@ -26,11 +26,11 @@ import (
 )
 
 func init() {
-	IDevCmd.AddCommand(backupRestoreCmd)
+	IDevCmd.AddCommand(RestoreCmd)
 }
 
-// restoreCmd represents the restore command
-var restoreCmd = &cobra.Command{
+// RestoreCmd represents the restore command
+var RestoreCmd = &cobra.Command{
 	Use:   "restore",
 	Short: "Restore commands",
 	Args:  cobra.NoArgs,

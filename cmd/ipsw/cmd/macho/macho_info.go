@@ -39,6 +39,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fullsailor/pkcs7"
@@ -61,6 +62,7 @@ func init() {
 	machoInfoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
 	machoInfoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	machoInfoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
+	machoInfoCmd.Flags().BoolP("split-seg", "g", false, "Print split seg info")
 	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
 	machoInfoCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
@@ -78,6 +80,7 @@ func init() {
 	viper.BindPFlag("macho.info.starts", machoInfoCmd.Flags().Lookup("starts"))
 	viper.BindPFlag("macho.info.strings", machoInfoCmd.Flags().Lookup("strings"))
 	viper.BindPFlag("macho.info.fixups", machoInfoCmd.Flags().Lookup("fixups"))
+	viper.BindPFlag("macho.info.split-seg", machoInfoCmd.Flags().Lookup("split-seg"))
 	viper.BindPFlag("macho.info.fileset-entry", machoInfoCmd.Flags().Lookup("fileset-entry"))
 	viper.BindPFlag("macho.info.extract-fileset-entry", machoInfoCmd.Flags().Lookup("extract-fileset-entry"))
 	viper.BindPFlag("macho.info.all-fileset-entries", machoInfoCmd.Flags().Lookup("all-fileset-entries"))
@@ -89,10 +92,12 @@ func init() {
 
 // machoInfoCmd represents the macho command
 var machoInfoCmd = &cobra.Command{
-	Use:          "info <macho>",
-	Short:        "Explore a MachO file",
-	Args:         cobra.MinimumNArgs(1),
-	SilenceUsage: true,
+	Use:           "info <macho>",
+	Aliases:       []string{"i"},
+	Short:         "Explore a MachO file",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File
@@ -114,6 +119,7 @@ var machoInfoCmd = &cobra.Command{
 		showFuncStarts := viper.GetBool("macho.info.starts")
 		dumpStrings := viper.GetBool("macho.info.strings")
 		showFixups := viper.GetBool("macho.info.fixups")
+		showSplitSeg := viper.GetBool("macho.info.split-seg")
 		filesetEntry := viper.GetString("macho.info.fileset-entry")
 		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
 		dumpCert := viper.GetBool("macho.info.dump-cert")
@@ -123,13 +129,14 @@ var machoInfoCmd = &cobra.Command{
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
 		}
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
-		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings
-		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings
-		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings
-		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings
-		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings && !showSplitSeg
+		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
+		onlySplitSegs := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && showSplitSeg
 
 		machoPath := filepath.Clean(args[0])
 
@@ -140,6 +147,10 @@ var machoInfoCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+		}
+
+		if ok, err := magic.IsMachO(machoPath); !ok {
+			return fmt.Errorf(err.Error())
 		}
 
 		// first check for fat file
@@ -241,8 +252,7 @@ var machoInfoCmd = &cobra.Command{
 				}
 
 				if extractfilesetEntry {
-					err = m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil) // TODO: do I want to add any extra syms?
-					if err != nil {
+					if err := m.Export(filepath.Join(folder, filesetEntry), dcf, baseAddress, nil); err != nil { // TODO: do I want to add any extra syms?
 						return fmt.Errorf("failed to export entry MachO %s; %v", filesetEntry, err)
 					}
 					log.Infof("Created %s", filepath.Join(folder, filesetEntry))
@@ -267,7 +277,7 @@ var machoInfoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings) {
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg) {
 			fmt.Println(m.FileTOC.String())
 		} else {
 			if len(filesetEntry) == 0 && !viper.GetBool("macho.info.all-fileset-entries") {
@@ -546,13 +556,23 @@ var machoInfoCmd = &cobra.Command{
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 						log.Error(err.Error())
 					}
-					if methods, err := m.GetObjCMethodNames(); err == nil {
-						fmt.Printf("\n@methods\n")
-						for method, vmaddr := range methods {
-							fmt.Printf("0x%011x: %s\n", vmaddr, method)
+					if viper.GetBool("verbose") {
+						if classes, err := m.GetObjCClassNames(); err == nil {
+							fmt.Printf("\n@objc_classname\n")
+							for vmaddr, className := range classes {
+								fmt.Printf("0x%011x: %s\n", vmaddr, className)
+							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
 						}
-					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
+						if methods, err := m.GetObjCMethodNames(); err == nil {
+							fmt.Printf("\n@objc_methname\n")
+							for vmaddr, method := range methods {
+								fmt.Printf("0x%011x: %s\n", vmaddr, method)
+							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
+						}
 					}
 				}
 			} else {
@@ -667,6 +687,31 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				fmt.Println("  - no fixups")
 			}
+		}
+
+		if showSplitSeg {
+			if !onlySplitSegs {
+				fmt.Println("SEGMENT_SPLIT_INFO")
+				fmt.Println("==================")
+			}
+			var sections []macho.Section
+			for _, l := range m.Loads {
+				if s, ok := l.(*macho.Segment); ok {
+					for j := uint32(0); j < s.Nsect; j++ {
+						sections = append(sections, *m.Sections[j+s.Firstsect])
+					}
+				}
+			}
+			m.ForEachV2SplitSegReference(func(fromSectionIndex, fromSectionOffset, toSectionIndex, toSectionOffset uint64, kind types.SplitInfoKind) {
+				fmt.Printf("%16s.%-16s %#08x  =>  %16s.%-16s %#08x\tkind(%s)\n",
+					sections[fromSectionIndex-1].Seg,
+					sections[fromSectionIndex-1].Name,
+					sections[fromSectionIndex-1].Addr+fromSectionOffset,
+					sections[toSectionIndex-1].Seg,
+					sections[toSectionIndex-1].Name,
+					sections[toSectionIndex-1].Addr+toSectionOffset,
+					kind)
+			})
 		}
 
 		if dumpStrings {

@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: ipsw
 description: Download and Parse IPSWs (and SO much more)
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw
@@ -17,7 +17,7 @@ Download and Parse IPSWs (and SO much more)
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -h, --help            help for ipsw
   -V, --verbose         verbose output
 ```

@@ -1,2 +1,0 @@
-# Parse OTAs
-

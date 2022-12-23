@@ -293,14 +293,20 @@ type getValueRequest struct {
 }
 
 type getValueResponse struct {
-	Request string
+	Domain  string `plist:"Domain,omitempty"`
+	Error   string `plist:"Error,omitempty"`
+	Key     string `plist:"Key,omitempty"`
+	Request string `plist:"Request,omitempty"`
 	Result  string `plist:"Result,omitempty"`
 	Value   *DeviceValues
 }
 
 type getBoolResponse struct {
-	Request string
-	Value   bool
+	Domain  string `plist:"Domain,omitempty"`
+	Error   string `plist:"Error,omitempty"`
+	Key     string `plist:"Key,omitempty"`
+	Request string `plist:"Request,omitempty"`
+	Value   bool   `plist:"Value,omitempty"`
 }
 
 type wifiConnections struct {
@@ -402,6 +408,9 @@ func (lc *Client) DeveloperModeEnabled() (bool, error) {
 	var resp getBoolResponse
 	if err := lc.Request(req, &resp); err != nil {
 		return false, err
+	}
+	if resp.Error == "MissingValue" { // this is a device without developer mode support
+		return true, nil
 	}
 	return resp.Value, nil
 }

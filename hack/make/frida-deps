@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+if [[ "${TRACE-0}" == "1" ]]; then
+    set -o xtrace
+fi
+
+FRIDA_VERSION=""
+
+if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+    echo 'Usage: hack/make/frida-deps
+
+This script downloads and unpacks the latest frida-core-devkits for macOS.
+
+'
+    exit
+fi
+
+get_version() {
+    FRIDA_VERSION=$(gh release view --json tagName -q '.tagName' --repo frida/frida)
+    echo "  [!] Updating to version: $FRIDA_VERSION"
+}
+
+change_version() {
+    echo "  [!] Updating version in cmd/ipsw/cmd/frida/frida.go"
+    sed -i '' "s/const fridaVersion = \".*\"/const fridaVersion = \"$FRIDA_VERSION\"/" cmd/ipsw/cmd/frida/frida.go
+}
+
+update_frida() {
+    echo "  [!] Updating frida-core-devkit (ARM64)"
+    gh release download --pattern 'frida-core-devkit-*-macos-arm64.tar.xz' --repo frida/frida --dir /tmp --skip-existing
+    gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /opt/homebrew/lib libfrida-core.a
+    gunzip -c /tmp/frida-core-devkit-*-macos-arm64.tar.xz | tar -xf - -C /opt/homebrew/include frida-core.h
+    echo "  [!] Updating frida-core-devkit (x86_64)"
+    gh release download --pattern 'frida-core-devkit-*-macos-x86_64.tar.xz' --repo frida/frida --dir /tmp --skip-existing
+    gunzip -c /tmp/frida-core-devkit-*-macos-x86_64.tar.xz | tar -xf - -C /usr/local/homebrew/lib libfrida-core.a
+    gunzip -c /tmp/frida-core-devkit-*-macos-x86_64.tar.xz | tar -xf - -C /usr/local/homebrew/include frida-core.h
+}
+
+main() {
+    get_version
+    change_version
+    update_frida
+    echo "  🎉 Done!"
+}
+
+main "$@"

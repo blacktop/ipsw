@@ -35,11 +35,17 @@ import (
 
 func init() {
 	DyldCmd.AddCommand(SwiftCmd)
-	SwiftCmd.Flags().BoolP("types", "t", false, "Print the types")
-	// SwiftCmd.Flags().BoolP("sel", "s", false, "Print the selectors")
-	// SwiftCmd.Flags().BoolP("proto", "p", false, "Print the protocols")
-	// SwiftCmd.Flags().BoolP("imp-cache", "i", false, "Print the imp-caches")
+	SwiftCmd.Flags().BoolP("types", "t", false, "Print the type conformances")
+	SwiftCmd.Flags().BoolP("metadata", "m", false, "Print the metadata conformances")
+	SwiftCmd.Flags().BoolP("foreign", "f", false, "Print the foreign type conformances")
+	SwiftCmd.Flags().BoolP("demangle", "d", false, "Demangle the Swift symbols")
+	SwiftCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+
 	viper.BindPFlag("dyld.swift.types", SwiftCmd.Flags().Lookup("types"))
+	viper.BindPFlag("dyld.swift.metadata", SwiftCmd.Flags().Lookup("metadata"))
+	viper.BindPFlag("dyld.swift.foreign", SwiftCmd.Flags().Lookup("foreign"))
+	viper.BindPFlag("dyld.swift.demangle", SwiftCmd.Flags().Lookup("demangle"))
+	viper.BindPFlag("dyld.swift.cache", SwiftCmd.Flags().Lookup("cache"))
 
 	SwiftCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -47,10 +53,9 @@ func init() {
 // SwiftCmd represents the swift command
 var SwiftCmd = &cobra.Command{
 	Use:           "swift",
-	Short:         "Dump Swift Optimization Info",
+	Short:         "Dump Swift Optimizations Info",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -84,8 +89,27 @@ var SwiftCmd = &cobra.Command{
 		}
 		defer f.Close()
 
+		cacheFile := viper.GetString("dyld.swift.cache")
+
+		if len(cacheFile) == 0 {
+			cacheFile = dscPath + ".a2s"
+		}
+		if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+			return err
+		}
+
 		if viper.GetBool("dyld.swift.types") {
-			if _, err := f.GetAllSwiftTypes(true); err != nil {
+			if err := f.GetAllSwiftTypes(true, viper.GetBool("dyld.swift.demangle")); err != nil {
+				return fmt.Errorf("failed to get swift types: %w", err)
+			}
+		}
+		if viper.GetBool("dyld.swift.metadata") {
+			if err := f.GetAllSwiftMetadatas(true, viper.GetBool("dyld.swift.demangle")); err != nil {
+				return fmt.Errorf("failed to get swift types: %w", err)
+			}
+		}
+		if viper.GetBool("dyld.swift.foreign") {
+			if err := f.GetAllSwiftForeignTypes(true, viper.GetBool("dyld.swift.demangle")); err != nil {
 				return fmt.Errorf("failed to get swift types: %w", err)
 			}
 		}

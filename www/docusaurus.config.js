@@ -28,12 +28,6 @@ const config = {
     locales: ["en"],
   },
 
-  markdown: {
-    mermaid: true,
-  },
-
-  themes: ["@docusaurus/theme-mermaid"],
-
   presets: [
     [
       "classic",
@@ -87,21 +81,12 @@ const config = {
         themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
         additionalLanguages: ["armasm"],
       },
-      zoom: {
-        selector: ".markdown img:not(.not-zoom)",
-        background: {
-          light: "rgb(255, 255, 255)",
-          dark: "rgb(50, 50, 50)",
-        },
-        // medium-zoom configuration options
-        // Refer to https://github.com/francoischalifour/medium-zoom#options
-        config: {},
+      algolia: {
+        appId: "KYIBYORJ9P",
+        apiKey: "3affebe656f9ea5ea2f830e2747f5afc",
+        indexName: "ipsw",
+        contextualSearch: false,
       },
-      // algolia: {
-      //   appId: 'X1Z85QJPUV',
-      //   apiKey: 'bf7211c161e8205da2f933a02534105a',
-      //   indexName: 'docusaurus-2',
-      // },
       navbar: {
         hideOnScroll: true,
         title: "ipsw",
@@ -126,25 +111,6 @@ const config = {
             label: "CLI",
           },
           // Right
-          // {
-          //   type: "localeDropdown",
-          //   position: "right",
-          //   dropdownItemsAfter: [
-          //     {
-          //       type: "html",
-          //       value: '<hr style="margin: 0.3rem 0;">',
-          //     },
-          //     {
-          //       href: "https://github.com/facebook/docusaurus/issues/3526",
-          //       label: "Help Us Translate",
-          //     },
-          //   ],
-          // },
-          // {
-          //   type: "docsVersionDropdown",
-          //   position: "right",
-          //   dropdownActiveClassDisabled: true,
-          // },
           {
             href: "https://github.com/blacktop/ipsw",
             position: "right",
@@ -188,11 +154,11 @@ const config = {
             items: [
               {
                 label: "Discord",
-                href: "https://discordapp.com/invite/docusaurus",
+                href: "https://discord.gg/xx2y9yrcgs",
               },
               {
                 label: "Twitter",
-                href: "https://twitter.com/docusaurus",
+                href: "https://twitter.com/blacktop__",
               },
               {
                 label: "Mastodon",
@@ -209,7 +175,7 @@ const config = {
               },
               {
                 label: "GitHub",
-                href: "https://github.com/facebook/docusaurus",
+                href: "https://github.com/blacktop/ipsw",
               },
             ],
           },
@@ -217,8 +183,6 @@ const config = {
         copyright: `Copyright © ${new Date().getFullYear()} ipsw. Built with Go and ❤️`,
       },
     }),
-
-  plugins: ["docusaurus-plugin-image-zoom"],
 };
 
 module.exports = config;

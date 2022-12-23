@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: git
 description: Download github.com/orgs/apple-oss-distributions tarballs
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw download git
@@ -34,7 +34,7 @@ ipsw download git [flags]
       --black-list stringArray   iOS device black list
   -b, --build string             iOS BuildID (i.e. 16F203)
       --color                    colorize output
-      --config string            config file (default is $HOME/.ipsw.yaml)
+      --config string            config file (default is $HOME/.ipsw/config.yaml)
   -y, --confirm                  do not prompt user for confirmation
   -d, --device string            iOS Device (i.e. iPhone11,2)
       --insecure                 do not verify ssl certs

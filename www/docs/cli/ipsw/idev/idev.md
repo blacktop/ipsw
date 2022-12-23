@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: idev
 description: USB connected device commands
 last_update:
-  date: 2022-11-27T17:57:56-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw idev
@@ -28,7 +28,7 @@ ipsw idev [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 
@@ -50,7 +50,7 @@ ipsw idev [flags]
 * [ipsw idev prov](/docs/cli/ipsw/idev/prov)	 - Provision commands
 * [ipsw idev proxy](/docs/cli/ipsw/idev/proxy)	 - Create a TCP proxy (for ssh/debugging)
 * [ipsw idev ps](/docs/cli/ipsw/idev/ps)	 - Process list
-* [ipsw idev restore](/docs/cli/ipsw/idev/restore)	 - A brief description of your command
+* [ipsw idev restore](/docs/cli/ipsw/idev/restore)	 - Restore commands
 * [ipsw idev screen](/docs/cli/ipsw/idev/screen)	 - Dump screenshot as a PNG
 * [ipsw idev springb](/docs/cli/ipsw/idev/springb)	 - SpringBoard commands
 * [ipsw idev syslog](/docs/cli/ipsw/idev/syslog)	 - Dump syslog lines

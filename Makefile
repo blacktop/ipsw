@@ -43,13 +43,13 @@ snapshot: ## Run goreleaser snapshot
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
+	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --skip-validate
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
 	@echo " > Creating Release $(shell svu minor)"
 	@hack/make/release $(shell svu minor)
-	@goreleaser --rm-dist
+	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
 
 .PHONY: destroy
 destroy: ## Remove release from the CUR_VERSION
@@ -70,14 +70,14 @@ build-ios: ## Build ipsw for iOS
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
 .PHONY: docs
-docs: ## Build the hugo docs
-	@echo " > Building Docs"
-	hack/publish/gh-pages
+docs: ## Build the cli docs
+	@echo " > Updating CLI Docs"
+	hack/make/docs
 
 .PHONY: test-docs
-test-docs: ## Start local server hosting hugo docs
+test-docs: ## Start local server hosting docusaurus docs
 	@echo " > Testing Docs"
-	cd docs; hugo server -D
+	cd www; npm start
 
 .PHONY: update_mod
 update_mod: ## Update go.mod file
@@ -95,6 +95,11 @@ update_devs: ## Parse XCode database for new devices
 update_keys: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating firmware_keys.json"
 	CGO_ENABLED=0 $(GO_BIN) run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
+
+.PHONY: update_frida
+update_frida: ## Updates the frida-core-devkits used in the frida cmd
+	@echo " > Updating frida-core-devkits"
+	@hack/make/frida-deps
 
 .PHONY: docker
 docker: ## Build docker image
