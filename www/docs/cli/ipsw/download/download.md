@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: download
 description: Download Apple Firmware files (and more)
 last_update:
-  date: 2022-12-17T17:42:11-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw download
@@ -40,7 +40,7 @@ ipsw download [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 
@@ -49,6 +49,7 @@ ipsw download [flags]
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw download dev](/docs/cli/ipsw/download/dev)	 - Download IPSWs (and more) from https://developer.apple.com/download
 * [ipsw download git](/docs/cli/ipsw/download/git)	 - Download github.com/orgs/apple-oss-distributions tarballs
+* [ipsw download ipa](/docs/cli/ipsw/download/ipa)	 - Download App Packages from the iOS App Store
 * [ipsw download ipsw](/docs/cli/ipsw/download/ipsw)	 - Download and parse IPSW(s) from the internets
 * [ipsw download macos](/docs/cli/ipsw/download/macos)	 - Download macOS installers
 * [ipsw download ota](/docs/cli/ipsw/download/ota)	 - Download OTAs

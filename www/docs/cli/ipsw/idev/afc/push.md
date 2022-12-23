@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: push
 description: Push local file rooted at /var/mobile/Media
 last_update:
-  date: 2022-12-17T17:42:11-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw idev afc push
@@ -27,7 +27,7 @@ ipsw idev afc push <local file> <remote file> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -u, --udid string     Device UniqueDeviceID to connect to
   -V, --verbose         verbose output
 ```

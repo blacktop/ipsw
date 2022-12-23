@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: dev
 description: Download IPSWs (and more) from https://developer.apple.com/download
 last_update:
-  date: 2022-12-17T17:42:11-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw download dev
@@ -20,14 +20,16 @@ ipsw download dev [flags]
 ### Options
 
 ```
-  -h, --help                help for dev
-      --json                Output downloadable items as JSON
-      --more                Download 'More' OSs/Apps
-  -o, --output string       Folder to download files to
-  -p, --page int            Page size for file lists (default 20)
-      --pretty              Pretty print JSON
-      --sms                 Prefer SMS Two-factor authentication
-      --watch stringArray   dev portal type to watch
+  -h, --help                    help for dev
+      --json                    Output downloadable items as JSON
+      --more                    Download 'More' OSes/Apps
+      --os                      Download '*OS' OSes/Apps
+  -o, --output string           Folder to download files to
+  -p, --page int                Page size for file lists (default 20)
+      --pretty                  Pretty print JSON
+      --sms                     Prefer SMS Two-factor authentication
+  -k, --vault-password string   Password to unlock credential vault (only for file vaults)
+  -w, --watch stringArray       Developer portal group pattern to watch (i.e. '^iOS.*beta$')
 ```
 
 ### Options inherited from parent commands
@@ -36,7 +38,7 @@ ipsw download dev [flags]
       --black-list stringArray   iOS device black list
   -b, --build string             iOS BuildID (i.e. 16F203)
       --color                    colorize output
-      --config string            config file (default is $HOME/.ipsw.yaml)
+      --config string            config file (default is $HOME/.ipsw/config.yaml)
   -y, --confirm                  do not prompt user for confirmation
   -d, --device string            iOS Device (i.e. iPhone11,2)
       --insecure                 do not verify ssl certs

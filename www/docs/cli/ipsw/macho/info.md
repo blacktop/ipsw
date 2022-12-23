@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: info
 description: Explore a MachO file
 last_update:
-  date: 2022-12-17T17:42:11-07:00
+  date: 2022-12-23T02:36:33-07:00
   author: blacktop
 ---
 ## ipsw macho info
@@ -34,6 +34,7 @@ ipsw macho info <macho> [flags]
   -r, --objc-refs               Print ObjC references
       --output string           Directory to extract files to
   -s, --sig                     Print code signature
+  -g, --split-seg               Print split seg info
   -f, --starts                  Print function starts
   -c, --strings                 Print cstrings
   -n, --symbols                 Print symbols
@@ -43,7 +44,7 @@ ipsw macho info <macho> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 
