@@ -31,6 +31,7 @@ type Download struct {
 	URL      string
 	Sha1     string
 	DestName string
+	Headers  map[string]string
 
 	size         int64
 	bytesResumed int64
@@ -147,6 +148,12 @@ func (d *Download) Do() error {
 		return errors.Wrap(err, "cannot create http request")
 	}
 	req.Header.Add("User-Agent", utils.RandomAgent())
+
+	if d.Headers != nil {
+		for k, v := range d.Headers {
+			req.Header.Add(k, v)
+		}
+	}
 
 	if d.canResume {
 		if f, err := os.Stat(d.DestName + ".download"); !os.IsNotExist(err) {
