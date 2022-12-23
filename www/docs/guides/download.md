@@ -438,7 +438,7 @@ This is when ran on an OS that does not have a native Keychain, Credential Manag
 Watch for 🆕 **beta** IPSWs
 
 ```bash
-❯ ipsw download dev  --watch 'iOS.*beta'
+❯ ipsw download dev --watch 'iOS.*beta'
    • Downloading               file=iPhone11,8,iPhone12,1_15.0_19A5307g_Restore.ipsw
 	6.1 GiB / 6.1 GiB [==========================================================| ✅  ]  4.15 MiB/s
    <SNIP>
