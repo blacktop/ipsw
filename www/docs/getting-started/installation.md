@@ -23,6 +23,12 @@ import TabItem from '@theme/TabItem';
 brew install blacktop/tap/ipsw
 ```
 
+Install `frida` version
+
+```bash
+brew install blacktop/tap/ipsw-frida
+```
+
 ### Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
