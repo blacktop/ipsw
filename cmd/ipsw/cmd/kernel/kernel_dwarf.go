@@ -28,7 +28,7 @@ import (
 	"github.com/apex/log"
 	dwf "github.com/blacktop/go-dwarf"
 	"github.com/blacktop/go-macho"
-	"github.com/sergi/go-diff/diffmatchpatch"
+	"github.com/blacktop/ipsw/internal/utils"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -190,20 +190,15 @@ var dwarfCmd = &cobra.Command{
 					return fmt.Errorf("could not find type '%s' in either file", viper.GetString("kernel.dwarf.type"))
 				}
 
-				dmp := diffmatchpatch.New()
-
-				diffs := dmp.DiffMain(t1.Defn(), t2.Defn(), false)
-				if len(diffs) > 2 {
-					diffs = dmp.DiffCleanupSemantic(diffs)
-					diffs = dmp.DiffCleanupEfficiency(diffs)
+				out, err := utils.GitDiff(t1.Defn(), t2.Defn())
+				if err != nil {
+					return err
 				}
-				if len(diffs) == 1 {
-					if diffs[0].Type == diffmatchpatch.DiffEqual {
-						log.Info("No differences found")
-					}
+				if len(out) == 0 {
+					log.Info("No differences found")
 				} else {
 					log.Info("Differences found")
-					fmt.Println(dmp.DiffPrettyText(diffs))
+					fmt.Println(out)
 				}
 			}
 		} else if len(viper.GetString("kernel.dwarf.name")) > 0 {

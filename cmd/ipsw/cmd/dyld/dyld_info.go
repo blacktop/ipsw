@@ -27,16 +27,17 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -277,13 +278,14 @@ var InfoCmd = &cobra.Command{
 				}
 
 				var dout1 []string
-				for idx, img := range f.Images {
+				for _, img := range f.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
-					dout1 = append(dout1, fmt.Sprintf("%4d: (%s)\t%s", idx+1, m.SourceVersion().Version, img.Name))
+					dout1 = append(dout1, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
 				}
+				sort.Strings(dout1)
 
 				f2, err := dyld.Open(filepath.Clean(args[1]))
 				if err != nil {
@@ -292,31 +294,24 @@ var InfoCmd = &cobra.Command{
 				defer f.Close()
 
 				var dout2 []string
-				for idx, img := range f2.Images {
+				for _, img := range f2.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
-					dout2 = append(dout2, fmt.Sprintf("%4d: (%s)\t%s", idx+1, m.SourceVersion().Version, img.Name))
+					dout2 = append(dout2, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
 				}
+				sort.Strings(dout2)
 
-				dmp := diffmatchpatch.New()
-
-				diffs := dmp.DiffMain(strings.Join(dout1, "\n"), strings.Join(dout2, "\n"), false)
-				if len(diffs) > 2 {
-					diffs = dmp.DiffCleanupSemantic(diffs)
-					diffs = dmp.DiffCleanupEfficiency(diffs)
+				out, err := utils.GitDiff(strings.Join(dout1, "\n"), strings.Join(dout2, "\n"))
+				if err != nil {
+					return err
 				}
-
-				fmt.Println("Images")
-				fmt.Println("======")
-				if len(diffs) == 1 {
-					if diffs[0].Type == diffmatchpatch.DiffEqual {
-						log.Info("No differences found")
-					}
+				if len(out) == 0 {
+					log.Info("No differences found")
 				} else {
 					log.Info("Differences found")
-					fmt.Println(dmp.DiffPrettyText(diffs))
+					fmt.Println(out)
 				}
 			} else {
 				fmt.Println("Images")
