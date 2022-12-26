@@ -288,30 +288,17 @@ var entCmd = &cobra.Command{
 			} else {
 				found := false
 				for f2, e2 := range entDB2 { // DIFF ALL ENTITLEMENTS
-					if e, ok := entDB[f2]; ok {
-						diffs := dmp.DiffMain(e, e2, false)
-						if len(diffs) > 2 {
-							diffs = dmp.DiffCleanupSemantic(diffs)
-							diffs = dmp.DiffCleanupEfficiency(diffs)
+					if e1, ok := entDB[f2]; ok {
+						out, err := utils.GitDiff(e1, e2)
+						if err != nil {
+							return err
 						}
-						if len(diffs) == 0 {
+						if len(out) == 0 {
 							continue
-						} else if len(diffs) == 1 {
-							if diffs[0].Type == diffmatchpatch.DiffEqual {
-								continue
-							} else {
-								found = true
-								fmt.Printf("\n%s\n\n", f2)
-								fmt.Println(dmp.DiffPrettyText(diffs))
-							}
-						} else {
-							found = true
-							fmt.Printf("\n%s\n\n", f2)
-							fmt.Println(dmp.DiffPrettyText(diffs))
 						}
-					} else {
 						found = true
-						fmt.Printf("\n🆕 %s 🆕\n\n%s", f2, e2)
+						fmt.Printf("\n%s\n\n", f2)
+						fmt.Println(out)
 					}
 				}
 				if !found {
