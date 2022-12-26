@@ -38,6 +38,7 @@ import (
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -298,11 +299,11 @@ var entCmd = &cobra.Command{
 							continue
 						}
 						found = true
-						fmt.Printf("\n%s\n\n", f2)
+						color.New(color.Bold).Printf("\n%s\n\n", f2)
 						fmt.Println(out)
 					} else {
 						found = true
-						fmt.Printf("\n🆕 %s 🆕\n\n", f2)
+						color.New(color.Bold).Printf("\n🆕 %s 🆕\n\n", f2)
 						if len(e2) == 0 {
 							log.Warn("No entitlements (yet)")
 						} else {
