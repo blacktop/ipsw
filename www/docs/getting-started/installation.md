@@ -20,8 +20,12 @@ import TabItem from '@theme/TabItem';
 ### Via [homebrew](https://brew.sh)
 
 ```bash
-brew install blacktop/tap/ipsw
+brew install blacktop/tap/ipsw --with-git-delta
 ```
+
+:::info 
+`--with-git-delta` is optional and will install [git-delta](https://github.com/dandavison/delta) for better looking diffs.
+:::
 
 Install `frida` version
 
