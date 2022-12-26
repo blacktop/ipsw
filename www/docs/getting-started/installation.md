@@ -49,7 +49,9 @@ wget https://github.com/blacktop/ipsw/releases/download/v3.1.220/ipsw_3.1.221_ma
 tar xzf ipsw_3.1.221_macOS_arm64_extras.tar.gz
 ```
 
-> **NOTE:** The `extras` version is what is installed via homebrew by default.
+:::info 
+The `extras` version is what is installed via homebrew by default.
+:::
 
 ### Frida Version
 
