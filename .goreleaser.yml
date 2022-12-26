@@ -316,6 +316,8 @@ brews:
         type: optional
       - name: unicorn
         type: optional
+      - name: git-delta
+        type: optional
     conflicts:
       - ipsw-frida
     install: |
