@@ -60,10 +60,8 @@ wget https://github.com/blacktop/ipsw/releases/download/v3.1.221/ipsw_3.1.221_ma
 tar xzf ipsw_3.1.221_macOS_arm64_frida.tar.gz
 ```
 
-:::info 
-
-The **extras** and **frida** versions or `ipsw` only support macOS for now. *(Please let the author know if you want them supported on your platform)*
-
+:::caution 
+The **extras** and **frida** versions of `ipsw` only support macOS for now. *(Please let the author know if you want them supported on your platform)*
 :::
 
 ```mdx-code-block
