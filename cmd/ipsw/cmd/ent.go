@@ -32,6 +32,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
@@ -301,9 +302,13 @@ var entCmd = &cobra.Command{
 						fmt.Println(out)
 					} else {
 						found = true
-						fmt.Printf("\n🆕 %s 🆕\n\n%s", f2, e2)
+						fmt.Printf("\n🆕 %s 🆕\n\n", f2)
 						if len(e2) == 0 {
 							log.Warn("No entitlements (yet)")
+						} else {
+							if err := quick.Highlight(os.Stdout, e2, "xml", "terminal16m", "nord"); err != nil {
+								return err
+							}
 						}
 					}
 				}
