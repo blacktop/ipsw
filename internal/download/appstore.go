@@ -35,8 +35,8 @@ const (
 	url2faPrefex        = "https://p71-"
 	appStoreAuthURL     = urlPrefex + "buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
 	appStoreAuth2faURL  = url2faPrefex + "buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
-	appStorePurchaseURL = "https://buy.itunes.apple.com/WebObjects/MZBuy.woa/wa/buyProduct"
 	appStoreDownloadURL = urlPrefex + "buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
+	appStorePurchaseURL = "https://buy.itunes.apple.com/WebObjects/MZBuy.woa/wa/buyProduct"
 	appStoreSearchURL   = "https://itunes.apple.com/search"
 	appStoreLookupURL   = "https://itunes.apple.com/lookup"
 
@@ -260,7 +260,7 @@ func NewAppStore(config *AppStoreConfig) *AppStore {
 	return &as
 }
 
-// Init app
+// Init AppStore
 func (as *AppStore) Init() (err error) {
 	// create credential vault (if it doesn't exist)
 	as.Vault, err = keyring.Open(keyring.Config{
