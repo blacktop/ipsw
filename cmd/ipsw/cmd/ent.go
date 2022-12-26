@@ -299,6 +299,12 @@ var entCmd = &cobra.Command{
 						found = true
 						fmt.Printf("\n%s\n\n", f2)
 						fmt.Println(out)
+					} else {
+						found = true
+						fmt.Printf("\n🆕 %s 🆕\n\n%s", f2, e2)
+						if len(e2) == 0 {
+							log.Warn("No entitlements (yet)")
+						}
 					}
 				}
 				if !found {
