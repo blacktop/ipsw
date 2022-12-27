@@ -425,11 +425,11 @@ Download IPSWs (and more) from https://developer.apple.com/download
         42.11 MiB / 6.27 GiB [----------------------------------------------------------| 20m56s ]  1.54 MiB/s
 ```
 
-:::info vault
+:::info vaults
 Your Developer Portal credentials and session are stored securely in your Keychain on macOS; in your Windows Credential Manager on Windows and in your Linux Keyring on Linux.
 :::
 
-:::caution
+:::caution note
 The `--vault-password` flag is the encryption password for the **file** based vaults that will be placed encrypted in the `~/.ipsw` directory. This is **NOT** for your Developer Portal credentials.  
 
 This is when ran on an OS that does not have a native Keychain, Credential Manager or Keyring etc.
@@ -444,7 +444,9 @@ Watch for 🆕 **beta** IPSWs
    <SNIP>
 ```
 
-> **NOTE:** This will check every 5 minutes for new files and download them. (I've seem apple expire the session and am not sure how to prevent it yet.)
+:::info NOTE
+This will check every 5 minutes for new files and download them.
+:::
 
 Output downloadable items as JSON
 
