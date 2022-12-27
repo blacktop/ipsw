@@ -15,6 +15,18 @@ description: How to symbolicate crashlogs.
    ⨯ please supply a dyld_shared_cache for iPhone12,1 running 14.5 (18E5154f)
 ```
 
+You can download the required `dyld_shared_cache` like so
+
+```bash
+❯ ipsw download ipsw --device iPhone12,1 --version 14.5
+```
+
+To extract the `dyld_shared_cache` from the downloaded IPSW file
+
+```bash
+❯ ipsw extract --dyld <IPSW.ipsw>
+```
+
 You can download the current `beta` shared caches like so
 
 ```bash
@@ -23,6 +35,8 @@ You can download the current `beta` shared caches like so
    • Parsing remote OTA        build=18E5154f device=iPhone12,1 iPhone11,8 version=iOS145DevBeta2
    • Extracting remote dyld_shared_cache (can be a bit CPU intensive)
 ```
+
+Now you can symbolicate the crashlog
 
 ```bash
 ❯ ipsw symbolicate solitaire-2021-02-23-185510.ips dyld_shared_cache_arm64e
@@ -77,4 +91,6 @@ Thread 45 State:
    esr: 0x92000004
 ```
 
-> **NOTE:** You can use the `--unslide` flag to unslide the crashlog for easier static analysis
+:::info 
+You can use the `--unslide` flag to unslide the crashlog for easier static analysis
+:::
