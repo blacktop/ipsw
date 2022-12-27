@@ -1,5 +1,6 @@
 ---
 description: How to extract the files you need from OTAs.
+hide_table_of_contents: true
 ---
 
 # Parse OTAs
@@ -62,7 +63,7 @@ iPhone 14 Pro
 #### List files in OTA
 
 ```bash
-❯ ipsw ota ls iPhone15,2_1418867a3b673659e7bcd30c3823ff997b4ba990.zip | head
+❯ ipsw ota ls OTA.zip | head
    • Listing files in OTA zip...
 [ OTA zip files ] --------------------------------------------------
 -rw-r--r-- 2022-11-28T05:58:49-07:00 3.9 kB Info.plist
@@ -86,21 +87,19 @@ See if `dyld` is in the OTA files
 -rwxr-xr-x 2022-11-28T00:43:03-07:00 926 kB usr/lib/dyld
 ```
 
-#### Extract file(s) from OTA payloads
+#### Extract file(s) from OTA payloads that match a regex pattern
 
 ```bash
-❯ ipsw ota extract test-caches/30f4510f7fa8e1ecfb8d137f6081a8691cfc28b5.zip '^System/Library/.*/dyld_shared_cache.*$'
+❯ ipsw ota extract OTA.zip '^System/Library/.*/dyld_shared_cache.*$'
    • Extracting ^System/Library/.*/dyld_shared_cache.*$...
       • Extracting -rwxr-xr-x   1.5 GB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e
       • Extracting -rwxr-xr-x   787 MB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.1 to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e.1
       • Extracting -rwxr-xr-x   480 MB  /System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e.symbols to iPhone14,2_D63AP_19C5026i/dyld_shared_cache_arm64e.symbols
 ```
 
-:::info 
-You can supply a regex to match *(see `re_format(7)`)*
+:::info
+:new: iOS 16.x/macOS 13.x OTAs now contain a RIDIFF10 cryptex volumes that contain the `dyld_shared_cache` files
 :::
-
-### :new: iOS 16.x/macOS 13.x OTAs now contain a RIDIFF10 cryptex volumes that contain the `dyld_shared_cache` files
 
 #### Extract file(s) from OTA RIDIFF10 cryptex volumes
 
@@ -147,8 +146,13 @@ You must first download and "patch" the base OTA file
 ```bash
 ❯ ipsw download ota --platform ios --device iPhone15,2 --beta
 ```
+```bash
+❯ ipsw ota patch iPhone15,2_17280b5c6122ee9c11e60081a2610e9766e8b892.zip --output /tmp/PATCHES
+   • Patching cryptex-app to /tmp/PATCHES/20C5049e__iPhone15,2/AppOS/098-19380-026.dmg
+   • Patching cryptex-system-arm64e to /tmp/PATCHES/20C5049e__iPhone15,2/SystemOS/098-18456-023.dmg
+```
 
-Now download the RSR OTA patch that belongs to the base OTA file
+Now download the corresponding RSR OTA patch that belongs to the base OTA file
 
 ```bash
 ❯ ipsw download ota --platform ios --device iPhone15,2 --build 20D5024e --beta --rsr 
@@ -171,9 +175,24 @@ First patch the base OTA file
 Now apply the patch to the base OTA file
 
 ```bash
-❯ ipsw ota patch OTA_RSR.zip --input /tmp/PATCHES/20C5049e__iPhone15,2 --output /tmp/RSR
+❯ ipsw ota patch --input /tmp/PATCHES/20C5049e__iPhone15,2 --output /tmp/PATCHES/ iPhone15,2_f3e5bd99446db9c96e89f740560fdb4dd4e3a503.zip 
+   • Patching cryptex-app to /tmp/PATCHES/20C7750490e__iPhone15,2/AppOS/098-50146-002.dmg
+   • Patching cryptex-system-arm64e to /tmp/PATCHES/20C7750490e__iPhone15,2/SystemOS/098-50080-002.dmg
 ```
 
-:::caution 
-For now the `ipsw ota patch` command will only work on **macOS Ventura** as it calls into a private API to apply the patch,  I plan on adding cross-platform support in the future
+```bash
+❯ tree /tmp/PATCHES/20C7750490e__iPhone15,2/
+/tmp/PATCHES/20C7750490e__iPhone15,2/
+├── AppOS
+│   └── 098-50146-002.dmg
+└── SystemOS
+    └── 098-50080-002.dmg
+
+3 directories, 2 files
+```
+
+Now you have the RSR patched files ready to start diffing :smirk: :tada:
+
+:::caution NOTE
+For now the `ipsw ota patch` command will only work on **macOS Ventura** as it calls into a private API to apply the patch.  We plan on adding cross-platform support in the future.
 :::
