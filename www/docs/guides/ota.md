@@ -168,12 +168,6 @@ To get the `--build` value, you can use `ipsw download ota --show-latest-build` 
 ```
 :::
 
-First patch the base OTA file
-
-```bash
-❯ ipsw ota patch OTA_BASE.zip --output /tmp/PATCHES
-```
-
 Now apply the patch to the base OTA file
 
 ```bash
