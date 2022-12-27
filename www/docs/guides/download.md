@@ -634,7 +634,9 @@ Download SHSH blobs from Apple
 ❯ ipsw download tss
 ```
 
-> ⚠️ **NOTICE:** this is still a WIP _(however `signed` check does work)_
+:::caution  note
+This is still a WIP _(however `signed` check does work)_
+:::
 
 Check the signing status of an **iOS** version
 
