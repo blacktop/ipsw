@@ -11,12 +11,14 @@ hide_table_of_contents: true
 ❯ ipsw download ota --platform ios --device iPhone15,2 --beta
 ```
 
-:::info
-If running on macOS you can also remotely extract the `dyld_shared_cache` from the :new: RIDIFF10 cryptex volume OTAs like so
+To only download the OTA's `dyld_shared_cache(s)` and `kernelcache`
 
 ```bash 
-❯ ipsw download ota --platform ios --device iPhone15,2 --beta --dyld
+❯ ipsw download ota --platform ios --device iPhone15,2 --beta --dyld --kernel
 ```
+
+:::caution NOTE
+If you are downloading OTAs for iOS16.x or macOS13.x or newer this will only work when ran on a **macOS Ventura** host as it calls into a private API to apply the patch.
 :::
 
 To download the latest RSR (Rapid Security Release) OTA
@@ -175,13 +177,13 @@ First patch the base OTA file
 Now apply the patch to the base OTA file
 
 ```bash
-❯ ipsw ota patch --input /tmp/PATCHES/20C5049e__iPhone15,2 --output /tmp/PATCHES/ iPhone15,2_f3e5bd99446db9c96e89f740560fdb4dd4e3a503.zip 
+❯ ipsw ota patch --input /tmp/PATCHES/20C5049e__iPhone15,2 --output /tmp/PATCHES/ RSR_OTA.zip 
    • Patching cryptex-app to /tmp/PATCHES/20C7750490e__iPhone15,2/AppOS/098-50146-002.dmg
    • Patching cryptex-system-arm64e to /tmp/PATCHES/20C7750490e__iPhone15,2/SystemOS/098-50080-002.dmg
 ```
 
 ```bash
-❯ tree /tmp/PATCHES/20C7750490e__iPhone15,2/
+❯ tree /tmp/PATCHES/20C7750490e__iPhone15,2/ # Notice the new build number
 /tmp/PATCHES/20C7750490e__iPhone15,2/
 ├── AppOS
 │   └── 098-50146-002.dmg
