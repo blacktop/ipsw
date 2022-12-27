@@ -89,7 +89,7 @@ See if `dyld` is in the OTA files
 -rwxr-xr-x 2022-11-28T00:43:03-07:00 926 kB usr/lib/dyld
 ```
 
-#### Extract file(s) from OTA payloads that match a regex pattern
+#### Extract file(s) from OTA zip *or* payloads that match a regex pattern
 
 ```bash
 ❯ ipsw ota extract OTA.zip '^System/Library/.*/dyld_shared_cache.*$'
