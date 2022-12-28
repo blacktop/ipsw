@@ -258,10 +258,15 @@ archives:
       - linux_arm64_build
       - windows_amd64_build
       - windows_arm64_build
-    replacements:
-      darwin: macOS
-      amd64: x86_64
-      all: universal
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "ios" }}iOS
+      {{- else }}{{ .Os }}{{ end }}
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "all" }}universal
+      {{- else }}{{ .Arch }}{{ end }}
     rlcp: true
     files:
       - README.md
@@ -275,10 +280,15 @@ archives:
       - darwin_arm64_extras_build
       # - linux_amd64_extras_build
       # - linux_arm64_extras_build
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
-    replacements:
-      darwin: macOS
-      amd64: x86_64
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "ios" }}iOS
+      {{- else }}{{ .Os }}{{ end }}
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "all" }}universal
+      {{- else }}{{ .Arch }}{{ end }}_extras
     rlcp: true
     files:
       - README.md
@@ -290,10 +300,15 @@ archives:
     builds:
       - darwin_amd64_frida_build
       - darwin_arm64_frida_build
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_frida"
-    replacements:
-      darwin: macOS
-      amd64: x86_64
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "ios" }}iOS
+      {{- else }}{{ .Os }}{{ end }}
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "all" }}universal
+      {{- else }}{{ .Arch }}{{ end }}_frida
     rlcp: true
     files:
       - README.md
@@ -426,8 +441,12 @@ nfpms:
         dst: /usr/share/doc/ipsw/copyright
         file_info:
           mode: 0644
-    replacements:
-      amd64: x86_64
+    file_name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
     formats:
       - deb
       - rpm
