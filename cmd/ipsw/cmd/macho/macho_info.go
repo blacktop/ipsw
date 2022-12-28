@@ -306,7 +306,7 @@ var machoInfoCmd = &cobra.Command{
 						}
 						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
 						fmt.Printf("\tVersion:     %s%s\n"+
-							"\tFlags:       %s\n"+
+							"\tFlags:       %#x (%s)\n"+
 							"\tCodeLimit:   %#x\n"+
 							"\tIdentifier:  %s (@%#x)\n"+
 							"%s"+
@@ -315,6 +315,7 @@ var machoInfoCmd = &cobra.Command{
 							"\tHashes @%d size: %d Type: %s\n",
 							cd.Header.Version,
 							execSegFlags,
+							uint32(cd.Header.Flags),
 							cd.Header.Flags,
 							cd.Header.CodeLimit,
 							cd.ID,
@@ -605,31 +606,69 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			var sec string
+			var label string
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			if m.Symtab != nil {
+				label = "Symtab"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
 				for _, sym := range m.Symtab.Syms {
 					if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 						sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
 					}
-					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
-					// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+					var lib string
+					if sym.Desc.GetLibraryOrdinal() != types.SELF_LIBRARY_ORDINAL && sym.Desc.GetLibraryOrdinal() < types.MAX_LIBRARY_ORDINAL {
+						lib = fmt.Sprintf("\t(%s)", filepath.Base(m.ImportedLibraries()[sym.Desc.GetLibraryOrdinal()-1]))
+					}
+					if viper.GetBool("verbose") {
+						if sym.Value == 0 {
+							fmt.Fprintf(w, "              <%s> [%s]\t%s%s\n", sym.Type.String(sec), sym.Desc, sym.Name, lib)
+						} else {
+							fmt.Fprintf(w, "%#09x:  <%s> [%s]\t%s%s\n", sym.Value, sym.Type.String(sec), sym.Desc, sym.Name, lib)
+						}
+					} else {
+						if sym.Value == 0 {
+							fmt.Fprintf(w, "              <%s>\t%s%s\n", sym.Type.String(sec), sym.Name, lib)
+						} else {
+							fmt.Fprintf(w, "%#09x:  <%s>\t%s%s\n", sym.Value, sym.Type.String(sec), sym.Name, lib)
+						}
+					}
 				}
 				w.Flush()
 			} else {
 				fmt.Println("  - no symbol table")
 			}
 			if binds, err := m.GetBindInfo(); err == nil {
-				fmt.Printf("\nDyld Binds\n")
-				fmt.Println("----------")
+				label = "DyldInfo [Binds]"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
 				for _, bind := range binds {
-					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+					fmt.Fprintf(w, "%#09x:\t%s\n", bind.Start+bind.Offset, bind)
 				}
 				w.Flush()
 			}
-			// Dedup these symbols (has repeats but also additional symbols??)
-			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && viper.GetBool("verbose") {
-				fmt.Printf("\nDyld Exports\n")
-				fmt.Println("------------")
+			if rebases, err := m.GetRebaseInfo(); err == nil {
+				label = "DyldInfo [Rebases]"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
+				for _, rebase := range rebases {
+					fmt.Fprintf(w, "%#09x:\t%s\n", rebase.Start+rebase.Offset, rebase)
+				}
+				w.Flush()
+			}
+			if exports, err := m.GetExports(); err == nil {
+				label = "DyldInfo [Exports]"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
+				for _, export := range exports {
+					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
+				}
+				w.Flush()
+			}
+			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
+				label = "Dyld Exports Trie"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
 				exports, err := m.DyldExports()
 				if err != nil {
 					return err
