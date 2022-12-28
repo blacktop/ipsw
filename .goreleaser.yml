@@ -262,6 +262,7 @@ archives:
       darwin: macOS
       amd64: x86_64
       all: universal
+    rlcp: true
     files:
       - README.md
       - LICENSE
@@ -278,6 +279,7 @@ archives:
     replacements:
       darwin: macOS
       amd64: x86_64
+    rlcp: true
     files:
       - README.md
       - LICENSE
@@ -292,6 +294,7 @@ archives:
     replacements:
       darwin: macOS
       amd64: x86_64
+    rlcp: true
     files:
       - README.md
       - LICENSE
