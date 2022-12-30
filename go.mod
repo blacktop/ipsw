@@ -32,7 +32,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.2.0
-	github.com/shurcooL/githubv4 v0.0.0-20221203213311-70889c5dac07
+	github.com/shurcooL/githubv4 v0.0.0-20221229060216-a8d4a561cc93
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
@@ -49,7 +49,8 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-// replace github.com/blacktop/go-macho => ../go-macho
+replace github.com/blacktop/go-macho => ../go-macho
+
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 // replace github.com/unicorn-engine/unicorn => ./unicorn2
 
@@ -81,7 +82,7 @@ require (
 	github.com/kennygrant/sanitize v1.2.4 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.16 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/mtibben/percent v0.2.1 // indirect

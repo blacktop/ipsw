@@ -279,6 +279,11 @@ var machoInfoCmd = &cobra.Command{
 		}
 		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg) {
 			fmt.Println(m.FileTOC.String())
+			// dat, err := m.FileTOC.MarshalJSON()
+			// if err != nil {
+			// 	return fmt.Errorf("failed to marshal json: %v", err)
+			// }
+			// fmt.Println(string(dat))
 		} else {
 			if len(filesetEntry) == 0 && !viper.GetBool("macho.info.all-fileset-entries") {
 				if m.FileTOC.FileHeader.Type == types.MH_FILESET {
@@ -694,8 +699,8 @@ var machoInfoCmd = &cobra.Command{
 
 				for _, start := range dcf.Starts {
 					if start.PageStarts != nil {
-						var sec *macho.Section
-						var lastSec *macho.Section
+						var sec *types.Section
+						var lastSec *types.Section
 						for _, fixup := range start.Fixups {
 							switch f := fixup.(type) {
 							case fixupchains.Bind:
@@ -733,7 +738,7 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("SEGMENT_SPLIT_INFO")
 				fmt.Println("==================")
 			}
-			var sections []macho.Section
+			var sections []types.Section
 			for _, l := range m.Loads {
 				if s, ok := l.(*macho.Segment); ok {
 					for j := uint32(0); j < s.Nsect; j++ {

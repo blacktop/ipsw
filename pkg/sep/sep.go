@@ -380,7 +380,7 @@ func Parse(data []byte) error {
 			if err != nil {
 				return fmt.Errorf("failed to create MachO from embedded app file data: %w", err)
 			}
-			fmt.Println(m.FileTOC.LoadsString())
+			fmt.Println(m.FileTOC.String())
 
 			// vma := types.VMAddrConverter{
 			// 	Converter: func(addr uint64) uint64 {
