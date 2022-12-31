@@ -54,6 +54,7 @@ func init() {
 	machoInfoCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	machoInfoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
 	machoInfoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	machoInfoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	machoInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	machoInfoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	machoInfoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
@@ -72,6 +73,7 @@ func init() {
 	viper.BindPFlag("macho.info.arch", machoInfoCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.info.header", machoInfoCmd.Flags().Lookup("header"))
 	viper.BindPFlag("macho.info.loads", machoInfoCmd.Flags().Lookup("loads"))
+	viper.BindPFlag("macho.info.json", machoInfoCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.info.sig", machoInfoCmd.Flags().Lookup("sig"))
 	viper.BindPFlag("macho.info.ent", machoInfoCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("macho.info.objc", machoInfoCmd.Flags().Lookup("objc"))
@@ -278,12 +280,15 @@ var machoInfoCmd = &cobra.Command{
 			fmt.Println(m.FileHeader.String())
 		}
 		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg) {
-			fmt.Println(m.FileTOC.String())
-			// dat, err := m.FileTOC.MarshalJSON()
-			// if err != nil {
-			// 	return fmt.Errorf("failed to marshal json: %v", err)
-			// }
-			// fmt.Println(string(dat))
+			if viper.GetBool("macho.info.json") {
+				dat, err := m.FileTOC.MarshalJSON()
+				if err != nil {
+					return fmt.Errorf("failed to marshal json: %v", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				fmt.Println(m.FileTOC.String())
+			}
 		} else {
 			if len(filesetEntry) == 0 && !viper.GetBool("macho.info.all-fileset-entries") {
 				if m.FileTOC.FileHeader.Type == types.MH_FILESET {
