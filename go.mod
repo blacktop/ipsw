@@ -10,7 +10,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
 	github.com/blacktop/go-dwarf v1.0.7
-	github.com/blacktop/go-macho v1.1.116
+	github.com/blacktop/go-macho v1.1.117
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -18,7 +18,7 @@ require (
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fatih/color v1.13.0
-	github.com/frida/frida-go v0.5.0
+	github.com/frida/frida-go v0.5.2
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20220909211152-5a9ec94374f6
 	github.com/gocolly/colly/v2 v2.1.0
@@ -49,8 +49,10 @@ require (
 	gopkg.in/yaml.v3 v3.0.1
 )
 
-replace github.com/blacktop/go-macho => ../go-macho
+// TODO: remove this once https://github.com/spf13/cast/pull/155 is merged
+replace github.com/spf13/cast => github.com/blacktop/cast v1.5.1
 
+// replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 // replace github.com/unicorn-engine/unicorn => ./unicorn2
 
