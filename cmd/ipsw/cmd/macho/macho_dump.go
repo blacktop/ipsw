@@ -48,6 +48,7 @@ func init() {
 	machoDumpCmd.Flags().BoolP("addr", "v", false, "Output as addresses/uint64s")
 	machoDumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
 	machoDumpCmd.Flags().StringP("output", "o", "", "Output to a file")
+	machoDumpCmd.Flags().StringP("section", "x", "", "Dump a specific segment/section (i.e. __TEXT.__text)")
 
 	viper.BindPFlag("macho.dump.arch", machoDumpCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.dump.size", machoDumpCmd.Flags().Lookup("size"))
@@ -55,6 +56,7 @@ func init() {
 	viper.BindPFlag("macho.dump.addr", machoDumpCmd.Flags().Lookup("addr"))
 	viper.BindPFlag("macho.dump.bytes", machoDumpCmd.Flags().Lookup("bytes"))
 	viper.BindPFlag("macho.dump.output", machoDumpCmd.Flags().Lookup("output"))
+	viper.BindPFlag("macho.dump.section", machoDumpCmd.Flags().Lookup("section"))
 
 	machoDumpCmd.MarkZshCompPositionalArgumentFile(1)
 }
@@ -63,7 +65,7 @@ func init() {
 var machoDumpCmd = &cobra.Command{
 	Use:   "dump <macho> <address>",
 	Short: "Dump MachO data at given virtual address",
-	Args:  cobra.MinimumNArgs(2),
+	Args: cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
@@ -80,6 +82,7 @@ var machoDumpCmd = &cobra.Command{
 		asAddrs := viper.GetBool("macho.dump.addr")
 		asBytes := viper.GetBool("macho.dump.bytes")
 		outFile := viper.GetString("macho.dump.output")
+		segmentSection := viper.GetString("macho.dump.section")
 
 		color.NoColor = !viper.GetBool("color")
 
@@ -93,22 +96,8 @@ var machoDumpCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --bytes with --size")
 		}
 
-		if asAddrs {
-			if count == 0 {
-				log.Info("Setting --count=20")
-				count = 20
-			}
-			size = count * uint64(binary.Size(uint64(0)))
-		} else {
-			if size == 0 {
-				log.Info("Setting --size=256")
-				size = 256
-			}
-		}
-
-		addr, err := utils.ConvertStrToInt(args[1])
-		if err != nil {
-			return err
+		if err := cobra.ExactArgs(1)(cmd, args); err != nil && len(segmentSection) != 0 {
+			return fmt.Errorf("you can only use <address> OR --section");
 		}
 
 		machoPath := filepath.Clean(args[0])
@@ -151,6 +140,40 @@ var machoDumpCmd = &cobra.Command{
 				}
 				survey.AskOne(prompt, &choice)
 				m = fat.Arches[choice].File
+			}
+		}
+
+		var addr uint64
+		if len(segmentSection) != 0 {
+			parts := strings.Split(segmentSection, ".")
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid section")
+			}
+			if sec := m.Section(parts[0], parts[1]); sec != nil {
+				addr = sec.Addr
+				if size == 0 && count == 0 {
+					size = sec.Size
+				}
+			} else {
+				return fmt.Errorf("failed to find section %s", segmentSection)
+			}
+		} else {
+			addr, err = utils.ConvertStrToInt(args[1])
+			if err != nil {
+				return err
+			}
+		}
+
+		if asAddrs {
+			if count == 0 {
+				log.Info("Setting --count=20")
+				count = 20
+			}
+			size = count * uint64(binary.Size(uint64(0)))
+		} else {
+			if size == 0 {
+				log.Info("Setting --size=256")
+				size = 256
 			}
 		}
 
