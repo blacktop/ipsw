@@ -49,7 +49,7 @@ func NewTBD(f *dyld.File, image *dyld.CacheImage) (*TBD, error) {
 
 	return &TBD{
 		// TODO: do I need uuid?
-		UUID:     m.UUID().ID,
+		UUID:     m.UUID().UUID.String(),
 		Archs:    []string{archs},
 		Platform: strings.ToLower(f.Headers[f.UUID].Platform.String()),
 		Path:     image.Name,
