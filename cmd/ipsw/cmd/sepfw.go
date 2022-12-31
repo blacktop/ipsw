@@ -275,7 +275,7 @@ var sepCmd = &cobra.Command{
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
 			if Verbose {
-				fmt.Println(m.FileTOC.LoadsString())
+				fmt.Println(m.FileTOC.String())
 			}
 
 			// SEPOS
@@ -292,7 +292,7 @@ var sepCmd = &cobra.Command{
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
 			if Verbose {
-				fmt.Println(m.FileTOC.LoadsString())
+				fmt.Println(m.FileTOC.String())
 			}
 
 			// APPS
@@ -311,7 +311,7 @@ var sepCmd = &cobra.Command{
 					return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 				}
 				if Verbose {
-					fmt.Println(m.FileTOC.LoadsString())
+					fmt.Println(m.FileTOC.String())
 				}
 			}
 

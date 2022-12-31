@@ -46,6 +46,7 @@ func init() {
 	DyldCmd.AddCommand(MachoCmd)
 	MachoCmd.Flags().BoolP("all", "a", false, "Parse ALL dylibs")
 	MachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	MachoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	MachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	MachoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
 	MachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
@@ -125,6 +126,7 @@ var MachoCmd = &cobra.Command{
 		}
 
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
+		showLoadCommandsAsJSON, _ := cmd.Flags().GetBool("json")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
@@ -252,7 +254,15 @@ var MachoCmd = &cobra.Command{
 				}
 
 				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs && searchPattern == "" {
-					fmt.Println(m.FileTOC.String())
+					if showLoadCommandsAsJSON {
+						dat, err := m.FileTOC.MarshalJSON()
+						if err != nil {
+							return fmt.Errorf("failed to marshal MachO table of contents as JSON: %v", err)
+						}
+						fmt.Println(string(dat))
+					} else {
+						fmt.Println(m.FileTOC.String())
+					}
 				}
 
 				if showObjC {

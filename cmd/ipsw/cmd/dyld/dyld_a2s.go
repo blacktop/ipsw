@@ -149,11 +149,7 @@ var AddrToSymCmd = &cobra.Command{
 					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
 						if showImage {
 							fmt.Println(s)
-							secFlags := ""
-							if !c.Flags.IsRegular() {
-								secFlags = fmt.Sprintf("(%s)", c.Flags)
-							}
-							fmt.Printf("\tsz=0x%08x off=0x%08x-0x%08x addr=0x%09x-0x%09x\t\t%s.%-20v%s %s\n", c.Size, c.Offset, uint64(c.Offset)+c.Size, c.Addr, c.Addr+c.Size, s.Name, c.Name, c.Flags.AttributesString(), secFlags)
+							fmt.Println(c)
 						} else {
 							log.WithFields(log.Fields{
 								"dylib":   image.Name,
