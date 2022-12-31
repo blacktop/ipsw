@@ -175,11 +175,11 @@ var machoDumpCmd = &cobra.Command{
 					}
 					w := bufio.NewWriter(o)
 					for _, a := range addrs {
-						w.WriteString(fmt.Sprintf("%#x\n", a))
+						w.WriteString(fmt.Sprintf("%#x\n", m.SlidePointer(a)))
 					}
 				} else {
 					for _, a := range addrs {
-						fmt.Printf("%#x\n", a)
+						fmt.Printf("%#x\n", m.SlidePointer(a))
 					}
 				}
 			} else if asBytes {
