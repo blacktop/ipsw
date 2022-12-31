@@ -283,7 +283,7 @@ var machoInfoCmd = &cobra.Command{
 			if viper.GetBool("macho.info.json") {
 				dat, err := m.FileTOC.MarshalJSON()
 				if err != nil {
-					return fmt.Errorf("failed to marshal json: %v", err)
+					return fmt.Errorf("failed to marshal MachO table of contents as JSON: %v", err)
 				}
 				fmt.Println(string(dat))
 			} else {
