@@ -52,7 +52,8 @@ require (
 // TODO: remove this once https://github.com/spf13/cast/pull/155 is merged
 replace github.com/spf13/cast => github.com/blacktop/cast v1.5.1
 
-// replace github.com/blacktop/go-macho => ../go-macho
+replace github.com/blacktop/go-macho => ../go-macho
+
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 // replace github.com/unicorn-engine/unicorn => ./unicorn2
 
