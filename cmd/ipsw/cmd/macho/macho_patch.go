@@ -66,7 +66,7 @@ func confirm(path string, overwrite bool) bool {
 	}
 	yes := false
 	prompt := &survey.Confirm{
-		Message: fmt.Sprintf("You are about to overwrite %s. Continue?", filepath.Base(path)),
+		Message: fmt.Sprintf("You are about to overwrite %s. Continue?", path),
 	}
 	survey.AskOne(prompt, &yes)
 	return yes
@@ -84,7 +84,7 @@ func init() {
 var machoPatchCmd = &cobra.Command{
 	Use:           "patch [add|rm|mod] <MACHO> <LC> [OPTIONS]",
 	Short:         "Patch MachO Load Commands",
-	Args:          cobra.MinimumNArgs(4),
+	Args:          cobra.MinimumNArgs(3),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
@@ -137,8 +137,6 @@ var machoPatchCmd = &cobra.Command{
 		}
 		outPath := filepath.Join(folder, filepath.Base(machoPath))
 
-		outPath += ".patched"
-
 		if fat, err := macho.OpenFat(machoPath); err == nil { // UNIVERSAL MACHO
 			_ = fat // TODO: patch universal machos
 			return fmt.Errorf("universal machos are not supported yet")
@@ -158,12 +156,17 @@ var machoPatchCmd = &cobra.Command{
 		case "add":
 			log.Infof("adding load command %s to %s", loadCommand, machoPath)
 			switch loadCommand {
+			case "LC_ID_DYLIB":
+				m.FileHeader.Type = types.MH_DYLIB // set type to dylib
+				fallthrough
 			case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
 				if len(args) < 6 {
 					return fmt.Errorf("not enough arguments for adding %s; must supply PATH, CURRENT_VERSION and COMPAT_VERSION strings", loadCommand)
 				}
 				var lc types.LoadCmd
 				switch loadCommand {
+				case "LC_ID_DYLIB":
+					lc = types.LC_ID_DYLIB
 				case "LC_LOAD_DYLIB":
 					lc = types.LC_LOAD_DYLIB
 				case "LC_LOAD_WEAK_DYLIB":
@@ -183,10 +186,14 @@ var machoPatchCmd = &cobra.Command{
 				if err := compatVer.Set(args[5]); err != nil {
 					return fmt.Errorf("failed to parse compatibility version: %v", err)
 				}
+				sz := uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1)
+				if (sz % 8) != 0 {
+					sz += 8 - (sz % 8)
+				}
 				m.AddLoad(&macho.Dylib{
 					DylibCmd: types.DylibCmd{
 						LoadCmd:        lc,
-						Len:            uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1),
+						Len:            sz,
 						NameOffset:     0x18,
 						Timestamp:      2,
 						CurrentVersion: currVer,
@@ -195,29 +202,51 @@ var machoPatchCmd = &cobra.Command{
 					Name: args[3],
 				})
 			case "LC_RPATH":
-				if len(args) < 5 {
+				if len(args) < 4 {
 					return fmt.Errorf("not enough arguments for adding %s; must supply PATH string", loadCommand)
 				}
+				sz := uint32(binary.Size(types.RpathCmd{}) + len(args[3]) + 1)
+				if (sz % 8) != 0 {
+					sz += 8 - (sz % 8)
+				}
 				m.AddLoad(&macho.Rpath{
-					Path: args[4],
+					RpathCmd: types.RpathCmd{
+						LoadCmd:    types.LC_RPATH,
+						Len:        sz,
+						PathOffset: 0xC,
+					},
+					Path: args[3],
 				})
 			case "LC_BUILD_VERSION":
 				if len(args) < 5 {
 					return fmt.Errorf("not enough arguments for adding %s; must supply PLATFORM, MINOS, SDK strings and TOOLS via --tools", loadCommand)
 				}
-				panic("not implemented yet")
+				var minos types.Version
+				if err := minos.Set(args[3]); err != nil {
+					return fmt.Errorf("failed to parse min OS version: %v", err)
+				}
+				var sdk types.Version
+				if err := sdk.Set(args[4]); err != nil {
+					return fmt.Errorf("failed to parse SDK version: %v", err)
+				}
+				var toolVer types.Version
+				if err := toolVer.Set(args[5]); err != nil {
+					return fmt.Errorf("failed to parse tool version: %v", err)
+				}
 				m.AddLoad(&macho.BuildVersion{
 					BuildVersionCmd: types.BuildVersionCmd{
+						LoadCmd:  types.LC_BUILD_VERSION,
+						Len:      uint32(binary.Size(types.BuildVersionCmd{}) + binary.Size(types.BuildVersionTool{})),
 						Platform: 1,
-						// Minos:    types.Version{Major: 10, Minor: 15, Patch: 0},
-						// Sdk:      types.Version{Major: 11, Minor: 0, Patch: 0},
-						// Tools: []types.BuildToolVersion{
-						// 	{
-						// 		Tool:    1,
-						// 		Version: types.Version{Major: 11, Minor: 0, Patch: 0},
-						// 	},
-						// },
+						Minos:    minos,
+						Sdk:      sdk,
 						NumTools: 1,
+					},
+					Tools: []types.BuildVersionTool{
+						{
+							Tool:    1,
+							Version: toolVer,
+						},
 					},
 				})
 			default:
@@ -226,13 +255,23 @@ var machoPatchCmd = &cobra.Command{
 		case "rm":
 			log.Infof("deleting load command %s from %s", loadCommand, machoPath)
 			switch loadCommand {
-			case "LC_LOAD_DYLIB",
-				"LC_LOAD_WEAK_DYLIB",
-				"LC_REEXPORT_DYLIB",
-				"LC_LAZY_LOAD_DYLIB",
-				"LC_LOAD_UPWARD_DYLIB":
+			case "LC_ID_DYLIB":
+				if m.FileHeader.Type == types.MH_DYLIB {
+					m.FileHeader.Type = types.MH_EXECUTE // set type to executable to remove LC_ID_DYLIB
+				}
+				fallthrough
+			case "LC_BUILD_VERSION":
 				for _, lc := range m.GetLoadsByName(loadCommand) {
-					if lc.(*macho.LoadDylib).Name == args[3] {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
+				}
+			case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB", "LC_RPATH":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for removing %s; must supply PATH string", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.Dylib).Name == args[3] {
 						if err := m.RemoveLoad(lc); err != nil {
 							return fmt.Errorf("failed to remove load command: %v", err)
 						}
@@ -248,6 +287,17 @@ var machoPatchCmd = &cobra.Command{
 			case "LC_ID_DYLIB":
 				if m.FileHeader.Type != types.MH_DYLIB {
 					return fmt.Errorf("you can only modify LC_ID_DYLIB in a dylib")
+				}
+			case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.LoadDylib).Name == args[3] {
+						sz := uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1)
+						if (sz % 8) != 0 {
+							sz += 8 - (sz % 8)
+						}
+						lc.(*macho.LoadDylib).Len = sz
+						lc.(*macho.LoadDylib).Name = args[4]
+					}
 				}
 			default:
 				return fmt.Errorf("unsupported load command for action '%s': %s", action, loadCommand)
