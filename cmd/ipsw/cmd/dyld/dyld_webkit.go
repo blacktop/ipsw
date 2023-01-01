@@ -111,7 +111,7 @@ var WebkitCmd = &cobra.Command{
 
 		if getRev {
 			log.Info("Querying https://trac.webkit.org...")
-			ver, rev, err := dyld.ScrapeWebKitTRAC(m.SourceVersion().Version)
+			ver, rev, err := dyld.ScrapeWebKitTRAC(m.SourceVersion().Version.String())
 			if err != nil {
 				log.Infof("WebKit Version: %s", m.SourceVersion().Version)
 				return err
@@ -135,7 +135,7 @@ var WebkitCmd = &cobra.Command{
 				}
 			}
 			for _, tag := range tags {
-				if strings.Contains(tag.Name, m.SourceVersion().Version) {
+				if strings.Contains(tag.Name, m.SourceVersion().Version.String()) {
 					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))

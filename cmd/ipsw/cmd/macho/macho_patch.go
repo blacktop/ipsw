@@ -185,13 +185,14 @@ var machoPatchCmd = &cobra.Command{
 				}
 				m.AddLoad(&macho.Dylib{
 					DylibCmd: types.DylibCmd{
-						LoadCmd: lc,
-						Len:     uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1),
+						LoadCmd:        lc,
+						Len:            uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1),
+						NameOffset:     0x18,
+						Timestamp:      2,
+						CurrentVersion: currVer,
+						CompatVersion:  compatVer,
 					},
-					Name:           args[3],
-					Timestamp:      2,
-					CurrentVersion: currVer,
-					CompatVersion:  compatVer,
+					Name: args[3],
 				})
 			case "LC_RPATH":
 				if len(args) < 5 {

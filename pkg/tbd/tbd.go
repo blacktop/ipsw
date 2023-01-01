@@ -53,7 +53,7 @@ func NewTBD(f *dyld.File, image *dyld.CacheImage) (*TBD, error) {
 		Archs:    []string{archs},
 		Platform: strings.ToLower(f.Headers[f.UUID].Platform.String()),
 		Path:     image.Name,
-		Version:  m.SourceVersion().Version,
+		Version:  m.SourceVersion().Version.String(),
 		Symbols:  syms,
 	}, nil
 }

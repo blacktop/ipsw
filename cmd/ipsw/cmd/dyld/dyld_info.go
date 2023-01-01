@@ -159,7 +159,7 @@ var InfoCmd = &cobra.Command{
 					dinfo.Dylibs = append(dinfo.Dylibs, dylib{
 						Index:       idx + 1,
 						Name:        img.Name,
-						Version:     m.SourceVersion().Version,
+						Version:     m.SourceVersion().Version.String(),
 						UUID:        m.UUID().String(),
 						LoadAddress: img.Info.Address,
 					})
@@ -345,7 +345,7 @@ var InfoCmd = &cobra.Command{
 						}
 						srcVer := "No SourceVersion"
 						if m.SourceVersion() != nil {
-							srcVer = m.SourceVersion().Version
+							srcVer = m.SourceVersion().Version.String()
 						}
 						if viper.GetBool("verbose") {
 							fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), srcVer, img.Name)

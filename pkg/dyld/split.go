@@ -131,7 +131,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		m := fat.Arches[0]
 		extVer := "1040.2.2.0.0"
 		if m.SourceVersion() != nil {
-			extVer = m.SourceVersion().Version
+			extVer = m.SourceVersion().Version.String()
 		}
 		fat.Close()
 		// get XCodeVersion
