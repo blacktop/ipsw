@@ -83,7 +83,7 @@ func init() {
 // machoPatchCmd represents the patch command
 var machoPatchCmd = &cobra.Command{
 	Use:           "patch [add|rm|mod] <MACHO> <LC> [OPTIONS]",
-	Short:         "Patch a MachO Load Commands",
+	Short:         "Patch MachO Load Commands",
 	Args:          cobra.MinimumNArgs(4),
 	SilenceUsage:  true,
 	SilenceErrors: true,
