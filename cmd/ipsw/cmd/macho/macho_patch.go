@@ -72,10 +72,17 @@ func confirm(path string, overwrite bool) bool {
 	return yes
 }
 
+func pointerAlign(sz uint32) uint32 {
+	if (sz % 8) != 0 {
+		sz += 8 - (sz % 8)
+	}
+	return sz
+}
+
 func init() {
 	MachoCmd.AddCommand(machoPatchCmd)
 	machoPatchCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
-	machoPatchCmd.Flags().StringP("output", "o", "", "Directory to save codesigned files to")
+	machoPatchCmd.Flags().StringP("output", "o", "", "Output new file")
 	viper.BindPFlag("macho.patch.overwrite", machoPatchCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.patch.output", machoPatchCmd.Flags().Lookup("output"))
 }
@@ -106,7 +113,9 @@ var machoPatchCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
 		overwrite := viper.GetBool("macho.patch.overwrite")
+		output := viper.GetString("macho.patch.output")
 
 		var m *macho.File
 
@@ -131,12 +140,6 @@ var machoPatchCmd = &cobra.Command{
 			return fmt.Errorf(err.Error())
 		}
 
-		folder := filepath.Dir(machoPath) // default to folder of macho file
-		if len(viper.GetString("macho.patch.output")) > 0 {
-			folder = viper.GetString("macho.patch.output")
-		}
-		outPath := filepath.Join(folder, filepath.Base(machoPath))
-
 		if fat, err := macho.OpenFat(machoPath); err == nil { // UNIVERSAL MACHO
 			_ = fat // TODO: patch universal machos
 			return fmt.Errorf("universal machos are not supported yet")
@@ -154,7 +157,7 @@ var machoPatchCmd = &cobra.Command{
 
 		switch action {
 		case "add":
-			log.Infof("adding load command %s to %s", loadCommand, machoPath)
+			log.Infof("Adding load command %s to %s", loadCommand, machoPath)
 			switch loadCommand {
 			case "LC_ID_DYLIB":
 				m.FileHeader.Type = types.MH_DYLIB // set type to dylib
@@ -186,14 +189,10 @@ var machoPatchCmd = &cobra.Command{
 				if err := compatVer.Set(args[5]); err != nil {
 					return fmt.Errorf("failed to parse compatibility version: %v", err)
 				}
-				sz := uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1)
-				if (sz % 8) != 0 {
-					sz += 8 - (sz % 8)
-				}
 				m.AddLoad(&macho.Dylib{
 					DylibCmd: types.DylibCmd{
 						LoadCmd:        lc,
-						Len:            sz,
+						Len:            pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1)),
 						NameOffset:     0x18,
 						Timestamp:      2,
 						CurrentVersion: currVer,
@@ -205,46 +204,52 @@ var machoPatchCmd = &cobra.Command{
 				if len(args) < 4 {
 					return fmt.Errorf("not enough arguments for adding %s; must supply PATH string", loadCommand)
 				}
-				sz := uint32(binary.Size(types.RpathCmd{}) + len(args[3]) + 1)
-				if (sz % 8) != 0 {
-					sz += 8 - (sz % 8)
-				}
 				m.AddLoad(&macho.Rpath{
 					RpathCmd: types.RpathCmd{
 						LoadCmd:    types.LC_RPATH,
-						Len:        sz,
+						Len:        pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[3]) + 1)),
 						PathOffset: 0xC,
 					},
 					Path: args[3],
 				})
 			case "LC_BUILD_VERSION":
-				if len(args) < 5 {
-					return fmt.Errorf("not enough arguments for adding %s; must supply PLATFORM, MINOS, SDK strings and TOOLS via --tools", loadCommand)
+				if len(args) < 8 {
+					return fmt.Errorf("not enough arguments for adding %s; must supply PLATFORM, MINOS, SDK strings and TOOL, TOOL_VERSION strings", loadCommand)
+				} else if len(args) > 8 {
+					return fmt.Errorf("too many arguments for adding %s; NOTE you can only add one tool to a %s", loadCommand, loadCommand)
+				}
+				platform, err := types.GetPlatformByName(args[3])
+				if err != nil {
+					return fmt.Errorf("failed to parse tool name: %v", err)
 				}
 				var minos types.Version
-				if err := minos.Set(args[3]); err != nil {
+				if err := minos.Set(args[4]); err != nil {
 					return fmt.Errorf("failed to parse min OS version: %v", err)
 				}
 				var sdk types.Version
-				if err := sdk.Set(args[4]); err != nil {
+				if err := sdk.Set(args[5]); err != nil {
 					return fmt.Errorf("failed to parse SDK version: %v", err)
 				}
+				tool, err := types.GetToolByName(args[6])
+				if err != nil {
+					return fmt.Errorf("failed to parse tool name: %v", err)
+				}
 				var toolVer types.Version
-				if err := toolVer.Set(args[5]); err != nil {
+				if err := toolVer.Set(args[7]); err != nil {
 					return fmt.Errorf("failed to parse tool version: %v", err)
 				}
 				m.AddLoad(&macho.BuildVersion{
 					BuildVersionCmd: types.BuildVersionCmd{
 						LoadCmd:  types.LC_BUILD_VERSION,
 						Len:      uint32(binary.Size(types.BuildVersionCmd{}) + binary.Size(types.BuildVersionTool{})),
-						Platform: 1,
+						Platform: platform,
 						Minos:    minos,
 						Sdk:      sdk,
 						NumTools: 1,
 					},
 					Tools: []types.BuildVersionTool{
 						{
-							Tool:    1,
+							Tool:    tool,
 							Version: toolVer,
 						},
 					},
@@ -253,7 +258,7 @@ var machoPatchCmd = &cobra.Command{
 				return fmt.Errorf("unsupported load command for action '%s': %s", action, loadCommand)
 			}
 		case "rm":
-			log.Infof("deleting load command %s from %s", loadCommand, machoPath)
+			log.Infof("Deleting load command %s from %s", loadCommand, machoPath)
 			switch loadCommand {
 			case "LC_ID_DYLIB":
 				if m.FileHeader.Type == types.MH_DYLIB {
@@ -282,7 +287,7 @@ var machoPatchCmd = &cobra.Command{
 			}
 
 		case "mod":
-			log.Infof("modifying load command %s in %s", loadCommand, machoPath)
+			log.Infof("Modifying load command %s in %s", loadCommand, machoPath)
 			switch loadCommand {
 			case "LC_ID_DYLIB":
 				if m.FileHeader.Type != types.MH_DYLIB {
@@ -290,13 +295,67 @@ var machoPatchCmd = &cobra.Command{
 				}
 			case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
 				for _, lc := range m.GetLoadsByName(loadCommand) {
-					if lc.(*macho.LoadDylib).Name == args[3] {
-						sz := uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1)
-						if (sz % 8) != 0 {
-							sz += 8 - (sz % 8)
-						}
-						lc.(*macho.LoadDylib).Len = sz
+					if lc.(*macho.Dylib).Name == args[3] {
+						lc.(*macho.LoadDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
 						lc.(*macho.LoadDylib).Name = args[4]
+					}
+				}
+			case "LC_BUILD_VERSION":
+				if len(args) < 8 {
+					return fmt.Errorf("not enough arguments for adding %s; must supply PLATFORM, MINOS, SDK strings and TOOL, TOOL_VERSION strings", loadCommand)
+				} else if len(args) > 8 {
+					return fmt.Errorf("too many arguments for adding %s; NOTE you can only add one tool to a %s", loadCommand, loadCommand)
+				}
+				platform, err := types.GetPlatformByName(args[3])
+				if err != nil {
+					return fmt.Errorf("failed to parse tool name: %v", err)
+				}
+				var minos types.Version
+				if err := minos.Set(args[4]); err != nil {
+					return fmt.Errorf("failed to parse min OS version: %v", err)
+				}
+				var sdk types.Version
+				if err := sdk.Set(args[5]); err != nil {
+					return fmt.Errorf("failed to parse SDK version: %v", err)
+				}
+				tool, err := types.GetToolByName(args[6])
+				if err != nil {
+					return fmt.Errorf("failed to parse tool name: %v", err)
+				}
+				var toolVer types.Version
+				if err := toolVer.Set(args[7]); err != nil {
+					return fmt.Errorf("failed to parse tool version: %v", err)
+				}
+				lcbvs := m.GetLoadsByName(loadCommand)
+				if len(lcbvs) == 0 {
+					return fmt.Errorf("failed to find load command %s in %s", loadCommand, machoPath)
+				} else if len(lcbvs) == 1 {
+					lcbvs[0].(*macho.BuildVersion).Len = uint32(binary.Size(types.BuildVersionCmd{}) + binary.Size(types.BuildVersionTool{}))
+					lcbvs[0].(*macho.BuildVersion).NumTools = 1
+					lcbvs[0].(*macho.BuildVersion).Platform = platform
+					lcbvs[0].(*macho.BuildVersion).Minos = minos
+					lcbvs[0].(*macho.BuildVersion).Sdk = sdk
+					lcbvs[0].(*macho.BuildVersion).Tools = []types.BuildVersionTool{
+						{
+							Tool:    tool,
+							Version: toolVer,
+						},
+					}
+				} else {
+					return fmt.Errorf("found more than one load command %s in %s", loadCommand, machoPath)
+				}
+			case "LC_RPATH":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for adding %s; must supply OLD_PATH NEW_PATH string", loadCommand)
+				}
+				lcrps := m.GetLoadsByName(loadCommand)
+				if len(lcrps) == 0 {
+					return fmt.Errorf("failed to find load command %s in %s", loadCommand, machoPath)
+				}
+				for _, lc := range lcrps {
+					if lc.(*macho.Rpath).Path == args[3] {
+						lc.(*macho.Rpath).Len = pointerAlign(uint32(binary.Size(types.RpathCmd{}) + len(args[4]) + 1))
+						lc.(*macho.Rpath).Path = args[4]
 					}
 				}
 			default:
@@ -304,17 +363,21 @@ var machoPatchCmd = &cobra.Command{
 			}
 		}
 
-		if filepath.Clean(args[1]) == outPath {
-			if !confirm(outPath, overwrite) { // confirm overwrite
+		if len(output) == 0 {
+			output = machoPath
+		}
+
+		if filepath.Clean(args[1]) == output {
+			if !confirm(output, overwrite) { // confirm overwrite
 				return nil
 			}
 		}
 
-		if err := m.Save(outPath); err != nil {
+		if err := m.Save(output); err != nil {
 			return fmt.Errorf("failed to save MachO file: %v", err)
 		}
 
-		log.Warn("code signature has been invalidated (MachO may need to be re-signed)")
+		log.Warn("Code signature has been invalidated (MachO may need to be re-signed)")
 
 		return nil
 	},
