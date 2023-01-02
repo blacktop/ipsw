@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: symbolicate
 description: Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
 last_update:
-  date: 2022-12-23T02:36:33-07:00
+  date: 2023-01-02T12:28:07-07:00
   author: blacktop
 ---
 ## ipsw symbolicate
