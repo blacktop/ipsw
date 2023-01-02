@@ -293,7 +293,17 @@ var machoPatchCmd = &cobra.Command{
 				if m.FileHeader.Type != types.MH_DYLIB {
 					return fmt.Errorf("you can only modify LC_ID_DYLIB in a dylib")
 				}
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply ID string", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					lc.(*macho.IDDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
+					lc.(*macho.IDDylib).Name = args[3]
+				}
 			case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
 				for _, lc := range m.GetLoadsByName(loadCommand) {
 					if lc.(*macho.Dylib).Name == args[3] {
 						lc.(*macho.LoadDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
