@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: git
 description: Download github.com/orgs/apple-oss-distributions tarballs
 last_update:
-  date: 2022-12-23T02:36:33-07:00
+  date: 2023-01-02T12:28:07-07:00
   author: blacktop
 ---
 ## ipsw download git

@@ -92,12 +92,15 @@ func init() {
 
 // machoPatchCmd represents the patch command
 var machoPatchCmd = &cobra.Command{
-	Use:           "patch [add|rm|mod] <MACHO> <LC> <LC_FIELDS...>",
-	Short:         "Patch MachO Load Commands",
+	Use:   "patch [add|rm|mod] <MACHO> <LC> <LC_FIELDS...>",
+	Short: "Patch MachO Load Commands",
+	Example: `  # Modify LC_BUILD_VERSION like vtool
+  ❯ ipsw macho patch mod MACHO LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
+  # Add an LC_RPATH like install_name_tool
+  ❯ ipsw macho patch add MACHO LC_RPATH @executable_path/Frameworks`,
 	Args:          cobra.MinimumNArgs(3),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			return supportedActions, cobra.ShellCompDirectiveNoFileComp
