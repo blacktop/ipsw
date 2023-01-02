@@ -58,6 +58,9 @@ var supportedLCs = []string{
 	"LC_LOAD_UPWARD_DYLIB",
 	"LC_RPATH",
 	"LC_BUILD_VERSION",
+	"LC_LOAD_DYLINKER",
+	"LC_ID_DYLINKER",
+	"LC_DYLD_ENVIRONMENT",
 }
 
 func confirm(path string, overwrite bool) bool {
@@ -159,6 +162,47 @@ var machoPatchCmd = &cobra.Command{
 		case "add":
 			log.Infof("Adding load command %s to %s", loadCommand, machoPath)
 			switch loadCommand {
+			case "LC_DYLD_ENVIRONMENT":
+				if m.FileHeader.Type != types.MH_EXECUTE {
+					return fmt.Errorf("You can only modify LC_DYLD_ENVIRONMENT in a main binary")
+				}
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply VAR name, and VALUE strings", loadCommand)
+				}
+				env := args[3] + "=" + args[4]
+				m.AddLoad(&macho.Dylinker{
+					DylinkerCmd: types.DylinkerCmd{
+						LoadCmd:        types.LC_DYLD_ENVIRONMENT,
+						Len:            pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(env) + 1)),
+						NameOffset:     0xc,
+					},
+					Name: env,
+				})
+			case "LC_ID_DYLINKER":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply ID name", loadCommand)
+				}
+				m.FileHeader.Type = types.MH_DYLINKER
+				m.AddLoad(&macho.Dylinker{
+					DylinkerCmd: types.DylinkerCmd{
+						LoadCmd:        types.LC_ID_DYLINKER,
+						Len:            pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[3]) + 1)),
+						NameOffset:     0xc,
+					},
+					Name: args[3],
+				})
+			case "LC_LOAD_DYLINKER":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply PATH string", loadCommand)
+				}
+				m.AddLoad(&macho.Dylinker{
+					DylinkerCmd: types.DylinkerCmd{
+						LoadCmd:        types.LC_LOAD_DYLINKER,
+						Len:            pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[3]) + 1)),
+						NameOffset:     0xc,
+					},
+					Name: args[3],
+				})
 			case "LC_ID_DYLIB":
 				m.FileHeader.Type = types.MH_DYLIB // set type to dylib
 				fallthrough
@@ -260,6 +304,37 @@ var machoPatchCmd = &cobra.Command{
 		case "rm":
 			log.Infof("Deleting load command %s from %s", loadCommand, machoPath)
 			switch loadCommand {
+			case "LC_ID_DYLINKER":
+				if m.FileHeader.Type == types.MH_DYLINKER {
+					m.FileHeader.Type = types.MH_EXECUTE
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if err := m.RemoveLoad(lc); err != nil {
+						return fmt.Errorf("failed to remove load command: %v", err)
+					}
+				}
+			case "LC_LOAD_DYLINKER":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for removing %s; must supply PATH string", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.LoadDylinker).Name == args[3] {
+						if err := m.RemoveLoad(lc); err != nil {
+							return fmt.Errorf("failed to remove load command: %v", err)
+						}
+					}
+				}
+			case "LC_DYLD_ENVIRONMENT":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for removing %s; must supply ENV string", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if strings.Split(lc.(*macho.DyldEnvironment).Name, "=")[0] == args[3] {
+						if err := m.RemoveLoad(lc); err != nil {
+							return fmt.Errorf("failed to remove load command: %v", err)
+						}
+					}
+				}
 			case "LC_ID_DYLIB":
 				if m.FileHeader.Type == types.MH_DYLIB {
 					m.FileHeader.Type = types.MH_EXECUTE // set type to executable to remove LC_ID_DYLIB
@@ -289,15 +364,94 @@ var machoPatchCmd = &cobra.Command{
 		case "mod":
 			log.Infof("Modifying load command %s in %s", loadCommand, machoPath)
 			switch loadCommand {
+			case "LC_DYLD_ENVIRONMENT":
+				if m.FileHeader.Type != types.MH_EXECUTE {
+					return fmt.Errorf("You can only modify LC_DYLD_ENVIRONMENT in a main binary")
+				}
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply VAR name, and NEW VALUE strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if strings.Split(lc.(*macho.LoadDylib).Name, "=")[0] == args[3] {
+						lc.(*macho.DyldEnvironment).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[4]) + 1))
+						lc.(*macho.DyldEnvironment).Name = args[4]
+					}
+				}
+			case "LC_LOAD_DYLINKER":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply PATH string", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					lc.(*macho.LoadDylinker).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[3]) + 1))
+					lc.(*macho.LoadDylinker).Name = args[3]
+				}
+			case "LC_ID_DYLINKER":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply PATH string", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					lc.(*macho.DylinkerID).Len = pointerAlign(uint32(binary.Size(types.DylinkerCmd{}) + len(args[3]) + 1))
+					lc.(*macho.DylinkerID).Name = args[3]
+				}
 			case "LC_ID_DYLIB":
 				if m.FileHeader.Type != types.MH_DYLIB {
 					return fmt.Errorf("you can only modify LC_ID_DYLIB in a dylib")
 				}
-			case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
+				if len(args) < 4 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply ID string", loadCommand)
+				}
 				for _, lc := range m.GetLoadsByName(loadCommand) {
-					if lc.(*macho.Dylib).Name == args[3] {
+					lc.(*macho.IDDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
+					lc.(*macho.IDDylib).Name = args[3]
+				}
+			case "LC_LOAD_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.LoadDylib).Name == args[3] {
 						lc.(*macho.LoadDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
 						lc.(*macho.LoadDylib).Name = args[4]
+					}
+				}
+			case "LC_LOAD_UPWARD_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.UpwardDylib).Name == args[3] {
+						lc.(*macho.UpwardDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.UpwardDylib).Name = args[4]
+					}
+				}
+			case "LC_LAZY_LOAD_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.LazyLoadDylib).Name == args[3] {
+						lc.(*macho.LazyLoadDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.LazyLoadDylib).Name = args[4]
+					}
+				}
+			case "LC_REEXPORT_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.ReExportDylib).Name == args[3] {
+						lc.(*macho.ReExportDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.ReExportDylib).Name = args[4]
+					}
+				}
+			case "LC_LOAD_WEAK_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.WeakDylib).Name == args[3] {
+						lc.(*macho.WeakDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.WeakDylib).Name = args[4]
 					}
 				}
 			case "LC_BUILD_VERSION":
