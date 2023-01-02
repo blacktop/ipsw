@@ -300,14 +300,54 @@ var machoPatchCmd = &cobra.Command{
 					lc.(*macho.IDDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[3]) + 1))
 					lc.(*macho.IDDylib).Name = args[3]
 				}
-			case "LC_LOAD_DYLIB", "LC_LOAD_WEAK_DYLIB", "LC_REEXPORT_DYLIB", "LC_LAZY_LOAD_DYLIB", "LC_LOAD_UPWARD_DYLIB":
+			case "LC_LOAD_DYLIB":
 				if len(args) < 5 {
 					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
 				}
 				for _, lc := range m.GetLoadsByName(loadCommand) {
-					if lc.(*macho.Dylib).Name == args[3] {
+					if lc.(*macho.LoadDylib).Name == args[3] {
 						lc.(*macho.LoadDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
 						lc.(*macho.LoadDylib).Name = args[4]
+					}
+				}
+			case "LC_LOAD_UPWARD_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.UpwardDylib).Name == args[3] {
+						lc.(*macho.UpwardDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.UpwardDylib).Name = args[4]
+					}
+				}
+			case "LC_LAZY_LOAD_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.LazyLoadDylib).Name == args[3] {
+						lc.(*macho.LazyLoadDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.LazyLoadDylib).Name = args[4]
+					}
+				}
+			case "LC_REEXPORT_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.ReExportDylib).Name == args[3] {
+						lc.(*macho.ReExportDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.ReExportDylib).Name = args[4]
+					}
+				}
+			case "LC_LOAD_WEAK_DYLIB":
+				if len(args) < 5 {
+					return fmt.Errorf("not enough arguments for setting %s; must supply OLD and NEW strings", loadCommand)
+				}
+				for _, lc := range m.GetLoadsByName(loadCommand) {
+					if lc.(*macho.WeakDylib).Name == args[3] {
+						lc.(*macho.WeakDylib).Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+						lc.(*macho.WeakDylib).Name = args[4]
 					}
 				}
 			case "LC_BUILD_VERSION":
