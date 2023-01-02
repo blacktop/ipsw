@@ -42,8 +42,8 @@ import (
 
 /*
  * ROADMAP:
- * - [ ] add install_name_tool features
- * - [ ] add vtool features
+ * - [x] add install_name_tool features
+ * - [x] add vtool features
  * - [ ] add ability to add arbitrary LCs
  */
 
