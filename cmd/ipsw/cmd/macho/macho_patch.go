@@ -89,7 +89,7 @@ func init() {
 
 // machoPatchCmd represents the patch command
 var machoPatchCmd = &cobra.Command{
-	Use:           "patch [add|rm|mod] <MACHO> <LC> [OPTIONS]",
+	Use:           "patch [add|rm|mod] <LC> <MACHO> [OPTIONS]",
 	Short:         "Patch MachO Load Commands",
 	Args:          cobra.MinimumNArgs(3),
 	SilenceUsage:  true,
@@ -100,10 +100,10 @@ var machoPatchCmd = &cobra.Command{
 			return supportedActions, cobra.ShellCompDirectiveNoFileComp
 		}
 		if len(args) == 1 {
-			return nil, cobra.ShellCompDirectiveDefault
+			return supportedLCs, cobra.ShellCompDirectiveNoFileComp
 		}
 		if len(args) == 2 {
-			return supportedLCs, cobra.ShellCompDirectiveNoFileComp
+			return nil, cobra.ShellCompDirectiveDefault
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	},
@@ -120,8 +120,8 @@ var machoPatchCmd = &cobra.Command{
 		var m *macho.File
 
 		action := args[0]
-		machoPath := filepath.Clean(args[1])
-		loadCommand := args[2]
+		loadCommand := args[1]
+		machoPath := filepath.Clean(args[2])
 
 		if !utils.StrSliceHas(supportedLCs, strings.ToUpper(loadCommand)) {
 			return fmt.Errorf("unsupported load command: %s; must be one of: %s", loadCommand, strings.Join(supportedLCs, ", "))
