@@ -40,15 +40,17 @@ func init() {
 
 	machoSignCmd.Flags().BoolP("ad-hoc", "a", false, "Ad-hoc codesign")
 	machoSignCmd.Flags().StringP("cert", "c", "", "p12 codesign with cert")
-	machoSignCmd.Flags().StringP("output", "o", "", "Directory to save codesigned files to")
+	machoSignCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
+	machoSignCmd.Flags().StringP("output", "o", "", "Output codesigned file")
 	viper.BindPFlag("macho.sign.ad-hoc", machoSignCmd.Flags().Lookup("ad-hoc"))
 	viper.BindPFlag("macho.sign.cert", machoSignCmd.Flags().Lookup("cert"))
+	viper.BindPFlag("macho.sign.overwrite", machoSignCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.sign.output", machoSignCmd.Flags().Lookup("output"))
 }
 
 // machoSignCmd represents the macho sign command
 var machoSignCmd = &cobra.Command{
-	Use:           "sign",
+	Use:           "sign <MACHO>",
 	Short:         "Codesign a MachO",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
@@ -59,6 +61,12 @@ var machoSignCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		// flags
+		overwrite := viper.GetBool("macho.sign.overwrite")
+		output := viper.GetString("macho.sign.output")
+
+		var m *macho.File
 
 		machoPath := filepath.Clean(args[0])
 
@@ -75,23 +83,19 @@ var machoSignCmd = &cobra.Command{
 			return fmt.Errorf(err.Error())
 		}
 
-		// folder := filepath.Dir(machoPath) // default to folder of macho file
-		// if len(viper.GetString("macho.sign.output")) > 0 {
-		// 	folder = viper.GetString("macho.sign.output")
-		// }
-
 		if fat, err := macho.OpenFat(machoPath); err == nil { // UNIVERSAL MACHO
+			defer fat.Close()
 			if viper.GetBool("macho.sign.ad-hoc") {
-				// TODO: ad-hoc codesign universal MachO
-				_ = fat
-				panic("not implemented yet")
+				_ = fat // TODO: sign universal machos
 			}
+			return fmt.Errorf("universal machos are not supported yet")
 		} else {
 			if errors.Is(err, macho.ErrNotFat) {
-				m, err := macho.Open(machoPath)
+				m, err = macho.Open(machoPath)
 				if err != nil {
 					return err
 				}
+				defer m.Close()
 				if viper.GetBool("macho.sign.ad-hoc") {
 					_ = m
 					// if err := codesign.AdHocSign(); err != nil {
@@ -99,8 +103,22 @@ var machoSignCmd = &cobra.Command{
 					// }
 				}
 			} else {
-				return err
+				return fmt.Errorf("failed to open MachO file: %v", err)
 			}
+		}
+
+		if len(output) == 0 {
+			output = machoPath
+		}
+
+		if filepath.Clean(args[1]) == output {
+			if !confirm(output, overwrite) { // confirm overwrite
+				return nil
+			}
+		}
+
+		if err := m.Save(output); err != nil {
+			return fmt.Errorf("failed to save signed MachO file: %v", err)
 		}
 
 		return nil
