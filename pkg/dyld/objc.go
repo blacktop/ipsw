@@ -195,7 +195,11 @@ func (f *File) getOptimizationsOld() (Optimization, error) {
 	}
 
 	if s := libObjC.Section("__TEXT", "__objc_opt_ro"); s != nil {
-		dat, err := s.Data()
+		uuid, off, err := f.GetOffset(s.Addr)
+		if err != nil {
+			return nil, err
+		}
+		dat, err := f.ReadBytesForUUID(uuid, int64(off), s.Size)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read __TEXT.__objc_opt_ro data")
 		}
