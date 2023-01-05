@@ -315,7 +315,7 @@ func (i *Info) GetAppOsDmg() (string, error) {
 		if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
-			return "", fmt.Errorf("multiple AppOS dmgs found")
+			return "", fmt.Errorf("multiple AppOS DMGs found")
 		}
 	}
 	return "", fmt.Errorf("no AppOS DMG found")
@@ -328,18 +328,16 @@ func (i *Info) GetSystemOsDmg() (string, error) {
 		for _, bi := range i.Plists.BuildIdentities {
 			if sysOS, ok := bi.Manifest["Cryptex1,SystemOS"]; ok {
 				return sysOS.Info.Path, nil
-			} else if _, ok := bi.Manifest["OS"]; ok {
-				return i.GetFileSystemOsDmg()
 			}
 		}
 		dmgs = utils.Unique(dmgs)
 		if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
-			return "", fmt.Errorf("multiple SystemOS dmgs found")
+			return "", fmt.Errorf("multiple SystemOS DMGs found")
 		}
 	}
-	return "", fmt.Errorf("no SystemOS or pre-cryptex FS DMG found")
+	return "", fmt.Errorf("no SystemOS DMG found")
 }
 
 // GetFileSystemOsDmg returns the name of the file system dmg
@@ -355,7 +353,7 @@ func (i *Info) GetFileSystemOsDmg() (string, error) {
 		if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
-			return "", fmt.Errorf("multiple filesystem dmgs found")
+			return "", fmt.Errorf("multiple filesystem DMGs found")
 		}
 	}
 	return "", fmt.Errorf("filesystem DMG not found")
