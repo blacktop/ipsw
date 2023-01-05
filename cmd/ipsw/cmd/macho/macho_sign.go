@@ -29,6 +29,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/spf13/cobra"
@@ -38,35 +39,45 @@ import (
 func init() {
 	MachoCmd.AddCommand(machoSignCmd)
 
-	machoSignCmd.Flags().BoolP("ad-hoc", "a", false, "Ad-hoc codesign")
+	machoSignCmd.Flags().StringP("id", "i", "", "sign with identifier")
+	machoSignCmd.Flags().BoolP("ad-hoc", "a", false, "ad-hoc codesign")
 	machoSignCmd.Flags().StringP("cert", "c", "", "p12 codesign with cert")
+	machoSignCmd.Flags().StringP("ent", "e", "", "entitlements.plist file")
 	machoSignCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
 	machoSignCmd.Flags().StringP("output", "o", "", "Output codesigned file")
+	viper.BindPFlag("macho.sign.id", machoSignCmd.Flags().Lookup("id"))
 	viper.BindPFlag("macho.sign.ad-hoc", machoSignCmd.Flags().Lookup("ad-hoc"))
 	viper.BindPFlag("macho.sign.cert", machoSignCmd.Flags().Lookup("cert"))
+	viper.BindPFlag("macho.sign.ent", machoSignCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("macho.sign.overwrite", machoSignCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.sign.output", machoSignCmd.Flags().Lookup("output"))
+	machoSignCmd.MarkFlagRequired("id")
 }
 
 // machoSignCmd represents the macho sign command
 var machoSignCmd = &cobra.Command{
 	Use:           "sign <MACHO>",
 	Short:         "Codesign a MachO",
-	Args:          cobra.MinimumNArgs(1),
+	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		var err error
+		var m *macho.File
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
 		// flags
+		id := viper.GetString("macho.sign.id")
+		adHoc := viper.GetBool("macho.sign.ad-hoc")
+		// certFile := viper.GetString("macho.sign.cert")
+		entitlementsPlist := viper.GetString("macho.sign.ent")
 		overwrite := viper.GetBool("macho.sign.overwrite")
 		output := viper.GetString("macho.sign.output")
-
-		var m *macho.File
 
 		machoPath := filepath.Clean(args[0])
 
@@ -82,10 +93,17 @@ var machoSignCmd = &cobra.Command{
 		if ok, err := magic.IsMachO(machoPath); !ok {
 			return fmt.Errorf(err.Error())
 		}
+		var entitlementData []byte
+		if len(entitlementsPlist) > 0 {
+			entitlementData, err = os.ReadFile(entitlementsPlist)
+			if err != nil {
+				return fmt.Errorf("failed to read entitlements file %s: %v", entitlementsPlist, err)
+			}
+		}
 
 		if fat, err := macho.OpenFat(machoPath); err == nil { // UNIVERSAL MACHO
 			defer fat.Close()
-			if viper.GetBool("macho.sign.ad-hoc") {
+			if adHoc {
 				_ = fat // TODO: sign universal machos
 			}
 			return fmt.Errorf("universal machos are not supported yet")
@@ -96,10 +114,15 @@ var machoSignCmd = &cobra.Command{
 					return err
 				}
 				defer m.Close()
-				if viper.GetBool("macho.sign.ad-hoc") {
-					_ = m
-					// if err := codesign.AdHocSign(); err != nil {
-					// 	return err
+
+				if adHoc {
+					if err := m.CodeSign(id, ctypes.ADHOC, entitlementData); err != nil {
+						return fmt.Errorf("failed to codesign MachO file: %v", err)
+					}
+				} else {
+					panic("non ad-hoc codesigning is not supported yet")
+					// if err := m.CodeSign(id, ctypes.RUNTIME, entitlementData); err != nil {
+					// 	return fmt.Errorf("failed to codesign MachO file: %v", err)
 					// }
 				}
 			} else {
@@ -111,12 +134,13 @@ var machoSignCmd = &cobra.Command{
 			output = machoPath
 		}
 
-		if filepath.Clean(args[1]) == output {
+		if filepath.Clean(args[0]) == output {
 			if !confirm(output, overwrite) { // confirm overwrite
 				return nil
 			}
 		}
 
+		log.Infof("Codesigning %s", output)
 		if err := m.Save(output); err != nil {
 			return fmt.Errorf("failed to save signed MachO file: %v", err)
 		}
