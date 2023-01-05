@@ -13,7 +13,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
-	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -43,7 +42,7 @@ type localSymbolInfo struct {
 
 type cacheImages []*CacheImage
 type cacheMappings []*CacheMapping
-type codesignature *ctypes.CodeSignature
+type codesignature *codesign.CodeSignature
 type cacheMappingsWithSlideInfo []*CacheMappingWithSlideInfo
 
 func (m cacheMappingsWithSlideInfo) Len() int {

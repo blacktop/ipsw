@@ -33,7 +33,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/pkg/codesign/types"
+	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fullsailor/pkcs7"
@@ -70,7 +70,7 @@ type dyldInfo struct {
 	SubCacheGroupID    int                                         `json:"sub_cache_group_id,omitempty"`
 	SymSubCacheUUID    string                                      `json:"sym_sub_cache_uuid,omitempty"`
 	Mappings           map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
-	CodeSignature      map[string]types.CodeSignature              `json:"code_signature,omitempty"`
+	CodeSignature      map[string]codesign.CodeSignature           `json:"code_signature,omitempty"`
 	Dylibs             []dylib                                     `json:"dylibs,omitempty"`
 }
 
@@ -141,7 +141,7 @@ var InfoCmd = &cobra.Command{
 				}
 			}
 
-			dinfo.CodeSignature = make(map[string]types.CodeSignature)
+			dinfo.CodeSignature = make(map[string]codesign.CodeSignature)
 
 			if showSignature {
 				for u, cs := range f.CodeSignatures {
@@ -195,7 +195,7 @@ var InfoCmd = &cobra.Command{
 							if len(cd.TeamID) > 0 {
 								teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
 							}
-							fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
+							fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
 							fmt.Printf("\tVersion:     %s\n"+
 								"\tFlags:       %s\n"+
 								"\tCodeLimit:   0x%x\n"+

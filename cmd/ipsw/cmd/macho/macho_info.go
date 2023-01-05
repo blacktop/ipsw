@@ -314,7 +314,7 @@ var machoInfoCmd = &cobra.Command{
 						if cd.Header.ExecSegFlags > 0 {
 							execSegFlags = fmt.Sprintf(" (%s)", cd.Header.ExecSegFlags.String())
 						}
-						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
+						fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
 						fmt.Printf("\tVersion:     %s%s\n"+
 							"\tFlags:       %#x (%s)\n"+
 							"\tCodeLimit:   %#x\n"+
