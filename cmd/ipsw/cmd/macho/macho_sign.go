@@ -51,7 +51,6 @@ func init() {
 	viper.BindPFlag("macho.sign.ent", machoSignCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("macho.sign.overwrite", machoSignCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.sign.output", machoSignCmd.Flags().Lookup("output"))
-	machoSignCmd.MarkFlagRequired("id")
 }
 
 // machoSignCmd represents the macho sign command
