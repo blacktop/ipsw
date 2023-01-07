@@ -65,7 +65,7 @@ func init() {
 var machoDumpCmd = &cobra.Command{
 	Use:   "dump <macho> <address>",
 	Short: "Dump MachO data at given virtual address",
-	Args: cobra.MaximumNArgs(2),
+	Args:  cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
@@ -94,10 +94,8 @@ var machoDumpCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --addr with --count")
 		} else if asBytes && count > 0 {
 			return fmt.Errorf("you can only use --bytes with --size")
-		}
-
-		if err := cobra.ExactArgs(1)(cmd, args); err != nil && len(segmentSection) != 0 {
-			return fmt.Errorf("you can only use <address> OR --section");
+		} else if len(segmentSection) > 0 && len(args) != 1 {
+			return fmt.Errorf("you can only use <address> OR --section")
 		}
 
 		machoPath := filepath.Clean(args[0])
