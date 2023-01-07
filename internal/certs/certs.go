@@ -18,6 +18,7 @@ var (
 	OIDCRLDistributionPoints asn1.ObjectIdentifier = []int{2, 5, 29, 31}
 	OIDAuthorityInfoAccess   asn1.ObjectIdentifier = []int{1, 3, 6, 1, 5, 5, 7, 1, 1}
 	OIDCRLNumber             asn1.ObjectIdentifier = []int{2, 5, 29, 20}
+	OIDEmailAddress          asn1.ObjectIdentifier = []int{1, 2, 840, 113549, 1, 9, 1}
 )
 
 var (
