@@ -57,8 +57,11 @@ func init() {
 
 // machoSignCmd represents the macho sign command
 var machoSignCmd = &cobra.Command{
-	Use:           "sign <MACHO>",
-	Short:         "Codesign a MachO",
+	Use:     "sign <MACHO>",
+	Aliases: []string{"s"},
+	Short:   "Codesign a MachO",
+	Example: `  # Ad-hoc codesign a MachO w/ entitlements
+  ❯ ipsw macho sign --id com.apple.ls --ad-hoc --ent entitlements.plist <MACHO>`,
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -94,6 +97,14 @@ var machoSignCmd = &cobra.Command{
 		if ok, err := magic.IsMachO(machoPath); !ok {
 			return fmt.Errorf(err.Error())
 		}
+
+		if len(output) == 0 { // sign in place
+			output = machoPath
+			if !confirm(output, overwrite) { // confirm overwrite
+				return nil
+			}
+		}
+
 		var entitlementData []byte
 		if len(entitlementsPlist) > 0 {
 			entitlementData, err = os.ReadFile(entitlementsPlist)
@@ -117,10 +128,12 @@ var machoSignCmd = &cobra.Command{
 				defer m.Close()
 
 				if adHoc {
-					if err := m.CodeSign(id, ctypes.ADHOC, entitlementData); err != nil {
+					log.Infof("ad-hoc codesigning %s", output)
+					if err := m.CodeSign(id, ctypes.ADHOC, entitlementData, nil, nil); err != nil {
 						return fmt.Errorf("failed to codesign MachO file: %v", err)
 					}
 				} else {
+					log.Infof("codesigning %s", output)
 					panic("non ad-hoc codesigning is not supported yet")
 					// if err := m.CodeSign(id, ctypes.RUNTIME, entitlementData); err != nil {
 					// 	return fmt.Errorf("failed to codesign MachO file: %v", err)
@@ -131,17 +144,6 @@ var machoSignCmd = &cobra.Command{
 			}
 		}
 
-		if len(output) == 0 {
-			output = machoPath
-		}
-
-		if filepath.Clean(args[0]) == output {
-			if !confirm(output, overwrite) { // confirm overwrite
-				return nil
-			}
-		}
-
-		log.Infof("Codesigning %s", output)
 		if err := m.Save(output); err != nil {
 			return fmt.Errorf("failed to save signed MachO file: %v", err)
 		}

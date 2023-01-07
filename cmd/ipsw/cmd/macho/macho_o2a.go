@@ -48,9 +48,10 @@ func init() {
 
 // machoO2aCmd represents the mo2a command
 var machoO2aCmd = &cobra.Command{
-	Use:   "o2a <macho> <offset>",
-	Short: "Convert MachO offset to address",
-	Args:  cobra.MinimumNArgs(2),
+	Use:     "o2a <macho> <offset>",
+	Aliases: []string{"o"},
+	Short:   "Convert MachO offset to address",
+	Args:    cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error

@@ -70,6 +70,7 @@ func confirm(path string, overwrite bool) bool {
 	yes := false
 	prompt := &survey.Confirm{
 		Message: fmt.Sprintf("You are about to overwrite %s. Continue?", path),
+		Default: true,
 	}
 	survey.AskOne(prompt, &yes)
 	return yes
@@ -92,8 +93,9 @@ func init() {
 
 // machoPatchCmd represents the patch command
 var machoPatchCmd = &cobra.Command{
-	Use:   "patch [add|rm|mod] <MACHO> <LC> <LC_FIELDS...>",
-	Short: "Patch MachO Load Commands",
+	Use:     "patch [add|rm|mod] <MACHO> <LC> <LC_FIELDS...>",
+	Aliases: []string{"p"},
+	Short:   "Patch MachO Load Commands",
 	Example: `  # Modify LC_BUILD_VERSION like vtool
   ❯ ipsw macho patch mod MACHO LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
   # Add an LC_RPATH like install_name_tool
@@ -144,6 +146,13 @@ var machoPatchCmd = &cobra.Command{
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
 			return fmt.Errorf(err.Error())
+		}
+
+		if len(output) == 0 { // modify in place
+			output = machoPath
+			if !confirm(output, overwrite) { // confirm overwrite
+				return nil
+			}
 		}
 
 		if fat, err := macho.OpenFat(machoPath); err == nil { // UNIVERSAL MACHO
@@ -552,16 +561,6 @@ var machoPatchCmd = &cobra.Command{
 				}
 			default:
 				return fmt.Errorf("unsupported load command for action '%s': %s", action, loadCommand)
-			}
-		}
-
-		if len(output) == 0 {
-			output = machoPath
-		}
-
-		if filepath.Clean(args[1]) == output {
-			if !confirm(output, overwrite) { // confirm overwrite
-				return nil
 			}
 		}
 
