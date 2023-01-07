@@ -131,6 +131,30 @@ func CodeSignAdHoc(filePath string) error {
 	return CodeSign(filePath, "-")
 }
 
+func CodesignVerify(path string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("codesign", "--verify", "--deep", "--strict", "--verbose=4", path)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return string(out), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
+func CodesignShow(path string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("codesign", "-d", "--verbose=4", path)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return string(out), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
 // CreateSparseDiskImage creates a sparse disk image and returns it's path
 func CreateSparseDiskImage(volumeName, diskPath string) (string, error) {
 	if runtime.GOOS == "darwin" {
