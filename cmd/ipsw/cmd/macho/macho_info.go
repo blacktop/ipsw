@@ -23,6 +23,7 @@ package macho
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
@@ -381,16 +382,34 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Fprintf(w, "\tData:\n")
 							fmt.Fprintf(w, "\t\tVersion: %d (%#x)\n", cert.Version, cert.Version)
 							fmt.Fprintf(w, "\t\tSerial Number: %d (%#x)\n", cert.SerialNumber, cert.SerialNumber)
-							fmt.Fprintf(w, "\t\tIssuer: %s\n", cert.Issuer.String())
+							var extraIssuerInfo string
+							for _, name := range cert.Issuer.Names {
+								if name.Type.Equal(certs.OIDEmailAddress) {
+									extraIssuerInfo = fmt.Sprintf(",email=%s", name.Value.(string))
+								}
+							}
+							fmt.Fprintf(w, "\t\tIssuer: %s\n", cert.Issuer.String()+extraIssuerInfo)
 							fmt.Fprintf(w, "\t\tValidity:\n")
 							fmt.Fprintf(w, "\t\t\tNot Before: %s\n", cert.NotBefore.Format("Jan 2 15:04:05 2006 MST"))
 							fmt.Fprintf(w, "\t\t\tNot After:  %s\n", cert.NotAfter.Format("Jan 2 15:04:05 2006 MST"))
-							fmt.Fprintf(w, "\t\tSubject: %s\n", cert.Subject.String())
+							var extraSubjectInfo string
+							for _, name := range cert.Subject.Names {
+								if name.Type.Equal(certs.OIDEmailAddress) {
+									extraSubjectInfo = fmt.Sprintf(",email=%s", name.Value.(string))
+								}
+							}
+							fmt.Fprintf(w, "\t\tSubject: %s\n", cert.Subject.String()+extraSubjectInfo)
 							fmt.Fprintf(w, "\t\tSubject Public Key Info:\n")
 							fmt.Fprintf(w, "\t\t\tPublic Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
-							fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", cert.PublicKey.(*rsa.PublicKey).Size()*8) // convert bytes to bits
-							fmt.Fprintf(w, "\t\t\t\tModulus: \n%s\n", certs.ReprData(cert.PublicKey.(*rsa.PublicKey).N.Bytes(), 5, 14))
-							fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", cert.PublicKey.(*rsa.PublicKey).E, cert.PublicKey.(*rsa.PublicKey).E)
+							switch key := cert.PublicKey.(type) {
+							case *rsa.PublicKey:
+								fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", key.Size()*8) // convert bytes to bits
+								fmt.Fprintf(w, "\t\t\t\tModulus: \n%s\n", certs.ReprData(key.N.Bytes(), 5, 14))
+								fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", key.E, key.E)
+							case *ecdsa.PublicKey:
+								fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", key.Params().BitSize)
+								fmt.Fprintf(w, "\t\t\t\t NIST CURVE: %s\n", key.Params().Name)
+							}
 							fmt.Fprintf(w, "\tX509v3 Extensions:\n")
 							for _, ext := range cert.Extensions {
 								critical := ""
