@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -428,8 +429,10 @@ var otaDLCmd = &cobra.Command{
 					os.MkdirAll(folder, 0750)
 					var devices string
 					if len(o.SupportedDevices) > 0 {
+						sort.Strings(o.SupportedDevices)
 						devices = strings.Join(o.SupportedDevices, "_")
 					} else {
+						sort.Strings(o.SupportedDeviceModels)
 						devices = strings.Join(o.SupportedDeviceModels, "_")
 					}
 					url := o.BaseURL + o.RelativePath

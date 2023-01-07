@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/apex/log"
@@ -417,6 +418,7 @@ func (i *Info) GetFolder() (string, error) {
 		devs = utils.SortDevices(utils.Unique(devs))
 		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs)), nil
 	} else {
+		sort.Strings(i.Plists.BuildManifest.SupportedProductTypes)
 		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(i.Plists.BuildManifest.SupportedProductTypes)), nil
 	}
 	// return "", fmt.Errorf("no devices found")

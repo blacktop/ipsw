@@ -85,6 +85,7 @@ func (a *AssetSets) ForDevice(device string) []AssetSet {
 func (a *AssetSets) GetDevicesForVersion(version string, typ string) []string {
 	for _, asset := range a.AssetSets[typ] {
 		if asset.ProductVersion == version {
+			sort.Strings(asset.SupportedDevices)
 			return asset.SupportedDevices
 		}
 	}
