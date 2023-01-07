@@ -633,6 +633,7 @@ func uniqueOTAs(otas []types.Asset) []types.Asset {
 						for _, dev := range devs {
 							os[idx].Devices = utils.UniqueAppend(os[idx].Devices, fmt.Sprintf("%s_%s", dev.First, dev.Second))
 						}
+						sort.Strings(os[idx].Devices)
 					}
 				}
 			}
