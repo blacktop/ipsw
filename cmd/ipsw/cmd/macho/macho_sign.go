@@ -26,11 +26,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -142,6 +144,19 @@ var machoSignCmd = &cobra.Command{
 		log.Infof("Codesigning %s", output)
 		if err := m.Save(output); err != nil {
 			return fmt.Errorf("failed to save signed MachO file: %v", err)
+		}
+
+		if runtime.GOOS == "darwin" {
+			out, err := utils.CodesignShow(output)
+			if err != nil {
+				return err
+			}
+			log.Debugf("NEW CODESIGNATURE:\n%s", out)
+			out, err = utils.CodesignVerify(output)
+			if err != nil {
+				return err
+			}
+			log.Debugf("CODESIGNATURE VERIFY:\n%s", out)
 		}
 
 		return nil

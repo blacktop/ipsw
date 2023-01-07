@@ -307,18 +307,23 @@ var machoInfoCmd = &cobra.Command{
 				if len(cds) > 0 {
 					for _, cd := range cds {
 						var teamID string
+						var platform string
 						var execSegFlags string
 						if len(cd.TeamID) > 0 {
 							teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
 						}
+						if cd.Header.Platform != 0 {
+							platform = fmt.Sprintf("\tPlatform:    %s (%d)\n", cd.Header.Platform, cd.Header.Platform)
+						}
 						if cd.Header.ExecSegFlags > 0 {
-							execSegFlags = fmt.Sprintf(" (%s)", cd.Header.ExecSegFlags.String())
+							execSegFlags = fmt.Sprintf(" (%s)", cd.Header.ExecSegFlags)
 						}
 						fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
 						fmt.Printf("\tVersion:     %s%s\n"+
 							"\tFlags:       %#x (%s)\n"+
 							"\tCodeLimit:   %#x\n"+
 							"\tIdentifier:  %s (@%#x)\n"+
+							"%s"+
 							"%s"+
 							"\tCDHash:      %s (computed)\n"+
 							"\t# of hashes: %d code (%d pages) + %d special\n"+
@@ -331,6 +336,7 @@ var machoInfoCmd = &cobra.Command{
 							cd.ID,
 							cd.Header.IdentOffset,
 							teamID,
+							platform,
 							cd.CDHash,
 							cd.Header.NCodeSlots,
 							int(math.Pow(2, float64(cd.Header.PageSize))),
