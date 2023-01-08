@@ -432,7 +432,7 @@ jobs:
         working-directory: /tmp/ipsw
         run: |
           ipsw macho patch mod /tmp/ls.arm64e LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
-          ipsw macho patch mod /tmp/ls.arm64e LC_RPATH @executable_path/Frameworks --overwrite
+          ipsw macho patch add /tmp/ls.arm64e LC_RPATH @executable_path/Frameworks --overwrite
       - name: Run macho sign
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
