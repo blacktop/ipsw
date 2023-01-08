@@ -103,8 +103,8 @@ var machoInfoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var m *macho.File
 		var err error
+		var m *macho.File
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -212,6 +212,7 @@ var machoInfoCmd = &cobra.Command{
 					}
 					// create output file
 					outPEM := filepath.Join(folder, filepath.Base(filepath.Clean(machoPath))+".pem")
+					log.Infof("Created %s", outPEM)
 					f, err := os.Create(outPEM)
 					if err != nil {
 						return fmt.Errorf("failed to create pem file %s: %v", outPEM, err)
@@ -219,15 +220,10 @@ var machoInfoCmd = &cobra.Command{
 					defer f.Close()
 					// write certs to file
 					for _, cert := range p7.Certificates {
-						publicKeyBlock := pem.Block{
-							Type:  "CERTIFICATE",
-							Bytes: cert.Raw,
-						}
-						if _, err := f.WriteString(string(pem.EncodeToMemory(&publicKeyBlock))); err != nil {
+						if err := pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); err != nil {
 							return fmt.Errorf("failed to write pem file: %v", err)
 						}
 					}
-					log.Infof("Created %s", outPEM)
 				} else {
 					return fmt.Errorf("no CMS signature found")
 				}
@@ -370,7 +366,7 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 				if len(m.CodeSignature().CMSSignature) > 0 {
-					fmt.Println("CMS (RFC3852) signature:")
+					fmt.Printf("CMS (RFC3852) signature (%d bytes):", len(m.CodeSignature().CMSSignature))
 					p7, err := pkcs7.Parse(m.CodeSignature().CMSSignature)
 					if err != nil {
 						return err
