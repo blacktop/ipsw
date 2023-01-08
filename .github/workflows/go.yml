@@ -418,7 +418,26 @@ jobs:
       - name: Run lipo
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw macho lipo /bin/ls --output /tmp --arch x86_64
+        run: |
+          ipsw macho lipo /bin/ls --output /tmp --arch x86_64
+          ipsw macho lipo /bin/ls --output /tmp --arch arm64e
+      - name: Run bbl
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: |
+          ipsw macho bbl --output /tmp/ls.bbl /tmp/ls.x86_64 /tmp/ls.arm64e
+          [[ "$(md5sum /bin/ls)" = "$(md5sum /tmp/ls.bbl" ]]
+      - name: Run patch
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: |
+          ipsw macho patch mod /tmp/ls.arm64e LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
+          ipsw macho patch mod /tmp/ls.arm64e LC_RPATH @executable_path/Frameworks --overwrite
+      - name: Run sign
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: |
+          ipsw macho sign -V --ad-hoc --overwrite /tmp/ls.arm64e
 
       #
       # ENT CMD (macOS)
