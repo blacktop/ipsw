@@ -426,7 +426,7 @@ jobs:
         working-directory: /tmp/ipsw
         run: |
           ipsw macho bbl --output /tmp/ls.bbl /tmp/ls.x86_64 /tmp/ls.arm64e
-          [[ "$(md5sum /bin/ls)" = "$(md5sum /tmp/ls.bbl" ]]
+          diff /bin/ls /tmp/ls.bbl
       - name: Run macho patch
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
