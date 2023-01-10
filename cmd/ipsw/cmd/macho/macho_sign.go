@@ -22,6 +22,7 @@ THE SOFTWARE.
 package macho
 
 import (
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"os"
@@ -30,7 +31,10 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	ctypes "github.com/blacktop/go-macho/pkg/codesign/types"
+	mcs "github.com/blacktop/go-macho/pkg/codesign"
+	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
+	"github.com/blacktop/ipsw/internal/codesign"
+	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -44,13 +48,23 @@ func init() {
 	machoSignCmd.Flags().StringP("id", "i", "", "sign with identifier")
 	machoSignCmd.Flags().BoolP("ad-hoc", "a", false, "ad-hoc codesign")
 	machoSignCmd.Flags().StringP("cert", "c", "", "p12 codesign with cert")
+	machoSignCmd.Flags().StringP("pw", "p", "", "p12 cert password")
 	machoSignCmd.Flags().StringP("ent", "e", "", "entitlements.plist file")
+	machoSignCmd.Flags().BoolP("ts", "t", false, "timestamp signature")
+	machoSignCmd.Flags().String("timestamp-url", "http://timestamp.apple.com/ts01", "timeserver URL")
+	machoSignCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	machoSignCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	machoSignCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
 	machoSignCmd.Flags().StringP("output", "o", "", "Output codesigned file")
 	viper.BindPFlag("macho.sign.id", machoSignCmd.Flags().Lookup("id"))
 	viper.BindPFlag("macho.sign.ad-hoc", machoSignCmd.Flags().Lookup("ad-hoc"))
 	viper.BindPFlag("macho.sign.cert", machoSignCmd.Flags().Lookup("cert"))
+	viper.BindPFlag("macho.sign.pw", machoSignCmd.Flags().Lookup("pw"))
 	viper.BindPFlag("macho.sign.ent", machoSignCmd.Flags().Lookup("ent"))
+	viper.BindPFlag("macho.sign.ts", machoSignCmd.Flags().Lookup("ts"))
+	viper.BindPFlag("macho.sign.timestamp-url", machoSignCmd.Flags().Lookup("timestamp-url"))
+	viper.BindPFlag("macho.sign.proxy", machoSignCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("macho.sign.insecure", machoSignCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("macho.sign.overwrite", machoSignCmd.Flags().Lookup("overwrite"))
 	viper.BindPFlag("macho.sign.output", machoSignCmd.Flags().Lookup("output"))
 }
@@ -78,7 +92,6 @@ var machoSignCmd = &cobra.Command{
 		// flags
 		id := viper.GetString("macho.sign.id")
 		adHoc := viper.GetBool("macho.sign.ad-hoc")
-		// certFile := viper.GetString("macho.sign.cert")
 		entitlementsPlist := viper.GetString("macho.sign.ent")
 		overwrite := viper.GetBool("macho.sign.overwrite")
 		output := viper.GetString("macho.sign.output")
@@ -106,10 +119,27 @@ var machoSignCmd = &cobra.Command{
 		}
 
 		var entitlementData []byte
+		var entitlementDerData []byte
 		if len(entitlementsPlist) > 0 {
 			entitlementData, err = os.ReadFile(entitlementsPlist)
 			if err != nil {
 				return fmt.Errorf("failed to read entitlements file %s: %v", entitlementsPlist, err)
+			}
+			entitlementDerData, err = ents.DerEncode(entitlementData)
+			if err != nil {
+				return fmt.Errorf("failed to encode entitlements plist %s: %v", entitlementsPlist, err)
+			}
+		}
+
+		var privateKey any
+		var certs []*x509.Certificate
+		if len(viper.GetString("macho.sign.cert")) > 0 && len(viper.GetString("macho.sign.pw")) > 0 {
+			privateKey, certs, err = codesign.ParseP12(viper.GetString("macho.sign.cert"), viper.GetString("macho.sign.pw"))
+			if err != nil {
+				return fmt.Errorf("failed to parse p12: %v", err)
+			}
+			if len(certs) == 0 {
+				return fmt.Errorf("no certificates found in p12")
 			}
 		}
 
@@ -129,15 +159,43 @@ var machoSignCmd = &cobra.Command{
 
 				if adHoc {
 					log.Infof("ad-hoc codesigning %s", output)
-					if err := m.CodeSign(id, ctypes.ADHOC, entitlementData, nil, nil); err != nil {
+					if err := m.CodeSign(&mcs.Config{
+						ID:              id,
+						Flags:           cstypes.ADHOC,
+						Entitlements:    entitlementData,
+						EntitlementsDER: entitlementDerData,
+					}); err != nil {
 						return fmt.Errorf("failed to codesign MachO file: %v", err)
 					}
 				} else {
 					log.Infof("codesigning %s", output)
-					panic("non ad-hoc codesigning is not supported yet")
-					// if err := m.CodeSign(id, ctypes.RUNTIME, entitlementData); err != nil {
-					// 	return fmt.Errorf("failed to codesign MachO file: %v", err)
-					// }
+					if err := m.CodeSign(&mcs.Config{
+						ID:              id,
+						Flags:           cstypes.NONE,
+						Entitlements:    entitlementData,
+						EntitlementsDER: entitlementDerData,
+						CertChain:       certs,
+						SignerFunction: func(data []byte) ([]byte, error) {
+							cmsdata, err := codesign.CreateCMSSignature(data, &codesign.CMSConfig{
+								CertChain:    certs,
+								PrivateKey:   privateKey,
+								Timestamp:    viper.GetBool("macho.sign.ts"),
+								TimestampURL: viper.GetString("macho.sign.timestamp-url"),
+								Proxy:        viper.GetString("macho.sign.proxy"),
+								Insecure:     viper.GetBool("macho.sign.insecure"),
+							})
+							if err != nil {
+								return nil, fmt.Errorf("failed to create CMS signature: %v", err)
+							}
+							if viper.GetBool("verbose") {
+								fmt.Println("CMS DATA")
+								fmt.Println("========")
+								utils.PrintCMSData(cmsdata)
+							}
+							return cmsdata, nil
+						}}); err != nil {
+						return fmt.Errorf("failed to codesign MachO file: %v", err)
+					}
 				}
 			} else {
 				return fmt.Errorf("failed to open MachO file: %v", err)
