@@ -1,26 +1,27 @@
 ---
-id: iboot
-title: iboot
+id: bbl
+title: bbl
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: iboot
-description: Dump firmwares
+sidebar_label: bbl
+description: Create single universal/fat MachO out many MachOs
 last_update:
   date: 2023-01-10T12:52:46-07:00
   author: blacktop
 ---
-## ipsw iboot
+## ipsw macho bbl
 
-Dump firmwares
+Create single universal/fat MachO out many MachOs
 
 ```
-ipsw iboot <IBOOT_BIN> [flags]
+ipsw macho bbl <[MACHO]...> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for iboot
+  -h, --help            help for bbl
+      --output string   Path to output the universal/fat MachO
 ```
 
 ### Options inherited from parent commands
@@ -33,5 +34,5 @@ ipsw iboot <IBOOT_BIN> [flags]
 
 ### SEE ALSO
 
-* [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw macho](/docs/cli/ipsw/macho)	 - Parse MachO
 
