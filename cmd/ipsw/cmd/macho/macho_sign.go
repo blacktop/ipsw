@@ -51,7 +51,7 @@ func init() {
 	machoSignCmd.Flags().StringP("pw", "p", "", "p12 cert password")
 	machoSignCmd.Flags().StringP("ent", "e", "", "entitlements.plist file")
 	machoSignCmd.Flags().BoolP("ts", "t", false, "timestamp signature")
-	machoSignCmd.Flags().String("timestamp-url", "http://timestamp.apple.com/ts01", "timeserver URL")
+	machoSignCmd.Flags().String("timeserver", "http://timestamp.apple.com/ts01", "timeserver URL")
 	machoSignCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	machoSignCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	machoSignCmd.Flags().BoolP("overwrite", "f", false, "Overwrite file")
@@ -62,7 +62,7 @@ func init() {
 	viper.BindPFlag("macho.sign.pw", machoSignCmd.Flags().Lookup("pw"))
 	viper.BindPFlag("macho.sign.ent", machoSignCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("macho.sign.ts", machoSignCmd.Flags().Lookup("ts"))
-	viper.BindPFlag("macho.sign.timestamp-url", machoSignCmd.Flags().Lookup("timestamp-url"))
+	viper.BindPFlag("macho.sign.timeserver", machoSignCmd.Flags().Lookup("timeserver"))
 	viper.BindPFlag("macho.sign.proxy", machoSignCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("macho.sign.insecure", machoSignCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("macho.sign.overwrite", machoSignCmd.Flags().Lookup("overwrite"))
@@ -79,7 +79,6 @@ var machoSignCmd = &cobra.Command{
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
@@ -180,7 +179,7 @@ var machoSignCmd = &cobra.Command{
 								CertChain:    certs,
 								PrivateKey:   privateKey,
 								Timestamp:    viper.GetBool("macho.sign.ts"),
-								TimestampURL: viper.GetString("macho.sign.timestamp-url"),
+								TimestampURL: viper.GetString("macho.sign.timeserver"),
 								Proxy:        viper.GetString("macho.sign.proxy"),
 								Insecure:     viper.GetBool("macho.sign.insecure"),
 							})

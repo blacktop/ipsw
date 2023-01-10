@@ -15,7 +15,7 @@ import (
 	"sort"
 	"time"
 
-	// "github.com/blacktop/go-plist"
+	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/codesign/cms/oid"
 )
 
@@ -299,12 +299,12 @@ func (sd *SignedData) Sign(chain []*x509.Certificate, privateKey any) error {
 	if _, err = md.Write(content); err != nil {
 		return err
 	}
-	// pldata, err := plist.Marshal(CDHash{
-	// 	CDHashes: [][]byte{md.Sum(nil)[:20]},
-	// }, plist.XMLFormat)
-	// if err != nil {
-	// 	return err
-	// }
+	pldata, err := plist.MarshalIndent(CDHash{
+		CDHashes: [][]byte{md.Sum(nil)[:20]},
+	}, plist.XMLFormat, "\t")
+	if err != nil {
+		return err
+	}
 
 	// Build our SignedAttributes
 	stAttr, err := NewAttribute(oid.AttributeSigningTime, time.Now().UTC())
@@ -319,26 +319,25 @@ func (sd *SignedData) Sign(chain []*x509.Certificate, privateKey any) error {
 	if err != nil {
 		return err
 	}
-	// hvAttr, err := NewAttribute(oid.AttributeAppleHashAgilityV1, AppleHashAgility{
-	// 	Type: oid.DigestAlgorithmSHA256,
-	// 	Content: asn1.RawValue{
-	// 		Class:      asn1.ClassUniversal,
-	// 		Tag:        asn1.TagOctetString,
-	// 		Bytes:      md.Sum(nil),
-	// 		IsCompound: false,
-	// 	},
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-	// hv2Attr, err := NewAttribute(oid.AttributeAppleHashAgilityV2, pldata)
-	// if err != nil {
-	// 	return err
-	// }
+	hvAttr, err := NewAttribute(oid.AttributeAppleHashAgilityV1, pldata)
+	if err != nil {
+		return err
+	}
+	hv2Attr, err := NewAttribute(oid.AttributeAppleHashAgilityV2, AppleHashAgility{
+		Type: oid.DigestAlgorithmSHA256,
+		Content: asn1.RawValue{
+			Class:      asn1.ClassUniversal,
+			Tag:        asn1.TagOctetString,
+			Bytes:      md.Sum(nil),
+			IsCompound: false,
+		},
+	})
+	if err != nil {
+		return err
+	}
 
 	// sort attributes to match required order in marshaled form
-	// si.SignedAttrs, err = sortAttributes(stAttr, mdAttr, ctAttr, hvAttr, hv2Attr)
-	si.SignedAttrs, err = sortAttributes(stAttr, mdAttr, ctAttr)
+	si.SignedAttrs, err = sortAttributes(stAttr, mdAttr, ctAttr, hvAttr, hv2Attr)
 	if err != nil {
 		return err
 	}
