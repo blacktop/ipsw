@@ -442,7 +442,11 @@ var MachoCmd = &cobra.Command{
 					fmt.Println("--------")
 					for _, sec := range m.Sections {
 						if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
-							dat, err := sec.Data()
+							uuid, off, err := f.GetOffset(sec.Addr)
+							if err != nil {
+								return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
+							}
+							dat, err := f.ReadBytesForUUID(uuid, int64(off), sec.Size)
 							if err != nil {
 								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 							}
@@ -538,9 +542,13 @@ var MachoCmd = &cobra.Command{
 					}
 
 					if textSeg := m.Segment("__TEXT"); textSeg != nil {
-						data, err := textSeg.Data()
+						uuid, off, err := f.GetOffset(textSeg.Addr)
 						if err != nil {
-							return err
+							return fmt.Errorf("failed to get offset for %s: %v", textSeg.Name, err)
+						}
+						data, err := f.ReadBytesForUUID(uuid, int64(off), textSeg.Filesz)
+						if err != nil {
+							return fmt.Errorf("failed to read cstrings in %s: %v", textSeg.Name, err)
 						}
 
 						i := 0

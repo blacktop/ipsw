@@ -109,7 +109,11 @@ var StrSearchCmd = &cobra.Command{
 			// cstrings
 			for _, sec := range m.Sections {
 				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
-					dat, err := sec.Data()
+					uuid, off, err := f.GetOffset(sec.Addr)
+					if err != nil {
+						return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
+					}
+					dat, err := f.ReadBytesForUUID(uuid, int64(off), sec.Size)
 					if err != nil {
 						return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 					}
