@@ -23,6 +23,7 @@ package macho
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/pem"
 	"fmt"
@@ -54,6 +55,7 @@ func init() {
 	machoInfoCmd.Flags().StringP("arch", "a", "", "Which architecture to use for fat/universal MachO")
 	machoInfoCmd.Flags().BoolP("header", "d", false, "Print the mach header")
 	machoInfoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	machoInfoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	machoInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	machoInfoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	machoInfoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
@@ -72,6 +74,7 @@ func init() {
 	viper.BindPFlag("macho.info.arch", machoInfoCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.info.header", machoInfoCmd.Flags().Lookup("header"))
 	viper.BindPFlag("macho.info.loads", machoInfoCmd.Flags().Lookup("loads"))
+	viper.BindPFlag("macho.info.json", machoInfoCmd.Flags().Lookup("json"))
 	viper.BindPFlag("macho.info.sig", machoInfoCmd.Flags().Lookup("sig"))
 	viper.BindPFlag("macho.info.ent", machoInfoCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("macho.info.objc", machoInfoCmd.Flags().Lookup("objc"))
@@ -100,8 +103,8 @@ var machoInfoCmd = &cobra.Command{
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		var m *macho.File
 		var err error
+		var m *macho.File
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -209,6 +212,7 @@ var machoInfoCmd = &cobra.Command{
 					}
 					// create output file
 					outPEM := filepath.Join(folder, filepath.Base(filepath.Clean(machoPath))+".pem")
+					log.Infof("Created %s", outPEM)
 					f, err := os.Create(outPEM)
 					if err != nil {
 						return fmt.Errorf("failed to create pem file %s: %v", outPEM, err)
@@ -216,15 +220,10 @@ var machoInfoCmd = &cobra.Command{
 					defer f.Close()
 					// write certs to file
 					for _, cert := range p7.Certificates {
-						publicKeyBlock := pem.Block{
-							Type:  "CERTIFICATE",
-							Bytes: cert.Raw,
-						}
-						if _, err := f.WriteString(string(pem.EncodeToMemory(&publicKeyBlock))); err != nil {
+						if err := pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}); err != nil {
 							return fmt.Errorf("failed to write pem file: %v", err)
 						}
 					}
-					log.Infof("Created %s", outPEM)
 				} else {
 					return fmt.Errorf("no CMS signature found")
 				}
@@ -278,7 +277,15 @@ var machoInfoCmd = &cobra.Command{
 			fmt.Println(m.FileHeader.String())
 		}
 		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg) {
-			fmt.Println(m.FileTOC.String())
+			if viper.GetBool("macho.info.json") {
+				dat, err := m.FileTOC.MarshalJSON()
+				if err != nil {
+					return fmt.Errorf("failed to marshal MachO table of contents as JSON: %v", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				fmt.Println(m.FileTOC.String())
+			}
 		} else {
 			if len(filesetEntry) == 0 && !viper.GetBool("macho.info.all-fileset-entries") {
 				if m.FileTOC.FileHeader.Type == types.MH_FILESET {
@@ -297,29 +304,36 @@ var machoInfoCmd = &cobra.Command{
 				if len(cds) > 0 {
 					for _, cd := range cds {
 						var teamID string
+						var platform string
 						var execSegFlags string
 						if len(cd.TeamID) > 0 {
 							teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
 						}
-						if cd.Header.ExecSegFlags > 0 {
-							execSegFlags = fmt.Sprintf(" (%s)", cd.Header.ExecSegFlags.String())
+						if cd.Header.Platform != 0 {
+							platform = fmt.Sprintf("\tPlatform:    %s (%d)\n", cd.Header.Platform, cd.Header.Platform)
 						}
-						fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
+						if cd.Header.ExecSegFlags > 0 {
+							execSegFlags = fmt.Sprintf(" (%s)", cd.Header.ExecSegFlags)
+						}
+						fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
 						fmt.Printf("\tVersion:     %s%s\n"+
-							"\tFlags:       %s\n"+
+							"\tFlags:       %#x (%s)\n"+
 							"\tCodeLimit:   %#x\n"+
 							"\tIdentifier:  %s (@%#x)\n"+
+							"%s"+
 							"%s"+
 							"\tCDHash:      %s (computed)\n"+
 							"\t# of hashes: %d code (%d pages) + %d special\n"+
 							"\tHashes @%d size: %d Type: %s\n",
 							cd.Header.Version,
 							execSegFlags,
+							uint32(cd.Header.Flags),
 							cd.Header.Flags,
 							cd.Header.CodeLimit,
 							cd.ID,
 							cd.Header.IdentOffset,
 							teamID,
+							platform,
 							cd.CDHash,
 							cd.Header.NCodeSlots,
 							int(math.Pow(2, float64(cd.Header.PageSize))),
@@ -352,7 +366,7 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 				if len(m.CodeSignature().CMSSignature) > 0 {
-					fmt.Println("CMS (RFC3852) signature:")
+					fmt.Printf("CMS (RFC3852) signature (%d bytes):", len(m.CodeSignature().CMSSignature))
 					p7, err := pkcs7.Parse(m.CodeSignature().CMSSignature)
 					if err != nil {
 						return err
@@ -364,16 +378,34 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Fprintf(w, "\tData:\n")
 							fmt.Fprintf(w, "\t\tVersion: %d (%#x)\n", cert.Version, cert.Version)
 							fmt.Fprintf(w, "\t\tSerial Number: %d (%#x)\n", cert.SerialNumber, cert.SerialNumber)
-							fmt.Fprintf(w, "\t\tIssuer: %s\n", cert.Issuer.String())
+							var extraIssuerInfo string
+							for _, name := range cert.Issuer.Names {
+								if name.Type.Equal(certs.OIDEmailAddress) {
+									extraIssuerInfo = fmt.Sprintf(",email=%s", name.Value.(string))
+								}
+							}
+							fmt.Fprintf(w, "\t\tIssuer: %s\n", cert.Issuer.String()+extraIssuerInfo)
 							fmt.Fprintf(w, "\t\tValidity:\n")
 							fmt.Fprintf(w, "\t\t\tNot Before: %s\n", cert.NotBefore.Format("Jan 2 15:04:05 2006 MST"))
 							fmt.Fprintf(w, "\t\t\tNot After:  %s\n", cert.NotAfter.Format("Jan 2 15:04:05 2006 MST"))
-							fmt.Fprintf(w, "\t\tSubject: %s\n", cert.Subject.String())
+							var extraSubjectInfo string
+							for _, name := range cert.Subject.Names {
+								if name.Type.Equal(certs.OIDEmailAddress) {
+									extraSubjectInfo = fmt.Sprintf(",email=%s", name.Value.(string))
+								}
+							}
+							fmt.Fprintf(w, "\t\tSubject: %s\n", cert.Subject.String()+extraSubjectInfo)
 							fmt.Fprintf(w, "\t\tSubject Public Key Info:\n")
 							fmt.Fprintf(w, "\t\t\tPublic Key Algorithm: %s\n", cert.PublicKeyAlgorithm)
-							fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", cert.PublicKey.(*rsa.PublicKey).Size()*8) // convert bytes to bits
-							fmt.Fprintf(w, "\t\t\t\tModulus: \n%s\n", certs.ReprData(cert.PublicKey.(*rsa.PublicKey).N.Bytes(), 5, 14))
-							fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", cert.PublicKey.(*rsa.PublicKey).E, cert.PublicKey.(*rsa.PublicKey).E)
+							switch key := cert.PublicKey.(type) {
+							case *rsa.PublicKey:
+								fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", key.Size()*8) // convert bytes to bits
+								fmt.Fprintf(w, "\t\t\t\tModulus: \n%s\n", certs.ReprData(key.N.Bytes(), 5, 14))
+								fmt.Fprintf(w, "\t\t\t\tExponent: %d (%#x)\n", key.E, key.E)
+							case *ecdsa.PublicKey:
+								fmt.Fprintf(w, "\t\t\t\tPublic Key: (%d bits)\n", key.Params().BitSize)
+								fmt.Fprintf(w, "\t\t\t\t NIST CURVE: %s\n", key.Params().Name)
+							}
 							fmt.Fprintf(w, "\tX509v3 Extensions:\n")
 							for _, ext := range cert.Extensions {
 								critical := ""
@@ -435,6 +467,8 @@ var machoInfoCmd = &cobra.Command{
 							}
 							publicKeyPem := string(pem.EncodeToMemory(&publicKeyBlock))
 							fmt.Fprintf(w, "\n%s\n", publicKeyPem)
+							fmt.Println()
+							utils.PrintCMSData(m.CodeSignature().CMSSignature)
 						} else {
 							var ou string
 							if cert.Issuer.Organization != nil {
@@ -605,31 +639,69 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("=======")
 			}
 			var sec string
+			var label string
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			if m.Symtab != nil {
+				label = "Symtab"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
 				for _, sym := range m.Symtab.Syms {
 					if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
 						sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
 					}
-					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
-					// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+					var lib string
+					if sym.Desc.GetLibraryOrdinal() != types.SELF_LIBRARY_ORDINAL && sym.Desc.GetLibraryOrdinal() < types.MAX_LIBRARY_ORDINAL {
+						lib = fmt.Sprintf("\t(%s)", filepath.Base(m.ImportedLibraries()[sym.Desc.GetLibraryOrdinal()-1]))
+					}
+					if viper.GetBool("verbose") {
+						if sym.Value == 0 {
+							fmt.Fprintf(w, "              <%s> [%s]\t%s%s\n", sym.Type.String(sec), sym.Desc, sym.Name, lib)
+						} else {
+							fmt.Fprintf(w, "%#09x:  <%s> [%s]\t%s%s\n", sym.Value, sym.Type.String(sec), sym.Desc, sym.Name, lib)
+						}
+					} else {
+						if sym.Value == 0 {
+							fmt.Fprintf(w, "              <%s>\t%s%s\n", sym.Type.String(sec), sym.Name, lib)
+						} else {
+							fmt.Fprintf(w, "%#09x:  <%s>\t%s%s\n", sym.Value, sym.Type.String(sec), sym.Name, lib)
+						}
+					}
 				}
 				w.Flush()
 			} else {
 				fmt.Println("  - no symbol table")
 			}
 			if binds, err := m.GetBindInfo(); err == nil {
-				fmt.Printf("\nDyld Binds\n")
-				fmt.Println("----------")
+				label = "DyldInfo [Binds]"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
 				for _, bind := range binds {
-					fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
+					fmt.Fprintf(w, "%#09x:\t%s\n", bind.Start+bind.Offset, bind)
 				}
 				w.Flush()
 			}
-			// Dedup these symbols (has repeats but also additional symbols??)
-			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && viper.GetBool("verbose") {
-				fmt.Printf("\nDyld Exports\n")
-				fmt.Println("------------")
+			if rebases, err := m.GetRebaseInfo(); err == nil {
+				label = "DyldInfo [Rebases]"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
+				for _, rebase := range rebases {
+					fmt.Fprintf(w, "%#09x:\t%s\n", rebase.Start+rebase.Offset, rebase)
+				}
+				w.Flush()
+			}
+			if exports, err := m.GetExports(); err == nil {
+				label = "DyldInfo [Exports]"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
+				for _, export := range exports {
+					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
+				}
+				w.Flush()
+			}
+			if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
+				label = "Dyld Exports Trie"
+				fmt.Printf("\n%s\n", label)
+				fmt.Println(strings.Repeat("-", len(label)))
 				exports, err := m.DyldExports()
 				if err != nil {
 					return err
@@ -655,8 +727,8 @@ var machoInfoCmd = &cobra.Command{
 
 				for _, start := range dcf.Starts {
 					if start.PageStarts != nil {
-						var sec *macho.Section
-						var lastSec *macho.Section
+						var sec *types.Section
+						var lastSec *types.Section
 						for _, fixup := range start.Fixups {
 							switch f := fixup.(type) {
 							case fixupchains.Bind:
@@ -694,7 +766,7 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("SEGMENT_SPLIT_INFO")
 				fmt.Println("==================")
 			}
-			var sections []macho.Section
+			var sections []types.Section
 			for _, l := range m.Loads {
 				if s, ok := l.(*macho.Segment); ok {
 					for j := uint32(0); j < s.Nsect; j++ {

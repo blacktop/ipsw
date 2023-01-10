@@ -171,9 +171,13 @@ func (e *Emulation) InitStack() error {
 		if err := e.mu.MemMap(a, s); err != nil {
 			return fmt.Errorf("failed to memmap libsystem_c.dylib segment %s at %#x: %v", seg.Name, a, err)
 		}
-		segData, err := seg.Data()
+		off, err := lsC.GetOffset(seg.Addr)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get offset for %s: %v", seg.Name, err)
+		}
+		segData := make([]byte, seg.Filesz)
+		if _, err := lsC.ReadAt(segData, int64(off)); err != nil {
+			return fmt.Errorf("failed to read libsystem_c.dylib segment %s data: %v", seg.Name, err)
 		}
 		if err := e.mu.MemWrite(seg.Addr, segData); err != nil {
 			return fmt.Errorf("failed to write libsystem_c.dylib segment %s data: %v", seg.Name, err)

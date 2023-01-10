@@ -27,8 +27,8 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -70,22 +70,16 @@ var kextsCmd = &cobra.Command{
 				return err
 			}
 
-			dmp := diffmatchpatch.New()
-
-			diffs := dmp.DiffMain(strings.Join(kout1, "\n"), strings.Join(kout2, "\n"), false)
-			if len(diffs) > 2 {
-				diffs = dmp.DiffCleanupSemantic(diffs)
-				diffs = dmp.DiffCleanupEfficiency(diffs)
+			out, err := utils.GitDiff(strings.Join(kout1, "\n"), strings.Join(kout2, "\n"))
+			if err != nil {
+				return err
 			}
-
-			if len(diffs) == 1 {
-				if diffs[0].Type == diffmatchpatch.DiffEqual {
-					log.Info("No differences found")
-				}
-			} else {
-				log.Info("Differences found")
-				fmt.Println(dmp.DiffPrettyText(diffs))
+			if len(out) == 0 {
+				log.Info("No differences found")
+				return nil
 			}
+			log.Info("Differences found")
+			fmt.Println(out)
 		} else {
 			kout, err := kernelcache.KextList(args[0], false)
 			if err != nil {

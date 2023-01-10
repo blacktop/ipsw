@@ -185,7 +185,25 @@ var symbolicateCmd = &cobra.Command{
 			w.Flush()
 			var note string
 			if unslide {
-				note = " (may contain slid addresses)"
+				if len(crashLog.Threads[crashLog.CrashedThread].BackTrace) > 0 {
+					var slide uint64
+					if img, err := f.GetImageContainingVMAddr(crashLog.Threads[crashLog.CrashedThread].State["pc"]); err == nil {
+						found := false
+						for _, bt := range crashLog.Threads[crashLog.CrashedThread].BackTrace {
+							if bt.Image.Name == img.Name {
+								slide = bt.Image.Slide
+								found = true
+								break
+							}
+						}
+						if !found {
+							slide = crashLog.Threads[crashLog.CrashedThread].BackTrace[0].Image.Slide
+						}
+					}
+					note = fmt.Sprintf(" (may contain slid addresses; slide=%#x)", slide)
+				} else {
+					note = " (may contain slid addresses)"
+				}
 			}
 			fmt.Printf("\nThread %d State:%s\n%s\n", crashLog.CrashedThread, note, crashLog.Threads[crashLog.CrashedThread].State)
 			// slide := crashLog.Threads[crashLog.CrashedThread].BackTrace[0].Image.Slide

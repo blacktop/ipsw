@@ -32,9 +32,9 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/ctf"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -223,20 +223,15 @@ var ctfdumpCmd = &cobra.Command{
 				return fmt.Errorf("could not find struct '%s' in either file", args[2])
 			}
 
-			dmp := diffmatchpatch.New()
-
-			diffs := dmp.DiffMain(t1.String(), t2.String(), false)
-			if len(diffs) > 2 {
-				diffs = dmp.DiffCleanupSemantic(diffs)
-				diffs = dmp.DiffCleanupEfficiency(diffs)
+			out, err := utils.GitDiff(t1.String(), t2.String())
+			if err != nil {
+				return err
 			}
-			if len(diffs) == 1 {
-				if diffs[0].Type == diffmatchpatch.DiffEqual {
-					log.Info("No differences found")
-				}
+			if len(out) == 0 {
+				log.Info("No differences found")
 			} else {
 				log.Info("Differences found")
-				fmt.Println(dmp.DiffPrettyText(diffs))
+				fmt.Println(out)
 			}
 		} else if len(args) > 1 {
 			for _, id := range ids {

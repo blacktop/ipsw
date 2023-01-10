@@ -415,10 +415,29 @@ jobs:
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: ipsw macho disass "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --all-fileset-entries  --quiet --section __TEXT_EXEC.__text | grep 'addg\|cmpp\|gmi\|irg\|ldg\|ldgv\|st2g\|stg\|stgp\|stgv\|stz2g\|stzg\|subg\|subp\|subps'
-      - name: Run lipo
+      - name: Run macho lipo
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw macho lipo /bin/ls --output /tmp --arch x86_64
+        run: |
+          ipsw macho lipo /bin/ls --output /tmp --arch x86_64
+          ipsw macho lipo /bin/ls --output /tmp --arch arm64e
+      - name: Run macho bbl
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: |
+          ipsw macho bbl --output /tmp/ls.bbl /tmp/ls.x86_64 /tmp/ls.arm64e
+          diff /bin/ls /tmp/ls.bbl
+      - name: Run macho patch
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: |
+          ipsw macho patch mod /tmp/ls.arm64e LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
+          ipsw macho patch add /tmp/ls.arm64e LC_RPATH @executable_path/Frameworks --overwrite
+      - name: Run macho sign
+        if: matrix.platform == 'macos-12'
+        working-directory: /tmp/ipsw
+        run: |
+          ipsw macho sign -V --ad-hoc --overwrite /tmp/ls.arm64e
 
       #
       # ENT CMD (macOS)

@@ -20,8 +20,12 @@ import TabItem from '@theme/TabItem';
 ### Via [homebrew](https://brew.sh)
 
 ```bash
-brew install blacktop/tap/ipsw
+brew install blacktop/tap/ipsw --with-git-delta
 ```
+
+:::info 
+`--with-git-delta` is optional and will install [git-delta](https://github.com/dandavison/delta) for better looking diffs.
+:::
 
 Install `frida` version
 
@@ -45,7 +49,9 @@ wget https://github.com/blacktop/ipsw/releases/download/v3.1.220/ipsw_3.1.221_ma
 tar xzf ipsw_3.1.221_macOS_arm64_extras.tar.gz
 ```
 
-> **NOTE:** The `extras` version is what is installed via homebrew by default.
+:::info 
+The `extras` version is what is installed via homebrew by default.
+:::
 
 ### Frida Version
 
@@ -56,10 +62,8 @@ wget https://github.com/blacktop/ipsw/releases/download/v3.1.221/ipsw_3.1.221_ma
 tar xzf ipsw_3.1.221_macOS_arm64_frida.tar.gz
 ```
 
-:::info 
-
-The **extras** and **frida** versions or `ipsw` only support macOS for now. *(Please let the author know if you want them supported on your platform)*
-
+:::caution 
+The **extras** and **frida** versions of `ipsw` only support macOS for now. *(Please let the author know if you want them supported on your platform)*
 :::
 
 ```mdx-code-block

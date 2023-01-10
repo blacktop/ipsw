@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: ls
 description: List installed applications
 last_update:
-  date: 2022-12-23T02:36:33-07:00
+  date: 2023-01-10T12:52:46-07:00
   author: blacktop
 ---
 ## ipsw idev apps ls

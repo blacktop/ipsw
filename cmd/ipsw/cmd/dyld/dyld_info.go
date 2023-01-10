@@ -27,16 +27,17 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/pkg/codesign/types"
+	"github.com/blacktop/go-macho/pkg/codesign"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -69,7 +70,7 @@ type dyldInfo struct {
 	SubCacheGroupID    int                                         `json:"sub_cache_group_id,omitempty"`
 	SymSubCacheUUID    string                                      `json:"sym_sub_cache_uuid,omitempty"`
 	Mappings           map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
-	CodeSignature      map[string]types.CodeSignature              `json:"code_signature,omitempty"`
+	CodeSignature      map[string]codesign.CodeSignature           `json:"code_signature,omitempty"`
 	Dylibs             []dylib                                     `json:"dylibs,omitempty"`
 }
 
@@ -140,7 +141,7 @@ var InfoCmd = &cobra.Command{
 				}
 			}
 
-			dinfo.CodeSignature = make(map[string]types.CodeSignature)
+			dinfo.CodeSignature = make(map[string]codesign.CodeSignature)
 
 			if showSignature {
 				for u, cs := range f.CodeSignatures {
@@ -158,7 +159,7 @@ var InfoCmd = &cobra.Command{
 					dinfo.Dylibs = append(dinfo.Dylibs, dylib{
 						Index:       idx + 1,
 						Name:        img.Name,
-						Version:     m.SourceVersion().Version,
+						Version:     m.SourceVersion().Version.String(),
 						UUID:        m.UUID().String(),
 						LoadAddress: img.Info.Address,
 					})
@@ -194,7 +195,7 @@ var InfoCmd = &cobra.Command{
 							if len(cd.TeamID) > 0 {
 								teamID = fmt.Sprintf("\tTeamID:      %s\n", cd.TeamID)
 							}
-							fmt.Printf("Code Directory (%d bytes)\n", cd.Header.Length)
+							fmt.Printf("Code Directory (%d bytes)\n", cd.Length)
 							fmt.Printf("\tVersion:     %s\n"+
 								"\tFlags:       %s\n"+
 								"\tCodeLimit:   0x%x\n"+
@@ -277,13 +278,14 @@ var InfoCmd = &cobra.Command{
 				}
 
 				var dout1 []string
-				for idx, img := range f.Images {
+				for _, img := range f.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
-					dout1 = append(dout1, fmt.Sprintf("%4d: (%s)\t%s", idx+1, m.SourceVersion().Version, img.Name))
+					dout1 = append(dout1, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
 				}
+				sort.Strings(dout1)
 
 				f2, err := dyld.Open(filepath.Clean(args[1]))
 				if err != nil {
@@ -292,31 +294,24 @@ var InfoCmd = &cobra.Command{
 				defer f.Close()
 
 				var dout2 []string
-				for idx, img := range f2.Images {
+				for _, img := range f2.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
-					dout2 = append(dout2, fmt.Sprintf("%4d: (%s)\t%s", idx+1, m.SourceVersion().Version, img.Name))
+					dout2 = append(dout2, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
 				}
+				sort.Strings(dout2)
 
-				dmp := diffmatchpatch.New()
-
-				diffs := dmp.DiffMain(strings.Join(dout1, "\n"), strings.Join(dout2, "\n"), false)
-				if len(diffs) > 2 {
-					diffs = dmp.DiffCleanupSemantic(diffs)
-					diffs = dmp.DiffCleanupEfficiency(diffs)
+				out, err := utils.GitDiff(strings.Join(dout1, "\n"), strings.Join(dout2, "\n"))
+				if err != nil {
+					return err
 				}
-
-				fmt.Println("Images")
-				fmt.Println("======")
-				if len(diffs) == 1 {
-					if diffs[0].Type == diffmatchpatch.DiffEqual {
-						log.Info("No differences found")
-					}
+				if len(out) == 0 {
+					log.Info("No differences found")
 				} else {
 					log.Info("Differences found")
-					fmt.Println(dmp.DiffPrettyText(diffs))
+					fmt.Println(out)
 				}
 			} else {
 				fmt.Println("Images")
@@ -350,7 +345,7 @@ var InfoCmd = &cobra.Command{
 						}
 						srcVer := "No SourceVersion"
 						if m.SourceVersion() != nil {
-							srcVer = m.SourceVersion().Version
+							srcVer = m.SourceVersion().Version.String()
 						}
 						if viper.GetBool("verbose") {
 							fmt.Fprintf(w, "%4d: %#x\t%s\t(%s)\t%s\n", idx+1, img.Info.Address, m.UUID(), srcVer, img.Name)

@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: macho
 description: Parse a dylib file
 last_update:
-  date: 2022-12-23T02:36:33-07:00
+  date: 2023-01-10T12:52:46-07:00
   author: blacktop
 ---
 ## ipsw dyld macho
@@ -24,6 +24,7 @@ ipsw dyld macho <dyld_shared_cache> <dylib> [flags]
   -x, --extract         🚧 Extract the dylib
       --force           Overwrite existing extracted dylib(s)
   -h, --help            help for macho
+  -j, --json            Print the TOC as JSON
   -l, --loads           Print the load commands
   -o, --objc            Print ObjC info
   -r, --objc-refs       Print ObjC references

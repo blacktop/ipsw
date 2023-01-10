@@ -31,9 +31,8 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/sandbox"
-	"github.com/fatih/color"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -82,9 +81,6 @@ var kernelSandboxCmd = &cobra.Command{
 		}
 
 		if diff {
-			in := color.New(color.FgGreen).Add(color.Bold)
-			dl := color.New(color.FgRed).Add(color.Bold)
-
 			if len(args) < 2 {
 				return fmt.Errorf("please provide two kernelcache files to diff")
 			}
@@ -111,34 +107,15 @@ var kernelSandboxCmd = &cobra.Command{
 				return fmt.Errorf("failed to get sandbox operations: %s", err)
 			}
 
-			sb1OUT := strings.Join(sbOpts, "\n")
-			sb2OUT := strings.Join(sbOpts2, "\n")
-
-			dmp := diffmatchpatch.New()
-
-			diffs := dmp.DiffMain(sb1OUT, sb2OUT, true)
-			if len(diffs) > 2 {
-				diffs = dmp.DiffCleanupSemantic(diffs)
-				diffs = dmp.DiffCleanupEfficiency(diffs)
+			out, err := utils.GitDiff(strings.Join(sbOpts, "\n"), strings.Join(sbOpts2, "\n"))
+			if err != nil {
+				return err
 			}
-
-			if len(diffs) == 1 {
-				if diffs[0].Type == diffmatchpatch.DiffEqual {
-					log.Info("No differences found")
-				}
+			if len(out) == 0 {
+				log.Info("No differences found")
 			} else {
 				log.Info("Differences found")
-				if viper.GetBool("verbose") {
-					fmt.Println(dmp.DiffPrettyText(diffs))
-				} else {
-					for _, d := range diffs {
-						if d.Type == diffmatchpatch.DiffInsert {
-							in.Println(d.Text)
-						} else if d.Type == diffmatchpatch.DiffDelete {
-							dl.Println(d.Text)
-						}
-					}
-				}
+				fmt.Println(out)
 			}
 		} else {
 			title := fmt.Sprintf("Sandbox Operations (%d)", len(sbOpts))

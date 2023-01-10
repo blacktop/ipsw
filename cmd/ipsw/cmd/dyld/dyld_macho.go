@@ -46,6 +46,7 @@ func init() {
 	DyldCmd.AddCommand(MachoCmd)
 	MachoCmd.Flags().BoolP("all", "a", false, "Parse ALL dylibs")
 	MachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	MachoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	MachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	MachoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
 	MachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
@@ -125,6 +126,7 @@ var MachoCmd = &cobra.Command{
 		}
 
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
+		showLoadCommandsAsJSON, _ := cmd.Flags().GetBool("json")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
@@ -252,7 +254,15 @@ var MachoCmd = &cobra.Command{
 				}
 
 				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs && searchPattern == "" {
-					fmt.Println(m.FileTOC.String())
+					if showLoadCommandsAsJSON {
+						dat, err := m.FileTOC.MarshalJSON()
+						if err != nil {
+							return fmt.Errorf("failed to marshal MachO table of contents as JSON: %v", err)
+						}
+						fmt.Println(string(dat))
+					} else {
+						fmt.Println(m.FileTOC.String())
+					}
 				}
 
 				if showObjC {
@@ -432,7 +442,11 @@ var MachoCmd = &cobra.Command{
 					fmt.Println("--------")
 					for _, sec := range m.Sections {
 						if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
-							dat, err := sec.Data()
+							uuid, off, err := f.GetOffset(sec.Addr)
+							if err != nil {
+								return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
+							}
+							dat, err := f.ReadBytesForUUID(uuid, int64(off), sec.Size)
 							if err != nil {
 								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 							}
@@ -528,9 +542,13 @@ var MachoCmd = &cobra.Command{
 					}
 
 					if textSeg := m.Segment("__TEXT"); textSeg != nil {
-						data, err := textSeg.Data()
+						uuid, off, err := f.GetOffset(textSeg.Addr)
 						if err != nil {
-							return err
+							return fmt.Errorf("failed to get offset for %s: %v", textSeg.Name, err)
+						}
+						data, err := f.ReadBytesForUUID(uuid, int64(off), textSeg.Filesz)
+						if err != nil {
+							return fmt.Errorf("failed to read cstrings in %s: %v", textSeg.Name, err)
 						}
 
 						i := 0

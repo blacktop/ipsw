@@ -4,13 +4,15 @@ description: All the MANY ways and types of files you can download.
 
 # Download All Teh Things
 
-> ⚠️ **NOTICE:** Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why.
+:::caution NOTICE
+Apple seems to be removing old `ipsws` from their CDN servers so if you get a 404 or some other error that might be the reason why.
+:::
 
 ## **download ipsw**
 
 > Queries the [ipsw.me](https://ipsw.me) API
 
-Download an ipsw and extract/decompress the kernelcache
+Download an IPSW and extract/decompress the kernelcache
 
 ```bash
 ❯ ipsw download ipsw --device iPhone11,2 --build 16A366
@@ -25,7 +27,9 @@ Download an ipsw and extract/decompress the kernelcache
       • Created 16A366__iPhone11,2/kernelcache.release.iPhone11,2
 ```
 
-> ⚠️ notice that the kernelcache was extracted from the ipsw and decompressed 😈
+:::info note
+The kernelcache was extracted from the IPSW and decompressed
+:::
 
 ```bash
 ❯ file 16A366__iPhone11,2/kernelcache.release.iPhone11,2
@@ -33,7 +37,7 @@ Download an ipsw and extract/decompress the kernelcache
 16A366__iPhone11,2/kernelcache.release.iPhone11,2 "Mach-O 64-bit executable arm64"
 ```
 
-Download ALL the **iOS** `12.0` ipsws
+Download ALL the **iOS** `12.0` IPSWs
 
 ```bash
 ❯ ipsw download ipsw --version 12.0
@@ -47,7 +51,7 @@ Download ALL the **iOS** `12.0` ipsws
   ...
 ```
 
-Download the **macOS** `11.5` ipsw
+Download the **macOS** `11.5` IPSW
 
 ```bash
 ❯ ipsw download ipsw --macos --version 11.5
@@ -69,7 +73,9 @@ Debug speed issues
 	5.3 MiB / 5.3 GiB [----------------------------------------------------------| 1h18m2s ]  1.17 MiB/s
 ```
 
-> **NOTE:** The Apple CDN's IP has been geo-looked up and is in **Santa Clara**. You can Ctrl+C and try again for a closer CDN which will typically correlate with increased download speeds.
+:::info note
+The Apple CDN's IP has been geo-looked up and is in **Santa Clara**. You can Ctrl+C and try again for a closer CDN which will typically correlate with increased download speeds.
+:::
 
 Download with a Proxy
 
@@ -90,7 +96,7 @@ To disable SSL cert verification
 You can also use a config file with `ipsw` so you don't have to use the flags
 
 ```bash
-❯ cat ~/.ipsw.yml
+❯ cat ~/.ipsw/config.yml
 ```
 
 ```yaml
@@ -116,7 +122,7 @@ You can also use environment variables to set `ipsw` config
 
 > Queries the iTunes XML for latest version _(maybe run this as a cron job)_ 😉
 
-Download all the latest ipsws
+Download all the latest IPSWs
 
 ```bash
 ❯ ipsw download ipsw -V --black-list AppleTV --black-list iPod7,1 --latest --confirm
@@ -137,7 +143,9 @@ iPadPro_9.7_13.2.3_17B111_Restore.ipsw: OK
 iPad_Educational_13.2.3_17B111_Restore.ipsw: OK
 ```
 
-> ⚠️ **NOTE:** you must do **one** device type/family per `--black-list` or `--white-list` flag
+:::info note
+You must do **one** device type/family per `--black-list` or `--white-list` flag
+:::
 
 To grab _only_ the iPods
 
@@ -150,7 +158,7 @@ To grab _only_ the iPods
   ...
 ```
 
-Download **latest** `macOS` ipsws
+Download **latest** `macOS` IPSWs
 
 ```bash
 ❯ ipsw download ipsw --macos --latest -y
@@ -210,7 +218,7 @@ That's **38** decompressed kernelcaches in under **8 minutess** and I've seen **
 Only download files that match a given name/path
 
 ```bash
-❯ ipsw download -d iPhone14,2 --latest --pattern iBoot
+❯ ipsw download ipsw -d iPhone14,2 --latest --pattern iBoot
 
    • Latest release found is: 15.1
    • Parsing remote IPSW       build=19B74 device=iPhone14,2 signed=true version=15.1
@@ -246,14 +254,16 @@ Download IPSWs from The iPhone Wiki
       • Writing 19R346__Watch6,9/kernelcache.release.Watch6,9
 ```
 
-> **NOTE:** This depends on the iphonewiki maintainers publishing the IPSW firmware download links.
+:::info note
+This depends on the iphonewiki maintainers publishing the IPSW firmware download links.
+:::
 
 ## **download ota**
 
 Check for availiable OTA _(over the air updates)_ download versions
 
 ```bash
-❯ ipsw download ota --info
+❯ ipsw download ota --platform ios --info
 
 ? Choose an OS type: iOS
    • OTAs                      type=iOS
@@ -285,7 +295,7 @@ Check for availiable OTA _(over the air updates)_ download versions
 Download the OTA `14.8.1` release for the `iPhone14,2` device
 
 ```bash
-❯ ipsw download ota --version 14.8.1 --device iPhone10,1
+❯ ipsw download ota --platform ios --version 14.8.1 --device iPhone10,1
 
 ? You are about to download 1 OTA files. Continue? Yes
    • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
@@ -295,7 +305,7 @@ Download the OTA `14.8.1` release for the `iPhone14,2` device
 Download iOS `15.2` developer **beta** OTA
 
 ```bash
-❯ ipsw download ota --device iPhone12,3 --beta
+❯ ipsw download ota --platform ios --device iPhone12,3 --beta
 
 ? You are about to download 1 OTA files. Continue? Yes
    • Getting OTA               build=19C5026i device=iPhone12,3 version=iOS152DevBeta1
@@ -325,7 +335,7 @@ Download the latest Studio Display `beta` OTA
 Just download the _kernelcache_ and _dyld_shared_cache_
 
 ```bash
-❯ ipsw download ota --device iPod9,1 --kernel --dyld
+❯ ipsw download ota --platform ios --device iPod9,1 --kernel --dyld
 ? You are about to download 1 OTA files. Continue? Yes
    • Parsing remote OTA        build=19A344 device=iPod9,1 version=iOS15Long
    • Extracting remote dyld_shared_cache (can be a bit CPU intensive)
@@ -384,7 +394,9 @@ You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` re
 	74.6 MiB / 11.3 GiB [----------------------------------------------------------| 1h4m28s ]  2.97 MiB/s
 ```
 
-> ⚠️ **NOTE:** macOS sandboxes certain folders and prevents you from running some of the Apple utils required to build the FULL installers. _(try running in `/Users/Shared`)_
+:::info note
+macOS sandboxes certain folders and prevents you from running some of the Apple utils required to build the FULL installers. _(try running in `/Users/Shared`)_
+:::
 
 #### To ignore digest verification errors
 
@@ -392,7 +404,9 @@ You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` re
 ❯ ipsw download macos --ignore
 ```
 
-> **NOTE:** This is probably a bad idea, but I've noticed some of the recent installer parts have bad sha1 digests listed in the sucatalogs
+:::info note
+This is probably a bad idea, but I've noticed some of the recent installer parts have bad sha1 digests listed in the sucatalogs
+:::
 
 #### To _ONLY_ download the `InstallAssistant.pkg` file _(which includes the install App as well)_
 
@@ -406,7 +420,9 @@ You just plucked the `kernelcache` AND THE MUTHA FLIPPIN' `dyld_shared_cache` re
 ❯ ipsw download macos --latest
 ```
 
-> **NOTE** This will find the latest installer and then also download any other installers released on the same day.
+:::info note
+This will find the latest installer and then also download any other installers released on the same day.
+:::
 
 ## **download dev**
 
@@ -425,11 +441,11 @@ Download IPSWs (and more) from https://developer.apple.com/download
         42.11 MiB / 6.27 GiB [----------------------------------------------------------| 20m56s ]  1.54 MiB/s
 ```
 
-:::info vault
+:::info vaults
 Your Developer Portal credentials and session are stored securely in your Keychain on macOS; in your Windows Credential Manager on Windows and in your Linux Keyring on Linux.
 :::
 
-:::caution
+:::caution note
 The `--vault-password` flag is the encryption password for the **file** based vaults that will be placed encrypted in the `~/.ipsw` directory. This is **NOT** for your Developer Portal credentials.  
 
 This is when ran on an OS that does not have a native Keychain, Credential Manager or Keyring etc.
@@ -444,7 +460,9 @@ Watch for 🆕 **beta** IPSWs
    <SNIP>
 ```
 
-> **NOTE:** This will check every 5 minutes for new files and download them. (I've seem apple expire the session and am not sure how to prevent it yet.)
+:::info NOTE
+This will check every 5 minutes for new files and download them.
+:::
 
 Output downloadable items as JSON
 
@@ -479,62 +497,6 @@ Download App Packages from the iOS App Store
    • Downloading               file=/var/folders/5q/g6x_p_yn113dpvwd1tm2kjzc0000gn/T/appstore.ipa2930715700
 	197.74 MiB / 197.74 MiB [==========================================================| ✅  ] 11.68 MiB/s
    • Created com.zhiliaoapp.musically_835599320.v27.4.0.ipa
-```   
-
-## **download oss**
-
-> Download [opensource.apple.com](https://opensource.apple.com) file for macOS version
-
-Download them all
-
-```
-❯ ipsw download oss --macos 11.4 --all
-```
-
-Download single product
-
-```
-❯ ipsw download oss --macos 11.4 --product dyld
-```
-
-List all downloads
-
-```
-❯ ipsw download oss --macos 11.4
-```
-
-```json
-{
-   "build": "GoldenGateF20F71",
-   "inherits": "GoldenGateE20E232",
-   "projects": {
-      "AppleFileSystemDriver": {
-         "version": "27",
-         "url": "https://opensource.apple.com/tarballs/AppleFileSystemDriver/AppleFileSystemDriver-27.tar.gz"
-      },
-      <SNIP>
-      "xar": {
-         "version": "452",
-         "url": "https://opensource.apple.com/tarballs/xar/xar-452.tar.gz"
-      },
-      "xnu": {
-         "version": "7195.121.3",
-         "url": "https://opensource.apple.com/tarballs/xnu/xnu-7195.121.3.tar.gz"
-      },
-      "zip": {
-         "version": "18",
-         "url": "https://opensource.apple.com/tarballs/zip/zip-18.tar.gz"
-      },
-      "zlib": {
-         "version": "76",
-         "url": "https://opensource.apple.com/tarballs/zlib/zlib-76.tar.gz"
-      },
-      "zsh": {
-         "version": "87",
-         "url": "https://opensource.apple.com/tarballs/zsh/zsh-87.tar.gz"
-      }
-   }
-}
 ```
 
 ## **download git**
@@ -559,7 +521,9 @@ Supply API token _(to prevent rate limiting)_
 ❯ ipsw download git --api GITHUB_TOKEN
 ```
 
-> **NOTE:** `ipsw` will also check for env vars `GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `IPSW_DOWNLOAD_GIT_API`
+:::info note
+`ipsw` will also check for env vars `GITHUB_TOKEN`, `GITHUB_API_TOKEN` or `IPSW_DOWNLOAD_GIT_API`
+:::
 
 Download repo archive links as JSON
 
@@ -632,7 +596,9 @@ Download SHSH blobs from Apple
 ❯ ipsw download tss
 ```
 
-> ⚠️ **NOTICE:** this is still a WIP _(however `signed` check does work)_
+:::caution  note
+This is still a WIP _(however `signed` check does work)_
+:::
 
 Check the signing status of an **iOS** version
 
