@@ -145,9 +145,98 @@ var machoSignCmd = &cobra.Command{
 		if fat, err := macho.OpenFat(machoPath); err == nil { // UNIVERSAL MACHO
 			defer fat.Close()
 			if adHoc {
-				_ = fat // TODO: sign universal machos
+				log.Infof("ad-hoc codesigning %s", output)
+				var slices []string
+				for _, arch := range fat.Arches {
+					if err := arch.File.CodeSign(&mcs.Config{
+						ID:              id,
+						Flags:           cstypes.ADHOC,
+						Entitlements:    entitlementData,
+						EntitlementsDER: entitlementDerData,
+					}); err != nil {
+						return fmt.Errorf("failed to codesign %s: %v", output, err)
+					}
+					tmp, err := os.CreateTemp("", "macho_"+arch.File.CPU.String())
+					if err != nil {
+						return fmt.Errorf("failed to create temp file: %v", err)
+					}
+					defer os.Remove(tmp.Name())
+					if err := arch.File.Save(tmp.Name()); err != nil {
+						return fmt.Errorf("failed to save temp file: %v", err)
+					}
+					if err := tmp.Close(); err != nil {
+						return fmt.Errorf("failed to close temp file: %v", err)
+					}
+					slices = append(slices, tmp.Name())
+				}
+				if ff, err := macho.CreateFat(output, slices...); err != nil {
+					return fmt.Errorf("failed to create fat file: %v", err)
+				} else {
+					defer ff.Close()
+				}
+			} else {
+				log.Infof("codesigning %s", output)
+				var slices []string
+				for _, arch := range fat.Arches {
+					if err := arch.File.CodeSign(&mcs.Config{
+						ID:              id,
+						Flags:           cstypes.NONE,
+						Entitlements:    entitlementData,
+						EntitlementsDER: entitlementDerData,
+						CertChain:       certs,
+						SignerFunction: func(data []byte) ([]byte, error) {
+							cmsdata, err := codesign.CreateCMSSignature(data, &codesign.CMSConfig{
+								CertChain:    certs,
+								PrivateKey:   privateKey,
+								Timestamp:    viper.GetBool("macho.sign.ts"),
+								TimestampURL: viper.GetString("macho.sign.timeserver"),
+								Proxy:        viper.GetString("macho.sign.proxy"),
+								Insecure:     viper.GetBool("macho.sign.insecure"),
+							})
+							if err != nil {
+								return nil, fmt.Errorf("failed to create CMS signature: %v", err)
+							}
+							if viper.GetBool("verbose") {
+								fmt.Println("CMS DATA")
+								fmt.Println("========")
+								utils.PrintCMSData(cmsdata)
+							}
+							return cmsdata, nil
+						}}); err != nil {
+						return fmt.Errorf("failed to codesign MachO file: %v", err)
+					}
+					tmp, err := os.CreateTemp("", "macho_"+arch.File.CPU.String())
+					if err != nil {
+						return fmt.Errorf("failed to create temp file: %v", err)
+					}
+					defer os.Remove(tmp.Name())
+					if err := arch.File.Save(tmp.Name()); err != nil {
+						return fmt.Errorf("failed to save temp file: %v", err)
+					}
+					if err := tmp.Close(); err != nil {
+						return fmt.Errorf("failed to close temp file: %v", err)
+					}
+					slices = append(slices, tmp.Name())
+				}
+				if ff, err := macho.CreateFat(output, slices...); err != nil {
+					return fmt.Errorf("failed to create fat file: %v", err)
+				} else {
+					defer ff.Close()
+				}
 			}
-			return fmt.Errorf("universal machos are not supported yet")
+			if runtime.GOOS == "darwin" {
+				out, err := utils.CodesignShow(output)
+				if err != nil {
+					return err
+				}
+				log.Debugf("NEW CODESIGNATURE:\n%s", out)
+				out, err = utils.CodesignVerify(output)
+				if err != nil {
+					return err
+				}
+				log.Debugf("CODESIGNATURE VERIFY:\n%s", out)
+			}
+			return nil
 		} else {
 			if errors.Is(err, macho.ErrNotFat) {
 				m, err = macho.Open(machoPath)
