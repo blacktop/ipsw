@@ -40,7 +40,6 @@ manpages/
 *.prof
 *.download
 checksums.txt.sha1
-unicorn2/
 
 # Docs
 public
@@ -54,3 +53,7 @@ www/docs/static/releases*.json
 
 # Unicorn EMU
 unicorn2/
+
+# Sssssssh
+cmd/ipsw/cmd/kernel/kernel_sbdec.go
+pkg/sandbox/
