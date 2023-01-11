@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"sort"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -95,7 +93,7 @@ func (i KmodInfoT) String() string {
 	)
 }
 
-func getKextStartVMAddrs(m *macho.File) ([]uint64, error) {
+func GetKextStartVMAddrs(m *macho.File) ([]uint64, error) {
 	if kmodStart := m.Section("__PRELINK_INFO", "__kmod_start"); kmodStart != nil {
 		data, err := kmodStart.Data()
 		if err != nil {
@@ -110,7 +108,7 @@ func getKextStartVMAddrs(m *macho.File) ([]uint64, error) {
 	return nil, fmt.Errorf("section __PRELINK_INFO.__kmod_start not found")
 }
 
-func getKextInfos(m *macho.File) ([]KmodInfoT, error) {
+func GetKextInfos(m *macho.File) ([]KmodInfoT, error) {
 	var infos []KmodInfoT
 	if kmodStart := m.Section("__PRELINK_INFO", "__kmod_info"); kmodStart != nil {
 		data, err := kmodStart.Data()
@@ -149,40 +147,6 @@ func getKextInfos(m *macho.File) ([]KmodInfoT, error) {
 	return nil, fmt.Errorf("section __PRELINK_INFO.__kmod_start not found")
 }
 
-func findCStringVMaddr(m *macho.File, cstr string) (uint64, error) {
-	for _, sec := range m.Sections {
-
-		if sec.Flags.IsCstringLiterals() || strings.Contains(sec.Name, "cstring") {
-			dat, err := sec.Data()
-			if err != nil {
-				return 0, fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
-			}
-
-			csr := bytes.NewBuffer(dat[:])
-
-			for {
-				pos := sec.Addr + uint64(csr.Cap()-csr.Len())
-
-				s, err := csr.ReadString('\x00')
-
-				if err == io.EOF {
-					break
-				}
-
-				if err != nil {
-					return 0, fmt.Errorf("failed to read string: %v", err)
-				}
-
-				if len(s) > 0 && strings.EqualFold(strings.Trim(s, "\x00"), cstr) {
-					return pos, nil
-				}
-			}
-		}
-	}
-
-	return 0, fmt.Errorf("string not found in MachO")
-}
-
 // KextList lists all the kernel extensions in the kernelcache
 func KextList(kernel string, diffable bool) ([]string, error) {
 	var out []string
@@ -193,7 +157,7 @@ func KextList(kernel string, diffable bool) ([]string, error) {
 	}
 	defer m.Close()
 
-	kextStartAdddrs, err := getKextStartVMAddrs(m)
+	kextStartAdddrs, err := GetKextStartVMAddrs(m)
 	if err != nil {
 		log.Debugf("failed to get kext start addresses: %v", err)
 	}
