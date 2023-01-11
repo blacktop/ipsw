@@ -41,9 +41,10 @@ func init() {
 
 // kextsCmd represents the kexts command
 var kextsCmd = &cobra.Command{
-	Use:   "kexts <kernelcache>",
-	Short: "List kernel extentions",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "kexts <kernelcache>",
+	Aliases: []string{"k"},
+	Short:   "List kernel extentions",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

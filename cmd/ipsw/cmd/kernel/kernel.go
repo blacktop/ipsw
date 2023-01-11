@@ -28,9 +28,10 @@ import (
 
 // KernelcacheCmd represents the kernelcache command
 var KernelcacheCmd = &cobra.Command{
-	Use:   "kernel",
-	Short: "Parse kernelcache",
-	Args:  cobra.NoArgs,
+	Use:     "kernel",
+	Aliases: []string{"k"},
+	Short:   "Parse kernelcache",
+	Args:    cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
