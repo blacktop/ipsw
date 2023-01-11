@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -114,7 +113,7 @@ func Extract(ipsw, destPath string) error {
 		// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(kcache, filepath.Ext(kcache)), strings.Join(i.GetDevicesForKernelCache(kcache), "_"))
 		fname = filepath.Join(destPath, fname)
 
-		content, err := ioutil.ReadFile(kcache)
+		content, err := os.ReadFile(kcache)
 		if err != nil {
 			return errors.Wrap(err, "failed to read Kernelcache")
 		}
@@ -131,7 +130,7 @@ func Extract(ipsw, destPath string) error {
 
 		os.Mkdir(destPath, 0750)
 
-		err = ioutil.WriteFile(fname, dec, 0660)
+		err = os.WriteFile(fname, dec, 0660)
 		if err != nil {
 			return errors.Wrap(err, "failed to write kernelcache")
 		}
@@ -144,7 +143,7 @@ func Extract(ipsw, destPath string) error {
 
 // Decompress decompresses a compressed kernelcache
 func Decompress(kcache, outputDir string) error {
-	content, err := ioutil.ReadFile(kcache)
+	content, err := os.ReadFile(kcache)
 	if err != nil {
 		return errors.Wrap(err, "failed to read Kernelcache")
 	}
@@ -163,7 +162,7 @@ func Decompress(kcache, outputDir string) error {
 	kcache = filepath.Join(outputDir, kcache+".decompressed")
 	os.MkdirAll(filepath.Dir(kcache), 0755)
 
-	err = ioutil.WriteFile(kcache, dec, 0660)
+	err = os.WriteFile(kcache, dec, 0660)
 	if err != nil {
 		return errors.Wrap(err, "failed to write kernelcache")
 	}
@@ -173,7 +172,7 @@ func Decompress(kcache, outputDir string) error {
 
 // DecompressKernelManagement decompresses a compressed KernelManagement_host kernelcache
 func DecompressKernelManagement(kcache, outputDir string) error {
-	content, err := ioutil.ReadFile(kcache)
+	content, err := os.ReadFile(kcache)
 	if err != nil {
 		return errors.Wrap(err, "failed to read Kernelcache")
 	}
@@ -313,7 +312,7 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 				}
 
 				os.Mkdir(destPath, 0750)
-				err = ioutil.WriteFile(fname, dec, 0660)
+				err = os.WriteFile(fname, dec, 0660)
 				if err != nil {
 					return errors.Wrap(err, "failed to write kernelcache")
 				}

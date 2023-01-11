@@ -129,7 +129,6 @@ func openFlagsToAfcFlags(flags int) uint64 {
 	default:
 		panic(fmt.Errorf("unsuported file mode %v", flags))
 	}
-	return 0
 }
 
 func encodeArgs(args ...any) []byte {

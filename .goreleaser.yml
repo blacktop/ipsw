@@ -579,12 +579,14 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
+      - '^chore'
       - "^bumping"
       - "^Update"
       - "^Delete"
       - "^Working"
       - "reorg"
       - "updates"
+      - 'merge conflict'
       - Merge pull request
       - Merge remote-tracking branch
       - Merge branch
