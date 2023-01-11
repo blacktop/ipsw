@@ -56,4 +56,5 @@ unicorn2/
 
 # 🤫
 cmd/ipsw/cmd/kernel/kernel_sbdec.go
+cmd/ipsw/cmd/kernel/kernel_libsandbox.go
 pkg/sandbox/
