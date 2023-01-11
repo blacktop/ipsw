@@ -55,12 +55,12 @@ func init() {
 
 // ctfdumpCmd represents the ctfdump command
 var ctfdumpCmd = &cobra.Command{
-	Use:           "ctf",
+	Use:           "ctfdump",
+	Aliases:       []string{"c", "ctf"},
 	Short:         "Dump CTF info",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Aliases:       []string{"ctfdump"},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var m *macho.File

@@ -37,9 +37,8 @@ func init() {
 
 // diffCmd represents the diff command
 var diffCmd = &cobra.Command{
-	Use:   "diff",
-	Short: "🚧 diff kernelcache (using assert strings)",
-	// Long:   longDesc,
+	Use:    "diff",
+	Short:  "🚧 diff kernelcache (using assert strings)",
 	Args:   cobra.MinimumNArgs(1),
 	Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

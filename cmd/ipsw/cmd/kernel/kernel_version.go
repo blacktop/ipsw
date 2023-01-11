@@ -45,6 +45,7 @@ func init() {
 // kernelVersionCmd represents the version command
 var kernelVersionCmd = &cobra.Command{
 	Use:           "version",
+	Aliases:       []string{"v"},
 	Short:         "Dump kernelcache version",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

@@ -44,6 +44,7 @@ func init() {
 // syscallCmd represents the syscall command
 var syscallCmd = &cobra.Command{
 	Use:           "syscall",
+	Aliases:       []string{"sc"},
 	Short:         "Dump kernelcache syscalls",
 	Args:          cobra.MinimumNArgs(0),
 	SilenceUsage:  true,

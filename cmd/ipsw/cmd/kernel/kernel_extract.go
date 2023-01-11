@@ -48,6 +48,7 @@ func init() {
 // kerExtractCmd represents the kerExtract command
 var kerExtractCmd = &cobra.Command{
 	Use:           "extract <KERNELCACHE> <KEXT>",
+	Aliases:       []string{"e"},
 	Short:         "Extract KEXT(s) from kernelcache",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
