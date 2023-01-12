@@ -85,7 +85,19 @@ const config = {
         appId: "KYIBYORJ9P",
         apiKey: "3affebe656f9ea5ea2f830e2747f5afc",
         indexName: "ipsw",
-        contextualSearch: false,
+        contextualSearch: true,
+        custom_settings: {
+          attributesForFaceting: [
+            "language",
+            "version",
+            "type",
+            "docusaurus_tag",
+          ],
+        },
+      },
+      gtag: {
+        trackingID: "G-6PLDXGZBEK",
+        anonymizeIP: false,
       },
       navbar: {
         hideOnScroll: true,
