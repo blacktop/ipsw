@@ -34,6 +34,14 @@ Extract file from Universal/FAT MachO
 
 > **NOTE:** you can supply `--arch arm64e` instead of using the arch picker UI
 
+### **macho bbl**
+
+Create single universal/fat MachO out many MachOs
+
+```bash
+❯ ipsw macho bbl /tmp/ls.x86_64 /tmp/ls.arm64e --output /tmp/ls
+```
+
 ### **macho dump**
 
 First print the MachO header for `kernelcache`
@@ -877,4 +885,33 @@ Demangle C++ names
 
 ```bash
 ❯ ipsw disass --demangle --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore --color
+```
+
+### **macho patch**
+
+Patch MachO Load Commands
+
+```bash
+# Modify LC_BUILD_VERSION like vtool
+❯ ipsw macho patch mod MACHO LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
+# Add an LC_RPATH like install_name_tool
+❯ ipsw macho patch add MACHO LC_RPATH @executable_path/Frameworks
+```
+
+### **macho sign**
+
+Codesign a MachO
+
+```bash
+❯ ipsw macho sign --id com.apple.ls --ad-hoc --ent entitlements.plist /tmp/ls
+? You are about to overwrite /tmp/ls. Continue? Yes
+   • ad-hoc codesigning /tmp/ls
+```
+
+Check the signature
+
+```bash
+❯ codesign --verify --deep --strict --verbose=4 /tmp/ls
+/tmp/ls: valid on disk
+/tmp/ls: satisfies its Designated Requirement
 ```
