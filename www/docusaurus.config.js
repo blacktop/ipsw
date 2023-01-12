@@ -86,18 +86,9 @@ const config = {
         additionalLanguages: ["armasm"],
       },
       algolia: {
-        appId: "KYIBYORJ9P",
-        apiKey: "3affebe656f9ea5ea2f830e2747f5afc",
+        appId: "XN7OVST81R",
+        apiKey: "493729d49a9639b14fe433a033ef5992",
         indexName: "ipsw",
-        contextualSearch: true,
-        custom_settings: {
-          attributesForFaceting: [
-            "language",
-            "version",
-            "type",
-            "docusaurus_tag",
-          ],
-        },
       },
       navbar: {
         hideOnScroll: true,
