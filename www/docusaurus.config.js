@@ -39,6 +39,10 @@ const config = {
           // Remove this to remove the "edit this page" links.
           editUrl: "https://github.com/blacktop/ipsw/tree/master/www/",
         },
+        gtag: {
+          trackingID: "G-6PLDXGZBEK",
+          anonymizeIP: false,
+        },
         // blog: {
         //   showReadingTime: true,
         //   // Please change this to your repo.
@@ -94,10 +98,6 @@ const config = {
             "docusaurus_tag",
           ],
         },
-      },
-      gtag: {
-        trackingID: "G-6PLDXGZBEK",
-        anonymizeIP: false,
       },
       navbar: {
         hideOnScroll: true,
