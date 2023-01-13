@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: ipsw
 description: Download and Parse IPSWs (and SO much more)
 last_update:
-  date: 2023-01-10T12:52:46-07:00
+  date: 2023-01-13T11:46:22-07:00
   author: blacktop
 ---
 ## ipsw
@@ -24,6 +24,7 @@ Download and Parse IPSWs (and SO much more)
 
 ### SEE ALSO
 
+* [ipsw debugserver](/docs/cli/ipsw/debugserver)	 - Prep device for remote debugging
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
 * [ipsw dtree](/docs/cli/ipsw/dtree)	 - Parse DeviceTree

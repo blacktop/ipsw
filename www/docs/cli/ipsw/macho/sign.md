@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: sign
 description: Codesign a MachO
 last_update:
-  date: 2023-01-10T12:52:46-07:00
+  date: 2023-01-13T11:46:22-07:00
   author: blacktop
 ---
 ## ipsw macho sign
@@ -30,6 +30,7 @@ ipsw macho sign <MACHO> [flags]
   -a, --ad-hoc              ad-hoc codesign
   -c, --cert string         p12 codesign with cert
   -e, --ent string          entitlements.plist file
+  -d, --ent-der string      entitlements asn1/der file
   -h, --help                help for sign
   -i, --id string           sign with identifier
       --insecure            do not verify ssl certs

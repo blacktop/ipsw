@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: shsh
 description: Get shsh blobs from device
 last_update:
-  date: 2023-01-10T12:52:46-07:00
+  date: 2023-01-13T11:46:22-07:00
   author: blacktop
 ---
 ## ipsw shsh
@@ -20,7 +20,11 @@ ipsw shsh [flags]
 ### Options
 
 ```
-  -h, --help   help for shsh
+  -h, --help          help for shsh
+  -t, --host string   ssh host (default "localhost")
+  -n, --insecure      ignore known_hosts key checking
+  -i, --key string    ssh key (default "$HOME/.ssh/id_rsa")
+  -p, --port string   ssh port (default "2222")
 ```
 
 ### Options inherited from parent commands

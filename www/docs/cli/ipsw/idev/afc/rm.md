@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: rm
 description: rm file rooted at /var/mobile/Media
 last_update:
-  date: 2023-01-10T12:52:46-07:00
+  date: 2023-01-13T11:46:22-07:00
   author: blacktop
 ---
 ## ipsw idev afc rm
