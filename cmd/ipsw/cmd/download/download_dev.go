@@ -142,7 +142,7 @@ var devCmd = &cobra.Command{
 			}
 		}
 
-		dlType := ""
+		dlType := "os"
 		if viper.GetBool("download.dev.os") {
 			dlType = "os"
 		} else if viper.GetBool("download.dev.more") {
