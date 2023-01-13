@@ -53,6 +53,7 @@ const sidebars = {
         "guides/symbolicate",
         "guides/device_list",
         "guides/shsh",
+        "guides/debugserver",
         // {
         //   type: "category",
         //   label: "Docs",
