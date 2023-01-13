@@ -38,6 +38,8 @@ import (
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
+const defaultKeyPath = "$HOME/.ssh/id_rsa"
+
 func keyString(k ssh.PublicKey) string {
 	return k.Type() + " " + base64.StdEncoding.EncodeToString(k.Marshal())
 }
@@ -57,9 +59,11 @@ func init() {
 	rootCmd.AddCommand(shshCmd)
 	shshCmd.Flags().StringP("host", "t", "localhost", "ssh host")
 	shshCmd.Flags().StringP("port", "p", "2222", "ssh port")
+	shshCmd.Flags().StringP("key", "i", defaultKeyPath, "ssh key")
 	shshCmd.Flags().BoolP("insecure", "n", false, "ignore known_hosts key checking")
 	viper.BindPFlag("shsh.host", shshCmd.Flags().Lookup("host"))
 	viper.BindPFlag("shsh.port", shshCmd.Flags().Lookup("port"))
+	viper.BindPFlag("shsh.key", shshCmd.Flags().Lookup("key"))
 	viper.BindPFlag("shsh.insecure", shshCmd.Flags().Lookup("insecure"))
 }
 
@@ -78,35 +82,54 @@ var shshCmd = &cobra.Command{
 
 		sshHost := viper.GetString("shsh.host")
 		sshPort := viper.GetString("shsh.port")
+		sshKey := viper.GetString("shsh.key")
+
+		home, err := os.UserHomeDir()
+		if err != nil {
+			panic(fmt.Sprintf("failed to get user home directory: %v", err))
+		}
+
+		knownhostsPath := filepath.Join(home, ".ssh", "known_hosts")
+
+		var signer ssh.Signer
+		if len(sshKey) > 0 {
+			if sshKey == defaultKeyPath {
+				sshKey = filepath.Join(home, ".ssh", "id_rsa")
+			}
+			key, err := os.ReadFile(sshKey)
+			if err != nil {
+				return fmt.Errorf("failed to read private key: %w", err)
+			}
+			signer, err = ssh.ParsePrivateKey(key)
+			if err != nil {
+				return fmt.Errorf("failed to parse private key: %w", err)
+			}
+		}
 
 		var sshConfig *ssh.ClientConfig
 		if viper.GetBool("shsh.insecure") {
 			sshConfig = &ssh.ClientConfig{
 				User: "root",
 				Auth: []ssh.AuthMethod{
+					ssh.PublicKeys(signer),
 					ssh.Password("alpine"),
 				},
 				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			}
 		} else {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return fmt.Errorf("failed to get user home directory: %w", err)
-			}
-
 			var hostKeyCallback ssh.HostKeyCallback
-			if _, err := os.Stat(filepath.Join(home, ".ssh/known_hosts")); err == nil {
-				hostKeyCallback, err = knownhosts.New(filepath.Join(home, ".ssh/known_hosts"))
+			if _, err := os.Stat(knownhostsPath); err == nil {
+				hostKeyCallback, err = knownhosts.New(knownhostsPath)
 				if err != nil {
 					return err
 				}
 			} else if errors.Is(err, os.ErrNotExist) {
-				f, err := os.OpenFile(filepath.Join(home, ".ssh/known_hosts"), os.O_CREATE, 0600)
+				f, err := os.OpenFile(knownhostsPath, os.O_CREATE, 0600)
 				if err != nil {
 					return err
 				}
 				f.Close()
-				hostKeyCallback, err = knownhosts.New(filepath.Join(home, ".ssh/known_hosts"))
+				hostKeyCallback, err = knownhosts.New(knownhostsPath)
 				if err != nil {
 					return err
 				}
@@ -117,6 +140,7 @@ var shshCmd = &cobra.Command{
 			sshConfig = &ssh.ClientConfig{
 				User: "root",
 				Auth: []ssh.AuthMethod{
+					ssh.PublicKeys(signer),
 					ssh.Password("alpine"),
 				},
 				HostKeyCallback: hostKeyCallback,
@@ -145,8 +169,7 @@ var shshCmd = &cobra.Command{
 			return err
 		}
 
-		err = shsh.ParseRAW(r)
-		if err != nil {
+		if err = shsh.ParseRAW(r); err != nil {
 			return err
 		}
 

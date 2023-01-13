@@ -1,3 +1,5 @@
+//go:build darwin
+
 /*
 Copyright © 2018-2023 blacktop
 
@@ -43,11 +45,13 @@ func init() {
 	rootCmd.AddCommand(debugserverCmd)
 	debugserverCmd.Flags().StringP("host", "t", "localhost", "ssh host")
 	debugserverCmd.Flags().StringP("port", "p", "2222", "ssh port")
-	debugserverCmd.Flags().StringP("image", "i", "", "path to DeveloperDiskImage.dmg")
+	debugserverCmd.Flags().StringP("key", "i", defaultKeyPath, "ssh key")
+	debugserverCmd.Flags().StringP("image", "m", "", "path to DeveloperDiskImage.dmg")
 	debugserverCmd.Flags().BoolP("force", "f", false, "overwrite file on device")
 	debugserverCmd.Flags().BoolP("insecure", "n", false, "ignore known_hosts key checking")
 	viper.BindPFlag("debugserver.host", debugserverCmd.Flags().Lookup("host"))
 	viper.BindPFlag("debugserver.port", debugserverCmd.Flags().Lookup("port"))
+	viper.BindPFlag("debugserver.key", debugserverCmd.Flags().Lookup("key"))
 	viper.BindPFlag("debugserver.image", debugserverCmd.Flags().Lookup("image"))
 	viper.BindPFlag("debugserver.force", debugserverCmd.Flags().Lookup("force"))
 	viper.BindPFlag("debugserver.insecure", debugserverCmd.Flags().Lookup("insecure"))
@@ -78,6 +82,7 @@ var debugserverCmd = &cobra.Command{
 
 		sshHost, _ := cmd.Flags().GetString("host")
 		sshPort, _ := cmd.Flags().GetString("port")
+		sshKey, _ := cmd.Flags().GetString("key")
 		imagePath, _ := cmd.Flags().GetString("image")
 		force, _ := cmd.Flags().GetBool("force")
 		insecure, _ := cmd.Flags().GetBool("force")
@@ -87,23 +92,40 @@ var debugserverCmd = &cobra.Command{
 			return fmt.Errorf("failed to get user home directory: %w", err)
 		}
 
+		var signer ssh.Signer
+		if len(sshKey) > 0 {
+			if sshKey == defaultKeyPath {
+				sshKey = filepath.Join(home, ".ssh", "id_rsa")
+			}
+			key, err := os.ReadFile(sshKey)
+			if err != nil {
+				return fmt.Errorf("failed to read private key: %w", err)
+			}
+			signer, err = ssh.ParsePrivateKey(key)
+			if err != nil {
+				return fmt.Errorf("failed to parse private key: %w", err)
+			}
+		}
+
 		var sshConfig *ssh.ClientConfig
 		if insecure {
 			sshConfig = &ssh.ClientConfig{
 				User: "root",
 				Auth: []ssh.AuthMethod{
+					ssh.PublicKeys(signer),
 					ssh.Password("alpine"),
 				},
 				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 			}
 		} else {
-			hostKeyCallback, err := knownhosts.New(filepath.Join(home, ".ssh/known_hosts"))
+			hostKeyCallback, err := knownhosts.New(filepath.Join(home, ".ssh", "known_hosts"))
 			if err != nil {
 				return fmt.Errorf("failed to create ssh host key callback: %w", err)
 			}
 			sshConfig = &ssh.ClientConfig{
 				User: "root",
 				Auth: []ssh.AuthMethod{
+					ssh.PublicKeys(signer),
 					ssh.Password("alpine"),
 				},
 				HostKeyCallback: hostKeyCallback,
@@ -130,16 +152,10 @@ var debugserverCmd = &cobra.Command{
 
 		if strings.Contains(string(output), "No such file or directory") || force {
 			// Find all the DeveloperDiskImages
-			images, err := filepath.Glob("/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/*/DeveloperDiskImage.dmg")
+			images, err := filepath.Glob("/Applications/Xcode*.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/*/DeveloperDiskImage.dmg")
 			if err != nil {
 				return fmt.Errorf("failed to glob for DeveloperDiskImage.dmg: %w", err)
 			}
-			betaImages, err := filepath.Glob("/Applications/Xcode-beta.app/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/*/DeveloperDiskImage.dmg")
-			if err != nil {
-				return fmt.Errorf("failed to glob for beta DeveloperDiskImage.dmg: %w", err)
-			}
-
-			images = append(images, betaImages...)
 
 			if len(imagePath) == 0 {
 				choice := 0
