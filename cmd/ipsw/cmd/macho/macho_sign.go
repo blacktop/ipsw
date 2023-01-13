@@ -50,6 +50,7 @@ func init() {
 	machoSignCmd.Flags().StringP("cert", "c", "", "p12 codesign with cert")
 	machoSignCmd.Flags().StringP("pw", "p", "", "p12 cert password")
 	machoSignCmd.Flags().StringP("ent", "e", "", "entitlements.plist file")
+	machoSignCmd.Flags().StringP("ent-der", "d", "", "entitlements asn1/der file")
 	machoSignCmd.Flags().BoolP("ts", "t", false, "timestamp signature")
 	machoSignCmd.Flags().String("timeserver", "http://timestamp.apple.com/ts01", "timeserver URL")
 	machoSignCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
@@ -61,6 +62,7 @@ func init() {
 	viper.BindPFlag("macho.sign.cert", machoSignCmd.Flags().Lookup("cert"))
 	viper.BindPFlag("macho.sign.pw", machoSignCmd.Flags().Lookup("pw"))
 	viper.BindPFlag("macho.sign.ent", machoSignCmd.Flags().Lookup("ent"))
+	viper.BindPFlag("macho.sign.ent-der", machoSignCmd.Flags().Lookup("ent-der"))
 	viper.BindPFlag("macho.sign.ts", machoSignCmd.Flags().Lookup("ts"))
 	viper.BindPFlag("macho.sign.timeserver", machoSignCmd.Flags().Lookup("timeserver"))
 	viper.BindPFlag("macho.sign.proxy", machoSignCmd.Flags().Lookup("proxy"))
@@ -92,6 +94,7 @@ var machoSignCmd = &cobra.Command{
 		id := viper.GetString("macho.sign.id")
 		adHoc := viper.GetBool("macho.sign.ad-hoc")
 		entitlementsPlist := viper.GetString("macho.sign.ent")
+		entitlementsDER := viper.GetString("macho.sign.ent-der")
 		overwrite := viper.GetBool("macho.sign.overwrite")
 		output := viper.GetString("macho.sign.output")
 
@@ -124,9 +127,16 @@ var machoSignCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to read entitlements file %s: %v", entitlementsPlist, err)
 			}
-			entitlementDerData, err = ents.DerEncode(entitlementData)
-			if err != nil {
-				return fmt.Errorf("failed to encode entitlements plist %s: %v", entitlementsPlist, err)
+			if len(entitlementsDER) > 0 {
+				entitlementDerData, err = os.ReadFile(entitlementsDER)
+				if err != nil {
+					return fmt.Errorf("failed to read entitlements asn1/der file %s: %v", entitlementsDER, err)
+				}
+			} else {
+				entitlementDerData, err = ents.DerEncode(entitlementData)
+				if err != nil {
+					return fmt.Errorf("failed to asn1/der encode entitlements plist %s: %v", entitlementsPlist, err)
+				}
 			}
 		}
 
