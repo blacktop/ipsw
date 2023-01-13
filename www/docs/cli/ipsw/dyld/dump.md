@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: dump
 description: Dump dyld_shared_cache data at given virtual address
 last_update:
-  date: 2023-01-10T12:52:46-07:00
+  date: 2023-01-13T11:46:22-07:00
   author: blacktop
 ---
 ## ipsw dyld dump
