@@ -97,6 +97,10 @@ var machoSignCmd = &cobra.Command{
 		entitlementsDER := viper.GetString("macho.sign.ent-der")
 		overwrite := viper.GetBool("macho.sign.overwrite")
 		output := viper.GetString("macho.sign.output")
+		// verify flags
+		if len(entitlementsDER) > 0 && len(entitlementsPlist) == 0 {
+			return fmt.Errorf("must specify --ent with --ent-der")
+		}
 
 		machoPath := filepath.Clean(args[0])
 
