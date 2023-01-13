@@ -22,57 +22,112 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/base64"
+	"errors"
 	"fmt"
+	"net"
+	"os"
 	"path/filepath"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/shsh"
-	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
+func keyString(k ssh.PublicKey) string {
+	return k.Type() + " " + base64.StdEncoding.EncodeToString(k.Marshal())
+}
+
+func addHostKey(known_hosts string, remote net.Addr, pubKey ssh.PublicKey) error {
+	f, err := os.OpenFile(known_hosts, os.O_APPEND|os.O_WRONLY, 0600)
+	if err != nil {
+		return fmt.Errorf("failed to open known_hosts: %w", err)
+	}
+	defer f.Close()
+
+	_, err = f.WriteString(knownhosts.Line([]string{knownhosts.Normalize(remote.String())}, pubKey))
+	return err
+}
+
 func init() {
 	rootCmd.AddCommand(shshCmd)
+	shshCmd.Flags().StringP("host", "t", "localhost", "ssh host")
+	shshCmd.Flags().StringP("port", "p", "2222", "ssh port")
+	shshCmd.Flags().BoolP("insecure", "n", false, "ignore known_hosts key checking")
+	viper.BindPFlag("shsh.host", shshCmd.Flags().Lookup("host"))
+	viper.BindPFlag("shsh.port", shshCmd.Flags().Lookup("port"))
+	viper.BindPFlag("shsh.insecure", shshCmd.Flags().Lookup("insecure"))
 }
 
 // shshCmd represents the shsh command
 var shshCmd = &cobra.Command{
-	Use:   "shsh",
-	Short: "Get shsh blobs from device",
-	Args:  cobra.NoArgs,
+	Use:           "shsh",
+	Short:         "Get shsh blobs from device",
+	Args:          cobra.NoArgs,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// Find home directory.
-		home, err := homedir.Dir()
-		if err != nil {
-			return err
+		sshHost := viper.GetString("shsh.host")
+		sshPort := viper.GetString("shsh.port")
+
+		var sshConfig *ssh.ClientConfig
+		if viper.GetBool("shsh.insecure") {
+			sshConfig = &ssh.ClientConfig{
+				User: "root",
+				Auth: []ssh.AuthMethod{
+					ssh.Password("alpine"),
+				},
+				HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+			}
+		} else {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("failed to get user home directory: %w", err)
+			}
+
+			var hostKeyCallback ssh.HostKeyCallback
+			if _, err := os.Stat(filepath.Join(home, ".ssh/known_hosts")); err == nil {
+				hostKeyCallback, err = knownhosts.New(filepath.Join(home, ".ssh/known_hosts"))
+				if err != nil {
+					return err
+				}
+			} else if errors.Is(err, os.ErrNotExist) {
+				f, err := os.OpenFile(filepath.Join(home, ".ssh/known_hosts"), os.O_CREATE, 0600)
+				if err != nil {
+					return err
+				}
+				f.Close()
+				hostKeyCallback, err = knownhosts.New(filepath.Join(home, ".ssh/known_hosts"))
+				if err != nil {
+					return err
+				}
+			} else {
+				return fmt.Errorf("failed to open known_hosts: %w", err)
+			}
+
+			sshConfig = &ssh.ClientConfig{
+				User: "root",
+				Auth: []ssh.AuthMethod{
+					ssh.Password("alpine"),
+				},
+				HostKeyCallback: hostKeyCallback,
+			}
 		}
 
-		hostKeyCallback, err := knownhosts.New(filepath.Join(home, ".ssh/known_hosts"))
+		utils.Indent(log.Info, 1)(fmt.Sprintf("Connecting to root@%s:%s", sshHost, sshPort))
+
+		client, err := ssh.Dial("tcp", sshHost+":"+sshPort, sshConfig)
 		if err != nil {
-			return err
-		}
-
-		sshConfig := &ssh.ClientConfig{
-			User: "root",
-			Auth: []ssh.AuthMethod{
-				ssh.Password("alpine"),
-			},
-			HostKeyCallback: hostKeyCallback,
-		}
-
-		utils.Indent(log.Info, 1)("Connecting to root@localhost:2222")
-
-		client, err := ssh.Dial("tcp", "localhost:2222", sshConfig)
-		if err != nil {
-			return fmt.Errorf("failed to dial: %s", err)
+			log.Fatalf("failed to dial: %s", err)
 		}
 
 		session, err := client.NewSession()
