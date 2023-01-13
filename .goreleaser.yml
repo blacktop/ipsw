@@ -550,7 +550,7 @@ scoop:
 #     license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
 #     authors: blacktop
 #     release_notes: "https://github.com/blacktop/ipsw/releases/tag/v{{ .Version }}"
-#     copyright: 2018-2022 blacktop
+#     copyright: 2018-2023 blacktop
 #     project_source_url: https://github.com/blacktop/ipsw
 #     docs_url: https://blacktop.github.io/ipsw/
 #     summary: iOS/macOS Research Swiss Army Knife
@@ -579,14 +579,14 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-      - '^chore'
+      - "^chore"
       - "^bumping"
       - "^Update"
       - "^Delete"
       - "^Working"
       - "reorg"
       - "updates"
-      - 'merge conflict'
+      - "merge conflict"
       - Merge pull request
       - Merge remote-tracking branch
       - Merge branch
