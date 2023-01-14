@@ -3,24 +3,31 @@ package resources
 import (
 	"crypto/sha1"
 	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
+	pl "github.com/blacktop/ipsw/pkg/plist"
 )
 
-const frameworksDirectory = "Contents/Frameworks"
 const libraryDirectory = "Contents/Library"
 const resourcesDirectory = "Contents/Resources"
+const frameworksDirectory = "Contents/Frameworks"
 const CodeResourcesPath = "Contents/_CodeSignature/CodeResources"
 
 type hash2 struct {
-	CDHash   []byte `plist:"cdhash,omitempty" xml:"cdhash,omitempty"`
-	Hash2    []byte `plist:"hash2,omitempty" xml:"hash2,omitempty"`
-	Symlink  string `plist:"symlink,omitempty" xml:"symlink,omitempty"`
-	Optional bool   `plist:"optional,omitempty" xml:"optional,omitempty"`
+	CDHash      []byte `plist:"cdhash,omitempty" xml:"cdhash,omitempty"`
+	Requirement string `plist:"requirement,omitempty" xml:"requirement,omitempty"`
+	Hash2       []byte `plist:"hash2,omitempty" xml:"hash2,omitempty"`
+	Symlink     string `plist:"symlink,omitempty" xml:"symlink,omitempty"`
+	Optional    bool   `plist:"optional,omitempty" xml:"optional,omitempty"`
 }
 
 type CodeResources struct {
@@ -135,11 +142,130 @@ func CreateCodeResources(dir string) error {
 	}{
 		Weight: 20,
 	}
-	// TODO: walk frameworksDirectory
+
+	if err := filepath.WalkDir(filepath.Join(dir, frameworksDirectory), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		relPath, err := filepath.Rel(filepath.Join(dir, "Contents"), path)
+		if err != nil {
+			return err
+		}
+
+		var fwpath string
+		if regexp.MustCompile(`^Frameworks/[^/]+\.framework/.+Info\.plist$`).MatchString(relPath) {
+			dat, err := os.ReadFile(path)
+			if err != nil {
+				return fmt.Errorf("failed to read %s: %w", path, err)
+			}
+			ainfo, err := pl.ParseAppInfo(dat)
+			if err != nil {
+				return fmt.Errorf("failed to parse %s: %w", path, err)
+			}
+			if ainfo.CFBundleExecutable != "" {
+				before, _, ok := strings.Cut(path, ".framework/")
+				if ok {
+					fwpath = filepath.Join(before+".framework/", ainfo.CFBundleExecutable)
+				}
+			}
+		} else {
+			return nil
+		}
+
+		if _, ok := cr.Files2[fwpath]; ok {
+			return nil // already added
+		}
+
+		// files
+		var m *macho.File
+		if fat, err := macho.OpenFat(fwpath); err == nil { // UNIVERSAL MACHO
+			defer fat.Close()
+			m = fat.Arches[len(fat.Arches)-1].File
+		} else { // SINGLE MACHO ARCH
+			if errors.Is(err, macho.ErrNotFat) {
+				m, err = macho.Open(fwpath)
+				if err != nil {
+					return nil
+					// return err
+				}
+				defer m.Close()
+			} else {
+				return nil // not a macho file
+			}
+		}
+		cs := m.CodeSignature()
+		if cs == nil {
+			return fmt.Errorf("no code signature in %s", path)
+		}
+		if len(cs.CodeDirectories) == 0 {
+			return fmt.Errorf("no code directory in %s", path)
+		}
+		cdhashBytes, err := hex.DecodeString(cs.CodeDirectories[len(cs.CodeDirectories)-1].CDHash)
+		if err != nil {
+			return err
+		}
+		var requirement string
+		if len(cs.Requirements) > 0 {
+			requirement = cs.Requirements[0].Detail
+		}
+		relPath, err = filepath.Rel(filepath.Join(dir, "Contents"), fwpath)
+		if err != nil {
+			return err
+		}
+		cr.Files2[filepath.Dir(relPath)] = hash2{
+			CDHash:      cdhashBytes[:20],
+			Requirement: requirement,
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to walk %s: %w", filepath.Join(dir, "Resources"), err)
+	}
 	// TODO: walk pluginsDirectory ??
 	// TODO: walk xpcServicesDirectory ??
 	// TODO: walk helpersDirectory ??
-	// TODO: walk libraryDirectory
+	if err := filepath.WalkDir(filepath.Join(dir, libraryDirectory), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		relPath, err := filepath.Rel(filepath.Join(dir, "Contents"), path)
+		if err != nil {
+			return err
+		}
+		fi, err := os.Lstat(path)
+		if err != nil {
+			return fmt.Errorf("file %s does not exist", path)
+		}
+		var symlink string
+		if (fi.Mode() & os.ModeSymlink) != 0 {
+			symlink, err = os.Readlink(path)
+			if err != nil {
+				return fmt.Errorf("failed to eval symlink %s: %w", path, err)
+			}
+		}
+		if symlink != "" {
+			cr.Files2[relPath] = hash2{Symlink: symlink}
+		} else {
+			if d.IsDir() {
+				return nil
+			}
+			f, err := os.Open(path)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+			h := sha256.New()
+			if _, err := io.Copy(h, f); err != nil {
+				return err
+			}
+			cr.Files2[relPath] = hash2{Hash2: h.Sum(nil)}
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("failed to walk %s: %w", filepath.Join(dir, "Resources"), err)
+	}
 	if err := filepath.WalkDir(filepath.Join(dir, resourcesDirectory), func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
