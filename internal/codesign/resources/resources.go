@@ -14,7 +14,7 @@ import (
 const frameworksDirectory = "Contents/Frameworks"
 const libraryDirectory = "Contents/Library"
 const resourcesDirectory = "Contents/Resources"
-const codeResourcesPath = "Contents/_CodeSignature/CodeResources"
+const CodeResourcesPath = "Contents/_CodeSignature/CodeResources"
 
 type hash2 struct {
 	CDHash   []byte `plist:"cdhash,omitempty" xml:"cdhash,omitempty"`
@@ -176,12 +176,12 @@ func CreateCodeResources(dir string) error {
 		return fmt.Errorf("failed to walk %s: %w", filepath.Join(dir, "Resources"), err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, codeResourcesPath)), 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", filepath.Dir(filepath.Join(dir, codeResourcesPath)), err)
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, CodeResourcesPath)), 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", filepath.Dir(filepath.Join(dir, CodeResourcesPath)), err)
 	}
-	f, err := os.Create(filepath.Join(dir, codeResourcesPath))
+	f, err := os.Create(filepath.Join(dir, CodeResourcesPath))
 	if err != nil {
-		return fmt.Errorf("failed to create %s: %w", codeResourcesPath, err)
+		return fmt.Errorf("failed to create %s: %w", CodeResourcesPath, err)
 	}
 	defer f.Close()
 

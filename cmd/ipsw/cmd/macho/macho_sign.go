@@ -22,6 +22,7 @@ THE SOFTWARE.
 package macho
 
 import (
+	"crypto/sha256"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/ipsw/internal/codesign"
 	ents "github.com/blacktop/ipsw/internal/codesign/entitlements"
+	"github.com/blacktop/ipsw/internal/codesign/resources"
 	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
@@ -85,6 +87,8 @@ var machoSignCmd = &cobra.Command{
 
 		var err error
 		var m *macho.File
+		var infoPlistData []byte
+		var resourceDirSlotHash []byte
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -93,6 +97,7 @@ var machoSignCmd = &cobra.Command{
 		// flags
 		id := viper.GetString("macho.sign.id")
 		adHoc := viper.GetBool("macho.sign.ad-hoc")
+		timestamp := viper.GetBool("macho.sign.ts")
 		entitlementsPlist := viper.GetString("macho.sign.ent")
 		entitlementsDER := viper.GetString("macho.sign.ent-der")
 		overwrite := viper.GetBool("macho.sign.overwrite")
@@ -107,10 +112,38 @@ var machoSignCmd = &cobra.Command{
 		if info, err := os.Stat(machoPath); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", machoPath)
 		} else if info.IsDir() {
-			machoPath, err = plist.GetBinaryInApp(machoPath)
+			// Is a bundle .app ///////////////////////////////////
+			bundleMachoPath, err := plist.GetBinaryInApp(machoPath)
 			if err != nil {
 				return err
 			}
+			if _, err := os.Stat(filepath.Join(machoPath, resources.CodeResourcesPath)); os.IsNotExist(err) {
+				log.Infof("Creating %s", filepath.Join(machoPath, resources.CodeResourcesPath))
+				if err := resources.CreateCodeResources(machoPath); err != nil {
+					return err
+				}
+			}
+			// get embedded CodeResources hash
+			h := sha256.New()
+			crdata, err := os.ReadFile(filepath.Join(machoPath, resources.CodeResourcesPath))
+			if err != nil {
+				return err
+			}
+			if _, err := h.Write(crdata); err != nil {
+				return err
+			}
+			resourceDirSlotHash = h.Sum(nil)
+			// get non-embedded Info.plist data
+			infoPlistData, err = os.ReadFile(filepath.Join(machoPath, "Contents", "Info.plist"))
+			if err != nil {
+				if !errors.Is(err, os.ErrNotExist) {
+					return err
+				}
+			}
+			// bundles require secure timestamping
+			timestamp = true
+			// set machoPath to the binary in the bundle
+			machoPath = bundleMachoPath
 		}
 
 		if ok, err := magic.IsMachO(machoPath); !ok {
@@ -158,51 +191,34 @@ var machoSignCmd = &cobra.Command{
 
 		if fat, err := macho.OpenFat(machoPath); err == nil { // UNIVERSAL MACHO
 			defer fat.Close()
-			if adHoc {
-				log.Infof("ad-hoc codesigning %s", output)
-				var slices []string
-				for _, arch := range fat.Arches {
+			log.Infof("Codesigning %s", output)
+			var slices []string
+			for _, arch := range fat.Arches {
+				if adHoc {
 					if err := arch.File.CodeSign(&mcs.Config{
-						ID:              id,
-						Flags:           cstypes.ADHOC,
-						Entitlements:    entitlementData,
-						EntitlementsDER: entitlementDerData,
+						ID:                  id,
+						Flags:               cstypes.ADHOC,
+						Entitlements:        entitlementData,
+						EntitlementsDER:     entitlementDerData,
+						InfoPlist:           infoPlistData,
+						ResourceDirSlotHash: resourceDirSlotHash,
 					}); err != nil {
 						return fmt.Errorf("failed to codesign %s: %v", output, err)
 					}
-					tmp, err := os.CreateTemp("", "macho_"+arch.File.CPU.String())
-					if err != nil {
-						return fmt.Errorf("failed to create temp file: %v", err)
-					}
-					defer os.Remove(tmp.Name())
-					if err := arch.File.Save(tmp.Name()); err != nil {
-						return fmt.Errorf("failed to save temp file: %v", err)
-					}
-					if err := tmp.Close(); err != nil {
-						return fmt.Errorf("failed to close temp file: %v", err)
-					}
-					slices = append(slices, tmp.Name())
-				}
-				if ff, err := macho.CreateFat(output, slices...); err != nil {
-					return fmt.Errorf("failed to create fat file: %v", err)
 				} else {
-					defer ff.Close()
-				}
-			} else {
-				log.Infof("codesigning %s", output)
-				var slices []string
-				for _, arch := range fat.Arches {
 					if err := arch.File.CodeSign(&mcs.Config{
-						ID:              id,
-						Flags:           cstypes.NONE,
-						Entitlements:    entitlementData,
-						EntitlementsDER: entitlementDerData,
-						CertChain:       certs,
+						ID:                  id,
+						Flags:               cstypes.NONE,
+						Entitlements:        entitlementData,
+						EntitlementsDER:     entitlementDerData,
+						InfoPlist:           infoPlistData,
+						ResourceDirSlotHash: resourceDirSlotHash,
+						CertChain:           certs,
 						SignerFunction: func(data []byte) ([]byte, error) {
 							cmsdata, err := codesign.CreateCMSSignature(data, &codesign.CMSConfig{
 								CertChain:    certs,
 								PrivateKey:   privateKey,
-								Timestamp:    viper.GetBool("macho.sign.ts"),
+								Timestamp:    timestamp,
 								TimestampURL: viper.GetString("macho.sign.timeserver"),
 								Proxy:        viper.GetString("macho.sign.proxy"),
 								Insecure:     viper.GetBool("macho.sign.insecure"),
@@ -210,7 +226,7 @@ var machoSignCmd = &cobra.Command{
 							if err != nil {
 								return nil, fmt.Errorf("failed to create CMS signature: %v", err)
 							}
-							if viper.GetBool("verbose") {
+							if viper.GetBool("verbose") && runtime.GOOS == "darwin" {
 								fmt.Println("CMS DATA")
 								fmt.Println("========")
 								utils.PrintCMSData(cmsdata)
@@ -219,69 +235,60 @@ var machoSignCmd = &cobra.Command{
 						}}); err != nil {
 						return fmt.Errorf("failed to codesign MachO file: %v", err)
 					}
-					tmp, err := os.CreateTemp("", "macho_"+arch.File.CPU.String())
-					if err != nil {
-						return fmt.Errorf("failed to create temp file: %v", err)
-					}
-					defer os.Remove(tmp.Name())
-					if err := arch.File.Save(tmp.Name()); err != nil {
-						return fmt.Errorf("failed to save temp file: %v", err)
-					}
-					if err := tmp.Close(); err != nil {
-						return fmt.Errorf("failed to close temp file: %v", err)
-					}
-					slices = append(slices, tmp.Name())
 				}
-				if ff, err := macho.CreateFat(output, slices...); err != nil {
-					return fmt.Errorf("failed to create fat file: %v", err)
-				} else {
-					defer ff.Close()
-				}
-			}
-			if runtime.GOOS == "darwin" {
-				out, err := utils.CodesignShow(output)
+				tmp, err := os.CreateTemp("", "macho_"+arch.File.CPU.String())
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to create temp file: %v", err)
 				}
-				log.Debugf("NEW CODESIGNATURE:\n%s", out)
-				out, err = utils.CodesignVerify(output)
-				if err != nil {
-					return err
+				defer os.Remove(tmp.Name())
+				if err := arch.File.Save(tmp.Name()); err != nil {
+					return fmt.Errorf("failed to save temp file: %v", err)
 				}
-				log.Debugf("CODESIGNATURE VERIFY:\n%s", out)
+				if err := tmp.Close(); err != nil {
+					return fmt.Errorf("failed to close temp file: %v", err)
+				}
+				slices = append(slices, tmp.Name())
 			}
-			return nil
-		} else {
+			// write signed fat file
+			if ff, err := macho.CreateFat(output, slices...); err != nil {
+				return fmt.Errorf("failed to create fat file: %v", err)
+			} else {
+				defer ff.Close()
+			}
+		} else { // SINGLE MACHO ARCH
 			if errors.Is(err, macho.ErrNotFat) {
 				m, err = macho.Open(machoPath)
 				if err != nil {
 					return err
 				}
 				defer m.Close()
-
 				if adHoc {
-					log.Infof("ad-hoc codesigning %s", output)
+					log.Infof("Ad-hoc Codesigning %s", output)
 					if err := m.CodeSign(&mcs.Config{
-						ID:              id,
-						Flags:           cstypes.ADHOC,
-						Entitlements:    entitlementData,
-						EntitlementsDER: entitlementDerData,
+						ID:                  id,
+						Flags:               cstypes.ADHOC,
+						Entitlements:        entitlementData,
+						EntitlementsDER:     entitlementDerData,
+						InfoPlist:           infoPlistData,
+						ResourceDirSlotHash: resourceDirSlotHash,
 					}); err != nil {
 						return fmt.Errorf("failed to codesign MachO file: %v", err)
 					}
 				} else {
-					log.Infof("codesigning %s", output)
+					log.Infof("Codesigning %s", output)
 					if err := m.CodeSign(&mcs.Config{
-						ID:              id,
-						Flags:           cstypes.NONE,
-						Entitlements:    entitlementData,
-						EntitlementsDER: entitlementDerData,
-						CertChain:       certs,
+						ID:                  id,
+						Flags:               cstypes.NONE,
+						Entitlements:        entitlementData,
+						EntitlementsDER:     entitlementDerData,
+						InfoPlist:           infoPlistData,
+						ResourceDirSlotHash: resourceDirSlotHash,
+						CertChain:           certs,
 						SignerFunction: func(data []byte) ([]byte, error) {
 							cmsdata, err := codesign.CreateCMSSignature(data, &codesign.CMSConfig{
 								CertChain:    certs,
 								PrivateKey:   privateKey,
-								Timestamp:    viper.GetBool("macho.sign.ts"),
+								Timestamp:    timestamp,
 								TimestampURL: viper.GetString("macho.sign.timeserver"),
 								Proxy:        viper.GetString("macho.sign.proxy"),
 								Insecure:     viper.GetBool("macho.sign.insecure"),
@@ -289,7 +296,7 @@ var machoSignCmd = &cobra.Command{
 							if err != nil {
 								return nil, fmt.Errorf("failed to create CMS signature: %v", err)
 							}
-							if viper.GetBool("verbose") {
+							if viper.GetBool("verbose") && runtime.GOOS == "darwin" {
 								fmt.Println("CMS DATA")
 								fmt.Println("========")
 								utils.PrintCMSData(cmsdata)
@@ -302,10 +309,10 @@ var machoSignCmd = &cobra.Command{
 			} else {
 				return fmt.Errorf("failed to open MachO file: %v", err)
 			}
-		}
-
-		if err := m.Save(output); err != nil {
-			return fmt.Errorf("failed to save signed MachO file: %v", err)
+			// write signed file
+			if err := m.Save(output); err != nil {
+				return fmt.Errorf("failed to save signed MachO file: %v", err)
+			}
 		}
 
 		if runtime.GOOS == "darwin" {
@@ -313,12 +320,12 @@ var machoSignCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			log.Debugf("NEW CODESIGNATURE:\n%s", out)
+			log.Debugf("New CODESIGNATURE:\n%s", out)
 			out, err = utils.CodesignVerify(output)
 			if err != nil {
 				return err
 			}
-			log.Debugf("CODESIGNATURE VERIFY:\n%s", out)
+			log.Debugf("CODESIGNATURE Verify:\n%s", out)
 		}
 
 		return nil
