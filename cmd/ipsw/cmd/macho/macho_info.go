@@ -366,7 +366,7 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 				if len(m.CodeSignature().CMSSignature) > 0 {
-					fmt.Printf("CMS (RFC3852) signature (%d bytes):", len(m.CodeSignature().CMSSignature))
+					fmt.Printf("CMS (RFC3852) signature (%d bytes):\n", len(m.CodeSignature().CMSSignature))
 					p7, err := pkcs7.Parse(m.CodeSignature().CMSSignature)
 					if err != nil {
 						return err
