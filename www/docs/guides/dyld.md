@@ -152,7 +152,7 @@ DOF Offsets:
 	0x3a6d04
 ```
 
-> **NOTE:** This currently doesn't _yet_ work on macOS12+/iOS15+ caches
+> **NOTE:** In macOS12+/iOS15+ caches replaced this data with `prebuilt loader sets` which contain much of the same data and are still VERY powerful  *(this cmd outputs both types)*
 
 ### **dyld extract**
 
