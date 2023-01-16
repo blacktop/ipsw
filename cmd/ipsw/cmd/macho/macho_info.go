@@ -69,6 +69,7 @@ func init() {
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
 	machoInfoCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
 	machoInfoCmd.Flags().Bool("dump-cert", false, "Dump the certificate")
+	machoInfoCmd.Flags().BoolP("bit-code", "b", false, "Dump the LLVM bitcode")
 	machoInfoCmd.Flags().String("output", "", "Directory to extract files to")
 
 	viper.BindPFlag("macho.info.arch", machoInfoCmd.Flags().Lookup("arch"))
@@ -88,6 +89,7 @@ func init() {
 	viper.BindPFlag("macho.info.extract-fileset-entry", machoInfoCmd.Flags().Lookup("extract-fileset-entry"))
 	viper.BindPFlag("macho.info.all-fileset-entries", machoInfoCmd.Flags().Lookup("all-fileset-entries"))
 	viper.BindPFlag("macho.info.dump-cert", machoInfoCmd.Flags().Lookup("dump-cert"))
+	viper.BindPFlag("macho.info.bit-code", machoInfoCmd.Flags().Lookup("bit-code"))
 	viper.BindPFlag("macho.info.output", machoInfoCmd.Flags().Lookup("output"))
 
 	machoInfoCmd.MarkZshCompPositionalArgumentFile(1)
@@ -126,6 +128,7 @@ var machoInfoCmd = &cobra.Command{
 		filesetEntry := viper.GetString("macho.info.fileset-entry")
 		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
 		dumpCert := viper.GetBool("macho.info.dump-cert")
+		dumpBitCode := viper.GetBool("macho.info.bit-code")
 		extractPath := viper.GetString("macho.info.output")
 
 		if len(filesetEntry) == 0 && extractfilesetEntry {
@@ -231,6 +234,83 @@ var machoInfoCmd = &cobra.Command{
 			} else {
 				return fmt.Errorf("no LC_CODE_SIGNATURE found")
 			}
+		}
+
+		if dumpBitCode {
+			// NOTE: /opt/homebrew/opt/llvm/bin/llvm-dis 1.bc 2.bc 3.bc # to disassemble bitcode
+			xr, err := m.GetEmbeddedLLVMBitcode()
+			if err != nil {
+				return fmt.Errorf("failed to get embedded llvm bitcode: %v", err)
+			}
+			reverse := func(arr []string) []string {
+				reversed := make([]string, len(arr))
+				j := 0
+				for i := len(arr) - 1; i >= 0; i-- {
+					reversed[j] = arr[i]
+					j++
+				}
+				return reversed
+			}
+			sd := xr.Subdoc()
+			var lo string
+			for i, l := range reverse(sd.LinkOptions) {
+				if i == 0 {
+					lo = "    " + l
+				} else if strings.HasPrefix(l, "-") {
+					lo += "\n    " + l
+				} else {
+					lo += " " + l
+				}
+			}
+			var ds []string
+			for _, d := range reverse(sd.Dylibs) {
+				ds = append(ds, fmt.Sprintf("    %s", d))
+			}
+			fmt.Printf(
+				"LLVM Bitcode:\n"+
+					"  Name:      %s\n"+
+					"  Version:   %s\n"+
+					"  Platform:  %s\n"+
+					"  Arch:      %s\n"+
+					"  SDK:       %s\n"+
+					"  Hide Syms: %d\n"+
+					"  Linker Options:\n"+
+					"%s\n"+
+					"  Dylibs:\n"+
+					"%s\n\n",
+				sd.Name,
+				sd.Version,
+				sd.Platform,
+				sd.Arch,
+				sd.SDKVersion,
+				sd.HideSymbols,
+				lo,
+				strings.Join(ds, "\n"),
+			)
+			if xr.HasSignature() {
+				log.Infof("Found embedded llvm bitcode signature")
+				for _, cert := range xr.Certificates {
+					fmt.Println(cert)
+				}
+			}
+			toc := xr.TOC()
+			for idx, xf := range xr.File {
+				f, err := xf.Open()
+				if err != nil {
+					return fmt.Errorf("failed to open xar file: %v", err)
+				}
+				data, err := io.ReadAll(f)
+				if err != nil {
+					return fmt.Errorf("failed to read xar file: %v", err)
+				}
+				log.Infof("%s: %s", toc.File[idx-1].FileType, strings.Join(reverse(toc.File[idx-1].ClangArgs), " "))
+				utils.Indent(log.Info, 2)("Extracting " + filepath.Join(folder, xf.Name+".bc"))
+				if err := os.WriteFile(filepath.Join(folder, xf.Name+".bc"), data, 0644); err != nil {
+					return fmt.Errorf("failed to write bitcode file: %v", err)
+				}
+				f.Close()
+			}
+			return nil
 		}
 
 		// Fileset MachO type
