@@ -362,7 +362,7 @@ Make the output look amazing by piping to `bat -l m --tabs 0 -p --theme Nord --w
 #### Search for byte pattern
 
 ```bash
-❯ ipsw dyld macho dyld_shared_cache_arm64e JavaScriptCore --search "7f 23 03 d5 * * * * f6 57 01 a9" | head
+❯ ipsw dyld macho dyld_shared_cache_arm64e JavaScriptCore --search "7f 23 03 d5 * * * * f6 57 01 a9"
 
 Search Results
 --------------
@@ -373,6 +373,7 @@ Search Results
 0x199f28860
 0x199f289d8
 0x199f2966c
+<SNIP>
 ```
 
 ### **dyld stubs**
@@ -387,7 +388,6 @@ Print out the 🆕 stubs islands
 0x1c8d0f350: _$ss10_HashTableV12previousHole6beforeAB6BucketVAF_tF
 0x1cf7eba00: _$s5TeaUI14KeyCommandItemVMa
 0x1bb1f8a40: _swift_task_switch
-0x1c1f5edc0: _$s4GRDB3RowC19fastDecodeIfPresent_16atUncheckedIndexxSgxm_SitKAA24DatabaseValueConvertibleRzAA015StatementColumnL0RzlF
 0x1ec2127d0: _CGColorGetColorSpace
 0x207434db0: __swift_stdlib_strtod_clocale
 0x1a0622e00: _objc_retain_x20
@@ -657,8 +657,8 @@ To create a `~/Library/Developer/Xcode/iOS DeviceSupport/` folder from a _dyld_s
 
 ```bash
 ❯ ipsw dyld split dyld_shared_cache_arm64e --cache --version 16.3 --build 20D5035i
-   • Splitting dyld_shared_cache to /Users/blacktop/Library/Developer/Xcode/iOS DeviceSupport/16.3 (20D5035i) arm64e
-   • Creating XCode cache /Users/blacktop/Library/Developer/Xcode/iOS DeviceSupport/16.3 (20D5035i) arm64e/Info.plist
+   • Splitting dyld_shared_cache to ~/Library/Developer/Xcode/iOS DeviceSupport/16.3 (20D5035i) arm64e
+   • Creating XCode cache ~/Library/Developer/Xcode/iOS DeviceSupport/16.3 (20D5035i) arm64e/Info.plist
 0/2700
 1/2700
 2/2700
@@ -1174,7 +1174,7 @@ To dump a section from a dylib in the _dyld_shared_cache_
 
 ```bash
 ❯ ipsw dyld dump dyld_shared_cache_arm64e --image JavaScriptCore --section __TEXT.__cstring --size 208
-   • Address location          dylib=/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore section=__TEXT.__cstring
+   • Address location          dylib=JavaScriptCore section=__TEXT.__cstring
 000000019ba27290:  41 70 70 72 6f 78 69 6d  61 74 65 28 00 20 73 65  |Approximate(. se|
 000000019ba272a0:  63 29 00 4e 4f 54 20 49  4d 50 4c 45 4d 45 4e 54  |c).NOT IMPLEMENT|
 000000019ba272b0:  45 44 20 59 45 54 0a 00  41 53 53 45 52 54 49 4f  |ED YET..ASSERTIO|
