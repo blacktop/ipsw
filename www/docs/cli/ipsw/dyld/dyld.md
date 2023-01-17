@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: dyld
 description: Parse dyld_shared_cache
 last_update:
-  date: 2023-01-16T23:18:46-07:00
+  date: 2023-01-16T23:32:27-07:00
   author: blacktop
 ---
 ## ipsw dyld
@@ -50,6 +50,7 @@ ipsw dyld [flags]
 * [ipsw dyld slide](/docs/cli/ipsw/dyld/slide)	 - Dump slide info
 * [ipsw dyld split](/docs/cli/ipsw/dyld/split)	 - Extracts all the dyld_shared_cache libraries
 * [ipsw dyld str](/docs/cli/ipsw/dyld/str)	 - Search dyld_shared_cache for string
+* [ipsw dyld stubs](/docs/cli/ipsw/dyld/stubs)	 - Dump Stub Islands
 * [ipsw dyld swift](/docs/cli/ipsw/dyld/swift)	 - Dump Swift Optimizations Info
 * [ipsw dyld symaddr](/docs/cli/ipsw/dyld/symaddr)	 - Lookup or dump symbol(s)
 * [ipsw dyld tbd](/docs/cli/ipsw/dyld/tbd)	 - Generate a .tbd file for a dylib

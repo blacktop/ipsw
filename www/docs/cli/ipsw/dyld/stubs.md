@@ -1,26 +1,27 @@
 ---
-id: clear
-title: clear
+id: stubs
+title: stubs
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: clear
-description: Reset simulated Location
+sidebar_label: stubs
+description: Dump Stub Islands
 last_update:
   date: 2023-01-16T23:32:27-07:00
   author: blacktop
 ---
-## ipsw idev loc clear
+## ipsw dyld stubs
 
-Reset simulated Location
+Dump Stub Islands
 
 ```
-ipsw idev loc clear [flags]
+ipsw dyld stubs [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for clear
+      --cache string   Path to .a2s addr to sym cache file (speeds up analysis)
+  -h, --help           help for stubs
 ```
 
 ### Options inherited from parent commands
@@ -28,11 +29,10 @@ ipsw idev loc clear [flags]
 ```
       --color           colorize output
       --config string   config file (default is $HOME/.ipsw/config.yaml)
-  -u, --udid string     Device UniqueDeviceID to connect to
   -V, --verbose         verbose output
 ```
 
 ### SEE ALSO
 
-* [ipsw idev loc](/docs/cli/ipsw/idev/loc)	 - Simulate location commands
+* [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache
 
