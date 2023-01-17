@@ -375,7 +375,9 @@ Search Results
 0x199f2966c
 ```
 
-#### Print out the 🆕 stubs islands
+### **dyld stubs**
+
+Print out the 🆕 stubs islands
 
 ```bash
 ❯ ipsw dyld stubs dyld_shared_cache_arm64e | head
