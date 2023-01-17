@@ -66,6 +66,7 @@ func init() {
 // disassCmd represents the disass command
 var DisassCmd = &cobra.Command{
 	Use:           "disass <dyld_shared_cache>",
+	Aliases:       []string{"dis"},
 	Short:         "Disassemble dyld_shared_cache at symbol/vaddr",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

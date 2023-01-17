@@ -64,6 +64,7 @@ func init() {
 // MachoCmd represents the macho command
 var MachoCmd = &cobra.Command{
 	Use:           "macho <dyld_shared_cache> <dylib>",
+	Aliases:       []string{"m"},
 	Short:         "Parse a dylib file",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

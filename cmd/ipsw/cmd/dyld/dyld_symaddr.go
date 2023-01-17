@@ -52,6 +52,7 @@ func init() {
 // SymAddrCmd represents the symaddr command
 var SymAddrCmd = &cobra.Command{
 	Use:           "symaddr <dyld_shared_cache>",
+	Aliases:       []string{"sym"},
 	Short:         "Lookup or dump symbol(s)",
 	SilenceUsage:  false,
 	SilenceErrors: true,

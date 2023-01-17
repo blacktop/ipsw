@@ -102,9 +102,10 @@ func init() {
 
 // ImportsCmd represents the imports command
 var ImportsCmd = &cobra.Command{
-	Use:   "imports",
-	Short: "List all dylibs that load a given dylib",
-	Args:  cobra.MinimumNArgs(2),
+	Use:     "imports",
+	Aliases: []string{"imp"},
+	Short:   "List all dylibs that load a given dylib",
+	Args:    cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

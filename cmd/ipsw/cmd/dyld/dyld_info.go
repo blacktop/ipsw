@@ -77,6 +77,7 @@ type dyldInfo struct {
 // infoCmd represents the info command
 var InfoCmd = &cobra.Command{
 	Use:           "info <dyld_shared_cache>",
+	Aliases:       []string{"i"},
 	Short:         "Parse dyld_shared_cache",
 	SilenceUsage:  true,
 	SilenceErrors: true,
