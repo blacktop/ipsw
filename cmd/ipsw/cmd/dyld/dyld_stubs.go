@@ -48,7 +48,6 @@ var stubsCmd = &cobra.Command{
 	Short:         "Dump Stub Islands",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
