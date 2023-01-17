@@ -44,17 +44,10 @@ Create single universal/fat MachO out many MachOs
 
 ### **macho dump**
 
-First print the MachO header for `kernelcache`
-
-```bash
-❯ ipsw macho info kernelcache | grep __DATA_CONST.__mod_init_func
-        sz=0x00000290 off=0x000b0000-0x000b0290 addr=0xfffffff0070b4000-0xfffffff0070b4290              __DATA_CONST.__mod_init_func     (ModInitFuncPointers)
-```
-
 Hexdump the section `__DATA_CONST.__mod_init_func`
 
 ```bash
-❯ ipsw dyld dump kernelcache 0xfffffff0070b4000 --size 656 # 0x290 in decimal
+❯ ipsw dyld dump kernelcache --section __DATA_CONST.__mod_init_func --size 656 # 0x290 in decimal
 
 00000000  34 ba 69 07 f0 ff ff ff  0c c2 69 07 f0 ff ff ff  |4.i.......i.....|
 00000010  98 e5 69 07 f0 ff ff ff  18 fc 69 07 f0 ff ff ff  |..i.......i.....|
@@ -78,7 +71,7 @@ Hexdump the section `__DATA_CONST.__mod_init_func`
 Or dump the section as a list of pointers
 
 ```bash
-❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --addr --count 10
+❯ ipsw macho dump kernelcache --section __DATA_CONST.__mod_init_func --addr --count 10
 
 0xfffffff00769ba34
 0xfffffff00769c20c
@@ -95,7 +88,7 @@ Or dump the section as a list of pointers
 Or write to a file for later post-processing
 
 ```bash
-❯ ipsw macho dump kernelcache 0xfffffff0070b4000 --size 656 --output ./data.bin
+❯ ipsw macho dump kernelcache --section __DATA_CONST.__mod_init_func --size 656 --output ./mod_init_func .bin
    • Wrote data to file ./data.bin
 ```
 
