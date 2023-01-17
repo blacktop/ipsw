@@ -172,7 +172,7 @@ Extract all dylibs from *dyld_shared_cache*
 ```bash
 ❯ ipsw dyld extract dyld_shared_cache_arm64e --all
    • Extracting all dylibs from dyld_shared_cache_arm64e
-      [extracting]  ✅  [=============================================================| 2700/2700 ]
+      ✅  [=============================================================| 2700/2700 ]
 ```
 
 :::info note
@@ -1091,7 +1091,7 @@ First print the MachO header for `CoreData` in a cache
 
 ```bash
 ❯ ipsw dyld macho dyld_shared_cache_arm64e CoreData | grep "__DATA_CONST.__got"
-        sz="0x000002d8" off=0x502c2428-0x502c2700 addr="0x1d22c2428"-0x1d22c2700    __DATA_CONST.__got
+   sz="0x000002d8" off=0x502c2428-0x502c2700 addr="0x1d22c2428"-0x1d22c2700   __DATA_CONST.__got
 ```
 
 Hexdump the section `__DATA_CONST.__got`
@@ -1131,18 +1131,19 @@ Or dump the section as a list of pointers
 Lookup those pointers in the cache
 
 ```bash
-❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size 728 --addr | xargs -I {} /bin/zsh -c 'ipsw dyld a2s dyld_shared_cache_arm64e {}'
+❯ ipsw dyld dump dyld_shared_cache_arm64e 0x1d22c2428 --size 728 --addr \
+               | xargs -I {} /bin/zsh -c 'ipsw dyld a2s dyld_shared_cache_arm64e {}'
 
-   • Address location          dylib=/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation section=__DATA_CONST.__const
+   • Address dylib=CoreFoundation section=__DATA_CONST.__const
 0x1d9a84600: _NSCalendarIdentifierGregorian
 
-   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation section=__DATA_CONST.__const
+   • Address dylib=Foundation section=__DATA_CONST.__const
 0x1d9a8ba90: _NSCocoaErrorDomain
 
-   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation section=__DATA.__common
+   • Address dylib=Foundation section=__DATA.__common
 0x1d6d83b52: _NSDeallocateZombies
 
-   • Address location          dylib=/System/Library/Frameworks/Foundation.framework/Foundation section=__DATA_CONST.__const
+   • Address dylib=/Foundation section=__DATA_CONST.__const
 0x1d9a8ba20: _NSFilePathErrorKey
 
 <SNIP>
