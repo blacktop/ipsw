@@ -10,7 +10,7 @@ Convert MachO address to offset
 
 ```bash
 ❯ ipsw macho a2o kernelcache 0xfffffff0070b4000
-   • Offset                    dec=720896 hex=0xb0000 section=__mod_init_func segment=__DATA_CONST
+   • Offset     dec=720896 hex=0xb0000 section=__mod_init_func segment=__DATA_CONST
 ```
 
 ### **macho o2a**
@@ -19,7 +19,7 @@ Convert MachO offset to address
 
 ```bash
 ❯ ipsw macho o2a kernelcache 0x007dc000
-   • Address                   dec=18446744005115772928 hex=0xfffffff0077e0000 section=__data segment=__DATA
+   • Address    dec=18446744005115772928 hex=0xfffffff0077e0000 section=__data segment=__DATA
 ```
 
 ### **macho lipo**
@@ -93,7 +93,7 @@ Or write to a file for later post-processing
 ```
 
 ```bash
-❯ hexdump -C data.bin
+❯ hexdump -C mod_init_func.bin
 00000000  34 ba 69 07 f0 ff ff ff  0c c2 69 07 f0 ff ff ff  |4.i.......i.....|
 00000010  98 e5 69 07 f0 ff ff ff  18 fc 69 07 f0 ff ff ff  |..i.......i.....|
 00000020  b8 05 6a 07 f0 ff ff ff  b0 0d 6a 07 f0 ff ff ff  |..j.......j.....|
