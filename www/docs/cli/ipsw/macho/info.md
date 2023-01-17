@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: info
 description: Explore a MachO file
 last_update:
-  date: 2023-01-13T11:46:22-07:00
+  date: 2023-01-16T23:18:46-07:00
   author: blacktop
 ---
 ## ipsw macho info
@@ -22,6 +22,7 @@ ipsw macho info <macho> [flags]
 ```
   -z, --all-fileset-entries     Parse all fileset entries
   -a, --arch string             Which architecture to use for fat/universal MachO
+  -b, --bit-code                Dump the LLVM bitcode
       --dump-cert               Dump the certificate
   -e, --ent                     Print entitlements
   -x, --extract-fileset-entry   Extract the fileset entry

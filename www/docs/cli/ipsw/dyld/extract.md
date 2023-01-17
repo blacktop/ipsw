@@ -4,24 +4,27 @@ title: extract
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: extract
-description: Extract dyld_shared_cache from DMG in IPSW
+description: Extract dylib from dyld_shared_cache
 last_update:
-  date: 2023-01-13T11:46:22-07:00
+  date: 2023-01-16T23:18:46-07:00
   author: blacktop
 ---
 ## ipsw dyld extract
 
-Extract dyld_shared_cache from DMG in IPSW
+Extract dylib from dyld_shared_cache
 
 ```
-ipsw dyld extract <IPSW> <DEST> [flags]
+ipsw dyld extract <DSC> <DYLIB> [flags]
 ```
 
 ### Options
 
 ```
-  -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
-  -h, --help                    help for extract
+  -a, --all             Split ALL dylibs
+      --force           Overwrite existing extracted dylib(s)
+  -h, --help            help for extract
+  -o, --output string   Directory to extract the dylib(s)
+      --slide           Apply slide info to extracted dylib(s)
 ```
 
 ### Options inherited from parent commands
