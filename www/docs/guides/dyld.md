@@ -1091,7 +1091,7 @@ First print the MachO header for `CoreData` in a cache
 
 ```bash
 ❯ ipsw dyld macho dyld_shared_cache_arm64e CoreData | grep "__DATA_CONST.__got"
-        sz="0x000002d8" off=0x502c2428-0x502c2700 addr="0x1d22c2428"-0x1d22c2700            __DATA_CONST.__got               (NonLazySymbolPointers)
+        sz="0x000002d8" off=0x502c2428-0x502c2700 addr="0x1d22c2428"-0x1d22c2700    __DATA_CONST.__got
 ```
 
 Hexdump the section `__DATA_CONST.__got`
@@ -1173,7 +1173,7 @@ Or write to a file for later post-processing
 To dump a section from a dylib in the _dyld_shared_cache_
 
 ```bash
-❯ ipsw dyld dump dyld_shared_cache_arm64e --image JavaScriptCore --section __TEXT.__cstring --size 208
+❯ ipsw dyld dump dyld_shared_cache --image JavaScriptCore --section __TEXT.__cstring --size 208
    • Address location          dylib=JavaScriptCore section=__TEXT.__cstring
 000000019ba27290:  41 70 70 72 6f 78 69 6d  61 74 65 28 00 20 73 65  |Approximate(. se|
 000000019ba272a0:  63 29 00 4e 4f 54 20 49  4d 50 4c 45 4d 45 4e 54  |c).NOT IMPLEMENT|
