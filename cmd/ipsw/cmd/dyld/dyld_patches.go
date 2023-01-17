@@ -45,6 +45,7 @@ func init() {
 // PatchesCmd represents the patches command
 var PatchesCmd = &cobra.Command{
 	Use:           "patches <dyld_shared_cache>",
+	Aliases:       []string{"p"},
 	Short:         "Dump dyld patch info",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

@@ -54,6 +54,7 @@ func init() {
 // XrefCmd represents the xref command
 var XrefCmd = &cobra.Command{
 	Use:           "xref <dyld_shared_cache> <vaddr>",
+	Aliases:       []string{"x"},
 	Short:         "🚧 [WIP] Find all cross references to an address",
 	Args:          cobra.MinimumNArgs(2),
 	SilenceUsage:  true,

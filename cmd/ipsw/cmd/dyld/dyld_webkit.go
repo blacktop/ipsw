@@ -48,9 +48,10 @@ func init() {
 
 // WebkitCmd represents the webkit command
 var WebkitCmd = &cobra.Command{
-	Use:   "webkit <dyld_shared_cache>",
-	Short: "Get WebKit version from a dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "webkit <dyld_shared_cache>",
+	Aliases: []string{"w"},
+	Short:   "Get WebKit version from a dyld_shared_cache",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

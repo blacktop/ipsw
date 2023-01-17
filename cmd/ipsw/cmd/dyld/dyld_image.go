@@ -41,6 +41,7 @@ func init() {
 // imageCmd represents the image command
 var ImageCmd = &cobra.Command{
 	Use:           "image <dyld_shared_cache> <IMAGE>",
+	Aliases:       []string{"img"},
 	Short:         "Dump image array info",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

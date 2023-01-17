@@ -104,6 +104,7 @@ func init() {
 // dyldExtractCmd represents the extractDyld command
 var dyldExtractCmd = &cobra.Command{
 	Use:           "extract <DSC> <DYLIB>",
+	Aliases:       []string{"e"},
 	Short:         "Extract dylib from dyld_shared_cache",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
