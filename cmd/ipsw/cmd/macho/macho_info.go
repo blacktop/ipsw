@@ -293,6 +293,9 @@ var machoInfoCmd = &cobra.Command{
 					fmt.Println(cert)
 				}
 			}
+			if err := os.MkdirAll(folder, 0755); err != nil {
+				return fmt.Errorf("failed to create folder %s: %v", folder, err)
+			}
 			toc := xr.TOC()
 			for idx, xf := range xr.File {
 				f, err := xf.Open()
