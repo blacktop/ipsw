@@ -33,8 +33,9 @@ func init() {
 
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the version number of ipsw",
+	Use:     "version",
+	Aliases: []string{"v"},
+	Short:   "Print the version number of ipsw",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Version: ", AppVersion, ", BuildTime: ", AppBuildTime)
 	},

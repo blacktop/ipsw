@@ -53,9 +53,10 @@ func init() {
 
 // ibootCmd represents the iboot command
 var ibootCmd = &cobra.Command{
-	Use:   "iboot <IBOOT_BIN>",
-	Short: "Dump firmwares",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "iboot <IBOOT_BIN>",
+	Aliases: []string{"ib"},
+	Short:   "Dump firmwares",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var name string
 

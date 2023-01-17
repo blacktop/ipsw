@@ -61,6 +61,7 @@ func init() {
 // infoCmd represents the info command
 var infoCmd = &cobra.Command{
 	Use:           "info <IPSW>",
+	Aliases:       []string{"i"},
 	Short:         "Display IPSW/OTA Info",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

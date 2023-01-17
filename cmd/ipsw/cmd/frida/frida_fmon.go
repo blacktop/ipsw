@@ -41,6 +41,7 @@ func init() {
 // fridaFMonCmd represents the fmon command
 var fridaFMonCmd = &cobra.Command{
 	Use:           "fmon",
+	Aliases:       []string{"fm"},
 	Short:         "File Monitor",
 	SilenceUsage:  true,
 	SilenceErrors: true,

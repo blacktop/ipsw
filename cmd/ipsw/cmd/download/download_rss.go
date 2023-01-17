@@ -61,8 +61,9 @@ func init() {
 
 // rssCmd represents the rss command
 var rssCmd = &cobra.Command{
-	Use:   "rss",
-	Short: "Read Releases - Apple Developer RSS Feed",
+	Use:     "rss",
+	Aliases: []string{"r"},
+	Short:   "Read Releases - Apple Developer RSS Feed",
 	Run: func(cmd *cobra.Command, args []string) {
 		var releases []string
 

@@ -31,10 +31,11 @@ func init() {
 
 // BackupCmd represents the backup command
 var BackupCmd = &cobra.Command{ // FIXME: implement backup command
-	Use:    "backup",
-	Short:  "Backup commands",
-	Args:   cobra.NoArgs,
-	Hidden: true,
+	Use:     "backup",
+	Aliases: []string{"bk"},
+	Short:   "Backup commands",
+	Args:    cobra.NoArgs,
+	Hidden:  true,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 	},
