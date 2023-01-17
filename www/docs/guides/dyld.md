@@ -193,6 +193,37 @@ This command isn't 💯 done yet and is missing some features:
 Parse a cached `dylib` MachO file
 
 ```bash
+❯ ipsw dyld macho --help
+Parse a dylib file
+
+Usage:
+  ipsw dyld macho <dyld_shared_cache> <dylib> [flags]
+
+Flags:
+  -a, --all             Parse ALL dylibs
+  -x, --extract         🚧 Extract the dylib
+      --force           Overwrite existing extracted dylib(s)
+  -h, --help            help for macho
+  -j, --json            Print the TOC as JSON
+  -l, --loads           Print the load commands
+  -o, --objc            Print ObjC info
+  -r, --objc-refs       Print ObjC references
+      --output string   Directory to extract the dylib(s)
+      --search string   Search for byte pattern
+  -f, --starts          Print function starts
+  -s, --strings         Print cstrings
+  -b, --stubs           Print stubs
+  -n, --symbols         Print symbols
+
+Global Flags:
+      --color           colorize output
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
+  -V, --verbose         verbose output
+```
+
+#### Print a dylibs load commands AND dump the ObjC runtime data
+
+```bash
 ❯ ipsw dyld macho dyld_shared_cache JavaScriptCore --loads --objc
 
 Magic         = 64-bit MachO
@@ -276,6 +307,91 @@ Flags         = NoUndefs, DyldLink, TwoLevel, NoReexportedDylibs, AppExtensionSa
 :::info note
 Make the output look amazing by piping to `bat -l m --tabs 0 -p --theme Nord --wrap=never --pager "less -S"`
 :::
+
+#### Dump a dylib's header as JSON
+
+```bash
+❯ ipsw dyld macho test-caches/IPSWs/20D5035i__iPhone15,2/dyld_shared_cache_arm64e JavaScriptCore --json | jq . -C | less -Sr
+```
+
+```json
+{
+  "header": {
+    "magic": "64-bit MachO",
+    "type": "DYLIB",
+    "cpu": "AARCH64, ARM64e caps: USR00",
+    "commands": 24,
+    "commands_size": 4736,
+    "flags": [
+      "NoUndefs",
+      "DyldLink",
+      "TwoLevel",
+      "BindsToWeak",
+      "NoReexportedDylibs",
+      "AppExtensionSafe",
+      "DylibInCache"
+    ]
+  },
+  "loads": [
+    {
+      "load_cmd": "LC_SEGMENT_64",
+      "len": 1112,
+      "name": "__TEXT",
+      "addr": 6885064704,
+      "memsz": 21749760,
+      "offset": 376832,
+      "filesz": 21749760,
+      "maxprot": "r-x",
+      "prot": "r-x",
+      "nsect": 13,
+      "sections": [
+        {
+          "name": "__text",
+          "segment": "__TEXT",
+          "addr": 6885070320,
+          "size": 20555936,
+          "offset": 382448,
+          "align": 4,
+          "reloff": 0,
+          "nreloc": 0,
+          "type": 64
+        },
+<SNIP>        
+```
+
+#### Search for byte pattern
+
+```bash
+❯ ipsw dyld macho dyld_shared_cache_arm64e JavaScriptCore --search "7f 23 03 d5 * * * * f6 57 01 a9" | head
+
+Search Results
+--------------
+"0x199f25c80"
+0x199f26804
+0x199f285c4
+"0x199f286c4"
+0x199f28860
+0x199f289d8
+0x199f2966c
+```
+
+#### Print out the 🆕 stubs islands
+
+```bash
+❯ ipsw dyld stubs dyld_shared_cache_arm64e | head
+   • Loading symbol cache file...
+0x199ce7640: _CMPhotoJPEGWriteMPFWithJPEG
+0x1ad5d5970: _objc_autorelease
+0x1c8d0f350: _$ss10_HashTableV12previousHole6beforeAB6BucketVAF_tF
+0x1cf7eba00: _$s5TeaUI14KeyCommandItemVMa
+0x1bb1f8a40: _swift_task_switch
+0x1c1f5edc0: _$s4GRDB3RowC19fastDecodeIfPresent_16atUncheckedIndexxSgxm_SitKAA24DatabaseValueConvertibleRzAA015StatementColumnL0RzlF
+0x1ec2127d0: _CGColorGetColorSpace
+0x207434db0: __swift_stdlib_strtod_clocale
+0x1a0622e00: _objc_retain_x20
+0x1c1f87d30: _swift_getTupleTypeLayout3
+"0x1bb220d70: _fcntl"
+```
 
 ### **dyld symaddr**
 
