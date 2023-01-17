@@ -198,7 +198,7 @@ func init() {
 
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
 	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO")
-	entCmd.Flags().String("output", "o", "Folder to r/w entitlement databases")
+	entCmd.Flags().StringP("output", "o", "", "Folder to r/w entitlement databases")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	viper.BindPFlag("ent.ent", entCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
