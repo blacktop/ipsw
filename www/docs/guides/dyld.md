@@ -547,6 +547,16 @@ To create a `~/Library/Developer/Xcode/iOS DeviceSupport/` folder from a _dyld_s
 <SNIP>
 ```
 
+```bash
+❯ ls -1 ~/Library/Developer/Xcode/iOS\ DeviceSupport/
+14.4.1 (18D61)
+14.4.2 (18D70)
+16.0 (20A5303i) arm64e
+16.0 (20A5328h) arm64e
+16.0 (20A5339d) arm64e
+"16.3 (20D5035i) arm64e" 👀
+```
+
 :::info note
 This commnd calls into XCode's `dsc_extractor.bundle` so will ALWAYS work as long as your have a recent version of XCode installed
 :::
@@ -871,6 +881,10 @@ In FileSystem DMG (Apps)
 /usr/libexec/proactiveeventtrackerd
 ```
 
+:::info note
+Notice we also got the filesystem's binaries that import that dylib??? That's due to the POWER 💪 of `prebuilt loader sets` 😎
+:::
+
 ### **dyld xref**
 
 List all the cross-references in the _dyld_shared_cache_ for a given virtual address
@@ -912,7 +926,10 @@ Search the dylib that the symbol is in by default
 <SNIP>
 ```
 :::info note
-To search ALL dylibs, use the `--all` flag. To search a specific dylib, use the `--image` flag and to search all other dylibs that import the dylib that contains the symbol/address, use the `--imports` flag.
+- To search ALL dylibs, use the `--all` flag  
+- To search a specific dylib, use the `--image` flag  
+- To search all other dylibs that import the dylib that contains the symbol/address, use the `--imports` flag  
+
 :::
 
 :::info
