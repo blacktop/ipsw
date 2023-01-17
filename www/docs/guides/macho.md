@@ -88,8 +88,8 @@ Or dump the section as a list of pointers
 Or write to a file for later post-processing
 
 ```bash
-❯ ipsw macho dump kernelcache --section __DATA_CONST.__mod_init_func --size 656 --output ./mod_init_func .bin
-   • Wrote data to file ./data.bin
+❯ ipsw macho dump kernelcache --section __DATA_CONST.__mod_init_func --size 656 --output mod_init_func.bin
+   • Wrote data to file mod_init_func.bin
 ```
 
 ```bash
