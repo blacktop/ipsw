@@ -197,8 +197,7 @@ Flags         = NoUndefs, DyldLink, TwoLevel, NoReexportedDylibs, AppExtensionSa
 <SNIP>
 ```
 
-```m
-<SNIP>
+```objc
 0x001e39fc000 JSContext : NSObject {
   // instance variables
   +0x08 @"JSVirtualMachine" m_virtualMachine (0x8)

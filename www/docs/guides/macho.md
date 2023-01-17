@@ -390,7 +390,7 @@ Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
 ❯ ipsw macho info /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
 ```
 
-```m
+```objc
 Objective-C
 ===========
 
