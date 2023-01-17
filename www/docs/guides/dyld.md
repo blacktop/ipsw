@@ -911,24 +911,9 @@ Search the dylib that the symbol is in by default
 0x181838c80: +[NSMessagePort sendBeforeTime:streamData:components:to:from:msgid:reserved:] + 476
 <SNIP>
 ```
-
-Search ALL the dylibs in the *dyld_shared_cache* for the xrefs to `_NSLog`
-
-```bash
-❯ ipsw dyld xref test-caches/IPSWs/20D5035i__iPhone15,2/dyld_shared_cache_arm64e 0x1813450bc --all
-   • Loading symbol cache file...
-   • Searching for xrefs (use -V for more progess output)
-   • XREFS                     dylib=/System/Library/Frameworks/Foundation.framework/Foundation sym=_NSLog xrefs=314
-0x181363114: _NSNextMapEnumeratorPair + 108
-0x1818691a0: -[__NSConcreteURLComponents setPercentEncodedHost:] + 160
-0x18187dc18: ___66-[_NSKeyValueDebugging object:willAddObserver:forKeyPath:context:]_block_invoke_2 + 592
-0x1818a83d4: -[NSRTFD initWithDataRepresentation:] + 60
-0x1818c33cc: ___41-[NSFileAccessArbiter _grantAccessClaim:]_block_invoke + 20
-0x1818cdd88: -[NSFilePresenterXPCMessenger observeMoveToURL:withSubitemURL:byWriterWithPurposeID:] + 232
-0x1812cd1c8: -[NSString(NSStringOtherEncodings) dataUsingEncoding:allowLossyConversion:] + 136
-<SNIP>
-
-```
+:::info note
+To search ALL dylibs, use the `--all` flag. To search a specific dylib, use the `--image` flag and to search all other dylibs that import the dylib that contains the symbol/address, use the `--imports` flag.
+:::
 
 :::info
 This is one of `ipsw`'s MOST powerful commands and is getting better all the time.  Check back periodically and see what's new!
