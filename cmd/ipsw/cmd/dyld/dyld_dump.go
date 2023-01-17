@@ -28,6 +28,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -44,6 +45,8 @@ func init() {
 	DumpCmd.Flags().Uint64P("count", "c", 0, "The number of total items to display")
 	DumpCmd.Flags().BoolP("addr", "a", false, "Output as addresses/uint64s")
 	DumpCmd.Flags().BoolP("bytes", "b", false, "Output as bytes")
+	DumpCmd.Flags().StringP("image", "i", "", "Dump from image (requires --section)")
+	DumpCmd.Flags().StringP("section", "x", "", "Dump a specific segment/section (i.e. __TEXT.__text)")
 	DumpCmd.Flags().StringP("output", "o", "", "Output to a file")
 
 	viper.BindPFlag("dyld.dump.arch", DumpCmd.Flags().Lookup("arch"))
@@ -51,6 +54,8 @@ func init() {
 	viper.BindPFlag("dyld.dump.count", DumpCmd.Flags().Lookup("count"))
 	viper.BindPFlag("dyld.dump.addr", DumpCmd.Flags().Lookup("addr"))
 	viper.BindPFlag("dyld.dump.bytes", DumpCmd.Flags().Lookup("bytes"))
+	viper.BindPFlag("dyld.dump.image", DumpCmd.Flags().Lookup("image"))
+	viper.BindPFlag("dyld.dump.section", DumpCmd.Flags().Lookup("section"))
 	viper.BindPFlag("dyld.dump.output", DumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("dyld.dump.color", DumpCmd.Flags().Lookup("color"))
 
@@ -61,7 +66,7 @@ func init() {
 var DumpCmd = &cobra.Command{
 	Use:   "dump <dyld_shared_cache> <address>",
 	Short: "Dump dyld_shared_cache data at given virtual address",
-	Args:  cobra.MinimumNArgs(2),
+	Args:  cobra.MaximumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -74,6 +79,8 @@ var DumpCmd = &cobra.Command{
 		count := viper.GetUint64("dyld.dump.count")
 		asAddrs := viper.GetBool("dyld.dump.addr")
 		asBytes := viper.GetBool("dyld.dump.bytes")
+		fromImage := viper.GetString("dyld.dump.image")
+		segmentSection := viper.GetString("dyld.dump.section")
 		outFile := viper.GetString("dyld.dump.output")
 
 		if size > 0 && count > 0 {
@@ -84,24 +91,12 @@ var DumpCmd = &cobra.Command{
 			return fmt.Errorf("you can only use --addr with --count")
 		} else if asBytes && count > 0 {
 			return fmt.Errorf("you can only use --bytes with --size")
-		}
-
-		if asAddrs {
-			if count == 0 {
-				log.Info("Setting --count=20")
-				count = 20
-			}
-			size = count * uint64(binary.Size(uint64(0)))
-		} else {
-			if size == 0 {
-				log.Info("Setting --size=256")
-				size = 256
-			}
-		}
-
-		addr, err := utils.ConvertStrToInt(args[1])
-		if err != nil {
-			return err
+		} else if fromImage != "" && segmentSection == "" {
+			return fmt.Errorf("you must specify a --section when using --image")
+		} else if fromImage == "" && segmentSection != "" {
+			return fmt.Errorf("you must specify an --image when using --section")
+		} else if len(segmentSection) > 0 && len(args) != 1 {
+			return fmt.Errorf("you can only use <address> OR (--image AND --section)")
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -129,6 +124,48 @@ var DumpCmd = &cobra.Command{
 			return err
 		}
 		defer f.Close()
+
+		var addr uint64
+		if len(segmentSection) != 0 {
+			parts := strings.Split(segmentSection, ".")
+			if len(parts) != 2 {
+				return fmt.Errorf("invalid section")
+			}
+			image, err := f.Image(fromImage)
+			if err != nil {
+				return err
+			}
+			m, err := image.GetPartialMacho()
+			if err != nil {
+				return err
+			}
+			if sec := m.Section(parts[0], parts[1]); sec != nil {
+				addr = sec.Addr
+				if size == 0 && count == 0 {
+					size = sec.Size
+				}
+			} else {
+				return fmt.Errorf("failed to find section %s", segmentSection)
+			}
+		} else {
+			addr, err = utils.ConvertStrToInt(args[1])
+			if err != nil {
+				return err
+			}
+		}
+
+		if asAddrs {
+			if count == 0 {
+				log.Info("Setting --count=20")
+				count = 20
+			}
+			size = count * uint64(binary.Size(uint64(0)))
+		} else {
+			if size == 0 {
+				log.Info("Setting --size=256")
+				size = 256
+			}
+		}
 
 		uuid, off, err := f.GetOffset(addr)
 		if err != nil {
