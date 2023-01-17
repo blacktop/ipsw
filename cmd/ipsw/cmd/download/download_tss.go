@@ -55,6 +55,7 @@ func init() {
 // tssCmd represents the tss command
 var tssCmd = &cobra.Command{
 	Use:           "tss",
+	Aliases:       []string{"t", "tsschecker"},
 	Short:         "🚧 Download SHSH Blobs",
 	SilenceUsage:  false,
 	SilenceErrors: true,

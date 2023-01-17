@@ -44,6 +44,7 @@ func init() {
 // img4KbagCmd represents the kbag command
 var img4KbagCmd = &cobra.Command{
 	Use:           "kbag <IMG4>",
+	Aliases:       []string{"k"},
 	Short:         "Extract kbag from img4",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

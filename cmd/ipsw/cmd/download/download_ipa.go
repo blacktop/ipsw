@@ -68,6 +68,7 @@ func init() {
 // ipaCmd represents the dev command
 var ipaCmd = &cobra.Command{
 	Use:           "ipa",
+	Aliases:       []string{"app"},
 	Short:         "Download App Packages from the iOS App Store",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  false,

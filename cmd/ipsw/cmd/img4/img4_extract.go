@@ -45,9 +45,10 @@ func init() {
 
 // img4ExtractCmd represents the extract command
 var img4ExtractCmd = &cobra.Command{
-	Use:   "extract <im4p>",
-	Short: "Extract im4p payloads",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "extract <im4p>",
+	Aliases: []string{"e"},
+	Short:   "Extract im4p payloads",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

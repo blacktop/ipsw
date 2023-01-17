@@ -38,9 +38,10 @@ func init() {
 
 // deviceListCmd represents the deviceList command
 var deviceListCmd = &cobra.Command{
-	Use:   "device-list",
-	Short: "List all iOS devices",
-	Args:  cobra.NoArgs,
+	Use:     "device-list",
+	Aliases: []string{"devs"},
+	Short:   "List all iOS devices",
+	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		// gen, _ := cmd.Flags().GetBool("gen")

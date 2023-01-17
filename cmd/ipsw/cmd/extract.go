@@ -110,6 +110,7 @@ func init() {
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
 	Use:           "extract <IPSW/OTA | URL>",
+	Aliases:       []string{"e", "ex"},
 	Short:         "Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

@@ -56,6 +56,7 @@ func init() {
 // mdevsCmd represents the mdevs command
 var mdevsCmd = &cobra.Command{
 	Use:           "mdevs",
+	Aliases:       []string{"md", "mobiledevices"},
 	Short:         "List all MobileDevices in IPSW",
 	SilenceUsage:  true,
 	SilenceErrors: true,

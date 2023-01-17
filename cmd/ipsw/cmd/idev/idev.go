@@ -32,9 +32,10 @@ func init() {
 
 // IDevCmd represents the idev command
 var IDevCmd = &cobra.Command{
-	Use:   "idev",
-	Short: "USB connected device commands",
-	Args:  cobra.NoArgs,
+	Use:     "idev",
+	Aliases: []string{"usb"},
+	Short:   "USB connected device commands",
+	Args:    cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))

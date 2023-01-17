@@ -55,6 +55,7 @@ func init() {
 // deviceTreeCmd represents the deviceTree command
 var deviceTreeCmd = &cobra.Command{
 	Use:           "dtree <DeviceTree>",
+	Aliases:       []string{"dt", "devicetree"},
 	Short:         "Parse DeviceTree",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

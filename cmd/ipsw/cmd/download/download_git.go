@@ -68,6 +68,7 @@ func init() {
 // gitCmd represents the git command
 var gitCmd = &cobra.Command{
 	Use:           "git",
+	Aliases:       []string{"g", "github"},
 	Short:         "Download github.com/orgs/apple-oss-distributions tarballs",
 	SilenceUsage:  false,
 	SilenceErrors: false,

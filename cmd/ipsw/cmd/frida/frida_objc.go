@@ -98,7 +98,8 @@ func init() {
 
 // fridaObjcCmd represents the frida command
 var fridaObjcCmd = &cobra.Command{
-	Use:           "frida",
+	Use:           "objc",
+	Aliases:       []string{"o"},
 	Short:         "Trace ObjC methods",
 	SilenceUsage:  true,
 	SilenceErrors: true,

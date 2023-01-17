@@ -78,6 +78,7 @@ func init() {
 // macosCmd represents the macos command
 var macosCmd = &cobra.Command{
 	Use:           "macos",
+	Aliases:       []string{"m", "mac"},
 	Short:         "Download macOS installers",
 	SilenceUsage:  false,
 	SilenceErrors: true,

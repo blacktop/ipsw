@@ -70,6 +70,7 @@ func init() {
 // shshCmd represents the shsh command
 var shshCmd = &cobra.Command{
 	Use:           "shsh",
+	Aliases:       []string{"sh"},
 	Short:         "Get shsh blobs from device",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,

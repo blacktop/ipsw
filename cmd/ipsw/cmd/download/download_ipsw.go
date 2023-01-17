@@ -77,6 +77,7 @@ func init() {
 // ipswCmd represents the ipsw command
 var ipswCmd = &cobra.Command{
 	Use:           "ipsw",
+	Aliases:       []string{"i"},
 	Short:         "Download and parse IPSW(s) from the internets",
 	SilenceUsage:  true,
 	SilenceErrors: true,
