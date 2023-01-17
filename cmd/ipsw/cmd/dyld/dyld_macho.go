@@ -23,7 +23,6 @@ package dyld
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -60,56 +59,6 @@ func init() {
 	MachoCmd.Flags().Bool("force", false, "Overwrite existing extracted dylib(s)")
 
 	MachoCmd.MarkZshCompPositionalArgumentFile(1)
-}
-
-func rebaseMachO(dsc *dyld.File, machoPath string) error {
-	f, err := os.OpenFile(machoPath, os.O_RDWR, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to open exported MachO %s: %v", machoPath, err)
-	}
-	defer f.Close()
-
-	mm, err := macho.NewFile(f)
-	if err != nil {
-		return err
-	}
-
-	for _, seg := range mm.Segments() {
-		uuid, mapping, err := dsc.GetMappingForVMAddress(seg.Addr)
-		if err != nil {
-			return err
-		}
-
-		if mapping.SlideInfoOffset == 0 {
-			continue
-		}
-
-		startAddr := seg.Addr - mapping.Address
-		endAddr := ((seg.Addr + seg.Memsz) - mapping.Address) + uint64(dsc.SlideInfo.GetPageSize())
-
-		start := startAddr / uint64(dsc.SlideInfo.GetPageSize())
-		end := endAddr / uint64(dsc.SlideInfo.GetPageSize())
-
-		rebases, err := dsc.GetRebaseInfoForPages(uuid, mapping, start, end)
-		if err != nil {
-			return err
-		}
-
-		for _, rebase := range rebases {
-			off, err := mm.GetOffset(rebase.CacheVMAddress)
-			if err != nil {
-				continue
-			}
-			if _, err := f.Seek(int64(off), io.SeekStart); err != nil {
-				return fmt.Errorf("failed to seek in exported file to offset %#x from the start: %v", off, err)
-			}
-			if err := binary.Write(f, dsc.ByteOrder, rebase.Target); err != nil {
-				return fmt.Errorf("failed to write rebase address %#x: %v", rebase.Target, err)
-			}
-		}
-	}
-
-	return nil
 }
 
 // MachoCmd represents the macho command

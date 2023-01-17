@@ -160,27 +160,33 @@ In macOS12+/iOS15+ caches replaced this data with `prebuilt loader sets` which c
 
 ### **dyld extract**
 
-Extract _dyld_shared_cache_ from a previously downloaded _ipsw_
-
-- `macOS`
+Extract dylib from *dyld_shared_cache*
 
 ```bash
-❯ ipsw dyld extract iPhone11,2_12.0_16A366_Restore.ipsw
-   • Extracting dyld_shared_cache from IPSW
-   • Mounting DMG
-   • Extracting System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e to dyld_shared_cache
-   • Unmounting DMG
+❯ ipsw dyld extract dyld_shared_cache_arm64e JavaScriptCore
+   • Created JavaScriptCore
 ```
 
-- `docker`
+Extract all dylibs from *dyld_shared_cache*
 
 ```bash
-❯ docker run --init -it --rm \
-             --device /dev/fuse \
-             --cap-add=SYS_ADMIN \
-             -v `pwd` :/data \
-             blacktop/ipsw -V dyld extract iPhone11_2_12.4.1_16G102_Restore.ipsw
+❯ ipsw dyld extract dyld_shared_cache_arm64e --all
+   • Extracting all dylibs from dyld_shared_cache_arm64e
+      [extracting]  ✅  [==============================================================================| 2700/2700 ]
 ```
+
+:::info note
+This command allows you to extract dylibs on non-darwin systems and it will add all local symbols to the symbol table as well as apply the DSC slide info for the pages included in the dylib if you supply the `--slide` flag *(this removes PACed pointers)*
+:::
+
+:::caution
+
+This command isn't 💯 done yet and is missing some features:
+- [ ] Repairing the ObjC runtime data
+- [ ] Patching the stubs  
+- [ ] 🤔 Create an [issue](https://github.com/blacktop/ipsw/issues) if you find something else missing
+
+:::
 
 ### **dyld macho**
 
@@ -561,6 +567,9 @@ To create a `~/Library/Developer/Xcode/iOS DeviceSupport/` folder from a _dyld_s
 This commnd calls into XCode's `dsc_extractor.bundle` so will ALWAYS work as long as your have a recent version of XCode installed
 :::
 
+:::info note
+If you are on a **non-darwin** system use the `ipsw dyld extract` command instead.  You can use the `ipsw dyld extract` command on **darwin** systems as well, however, it will be slower than using the `dsc_extractor.bundle` based `ipsw dyld split` command and *(for now)* only improves on the output by also applying the DSC slide-info if you use the `--slide` flag.  Eventually `ipsw dyld extract` will be able to create **near** perfect dylib extractions and will be the preferred command and this one will only be useful when Apple releases the next major OS version and inevitably breaks everyones DSC parsing 😏 again, but you can count on `ipsw` to once again be the FIRST to figure it out again 😁
+:::
 
 ### **dyld webkit**
 
