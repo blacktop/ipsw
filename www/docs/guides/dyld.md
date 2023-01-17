@@ -311,7 +311,7 @@ Make the output look amazing by piping to `bat -l m --tabs 0 -p --theme Nord --w
 #### Dump a dylib's header as JSON
 
 ```bash
-❯ ipsw dyld macho test-caches/IPSWs/20D5035i__iPhone15,2/dyld_shared_cache_arm64e JavaScriptCore --json | jq . -C | less -Sr
+❯ ipsw dyld macho dyld_shared_cache_arm64e JavaScriptCore --json | jq . -C | less -Sr
 ```
 
 ```json
@@ -366,10 +366,10 @@ Make the output look amazing by piping to `bat -l m --tabs 0 -p --theme Nord --w
 
 Search Results
 --------------
-"0x199f25c80"
+0x199f25c80
 0x199f26804
 0x199f285c4
-"0x199f286c4"
+0x199f286c4
 0x199f28860
 0x199f289d8
 0x199f2966c
@@ -390,7 +390,7 @@ Search Results
 0x207434db0: __swift_stdlib_strtod_clocale
 0x1a0622e00: _objc_retain_x20
 0x1c1f87d30: _swift_getTupleTypeLayout3
-"0x1bb220d70: _fcntl"
+0x1bb220d70: _fcntl
 ```
 
 ### **dyld symaddr**
