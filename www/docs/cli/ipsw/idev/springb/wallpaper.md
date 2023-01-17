@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: wallpaper
 description: Dump wallpaper as PNG
 last_update:
-  date: 2023-01-13T11:46:22-07:00
+  date: 2023-01-16T23:18:46-07:00
   author: blacktop
 ---
 ## ipsw idev springb wallpaper

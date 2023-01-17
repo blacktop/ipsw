@@ -6,7 +6,7 @@ hide_table_of_contents: true
 sidebar_label: dyld
 description: Parse dyld_shared_cache
 last_update:
-  date: 2023-01-13T11:46:22-07:00
+  date: 2023-01-16T23:18:46-07:00
   author: blacktop
 ---
 ## ipsw dyld
@@ -39,7 +39,7 @@ ipsw dyld [flags]
 * [ipsw dyld a2s](/docs/cli/ipsw/dyld/a2s)	 - Lookup symbol at unslid address
 * [ipsw dyld disass](/docs/cli/ipsw/dyld/disass)	 - Disassemble dyld_shared_cache at symbol/vaddr
 * [ipsw dyld dump](/docs/cli/ipsw/dyld/dump)	 - Dump dyld_shared_cache data at given virtual address
-* [ipsw dyld extract](/docs/cli/ipsw/dyld/extract)	 - Extract dyld_shared_cache from DMG in IPSW
+* [ipsw dyld extract](/docs/cli/ipsw/dyld/extract)	 - Extract dylib from dyld_shared_cache
 * [ipsw dyld image](/docs/cli/ipsw/dyld/image)	 - Dump image array info
 * [ipsw dyld imports](/docs/cli/ipsw/dyld/imports)	 - List all dylibs that load a given dylib
 * [ipsw dyld info](/docs/cli/ipsw/dyld/info)	 - Parse dyld_shared_cache
