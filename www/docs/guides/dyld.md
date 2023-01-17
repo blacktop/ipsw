@@ -172,7 +172,7 @@ Extract all dylibs from *dyld_shared_cache*
 ```bash
 ❯ ipsw dyld extract dyld_shared_cache_arm64e --all
    • Extracting all dylibs from dyld_shared_cache_arm64e
-      [extracting]  ✅  [================================================================| 2700/2700 ]
+      [extracting]  ✅  [=============================================================| 2700/2700 ]
 ```
 
 :::info note
