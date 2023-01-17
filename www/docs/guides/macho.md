@@ -118,29 +118,39 @@ Help for macho cmd
 ```bash
 ❯ ipsw macho info --help
 
-Parse a MachO file
+Explore a MachO file
 
 Usage:
   ipsw macho info <macho> [flags]
 
+Aliases:
+  info, i
+
 Flags:
+  -z, --all-fileset-entries     Parse all fileset entries
   -a, --arch string             Which architecture to use for fat/universal MachO
+  -b, --bit-code                Dump the LLVM bitcode
+      --dump-cert               Dump the certificate
   -e, --ent                     Print entitlements
   -x, --extract-fileset-entry   Extract the fileset entry
   -t, --fileset-entry string    Which fileset entry to analyze
   -u, --fixups                  Print fixup chains
   -d, --header                  Print the mach header
-  -h, --help                    help for macho
+  -h, --help                    help for info
+  -j, --json                    Print the TOC as JSON
   -l, --loads                   Print the load commands
   -o, --objc                    Print ObjC info
   -r, --objc-refs               Print ObjC references
+      --output string           Directory to extract files to
   -s, --sig                     Print code signature
+  -g, --split-seg               Print split seg info
   -f, --starts                  Print function starts
   -c, --strings                 Print cstrings
   -n, --symbols                 Print symbols
 
 Global Flags:
-      --config string   config file (default is $HOME/.ipsw.yaml)
+      --color           colorize output
+      --config string   config file (default is $HOME/.ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 
@@ -233,6 +243,47 @@ Flags         = NoUndefs, DyldLink, TwoLevel, BindsToWeak, NoReexportedDylibs, A
 22: LC_LOAD_DYLIB               /usr/lib/libSystem.B.dylib (1292.0.0)
 23: LC_FUNCTION_STARTS          offset=0x01020ab0-0x0102ba28, size=44920, count=26030
 24: LC_DATA_IN_CODE             offset=0x0102ba28-0x0102ba28, size=    0, entries=0
+```
+
+### **macho info --json**
+
+Output the same information as `macho info --header --loads` but output as JSON
+
+```bash
+❯ ipsw macho info JavaScriptCore --json | jq . -C | less -Sr
+```
+```json
+{
+  "header": {
+    "magic": "64-bit MachO",
+    "type": "DYLIB",
+    "cpu": "AARCH64, ARM64e caps: USR00",
+    "commands": 24,
+    "commands_size": 4736,
+    "flags": [
+      "NoUndefs",
+      "DyldLink",
+      "TwoLevel",
+      "BindsToWeak",
+      "NoReexportedDylibs",
+      "AppExtensionSafe",
+      "DylibInCache"
+    ]
+  },
+  "loads": [
+    {
+      "load_cmd": "LC_SEGMENT_64",
+      "len": 1112,
+      "name": "__TEXT",
+      "addr": 6885064704,
+      "memsz": 21749760,
+      "offset": 376832,
+      "filesz": 21749760,
+      "maxprot": "r-x",
+      "prot": "r-x",
+      "nsect": 13,
+      "sections":
+<SNIP>              
 ```
 
 ### **macho info --sig**
@@ -809,6 +860,104 @@ Flags         = NoUndefs, DyldLink, TwoLevel, DylibInCache
 
 -rwxr-xr-x  1 blacktop    15M May  9 22:08 com.apple.security.sandbox
 -rw-r--r--  1 blacktop    96M Apr 29 21:56 kernelcache.production
+```
+
+### **macho info --split-seg**
+
+Dump the `LC_SEGMENT_SPLIT_INFO` of a KDK Kext
+
+```bash
+❯ ipsw macho info --arch arm64e --split-seg \
+IOFireWireSerialBusProtocolSansPhysicalUnit.kext/Contents/MacOS/IOFireWireSerialBusProtocolSansPhysicalUnit
+```
+```bash
+     __TEXT_EXEC.__text           0x0000400c  =>            __TEXT.__cstring        0x000005c8	kind(arm64_adrp)
+     __TEXT_EXEC.__text           0x0000412c  =>            __TEXT.__cstring        0x000005c8	kind(arm64_adrp)
+     __TEXT_EXEC.__text           0x00004464  =>            __TEXT.__cstring        0x000005c8	kind(arm64_adrp)
+     __TEXT_EXEC.__text           0x00004010  =>            __TEXT.__cstring        0x000005c8	kind(arm64_off_12)
+     __TEXT_EXEC.__text           0x00004130  =>            __TEXT.__cstring        0x000005c8	kind(arm64_off_12)
+     __TEXT_EXEC.__text           0x00004468  =>            __TEXT.__cstring        0x000005c8	kind(arm64_off_12)
+     __TEXT_EXEC.__text           0x00004300  =>            __TEXT.__cstring        0x0000066d	kind(arm64_adrp)
+     __TEXT_EXEC.__text           0x00004304  =>            __TEXT.__cstring        0x0000066d	kind(arm64_off_12)
+     __TEXT_EXEC.__text           0x000040fc  =>       __TEXT_EXEC.__auth_stubs     0x0000451c	kind(arm64_br_26)
+     __TEXT_EXEC.__text           0x00004110  =>       __TEXT_EXEC.__auth_stubs     0x0000451c	kind(arm64_br_26)
+     __TEXT_EXEC.__text           0x00004184  =>       __TEXT_EXEC.__auth_stubs     0x0000452c	kind(arm64_br_26)
+     __TEXT_EXEC.__text           0x000041dc  =>       __TEXT_EXEC.__auth_stubs     0x0000452c	kind(arm64_br_26)
+     __TEXT_EXEC.__text           0x00004020  =>       __TEXT_EXEC.__auth_stubs     0x0000453c	kind(arm64_br_26)
+     __TEXT_EXEC.__text           0x00004140  =>       __TEXT_EXEC.__auth_stubs     0x0000453c	kind(arm64_br_26)
+     __TEXT_EXEC.__text           0x00004478  =>       __TEXT_EXEC.__auth_stubs     0x0000453c	kind(arm64_br_26)
+     __TEXT_EXEC.__text           0x00004048  =>       __TEXT_EXEC.__auth_stubs     0x0000454c	kind(arm64_br_26)
+<SNIP>     
+```       
+
+### **macho info --bit-code**
+
+Extract the LLVM bitcode from a MachO exported from iOS archive file
+
+```bash
+❯ ipsw macho info --bit-code <MACHO> --output /tmp/bc
+```
+```bash
+LLVM Bitcode:
+  Name:      Ld
+  Version:   1.0
+  Platform:  iOS
+  Arch:      arm64
+  SDK:       15.5
+  Hide Syms: 1
+  Linker Options:
+    -execute
+    -platform_version ios 15.5 15.5
+    -e _main
+    -rpath @executable_path/Frameworks
+    -executable_path /Users/blacktop/Library/Developer/Xcode/DerivedData/App-gteiirrrrrixcmdujgfktocqukjq/Build/Intermediates.noindex/ArchiveIntermediates/App/InstallationBuildProductsLocation/Applications/App.app/App
+    -dead_strip
+  Dylibs:
+    {SDKPATH}/System/Library/Frameworks/Foundation.framework/Foundation
+    {SDKPATH}/usr/lib/libobjc.A.dylib
+    {SDKPATH}/usr/lib/libSystem.B.dylib
+    {SDKPATH}/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+    {SDKPATH}/System/Library/Frameworks/UIKit.framework/UIKit
+
+   • Bitcode: -cc1 -triple arm64-apple-ios15.5.0 -emit-obj --mrelax-relocations -disable-llvm-passes -target-sdk-version=15.5 -fvisibility-inlines-hidden-static-local-var -fno-rounding-math -target-abi darwinpcs -Os
+      • Extracting /tmp/bc/5.bc
+   • Bitcode: -cc1 -triple arm64-apple-ios15.5.0 -emit-obj --mrelax-relocations -disable-llvm-passes -target-sdk-version=15.5 -fvisibility-inlines-hidden-static-local-var -fno-rounding-math -target-abi darwinpcs -Os
+      • Extracting /tmp/bc/4.bc
+   • Bitcode: -cc1 -triple arm64-apple-ios15.5.0 -emit-obj --mrelax-relocations -disable-llvm-passes -target-sdk-version=15.5 -fvisibility-inlines-hidden-static-local-var -fno-rounding-math -target-abi darwinpcs -Os
+      • Extracting /tmp/bc/3.bc
+   • Bitcode: -cc1 -triple arm64-apple-ios15.5.0 -emit-obj --mrelax-relocations -disable-llvm-passes -target-sdk-version=15.5 -fvisibility-inlines-hidden-static-local-var -fno-rounding-math -target-abi darwinpcs -Os
+      • Extracting /tmp/bc/2.bc
+   • Bitcode: -cc1 -triple arm64-apple-ios15.5.0 -emit-obj --mrelax-relocations -disable-llvm-passes -target-sdk-version=15.5 -fvisibility-inlines-hidden-static-local-var -fno-rounding-math -target-abi darwinpcs -Os
+      • Extracting /tmp/bc/1.bc
+```
+
+Now to get LLVM IR disassembly from the bitcode files:
+
+```bash
+❯ llvm-dis /tmp/*.bc
+```
+
+```bash
+❯ ls /tmp/bc
+1.bc 1.ll 2.bc 2.ll 3.bc 3.ll 4.bc 4.ll 5.bc 5.ll
+```
+
+Take a look at the output
+
+```bash
+❯ cat /tmp/bc/1.ll
+```
+```llvm
+; ModuleID = '/tmp/bc/1.bc'
+target datalayout = "e-m:o-i64:64-i128:128-n32:64-S128"
+target triple = "arm64-apple-ios15.5.0"
+
+%0 = type opaque
+%1 = type opaque
+%"__ir_hidden#19_" = type { i32*, i32, i8*, i64 }
+%"__ir_hidden#20_" = type opaque
+%"__ir_hidden#21_" = type { %"__ir_hidden#21_"*, %"__ir_hidden#21_"*, %"__ir_hidden#20_"*, i8* (i8*, i8*)**, %"__ir_hidden#22_"* }
+%"__ir_hidden#22_" = type { i32, i32, i32, i8*, i8*, %"__ir_hidden#23_"*, %"__ir_hidden#25_"*, %"__ir_hidden#27_"*, i8*, %"__ir_hidden#29_"* }
 ```
 
 ### **macho disass**
