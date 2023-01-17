@@ -443,7 +443,7 @@ Dump all the imp-caches
 ```
 
 :::caution
-NOT supported on macOS12/iOS15+ (yet)
+`--imp-cache` NOT supported on macOS12/iOS15+ *(yet)*
 :::
 
 ### **dyld objc class**
@@ -1041,4 +1041,24 @@ Or write to a file for later post-processing
 00000080  c0 3d a8 d9 01 00 08 00  68 be a8 d9 01 00 08 00  |.=......h.......|
 00000090  70 be a8 d9 01 00 08 00  78 be a8 d9 01 00 08 00  |p.......x.......|
 <SNIP>
+```
+
+To dump a section from a dylib in the _dyld_shared_cache_
+
+```bash
+❯ ipsw dyld dump dyld_shared_cache_arm64e --image JavaScriptCore --section __TEXT.__cstring --size 208
+   • Address location          dylib=/System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore section=__TEXT.__cstring
+000000019ba27290:  41 70 70 72 6f 78 69 6d  61 74 65 28 00 20 73 65  |Approximate(. se|
+000000019ba272a0:  63 29 00 4e 4f 54 20 49  4d 50 4c 45 4d 45 4e 54  |c).NOT IMPLEMENT|
+000000019ba272b0:  45 44 20 59 45 54 0a 00  41 53 53 45 52 54 49 4f  |ED YET..ASSERTIO|
+000000019ba272c0:  4e 20 46 41 49 4c 45 44  3a 20 25 73 0a 00 53 48  |N FAILED: %s..SH|
+000000019ba272d0:  4f 55 4c 44 20 4e 45 56  45 52 20 42 45 20 52 45  |OULD NEVER BE RE|
+000000019ba272e0:  41 43 48 45 44 0a 00 41  53 53 45 52 54 49 4f 4e  |ACHED..ASSERTION|
+000000019ba272f0:  20 46 41 49 4c 45 44 3a  20 00 0a 25 73 0a 00 41  | FAILED: ..%s..A|
+000000019ba27300:  52 47 55 4d 45 4e 54 20  42 41 44 3a 20 25 73 2c  |RGUMENT BAD: %s,|
+000000019ba27310:  20 25 73 0a 00 00 46 41  54 41 4c 20 45 52 52 4f  | %s...FATAL ERRO|
+000000019ba27320:  52 3a 20 00 0a 00 55 6e  6b 6e 6f 77 6e 20 6c 6f  |R: ...Unknown lo|
+000000019ba27330:  67 67 69 6e 67 20 6c 65  76 65 6c 3a 20 25 73 00  |gging level: %s.|
+000000019ba27340:  55 6e 6b 6e 6f 77 6e 20  6c 6f 67 67 69 6e 67 20  |Unknown logging |
+000000019ba27350:  63 68 61 6e 6e 65 6c 3a  20 25 73 00 25 40 00 25  |channel: %s.%@.%|
 ```
