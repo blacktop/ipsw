@@ -873,9 +873,13 @@ var machoInfoCmd = &cobra.Command{
 			}
 			for _, sec := range m.Sections {
 				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
-					dat, err := sec.Data()
+					off, err := m.GetOffset(sec.Addr)
 					if err != nil {
-						return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
+						return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
+					}
+					dat := make([]byte, sec.Size)
+					if _, err = m.ReadAt(dat, int64(off)); err != nil {
+						return fmt.Errorf("failed to read cstring data in %s.%s: %v", sec.Seg, sec.Name, err)
 					}
 
 					csr := bytes.NewBuffer(dat)
