@@ -43,6 +43,7 @@ func init() {
 	WebkitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	WebkitCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	WebkitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	WebkitCmd.Flags().BoolP("diff", "d", false, "Diff two dyld_shared_cache files")
 	WebkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -63,6 +64,7 @@ var WebkitCmd = &cobra.Command{
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		apiToken, _ := cmd.Flags().GetString("api")
+		diff, _ := cmd.Flags().GetBool("diff")
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
@@ -108,6 +110,55 @@ var WebkitCmd = &cobra.Command{
 		m, err := image.GetPartialMacho()
 		if err != nil {
 			return err
+		}
+
+		if diff {
+			dscPath2 := filepath.Clean(args[1])
+			fileInfo, err := os.Lstat(dscPath2)
+			if err != nil {
+				return fmt.Errorf("file %s does not exist", dscPath2)
+			}
+			// Check if file is a symlink
+			if fileInfo.Mode()&os.ModeSymlink != 0 {
+				symlinkPath, err := os.Readlink(dscPath2)
+				if err != nil {
+					return errors.Wrapf(err, "failed to read symlink %s", dscPath2)
+				}
+				// TODO: this seems like it would break
+				linkParent := filepath.Dir(dscPath2)
+				linkRoot := filepath.Dir(linkParent)
+
+				dscPath2 = filepath.Join(linkRoot, symlinkPath)
+			}
+
+			f, err := dyld.Open(dscPath2)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			image, err := f.Image("WebKit")
+			if err != nil {
+				return fmt.Errorf("image not in %s: %v", dscPath2, err)
+			}
+
+			m2, err := image.GetPartialMacho()
+			if err != nil {
+				return err
+			}
+
+			out, err := utils.GitDiff(m.SourceVersion().Version.String()+"\n", m2.SourceVersion().Version.String()+"\n")
+			if err != nil {
+				return err
+			}
+			if len(out) == 0 {
+				log.Info("No differences found")
+				return nil
+			}
+			log.Info("Differences found")
+			fmt.Println(out)
+
+			return nil
 		}
 
 		if getRev {
