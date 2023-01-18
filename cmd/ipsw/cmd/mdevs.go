@@ -112,20 +112,30 @@ var mdevsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to glob MobileDevices: %v", err)
 		}
-		if len(mobileDevices) == 0 { // try the host macOS
-			mobileDevices, err = filepath.Glob("/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/MobileDevices*")
+		if len(mobileDevices) == 0 { // try NEW pattern
+			pattern = filepath.Join(mountPoint, "System/Library/Templates/Data/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/MobileDevices*")
+			mobileDevices, err = filepath.Glob(pattern)
 			if err != nil {
 				return fmt.Errorf("failed to glob MobileDevices: %v", err)
+			}
+			if len(mobileDevices) == 0 { // try the host macOS
+				mobileDevices, err = filepath.Glob("/System/Library/CoreServices/CoreTypes.bundle/Contents/Library/MobileDevices*")
+				if err != nil {
+					return fmt.Errorf("failed to glob MobileDevices: %v", err)
+				}
 			}
 		}
 
 		for _, mobileDevice := range mobileDevices {
-			fmt.Println(mobileDevice)
-			dat, err := os.ReadFile(filepath.Join(mobileDevice, "Info.plist"))
+			log.Info(mobileDevice)
+			infoPlistPath := filepath.Join(mobileDevice, "Info.plist")
+			if _, err := os.Stat(infoPlistPath); os.IsNotExist(err) {
+				infoPlistPath = filepath.Join(mobileDevice, "Contents/Info.plist")
+			}
+			dat, err := os.ReadFile(infoPlistPath)
 			if err != nil {
 				return fmt.Errorf("failed to read Info.plist: %v", err)
 			}
-			// var ting any
 			var md MobileDevice
 			if err := plist.NewDecoder(bytes.NewReader(dat)).Decode(&md); err != nil {
 				return fmt.Errorf("failed to decode Info.plist: %v", err)
