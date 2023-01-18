@@ -100,11 +100,6 @@ func init() {
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("extract.flat", extractCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("extract.dyld-arch", extractCmd.Flags().Lookup("dyld-arch"))
-
-	extractCmd.MarkZshCompPositionalArgumentFile(1, "*.ipsw")
-	extractCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
-	}
 }
 
 // extractCmd represents the extract command
@@ -115,6 +110,9 @@ var extractCmd = &cobra.Command{
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
