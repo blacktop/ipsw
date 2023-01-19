@@ -337,6 +337,21 @@ func (f *File) DumpStubIslands() error {
 	return nil
 }
 
+func (f *File) GetStubIslands() (map[uint64]string, error) {
+	stubs := make(map[uint64]string)
+	if len(f.islandStubs) == 0 {
+		if err := f.ParseStubIslands(); err != nil {
+			return nil, fmt.Errorf("failed to parse stub islands: %v", err)
+		}
+	}
+	for stub, target := range f.islandStubs {
+		if symName, ok := f.AddressToSymbol[target]; ok {
+			stubs[stub] = symName
+		}
+	}
+	return stubs, nil
+}
+
 // OpenOrCreateA2SCache returns an address to symbol map if the cache file exists otherwise it will create a NEW one
 func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
