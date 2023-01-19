@@ -3,19 +3,25 @@
 package sep
 
 /*
-#cgo LDFLAGS: ./lib/libsepsplit_rs.a -ldl
+#cgo LDFLAGS: ${SRCDIR}/lib/libsepsplit_rs.a -ldl
 #include <stdlib.h>
 
-int split(const char* filein, const char* outdir);
+int split(const char* filein, const char* outdir, unsigned int verbose);
 */
 import "C"
 import (
+	"errors"
 	"fmt"
 	"os"
 	"unsafe"
 )
 
 func Split(src, dst string) error {
+
+	if _, err := os.Stat(src); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("file %s does not exist", src)
+	}
+
 	if err := os.MkdirAll(dst, 0755); err != nil {
 		return err
 	}
@@ -26,7 +32,7 @@ func Split(src, dst string) error {
 	output := C.CString(dst)
 	defer C.free(unsafe.Pointer(output))
 
-	if C.split(input, output) != 0 {
+	if C.split(input, output, 0) != 0 {
 		return fmt.Errorf("failed to split %s", src)
 	}
 
