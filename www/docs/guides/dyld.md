@@ -177,11 +177,8 @@ Extract all dylibs from *dyld_shared_cache*
 
 :::info note
 This command allows you to extract dylibs on non-darwin systems and it will add all local symbols to the symbol table as well as apply the DSC slide info for the pages included in the dylib if you supply the `--slide` flag *(this removes PACed pointers)*
-:::
-
-:::info 🆕
-
-We recently added 2 new flags:
+ 
+🆕 We recently added 2 new flags:
  - `--objc` that "symbolicates" ObjC runtime info *(classes, class methods instance methods, categories, etc.)*
  - `--stubs` that "symbolicates" all the addresses that point to StubIsland stubs *(**NOTE:** right now this adds ALL them, in the future we'll try and only add the needed stubs)*
 
@@ -193,8 +190,9 @@ We recently added 2 new flags:
 This command isn't 💯 done yet and is missing some features:
 - [ ] Repairing the ObjC runtime data
 - [ ] Patching the stubs  
-- [ ] 🤔 Create an [issue](https://github.com/blacktop/ipsw/issues) if you find something else missing
+- [ ] 🤔 Create an [issue](https://github.com/blacktop/ipsw/issues) if you would like something else added
 
+The goal with this command is to 1) create "near" perfect dylibs that can be used as stand alone frameworks and 2) create dylibs for reverse engineering *(packed with symbols etc)* for use in tools like Ghidra.
 :::
 
 ### **dyld macho**
