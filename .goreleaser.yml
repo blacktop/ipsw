@@ -579,7 +579,6 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-      - "^chore"
       - "^bumping"
       - "^Update"
       - "^Delete"
