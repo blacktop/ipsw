@@ -179,6 +179,15 @@ Extract all dylibs from *dyld_shared_cache*
 This command allows you to extract dylibs on non-darwin systems and it will add all local symbols to the symbol table as well as apply the DSC slide info for the pages included in the dylib if you supply the `--slide` flag *(this removes PACed pointers)*
 :::
 
+:::info 🆕
+
+We recently added 2 new flags:
+ - `--objc` that "symbolicates" ObjC runtime info *(classes, class methods instance methods, categories, etc.)*
+ - `--stubs` that "symbolicates" all the addresses that point to StubIsland stubs *(**NOTE:** right now this adds ALL them, in the future we'll try and only add the needed stubs)*
+
+> **NOTE:** This isn't repairing the ObjC runtime data or patching stubs, it's just adding the symbols to the symbol table so you can use them in your analysis.
+:::
+
 :::caution
 
 This command isn't 💯 done yet and is missing some features:
