@@ -29,6 +29,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
@@ -188,7 +189,24 @@ var machoDisassCmd = &cobra.Command{
 							return fmt.Errorf("failed to open address-to-symbol cache file %s: %v", cacheFile, err)
 						} else {
 							if err := gob.NewDecoder(f).Decode(&symbolMap); err != nil {
-								return fmt.Errorf("failed to decode address-to-symbol cache file: %v", err)
+								log.Errorf("address-to-symbol cache file is corrupt: %v", err)
+								yes := false
+								prompt := &survey.Confirm{
+									Message: fmt.Sprintf("Recreate %s. Continue?", cacheFile),
+									Default: true,
+								}
+								survey.AskOne(prompt, &yes)
+								if yes {
+									f.Close()
+									if err := os.Remove(cacheFile); err != nil {
+										return fmt.Errorf("failed to remove address-to-symbol cache file %s: %v", cacheFile, err)
+									}
+									if _, err := os.Create(cacheFile); err != nil {
+										return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+									}
+								} else {
+									return nil
+								}
 							}
 							f.Close()
 						}
