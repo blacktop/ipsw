@@ -1019,6 +1019,12 @@ In FileSystem DMG (Apps)
 Notice we also got the filesystem's binaries that import that dylib??? That's due to the POWER 💪 of `prebuilt loader sets` 😎
 :::
 
+For a more comprehensive list of imports run
+
+```bash
+❯ ipsw dyld imports --file-system iPhone15,2_16.3_20D47_Restore.ipsw JavaScriptCore
+```
+
 ### **dyld xref**
 
 List all the cross-references in the _dyld_shared_cache_ for a given virtual address
