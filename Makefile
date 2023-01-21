@@ -44,6 +44,8 @@ release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
 	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --skip-validate
+	@echo " > Update Portfile ${NEXT_VERSION}"	
+	@hack/make/portfile
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
