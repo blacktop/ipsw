@@ -1,0 +1,60 @@
+# -*- coding: utf-8; mode: tcl; tab-width: 4; indent-tabs-mode: nil; c-basic-offset: 4 -*- vim:fenc=utf-8:ft=tcl:et:sw=4:ts=4:sts=4
+
+PortSystem          1.0
+PortGroup           golang 1.0
+
+go.setup            github.com/blacktop/ipsw 3.1.255 v
+github.tarball_from archive
+revision            0
+
+homepage            https://blacktop.github.io/ipsw
+
+description         iOS/macOS Research Swiss Army Knife.
+
+long_description    {*}${description}. Everything you need to get started \
+                    researching Apple security and internals.
+
+categories          security
+installs_libs       no
+license             MIT
+maintainers         https://github.com/blacktop
+
+checksums           rmd160  fefbbf7bd189611757b7a224cbf464a425857055 \
+                    sha256  df1cb07d9f9a63746a0547c929241808292e0f3db1b4556293d2b79b540d3d1b \
+                    size    24082649
+
+set build_script    ${worksrcpath}/_build.sh
+
+# Allow deps to be fetched at build-time.
+build.env-delete    GO111MODULE=off GOPROXY=off
+
+build.cmd           ${build_script}
+build.pre_args      {}
+build.args          {}
+
+post-extract {
+    set bs [open "${build_script}" w+]
+    puts ${bs} "#!/bin/sh"
+    puts ${bs} "set -x"
+    puts ${bs} "CGO_ENABLED=1 ${go.bin} build -trimpath -ldflags \" -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=${version} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d) \" && \\"
+    puts ${bs} "./hack/make/completions"
+    close ${bs}
+
+    file attributes ${build_script} -permissions 0755
+}
+
+destroot {
+    xinstall -m 0755 ${worksrcpath}/${name} ${destroot}${prefix}/bin/
+
+    set bash_comp_dir ${destroot}${prefix}/share/bash-completion/completions
+    xinstall -d ${bash_comp_dir}
+    copy ${worksrcpath}/completions/_bash ${bash_comp_dir}/${name}
+
+    set fish_comp_dir ${destroot}${prefix}/share/fish/vendor_completions.d
+    xinstall -d ${fish_comp_dir}
+    copy ${worksrcpath}/completions/_fish ${fish_comp_dir}/
+
+    set zsh_comp_dir ${destroot}${prefix}/share/zsh/site-functions
+    xinstall -d ${zsh_comp_dir}
+    copy ${worksrcpath}/completions/_zsh ${zsh_comp_dir}/_${name}
+}
