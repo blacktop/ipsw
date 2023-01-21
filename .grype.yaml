@@ -1,7 +1,8 @@
 add-cpes-if-none: true
 fail-on-severity: high
 output: table
-exclude:
-  - "**/testdata/**"
 ignore:
   - fix-state: unknown
+match:
+  golang:
+    using-cpes: true
