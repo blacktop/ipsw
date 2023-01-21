@@ -62,7 +62,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --clean -f hack/goreleaser/linux.yml
+          args: release --rm-dist -f hack/goreleaser/linux.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: matrix.platform == 'ubuntu-latest'
@@ -86,7 +86,7 @@ jobs:
       #   with:
       #     distribution: goreleaser
       #     version: latest
-      #     args: release --clean -f hack/goreleaser/windows.yml
+      #     args: release --rm-dist -f hack/goreleaser/windows.yml
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #     SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
@@ -120,7 +120,7 @@ jobs:
       #   with:
       #     distribution: goreleaser
       #     version: latest
-      #     args: release --clean -f hack/goreleaser/darwin.yml
+      #     args: release --rm-dist -f hack/goreleaser/darwin.yml
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #     SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
