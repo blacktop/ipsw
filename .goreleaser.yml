@@ -260,6 +260,7 @@ archives:
       - windows_arm64_build
     name_template: >-
       {{ .ProjectName }}_
+      {{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
       {{- else if eq .Os "ios" }}iOS
       {{- else }}{{ .Os }}{{ end }}_
@@ -282,6 +283,7 @@ archives:
       # - linux_arm64_extras_build
     name_template: >-
       {{ .ProjectName }}_
+      {{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
       {{- else if eq .Os "ios" }}iOS
       {{- else }}{{ .Os }}{{ end }}_
@@ -302,6 +304,7 @@ archives:
       - darwin_arm64_frida_build
     name_template: >-
       {{ .ProjectName }}_
+      {{ .Version }}_      
       {{- if eq .Os "darwin" }}macOS
       {{- else if eq .Os "ios" }}iOS
       {{- else }}{{ .Os }}{{ end }}_
@@ -443,6 +446,7 @@ nfpms:
           mode: 0644
     file_name_template: >-
       {{ .ProjectName }}_
+      {{ .Version }}_      
       {{- .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
