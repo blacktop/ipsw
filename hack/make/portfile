@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+if [[ "${TRACE-0}" == "1" ]]; then
+    set -o xtrace
+fi
+
+LATEST_VERSION=""
+
+if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+    echo 'Usage: hack/make/portfile
+
+This script updates Portfile to latest version.
+
+'
+    exit
+fi
+
+get_version() {
+    LATEST_VERSION=$(gh release view --json tagName --template '{{ slice .tagName 1 }}')
+    echo "  [!] Updating to version: $LATEST_VERSION"
+}
+
+main() {
+    get_version
+    gh release download --archive=tar.gz --dir /tmp --skip-existing
+    rmd160=$(openssl dgst -rmd160 /tmp/ipsw-*.tar.gz | awk '{print $2}')
+    sha256=$(openssl dgst -sha256 /tmp/ipsw-*.tar.gz | awk '{print $2}')
+    size=$(stat -f '%z' /tmp/ipsw-*.tar.gz)
+    sed -i '' "s/github.com\/blacktop\/ipsw .* v/github.com\/blacktop\/ipsw ${LATEST_VERSION} v/" Portfile
+    sed -i '' "s/github.setup        blacktop ipsw .*/github.setup        blacktop ipsw ${LATEST_VERSION}/" Portfile
+    echo "  [!] Updating rmd160 to $rmd160"
+    sed -i '' "s/rmd160  .* \\\/rmd160  ${rmd160} \\\/" Portfile
+    echo "  [!] Updating sha256 to $sha256"
+    sed -i '' "s/sha256  .* \\\/sha256  ${sha256} \\\/" Portfile
+    echo "  [!] Updating size to $size"
+    sed -i '' "s/size    .*/size    ${size}/" Portfile
+}
+
+main "$@"
