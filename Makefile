@@ -32,18 +32,18 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_arm64_extras_build --clean--snapshot --single-target --output dist/ipsw
+	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_arm64_extras_build --clean --snapshot --single-target --output dist/ipsw
 
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser --clean--snapshot
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --snapshot
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@GOROOT=$(shell go env GOROOT) goreleaser --clean--skip-validate
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --skip-validate
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
