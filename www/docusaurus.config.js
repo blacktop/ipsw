@@ -59,7 +59,7 @@ const config = {
       }),
     ],
   ],
-
+  plugins: [require.resolve("@cmfcmf/docusaurus-search-local")],
   themeConfig:
     /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
     ({
@@ -85,11 +85,11 @@ const config = {
         themes: [path.resolve(__dirname, "/src/themes/prism-nord")],
         additionalLanguages: ["armasm", "llvm"],
       },
-      algolia: {
-        appId: "XN7OVST81R",
-        apiKey: "493729d49a9639b14fe433a033ef5992",
-        indexName: "ipsw",
-      },
+      // algolia: {
+      //   appId: "XN7OVST81R",
+      //   apiKey: "493729d49a9639b14fe433a033ef5992",
+      //   indexName: "ipsw",
+      // },
       navbar: {
         hideOnScroll: true,
         title: "ipsw",
