@@ -4,6 +4,7 @@ PortSystem          1.0
 PortGroup           golang 1.0
 
 go.setup            github.com/blacktop/ipsw 3.1.256 v
+github.setup        blacktop ipsw 3.1.256
 github.tarball_from archive
 revision            0
 
