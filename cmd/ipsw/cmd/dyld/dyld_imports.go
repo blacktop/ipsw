@@ -55,10 +55,11 @@ func init() {
 
 // dyldImportsCmd represents the imports command
 var dyldImportsCmd = &cobra.Command{
-	Use:     "imports",
-	Aliases: []string{"imp"},
-	Short:   "List all dylibs that load a given dylib",
-	Args:    cobra.MaximumNArgs(1),
+	Use:           "imports",
+	Aliases:       []string{"imp"},
+	Short:         "List all dylibs that load a given dylib",
+	Args:          cobra.MaximumNArgs(2),
+	SilenceErrors: true,
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
@@ -70,13 +71,19 @@ var dyldImportsCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
+		// flags
 		ipswPath, _ := cmd.Flags().GetString("ipsw")
+		// validate args
+		if ipswPath != "" && len(args) != 1 {
+			return errors.New("you must specify a DYLIB to search for")
+		} else if ipswPath == "" && len(args) != 2 {
+			return errors.New("you must specify a DSC and a DYLIB to search for")
+		}
 
 		if ipswPath != "" {
 			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), func(path string, m *macho.File) error {
 				for _, imp := range m.ImportedLibraries() {
-					if strings.Contains(strings.ToLower(imp), strings.ToLower(args[1])) {
+					if strings.Contains(strings.ToLower(imp), strings.ToLower(args[0])) {
 						fmt.Printf("%s\n", path)
 					}
 				}

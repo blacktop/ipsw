@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -386,6 +387,9 @@ func MountFS(image string) (string, error) {
 	var mountPoint string
 	if runtime.GOOS == "darwin" {
 		mountPoint = fmt.Sprintf("/tmp/%s.mount", filepath.Base(image))
+		if _, err := os.Stat(mountPoint); os.IsNotExist(err) {
+			mountPoint = fmt.Sprintf("/tmp/%s_%d.mount", filepath.Base(image), rand.Intn(100))
+		}
 	} else {
 		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
 			// Create in-docker mount point

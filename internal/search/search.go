@@ -32,7 +32,7 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 	}
 	defer func() {
 		utils.Indent(log.Debug, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-		if err := utils.Unmount(mountPoint, true); err != nil {
+		if err := utils.Unmount(mountPoint, false); err != nil {
 			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
 		}
 	}()

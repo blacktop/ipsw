@@ -40,6 +40,8 @@ func init() {
 	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol")
 	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class")
 	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category")
+	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector")
+	machoSearchCmd.Flags().String("ivar", "", "Search for specific ObjC instance variable")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})
@@ -48,14 +50,17 @@ func init() {
 	viper.BindPFlag("macho.search.protocol", machoSearchCmd.Flags().Lookup("protocol"))
 	viper.BindPFlag("macho.search.class", machoSearchCmd.Flags().Lookup("class"))
 	viper.BindPFlag("macho.search.category", machoSearchCmd.Flags().Lookup("category"))
+	viper.BindPFlag("macho.search.sel", machoSearchCmd.Flags().Lookup("sel"))
+	viper.BindPFlag("macho.search.ivar", machoSearchCmd.Flags().Lookup("ivar"))
 }
 
 // machoSearchCmd represents the search command
 var machoSearchCmd = &cobra.Command{
-	Use:     "search",
-	Aliases: []string{"sr"},
-	Short:   "Find Mach-O files for given search criteria",
-	Args:    cobra.NoArgs,
+	Use:           "search",
+	Aliases:       []string{"sr"},
+	Short:         "Find Mach-O files for given search criteria",
+	Args:          cobra.NoArgs,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -85,12 +90,34 @@ var machoSearchCmd = &cobra.Command{
 							log.Error(err.Error())
 						}
 					}
-					if viper.GetString("macho.search.class") != "" {
+					if viper.GetString("macho.search.class") != "" || viper.GetString("macho.search.sel") != "" || viper.GetString("macho.search.ivar") != "" {
 						if classes, err := m.GetObjCClasses(); err == nil {
 							for _, class := range classes {
 								if class.Name == viper.GetString("macho.search.class") {
 									fmt.Println(path)
 									break
+								}
+								if viper.GetString("macho.search.sel") != "" {
+									for _, sel := range class.ClassMethods {
+										if sel.Name == viper.GetString("macho.search.sel") {
+											fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, class.Name)
+											break
+										}
+									}
+									for _, sel := range class.InstanceMethods {
+										if sel.Name == viper.GetString("macho.search.sel") {
+											fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, class.Name)
+											break
+										}
+									}
+								}
+								if viper.GetString("macho.search.ivar") != "" {
+									for _, ivar := range class.Ivars {
+										if ivar.Name == viper.GetString("macho.search.ivar") {
+											fmt.Printf("%s\t(%s)\n", path, class.Name)
+											break
+										}
+									}
 								}
 							}
 						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -98,18 +125,52 @@ var machoSearchCmd = &cobra.Command{
 						}
 					}
 				}
-				if viper.GetString("macho.search.category") != "" {
+				if viper.GetString("macho.search.category") != "" || viper.GetString("macho.search.ivar") != "" {
 					if cats, err := m.GetObjCCategories(); err == nil {
 						for _, cat := range cats {
 							if cat.Name == viper.GetString("macho.search.category") {
 								fmt.Println(path)
 								break
 							}
+							if viper.GetString("macho.search.sel") != "" {
+								for _, sel := range cat.Class.ClassMethods {
+									if sel.Name == viper.GetString("macho.search.sel") {
+										fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, cat.Class.Name)
+										break
+									}
+								}
+								for _, sel := range cat.Class.InstanceMethods {
+									if sel.Name == viper.GetString("macho.search.sel") {
+										fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, cat.Class.Name)
+										break
+									}
+								}
+							}
+							if viper.GetString("macho.search.ivar") != "" {
+								for _, ivar := range cat.Class.Ivars {
+									if ivar.Name == viper.GetString("macho.search.ivar") {
+										fmt.Printf("%s\t(%s)\n", path, cat.Class.Name)
+										break
+									}
+								}
+							}
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 						log.Error(err.Error())
 					}
 				}
+				// if viper.GetString("macho.search.sel") != "" {
+				// 	if sels, err := m.GetObjCSelectorReferences(); err == nil {
+				// 		for _, sel := range sels {
+				// 			if sel.Name == viper.GetString("macho.search.sel") {
+				// 				fmt.Println(path)
+				// 				break
+				// 			}
+				// 		}
+				// 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+				// 		log.Error(err.Error())
+				// 	}
+				// }
 				return nil
 			}); err != nil {
 				return fmt.Errorf("failed to scan files in IPSW: %v", err)
