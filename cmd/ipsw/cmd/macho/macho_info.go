@@ -858,13 +858,25 @@ var machoInfoCmd = &cobra.Command{
 				}
 			}
 			m.ForEachV2SplitSegReference(func(fromSectionIndex, fromSectionOffset, toSectionIndex, toSectionOffset uint64, kind types.SplitInfoKind) {
+				var toSeg string
+				var toName string
+				var toAddr uint64
+				if toSectionIndex > 0 {
+					toSeg = sections[toSectionIndex-1].Seg
+					toName = sections[toSectionIndex-1].Name
+					toAddr = sections[toSectionIndex-1].Addr + fromSectionOffset
+				} else {
+					toSeg = "mach"
+					toName = "header"
+					toAddr = fromSectionOffset
+				}
 				fmt.Printf("%16s.%-16s %#08x  =>  %16s.%-16s %#08x\tkind(%s)\n",
 					sections[fromSectionIndex-1].Seg,
 					sections[fromSectionIndex-1].Name,
 					sections[fromSectionIndex-1].Addr+fromSectionOffset,
-					sections[toSectionIndex-1].Seg,
-					sections[toSectionIndex-1].Name,
-					sections[toSectionIndex-1].Addr+toSectionOffset,
+					toSeg,
+					toName,
+					toAddr,
 					kind)
 			})
 		}
