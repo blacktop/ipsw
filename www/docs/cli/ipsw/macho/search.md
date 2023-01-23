@@ -21,8 +21,10 @@ ipsw macho search [flags]
   -c, --class string          Search for specific ObjC class
   -h, --help                  help for search
   -i, --ipsw string           Path to IPSW to scan for search criteria
+      --ivar string           Search for specific ObjC instance variable
   -l, --load-command string   Search for specific load command
   -p, --protocol string       Search for specific ObjC protocol
+  -s, --sel string            Search for specific ObjC selector
 ```
 
 ### Options inherited from parent commands
