@@ -1057,3 +1057,55 @@ Check the signature
 /tmp/ls: valid on disk
 /tmp/ls: satisfies its Designated Requirement
 ```
+
+### **macho search**
+
+Search for MachOs that have split segments
+
+```bash
+❯ ipsw macho search --ipsw iPhone15,2_16.3_20D47_Restore.ipsw --load-command 'LC_SEGMENT_SPLIT_INFO'
+
+/System/Library/PrivateFrameworks/VisualTestKit.framework/VisualTestKit
+/usr/lib/libstdc++.6.0.9.dylib
+/usr/lib/libstdc++.6.dylib
+/usr/lib/libstdc++.dylib
+/System/DriverKit/System/Library/PrivateFrameworks/TimeSensitiveNetworking.framework/TimeSensitiveNetworking
+/System/DriverKit/usr/lib/libSystem_debug.dylib
+/System/DriverKit/usr/lib/system/libdispatch_debug.dylib
+/System/DriverKit/usr/lib/system/libdispatch_profile.dylib
+/System/DriverKit/usr/lib/system/libsystem_blocks_debug.dylib
+/System/DriverKit/usr/lib/system/libsystem_blocks_profile.dylib
+/System/DriverKit/usr/lib/system/libsystem_c_debug.dylib
+/System/DriverKit/usr/lib/system/libsystem_malloc_debug.dylib
+/System/DriverKit/usr/lib/system/libsystem_platform_debug.dylib
+/System/DriverKit/usr/lib/system/libsystem_pthread_debug.dylib
+/System/DriverKit/usr/lib/system/libsystem_trace_debug.dylib
+/System/Library/Extensions/ASIOKit.kext/ASIOKit
+/System/Library/Extensions/AppleGameControllerPersonality.kext/AppleGameControllerPersonality
+/System/Library/Extensions/AppleUserConsent.kext/AppleUserConsent
+/System/Library/Extensions/AppleUserConsent.kext/AppleUserConsent_development
+/System/Library/Extensions/lifs.kext/lifs
+/System/Library/PrivateFrameworks/iWorkImport.framework/iWorkImport
+/usr/lib/dyld
+/usr/lib/system/introspection/libdispatch.dylib
+```
+
+Search for MachOs that impliment an ObjC protocol
+
+```bash 
+❯ ipsw macho search --ipsw iPhone15,2_16.3_20D47_Restore.ipsw --protocol 'NSObject'
+
+/System/Library/Accounts/DataclassOwners/Bookmarks.bundle/Bookmarks
+/System/Library/Frameworks/SafariServices.framework/XPCServices/com.apple.SafariServices.ContentBlockerLoader.xpc/com.apple.SafariServices.ContentBlockerLoader
+/System/Library/PrivateFrameworks/SafariFoundation.framework/XPCServices/AutoFillHelper.xpc/AutoFillHelper
+/System/Library/PrivateFrameworks/SafariFoundation.framework/XPCServices/CredentialProviderExtensionHelper.xpc/CredentialProviderExtensionHelper
+/System/Library/PrivateFrameworks/VisualTestKit.framework/VisualTestKit
+/Applications/AAUIViewService.app/AAUIViewService
+/Applications/AMSEngagementViewService.app/AMSEngagementViewService
+/Applications/AXRemoteViewService.app/AXRemoteViewService
+/Applications/AXUIViewService.app/AXUIViewService
+/Applications/AccountAuthenticationDialog.app/AccountAuthenticationDialog
+/Applications/ActivityMessagesApp.app/PlugIns/ActivityMessagesExtension.appex/ActivityMessagesExtension
+/Applications/AirDropUI.app/AirDropUI
+<SNIP>
+```
