@@ -22,7 +22,6 @@ THE SOFTWARE.
 package dyld
 
 import (
-	"archive/zip"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,69 +29,12 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-var haveChecked []string
-
-func scanDmg(ipswPath, dmgPath, dmgType, dylib string) error {
-	if utils.StrSliceHas(haveChecked, dmgPath) {
-		return nil // already checked
-	}
-
-	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-	}
-	if len(dmgs) == 0 {
-		return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-	}
-	defer os.Remove(dmgs[0])
-
-	utils.Indent(log.Info, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
-	mountPoint, err := utils.MountFS(dmgs[0])
-	if err != nil {
-		return fmt.Errorf("failed to mount DMG: %v", err)
-	}
-	defer func() {
-		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-		if err := utils.Unmount(mountPoint, false); err != nil {
-			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
-		}
-	}()
-
-	var files []string
-	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() {
-			files = append(files, path)
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
-	}
-
-	for _, file := range files {
-		if m, err := macho.Open(file); err == nil {
-			for _, imp := range m.ImportedLibraries() {
-				if strings.Contains(strings.ToLower(imp), strings.ToLower(dylib)) {
-					fmt.Printf("%s\n", file)
-				}
-			}
-			m.Close()
-		}
-	}
-
-	haveChecked = append(haveChecked, dmgPath)
-
-	return nil
-}
 
 func init() {
 	DyldCmd.AddCommand(ImportsCmd)
@@ -116,26 +58,15 @@ var ImportsCmd = &cobra.Command{
 
 		if scanFS {
 			ipswPath := filepath.Clean(args[0])
-
-			i, err := info.Parse(ipswPath)
-			if err != nil {
-				return fmt.Errorf("failed to parse IPSW: %v", err)
-			}
-
-			if appOS, err := i.GetAppOsDmg(); err == nil {
-				if err := scanDmg(ipswPath, appOS, "AppOS", args[1]); err != nil {
-					return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+			if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
+				for _, imp := range m.ImportedLibraries() {
+					if strings.Contains(strings.ToLower(imp), strings.ToLower(args[1])) {
+						fmt.Printf("%s\n", path)
+					}
 				}
-			}
-			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				if err := scanDmg(ipswPath, systemOS, "SystemOS", args[1]); err != nil {
-					return fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
-				}
-			}
-			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				if err := scanDmg(ipswPath, fsOS, "filesystem", args[1]); err != nil {
-					return fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
-				}
+				return nil
+			}); err != nil {
+				return fmt.Errorf("failed to scan files in IPSW: %v", err)
 			}
 		} else {
 			dscPath := filepath.Clean(args[0])
