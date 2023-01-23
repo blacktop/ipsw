@@ -905,7 +905,9 @@ func (as *AppStore) replicateZip(src *zip.ReadCloser, dst *zip.Writer, info *byt
 				return "", fmt.Errorf("failed to open source file: %v", err)
 			}
 
-			appBundle = filepath.Base(strings.TrimSuffix(file.Name, ".app/Info.plist"))
+			if !strings.Contains(file.Name, "/Watch/") {
+				appBundle = filepath.Base(strings.TrimSuffix(file.Name, ".app/Info.plist"))
+			}
 
 			if _, err := io.Copy(info, srcFileD); err != nil {
 				return "", fmt.Errorf("failed to copy info file: %v", err)

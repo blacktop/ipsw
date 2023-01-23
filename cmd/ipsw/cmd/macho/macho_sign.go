@@ -76,7 +76,7 @@ func init() {
 // machoSignCmd represents the macho sign command
 var machoSignCmd = &cobra.Command{
 	Use:     "sign <MACHO>",
-	Aliases: []string{"s"},
+	Aliases: []string{"sn"},
 	Short:   "Codesign a MachO",
 	Example: `  # Ad-hoc codesign a MachO w/ entitlements
   ❯ ipsw macho sign --id com.apple.ls --ad-hoc --ent entitlements.plist <MACHO>`,
