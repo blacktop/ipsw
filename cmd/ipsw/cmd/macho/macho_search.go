@@ -51,7 +51,7 @@ func init() {
 var machoSearchCmd = &cobra.Command{
 	Use:     "search",
 	Aliases: []string{"sr"},
-	Short:   "Create single universal/fat MachO out many MachOs",
+	Short:   "Find Mach-O files for given search criteria",
 	Args:    cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
