@@ -24,19 +24,22 @@ get_version() {
 }
 
 main() {
-    get_version
     gh release download --archive=tar.gz --dir /tmp --skip-existing
-    rmd160=$(openssl dgst -rmd160 /tmp/ipsw-*.tar.gz | awk '{print $2}')
-    sha256=$(openssl dgst -sha256 /tmp/ipsw-*.tar.gz | awk '{print $2}')
-    size=$(stat -f '%z' /tmp/ipsw-*.tar.gz)
+    get_version
     sed -i '' "s/github.com\/blacktop\/ipsw .* v/github.com\/blacktop\/ipsw ${LATEST_VERSION} v/" Portfile
     sed -i '' "s/github.setup        blacktop ipsw .*/github.setup        blacktop ipsw ${LATEST_VERSION}/" Portfile
-    echo "  [!] Updating rmd160 to $rmd160"
-    sed -i '' "s/rmd160  .* \\\/rmd160  ${rmd160} \\\/" Portfile
-    echo "  [!] Updating sha256 to $sha256"
-    sed -i '' "s/sha256  .* \\\/sha256  ${sha256} \\\/" Portfile
-    echo "  [!] Updating size to $size"
-    sed -i '' "s/size    .*/size    ${size}/" Portfile
+
+    echo "  [!] Updating rmd160 to ${RMD160}"
+    RMD160=$(openssl dgst -rmd160 /tmp/ipsw-$LATEST_VERSION.tar.gz | awk '{print $2}')
+    sed -i '' "s|rmd160  .* \\\|rmd160  ${RMD160} \\\|" Portfile
+
+    echo "  [!] Updating sha256 to $SHA256"
+    SHA256=$(openssl dgst -sha256 /tmp/ipsw-$LATEST_VERSION.tar.gz | awk '{print $2}')
+    sed -i '' "s|sha256  .* \\\|sha256  ${SHA256} \\\|" Portfile
+
+    echo "  [!] Updating size to $SIZE"
+    SIZE=$(stat -f '%z' /tmp/ipsw-$LATEST_VERSION.tar.gz)
+    sed -i '' "s|size    .*|size    ${SIZE}|" Portfile
 }
 
 main "$@"
