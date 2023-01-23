@@ -36,29 +36,45 @@ import (
 	"github.com/spf13/viper"
 )
 
-func init() {
-	DyldCmd.AddCommand(ImportsCmd)
-	ImportsCmd.Flags().BoolP("file-system", "f", false, "Scan File System in IPSW for MachO files that import dylib")
-	ImportsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+func getDSCs(path string) []string {
+	matches, err := filepath.Glob(filepath.Join(path, "dyld_shared_cache*"))
+	if err != nil {
+		return nil
+	}
+	return matches
 }
 
-// ImportsCmd represents the imports command
-var ImportsCmd = &cobra.Command{
+func init() {
+	DyldCmd.AddCommand(dyldImportsCmd)
+	dyldImportsCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for MachO files that import dylib")
+	dyldImportsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
+	})
+}
+
+// dyldImportsCmd represents the imports command
+var dyldImportsCmd = &cobra.Command{
 	Use:     "imports",
 	Aliases: []string{"imp"},
 	Short:   "List all dylibs that load a given dylib",
-	Args:    cobra.MinimumNArgs(2),
+	Args:    cobra.MaximumNArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		scanFS, _ := cmd.Flags().GetBool("file-system")
+		ipswPath, _ := cmd.Flags().GetString("ipsw")
 
-		if scanFS {
-			ipswPath := filepath.Clean(args[0])
-			if err := search.ForEachMachoInIPSW(ipswPath, func(path string, m *macho.File) error {
+		if ipswPath != "" {
+			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), func(path string, m *macho.File) error {
 				for _, imp := range m.ImportedLibraries() {
 					if strings.Contains(strings.ToLower(imp), strings.ToLower(args[1])) {
 						fmt.Printf("%s\n", path)
