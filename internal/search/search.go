@@ -25,13 +25,13 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 	}
 	defer os.Remove(dmgs[0])
 
-	utils.Indent(log.Info, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
+	utils.Indent(log.Debug, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
 	mountPoint, err := utils.MountFS(dmgs[0])
 	if err != nil {
 		return fmt.Errorf("failed to mount DMG: %v", err)
 	}
 	defer func() {
-		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
 		if err := utils.Unmount(mountPoint, true); err != nil {
 			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
 		}
