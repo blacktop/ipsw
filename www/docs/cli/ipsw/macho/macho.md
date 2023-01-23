@@ -5,9 +5,6 @@ hide_title: true
 hide_table_of_contents: true
 sidebar_label: macho
 description: Parse MachO
-last_update:
-  date: 2023-01-16T23:32:27-07:00
-  author: blacktop
 ---
 ## ipsw macho
 
@@ -42,5 +39,6 @@ ipsw macho [flags]
 * [ipsw macho lipo](/docs/cli/ipsw/macho/lipo)	 - Extract single MachO out of a universal/fat MachO
 * [ipsw macho o2a](/docs/cli/ipsw/macho/o2a)	 - Convert MachO offset to address
 * [ipsw macho patch](/docs/cli/ipsw/macho/patch)	 - Patch MachO Load Commands
+* [ipsw macho search](/docs/cli/ipsw/macho/search)	 - Find Mach-O files for given search criteria
 * [ipsw macho sign](/docs/cli/ipsw/macho/sign)	 - Codesign a MachO
 
