@@ -29,16 +29,16 @@ main() {
     sed -i '' "s/github.com\/blacktop\/ipsw .* v/github.com\/blacktop\/ipsw ${LATEST_VERSION} v/" Portfile
     sed -i '' "s/github.setup        blacktop ipsw .*/github.setup        blacktop ipsw ${LATEST_VERSION}/" Portfile
 
-    echo "  [!] Updating rmd160 to ${RMD160}"
     RMD160=$(openssl dgst -rmd160 /tmp/ipsw-$LATEST_VERSION.tar.gz | awk '{print $2}')
+    echo "  [!] Updating rmd160 to ${RMD160}"
     sed -i '' "s|rmd160  .* \\\|rmd160  ${RMD160} \\\|" Portfile
 
-    echo "  [!] Updating sha256 to $SHA256"
     SHA256=$(openssl dgst -sha256 /tmp/ipsw-$LATEST_VERSION.tar.gz | awk '{print $2}')
+    echo "  [!] Updating sha256 to $SHA256"
     sed -i '' "s|sha256  .* \\\|sha256  ${SHA256} \\\|" Portfile
 
-    echo "  [!] Updating size to $SIZE"
     SIZE=$(stat -f '%z' /tmp/ipsw-$LATEST_VERSION.tar.gz)
+    echo "  [!] Updating size to $SIZE"
     sed -i '' "s|size    .*|size    ${SIZE}|" Portfile
 }
 
