@@ -40,6 +40,9 @@ func init() {
 	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol")
 	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class")
 	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category")
+	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
+	})
 	viper.BindPFlag("macho.search.ipsw", machoSearchCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("macho.search.load-command", machoSearchCmd.Flags().Lookup("load-command"))
 	viper.BindPFlag("macho.search.protocol", machoSearchCmd.Flags().Lookup("protocol"))
