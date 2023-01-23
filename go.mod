@@ -17,7 +17,7 @@ require (
 	github.com/blacktop/ranger v1.0.3
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/dustin/go-humanize v1.0.1
-	github.com/fatih/color v1.14.0
+	github.com/fatih/color v1.14.1
 	github.com/frida/frida-go v0.6.1
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20220909211152-5a9ec94374f6
