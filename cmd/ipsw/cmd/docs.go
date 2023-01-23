@@ -29,7 +29,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/cobra/doc"
@@ -42,9 +41,6 @@ hide_title: true
 hide_table_of_contents: true
 sidebar_label: %s
 description: %s
-last_update:
-  date: %s
-  author: blacktop
 ---
 `
 
@@ -138,8 +134,7 @@ var docsCmd = &cobra.Command{
 				base,
 				strings.Replace(base, "_", " ", -1),
 				subCmdName,
-				description,
-				time.Now().Format(time.RFC3339))
+				description)
 		}, func(s string) string {
 			s = strings.TrimSuffix(s, ".md")
 			if s == "ipsw.md" {

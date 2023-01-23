@@ -5,9 +5,6 @@ hide_title: true
 hide_table_of_contents: true
 sidebar_label: extract
 description: Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
-last_update:
-  date: 2023-01-16T23:32:27-07:00
-  author: blacktop
 ---
 ## ipsw extract
 

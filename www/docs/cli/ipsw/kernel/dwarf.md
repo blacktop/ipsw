@@ -5,9 +5,6 @@ hide_title: true
 hide_table_of_contents: true
 sidebar_label: dwarf
 description: 🚧 Dump DWARF debug information
-last_update:
-  date: 2023-01-16T23:32:27-07:00
-  author: blacktop
 ---
 ## ipsw kernel dwarf
 

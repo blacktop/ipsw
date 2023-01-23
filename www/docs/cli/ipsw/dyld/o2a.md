@@ -5,9 +5,6 @@ hide_title: true
 hide_table_of_contents: true
 sidebar_label: o2a
 description: Convert dyld_shared_cache offset to address
-last_update:
-  date: 2023-01-16T23:32:27-07:00
-  author: blacktop
 ---
 ## ipsw dyld o2a
 
