@@ -391,7 +391,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 					panic(err)
 				}
 			}()
-			Indent(log.Info, 2)(fmt.Sprintf("Created %s", path))
+			Indent(log.Debug, 2)(fmt.Sprintf("Extracted %s", path))
 			_, err = io.Copy(f, rc)
 			if err != nil {
 				return err
