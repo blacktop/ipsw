@@ -3,8 +3,8 @@
 PortSystem          1.0
 PortGroup           golang 1.0
 
-go.setup            github.com/blacktop/ipsw 3.1.258 v
-github.setup        blacktop ipsw 3.1.258
+go.setup            github.com/blacktop/ipsw 3.1.259 v
+github.setup        blacktop ipsw 3.1.259
 github.tarball_from archive
 revision            0
 
@@ -20,9 +20,9 @@ installs_libs       no
 license             MIT
 maintainers         https://github.com/blacktop
 
-checksums           rmd160  40f4d2d526bb738e773cc861c8dd313c66917300 \
-                    sha256  530b621990195f217bfceb06f6a4d17d8260b7b0e1e28e4b3ba2b71124db779e \
-                    size    3528554
+checksums           rmd160  b04306c8a6517fa16f3da8c314317a9b0c238aa3 \
+                    sha256  2433c83c9178271c2259800f42517d0984a11ed4d1c9a03e7d47bcef5459f84f \
+                    size    3531648
 
 set build_script    ${worksrcpath}/_build.sh
 
