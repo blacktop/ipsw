@@ -403,9 +403,8 @@ jobs:
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: |
-          ls /tmp 
-          ls /tmp/*mount
-          ipsw macho info "${{ env.latest_ios_build }}__iPhone12,1"/**/ApplePushService.framework/apsd --objc --objc-refs --fixups
+          ls /tmp/*.mount
+          ipsw macho info "${{ env.latest_ios_build }}__iPhone12,1"/System/Library/PrivateFrameworks/ApplePushService.framework/apsd --objc --objc-refs --fixups
       - name: Run macho info (Dump Cert)
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
