@@ -1,6 +1,6 @@
 ---
-hide_table_of_contents: false
 description: How to install ipsw locally.
+hide_table_of_contents: true
 ---
 
 # Installation
@@ -17,7 +17,7 @@ import TabItem from '@theme/TabItem';
 <TabItem value="macOS">
 ```
 
-### Via [homebrew](https://brew.sh)
+## Via [homebrew](https://brew.sh)
 
 ```bash
 brew install blacktop/tap/ipsw --with-git-delta
@@ -33,7 +33,7 @@ Install `frida` version
 brew install blacktop/tap/ipsw-frida
 ```
 
-### Via [macports](https://www.macports.org)
+## Via [MacPorts](https://www.macports.org)
 
 ```bash
 git clone https://github.com/blacktop/ports ~/.config/macports/ports/blacktop
@@ -51,7 +51,7 @@ Then install `ipsw`:
 sudo port install ipsw
 ```
 
-### Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
+## Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
 wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_macOS_universal.tar.gz
@@ -89,26 +89,26 @@ The **extras** and **frida** versions of `ipsw` only support macOS for now. *(Pl
 <TabItem value="Linux">
 ```
 
-### Via [snapcraft](https://snapcraft.io/ipsw)
+## Via [snapcraft](https://snapcraft.io/ipsw)
 
 ```bash
 sudo snap install ipsw
 ```
 
-### Via `deb`/`rpm`/`apk` debian packages in the [releases](https://github.com/blacktop/ipsw/releases) page
+## Via `deb`/`rpm`/`apk` debian packages in the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
 wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_linux_x86_64.deb
 sudo dpkg -i ipsw_3.1.199_linux_x86_64.deb
 ```
 
-### Install [archlinux](https://aur.archlinux.org/packages/ipsw-bin/) package from AUR
+## Install [archlinux](https://aur.archlinux.org/packages/ipsw-bin/) package from AUR
 
 ```bash
 pacman -U ipsw-bin
 ```
 
-### Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
+## Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
 wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_linux_x86_64.tar.gz
@@ -122,7 +122,7 @@ tar xzf ipsw_3.1.199_linux_x86_64.tar.gz
 
 [![Docker Stars](https://img.shields.io/docker/stars/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Pulls](https://img.shields.io/docker/pulls/blacktop/ipsw.svg)](https://hub.docker.com/r/blacktop/ipsw/) [![Docker Image](https://img.shields.io/badge/docker%20image-114MB-blue.svg)](https://hub.docker.com/r/blacktop/ipsw/)
 
-### Download docker image
+## Download docker image
 
 ```bash
 $ docker pull blacktop/ipsw
@@ -141,7 +141,7 @@ $ alias ipsw='docker run -it --rm -v $(pwd):/data blacktop/ipsw'
 <TabItem value="Windows">
 ```
 
-### Via [scoop](https://scoop.sh)
+## Via [scoop](https://scoop.sh)
 
 ```bash
 scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git 
@@ -154,7 +154,7 @@ scoop install blacktop/ipsw
 choco install ipsw
 ```  -->
 
-### Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
+## Via binary from the [releases](https://github.com/blacktop/ipsw/releases) page
 
 ```bash
 wget https://github.com/blacktop/ipsw/releases/download/v3.1.199/ipsw_3.1.199_windows_x86_64.tar.gz
