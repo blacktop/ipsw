@@ -260,10 +260,10 @@ jobs:
       #
       # Mount CMD (macOS)
       #
-      - name: Run mdevs
+      - name: Run mount
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw mount fs *.ipsw & # mount in background
+        run: ipsw mount fs -V *.ipsw & # mount in background
 
       #
       # KERNEL CMD (macOS)
