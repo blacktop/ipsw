@@ -45,12 +45,22 @@ type Properties map[string]interface{}
 // DeviceTree object
 type DeviceTree map[string]Properties
 
+type dtCPU struct {
+	Name string
+	Type string
+	ARM  string
+}
+
 // Summary object
 type Summary struct {
 	ProductName        string
 	ProductDescription string
 	ProductType        string
 	BoardConfig        string
+	SocName            string
+	DeviceType         string
+	SocGeneration      string
+	CPUs               []dtCPU
 	Timestamp          time.Time
 }
 
@@ -71,6 +81,30 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 			}
 			if productDesc, ok := (c)["product"]["product-description"].(string); ok {
 				summary.ProductDescription = productDesc
+			}
+			if socName, ok := (c)["product"]["product-soc-name"].(string); ok {
+				summary.SocName = socName
+			}
+			if devType, ok := (c)["arm-io"]["compatible"].(string); ok {
+				summary.DeviceType = strings.TrimPrefix(devType, "arm-io,")
+			}
+			if socGeneration, ok := (c)["arm-io"]["soc-generation"].(string); ok {
+				summary.SocGeneration = socGeneration
+			}
+			if cpus, ok := (c)["cpus"]["children"]; ok {
+				for idx, cpu := range cpus.([]DeviceTree) {
+					if cpuN, ok := cpu[fmt.Sprintf("cpu%d", idx)]; ok {
+						if compat, ok := cpuN["compatible"].([]string); ok {
+							if len(compat) == 2 {
+								summary.CPUs = append(summary.CPUs, dtCPU{
+									Name: strings.TrimPrefix(compat[0], "apple,"),
+									ARM:  strings.TrimPrefix(compat[1], "ARM,"),
+									Type: cpuN["cluster-type"].(string),
+								})
+							}
+						}
+					}
+				}
 			}
 		}
 	}
