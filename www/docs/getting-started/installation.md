@@ -36,13 +36,14 @@ brew install blacktop/tap/ipsw-frida
 ## Via [MacPorts](https://www.macports.org)
 
 ```bash
-git clone https://github.com/blacktop/ports ~/.config/macports/ports/blacktop
+git clone https://github.com/blacktop/ports ~/.config/macports/blacktop
 ```
 
-Add the following to your `~/.macports/sources.conf` file:
+Add the following to the `sources.conf` file:
 
 ```bash
-file:///Users/yourusername/.config/macports/ports/blacktop
+sudo echo "file://$HOME/.config/macports/blacktop [default]" >> /opt/local/etc/macports/sources.conf
+sudo port selfupdate
 ```
 
 Then install `ipsw`:
