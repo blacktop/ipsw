@@ -48,18 +48,20 @@ func isURL(str string) bool {
 }
 
 func extractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) error {
-	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	// check if filesystem DMG already exists (due to previous mount command)
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		}
+		if len(dmgs) == 0 {
+			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+		}
+		defer os.Remove(dmgs[0])
 	}
-	if len(dmgs) == 0 {
-		return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-	}
-	defer os.Remove(dmgs[0])
-
-	if err := utils.ExtractFromDMG(dmgs[0], destPath, pattern); err != nil {
+	if err := utils.ExtractFromDMG(dmgPath, destPath, pattern); err != nil {
 		return fmt.Errorf("failed to extract files matching pattern: %v", err)
 	}
 

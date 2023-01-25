@@ -391,7 +391,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 					panic(err)
 				}
 			}()
-			Indent(log.Debug, 2)(fmt.Sprintf("Extracted %s", path))
+			Indent(log.Debug, 2)(fmt.Sprintf("Extracted %s from %s", path, filepath.Base(src)))
 			_, err = io.Copy(f, rc)
 			if err != nil {
 				return err
@@ -427,7 +427,7 @@ func UnTarGz(tarfile, destPath string) error {
 
 	tarReader := tar.NewReader(uncompressedStream)
 
-	for true {
+	for {
 		header, err := tarReader.Next()
 
 		if err == io.EOF {

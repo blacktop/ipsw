@@ -25,6 +25,7 @@ package cmd
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -36,7 +37,6 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -59,7 +59,7 @@ var mountCmd = &cobra.Command{
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
+		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
@@ -93,30 +93,41 @@ var mountCmd = &cobra.Command{
 			log.Info("Found AppOS DMG")
 		}
 
-		// extract filesystem DMG
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		// check if filesystem DMG already exists (due to previous mount command)
+		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+			// extract filesystem DMG
+			dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+				return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+			})
+			if err != nil {
+				return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+			}
+			if len(dmgs) == 0 {
+				return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+			}
+			defer os.Remove(dmgs[0])
+		} else {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 		}
-		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		defer os.Remove(dmgs[0])
 
 		// mount filesystem DMG
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgs[0]))
-		mountPoint, err := utils.MountFS(dmgs[0])
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
+		mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
 		if err != nil {
-			return fmt.Errorf("failed to mount DMG: %v", err)
-		}
-		defer func() {
-			utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-			if err := utils.Unmount(mountPoint, false); err != nil {
-				log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
+			if !errors.Is(err, utils.ErrMountResourceBusy) {
+				return fmt.Errorf("failed to mount DMG: %v", err)
 			}
-		}()
+		}
+		if alreadyMounted {
+			utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+		} else {
+			defer func() {
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+				if err := utils.Unmount(mountPoint, false); err != nil {
+					log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
+				}
+			}()
+		}
 
 		// block until user hits ctrl-c
 		done := make(chan os.Signal, 1)
