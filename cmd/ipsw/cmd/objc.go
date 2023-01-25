@@ -30,7 +30,6 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/objc"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
@@ -47,7 +46,7 @@ var objcCmd = &cobra.Command{
 	Hidden:        true,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		if viper.GetBool("verbose") {
+		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 

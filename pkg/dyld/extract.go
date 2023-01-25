@@ -44,16 +44,21 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	config.MountPoint, err = utils.MountFS(dmgPath)
+	var alreadyMounted bool
+	config.MountPoint, alreadyMounted, err = utils.MountFS(dmgPath)
 	if err != nil {
 		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
-	defer func() {
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", dmgPath))
-		if err := utils.Unmount(config.MountPoint, false); err != nil {
-			log.Errorf("failed to unmount File System DMG mount at %s: %v", dmgPath, err)
-		}
-	}()
+	if alreadyMounted {
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+	} else {
+		defer func() {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+			if err := utils.Unmount(config.MountPoint, false); err != nil {
+				log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
+			}
+		}()
+	}
 
 	if runtime.GOOS == "darwin" {
 		if err := os.MkdirAll(destPath, 0750); err != nil {
@@ -152,18 +157,22 @@ func Extract(ipsw, destPath string, arches []string) error {
 			return fmt.Errorf("failed to get File System DMG: %v", err)
 		}
 	}
-	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-	}
-	if len(dmgs) == 0 {
-		return fmt.Errorf("File System %s NOT found in IPSW", dmgPath)
-	}
-	defer os.Remove(dmgs[0])
 
-	return ExtractFromDMG(i, dmgs[0], destPath, arches)
+	// check if filesystem DMG already exists (due to previous mount command)
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		}
+		if len(dmgs) == 0 {
+			return fmt.Errorf("File System %s NOT found in IPSW", dmgPath)
+		}
+		defer os.Remove(dmgs[0])
+	}
+
+	return ExtractFromDMG(i, dmgPath, destPath, arches)
 }
 
 func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) error {

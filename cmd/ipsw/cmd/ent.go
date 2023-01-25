@@ -53,28 +53,37 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 		return nil, nil // already checked
 	}
 
-	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	// check if filesystem DMG already exists (due to previous mount command)
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		}
+		if len(dmgs) == 0 {
+			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
+		}
+		defer os.Remove(dmgs[0])
+	} else {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 	}
-	if len(dmgs) == 0 {
-		return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
-	}
-	defer os.Remove(dmgs[0])
 
-	utils.Indent(log.Info, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
-	mountPoint, err := utils.MountFS(dmgs[0])
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
+	mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount DMG: %v", err)
 	}
-	defer func() {
-		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-		if err := utils.Unmount(mountPoint, true); err != nil {
-			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
-		}
-	}()
+	if alreadyMounted {
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+	} else {
+		defer func() {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+			if err := utils.Unmount(mountPoint, false); err != nil {
+				log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
+			}
+		}()
+	}
 
 	var files []string
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
@@ -120,6 +129,7 @@ func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, erro
 		log.Info("Generating entitlement database file...")
 
 		if appOS, err := i.GetAppOsDmg(); err == nil {
+			log.Info("Scanning AppOS")
 			if ents, err := scanEnts(ipswPath, appOS, "AppOS"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
 			} else {
@@ -129,6 +139,7 @@ func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, erro
 			}
 		}
 		if systemOS, err := i.GetSystemOsDmg(); err == nil {
+			log.Info("Scanning SystemOS")
 			if ents, err := scanEnts(ipswPath, systemOS, "SystemOS"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
 			} else {
@@ -138,6 +149,7 @@ func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, erro
 			}
 		}
 		if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+			log.Info("Scanning filesystem")
 			if ents, err := scanEnts(ipswPath, fsOS, "filesystem"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
 			} else {
