@@ -95,13 +95,15 @@ func (dtree *DeviceTree) Summary() (*Summary, error) {
 				for idx, cpu := range cpus.([]DeviceTree) {
 					if cpuN, ok := cpu[fmt.Sprintf("cpu%d", idx)]; ok {
 						if compat, ok := cpuN["compatible"].([]string); ok {
+							c := dtCPU{}
 							if len(compat) == 2 {
-								summary.CPUs = append(summary.CPUs, dtCPU{
-									Name: strings.TrimPrefix(compat[0], "apple,"),
-									ARM:  strings.TrimPrefix(compat[1], "ARM,"),
-									Type: cpuN["cluster-type"].(string),
-								})
+								c.Name = strings.TrimPrefix(compat[0], "apple,")
+								c.ARM = strings.TrimPrefix(compat[1], "ARM,")
 							}
+							if clusterType, ok := cpuN["cluster-type"].(string); ok {
+								c.Type = clusterType
+							}
+							summary.CPUs = append(summary.CPUs, c)
 						}
 					}
 				}
