@@ -38,6 +38,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for search criteria")
 	machoSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command")
 	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol")
+	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol")
 	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class")
 	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category")
 	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector")
@@ -47,6 +48,7 @@ func init() {
 	})
 	viper.BindPFlag("macho.search.ipsw", machoSearchCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("macho.search.load-command", machoSearchCmd.Flags().Lookup("load-command"))
+	viper.BindPFlag("macho.search.sym", machoSearchCmd.Flags().Lookup("sym"))
 	viper.BindPFlag("macho.search.protocol", machoSearchCmd.Flags().Lookup("protocol"))
 	viper.BindPFlag("macho.search.class", machoSearchCmd.Flags().Lookup("class"))
 	viper.BindPFlag("macho.search.category", machoSearchCmd.Flags().Lookup("category"))
@@ -74,6 +76,42 @@ var machoSearchCmd = &cobra.Command{
 						if lc.Command().String() == viper.GetString("macho.search.load-command") {
 							fmt.Println(path)
 							break
+						}
+					}
+				}
+				if viper.GetString("macho.search.sym") != "" {
+					for _, sym := range m.Symtab.Syms {
+						if sym.Name == viper.GetString("macho.search.sym") {
+							fmt.Printf("%#x: %s\t(%s)\t%s\n", sym.Value, path, sym.Type.String(""), sym.Name)
+							break
+						}
+					}
+					if binds, err := m.GetBindInfo(); err == nil {
+						for _, bind := range binds {
+							if bind.Name == viper.GetString("macho.search.sym") {
+								fmt.Printf("%#x: %s\t(%s)\n", bind.Start+bind.Offset, path, bind.Name)
+								break
+							}
+						}
+					}
+					if exports, err := m.GetExports(); err == nil {
+						for _, export := range exports {
+							if export.Name == viper.GetString("macho.search.sym") {
+								fmt.Printf("%#x: %s\t(%s)\t%s\n", export.Address, path, export.Flags, export.Name)
+								break
+							}
+						}
+					}
+					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
+						exports, err := m.DyldExports()
+						if err != nil {
+							return err
+						}
+						for _, export := range exports {
+							if export.Name == viper.GetString("macho.search.sym") {
+								fmt.Printf("%#x: %s\t(%s)\t%s\n", export.Address, path, export.Flags, export.Name)
+								break
+							}
 						}
 					}
 				}
