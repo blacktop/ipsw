@@ -24,6 +24,7 @@ package macho
 import (
 	"fmt"
 	"path/filepath"
+	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -36,13 +37,13 @@ import (
 func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
 	machoSearchCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for search criteria")
-	machoSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command")
-	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol")
-	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol")
-	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class")
-	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category")
-	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector")
-	machoSearchCmd.Flags().String("ivar", "", "Search for specific ObjC instance variable")
+	machoSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
+	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
+	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol regex")
+	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class regex")
+	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category regex")
+	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
+	machoSearchCmd.Flags().String("ivar", "", "Search for specific ObjC instance variable regex")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})
@@ -72,23 +73,31 @@ var machoSearchCmd = &cobra.Command{
 		if viper.GetString("macho.search.ipsw") != "" {
 			if err := search.ForEachMachoInIPSW(filepath.Clean(viper.GetString("macho.search.ipsw")), func(path string, m *macho.File) error {
 				if viper.GetString("macho.search.load-command") != "" {
+					re, err := regexp.Compile(viper.GetString("macho.search.load-command"))
+					if err != nil {
+						return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.load-command"), err)
+					}
 					for _, lc := range m.Loads {
-						if lc.Command().String() == viper.GetString("macho.search.load-command") {
+						if re.MatchString(lc.Command().String()) {
 							fmt.Println(path)
 							break
 						}
 					}
 				}
 				if viper.GetString("macho.search.sym") != "" {
+					symRE, err := regexp.Compile(viper.GetString("macho.search.sym"))
+					if err != nil {
+						return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.sym"), err)
+					}
 					for _, sym := range m.Symtab.Syms {
-						if sym.Name == viper.GetString("macho.search.sym") {
+						if symRE.MatchString(sym.Name) {
 							fmt.Printf("%#x: %s\t(%s)\t%s\n", sym.Value, path, sym.Type.String(""), sym.Name)
 							break
 						}
 					}
 					if binds, err := m.GetBindInfo(); err == nil {
 						for _, bind := range binds {
-							if bind.Name == viper.GetString("macho.search.sym") {
+							if symRE.MatchString(bind.Name) {
 								fmt.Printf("%#x: %s\t(%s)\n", bind.Start+bind.Offset, path, bind.Name)
 								break
 							}
@@ -96,7 +105,7 @@ var machoSearchCmd = &cobra.Command{
 					}
 					if exports, err := m.GetExports(); err == nil {
 						for _, export := range exports {
-							if export.Name == viper.GetString("macho.search.sym") {
+							if symRE.MatchString(export.Name) {
 								fmt.Printf("%#x: %s\t(%s)\t%s\n", export.Address, path, export.Flags, export.Name)
 								break
 							}
@@ -108,7 +117,7 @@ var machoSearchCmd = &cobra.Command{
 							return err
 						}
 						for _, export := range exports {
-							if export.Name == viper.GetString("macho.search.sym") {
+							if symRE.MatchString(export.Name) {
 								fmt.Printf("%#x: %s\t(%s)\t%s\n", export.Address, path, export.Flags, export.Name)
 								break
 							}
@@ -118,8 +127,12 @@ var machoSearchCmd = &cobra.Command{
 				if m.HasObjC() {
 					if viper.GetString("macho.search.protocol") != "" {
 						if protos, err := m.GetObjCProtocols(); err == nil {
+							protRE, err := regexp.Compile(viper.GetString("macho.search.protocol"))
+							if err != nil {
+								return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.protocol"), err)
+							}
 							for _, proto := range protos {
-								if proto.Name == viper.GetString("macho.search.protocol") {
+								if protRE.MatchString(proto.Name) {
 									fmt.Println(path)
 									break
 								}
@@ -130,28 +143,40 @@ var machoSearchCmd = &cobra.Command{
 					}
 					if viper.GetString("macho.search.class") != "" || viper.GetString("macho.search.sel") != "" || viper.GetString("macho.search.ivar") != "" {
 						if classes, err := m.GetObjCClasses(); err == nil {
+							classRE, err := regexp.Compile(viper.GetString("macho.search.class"))
+							if err != nil {
+								return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.class"), err)
+							}
 							for _, class := range classes {
-								if class.Name == viper.GetString("macho.search.class") {
+								if classRE.MatchString(class.Name) {
 									fmt.Println(path)
 									break
 								}
 								if viper.GetString("macho.search.sel") != "" {
+									re, err := regexp.Compile(viper.GetString("macho.search.sel"))
+									if err != nil {
+										return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.sel"), err)
+									}
 									for _, sel := range class.ClassMethods {
-										if sel.Name == viper.GetString("macho.search.sel") {
+										if re.MatchString(sel.Name) {
 											fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, class.Name)
 											break
 										}
 									}
 									for _, sel := range class.InstanceMethods {
-										if sel.Name == viper.GetString("macho.search.sel") {
+										if re.MatchString(sel.Name) {
 											fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, class.Name)
 											break
 										}
 									}
 								}
 								if viper.GetString("macho.search.ivar") != "" {
+									ivarRE, err := regexp.Compile(viper.GetString("macho.search.ivar"))
+									if err != nil {
+										return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.ivar"), err)
+									}
 									for _, ivar := range class.Ivars {
-										if ivar.Name == viper.GetString("macho.search.ivar") {
+										if ivarRE.MatchString(ivar.Name) {
 											fmt.Printf("%s\t(%s)\n", path, class.Name)
 											break
 										}
@@ -165,28 +190,40 @@ var machoSearchCmd = &cobra.Command{
 				}
 				if viper.GetString("macho.search.category") != "" || viper.GetString("macho.search.ivar") != "" {
 					if cats, err := m.GetObjCCategories(); err == nil {
+						catRE, err := regexp.Compile(viper.GetString("macho.search.category"))
+						if err != nil {
+							return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.category"), err)
+						}
 						for _, cat := range cats {
-							if cat.Name == viper.GetString("macho.search.category") {
+							if catRE.MatchString(cat.Name) {
 								fmt.Println(path)
 								break
 							}
 							if viper.GetString("macho.search.sel") != "" {
+								re, err := regexp.Compile(viper.GetString("macho.search.sel"))
+								if err != nil {
+									return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.sel"), err)
+								}
 								for _, sel := range cat.Class.ClassMethods {
-									if sel.Name == viper.GetString("macho.search.sel") {
+									if re.MatchString(sel.Name) {
 										fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, cat.Class.Name)
 										break
 									}
 								}
 								for _, sel := range cat.Class.InstanceMethods {
-									if sel.Name == viper.GetString("macho.search.sel") {
+									if re.MatchString(sel.Name) {
 										fmt.Printf("%#x: %s\t(%s)\n", sel.ImpVMAddr, path, cat.Class.Name)
 										break
 									}
 								}
 							}
 							if viper.GetString("macho.search.ivar") != "" {
+								ivarRE, err := regexp.Compile(viper.GetString("macho.search.ivar"))
+								if err != nil {
+									return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.ivar"), err)
+								}
 								for _, ivar := range cat.Class.Ivars {
-									if ivar.Name == viper.GetString("macho.search.ivar") {
+									if ivarRE.MatchString(ivar.Name) {
 										fmt.Printf("%s\t(%s)\n", path, cat.Class.Name)
 										break
 									}
