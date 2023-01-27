@@ -1,3 +1,5 @@
+//go:build libusb
+
 /*
 Copyright © 2023 blacktop
 
