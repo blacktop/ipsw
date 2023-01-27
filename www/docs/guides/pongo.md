@@ -10,7 +10,7 @@ description: PongoOS shell
 Right now it can only decrypt the keybags, but in the future it will be able to do more.
 :::
 
-- Put your checkm8-able *AND* [black-bird-able](https://www.theiphonewiki.com/wiki/Blackbird_Exploit) device into DFU mode.
+- Put your checkm8-able *AND* [blackbird-able](https://www.theiphonewiki.com/wiki/Blackbird_Exploit) device into DFU mode.
 - Run [checkra1n](https://checkra.in)
 
 ```bash
