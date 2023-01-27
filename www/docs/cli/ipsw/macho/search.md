@@ -17,14 +17,15 @@ ipsw macho search [flags]
 ### Options
 
 ```
-  -g, --category string       Search for specific ObjC category
-  -c, --class string          Search for specific ObjC class
+  -g, --category string       Search for specific ObjC category regex
+  -c, --class string          Search for specific ObjC class regex
   -h, --help                  help for search
   -i, --ipsw string           Path to IPSW to scan for search criteria
-      --ivar string           Search for specific ObjC instance variable
-  -l, --load-command string   Search for specific load command
-  -p, --protocol string       Search for specific ObjC protocol
-  -s, --sel string            Search for specific ObjC selector
+      --ivar string           Search for specific ObjC instance variable regex
+  -l, --load-command string   Search for specific load command regex
+  -p, --protocol string       Search for specific ObjC protocol regex
+  -s, --sel string            Search for specific ObjC selector regex
+  -m, --sym string            Search for specific symbol regex
 ```
 
 ### Options inherited from parent commands
