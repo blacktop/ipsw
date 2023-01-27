@@ -62,19 +62,32 @@ type kbagType int
 const (
 	PRODUCTION  kbagType = 1
 	DEVELOPMENT kbagType = 2
+	DECRYPTED   kbagType = 3
 )
 
 func (t kbagType) String() string {
-	if t == PRODUCTION {
+	switch t {
+	case PRODUCTION:
 		return "PRODUCTION"
+	case DEVELOPMENT:
+		return "DEVELOPMENT"
+	case DECRYPTED:
+		return "DECRYPTED"
+	default:
+		return fmt.Sprintf("UNKNOWN(%d)", t)
 	}
-	return "DEVELOPMENT"
 }
 func (t kbagType) Short() string {
-	if t == PRODUCTION {
+	switch t {
+	case PRODUCTION:
 		return "prod"
+	case DEVELOPMENT:
+		return "dev"
+	case DECRYPTED:
+		return "dec"
+	default:
+		return fmt.Sprintf("unknown(%d)", t)
 	}
-	return "dev"
 }
 
 type Keybag struct {
@@ -429,20 +442,51 @@ type im4pKBag struct {
 	Keybags []Keybag `json:"kbags,omitempty"`
 }
 
-func ParseZipKeyBagsAsJSON(files []*zip.File, inf *info.Info, pattern string) (string, error) {
-	var kbags []im4pKBag
+type KeyBags struct {
+	Type    string
+	Version string
+	Build   string
+	Devices []string
+	Files   []im4pKBag
+}
+
+func (kbs KeyBags) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Type    string     `json:"type,omitempty"`
+		Version string     `json:"version,omitempty"`
+		Build   string     `json:"build,omitempty"`
+		Devices []string   `json:"devices,omitempty"`
+		Files   []im4pKBag `json:"files,omitempty"`
+	}{
+		Type:    kbs.Type,
+		Version: kbs.Version,
+		Build:   kbs.Build,
+		Devices: kbs.Devices,
+		Files:   kbs.Files,
+	})
+}
+
+func ParseZipKeyBags(files []*zip.File, inf *info.Info, pattern string) (*KeyBags, error) {
+	kbags := &KeyBags{
+		Type:    inf.Plists.Type,
+		Version: inf.Plists.BuildManifest.ProductVersion,
+		Build:   inf.Plists.BuildManifest.ProductBuildVersion,
+		Devices: inf.Plists.Restore.SupportedProductTypes,
+	}
+
 	rePattern := `.*im4p$`
 	if len(pattern) > 0 {
 		if _, err := regexp.Compile(pattern); err != nil {
-			return "", fmt.Errorf("failed to compile --pattern regexp: %v", err)
+			return nil, fmt.Errorf("failed to compile --pattern regexp: %v", err)
 		}
 		rePattern = pattern
 	}
+
 	for _, f := range files {
 		if regexp.MustCompile(rePattern).MatchString(f.Name) {
 			rc, err := f.Open()
 			if err != nil {
-				return "", fmt.Errorf("error opening zipped file %s: %v", f.Name, err)
+				return nil, fmt.Errorf("error opening zipped file %s: %v", f.Name, err)
 			}
 			im4p, err := ParseIm4p(rc)
 			if err != nil {
@@ -451,28 +495,13 @@ func ParseZipKeyBagsAsJSON(files []*zip.File, inf *info.Info, pattern string) (s
 			if im4p.Kbags == nil { // kbags are optional
 				continue
 			}
-			kbags = append(kbags, im4pKBag{
+			kbags.Files = append(kbags.Files, im4pKBag{
 				Name:    filepath.Base(f.Name),
 				Keybags: im4p.Kbags,
 			})
 			rc.Close()
 		}
 	}
-	dat, err := json.Marshal(&struct {
-		Type    string     `json:"type,omitempty"`
-		Version string     `json:"version,omitempty"`
-		Build   string     `json:"build,omitempty"`
-		Devices []string   `json:"devices,omitempty"`
-		Files   []im4pKBag `json:"files,omitempty"`
-	}{
-		Type:    inf.Plists.Type,
-		Version: inf.Plists.BuildManifest.ProductVersion,
-		Build:   inf.Plists.BuildManifest.ProductBuildVersion,
-		Devices: inf.Plists.Restore.SupportedProductTypes,
-		Files:   kbags,
-	})
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal im4p kbag: %v", err)
-	}
-	return string(dat), nil
+
+	return kbags, nil
 }
