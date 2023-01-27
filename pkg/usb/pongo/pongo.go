@@ -1,3 +1,5 @@
+//go:build libusb
+
 package pongo
 
 import (

@@ -6,11 +6,12 @@ description: PongoOS shell
 
 > `ipsw pongo` is a tool to interact with the PongoOS shell.
 
+:::info
 Right now it can only decrypt the keybags, but in the future it will be able to do more.
+:::
 
-Step 1: Put your checkm8-able device into DFU mode.
-
-Step 2: Run [checkra1n](https://checkra.in)
+- Put your checkm8-able *AND* [black-bird-able](https://www.theiphonewiki.com/wiki/Blackbird_Exploit) device into DFU mode.
+- Run [checkra1n](https://checkra.in)
 
 ```bash
 ❯ /Applications/checkra1n.app/Contents/MacOS/checkra1n -cp
@@ -93,14 +94,14 @@ Extract ALL the im4p files from the IPSW
 Decrypt the SEP firmware
 
 ```bash
-❯ ipsw img4 dec --iv-key <REDACTED> 20D47__iPad6,11_12_iPad7,5_6/Firmware/all_flash/sep-firmware.j71b.RELEASE.im4p
-      • Decrypting file to 20D47__iPad6,11_12_iPad7,5_6/Firmware/all_flash/sep-firmware.j71b.RELEASE.im4p.dec
+❯ ipsw img4 dec --iv-key <REDACTED> sep-firmware.j71b.RELEASE.im4p
+      • Decrypting file to sep-firmware.j71b.RELEASE.im4p.dec
 ```
 
 And WIN.
 
 ```bash
-❯ hexdump -C -s 65578 -n 16 20D47__iPad6,11_12_iPad7,5_6/Firmware/all_flash/sep-firmware.j71b.RELEASE.im4p.dec
+❯ hexdump -C -s 65578 -n 16 sep-firmware.j71b.RELEASE.im4p.dec
 
 0001002a  42 75 69 6c 74 20 62 79  20 6c 65 67 69 6f 6e 32  |"Built by legion2"|
 ```
