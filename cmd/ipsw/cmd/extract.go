@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"archive/zip"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
@@ -216,13 +217,17 @@ var extractCmd = &cobra.Command{
 
 			if viper.GetBool("extract.kbag") {
 				log.Info("Extracting im4p kbags")
-				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i, viper.GetString("extract.pattern"))
+				kbags, err := img4.ParseZipKeyBags(zr.File, i, viper.GetString("extract.pattern"))
 				if err != nil {
 					return fmt.Errorf("failed to parse im4p kbags: %v", err)
 				}
-				fmt.Println(out)
+				out, err := json.Marshal(kbags)
+				if err != nil {
+					return fmt.Errorf("failed to marshal im4p kbags: %v", err)
+				}
+				fmt.Println(string(out))
 				os.Mkdir(destPath, 0770)
-				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
+				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), out, 0660); err != nil {
 					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
 				}
 			}
@@ -317,13 +322,17 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("failed to open zip: %v", err)
 				}
 				defer zr.Close()
-				out, err := img4.ParseZipKeyBagsAsJSON(zr.File, i, viper.GetString("extract.pattern"))
+				kbags, err := img4.ParseZipKeyBags(zr.File, i, viper.GetString("extract.pattern"))
 				if err != nil {
 					return fmt.Errorf("failed to parse im4p kbags: %v", err)
 				}
-				fmt.Println(out)
+				out, err := json.Marshal(kbags)
+				if err != nil {
+					return fmt.Errorf("failed to marshal im4p kbags: %v", err)
+				}
+				fmt.Println(string(out))
 				os.Mkdir(destPath, 0770)
-				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), []byte(out), 0660); err != nil {
+				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), out, 0660); err != nil {
 					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
 				}
 			}
