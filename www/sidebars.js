@@ -54,6 +54,7 @@ const sidebars = {
         "guides/device_list",
         "guides/shsh",
         "guides/debugserver",
+        "guides/pongo",
         // {
         //   type: "category",
         //   label: "Docs",
