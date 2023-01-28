@@ -102,5 +102,6 @@ Firmware/018-95946-047.dmg.trustcache                                  56 kB
 ```bash
 ❯ ipsw info OTA -V
 ```
-
-> **NOTE:** This will also dump out the full BuidManifest.plist, Restore.plist, and Info.plists etc
+:::info note
+This will also dump out the full BuidManifest.plist, Restore.plist, and Info.plists etc
+:::

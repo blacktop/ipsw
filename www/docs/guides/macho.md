@@ -32,7 +32,9 @@ Extract file from Universal/FAT MachO
 • Extracted ARM64e file as debugserver.arm64e
 ```
 
-> **NOTE:** you can supply `--arch arm64e` instead of using the arch picker UI
+:::info note
+You can supply `--arch arm64e` instead of using the arch picker UI
+:::
 
 ### **macho bbl**
 
@@ -313,7 +315,9 @@ CMS (RFC3852) signature:
         OU: Apple Certification Authority CN: Software Signing                           (2013-04-12 thru 2021-04-12)
 ```
 
-> **NOTE:** If you supply the `-V` flag, the output will be VERY similar to that of `openssl`
+:::info note
+If you supply the `-V` flag, the output will be VERY similar to that of `openssl`
+:::
 
 ### **macho info --dump-cert**
 
@@ -377,7 +381,9 @@ Similar to `jtool --ent`
 
 Similar to `objdump --macho --objc-meta-data` OR `dsdump --objc -vv`
 
-**NOTE:** Currently only supports _64-bit_ architechtures
+:::info note
+Currently only supports _64-bit_ architechtures
+:::
 
 ```bash
 ❯ ipsw macho info /usr/lib/libobjc.A.dylib --arch amd64 --objc | bat -l m
