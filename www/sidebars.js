@@ -39,6 +39,7 @@ const sidebars = {
       },
       items: [
         "guides/download",
+        "guides/info",
         "guides/extract",
         "guides/macho",
         "guides/kernel",
