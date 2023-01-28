@@ -40,61 +40,102 @@ It's a thing of beauty 😍
 
 ## **img4 extract**
 
-### Ever wonder how to mount the RAM disks in the _ipsw_ ?
+### Ever wonder how to mount the RAM disks in the IPSW ?
 
 ```bash
-❯ unzip -l iPhone11,8,iPhone12,1_14.0_18A5319i_Restore.zip | grep dmg
-107235355  01-09-2007 09:41   038-44087-104.dmg
-104157211  01-09-2007 09:41   038-44135-103.dmg
-5041226384  01-09-2007 09:41   038-44337-066.dmg
-     5041  01-09-2007 09:41   Firmware/038-44087-104.dmg.trustcache
-     4865  01-09-2007 09:41   Firmware/038-44135-103.dmg.trustcache
-  8574971  01-09-2007 09:41   Firmware/038-44337-066.dmg.mtree
-       99  01-09-2007 09:41   Firmware/038-44337-066.dmg.root_hash
-    49173  01-09-2007 09:41   Firmware/038-44337-066.dmg.trustcache
+❯ ipsw info iPhone15,2_16.3_20D47_Restore.ipsw
+
+[IPSW Info]
+===========
+Version        = 16.3
+BuildVersion   = 20D47
+OS Type        = Production
+FileSystem     = 098-24861-056.dmg
+SystemOS       = 098-24573-060.dmg
+AppOS          = 098-24753-064.dmg
+RestoreRamDisk = [098-24758-064.dmg 098-25526-064.dmg]
+<SNIP>
 ```
 
-The **BIG** one _(4.7G)_ is the _file system_ (aka the one that has the _dyld_shared_cache_).
-
-The other two are the `arm64eCustomerRamDisk` and the `arm64eUpdateRamDisk`, however, you cannot mount them as they are actually **im4p** files. 😕
+The RestoreRamDisk DMGs `098-24758-064.dmg` and `098-25526-064.dmg` are the `arm64eCustomerRamDisk` and the `arm64eUpdateRamDisk`, however, you cannot mount them as they are actually **im4p** files. 😕
 
 You can now extract the Img4 payloads with the following command:
 
 ```bash
-❯ unzip -p iPhone_4.7_14.0_18A5319i_Restore.ipsw 038-44087-104.dmg > 038-44087-104.dmg
-❯ ipsw img4 extract 038-44087-104.dmg
+❯ unzip -p iPhone15,2_16.3_20D47_Restore.ipsw 098-25526-064.dmg > 098-25526-064.dmg
+❯ ipsw img4 extract 098-25526-064.dmg
    • Parsing Im4p
-      • Exracting payload to file 038-44087-104.dmg.payload
+      • Exracting payload to file 098-25526-064.dmg.payload
 ```
 
 Rename the `payload` back to a _DMG_
 
 ```bash
-❯ mv 038-44087-104.dmg.payload 038-44087-104.dmg.payload.dmg
+❯ mv 098-25526-064.dmg.payload 098-25526-064.dmg.payload.dmg
 ```
 
 And now you can open the 🆕 _DMG_ to mount the RAM disk image.
 
 ```bash
-❯ open 038-44087-104.dmg.payload.dmg
-❯ ls -l /Volumes/AzulSeed18A5319i.arm64eUpdateRamDisk/
-total 16
-drwxrwxr-x  3 blacktop  staff  102 Jul  2 02:15 Library
-drwxr-xr-x  4 blacktop  staff  136 Jul  2 02:15 System
-drwxr-xr-x  2 blacktop  staff  272 Jul  2 02:15 bin
-dr-xr-xr-x  2 blacktop  staff   68 Jul  2 02:15 dev
-lrwxr-xr-x  1 blacktop  staff   11 Jul  2 02:15 etc -> private/etc
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt1
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt2
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt3
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt4
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt5
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt6
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt7
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt8
-drwxr-xr-x  2 blacktop  staff   68 Jul  2 02:15 mnt9
-drwxr-xr-x  4 blacktop  staff  136 Jul  2 02:15 private
-drwxr-xr-x  2 blacktop  staff  544 Jul  2 02:15 sbin
-drwxr-xr-x  9 blacktop  staff  306 Jul  2 02:15 usr
-lrwxr-xr-x  1 blacktop  staff   11 Jul  2 02:15 var -> private/var
+❯ open 098-25526-064.dmg.payload.dmg
+```
+```
+❯ ls -l /Volumes/SydneyD20D47.arm64eUpdateRamDisk/
+total 0
+drwxr-xr-x   5 blacktop  staff  160 Jan 28 12:35 System
+drwxr-xr-x   8 blacktop  staff  256 Jan 13 21:39 bin
+dr-xr-xr-x   2 blacktop  staff   64 Dec 16 20:57 dev
+lrwxr-xr-x   1 blacktop  staff   11 Jan 13 21:39 etc -> private/etc
+drwxr-xr-x   4 blacktop  staff  128 Jan 28 12:40 mnt1
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt2
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt3
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt4
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt5
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt6
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt7
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt8
+drwxr-xr-x   2 blacktop  staff   64 Dec  8  2020 mnt9
+drwxr-xr-x   5 blacktop  staff  160 Jan 28 12:39 private
+drwxr-xr-x  16 blacktop  staff  512 Jan 13 21:39 sbin
+drwxr-xr-x  10 blacktop  staff  320 Jan 28 12:37 usr
+lrwxr-xr-x   1 blacktop  staff   11 Jan 13 21:39 var -> private/var
+```
+
+:::info note
+This is one of the last places you can find the individual framework dylibs
+```bash
+❯ ls -l /Volumes/SydneyD20D47.arm64eUpdateRamDisk/System/Library/Frameworks/
+
+total 0
+drwxr-xr-x  5 blacktop  staff  160 Jan 13 21:39 CFNetwork.framework
+drwxr-xr-x  4 blacktop  staff  128 Jan 13 21:39 Combine.framework
+drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 CoreFoundation.framework
+drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 CoreServices.framework
+drwxr-xr-x  4 blacktop  staff  128 Jan 13 21:39 Foundation.framework
+drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 IOKit.framework
+drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 IOSurface.framework
+drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 MobileCoreServices.framework
+drwxr-xr-x  4 blacktop  staff  128 Jan 13 21:39 Network.framework
+drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 Security.framework
+drwxr-xr-x  3 blacktop  staff   96 Jan 13 21:39 SystemConfiguration.framework
+```
+:::
+
+## **img4 kbags**
+
+### Extract keybags from im4p
+
+```bash
+❯ ipsw img4 kbag iBoot.ipad6f.RELEASE.im4p
+   • Parsing Im4p
+
+Keybags:
+-
+  type: PRODUCTION
+    iv: e59e7976e1f88c7a3e76c22c75f518ff
+   key: 9daae21aeb6189554aa9acb67e229dfc67ec3d04f2f881c2929ff58663cece96
+-
+  type: DEVELOPMENT
+    iv: 510a264622ca1f66909f57fd65405c9c
+   key: 7a65aeb58f7900283539388f12ca0930170747ffbe4db10f8a775aaf25636bbb
 ```
