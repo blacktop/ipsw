@@ -18,7 +18,9 @@ ipsw img4 dec <img4> [flags]
 
 ```
   -h, --help            help for dec
-  -k, --iv-key string   AES key
+  -i, --iv string       AES iv
+      --iv-key string   AES iv+key
+  -k, --key string      AES key
   -o, --output string   Output file
 ```
 

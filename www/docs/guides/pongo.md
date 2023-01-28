@@ -7,7 +7,7 @@ description: PongoOS shell
 > `ipsw pongo` is a tool to interact with the PongoOS shell.
 
 :::info
-Right now it can only decrypt the keybags, but in the future it will be able to do more.
+Right now it can only decrypt the keybags/im4p firmwares, but in the future it will be able to do more.
 :::
 
 - Put your checkm8-able *AND* [blackbird-able](https://www.theiphonewiki.com/wiki/Blackbird_Exploit) device into DFU mode.
@@ -16,6 +16,8 @@ Right now it can only decrypt the keybags, but in the future it will be able to 
 ```bash
 ❯ /Applications/checkra1n.app/Contents/MacOS/checkra1n -cp
 ```
+
+## Decrypting keybags
 
 Now we can run `ipsw pongo` to interact with the PongoOS shell.
 
@@ -104,4 +106,20 @@ And WIN.
 ❯ hexdump -C -s 65578 -n 16 sep-firmware.j71b.RELEASE.im4p.dec
 
 0001002a  42 75 69 6c 74 20 62 79  20 6c 65 67 69 6f 6e 32  |"Built by legion2"|
+```
+
+## Decrypting LOCAL im4p files as well
+
+This will also extract the im4p files from the IPSW and decrypt them using the decrypted keybags.
+
+```bash
+❯ ipsw pongo iPad_64bit_TouchID_ASTC_16.3_20D47_Restore.ipsw --decrypt
+```
+
+## Decrypting REMOTE im4p files as well 👀
+
+This will also extract the im4p files from the URL using and decrypt them using the decrypted keybags.
+
+```bash
+❯ ipsw pongo --decrypt --remote https://updates.cdn-apple.com/2022FallFCS/fullrestores/012-93153/1C7560C7-943E-4E7F-AEBB-F1DB30A4D931/iPad_Pro_HFR_16.1_20B82_Restore.ipsw
 ```
