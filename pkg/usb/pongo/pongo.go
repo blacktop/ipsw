@@ -30,11 +30,11 @@ func NewClient() (*Client, error) {
 			if err != nil {
 				log.Fatalf("Could not open a device: %v", err)
 			}
-			man, _ := dev.Manufacturer()
-			prod, _ := dev.Product()
+			vendor, _ := dev.Manufacturer()
+			product, _ := dev.Product()
 			log.WithFields(log.Fields{
-				"vendor":  man,
-				"product": prod,
+				"vendor":  fmt.Sprintf("'%s'", vendor),
+				"product": fmt.Sprintf("'%s'", product),
 			}).Debug("Found USB Device")
 			return true
 		}

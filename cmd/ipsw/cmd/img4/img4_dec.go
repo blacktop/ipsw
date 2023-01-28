@@ -22,20 +22,12 @@ THE SOFTWARE.
 package img4
 
 import (
-	"bytes"
 	"crypto/aes"
-	"crypto/cipher"
 	"encoding/hex"
 	"fmt"
-	"io"
-	"os"
 
 	"github.com/apex/log"
-	// lzfse "github.com/blacktop/go-lzfse"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/img4"
-	"github.com/blacktop/ipsw/pkg/lzfse"
-	"github.com/pkg/errors"
+	icmd "github.com/blacktop/ipsw/internal/commands/img4"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -43,7 +35,9 @@ import (
 func init() {
 	Img4Cmd.AddCommand(decImg4Cmd)
 
-	decImg4Cmd.PersistentFlags().StringP("iv-key", "k", "", "AES key")
+	decImg4Cmd.PersistentFlags().String("iv-key", "", "AES iv+key")
+	decImg4Cmd.PersistentFlags().StringP("iv", "i", "", "AES iv")
+	decImg4Cmd.PersistentFlags().StringP("key", "k", "", "AES key")
 	decImg4Cmd.PersistentFlags().StringP("output", "o", "", "Output file")
 }
 
@@ -59,73 +53,40 @@ var decImg4Cmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		var r io.Reader
+		// flags
 		outputFile, _ := cmd.Flags().GetString("output")
 		ivkeyStr, _ := cmd.Flags().GetString("iv-key")
-
-		if len(ivkeyStr) == 0 {
-			return errors.New("you must supply an ivkey with the flag --iv-key")
+		ivStr, _ := cmd.Flags().GetString("iv")
+		keyStr, _ := cmd.Flags().GetString("key")
+		// validate flags
+		if len(ivkeyStr) != 0 && (len(ivStr) != 0 || len(keyStr) != 0) {
+			return fmt.Errorf("cannot specify both --iv-key AND --iv/--key")
+		} else if len(ivkeyStr) == 0 && (len(ivStr) == 0 || len(keyStr) == 0) {
+			return fmt.Errorf("must specify either --iv-key OR --iv/--key")
 		}
 
-		ivkey, _ := hex.DecodeString(ivkeyStr)
-		iv := ivkey[:aes.BlockSize]
-		key := ivkey[aes.BlockSize:]
+		var iv []byte
+		var key []byte
 
-		f, err := os.Open(args[0])
-		if err != nil {
-			return errors.Wrapf(err, "unabled to open file: %s", args[0])
-		}
-		defer f.Close()
-
-		i, err := img4.ParseIm4p(f)
-		if err != nil {
-			return errors.Wrap(err, "unabled to parse Im4p")
-		}
-
-		block, err := aes.NewCipher(key)
-		if err != nil {
-			return errors.Wrap(err, "failed to create new AES cipher")
-		}
-
-		if len(i.Data) < aes.BlockSize {
-			return errors.Errorf("Im4p data too short")
-		}
-
-		// CBC mode always works in whole blocks.
-		if len(i.Data)%aes.BlockSize != 0 {
-			return errors.Errorf("Im4p data is not a multiple of the block size")
-		}
-
-		mode := cipher.NewCBCDecrypter(block, iv)
-
-		mode.CryptBlocks(i.Data, i.Data)
-
-		if len(outputFile) == 0 {
-			outputFile = args[0] + ".dec"
-		}
-
-		of, err := os.Create(outputFile)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create file: ", outputFile)
-		}
-
-		if bytes.Contains(i.Data[:4], []byte("bvx2")) {
-			utils.Indent(log.Debug, 2)("Detected LZFSE compression")
-			dat, err := lzfse.NewDecoder(i.Data).DecodeBuffer()
+		if len(ivkeyStr) != 0 {
+			ivkey, err := hex.DecodeString(ivkeyStr)
 			if err != nil {
-				return fmt.Errorf("failed to lzfse decompress %s: %v", args[0], err)
+				return fmt.Errorf("failed to decode --iv-key: %v", err)
 			}
-			r = bytes.NewReader(dat)
+			iv = ivkey[:aes.BlockSize]
+			key = ivkey[aes.BlockSize:]
 		} else {
-			r = bytes.NewReader(i.Data)
+			var err error
+			iv, err = hex.DecodeString(ivStr)
+			if err != nil {
+				return fmt.Errorf("failed to decode --iv-key: %v", err)
+			}
+			key, err = hex.DecodeString(keyStr)
+			if err != nil {
+				return fmt.Errorf("failed to decode --iv-key: %v", err)
+			}
 		}
 
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Decrypting file to %s", outputFile))
-		_, err = io.Copy(of, r)
-		if err != nil {
-			return errors.Wrapf(err, "failed to decompress to file: ", outputFile)
-		}
-
-		return nil
+		return icmd.DecryptPayload(args[0], outputFile, iv, key)
 	},
 }

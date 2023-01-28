@@ -287,13 +287,12 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				fname = filepath.Join(folder, filepath.Base(f.Name))
 			} else {
 				fname = filepath.Join(folder, filepath.Clean(f.Name))
-				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
-					return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
-				}
-				if f.FileInfo().IsDir() {
-					continue
-				}
 			}
+
+			if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+			}
+
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				rc, err := f.Open()
 				if err != nil {
@@ -322,7 +321,7 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				proxyReader := bar.ProxyReader(io.LimitReader(rc, total))
 				defer proxyReader.Close()
 
-				Indent(log.Info, 2)(fmt.Sprintf("Creating %s", strings.TrimPrefix(fname, cwd)))
+				Indent(log.Info, 2)(fmt.Sprintf("Extracting %s", strings.TrimPrefix(fname, cwd)))
 				out, err := os.Create(fname)
 				if err != nil {
 					return fmt.Errorf("error creating remote unzipped file destination %s: %v", fname, err)

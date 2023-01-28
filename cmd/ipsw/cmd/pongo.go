@@ -30,10 +30,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/apex/log"
+	icmd "github.com/blacktop/ipsw/internal/commands/img4"
+	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -44,13 +47,22 @@ import (
 
 func init() {
 	rootCmd.AddCommand(pongoCmd)
+	pongoCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	pongoCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	pongoCmd.Flags().BoolP("remote", "r", false, "Use remote IPSW")
+	pongoCmd.Flags().BoolP("decrypt", "d", false, "Extract and decrypt im4p files")
 	pongoCmd.Flags().StringP("output", "o", "", "Folder to write JSON to")
+	viper.BindPFlag("pongo.proxy", pongoCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("pongo.insecure", pongoCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("pongo.remote", pongoCmd.Flags().Lookup("remote"))
+	viper.BindPFlag("pongo.decrypt", pongoCmd.Flags().Lookup("decrypt"))
 	viper.BindPFlag("pongo.output", pongoCmd.Flags().Lookup("output"))
 }
 
 // pongoCmd represents the pongo command
 var pongoCmd = &cobra.Command{
 	Use:           "pongo <IPSW>",
+	Aliases:       []string{"p"},
 	Short:         "PongoOS Terminal",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
@@ -61,31 +73,86 @@ var pongoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		ipswPath := filepath.Clean(args[0])
+		var err error
+		var i *info.Info
+		var destPath string
+		var kbags *img4.KeyBags
 
-		if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", ipswPath)
-		}
+		if viper.GetBool("pongo.remote") {
+			remoteURL := args[0]
 
-		i, err := info.Parse(ipswPath)
-		if err != nil {
-			return fmt.Errorf("failed to parse plists in IPSW: %v", err)
-		}
-		folder, err := i.GetFolder()
-		if err != nil {
-			log.Errorf("failed to get folder from remote zip metadata: %v", err)
-		}
-		destPath := filepath.Join(filepath.Clean(viper.GetString("pongo.output")), folder)
+			if !isURL(remoteURL) {
+				log.Fatal("must supply valid URL when using the remote flag")
+			}
 
-		zr, err := zip.OpenReader(ipswPath)
-		if err != nil {
-			return fmt.Errorf("failed to open zip: %v", err)
-		}
-		defer zr.Close()
+			// Get handle to remote IPSW zip
+			zr, err := download.NewRemoteZipReader(remoteURL, &download.RemoteConfig{
+				Proxy:    viper.GetString("pongo.proxy"),
+				Insecure: viper.GetBool("pongo.insecure"),
+			})
+			if err != nil {
+				return fmt.Errorf("unable to download remote zip: %v", err)
+			}
 
-		kbags, err := img4.ParseZipKeyBags(zr.File, i, "")
-		if err != nil {
-			return fmt.Errorf("failed to parse IPSW im4p kbags: %v", err)
+			i, err = info.ParseZipFiles(zr.File)
+			if err != nil {
+				return fmt.Errorf("failed to parse plists in remote zip: %v", err)
+			}
+			folder, err := i.GetFolder()
+			if err != nil {
+				log.Errorf("failed to get folder from remote zip metadata: %v", err)
+			}
+			destPath = filepath.Join(filepath.Clean(viper.GetString("pongo.output")), folder)
+
+			log.Info("Extracting im4p kbags")
+			kbags, err = img4.ParseZipKeyBags(zr.File, i, "")
+			if err != nil {
+				return fmt.Errorf("failed to parse im4p kbags: %v", err)
+			}
+
+			if viper.GetBool("pongo.decrypt") {
+				for _, kbag := range kbags.Files {
+					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(kbag.Name), destPath, true); err != nil {
+						return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
+					}
+				}
+			}
+		} else {
+			ipswPath := filepath.Clean(args[0])
+
+			if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
+				return fmt.Errorf("file %s does not exist", ipswPath)
+			}
+
+			i, err = info.Parse(ipswPath)
+			if err != nil {
+				return fmt.Errorf("failed to parse plists in IPSW: %v", err)
+			}
+			folder, err := i.GetFolder()
+			if err != nil {
+				log.Errorf("failed to get folder from remote zip metadata: %v", err)
+			}
+			destPath = filepath.Join(filepath.Clean(viper.GetString("pongo.output")), folder)
+
+			zr, err := zip.OpenReader(ipswPath)
+			if err != nil {
+				return fmt.Errorf("failed to open zip: %v", err)
+			}
+			defer zr.Close()
+
+			log.Info("Extracting im4p kbags")
+			kbags, err = img4.ParseZipKeyBags(zr.File, i, "")
+			if err != nil {
+				return fmt.Errorf("failed to parse IPSW im4p kbags: %v", err)
+			}
+
+			if viper.GetBool("pongo.decrypt") {
+				for _, kbag := range kbags.Files {
+					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf(".*%s$", kbag.Name)), destPath, true); err != nil {
+						return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
+					}
+				}
+			}
 		}
 
 		cli, err := pongo.NewClient()
@@ -119,14 +186,19 @@ var pongoCmd = &cobra.Command{
 			}
 
 			parts := strings.Split(strings.ReplaceAll(out, "\r\n", "\n"), "\n")
-			if len(parts) != 3 {
-				return fmt.Errorf("got unexpected output: %v", parts)
+			found := false
+			var ivkey string
+			for _, part := range parts {
+				if strings.HasPrefix(part, "kbag out: ") {
+					found = true
+					ivkey = strings.TrimPrefix(part, "kbag out: ")
+					break
+				}
 			}
-			if !strings.HasPrefix(parts[1], "kbag out: ") {
-				return fmt.Errorf("got unexpected output: %v; should have prefex 'kbag out: '", parts[1])
+			if !found {
+				return fmt.Errorf("got unexpected output: should have found line with prefex 'kbag out: %s", out)
 			}
 
-			ivkey := strings.TrimPrefix(parts[1], "kbag out: ")
 			ivKeyBytes, err := hex.DecodeString(ivkey)
 			if err != nil {
 				return fmt.Errorf("failed to decode iv+key string: %v", err)
@@ -136,6 +208,14 @@ var pongoCmd = &cobra.Command{
 				Key:  ivKeyBytes[aes.BlockSize:],
 				Type: img4.DECRYPTED,
 			})
+		}
+
+		if viper.GetBool("pongo.decrypt") {
+			for _, kbag := range kbags.Files {
+				if err := icmd.DecryptPayload(filepath.Join(destPath, kbag.Name), "", kbag.Keybags[2].IV, kbag.Keybags[2].Key); err != nil {
+					return fmt.Errorf("failed to decrypt payload: %v", err)
+				}
+			}
 		}
 
 		kbJSON, err := kbags.MarshalJSON()
