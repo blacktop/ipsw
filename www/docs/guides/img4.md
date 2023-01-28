@@ -63,6 +63,8 @@ You can now extract the Img4 payloads with the following command:
 
 ```bash
 ❯ unzip -p iPhone15,2_16.3_20D47_Restore.ipsw 098-25526-064.dmg > 098-25526-064.dmg
+```
+```bash
 ❯ ipsw img4 extract 098-25526-064.dmg
    • Parsing Im4p
       • Exracting payload to file 098-25526-064.dmg.payload
@@ -79,7 +81,7 @@ And now you can open the 🆕 _DMG_ to mount the RAM disk image.
 ```bash
 ❯ open 098-25526-064.dmg.payload.dmg
 ```
-```
+```bash
 ❯ ls -l /Volumes/SydneyD20D47.arm64eUpdateRamDisk/
 total 0
 drwxr-xr-x   5 blacktop  staff  160 Jan 28 12:35 System
