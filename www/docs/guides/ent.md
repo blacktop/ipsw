@@ -106,7 +106,9 @@ Use a previously created entitlements database
 ❯ ipsw ent iPhone11,8,iPhone12,1_14.5_18E5199a_Restore.ipsw --ent platform-application --db /tmp/IPSW.entDB
 ```
 
-> **NOTE:** When you run the `ipsw ent` command on an **IPSW** it will auto-create **IPSW.entDB** next to the **IPSW** file and it will try and use that if you run it again on the same **IPSW**.
+:::info note
+When you run the `ipsw ent` command on an **IPSW** it will auto-create **IPSW.entDB** next to the **IPSW** file and it will try and use that if you run it again on the same **IPSW**.
+:::
 
 ### Diff two IPSWs
 
