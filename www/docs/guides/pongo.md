@@ -1,5 +1,6 @@
 ---
 description: PongoOS shell
+hide_table_of_contents: true
 ---
 
 # PongoOS
@@ -108,7 +109,7 @@ And WIN.
 0001002a  42 75 69 6c 74 20 62 79  20 6c 65 67 69 6f 6e 32  |"Built by legion2"|
 ```
 
-## Decrypting LOCAL im4p files as well
+## Decrypting LOCAL im4p files
 
 This will also extract the im4p files from the IPSW and decrypt them using the decrypted keybags.
 
@@ -116,10 +117,10 @@ This will also extract the im4p files from the IPSW and decrypt them using the d
 ❯ ipsw pongo iPad_64bit_TouchID_ASTC_16.3_20D47_Restore.ipsw --decrypt
 ```
 
-## Decrypting REMOTE im4p files as well 👀
+## Decrypting REMOTE im4p files 👀
 
 This will also extract the im4p files from the URL using and decrypt them using the decrypted keybags.
 
 ```bash
-❯ ipsw pongo --decrypt --remote https://updates.cdn-apple.com/2022FallFCS/fullrestores/012-93153/1C7560C7-943E-4E7F-AEBB-F1DB30A4D931/iPad_Pro_HFR_16.1_20B82_Restore.ipsw
+❯ ipsw pongo --decrypt --remote https://updates.cdn-apple.com/iPad_Pro_HFR_16.1_20B82_Restore.ipsw
 ```
