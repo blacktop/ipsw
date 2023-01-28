@@ -165,6 +165,34 @@ Then you could use `git diff` or something to get a quick **high** level view of
 
 You can see an example of what this outputs [HERE](https://github.com/blacktop/ipsw/tree/master/pkg/kernelcache/diff/Library/Caches/com.apple.xbs/Sources)
 
+### **kernel symbolsets**
+
+Dump kernel symbolsets
+
+```bash
+❯ ipsw kernel symbolsets 20D47__iPhone15,2/kernelcache.release.iPhone15,2
+```
+```md
+Symbol Sets
+===========
+
+com.apple.kpi.bsd: (22.3.0)
+---------------------------
+_VNOP_BWRITE
+_VNOP_FSYNC
+_VNOP_IOCTL
+_VNOP_READ
+_VNOP_STRATEGY
+_VNOP_WRITE
+_advisory_read
+_advisory_read_ext
+_bcd2bin_data
+_bdevsw_add
+_bdevsw_isfree
+_bdevsw_remove
+<SNIP>
+```
+
 ### **kernel ctfdump**
 
 #### Dump CTF info
