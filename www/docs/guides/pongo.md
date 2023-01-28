@@ -7,16 +7,25 @@ hide_table_of_contents: false
 
 > `ipsw pongo` is a tool to interact with the PongoOS shell.
 
-:::info
-Right now it can only decrypt the keybags/im4p firmwares, but in the future it will be able to do more.
-:::
+## Requirements
 
-- Put your checkm8-able *AND* [blackbird-able](https://www.theiphonewiki.com/wiki/Blackbird_Exploit) device into DFU mode.
-- Run [checkra1n](https://checkra.in)
+Setup your device to boot to [PongoOS](https://github.com/checkra1n/PongoOS)
+
+- Put your [checkm8-able](https://github.com/axi0mX/ipwndfu) *AND* [blackbird-able](https://www.theiphonewiki.com/wiki/Blackbird_Exploit) device into DFU mode.
+- Run [checkra1n](https://checkra.in) via the following CLI command:
 
 ```bash
 ❯ /Applications/checkra1n.app/Contents/MacOS/checkra1n -cp
 ```
+
+:::info
+The only devices that are checkm8-able and blackbird-able are **A10**/**T2** devices.
+:::
+
+:::info
+Right now `ipsw pongo` can only decrypt the keybags/im4p firmwares in local/remote IPSW/OTAs, but in the future it will be able to do more.
+:::
+
 
 ## Decrypting keybags
 
