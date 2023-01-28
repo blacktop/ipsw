@@ -17,8 +17,12 @@ ipsw pongo <IPSW> [flags]
 ### Options
 
 ```
+  -d, --decrypt         Extract and decrypt im4p files
   -h, --help            help for pongo
+      --insecure        do not verify ssl certs
   -o, --output string   Folder to write JSON to
+      --proxy string    HTTP/HTTPS proxy
+  -r, --remote          Use remote IPSW
 ```
 
 ### Options inherited from parent commands
