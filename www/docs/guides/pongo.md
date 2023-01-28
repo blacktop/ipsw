@@ -117,10 +117,11 @@ This will also extract the im4p files from the IPSW and decrypt them using the d
 ❯ ipsw pongo iPad_64bit_TouchID_ASTC_16.3_20D47_Restore.ipsw --decrypt
 ```
 
-## Decrypting REMOTE im4p files 👀
+## Decrypting REMOTE im4p files
 
 This will also extract the im4p files from the URL using and decrypt them using the decrypted keybags.
 
 ```bash
-❯ ipsw pongo --decrypt --remote https://updates.cdn-apple.com/iPad_Pro_HFR_16.1_20B82_Restore.ipsw
+❯ ipsw pongo --decrypt --remote \
+      https://updates.cdn-apple.com/iPad_Pro_HFR_16.1_20B82_Restore.ipsw
 ```
