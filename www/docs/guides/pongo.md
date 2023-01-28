@@ -1,6 +1,6 @@
 ---
 description: PongoOS shell
-hide_table_of_contents: true
+hide_table_of_contents: false
 ---
 
 # PongoOS
@@ -114,7 +114,7 @@ And WIN.
 This will also extract the im4p files from the IPSW and decrypt them using the decrypted keybags.
 
 ```bash
-❯ ipsw pongo iPad_64bit_TouchID_ASTC_16.3_20D47_Restore.ipsw --decrypt
+❯ ipsw pongo --decrypt iPad_64bit_TouchID_ASTC_16.3_20D47_Restore.ipsw
 ```
 
 ## Decrypting REMOTE im4p files
