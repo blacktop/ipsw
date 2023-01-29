@@ -245,9 +245,9 @@ type CacheImage struct {
 	cache *File // pointer back to the dyld cache that the image belongs to
 	cuuid types.UUID
 	CacheReader
-	m     *macho.File
-	pm    *macho.File // partial macho
-	sinfo map[uint64]uint64
+	m       *macho.File
+	partial []types.LoadCmd
+	sinfo   map[uint64]uint64
 }
 
 // NewCacheReader returns a CacheReader that reads from r
@@ -426,9 +426,38 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 
 // GetPartialMacho parses dyld image as a partial MachO (fast)
 func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
-	if i.pm != nil {
-		return i.pm, nil
+	var partial []types.LoadCmd = []types.LoadCmd{
+		types.LC_SEGMENT_64,
+		types.LC_DYLD_INFO,
+		types.LC_DYLD_INFO_ONLY,
+		types.LC_ID_DYLIB,
+		types.LC_UUID,
+		types.LC_BUILD_VERSION,
+		types.LC_SOURCE_VERSION,
+		types.LC_SUB_FRAMEWORK,
+		types.LC_SUB_CLIENT,
+		types.LC_REEXPORT_DYLIB,
+		types.LC_LOAD_DYLIB,
+		types.LC_LOAD_WEAK_DYLIB,
+		types.LC_LOAD_UPWARD_DYLIB,
 	}
+
+	var desired map[types.LoadCmd]struct{} = make(map[types.LoadCmd]struct{})
+	for _, command := range partial {
+		desired[command] = struct{}{}
+	}
+	for _, command := range i.partial {
+		delete(desired, command)
+	}
+	var loadIncluding []types.LoadCmd = []types.LoadCmd{}
+	for command := range desired {
+		loadIncluding = append(loadIncluding, command)
+	}
+
+	if len(desired) == 0 && i.m != nil {
+		return i.m, nil
+	}
+
 	offset, err := i.GetOffset(i.LoadAddress)
 	if err != nil {
 		return nil, err
@@ -444,21 +473,9 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 			return i.GetVMAddress(offset)
 		},
 	}
-	i.pm, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
-		LoadFilter: []types.LoadCmd{
-			types.LC_SEGMENT_64,
-			types.LC_DYLD_INFO,
-			types.LC_DYLD_INFO_ONLY,
-			types.LC_ID_DYLIB,
-			types.LC_UUID,
-			types.LC_BUILD_VERSION,
-			types.LC_SOURCE_VERSION,
-			types.LC_SUB_FRAMEWORK,
-			types.LC_SUB_CLIENT,
-			types.LC_REEXPORT_DYLIB,
-			types.LC_LOAD_DYLIB,
-			types.LC_LOAD_WEAK_DYLIB,
-			types.LC_LOAD_UPWARD_DYLIB},
+
+	i.m, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
+		LoadIncluding:   loadIncluding,
 		Offset:          int64(offset),
 		SectionReader:   types.NewCustomSectionReader(i.cache.r[i.cuuid], &vma, 0, 1<<63-1),
 		CacheReader:     i,
@@ -469,7 +486,11 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 		return nil, err
 	}
 
-	return i.pm, nil
+	for command := range desired {
+		i.partial = append(i.partial, command)
+	}
+
+	return i.m, nil
 }
 
 // Analyze analyzes an image by parsing it's symbols, stubs and GOT
