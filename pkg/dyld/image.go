@@ -398,6 +398,12 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 		}
 	}
 
+	var loadExcluding []types.LoadCmd
+
+	if i.cache.Symtab != nil {
+		loadExcluding = []types.LoadCmd{types.LC_SYMTAB}
+	}
+
 	i.CacheReader = NewCacheReader(0, 1<<63-1, i.cuuid)
 	vma := types.VMAddrConverter{
 		Converter: func(addr uint64) uint64 {
@@ -410,15 +416,25 @@ func (i *CacheImage) GetMacho() (*macho.File, error) {
 			return i.GetVMAddress(offset)
 		},
 	}
+
 	i.m, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
 		Offset:               int64(offset),
+		LoadExcluding:        loadExcluding,
 		SectionReader:        types.NewCustomSectionReader(i.cache.r[i.cuuid], &vma, 0, 1<<63-1),
 		CacheReader:          i,
 		VMAddrConverter:      vma,
 		RelativeSelectorBase: rsBase,
 	})
+
 	if err != nil {
 		return nil, err
+	}
+
+	if i.cache.Symtab == nil {
+		i.cache.Symtab = i.m.Symtab
+	} else {
+		i.m.Symtab = i.cache.Symtab
+		i.m.Loads = append(i.m.Loads, i.m.Symtab)
 	}
 
 	return i.m, nil
