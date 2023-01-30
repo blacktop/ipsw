@@ -271,7 +271,7 @@ func Verify(sha1sum, name string) (bool, error) {
 }
 
 // RemoteUnzip unzips a remote file from zip (like partialzip)
-func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat bool) error {
+func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, progress bool) error {
 	var fname string
 
 	cwd, err := os.Getwd()
@@ -282,6 +282,9 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 	found := false
 	for _, f := range files {
 		if pattern.MatchString(f.Name) {
+			if f.FileInfo().IsDir() {
+				continue
+			}
 			found = true
 			if flat {
 				fname = filepath.Join(folder, filepath.Base(f.Name))
@@ -293,6 +296,7 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
 			}
 
+			var r io.ReadCloser
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				rc, err := f.Open()
 				if err != nil {
@@ -300,26 +304,31 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				}
 				defer rc.Close()
 
-				// setup progress bar
-				var total int64 = int64(f.UncompressedSize64)
-				p := mpb.New(
-					mpb.WithWidth(60),
-					mpb.WithRefreshRate(180*time.Millisecond),
-				)
-				bar := p.New(total,
-					mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
-					mpb.PrependDecorators(
-						decor.CountersKibiByte("\t% .2f / % .2f"),
-					),
-					mpb.AppendDecorators(
-						decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
-						decor.Name(" ] "),
-						decor.AverageSpeed(decor.UnitKiB, "% .2f"),
-					),
-				)
-				// create proxy reader
-				proxyReader := bar.ProxyReader(io.LimitReader(rc, total))
-				defer proxyReader.Close()
+				var p *mpb.Progress
+				if progress {
+					// setup progress bar
+					var total int64 = int64(f.UncompressedSize64)
+					p = mpb.New(
+						mpb.WithWidth(60),
+						mpb.WithRefreshRate(180*time.Millisecond),
+					)
+					bar := p.New(total,
+						mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
+						mpb.PrependDecorators(
+							decor.CountersKibiByte("\t% .2f / % .2f"),
+						),
+						mpb.AppendDecorators(
+							decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
+							decor.Name(" ] "),
+							decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+						),
+					)
+					// create proxy reader
+					r = bar.ProxyReader(io.LimitReader(rc, total))
+					defer r.Close()
+				} else {
+					r = rc
+				}
 
 				Indent(log.Info, 2)(fmt.Sprintf("Extracting %s", strings.TrimPrefix(fname, cwd)))
 				out, err := os.Create(fname)
@@ -328,9 +337,12 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				}
 				defer out.Close()
 
-				io.Copy(out, proxyReader)
-				// wait for our bar to complete and flush and close remote zip and temp file
-				p.Wait()
+				io.Copy(out, r)
+
+				if progress {
+					// wait for our bar to complete and flush and close remote zip and temp file
+					p.Wait()
+				}
 
 			} else {
 				log.Warnf("%s already exists", fname)

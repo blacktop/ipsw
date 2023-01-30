@@ -348,7 +348,7 @@ var wikiCmd = &cobra.Command{
 								log.Errorf("failed to get folder from remote ipsw: %v", err)
 							}
 							destPath = filepath.Join(destPath, folder)
-							if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
+							if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat, true); err != nil {
 								return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
 							}
 						}

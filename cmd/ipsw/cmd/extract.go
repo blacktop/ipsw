@@ -182,7 +182,7 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
 				}
 				defer os.RemoveAll(tmpDIR)
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true); err != nil {
+				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, viper.GetBool("extract.flat"), true); err != nil {
 					return fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 				}
 				if err := dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), destPath, viper.GetStringSlice("extract.dyld-arch")); err != nil {
@@ -196,21 +196,21 @@ var extractCmd = &cobra.Command{
 
 			if viper.GetBool("extract.dtree") {
 				log.Info("Extracting remote DeviceTree(s)")
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*DeviceTree.*im(3|4)p$`), destPath, viper.GetBool("extract.flat")); err != nil {
+				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*DeviceTree.*im(3|4)p$`), destPath, viper.GetBool("extract.flat"), true); err != nil {
 					return fmt.Errorf("failed to extract DeviceTree from remote IPSW: %v", err)
 				}
 			}
 
 			if viper.GetBool("extract.iboot") {
 				log.Info("Extracting remote iBoot(s)")
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*iBoot.*im4p$`), destPath, viper.GetBool("extract.flat")); err != nil {
+				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*iBoot.*im4p$`), destPath, viper.GetBool("extract.flat"), true); err != nil {
 					return fmt.Errorf("failed to extract iBoot from remote IPSW: %v", err)
 				}
 			}
 
 			if viper.GetBool("extract.sep") {
 				log.Info("Extracting sep-firmware(s)")
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*sep-firmware.*im4p$`), destPath, viper.GetBool("extract.flat")); err != nil {
+				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*sep-firmware.*im4p$`), destPath, viper.GetBool("extract.flat"), true); err != nil {
 					return fmt.Errorf("failed to extract SEPOS from remote IPSW: %v", err)
 				}
 			}
@@ -238,7 +238,7 @@ var extractCmd = &cobra.Command{
 				if err != nil {
 					return fmt.Errorf("failed to compile regexp: %v", err)
 				}
-				if err := utils.RemoteUnzip(zr.File, validRegex, destPath, viper.GetBool("extract.flat")); err != nil {
+				if err := utils.RemoteUnzip(zr.File, validRegex, destPath, viper.GetBool("extract.flat"), true); err != nil {
 					return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
 				}
 			}
@@ -366,7 +366,7 @@ var extractCmd = &cobra.Command{
 						return fmt.Errorf("failed to open IPSW: %v", err)
 					}
 					defer zr.Close()
-					if err := utils.RemoteUnzip(zr.File, patternRE, destPath, viper.GetBool("extract.flat")); err != nil {
+					if err := utils.RemoteUnzip(zr.File, patternRE, destPath, viper.GetBool("extract.flat"), false); err != nil {
 						return fmt.Errorf("failed to extract files matching pattern: %v", err)
 					}
 				}

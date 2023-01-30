@@ -112,7 +112,7 @@ var pongoCmd = &cobra.Command{
 
 			if viper.GetBool("pongo.decrypt") {
 				for _, kbag := range kbags.Files {
-					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(kbag.Name), destPath, true); err != nil {
+					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(kbag.Name), destPath, true, true); err != nil {
 						return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
 					}
 				}
@@ -148,7 +148,7 @@ var pongoCmd = &cobra.Command{
 
 			if viper.GetBool("pongo.decrypt") {
 				for _, kbag := range kbags.Files {
-					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf(".*%s$", kbag.Name)), destPath, true); err != nil {
+					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf(".*%s$", kbag.Name)), destPath, true, false); err != nil {
 						return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
 					}
 				}

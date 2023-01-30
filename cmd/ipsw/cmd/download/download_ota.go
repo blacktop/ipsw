@@ -394,7 +394,7 @@ var otaDLCmd = &cobra.Command{
 						if err != nil {
 							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
 						}
-						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(remotePattern), filepath.Join(destPath, folder), flat); err != nil {
+						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(remotePattern), filepath.Join(destPath, folder), flat, true); err != nil {
 							utils.Indent(log.Warn, 2)("0 files matched pattern in remote OTA zip. Now checking payloadv2 payloads...")
 							rfiles, err := ota.RemoteList(zr)
 							if err != nil {
