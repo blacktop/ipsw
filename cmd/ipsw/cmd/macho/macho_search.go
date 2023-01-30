@@ -38,8 +38,8 @@ func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
 	machoSearchCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for search criteria")
 	machoSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
-	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
 	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol regex")
+	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
 	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class regex")
 	machoSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category regex")
 	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
@@ -188,7 +188,7 @@ var machoSearchCmd = &cobra.Command{
 						}
 					}
 				}
-				if viper.GetString("macho.search.category") != "" || viper.GetString("macho.search.ivar") != "" {
+				if viper.GetString("macho.search.category") != "" || viper.GetString("macho.search.sel") != "" || viper.GetString("macho.search.ivar") != "" {
 					if cats, err := m.GetObjCCategories(); err == nil {
 						catRE, err := regexp.Compile(viper.GetString("macho.search.category"))
 						if err != nil {
