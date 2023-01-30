@@ -1,6 +1,6 @@
 # Roadmap
 
-I'd like to get to a 1-to-1 feature match with `jtool2` _(VERY close now)_
+I'd like to get to a 1-to-1 feature match with `jtool2` _(✅ DONE)_
 
 My main goal is to create a mantainable _dyld_shared_cache_ splitter
 
