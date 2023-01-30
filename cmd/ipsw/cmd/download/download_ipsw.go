@@ -379,7 +379,7 @@ var ipswCmd = &cobra.Command{
 							return fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
 						}
 						defer os.RemoveAll(tmpDIR)
-						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true); err != nil {
+						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true, true); err != nil {
 							return fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 						}
 						folder, err := i.GetFolder()
@@ -420,7 +420,7 @@ var ipswCmd = &cobra.Command{
 						if err != nil {
 							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
 						}
-						if err := utils.RemoteUnzip(zr.File, dlRE, filepath.Join(destPath, folder), flat); err != nil {
+						if err := utils.RemoteUnzip(zr.File, dlRE, filepath.Join(destPath, folder), flat, true); err != nil {
 							return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
 						}
 					}
