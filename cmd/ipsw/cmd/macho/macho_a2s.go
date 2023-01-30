@@ -148,7 +148,7 @@ var machoA2sCmd = &cobra.Command{
 			}
 			// search for symbols
 			if sym, ok := s2a[addr]; ok {
-				fmt.Println(sym)
+				fmt.Printf("\n%#x: %s\n", addr, sym)
 				return nil
 			}
 
