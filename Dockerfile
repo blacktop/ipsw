@@ -17,7 +17,7 @@ RUN CGO_ENABLED=1 go build \
 ####################################################
 # APFS-FUSE BUILDER
 ####################################################
-FROM ubuntu:22.04
+FROM ubuntu:23.04
 
 LABEL maintainer "https://github.com/blacktop"
 
