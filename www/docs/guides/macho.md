@@ -1070,30 +1070,31 @@ Search for MachOs that have split segments
 
 ```bash
 ❯ ipsw macho search --ipsw iPhone15,2_16.3_20D47_Restore.ipsw --load-command 'LC_SEGMENT_SPLIT_INFO'
-
-/System/Library/PrivateFrameworks/VisualTestKit.framework/VisualTestKit
-/usr/lib/libstdc++.6.0.9.dylib
-/usr/lib/libstdc++.6.dylib
-/usr/lib/libstdc++.dylib
-/System/DriverKit/System/Library/PrivateFrameworks/TimeSensitiveNetworking.framework/TimeSensitiveNetworking
-/System/DriverKit/usr/lib/libSystem_debug.dylib
-/System/DriverKit/usr/lib/system/libdispatch_debug.dylib
-/System/DriverKit/usr/lib/system/libdispatch_profile.dylib
-/System/DriverKit/usr/lib/system/libsystem_blocks_debug.dylib
-/System/DriverKit/usr/lib/system/libsystem_blocks_profile.dylib
-/System/DriverKit/usr/lib/system/libsystem_c_debug.dylib
-/System/DriverKit/usr/lib/system/libsystem_malloc_debug.dylib
-/System/DriverKit/usr/lib/system/libsystem_platform_debug.dylib
-/System/DriverKit/usr/lib/system/libsystem_pthread_debug.dylib
-/System/DriverKit/usr/lib/system/libsystem_trace_debug.dylib
-/System/Library/Extensions/ASIOKit.kext/ASIOKit
-/System/Library/Extensions/AppleGameControllerPersonality.kext/AppleGameControllerPersonality
-/System/Library/Extensions/AppleUserConsent.kext/AppleUserConsent
-/System/Library/Extensions/AppleUserConsent.kext/AppleUserConsent_development
-/System/Library/Extensions/lifs.kext/lifs
-/System/Library/PrivateFrameworks/iWorkImport.framework/iWorkImport
-/usr/lib/dyld
-/usr/lib/system/introspection/libdispatch.dylib
+   • Scanning filesystem
+/System/DriverKit/usr/lib/libSystem_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libdispatch_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libdispatch_profile.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libsystem_blocks_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libsystem_blocks_profile.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libsystem_c_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libsystem_malloc_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libsystem_platform_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libsystem_pthread_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/DriverKit/usr/lib/system/libsystem_trace_debug.dylib	load=LC_SEGMENT_SPLIT_INFO
+/System/Library/Extensions/ASIOKit.kext/ASIOKit	load=LC_SEGMENT_SPLIT_INFO
+/System/Library/Extensions/AppleGameControllerPersonality.kext/AppleGameControllerPersonality	load=LC_SEGMENT_SPLIT_INFO
+/System/Library/Extensions/AppleUserConsent.kext/AppleUserConsent	load=LC_SEGMENT_SPLIT_INFO
+/System/Library/Extensions/AppleUserConsent.kext/AppleUserConsent_development	load=LC_SEGMENT_SPLIT_INFO
+/System/Library/Extensions/lifs.kext/lifs	load=LC_SEGMENT_SPLIT_INFO
+/System/Library/PrivateFrameworks/iWorkImport.framework/iWorkImport	load=LC_SEGMENT_SPLIT_INFO
+/usr/lib/dyld	load=LC_SEGMENT_SPLIT_INFO
+/usr/lib/system/introspection/libdispatch.dylib	load=LC_SEGMENT_SPLIT_INFO
+   • Scanning SystemOS
+/System/Library/PrivateFrameworks/VisualTestKit.framework/VisualTestKit	load=LC_SEGMENT_SPLIT_INFO
+/usr/lib/libstdc++.6.0.9.dylib	load=LC_SEGMENT_SPLIT_INFO
+/usr/lib/libstdc++.6.dylib	load=LC_SEGMENT_SPLIT_INFO
+/usr/lib/libstdc++.dylib	load=LC_SEGMENT_SPLIT_INFO
+   • Scanning AppOS
 ```
 
 Search for MachOs that impliment an ObjC protocol
@@ -1101,17 +1102,26 @@ Search for MachOs that impliment an ObjC protocol
 ```bash 
 ❯ ipsw macho search --ipsw iPhone15,2_16.3_20D47_Restore.ipsw --protocol 'NSObject'
 
-/System/Library/Accounts/DataclassOwners/Bookmarks.bundle/Bookmarks
-/System/Library/Frameworks/SafariServices.framework/XPCServices/com.apple.SafariServices.ContentBlockerLoader.xpc/com.apple.SafariServices.ContentBlockerLoader
-/System/Library/PrivateFrameworks/SafariFoundation.framework/XPCServices/AutoFillHelper.xpc/AutoFillHelper
-/System/Library/PrivateFrameworks/SafariFoundation.framework/XPCServices/CredentialProviderExtensionHelper.xpc/CredentialProviderExtensionHelper
-/System/Library/PrivateFrameworks/VisualTestKit.framework/VisualTestKit
-/Applications/AAUIViewService.app/AAUIViewService
-/Applications/AMSEngagementViewService.app/AMSEngagementViewService
-/Applications/AXRemoteViewService.app/AXRemoteViewService
-/Applications/AXUIViewService.app/AXUIViewService
-/Applications/AccountAuthenticationDialog.app/AccountAuthenticationDialog
-/Applications/ActivityMessagesApp.app/PlugIns/ActivityMessagesExtension.appex/ActivityMessagesExtension
-/Applications/AirDropUI.app/AirDropUI
+   • Scanning filesystem
+/Applications/AAUIViewService.app/AAUIViewService	protocol=NSObject
+/Applications/AMSEngagementViewService.app/AMSEngagementViewService	protocol=NSObject
+/Applications/AXRemoteViewService.app/AXRemoteViewService	protocol=NSObject
+/Applications/AXUIViewService.app/AXUIViewService	protocol=NSObject
+/Applications/AccountAuthenticationDialog.app/AccountAuthenticationDialog	protocol=NSObject
+/Applications/ActivityMessagesApp.app/PlugIns/ActivityMessagesExtension.appex/ActivityMessagesExtension	protocol=NSObject
+/Applications/AirDropUI.app/AirDropUI	protocol=NSObject
+/Applications/AirPlayReceiver.app/AirPlayReceiver	protocol=NSObject
+/Applications/AnimojiStickers.app/AnimojiStickers	protocol=NSObject
+/Applications/AnimojiStickers.app/PlugIns/AnimojiStickersExtension.appex/AnimojiStickersExtension	protocol=NSObject
+/Applications/AppSSOUIService.app/AppSSOUIService	protocol=NSObject
+/Applications/AppStore.app/AppStore	protocol=NSObject
+/Applications/AppStore.app/PlugIns/AppStoreWidgetsExtension.appex/AppStoreWidgetsExtension	protocol=NSObject
+/Applications/AppStore.app/PlugIns/ProductPageExtension.appex/ProductPageExtension	protocol=NSObject
+/Applications/AppStore.app/PlugIns/SubscribePageExtension.appex/SubscribePageExtension	protocol=NSObject
+/Applications/Apple TV Remote.app/Apple TV Remote	protocol=NSObject
+/Applications/Apple TV Remote.app/PlugIns/TVRemoteIntentExtension.appex/TVRemoteIntentExtension	protocol=NSObject
+/Applications/AskPermissionUI.app/AskPermissionUI	protocol=NSObject
+/Applications/AuthKitUIService.app/AuthKitUIService	protocol=NSObject
+/Applications/AuthenticationServicesUI.app/AuthenticationServicesUI	protocol=NSObject
 <SNIP>
 ```
