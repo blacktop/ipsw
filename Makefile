@@ -32,18 +32,18 @@ setup: build-deps dev-deps ## Install all the build and dev dependencies
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_arm64_extras_build --rm-dist --snapshot --single-target --output dist/ipsw
+	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_arm64_extras_build --clean --timeout 60m --snapshot --single-target --output dist/ipsw
 
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --snapshot
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --snapshot
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --skip-validate
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip-validate
 	@echo " > Update Portfile ${NEXT_VERSION}"	
 	@hack/make/portfile ../ports
 
@@ -51,7 +51,7 @@ release: ## Create a new release from the NEXT_VERSION
 release-minor: ## Create a new minor semver release
 	@echo " > Creating Release $(shell svu minor)"
 	@hack/make/release $(shell svu minor)
-	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip-validate
 
 .PHONY: destroy
 destroy: ## Remove release from the CUR_VERSION
