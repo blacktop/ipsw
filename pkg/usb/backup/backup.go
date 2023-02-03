@@ -24,3 +24,11 @@ func NewClient(udid string) (*Client, error) {
 func (c *Client) Close() error {
 	return c.c.Close()
 }
+
+func (c *Client) GetMsg() (any, error) {
+	var resp any
+	if err := c.c.Recv(resp); err != nil {
+		return nil, err
+	}
+	return resp, nil
+}

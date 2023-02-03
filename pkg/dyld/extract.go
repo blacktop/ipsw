@@ -44,16 +44,21 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	config.MountPoint, err = utils.MountFS(dmgPath)
+	var alreadyMounted bool
+	config.MountPoint, alreadyMounted, err = utils.MountFS(dmgPath)
 	if err != nil {
 		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
-	defer func() {
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", dmgPath))
-		if err := utils.Unmount(config.MountPoint, false); err != nil {
-			log.Errorf("failed to unmount File System DMG mount at %s: %v", dmgPath, err)
-		}
-	}()
+	if alreadyMounted {
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+	} else {
+		defer func() {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+			if err := utils.Unmount(config.MountPoint, false); err != nil {
+				log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
+			}
+		}()
+	}
 
 	if runtime.GOOS == "darwin" {
 		if err := os.MkdirAll(destPath, 0750); err != nil {
@@ -145,35 +150,42 @@ func Extract(ipsw, destPath string, arches []string) error {
 		return fmt.Errorf("failed to parse IPSW: %v", err)
 	}
 
-	systemDMG, err := i.GetSystemOsDmg()
+	dmgPath, err := i.GetSystemOsDmg()
 	if err != nil {
-		return fmt.Errorf("failed to get system DMG: %v", err)
+		dmgPath, err = i.GetFileSystemOsDmg()
+		if err != nil {
+			return fmt.Errorf("failed to get File System DMG: %v", err)
+		}
 	}
-	dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), systemDMG)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %v", systemDMG, err)
-	}
-	if len(dmgs) == 0 {
-		return fmt.Errorf("File System %s NOT found in IPSW", systemDMG)
-	}
-	defer os.Remove(dmgs[0])
 
-	return ExtractFromDMG(i, dmgs[0], destPath, arches)
+	// check if filesystem DMG already exists (due to previous mount command)
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		dmgs, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		}
+		if len(dmgs) == 0 {
+			return fmt.Errorf("File System %s NOT found in IPSW", dmgPath)
+		}
+		defer os.Remove(dmgs[0])
+	}
+
+	return ExtractFromDMG(i, dmgPath, destPath, arches)
 }
 
 func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) error {
 	found := false
 
 	for _, zf := range zr.File {
-		if regexp.MustCompile(`cryptex-system-arm64e$`).MatchString(zf.Name) {
+		if regexp.MustCompile(`cryptex-system-arm64?e$`).MatchString(zf.Name) {
 			found = true
 			rc, err := zf.Open()
 			if err != nil {
 				return fmt.Errorf("failed to open cryptex-system-arm64e: %v", err)
 			}
-
+			defer rc.Close()
 			// setup progress bar
 			var total int64 = int64(zf.UncompressedSize64)
 			p := mpb.New(
@@ -205,7 +217,6 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 			io.Copy(in, proxyReader)
 			// wait for our bar to complete and flush and close remote zip and temp file
 			p.Wait()
-			rc.Close()
 			in.Close()
 
 			out, err := os.CreateTemp("", "cryptex-system-arm64e.decrypted.*.dmg")
@@ -216,7 +227,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 			out.Close()
 
 			log.Info("Patching cryptex-system-arm64e")
-			if err := ridiff.RawImagePatch(in.Name(), out.Name()); err != nil {
+			if err := ridiff.RawImagePatch("", in.Name(), out.Name(), 0); err != nil {
 				return fmt.Errorf("failed to patch cryptex-system-arm64e: %v", err)
 
 			}
@@ -236,7 +247,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 				return fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
 			}
 
-			break
+			return nil
 		}
 	}
 

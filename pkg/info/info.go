@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/apex/log"
@@ -169,24 +170,50 @@ func getApFirmwareKey(device, build, filename string) (string, string, error) {
 
 func (i *Info) String() string {
 	var iStr string
+	var verextra string
+	if i.Plists.OTAInfo != nil {
+		verextra = fmt.Sprintf(" %s", i.Plists.OTAInfo.MobileAssetProperties.ProductVersionExtra)
+	}
 	iStr += fmt.Sprintf(
 		"Version        = %s\n"+
 			"BuildVersion   = %s\n"+
 			"OS Type        = %s\n",
-		i.Plists.BuildManifest.ProductVersion,
+		i.Plists.BuildManifest.ProductVersion+verextra,
 		i.Plists.BuildManifest.ProductBuildVersion,
 		i.Plists.GetOSType(),
 	)
 	if i.Plists.Restore != nil {
-		iStr += "FileSystem     = "
-		if len(i.Plists.Restore.SystemRestoreImageFileSystems) > 0 {
-			for file, fsType := range i.Plists.Restore.SystemRestoreImageFileSystems {
-				iStr += fmt.Sprintf("%s (Type: %s)\n", file, fsType)
+		foundFS := false
+		if fsDMG, err := i.GetFileSystemOsDmg(); err == nil {
+			foundFS = true
+			iStr += fmt.Sprintf("FileSystem     = %s\n", fsDMG)
+		}
+		if fsDMG, err := i.GetSystemOsDmg(); err == nil {
+			iStr += fmt.Sprintf("SystemOS       = %s\n", fsDMG)
+		}
+		if fsDMG, err := i.GetAppOsDmg(); err == nil {
+			iStr += fmt.Sprintf("AppOS          = %s\n", fsDMG)
+		}
+		if ramDisk, err := i.GetRestoreRamDiskDmgs(); err == nil {
+			iStr += fmt.Sprintf("RestoreRamDisk = %s\n", ramDisk)
+		}
+		if !foundFS {
+			if len(i.Plists.Restore.SystemRestoreImageFileSystems) > 0 {
+				for file, fsType := range i.Plists.Restore.SystemRestoreImageFileSystems {
+					iStr += fmt.Sprintf("FileSystem     = %s (Type: %s)\n", file, fsType)
+				}
 			}
-		} else {
-			if fsDMG, err := i.GetSystemOsDmg(); err == nil {
-				iStr += fsDMG
-			}
+		}
+	}
+	if i.Plists.OTAInfo != nil {
+		if len(i.Plists.OTAInfo.MobileAssetProperties.RestoreVersion) > 0 {
+			iStr += fmt.Sprintf("RestoreVersion = %s\n", i.Plists.OTAInfo.MobileAssetProperties.RestoreVersion)
+		}
+		if len(i.Plists.OTAInfo.MobileAssetProperties.PrerequisiteBuild) > 0 {
+			iStr += fmt.Sprintf("PrereqBuild    = %s\n", i.Plists.OTAInfo.MobileAssetProperties.PrerequisiteBuild)
+		}
+		if i.Plists.OTAInfo.MobileAssetProperties.SplatOnly {
+			iStr += "IsRSR          = ✅\n"
 		}
 	}
 	kcs := i.Plists.BuildManifest.GetKernelCaches()
@@ -295,7 +322,7 @@ func (i *Info) GetAppOsDmg() (string, error) {
 		if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
-			return "", fmt.Errorf("multiple AppOS dmgs found")
+			return "", fmt.Errorf("multiple AppOS DMGs found")
 		}
 	}
 	return "", fmt.Errorf("no AppOS DMG found")
@@ -308,18 +335,16 @@ func (i *Info) GetSystemOsDmg() (string, error) {
 		for _, bi := range i.Plists.BuildIdentities {
 			if sysOS, ok := bi.Manifest["Cryptex1,SystemOS"]; ok {
 				return sysOS.Info.Path, nil
-			} else if _, ok := bi.Manifest["OS"]; ok {
-				return i.GetFileSystemOsDmg()
 			}
 		}
 		dmgs = utils.Unique(dmgs)
 		if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
-			return "", fmt.Errorf("multiple SystemOS dmgs found")
+			return "", fmt.Errorf("multiple SystemOS DMGs found")
 		}
 	}
-	return "", fmt.Errorf("no SystemOS or pre-cryptex FS DMG found")
+	return "", fmt.Errorf("no SystemOS DMG found")
 }
 
 // GetFileSystemOsDmg returns the name of the file system dmg
@@ -335,7 +360,7 @@ func (i *Info) GetFileSystemOsDmg() (string, error) {
 		if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
-			return "", fmt.Errorf("multiple filesystem dmgs found")
+			return "", fmt.Errorf("multiple filesystem DMGs found")
 		}
 	}
 	return "", fmt.Errorf("filesystem DMG not found")
@@ -398,8 +423,11 @@ func (i *Info) GetFolder() (string, error) {
 		}
 		devs = utils.SortDevices(utils.Unique(devs))
 		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(devs)), nil
+	} else {
+		sort.Strings(i.Plists.BuildManifest.SupportedProductTypes)
+		return fmt.Sprintf("%s__%s", i.Plists.BuildManifest.ProductBuildVersion, getAbbreviatedDevList(i.Plists.BuildManifest.SupportedProductTypes)), nil
 	}
-	return "", fmt.Errorf("no devices found")
+	// return "", fmt.Errorf("no devices found")
 }
 
 // GetFolders returns a list of the IPSW name folders

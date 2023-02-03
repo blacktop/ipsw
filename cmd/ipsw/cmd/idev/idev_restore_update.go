@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,23 +28,24 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(updateCmd)
+	RestoreCmd.AddCommand(restoreUpdateCmd)
 }
 
-// updateCmd represents the update command
-var updateCmd = &cobra.Command{
+// restoreUpdateCmd represents the update command
+var restoreUpdateCmd = &cobra.Command{
 	Use:           "update",
 	Short:         "Update device",
 	Args:          cobra.MaximumNArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		panic("not implemented")
+		panic("not implemented") // TODO: implement
 
 		return nil
 	},

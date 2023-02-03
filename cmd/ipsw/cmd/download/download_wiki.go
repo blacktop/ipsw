@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -50,6 +50,12 @@ func init() {
 	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	wikiCmd.Flags().String("db", "wiki_db.json", "Path to local JSON database (will use CWD by default)")
 	wikiCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	wikiCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("model") // TODO: remove this?
+		c.Parent().HelpFunc()(c, s)
+	})
 	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.wiki.pattern", wikiCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.wiki.beta", wikiCmd.Flags().Lookup("beta"))
@@ -63,6 +69,7 @@ func init() {
 // wikiCmd represents the wiki command
 var wikiCmd = &cobra.Command{
 	Use:           "wiki",
+	Aliases:       []string{"w"},
 	Short:         "Download old(er) IPSWs from theiphonewiki.com",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
@@ -341,7 +348,7 @@ var wikiCmd = &cobra.Command{
 								log.Errorf("failed to get folder from remote ipsw: %v", err)
 							}
 							destPath = filepath.Join(destPath, folder)
-							if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat); err != nil {
+							if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat, true); err != nil {
 								return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
 							}
 						}

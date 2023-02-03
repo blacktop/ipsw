@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,6 +22,7 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -51,6 +52,7 @@ func init() {
 // SymAddrCmd represents the symaddr command
 var SymAddrCmd = &cobra.Command{
 	Use:           "symaddr <dyld_shared_cache>",
+	Aliases:       []string{"sym"},
 	Short:         "Lookup or dump symbol(s)",
 	SilenceUsage:  false,
 	SilenceErrors: true,
@@ -272,6 +274,18 @@ var SymAddrCmd = &cobra.Command{
 			/**********************************
 			 * Search ALL dylibs for a symbol *
 			 **********************************/
+			symChan, err := f.GetExportedSymbols(context.Background(), args[1])
+			if err != nil {
+				return err
+			}
+			for {
+				sym, ok := <-symChan
+				if !ok {
+					break
+				}
+				fmt.Println(sym.String(viper.GetBool("color")))
+			}
+
 			for _, image := range f.Images {
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				if sym, err := image.GetSymbol(args[1]); err == nil {

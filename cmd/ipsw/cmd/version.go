@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -33,9 +34,10 @@ func init() {
 
 // versionCmd represents the version command
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the version number of ipsw",
+	Use:     "version",
+	Aliases: []string{"v"},
+	Short:   "Print the version number of ipsw",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Version: ", AppVersion, ", BuildTime: ", AppBuildTime)
+		fmt.Printf("Version: %s, BuildTime: %s\n", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime))
 	},
 }

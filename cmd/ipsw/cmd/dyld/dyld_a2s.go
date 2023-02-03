@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,12 +38,12 @@ func init() {
 	AddrToSymCmd.Flags().Uint64P("slide", "s", 0, "dyld_shared_cache slide to apply")
 	AddrToSymCmd.Flags().BoolP("image", "i", false, "Only lookup address's dyld_shared_cache mapping")
 	AddrToSymCmd.Flags().BoolP("mapping", "m", false, "Only lookup address's image segment/section")
-	// AddrToSymCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	AddrToSymCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
 	viper.BindPFlag("dyld.a2s.slide", AddrToSymCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.a2s.image", AddrToSymCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.a2s.mapping", AddrToSymCmd.Flags().Lookup("mapping"))
-	// viper.BindPFlag("dyld.a2s.cache", AddrToSymCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("dyld.a2s.cache", AddrToSymCmd.Flags().Lookup("cache"))
 
 	AddrToSymCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -65,7 +65,7 @@ var AddrToSymCmd = &cobra.Command{
 		slide := viper.GetUint64("dyld.a2s.slide")
 		showImage := viper.GetBool("dyld.a2s.image")
 		showMapping := viper.GetBool("dyld.a2s.mapping")
-		// cacheFile := viper.GetString("dyld.a2s.cache")
+		cacheFile := viper.GetString("dyld.a2s.cache")
 
 		secondAttempt := false
 
@@ -105,15 +105,12 @@ var AddrToSymCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		if err := f.ParseStubIslands(); err != nil {
-			return fmt.Errorf("failed to parse stub islands: %v", err)
+		if len(cacheFile) == 0 {
+			cacheFile = dscPath + ".a2s"
 		}
-		// if len(cacheFile) == 0 {
-		// 	cacheFile = dscPath + ".a2s"
-		// }
-		// if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
-		// 	return err
-		// }
+		if err := f.OpenOrCreateA2SCache(cacheFile); err != nil {
+			return err
+		}
 
 	retry:
 		if showMapping {
@@ -152,11 +149,7 @@ var AddrToSymCmd = &cobra.Command{
 					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
 						if showImage {
 							fmt.Println(s)
-							secFlags := ""
-							if !c.Flags.IsRegular() {
-								secFlags = fmt.Sprintf("(%s)", c.Flags)
-							}
-							fmt.Printf("\tsz=0x%08x off=0x%08x-0x%08x addr=0x%09x-0x%09x\t\t%s.%-20v%s %s\n", c.Size, c.Offset, uint64(c.Offset)+c.Size, c.Addr, c.Addr+c.Size, s.Name, c.Name, c.Flags.AttributesString(), secFlags)
+							fmt.Println(c)
 						} else {
 							log.WithFields(log.Fields{
 								"dylib":   image.Name,

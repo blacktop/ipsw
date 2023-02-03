@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,7 +29,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -45,10 +44,14 @@ func init() {
 
 // PatchesCmd represents the patches command
 var PatchesCmd = &cobra.Command{
-	Use:   "patches <dyld_shared_cache>",
-	Short: "Dump dyld patch info",
-	Args:  cobra.MinimumNArgs(1),
+	Use:           "patches <dyld_shared_cache>",
+	Aliases:       []string{"p"},
+	Short:         "Dump dyld patch info",
+	Args:          cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -83,98 +86,131 @@ var PatchesCmd = &cobra.Command{
 		defer f.Close()
 
 		if err := f.ParsePatchInfo(); err != nil {
-			return err
+			return fmt.Errorf("failed to parse patch info: %s", err)
 		}
+
+		var images []*dyld.CacheImage
 
 		if len(imageName) > 0 {
 			image, err := f.Image(imageName)
 			if err != nil {
 				return fmt.Errorf("image not in %s: %v", dscPath, err)
 			}
-			if image.PatchableExports != nil {
-				if len(symbolName) > 0 {
-					if f.PatchInfoVersion == 1 {
-						for _, patch := range image.PatchableExports {
-							if strings.EqualFold(strings.ToLower(patch.Name), strings.ToLower(symbolName)) {
-								log.Infof("%s patch locations", patch.Name)
-								for _, loc := range patch.PatchLocations {
-									fmt.Println(loc.String(f.Headers[f.UUID].SharedRegionStart))
-								}
+			images = append(images, image)
+		} else {
+			images = f.Images
+		}
+
+		for idx, image := range images {
+			if image.PatchableExports == nil && image.PatchableGOTs == nil {
+				continue
+			}
+
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
+
+			if len(symbolName) > 0 {
+				switch f.PatchInfoVersion {
+				case 1:
+					for _, patch := range image.PatchableExports {
+						if strings.EqualFold(strings.ToLower(patch.GetName()), strings.ToLower(symbolName)) {
+							log.Infof("%s patch locations", patch.GetName())
+							for _, loc := range patch.GetPatchLocations().([]dyld.CachePatchableLocationV1) {
+								fmt.Println(loc.String(f.Headers[f.UUID].SharedRegionStart))
 							}
-						}
-					} else {
-						exp2uses := make(map[string][]dyld.PatchableExport)
-						for _, patch := range image.PatchableExports {
-							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
-						}
-						if patches, ok := exp2uses[symbolName]; ok {
-							fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].OffsetOfImpl), symbolName)
-							for _, patch := range patches {
-								for _, loc := range patch.PatchLocationsV2 {
-									fmt.Printf("    %s\t%s\n",
-										loc.String(f.Images[patch.ClientIndex].LoadAddress),
-										f.Images[patch.ClientIndex].Name)
-								}
-							}
-						} else {
-							log.Infof("%s patch locations", symbolName)
-							utils.Indent(log.Error, 2)("no patches found")
 						}
 					}
-				} else {
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-					if f.PatchInfoVersion == 1 {
-						for _, patch := range image.PatchableExports {
-							fmt.Fprintf(w, "%#x\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
+				case 2, 3:
+					exp2uses := make(map[string][]dyld.Patch)
+					for _, patch := range image.PatchableExports {
+						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
+					}
+					if patches, ok := exp2uses[symbolName]; ok {
+						fmt.Printf("%#x: %s%s\n", image.LoadAddress+uint64(patches[0].GetImplOffset()), patches[0].GetKind(), symbolName)
+						for _, patch := range patches {
+							for _, loc := range patch.GetPatchLocations().([]dyld.CachePatchableLocationV2) {
+								fmt.Fprintf(w, "    %s\t%s\n",
+									loc.String(f.Images[patch.GetClientIndex()].LoadAddress),
+									f.Images[patch.GetClientIndex()].Name)
+							}
 						}
-						w.Flush()
-					} else {
-						exp2uses := make(map[string][]dyld.PatchableExport)
-						for _, patch := range image.PatchableExports {
-							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
+					}
+					if f.PatchInfoVersion == 3 {
+						// GOT patch locations
+						got2uses := make(map[string][]dyld.Patch)
+						for _, got := range image.PatchableGOTs {
+							got2uses[got.GetName()] = append(got2uses[got.GetName()], got)
 						}
-						for name, patches := range exp2uses {
-							fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].OffsetOfImpl), name)
+						if patches, ok := got2uses[symbolName]; ok {
 							for _, patch := range patches {
+								for _, got := range patch.GetGotLocations() {
+									fmt.Fprintf(w, "    %s\tGOT\n",
+										got.String(func(u uint64) uint64 {
+											if _, addr, err := f.GetCacheVMAddress(u); err == nil {
+												return addr
+											}
+											return 0
+										}))
+								}
+							}
+						}
+					}
+					w.Flush()
+					// } else {
+					// 	return fmt.Errorf("symbol not found: %s", symbolName)
+					// }
+				default:
+					return fmt.Errorf("unsupported patch info version %d", f.PatchInfoVersion)
+				}
+			} else {
+				if idx == 0 {
+					fmt.Printf("[PATCHES] %s", image.Name)
+				} else {
+					fmt.Printf("\n[PATCHES] %s", image.Name)
+				}
+				switch f.PatchInfoVersion {
+				case 1:
+					fmt.Println()
+					for _, patch := range image.PatchableExports {
+						fmt.Fprintf(w, "%#x\t(%d patches)\t%s\n", patch.GetImplOffset(), len(patch.GetPatchLocations().([]dyld.CachePatchableLocationV1)), patch.GetName())
+					}
+					w.Flush()
+				case 2, 3:
+					exp2uses := make(map[string][]dyld.Patch)
+					for _, patch := range image.PatchableExports {
+						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
+					}
+					if f.PatchInfoVersion == 3 {
+						for _, got := range image.PatchableGOTs {
+							exp2uses[got.GetName()] = append(exp2uses[got.GetName()], got)
+						}
+					}
+					fmt.Printf("\t(%d symbols)\n", len(exp2uses))
+					for name, patches := range exp2uses {
+						fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].GetImplOffset()), name)
+						for _, patch := range patches {
+							switch patch := patch.(type) {
+							case dyld.PatchableExport:
 								for _, loc := range patch.PatchLocationsV2 {
 									fmt.Fprintf(w, "    %s\t%s\n",
 										loc.String(f.Images[patch.ClientIndex].LoadAddress),
 										f.Images[patch.ClientIndex].Name)
 								}
+							case dyld.PatchableGotExport:
+								for _, got := range patch.GotLocationsV3 {
+									fmt.Fprintf(w, "    %s\tGOT\n",
+										got.String(func(u uint64) uint64 {
+											if _, addr, err := f.GetCacheVMAddress(u); err == nil {
+												return addr
+											}
+											return 0
+										}))
+								}
 							}
-							w.Flush()
-						}
-					}
-				}
-			} else {
-				log.Warnf("image %s had no patch entries", filepath.Base(image.Name))
-			}
-		} else {
-			for _, image := range f.Images {
-				if image.PatchableExports != nil {
-					fmt.Printf("[%d entries] %s\n", len(image.PatchableExports), image.Name)
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', tabwriter.DiscardEmptyColumns)
-					if f.PatchInfoVersion == 1 {
-						for _, patch := range image.PatchableExports {
-							fmt.Fprintf(w, "%#x\t(%d patches)\t%s\n", patch.OffsetOfImpl, len(patch.PatchLocations), patch.Name)
 						}
 						w.Flush()
-					} else {
-						exp2uses := make(map[string][]dyld.PatchableExport)
-						for _, patch := range image.PatchableExports {
-							exp2uses[patch.Name] = append(exp2uses[patch.Name], patch)
-						}
-						for name, patches := range exp2uses {
-							fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].OffsetOfImpl), name)
-							for _, patch := range patches {
-								for _, loc := range patch.PatchLocationsV2 {
-									fmt.Fprintf(w, "    %s\t%s\n", loc.String(f.Images[patch.ClientIndex].LoadAddress), f.Images[patch.ClientIndex].Name)
-								}
-								w.Flush()
-							}
-						}
 					}
-
+				default:
+					return fmt.Errorf("unsupported patch info version %d", f.PatchInfoVersion)
 				}
 			}
 		}

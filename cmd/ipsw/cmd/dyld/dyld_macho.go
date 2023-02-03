@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,6 @@ package dyld
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -46,6 +45,7 @@ func init() {
 	DyldCmd.AddCommand(MachoCmd)
 	MachoCmd.Flags().BoolP("all", "a", false, "Parse ALL dylibs")
 	MachoCmd.Flags().BoolP("loads", "l", false, "Print the load commands")
+	MachoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	MachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	MachoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
 	MachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
@@ -61,59 +61,10 @@ func init() {
 	MachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
-func rebaseMachO(dsc *dyld.File, machoPath string) error {
-	f, err := os.OpenFile(machoPath, os.O_RDWR, 0755)
-	if err != nil {
-		return fmt.Errorf("failed to open exported MachO %s: %v", machoPath, err)
-	}
-	defer f.Close()
-
-	mm, err := macho.NewFile(f)
-	if err != nil {
-		return err
-	}
-
-	for _, seg := range mm.Segments() {
-		uuid, mapping, err := dsc.GetMappingForVMAddress(seg.Addr)
-		if err != nil {
-			return err
-		}
-
-		if mapping.SlideInfoOffset == 0 {
-			continue
-		}
-
-		startAddr := seg.Addr - mapping.Address
-		endAddr := ((seg.Addr + seg.Memsz) - mapping.Address) + uint64(dsc.SlideInfo.GetPageSize())
-
-		start := startAddr / uint64(dsc.SlideInfo.GetPageSize())
-		end := endAddr / uint64(dsc.SlideInfo.GetPageSize())
-
-		rebases, err := dsc.GetRebaseInfoForPages(uuid, mapping, start, end)
-		if err != nil {
-			return err
-		}
-
-		for _, rebase := range rebases {
-			off, err := mm.GetOffset(rebase.CacheVMAddress)
-			if err != nil {
-				continue
-			}
-			if _, err := f.Seek(int64(off), io.SeekStart); err != nil {
-				return fmt.Errorf("failed to seek in exported file to offset %#x from the start: %v", off, err)
-			}
-			if err := binary.Write(f, dsc.ByteOrder, rebase.Target); err != nil {
-				return fmt.Errorf("failed to write rebase address %#x: %v", rebase.Target, err)
-			}
-		}
-	}
-
-	return nil
-}
-
 // MachoCmd represents the macho command
 var MachoCmd = &cobra.Command{
 	Use:           "macho <dyld_shared_cache> <dylib>",
+	Aliases:       []string{"m"},
 	Short:         "Parse a dylib file",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
@@ -125,6 +76,7 @@ var MachoCmd = &cobra.Command{
 		}
 
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
+		showLoadCommandsAsJSON, _ := cmd.Flags().GetBool("json")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
@@ -252,7 +204,15 @@ var MachoCmd = &cobra.Command{
 				}
 
 				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs && searchPattern == "" {
-					fmt.Println(m.FileTOC.String())
+					if showLoadCommandsAsJSON {
+						dat, err := m.FileTOC.MarshalJSON()
+						if err != nil {
+							return fmt.Errorf("failed to marshal MachO table of contents as JSON: %v", err)
+						}
+						fmt.Println(string(dat))
+					} else {
+						fmt.Println(m.FileTOC.String())
+					}
 				}
 
 				if showObjC {
@@ -338,13 +298,23 @@ var MachoCmd = &cobra.Command{
 							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 								log.Error(err.Error())
 							}
-							if methods, err := m.GetObjCMethodNames(); err == nil {
-								fmt.Printf("\n@methods\n")
-								for method, vmaddr := range methods {
-									fmt.Printf("0x%011x: %s\n", vmaddr, method)
+							if viper.GetBool("verbose") {
+								if classes, err := m.GetObjCClassNames(); err == nil {
+									fmt.Printf("\n@objc_classname\n")
+									for vmaddr, className := range classes {
+										fmt.Printf("0x%011x: %s\n", vmaddr, className)
+									}
+								} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+									log.Error(err.Error())
 								}
-							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-								log.Error(err.Error())
+								if methods, err := m.GetObjCMethodNames(); err == nil {
+									fmt.Printf("\n@objc_methname\n")
+									for vmaddr, method := range methods {
+										fmt.Printf("0x%011x: %s\n", vmaddr, method)
+									}
+								} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+									log.Error(err.Error())
+								}
 							}
 						}
 
@@ -422,7 +392,11 @@ var MachoCmd = &cobra.Command{
 					fmt.Println("--------")
 					for _, sec := range m.Sections {
 						if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
-							dat, err := sec.Data()
+							uuid, off, err := f.GetOffset(sec.Addr)
+							if err != nil {
+								return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
+							}
+							dat, err := f.ReadBytesForUUID(uuid, int64(off), sec.Size)
 							if err != nil {
 								return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 							}
@@ -518,9 +492,13 @@ var MachoCmd = &cobra.Command{
 					}
 
 					if textSeg := m.Segment("__TEXT"); textSeg != nil {
-						data, err := textSeg.Data()
+						uuid, off, err := f.GetOffset(textSeg.Addr)
 						if err != nil {
-							return err
+							return fmt.Errorf("failed to get offset for %s: %v", textSeg.Name, err)
+						}
+						data, err := f.ReadBytesForUUID(uuid, int64(off), textSeg.Filesz)
+						if err != nil {
+							return fmt.Errorf("failed to read cstrings in %s: %v", textSeg.Name, err)
 						}
 
 						i := 0

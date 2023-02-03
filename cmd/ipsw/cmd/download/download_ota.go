@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,6 +28,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -35,6 +36,7 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
@@ -49,6 +51,7 @@ func init() {
 
 	otaDLCmd.Flags().StringP("platform", "p", "", "Platform to download (ios, watchos, tvos, audioos || accessory, macos, recovery)")
 	otaDLCmd.Flags().Bool("beta", false, "Download Beta OTAs")
+	otaDLCmd.Flags().Bool("rsr", false, "Download Rapid Security Response OTAs")
 	otaDLCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote OTA zip")
 	otaDLCmd.Flags().Bool("dyld", false, "Extract dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
@@ -56,11 +59,14 @@ func init() {
 	otaDLCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture(s) to remote extract")
 	otaDLCmd.Flags().Bool("driver-kit", false, "Extract DriverKit dyld_shared_cache(s) from remote OTA zip")
 	otaDLCmd.Flags().String("pattern", "", "Download remote files that match regex")
+	otaDLCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	otaDLCmd.Flags().Bool("info", false, "Show all the latest OTAs available")
-	otaDLCmd.Flags().String("info-type", "", "OS type to show OTAs for")
 	otaDLCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	otaDLCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
+	otaDLCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	viper.BindPFlag("download.ota.platform", otaDLCmd.Flags().Lookup("platform"))
 	viper.BindPFlag("download.ota.beta", otaDLCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.ota.rsr", otaDLCmd.Flags().Lookup("rsr"))
 	viper.BindPFlag("download.ota.dyld", otaDLCmd.Flags().Lookup("dyld"))
 	viper.BindPFlag("download.ota.urls", otaDLCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.ota.json", otaDLCmd.Flags().Lookup("json"))
@@ -68,16 +74,28 @@ func init() {
 	viper.BindPFlag("download.ota.driver-kit", otaDLCmd.Flags().Lookup("driver-kit"))
 	viper.BindPFlag("download.ota.kernel", otaDLCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.ota.pattern", otaDLCmd.Flags().Lookup("pattern"))
+	viper.BindPFlag("download.ota.flat", otaDLCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.ota.info", otaDLCmd.Flags().Lookup("info"))
-	viper.BindPFlag("download.ota.info-type", otaDLCmd.Flags().Lookup("info-type"))
 	viper.BindPFlag("download.ota.output", otaDLCmd.Flags().Lookup("output"))
+	viper.BindPFlag("download.ota.show-latest-version", otaDLCmd.Flags().Lookup("show-latest-version"))
+	viper.BindPFlag("download.ota.show-latest-build", otaDLCmd.Flags().Lookup("show-latest-build"))
+
+	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta")
 }
 
 // otaDLCmd represents the ota download command
 var otaDLCmd = &cobra.Command{
-	Use:           "ota [options]",
-	Short:         "Download OTAs",
-	SilenceUsage:  false,
+	Use:     "ota [options]",
+	Aliases: []string{"o"},
+	Short:   "Download OTAs",
+	Example: `  # Download the iOS 14.8.1 OTA for the iPhone10,1
+  ❯ ipsw download ota --platform ios --version 14.8.1 --device iPhone10,1
+    ? You are about to download 1 OTA files. Continue? Yes
+	  • Getting OTA               build=18H107 device=iPhone10,1 version=iOS1481Short
+	  280.0 MiB / 3.7 GiB [===>------------------------------------------------------| 51m18s
+  # Get all the latest BETA iOS OTAs URLs as JSON
+  ❯ ipsw download ota --platform ios --beta --urls --json`,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -120,14 +138,17 @@ var otaDLCmd = &cobra.Command{
 		// flags
 		platform := viper.GetString("download.ota.platform")
 		getBeta := viper.GetBool("download.ota.beta")
+		getRSR := viper.GetBool("download.ota.rsr")
 		remoteDyld := viper.GetBool("download.ota.dyld")
 		dyldArches := viper.GetStringSlice("download.ota.dyld-arch")
 		dyldDriverKit := viper.GetBool("download.ota.driver-kit")
 		remoteKernel := viper.GetBool("download.ota.kernel")
 		remotePattern := viper.GetString("download.ota.pattern")
+		flat := viper.GetBool("download.ota.flat")
 		otaInfo := viper.GetBool("download.ota.info")
-		otaInfoType := viper.GetString("download.ota.info-type")
 		output := viper.GetString("download.ota.output")
+		showLatestVersion := viper.GetBool("download.ota.show-latest-version")
+		showLatestBuild := viper.GetBool("download.ota.show-latest-build")
 		// verify args
 		if len(dyldArches) > 0 && !remoteDyld {
 			return errors.New("--dyld-arch || -a can only be used with --dyld || -d")
@@ -139,11 +160,21 @@ var otaDLCmd = &cobra.Command{
 				}
 			}
 		}
-		if len(platform) == 0 || !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory"}, platform) {
+		if len(platform) == 0 {
 			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos || accessory, macos, recovery")
+		} else {
+			if !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory"}, platform) {
+				return fmt.Errorf("valid --platform flag choices are: ios, watchos, tvos, audioos || accessory, macos, recovery")
+			}
+		}
+		if (showLatestVersion || showLatestBuild) && len(device) == 0 {
+			return fmt.Errorf("you must supply a --device when using --show-latest-version or --show-latest-build")
 		}
 		if len(version) == 0 {
 			version = "0"
+		}
+		if getRSR && len(build) == 0 {
+			return fmt.Errorf("for now you will need to supply a --build number when using --rsr")
 		}
 		if len(build) == 0 {
 			build = "0"
@@ -168,16 +199,13 @@ var otaDLCmd = &cobra.Command{
 					}).Info, 2)(asset.ProductVersion)
 				}
 			} else {
-				if len(otaInfoType) == 0 {
-					prompt := &survey.Select{
-						Message: "Choose an OS type:",
-						Options: []string{"iOS", "macOS"},
-					}
-					survey.AskOne(prompt, &otaInfoType)
+				var otaInfoType string
+				if utils.StrSliceHas([]string{"ios", "watchos", "tvos", "audioos"}, platform) {
+					otaInfoType = "iOS"
+				} else if utils.StrSliceHas([]string{"macos", "recovery"}, platform) {
+					otaInfoType = "macOS"
 				} else {
-					if !utils.StrSliceHas([]string{"iOS", "macOS"}, otaInfoType) {
-						log.Fatal("you must supply a valid --info-type flag: (iOS, macOS)")
-					}
+					log.Errorf("--info flag does not support platform '%s'", platform)
 				}
 				log.WithField("type", otaInfoType).Info("OTAs")
 				if otaInfoType == "iOS" {
@@ -208,6 +236,7 @@ var otaDLCmd = &cobra.Command{
 		otaXML, err := download.NewOTA(as, download.OtaConf{
 			Platform:        strings.ToLower(platform),
 			Beta:            getBeta,
+			RSR:             getRSR,
 			Device:          device,
 			Model:           model,
 			Version:         ver,
@@ -225,6 +254,20 @@ var otaDLCmd = &cobra.Command{
 		otas, err := otaXML.GetPallasOTAs()
 		if err != nil {
 			return err
+		}
+
+		if showLatestVersion {
+			if len(otas) > 0 {
+				fmt.Println(strings.TrimPrefix(otas[0].OSVersion, "9.9."))
+				return nil
+			}
+			return fmt.Errorf("no OTA found")
+		} else if showLatestBuild {
+			if len(otas) > 0 {
+				fmt.Println(otas[0].Build)
+				return nil
+			}
+			return fmt.Errorf("no OTA found")
 		}
 
 		if viper.GetBool("download.ota.urls") || viper.GetBool("download.ota.json") {
@@ -301,7 +344,7 @@ var otaDLCmd = &cobra.Command{
 						if runtime.GOOS == "darwin" { // FIXME: figure out how to do this on all platforms
 							log.Info("Extracting remote dyld_shared_cache")
 							if err := dyld.ExtractFromRemoteCryptex(zr, destPath, dyldArches); err != nil {
-								return fmt.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
+								log.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
 							}
 							found = true
 						}
@@ -342,26 +385,41 @@ var otaDLCmd = &cobra.Command{
 						}
 					}
 					if len(remotePattern) > 0 { // REMOTE PATTERN MATCHING MODE
-						rfiles, err := ota.RemoteList(zr)
+						log.Infof("Downloading files matching pattern %#v", remotePattern)
+						iinfo, err := info.ParseZipFiles(zr.File)
 						if err != nil {
-							return fmt.Errorf("failed to list remote OTA files: %v", err)
+							return errors.Wrap(err, "failed to parse remote ipsw")
 						}
-						var matches []string
-						for _, rf := range rfiles {
-							if regexp.MustCompile(remotePattern).MatchString(rf.Name()) {
-								matches = append(matches, rf.Name())
+						folder, err := iinfo.GetFolder()
+						if err != nil {
+							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
+						}
+						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(remotePattern), filepath.Join(destPath, folder), flat, true); err != nil {
+							utils.Indent(log.Warn, 2)("0 files matched pattern in remote OTA zip. Now checking payloadv2 payloads...")
+							rfiles, err := ota.RemoteList(zr)
+							if err != nil {
+								return fmt.Errorf("failed to list remote OTA files: %v", err)
 							}
-						}
-						err = ota.RemoteExtract(zr, remotePattern, destPath, func(path string) bool {
-							for i, v := range matches {
-								if strings.HasSuffix(v, filepath.Base(path)) {
-									matches = append(matches[:i], matches[i+1:]...)
+							var matches []string
+							for _, rf := range rfiles {
+								if regexp.MustCompile(remotePattern).MatchString(rf.Name()) {
+									matches = append(matches, rf.Name())
 								}
 							}
-							return len(matches) == 0 // stop if we've extracted all matches
-						})
-						if err != nil {
-							return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
+							if len(matches) == 0 {
+								return fmt.Errorf("no files matched pattern %#v in remote OTA zip", remotePattern)
+							}
+							err = ota.RemoteExtract(zr, remotePattern, destPath, func(path string) bool {
+								for i, v := range matches {
+									if strings.HasSuffix(v, filepath.Base(path)) {
+										matches = append(matches[:i], matches[i+1:]...)
+									}
+								}
+								return len(matches) == 0 // stop if we've extracted all matches
+							})
+							if err != nil {
+								return fmt.Errorf("failed to download dyld_shared_cache from remote ota: %v", err)
+							}
 						}
 					}
 				}
@@ -372,8 +430,10 @@ var otaDLCmd = &cobra.Command{
 					os.MkdirAll(folder, 0750)
 					var devices string
 					if len(o.SupportedDevices) > 0 {
+						sort.Strings(o.SupportedDevices)
 						devices = strings.Join(o.SupportedDevices, "_")
 					} else {
+						sort.Strings(o.SupportedDeviceModels)
 						devices = strings.Join(o.SupportedDeviceModels, "_")
 					}
 					url := o.BaseURL + o.RelativePath

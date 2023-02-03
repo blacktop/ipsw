@@ -401,12 +401,15 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 		return fmt.Errorf("failed to create output directory %s: %v", folder, err)
 	}
 
+	re, err := regexp.Compile(extractPattern)
+	if err != nil {
+		return fmt.Errorf("failed to compile extract regex pattern: %v", err)
+	}
+
 	// check for matches in the OTA zip
-	if err := utils.RemoteUnzip(zr.File,
-		regexp.MustCompile(extractPattern),
-		filepath.Join(folder, "_OTAZIP"),
-		false); err != nil {
-		return fmt.Errorf("failed to extract OTA zip files: %v", err)
+	if err := utils.RemoteUnzip(zr.File, re, folder, false, false); err != nil {
+		log.Errorf("failed to find in OTA zip: %v", err)
+		log.Info("Checking for payload files...")
 	}
 
 	// hack: to get a priori list of files to extract (so we know when to stop)
@@ -418,7 +421,7 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 	var matches []string
 	for _, rf := range rfiles {
 		if !rf.IsDir() {
-			if regexp.MustCompile(extractPattern).MatchString(rf.Name()) {
+			if re.MatchString(rf.Name()) {
 				matches = append(matches, rf.Name())
 			}
 		}

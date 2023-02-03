@@ -186,20 +186,54 @@ func Uint64SliceContains(slice []uint64, item uint64) bool {
 	return false
 }
 
-// Unique returns a slice with only unique strings
-func Unique(s []string) []string {
-	unique := make(map[string]bool, len(s))
-	us := make([]string, len(unique))
-	for _, elem := range s {
-		if len(elem) != 0 {
-			if !unique[elem] {
-				us = append(us, elem)
-				unique[elem] = true
-			}
+// Unique returns a slice with only unique elements
+func Unique[T comparable](s []T) []T {
+	inResult := make(map[T]bool)
+	var result []T
+	for _, str := range s {
+		if _, ok := inResult[str]; !ok {
+			inResult[str] = true
+			result = append(result, str)
 		}
 	}
+	return result
+}
 
-	return us
+func UniqueAppend[T comparable](slice []T, i T) []T {
+	for _, ele := range slice {
+		if ele == i {
+			return slice
+		}
+	}
+	return append(slice, i)
+}
+
+func UniqueConcat[T comparable](slice []T, in []T) []T {
+	for _, i := range in {
+		for _, ele := range slice {
+			if ele == i {
+				return slice
+			}
+		}
+		slice = append(slice, i)
+	}
+	return slice
+}
+
+type Pair[T, U any] struct {
+	First  T
+	Second U
+}
+
+func Zip[T, U any](ts []T, us []U) ([]Pair[T, U], error) {
+	if len(ts) != len(us) {
+		return nil, fmt.Errorf("slices have different lengths")
+	}
+	pairs := make([]Pair[T, U], len(ts))
+	for i := 0; i < len(ts); i++ {
+		pairs[i] = Pair[T, U]{ts[i], us[i]}
+	}
+	return pairs, nil
 }
 
 // ReverseBytes reverse byte array order
@@ -237,7 +271,7 @@ func Verify(sha1sum, name string) (bool, error) {
 }
 
 // RemoteUnzip unzips a remote file from zip (like partialzip)
-func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat bool) error {
+func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, progress bool) error {
 	var fname string
 
 	cwd, err := os.Getwd()
@@ -245,19 +279,24 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 		return fmt.Errorf("failed to get current working directory: %v", err)
 	}
 
+	found := false
 	for _, f := range files {
 		if pattern.MatchString(f.Name) {
+			if f.FileInfo().IsDir() {
+				continue
+			}
+			found = true
 			if flat {
 				fname = filepath.Join(folder, filepath.Base(f.Name))
 			} else {
 				fname = filepath.Join(folder, filepath.Clean(f.Name))
-				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
-					return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
-				}
-				if f.FileInfo().IsDir() {
-					continue
-				}
 			}
+
+			if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+			}
+
+			var r io.ReadCloser
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				rc, err := f.Open()
 				if err != nil {
@@ -265,42 +304,54 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat 
 				}
 				defer rc.Close()
 
-				// setup progress bar
-				var total int64 = int64(f.UncompressedSize64)
-				p := mpb.New(
-					mpb.WithWidth(60),
-					mpb.WithRefreshRate(180*time.Millisecond),
-				)
-				bar := p.New(total,
-					mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
-					mpb.PrependDecorators(
-						decor.CountersKibiByte("\t% .2f / % .2f"),
-					),
-					mpb.AppendDecorators(
-						decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
-						decor.Name(" ] "),
-						decor.AverageSpeed(decor.UnitKiB, "% .2f"),
-					),
-				)
-				// create proxy reader
-				proxyReader := bar.ProxyReader(io.LimitReader(rc, total))
-				defer proxyReader.Close()
+				var p *mpb.Progress
+				if progress {
+					// setup progress bar
+					var total int64 = int64(f.UncompressedSize64)
+					p = mpb.New(
+						mpb.WithWidth(60),
+						mpb.WithRefreshRate(180*time.Millisecond),
+					)
+					bar := p.New(total,
+						mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|"),
+						mpb.PrependDecorators(
+							decor.CountersKibiByte("\t% .2f / % .2f"),
+						),
+						mpb.AppendDecorators(
+							decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
+							decor.Name(" ] "),
+							decor.AverageSpeed(decor.UnitKiB, "% .2f"),
+						),
+					)
+					// create proxy reader
+					r = bar.ProxyReader(io.LimitReader(rc, total))
+					defer r.Close()
+				} else {
+					r = rc
+				}
 
-				Indent(log.Info, 2)(fmt.Sprintf("Creating %s", strings.TrimPrefix(fname, cwd)))
+				Indent(log.Info, 2)(fmt.Sprintf("Extracting %s", strings.TrimPrefix(fname, cwd)))
 				out, err := os.Create(fname)
 				if err != nil {
 					return fmt.Errorf("error creating remote unzipped file destination %s: %v", fname, err)
 				}
 				defer out.Close()
 
-				io.Copy(out, proxyReader)
-				// wait for our bar to complete and flush and close remote zip and temp file
-				p.Wait()
+				io.Copy(out, r)
+
+				if progress {
+					// wait for our bar to complete and flush and close remote zip and temp file
+					p.Wait()
+				}
 
 			} else {
 				log.Warnf("%s already exists", fname)
 			}
 		}
+	}
+
+	if !found {
+		return fmt.Errorf("no files found matching %s", pattern.String())
 	}
 
 	return nil
@@ -351,7 +402,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 					panic(err)
 				}
 			}()
-			Indent(log.Info, 2)(fmt.Sprintf("Created %s", path))
+			Indent(log.Debug, 2)(fmt.Sprintf("Extracted %s from %s", path, filepath.Base(src)))
 			_, err = io.Copy(f, rc)
 			if err != nil {
 				return err
@@ -387,7 +438,7 @@ func UnTarGz(tarfile, destPath string) error {
 
 	tarReader := tar.NewReader(uncompressedStream)
 
-	for true {
+	for {
 		header, err := tarReader.Next()
 
 		if err == io.EOF {

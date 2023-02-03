@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -42,7 +42,7 @@ func init() {
 	DyldCmd.AddCommand(StrSearchCmd)
 	StrSearchCmd.Flags().BoolP("insensitive", "i", false, "Case-insensitive search")
 	StrSearchCmd.Flags().BoolP("contains", "c", false, "Match strings that contain the search substring")
-	StrSearchCmd.Flags().StringP("pattern", "p", "", "Regex match strings")
+	StrSearchCmd.Flags().StringP("pattern", "p", "", "Regex match strings (FAST)")
 	viper.BindPFlag("dyld.str.insensitive", StrSearchCmd.Flags().Lookup("insensitive"))
 	viper.BindPFlag("dyld.str.contains", StrSearchCmd.Flags().Lookup("contains"))
 	viper.BindPFlag("dyld.str.pattern", StrSearchCmd.Flags().Lookup("pattern"))
@@ -62,8 +62,12 @@ var StrSearchCmd = &cobra.Command{
 		var err error
 		var strRE *regexp.Regexp
 
-		if len(viper.GetString("dyld.str.pattern")) > 0 {
-			strRE, err = regexp.Compile(viper.GetString("dyld.str.pattern"))
+		insensitive := viper.GetBool("dyld.str.insensitive")
+		contains := viper.GetBool("dyld.str.contains")
+		pattern := viper.GetString("dyld.str.pattern")
+
+		if len(pattern) > 0 {
+			strRE, err = regexp.Compile(pattern)
 			if err != nil {
 				return fmt.Errorf("invalid regex: %w", err)
 			}
@@ -105,7 +109,11 @@ var StrSearchCmd = &cobra.Command{
 			// cstrings
 			for _, sec := range m.Sections {
 				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
-					dat, err := sec.Data()
+					uuid, off, err := f.GetOffset(sec.Addr)
+					if err != nil {
+						return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
+					}
+					dat, err := f.ReadBytesForUUID(uuid, int64(off), sec.Size)
 					if err != nil {
 						return fmt.Errorf("failed to read cstrings in %s.%s: %v", sec.Seg, sec.Name, err)
 					}
@@ -131,26 +139,26 @@ var StrSearchCmd = &cobra.Command{
 							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) {
 								continue // skip non-ascii strings when dumping __TEXT.__const
 							}
-							if len(viper.GetString("dyld.str.pattern")) > 0 {
+							if len(pattern) > 0 {
 								if strRE.MatchString(s) {
-									fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+									fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 								}
 							} else {
-								if viper.GetBool("dyld.str.contains") && viper.GetBool("dyld.str.insensitive") {
+								if contains && insensitive {
 									if strings.Contains(strings.ToLower(s), strings.ToLower(args[1])) {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
-								} else if viper.GetBool("dyld.str.contains") {
+								} else if contains {
 									if strings.Contains(s, args[1]) {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
-								} else if viper.GetBool("dyld.str.insensitive") {
-									if strings.EqualFold(s, args[1]) {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+								} else if insensitive {
+									if len(s) == len(args[1]) && strings.EqualFold(s, args[1]) {
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
 								} else {
-									if s == args[1] {
-										fmt.Printf("%#x: (%s) %#v\n", pos, filepath.Base(i.Name), s)
+									if len(s) == len(args[1]) && s == args[1] {
+										fmt.Printf("%#x: (%s)\t%#v\n", pos, filepath.Base(i.Name), s)
 									}
 								}
 							}
@@ -163,26 +171,26 @@ var StrSearchCmd = &cobra.Command{
 			if cfstrs, err := m.GetCFStrings(); err == nil {
 				if len(cfstrs) > 0 {
 					for _, cfstr := range cfstrs {
-						if len(viper.GetString("dyld.str.pattern")) > 0 {
+						if len(pattern) > 0 {
 							if strRE.MatchString(cfstr.Name) {
-								fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+								fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 							}
 						} else {
-							if viper.GetBool("dyld.str.contains") && viper.GetBool("dyld.str.insensitive") {
+							if contains && insensitive {
 								if strings.Contains(strings.ToLower(cfstr.Name), strings.ToLower(args[1])) {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
-							} else if viper.GetBool("dyld.str.contains") {
+							} else if contains {
 								if strings.Contains(cfstr.Name, args[1]) {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
-							} else if viper.GetBool("dyld.str.insensitive") {
-								if strings.EqualFold(cfstr.Name, args[1]) {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+							} else if insensitive {
+								if len(cfstr.Name) == len(args[1]) && strings.EqualFold(cfstr.Name, args[1]) {
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
 							} else {
-								if cfstr.Name == args[1] {
-									fmt.Printf("%#09x: (%s) %#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
+								if len(cfstr.Name) == len(args[1]) && cfstr.Name == args[1] {
+									fmt.Printf("%#09x: (%s)\t%#v\n", cfstr.Address, filepath.Base(i.Name), cfstr.Name)
 								}
 							}
 						}

@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -66,6 +66,7 @@ func init() {
 // disassCmd represents the disass command
 var DisassCmd = &cobra.Command{
 	Use:           "disass <dyld_shared_cache>",
+	Aliases:       []string{"dis"},
 	Short:         "Disassemble dyld_shared_cache at symbol/vaddr",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
@@ -133,10 +134,6 @@ var DisassCmd = &cobra.Command{
 		if !f.IsArm64() {
 			log.Errorf("can only disassemble arm64 caches")
 			return nil
-		}
-
-		if !quiet {
-			f.ParseStubIslands()
 		}
 
 		if !quiet || len(symbolName) > 0 {

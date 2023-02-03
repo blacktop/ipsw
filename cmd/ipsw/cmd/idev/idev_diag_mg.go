@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -80,4 +80,16 @@ var idevDiagMobileGestaltCmd = &cobra.Command{
 
 		return nil
 	},
+	Example: `❯ ipsw idev diag mg -k SupplementalBuildVersion,ProductVersionExtra | jq .
+
+	{
+		"status": "Success",
+		"diagnostics": {
+		  "MobileGestalt": {
+			"ProductVersionExtra": "(a)",
+			"Status": "Success",
+			"SupplementalBuildVersion": "20C7750490e"
+		  }
+		}
+	  }`,
 }

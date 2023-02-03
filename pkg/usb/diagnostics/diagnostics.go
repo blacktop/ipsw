@@ -8,12 +8,17 @@ import (
 
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/fatih/color"
 )
 
 const (
 	serviceName    = "com.apple.mobile.diagnostics_relay"
 	oldServiceName = "com.apple.iosdiagnostics.relay"
 )
+
+var colorHeader = color.New(color.FgHiBlue).SprintFunc()
+var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
+var colorBold = color.New(color.Bold).SprintFunc()
 
 type Response map[string]any
 
@@ -36,6 +41,59 @@ type IORegistryRequest struct {
 	CurrentPlane string `plist:"CurrentPlane,omitempty"`
 	EntryName    string `plist:"EntryName,omitempty"`
 	EntryClass   string `plist:"EntryClass,omitempty"`
+}
+
+type Diagnostics struct {
+	GasGauge struct {
+		CycleCount         int    `plist:"CycleCount,omitempty" json:"cycle_count,omitempty"`
+		DesignCapacity     int    `plist:"DesignCapacity,omitempty" json:"design_capacity,omitempty"`
+		FullChargeCapacity int    `plist:"FullChargeCapacity,omitempty" json:"full_charge_capacity,omitempty"`
+		Status             string `plist:"Status,omitempty" json:"status,omitempty"`
+	} `plist:"GasGauge,omitempty" json:"gas_gauge,omitempty"`
+	HDMI struct {
+		Connection string `plist:"Connection,omitempty" json:"connection,omitempty"`
+		Status     string `plist:"Status,omitempty" json:"status,omitempty"`
+	} `plist:"HDMI,omitempty" json:"hdmi,omitempty"`
+	NAND struct {
+		Status string `plist:"Status,omitempty" json:"status,omitempty"`
+	} `plist:"NAND,omitempty" json:"nand,omitempty"`
+	WiFi struct {
+		Active string `plist:"Active,omitempty" json:"active,omitempty"`
+		Status string `plist:"Status,omitempty" json:"status,omitempty"`
+	} `plist:"WiFi,omitempty" json:"wifi,omitempty"`
+}
+
+func (d Diagnostics) String() string {
+	return fmt.Sprintf(
+		colorHeader("[DIAGNOSTICS]\n")+
+			colorHeader("  GasGauge:\n")+
+			colorFaint("    CycleCount:         ")+colorBold("%d\n")+
+			colorFaint("    DesignCapacity:     ")+colorBold("%d\n")+
+			colorFaint("    FullChargeCapacity: ")+colorBold("%d\n")+
+			colorFaint("    Status:             ")+colorBold("%s\n")+
+			colorHeader("  HDMI:\n")+
+			colorFaint("    Connection: ")+colorBold("%s\n")+
+			colorFaint("    Status:     ")+colorBold("%s\n")+
+			colorHeader("  NAND:\n")+
+			colorFaint("    Status: ")+colorBold("%s\n")+
+			colorHeader("  WiFi:\n")+
+			colorFaint("    Active: ")+colorBold("%s\n")+
+			colorFaint("    Status: ")+colorBold("%s\n"),
+		d.GasGauge.CycleCount,
+		d.GasGauge.DesignCapacity,
+		d.GasGauge.FullChargeCapacity,
+		d.GasGauge.Status,
+		d.HDMI.Connection,
+		d.HDMI.Status,
+		d.NAND.Status,
+		d.WiFi.Active,
+		d.WiFi.Status,
+	)
+}
+
+type infoResponse struct {
+	Diagnostics Diagnostics `plist:"Diagnostics,omitempty" json:"diagnostics,omitempty"`
+	Status      string      `plist:"Status,omitempty" json:"status,omitempty"`
 }
 
 type Client struct {
@@ -83,6 +141,29 @@ func (c *Client) IORegistry(plane, entryName, entryClass string) (*DiagnosticsRe
 		return nil, err
 	}
 	return resp, nil
+}
+
+func (c *Client) Info() (*Diagnostics, error) {
+	req := &Request{"All"}
+	var resp infoResponse
+	if err := c.c.Request(req, &resp); err != nil {
+		return nil, err
+	}
+	if resp.Status != "Success" {
+		return nil, fmt.Errorf("failed to restart: %s", resp.Status)
+	}
+	return &resp.Diagnostics, nil
+}
+
+func (c *Client) Battery() (map[string]any, error) {
+	bat, err := c.IORegistry("", "", "IOPMPowerSource")
+	if err != nil {
+		return nil, err
+	}
+	if bat.Status != "Success" {
+		return nil, fmt.Errorf("failed to get battery info: %s", bat.Status)
+	}
+	return bat.Diagnostics, nil
 }
 
 func (c *Client) MobileGestalt(keys ...string) (*DiagnosticsResponse, error) {

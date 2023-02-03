@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,7 +22,6 @@ THE SOFTWARE.
 package dyld
 
 import (
-	"archive/zip"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,111 +29,67 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var haveChecked []string
-
-func scanDmg(ipswPath, dmgPath, dmgType, dylib string) error {
-	if utils.StrSliceHas(haveChecked, dmgPath) {
-		return nil // already checked
-	}
-
-	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-	})
+func getDSCs(path string) []string {
+	matches, err := filepath.Glob(filepath.Join(path, "dyld_shared_cache*"))
 	if err != nil {
-		return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-	}
-	if len(dmgs) == 0 {
-		return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-	}
-	defer os.Remove(dmgs[0])
-
-	utils.Indent(log.Info, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
-	mountPoint, err := utils.MountFS(dmgs[0])
-	if err != nil {
-		return fmt.Errorf("failed to mount DMG: %v", err)
-	}
-	defer func() {
-		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-		if err := utils.Unmount(mountPoint, false); err != nil {
-			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
-		}
-	}()
-
-	var files []string
-	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
-		if !info.IsDir() {
-			files = append(files, path)
-		}
 		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to walk files in dir %s: %v", mountPoint, err)
 	}
-
-	for _, file := range files {
-		if m, err := macho.Open(file); err == nil {
-			for _, imp := range m.ImportedLibraries() {
-				if strings.Contains(strings.ToLower(imp), strings.ToLower(dylib)) {
-					fmt.Printf("%s\n", file)
-				}
-			}
-			m.Close()
-		}
-	}
-
-	haveChecked = append(haveChecked, dmgPath)
-
-	return nil
+	return matches
 }
 
 func init() {
-	DyldCmd.AddCommand(ImportsCmd)
-	ImportsCmd.Flags().BoolP("file-system", "f", false, "Scan File System in IPSW for MachO files that import dylib")
-	ImportsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	DyldCmd.AddCommand(dyldImportsCmd)
+	dyldImportsCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for MachO files that import dylib")
+	dyldImportsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
+	})
 }
 
-// ImportsCmd represents the imports command
-var ImportsCmd = &cobra.Command{
-	Use:   "imports",
-	Short: "List all dylibs that load a given dylib",
-	Args:  cobra.MinimumNArgs(2),
+// dyldImportsCmd represents the imports command
+var dyldImportsCmd = &cobra.Command{
+	Use:           "imports",
+	Aliases:       []string{"imp"},
+	Short:         "List all dylibs that load a given dylib",
+	Args:          cobra.MaximumNArgs(2),
+	SilenceErrors: true,
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		// flags
+		ipswPath, _ := cmd.Flags().GetString("ipsw")
+		// validate args
+		if ipswPath != "" && len(args) != 1 {
+			return errors.New("you must specify a DYLIB to search for")
+		} else if ipswPath == "" && len(args) != 2 {
+			return errors.New("you must specify a DSC and a DYLIB to search for")
+		}
 
-		scanFS, _ := cmd.Flags().GetBool("file-system")
-
-		if scanFS {
-			ipswPath := filepath.Clean(args[0])
-
-			i, err := info.Parse(ipswPath)
-			if err != nil {
-				return fmt.Errorf("failed to parse IPSW: %v", err)
-			}
-
-			if appOS, err := i.GetAppOsDmg(); err == nil {
-				if err := scanDmg(ipswPath, appOS, "AppOS", args[1]); err != nil {
-					return fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+		if ipswPath != "" {
+			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), func(path string, m *macho.File) error {
+				for _, imp := range m.ImportedLibraries() {
+					if strings.Contains(strings.ToLower(imp), strings.ToLower(args[0])) {
+						fmt.Printf("%s\n", path)
+					}
 				}
-			}
-			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				if err := scanDmg(ipswPath, systemOS, "SystemOS", args[1]); err != nil {
-					return fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
-				}
-			}
-			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				if err := scanDmg(ipswPath, fsOS, "filesystem", args[1]); err != nil {
-					return fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
-				}
+				return nil
+			}); err != nil {
+				return fmt.Errorf("failed to scan files in IPSW: %v", err)
 			}
 		} else {
 			dscPath := filepath.Clean(args[0])
@@ -170,18 +125,55 @@ var ImportsCmd = &cobra.Command{
 
 			title := fmt.Sprintf("\n%s Imported By:\n", filepath.Base(image.Name))
 			fmt.Print(title)
-			fmt.Println(strings.Repeat("=", len(title)-1))
-			for _, img := range f.Images {
-				m, err := img.GetPartialMacho()
-				if err != nil {
-					return err
-				}
-				for _, imp := range m.ImportedLibraries() {
-					if strings.EqualFold(imp, image.Name) {
-						fmt.Printf("%s\n", img.Name)
+			fmt.Println(strings.Repeat("=", len(title)-2))
+
+			if f.SupportsDylibPrebuiltLoader() {
+				fmt.Println("\nIn DSC (Dylibs)")
+				fmt.Println("---------------")
+				for _, img := range f.Images {
+					pbl, err := f.GetDylibPrebuiltLoader(img.Name)
+					if err != nil {
+						return err
+					}
+					for _, dep := range pbl.Dependents {
+						if strings.EqualFold(dep.Name, image.Name) {
+							fmt.Println(img.Name)
+						}
 					}
 				}
-				m.Close()
+			} else {
+				for _, img := range f.Images {
+					m, err := img.GetPartialMacho()
+					if err != nil {
+						return err
+					}
+					for _, imp := range m.ImportedLibraries() {
+						if strings.EqualFold(imp, image.Name) {
+							fmt.Println(img.Name)
+						}
+					}
+					m.Close()
+				}
+			}
+
+			if f.SupportsPrebuiltLoaderSet() {
+				fmt.Println("\nIn FileSystem DMG (Apps)")
+				fmt.Println("------------------------")
+				if err := f.ForEachLaunchLoaderSet(func(execPath string, pset *dyld.PrebuiltLoaderSet) {
+					for _, loader := range pset.Loaders {
+						for _, dep := range loader.Dependents {
+							if strings.EqualFold(dep.Name, image.Name) {
+								if execPath != loader.Path {
+									fmt.Printf("%s (%s)\n", execPath, loader.Path)
+								} else {
+									fmt.Println(execPath)
+								}
+							}
+						}
+					}
+				}); err != nil {
+					return err
+				}
 			}
 		}
 

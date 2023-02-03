@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -43,9 +43,10 @@ func init() {
 
 // objcProtoCmd represents the proto command
 var objcProtoCmd = &cobra.Command{
-	Use:   "proto  <dyld_shared_cache>",
-	Short: "Get ObjC proto info",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "proto  <dyld_shared_cache>",
+	Aliases: []string{"p"},
+	Short:   "Get ObjC proto info",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

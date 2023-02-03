@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -47,9 +47,10 @@ func init() {
 
 // symbolicateCmd represents the symbolicate command
 var symbolicateCmd = &cobra.Command{
-	Use:   "symbolicate <crashlog> <dyld_shared_cache>",
-	Short: "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "symbolicate <crashlog> <dyld_shared_cache>",
+	Aliases: []string{"sym"},
+	Short:   "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -142,11 +143,11 @@ var symbolicateCmd = &cobra.Command{
 				}
 
 				for _, patch := range image.PatchableExports {
-					addr, err := image.GetVMAddress(uint64(patch.OffsetOfImpl))
+					addr, err := image.GetVMAddress(uint64(patch.GetImplOffset()))
 					if err != nil {
 						return err
 					}
-					f.AddressToSymbol[addr] = patch.Name
+					f.AddressToSymbol[addr] = patch.GetName()
 				}
 
 				if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
@@ -185,7 +186,25 @@ var symbolicateCmd = &cobra.Command{
 			w.Flush()
 			var note string
 			if unslide {
-				note = " (may contain slid addresses)"
+				if len(crashLog.Threads[crashLog.CrashedThread].BackTrace) > 0 {
+					var slide uint64
+					if img, err := f.GetImageContainingVMAddr(crashLog.Threads[crashLog.CrashedThread].State["pc"]); err == nil {
+						found := false
+						for _, bt := range crashLog.Threads[crashLog.CrashedThread].BackTrace {
+							if bt.Image.Name == img.Name {
+								slide = bt.Image.Slide
+								found = true
+								break
+							}
+						}
+						if !found {
+							slide = crashLog.Threads[crashLog.CrashedThread].BackTrace[0].Image.Slide
+						}
+					}
+					note = fmt.Sprintf(" (may contain slid addresses; slide=%#x)", slide)
+				} else {
+					note = " (may contain slid addresses)"
+				}
 			}
 			fmt.Printf("\nThread %d State:%s\n%s\n", crashLog.CrashedThread, note, crashLog.Threads[crashLog.CrashedThread].State)
 			// slide := crashLog.Threads[crashLog.CrashedThread].BackTrace[0].Image.Slide
