@@ -573,11 +573,13 @@ changelog:
     - title: "Documentation updates"
       regexp: ^.*?doc(\([[:word:]]+\))??!?:.+$
       order: 400
+    - title: "Build process updates"
+      regexp: ^.*?build(\([[:word:]]+\))??!?:.+$
+      order: 400
     - title: Other work
       order: 9999
   filters:
     exclude:
-      - "^docs:"
       - "^test:"
       - "^bumping"
       - "^Update"
@@ -598,6 +600,7 @@ release:
     - Read the [documentation](https://blacktop.github.io/ipsw/docs/)
     - Join our [Discord server](https://discord.gg/xx2y9yrcgs)
     - Follow us on [Twitter](https://twitter.com/blacktop__)
+    - Follow us on [Mastodon](https://mastodon.social/@blacktop)
 
 announce:
   discord:
