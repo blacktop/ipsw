@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -88,29 +88,25 @@ var ObjcCmd = &cobra.Command{
 		defer f.Close()
 
 		if printClasses {
-			_, err := f.GetAllObjCClasses(true)
-			if err != nil {
+			if _, err := f.GetAllObjCClasses(true); err != nil {
 				return err
 			}
 		}
 
 		if printSelectors {
-			_, err := f.GetAllObjCSelectors(true)
-			if err != nil {
+			if _, err := f.GetAllObjCSelectors(true); err != nil {
 				return err
 			}
 		}
 
 		if printProtocols {
-			_, err := f.GetAllObjCProtocols(true)
-			if err != nil {
+			if _, err := f.GetAllObjCProtocols(true); err != nil {
 				return err
 			}
 		}
 
 		if printImpCaches {
-			err = f.ImpCachesForImage()
-			if err != nil {
+			if err = f.ImpCachesForImage(); err != nil {
 				return err
 			}
 		}

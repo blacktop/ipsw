@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -41,9 +41,10 @@ func init() {
 
 // idevImgLookupCmd represents the lookup command
 var idevImgLookupCmd = &cobra.Command{
-	Use:           "lookup",
+	Use:           "lookup [Developer|Cryptex]",
 	Short:         "Lookup image type",
-	Args:          cobra.ExactArgs(1),
+	ValidArgs:     []string{"Developer", "Cryptex"},
+	Args:          cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

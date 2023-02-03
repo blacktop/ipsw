@@ -8,7 +8,7 @@ GO_BIN=go
 .PHONY: build-deps
 build-deps: ## Install the build dependencies
 	@echo " > Installing build deps"
-	brew install $(GO_BIN) goreleaser
+	brew install $(GO_BIN) goreleaser zig unicorn libusb
 
 .PHONY: dev-deps
 dev-deps: ## Install the dev dependencies
@@ -19,42 +19,51 @@ dev-deps: ## Install the dev dependencies
 	$(GO_BIN) get -d golang.org/x/tools/cmd/stringer
 	$(GO_BIN) get -d github.com/caarlos0/svu@v1.4.1
 
+.PHONY: x86-brew
+x86-brew: ## Install the x86_64 homebrew on Apple Silicon
+	mkdir /tmp/homebrew
+	cd /tmp/homebrew; curl -L https://github.com/Homebrew/brew/tarball/master | tar xz --strip 1 -C homebrew
+	sudo mv /tmp/homebrew/homebrew /usr/local/homebrew
+	arch -x86_64 /usr/local/homebrew/bin/brew install unicorn libusb
+
 .PHONY: setup
 setup: build-deps dev-deps ## Install all the build and dev dependencies
 
 .PHONY: dry_release
 dry_release: ## Run goreleaser without releasing/pushing artifacts to github
 	@echo " > Creating Pre-release Build ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_arm64_extras_build --rm-dist --snapshot --single-target --output dist/ipsw
+	@GOROOT=$(shell go env GOROOT) goreleaser build --id darwin_arm64_extras_build --clean --timeout 60m --snapshot --single-target --output dist/ipsw
 
 .PHONY: snapshot
 snapshot: ## Run goreleaser snapshot
 	@echo " > Creating Snapshot ${NEXT_VERSION}"
-	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist --snapshot
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --snapshot
 
 .PHONY: release
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@GOROOT=$(shell go env GOROOT) goreleaser --rm-dist
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip-validate
+	@echo " > Update Portfile ${NEXT_VERSION}"	
+	@hack/make/portfile ../ports
 
 .PHONY: release-minor
 release-minor: ## Create a new minor semver release
 	@echo " > Creating Release $(shell svu minor)"
 	@hack/make/release $(shell svu minor)
-	@goreleaser --rm-dist
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip-validate
 
 .PHONY: destroy
 destroy: ## Remove release from the CUR_VERSION
-	@echo " > Deleting Release ${CUR_VERSION}"
+	@echo " > Deleting Release ${LOCAL_VERSION}"
 	rm -rf dist
-	git tag -d ${CUR_VERSION}
-	git push origin :refs/tags/${CUR_VERSION}
+	git tag -d ${LOCAL_VERSION}
+	git push origin :refs/tags/${LOCAL_VERSION}
 
 build: ## Build ipsw
 	@echo " > Building ipsw"
 	@$(GO_BIN) mod download
-	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" ./cmd/ipsw
 
 build-ios: ## Build ipsw for iOS
 	@echo " > Building ipsw"
@@ -63,14 +72,14 @@ build-ios: ## Build ipsw for iOS
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
 .PHONY: docs
-docs: ## Build the hugo docs
-	@echo " > Building Docs"
-	hack/publish/gh-pages
+docs: ## Build the cli docs
+	@echo " > Updating CLI Docs"
+	hack/make/docs
 
 .PHONY: test-docs
-test-docs: ## Start local server hosting hugo docs
+test-docs: ## Start local server hosting docusaurus docs
 	@echo " > Testing Docs"
-	cd docs; hugo server -D
+	cd www; npm start
 
 .PHONY: update_mod
 update_mod: ## Update go.mod file
@@ -88,6 +97,11 @@ update_devs: ## Parse XCode database for new devices
 update_keys: ## Scrape the iPhoneWiki for AES keys
 	@echo " > Updating firmware_keys.json"
 	CGO_ENABLED=0 $(GO_BIN) run ./cmd/ipsw/main.go key-list-gen pkg/info/data/firmware_keys.json
+
+.PHONY: update_frida
+update_frida: ## Updates the frida-core-devkits used in the frida cmd
+	@echo " > Updating frida-core-devkits"
+	@hack/make/frida-deps
 
 .PHONY: docker
 docker: ## Build docker image

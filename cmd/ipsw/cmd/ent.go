@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -32,11 +32,13 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
+	"github.com/fatih/color"
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -51,28 +53,37 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 		return nil, nil // already checked
 	}
 
-	dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-		return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+	// check if filesystem DMG already exists (due to previous mount command)
+	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
+		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
+			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+		}
+		if len(dmgs) == 0 {
+			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
+		}
+		defer os.Remove(dmgs[0])
+	} else {
+		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 	}
-	if len(dmgs) == 0 {
-		return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
-	}
-	defer os.Remove(dmgs[0])
 
-	utils.Indent(log.Info, 3)(fmt.Sprintf("Mounting %s %s", dmgType, dmgs[0]))
-	mountPoint, err := utils.MountFS(dmgs[0])
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
+	mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to mount DMG: %v", err)
 	}
-	defer func() {
-		utils.Indent(log.Info, 3)(fmt.Sprintf("Unmounting %s", dmgs[0]))
-		if err := utils.Unmount(mountPoint, true); err != nil {
-			log.Errorf("failed to unmount DMG at %s: %v", dmgs[0], err)
-		}
-	}()
+	if alreadyMounted {
+		utils.Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+	} else {
+		defer func() {
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+			if err := utils.Unmount(mountPoint, false); err != nil {
+				log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
+			}
+		}()
+	}
 
 	var files []string
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
@@ -118,6 +129,7 @@ func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, erro
 		log.Info("Generating entitlement database file...")
 
 		if appOS, err := i.GetAppOsDmg(); err == nil {
+			log.Info("Scanning AppOS")
 			if ents, err := scanEnts(ipswPath, appOS, "AppOS"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
 			} else {
@@ -127,6 +139,7 @@ func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, erro
 			}
 		}
 		if systemOS, err := i.GetSystemOsDmg(); err == nil {
+			log.Info("Scanning SystemOS")
 			if ents, err := scanEnts(ipswPath, systemOS, "SystemOS"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
 			} else {
@@ -136,6 +149,7 @@ func getEntitlementDatabase(ipswPath, entDBPath string) (map[string]string, erro
 			}
 		}
 		if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+			log.Info("Scanning filesystem")
 			if ents, err := scanEnts(ipswPath, fsOS, "filesystem"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
 			} else {
@@ -196,7 +210,7 @@ func init() {
 
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
 	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO")
-	entCmd.Flags().String("output", "o", "Folder to r/w entitlement databases")
+	entCmd.Flags().StringP("output", "o", "", "Folder to r/w entitlement databases")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	viper.BindPFlag("ent.ent", entCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
@@ -288,30 +302,27 @@ var entCmd = &cobra.Command{
 			} else {
 				found := false
 				for f2, e2 := range entDB2 { // DIFF ALL ENTITLEMENTS
-					if e, ok := entDB[f2]; ok {
-						diffs := dmp.DiffMain(e, e2, false)
-						if len(diffs) > 2 {
-							diffs = dmp.DiffCleanupSemantic(diffs)
-							diffs = dmp.DiffCleanupEfficiency(diffs)
+					if e1, ok := entDB[f2]; ok {
+						out, err := utils.GitDiff(e1, e2)
+						if err != nil {
+							return err
 						}
-						if len(diffs) == 0 {
+						if len(out) == 0 {
 							continue
-						} else if len(diffs) == 1 {
-							if diffs[0].Type == diffmatchpatch.DiffEqual {
-								continue
-							} else {
-								found = true
-								fmt.Printf("\n%s\n\n", f2)
-								fmt.Println(dmp.DiffPrettyText(diffs))
-							}
-						} else {
-							found = true
-							fmt.Printf("\n%s\n\n", f2)
-							fmt.Println(dmp.DiffPrettyText(diffs))
 						}
+						found = true
+						color.New(color.Bold).Printf("\n%s\n\n", f2)
+						fmt.Println(out)
 					} else {
 						found = true
-						fmt.Printf("\n🆕 %s 🆕\n\n%s", f2, e2)
+						color.New(color.Bold).Printf("\n🆕 %s 🆕\n\n", f2)
+						if len(e2) == 0 {
+							log.Warn("No entitlements (yet)")
+						} else {
+							if err := quick.Highlight(os.Stdout, e2, "xml", "terminal16m", "nord"); err != nil {
+								return err
+							}
+						}
 					}
 				}
 				if !found {

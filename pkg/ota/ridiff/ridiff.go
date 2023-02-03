@@ -19,11 +19,11 @@ typedef struct
     uint32_t verbose;
 } RawImage;
 
-typedef int64_t RawImagePatch(RawImage *);
+typedef int32_t RawImagePatch(RawImage *);
 
-int ParseRawImage(char *output, char *patch);
+int ParseRawImage(char *input, char *output, char *patch, uint32_t verbose);
 
-int ParseRawImage(char *output, char *patch) {
+int ParseRawImage(char *input, char *output, char *patch, uint32_t verbose) {
 	void *handle = dlopen("/usr/lib/libParallelCompression.dylib", RTLD_LAZY);
 	if (!handle) {
 		fprintf(stderr, "%s\n", dlerror());
@@ -39,17 +39,17 @@ int ParseRawImage(char *output, char *patch) {
     RawImage ri = {
         .unknown1 = 0,
         .unknown2 = 0,
-        .input = NULL,
+        .input = input,
         .output = output,
         .patch = patch,
         .not_cryptex_cache = 0,
         .threads = 0,
-        .verbose = 0,
+        .verbose = verbose,
     };
 
-	int64_t ret = RawImagePatch(&ri);
+	int32_t ret = RawImagePatch(&ri);
 	if (ret != 0) {
-		fprintf(stderr, "RawImagePatch returned %lld", ret);
+		fprintf(stderr, "RawImagePatch returned %d\n", ret);
 		return ret;
 	}
 
@@ -69,7 +69,10 @@ import (
 )
 
 // RawImagePatch takes a Raw Image Diff and converts it to an APFS volume.
-func RawImagePatch(patch, output string) error {
+func RawImagePatch(input, patch, output string, verbose uint32) error {
+
+	i := C.CString(input)
+	defer C.free(unsafe.Pointer(i))
 
 	p := C.CString(patch)
 	defer C.free(unsafe.Pointer(p))
@@ -77,7 +80,7 @@ func RawImagePatch(patch, output string) error {
 	o := C.CString(output)
 	defer C.free(unsafe.Pointer(o))
 
-	ret := C.ParseRawImage(o, p)
+	ret := C.ParseRawImage(i, o, p, C.uint32_t(verbose))
 	if ret != 0 {
 		return fmt.Errorf("error parsing raw image: %v", errors.New(C.GoString(C.dlerror())))
 	}

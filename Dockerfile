@@ -1,7 +1,7 @@
 ####################################################
 # GOLANG BUILDER
 ####################################################
-FROM golang:1.19 as builder
+FROM golang:1.20 as builder
 
 ARG VERSION
 
@@ -17,7 +17,7 @@ RUN CGO_ENABLED=1 go build \
 ####################################################
 # APFS-FUSE BUILDER
 ####################################################
-FROM ubuntu:22.04
+FROM ubuntu:23.04
 
 LABEL maintainer "https://github.com/blacktop"
 

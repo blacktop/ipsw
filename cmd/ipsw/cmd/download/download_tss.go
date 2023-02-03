@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -34,12 +34,28 @@ func init() {
 	DownloadCmd.AddCommand(tssCmd)
 
 	tssCmd.Flags().StringP("signed", "s", "", "Check if iOS version is still being signed")
+	tssCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("device")
+		DownloadCmd.PersistentFlags().MarkHidden("model")
+		DownloadCmd.PersistentFlags().MarkHidden("version")
+		DownloadCmd.PersistentFlags().MarkHidden("build")
+		DownloadCmd.PersistentFlags().MarkHidden("confirm")
+		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
+		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
+		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
+		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
+		c.Parent().HelpFunc()(c, s)
+	})
+
 	viper.BindPFlag("download.tss.signed", tssCmd.Flags().Lookup("signed"))
 }
 
 // tssCmd represents the tss command
 var tssCmd = &cobra.Command{
 	Use:           "tss",
+	Aliases:       []string{"t", "tsschecker"},
 	Short:         "🚧 Download SHSH Blobs",
 	SilenceUsage:  false,
 	SilenceErrors: true,

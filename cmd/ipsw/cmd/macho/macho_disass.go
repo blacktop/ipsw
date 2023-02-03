@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -29,9 +29,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/caarlos0/ctrlc"
 	"github.com/fatih/color"
@@ -120,6 +122,10 @@ var machoDisassCmd = &cobra.Command{
 
 		machoPath := filepath.Clean(args[0])
 
+		if ok, err := magic.IsMachO(machoPath); !ok {
+			return fmt.Errorf(err.Error())
+		}
+
 		fat, err := macho.OpenFat(machoPath)
 		if err != nil && err != macho.ErrNotFat {
 			log.Fatal(err.Error())
@@ -183,7 +189,24 @@ var machoDisassCmd = &cobra.Command{
 							return fmt.Errorf("failed to open address-to-symbol cache file %s: %v", cacheFile, err)
 						} else {
 							if err := gob.NewDecoder(f).Decode(&symbolMap); err != nil {
-								return fmt.Errorf("failed to decode address-to-symbol cache file: %v", err)
+								log.Errorf("address-to-symbol cache file is corrupt: %v", err)
+								yes := false
+								prompt := &survey.Confirm{
+									Message: fmt.Sprintf("Recreate %s. Continue?", cacheFile),
+									Default: true,
+								}
+								survey.AskOne(prompt, &yes)
+								if yes {
+									f.Close()
+									if err := os.Remove(cacheFile); err != nil {
+										return fmt.Errorf("failed to remove address-to-symbol cache file %s: %v", cacheFile, err)
+									}
+									if _, err := os.Create(cacheFile); err != nil {
+										return fmt.Errorf("failed to create address-to-symbol cache file %s: %v", cacheFile, err)
+									}
+								} else {
+									return nil
+								}
 							}
 							f.Close()
 						}

@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -44,7 +44,8 @@ func init() {
 	DownloadCmd.AddCommand(ipswCmd)
 
 	ipswCmd.Flags().Bool("latest", false, "Download latest IPSWs")
-	ipswCmd.Flags().Bool("show-latest", false, "Show latest iOS version")
+	ipswCmd.Flags().Bool("show-latest-version", false, "Show latest iOS version")
+	ipswCmd.Flags().Bool("show-latest-build", false, "Show latest iOS build")
 	ipswCmd.Flags().Bool("macos", false, "Download macOS IPSWs")
 	ipswCmd.Flags().Bool("ibridge", false, "Download iBridge IPSWs")
 	ipswCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
@@ -58,7 +59,8 @@ func init() {
 	ipswCmd.Flags().BoolP("usb", "u", false, "Download IPSWs for USB attached iDevices")
 
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
-	viper.BindPFlag("download.ipsw.show-latest", ipswCmd.Flags().Lookup("show-latest"))
+	viper.BindPFlag("download.ipsw.show-latest-version", ipswCmd.Flags().Lookup("show-latest-version"))
+	viper.BindPFlag("download.ipsw.show-latest-build", ipswCmd.Flags().Lookup("show-latest-build"))
 	viper.BindPFlag("download.ipsw.macos", ipswCmd.Flags().Lookup("macos"))
 	viper.BindPFlag("download.ipsw.ibridge", ipswCmd.Flags().Lookup("ibridge"))
 	viper.BindPFlag("download.ipsw.kernel", ipswCmd.Flags().Lookup("kernel"))
@@ -75,6 +77,7 @@ func init() {
 // ipswCmd represents the ipsw command
 var ipswCmd = &cobra.Command{
 	Use:           "ipsw",
+	Aliases:       []string{"i"},
 	Short:         "Download and parse IPSW(s) from the internets",
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -121,14 +124,15 @@ var ipswCmd = &cobra.Command{
 		doNotDownload := viper.GetStringSlice("download.black-list")
 		// flags
 		latest := viper.GetBool("download.ipsw.latest")
-		showLatest := viper.GetBool("download.ipsw.show-latest")
+		showLatestVersion := viper.GetBool("download.ipsw.show-latest-version")
+		showLatestBuild := viper.GetBool("download.ipsw.show-latest-build")
 		macos := viper.GetBool("download.ipsw.macos")
 		ibridge := viper.GetBool("download.ipsw.ibridge")
 		remoteKernel := viper.GetBool("download.ipsw.kernel")
 		remoteDSC := viper.GetBool("download.ipsw.dyld")
 		dyldArches := viper.GetStringSlice("download.ipsw.dyld-arch")
 		// kernelSpecFolders := viper.GetBool("download.ipsw.kernel-spec")
-		pattern := viper.GetString("download.ipsw.pattern")
+		remotePattern := viper.GetString("download.ipsw.pattern")
 		output := viper.GetString("download.ipsw.output")
 		flat := viper.GetBool("download.ipsw.flat")
 		// beta := viper.GetBool("download.ipsw.beta")
@@ -143,6 +147,9 @@ var ipswCmd = &cobra.Command{
 					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
 				}
 			}
+		}
+		if showLatestBuild && len(device) == 0 {
+			return errors.New("--show-latest-build requires --device to be set")
 		}
 
 		if viper.GetBool("download.ipsw.usb") {
@@ -171,18 +178,81 @@ var ipswCmd = &cobra.Command{
 			}
 		}
 
-		if macos {
-			itunes, err = download.NewMacOsXML()
-			if err != nil {
-				return fmt.Errorf("failed to create itunes API: %v", err)
+		if showLatestVersion || showLatestBuild {
+			if ibridge {
+				itunes, err = download.NewIBridgeXML()
+				if err != nil {
+					return fmt.Errorf("failed to create itunes API: %v", err)
+				}
+				if showLatestVersion {
+					latestVersion, err := itunes.GetLatestVersion()
+					if err != nil {
+						return fmt.Errorf("failed to get latest iBride version: %v", err)
+					}
+					fmt.Println(latestVersion)
+				}
+				if showLatestBuild {
+					latestBuild, err := itunes.GetLatestBuild()
+					if err != nil {
+						return fmt.Errorf("failed to get latest iBride build: %v", err)
+					}
+					fmt.Println(latestBuild)
+				}
+			} else {
+				assets, err := download.GetAssetSets(proxy, insecure)
+				if err != nil {
+					return fmt.Errorf("failed to get asset latest version: %v", err)
+				}
+				if macos {
+					if showLatestVersion {
+						fmt.Println(assets.LatestVersion("macOS", "macos"))
+					}
+					if showLatestBuild {
+						itunes, err = download.NewMacOsXML()
+						if err != nil {
+							return fmt.Errorf("failed to create itunes API: %v", err)
+						}
+						latestBuild, err := itunes.GetLatestBuild()
+						if err != nil {
+							return fmt.Errorf("failed to get latest iOS build: %v", err)
+						}
+						fmt.Println(latestBuild)
+					}
+				} else { // iOS
+					latestVersion := assets.LatestVersion("iOS", "ios")
+					if showLatestVersion {
+						fmt.Println(latestVersion)
+					}
+					if showLatestBuild {
+						itunes, err = download.NewiTunesVersionMaster()
+						if err != nil {
+							return fmt.Errorf("failed to create itunes API: %v", err)
+						}
+						latestBuild, err := itunes.GetLatestBuilds(device)
+						if err != nil {
+							return fmt.Errorf("failed to get latest iOS build: %v", err)
+						}
+						if len(latestBuild) > 0 {
+							fmt.Println(latestBuild[0].BuildID)
+						} else {
+							fmt.Println("No build found for device: " + device)
+						}
+					}
+				}
 			}
-		} else if ibridge {
-			itunes, err = download.NewIBridgeXML()
-			if err != nil {
-				return fmt.Errorf("failed to create itunes API: %v", err)
-			}
+			return nil
 		} else {
-			if !showLatest { // This is a dumb hack to prevent having to pull down the FULL XML if you just want to know the latest iOS version
+			if macos {
+				itunes, err = download.NewMacOsXML()
+				if err != nil {
+					return fmt.Errorf("failed to create itunes API: %v", err)
+				}
+			} else if ibridge {
+				itunes, err = download.NewIBridgeXML()
+				if err != nil {
+					return fmt.Errorf("failed to create itunes API: %v", err)
+				}
+			} else { // iOS
 				itunes, err = download.NewiTunesVersionMaster()
 				if err != nil {
 					return fmt.Errorf("failed to create itunes API: %v", err)
@@ -190,37 +260,13 @@ var ipswCmd = &cobra.Command{
 			}
 		}
 
-		if showLatest {
-			if macos || ibridge {
-				latestVersion, err := itunes.GetLatestVersion()
-				if err != nil {
-					return fmt.Errorf("failed to get latest iOS version: %v", err)
-				}
-				fmt.Print(latestVersion)
-				// assets, err := download.GetAssetSets(proxy, insecure) // TODO: switch to this check (if IPSWs match eventually)
-				// if err != nil {
-				// 	return fmt.Errorf("failed to get latest iOS version: %v", err)
-				// }
-				// fmt.Print(assets.Latest("macOS"))
-			} else {
-				// latestVersion, err := itunes.GetLatestVersion()
-				// if err != nil {
-				// 	return fmt.Errorf("failed to get latest iOS version: %v", err)
-				// }
-				// fmt.Print(latestVersion)
-				assets, err := download.GetAssetSets(proxy, insecure)
-				if err != nil {
-					return fmt.Errorf("failed to get latest iOS version: %v", err)
-				}
-				fmt.Print(assets.LatestVersion("iOS", "ios"))
-			}
-			return nil
-		}
-
 		if latest {
 			builds, err = itunes.GetLatestBuilds(device)
 			if err != nil {
 				return fmt.Errorf("failed to get the latest builds: %v", err)
+			}
+			if len(builds) > 0 {
+				utils.Indent(log.Info, 1)(fmt.Sprintf("Latest release found is: %s", builds[0].Version))
 			}
 
 			for _, v := range builds {
@@ -253,7 +299,7 @@ var ipswCmd = &cobra.Command{
 				})
 			}
 		} else {
-			ipsws, err = filterIPSWs(cmd)
+			ipsws, err = filterIPSWs(cmd, macos)
 			if err != nil {
 				log.Fatal(err.Error())
 			}
@@ -277,29 +323,29 @@ var ipswCmd = &cobra.Command{
 		}
 
 		if cont {
-			if remoteKernel { // REMOTE KERNEL MODE
-				for _, i := range ipsws {
-					log.WithFields(log.Fields{
-						"device":  i.Identifier,
-						"build":   i.BuildID,
-						"version": i.Version,
-						"signed":  i.Signed,
-					}).Info("Parsing remote IPSW")
+			if remoteKernel || remoteDSC || len(remotePattern) > 0 {
+				if remoteKernel { // REMOTE KERNEL MODE
+					for _, i := range ipsws {
+						log.WithFields(log.Fields{
+							"device":  i.Identifier,
+							"build":   i.BuildID,
+							"version": i.Version,
+							"signed":  i.Signed,
+						}).Info("Parsing remote IPSW")
 
-					log.Info("Extracting remote kernelcache")
-					zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
-						Proxy:    proxy,
-						Insecure: insecure,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
-					}
-					if err := kernelcache.RemoteParse(zr, destPath); err != nil {
-						return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+						log.Info("Extracting remote kernelcache")
+						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
+							Proxy:    proxy,
+							Insecure: insecure,
+						})
+						if err != nil {
+							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+						}
+						if err := kernelcache.RemoteParse(zr, destPath); err != nil {
+							return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+						}
 					}
 				}
-			}
-			if remoteDSC || len(pattern) > 0 {
 				if remoteDSC { // REMOTE DSC MODE
 					for _, i := range ipsws {
 						log.WithFields(log.Fields{
@@ -333,7 +379,7 @@ var ipswCmd = &cobra.Command{
 							return fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
 						}
 						defer os.RemoveAll(tmpDIR)
-						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true); err != nil {
+						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true, true); err != nil {
 							return fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 						}
 						folder, err := i.GetFolder()
@@ -346,7 +392,7 @@ var ipswCmd = &cobra.Command{
 						}
 					}
 				}
-				if len(pattern) > 0 { // PATTERN MATCHING MODE
+				if len(remotePattern) > 0 { // PATTERN MATCHING MODE
 					for _, i := range ipsws {
 						log.WithFields(log.Fields{
 							"device":  i.Identifier,
@@ -354,11 +400,11 @@ var ipswCmd = &cobra.Command{
 							"version": i.Version,
 							"signed":  i.Signed,
 						}).Info("Parsing remote IPSW")
-						dlRE, err := regexp.Compile(pattern)
+						dlRE, err := regexp.Compile(remotePattern)
 						if err != nil {
 							return errors.Wrap(err, "failed to compile regexp")
 						}
-						log.Infof("Downloading files matching pattern %#v", pattern)
+						log.Infof("Downloading files matching pattern %#v", remotePattern)
 						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
 							Proxy:    proxy,
 							Insecure: insecure,
@@ -374,7 +420,7 @@ var ipswCmd = &cobra.Command{
 						if err != nil {
 							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
 						}
-						if err := utils.RemoteUnzip(zr.File, dlRE, filepath.Join(destPath, folder), flat); err != nil {
+						if err := utils.RemoteUnzip(zr.File, dlRE, filepath.Join(destPath, folder), flat, true); err != nil {
 							return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
 						}
 					}

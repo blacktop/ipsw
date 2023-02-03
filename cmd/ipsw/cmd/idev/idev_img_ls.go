@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -67,7 +67,7 @@ var idevImgListCmd = &cobra.Command{
 		}
 		defer cli.Close()
 
-		images, err := cli.ListImages(mount.ImageTypeDeveloper)
+		images, err := cli.ListImages()
 		if err != nil {
 			return fmt.Errorf("failed to list images: %w", err)
 		}

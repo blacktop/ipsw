@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -48,9 +48,10 @@ func init() {
 
 // machoO2aCmd represents the mo2a command
 var machoO2aCmd = &cobra.Command{
-	Use:   "o2a <macho> <offset>",
-	Short: "Convert MachO offset to address",
-	Args:  cobra.MinimumNArgs(2),
+	Use:     "o2a <macho> <offset>",
+	Aliases: []string{"o"},
+	Short:   "Convert MachO offset to address",
+	Args:    cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var err error
@@ -128,14 +129,24 @@ var machoO2aCmd = &cobra.Command{
 			} else {
 				sec := m.FindSectionForVMAddr(address)
 				if sec == nil {
-					return fmt.Errorf("failed to find a section containing address %#x", address)
+					seg := m.FindSegmentForVMAddr(address)
+					if seg == nil {
+						return fmt.Errorf("failed to find a segment or section containing address %#x", address)
+					} else {
+						log.WithFields(log.Fields{
+							"hex":     fmt.Sprintf("%#x", address),
+							"dec":     fmt.Sprintf("%d", address),
+							"segment": seg.Name,
+						}).Info("Address")
+					}
+				} else {
+					log.WithFields(log.Fields{
+						"hex":     fmt.Sprintf("%#x", address),
+						"dec":     fmt.Sprintf("%d", address),
+						"segment": sec.Seg,
+						"section": sec.Name,
+					}).Info("Address")
 				}
-				log.WithFields(log.Fields{
-					"hex":     fmt.Sprintf("%#x", address),
-					"dec":     fmt.Sprintf("%d", address),
-					"segment": sec.Seg,
-					"section": sec.Name,
-				}).Info("Address")
 			}
 		}
 

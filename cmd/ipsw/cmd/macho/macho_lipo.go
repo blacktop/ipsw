@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -46,9 +46,10 @@ func init() {
 
 // lipoCmd represents the lipo command
 var lipoCmd = &cobra.Command{
-	Use:   "lipo",
-	Short: "Extract single MachO out of a universal/fat MachO",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "lipo",
+	Aliases: []string{"l"},
+	Short:   "Extract single MachO out of a universal/fat MachO",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var farch macho.FatArch

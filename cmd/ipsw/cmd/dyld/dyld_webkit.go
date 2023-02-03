@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -43,14 +43,16 @@ func init() {
 	WebkitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	WebkitCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	WebkitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	WebkitCmd.Flags().BoolP("diff", "d", false, "Diff two dyld_shared_cache files")
 	WebkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // WebkitCmd represents the webkit command
 var WebkitCmd = &cobra.Command{
-	Use:   "webkit <dyld_shared_cache>",
-	Short: "Get WebKit version from a dyld_shared_cache",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "webkit <dyld_shared_cache>",
+	Aliases: []string{"w"},
+	Short:   "Get WebKit version from a dyld_shared_cache",
+	Args:    cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -62,6 +64,7 @@ var WebkitCmd = &cobra.Command{
 		proxy, _ := cmd.Flags().GetString("proxy")
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		apiToken, _ := cmd.Flags().GetString("api")
+		diff, _ := cmd.Flags().GetBool("diff")
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
@@ -109,9 +112,58 @@ var WebkitCmd = &cobra.Command{
 			return err
 		}
 
+		if diff {
+			dscPath2 := filepath.Clean(args[1])
+			fileInfo, err := os.Lstat(dscPath2)
+			if err != nil {
+				return fmt.Errorf("file %s does not exist", dscPath2)
+			}
+			// Check if file is a symlink
+			if fileInfo.Mode()&os.ModeSymlink != 0 {
+				symlinkPath, err := os.Readlink(dscPath2)
+				if err != nil {
+					return errors.Wrapf(err, "failed to read symlink %s", dscPath2)
+				}
+				// TODO: this seems like it would break
+				linkParent := filepath.Dir(dscPath2)
+				linkRoot := filepath.Dir(linkParent)
+
+				dscPath2 = filepath.Join(linkRoot, symlinkPath)
+			}
+
+			f, err := dyld.Open(dscPath2)
+			if err != nil {
+				return err
+			}
+			defer f.Close()
+
+			image, err := f.Image("WebKit")
+			if err != nil {
+				return fmt.Errorf("image not in %s: %v", dscPath2, err)
+			}
+
+			m2, err := image.GetPartialMacho()
+			if err != nil {
+				return err
+			}
+
+			out, err := utils.GitDiff(m.SourceVersion().Version.String()+"\n", m2.SourceVersion().Version.String()+"\n")
+			if err != nil {
+				return err
+			}
+			if len(out) == 0 {
+				log.Info("No differences found")
+				return nil
+			}
+			log.Info("Differences found")
+			fmt.Println(out)
+
+			return nil
+		}
+
 		if getRev {
 			log.Info("Querying https://trac.webkit.org...")
-			ver, rev, err := dyld.ScrapeWebKitTRAC(m.SourceVersion().Version)
+			ver, rev, err := dyld.ScrapeWebKitTRAC(m.SourceVersion().Version.String())
 			if err != nil {
 				log.Infof("WebKit Version: %s", m.SourceVersion().Version)
 				return err
@@ -135,7 +187,7 @@ var WebkitCmd = &cobra.Command{
 				}
 			}
 			for _, tag := range tags {
-				if strings.Contains(tag.Name, m.SourceVersion().Version) {
+				if strings.Contains(tag.Name, m.SourceVersion().Version.String()) {
 					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
 					utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
 					utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))

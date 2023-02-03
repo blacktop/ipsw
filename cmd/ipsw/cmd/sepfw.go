@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -200,9 +200,10 @@ func init() {
 
 // sepCmd represents the sep command
 var sepCmd = &cobra.Command{
-	Use:   "sepfw <SEP_FIRMWARE>",
-	Short: "Dump MachOs",
-	Args:  cobra.MinimumNArgs(1),
+	Use:     "sepfw <SEP_FIRMWARE>",
+	Aliases: []string{"sep"},
+	Short:   "Dump MachOs",
+	Args:    cobra.MinimumNArgs(1),
 	// Hidden: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -275,7 +276,7 @@ var sepCmd = &cobra.Command{
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
 			if Verbose {
-				fmt.Println(m.FileTOC.LoadsString())
+				fmt.Println(m.FileTOC.String())
 			}
 
 			// SEPOS
@@ -292,7 +293,7 @@ var sepCmd = &cobra.Command{
 				return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 			}
 			if Verbose {
-				fmt.Println(m.FileTOC.LoadsString())
+				fmt.Println(m.FileTOC.String())
 			}
 
 			// APPS
@@ -311,7 +312,7 @@ var sepCmd = &cobra.Command{
 					return fmt.Errorf("failed to write %s to disk: %v", fname, err)
 				}
 				if Verbose {
-					fmt.Println(m.FileTOC.LoadsString())
+					fmt.Println(m.FileTOC.String())
 				}
 			}
 

@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -44,6 +44,7 @@ func init() {
 // img4KbagCmd represents the kbag command
 var img4KbagCmd = &cobra.Command{
 	Use:           "kbag <IMG4>",
+	Aliases:       []string{"k"},
 	Short:         "Extract kbag from img4",
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,

@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -41,15 +41,29 @@ func init() {
 
 	rssCmd.Flags().BoolP("watch", "w", false, "Watch for NEW releases")
 	rssCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-
+	rssCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("device")
+		DownloadCmd.PersistentFlags().MarkHidden("model")
+		DownloadCmd.PersistentFlags().MarkHidden("version")
+		DownloadCmd.PersistentFlags().MarkHidden("build")
+		DownloadCmd.PersistentFlags().MarkHidden("confirm")
+		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
+		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
+		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
+		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
+		c.Parent().HelpFunc()(c, s)
+	})
 	viper.BindPFlag("download.rss.watch", rssCmd.Flags().Lookup("watch"))
 	viper.BindPFlag("download.rss.json", rssCmd.Flags().Lookup("json"))
 }
 
 // rssCmd represents the rss command
 var rssCmd = &cobra.Command{
-	Use:   "rss",
-	Short: "Read Releases - Apple Developer RSS Feed",
+	Use:     "rss",
+	Aliases: []string{"r"},
+	Short:   "Read Releases - Apple Developer RSS Feed",
 	Run: func(cmd *cobra.Command, args []string) {
 		var releases []string
 

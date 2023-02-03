@@ -1,0 +1,55 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: SandboxCollection15.bt
+//   Authors: blacktop
+//   Version: 1.5
+//   Purpose: iOS 15.x Sandbox Profile Collection
+//  Category: Operating System
+// File Mask:
+//  ID Bytes: 00 80, 00 00, 00 40
+//   History:
+//   1.5  2022-07-25 blacktop: Add support for iOS16.x and process more fields
+//   1.0  2021-04-17 blacktop: Initial header processing
+//------------------------------------------------
+
+typedef struct
+{
+    uint16 Type<format = hex>;
+    uint16 OpNodeCount<format = hex>;
+    uchar OpCount<format = decimal>;
+    uchar GlobalVarCount<format = decimal>;
+    uchar unknown1<format = decimal>;
+    uchar unknown2<format = decimal>;
+    uint16 ProfileCount<format = decimal>;
+    uint16 RegexItemCount<format = decimal>;
+    uint16 PolicyCount<format = decimal>;
+} CollectionHeader;
+
+typedef struct
+{
+    uint16 NameOffset<format = hex>;
+    uint16 Version<format = hex>;
+    uint16 Unknown<format = hex>;
+    uint16 OpCount[header.OpCount]<format = hex>;
+} Profile;
+
+typedef uint16 offset;
+typedef uint64 node;
+
+LittleEndian();
+
+CollectionHeader header;
+offset regexOffset[header.RegexItemCount]<format = hex, bgcolor = cLtBlue>;
+offset globalsOffsets[header.GlobalVarCount]<format = hex, bgcolor = cLtPurple>;
+offset policyOffsets[header.PolicyCount]<format = hex, bgcolor = cLtAqua>;
+if (header.unknown1 > 0)
+    offset entitlements[header.unknown1]<format = hex, bgcolor = cLtRed>;
+Profile profiles[header.ProfileCount]<format = hex, bgcolor = cLtGray>;
+local uint64 pos = FTell();
+if (pos % 8)
+byte padding[8 - ((pos + 8) % 8)]; // align to 8 byte boundary
+node operations[header.OpNodeCount]<format = hex, bgcolor = cLtYellow>;
+
+local uint64 baseOffset = FTell();
+Printf("baseOffset: %#x\n", baseOffset);

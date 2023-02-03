@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -40,9 +40,10 @@ func init() {
 
 // TbdCmd represents the tbd command
 var TbdCmd = &cobra.Command{
-	Use:   "tbd <dyld_shared_cache> <image>",
-	Short: "Generate a .tbd file for a dylib",
-	Args:  cobra.MinimumNArgs(2),
+	Use:     "tbd <dyld_shared_cache> <image>",
+	Aliases: []string{"t"},
+	Short:   "Generate a .tbd file for a dylib",
+	Args:    cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

@@ -1,7 +1,7 @@
 //go:build libusb
 
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -33,14 +33,14 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(exitCmd)
+	RestoreCmd.AddCommand(restoreExitCmd)
 }
 
-// exitCmd represents the exit command
-var exitCmd = &cobra.Command{
+// restoreExitCmd represents the exit command
+var restoreExitCmd = &cobra.Command{
 	Use:           "exit",
 	Short:         "Exit recovery mode",
-	Args:          cobra.MaximumNArgs(2),
+	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {

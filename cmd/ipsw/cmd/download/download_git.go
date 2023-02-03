@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -44,6 +44,20 @@ func init() {
 	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	gitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	gitCmd.Flags().Bool("webkit", false, "Get WebKit tags")
+	gitCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("device")
+		DownloadCmd.PersistentFlags().MarkHidden("model")
+		DownloadCmd.PersistentFlags().MarkHidden("version")
+		DownloadCmd.PersistentFlags().MarkHidden("build")
+		DownloadCmd.PersistentFlags().MarkHidden("confirm")
+		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
+		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
+		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
+		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
+		c.Parent().HelpFunc()(c, s)
+	})
 	viper.BindPFlag("download.git.product", gitCmd.Flags().Lookup("product"))
 	viper.BindPFlag("download.git.output", gitCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.git.api", gitCmd.Flags().Lookup("api"))
@@ -54,6 +68,7 @@ func init() {
 // gitCmd represents the git command
 var gitCmd = &cobra.Command{
 	Use:           "git",
+	Aliases:       []string{"g", "github"},
 	Short:         "Download github.com/orgs/apple-oss-distributions tarballs",
 	SilenceUsage:  false,
 	SilenceErrors: false,

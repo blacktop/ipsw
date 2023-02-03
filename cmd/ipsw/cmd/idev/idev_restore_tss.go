@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,23 +28,24 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(tssCmd)
+	RestoreCmd.AddCommand(restoreTssCmd)
 }
 
-// tssCmd represents the tss command
-var tssCmd = &cobra.Command{
+// restoreTssCmd represents the tss command
+var restoreTssCmd = &cobra.Command{
 	Use:           "tss",
 	Short:         "Get SHSH blobs",
 	Args:          cobra.MaximumNArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		panic("not implemented")
+		panic("not implemented") // TODO: implement
 
 		return nil
 	},

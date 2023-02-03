@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -42,6 +42,13 @@ func init() {
 	macosCmd.Flags().BoolP("assistant", "a", false, "Only download the InstallAssistant.pkg")
 	macosCmd.Flags().Bool("latest", false, "Download latest macOS installer")
 	// macosCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache from remote installer")
+	macosCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
+		DownloadCmd.PersistentFlags().MarkHidden("white-list")
+		DownloadCmd.PersistentFlags().MarkHidden("black-list")
+		DownloadCmd.PersistentFlags().MarkHidden("device")
+		DownloadCmd.PersistentFlags().MarkHidden("model")
+		c.Parent().HelpFunc()(c, s)
+	})
 	viper.BindPFlag("download.macos.list", macosCmd.Flags().Lookup("list"))
 	viper.BindPFlag("download.macos.work-dir", macosCmd.Flags().Lookup("work-dir"))
 	viper.BindPFlag("download.macos.ignore", macosCmd.Flags().Lookup("ignore"))
@@ -71,6 +78,7 @@ func init() {
 // macosCmd represents the macos command
 var macosCmd = &cobra.Command{
 	Use:           "macos",
+	Aliases:       []string{"m", "mac"},
 	Short:         "Download macOS installers",
 	SilenceUsage:  false,
 	SilenceErrors: true,
@@ -86,10 +94,6 @@ var macosCmd = &cobra.Command{
 		viper.BindPFlag("download.skip-all", cmd.Flags().Lookup("skip-all"))
 		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
 		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
-		viper.BindPFlag("download.white-list", cmd.Flags().Lookup("white-list"))
-		viper.BindPFlag("download.black-list", cmd.Flags().Lookup("black-list"))
-		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
-		viper.BindPFlag("download.model", cmd.Flags().Lookup("model"))
 		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
 		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 

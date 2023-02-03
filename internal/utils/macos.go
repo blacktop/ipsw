@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -129,6 +130,30 @@ func CodeSignWithEntitlements(filePath, entitlementsPath, signature string) erro
 // CodeSignAdHoc codesigns a given binary with ad-hoc signature
 func CodeSignAdHoc(filePath string) error {
 	return CodeSign(filePath, "-")
+}
+
+func CodesignVerify(path string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("codesign", "--verify", "--deep", "--strict", "--verbose=4", path)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return string(out), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
+func CodesignShow(path string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("codesign", "-d", "--verbose=4", path)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return string(out), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
 }
 
 // CreateSparseDiskImage creates a sparse disk image and returns it's path
@@ -332,10 +357,12 @@ func GetBuildInfo() (*BuildInfo, error) {
 	return nil, fmt.Errorf("only supported on macOS")
 }
 
+var ErrMountResourceBusy = errors.New("hdiutil: mount failed - Resource busy")
+
 // Mount mounts a DMG with hdiutil
 func Mount(image, mountPoint string) error {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
+		cmd := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -349,6 +376,9 @@ func Mount(image, mountPoint string) error {
 
 		out, err := cmd.CombinedOutput()
 		if err != nil {
+			if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
+				return ErrMountResourceBusy
+			}
 			return fmt.Errorf("%v: %s", err, out)
 		}
 
@@ -358,10 +388,35 @@ func Mount(image, mountPoint string) error {
 	return nil
 }
 
-func MountFS(image string) (string, error) {
+func IsAlreadyMounted(image string) (string, bool, error) {
+	info, err := MountInfo()
+	if err != nil {
+		return "", false, err
+	}
+	for _, i := range info.Images {
+		if strings.Contains(i.ImagePath, image) {
+			for _, entry := range i.SystemEntities {
+				if entry.MountPoint != "" {
+					return entry.MountPoint, true, nil
+				}
+			}
+			return "", true, nil
+		}
+	}
+	return "", false, nil
+}
+
+func MountFS(image string) (string, bool, error) {
 	var mountPoint string
 	if runtime.GOOS == "darwin" {
-		mountPoint = "/tmp/ios"
+		mountPoint = fmt.Sprintf("/tmp/%s.mount", filepath.Base(image))
+		// check if already mounted
+		if prevMountPoint, mounted, err := IsAlreadyMounted(image); mounted && err == nil {
+			if prevMountPoint != "" {
+				mountPoint = prevMountPoint
+			}
+			return mountPoint, true, nil
+		}
 	} else {
 		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
 			// Create in-docker mount point
@@ -371,14 +426,14 @@ func MountFS(image string) (string, error) {
 			// Create temporary non-darwin mount point
 			mountPoint = image + "_temp_mount"
 			if err := os.Mkdir(mountPoint, 0750); err != nil {
-				return "", fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
+				return "", false, fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
 			}
 		}
 	}
 	if err := Mount(image, mountPoint); err != nil {
-		return "", fmt.Errorf("failed to mount %s: %v", image, err)
+		return "", false, fmt.Errorf("failed to mount %s: %v", image, err)
 	}
-	return mountPoint, nil
+	return mountPoint, false, nil
 }
 
 // Unmount unmounts a DMG with hdiutil
@@ -409,19 +464,67 @@ func Unmount(mountPoint string, force bool) error {
 	return nil
 }
 
+type systemEntry struct {
+	ContentHint string `plist:"content-hint,omitempty" xml:"content-hint,omitempty"`
+	DevEntry    string `plist:"dev-entry,omitempty" xml:"dev-entry,omitempty"`
+	MountPoint  string `plist:"mount-point,omitempty" xml:"mount-point,omitempty"`
+}
+
+type image struct {
+	Autodiskmount  bool          `plist:"autodiskmount,omitempty" xml:"autodiskmount,omitempty"`
+	BlockCount     int64         `plist:"blockcount,omitempty" xml:"blockcount,omitempty"`
+	BlockSize      int64         `plist:"blocksize,omitempty" xml:"blocksize,omitempty"`
+	DiskImages2    bool          `plist:"diskimages2,omitempty" xml:"diskimages2,omitempty"`
+	HdidPID        int64         `plist:"hdid-pid,omitempty" xml:"hdid-pid,omitempty"`
+	IconPath       string        `plist:"icon-path,omitempty" xml:"icon-path,omitempty"`
+	ImageEncrypted bool          `plist:"image-encrypted,omitempty" xml:"image-encrypted,omitempty"`
+	ImagePath      string        `plist:"image-path,omitempty" xml:"image-path,omitempty"`
+	ImageType      string        `plist:"image-type,omitempty" xml:"image-type,omitempty"`
+	OwnerUID       int64         `plist:"owner-uid,omitempty" xml:"owner-uid,omitempty"`
+	Removable      bool          `plist:"removable,omitempty" xml:"removable,omitempty"`
+	SystemEntities []systemEntry `plist:"system-entities,omitempty" xml:"system-entities,omitempty"`
+}
+
+type HdiUtilInfo struct {
+	Framework string  `plist:"framework,omitempty" xml:"framework,omitempty"`
+	Revision  string  `plist:"revision,omitempty" xml:"revision,omitempty"`
+	Vendor    string  `plist:"vendor,omitempty" xml:"vendor,omitempty"`
+	Images    []image `plist:"images,omitempty" xml:"images,omitempty"`
+}
+
+func MountInfo() (*HdiUtilInfo, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("hdiutil", "info", "-plist")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("%v: %s", err, out)
+		}
+		var info HdiUtilInfo
+		if err := plist.NewDecoder(bytes.NewReader(out)).Decode(&info); err != nil {
+			return nil, fmt.Errorf("failed to decode hdiutil info plist: %v", err)
+		}
+		return &info, nil
+	}
+	return nil, fmt.Errorf("only supported on macOS")
+}
+
 func ExtractFromDMG(dmgPath, destPath string, pattern *regexp.Regexp) error {
 
 	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
-	mountPoint, err := MountFS(dmgPath)
+	mountPoint, alreadyMounted, err := MountFS(dmgPath)
 	if err != nil {
 		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
-	defer func() {
-		Indent(log.Info, 2)(fmt.Sprintf("Unmounting DMG %s", dmgPath))
-		if err := Unmount(mountPoint, false); err != nil {
-			log.Errorf("failed to unmount File System DMG mount at %s: %v", dmgPath, err)
-		}
-	}()
+	if alreadyMounted {
+		Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
+	} else {
+		defer func() {
+			Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
+			if err := Unmount(mountPoint, false); err != nil {
+				log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
+			}
+		}()
+	}
 
 	// extract files that match regex pattern
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {

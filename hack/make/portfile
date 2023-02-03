@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+set -o errexit
+set -o nounset
+set -o pipefail
+if [[ "${TRACE-0}" == "1" ]]; then
+    set -o xtrace
+fi
+
+LATEST_VERSION=""
+
+if [[ "${1-}" =~ ^-*h(elp)?$ ]]; then
+    echo 'Usage: hack/make/portfile github.com/blacktop/ports
+
+This script updates Portfile to latest version.
+
+'
+    exit
+fi
+
+get_version() {
+    LATEST_VERSION=$(gh release view --json tagName --template '{{ slice .tagName 1 }}')
+    echo "  [!] Updating to version: $LATEST_VERSION"
+}
+
+main() {
+    REPO="$1"
+    PORTFILE="$REPO/security/ipsw/Portfile"
+
+    gh release download --archive=tar.gz --dir /tmp --skip-existing
+    get_version
+    sed -i '' "s/github.com\/blacktop\/ipsw .* v/github.com\/blacktop\/ipsw ${LATEST_VERSION} v/" ${PORTFILE}
+
+    RMD160=$(openssl dgst -rmd160 /tmp/ipsw-$LATEST_VERSION.tar.gz | awk '{print $2}')
+    echo "  [!] Updating rmd160 to ${RMD160}"
+    sed -i '' "s|rmd160  .* \\\|rmd160  ${RMD160} \\\|" ${PORTFILE}
+
+    SHA256=$(openssl dgst -sha256 /tmp/ipsw-$LATEST_VERSION.tar.gz | awk '{print $2}')
+    echo "  [!] Updating sha256 to $SHA256"
+    sed -i '' "s|sha256  .* \\\|sha256  ${SHA256} \\\|" ${PORTFILE}
+
+    SIZE=$(stat -f '%z' /tmp/ipsw-$LATEST_VERSION.tar.gz)
+    echo "  [!] Updating size to $SIZE"
+    sed -i '' "s|size    .*|size    ${SIZE}|" ${PORTFILE}
+
+    echo "  [!] Pushing update..."
+    cd $REPO
+    git commit -am "ipsw: update to $LATEST_VERSION"
+    git push
+}
+
+main "$@"

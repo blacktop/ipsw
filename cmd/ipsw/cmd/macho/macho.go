@@ -1,5 +1,5 @@
 /*
-Copyright © 2018-2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,9 +28,10 @@ import (
 
 // MachoCmd represents the macho command
 var MachoCmd = &cobra.Command{
-	Use:   "macho",
-	Short: "Parse MachO",
-	Args:  cobra.NoArgs,
+	Use:     "macho",
+	Aliases: []string{"m"},
+	Short:   "Parse MachO",
+	Args:    cobra.NoArgs,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))

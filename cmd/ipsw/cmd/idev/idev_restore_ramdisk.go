@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 blacktop
+Copyright © 2018-2023 blacktop
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -28,23 +28,24 @@ import (
 )
 
 func init() {
-	restoreCmd.AddCommand(ramdiskCmd)
+	RestoreCmd.AddCommand(restoreRamdiskCmd)
 }
 
-// ramdiskCmd represents the ramdisk command
-var ramdiskCmd = &cobra.Command{
+// restoreRamdiskCmd represents the ramdisk command
+var restoreRamdiskCmd = &cobra.Command{
 	Use:           "ramdisk",
 	Short:         "Enter ramdisk",
 	Args:          cobra.MaximumNArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		panic("not implemented")
+		panic("not implemented") // TODO: implement
 
 		return nil
 	},

@@ -4,6 +4,7 @@
 *.dll
 *.so
 *.dylib
+*.a
 
 # Test binary, build with `go test -c`
 *.test
@@ -40,7 +41,6 @@ manpages/
 *.prof
 *.download
 checksums.txt.sha1
-unicorn2/
 
 # Docs
 public
@@ -54,3 +54,9 @@ www/docs/static/releases*.json
 
 # Unicorn EMU
 unicorn2/
+
+# 🤫
+cmd/ipsw/cmd/kernel/kernel_sbdec.go
+cmd/ipsw/cmd/kernel/kernel_sbopts.go
+cmd/ipsw/cmd/kernel/kernel_libsandbox.go
+pkg/sandbox/

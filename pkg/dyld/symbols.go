@@ -3,6 +3,7 @@ package dyld
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/gob"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // ErrNoLocals is the error for a shared cache that has no LocalSymbolsOffset
@@ -67,8 +69,9 @@ type Symbol struct {
 	Kind    symKind `json:"-"`
 }
 
+var symDarkAddrColor = color.New(color.Bold, color.FgBlue).SprintfFunc()
 var symAddrColor = color.New(color.Bold, color.FgMagenta).SprintfFunc()
-var symTypeColor = color.New(color.FgCyan).SprintfFunc()
+var symTypeColor = color.New(color.FgGreen).SprintfFunc()
 var symNameColor = color.New(color.Bold).SprintFunc()
 var symImageColor = color.New(color.Faint, color.FgHiWhite).SprintfFunc()
 
@@ -258,7 +261,6 @@ func (f *File) GetSymbol(name string) (*Symbol, error) {
 }
 
 func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieExport, error) {
-
 	for _, image := range f.Images {
 		if image.CacheImageInfoExtra.ExportsTrieSize > 0 {
 			log.Debugf("Scanning Image: %s", image.Name)
@@ -277,6 +279,79 @@ func (f *File) FindExportedSymbol(symbolName string) (*trie.TrieExport, error) {
 	return nil, fmt.Errorf("symbol was not found in exports")
 }
 
+func (f *File) GetExportedSymbols(ctx context.Context, symbolName string) (<-chan *Symbol, error) {
+	errs, _ := errgroup.WithContext(ctx)
+	syms := make(chan *Symbol, 1)
+
+	if f.SupportsDylibPrebuiltLoader() {
+		errs.Go(func() error {
+			for _, image := range f.Images {
+				pbl, err := f.GetDylibPrebuiltLoader(image.Name)
+				if err != nil {
+					return fmt.Errorf("failed to get prebuilt loader for %s: %s", image.Name, err)
+				}
+				uuid, off, err := f.GetOffset(image.LoadAddress + pbl.ExportsTrieLoaderOffset)
+				if err != nil {
+					return fmt.Errorf("failed to get ExportsTrie offset for %s: %s", image.Name, err)
+				}
+				data, err := f.ReadBytesForUUID(uuid, int64(off), uint64(pbl.ExportsTrieLoaderSize))
+				if err != nil {
+					return fmt.Errorf("failed to read ExportsTrie data for %s: %s", image.Name, err)
+				}
+				r := bytes.NewReader(data)
+				if _, err := trie.WalkTrie(r, symbolName); err == nil {
+					sym, err := trie.ReadExport(r, symbolName, image.LoadAddress)
+					if err != nil {
+						return fmt.Errorf("failed to read export for %s: %s", image.Name, err)
+					}
+					syms <- &Symbol{
+						Name:    sym.Name,
+						Address: sym.Address,
+						Type:    sym.Type(),
+						Image:   image.Name,
+					}
+				}
+			}
+			close(syms)
+			return nil
+		})
+		return syms, errs.Wait()
+	}
+
+	return nil, fmt.Errorf("shared cache does not support prebuilt loader")
+}
+
+func (f *File) DumpStubIslands() error {
+	if len(f.islandStubs) == 0 {
+		if err := f.ParseStubIslands(); err != nil {
+			return fmt.Errorf("failed to parse stub islands: %v", err)
+		}
+	}
+	for stub, target := range f.islandStubs {
+		if symName, ok := f.AddressToSymbol[target]; ok {
+			fmt.Printf("%#x: %s\n", stub, symName)
+		} else {
+			fmt.Printf("%#x: %#x\n", stub, target)
+		}
+	}
+	return nil
+}
+
+func (f *File) GetStubIslands() (map[uint64]string, error) {
+	stubs := make(map[uint64]string)
+	if len(f.islandStubs) == 0 {
+		if err := f.ParseStubIslands(); err != nil {
+			return nil, fmt.Errorf("failed to parse stub islands: %v", err)
+		}
+	}
+	for stub, target := range f.islandStubs {
+		if symName, ok := f.AddressToSymbol[target]; ok {
+			stubs[stub] = symName
+		}
+	}
+	return stubs, nil
+}
+
 // OpenOrCreateA2SCache returns an address to symbol map if the cache file exists otherwise it will create a NEW one
 func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	if _, err := os.Stat(cacheFile); os.IsNotExist(err) {
@@ -292,7 +367,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 				return err
 			}
 		}
-		if f.Headers[f.UUID].CacheType == CacheTypeStubIslands {
+		if f.Headers[f.UUID].CacheType == CacheTypeUniversal {
 			log.Info("parsing stub islands...")
 			if err := f.ParseStubIslands(); err != nil {
 				return fmt.Errorf("failed to parse stub islands: %v", err)
@@ -333,6 +408,8 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 	}
 	// gzr.Close()
 	a2sFile.Close()
+
+	f.symCacheLoaded = true
 
 	return nil
 }
@@ -397,19 +474,19 @@ func (f *File) GetCString(strVMAdr uint64) (string, error) {
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	if _, err := sr.Seek(int64(strOffset), io.SeekStart); err != nil {
-		return "", fmt.Errorf("failed to Seek to offset 0x%x: %v", strOffset, err)
+		return "", fmt.Errorf("failed to Seek to offset %#x: %v", strOffset, err)
 	}
 
 	s, err := bufio.NewReader(sr).ReadString('\x00')
 	if err != nil {
-		return "", fmt.Errorf("failed to ReadString as offset 0x%x, %v", strOffset, err)
+		return "", fmt.Errorf("failed to ReadString as offset %#x, %v", strOffset, err)
 	}
 
 	if len(s) > 0 {
 		return strings.Trim(s, "\x00"), nil
 	}
 
-	return "", fmt.Errorf("string not found at offset 0x%x", strOffset)
+	return "", fmt.Errorf("string not found at offset %#x", strOffset)
 }
 
 // GetCStringAtOffsetForUUID returns a c-string at a given offset
@@ -418,17 +495,17 @@ func (f *File) GetCStringAtOffsetForUUID(uuid types.UUID, offset uint64) (string
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
 	if _, err := sr.Seek(int64(offset), io.SeekStart); err != nil {
-		return "", fmt.Errorf("failed to Seek to offset 0x%x: %v", offset, err)
+		return "", fmt.Errorf("failed to Seek to offset %#x: %v", offset, err)
 	}
 
 	s, err := bufio.NewReader(sr).ReadString('\x00')
 	if err != nil {
-		return "", fmt.Errorf("failed to ReadString as offset 0x%x, %v", offset, err)
+		return "", fmt.Errorf("failed to ReadString as offset %#x, %v", offset, err)
 	}
 
 	if len(s) > 0 {
 		return strings.Trim(s, "\x00"), nil
 	}
 
-	return "", fmt.Errorf("string not found at offset 0x%x", offset)
+	return "", fmt.Errorf("string not found at offset %#x", offset)
 }

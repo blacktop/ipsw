@@ -119,6 +119,33 @@ func (i *Info) GetDevices(devs *Devices) error {
 				// return fmt.Errorf("error getting device %s in xcode device list: %v", dt.ProductType, err)
 			}
 
+			devType := "unknown"
+			devSDK := "unknown"
+			switch {
+			case strings.HasPrefix(dt.ProductType, "iPod"):
+				fallthrough
+			case strings.HasPrefix(dt.ProductType, "iPad"):
+				fallthrough
+			case strings.HasPrefix(dt.ProductType, "iPhone"):
+				devType = "ios"
+				devSDK = "iphoneos"
+			case strings.HasPrefix(dt.ProductType, "Watch"):
+				devType = "watchos"
+				devSDK = "watchos"
+			case strings.HasPrefix(dt.ProductType, "AudioAccessory"):
+				devType = "audioos"
+				devSDK = "appletvos"
+			case strings.HasPrefix(dt.ProductType, "AppleTV"):
+				devType = "tvos"
+				devSDK = "appletvos"
+			case strings.HasPrefix(dt.ProductType, "Mac"):
+				devType = "macos"
+				devSDK = "macosx"
+			case strings.HasPrefix(dt.ProductType, "AppleDisplay"):
+				devType = "accessory"
+				devSDK = "iphoneos"
+			}
+
 			if len(dt.ProductType) > 0 {
 				if _, ok := (*devs)[dt.ProductType]; !ok {
 					if dt.ProductName != dt.ProductDescription {
@@ -127,37 +154,45 @@ func (i *Info) GetDevices(devs *Devices) error {
 							Description: dt.ProductDescription,
 							Boards:      make(map[string]Board),
 							MemClass:    uint64(xdev.DeviceTrait.DevicePerformanceMemoryClass),
+							Type:        devType,
+							SDKPlatform: devSDK,
 						}
 					} else {
 						(*devs)[dt.ProductType] = Device{
-							Name:     dt.ProductName,
-							Boards:   make(map[string]Board),
-							MemClass: uint64(xdev.DeviceTrait.DevicePerformanceMemoryClass),
+							Name:        dt.ProductName,
+							Boards:      make(map[string]Board),
+							MemClass:    uint64(xdev.DeviceTrait.DevicePerformanceMemoryClass),
+							Type:        devType,
+							SDKPlatform: devSDK,
 						}
 					}
 				}
 			}
 
-			proc, err := getProcessor(xdev.Platform)
-			if err != nil {
-				return fmt.Errorf("failed to get processor for CPU ID %s: %v", xdev.Platform, err)
-			}
-
-			if len(proc.Name) == 0 {
-				log.Errorf("no processor for %s for board %s: %s", dt.ProductType, dt.BoardConfig, dt.ProductName)
-			}
-
-			(*devs)[dt.ProductType].Boards[dt.BoardConfig] = Board{
-				CPU:      proc.Name,
-				Platform: xdev.Platform,
-				// PlatformName:      d.PlatformName,
-				ChipID:          i.Plists.BuildManifest.BuildIdentities[0].ApChipID,
-				CpuISA:          proc.CPUISA,
-				Arch:            xdev.DeviceTrait.PreferredArchitecture,
-				BoardID:         i.Plists.BuildManifest.BuildIdentities[0].ApBoardID,
-				BasebandChipID:  i.Plists.BuildManifest.BuildIdentities[0].BbChipID,
-				KernelCacheType: kctype,
-				// ResearchSupported: d.ResearchSupported,
+			if i.Plists.Restore != nil {
+				if dev := i.Plists.GetDeviceForBoardConfig(dt.BoardConfig); dev != nil {
+					proc, err := getProcessor(dev.Platform)
+					if err != nil {
+						return fmt.Errorf("failed to get processor for CPU ID %s: %v", dt.DeviceType, err)
+					}
+					if len(proc.Name) == 0 {
+						log.Errorf("no processor for %s for board %s: %s", dt.ProductType, dt.BoardConfig, dt.ProductName)
+					}
+					(*devs)[dt.ProductType].Boards[dt.BoardConfig] = Board{
+						CPU:             proc.Name,
+						Platform:        dev.Platform,
+						PlatformName:    dt.SocGeneration,
+						ChipID:          fmt.Sprintf("%#x", dev.CPID),
+						CpuISA:          proc.CPUISA,
+						Arch:            xdev.DeviceTrait.PreferredArchitecture,
+						BoardID:         fmt.Sprintf("%#x", dev.BDID),
+						BasebandChipID:  i.Plists.BuildManifest.BuildIdentities[0].BbChipID,
+						KernelCacheType: kctype,
+						// ResearchSupported: d.ResearchSupported,
+					}
+				}
+			} else {
+				return fmt.Errorf("no restore plist found for %s", dt.ProductType)
 			}
 		}
 	} else {

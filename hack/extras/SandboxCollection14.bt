@@ -1,0 +1,27 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.1 Binary Template
+//
+//      File: SandboxCollection14.bt
+//   Authors: blacktop
+//   Version: 1.0
+//   Purpose: iOS 14.x Sandbox Profile Collection
+//  Category: Operating System
+// File Mask:
+//  ID Bytes: 00 80, 00 00
+//   History:
+//------------------------------------------------
+
+typedef struct
+{
+    uint16 Type<format = hex>;
+    uint16 OpNodeSize<format = hex>;
+    uchar OpCount<format = decimal>;
+    uchar GlobalVarCount<format = decimal>;
+    uint16 ProfileCount<format = decimal>;
+    uint16 RegexItemCount<format = decimal>;
+    uint16 MsgItemCount<format = decimal>;
+} CollectionHeader;
+
+LittleEndian();
+
+CollectionHeader header;

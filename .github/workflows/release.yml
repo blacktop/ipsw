@@ -16,16 +16,13 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      -
-        name: Checkout
+      - name: Checkout
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      -
-        name: Fetch all tags
+      - name: Fetch all tags
         run: git fetch --force --tags
-      -
-        name: Set up Go
+      - name: Set up Go
         uses: actions/setup-go@v3
         with:
           go-version: 1.19
@@ -35,8 +32,7 @@ jobs:
         name: linux-deps
         run: |
           sudo apt-get -yq install gcc-aarch64-linux-gnu cmake pkg-config jq libusb-1.0-0-dev
-      -
-        if: matrix.platform == 'ubuntu-latest'
+      - if: matrix.platform == 'ubuntu-latest'
         name: install-unicorn
         run: |
           cd /tmp
@@ -60,18 +56,16 @@ jobs:
       #   name: snapcraft-login
       #   if: matrix.platform == 'ubuntu-latest'
       #   run: snapcraft login --with <(echo "${{ secrets.SNAPCRAFT_LOGIN }}")
-      -
-        if: matrix.platform == 'ubuntu-latest'
+      - if: matrix.platform == 'ubuntu-latest'
         name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v3
+        uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
           version: latest
           args: release --rm-dist -f hack/goreleaser/linux.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      -
-        if: matrix.platform == 'ubuntu-latest'
+      - if: matrix.platform == 'ubuntu-latest'
         name: Upload assets
         uses: actions/upload-artifact@v3
         with:
@@ -88,7 +82,7 @@ jobs:
       # -
       #   if: matrix.platform == 'windows-latest'
       #   name: Run GoReleaser
-      #   uses: goreleaser/goreleaser-action@v3
+      #   uses: goreleaser/goreleaser-action@v4
       #   with:
       #     distribution: goreleaser
       #     version: latest
@@ -122,7 +116,7 @@ jobs:
       # -
       #   if: matrix.platform == 'macos-12'
       #   name: Run GoReleaser
-      #   uses: goreleaser/goreleaser-action@v3
+      #   uses: goreleaser/goreleaser-action@v4
       #   with:
       #     distribution: goreleaser
       #     version: latest
