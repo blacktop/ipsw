@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/go-macho/pkg/trie"
 	mtypes "github.com/blacktop/go-macho/types"
@@ -77,6 +78,7 @@ type File struct {
 	BranchPools    []uint64
 	CodeSignatures map[mtypes.UUID]codesignature
 
+	Symtab          *macho.Symtab
 	AddressToSymbol map[uint64]string
 
 	IsDyld4         bool
