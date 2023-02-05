@@ -12,7 +12,7 @@ import (
 
 // TBD object
 type TBD struct {
-	UUID     string
+	UUIDs    []string
 	Archs    []string
 	Platform string
 	Path     string
@@ -43,14 +43,13 @@ func NewTBD(f *dyld.File, image *dyld.CacheImage) (*TBD, error) {
 		return nil, fmt.Errorf("%s contains no exported symbols", image.Name)
 	}
 
-	archs := strings.Fields(strings.ToLower(m.SubCPU.String(m.CPU)))[0]
-
+	arch := strings.Fields(strings.ToLower(m.SubCPU.String(m.CPU)))[0]
+	uuid := fmt.Sprintf("'%s: %s'", arch, m.UUID().UUID.String())
 	// TODO: add objc-classes
 
 	return &TBD{
-		// TODO: do I need uuid?
-		UUID:     m.UUID().UUID.String(),
-		Archs:    []string{archs},
+		UUIDs:    []string{uuid},
+		Archs:    []string{arch},
 		Platform: strings.ToLower(f.Headers[f.UUID].Platform.String()),
 		Path:     image.Name,
 		Version:  m.SourceVersion().Version.String(),

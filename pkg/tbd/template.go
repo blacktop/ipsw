@@ -2,6 +2,7 @@ package tbd
 
 const tbdTemplate = `--- !tapi-tbd-v3
 archs:           [ {{ StringsJoin .Archs ", " }} ]
+uuids:           [ {{ StringsJoin .UUIDs ", " }} ]
 platform:        {{.Platform}}
 install-name:    {{.Path}}
 current-version: {{.Version}}
