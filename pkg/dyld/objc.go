@@ -177,14 +177,14 @@ func (f *File) getLibObjC() (*macho.File, error) {
 		return nil, err
 	}
 
-	if image.pm == nil {
-		image.pm, err = image.GetPartialMacho()
+	if image.m == nil {
+		image.m, err = image.GetPartialMacho()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return image.pm, nil
+	return image.m, nil
 }
 
 func (f *File) getOptimizationsOld() (Optimization, error) {
