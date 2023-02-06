@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -82,31 +81,33 @@ var objcSelCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(args) > 1 {
-			ptr, err := f.GetSelectorAddress(args[1])
+			ptrs, err := f.GetSelectorAddresses(args[1])
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get selector addresses: %v", err)
 			}
-			fmt.Printf("0x%x: %s\n", ptr, args[1])
+			for _, ptr := range ptrs {
+				fmt.Printf("%s: %s=%s\n", colorAddr("%#09x", ptr), colorClassField("sel"), args[1])
+			}
 		} else {
 			if len(imageName) > 0 {
-				if err := f.SelectorsForImage(imageName); err != nil {
-					return fmt.Errorf("failed to parse objc selectors for image %s: %v", imageName, err)
+				image, err := f.Image(imageName)
+				if err != nil {
+					return fmt.Errorf("failed to find image %s: %v", imageName, err)
 				}
-
-				// sort by address
-				addrs := make([]uint64, 0, len(f.AddressToSymbol))
-				for a := range f.AddressToSymbol {
-					addrs = append(addrs, a)
+				m, err := image.GetMacho()
+				if err != nil {
+					return fmt.Errorf("failed to get macho for image %s: %v", imageName, err)
 				}
-				sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
-
-				for _, addr := range addrs {
-					fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
+				sels, err := m.GetObjCSelectorReferences()
+				if err != nil {
+					return fmt.Errorf("failed to get objc selectors references for image %s: %v", imageName, err)
 				}
-
+				for _, sel := range sels {
+					fmt.Printf("%s: %s\n", colorAddr("%#09x", sel.VMAddr), sel.Name)
+				}
 			} else {
 				if _, err := f.GetAllObjCSelectors(true); err != nil {
-					return err
+					return fmt.Errorf("failed to get all objc selectors: %v", err)
 				}
 			}
 		}
