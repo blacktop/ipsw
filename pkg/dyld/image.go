@@ -445,7 +445,7 @@ func (i *CacheImage) GetPartialMacho() (*macho.File, error) {
 		},
 	}
 	i.pm, err = macho.NewFile(io.NewSectionReader(i.cache.r[i.cuuid], int64(offset), int64(i.TextSegmentSize)), macho.FileConfig{
-		LoadFilter: []types.LoadCmd{
+		LoadIncluding: []types.LoadCmd{
 			types.LC_SEGMENT_64,
 			types.LC_DYLD_INFO,
 			types.LC_DYLD_INFO_ONLY,
