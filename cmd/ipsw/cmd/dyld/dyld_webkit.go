@@ -22,6 +22,7 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -44,6 +45,7 @@ func init() {
 	WebkitCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	WebkitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	WebkitCmd.Flags().BoolP("diff", "d", false, "Diff two dyld_shared_cache files")
+	WebkitCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	WebkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
@@ -65,6 +67,7 @@ var WebkitCmd = &cobra.Command{
 		insecure, _ := cmd.Flags().GetBool("insecure")
 		apiToken, _ := cmd.Flags().GetString("api")
 		diff, _ := cmd.Flags().GetBool("diff")
+		asJSON, _ := cmd.Flags().GetBool("json")
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
@@ -161,6 +164,7 @@ var WebkitCmd = &cobra.Command{
 			return nil
 		}
 
+		var svnRev string
 		if getRev {
 			log.Info("Querying https://trac.webkit.org...")
 			ver, rev, err := dyld.ScrapeWebKitTRAC(m.SourceVersion().Version.String())
@@ -168,8 +172,7 @@ var WebkitCmd = &cobra.Command{
 				log.Infof("WebKit Version: %s", m.SourceVersion().Version)
 				return err
 			}
-			log.Infof("%s (svn rev %s)", ver, rev)
-			return nil
+			svnRev = fmt.Sprintf("%s (svn rev %s)", ver, rev)
 		} else if getGit {
 			log.Info("Querying https://github.com API...")
 			var tags []download.GithubTag
@@ -188,16 +191,48 @@ var WebkitCmd = &cobra.Command{
 			}
 			for _, tag := range tags {
 				if strings.Contains(tag.Name, m.SourceVersion().Version.String()) {
-					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
-					utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Date: %s", tag.Commit.Date.Format("02Jan2006 15:04:05")))
+					if asJSON {
+						b, err := json.Marshal(&struct {
+							Version string             `json:"version"`
+							Tag     download.GithubTag `json:"tag,omitempty"`
+						}{
+							Version: m.SourceVersion().Version.String(),
+							Tag:     tag,
+						})
+						if err != nil {
+							return err
+						}
+						fmt.Println(string(b))
+					} else {
+						log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+						utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
+						utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))
+						utils.Indent(log.Info, 2)(fmt.Sprintf("Date: %s", tag.Commit.Date.Format("02Jan2006 15:04:05")))
+					}
 					return nil
 				}
 			}
 		}
 
-		log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+		if asJSON {
+			b, err := json.Marshal(&struct {
+				Version string `json:"version"`
+				Rev     string `json:"rev,omitempty"`
+			}{
+				Version: m.SourceVersion().Version.String(),
+				Rev:     svnRev,
+			})
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(b))
+		} else {
+			log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+			if len(svnRev) > 0 {
+				utils.Indent(log.Info, 2)(svnRev)
+			}
+		}
+
 		return nil
 	},
 }
