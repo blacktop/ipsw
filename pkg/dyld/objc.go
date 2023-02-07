@@ -1117,7 +1117,7 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 
 		for _, cfstr := range image.ObjC.CFStrings {
 			if len(cfstr.Name) > 0 {
-				f.AddressToSymbol[cfstr.Address] = cfstr.Name
+				f.AddressToSymbol[cfstr.Address] = fmt.Sprintf("\"%s\"", cfstr.Name)
 			}
 		}
 	}
