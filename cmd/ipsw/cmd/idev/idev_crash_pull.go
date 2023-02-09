@@ -41,13 +41,13 @@ func init() {
 	CrashCmd.AddCommand(iDevCrashPullCmd)
 	iDevCrashPullCmd.Flags().BoolP("all", "a", false, "Pull all crashlogs")
 	iDevCrashPullCmd.Flags().BoolP("rm", "r", false, "Remove crashlogs after pulling")
-	iDevCrashPullCmd.Flags().StringP("output", "o", "", "Folder to save screenshot(s)")
+	iDevCrashPullCmd.Flags().StringP("output", "o", "", "Folder to save crashlogs")
 }
 
 // iDevCrashPullCmd represents the pull command
 var iDevCrashPullCmd = &cobra.Command{
 	Use:           "pull",
-	Short:         "Pull all crashlogs",
+	Short:         "Pull crashlogs",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -86,7 +86,17 @@ var iDevCrashPullCmd = &cobra.Command{
 		}
 		defer cli.Close()
 
-		if len(args) == 0 { // list logs for user selection
+		if allLogs { // pull all crashlogs
+			destPath := filepath.Join(output, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion))
+			if err := cli.CopyFromDevice(destPath, "/", nil); err != nil {
+				return fmt.Errorf("failed to copy all crashlogs from device: %w", err)
+			}
+			if removeLogs {
+				if err := cli.RemoveAll("/"); err != nil {
+					return fmt.Errorf("failed to remove all crashlogs from device: %w", err)
+				}
+			}
+		} else if len(args) == 0 { // list logs for user selection
 			var logs []string
 			if err := cli.Walk("/", func(path string, info fs.FileInfo, err error) error {
 				if err != nil {
@@ -134,16 +144,6 @@ var iDevCrashPullCmd = &cobra.Command{
 					if err := cli.RemovePath(clog); err != nil {
 						return fmt.Errorf("failed to remove crashlog from device: %w", err)
 					}
-				}
-			}
-		} else if allLogs { // pull all crashlogs
-			destPath := filepath.Join(output, fmt.Sprintf("%s_%s_%s", dev.ProductType, dev.HardwareModel, dev.BuildVersion))
-			if err := cli.CopyFromDevice(destPath, "/", nil); err != nil {
-				return fmt.Errorf("failed to copy all crashlogs from device: %w", err)
-			}
-			if removeLogs {
-				if err := cli.RemoveAll("/"); err != nil {
-					return fmt.Errorf("failed to remove all crashlogs from device: %w", err)
 				}
 			}
 		} else { // pull specific crashlogs
