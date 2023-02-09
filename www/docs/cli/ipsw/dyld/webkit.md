@@ -22,6 +22,7 @@ ipsw dyld webkit <dyld_shared_cache> [flags]
   -g, --git            Lookup git tag on github.com
   -h, --help           help for webkit
       --insecure       do not verify ssl certs
+  -j, --json           Output as JSON
       --proxy string   HTTP/HTTPS proxy
   -r, --rev            Lookup svn rev on trac.webkit.org
 ```
