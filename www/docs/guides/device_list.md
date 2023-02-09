@@ -1,5 +1,6 @@
 ---
 description: List all the devices XCode knows about.
+hide_table_of_contents: true
 ---
 
 # List *OS Devices
