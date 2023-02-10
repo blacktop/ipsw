@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: www
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -49,3 +49,31 @@ jobs:
           # You can swap them out with your own user credentials.
           user_name: github-actions[bot]
           user_email: 41898282+github-actions[bot]@users.noreply.github.com
+  # update-search-index:
+  #   needs: deploy
+  #   if: (github.event_name == 'push' && github.ref_name == 'master')
+  #   runs-on: ubuntu-latest
+  #   env:
+  #     MEILISEARCH_HOST_URL: ${{ secrets.MEILISEARCH_HOST_URL }}
+  #     MEILISEARCH_API_KEY: ${{ secrets.MEILISEARCH_API_KEY }}
+  #     CONFIG_FILE_PATH: ${{ github.workspace }}/hack/scripts/scraper.json
+  #   steps:
+  #     - uses: actions/checkout@v3
+
+  #     - name: Wait for Meilisearch
+  #       run: node ./hack/scripts/wait-for-search.js
+
+  #     - name: Run scraper
+  #       run: |
+  #         docker run -t --rm \
+  #           -e MEILISEARCH_HOST_URL=$MEILISEARCH_HOST_URL \
+  #           -e MEILISEARCH_API_KEY=$MEILISEARCH_API_KEY \
+  #           -v $CONFIG_FILE_PATH:/docs-scraper/scraper.json \
+  #           getmeili/docs-scraper:v0.12.7 pipenv run ./docs_scraper ./scraper.json
+
+  #     - name: Wait for Meilisearch
+  #       run: node ./hack/scripts/wait-for-search.js
+
+  #     - name: Swap index
+  #       run: |
+  #         curl -X POST "$MEILISEARCH_HOST_URL/swap-indexes" -H "Authorization: Bearer $MEILISEARCH_API_KEY" -H "Content-Type: application/json" --data-binary '[ { "indexes": ["docs-v1", "docs-v1-staging"] } ]'
