@@ -35,6 +35,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
@@ -605,9 +606,18 @@ var machoInfoCmd = &cobra.Command{
 				if protos, err := m.GetObjCProtocols(); err == nil {
 					for _, proto := range protos {
 						if viper.GetBool("verbose") {
-							fmt.Println(proto.Verbose())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, proto.Verbose(), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(proto.Verbose())
+							}
 						} else {
-							fmt.Println(proto.String())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, proto.String()+"\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(proto.String())
+							}
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -616,9 +626,18 @@ var machoInfoCmd = &cobra.Command{
 				if classes, err := m.GetObjCClasses(); err == nil {
 					for _, class := range classes {
 						if viper.GetBool("verbose") {
-							fmt.Println(class.Verbose())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, class.Verbose(), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(class.Verbose())
+							}
 						} else {
-							fmt.Println(class.String())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, class.String()+"\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(class.String())
+							}
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -627,9 +646,18 @@ var machoInfoCmd = &cobra.Command{
 				if cats, err := m.GetObjCCategories(); err == nil {
 					for _, cat := range cats {
 						if viper.GetBool("verbose") {
-							fmt.Println(cat.Verbose())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, cat.Verbose(), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(cat.Verbose())
+							}
 						} else {
-							fmt.Println(cat.String())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, cat.String()+"\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(cat.String())
+							}
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
