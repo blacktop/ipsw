@@ -28,7 +28,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const fridaVersion = "16.0.8"
+const fridaVersion = "16.0.9"
 
 func init() {
 	FridaCmd.PersistentFlags().StringP("udid", "u", "", "Device UniqueDeviceID to connect to")
