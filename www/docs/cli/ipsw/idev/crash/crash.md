@@ -34,5 +34,5 @@ ipsw idev crash [flags]
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
 * [ipsw idev crash clear](/docs/cli/ipsw/idev/crash/clear)	 - Delete all crashlogs
 * [ipsw idev crash ls](/docs/cli/ipsw/idev/crash/ls)	 - List crashlogs
-* [ipsw idev crash pull](/docs/cli/ipsw/idev/crash/pull)	 - Pull all crashlogs
+* [ipsw idev crash pull](/docs/cli/ipsw/idev/crash/pull)	 - Pull crashlogs
 
