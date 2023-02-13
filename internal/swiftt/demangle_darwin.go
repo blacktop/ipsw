@@ -75,6 +75,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"unsafe"
 )
 
@@ -112,6 +113,18 @@ func Demangle(input string) (string, error) {
 	return C.GoString(output), nil
 }
 
+func DemangleBlob(blob string) string {
+	words := regexp.MustCompile(`\b\w+\b`)
+	blob = words.ReplaceAllStringFunc(blob, func(s string) string {
+		out, err := Demangle(s)
+		if err != nil {
+			return s
+		}
+		return out
+	})
+	return blob
+}
+
 func DemangleSimple(input string) (string, error) {
 	output := (*C.char)(C.malloc(2048))
 	defer C.free(unsafe.Pointer(output))
@@ -135,4 +148,16 @@ func DemangleSimple(input string) (string, error) {
 	}
 
 	return C.GoString(output), nil
+}
+
+func DemangleSimpleBlob(blob string) string {
+	words := regexp.MustCompile(`\b\w+\b`)
+	blob = words.ReplaceAllStringFunc(blob, func(s string) string {
+		out, err := DemangleSimple(s)
+		if err != nil {
+			return s
+		}
+		return out
+	})
+	return blob
 }

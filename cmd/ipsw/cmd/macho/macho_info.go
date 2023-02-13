@@ -42,6 +42,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
 	"github.com/blacktop/ipsw/internal/magic"
+	swift "github.com/blacktop/ipsw/internal/swiftt"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fullsailor/pkcs7"
@@ -607,10 +608,10 @@ var machoInfoCmd = &cobra.Command{
 					for _, proto := range protos {
 						if viper.GetBool("verbose") {
 							if viper.GetBool("color") {
-								quick.Highlight(os.Stdout, proto.Verbose(), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", "nord")
 								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
 							} else {
-								fmt.Println(proto.Verbose())
+								fmt.Println(swift.DemangleBlob(proto.Verbose()))
 							}
 						} else {
 							if viper.GetBool("color") {
@@ -627,10 +628,10 @@ var machoInfoCmd = &cobra.Command{
 					for _, class := range classes {
 						if viper.GetBool("verbose") {
 							if viper.GetBool("color") {
-								quick.Highlight(os.Stdout, class.Verbose(), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", "nord")
 								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
 							} else {
-								fmt.Println(class.Verbose())
+								fmt.Println(swift.DemangleBlob(class.Verbose()))
 							}
 						} else {
 							if viper.GetBool("color") {
@@ -647,10 +648,10 @@ var machoInfoCmd = &cobra.Command{
 					for _, cat := range cats {
 						if viper.GetBool("verbose") {
 							if viper.GetBool("color") {
-								quick.Highlight(os.Stdout, cat.Verbose(), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", "nord")
 								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
 							} else {
-								fmt.Println(cat.Verbose())
+								fmt.Println(swift.DemangleBlob(cat.Verbose()))
 							}
 						} else {
 							if viper.GetBool("color") {
