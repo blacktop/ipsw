@@ -33,13 +33,13 @@ int SwiftDemangle(char *input, char *output, size_t length) {
         return -1;
     }
 
-    swift_demangle_getDemangledName(input, output, length);
+    size_t ret = swift_demangle_getDemangledName(input, output, length);
 
     if (dlclose(handle) != 0) {
         return -1;
     }
 
-    return 0;
+    return ret;
 }
 
 int SwiftDemangleSimple(char *input, char *output, size_t length) {
