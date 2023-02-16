@@ -114,7 +114,7 @@ func Demangle(input string) (string, error) {
 }
 
 func DemangleBlob(blob string) string {
-	words := regexp.MustCompile(`\b\w+\b`)
+	words := regexp.MustCompile(`\b(_\$s)?\w+\b`)
 	blob = words.ReplaceAllStringFunc(blob, func(s string) string {
 		out, err := Demangle(s)
 		if err != nil {
@@ -151,7 +151,7 @@ func DemangleSimple(input string) (string, error) {
 }
 
 func DemangleSimpleBlob(blob string) string {
-	words := regexp.MustCompile(`\b\w+\b`)
+	words := regexp.MustCompile(`\b(_\$s)?\w+\b`)
 	blob = words.ReplaceAllStringFunc(blob, func(s string) string {
 		out, err := DemangleSimple(s)
 		if err != nil {

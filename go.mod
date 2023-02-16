@@ -10,7 +10,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
 	github.com/blacktop/go-dwarf v1.0.7
-	github.com/blacktop/go-macho v1.1.142
+	github.com/blacktop/go-macho v1.1.143
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -50,8 +50,7 @@ require (
 // TODO: remove this once https://github.com/spf13/cast/pull/155 is merged
 replace github.com/spf13/cast => github.com/blacktop/cast v1.5.1
 
-replace github.com/blacktop/go-macho => ../go-macho
-
+// replace github.com/blacktop/go-macho => ../go-macho
 // replace github.com/blacktop/arm64-cgo => ../arm64-cgo
 // replace github.com/unicorn-engine/unicorn => ./unicorn2
 
