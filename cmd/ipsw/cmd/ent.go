@@ -232,7 +232,7 @@ var entCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = !Color
+		color.NoColor = !viper.GetBool("color")
 
 		entitlement := viper.GetString("ent.ent")
 		searchFile := viper.GetString("ent.file")
@@ -320,7 +320,7 @@ var entCmd = &cobra.Command{
 						if markdown {
 							tool = "git"
 						}
-						out, err := utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Tool: tool, Color: Color})
+						out, err := utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Tool: tool, Color: viper.GetBool("color")})
 						if err != nil {
 							return err
 						}
@@ -351,7 +351,7 @@ var entCmd = &cobra.Command{
 								log.Warn("No entitlements (yet)")
 							}
 						} else {
-							if Color {
+							if viper.GetBool("color") {
 								if err := quick.Highlight(os.Stdout, e2, "xml", "terminal256", "nord"); err != nil {
 									return err
 								}
