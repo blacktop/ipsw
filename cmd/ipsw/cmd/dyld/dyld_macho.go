@@ -355,42 +355,42 @@ var MachoCmd = &cobra.Command{
 					fmt.Println()
 				}
 
-				// if showSwift {
-				// 	fmt.Println("Swift")
-				// 	fmt.Println("=====")
-				// 	info, err := m.GetObjCImageInfo()
-				// 	if err != nil {
-				// 		if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-				// 			return err
-				// 		}
-				// 	}
-				// 	if info != nil && info.HasSwift() {
-				// 		if fields, err := m.GetSwiftFields(); err == nil {
-				// 			for _, field := range fields {
-				// 				if viper.GetBool("verbose") {
-				// 					if viper.GetBool("color") {
-				// 						quick.Highlight(os.Stdout, swift.DemangleBlob(field.String()), "swift", "terminal256", "nord")
-				// 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-				// 					} else {
-				// 						fmt.Println(swift.DemangleBlob(field.String()))
-				// 					}
-				// 				} else {
-				// 					if viper.GetBool("color") {
-				// 						quick.Highlight(os.Stdout, field.String(), "swift", "terminal256", "nord")
-				// 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-				// 					} else {
-				// 						fmt.Println(field.String())
-				// 					}
-				// 				}
-				// 			}
-				// 		} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-				// 			log.Error(err.Error())
-				// 		}
-				// 	} else {
-				// 		fmt.Println("  - no swift")
-				// 	}
-				// 	fmt.Println()
-				// }
+				if showSwift {
+					fmt.Println("Swift")
+					fmt.Println("=====")
+					info, err := m.GetObjCImageInfo()
+					if err != nil {
+						if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							return err
+						}
+					}
+					if info != nil && info.HasSwift() {
+						if fields, err := m.GetSwiftFields(); err == nil {
+							for _, field := range fields {
+								if viper.GetBool("verbose") {
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, swift.DemangleBlob(field.String()), "swift", "terminal256", "nord")
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									} else {
+										fmt.Println(swift.DemangleBlob(field.String()))
+									}
+								} else {
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, field.String(), "swift", "terminal256", "nord")
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									} else {
+										fmt.Println(field.String())
+									}
+								}
+							}
+						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+							log.Error(err.Error())
+						}
+					} else {
+						fmt.Println("  - no swift")
+					}
+					fmt.Println()
+				}
 
 				if showFuncStarts {
 					if !onlyFuncStarts {
