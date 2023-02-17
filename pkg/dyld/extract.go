@@ -237,12 +237,6 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 				return fmt.Errorf("failed to parse info from cryptex-system-arm64e: %v", err)
 			}
 
-			folder, err := i.GetFolder()
-			if err != nil {
-				log.Errorf("failed to get folder from remote zip metadata: %v", err)
-			}
-			destPath = filepath.Join(destPath, folder)
-
 			if err := ExtractFromDMG(i, out.Name(), destPath, arches); err != nil {
 				return fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
 			}

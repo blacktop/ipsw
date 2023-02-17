@@ -345,7 +345,7 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat,
 				}
 
 			} else {
-				log.Warnf("%s already exists", fname)
+				Indent(log.Warn, 2)(fmt.Sprintf("%s already exists", fname))
 			}
 		}
 	}

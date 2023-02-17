@@ -17,7 +17,6 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/bom"
 	"github.com/dustin/go-humanize"
 	"golang.org/x/sys/execabs"
@@ -383,20 +382,14 @@ func yaaDecodeHeader(r *bytes.Reader) (*Entry, error) {
 }
 
 // Extract extracts and decompresses OTA payload files
-func Extract(otaZIP, extractPattern, outputDir string) error {
+func Extract(otaZIP, extractPattern, folder string) error {
 	// open the OTA ZIP file
 	zr, err := zip.OpenReader(otaZIP)
 	if err != nil {
 		return errors.Wrap(err, "failed to open ota zip")
 	}
 	defer zr.Close()
-	// create the output directory based on OTA metadata
-	folder, err := getFolder(&zr.Reader)
-	if err != nil {
-		return fmt.Errorf("failed to get folder for OTA: %v", err)
-	}
-	// append to user specified output directory
-	folder = filepath.Join(outputDir, folder)
+
 	if err := os.MkdirAll(folder, 0750); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %v", folder, err)
 	}
@@ -407,10 +400,12 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 	}
 
 	// check for matches in the OTA zip
+	utils.Indent(log.Info, 2)("Searching in OTA zip files...")
 	if err := utils.RemoteUnzip(zr.File, re, folder, false, false); err != nil {
 		log.Errorf("failed to find in OTA zip: %v", err)
-		log.Info("Checking for payload files...")
 	}
+
+	utils.Indent(log.Info, 2)("Searching in OTA payload files...")
 
 	// hack: to get a priori list of files to extract (so we know when to stop)
 	// this prevents us from having to parse ALL the payload.0?? files
@@ -426,7 +421,7 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 			}
 		}
 	}
-	return parsePayload(&zr.Reader, extractPattern, outputDir, func(path string) bool {
+	return parsePayload(&zr.Reader, extractPattern, folder, func(path string) bool {
 		i := 0
 		for _, v := range matches {
 			if !strings.HasSuffix(path, v) {
@@ -439,24 +434,10 @@ func Extract(otaZIP, extractPattern, outputDir string) error {
 	})
 }
 
-func getFolder(zr *zip.Reader) (string, error) {
-	i, err := info.ParseZipFiles(zr.File)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse plists in remote zip: %v", err)
-	}
-	return i.GetFolder()
-}
-
 // RemoteExtract extracts and decompresses remote OTA payload files
 func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop func(string) bool) error {
 
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
-
-	folder, err := getFolder(zr)
-	if err != nil {
-		return err
-	}
-	folder = filepath.Join(destPath, folder)
 
 	// sortFileBySize(zr.File)
 	sortFileByNameAscend(zr.File)
@@ -468,7 +449,7 @@ func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop f
 				"filename": f.Name,
 				"size":     humanize.Bytes(f.UncompressedSize64),
 			}).Debug, 2)("Processing OTA payload")
-			goteet, path, err := Parse(f, folder, extractPattern)
+			goteet, path, err := Parse(f, destPath, extractPattern)
 			if err != nil {
 				log.Error(err.Error())
 			}
@@ -486,14 +467,8 @@ func RemoteExtract(zr *zip.Reader, extractPattern, destPath string, shouldStop f
 	return fmt.Errorf("%s not found", extractPattern)
 }
 
-func parsePayload(zr *zip.Reader, extractPattern, outputDir string, shouldStop func(string) bool) error {
+func parsePayload(zr *zip.Reader, extractPattern, folder string, shouldStop func(string) bool) error {
 	var validPayload = regexp.MustCompile(`payload.0\d+$`)
-
-	folder, err := getFolder(zr)
-	if err != nil {
-		return err
-	}
-	folder = filepath.Join(outputDir, folder)
 
 	// sortFileBySize(zr.File)
 	// sortFileByNameAscend(zr.File)
@@ -520,7 +495,7 @@ func parsePayload(zr *zip.Reader, extractPattern, outputDir string, shouldStop f
 	if found {
 		return nil
 	}
-	return fmt.Errorf("no files matched: %s", extractPattern)
+	return fmt.Errorf("no payload files matched '%s'", extractPattern)
 }
 
 // Parse parses a ota payload file inside the zip
