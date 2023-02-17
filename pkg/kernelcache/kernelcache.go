@@ -281,42 +281,36 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 	if err != nil {
 		return err
 	}
-	folder, err := i.GetFolder()
-	if err != nil {
-		log.Errorf("failed to get folder from remote zip metadata: %v", err)
-	}
-	destPath = filepath.Join(destPath, folder)
 
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
-			fname := i.GetKernelCacheFileName(f.Name)
-			// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(f.Name, filepath.Ext(f.Name)), strings.Join(i.GetDevicesForKernelCache(f.Name), "_"))
-			fname = filepath.Join(destPath, filepath.Clean(fname))
+			fname := filepath.Join(destPath, filepath.Clean(i.GetKernelCacheFileName(f.Name)))
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				kdata := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
 				if err != nil {
-					return errors.Wrapf(err, "failed to open file in zip: %s", f.Name)
+					return fmt.Errorf("failed to open kernelcache %s in zip: %v", f.Name, err)
 				}
 				io.ReadFull(rc, kdata)
 				rc.Close()
 
 				kcomp, err := ParseImg4Data(kdata)
 				if err != nil {
-					return errors.Wrap(err, "failed parse kernelcache img4")
+					return fmt.Errorf("failed to parse kernelcache im4p %s: %v", f.Name, err)
 				}
 
 				dec, err := DecompressData(kcomp)
 				if err != nil {
-					return errors.Wrapf(err, "failed to decompress kernelcache %s", fname)
+					return fmt.Errorf("failed to decompress kernelcache %s: %v", f.Name, err)
 				}
 
-				os.Mkdir(destPath, 0750)
-				err = os.WriteFile(fname, dec, 0660)
-				if err != nil {
-					return errors.Wrap(err, "failed to write kernelcache")
+				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+					return fmt.Errorf("failed to create destination directory: %v", err)
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
+				if err := os.WriteFile(fname, dec, 0660); err != nil {
+					return fmt.Errorf("failed to write kernelcache %s: %v", fname, err)
+				}
 			} else {
 				log.Warnf("kernelcache already exists: %s", fname)
 			}

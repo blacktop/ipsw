@@ -22,9 +22,11 @@ THE SOFTWARE.
 package ota
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -39,11 +41,11 @@ func init() {
 
 // extractCmd represents the extract command
 var extractCmd = &cobra.Command{
-	Use:     "extract <OTA> <PATTERN>",
-	Aliases: []string{"e"},
-	Short:   "Extract OTA payload files",
-	Args:    cobra.MinimumNArgs(2),
-	// SilenceUsage:  true,
+	Use:           "extract <OTA> <PATTERN>",
+	Aliases:       []string{"e"},
+	Short:         "Extract OTA payload files",
+	Args:          cobra.MinimumNArgs(2),
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -53,7 +55,18 @@ var extractCmd = &cobra.Command{
 
 		otaPath := filepath.Clean(args[0])
 
-		log.Infof("Extracting files that match %#v", args[1])
-		return ota.Extract(otaPath, args[1], viper.GetString("ota.extract.output"))
+		inf, err := info.Parse(otaPath)
+		if err != nil {
+			return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
+		}
+
+		folder, err := inf.GetFolder()
+		if err != nil {
+			log.Errorf("failed to get folder from remote zip metadata: %v", err)
+		}
+		output := filepath.Join(filepath.Clean(viper.GetString("ota.extract.output")), folder)
+
+		log.Infof("Extracting files that match '%s'", args[1])
+		return ota.Extract(otaPath, args[1], output)
 	},
 }
