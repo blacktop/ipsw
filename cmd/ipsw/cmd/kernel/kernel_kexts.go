@@ -71,7 +71,10 @@ var kextsCmd = &cobra.Command{
 				return err
 			}
 
-			out, err := utils.GitDiff(strings.Join(kout1, "\n"), strings.Join(kout2, "\n"))
+			out, err := utils.GitDiff(
+				strings.Join(kout1, "\n"),
+				strings.Join(kout2, "\n"),
+				&utils.GitDiffConfig{Color: viper.GetBool("color")})
 			if err != nil {
 				return err
 			}

@@ -150,7 +150,10 @@ var WebkitCmd = &cobra.Command{
 				return err
 			}
 
-			out, err := utils.GitDiff(m.SourceVersion().Version.String()+"\n", m2.SourceVersion().Version.String()+"\n")
+			out, err := utils.GitDiff(
+				m.SourceVersion().Version.String()+"\n",
+				m2.SourceVersion().Version.String()+"\n",
+				&utils.GitDiffConfig{Color: viper.GetBool("color")})
 			if err != nil {
 				return err
 			}
