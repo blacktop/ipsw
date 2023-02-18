@@ -48,7 +48,8 @@ const (
 
 //go:embed data/audiences.gz
 var audienceData []byte // CREDIT: Siguza
-
+/* NOTE: to find these values grep the symbols in the SoftwareUpdateSettingsUI dylib that start with "
+ * _MA_PALLAS_AUDIENCE_CUSTOMER_" and read the address there to get the CFString value */
 type assetType string
 
 const (
