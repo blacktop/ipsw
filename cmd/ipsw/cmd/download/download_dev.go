@@ -75,9 +75,9 @@ func init() {
 // devCmd represents the dev command
 var devCmd = &cobra.Command{
 	Use:           "dev",
-	Aliases:       []string{"d", "developers"},
+	Aliases:       []string{"d", "developer"},
 	Short:         "Download IPSWs (and more) from https://developer.apple.com/download",
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
