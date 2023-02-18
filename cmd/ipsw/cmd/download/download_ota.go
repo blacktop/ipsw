@@ -46,6 +46,16 @@ import (
 	"github.com/spf13/viper"
 )
 
+var otaDlCmdPlatforms = []string{
+	"ios\tiOS",
+	"watchos\twatchOS",
+	"tvos\ttvOS",
+	"audioos\tAudioOS",
+	"accessory\tAccessory: Studio Display, etc.",
+	"macos\tmacOS",
+	"recovery\trecoveryOS",
+}
+
 func init() {
 	DownloadCmd.AddCommand(otaDLCmd)
 
@@ -80,7 +90,11 @@ func init() {
 	viper.BindPFlag("download.ota.show-latest-version", otaDLCmd.Flags().Lookup("show-latest-version"))
 	viper.BindPFlag("download.ota.show-latest-build", otaDLCmd.Flags().Lookup("show-latest-build"))
 
+	otaDLCmd.MarkFlagDirname("output")
 	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta")
+	otaDLCmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
+	})
 }
 
 // otaDLCmd represents the ota download command
