@@ -12,7 +12,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
-//go:embed device_traits.gz
+//go:embed data/device_traits.gz
 var traitsData []byte
 
 // Device object

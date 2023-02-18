@@ -245,7 +245,7 @@ var otaDLCmd = &cobra.Command{
 			DeviceBlackList: doNotDownload,
 			Proxy:           proxy,
 			Insecure:        insecure,
-			TimeoutSeconds:  90,
+			Timeout:         90,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
