@@ -290,7 +290,7 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 				}
 			}
 		} else {
-			return []string{assetAudienceDB["ios"].Release, assetAudienceDB["ios"].Generic}, nil
+			return []string{assetAudienceDB["macos"].Release, assetAudienceDB["macos"].Generic}, nil
 		}
 	default:
 		if o.Config.Beta {
@@ -321,7 +321,7 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 				}
 			}
 		} else {
-			return []string{assetAudienceDB["ios"].Release, assetAudienceDB["ios"].Generic}, nil
+			return []string{assetAudienceDB[o.Config.Platform].Release, assetAudienceDB[o.Config.Platform].Generic}, nil
 		}
 	}
 	return nil, fmt.Errorf("unsupported platform %s", o.Config.Platform)
