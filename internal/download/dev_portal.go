@@ -1151,6 +1151,15 @@ func (dp *DevPortal) DownloadADC(path string) error {
 	return nil
 }
 
+func (dp *DevPortal) DownloadKDK(version, build string) error {
+	url := fmt.Sprintf("%s?path=Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
+		version,
+		build,
+	)
+	log.WithField("url", url).Info("Downloading KDK")
+	return dp.Download(url)
+}
+
 func (dp *DevPortal) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
 	switch downloadType {
 	case "more":

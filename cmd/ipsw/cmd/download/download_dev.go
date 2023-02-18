@@ -46,6 +46,7 @@ func init() {
 	devCmd.Flags().Bool("sms", false, "Prefer SMS Two-factor authentication")
 	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
+	devCmd.Flags().Bool("kdk", false, "Download KDK")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
@@ -55,8 +56,10 @@ func init() {
 	viper.BindPFlag("download.dev.sms", devCmd.Flags().Lookup("sms"))
 	viper.BindPFlag("download.dev.json", devCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.dev.pretty", devCmd.Flags().Lookup("pretty"))
+	viper.BindPFlag("download.dev.kdk", devCmd.Flags().Lookup("kdk"))
 	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.dev.vault-password", devCmd.Flags().Lookup("vault-password"))
+	devCmd.Flags().MarkHidden("kdk")
 	devCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")
@@ -89,6 +92,8 @@ var devCmd = &cobra.Command{
 		viper.BindPFlag("download.resume-all", cmd.Flags().Lookup("resume-all"))
 		viper.BindPFlag("download.restart-all", cmd.Flags().Lookup("restart-all"))
 		viper.BindPFlag("download.remove-commas", cmd.Flags().Lookup("remove-commas"))
+		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
 
 		// settings
 		proxy := viper.GetString("download.proxy")
@@ -135,6 +140,10 @@ var devCmd = &cobra.Command{
 
 		if err := app.Login(username, password); err != nil {
 			return fmt.Errorf("failed to login: %v", err)
+		}
+
+		if viper.GetBool("download.dev.kdk") {
+			return app.DownloadKDK(viper.GetString("download.version"), viper.GetString("download.build"))
 		}
 
 		if len(watchList) > 0 {
