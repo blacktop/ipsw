@@ -317,8 +317,8 @@ func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
-		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
+		shash = StringHash{Type: selopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		if err = shash.Read(NewDyldSharedCacheReader(f, 0)); err != nil {
 			return nil, nil, err
 		}
 	case *ObjcOptT:
@@ -326,7 +326,7 @@ func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.SelectorHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: selopt, FileOffset: int64(opt.SelectorHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -357,7 +357,7 @@ func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -366,7 +366,7 @@ func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.ClassHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ClassHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -397,7 +397,7 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -406,7 +406,7 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.ProtocolHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ProtocolHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -741,7 +741,7 @@ func (f *File) GetClassAddresses(class string) ([]uint64, error) {
 func (f *File) GetAllObjCProtocols(print bool) (map[uint64]objHashMap, error) {
 	shash, uuid, err := f.getProtocolStringHash()
 	if err != nil {
-		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
+		return nil, fmt.Errorf("failed read protocol objc_stringhash_t: %v", err)
 	}
 
 	if shash.dylibMap == nil {
