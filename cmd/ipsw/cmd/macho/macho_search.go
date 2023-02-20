@@ -29,7 +29,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
-	swift "github.com/blacktop/ipsw/internal/swiftt"
+	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
