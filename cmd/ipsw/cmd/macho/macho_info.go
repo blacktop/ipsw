@@ -35,12 +35,14 @@ import (
 	"text/tabwriter"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
 	"github.com/blacktop/ipsw/internal/magic"
+	swift "github.com/blacktop/ipsw/internal/swiftt"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/fullsailor/pkcs7"
@@ -59,7 +61,8 @@ func init() {
 	machoInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
 	machoInfoCmd.Flags().BoolP("ent", "e", false, "Print entitlements")
 	machoInfoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
-	machoInfoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
+	machoInfoCmd.Flags().Bool("objc-refs", false, "Print ObjC references")
+	machoInfoCmd.Flags().BoolP("swift", "w", false, "🚧 Print Swift info")
 	machoInfoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	machoInfoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
 	machoInfoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
@@ -80,6 +83,7 @@ func init() {
 	viper.BindPFlag("macho.info.ent", machoInfoCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("macho.info.objc", machoInfoCmd.Flags().Lookup("objc"))
 	viper.BindPFlag("macho.info.objc-refs", machoInfoCmd.Flags().Lookup("objc-refs"))
+	viper.BindPFlag("macho.info.swift", machoInfoCmd.Flags().Lookup("swift"))
 	viper.BindPFlag("macho.info.symbols", machoInfoCmd.Flags().Lookup("symbols"))
 	viper.BindPFlag("macho.info.starts", machoInfoCmd.Flags().Lookup("starts"))
 	viper.BindPFlag("macho.info.strings", machoInfoCmd.Flags().Lookup("strings"))
@@ -120,6 +124,7 @@ var machoInfoCmd = &cobra.Command{
 		showEntitlements := viper.GetBool("macho.info.ent")
 		showObjC := viper.GetBool("macho.info.objc")
 		showObjcRefs := viper.GetBool("macho.info.objc-refs")
+		showSwift := viper.GetBool("macho.info.swift")
 		showSymbols := viper.GetBool("macho.info.symbols")
 		showFuncStarts := viper.GetBool("macho.info.starts")
 		dumpStrings := viper.GetBool("macho.info.strings")
@@ -135,14 +140,15 @@ var machoInfoCmd = &cobra.Command{
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
 		}
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
-		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
-		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings && !showSplitSeg
-		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings && !showSplitSeg
-		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
-		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg
-		onlySplitSegs := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && showSplitSeg
+		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
+		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
+		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
+		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
+		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings && !showSplitSeg && !showSwift
+		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
+		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
+		onlySplitSegs := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
+		onlySwift := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && showSwift
 
 		machoPath := filepath.Clean(args[0])
 
@@ -359,7 +365,7 @@ var machoInfoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg) {
+		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift) {
 			if viper.GetBool("macho.info.json") {
 				dat, err := m.FileTOC.MarshalJSON()
 				if err != nil {
@@ -605,9 +611,18 @@ var machoInfoCmd = &cobra.Command{
 				if protos, err := m.GetObjCProtocols(); err == nil {
 					for _, proto := range protos {
 						if viper.GetBool("verbose") {
-							fmt.Println(proto.Verbose())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(swift.DemangleBlob(proto.Verbose()))
+							}
 						} else {
-							fmt.Println(proto.String())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, proto.String()+"\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(proto.String())
+							}
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -616,9 +631,18 @@ var machoInfoCmd = &cobra.Command{
 				if classes, err := m.GetObjCClasses(); err == nil {
 					for _, class := range classes {
 						if viper.GetBool("verbose") {
-							fmt.Println(class.Verbose())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(swift.DemangleBlob(class.Verbose()))
+							}
 						} else {
-							fmt.Println(class.String())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, class.String()+"\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(class.String())
+							}
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -627,9 +651,18 @@ var machoInfoCmd = &cobra.Command{
 				if cats, err := m.GetObjCCategories(); err == nil {
 					for _, cat := range cats {
 						if viper.GetBool("verbose") {
-							fmt.Println(cat.Verbose())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(swift.DemangleBlob(cat.Verbose()))
+							}
 						} else {
-							fmt.Println(cat.String())
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, cat.String()+"\n", "objc", "terminal256", "nord")
+							} else {
+								fmt.Println(cat.String())
+							}
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -694,6 +727,45 @@ var machoInfoCmd = &cobra.Command{
 				}
 			} else {
 				fmt.Println("  - no objc")
+			}
+			fmt.Println()
+		}
+
+		if showSwift {
+			if !onlySwift {
+				fmt.Println("Swift")
+				fmt.Println("=====")
+			}
+			info, err := m.GetObjCImageInfo()
+			if err != nil {
+				if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+					return err
+				}
+			}
+			if info != nil && info.HasSwift() {
+				if fields, err := m.GetSwiftFields(); err == nil {
+					for _, field := range fields {
+						if viper.GetBool("verbose") {
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, swift.DemangleBlob(field.String()), "swift", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+							} else {
+								fmt.Println(swift.DemangleBlob(field.String()))
+							}
+						} else {
+							if viper.GetBool("color") {
+								quick.Highlight(os.Stdout, field.String(), "swift", "terminal256", "nord")
+								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+							} else {
+								fmt.Println(field.String())
+							}
+						}
+					}
+				} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+					log.Error(err.Error())
+				}
+			} else {
+				fmt.Println("  - no swift")
 			}
 			fmt.Println()
 		}

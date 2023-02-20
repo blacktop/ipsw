@@ -1151,6 +1151,31 @@ func (dp *DevPortal) DownloadADC(path string) error {
 	return nil
 }
 
+func (dp *DevPortal) DownloadKDK(version, build string) error {
+	if err := dp.refreshSession(); err != nil {
+		return err
+	}
+	url := fmt.Sprintf("%s?path=/macOS/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
+		version,
+		build,
+		version,
+		build,
+	)
+	log.WithField("url", url).Info("Downloading KDK")
+	err := dp.Download(url)
+	if err != nil {
+		url := fmt.Sprintf("%s?path=/Developer_Tools/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
+			version,
+			build,
+			version,
+			build,
+		)
+		log.WithField("url", url).Info("Downloading KDK (retry)")
+		return dp.Download(url)
+	}
+	return nil
+}
+
 func (dp *DevPortal) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
 	switch downloadType {
 	case "more":
@@ -1194,6 +1219,8 @@ func (dp *DevPortal) getDownloads() (*Downloads, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// os.WriteFile("downloads.json", body, 0644)
 
 	if err := json.Unmarshal(body, &downloads); err != nil {
 		return nil, fmt.Errorf("failed to deserialize response body JSON: %v", err)

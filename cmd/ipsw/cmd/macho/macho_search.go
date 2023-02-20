@@ -29,6 +29,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
+	swift "github.com/blacktop/ipsw/internal/swiftt"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -150,6 +151,14 @@ var machoSearchCmd = &cobra.Command{
 									fmt.Printf("%s\t%s=%v\n", path, colorField("protocols"), ps)
 								}
 							}
+							// check for subprotocols
+							for _, proto := range protos {
+								for _, sub := range proto.Prots {
+									if protRE.MatchString(sub.Name) {
+										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", proto.Ptr), path, colorField("protocol"), sub.Name, colorField("sub-protocol"), proto.Name)
+									}
+								}
+							}
 						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 							log.Error(err.Error())
 						}
@@ -172,7 +181,7 @@ var machoSearchCmd = &cobra.Command{
 									}
 									for _, proto := range class.Protocols {
 										if protRE.MatchString(proto.Name) {
-											fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), path, colorField("protocol"), proto.Name, colorField("class"), class.Name)
+											fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), path, colorField("protocol"), proto.Name, colorField("class"), swift.DemangleBlob(class.Name))
 											break
 										}
 									}
@@ -229,9 +238,15 @@ var machoSearchCmd = &cobra.Command{
 								if err != nil {
 									return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.protocol"), err)
 								}
+								for _, proto := range cat.Protocols {
+									if protRE.MatchString(proto.Name) {
+										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.VMAddr), path, colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name))
+										break
+									}
+								}
 								for _, proto := range cat.Class.Protocols {
 									if protRE.MatchString(proto.Name) {
-										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), path, colorField("protocol"), proto.Name, colorField("class"), cat.Class.Name)
+										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), path, colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
 										break
 									}
 								}

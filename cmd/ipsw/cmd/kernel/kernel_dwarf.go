@@ -190,7 +190,7 @@ var dwarfCmd = &cobra.Command{
 					return fmt.Errorf("could not find type '%s' in either file", viper.GetString("kernel.dwarf.type"))
 				}
 
-				out, err := utils.GitDiff(t1.Defn(), t2.Defn())
+				out, err := utils.GitDiff(t1.Defn(), t2.Defn(), &utils.GitDiffConfig{Color: viper.GetBool("color")})
 				if err != nil {
 					return err
 				}

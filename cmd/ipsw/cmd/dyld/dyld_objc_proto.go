@@ -25,14 +25,21 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
+	"text/tabwriter"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var colorAddr = color.New(color.Faint).SprintfFunc()
+var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorClassField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
 
 func init() {
 	ObjcCmd.AddCommand(objcProtoCmd)
@@ -82,33 +89,69 @@ var objcProtoCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(args) > 1 {
-			ptr, err := f.GetProtocolAddress(args[1])
+			ptrs, err := f.GetProtocolAddresses(args[1])
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get protocol addresses: %v", err)
 			}
-			fmt.Printf("0x%x: %s\n", ptr, args[1])
+			for _, ptr := range ptrs {
+				fmt.Printf("%s: %s=%s\n", colorAddr("%#09x", ptr), colorClassField("protocol"), args[1])
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				classes, err := f.GetAllObjCClasses(false)
+				if err != nil {
+					return fmt.Errorf("failed to get objc classes: %v", err)
+				}
+				for addr, class := range classes {
+					protAddrs, err := f.GetObjCClassProtocolsAddrs(addr)
+					if err != nil {
+						return fmt.Errorf("failed to get objc class protocols: %v", err)
+					}
+					for _, protAddr := range protAddrs {
+						if protAddr == ptr {
+							fmt.Fprintf(w, "    %s: %s=%s\t%s=%s\n", colorAddr("%#09x", addr), colorClassField("dylib"), class.Dylib, colorClassField("class"), class.Name)
+							break
+						}
+					}
+				}
+				w.Flush()
+			}
 		} else {
 			if len(imageName) > 0 {
-				err = f.ProtocolsForImage(imageName)
+				image, err := f.Image(imageName)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to find image %s: %v", imageName, err)
 				}
-
-				// sort by address
-				addrs := make([]uint64, 0, len(f.AddressToSymbol))
-				for a := range f.AddressToSymbol {
-					addrs = append(addrs, a)
+				m, err := image.GetMacho()
+				if err != nil {
+					return fmt.Errorf("failed to get macho for image %s: %v", imageName, err)
 				}
-				sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
-
-				for _, addr := range addrs {
-					fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
+				w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+				if protos, err := m.GetObjCProtocols(); err == nil {
+					for _, proto := range protos {
+						foundClass := false
+						if classes, err := m.GetObjCClasses(); err == nil {
+							for _, class := range classes {
+								for _, prot := range class.Protocols {
+									if strings.EqualFold(proto.Name, prot.Name) {
+										foundClass = true
+										fmt.Fprintf(w, "%s: %s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), colorClassField("class"), class.Name, colorField("protocol"), proto.Name)
+										break
+									}
+								}
+							}
+						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							log.Error(err.Error())
+						}
+						if !foundClass {
+							fmt.Fprintf(w, "%s: %s=%s\n", colorAddr("%#09x", proto.Ptr), colorField("protocol"), proto.Name)
+						}
+					}
+					w.Flush()
+				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+					log.Error(err.Error())
 				}
-
 			} else {
-				_, err := f.GetAllObjCProtocols(true)
-				if err != nil {
-					return err
+				if _, err := f.GetAllObjCProtocols(true); err != nil {
+					return fmt.Errorf("failed to get all objc protocols: %v", err)
 				}
 			}
 		}

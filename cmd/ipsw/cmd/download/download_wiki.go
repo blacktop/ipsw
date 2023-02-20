@@ -109,11 +109,6 @@ var wikiCmd = &cobra.Command{
 		output := viper.GetString("download.wiki.output")
 		flat := viper.GetBool("download.wiki.flat")
 
-		// verify args
-		if kernel && len(pattern) > 0 {
-			return fmt.Errorf("you cannot supply a --kernel AND a --pattern (they are mutually exclusive)")
-		}
-
 		var destPath string
 		if len(output) > 0 {
 			destPath = filepath.Clean(output)
@@ -231,7 +226,7 @@ var wikiCmd = &cobra.Command{
 
 			filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
 			if len(filteredURLS) == 0 {
-				log.Errorf("no ipsws match %s", strings.Join([]string{device, version, build}, ", "))
+				log.Errorf("no IPSWs match %s", strings.Join([]string{device, version, build}, ", "))
 				return nil
 			}
 
@@ -300,56 +295,54 @@ var wikiCmd = &cobra.Command{
 					if len(filteredURLS) > 1 { // if filtered to a single device skip the prompt
 						cont = false
 						prompt := &survey.Confirm{
-							Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(filteredURLS)),
+							Message: fmt.Sprintf("You are about to download %d IPSW files. Continue?", len(filteredURLS)),
 						}
 						survey.AskOne(prompt, &cont)
 					}
 				}
 
 				if cont {
-					if kernel { // REMOTE KERNEL MODE
+					if kernel || len(pattern) > 0 {
 						for _, url := range filteredURLS {
 							d, v, b := download.ParseIpswURLString(url)
 							log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
-							log.Info("Extracting remote kernelcache")
+
 							zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
 								Proxy:    proxy,
 								Insecure: insecure,
 							})
 							if err != nil {
-								return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+								return fmt.Errorf("failed to create remote zip reader of IPSW: %v", err)
 							}
-							if err := kernelcache.RemoteParse(zr, destPath); err != nil {
-								return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
-							}
-						}
-					} else if len(pattern) > 0 { // PATTERN MATCHING MODE
-						dlRE, err := regexp.Compile(pattern)
-						if err != nil {
-							return fmt.Errorf("failed to compile regex: %v", err)
-						}
-						for _, url := range filteredURLS {
-							d, v, b := download.ParseIpswURLString(url)
-							log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
-							log.Infof("Downloading files that contain: %s", pattern)
-							zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
-								Proxy:    proxy,
-								Insecure: insecure,
-							})
+
+							inf, err := info.ParseZipFiles(zr.File)
 							if err != nil {
-								return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+								return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
 							}
-							iinfo, err := info.ParseZipFiles(zr.File)
+
+							folder, err := inf.GetFolder()
 							if err != nil {
-								return fmt.Errorf("failed to parse remote IPSW URL: %v", err)
-							}
-							folder, err := iinfo.GetFolder()
-							if err != nil {
-								log.Errorf("failed to get folder from remote ipsw: %v", err)
+								log.Errorf("failed to get folder from remote zip metadata: %v", err)
 							}
 							destPath = filepath.Join(destPath, folder)
-							if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat, true); err != nil {
-								return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
+
+							// REMOTE KERNEL MODE
+							if kernel {
+								log.Info("Extracting remote kernelcache")
+								if err := kernelcache.RemoteParse(zr, destPath); err != nil {
+									return fmt.Errorf("failed to download kernelcache from remote IPSW: %v", err)
+								}
+							}
+							// PATTERN MATCHING MODE
+							if len(pattern) > 0 {
+								dlRE, err := regexp.Compile(pattern)
+								if err != nil {
+									return fmt.Errorf("failed to compile regex for pattern '%s': %v", pattern, err)
+								}
+								log.Infof("Downloading files that contain: %s", pattern)
+								if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat, true); err != nil {
+									return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
+								}
 							}
 						}
 					} else { // NORMAL MODE
@@ -368,7 +361,7 @@ var wikiCmd = &cobra.Command{
 									return fmt.Errorf("failed to download IPSW: %v", err)
 								}
 							} else {
-								log.Warnf("ipsw already exists: %s", fname)
+								log.Warnf("IPSW already exists: %s", fname)
 							}
 						}
 					}

@@ -31,9 +31,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	swift "github.com/blacktop/ipsw/internal/swiftt"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -48,6 +50,7 @@ func init() {
 	MachoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	MachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	MachoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
+	// MachoCmd.Flags().BoolP("swift", "w", false, "🚧 Print Swift info")
 	MachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	MachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	MachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
@@ -79,6 +82,7 @@ var MachoCmd = &cobra.Command{
 		showLoadCommandsAsJSON, _ := cmd.Flags().GetBool("json")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
+		showSwift, _ := cmd.Flags().GetBool("swift")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
@@ -89,9 +93,9 @@ var MachoCmd = &cobra.Command{
 		extractPath, _ := cmd.Flags().GetString("output")
 		forceExtract, _ := cmd.Flags().GetBool("force")
 
-		onlyFuncStarts := !showLoadCommands && !showObjC && !dumpStubs && showFuncStarts
-		onlyStubs := !showLoadCommands && !showObjC && !showFuncStarts && dumpStubs
-		onlySearch := !showLoadCommands && !showObjC && !showFuncStarts && !dumpStubs && searchPattern != ""
+		onlyFuncStarts := !showLoadCommands && !showObjC && !showSwift && !dumpStubs && showFuncStarts
+		onlyStubs := !showLoadCommands && !showObjC && !showSwift && !showFuncStarts && dumpStubs
+		onlySearch := !showLoadCommands && !showObjC && !showSwift && !showFuncStarts && !dumpStubs && searchPattern != ""
 
 		dscPath := filepath.Clean(args[0])
 
@@ -230,9 +234,18 @@ var MachoCmd = &cobra.Command{
 						if protos, err := m.GetObjCProtocols(); err == nil {
 							for _, proto := range protos {
 								if viper.GetBool("verbose") {
-									fmt.Println(proto.Verbose())
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", "nord")
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+									} else {
+										fmt.Println(swift.DemangleBlob(proto.Verbose()))
+									}
 								} else {
-									fmt.Println(proto.String())
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, proto.String()+"\n", "objc", "terminal256", "nord")
+									} else {
+										fmt.Println(proto.String())
+									}
 								}
 							}
 						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -241,9 +254,18 @@ var MachoCmd = &cobra.Command{
 						if classes, err := m.GetObjCClasses(); err == nil {
 							for _, class := range classes {
 								if viper.GetBool("verbose") {
-									fmt.Println(class.Verbose())
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", "nord")
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+									} else {
+										fmt.Println(swift.DemangleBlob(class.Verbose()))
+									}
 								} else {
-									fmt.Println(class.String())
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, class.String()+"\n", "objc", "terminal256", "nord")
+									} else {
+										fmt.Println(class.String())
+									}
 								}
 							}
 						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -252,9 +274,18 @@ var MachoCmd = &cobra.Command{
 						if cats, err := m.GetObjCCategories(); err == nil {
 							for _, cat := range cats {
 								if viper.GetBool("verbose") {
-									fmt.Println(cat.Verbose())
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", "nord")
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+									} else {
+										fmt.Println(swift.DemangleBlob(cat.Verbose()))
+									}
 								} else {
-									fmt.Println(cat.String())
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, cat.String()+"\n", "objc", "terminal256", "nord")
+									} else {
+										fmt.Println(cat.String())
+									}
 								}
 							}
 						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -320,6 +351,43 @@ var MachoCmd = &cobra.Command{
 
 					} else {
 						fmt.Println("  - no objc")
+					}
+					fmt.Println()
+				}
+
+				if showSwift {
+					fmt.Println("Swift")
+					fmt.Println("=====")
+					info, err := m.GetObjCImageInfo()
+					if err != nil {
+						if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+							return err
+						}
+					}
+					if info != nil && info.HasSwift() {
+						if fields, err := m.GetSwiftFields(); err == nil {
+							for _, field := range fields {
+								if viper.GetBool("verbose") {
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, swift.DemangleBlob(field.String()), "swift", "terminal256", "nord")
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									} else {
+										fmt.Println(swift.DemangleBlob(field.String()))
+									}
+								} else {
+									if viper.GetBool("color") {
+										quick.Highlight(os.Stdout, field.String(), "swift", "terminal256", "nord")
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									} else {
+										fmt.Println(field.String())
+									}
+								}
+							}
+						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+							log.Error(err.Error())
+						}
+					} else {
+						fmt.Println("  - no swift")
 					}
 					fmt.Println()
 				}

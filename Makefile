@@ -76,6 +76,16 @@ docs: ## Build the cli docs
 	@echo " > Updating CLI Docs"
 	hack/make/docs
 
+.PHONY: docs-search
+docs-search: ## Build/Update the docs search index
+	@echo " > Updating Docs Search Index"
+	@docker run -t --rm \
+                  -e MEILISEARCH_HOST_URL=$(MEILISEARCH_HOST_URL) \
+                  -e MEILISEARCH_API_KEY=$(MEILISEARCH_API_KEY) \
+                  -v $(PWD)/hack/scripts/scraper.json:/docs-scraper/scraper.json \
+                  getmeili/docs-scraper:v0.12.7 pipenv run ./docs_scraper ./scraper.json
+	# @curl -X POST "$(MEILISEARCH_HOST_URL)/swap-indexes" -H "Authorization: Bearer $(MEILISEARCH_API_KEY)" -H "Content-Type: application/json" --data-binary '[ { "indexes": ["docs-v1", "docs-v1-staging"] } ]'
+
 .PHONY: test-docs
 test-docs: ## Start local server hosting docusaurus docs
 	@echo " > Testing Docs"
