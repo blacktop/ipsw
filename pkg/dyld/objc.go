@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"sort"
 	"strings"
 	"unsafe"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-macho/types/objc"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/pkg/errors"
 )
@@ -177,14 +177,14 @@ func (f *File) getLibObjC() (*macho.File, error) {
 		return nil, err
 	}
 
-	if image.m == nil {
-		image.m, err = image.GetPartialMacho()
+	if image.pm == nil {
+		image.pm, err = image.GetPartialMacho()
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	return image.m, nil
+	return image.pm, nil
 }
 
 func (f *File) getOptimizationsOld() (Optimization, error) {
@@ -317,7 +317,7 @@ func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: selopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -326,7 +326,7 @@ func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.SelectorHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: selopt, FileOffset: int64(opt.SelectorHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -357,7 +357,7 @@ func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -366,7 +366,7 @@ func (f *File) getClassStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.ClassHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ClassHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -397,7 +397,7 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(off), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -406,7 +406,7 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 		if err != nil {
 			return nil, nil, err
 		}
-		shash = StringHash{FileOffset: int64(opt.ProtocolHashTableOffset(off)), hdrRO: hdr, opt: opt}
+		shash = StringHash{Type: clsopt, FileOffset: int64(opt.ProtocolHashTableOffset(off)), hdrRO: hdr, opt: opt}
 		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
@@ -415,14 +415,14 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 	return &shash, &u, nil
 }
 
-func (f *File) dumpOffsets(shash *StringHash, fileOffset int64, uuid types.UUID) {
+func (f *File) dumpOffsets(shash *StringHash, uuid types.UUID) {
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 	for idx, ptr := range shash.Offsets {
 		if ptr != 0 {
-			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
+			sr.Seek(int64(int32(shash.FileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
+				log.Errorf("failed to read selector name at %#x: %v", int32(shash.FileOffset)+ptr, err)
 			}
 			if len(shash.ObjectOffsets) > 0 {
 				log.Debug(shash.ObjectOffsets[idx].String())
@@ -450,7 +450,7 @@ func (f *File) dumpOffsets(shash *StringHash, fileOffset int64, uuid types.UUID)
 					}
 				}
 			} else {
-				addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(fileOffset)+ptr))
+				addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(shash.FileOffset)+ptr))
 				fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
 			}
 		}
@@ -562,22 +562,66 @@ type header_info_rw struct {
 // 	}
 // }
 
-func (f *File) offsetsToMap(offsets []int32, fileOffset int64, uuid types.UUID) map[string]uint64 {
-	sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
+type objHashMap struct {
+	Dylib string
+	Name  string
+}
 
-	objcMap := make(map[string]uint64)
+func (f *File) offsetsToMap(shash *StringHash, uuid types.UUID) map[uint64]objHashMap {
+
+	objcMap := make(map[uint64]objHashMap)
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 
-	for _, ptr := range offsets {
+	for idx, ptr := range shash.Offsets {
 		if ptr != 0 {
-			sr.Seek(int64(int32(fileOffset)+ptr), io.SeekStart)
+			sr.Seek(int64(int32(shash.FileOffset)+ptr), io.SeekStart)
 			s, err := bufio.NewReader(sr).ReadString('\x00')
 			if err != nil {
-				log.Errorf("failed to read selector name at %#x: %v", int32(fileOffset)+ptr, err)
+				log.Errorf("failed to read objc name at %#x: %v", int32(shash.FileOffset)+ptr, err)
 			}
-			addr, _ := f.GetVMAddressForUUID(uuid, uint64(int32(fileOffset)+ptr))
-			objcMap[strings.Trim(s, "\x00")] = addr
-			f.AddressToSymbol[addr] = strings.Trim(s, "\x00")
+			addr, err := f.GetVMAddressForUUID(uuid, uint64(int32(shash.FileOffset)+ptr))
+			if err != nil {
+				log.Errorf("failed to get vmaddr for objc object at %#x: %v", int32(shash.FileOffset)+ptr, err)
+			}
+			s = strings.Trim(s, "\x00")
+			f.AddressToSymbol[addr] = s
+			if len(shash.ObjectOffsets) > 0 {
+				if !shash.ObjectOffsets[idx].IsDuplicate() {
+					_, addr, err := f.GetCacheVMAddress(shash.ObjectOffsets[idx].ObjectCacheOffset())
+					if err != nil {
+						log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
+					} else {
+						if len(shash.dylibMap) > 0 {
+							objcMap[addr] = objHashMap{
+								Dylib: filepath.Base(shash.dylibMap[shash.ObjectOffsets[idx].DylibObjCIndex()]),
+								Name:  s,
+							}
+						} else {
+							objcMap[addr] = objHashMap{Name: s}
+						}
+						f.AddressToSymbol[addr] = s
+					}
+				} else {
+					for i := uint16(0); i < shash.ObjectOffsets[idx].DuplicateCount(); i++ {
+						_, addr, err := f.GetCacheVMAddress(shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].ObjectCacheOffset())
+						if err != nil {
+							log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
+						} else {
+							if len(shash.dylibMap) > 0 {
+								objcMap[addr] = objHashMap{
+									Dylib: filepath.Base(shash.dylibMap[shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].DylibObjCIndex()]),
+									Name:  s,
+								}
+							} else {
+								objcMap[addr] = objHashMap{Name: s}
+							}
+							f.AddressToSymbol[addr] = s
+						}
+					}
+				}
+			} else {
+				objcMap[addr] = objHashMap{Name: s}
+			}
 		}
 	}
 
@@ -587,120 +631,148 @@ func (f *File) offsetsToMap(offsets []int32, fileOffset int64, uuid types.UUID) 
 // GetAllSelectors is a dumb brute force way to get all the ObjC selector/class etc address
 // by just dumping all the strings in the __OBJC_RO segment
 // returns: map[sym]addr
-func (f *File) GetAllObjCSelectors(print bool) (map[string]uint64, error) {
-
+func (f *File) GetAllObjCSelectors(print bool) (map[uint64]objHashMap, error) {
 	shash, uuid, err := f.getSelectorStringHash()
 	if err != nil {
 		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
-	if print {
-		f.dumpOffsets(shash, shash.FileOffset, *uuid)
+	if shash.dylibMap == nil {
+		shash.dylibMap = make(map[uint16]string)
+		for _, image := range f.Images {
+			if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
+				shash.dylibMap[idx] = image.Name
+			}
+		}
 	}
 
-	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
+	if print {
+		f.dumpOffsets(shash, *uuid)
+	}
+
+	return f.offsetsToMap(shash, *uuid), nil
 }
 
-// GetSelectorAddress returns a selector name's address
-func (f *File) GetSelectorAddress(selector string) (uint64, error) {
+func (f *File) getStringHashAddresses(shash *StringHash, index uint32, uuid *types.UUID) ([]uint64, error) {
+	if len(shash.ObjectOffsets) > 0 {
+		if !shash.ObjectOffsets[index].IsDuplicate() {
+			_, addr, err := f.GetCacheVMAddress(shash.ObjectOffsets[index].ObjectCacheOffset())
+			if err != nil {
+				return nil, fmt.Errorf("failed to get cache vmaddr for objc type at cache vmoffset %#x: %v", shash.ObjectOffsets[index].ObjectCacheOffset(), err)
+			}
+			return []uint64{addr}, nil
+		} else {
+			var addrs []uint64
+			for i := uint16(0); i < shash.ObjectOffsets[index].DuplicateCount(); i++ {
+				_, addr, err := f.GetCacheVMAddress(shash.DuplicateOffsets[shash.ObjectOffsets[index].DuplicateIndex()+uint64(i)].ObjectCacheOffset())
+				if err != nil {
+					log.Errorf("failed to get cache vmaddr for objc type at cache vmoffset %#x: %v", shash.ObjectOffsets[index].ObjectCacheOffset(), err)
+				} else {
+					addrs = append(addrs, addr)
+				}
+			}
+			addrs = utils.Unique(addrs)
+			return addrs, nil
+		}
+	}
+
+	addr, err := f.GetVMAddressForUUID(*uuid, uint64(shash.FileOffset+int64(shash.Offsets[index])))
+	if err != nil {
+		return nil, fmt.Errorf("failed get address for objc type: %w", err)
+	}
+
+	return []uint64{addr}, nil
+}
+
+// GetSelectorAddress returns a selector addresses
+func (f *File) GetSelectorAddresses(selector string) ([]uint64, error) {
 	shash, uuid, err := f.getSelectorStringHash()
 	if err != nil {
-		return 0, fmt.Errorf("failed get selector objc_stringhash_t for %s: %v", selector, err)
+		return nil, fmt.Errorf("failed get selector objc_stringhash_t for %s: %v", selector, err)
 	}
 
-	selIndex, err := shash.getIndex(selector)
+	idx, err := shash.getIndex(selector)
 	if err != nil {
-		return 0, fmt.Errorf("failed get selector address for %s", selector)
+		return nil, fmt.Errorf("failed get selector address for %s", selector)
 	}
 
-	ptr, err := f.GetVMAddressForUUID(*uuid, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
-	if err != nil {
-		return 0, fmt.Errorf("failed get selector address for %s: %w", selector, err)
-	}
-
-	return ptr, nil
+	return f.getStringHashAddresses(shash, idx, uuid)
 }
 
 // GetAllClasses dumps the classes from the optimized string hash
-func (f *File) GetAllObjCClasses(print bool) (map[string]uint64, error) {
+func (f *File) GetAllObjCClasses(print bool) (map[uint64]objHashMap, error) {
 	shash, uuid, err := f.getClassStringHash()
 	if err != nil {
 		return nil, fmt.Errorf("failed read class objc_stringhash_t")
 	}
 
-	shash.dylibMap = make(map[uint16]string)
-	for _, image := range f.Images {
-		if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
-			shash.dylibMap[idx] = image.Name
+	if shash.dylibMap == nil {
+		shash.dylibMap = make(map[uint16]string)
+		for _, image := range f.Images {
+			if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
+				shash.dylibMap[idx] = image.Name
+			}
 		}
 	}
 
 	if print {
-		f.dumpOffsets(shash, shash.FileOffset, *uuid)
+		f.dumpOffsets(shash, *uuid)
 	}
 
-	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
+	return f.offsetsToMap(shash, *uuid), nil
 }
 
-// GetClassAddress returns a class address
-func (f *File) GetClassAddress(class string) (uint64, error) {
+// GetClassAddress returns a class addresses
+func (f *File) GetClassAddresses(class string) ([]uint64, error) {
 	shash, uuid, err := f.getClassStringHash()
 	if err != nil {
-		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
+		return nil, fmt.Errorf("failed read class objc_stringhash_t: %v", err)
 	}
 
-	selIndex, err := shash.getIndex(class)
+	idx, err := shash.getIndex(class)
 	if err != nil {
-		return 0, fmt.Errorf("failed get class address for %s: %v", class, err)
+		return nil, fmt.Errorf("failed get class address for %s: %v", class, err)
 	}
 
-	ptr, err := f.GetVMAddressForUUID(*uuid, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
-	if err != nil {
-		return 0, fmt.Errorf("failed get class address for %s: %w", class, err)
-	}
-
-	return ptr, nil
+	return f.getStringHashAddresses(shash, idx, uuid)
 }
 
 // GetAllProtocols dumps the protols from the optimized string hash
-func (f *File) GetAllObjCProtocols(print bool) (map[string]uint64, error) {
+func (f *File) GetAllObjCProtocols(print bool) (map[uint64]objHashMap, error) {
 	shash, uuid, err := f.getProtocolStringHash()
 	if err != nil {
-		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
+		return nil, fmt.Errorf("failed read protocol objc_stringhash_t: %v", err)
 	}
 
-	shash.dylibMap = make(map[uint16]string)
-	for _, image := range f.Images {
-		if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
-			shash.dylibMap[idx] = image.Name
+	if shash.dylibMap == nil {
+		shash.dylibMap = make(map[uint16]string)
+		for _, image := range f.Images {
+			if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
+				shash.dylibMap[idx] = image.Name
+			}
 		}
 	}
 
 	if print {
-		f.dumpOffsets(shash, shash.FileOffset, *uuid)
+		f.dumpOffsets(shash, *uuid)
 	}
 
-	return f.offsetsToMap(shash.Offsets, shash.FileOffset, *uuid), nil
+	return f.offsetsToMap(shash, *uuid), nil
 }
 
-// GetProtocolAddress returns a protocol address
-func (f *File) GetProtocolAddress(protocol string) (uint64, error) {
+// GetProtocolAddress returns a protocol addresses
+func (f *File) GetProtocolAddresses(protocol string) ([]uint64, error) {
 	shash, uuid, err := f.getProtocolStringHash()
 	if err != nil {
-		return 0, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
+		return nil, fmt.Errorf("failed read protocol objc_stringhash_t: %v", err)
 	}
 
-	selIndex, err := shash.getIndex(protocol)
+	idx, err := shash.getIndex(protocol)
 	if err != nil {
-		return 0, fmt.Errorf("failed get protocol address for %s: %v", protocol, err)
+		return nil, fmt.Errorf("failed get protocol index for %s: %v", protocol, err)
 	}
 
-	ptr, err := f.GetVMAddressForUUID(*uuid, uint64(shash.FileOffset+int64(shash.Offsets[selIndex])))
-	if err != nil {
-		return 0, fmt.Errorf("failed get protocol address for %s: %w", protocol, err)
-	}
-
-	return ptr, nil
+	return f.getStringHashAddresses(shash, idx, uuid)
 }
 
 // ClassesForImage returns all of the Objective-C classes for a given image
@@ -1045,7 +1117,7 @@ func (f *File) CFStringsForImage(imageNames ...string) error {
 
 		for _, cfstr := range image.ObjC.CFStrings {
 			if len(cfstr.Name) > 0 {
-				f.AddressToSymbol[cfstr.Address] = cfstr.Name
+				f.AddressToSymbol[cfstr.Address] = fmt.Sprintf("\"%s\"", cfstr.Name)
 			}
 		}
 	}
@@ -1178,6 +1250,67 @@ func (f *File) GetObjCClass(vmaddr uint64) (*objc.Class, error) {
 	}, nil
 }
 
+func (f *File) GetObjCClassProtocolsAddrs(vmaddr uint64) ([]uint64, error) {
+	var addrs []uint64
+
+	if vmaddr == 0 {
+		return nil, nil
+	}
+
+	uuid, off, err := f.GetOffset(vmaddr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
+	}
+	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
+	sr.Seek(int64(off), io.SeekStart)
+
+	var classPtr objc.SwiftClassMetadata64
+	if err := binary.Read(sr, f.ByteOrder, &classPtr); err != nil {
+		return nil, fmt.Errorf("failed to read swift_class_metadata_t: %v", err)
+	}
+
+	uuid, off, err = f.GetOffset(f.SlideInfo.SlidePointer(classPtr.DataVMAddrAndFastFlags) & objc.FAST_DATA_MASK64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
+	}
+	sr = io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
+
+	sr.Seek(int64(off), io.SeekStart)
+
+	var info objc.ClassRO64
+	if err := binary.Read(sr, f.ByteOrder, &info); err != nil {
+		return nil, fmt.Errorf("failed to read class_ro_t: %v", err)
+	}
+
+	if info.BaseProtocolsVMAddr == 0 {
+		return nil, nil
+	}
+
+	off, err = f.GetOffsetForUUID(uuid, f.SlideInfo.SlidePointer(info.BaseProtocolsVMAddr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert vmaddr: %v", err)
+	}
+
+	sr.Seek(int64(off), io.SeekStart)
+
+	var protList objc.ProtocolList
+	if err := binary.Read(sr, f.ByteOrder, &protList.Count); err != nil {
+		return nil, fmt.Errorf("failed to read protocol_list_t count: %v", err)
+	}
+
+	protList.Protocols = make([]uint64, protList.Count)
+	if err := binary.Read(sr, f.ByteOrder, &protList.Protocols); err != nil {
+		return nil, fmt.Errorf("failed to read protocol_list_t prots: %v", err)
+	}
+
+	for _, prot := range protList.Protocols {
+		addrs = append(addrs, f.SlideInfo.SlidePointer(prot))
+	}
+
+	return addrs, nil
+}
+
 func (f *File) GetObjCStubsForImage(imageNames ...string) error {
 	var images []*CacheImage
 
@@ -1238,16 +1371,16 @@ func (f *File) GetObjCStubsForImage(imageNames ...string) error {
 // ParseAllObjc parses all the ObjC data in the cache and loads it into the symbol table
 func (f *File) ParseAllObjc() error {
 	if _, err := f.GetAllObjCClasses(false); err != nil {
-		return err
+		return fmt.Errorf("failed to parse objc classes: %v", err)
 	}
-	if err := f.GetAllObjcMethods(); err != nil {
-		return err
-	}
+	// if err := f.GetAllObjcMethods(); err != nil { TODO: should I put this back in? The same info is in the symbols
+	// 	return fmt.Errorf("failed to parse objc methods: %v", err)
+	// }
 	if _, err := f.GetAllObjCSelectors(false); err != nil {
-		return err
+		return fmt.Errorf("failed to parse objc selectors: %v", err)
 	}
 	if _, err := f.GetAllObjCProtocols(false); err != nil {
-		return err
+		return fmt.Errorf("failed to parse objc protocols: %v", err)
 	}
 	return nil
 }

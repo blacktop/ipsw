@@ -169,7 +169,7 @@ var ipswCmd = &cobra.Command{
 		if len(device) > 0 {
 			db, err := info.GetIpswDB()
 			if err != nil {
-				return fmt.Errorf("failed to get ipsw device DB: %v", err)
+				return fmt.Errorf("failed to get IPSW device DB: %v", err)
 			}
 			if dev, err := db.LookupDevice(device); err == nil {
 				if dev.SDKPlatform == "macosx" {
@@ -316,7 +316,7 @@ var ipswCmd = &cobra.Command{
 			if len(ipsws) > 1 {
 				cont = false
 				prompt := &survey.Confirm{
-					Message: fmt.Sprintf("You are about to download %d ipsw files. Continue?", len(ipsws)),
+					Message: fmt.Sprintf("You are about to download %d IPSW files. Continue?", len(ipsws)),
 				}
 				survey.AskOne(prompt, &cont)
 			}
@@ -324,50 +324,44 @@ var ipswCmd = &cobra.Command{
 
 		if cont {
 			if remoteKernel || remoteDSC || len(remotePattern) > 0 {
-				if remoteKernel { // REMOTE KERNEL MODE
-					for _, i := range ipsws {
-						log.WithFields(log.Fields{
-							"device":  i.Identifier,
-							"build":   i.BuildID,
-							"version": i.Version,
-							"signed":  i.Signed,
-						}).Info("Parsing remote IPSW")
+				for _, ipsw := range ipsws {
+					log.WithFields(log.Fields{
+						"device":  ipsw.Identifier,
+						"build":   ipsw.BuildID,
+						"version": ipsw.Version,
+						"signed":  ipsw.Signed,
+					}).Info("Parsing remote IPSW")
 
+					zr, err := download.NewRemoteZipReader(ipsw.URL, &download.RemoteConfig{
+						Proxy:    proxy,
+						Insecure: insecure,
+					})
+					if err != nil {
+						return fmt.Errorf("failed to create remote zip reader of IPSW: %v", err)
+					}
+
+					inf, err := info.ParseZipFiles(zr.File)
+					if err != nil {
+						return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
+					}
+
+					folder, err := inf.GetFolder()
+					if err != nil {
+						log.Errorf("failed to get folder from remote zip metadata: %v", err)
+					}
+					destPath = filepath.Join(destPath, folder)
+
+					// REMOTE KERNEL MODE
+					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
-						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
-							Proxy:    proxy,
-							Insecure: insecure,
-						})
-						if err != nil {
-							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
-						}
 						if err := kernelcache.RemoteParse(zr, destPath); err != nil {
-							return fmt.Errorf("failed to download kernelcache from remote ipsw: %v", err)
+							return fmt.Errorf("failed to download kernelcache from remote IPSW: %v", err)
 						}
 					}
-				}
-				if remoteDSC { // REMOTE DSC MODE
-					for _, i := range ipsws {
-						log.WithFields(log.Fields{
-							"device":  i.Identifier,
-							"build":   i.BuildID,
-							"version": i.Version,
-							"signed":  i.Signed,
-						}).Info("Parsing remote IPSW")
-
+					// REMOTE DSC MODE
+					if remoteDSC {
 						log.Info("Extracting remote dyld_shared_cache(s)")
-						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
-							Proxy:    proxy,
-							Insecure: insecure,
-						})
-						if err != nil {
-							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
-						}
-						i, err := info.ParseZipFiles(zr.File)
-						if err != nil {
-							return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
-						}
-						sysDMG, err := i.GetSystemOsDmg()
+						sysDMG, err := inf.GetSystemOsDmg()
 						if err != nil {
 							return fmt.Errorf("only iOS16.x/macOS13.x supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
 						}
@@ -382,46 +376,20 @@ var ipswCmd = &cobra.Command{
 						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true, true); err != nil {
 							return fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 						}
-						folder, err := i.GetFolder()
-						if err != nil {
-							log.Errorf("failed to get folder from remote zip metadata: %v", err)
-						}
-						destPath = filepath.Join(destPath, folder)
-						if err := dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), destPath, viper.GetStringSlice("extract.dyld-arch")); err != nil {
+
+						if err := dyld.ExtractFromDMG(inf, filepath.Join(tmpDIR, sysDMG), destPath, viper.GetStringSlice("extract.dyld-arch")); err != nil {
 							return fmt.Errorf("failed to extract dyld_shared_cache(s) from remote IPSW: %v", err)
 						}
 					}
-				}
-				if len(remotePattern) > 0 { // PATTERN MATCHING MODE
-					for _, i := range ipsws {
-						log.WithFields(log.Fields{
-							"device":  i.Identifier,
-							"build":   i.BuildID,
-							"version": i.Version,
-							"signed":  i.Signed,
-						}).Info("Parsing remote IPSW")
+					// PATTERN MATCHING MODE
+					if len(remotePattern) > 0 {
 						dlRE, err := regexp.Compile(remotePattern)
 						if err != nil {
-							return errors.Wrap(err, "failed to compile regexp")
+							return fmt.Errorf("failed to compile regex for pattern '%s': %v", remotePattern, err)
 						}
 						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						zr, err := download.NewRemoteZipReader(i.URL, &download.RemoteConfig{
-							Proxy:    proxy,
-							Insecure: insecure,
-						})
-						if err != nil {
-							return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
-						}
-						iinfo, err := info.ParseZipFiles(zr.File)
-						if err != nil {
-							return errors.Wrap(err, "failed to parse remote ipsw")
-						}
-						folder, err := iinfo.GetFolder()
-						if err != nil {
-							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
-						}
-						if err := utils.RemoteUnzip(zr.File, dlRE, filepath.Join(destPath, folder), flat, true); err != nil {
-							return fmt.Errorf("failed to download pattern matching files from remote ipsw: %v", err)
+						if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat, true); err != nil {
+							return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
 						}
 					}
 				}
@@ -457,7 +425,7 @@ var ipswCmd = &cobra.Command{
 							return fmt.Errorf("failed to write to checksums.txt.sha1: %v", err)
 						}
 					} else {
-						log.Warnf("ipsw already exists: %s", destName)
+						log.Warnf("IPSW already exists: %s", destName)
 					}
 				}
 			}

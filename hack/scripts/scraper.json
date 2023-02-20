@@ -1,0 +1,73 @@
+{
+  "index_uid": "docs-v1",
+  "start_urls": [
+    {
+      "url": "https://blacktop.github.io/ipsw/docs/introduction",
+      "extra_attributes": { "lang": ["en"] },
+      "selectors_key": "introduction"
+    },
+    {
+      "url": "https://blacktop.github.io/ipsw/docs/category/getting-started/",
+      "extra_attributes": { "lang": ["en"] },
+      "selectors_key": "getting-started"
+    },
+    {
+      "url": "https://blacktop.github.io/ipsw/docs/category/guides/",
+      "extra_attributes": { "lang": ["en"] },
+      "selectors_key": "guides"
+    },
+    {
+      "url": "https://blacktop.github.io/ipsw/docs/roadmap/",
+      "extra_attributes": { "lang": ["en"] },
+      "selectors_key": "roadmap"
+    },
+    {
+      "url": "https://blacktop.github.io/ipsw/docs/cli/",
+      "extra_attributes": { "lang": ["en"] },
+      "selectors_key": "cli"
+    },
+    {
+      "url": "https://blacktop.github.io/ipsw/",
+      "extra_attributes": { "lang": ["en"] }
+    }
+  ],
+  "stop_urls": [],
+  "sitemap_urls": ["https://blacktop.github.io/ipsw/sitemap.xml"],
+  "custom_settings": {
+    "filterableAttributes": ["lang"]
+  },
+  "selectors": {
+    "default": {
+      "lvl0": "article h1",
+      "lvl1": "article h2",
+      "lvl2": "article h3",
+      "lvl3": "article h4",
+      "lvl4": "article h5",
+      "text": "article p, article li"
+    },
+    "guides": {
+      "lvl0": {
+        "selector": "",
+        "default_value": "Documentation"
+      },
+      "lvl1": "article h1",
+      "lvl2": "article h2",
+      "lvl3": "article h3",
+      "lvl4": "article h4",
+      "lvl5": "article h5",
+      "text": "article p, article li"
+    },
+    "cli": {
+      "lvl0": {
+        "selector": "",
+        "default_value": "CLI"
+      },
+      "lvl1": "article h1",
+      "lvl2": "article h2",
+      "lvl3": "article h3",
+      "lvl4": "article h4",
+      "lvl5": "article h5",
+      "text": "article p, article li"
+    }
+  }
+}

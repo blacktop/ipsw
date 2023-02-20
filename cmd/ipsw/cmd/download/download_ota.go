@@ -46,6 +46,16 @@ import (
 	"github.com/spf13/viper"
 )
 
+var otaDlCmdPlatforms = []string{
+	"ios\tiOS",
+	"watchos\twatchOS",
+	"tvos\ttvOS",
+	"audioos\tAudioOS",
+	"accessory\tAccessory: Studio Display, etc.",
+	"macos\tmacOS",
+	"recovery\trecoveryOS",
+}
+
 func init() {
 	DownloadCmd.AddCommand(otaDLCmd)
 
@@ -80,7 +90,11 @@ func init() {
 	viper.BindPFlag("download.ota.show-latest-version", otaDLCmd.Flags().Lookup("show-latest-version"))
 	viper.BindPFlag("download.ota.show-latest-build", otaDLCmd.Flags().Lookup("show-latest-build"))
 
+	otaDLCmd.MarkFlagDirname("output")
 	otaDLCmd.MarkFlagsMutuallyExclusive("info", "beta")
+	otaDLCmd.RegisterFlagCompletionFunc("platform", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return otaDlCmdPlatforms, cobra.ShellCompDirectiveDefault
+	})
 }
 
 // otaDLCmd represents the ota download command
@@ -245,7 +259,7 @@ var otaDLCmd = &cobra.Command{
 			DeviceBlackList: doNotDownload,
 			Proxy:           proxy,
 			Insecure:        insecure,
-			TimeoutSeconds:  90,
+			Timeout:         90,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse remote OTA XML: %v", err)
@@ -325,6 +339,7 @@ var otaDLCmd = &cobra.Command{
 						"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices[:3], " "), len(o.SupportedDevices)),
 						"model":   strings.Join(o.SupportedDeviceModels, " "),
 					}).Info(fmt.Sprintf("Getting %s remote OTA", o.DocumentationID))
+
 					zr, err := download.NewRemoteZipReader(o.BaseURL+o.RelativePath, &download.RemoteConfig{
 						Proxy:    proxy,
 						Insecure: insecure,
@@ -332,6 +347,16 @@ var otaDLCmd = &cobra.Command{
 					if err != nil {
 						return fmt.Errorf("failed to open remote zip to OTA: %v", err)
 					}
+					inf, err := info.ParseZipFiles(zr.File)
+					if err != nil {
+						return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
+					}
+					folder, err := inf.GetFolder()
+					if err != nil {
+						log.Errorf("failed to get folder from remote zip metadata: %v", err)
+					}
+					destPath = filepath.Join(destPath, folder)
+
 					if remoteKernel { // REMOTE KERNEL MODE
 						log.Info("Extracting remote kernelcache")
 						err = kernelcache.RemoteParse(zr, destPath)
@@ -385,16 +410,12 @@ var otaDLCmd = &cobra.Command{
 						}
 					}
 					if len(remotePattern) > 0 { // REMOTE PATTERN MATCHING MODE
+						re, err := regexp.Compile(remotePattern)
+						if err != nil {
+							return fmt.Errorf("failed to compile regex for pattern '%s': %v", remotePattern, err)
+						}
 						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						iinfo, err := info.ParseZipFiles(zr.File)
-						if err != nil {
-							return errors.Wrap(err, "failed to parse remote ipsw")
-						}
-						folder, err := iinfo.GetFolder()
-						if err != nil {
-							log.Errorf("failed to get folder from remote ipsw metadata: %v", err)
-						}
-						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(remotePattern), filepath.Join(destPath, folder), flat, true); err != nil {
+						if err := utils.RemoteUnzip(zr.File, re, destPath, flat, true); err != nil {
 							utils.Indent(log.Warn, 2)("0 files matched pattern in remote OTA zip. Now checking payloadv2 payloads...")
 							rfiles, err := ota.RemoteList(zr)
 							if err != nil {
@@ -402,7 +423,7 @@ var otaDLCmd = &cobra.Command{
 							}
 							var matches []string
 							for _, rf := range rfiles {
-								if regexp.MustCompile(remotePattern).MatchString(rf.Name()) {
+								if re.MatchString(rf.Name()) {
 									matches = append(matches, rf.Name())
 								}
 							}

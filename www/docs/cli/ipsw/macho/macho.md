@@ -32,6 +32,7 @@ ipsw macho [flags]
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw macho a2o](/docs/cli/ipsw/macho/a2o)	 - Convert MachO address to offset
+* [ipsw macho a2s](/docs/cli/ipsw/macho/a2s)	 - Lookup symbol at unslid address
 * [ipsw macho bbl](/docs/cli/ipsw/macho/bbl)	 - Create single universal/fat MachO out many MachOs
 * [ipsw macho disass](/docs/cli/ipsw/macho/disass)	 - Disassemble ARM64 MachO at symbol/vaddr
 * [ipsw macho dump](/docs/cli/ipsw/macho/dump)	 - Dump MachO data at given virtual address

@@ -382,6 +382,10 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 				}
 			}
 		}
+		log.Info("parsing objc info...")
+		if err := f.ParseAllObjc(); err != nil {
+			return err
+		}
 
 		if err := f.SaveAddrToSymMap(cacheFile); err != nil {
 			return err

@@ -39,6 +39,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var mountCmdSubCmds = []string{"fs", "sys", "app"}
+
 func init() {
 	rootCmd.AddCommand(mountCmd)
 }
@@ -53,7 +55,7 @@ var mountCmd = &cobra.Command{
 	Args:          cobra.ExactArgs(2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			return []string{"fs", "sys", "app"}, cobra.ShellCompDirectiveNoFileComp
+			return mountCmdSubCmds, cobra.ShellCompDirectiveNoFileComp
 		}
 		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	},
@@ -91,6 +93,8 @@ var mountCmd = &cobra.Command{
 				return fmt.Errorf("failed to get AppOS DMG: %v", err)
 			}
 			log.Info("Found AppOS DMG")
+		default:
+			return fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", args[0], strings.Join(mountCmdSubCmds, "', '"))
 		}
 
 		// check if filesystem DMG already exists (due to previous mount command)

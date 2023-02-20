@@ -21,6 +21,7 @@ ipsw ent <IPSW> [flags]
   -e, --ent string      Entitlement to search for
   -f, --file string     Dump entitlements for MachO
   -h, --help            help for ent
+  -m, --md              Markdown style output
   -o, --output string   Folder to r/w entitlement databases
 ```
 

@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"text/tabwriter"
 
@@ -212,10 +213,12 @@ func init() {
 	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO")
 	entCmd.Flags().StringP("output", "o", "", "Folder to r/w entitlement databases")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
+	entCmd.Flags().BoolP("md", "m", false, "Markdown style output")
 	viper.BindPFlag("ent.ent", entCmd.Flags().Lookup("ent"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
 	viper.BindPFlag("ent.ouput", entCmd.Flags().Lookup("ouput"))
 	viper.BindPFlag("ent.diff", entCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("ent.md", entCmd.Flags().Lookup("md"))
 }
 
 // entCmd represents the ent command
@@ -229,9 +232,11 @@ var entCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		entitlement := viper.GetString("ent.ent")
 		searchFile := viper.GetString("ent.file")
+		markdown := viper.GetBool("ent.md")
 
 		if len(entitlement) > 0 && len(searchFile) > 0 {
 			log.Errorf("you can only use --ent OR --file (not both)")
@@ -300,10 +305,22 @@ var entCmd = &cobra.Command{
 					}
 				}
 			} else {
+				// sort latest entitlements DB's files
+				var files []string
+				for f := range entDB2 {
+					files = append(files, f)
+				}
+				sort.Strings(files)
+
 				found := false
-				for f2, e2 := range entDB2 { // DIFF ALL ENTITLEMENTS
+				for _, f2 := range files { // DIFF ALL ENTITLEMENTS
+					e2 := entDB2[f2]
 					if e1, ok := entDB[f2]; ok {
-						out, err := utils.GitDiff(e1, e2)
+						var tool string
+						if markdown {
+							tool = "git"
+						}
+						out, err := utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Tool: tool, Color: viper.GetBool("color")})
 						if err != nil {
 							return err
 						}
@@ -311,16 +328,41 @@ var entCmd = &cobra.Command{
 							continue
 						}
 						found = true
-						color.New(color.Bold).Printf("\n%s\n\n", f2)
-						fmt.Println(out)
+						if markdown {
+							color.New(color.Bold).Printf("\n### `%s`\n\n", f2)
+							fmt.Println("```diff")
+							fmt.Println(out)
+							fmt.Println("```")
+						} else {
+							color.New(color.Bold).Printf("\n%s\n\n", f2)
+							fmt.Println(out)
+						}
 					} else {
 						found = true
-						color.New(color.Bold).Printf("\n🆕 %s 🆕\n\n", f2)
-						if len(e2) == 0 {
-							log.Warn("No entitlements (yet)")
+						if markdown {
+							color.New(color.Bold).Printf("\n### 🆕 `%s`\n\n", f2)
 						} else {
-							if err := quick.Highlight(os.Stdout, e2, "xml", "terminal16m", "nord"); err != nil {
-								return err
+							color.New(color.Bold).Printf("\n🆕 %s 🆕\n\n", f2)
+						}
+						if len(e2) == 0 {
+							if markdown {
+								fmt.Println("- No entitlements *(yet)*")
+							} else {
+								log.Warn("No entitlements (yet)")
+							}
+						} else {
+							if viper.GetBool("color") {
+								if err := quick.Highlight(os.Stdout, e2, "xml", "terminal256", "nord"); err != nil {
+									return err
+								}
+							} else {
+								if markdown {
+									fmt.Println("```xml")
+									fmt.Println(e2)
+									fmt.Println("```")
+								} else {
+									fmt.Println(e2)
+								}
 							}
 						}
 					}

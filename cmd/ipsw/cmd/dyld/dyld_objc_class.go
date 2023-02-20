@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -82,33 +81,33 @@ var objcClassCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(args) > 1 {
-			ptr, err := f.GetClassAddress(args[1])
+			ptrs, err := f.GetClassAddresses(args[1])
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get class addresses: %v", err)
 			}
-			fmt.Printf("0x%x: %s\n", ptr, args[1])
+			for _, ptr := range ptrs {
+				fmt.Printf("%s: %s=%s\n", colorAddr("%#09x", ptr), colorClassField("class"), args[1])
+			}
 		} else {
 			if len(imageName) > 0 {
-				err = f.ClassesForImage(imageName)
+				image, err := f.Image(imageName)
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to find image %s: %v", imageName, err)
 				}
-
-				// sort by address
-				addrs := make([]uint64, 0, len(f.AddressToSymbol))
-				for a := range f.AddressToSymbol {
-					addrs = append(addrs, a)
+				m, err := image.GetMacho()
+				if err != nil {
+					return fmt.Errorf("failed to get macho for image %s: %v", imageName, err)
 				}
-				sort.Slice(addrs, func(i, j int) bool { return addrs[i] < addrs[j] })
-
-				for _, addr := range addrs {
-					fmt.Printf("%#x: %s\n", addr, f.AddressToSymbol[addr])
+				classes, err := m.GetObjCClassReferences()
+				if err != nil {
+					return fmt.Errorf("failed to get objc class references for image %s: %v", imageName, err)
 				}
-
+				for _, class := range classes {
+					fmt.Printf("%s: %s\n", colorAddr("%#09x", class.ClassPtr), class.Name)
+				}
 			} else {
-				_, err := f.GetAllObjCClasses(true)
-				if err != nil {
-					return err
+				if _, err := f.GetAllObjCClasses(true); err != nil {
+					return fmt.Errorf("failed to get all objc classes: %s", err)
 				}
 			}
 		}

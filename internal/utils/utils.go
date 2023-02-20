@@ -186,6 +186,14 @@ func Uint64SliceContains(slice []uint64, item uint64) bool {
 	return false
 }
 
+func StrSliceAddSuffix(slice []string, suffix string) []string {
+	var out []string
+	for _, s := range slice {
+		out = append(out, s+suffix)
+	}
+	return out
+}
+
 // Unique returns a slice with only unique elements
 func Unique[T comparable](s []T) []T {
 	inResult := make(map[T]bool)
@@ -345,7 +353,7 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat,
 				}
 
 			} else {
-				log.Warnf("%s already exists", fname)
+				Indent(log.Warn, 2)(fmt.Sprintf("%s already exists", fname))
 			}
 		}
 	}

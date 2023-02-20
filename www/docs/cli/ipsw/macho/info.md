@@ -30,12 +30,13 @@ ipsw macho info <macho> [flags]
   -j, --json                    Print the TOC as JSON
   -l, --loads                   Print the load commands
   -o, --objc                    Print ObjC info
-  -r, --objc-refs               Print ObjC references
+      --objc-refs               Print ObjC references
       --output string           Directory to extract files to
   -s, --sig                     Print code signature
   -g, --split-seg               Print split seg info
   -f, --starts                  Print function starts
   -c, --strings                 Print cstrings
+  -w, --swift                   🚧 Print Swift info
   -n, --symbols                 Print symbols
 ```
 

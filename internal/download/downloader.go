@@ -145,7 +145,7 @@ func (d *Download) Do() error {
 
 	req, err := http.NewRequest("GET", d.URL, nil)
 	if err != nil {
-		return errors.Wrap(err, "cannot create http request")
+		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
 	req.Header.Add("User-Agent", utils.RandomAgent())
 
@@ -157,7 +157,6 @@ func (d *Download) Do() error {
 
 	if d.canResume {
 		if f, err := os.Stat(d.DestName + ".download"); !os.IsNotExist(err) {
-
 			// don't try to download files being downloaded elsewhere
 			if d.skipAll {
 				d.resume = false
@@ -242,6 +241,25 @@ func (d *Download) Do() error {
 		return fmt.Errorf("server return status: %s", resp.Status)
 	}
 
+	// Apple likes to return 200 OK even when the file is not found/or is not available
+	if resp.Header.Get("Content-type") == "text/html; charset=UTF-8" {
+		// body, err := io.ReadAll(resp.Body)
+		// if err != nil {
+		// 	return fmt.Errorf("failed to read response body: %v", err)
+		// }
+		// f, err := os.CreateTemp("", "error.html")
+		// if err != nil {
+		// 	return fmt.Errorf("failed to create error.html: %v", err)
+		// }
+		// defer f.Close()
+		// log.Infof("Writing response body to %s", f.Name())
+		// if _, err := f.Write(body); err != nil {
+		// 	return fmt.Errorf("failed to write response body to %s: %v", f.Name(), err)
+		// }
+		// return fmt.Errorf("server returned a html page")
+		log.Warn("Server returned a HTML page")
+	}
+
 	// fileLock := flock.New(d.DestName + ".download")
 	// defer fileLock.Unlock()
 
@@ -260,62 +278,71 @@ func (d *Download) Do() error {
 		utils.Indent(log.WithField("file", d.DestName).Warn, 2)("Resuming a previous download")
 		dest, err = os.OpenFile(d.DestName+".download", os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
-			return errors.Wrapf(err, "cannot create %s", d.DestName)
+			return fmt.Errorf("cannot open %s: %v", d.DestName+".download", err)
 		}
-		dest.Seek(0, os.SEEK_END)
+		dest.Seek(0, io.SeekEnd)
 	} else {
 		dest, err = os.Create(d.DestName + ".download")
 		if err != nil {
-			return errors.Wrapf(err, "cannot create %s", d.DestName)
+			return fmt.Errorf("cannot open %s: %v", d.DestName+".download", err)
 		}
 	}
 
-	p := mpb.New(
-		mpb.WithWidth(60),
-		mpb.WithRefreshRate(180*time.Millisecond),
-	)
+	var p *mpb.Progress
+	var reader io.ReadCloser
 
-	var bar *mpb.Bar
+	if d.size > 0 {
+		p = mpb.New(
+			mpb.WithWidth(60),
+			mpb.WithRefreshRate(180*time.Millisecond),
+		)
 
-	bar = p.Add(d.size,
-		mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
-		mpb.PrependDecorators(
-			decor.CountersKibiByte("\t% .2f / % .2f"),
-		),
-		mpb.AppendDecorators(
-			decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
-			decor.Name(" ] "),
-			decor.AverageSpeed(decor.UnitKiB, "% .2f"),
-		),
-	)
+		var bar *mpb.Bar
 
-	if d.resume {
 		bar = p.Add(d.size,
 			mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
 			mpb.PrependDecorators(
 				decor.CountersKibiByte("\t% .2f / % .2f"),
 			),
 			mpb.AppendDecorators(
-				decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
+				decor.OnComplete(decor.AverageETA(decor.ET_STYLE_GO), "✅ "),
 				decor.Name(" ] "),
-				decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048)),
+				decor.AverageSpeed(decor.UnitKiB, "% .2f"),
 			),
 		)
-		// bar.SetCurrent(d.bytesResumed)
-		bar.SetRefill(d.bytesResumed)
-		bar.IncrInt64(d.bytesResumed)
-	}
 
-	// create proxy reader
-	reader := bar.ProxyReader(resp.Body)
+		if d.resume {
+			bar = p.Add(d.size,
+				mpb.NewBarFiller(mpb.BarStyle().Lbound("[").Filler("=").Tip(">").Padding("-").Rbound("|")),
+				mpb.PrependDecorators(
+					decor.CountersKibiByte("\t% .2f / % .2f"),
+				),
+				mpb.AppendDecorators(
+					decor.OnComplete(decor.EwmaETA(decor.ET_STYLE_GO, float64(d.size)/2048), "✅ "),
+					decor.Name(" ] "),
+					decor.EwmaSpeed(decor.UnitKiB, "% .2f", (float64(d.size)/2048)),
+				),
+			)
+			// bar.SetCurrent(d.bytesResumed)
+			bar.SetRefill(d.bytesResumed)
+			bar.IncrInt64(d.bytesResumed)
+		}
+
+		// create proxy reader
+		reader = bar.ProxyReader(resp.Body)
+	} else {
+		reader = resp.Body
+	}
 	defer reader.Close()
 
 	if d.resume {
 		if _, err := io.Copy(dest, reader); err != nil {
-			return err
+			return fmt.Errorf("failed to copy body reader data: %v", err)
 		}
 
-		p.Wait()
+		if d.size > 0 {
+			p.Wait()
+		}
 
 		// close file
 		dest.Sync()
@@ -326,7 +353,7 @@ func (d *Download) Do() error {
 			if ok, _ := utils.Verify(d.Sha1, d.DestName+".download"); !ok {
 				// fileLock.Unlock()
 				if err := os.Remove(d.DestName + ".download"); err != nil {
-					return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+					return fmt.Errorf("cannot remove downloaded file with checksum mismatch: %v", err)
 				}
 				return fmt.Errorf("bad download: ipsw %s sha1 hash is incorrect", d.DestName+".download")
 			}
@@ -340,7 +367,9 @@ func (d *Download) Do() error {
 			return err
 		}
 
-		p.Wait()
+		if d.size > 0 {
+			p.Wait()
+		}
 
 		// close file
 		dest.Sync()
@@ -357,15 +386,14 @@ func (d *Download) Do() error {
 				}).Error, 3)("❌ BAD CHECKSUM")
 				// fileLock.Unlock()
 				if err := os.Remove(d.DestName); err != nil {
-					return errors.Wrap(err, "cannot remove downloaded file with checksum mismatch")
+					return fmt.Errorf("cannot remove downloaded file with checksum mismatch: %v", err)
 				}
 			}
 		}
 	}
 
-	err = os.Rename(d.DestName+".download", d.DestName)
-	if err != nil {
-		return errors.Wrap(err, "failed to remove .download from completed download")
+	if err := os.Rename(d.DestName+".download", d.DestName); err != nil {
+		return fmt.Errorf("failed to rename %s to %s: %v", d.DestName+".download", d.DestName, err)
 	}
 
 	return nil
