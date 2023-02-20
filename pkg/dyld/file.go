@@ -87,6 +87,7 @@ type File struct {
 	dyldStartFnAddr uint64
 	objcOptRoAddr   uint64
 	islandStubs     map[uint64]uint64
+	size            int64
 
 	r       map[mtypes.UUID]io.ReaderAt
 	closers map[mtypes.UUID]io.Closer
@@ -143,6 +144,13 @@ func Open(name string) (*File, error) {
 		return nil, err
 	}
 
+	fi, err := f.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	ff.size = fi.Size()
+
 	if ff.IsDyld4 {
 
 		for i := 1; i <= int(ff.Headers[ff.UUID].SubCacheArrayCount); i++ {
@@ -158,6 +166,13 @@ func Open(name string) (*File, error) {
 			if err != nil {
 				return nil, err
 			}
+
+			fi, err := fsub.Stat()
+			if err != nil {
+				return nil, err
+			}
+
+			ff.size += fi.Size()
 
 			uuid, err := getUUID(fsub)
 			if err != nil {
@@ -643,6 +658,11 @@ func (f *File) parseCache(r io.ReaderAt, uuid mtypes.UUID) error {
 	}
 
 	return nil
+}
+
+// Size returns the size of the cache file(s)
+func (f *File) Size() int64 {
+	return f.size
 }
 
 // GetSubCacheInfo returns the subcache info for the given UUID.

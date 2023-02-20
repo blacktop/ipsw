@@ -109,7 +109,6 @@ func (f *File) GetCacheVMAddress(offset uint64) (types.UUID, uint64, error) {
 	for idx, scinfo := range f.SubCacheInfo { // check the sub subcaches
 		if idx < len(f.SubCacheInfo)-1 {
 			if scinfo.CacheVMOffset <= offset && offset < f.SubCacheInfo[idx+1].CacheVMOffset {
-
 				return scinfo.UUID, f.MappingsWithSlideInfo[scinfo.UUID][0].Address + (offset - scinfo.CacheVMOffset), nil
 			}
 		} else {
