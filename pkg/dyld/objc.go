@@ -318,7 +318,7 @@ func (f *File) getSelectorStringHash() (*StringHash, *types.UUID, error) {
 			return nil, nil, err
 		}
 		shash = StringHash{Type: selopt, FileOffset: int64(off), hdrRO: hdr, opt: opt}
-		if err = shash.Read(NewDyldSharedCacheReader(f, 0)); err != nil {
+		if err = shash.Read(io.NewSectionReader(f.r[u], 0, 1<<63-1)); err != nil {
 			return nil, nil, err
 		}
 	case *ObjcOptT:
