@@ -14,6 +14,13 @@ import (
  * Base class for precomputed selector table and class table.
  */
 
+type strHashType uint8
+
+const (
+	selopt strHashType = iota
+	clsopt
+)
+
 type stringHash struct {
 	Capacity uint32
 	Occupied uint32
@@ -38,6 +45,7 @@ type stringHashV16 struct {
 
 // StringHash struct
 type StringHash struct {
+	Type             strHashType
 	FileOffset       int64
 	shash            any
 	Tab              []byte       /* tab[mask+1] (always power-of-2) */
@@ -119,7 +127,7 @@ func (s *StringHash) Scramble() [256]uint32 {
 	return [256]uint32{0}
 }
 
-func (s *StringHash) Read(r *io.SectionReader) error {
+func (s *StringHash) Read(r io.ReadSeeker) error {
 
 	r.Seek(int64(s.FileOffset), io.SeekStart)
 
@@ -152,22 +160,24 @@ func (s *StringHash) Read(r *io.SectionReader) error {
 		return err
 	}
 
-	s.ObjectOffsets = make([]ObjectData, s.Capacity())
-	if err := binary.Read(r, binary.LittleEndian, &s.ObjectOffsets); err != nil {
-		if err == io.ErrUnexpectedEOF { // FIXME: gross hack (selectors don't use these fields)
-			s.ObjectOffsets = nil
-			return nil
+	if s.Type == clsopt {
+		s.ObjectOffsets = make([]ObjectData, s.Capacity())
+		if err := binary.Read(r, binary.LittleEndian, &s.ObjectOffsets); err != nil {
+			if err == io.ErrUnexpectedEOF { // FIXME: gross hack (selectors don't use these fields)
+				s.ObjectOffsets = nil
+				return nil
+			}
+			return err
 		}
-		return err
-	}
 
-	if err := binary.Read(r, binary.LittleEndian, &s.DuplicateCount); err != nil {
-		return err
-	}
+		if err := binary.Read(r, binary.LittleEndian, &s.DuplicateCount); err != nil {
+			return err
+		}
 
-	s.DuplicateOffsets = make([]ObjectData, s.DuplicateCount)
-	if err := binary.Read(r, binary.LittleEndian, &s.DuplicateOffsets); err != nil {
-		return err
+		s.DuplicateOffsets = make([]ObjectData, s.DuplicateCount)
+		if err := binary.Read(r, binary.LittleEndian, &s.DuplicateOffsets); err != nil {
+			return err
+		}
 	}
 
 	return nil
