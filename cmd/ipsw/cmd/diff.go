@@ -19,43 +19,40 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package kernel
+package cmd
 
 import (
 	"github.com/apex/log"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func init() {
-	KernelcacheCmd.AddCommand(kernelDiffCmd)
+	rootCmd.AddCommand(diffCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// kernelDiffCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// diffCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// kernelDiffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// diffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-// kernelDiffCmd represents the diff command
-var kernelDiffCmd = &cobra.Command{
+// diffCmd represents the diff command
+var diffCmd = &cobra.Command{
 	Use:           "diff",
-	Short:         "Diff kernelcaches",
+	Short:         "Diff IPSWs",
 	Args:          cobra.ExactArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		if viper.GetBool("verbose") {
+		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
 		return nil
-
-		// return kernelcache.ParseMachO(args[0])
 	},
 }

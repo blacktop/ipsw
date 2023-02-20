@@ -19,7 +19,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package kernel
+package macho
 
 import (
 	"github.com/apex/log"
@@ -28,23 +28,23 @@ import (
 )
 
 func init() {
-	KernelcacheCmd.AddCommand(kernelDiffCmd)
+	MachoCmd.AddCommand(machoDiffCmd)
 
 	// Here you will define your flags and configuration settings.
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:
-	// kernelDiffCmd.PersistentFlags().String("foo", "", "A help for foo")
+	// machoDiffCmd.PersistentFlags().String("foo", "", "A help for foo")
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// kernelDiffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// machoDiffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
-// kernelDiffCmd represents the diff command
-var kernelDiffCmd = &cobra.Command{
+// machoDiffCmd represents the diff command
+var machoDiffCmd = &cobra.Command{
 	Use:           "diff",
-	Short:         "Diff kernelcaches",
+	Short:         "Diff MachOs",
 	Args:          cobra.ExactArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -55,7 +55,5 @@ var kernelDiffCmd = &cobra.Command{
 		}
 
 		return nil
-
-		// return kernelcache.ParseMachO(args[0])
 	},
 }
