@@ -24,14 +24,17 @@ THE SOFTWARE.
 package download
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/caarlos0/ctrlc"
 
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/spf13/cobra"
@@ -47,6 +50,7 @@ func init() {
 	devCmd.Flags().Bool("json", false, "Output downloadable items as JSON")
 	devCmd.Flags().Bool("pretty", false, "Pretty print JSON")
 	devCmd.Flags().Bool("kdk", false, "Download KDK")
+	devCmd.Flags().DurationP("timeout", "t", 5*time.Minute, "Timeout for watch attempts in minutes")
 	devCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	devCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
 	viper.BindPFlag("download.dev.watch", devCmd.Flags().Lookup("watch"))
@@ -57,6 +61,7 @@ func init() {
 	viper.BindPFlag("download.dev.json", devCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.dev.pretty", devCmd.Flags().Lookup("pretty"))
 	viper.BindPFlag("download.dev.kdk", devCmd.Flags().Lookup("kdk"))
+	viper.BindPFlag("download.dev.timeout", devCmd.Flags().Lookup("timeout"))
 	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.dev.vault-password", devCmd.Flags().Lookup("vault-password"))
 	devCmd.Flags().MarkHidden("kdk")
@@ -143,13 +148,7 @@ var devCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("download.dev.kdk") {
-			return app.DownloadKDK(viper.GetString("download.version"), viper.GetString("download.build"))
-		}
-
-		if len(watchList) > 0 {
-			if err := app.Watch(); err != nil {
-				return fmt.Errorf("failed to watch: %v", err)
-			}
+			return app.DownloadKDK(viper.GetString("download.version"), viper.GetString("download.build"), output)
 		}
 
 		dlType := ""
@@ -176,6 +175,20 @@ var devCmd = &cobra.Command{
 			}
 		}
 
+		if len(watchList) > 0 {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			if err := ctrlc.Default.Run(ctx, func() error {
+				if err := app.Watch(ctx, dlType, output, viper.GetDuration("download.dev.timeout")); err != nil {
+					return fmt.Errorf("failed to watch: %v", err)
+				}
+				return nil
+			}); err != nil {
+				log.Warn("Exiting...")
+			}
+		}
+
 		if asJSON {
 			if dat, err := app.GetDownloadsAsJSON(dlType, prettyJSON); err != nil {
 				return fmt.Errorf("failed to get downloads as JSON: %v", err)
@@ -191,7 +204,7 @@ var devCmd = &cobra.Command{
 				}
 			}
 		} else {
-			if err := app.DownloadPrompt(dlType); err != nil {
+			if err := app.DownloadPrompt(dlType, output); err != nil {
 				return fmt.Errorf("failed to download: %v", err)
 			}
 		}
