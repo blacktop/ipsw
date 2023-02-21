@@ -37,20 +37,6 @@ func init() {
 	PipelineCmd.PersistentFlags().StringVarP(&pipelineConf, "pipeline", "f", "pipeline.yaml", "Pipeline file")
 }
 
-// PipelineCmd represents the pipeline command
-var PipelineCmd = &cobra.Command{
-	Use:   "pipeline",
-	Short: "Run ipsw pipelines",
-	Args:  cobra.NoArgs,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
-		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
-	},
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-	},
-}
-
 // initConfig reads in config file and ENV variables if set.
 func initPipeline() {
 	if pipelineConf != "" {
@@ -68,4 +54,18 @@ func initPipeline() {
 	// if err := pipeline.ReadInConfig(); err == nil {
 	// 	fmt.Fprintln(os.Stderr, "Using pipeline file:", pipeline.FileUsed())
 	// }
+}
+
+// PipelineCmd represents the pipeline command
+var PipelineCmd = &cobra.Command{
+	Use:   "pipeline",
+	Short: "Run ipsw pipelines",
+	Args:  cobra.NoArgs,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
+		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
+	},
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
 }

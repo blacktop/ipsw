@@ -58,11 +58,13 @@ var initCmd = &cobra.Command{
 			return err
 		}
 		defer gitignore.Close()
+
 		if _, err := gitignore.WriteString("\ndist/\n"); err != nil {
 			return err
 		}
 
 		log.WithField("file", pipelineConf).Info("config created; please edit accordingly to your needs")
+
 		return nil
 	},
 }
