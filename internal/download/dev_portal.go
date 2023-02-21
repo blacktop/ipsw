@@ -4,6 +4,7 @@ package download
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -144,7 +145,7 @@ type Downloads struct {
 	HTTPResponseHeaders struct {
 		SetCookie string `json:"Set-Cookie,omitempty"`
 	} `json:"httpResponseHeaders,omitempty"`
-	Downloads []dload
+	Downloads []MoreDownload
 }
 
 type authService struct {
@@ -296,7 +297,7 @@ func (d dfile) URL() string {
 	return fmt.Sprintf("%s?path=%s", downloadActionURL, d.RemotePath)
 }
 
-type dload struct {
+type MoreDownload struct {
 	Name          string     `json:"name,omitempty"`
 	Description   string     `json:"description,omitempty"`
 	IsReleased    int        `json:"isReleased,omitempty"`
@@ -922,41 +923,79 @@ func (dp *DevPortal) loadSession() error {
 }
 
 // Watch watches for NEW downloads
-func (dp *DevPortal) Watch() error {
+func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, duration time.Duration) error {
 
+	var prevDownloads []MoreDownload
 	var prevIPSWs map[string][]DevDownload
 
 	for {
 		// scrape dev portal
-		ipsws, err := dp.getDevDownloads()
-		if err != nil {
-			return err
-		}
+		switch downloadType {
+		case "more":
 
-		// check for NEW downloads
-		if reflect.DeepEqual(prevIPSWs, ipsws) {
-			time.Sleep(5 * time.Minute)
-
-			if err := dp.refreshSession(); err != nil {
-				return err
+			dloads, err := dp.getDownloads()
+			if err != nil {
+				return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 			}
 
-			continue
+			// check for NEW downloads
+			if reflect.DeepEqual(prevDownloads, dloads.Downloads) { // "8b42055e-8d9d-4bbb-800b-6a44c45c7b48"
+				time.Sleep(duration)
 
-		} else {
-			prevIPSWs = ipsws
-		}
-
-		for version := range ipsws {
-			for _, watchPattern := range dp.config.WatchList {
-				re, err := regexp.Compile(watchPattern)
-				if err != nil {
-					return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+				if err := dp.refreshSession(); err != nil {
+					return err
 				}
-				if re.MatchString(version) {
-					for _, ipsw := range ipsws[version] {
-						if err := dp.Download(ipsw.URL); err != nil {
-							log.Errorf("failed to download %s: %v", ipsw.URL, err)
+
+				continue
+
+			} else {
+				prevDownloads = dloads.Downloads
+			}
+
+			for _, dl := range dloads.Downloads {
+				for _, watchPattern := range dp.config.WatchList {
+					re, err := regexp.Compile(watchPattern)
+					if err != nil {
+						return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+					}
+					if re.MatchString(dl.Name) {
+						for _, f := range dl.Files {
+							dp.Download(f.URL(), folder)
+						}
+					}
+				}
+			}
+		default:
+			ipsws, err := dp.getDevDownloads()
+			if err != nil {
+				return fmt.Errorf("failed to get developer downloads: %v", err)
+			}
+
+			// check for NEW downloads
+			if reflect.DeepEqual(prevIPSWs, ipsws) {
+				time.Sleep(5 * time.Minute)
+
+				if err := dp.refreshSession(); err != nil {
+					return err
+				}
+
+				continue
+
+			} else {
+				prevIPSWs = ipsws
+			}
+
+			for version := range ipsws {
+				for _, watchPattern := range dp.config.WatchList {
+					re, err := regexp.Compile(watchPattern)
+					if err != nil {
+						return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+					}
+					if re.MatchString(version) {
+						for _, ipsw := range ipsws[version] {
+							if err := dp.Download(ipsw.URL, folder); err != nil {
+								log.Errorf("failed to download %s: %v", ipsw.URL, err)
+							}
 						}
 					}
 				}
@@ -966,7 +1005,7 @@ func (dp *DevPortal) Watch() error {
 }
 
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
-func (dp *DevPortal) DownloadPrompt(downloadType string) error {
+func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 	switch downloadType {
 	case "more":
 		dloads, err := dp.getDownloads()
@@ -992,7 +1031,7 @@ func (dp *DevPortal) DownloadPrompt(downloadType string) error {
 
 		for _, idx := range dfiles {
 			for _, f := range dloads.Downloads[idx].Files {
-				dp.Download(f.URL())
+				dp.Download(f.URL(), folder)
 			}
 		}
 	default:
@@ -1042,10 +1081,10 @@ func (dp *DevPortal) DownloadPrompt(downloadType string) error {
 			}
 
 			for _, df := range dfiles {
-				dp.Download(ipsws[version][df].URL)
+				dp.Download(ipsws[version][df].URL, folder)
 			}
 		} else {
-			dp.Download(ipsws[version][0].URL)
+			dp.Download(ipsws[version][0].URL, folder)
 		}
 	}
 
@@ -1053,7 +1092,7 @@ func (dp *DevPortal) DownloadPrompt(downloadType string) error {
 }
 
 // Download downloads a file that requires a valid dev portal session
-func (dp *DevPortal) Download(url string) error {
+func (dp *DevPortal) Download(url, folder string) error {
 
 	// proxy, insecure are null because we override the client below
 	downloader := NewDownload(
@@ -1069,6 +1108,8 @@ func (dp *DevPortal) Download(url string) error {
 	downloader.client = dp.Client
 
 	destName := getDestName(url, dp.config.RemoveCommas)
+	destName = filepath.Join(filepath.Clean(folder), filepath.Base(destName))
+
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
 
 		log.WithFields(log.Fields{
@@ -1151,7 +1192,7 @@ func (dp *DevPortal) DownloadADC(path string) error {
 	return nil
 }
 
-func (dp *DevPortal) DownloadKDK(version, build string) error {
+func (dp *DevPortal) DownloadKDK(version, build, folder string) error {
 	if err := dp.refreshSession(); err != nil {
 		return err
 	}
@@ -1162,7 +1203,7 @@ func (dp *DevPortal) DownloadKDK(version, build string) error {
 		build,
 	)
 	log.WithField("url", url).Info("Downloading KDK")
-	err := dp.Download(url)
+	err := dp.Download(url, folder)
 	if err != nil {
 		url := fmt.Sprintf("%s?path=/Developer_Tools/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
 			version,
@@ -1171,7 +1212,7 @@ func (dp *DevPortal) DownloadKDK(version, build string) error {
 			build,
 		)
 		log.WithField("url", url).Info("Downloading KDK (retry)")
-		return dp.Download(url)
+		return dp.Download(url, folder)
 	}
 	return nil
 }
