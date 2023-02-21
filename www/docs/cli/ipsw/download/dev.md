@@ -25,6 +25,7 @@ ipsw download dev [flags]
   -p, --page int                Page size for file lists (default 20)
       --pretty                  Pretty print JSON
       --sms                     Prefer SMS Two-factor authentication
+  -t, --timeout duration        Timeout for watch attempts in minutes (default 5m0s)
   -k, --vault-password string   Password to unlock credential vault (only for file vaults)
   -w, --watch stringArray       Developer portal group pattern to watch (i.e. '^iOS.*beta$')
 ```
