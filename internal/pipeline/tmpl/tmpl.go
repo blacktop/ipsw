@@ -11,8 +11,11 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
-	"github.com/blacktop/ipsw/internal/pipeline/artifact"
-	"github.com/blacktop/ipsw/internal/pipeline/context"
+	"github.com/goreleaser/goreleaser/internal/artifact"
+	"github.com/goreleaser/goreleaser/pkg/build"
+	"github.com/goreleaser/goreleaser/pkg/context"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Template holds data that can be applied to a template string.
@@ -79,17 +82,34 @@ func New(ctx *context.Context) *Template {
 
 	return &Template{
 		fields: Fields{
-			projectName: ctx.Config.ID,
-			version:     ctx.Version,
-			rawVersion:  rawVersionV,
-			env:         ctx.Env,
-			date:        ctx.Date.UTC().Format(time.RFC3339),
-			timestamp:   ctx.Date.UTC().Unix(),
-			major:       ctx.Semver.Major,
-			minor:       ctx.Semver.Minor,
-			patch:       ctx.Semver.Patch,
-			prerelease:  ctx.Semver.Prerelease,
-			runtimeK:    ctx.Runtime,
+			projectName:     ctx.Config.ProjectName,
+			modulePath:      ctx.ModulePath,
+			version:         ctx.Version,
+			rawVersion:      rawVersionV,
+			tag:             ctx.Git.CurrentTag,
+			previousTag:     ctx.Git.PreviousTag,
+			branch:          ctx.Git.Branch,
+			commit:          ctx.Git.Commit,
+			shortCommit:     ctx.Git.ShortCommit,
+			fullCommit:      ctx.Git.FullCommit,
+			commitDate:      ctx.Git.CommitDate.UTC().Format(time.RFC3339),
+			commitTimestamp: ctx.Git.CommitDate.UTC().Unix(),
+			gitURL:          ctx.Git.URL,
+			summary:         ctx.Git.Summary,
+			tagSubject:      ctx.Git.TagSubject,
+			tagContents:     ctx.Git.TagContents,
+			tagBody:         ctx.Git.TagBody,
+			releaseURL:      ctx.ReleaseURL,
+			env:             ctx.Env,
+			date:            ctx.Date.UTC().Format(time.RFC3339),
+			timestamp:       ctx.Date.UTC().Unix(),
+			major:           ctx.Semver.Major,
+			minor:           ctx.Semver.Minor,
+			patch:           ctx.Semver.Patch,
+			prerelease:      ctx.Semver.Prerelease,
+			isSnapshot:      ctx.Snapshot,
+			releaseNotes:    ctx.ReleaseNotes,
+			runtimeK:        ctx.Runtime,
 		},
 	}
 }
@@ -99,7 +119,10 @@ func New(ctx *context.Context) *Template {
 func (t *Template) WithEnvS(envs []string) *Template {
 	result := map[string]string{}
 	for _, env := range envs {
-		k, v, _ := strings.Cut(env, "=")
+		k, v, ok := strings.Cut(env, "=")
+		if !ok || k == "" {
+			continue
+		}
 		result[k] = v
 	}
 	return t.WithEnv(result)
@@ -120,18 +143,41 @@ func (t *Template) WithExtraFields(f Fields) *Template {
 	return t
 }
 
-// WithArtifact populates Fields from the artifact and replacements.
-func (t *Template) WithArtifact(a *artifact.Artifact, replacements map[string]string) *Template {
-	t.fields[osKey] = replace(replacements, a.Goos)
-	t.fields[arch] = replace(replacements, a.Goarch)
-	t.fields[arm] = replace(replacements, a.Goarm)
-	t.fields[mips] = replace(replacements, a.Gomips)
-	t.fields[amd64] = replace(replacements, a.Goamd64)
+// WithArtifact populates Fields from the artifact.
+func (t *Template) WithArtifact(a *artifact.Artifact) *Template {
+	t.fields[osKey] = a.Goos
+	t.fields[arch] = a.Goarch
+	t.fields[arm] = a.Goarm
+	t.fields[mips] = a.Gomips
+	t.fields[amd64] = a.Goamd64
 	t.fields[binary] = artifact.ExtraOr(*a, binary, t.fields[projectName].(string))
 	t.fields[artifactName] = a.Name
 	t.fields[artifactExt] = artifact.ExtraOr(*a, artifact.ExtraExt, "")
 	t.fields[artifactPath] = a.Path
 	return t
+}
+
+func (t *Template) WithBuildOptions(opts build.Options) *Template {
+	return t.WithExtraFields(buildOptsToFields(opts))
+}
+
+func buildOptsToFields(opts build.Options) Fields {
+	return Fields{
+		target: opts.Target,
+		ext:    opts.Ext,
+		name:   opts.Name,
+		path:   opts.Path,
+		osKey:  opts.Goos,
+		arch:   opts.Goarch,
+		arm:    opts.Goarm,
+		mips:   opts.Gomips,
+	}
+}
+
+// Bool Apply the given string, and converts it to a bool.
+func (t *Template) Bool(s string) (bool, error) {
+	r, err := t.Apply(s)
+	return strings.TrimSpace(strings.ToLower(r)) == "true", err
 }
 
 // Apply applies the given string against the Fields stored in the template.
@@ -150,6 +196,7 @@ func (t *Template) Apply(s string) (string, error) {
 			"trim":          strings.TrimSpace,
 			"trimprefix":    strings.TrimPrefix,
 			"trimsuffix":    strings.TrimSuffix,
+			"title":         cases.Title(language.English).String,
 			"dir":           filepath.Dir,
 			"abs":           filepath.Abs,
 			"incmajor":      incMajor,
@@ -200,14 +247,6 @@ func (t *Template) ApplySingleEnvOnly(s string) (string, error) {
 
 	err = tmpl.Execute(&out, t.fields)
 	return out.String(), err
-}
-
-func replace(replacements map[string]string, original string) string {
-	result := replacements[original]
-	if result == "" {
-		return original
-	}
-	return result
 }
 
 func incMajor(v string) string {
