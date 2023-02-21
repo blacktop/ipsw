@@ -460,8 +460,18 @@ Watch for 🆕 **beta** IPSWs
    <SNIP>
 ```
 
+To download all the KDKs
+
+```bash
+❯ ipsw download dev --more --watch 'Kernel Debug Kit' --output /path/to/SHARE
+   • Downloading               file=/path/to/SHARE/Kernel_Debug_Kit_13.3_build_22E5219e.dmg
+	988.41 MiB / 988.41 MiB [================| ✅  ] 16.99 MiB/s
+```
+
 :::info NOTE
 This will check every 5 minutes for new files and download them.
+
+You can change the timeout with the `--timeout` flag: `--timeout 10m` _(10 minutes)_ or `--timeout 1h` _(1 hour)_
 :::
 
 Output downloadable items as JSON
