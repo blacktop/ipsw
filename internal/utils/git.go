@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"regexp"
@@ -140,4 +141,41 @@ func createDeltaDiffPatch(src, dst string, conf *GitDiffConfig) (string, error) 
 	// }
 
 	return string(out), nil
+}
+
+func ClangFormat(src, filename string, color bool) string {
+	if _, err := exec.LookPath("clang-format"); err == nil {
+		cmd := exec.Command(
+			"clang-format",
+			"-style={AlignConsecutiveDeclarations: true}",
+			"--assume-filename",
+			filename,
+		)
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return src
+		}
+
+		go func() {
+			defer stdin.Close()
+			io.WriteString(stdin, src)
+		}()
+
+		out, _ := cmd.CombinedOutput()
+		// if err != nil {
+		// 	return "", fmt.Errorf("clang-format failed %s: %v", out, err)
+		// }
+
+		src = string(out)
+	}
+
+	if color {
+		b := new(strings.Builder)
+		if err := quick.Highlight(b, src, "c", "terminal256", "nord"); err != nil {
+			return ""
+		}
+		return b.String()
+	}
+
+	return src
 }

@@ -81,6 +81,51 @@ func getStructType(path, name string) (*dwf.StructType, error) {
 	return st, nil
 }
 
+func getAllStructs(path string) (<-chan *dwf.StructType, error) {
+	out := make(chan *dwf.StructType)
+
+	m, err := macho.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer m.Close()
+
+	df, err := m.DWARF()
+	if err != nil {
+		return nil, err
+	}
+
+	r := df.Reader()
+
+	go func() {
+		for {
+			entry, err := r.Next()
+			if err != nil {
+				break
+			}
+			if entry == nil {
+				break
+			}
+
+			var st *dwf.StructType
+			if entry.Tag == dwf.TagStructType {
+				typ, err := df.Type(entry.Offset)
+				if err != nil {
+					continue
+				}
+				st = typ.(*dwf.StructType)
+				if st.Incomplete {
+					continue
+				}
+				out <- st
+			}
+		}
+		close(out)
+	}()
+
+	return out, nil
+}
+
 func getName(path, name string) (*dwf.FuncType, error) {
 	m, err := macho.Open(path)
 	if err != nil {
@@ -97,7 +142,7 @@ func getName(path, name string) (*dwf.FuncType, error) {
 
 	off, err := df.LookupName(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find type %s: %v", name, err)
+		return nil, fmt.Errorf("failed to find name %s: %v", name, err)
 	}
 
 	r.Seek(off)
@@ -145,9 +190,14 @@ func init() {
 
 // dwarfCmd represents the dwarf command
 var dwarfCmd = &cobra.Command{
-	Use:           "dwarf",
-	Aliases:       []string{"dwarfdump", "dd"},
-	Short:         "🚧 Dump DWARF debug information",
+	Use:     "dwarf",
+	Aliases: []string{"dwarfdump", "dd"},
+	Short:   "🚧 Dump DWARF debug information",
+	Example: `# Dump the task struct (and pretty print with clang-format)
+❯ ipsw kernel dwarf KDK_13.0_22A5342f.kdk/kernel.development.t6000 --type task \
+											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
+# Diff two versions of a struct
+❯ ipsw kernel dwarf --type task --diff KDK_13.0_22A5342f.kdk/kernel.development.t6000 KDK_13.0_22A5352e.kdk/kernel.development.t6000`,
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  false,
 	SilenceErrors: true,
@@ -162,23 +212,20 @@ var dwarfCmd = &cobra.Command{
 		// prettyJSON := viper.GetBool("kernel.dwarf.pretty")
 		// outAsJSON := viper.GetBool("kernel.dwarf.json")
 		doDiff := viper.GetBool("kernel.dwarf.diff")
-
-		// args
+		// validate args
 		if len(viper.GetString("kernel.dwarf.type")) > 0 && len(viper.GetString("kernel.dwarf.name")) > 0 {
 			return fmt.Errorf("cannot specify both --type and --name")
 		}
 
-		if len(viper.GetString("kernel.dwarf.type")) > 0 {
-			t1, err := getStructType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
-			if err != nil {
-				return err
+		if doDiff {
+			if len(args) < 2 {
+				return fmt.Errorf("you must supply 2 KDK kernelcaches to diff")
 			}
 
-			if !doDiff {
-				fmt.Println(t1.Defn())
-			} else {
-				if len(args) < 2 {
-					return fmt.Errorf("you must supply 2 KDK kernelcaches to diff")
+			if len(viper.GetString("kernel.dwarf.type")) > 0 {
+				t1, err := getStructType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
+				if err != nil {
+					return err
 				}
 
 				t2, err := getStructType(filepath.Clean(args[1]), viper.GetString("kernel.dwarf.type"))
@@ -187,33 +234,104 @@ var dwarfCmd = &cobra.Command{
 				}
 
 				if t1 == nil || t2 == nil {
-					return fmt.Errorf("could not find type '%s' in either file", viper.GetString("kernel.dwarf.type"))
+					return fmt.Errorf("could not find type '%s' in one or both of the files", viper.GetString("kernel.dwarf.type"))
 				}
 
 				out, err := utils.GitDiff(t1.Defn(), t2.Defn(), &utils.GitDiffConfig{Color: viper.GetBool("color")})
 				if err != nil {
 					return err
 				}
+
 				if len(out) == 0 {
 					log.Info("No differences found")
 				} else {
 					log.Info("Differences found")
 					fmt.Println(out)
 				}
+			} else { // diff ALL types
+				m, err := macho.Open(args[0])
+				if err != nil {
+					return err
+				}
+				defer m.Close()
+
+				df, err := m.DWARF()
+				if err != nil {
+					return err
+				}
+
+				r := df.Reader()
+
+				types, err := getAllStructs(filepath.Clean(args[1]))
+				if err != nil {
+					return err
+				}
+
+				seen := make(map[string]bool)
+
+				for t := range types {
+					if len(t.StructName) > 0 {
+						if _, ok := seen[t.StructName]; !ok {
+							seen[t.StructName] = true
+							off, err := df.LookupType(t.StructName)
+							if err != nil {
+								log.WithField("struct", t.StructName).Info("NEW")
+								println()
+								fmt.Println(utils.ClangFormat(t.Defn(), t.StructName+".h", viper.GetBool("color")))
+								continue // not found in older version
+							}
+
+							r.Seek(off)
+
+							entry, err := r.Next()
+							if err != nil {
+								return err
+							}
+
+							var st *dwf.StructType
+							if entry.Tag == dwf.TagStructType {
+								typ, err := df.Type(entry.Offset)
+								if err != nil {
+									return err
+								}
+								st = typ.(*dwf.StructType)
+								if st.Incomplete {
+									continue
+								}
+								out, err := utils.GitDiff(st.Defn(), t.Defn(), &utils.GitDiffConfig{Color: viper.GetBool("color")})
+								if err != nil {
+									return err
+								}
+								if len(out) > 0 {
+									log.WithField("struct", t.StructName).Warn("DIFF")
+									fmt.Println(out)
+								}
+							}
+						}
+					}
+				}
 			}
-		} else if len(viper.GetString("kernel.dwarf.name")) > 0 {
+
+			return nil
+		}
+
+		if len(viper.GetString("kernel.dwarf.type")) > 0 {
+			typ, err := getStructType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
+			if err != nil {
+				return err
+			}
+			fmt.Println(utils.ClangFormat(typ.Defn(), viper.GetString("kernel.dwarf.type")+".h", viper.GetBool("color")))
+		}
+
+		if len(viper.GetString("kernel.dwarf.name")) > 0 {
 			n, err := getName(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.name"))
 			if err != nil {
 				return err
 			}
-			fmt.Println(n)
+
+			fmt.Println(utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color")))
 		}
 
 		return nil
 	},
-	Example: `# Dump the task struct (and pretty print with clang-format)
-❯ ipsw kernel dwarf KDK_13.0_22A5342f.kdk/kernel.development.t6000 --type task \
-											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
-# Diff two versions of a struct
-❯ ipsw kernel dwarf --type task --diff KDK_13.0_22A5342f.kdk/kernel.development.t6000 KDK_13.0_22A5352e.kdk/kernel.development.t6000`,
 }
