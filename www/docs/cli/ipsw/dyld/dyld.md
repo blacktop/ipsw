@@ -37,6 +37,7 @@ ipsw dyld [flags]
 * [ipsw dyld disass](/docs/cli/ipsw/dyld/disass)	 - Disassemble dyld_shared_cache at symbol/vaddr
 * [ipsw dyld dump](/docs/cli/ipsw/dyld/dump)	 - Dump dyld_shared_cache data at given virtual address
 * [ipsw dyld extract](/docs/cli/ipsw/dyld/extract)	 - Extract dylib from dyld_shared_cache
+* [ipsw dyld ida](/docs/cli/ipsw/dyld/ida)	 - Analyze DSC in IDA Pro
 * [ipsw dyld image](/docs/cli/ipsw/dyld/image)	 - Dump image array info
 * [ipsw dyld imports](/docs/cli/ipsw/dyld/imports)	 - List all dylibs that load a given dylib
 * [ipsw dyld info](/docs/cli/ipsw/dyld/info)	 - Parse dyld_shared_cache

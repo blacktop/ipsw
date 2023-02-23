@@ -61,7 +61,7 @@ func init() {
 // idaCmd represents the ida command
 var idaCmd = &cobra.Command{
 	Use:           "ida <DSC> <DYLIB> [DYLIBS...]",
-	Short:         "Dump Swift Optimizations Info",
+	Short:         "Analyze DSC in IDA Pro",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.MinimumNArgs(2),
