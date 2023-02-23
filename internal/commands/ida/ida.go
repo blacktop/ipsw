@@ -88,6 +88,7 @@ type Config struct {
 	PluginArgs   []string
 	FileType     string
 	ExtraArgs    []string
+	Verbose      bool
 }
 
 type Client struct {
@@ -239,8 +240,10 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 
 	cli.cmd = exec.CommandContext(ctx, executable, args...)
 	cli.cmd.Env = append(os.Environ(), conf.Env...)
-	cli.cmd.Stdout = os.Stdout
-	cli.cmd.Stderr = os.Stderr
+	if conf.Verbose {
+		cli.cmd.Stdout = os.Stdout
+		cli.cmd.Stderr = os.Stderr
+	}
 
 	utils.Indent(log.Debug, 2)(cli.cmd.String())
 
