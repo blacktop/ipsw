@@ -25,6 +25,8 @@ const (
 )
 
 const idaDscuPyScriptTemplate = `
+# https://hex-rays.com/products/ida/news/7_2/the_mac_rundown/
+
 def dscu_load_module(module):
 	node = idaapi.netnode()
 	node.create("$ dscu")
