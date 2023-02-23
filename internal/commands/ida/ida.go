@@ -127,10 +127,10 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 			}
 		case "linux":
 			// path = linuxPath
-			return nil, fmt.Errorf("supply IDA Pro path for linux (e.g. /opt/ida-7.0/)")
+			return nil, fmt.Errorf("supply IDA Pro '--ida-path' for linux (e.g. /opt/ida-7.0/)")
 		case "windows":
 			// path = windowsPath
-			return nil, fmt.Errorf("supply IDA Pro path for windows (e.g. C:\\Program Files\\IDA 7.0)")
+			return nil, fmt.Errorf("supply IDA Pro '--ida-path' for windows (e.g. C:\\Program Files\\IDA 7.0)")
 		default:
 			return nil, fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 		}
@@ -228,7 +228,7 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 			-T<ftype>[:<member>{:<ftype>:<member>}[:<ftype>]]
 			IDA does not display the 'load file' dialog in this case
 		*/
-		args = append(args, fmt.Sprintf("-T'%s'", conf.FileType))
+		args = append(args, fmt.Sprintf("-T%s", conf.FileType))
 	}
 	if conf.Output != "" {
 		args = append(args, fmt.Sprintf("-o%s", conf.Output)) // specify the output database (implies -c)
