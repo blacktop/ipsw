@@ -5,10 +5,13 @@ package download
 import (
 	"bytes"
 	"context"
+	"crypto/sha1"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -17,6 +20,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"time"
@@ -52,6 +56,11 @@ const (
 	olympusSessionURL = "https://appstoreconnect.apple.com/olympus/v1/session"
 
 	userAgent = "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8"
+
+	hashcacheVersion       = 1
+	hashcacheHeader        = "X-APPLE-HC"
+	hashcashCallengeHeader = "X-Apple-HC-Challenge"
+	hashcashBitsHeader     = "X-Apple-HC-Bits"
 )
 
 const (
@@ -73,6 +82,10 @@ type DevConfig struct {
 	SessionID string
 	SCNT      string
 	WidgetKey string
+	// hashcash
+	HashCache          string
+	HashCacheBits      string
+	HashCacheChallenge string
 	// download config
 	Proxy    string
 	Insecure bool
@@ -117,6 +130,7 @@ type session struct {
 	SessionID string         `json:"session_id,omitempty"`
 	SCNT      string         `json:"scnt,omitempty"`
 	WidgetKey string         `json:"widget_key,omitempty"`
+	HashCash  string         `json:"hashcash,omitempty"`
 	Cookies   []*http.Cookie `json:"cookies,omitempty"`
 }
 
@@ -371,6 +385,9 @@ func (dp *DevPortal) GetSCNT() string {
 func (dp *DevPortal) GetWidgetKey() string {
 	return dp.config.WidgetKey
 }
+func (dp *DevPortal) GetHashcash() string {
+	return dp.config.HashCache
+}
 
 // Login to Apple
 func (dp *DevPortal) Login(username, password string) error {
@@ -442,6 +459,36 @@ func (dp *DevPortal) Login(username, password string) error {
 	return nil
 }
 
+func (dp *DevPortal) generateHashcache() (string, error) {
+	var hashcachSha1 string
+
+	hcbits, err := strconv.Atoi(dp.config.HashCacheBits)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert hashcash bits %s to int: %v", dp.config.HashCacheBits, err)
+	}
+
+	zeros := int(math.Ceil(float64(hcbits) / 8))
+	hash := sha1.New()
+	counter := 0
+
+	for {
+		hash.Write([]byte(fmt.Sprintf("%s:%s:%s:%s::%s",
+			strconv.Itoa(hashcacheVersion),      // ver
+			dp.config.HashCacheBits,             // bits
+			time.Now().Format("20060102150405"), // date
+			dp.config.SCNT,                      // res
+			strconv.Itoa(counter),               // counter
+		)))
+		hashcachSha1 = hex.EncodeToString(hash.Sum(nil))
+		if strings.HasPrefix(hashcachSha1, strings.Repeat("0", zeros)) {
+			break
+		}
+		counter++
+	}
+
+	return hashcachSha1, nil
+}
+
 func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("Content-Type", "application/json")
@@ -450,6 +497,7 @@ func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Apple-Id-Session-Id", dp.config.SessionID)
 	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
 	req.Header.Set("Scnt", dp.config.SCNT)
+	req.Header.Set(hashcacheHeader, dp.config.HashCache)
 
 	req.Header.Add("User-Agent", userAgent)
 }
@@ -482,7 +530,35 @@ func (dp *DevPortal) getITCServiceKey() error {
 	return nil
 }
 
+func (dp *DevPortal) getHashcachHeaders() error {
+	response, err := dp.Client.Get(loginURL)
+	if err != nil {
+		return err
+	}
+
+	if response.StatusCode != 200 {
+		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
+	}
+
+	// 🆕 hashcash headers
+	dp.config.HashCacheBits = response.Header.Get(hashcashBitsHeader)
+	dp.config.HashCacheChallenge = response.Header.Get(hashcashCallengeHeader)
+	if dp.config.HashCacheBits != "" || dp.config.HashCacheChallenge != "" {
+		dp.config.HashCache, err = dp.generateHashcache()
+		if err != nil {
+			return fmt.Errorf("failed to generate hashcash: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (dp *DevPortal) signIn(username, password string) error {
+
+	if err := dp.getHashcachHeaders(); err != nil {
+		return fmt.Errorf("failed to get hashcash headers: %v", err)
+	}
+
 	buf := new(bytes.Buffer)
 
 	json.NewEncoder(buf).Encode(&auth{
@@ -873,6 +949,7 @@ func (dp *DevPortal) storeSession() error {
 		SessionID: dp.GetSessionID(),
 		SCNT:      dp.GetSCNT(),
 		WidgetKey: dp.GetWidgetKey(),
+		HashCash:  dp.GetHashcash(),
 		Cookies:   dp.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}),
 	}
 
@@ -910,6 +987,7 @@ func (dp *DevPortal) loadSession() error {
 	dp.config.SessionID = auth.DevPortalSession.SessionID
 	dp.config.SCNT = auth.DevPortalSession.SCNT
 	dp.config.WidgetKey = auth.DevPortalSession.WidgetKey
+	dp.config.HashCache = auth.DevPortalSession.HashCash
 	dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.DevPortalSession.Cookies)
 
 	// clear dev auth mem
