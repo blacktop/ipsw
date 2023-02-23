@@ -111,7 +111,13 @@ var idaCmd = &cobra.Command{
 		}
 
 		if len(args) > 2 { // add any extra args to default frameworks
-			defaultframeworks = append(defaultframeworks, args[2:]...)
+			for _, additional := range args[2:] {
+				img, err := f.Image(additional)
+				if err != nil {
+					return fmt.Errorf("failed to get image %s: %w", additional, err)
+				}
+				defaultframeworks = append(defaultframeworks, img.Name)
+			}
 		}
 
 		img, err := f.Image(args[1])
@@ -127,6 +133,12 @@ var idaCmd = &cobra.Command{
 			defaultframeworks = append(defaultframeworks, m.ImportedLibraries()...)
 		}
 
+		logFile := filepath.Join(viper.GetString("dyld.ida.output"), viper.GetString("dyld.ida.log-file"))
+		if _, err := os.Stat(logFile); err == nil {
+			if err := os.Remove(logFile); err != nil {
+				return fmt.Errorf("failed to remove log file %s: %w", logFile, err)
+			}
+		}
 		dbFile := fmt.Sprintf("dsc_%s_%s_%s.i64", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion)
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -157,6 +169,7 @@ var idaCmd = &cobra.Command{
 			// 	Host: viper.GetString("remote-debugger-host"),
 			// 	Port: viper.GetInt("remote-debugger-port"),
 			// },
+			Verbose: viper.GetBool("verbose"),
 		})
 		if err != nil {
 			return err
