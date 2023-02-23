@@ -44,7 +44,7 @@ func init() {
 
 	idaCmd.Flags().StringP("ida-path", "p", "", "IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)")
 	idaCmd.Flags().BoolP("dependancies", "d", false, "Analyze module dependencies")
-	idaCmd.Flags().BoolP("enable-gui", "g", false, "Compress output folder")
+	idaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
 	idaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
 	idaCmd.Flags().StringP("log-file", "l", "ida.log", "IDA log file")
 	idaCmd.Flags().StringP("output", "o", cwd, "Output folder")

@@ -19,11 +19,11 @@ ipsw dyld ida <DSC> <DYLIB> [DYLIBS...] [flags]
 ```
   -c, --delete-db         Disassemble a new file (delete the old database)
   -d, --dependancies      Analyze module dependencies
-  -g, --enable-gui        Compress output folder
+  -g, --enable-gui        Enable IDA Pro GUI (defaults to headless)
   -h, --help              help for ida
   -p, --ida-path string   IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)
   -l, --log-file string   IDA log file (default "ida.log")
-  -o, --output string     Output folder (default "/Users/blacktop/Developer/Github/blacktop/ipsw")
+  -o, --output string     Output folder (default "$PWD")
       --slide string      dyld_shared_cache image ASLR slide value (hexadecimal)
 ```
 
