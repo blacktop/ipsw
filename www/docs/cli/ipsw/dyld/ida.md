@@ -17,14 +17,18 @@ ipsw dyld ida <DSC> <DYLIB> [DYLIBS...] [flags]
 ### Options
 
 ```
-  -c, --delete-db         Disassemble a new file (delete the old database)
-  -d, --dependancies      Analyze module dependencies
-  -g, --enable-gui        Enable IDA Pro GUI (defaults to headless)
-  -h, --help              help for ida
-  -p, --ida-path string   IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)
-  -l, --log-file string   IDA log file (default "ida.log")
-  -o, --output string     Output folder (default "$PWD")
-      --slide string      dyld_shared_cache image ASLR slide value (hexadecimal)
+  -c, --delete-db             Disassemble a new file (delete the old database)
+  -d, --dependancies          Analyze module dependencies
+  -g, --enable-gui            Enable IDA Pro GUI (defaults to headless)
+  -e, --extra-args strings    IDA Pro CLI extra arguments
+  -h, --help                  help for ida
+  -p, --ida-path string       IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)
+  -l, --log-file string       IDA log file (default "ida.log")
+  -o, --output string         Output folder
+  -s, --script string         IDA Pro script to run
+  -a, --script-args strings   IDA Pro script arguments
+      --slide string          dyld_shared_cache image ASLR slide value (hexadecimal)
+  -t, --temp-db               Do not create a database file (requires --enable-gui)
 ```
 
 ### Options inherited from parent commands

@@ -1,10 +1,8 @@
 package ida
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"html/template"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +13,6 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -23,49 +20,6 @@ const (
 	linuxPath   = ""
 	windowsPath = ""
 )
-
-const idaDscuPyScriptTemplate = `
-# https://hex-rays.com/products/ida/news/7_2/the_mac_rundown/
-
-def dscu_load_module(module):
-	node = idaapi.netnode()
-	node.create("$ dscu")
-	node.supset(2, module)
-	load_and_run_plugin("dscu", 1)
-
-def dscu_load_region(ea):
-	node = idaapi.netnode()
-	node.create("$ dscu")
-	node.altset(3, ea)
-	load_and_run_plugin("dscu", 2)
-
-# load some commonly used system dylibs
-{{- range $framework := .Frameworks }}
-print("Loading {{ $framework }}")
-dscu_load_module("{{ $framework }}")
-{{- end }}
-
-print("analyzing objc types")
-load_and_run_plugin("objc", 1)
-print("analyzing NSConcreteGlobalBlock objects")
-load_and_run_plugin("objc", 4)
-
-# prevent IDA from creating functions with the noreturn attribute.
-# in dyldcache modules it is common that IDA will think a function doesn't return,
-# but in reality it just branches to an address outside of the current module.
-# this can break the analysis at times.
-idaapi.cvar.inf.af &= ~AF_ANORET
-
-print("perform autoanalysis...")
-auto_mark_range(0, BADADDR, AU_FINAL);
-auto_wait()
-
-print("analyzing NSConcreteStackBlock objects")
-load_and_run_plugin("objc", 5)
-
-# close IDA and save the database
-qexit(0)
-`
 
 type Config struct {
 	IdaPath    string
@@ -86,8 +40,8 @@ type Config struct {
 	Compiler     string
 	Processor    string
 	Options      []string
+	ScriptFile   string
 	ScriptArgs   []string
-	PluginArgs   []string
 	FileType     string
 	ExtraArgs    []string
 	Verbose      bool
@@ -111,13 +65,13 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 				return nil, err
 			}
 			if len(matches) == 0 {
-				return nil, fmt.Errorf("IDA Pro not found")
+				return nil, fmt.Errorf("IDA Pro not found: supply IDA Pro path via '--ida-path' (e.g. /Applications/IDA\\ Pro\\ 8.2/ida64.app/Contents/MacOS)")
 			}
 			if len(matches) == 1 {
 				path = matches[0]
 			} else { // len(matches) > 1
 				prompt := &survey.Select{
-					Message: "Multiple IDA Pro versions found:",
+					Message: "Multiple IDA Pro Versions Found:",
 					Options: matches,
 				}
 				if err := survey.AskOne(prompt, &path); err != nil {
@@ -130,10 +84,10 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 			}
 		case "linux":
 			// path = linuxPath
-			return nil, fmt.Errorf("supply IDA Pro '--ida-path' for linux (e.g. /opt/ida-7.0/)")
+			return nil, fmt.Errorf("supply IDA Pro path via '--ida-path' (e.g. /opt/ida-7.0/)")
 		case "windows":
 			// path = windowsPath
-			return nil, fmt.Errorf("supply IDA Pro '--ida-path' for windows (e.g. C:\\Program Files\\IDA 7.0)")
+			return nil, fmt.Errorf("supply IDA Pro path via '--ida-path' (e.g. C:\\Program Files\\IDA 7.0)")
 		default:
 			return nil, fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 		}
@@ -183,43 +137,38 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 		args = append(args, "-DABANDON_DATABASE=YES")
 	}
 	if len(conf.Options) > 0 {
+		/*
+			The -O command line switch allows the user to pass options to the plugins. A plugin which
+			uses options should call the get_plugin_options() function to get them.
+			Since there may be many plugins written by independent programmers, each options will have
+			a prefix -O in front of the plugin name.
+
+			For example, a plugin named "decomp" should expect its parameters to be in the following format:
+			        -Odecomp:option1:option2:option3
+			In this case, get_plugin_options("decomp") will return the "option1:option2:option3" part of the options string.
+			If there are several -O options in the command line, they will be concatenated with ':' between them.
+		*/
 		for _, opt := range conf.Options {
 			args = append(args, fmt.Sprintf("-O%s", opt))
 		}
 	}
-	if len(conf.ScriptArgs) > 0 {
-		// TODO: add script args
+	if conf.ScriptFile != "" {
+		/*
+			Execute a script file when the database is opened.
+			The script file extension is used to determine which extlang
+			will run the script.
+			It is possible to pass command line arguments after the script name.
+			For example: -S"myscript.idc argument1 \"argument 2\" argument3"
+			The passed parameters are stored in the "ARGV" global IDC variable.
+			Use "ARGV.count" to determine the number of arguments.
+			The first argument "ARGV[0]" contains the script name.
+		*/
+		if len(conf.ScriptArgs) > 0 {
+			args = append(args, fmt.Sprintf("-S%s %s", conf.ScriptFile, strings.Join(conf.ScriptArgs, " ")))
+		} else {
+			args = append(args, fmt.Sprintf("-S%s", conf.ScriptFile))
+		}
 	}
-	if len(conf.PluginArgs) > 0 {
-		// TODO: add plugin args (same thing as options)
-	}
-	// Script
-	script, err := cli.GenerateDSCUScript()
-	if err != nil {
-		return nil, err
-	}
-	tmp, err := os.CreateTemp("", "*.py")
-	if err != nil {
-		return nil, err
-	}
-	if _, err := tmp.WriteString(script); err != nil {
-		return nil, err
-	}
-	if err := tmp.Close(); err != nil {
-		return nil, err
-	}
-	/*
-		Execute a script file when the database is opened.
-		The script file extension is used to determine which extlang
-		will run the script.
-		It is possible to pass command line arguments after the script name.
-		For example: -S"myscript.idc argument1 \"argument 2\" argument3"
-		The passed parameters are stored in the "ARGV" global IDC variable.
-		Use "ARGV.count" to determine the number of arguments.
-		The first argument "ARGV[0]" contains the script name.
-	*/
-	args = append(args, fmt.Sprintf("-S%s", tmp.Name()))
-
 	if conf.FileType != "" {
 		/*
 			Interpret the input file as the specified file type
@@ -250,19 +199,6 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 	utils.Indent(log.Debug, 2)(cli.cmd.String())
 
 	return cli, nil
-}
-
-// Generate generates a IDAPython script from a template
-func (c *Client) GenerateDSCUScript() (string, error) {
-	var tplOut bytes.Buffer
-
-	tmpl := template.Must(template.New("ida").Funcs(template.FuncMap{"StringsJoin": strings.Join}).Parse(idaDscuPyScriptTemplate))
-
-	if err := tmpl.Execute(&tplOut, c.conf); err != nil {
-		return "", errors.Wrap(err, "failed to execute template")
-	}
-
-	return tplOut.String(), nil
 }
 
 func (c *Client) Run() error {
