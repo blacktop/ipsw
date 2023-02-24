@@ -46,6 +46,10 @@ func Parse(m *macho.File) (*CTF, error) {
 		return nil, fmt.Errorf("failed to read ctf_header_t: %v", err)
 	}
 
+	if c.Header.Preamble.Version == 4 {
+		return nil, fmt.Errorf("CTF version 4 is not supported (yet)")
+	}
+
 	if (c.Header.Preamble.Flags & F_COMPRESS) != 0 {
 		zr, err := zlib.NewReader(c.sr)
 		if err != nil {
