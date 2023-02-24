@@ -57,8 +57,8 @@ const (
 
 	userAgent = "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8"
 
-	hashcacheVersion       = 1
-	hashcacheHeader        = "X-APPLE-HC"
+	hashcashVersion        = 1
+	hashcashHeader         = "X-APPLE-HC"
 	hashcashCallengeHeader = "X-Apple-HC-Challenge"
 	hashcashBitsHeader     = "X-Apple-HC-Bits"
 )
@@ -83,9 +83,9 @@ type DevConfig struct {
 	SCNT      string
 	WidgetKey string
 	// hashcash
-	HashCache          string
-	HashCacheBits      string
-	HashCacheChallenge string
+	HashCash          string
+	HashCashBits      string
+	HashCashChallenge string
 	// download config
 	Proxy    string
 	Insecure bool
@@ -386,7 +386,7 @@ func (dp *DevPortal) GetWidgetKey() string {
 	return dp.config.WidgetKey
 }
 func (dp *DevPortal) GetHashcash() string {
-	return dp.config.HashCache
+	return dp.config.HashCash
 }
 
 // Login to Apple
@@ -459,22 +459,23 @@ func (dp *DevPortal) Login(username, password string) error {
 	return nil
 }
 
-func (dp *DevPortal) generateHashcache() (string, error) {
+func (dp *DevPortal) generateHashCash() (string, error) {
 	var hashcash string
 
-	hcbits, err := strconv.Atoi(dp.config.HashCacheBits)
+	hcbits, err := strconv.Atoi(dp.config.HashCashBits)
 	if err != nil {
-		return "", fmt.Errorf("failed to convert hashcash bits %s to int: %v", dp.config.HashCacheBits, err)
+		return "", fmt.Errorf("failed to convert hashcash bits %s to int: %v", dp.config.HashCashBits, err)
 	}
 
 	counter := 0
+
 	for {
 		hash := sha1.New()
 		hashcash = fmt.Sprintf("%s:%s:%s:%s::%s",
-			strconv.Itoa(hashcacheVersion),            // ver
-			dp.config.HashCacheBits,                   // bits
+			strconv.Itoa(hashcashVersion),             // ver
+			dp.config.HashCashBits,                    // bits
 			time.Now().UTC().Format("20060102150405"), // date
-			dp.config.HashCacheChallenge,              // res
+			dp.config.HashCashChallenge,               // res
 			strconv.Itoa(counter),                     // counter
 		)
 		hash.Write([]byte(hashcash))
@@ -496,7 +497,7 @@ func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Apple-Id-Session-Id", dp.config.SessionID)
 	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
 	req.Header.Set("Scnt", dp.config.SCNT)
-	req.Header.Set(hashcacheHeader, dp.config.HashCache)
+	req.Header.Set(hashcashHeader, dp.config.HashCash)
 
 	req.Header.Add("User-Agent", userAgent)
 }
@@ -540,10 +541,10 @@ func (dp *DevPortal) getHashcachHeaders() error {
 	}
 
 	// 🆕 hashcash headers
-	dp.config.HashCacheBits = response.Header.Get(hashcashBitsHeader)
-	dp.config.HashCacheChallenge = response.Header.Get(hashcashCallengeHeader)
-	if dp.config.HashCacheBits != "" || dp.config.HashCacheChallenge != "" {
-		dp.config.HashCache, err = dp.generateHashcache()
+	dp.config.HashCashBits = response.Header.Get(hashcashBitsHeader)
+	dp.config.HashCashChallenge = response.Header.Get(hashcashCallengeHeader)
+	if dp.config.HashCashBits != "" || dp.config.HashCashChallenge != "" {
+		dp.config.HashCash, err = dp.generateHashCash()
 		if err != nil {
 			return fmt.Errorf("failed to generate hashcash: %v", err)
 		}
@@ -574,7 +575,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
-	req.Header.Set(hashcacheHeader, dp.config.HashCache)
+	req.Header.Set(hashcashHeader, dp.config.HashCash)
 	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json, text/javascript")
 
@@ -987,7 +988,7 @@ func (dp *DevPortal) loadSession() error {
 	dp.config.SessionID = auth.DevPortalSession.SessionID
 	dp.config.SCNT = auth.DevPortalSession.SCNT
 	dp.config.WidgetKey = auth.DevPortalSession.WidgetKey
-	dp.config.HashCache = auth.DevPortalSession.HashCash
+	dp.config.HashCash = auth.DevPortalSession.HashCash
 	dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.DevPortalSession.Cookies)
 
 	// clear dev auth mem
