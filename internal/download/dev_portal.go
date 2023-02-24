@@ -7,11 +7,11 @@ import (
 	"context"
 	"crypto/sha1"
 	"crypto/tls"
-	"encoding/hex"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
+	"math/bits"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -460,33 +460,32 @@ func (dp *DevPortal) Login(username, password string) error {
 }
 
 func (dp *DevPortal) generateHashcache() (string, error) {
-	var hashcachSha1 string
+	var hashcash string
 
 	hcbits, err := strconv.Atoi(dp.config.HashCacheBits)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert hashcash bits %s to int: %v", dp.config.HashCacheBits, err)
 	}
 
-	zeros := int(math.Ceil(float64(hcbits) / 8))
-	hash := sha1.New()
 	counter := 0
-
 	for {
-		hash.Write([]byte(fmt.Sprintf("%s:%s:%s:%s::%s",
-			strconv.Itoa(hashcacheVersion),      // ver
-			dp.config.HashCacheBits,             // bits
-			time.Now().Format("20060102150405"), // date
-			dp.config.SCNT,                      // res
-			strconv.Itoa(counter),               // counter
-		)))
-		hashcachSha1 = hex.EncodeToString(hash.Sum(nil))
-		if strings.HasPrefix(hashcachSha1, strings.Repeat("0", zeros)) {
+		hash := sha1.New()
+		hashcash = fmt.Sprintf("%s:%s:%s:%s::%s",
+			strconv.Itoa(hashcacheVersion),            // ver
+			dp.config.HashCacheBits,                   // bits
+			time.Now().UTC().Format("20060102150405"), // date
+			dp.config.HashCacheChallenge,              // res
+			strconv.Itoa(counter),                     // counter
+		)
+		hash.Write([]byte(hashcash))
+		lz := bits.LeadingZeros32(binary.BigEndian.Uint32(hash.Sum(nil)[:4]))
+		if lz >= hcbits {
 			break
 		}
 		counter++
 	}
 
-	return hashcachSha1, nil
+	return hashcash, nil
 }
 
 func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
@@ -575,6 +574,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
+	req.Header.Set(hashcacheHeader, dp.config.HashCache)
 	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json, text/javascript")
 
