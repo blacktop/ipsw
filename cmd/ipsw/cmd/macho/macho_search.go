@@ -51,7 +51,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
 	machoSearchCmd.Flags().String("ivar", "", "Search for specific ObjC instance variable regex")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
+		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	})
 	viper.BindPFlag("macho.search.ipsw", machoSearchCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("macho.search.load-command", machoSearchCmd.Flags().Lookup("load-command"))
