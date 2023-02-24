@@ -187,6 +187,7 @@ var idaCmd = &cobra.Command{
 			var cerr *ctrlc.ErrorCtrlC
 			if errors.As(err, &cerr) {
 				log.Warn("Exiting...")
+				os.Exit(0)
 			} else {
 				return fmt.Errorf("failed to run IDA Pro: %v", err)
 			}
