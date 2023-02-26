@@ -23,8 +23,13 @@ package kernel
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	dwf "github.com/blacktop/go-dwarf"
 	"github.com/blacktop/go-macho"
@@ -33,6 +38,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+const dSymMachoPath = ".dSYM/Contents/Resources/DWARF"
 
 func getStructType(path, name string) (*dwf.StructType, error) {
 	m, err := macho.Open(path)
@@ -170,6 +177,128 @@ func getName(path, name string) (*dwf.FuncType, error) {
 	return ft, nil
 }
 
+func selectKDKs() ([]string, error) {
+	kdks, err := filepath.Glob("/Library/Developer/KDKs/KDK*")
+	if err != nil {
+		return nil, err
+	}
+
+	if len(kdks) < 2 {
+		return nil, fmt.Errorf("you must supply 2 KDK kernelcaches to diff")
+	}
+
+	selKDKs := []string{}
+	prompt := &survey.MultiSelect{
+		Message:  "Which KDKs would you like to diff (select 2):",
+		Options:  kdks,
+		PageSize: 15,
+	}
+	if err := survey.AskOne(prompt, &selKDKs, survey.WithValidator(survey.MaxItems(2))); err != nil {
+		if err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			os.Exit(0)
+		}
+		return nil, err
+	}
+	kdks = selKDKs
+
+	kernsGlob, err := filepath.Glob(filepath.Join(kdks[0], "System/Library/Kernels/kernel*"))
+	if err != nil {
+		return nil, err
+	}
+	if len(kernsGlob) == 0 {
+		return nil, fmt.Errorf("could not find kernel in %s", kdks[0])
+	}
+
+	// filter out .dSYM
+	var kerns []string
+	for _, k := range kernsGlob {
+		if strings.HasSuffix(k, ".dSYM") {
+			continue
+		}
+		kerns = append(kerns, filepath.Base(k))
+	}
+
+	var kern string
+	prompt2 := &survey.Select{
+		Message:  "Choose a kernel type to diff:",
+		Options:  kerns,
+		PageSize: 15,
+	}
+	if err := survey.AskOne(prompt2, &kern); err != nil {
+		if err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			os.Exit(0)
+		}
+		return nil, err
+	}
+
+	args := []string{
+		filepath.Join(kdks[0], "System/Library/Kernels", kern+dSymMachoPath, filepath.Base(kern)),
+		filepath.Join(kdks[1], "System/Library/Kernels", kern+dSymMachoPath, filepath.Base(kern)),
+	}
+
+	return args, nil
+}
+
+func selectKDK() (string, error) {
+	kdks, err := filepath.Glob("/Library/Developer/KDKs/KDK*")
+	if err != nil {
+		return "", err
+	}
+
+	if len(kdks) == 0 {
+		return "", fmt.Errorf("failed to find any KDKs in /Library/Developer/KDKs")
+	}
+
+	var selKDK string
+	prompt := &survey.Select{
+		Message:  "Which KDKs would you like to use:",
+		Options:  kdks,
+		PageSize: 15,
+	}
+	if err := survey.AskOne(prompt, &selKDK); err != nil {
+		if err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			os.Exit(0)
+		}
+		return "", err
+	}
+
+	kernsGlob, err := filepath.Glob(filepath.Join(selKDK, "System/Library/Kernels/kernel*"))
+	if err != nil {
+		return "", err
+	}
+	if len(kernsGlob) == 0 {
+		return "", fmt.Errorf("could not find kernels in %s", selKDK)
+	}
+
+	// filter out .dSYM
+	var kerns []string
+	for _, k := range kernsGlob {
+		if strings.HasSuffix(k, ".dSYM") {
+			continue
+		}
+		kerns = append(kerns, filepath.Base(k))
+	}
+
+	var kern string
+	prompt = &survey.Select{
+		Message:  "Choose a kernel type to diff:",
+		Options:  kerns,
+		PageSize: 15,
+	}
+	if err := survey.AskOne(prompt, &kern); err != nil {
+		if err == terminal.InterruptErr {
+			log.Warn("Exiting...")
+			os.Exit(0)
+		}
+		return "", err
+	}
+
+	return filepath.Join(selKDK, "System/Library/Kernels", kern+".dSYM/Contents/Resources/DWARF", kern), nil
+}
+
 func init() {
 	KernelcacheCmd.AddCommand(dwarfCmd)
 
@@ -190,15 +319,15 @@ func init() {
 
 // dwarfCmd represents the dwarf command
 var dwarfCmd = &cobra.Command{
-	Use:     "dwarf",
+	Use:     "dwarf <dSYM> [dSYM]",
 	Aliases: []string{"dwarfdump", "dd"},
 	Short:   "🚧 Dump DWARF debug information",
-	Example: `# Dump the task struct (and pretty print with clang-format)
-❯ ipsw kernel dwarf KDK_13.0_22A5342f.kdk/kernel.development.t6000 --type task \
-											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
-# Diff two versions of a struct
-❯ ipsw kernel dwarf --type task --diff KDK_13.0_22A5342f.kdk/kernel.development.t6000 KDK_13.0_22A5352e.kdk/kernel.development.t6000`,
-	Args:          cobra.MinimumNArgs(1),
+	Example: `# Dump the task struct
+❯ ipsw kernel dwarf -t task /Library/Developer/KDKs/KDK_13.3_22E5230e.kdk/System/Library/Kernels/kernel.development.t6020.dSYM
+# Diff task struct
+❯ ipsw kernel dwarf --type task --diff
+# Diff ALL structs
+❯ ipsw kernel dwarf --diff`,
 	SilenceUsage:  false,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -219,7 +348,22 @@ var dwarfCmd = &cobra.Command{
 
 		if doDiff {
 			if len(args) < 2 {
-				return fmt.Errorf("you must supply 2 KDK kernelcaches to diff")
+				if runtime.GOOS == "darwin" {
+					kdks, err := selectKDKs()
+					if err != nil {
+						return err
+					}
+					args = append(args, kdks...)
+				} else {
+					return fmt.Errorf("diff requires two KDK .dSYM(s) to diff")
+				}
+			} else {
+				if filepath.Ext(args[0]) == ".dSYM" {
+					args[0] = filepath.Join(args[0], "Contents/Resources/DWARF", filepath.Base(strings.TrimSuffix(args[0], filepath.Ext(args[0]))))
+				}
+				if filepath.Ext(args[1]) == ".dSYM" {
+					args[1] = filepath.Join(args[1], "Contents/Resources/DWARF", filepath.Base(strings.TrimSuffix(args[1], filepath.Ext(args[1]))))
+				}
 			}
 
 			if len(viper.GetString("kernel.dwarf.type")) > 0 {
@@ -315,6 +459,23 @@ var dwarfCmd = &cobra.Command{
 			return nil
 		}
 
+		if len(args) == 0 {
+			if runtime.GOOS == "darwin" {
+				aKDK, err := selectKDK()
+				if err != nil {
+					return err
+				}
+				args = append(args, aKDK)
+			} else {
+				return fmt.Errorf("requires a KDK .dSYM to process")
+			}
+		} else {
+			input := strings.TrimSuffix(args[0], "/")
+			if filepath.Ext(input) == ".dSYM" {
+				args[0] = filepath.Join(input, "Contents", "Resources", "DWARF", filepath.Base(strings.TrimSuffix(input, filepath.Ext(input))))
+			}
+		}
+
 		if len(viper.GetString("kernel.dwarf.type")) > 0 {
 			typ, err := getStructType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
 			if err != nil {
@@ -328,7 +489,6 @@ var dwarfCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-
 			fmt.Println(utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color")))
 		}
 
