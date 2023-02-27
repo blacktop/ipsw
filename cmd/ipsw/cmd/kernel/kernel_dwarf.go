@@ -41,53 +41,6 @@ import (
 
 const dSymMachoPath = ".dSYM/Contents/Resources/DWARF"
 
-func getStructType(path, name string) (*dwf.StructType, error) {
-	m, err := macho.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer m.Close()
-
-	df, err := m.DWARF()
-	if err != nil {
-		return nil, err
-	}
-
-	r := df.Reader()
-
-	off, err := df.LookupType(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find type %s: %v", name, err)
-	}
-
-	r.Seek(off)
-
-	entry, err := r.Next()
-	if err != nil {
-		return nil, err
-	}
-
-	var st *dwf.StructType
-	if entry.Tag == dwf.TagStructType {
-		typ, err := df.Type(entry.Offset)
-		if err != nil {
-			return nil, err
-		}
-		st = typ.(*dwf.StructType)
-		if st.Incomplete {
-			return nil, fmt.Errorf("type %s is incomplete", name)
-		}
-	} else {
-		typ, err := df.Type(entry.Offset)
-		if err != nil {
-			return nil, err
-		}
-		return nil, fmt.Errorf("did not find tag struct type: found %s; %s", entry.Tag, typ.String())
-	}
-
-	return st, nil
-}
-
 func getAllStructs(path string) (<-chan *dwf.StructType, error) {
 	out := make(chan *dwf.StructType)
 
@@ -177,6 +130,71 @@ func getName(path, name string) (*dwf.FuncType, error) {
 	return ft, nil
 }
 
+func getType(path, name string) (typeStr string, filename string, err error) {
+	m, err := macho.Open(path)
+	if err != nil {
+		return "", "", err
+	}
+	defer m.Close()
+
+	df, err := m.DWARF()
+	if err != nil {
+		return "", "", err
+	}
+
+	r := df.Reader()
+
+	off, err := df.LookupType(name)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to find type %s: %v", name, err)
+	}
+
+	r.Seek(off)
+
+	entry, err := r.Next()
+	if err != nil {
+		return "", "", err
+	}
+
+	fs, err := df.FilesForEntry(entry)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get files for entry: %v", err)
+	}
+	if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
+		if idx < int64(len(fs)) {
+			filename = fs[idx].Name
+		}
+	}
+
+	typ, err := df.Type(entry.Offset)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to get type for entry: %v", err)
+	}
+
+	switch t := typ.(type) {
+	case *dwf.StructType:
+		if t.Incomplete {
+			return "", "", fmt.Errorf("type %s is incomplete", name)
+		}
+		return t.Defn(), filename, nil
+	case *dwf.ArrayType:
+		return t.String(), filename, nil
+	case *dwf.PtrType:
+		return t.String(), filename, nil
+	case *dwf.FuncType:
+		return t.String(), filename, nil
+	case *dwf.EnumType:
+		return t.String(), filename, nil
+	case *dwf.TypedefType:
+		if enum, ok := t.Type.(*dwf.EnumType); ok {
+			return fmt.Sprintf("typedef %s %s;", enum.String(), t.Name), filename, nil
+		}
+		return fmt.Sprintf("typedef %s %s;", t.Type.Common().Name, t.Name), filename, nil
+	default:
+		return "", "", fmt.Errorf("did not find supported type: found %s; %s", entry.Tag, typ.String())
+	}
+}
+
 func selectKDKs() ([]string, error) {
 	kdks, err := filepath.Glob("/Library/Developer/KDKs/KDK*")
 	if err != nil {
@@ -193,7 +211,7 @@ func selectKDKs() ([]string, error) {
 		Options:  kdks,
 		PageSize: 15,
 	}
-	if err := survey.AskOne(prompt, &selKDKs, survey.WithValidator(survey.MaxItems(2))); err != nil {
+	if err := survey.AskOne(prompt, &selKDKs, survey.WithValidator(survey.MinItems(2)), survey.WithValidator(survey.MaxItems(2))); err != nil {
 		if err == terminal.InterruptErr {
 			log.Warn("Exiting...")
 			os.Exit(0)
@@ -328,7 +346,7 @@ var dwarfCmd = &cobra.Command{
 ❯ ipsw kernel dwarf --type task --diff
 # Diff ALL structs
 ❯ ipsw kernel dwarf --diff`,
-	SilenceUsage:  false,
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -359,29 +377,29 @@ var dwarfCmd = &cobra.Command{
 				}
 			} else {
 				if filepath.Ext(args[0]) == ".dSYM" {
-					args[0] = filepath.Join(args[0], "Contents/Resources/DWARF", filepath.Base(strings.TrimSuffix(args[0], filepath.Ext(args[0]))))
+					args[0] = filepath.Join(args[0], "Contents", "Resources", "DWARF", filepath.Base(strings.TrimSuffix(args[0], filepath.Ext(args[0]))))
 				}
 				if filepath.Ext(args[1]) == ".dSYM" {
-					args[1] = filepath.Join(args[1], "Contents/Resources/DWARF", filepath.Base(strings.TrimSuffix(args[1], filepath.Ext(args[1]))))
+					args[1] = filepath.Join(args[1], "Contents", "Resources", "DWARF", filepath.Base(strings.TrimSuffix(args[1], filepath.Ext(args[1]))))
 				}
 			}
 
 			if len(viper.GetString("kernel.dwarf.type")) > 0 {
-				t1, err := getStructType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
+				t1, _, err := getType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
 				if err != nil {
 					return err
 				}
 
-				t2, err := getStructType(filepath.Clean(args[1]), viper.GetString("kernel.dwarf.type"))
+				t2, _, err := getType(filepath.Clean(args[1]), viper.GetString("kernel.dwarf.type"))
 				if err != nil {
 					return err
 				}
 
-				if t1 == nil || t2 == nil {
+				if t1 == "" || t2 == "" {
 					return fmt.Errorf("could not find type '%s' in one or both of the files", viper.GetString("kernel.dwarf.type"))
 				}
 
-				out, err := utils.GitDiff(t1.Defn(), t2.Defn(), &utils.GitDiffConfig{Color: viper.GetBool("color")})
+				out, err := utils.GitDiff(t1, t2, &utils.GitDiffConfig{Color: viper.GetBool("color")})
 				if err != nil {
 					return err
 				}
@@ -392,7 +410,8 @@ var dwarfCmd = &cobra.Command{
 					log.Info("Differences found")
 					fmt.Println(out)
 				}
-			} else { // diff ALL types
+			} else { // diff ALL structs
+				log.Info("Diffing all structs")
 				m, err := macho.Open(args[0])
 				if err != nil {
 					return err
@@ -470,18 +489,25 @@ var dwarfCmd = &cobra.Command{
 				return fmt.Errorf("requires a KDK .dSYM to process")
 			}
 		} else {
-			input := strings.TrimSuffix(args[0], "/")
+			input := strings.TrimSuffix(args[0], "/") // remove trailing slash (in case user added one via tab completion)
 			if filepath.Ext(input) == ".dSYM" {
 				args[0] = filepath.Join(input, "Contents", "Resources", "DWARF", filepath.Base(strings.TrimSuffix(input, filepath.Ext(input))))
 			}
 		}
 
 		if len(viper.GetString("kernel.dwarf.type")) > 0 {
-			typ, err := getStructType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
+			typstr, file, err := getType(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.type"))
 			if err != nil {
 				return err
 			}
-			fmt.Println(utils.ClangFormat(typ.Defn(), viper.GetString("kernel.dwarf.type")+".h", viper.GetBool("color")))
+			if len(file) > 0 {
+				if _, after, ok := strings.Cut(file, "/Library/Caches/com.apple.xbs/Sources/"); ok {
+					log.WithField("file", after).Info(viper.GetString("kernel.dwarf.type"))
+				} else {
+					log.WithField("file", file).Info(viper.GetString("kernel.dwarf.type"))
+				}
+			}
+			fmt.Println(utils.ClangFormat(typstr, viper.GetString("kernel.dwarf.type")+".h", viper.GetBool("color")))
 		}
 
 		if len(viper.GetString("kernel.dwarf.name")) > 0 {
