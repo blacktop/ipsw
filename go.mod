@@ -9,7 +9,7 @@ require (
 	github.com/alecthomas/chroma v0.10.0
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
-	github.com/blacktop/go-dwarf v1.0.7
+	github.com/blacktop/go-dwarf v1.0.8
 	github.com/blacktop/go-macho v1.1.145
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
