@@ -12,7 +12,9 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/docker"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/google/uuid"
 )
 
 const (
@@ -45,9 +47,12 @@ type Config struct {
 	FileType     string
 	ExtraArgs    []string
 	Verbose      bool
+	RunInDocker  bool
+	DockerImage  string
 }
 
 type Client struct {
+	ctx  context.Context
 	conf *Config
 	cmd  *exec.Cmd
 }
@@ -55,7 +60,7 @@ type Client struct {
 func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 	var path string
 
-	cli := &Client{conf: conf}
+	cli := &Client{ctx: ctx, conf: conf}
 
 	if conf.IdaPath == "" {
 		switch runtime.GOOS {
@@ -100,6 +105,11 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 		executable = filepath.Join(path, "ida64")
 	}
 
+	if conf.RunInDocker {
+		conf.EnableGUI = false
+	}
+
+	// IDA Help: Command line switches - https://www.hex-rays.com/products/ida/support/idadoc/417.shtml
 	args := []string{}
 	if conf.AutoAnalyze {
 		args = append(args, "-a-")
@@ -202,5 +212,25 @@ func NewClient(ctx context.Context, conf *Config) (*Client, error) {
 }
 
 func (c *Client) Run() error {
+	if c.conf.RunInDocker {
+		cli := docker.NewClient(
+			uuid.New().String(),     // ID
+			c.conf.DockerImage,      // Image
+			[]string{"/ida/idat64"}, // Entrypoint
+			c.cmd.Args[1:],          // Args
+			c.conf.Env,              // Env
+			[]docker.HostMounts{ // Mounts
+				{
+					Source:   filepath.Dir(c.conf.Output),
+					Target:   filepath.Dir(c.conf.Output),
+					ReadOnly: false,
+				},
+				{
+					Source:   filepath.Dir(c.conf.InputFile),
+					Target:   filepath.Dir(c.conf.InputFile),
+					ReadOnly: false,
+				}})
+		return cli.Run(c.ctx)
+	}
 	return c.cmd.Run()
 }

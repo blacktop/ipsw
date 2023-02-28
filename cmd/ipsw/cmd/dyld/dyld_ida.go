@@ -48,10 +48,12 @@ func init() {
 	idaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
 	idaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
 	idaCmd.Flags().BoolP("temp-db", "t", false, "Do not create a database file (requires --enable-gui)")
-	idaCmd.Flags().StringP("log-file", "l", "ida.log", "IDA log file")
+	idaCmd.Flags().StringP("log-file", "l", "", "IDA log file")
 	idaCmd.Flags().StringSliceP("extra-args", "e", []string{}, "IDA Pro CLI extra arguments")
 	idaCmd.Flags().StringP("output", "o", "", "Output folder")
 	idaCmd.Flags().String("slide", "", "dyld_shared_cache image ASLR slide value (hexadecimal)")
+	idaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
+	idaCmd.Flags().String("docker-image", "blacktop/idapro:latest-pro", "IDA Pro docker image")
 	viper.BindPFlag("dyld.ida.ida-path", idaCmd.Flags().Lookup("ida-path"))
 	viper.BindPFlag("dyld.ida.script", idaCmd.Flags().Lookup("script"))
 	viper.BindPFlag("dyld.ida.script-args", idaCmd.Flags().Lookup("script-args"))
@@ -63,6 +65,8 @@ func init() {
 	viper.BindPFlag("dyld.ida.extra-args", idaCmd.Flags().Lookup("extra-args"))
 	viper.BindPFlag("dyld.ida.output", idaCmd.Flags().Lookup("output"))
 	viper.BindPFlag("dyld.ida.slide", idaCmd.Flags().Lookup("slide"))
+	viper.BindPFlag("dyld.ida.docker", idaCmd.Flags().Lookup("docker"))
+	viper.BindPFlag("dyld.ida.docker-image", idaCmd.Flags().Lookup("docker-image"))
 }
 
 // idaCmd represents the ida command
@@ -73,13 +77,13 @@ var idaCmd = &cobra.Command{
 	SilenceErrors: true,
 	Args:          cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
-
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
 
 		// flags
 		scriptFile := viper.GetString("dyld.ida.script")
+		logFile := viper.GetString("dyld.ida.log-file")
 		output := viper.GetString("dyld.ida.output")
 		// validate args
 		if !viper.GetBool("dyld.ida.enable-gui") && viper.GetBool("dyld.ida.temp-db") {
@@ -90,7 +94,10 @@ var idaCmd = &cobra.Command{
 			log.Warnf("will only load dependancies for first dylib (%s)", args[1])
 		}
 
-		dscPath := filepath.Clean(args[0])
+		dscPath, err := filepath.Abs(filepath.Clean(args[0]))
+		if err != nil {
+			return errors.Wrapf(err, "failed to get absolute path for %s", dscPath)
+		}
 
 		fileInfo, err := os.Lstat(dscPath)
 		if err != nil {
@@ -112,7 +119,11 @@ var idaCmd = &cobra.Command{
 
 		folder := filepath.Dir(dscPath) // default to folder of shared cache
 		if len(output) > 0 {
-			folder = output
+			absout, err := filepath.Abs(output)
+			if err != nil {
+				return fmt.Errorf("failed to get absolute path of %s: %w", output, err)
+			}
+			folder = absout
 		}
 		if _, err := os.Stat(folder); os.IsPermission(err) {
 			log.Errorf("permission denied to write to %s", folder)
@@ -175,7 +186,7 @@ var idaCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			tmp, err := os.CreateTemp("", "*.py")
+			tmp, err := os.Create(filepath.Join(folder, "dscu.py"))
 			if err != nil {
 				return err
 			}
@@ -189,16 +200,24 @@ var idaCmd = &cobra.Command{
 			defer os.Remove(scriptFile)
 		}
 
-		logFile := filepath.Join(folder, viper.GetString("dyld.ida.log-file"))
-		if _, err := os.Stat(logFile); err == nil {
-			if err := os.Remove(logFile); err != nil {
-				return fmt.Errorf("failed to remove log file %s: %w", logFile, err)
+		if len(logFile) > 0 {
+			logFile = filepath.Join(folder, viper.GetString("dyld.ida.log-file"))
+			if _, err := os.Stat(logFile); err == nil {
+				if err := os.Remove(logFile); err != nil {
+					return fmt.Errorf("failed to remove log file %s: %w", logFile, err)
+				}
 			}
 		}
+
 		dbFile := filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s.i64", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
+
+		_, magic, ok := strings.Cut(f.Headers[f.UUID].Magic.String(), " ")
+		if !ok {
+			return fmt.Errorf("failed to get arch from DSC magic %s", f.Headers[f.UUID].Magic.String())
+		}
 
 		cli, err := ida.NewClient(ctx, &ida.Config{
 			IdaPath:      viper.GetString("dyld.ida.ida-path"),
@@ -210,7 +229,7 @@ var idaCmd = &cobra.Command{
 			TempDatabase: viper.GetBool("dyld.ida.temp-database"),
 			DeleteDB:     viper.GetBool("dyld.ida.delete-db"),
 			CompressDB:   true,
-			FileType:     fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.Split(f.Headers[f.UUID].Magic.String(), " ")[2]),
+			FileType:     fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.TrimSpace(magic)),
 			Env: []string{
 				fmt.Sprintf("IDA_DYLD_CACHE_MODULE=%s", img.Name),
 				fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")),
@@ -223,7 +242,9 @@ var idaCmd = &cobra.Command{
 			// 	Host: viper.GetString("remote-debugger-host"),
 			// 	Port: viper.GetInt("remote-debugger-port"),
 			// },
-			Verbose: viper.GetBool("verbose"),
+			Verbose:     viper.GetBool("verbose"),
+			RunInDocker: viper.GetBool("dyld.ida.docker"),
+			DockerImage: viper.GetString("dyld.ida.docker-image"),
 		})
 		if err != nil {
 			return err
