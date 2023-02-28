@@ -19,11 +19,13 @@ ipsw dyld ida <DSC> <DYLIB> [DYLIBS...] [flags]
 ```
   -c, --delete-db             Disassemble a new file (delete the old database)
   -d, --dependancies          Analyze module dependencies
+  -k, --docker                Run IDA Pro in a docker container
+      --docker-image string   IDA Pro docker image (default "blacktop/idapro:latest-pro")
   -g, --enable-gui            Enable IDA Pro GUI (defaults to headless)
   -e, --extra-args strings    IDA Pro CLI extra arguments
   -h, --help                  help for ida
   -p, --ida-path string       IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)
-  -l, --log-file string       IDA log file (default "ida.log")
+  -l, --log-file string       IDA log file
   -o, --output string         Output folder
   -s, --script string         IDA Pro script to run
   -a, --script-args strings   IDA Pro script arguments
