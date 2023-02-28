@@ -101,7 +101,7 @@ update_mod: ## Update go.mod file
 .PHONY: update_devs
 update_devs: ## Parse XCode database for new devices
 	@echo " > Updating device_traits.json"
-	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc $(GO_BIN) run ./cmd/ipsw/main.go device-list-gen pkg/xcode/device_traits.json
+	CGO_ENABLED=1 CGO_CFLAGS=-I/usr/local/include CGO_LDFLAGS=-L/usr/local/lib CC=gcc $(GO_BIN) run ./cmd/ipsw/main.go device-list-gen pkg/xcode/data/device_traits.json
 
 .PHONY: update_keys
 update_keys: ## Scrape the iPhoneWiki for AES keys
