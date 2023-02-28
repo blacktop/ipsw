@@ -186,6 +186,7 @@ var devCmd = &cobra.Command{
 				return nil
 			}); err != nil {
 				log.Warn("Exiting...")
+				os.Exit(0)
 			}
 		}
 

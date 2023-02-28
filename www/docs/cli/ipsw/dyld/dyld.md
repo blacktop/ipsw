@@ -37,6 +37,7 @@ ipsw dyld [flags]
 * [ipsw dyld disass](/docs/cli/ipsw/dyld/disass)	 - Disassemble dyld_shared_cache at symbol/vaddr
 * [ipsw dyld dump](/docs/cli/ipsw/dyld/dump)	 - Dump dyld_shared_cache data at given virtual address
 * [ipsw dyld extract](/docs/cli/ipsw/dyld/extract)	 - Extract dylib from dyld_shared_cache
+* [ipsw dyld ida](/docs/cli/ipsw/dyld/ida)	 - Analyze DSC in IDA Pro
 * [ipsw dyld image](/docs/cli/ipsw/dyld/image)	 - Dump image array info
 * [ipsw dyld imports](/docs/cli/ipsw/dyld/imports)	 - List all dylibs that load a given dylib
 * [ipsw dyld info](/docs/cli/ipsw/dyld/info)	 - Parse dyld_shared_cache
@@ -44,6 +45,7 @@ ipsw dyld [flags]
 * [ipsw dyld o2a](/docs/cli/ipsw/dyld/o2a)	 - Convert dyld_shared_cache offset to address
 * [ipsw dyld objc](/docs/cli/ipsw/dyld/objc)	 - Dump Objective-C Optimization Info
 * [ipsw dyld patches](/docs/cli/ipsw/dyld/patches)	 - Dump dyld patch info
+* [ipsw dyld search](/docs/cli/ipsw/dyld/search)	 - Find Dylib files for given search criteria
 * [ipsw dyld slide](/docs/cli/ipsw/dyld/slide)	 - Dump slide info
 * [ipsw dyld split](/docs/cli/ipsw/dyld/split)	 - Extracts all the dyld_shared_cache libraries
 * [ipsw dyld str](/docs/cli/ipsw/dyld/str)	 - Search dyld_shared_cache for string
