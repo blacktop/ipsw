@@ -11,17 +11,18 @@ description: 🚧 Dump DWARF debug information
 🚧 Dump DWARF debug information
 
 ```
-ipsw kernel dwarf [flags]
+ipsw kernel dwarf <dSYM> [dSYM] [flags]
 ```
 
 ### Examples
 
 ```bash
-# Dump the task struct (and pretty print with clang-format)
-❯ ipsw kernel dwarf KDK_13.0_22A5342f.kdk/kernel.development.t6000 --type task \
-											| clang-format -style='{AlignConsecutiveDeclarations: true}' --assume-filename task.h
-# Diff two versions of a struct
-❯ ipsw kernel dwarf --type task --diff KDK_13.0_22A5342f.kdk/kernel.development.t6000 KDK_13.0_22A5352e.kdk/kernel.development.t6000
+# Dump the task struct
+❯ ipsw kernel dwarf -t task /Library/Developer/KDKs/KDK_13.3_22E5230e.kdk/System/Library/Kernels/kernel.development.t6020.dSYM
+# Diff task struct
+❯ ipsw kernel dwarf --type task --diff
+# Diff ALL structs
+❯ ipsw kernel dwarf --diff
 ```
 
 ### Options
