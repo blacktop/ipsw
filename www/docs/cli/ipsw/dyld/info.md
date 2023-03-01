@@ -18,6 +18,7 @@ ipsw dyld info <dyld_shared_cache> [flags]
 
 ```
   -c, --closures   Dump program launch closures
+      --delta      Delta two DSC's image's versions
       --diff       Diff two DSC's images
   -d, --dlopen     Dump all dylibs and bundles with dlopen closures
   -l, --dylibs     List dylibs and their versions

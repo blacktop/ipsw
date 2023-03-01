@@ -81,6 +81,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&Color, "color", false, "colorize output")
 	rootCmd.PersistentFlags().String("diff-tool", "", "git diff tool (for --diff commands)")
+	rootCmd.PersistentFlags().MarkHidden("diff-tool")
 	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
 	viper.BindPFlag("color", rootCmd.Flags().Lookup("color"))
 	viper.BindPFlag("diff-tool", rootCmd.Flags().Lookup("diff-tool"))
