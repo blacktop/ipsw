@@ -22,6 +22,7 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -31,6 +32,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign"
@@ -51,13 +53,13 @@ func init() {
 	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dyldInfoCmd.Flags().Bool("diff", false, "Diff two DSC's images")
 	dyldInfoCmd.Flags().Bool("delta", false, "Delta two DSC's image's versions")
-	viper.BindPFlag("dyld.info.closures", dyldSearchCmd.Flags().Lookup("closures"))
-	viper.BindPFlag("dyld.info.dlopen", dyldSearchCmd.Flags().Lookup("dlopen"))
-	viper.BindPFlag("dyld.info.dylibs", dyldSearchCmd.Flags().Lookup("dylibs"))
-	viper.BindPFlag("dyld.info.sig", dyldSearchCmd.Flags().Lookup("sig"))
-	viper.BindPFlag("dyld.info.json", dyldSearchCmd.Flags().Lookup("json"))
-	viper.BindPFlag("dyld.info.diff", dyldSearchCmd.Flags().Lookup("diff"))
-	viper.BindPFlag("dyld.info.delta", dyldSearchCmd.Flags().Lookup("delta"))
+	viper.BindPFlag("dyld.info.closures", dyldInfoCmd.Flags().Lookup("closures"))
+	viper.BindPFlag("dyld.info.dlopen", dyldInfoCmd.Flags().Lookup("dlopen"))
+	viper.BindPFlag("dyld.info.dylibs", dyldInfoCmd.Flags().Lookup("dylibs"))
+	viper.BindPFlag("dyld.info.sig", dyldInfoCmd.Flags().Lookup("sig"))
+	viper.BindPFlag("dyld.info.json", dyldInfoCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dyld.info.diff", dyldInfoCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("dyld.info.delta", dyldInfoCmd.Flags().Lookup("delta"))
 
 	dyldInfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -98,13 +100,13 @@ var dyldInfoCmd = &cobra.Command{
 
 		// flags
 		// showHeader := viper.GetBool("header")
-		showDylibs := viper.GetBool("dylibs")
-		showClosures := viper.GetBool("closures")
-		showDlopenOthers := viper.GetBool("dlopen")
-		showSignature := viper.GetBool("sig")
-		outAsJSON := viper.GetBool("json")
-		diff := viper.GetBool("diff")
-		delta := viper.GetBool("delta")
+		showDylibs := viper.GetBool("dyld.info.dylibs")
+		showClosures := viper.GetBool("dyld.info.closures")
+		showDlopenOthers := viper.GetBool("dyld.info.dlopen")
+		showSignature := viper.GetBool("dyld.info.sig")
+		outAsJSON := viper.GetBool("dyld.info.json")
+		diff := viper.GetBool("dyld.info.diff")
+		delta := viper.GetBool("dyld.info.delta")
 		// validate flags
 		if !showDylibs && (diff || delta) {
 			return errors.New("you must specify --dylibs to use --diff or --delta")
@@ -326,9 +328,11 @@ var dyldInfoCmd = &cobra.Command{
 
 					for d1, v1 := range dylib2ver1 {
 						if _, ok := dylib2ver2[d1]; !ok {
-							gone = append(gone, fmt.Sprintf("%s\t(%s)", d1, v1))
+							gone = append(gone, fmt.Sprintf("`%s`\t(%s)", d1, v1))
 						}
 					}
+
+					sort.Strings(gone)
 
 					var diffs []utils.MachoVersion
 					for d2, v2 := range dylib2ver2 {
@@ -345,25 +349,23 @@ var dyldInfoCmd = &cobra.Command{
 								// fmt.Printf("%s\t(%s -> %s) %s\n", d2, v2, v1, verdiff)
 							}
 						} else {
-							new = append(new, fmt.Sprintf("%s\t(%s)", d2, v2))
+							new = append(new, fmt.Sprintf("`%s`\t(%s)", d2, v2))
 						}
 					}
 
 					sort.Strings(new)
-					fmt.Printf("### 🆕 dylibs\n\n")
+
+					buf := bytes.NewBufferString("### 🆕 dylibs\n\n")
 					for _, d := range new {
-						fmt.Printf("- %s\n", d)
+						buf.WriteString(fmt.Sprintf("- %s\n", d))
 					}
-					fmt.Println()
-					sort.Strings(gone)
-					fmt.Printf("### ❌ removed dylibs\n\n")
+					buf.WriteString("\n### ❌ removed dylibs\n\n")
 					for _, d := range gone {
-						fmt.Printf("- %s\n", d)
+						buf.WriteString(fmt.Sprintf("- %s\n", d))
 					}
-					fmt.Println()
-					fmt.Printf("### ⬆️ (delta) updated dylibs\n\n")
+					buf.WriteString("\n### ⬆️ (delta) updated dylibs\n\n")
 					utils.SortMachoVersions(diffs)
-					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 					var prev string
 					for _, d := range diffs {
 						if len(prev) > 0 && prev != d.Version {
@@ -373,6 +375,15 @@ var dyldInfoCmd = &cobra.Command{
 						prev = d.Version
 					}
 					w.Flush()
+
+					if viper.GetBool("color") {
+						if err := quick.Highlight(os.Stdout, buf.String(), "md", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(buf.String())
+					}
+
 				}
 
 				if diff {
