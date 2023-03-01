@@ -30,6 +30,7 @@ ipsw kernel dwarf <dSYM> [dSYM] [flags]
 ```
   -d, --diff          Diff two structs
   -h, --help          help for dwarf
+  -m, --md            Markdown diff output
   -n, --name string   Name to lookup
   -t, --type string   Type to lookup
 ```
