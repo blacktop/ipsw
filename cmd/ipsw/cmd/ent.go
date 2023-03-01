@@ -316,20 +316,24 @@ var entCmd = &cobra.Command{
 				for _, f2 := range files { // DIFF ALL ENTITLEMENTS
 					e2 := entDB2[f2]
 					if e1, ok := entDB[f2]; ok {
-						var tool string
+						var out string
 						if markdown {
-							tool = "git"
-						}
-						out, err := utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Tool: tool, Color: viper.GetBool("color")})
-						if err != nil {
-							return err
+							out, err = utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Color: false, Tool: "git"})
+							if err != nil {
+								return err
+							}
+						} else {
+							out, err = utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
+							if err != nil {
+								return err
+							}
 						}
 						if len(out) == 0 {
 							continue
 						}
 						found = true
 						if markdown {
-							color.New(color.Bold).Printf("\n### `%s`\n\n", f2)
+							color.New(color.Bold).Printf("\n#### `%s`\n\n", f2)
 							fmt.Println("```diff")
 							fmt.Println(out)
 							fmt.Println("```")
@@ -340,7 +344,7 @@ var entCmd = &cobra.Command{
 					} else {
 						found = true
 						if markdown {
-							color.New(color.Bold).Printf("\n### 🆕 `%s`\n\n", f2)
+							color.New(color.Bold).Printf("\n#### 🆕 `%s`\n\n", f2)
 						} else {
 							color.New(color.Bold).Printf("\n🆕 %s 🆕\n\n", f2)
 						}

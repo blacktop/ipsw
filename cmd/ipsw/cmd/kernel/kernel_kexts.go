@@ -74,7 +74,7 @@ var kextsCmd = &cobra.Command{
 			out, err := utils.GitDiff(
 				strings.Join(kout1, "\n"),
 				strings.Join(kout2, "\n"),
-				&utils.GitDiffConfig{Color: viper.GetBool("color")})
+				&utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
 			if err != nil {
 				return err
 			}
