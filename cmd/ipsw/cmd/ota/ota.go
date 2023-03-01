@@ -34,6 +34,7 @@ var OtaCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		viper.BindPFlag("color", cmd.Flags().Lookup("color"))
 		viper.BindPFlag("verbose", cmd.Flags().Lookup("verbose"))
+		viper.BindPFlag("diff-tool", cmd.Flags().Lookup("diff-tool"))
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
