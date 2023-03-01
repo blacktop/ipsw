@@ -80,7 +80,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw/config.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&Color, "color", false, "colorize output")
-	rootCmd.PersistentFlags().String("diff-tool", "delta", "git diff tool (for --diff commands)")
+	rootCmd.PersistentFlags().String("diff-tool", "", "git diff tool (for --diff commands)")
 	viper.BindPFlag("verbose", rootCmd.Flags().Lookup("verbose"))
 	viper.BindPFlag("color", rootCmd.Flags().Lookup("color"))
 	viper.BindPFlag("diff-tool", rootCmd.Flags().Lookup("diff-tool"))
