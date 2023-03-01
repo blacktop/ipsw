@@ -223,7 +223,10 @@ var ctfdumpCmd = &cobra.Command{
 				return fmt.Errorf("could not find struct '%s' in either file", args[2])
 			}
 
-			out, err := utils.GitDiff(t1.String(), t2.String(), &utils.GitDiffConfig{Color: viper.GetBool("color")})
+			out, err := utils.GitDiff(
+				t1.String(),
+				t2.String(),
+				&utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
 			if err != nil {
 				return err
 			}

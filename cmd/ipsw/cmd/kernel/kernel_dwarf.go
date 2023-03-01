@@ -324,12 +324,14 @@ func init() {
 	// dwarfCmd.Flags().BoolP("pretty", "", false, "Pretty print JSON")
 	// dwarfCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	dwarfCmd.Flags().BoolP("diff", "d", false, "Diff two structs")
+	dwarfCmd.Flags().BoolP("md", "m", false, "Markdown diff output")
 	dwarfCmd.Flags().StringP("type", "t", "", "Type to lookup")
 	dwarfCmd.Flags().StringP("name", "n", "", "Name to lookup")
 	// viper.BindPFlag("kernel.dwarf.arch", dwarfCmd.Flags().Lookup("arch"))
 	// viper.BindPFlag("kernel.dwarf.pretty", dwarfCmd.Flags().Lookup("pretty"))
 	// viper.BindPFlag("kernel.dwarf.json", dwarfCmd.Flags().Lookup("json"))
 	viper.BindPFlag("kernel.dwarf.diff", dwarfCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("kernel.dwarf.md", dwarfCmd.Flags().Lookup("md"))
 	viper.BindPFlag("kernel.dwarf.type", dwarfCmd.Flags().Lookup("type"))
 	viper.BindPFlag("kernel.dwarf.name", dwarfCmd.Flags().Lookup("name"))
 	dwarfCmd.MarkZshCompPositionalArgumentFile(1)
@@ -399,7 +401,7 @@ var dwarfCmd = &cobra.Command{
 					return fmt.Errorf("could not find type '%s' in one or both of the files", viper.GetString("kernel.dwarf.type"))
 				}
 
-				out, err := utils.GitDiff(t1, t2, &utils.GitDiffConfig{Color: viper.GetBool("color")})
+				out, err := utils.GitDiff(t1, t2, &utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
 				if err != nil {
 					return err
 				}
@@ -438,9 +440,16 @@ var dwarfCmd = &cobra.Command{
 							seen[t.StructName] = true
 							off, err := df.LookupType(t.StructName)
 							if err != nil {
-								log.WithField("struct", t.StructName).Info("NEW")
-								println()
-								fmt.Println(utils.ClangFormat(t.Defn(), t.StructName+".h", viper.GetBool("color")))
+								if viper.GetBool("kernel.dwarf.md") {
+									fmt.Printf("#### %s\n\n", t.StructName)
+									fmt.Println("```c")
+									fmt.Println(utils.ClangFormat(t.Defn(), t.StructName+".h", false))
+									fmt.Println("```")
+								} else {
+									log.WithField("struct", t.StructName).Info("NEW")
+									println()
+									fmt.Println(utils.ClangFormat(t.Defn(), t.StructName+".h", viper.GetBool("color")))
+								}
 								continue // not found in older version
 							}
 
@@ -461,14 +470,28 @@ var dwarfCmd = &cobra.Command{
 								if st.Incomplete {
 									continue
 								}
-								out, err := utils.GitDiff(st.Defn(), t.Defn(), &utils.GitDiffConfig{Color: viper.GetBool("color")})
-								if err != nil {
-									return err
+								if viper.GetBool("kernel.dwarf.md") {
+									out, err := utils.GitDiff(st.Defn(), t.Defn(), &utils.GitDiffConfig{Color: false, Tool: "git"})
+									if err != nil {
+										return err
+									}
+									if len(out) > 0 {
+										fmt.Printf("#### %s\n\n", t.StructName)
+										fmt.Println("```diff")
+										fmt.Println(out)
+										fmt.Println("```")
+									}
+								} else {
+									out, err := utils.GitDiff(st.Defn(), t.Defn(), &utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
+									if err != nil {
+										return err
+									}
+									if len(out) > 0 {
+										log.WithField("struct", t.StructName).Warn("DIFF")
+										fmt.Println(out)
+									}
 								}
-								if len(out) > 0 {
-									log.WithField("struct", t.StructName).Warn("DIFF")
-									fmt.Println(out)
-								}
+
 							}
 						}
 					}

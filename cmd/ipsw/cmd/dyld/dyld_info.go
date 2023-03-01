@@ -307,7 +307,7 @@ var InfoCmd = &cobra.Command{
 				out, err := utils.GitDiff(
 					strings.Join(dout1, "\n"),
 					strings.Join(dout2, "\n"),
-					&utils.GitDiffConfig{Color: viper.GetBool("color")})
+					&utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
 				if err != nil {
 					return err
 				}
