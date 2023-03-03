@@ -40,7 +40,7 @@ func InspectKM(m *macho.File, filter string, explicitOnly, asJSON bool) (string,
 
 		for _, bundle := range prelink.PrelinkInfoDictionary {
 			if re.MatchString(bundle.ID) {
-				log.Debugf("found bundle '%s' who matches filter '%s'", bundle.ID, filter)
+				log.Debugf("found bundle '%s' who matches filter", bundle.ID)
 				continue
 			}
 			if len(bundle.OSBundleLibraries) == 0 {
@@ -50,16 +50,20 @@ func InspectKM(m *macho.File, filter string, explicitOnly, asJSON bool) (string,
 					out = append(out, bundle.ID)
 				}
 			} else {
+				skip := false
 				for name := range bundle.OSBundleLibraries {
 					if re.MatchString(name) {
-						log.Debugf("found bundle '%s' whose dependency matches filter '%s'", bundle.ID, filter)
-						continue
+						log.Debugf("found bundle '%s' whose dependency matches filter", bundle.ID)
+						skip = true
+						break
 					}
 				}
-				if explicitOnly {
-					out = append(out, fmt.Sprintf("-b %s", bundle.ID))
-				} else {
-					out = append(out, bundle.ID)
+				if !skip {
+					if explicitOnly {
+						out = append(out, fmt.Sprintf("-b %s", bundle.ID))
+					} else {
+						out = append(out, bundle.ID)
+					}
 				}
 			}
 		}
