@@ -200,8 +200,28 @@ func DecompressKernelManagement(kcache, outputDir string) error {
 			return fmt.Errorf("failed to write kernelcache %s: %v", kcache, err)
 		}
 	}
-
+	utils.Indent(log.Info, 2)("Created " + kcache)
 	return nil
+}
+
+// DecompressKernelManagementData decompresses a compressed KernelManagement_host kernelcache's data
+func DecompressKernelManagementData(kcache string) ([]byte, error) {
+	content, err := os.ReadFile(kcache)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read kernelcache: %v", err)
+	}
+
+	km, err := img4.ParseImg4(bytes.NewReader(content))
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse kernelmanagement img4: %v", err)
+	}
+
+	if bytes.Contains(km.IM4P.Data[:4], []byte("bvx2")) {
+		utils.Indent(log.Debug, 2)("Detected LZFSE compression")
+		return lzfse.NewDecoder(km.IM4P.Data).DecodeBuffer()
+	}
+
+	return km.IM4P.Data, nil
 }
 
 // DecompressData decompresses compressed kernelcache []byte data
