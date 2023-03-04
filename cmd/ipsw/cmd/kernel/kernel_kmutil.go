@@ -29,6 +29,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -125,6 +126,10 @@ var kernelKmutilCmd = &cobra.Command{
 				return err
 			}
 			defer m.Close()
+		}
+
+		if m.FileTOC.FileHeader.Type != types.MH_FILESET {
+			return fmt.Errorf("kernelcache type is not MH_FILESET (kext collection)")
 		}
 
 		switch args[0] {
