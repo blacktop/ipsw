@@ -250,6 +250,22 @@ func Reverse[T any](input []T) {
 	}
 }
 
+func Difference[T comparable](l1 []T, l2 []T) (diff []T) {
+	m := make(map[T]bool)
+
+	for _, item := range l2 {
+		m[item] = true
+	}
+
+	for _, item := range l1 {
+		if _, ok := m[item]; !ok {
+			diff = append(diff, item)
+		}
+	}
+
+	return
+}
+
 // ReverseBytes reverse byte array order
 func ReverseBytes(a []byte) []byte {
 	for i := len(a)/2 - 1; i >= 0; i-- {
