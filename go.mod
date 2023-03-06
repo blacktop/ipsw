@@ -17,7 +17,7 @@ require (
 	github.com/blacktop/ranger v1.0.3
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/docker/docker v23.0.1+incompatible
-	github.com/dominikbraun/graph v0.16.0
+	github.com/dominikbraun/graph v0.16.1
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.14.1
 	github.com/frida/frida-go v0.6.1
@@ -34,7 +34,7 @@ require (
 	github.com/opencontainers/image-spec v1.1.0-rc2
 	github.com/pkg/errors v0.9.1
 	github.com/sergi/go-diff v1.3.1
-	github.com/shurcooL/githubv4 v0.0.0-20230215024106-420ad0987b9b
+	github.com/shurcooL/githubv4 v0.0.0-20230305132112-efb623903184
 	github.com/spf13/cast v1.5.0
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.15.0
@@ -42,12 +42,12 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20230207094436-7b8c63dfe650
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.6.0
-	golang.org/x/net v0.7.0
-	golang.org/x/oauth2 v0.5.0
+	golang.org/x/crypto v0.7.0
+	golang.org/x/net v0.8.0
+	golang.org/x/oauth2 v0.6.0
 	golang.org/x/sync v0.1.0
-	golang.org/x/sys v0.5.0
-	golang.org/x/term v0.5.0
+	golang.org/x/sys v0.6.0
+	golang.org/x/term v0.6.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -107,14 +107,14 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29 // indirect
-	github.com/spf13/afero v1.9.4 // indirect
+	github.com/spf13/afero v1.9.5 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.4.2 // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	github.com/temoto/robotstxt v1.1.2 // indirect
-	golang.org/x/mod v0.8.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/mod v0.9.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
