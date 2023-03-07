@@ -14,11 +14,6 @@ import (
 )
 
 func InspectKM(m *macho.File, filter string, explicitOnly, asJSON bool) (string, error) {
-	re, err := regexp.Compile(filter)
-	if err != nil {
-		return "", fmt.Errorf("failed to compile filter regex: %v", err)
-	}
-
 	if sec := m.Section("__PRELINK_INFO", "__info"); sec != nil {
 		dat, err := sec.Data()
 		if err != nil {
@@ -39,54 +34,70 @@ func InspectKM(m *macho.File, filter string, explicitOnly, asJSON bool) (string,
 		}
 
 		var whitelist []string
-		var filterlist []string
-		var blacklist []string
 
-		for _, bundle := range prelink.PrelinkInfoDictionary {
-			if re.MatchString(bundle.ID) {
-				filterlist = append(filterlist, bundle.ID)
+		if len(filter) == 0 { // NO FILTER (add all bundles to whitelist)
+			for _, bundle := range prelink.PrelinkInfoDictionary {
+				if explicitOnly {
+					whitelist = append(whitelist, fmt.Sprintf("-b %s", bundle.ID))
+				} else {
+					whitelist = append(whitelist, bundle.ID)
+				}
 			}
-		}
+		} else {
+			re, err := regexp.Compile(filter)
+			if err != nil {
+				return "", fmt.Errorf("failed to compile filter regex: %v", err)
+			}
 
-		g := graph.New(graph.StringHash, graph.Directed(), graph.PreventCycles())
+			var filterlist []string
+			var blacklist []string
 
-		// generate dependency graph
-		for _, bundle := range prelink.PrelinkInfoDictionary {
-			if len(bundle.OSBundleLibraries) > 0 {
-				g.AddVertex(bundle.ID)
-				for dependency := range bundle.OSBundleLibraries {
-					g.AddVertex(dependency)
-					if err := g.AddEdge(bundle.ID, dependency); err != nil {
-						return "", fmt.Errorf("failed to add edge: %v", err)
+			for _, bundle := range prelink.PrelinkInfoDictionary {
+				if re.MatchString(bundle.ID) {
+					filterlist = append(filterlist, bundle.ID)
+				}
+			}
+
+			g := graph.New(graph.StringHash, graph.Directed(), graph.PreventCycles())
+
+			// generate dependency graph
+			for _, bundle := range prelink.PrelinkInfoDictionary {
+				if len(bundle.OSBundleLibraries) > 0 {
+					g.AddVertex(bundle.ID)
+					for dependency := range bundle.OSBundleLibraries {
+						g.AddVertex(dependency)
+						if err := g.AddEdge(bundle.ID, dependency); err != nil {
+							return "", fmt.Errorf("failed to add edge: %v", err)
+						}
 					}
 				}
 			}
-		}
 
-		blacklist = append(blacklist, filterlist...)
+			blacklist = append(blacklist, filterlist...)
 
-		// blacklist all bundles that dependacy paths contain filtered bundles
-		for _, skip := range filterlist {
+			// blacklist all bundles that dependacy paths contain filtered bundles
+			for _, skip := range filterlist {
+				for _, bundle := range prelink.PrelinkInfoDictionary {
+					path, err := graph.ShortestPath(g, bundle.ID, skip)
+					if err != nil {
+						continue
+					}
+					if len(path) > 0 {
+						blacklist = append(blacklist, bundle.ID)
+					}
+				}
+			}
+
+			// whitelist all bundles that are not blacklisted
 			for _, bundle := range prelink.PrelinkInfoDictionary {
-				path, err := graph.ShortestPath(g, bundle.ID, skip)
-				if err != nil {
+				if utils.StrSliceContains(blacklist, bundle.ID) {
 					continue
 				}
-				if len(path) > 0 {
-					blacklist = append(blacklist, bundle.ID)
+				if explicitOnly {
+					whitelist = append(whitelist, fmt.Sprintf("-b %s", bundle.ID))
+				} else {
+					whitelist = append(whitelist, bundle.ID)
 				}
-			}
-		}
-
-		// whitelist all bundles that are not blacklisted
-		for _, bundle := range prelink.PrelinkInfoDictionary {
-			if utils.StrSliceContains(blacklist, bundle.ID) {
-				continue
-			}
-			if explicitOnly {
-				whitelist = append(whitelist, fmt.Sprintf("-b %s", bundle.ID))
-			} else {
-				whitelist = append(whitelist, bundle.ID)
 			}
 		}
 
