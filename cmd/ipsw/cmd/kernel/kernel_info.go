@@ -22,9 +22,12 @@ THE SOFTWARE.
 package kernel
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"text/tabwriter"
 
@@ -32,6 +35,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/magic"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -47,7 +51,11 @@ func init() {
 	KernelcacheCmd.AddCommand(kernelInfoCmd)
 
 	kernelInfoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
+	kernelInfoCmd.Flags().BoolP("strings", "c", false, "Print cstrings")
+	kernelInfoCmd.Flags().StringP("filter", "f", "", "Filter symbols by name")
 	viper.BindPFlag("kernel.info.symbols", kernelInfoCmd.Flags().Lookup("symbols"))
+	viper.BindPFlag("kernel.info.strings", kernelInfoCmd.Flags().Lookup("strings"))
+	viper.BindPFlag("kernel.info.filter", kernelInfoCmd.Flags().Lookup("filter"))
 }
 
 // kernelInfoCmd represents the info command
@@ -59,9 +67,20 @@ var kernelInfoCmd = &cobra.Command{
 	SilenceErrors: true,
 	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var re *regexp.Regexp
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
+		}
+
+		filter := viper.GetString("kernel.info.filter")
+
+		if filter != "" {
+			var err error
+			re, err = regexp.Compile(filter)
+			if err != nil {
+				return err
+			}
 		}
 
 		kernelPath := filepath.Clean(args[0])
@@ -76,6 +95,7 @@ var kernelInfoCmd = &cobra.Command{
 		}
 
 		if kern.FileTOC.FileHeader.Type == types.MH_FILESET {
+			var label string
 			for _, fe := range kern.FileSets() {
 				entry, err := kern.GetFileSetFileByName(fe.EntryID)
 				if err != nil {
@@ -83,13 +103,17 @@ var kernelInfoCmd = &cobra.Command{
 				}
 				if viper.GetBool("kernel.info.symbols") {
 					var sec string
-					var label string
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 					if entry.Symtab != nil {
-						label = fmt.Sprintf("%s Symtab", fe.EntryID)
-						fmt.Printf("\n%s\n", label)
-						fmt.Println(strings.Repeat("-", len(label)))
+						if re == nil {
+							label = fmt.Sprintf("[%s] Symtab", fe.EntryID)
+							fmt.Printf("\n%s\n", label)
+							fmt.Println(strings.Repeat("-", len(label)))
+						}
 						for _, sym := range entry.Symtab.Syms {
+							if re != nil && !re.MatchString(sym.Name) {
+								continue
+							}
 							if sym.Sect > 0 && int(sym.Sect) <= len(entry.Sections) {
 								sec = fmt.Sprintf("%s.%s", entry.Sections[sym.Sect-1].Seg, entry.Sections[sym.Sect-1].Name)
 							}
@@ -108,7 +132,56 @@ var kernelInfoCmd = &cobra.Command{
 						fmt.Println("  - no symbol table")
 					}
 				}
+				if viper.GetBool("kernel.info.strings") {
+					if re == nil {
+						label = fmt.Sprintf("[%s] Strings", fe.EntryID)
+						fmt.Printf("\n%s\n", label)
+						fmt.Println(strings.Repeat("-", len(label)))
+					}
+					for _, sec := range entry.Sections {
+						if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
+							off, err := entry.GetOffset(sec.Addr)
+							if err != nil {
+								return fmt.Errorf("failed to get offset for %s.%s: %v", sec.Seg, sec.Name, err)
+							}
+							dat := make([]byte, sec.Size)
+							if _, err = entry.ReadAt(dat, int64(off)); err != nil {
+								return fmt.Errorf("failed to read cstring data in %s.%s: %v", sec.Seg, sec.Name, err)
+							}
+
+							csr := bytes.NewBuffer(dat)
+
+							for {
+								pos := sec.Addr + uint64(csr.Cap()-csr.Len())
+
+								s, err := csr.ReadString('\x00')
+
+								if err == io.EOF {
+									break
+								}
+
+								if err != nil {
+									return fmt.Errorf("failed to read string: %v", err)
+								}
+
+								s = strings.Trim(s, "\x00")
+
+								if len(s) > 0 {
+									if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) {
+										continue // skip non-ascii strings when dumping __TEXT.__const
+									}
+									if re != nil && !re.MatchString(s) {
+										continue
+									}
+									fmt.Printf("%s: %s\t%#v\n", symAddrColor("%#x", pos), symImageColor(fe.EntryID), s)
+								}
+							}
+						}
+					}
+				}
 			}
+		} else {
+			log.Warn("file is NOT a MH_FILESET: `ipsw kernel info` is intended for use on kernelcaches that are a MH_FILESET, you should use `ipsw macho info` instead")
 		}
 
 		return nil
