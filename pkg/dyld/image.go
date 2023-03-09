@@ -832,7 +832,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 			// w.Flush()
 
 			sort.Slice(i.LocalSymbols, func(j, k int) bool {
-				return i.LocalSymbols[j].Name <= i.LocalSymbols[k].Name
+				return i.LocalSymbols[j].Name < i.LocalSymbols[k].Name
 			})
 
 			i.Analysis.State.SetPrivates(true)
@@ -994,7 +994,7 @@ func (i *CacheImage) ParsePublicSymbols(dump bool) error {
 		}
 
 		sort.Slice(i.PublicSymbols, func(j, k int) bool {
-			return i.PublicSymbols[j].Name <= i.PublicSymbols[k].Name
+			return i.PublicSymbols[j].Name < i.PublicSymbols[k].Name
 		})
 
 		i.Analysis.State.SetExports(true)
