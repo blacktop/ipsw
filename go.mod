@@ -10,7 +10,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
 	github.com/blacktop/go-dwarf v1.0.9
-	github.com/blacktop/go-macho v1.1.147
+	github.com/blacktop/go-macho v1.1.148
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -22,7 +22,7 @@ require (
 	github.com/fatih/color v1.14.1
 	github.com/frida/frida-go v0.6.1
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-	github.com/gen2brain/beeep v0.0.0-20220909211152-5a9ec94374f6
+	github.com/gen2brain/beeep v0.0.0-20230307103607-6e717729cb4f
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/google/gousb v1.1.2
 	github.com/google/uuid v1.3.0
@@ -83,7 +83,7 @@ require (
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02 // indirect
@@ -115,9 +115,9 @@ require (
 	github.com/temoto/robotstxt v1.1.2 // indirect
 	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
-	golang.org/x/tools v0.6.0 // indirect
+	golang.org/x/tools v0.7.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	google.golang.org/protobuf v1.29.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gotest.tools/v3 v3.4.0 // indirect
