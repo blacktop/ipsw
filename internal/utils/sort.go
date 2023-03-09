@@ -70,6 +70,9 @@ func SortFileNameDescend(files []os.FileInfo) {
 }
 
 func SearchFileName(name string, files []os.FileInfo) (os.FileInfo, error) {
+	sort.Slice(files, func(i, j int) bool {
+		return files[i].Name() < files[j].Name()
+	})
 	idx := sort.Search(len(files), func(idx int) bool { return files[idx].Name() >= name })
 	if idx < len(files) && files[idx].Name() == name {
 		return files[idx], nil
