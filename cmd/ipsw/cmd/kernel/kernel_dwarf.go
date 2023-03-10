@@ -86,48 +86,62 @@ func getAllStructs(path string) (<-chan *dwf.StructType, error) {
 	return out, nil
 }
 
-func getName(path, name string) (*dwf.FuncType, error) {
+func getName(path, name string) (ft *dwf.FuncType, filename string, err error) {
 	m, err := macho.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer m.Close()
 
 	df, err := m.DWARF()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	r := df.Reader()
 
 	off, err := df.LookupName(name)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find name %s: %v", name, err)
+		return nil, "", fmt.Errorf("failed to find name %s: %v", name, err)
 	}
 
 	r.Seek(off)
 
 	entry, err := r.Next()
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	var ft *dwf.FuncType
+	fs, err := df.FilesForEntry(entry)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get files for entry: %v", err)
+	}
+	if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
+		if idx < int64(len(fs)) {
+			filename = fs[idx].Name
+		}
+	}
+
 	if entry.Tag == dwf.TagSubprogram || entry.Tag == dwf.TagSubroutineType || entry.Tag == dwf.TagInlinedSubroutine {
 		typ, err := df.Type(entry.Offset)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
 		ft = typ.(*dwf.FuncType)
+		if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
+			if idx < int64(len(fs)) {
+				filename = fs[idx].Name
+			}
+		}
 	} else {
 		typ, err := df.Type(entry.Offset)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		return nil, fmt.Errorf("did not find tag func type: found %s; %s", entry.Tag, typ.String())
+		return nil, "", fmt.Errorf("did not find tag func type: found %s; %s", entry.Tag, typ.String())
 	}
 
-	return ft, nil
+	return
 }
 
 func getType(path, name string) (typeStr string, filename string, err error) {
@@ -534,9 +548,16 @@ var dwarfCmd = &cobra.Command{
 		}
 
 		if len(viper.GetString("kernel.dwarf.name")) > 0 {
-			n, err := getName(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.name"))
+			n, file, err := getName(filepath.Clean(args[0]), viper.GetString("kernel.dwarf.name"))
 			if err != nil {
 				return err
+			}
+			if len(file) > 0 {
+				if _, after, ok := strings.Cut(file, "/Library/Caches/com.apple.xbs/Sources/"); ok {
+					log.WithField("file", after).Info(viper.GetString("kernel.dwarf.name"))
+				} else {
+					log.WithField("file", file).Info(viper.GetString("kernel.dwarf.name"))
+				}
 			}
 			fmt.Println(utils.ClangFormat(n.String(), viper.GetString("kernel.dwarf.name")+".h", viper.GetBool("color")))
 		}
