@@ -38,10 +38,17 @@ import (
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var symAddrColor = color.New(color.Faint).SprintfFunc()
+var symImageColor = color.New(color.Faint, color.FgBlue).SprintfFunc()
+var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
+var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
+var symNameColor = color.New(color.Bold).SprintFunc()
 
 func init() {
 	DyldCmd.AddCommand(MachoCmd)
@@ -409,17 +416,27 @@ var MachoCmd = &cobra.Command{
 				}
 
 				if dumpSymbols {
+					image.ParseLocalSymbols(false)
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 					if m.Symtab != nil {
 						fmt.Println("SYMBOLS")
 						fmt.Println("=======")
-						var sec string
+						undeflush := false
 						for _, sym := range m.Symtab.Syms {
-							if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-								sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+							if sym.Type.IsUndefinedSym() && !undeflush {
+								w.Flush()
+								undeflush = true
 							}
-							fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", sym.Value, sym.Type.String(sec), sym.Name)
-							// fmt.Printf("0x%016X <%s> %s\n", sym.Value, sym.Type.String(sec), sym.Name)
+							if sym.Value == 0 {
+								fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+							} else {
+								if sym.Name == "<redacted>" {
+									if name, ok := f.AddressToSymbol[sym.Value]; ok {
+										sym.Name = name
+									}
+								}
+								fmt.Fprintf(w, "%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
+							}
 						}
 						w.Flush()
 					}
