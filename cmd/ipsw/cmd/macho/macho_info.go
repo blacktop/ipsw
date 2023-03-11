@@ -45,11 +45,17 @@ import (
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/fatih/color"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var symAddrColor = color.New(color.Faint).SprintfFunc()
+var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
+var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
+var symNameColor = color.New(color.Bold).SprintFunc()
 
 func init() {
 	MachoCmd.AddCommand(machoInfoCmd)
@@ -793,33 +799,22 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("SYMBOLS")
 				fmt.Println("=======")
 			}
-			var sec string
 			var label string
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 			if m.Symtab != nil {
 				label = "Symtab"
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
+				undeflush := false
 				for _, sym := range m.Symtab.Syms {
-					if sym.Sect > 0 && int(sym.Sect) <= len(m.Sections) {
-						sec = fmt.Sprintf("%s.%s", m.Sections[sym.Sect-1].Seg, m.Sections[sym.Sect-1].Name)
+					if sym.Type.IsUndefinedSym() && !undeflush {
+						w.Flush()
+						undeflush = true
 					}
-					var lib string
-					if sym.Desc.GetLibraryOrdinal() != types.SELF_LIBRARY_ORDINAL && sym.Desc.GetLibraryOrdinal() < types.MAX_LIBRARY_ORDINAL {
-						lib = fmt.Sprintf("\t(%s)", filepath.Base(m.ImportedLibraries()[sym.Desc.GetLibraryOrdinal()-1]))
-					}
-					if viper.GetBool("verbose") {
-						if sym.Value == 0 {
-							fmt.Fprintf(w, "              <%s> [%s]\t%s%s\n", sym.Type.String(sec), sym.Desc, sym.Name, lib)
-						} else {
-							fmt.Fprintf(w, "%#09x:  <%s> [%s]\t%s%s\n", sym.Value, sym.Type.String(sec), sym.Desc, sym.Name, lib)
-						}
+					if sym.Value == 0 {
+						fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 					} else {
-						if sym.Value == 0 {
-							fmt.Fprintf(w, "              <%s>\t%s%s\n", sym.Type.String(sec), sym.Name, lib)
-						} else {
-							fmt.Fprintf(w, "%#09x:  <%s>\t%s%s\n", sym.Value, sym.Type.String(sec), sym.Name, lib)
-						}
+						fmt.Fprintf(w, "%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 					}
 				}
 				w.Flush()

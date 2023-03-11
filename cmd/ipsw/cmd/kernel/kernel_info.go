@@ -44,7 +44,7 @@ import (
 var symAddrColor = color.New(color.Faint).SprintfFunc()
 var symImageColor = color.New(color.Faint, color.FgBlue).SprintfFunc()
 var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
-var symLibColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
+var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
 var symNameColor = color.New(color.Bold).SprintFunc()
 
 func init() {
@@ -102,7 +102,6 @@ var kernelInfoCmd = &cobra.Command{
 					return fmt.Errorf("failed to parse file-set entry %s: %v", fe.EntryID, err)
 				}
 				if viper.GetBool("kernel.info.symbols") {
-					var sec string
 					w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 					if entry.Symtab != nil {
 						if re == nil {
@@ -114,17 +113,10 @@ var kernelInfoCmd = &cobra.Command{
 							if re != nil && !re.MatchString(sym.Name) {
 								continue
 							}
-							if sym.Sect > 0 && int(sym.Sect) <= len(entry.Sections) {
-								sec = fmt.Sprintf("%s.%s", entry.Sections[sym.Sect-1].Seg, entry.Sections[sym.Sect-1].Name)
-							}
-							var lib string
-							if sym.Desc.GetLibraryOrdinal() != types.SELF_LIBRARY_ORDINAL && sym.Desc.GetLibraryOrdinal() < types.MAX_LIBRARY_ORDINAL {
-								lib = fmt.Sprintf("\t(%s)", filepath.Base(entry.ImportedLibraries()[sym.Desc.GetLibraryOrdinal()-1]))
-							}
 							if sym.Value == 0 {
-								fmt.Fprintf(w, "                    %s\t<%s> [%s]\t%s%s\n", symImageColor(fe.EntryID), symTypeColor(sym.Type.String(sec)), symTypeColor(sym.Desc.String()), symNameColor(sym.Name), lib)
+								fmt.Fprintf(w, "                    %s\n", strings.Join([]string{symImageColor(fe.EntryID), symTypeColor(sym.GetType(entry)), symNameColor(sym.Name), symLibColor(sym.GetLib(entry))}, "\t"))
 							} else {
-								fmt.Fprintf(w, "%s: %s\t<%s> [%s]\t%s%s\n", symAddrColor("%#x", sym.Value), symImageColor(fe.EntryID), symTypeColor(sym.Type.String(sec)), symTypeColor(sym.Desc.String()), symNameColor(sym.Name), lib)
+								fmt.Fprintf(w, "%s: %s\n", symAddrColor("%#x", sym.Value), strings.Join([]string{symImageColor(fe.EntryID), symTypeColor(sym.GetType(entry)), symNameColor(sym.Name), symLibColor(sym.GetLib(entry))}, "\t"))
 							}
 						}
 						w.Flush()

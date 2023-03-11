@@ -128,11 +128,6 @@ func getName(path, name string) (ft *dwf.FuncType, filename string, err error) {
 			return nil, "", err
 		}
 		ft = typ.(*dwf.FuncType)
-		if idx, ok := entry.Val(dwf.AttrDeclFile).(int64); ok {
-			if idx < int64(len(fs)) {
-				filename = fs[idx].Name
-			}
-		}
 	} else {
 		typ, err := df.Type(entry.Offset)
 		if err != nil {
