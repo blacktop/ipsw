@@ -357,12 +357,12 @@ func GetBuildInfo() (*BuildInfo, error) {
 	return nil, fmt.Errorf("only supported on macOS")
 }
 
-func GetKerncachePath() (string, error) {
+func GetKernelCollectionPath() (string, error) {
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("sysctl", "-n", "kern.bootobjectspath")
 		out, err := cmd.CombinedOutput()
 		if err != nil {
-			return "", fmt.Errorf("%v: %s", err, out)
+			return "/System/Library/KernelCollections/BootKernelExtensions.kc", nil
 		}
 		return filepath.Join("/System/Volumes/Preboot", strings.TrimSpace(string(out)), "System/Library/Caches/com.apple.kernelcaches/kernelcache"), nil
 	}

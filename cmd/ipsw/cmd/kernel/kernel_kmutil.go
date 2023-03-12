@@ -84,14 +84,14 @@ var kernelKmutilCmd = &cobra.Command{
 		if outputDir == "" {
 			cwd, err := os.Getwd()
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get current working directory: %v", err)
 			}
 			outputDir = cwd
 		}
 
 		var kcpath string
 		if len(args) < 2 {
-			systemKernelCache, err := utils.GetKerncachePath()
+			systemKernelCache, err := utils.GetKernelCollectionPath()
 			if err != nil {
 				return fmt.Errorf("could not find system kernelcache: %v (Please specify path to kernelcache)", err)
 			}
@@ -110,18 +110,18 @@ var kernelKmutilCmd = &cobra.Command{
 			log.Info("Decompressing KernelManagement kernelcache")
 			data, err := kernelcache.DecompressKernelManagementData(kcpath)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to decompress kernelcache (kernel management data): %v", err)
 			}
 			m, err = macho.NewFile(bytes.NewReader(data))
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to parse kernelcache (kernel management data): %v", err
 			}
 			defer m.Close()
 		} else {
 			log.Info("Parsing KernelManagement kernelcache")
 			m, err = macho.Open(kcpath)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to parse kernelcache MachO: %v", err)
 			}
 			defer m.Close()
 		}
@@ -134,7 +134,7 @@ var kernelKmutilCmd = &cobra.Command{
 		case "inspect":
 			out, err := kernelcache.InspectKM(m, filter, explicitOnly, asJSON)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to inspect kernelcache: %v", err)
 			}
 			fmt.Println(out)
 		}
