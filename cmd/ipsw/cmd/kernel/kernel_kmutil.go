@@ -93,7 +93,7 @@ var kernelKmutilCmd = &cobra.Command{
 		if len(args) < 2 {
 			systemKernelCache, err := utils.GetKerncachePath()
 			if err != nil {
-				return err
+				return fmt.Errorf("could not find system kernelcache: %v (Please specify path to kernelcache)", err)
 			}
 			kcpath = systemKernelCache
 		} else {
