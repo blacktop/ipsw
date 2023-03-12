@@ -30,6 +30,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -90,14 +91,11 @@ var kernelKmutilCmd = &cobra.Command{
 
 		var kcpath string
 		if len(args) < 2 {
-			systemKernelCache, err := filepath.Glob("/System/Volumes/Preboot/*/boot/*/System/Library/Caches/com.apple.kernelcaches/kernelcache") // FIXME: this might be different on Intel?
+			systemKernelCache, err := utils.GetKerncachePath()
 			if err != nil {
 				return err
 			}
-			if len(systemKernelCache) == 0 {
-				return fmt.Errorf("could not find system kernelcache. Please specify path to kernelcache")
-			}
-			kcpath = systemKernelCache[0]
+			kcpath = systemKernelCache
 		} else {
 			kcpath = filepath.Clean(args[1])
 		}

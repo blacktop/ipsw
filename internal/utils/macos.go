@@ -357,6 +357,18 @@ func GetBuildInfo() (*BuildInfo, error) {
 	return nil, fmt.Errorf("only supported on macOS")
 }
 
+func GetKerncachePath() (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("sysctl", "-n", "kern.bootobjectspath")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return filepath.Join("/System/Volumes/Preboot", strings.TrimSpace(string(out)), "System/Library/Caches/com.apple.kernelcaches/kernelcache"), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
 var ErrMountResourceBusy = errors.New("hdiutil: mount failed - Resource busy")
 
 // Mount mounts a DMG with hdiutil
