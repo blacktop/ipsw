@@ -594,7 +594,13 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("============")
 			}
 			if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-				fmt.Println(m.CodeSignature().Entitlements)
+				if viper.GetBool("color") {
+					if err := quick.Highlight(os.Stdout, m.CodeSignature().Entitlements, "xml", "terminal256", "nord"); err != nil {
+						return err
+					}
+				} else {
+					fmt.Println(m.CodeSignature().Entitlements)
+				}
 			} else {
 				fmt.Println("  - no entitlements")
 			}
@@ -786,7 +792,7 @@ var machoInfoCmd = &cobra.Command{
 					if viper.GetBool("verbose") {
 						fmt.Printf("%#016x-%#016x\n", fn.StartAddr, fn.EndAddr)
 					} else {
-						fmt.Printf("0x%016X\n", fn.StartAddr)
+						fmt.Printf("%#016x\n", fn.StartAddr)
 					}
 				}
 			} else {
@@ -826,25 +832,23 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
 				for _, bind := range binds {
-					fmt.Fprintf(w, "%#09x:\t%s\n", bind.Start+bind.Offset, bind)
+					fmt.Printf("%s:  %s\n", symAddrColor("%#09x", bind.Start+bind.Offset), symNameColor(bind))
 				}
-				w.Flush()
 			}
 			if rebases, err := m.GetRebaseInfo(); err == nil {
 				label = "DyldInfo [Rebases]"
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
 				for _, rebase := range rebases {
-					fmt.Fprintf(w, "%#09x:\t%s\n", rebase.Start+rebase.Offset, rebase)
+					fmt.Printf("%s:  %s\n", symAddrColor("%#09x", rebase.Start+rebase.Offset), symNameColor(rebase))
 				}
-				w.Flush()
 			}
 			if exports, err := m.GetExports(); err == nil {
 				label = "DyldInfo [Exports]"
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
 				for _, export := range exports {
-					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
+					fmt.Fprintf(w, "%#09x:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
 				w.Flush()
 			}
@@ -857,7 +861,7 @@ var machoInfoCmd = &cobra.Command{
 					return err
 				}
 				for _, export := range exports {
-					fmt.Fprintf(w, "%#09x:  <%s> \t %s\n", export.Address, export.Flags, export.Name)
+					fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
 				w.Flush()
 			}
@@ -985,7 +989,7 @@ var machoInfoCmd = &cobra.Command{
 							if (sec.Seg == "__TEXT" && sec.Name == "__const") && !utils.IsASCII(s) {
 								continue // skip non-ascii strings when dumping __TEXT.__const
 							}
-							fmt.Printf("%#x: %#v\n", pos, s)
+							fmt.Printf("%s: %s\n", symAddrColor("%#09x", pos), symNameColor(fmt.Sprintf("%#v", s)))
 						}
 					}
 				}
@@ -995,7 +999,7 @@ var machoInfoCmd = &cobra.Command{
 					fmt.Printf("\nCFStrings\n")
 					fmt.Println("---------")
 					for _, cfstr := range cfstrs {
-						fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
+						fmt.Printf("%s:  %s\n", symAddrColor("%#09x", cfstr.Address), symNameColor(fmt.Sprintf("%#v", cfstr.Name)))
 					}
 				}
 			}
