@@ -32,7 +32,7 @@ This will open the `Email` dylib in the IDA Pro GUI and load the sane default su
 
 Add the `-V` verbose flag to see stdout/stderr from IDA Pro.
 
-I possible error could be that you are trying to analyze your systems DSC in a read-only folder and IDA Pro can't create it's IDB there so you'll need to supply the `--output` flag to specify a writable folder for IDBs and logs.
+A possible error could be that you are trying to analyze your systems DSC in a read-only folder and IDA Pro can't create it's IDB there so you'll need to supply the `--output` flag to specify a writable folder for IDBs and logs.
 
 ## Running with Docker
 
@@ -92,7 +92,8 @@ Congratulations!  You now have a registered IDA Pro image that you can perform h
 ### Running *headless* in Docker
 
 ```bash
-❯ ipsw dyld ida dyld_shared_cache_arm64e Email --delete-db --docker --docker-image blacktop/idapro:8.2-pro --output .
+❯ ipsw dyld ida dyld_shared_cache_arm64e Email --delete-db --output . \
+                     --docker --docker-image blacktop/idapro:8.2-pro
    • Starting IDA Pro...
    • 🎉 Done!                   db=DSC_Email_iOS_15.7.i64
 ```
