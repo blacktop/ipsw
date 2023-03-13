@@ -30,9 +30,11 @@ This will open the `Email` dylib in the IDA Pro GUI and load the sane default su
 
 ### Trouble Shooting 🤔
 
-Add the `-V` verbose flag to see stdout/stderr from IDA Pro.
+#### Add the `-V` verbose flag to see stdout/stderr from IDA Pro.
 
 A possible error could be that you are trying to analyze your systems DSC in a read-only folder and IDA Pro can't create it's IDB there so you'll need to supply the `--output` flag to specify a writable folder for IDBs and logs.
+
+Another possible error I've seen is if you are using an older version of IDA Pro that doesn't support the newer DSC format it will fail.  For example if you are using IDA Pro 7.x and try to analyze a DSC from iOS 16.x it will fail etc.
 
 ## Running with Docker
 
