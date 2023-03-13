@@ -28,6 +28,12 @@ To prep an IDA Pro session to analyze the `Email` dylib in the DSC
 
 This will open the `Email` dylib in the IDA Pro GUI and load the sane default support dylibs and analyze ObjC info in a few minutes.
 
+### Trouble Shooting 🤔
+
+Add the `-V` verbose flag to see stdout/stderr from IDA Pro.
+
+I possible error could be that you are trying to analyze your systems DSC in a read-only folder and IDA Pro can't create it's IDB there so you'll need to supply the `--output` flag to specify a writable folder for IDBs and logs.
+
 ## Running with Docker
 
 :::note
