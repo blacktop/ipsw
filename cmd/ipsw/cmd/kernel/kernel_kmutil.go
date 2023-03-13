@@ -114,7 +114,7 @@ var kernelKmutilCmd = &cobra.Command{
 			}
 			m, err = macho.NewFile(bytes.NewReader(data))
 			if err != nil {
-				return fmt.Errorf("failed to parse kernelcache (kernel management data): %v", err
+				return fmt.Errorf("failed to parse kernelcache (kernel management data): %v", err)
 			}
 			defer m.Close()
 		} else {
