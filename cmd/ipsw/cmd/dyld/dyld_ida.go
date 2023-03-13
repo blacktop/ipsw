@@ -253,7 +253,11 @@ var idaCmd = &cobra.Command{
 		f.Close() // close the dyld_shared_cache file so IDA can open it
 
 		if err := ctrlc.Default.Run(ctx, func() error {
-			log.Info("Starting IDA Pro...")
+			if viper.GetBool("dyld.ida.docker") {
+				log.Info("Starting IDA Pro in Docker...")
+			} else {
+				log.Info("Starting IDA Pro...")
+			}
 			if err := cli.Run(); err != nil {
 				return err
 			}
