@@ -6,6 +6,9 @@ on:
   pull_request:
     branches:
       - master
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   # download:
   #   runs-on: macos-12
