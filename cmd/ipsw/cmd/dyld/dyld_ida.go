@@ -53,7 +53,7 @@ func init() {
 	idaCmd.Flags().StringP("output", "o", "", "Output folder")
 	idaCmd.Flags().String("slide", "", "dyld_shared_cache image ASLR slide value (hexadecimal)")
 	idaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
-	idaCmd.Flags().String("docker-image", "blacktop/idapro:latest-pro", "IDA Pro docker image")
+	idaCmd.Flags().String("docker-image", "blacktop/idapro:8.2-pro", "IDA Pro docker image")
 	viper.BindPFlag("dyld.ida.ida-path", idaCmd.Flags().Lookup("ida-path"))
 	viper.BindPFlag("dyld.ida.script", idaCmd.Flags().Lookup("script"))
 	viper.BindPFlag("dyld.ida.script-args", idaCmd.Flags().Lookup("script-args"))
