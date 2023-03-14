@@ -20,7 +20,7 @@ ipsw dyld ida <DSC> <DYLIB> [DYLIBS...] [flags]
   -c, --delete-db             Disassemble a new file (delete the old database)
   -d, --dependancies          Analyze module dependencies
   -k, --docker                Run IDA Pro in a docker container
-      --docker-image string   IDA Pro docker image (default "blacktop/idapro:latest-pro")
+      --docker-image string   IDA Pro docker image (default "blacktop/idapro:8.2-pro")
   -g, --enable-gui            Enable IDA Pro GUI (defaults to headless)
   -e, --extra-args strings    IDA Pro CLI extra arguments
   -h, --help                  help for ida
