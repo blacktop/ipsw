@@ -12,11 +12,13 @@ In addition to loading a selected dylib *(and any addition dylibs supplied as ar
 - Generates an IDAPython script to load sane default support dylibs and analyze ObjC info
 - Generates a descriptive name for the compressed IDB file output
 - Allows you to slide the dylib in memory to a specific address with the `--slide` flag to match an `lldb` session or `crashlog`
-- Load all the of dependancies of a given dylib with the `--dependancies` or `-d` flag
+- Load all the of dependancies of a given dylib with the `-d` or `--dependancies` flag
 - If you just want to peek at a dylib you can use the `--enable-gui` flag to open the IDB in IDA Pro GUI with the `--temp-db` flag to prevent IDA Pro from creating a new IDB file
-- Create a log file of the IDA Pro output with the `--log` flag
+- Create a log file of the IDA Pro output with the `-l` or `--log-file` flag
 - Want you run your own IDA Pro script?  Use the `--script` flag and the `--script-args` flag to pass arguments to your script
 - **COMING SOON** - Load all the GOTs and stubs for a given dylib and the sane defaults
+
+See the [CLI Reference](https://blacktop.github.io/ipsw/docs/cli/ipsw/dyld/ida) for more info.
 
 ## Running with host IDA Pro
 
