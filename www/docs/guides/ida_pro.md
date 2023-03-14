@@ -84,7 +84,7 @@ This will create a new image called `blacktop/ida:8.2-pro`
 You can change that name with:
 
 ```bash
-❯ docker tag blacktop/ida:8.2-pro YOUR_ORG/ida:8.2-pro-licensed`
+❯ docker tag blacktop/ida:8.2-pro YOUR_ORG/ida:8.2-pro-licensed
 ```
 
 and then push that to your private registry.
