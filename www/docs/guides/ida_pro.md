@@ -18,7 +18,7 @@ In addition to loading a selected dylib *(and any addition dylibs supplied as ar
 - Want you run your own IDA Pro script?  Use the `--script` flag and the `--script-args` flag to pass arguments to your script
 - **COMING SOON** - Load all the GOTs and stubs for a given dylib and the sane defaults
 
-See the [CLI Reference](https://blacktop.github.io/ipsw/docs/cli/ipsw/dyld/ida) for more info.
+See the [CLI Reference](/docs/cli/ipsw/dyld/ida) for more info.
 
 ## Running with host IDA Pro
 
