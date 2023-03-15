@@ -333,7 +333,7 @@ var entCmd = &cobra.Command{
 						}
 						found = true
 						if markdown {
-							color.New(color.Bold).Printf("\n#### `%s`\n\n", f2)
+							color.New(color.Bold).Printf("\n### `%s`\n\n", f2)
 							fmt.Println("```diff")
 							fmt.Println(out)
 							fmt.Println("```")
@@ -344,7 +344,7 @@ var entCmd = &cobra.Command{
 					} else {
 						found = true
 						if markdown {
-							color.New(color.Bold).Printf("\n#### 🆕 `%s`\n\n", f2)
+							color.New(color.Bold).Printf("\n### 🆕 `%s`\n\n", f2)
 						} else {
 							color.New(color.Bold).Printf("\n🆕 %s 🆕\n\n", f2)
 						}
