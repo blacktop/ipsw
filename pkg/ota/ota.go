@@ -17,7 +17,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/ota/bom"
+	"github.com/blacktop/ipsw/pkg/bom"
 	"github.com/dustin/go-humanize"
 	"golang.org/x/sys/execabs"
 
@@ -175,7 +175,11 @@ func parseBOM(zr *zip.Reader, bomPathPattern string) ([]os.FileInfo, error) {
 			bomData := make([]byte, f.UncompressedSize64)
 			io.ReadFull(r, bomData)
 			r.Close()
-			return bom.Read(bytes.NewReader(bomData))
+			bm, err := bom.New(bytes.NewReader(bomData))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse bom: %v", err)
+			}
+			return bm.GetPaths()
 		}
 	}
 
