@@ -22,36 +22,51 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
+	"path/filepath"
+
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/diff"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
 	rootCmd.AddCommand(diffCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// diffCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// diffCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
+	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
+	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
+	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
 }
 
 // diffCmd represents the diff command
 var diffCmd = &cobra.Command{
-	Use:           "diff",
+	Use:           "diff <IPSW> <IPSW>",
 	Short:         "Diff IPSWs",
 	Args:          cobra.ExactArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		d := diff.New(
+			viper.GetString("diff.title"),
+			filepath.Clean(args[0]),
+			filepath.Clean(args[1]),
+		)
+
+		if err := d.Diff(); err != nil {
+			return err
+		}
+
+		if viper.GetString("diff.output") != "" {
+			return d.Save(viper.GetString("diff.output"))
+		}
+
+		fmt.Println(d)
 
 		return nil
 	},
