@@ -27,9 +27,8 @@ type Asset struct {
 	Header
 	Metadata  extendedMetadata
 	KeyFormat []renditionAttributeType
-	// ImageDB       map[string]image.Image
-	ImageDB []Rendition
-	ColorDB map[string]color.RGBA
+	ImageDB   []Rendition
+	ColorDB   map[string]color.RGBA
 	// FontDB        map[string]Font
 	// FontSizeDB    map[string]uint32
 	// GlyphDB       map[string]Glyph
