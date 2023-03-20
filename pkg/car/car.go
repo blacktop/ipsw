@@ -451,7 +451,11 @@ func Parse(name string, conf *Config) (*Asset, error) {
 							rend.Type = "Image"
 							img, err := decodeImage(vr, *cheader)
 							if err != nil {
-								log.Errorf("failed to decode image '%s': %v; data:\n%s", rend.Name, err, hex.Dump(vdata))
+								if a.conf.Verbose {
+									log.Errorf("failed to decode image '%s': %v; data:\n%s", rend.Name, err, hex.Dump(vdata))
+								} else {
+									log.Errorf("failed to decode image '%s': %v", rend.Name, err)
+								}
 								// return nil, err
 							}
 							if img != nil {
