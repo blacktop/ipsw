@@ -235,6 +235,102 @@ func (b *BOM) ReadTree(name string) (*Tree, error) {
 	return tree, nil
 }
 
+func (b *BOM) ReadTrees(name string) ([]*Tree, error) {
+	var trees []*Tree
+
+	br, err := b.ReadBlock(name)
+	if err != nil {
+		return nil, err
+	}
+
+	var thead TreeHeader
+	if err := binary.Read(br, binary.BigEndian, &thead); err != nil {
+		return nil, err
+	}
+
+	tree, err := b.readTree(thead.Child)
+	if err != nil {
+		return nil, err
+	}
+
+	for tree.IsLeaf == 0 {
+		var ti TreeIndex
+		if err := binary.Read(tree.r, binary.BigEndian, &ti.Value); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(tree.r, binary.BigEndian, &ti.Key); err != nil {
+			return nil, err
+		}
+
+		tree, err = b.readTree(ti.Value)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	tree.Indices = make([]TreeIndex, tree.Count)
+
+	for i := uint16(0); i < tree.Count; i++ {
+		var ti TreeIndex
+		if err := binary.Read(tree.r, binary.BigEndian, &ti.Value); err != nil {
+			return nil, err
+		}
+		if err := binary.Read(tree.r, binary.BigEndian, &ti.Key); err != nil {
+			return nil, err
+		}
+		ti.KeyReader, err = b.blockReader(ti.Key)
+		if err != nil {
+			if errors.Is(err, ErrBlockNotFound) {
+				p := make([]byte, 4)
+				binary.BigEndian.PutUint32(p, ti.Key)
+				ti.KeyReader = bytes.NewBuffer(p)
+			} else {
+				return nil, err
+			}
+		}
+		ti.ValueReader, err = b.blockReader(ti.Value)
+		if err != nil {
+			return nil, err
+		}
+		tree.Indices[i] = ti
+	}
+
+	trees = append(trees, tree)
+
+	for {
+		if tree.Forward == 0 {
+			break
+		} else {
+			tree, err = b.readTree(tree.Forward)
+			if err != nil {
+				return nil, err
+			}
+			tree.Indices = make([]TreeIndex, tree.Count)
+			for i := uint16(0); i < tree.Count; i++ {
+				var ti TreeIndex
+				if err := binary.Read(tree.r, binary.BigEndian, &ti.Value); err != nil {
+					return nil, err
+				}
+				if err := binary.Read(tree.r, binary.BigEndian, &ti.Key); err != nil {
+					return nil, err
+				}
+				ti.KeyReader, err = b.blockReader(ti.Key)
+				if err != nil {
+					return nil, err
+				}
+				ti.ValueReader, err = b.blockReader(ti.Value)
+				if err != nil {
+					return nil, err
+				}
+				tree.Indices[i] = ti
+			}
+			trees = append(trees, tree)
+		}
+	}
+
+	return trees, nil
+}
+
 func (b *BOM) readTree(index uint32) (*Tree, error) {
 	buf, err := b.blockReader(index)
 	if err != nil {
