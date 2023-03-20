@@ -244,6 +244,28 @@ func Zip[T, U any](ts []T, us []U) ([]Pair[T, U], error) {
 	return pairs, nil
 }
 
+func Reverse[T any](input []T) {
+	for i, j := 0, len(input)-1; i < j; i, j = i+1, j-1 {
+		input[i], input[j] = input[j], input[i]
+	}
+}
+
+func Difference[T comparable](l1 []T, l2 []T) (diff []T) {
+	m := make(map[T]bool)
+
+	for _, item := range l2 {
+		m[item] = true
+	}
+
+	for _, item := range l1 {
+		if _, ok := m[item]; !ok {
+			diff = append(diff, item)
+		}
+	}
+
+	return
+}
+
 // ReverseBytes reverse byte array order
 func ReverseBytes(a []byte) []byte {
 	for i := len(a)/2 - 1; i >= 0; i-- {

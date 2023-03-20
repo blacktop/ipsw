@@ -22,6 +22,7 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -31,6 +32,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/codesign"
@@ -43,14 +45,23 @@ import (
 )
 
 func init() {
-	DyldCmd.AddCommand(InfoCmd)
-	InfoCmd.Flags().BoolP("closures", "c", false, "Dump program launch closures")
-	InfoCmd.Flags().BoolP("dlopen", "d", false, "Dump all dylibs and bundles with dlopen closures")
-	InfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
-	InfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
-	InfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	InfoCmd.Flags().Bool("diff", false, "Diff two DSC's images")
-	InfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	DyldCmd.AddCommand(dyldInfoCmd)
+	dyldInfoCmd.Flags().BoolP("closures", "c", false, "Dump program launch closures")
+	dyldInfoCmd.Flags().BoolP("dlopen", "d", false, "Dump all dylibs and bundles with dlopen closures")
+	dyldInfoCmd.Flags().BoolP("dylibs", "l", false, "List dylibs and their versions")
+	dyldInfoCmd.Flags().BoolP("sig", "s", false, "Print code signature")
+	dyldInfoCmd.Flags().BoolP("json", "j", false, "Output as JSON")
+	dyldInfoCmd.Flags().Bool("diff", false, "Diff two DSC's images")
+	dyldInfoCmd.Flags().Bool("delta", false, "Delta two DSC's image's versions")
+	viper.BindPFlag("dyld.info.closures", dyldInfoCmd.Flags().Lookup("closures"))
+	viper.BindPFlag("dyld.info.dlopen", dyldInfoCmd.Flags().Lookup("dlopen"))
+	viper.BindPFlag("dyld.info.dylibs", dyldInfoCmd.Flags().Lookup("dylibs"))
+	viper.BindPFlag("dyld.info.sig", dyldInfoCmd.Flags().Lookup("sig"))
+	viper.BindPFlag("dyld.info.json", dyldInfoCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dyld.info.diff", dyldInfoCmd.Flags().Lookup("diff"))
+	viper.BindPFlag("dyld.info.delta", dyldInfoCmd.Flags().Lookup("delta"))
+
+	dyldInfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 type dylib struct {
@@ -74,8 +85,8 @@ type dyldInfo struct {
 	Dylibs             []dylib                                     `json:"dylibs,omitempty"`
 }
 
-// infoCmd represents the info command
-var InfoCmd = &cobra.Command{
+// dyldInfoCmd represents the info command
+var dyldInfoCmd = &cobra.Command{
 	Use:           "info <dyld_shared_cache>",
 	Aliases:       []string{"i"},
 	Short:         "Parse dyld_shared_cache",
@@ -87,14 +98,21 @@ var InfoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// showHeader, _ := cmd.Flags().GetBool("header")
-		showDylibs, _ := cmd.Flags().GetBool("dylibs")
-		showClosures, _ := cmd.Flags().GetBool("closures")
-		showDlopenOthers, _ := cmd.Flags().GetBool("dlopen")
-		showSignature, _ := cmd.Flags().GetBool("sig")
-
-		outAsJSON, _ := cmd.Flags().GetBool("json")
-		diff, _ := cmd.Flags().GetBool("diff")
+		// flags
+		// showHeader := viper.GetBool("header")
+		showDylibs := viper.GetBool("dyld.info.dylibs")
+		showClosures := viper.GetBool("dyld.info.closures")
+		showDlopenOthers := viper.GetBool("dyld.info.dlopen")
+		showSignature := viper.GetBool("dyld.info.sig")
+		outAsJSON := viper.GetBool("dyld.info.json")
+		diff := viper.GetBool("dyld.info.diff")
+		delta := viper.GetBool("dyld.info.delta")
+		// validate flags
+		if !showDylibs && (diff || delta) {
+			return errors.New("you must specify --dylibs to use --diff or --delta")
+		} else if outAsJSON && (diff || delta) {
+			return errors.New("you cannot use --json with --diff or --delta")
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -178,8 +196,10 @@ var InfoCmd = &cobra.Command{
 			return nil
 		}
 
-		// print HEADER info
-		fmt.Println(f.String(viper.GetBool("verbose")))
+		if !diff && !delta {
+			// print HEADER info
+			fmt.Println(f.String(viper.GetBool("verbose")))
+		}
 
 		if showSignature {
 			fmt.Println("Code Signature")
@@ -273,20 +293,19 @@ var InfoCmd = &cobra.Command{
 		}
 
 		if showDylibs {
-			if diff {
+			if diff || delta {
 				if len(args) < 2 {
 					return fmt.Errorf("please provide two dyld_shared_cache files to diff")
 				}
 
-				var dout1 []string
+				dylib2ver1 := make(map[string]string)
 				for _, img := range f.Images {
 					m, err := img.GetPartialMacho()
 					if err != nil {
 						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
 					}
-					dout1 = append(dout1, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
+					dylib2ver1[img.Name] = m.SourceVersion().Version.String()
 				}
-				sort.Strings(dout1)
 
 				f2, err := dyld.Open(filepath.Clean(args[1]))
 				if err != nil {
@@ -294,28 +313,114 @@ var InfoCmd = &cobra.Command{
 				}
 				defer f.Close()
 
-				var dout2 []string
-				for _, img := range f2.Images {
-					m, err := img.GetPartialMacho()
-					if err != nil {
-						return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+				if delta {
+					dylib2ver2 := make(map[string]string)
+					for _, img := range f2.Images {
+						m, err := img.GetPartialMacho()
+						if err != nil {
+							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+						}
+						dylib2ver2[img.Name] = m.SourceVersion().Version.String()
 					}
-					dout2 = append(dout2, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
-				}
-				sort.Strings(dout2)
 
-				out, err := utils.GitDiff(
-					strings.Join(dout1, "\n"),
-					strings.Join(dout2, "\n"),
-					&utils.GitDiffConfig{Color: viper.GetBool("color")})
-				if err != nil {
-					return err
+					var new []string
+					var gone []string
+
+					for d1, v1 := range dylib2ver1 {
+						if _, ok := dylib2ver2[d1]; !ok {
+							gone = append(gone, fmt.Sprintf("`%s`\t(%s)", d1, v1))
+						}
+					}
+
+					sort.Strings(gone)
+
+					var diffs []utils.MachoVersion
+					for d2, v2 := range dylib2ver2 {
+						if v1, ok := dylib2ver1[d2]; ok {
+							if v1 != v2 {
+								verdiff, err := utils.DiffVersion(v2, v1)
+								if err != nil {
+									return err
+								}
+								diffs = append(diffs, utils.MachoVersion{
+									Name:    d2,
+									Version: verdiff,
+								})
+								// fmt.Printf("%s\t(%s -> %s) %s\n", d2, v2, v1, verdiff)
+							}
+						} else {
+							new = append(new, fmt.Sprintf("`%s`\t(%s)", d2, v2))
+						}
+					}
+
+					sort.Strings(new)
+
+					buf := bytes.NewBufferString("### 🆕 dylibs\n\n")
+					for _, d := range new {
+						buf.WriteString(fmt.Sprintf("- %s\n", d))
+					}
+					buf.WriteString("\n### ❌ removed dylibs\n\n")
+					for _, d := range gone {
+						buf.WriteString(fmt.Sprintf("- %s\n", d))
+					}
+					buf.WriteString("\n### ⬆️ (delta) updated dylibs\n\n")
+					utils.SortMachoVersions(diffs)
+					w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+					var prev string
+					for _, d := range diffs {
+						if len(prev) > 0 && prev != d.Version {
+							fmt.Fprintf(w, "\n---\n\n")
+						}
+						fmt.Fprintf(w, "- (%s)\t`%s`  \n", d.Version, d.Name)
+						prev = d.Version
+					}
+					w.Flush()
+
+					if viper.GetBool("color") {
+						if err := quick.Highlight(os.Stdout, buf.String(), "md", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(buf.String())
+					}
+
 				}
-				if len(out) == 0 {
-					log.Info("No differences found")
-				} else {
-					log.Info("Differences found")
-					fmt.Println(out)
+
+				if diff {
+					var dout1 []string
+					for _, img := range f.Images {
+						m, err := img.GetPartialMacho()
+						if err != nil {
+							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+						}
+						dout1 = append(dout1, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
+					}
+					sort.Strings(dout1)
+
+					var dout2 []string
+					for _, img := range f2.Images {
+						m, err := img.GetPartialMacho()
+						if err != nil {
+							return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
+						}
+						dout2 = append(dout2, fmt.Sprintf("%s\t(%s)", img.Name, m.SourceVersion().Version))
+					}
+					sort.Strings(dout2)
+
+					out, err := utils.GitDiff(
+						strings.Join(dout1, "\n")+"\n",
+						strings.Join(dout2, "\n")+"\n",
+						&utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
+					if err != nil {
+						return err
+					}
+
+					if len(out) == 0 {
+						log.Info("No differences found")
+					} else {
+						log.Info("Differences found")
+						fmt.Println(out)
+					}
 				}
 			} else {
 				fmt.Println("Images")

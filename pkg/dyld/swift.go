@@ -12,7 +12,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/types"
-	iswift "github.com/blacktop/ipsw/internal/swiftt"
+	iswift "github.com/blacktop/ipsw/internal/swift"
 )
 
 type SwiftOptimizationHeader struct {

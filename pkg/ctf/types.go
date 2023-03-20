@@ -83,11 +83,13 @@ const (
 	LSIZE_SENT = 0xffff /* sentinel for ctt_size */
 	MAX_LSIZE  = math.MaxUint64
 	/* data format version number */
-	VERSION_1  = 1
-	VERSION_2  = 2
-	VERSION_3  = 3
-	VERSION    = VERSION_3 /* current version */
-	F_COMPRESS = 0x1       /* data buffer is compressed */
+	VERSION_1     = 1
+	VERSION_2     = 2
+	VERSION_3     = 3
+	VERSION_4     = 4
+	VERSION       = VERSION_4 /* current version */
+	F_COMPRESS    = 0x1       /* data buffer is compressed */
+	F_NEWFUNCINFO = 0x2       /* New v3 func info section format.  */
 )
 
 // ctf_preamble

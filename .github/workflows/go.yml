@@ -3,9 +3,15 @@ on:
   push:
     branches:
       - master
+    paths-ignore:
+      - "www/**"
+      - ".github/workflows/docs.yml"
   pull_request:
     branches:
       - master
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   # download:
   #   runs-on: macos-12
@@ -39,7 +45,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: "stable"
 

@@ -55,24 +55,6 @@ func init() {
 	viper.BindPFlag("download.macos.assistant", macosCmd.Flags().Lookup("assistant"))
 	viper.BindPFlag("download.macos.latest", macosCmd.Flags().Lookup("latest"))
 	// viper.BindPFlag("download.macos.kernel", macosCmd.Flags().Lookup("kernel"))
-	survey.MultiSelectQuestionTemplate = `
-{{- define "option"}}
-    {{- if eq .SelectedIndex .CurrentIndex }}{{color .Config.Icons.SelectFocus.Format }}{{ .Config.Icons.SelectFocus.Text }}{{color "reset"}}{{else}} {{end}}
-    {{- if index .Checked .CurrentOpt.Index }}{{color .Config.Icons.MarkedOption.Format }} {{ .Config.Icons.MarkedOption.Text }} {{else}}{{color .Config.Icons.UnmarkedOption.Format }} {{ .Config.Icons.UnmarkedOption.Text }} {{end}}
-    {{- color "reset"}}
-    {{- " "}}{{- .CurrentOpt.Value}}
-{{end}}
-{{- if .ShowHelp }}{{- color .Config.Icons.Help.Format }}{{ .Config.Icons.Help.Text }} {{ .Help }}{{color "reset"}}{{"\n"}}{{end}}
-{{- color .Config.Icons.Question.Format }}{{ .Config.Icons.Question.Text }} {{color "reset"}}
-{{- color "default+hb"}}{{ .Message }}{{ .FilterMessage }}{{color "reset"}}
-{{- if .ShowAnswer}}{{color "cyan"}} ✅{{color "reset"}}{{"\n"}}
-{{- else }}
-	{{- "  "}}{{- color "cyan"}}[Use arrows to move, space to select, <right> to all, <left> to none, type to filter{{- if and .Help (not .ShowHelp)}}, {{ .Config.HelpInput }} for more help{{end}}]{{color "reset"}}
-  {{- "\n"}}
-  {{- range $ix, $option := .PageEntries}}
-    {{- template "option" $.IterateOption $ix $option}}
-  {{- end}}
-{{- end}}`
 }
 
 // macosCmd represents the macos command
@@ -154,6 +136,24 @@ var macosCmd = &cobra.Command{
 
 		if len(prodList) > 1 && len(build) == 0 && !latest {
 			choices := []int{}
+			survey.MultiSelectQuestionTemplate = `
+	{{- define "option"}}
+	    {{- if eq .SelectedIndex .CurrentIndex }}{{color .Config.Icons.SelectFocus.Format }}{{ .Config.Icons.SelectFocus.Text }}{{color "reset"}}{{else}} {{end}}
+	    {{- if index .Checked .CurrentOpt.Index }}{{color .Config.Icons.MarkedOption.Format }} {{ .Config.Icons.MarkedOption.Text }} {{else}}{{color .Config.Icons.UnmarkedOption.Format }} {{ .Config.Icons.UnmarkedOption.Text }} {{end}}
+	    {{- color "reset"}}
+	    {{- " "}}{{- .CurrentOpt.Value}}
+	{{end}}
+	{{- if .ShowHelp }}{{- color .Config.Icons.Help.Format }}{{ .Config.Icons.Help.Text }} {{ .Help }}{{color "reset"}}{{"\n"}}{{end}}
+	{{- color .Config.Icons.Question.Format }}{{ .Config.Icons.Question.Text }} {{color "reset"}}
+	{{- color "default+hb"}}{{ .Message }}{{ .FilterMessage }}{{color "reset"}}
+	{{- if .ShowAnswer}}{{color "cyan"}} ✅{{color "reset"}}{{"\n"}}
+	{{- else }}
+		{{- "  "}}{{- color "cyan"}}[Use arrows to move, space to select, <right> to all, <left> to none, type to filter{{- if and .Help (not .ShowHelp)}}, {{ .Config.HelpInput }} for more help{{end}}]{{color "reset"}}
+	  {{- "\n"}}
+	  {{- range $ix, $option := .PageEntries}}
+	    {{- template "option" $.IterateOption $ix $option}}
+	  {{- end}}
+	{{- end}}`
 			prompt := &survey.MultiSelect{
 				Message:  "Choose installer(s):",
 				Options:  prodList,

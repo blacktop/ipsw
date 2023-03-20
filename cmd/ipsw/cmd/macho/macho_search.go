@@ -29,7 +29,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
-	swift "github.com/blacktop/ipsw/internal/swiftt"
+	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/fatih/color"
 	"github.com/pkg/errors"
@@ -51,7 +51,7 @@ func init() {
 	machoSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
 	machoSearchCmd.Flags().String("ivar", "", "Search for specific ObjC instance variable regex")
 	machoSearchCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
+		return []string{"ipsw"}, cobra.ShellCompDirectiveFilterFileExt
 	})
 	viper.BindPFlag("macho.search.ipsw", machoSearchCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("macho.search.load-command", machoSearchCmd.Flags().Lookup("load-command"))

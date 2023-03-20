@@ -4,10 +4,14 @@ package download
 
 import (
 	"bytes"
+	"context"
+	"crypto/sha1"
 	"crypto/tls"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/bits"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -16,6 +20,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"time"
@@ -51,6 +56,11 @@ const (
 	olympusSessionURL = "https://appstoreconnect.apple.com/olympus/v1/session"
 
 	userAgent = "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8"
+
+	hashcashVersion        = 1
+	hashcashHeader         = "X-APPLE-HC"
+	hashcashCallengeHeader = "X-Apple-HC-Challenge"
+	hashcashBitsHeader     = "X-Apple-HC-Bits"
 )
 
 const (
@@ -72,6 +82,10 @@ type DevConfig struct {
 	SessionID string
 	SCNT      string
 	WidgetKey string
+	// hashcash
+	HashCash          string
+	HashCashBits      string
+	HashCashChallenge string
 	// download config
 	Proxy    string
 	Insecure bool
@@ -116,6 +130,7 @@ type session struct {
 	SessionID string         `json:"session_id,omitempty"`
 	SCNT      string         `json:"scnt,omitempty"`
 	WidgetKey string         `json:"widget_key,omitempty"`
+	HashCash  string         `json:"hashcash,omitempty"`
 	Cookies   []*http.Cookie `json:"cookies,omitempty"`
 }
 
@@ -144,7 +159,7 @@ type Downloads struct {
 	HTTPResponseHeaders struct {
 		SetCookie string `json:"Set-Cookie,omitempty"`
 	} `json:"httpResponseHeaders,omitempty"`
-	Downloads []dload
+	Downloads []MoreDownload
 }
 
 type authService struct {
@@ -296,7 +311,7 @@ func (d dfile) URL() string {
 	return fmt.Sprintf("%s?path=%s", downloadActionURL, d.RemotePath)
 }
 
-type dload struct {
+type MoreDownload struct {
 	Name          string     `json:"name,omitempty"`
 	Description   string     `json:"description,omitempty"`
 	IsReleased    int        `json:"isReleased,omitempty"`
@@ -370,6 +385,9 @@ func (dp *DevPortal) GetSCNT() string {
 func (dp *DevPortal) GetWidgetKey() string {
 	return dp.config.WidgetKey
 }
+func (dp *DevPortal) GetHashcash() string {
+	return dp.config.HashCash
+}
 
 // Login to Apple
 func (dp *DevPortal) Login(username, password string) error {
@@ -441,6 +459,36 @@ func (dp *DevPortal) Login(username, password string) error {
 	return nil
 }
 
+func (dp *DevPortal) generateHashCash() (string, error) {
+	var hashcash string
+
+	hcbits, err := strconv.Atoi(dp.config.HashCashBits)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert hashcash bits %s to int: %v", dp.config.HashCashBits, err)
+	}
+
+	counter := 0
+
+	for {
+		hash := sha1.New()
+		hashcash = fmt.Sprintf("%s:%s:%s:%s::%s",
+			strconv.Itoa(hashcashVersion),             // ver
+			dp.config.HashCashBits,                    // bits
+			time.Now().UTC().Format("20060102150405"), // date
+			dp.config.HashCashChallenge,               // res
+			strconv.Itoa(counter),                     // counter
+		)
+		hash.Write([]byte(hashcash))
+		lz := bits.LeadingZeros32(binary.BigEndian.Uint32(hash.Sum(nil)[:4]))
+		if lz >= hcbits {
+			break
+		}
+		counter++
+	}
+
+	return hashcash, nil
+}
+
 func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("Content-Type", "application/json")
@@ -449,6 +497,7 @@ func (dp *DevPortal) updateRequestHeaders(req *http.Request) {
 	req.Header.Set("X-Apple-Id-Session-Id", dp.config.SessionID)
 	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
 	req.Header.Set("Scnt", dp.config.SCNT)
+	req.Header.Set(hashcashHeader, dp.config.HashCash)
 
 	req.Header.Add("User-Agent", userAgent)
 }
@@ -481,7 +530,35 @@ func (dp *DevPortal) getITCServiceKey() error {
 	return nil
 }
 
+func (dp *DevPortal) getHashcachHeaders() error {
+	response, err := dp.Client.Get(loginURL)
+	if err != nil {
+		return err
+	}
+
+	if response.StatusCode != 200 {
+		return fmt.Errorf("failed to get iTC Service Key: response received %s", response.Status)
+	}
+
+	// 🆕 hashcash headers
+	dp.config.HashCashBits = response.Header.Get(hashcashBitsHeader)
+	dp.config.HashCashChallenge = response.Header.Get(hashcashCallengeHeader)
+	if dp.config.HashCashBits != "" || dp.config.HashCashChallenge != "" {
+		dp.config.HashCash, err = dp.generateHashCash()
+		if err != nil {
+			return fmt.Errorf("failed to generate hashcash: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (dp *DevPortal) signIn(username, password string) error {
+
+	if err := dp.getHashcachHeaders(); err != nil {
+		return fmt.Errorf("failed to get hashcash headers: %v", err)
+	}
+
 	buf := new(bytes.Buffer)
 
 	json.NewEncoder(buf).Encode(&auth{
@@ -498,6 +575,7 @@ func (dp *DevPortal) signIn(username, password string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("X-Apple-Widget-Key", dp.config.WidgetKey)
+	req.Header.Set(hashcashHeader, dp.config.HashCash)
 	req.Header.Add("User-Agent", userAgent)
 	req.Header.Set("Accept", "application/json, text/javascript")
 
@@ -872,6 +950,7 @@ func (dp *DevPortal) storeSession() error {
 		SessionID: dp.GetSessionID(),
 		SCNT:      dp.GetSCNT(),
 		WidgetKey: dp.GetWidgetKey(),
+		HashCash:  dp.GetHashcash(),
 		Cookies:   dp.Client.Jar.Cookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}),
 	}
 
@@ -909,6 +988,7 @@ func (dp *DevPortal) loadSession() error {
 	dp.config.SessionID = auth.DevPortalSession.SessionID
 	dp.config.SCNT = auth.DevPortalSession.SCNT
 	dp.config.WidgetKey = auth.DevPortalSession.WidgetKey
+	dp.config.HashCash = auth.DevPortalSession.HashCash
 	dp.Client.Jar.SetCookies(&url.URL{Scheme: "https", Host: "idmsa.apple.com"}, auth.DevPortalSession.Cookies)
 
 	// clear dev auth mem
@@ -922,41 +1002,79 @@ func (dp *DevPortal) loadSession() error {
 }
 
 // Watch watches for NEW downloads
-func (dp *DevPortal) Watch() error {
+func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, duration time.Duration) error {
 
+	var prevDownloads []MoreDownload
 	var prevIPSWs map[string][]DevDownload
 
 	for {
 		// scrape dev portal
-		ipsws, err := dp.getDevDownloads()
-		if err != nil {
-			return err
-		}
+		switch downloadType {
+		case "more":
 
-		// check for NEW downloads
-		if reflect.DeepEqual(prevIPSWs, ipsws) {
-			time.Sleep(5 * time.Minute)
-
-			if err := dp.refreshSession(); err != nil {
-				return err
+			dloads, err := dp.getDownloads()
+			if err != nil {
+				return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
 			}
 
-			continue
+			// check for NEW downloads
+			if reflect.DeepEqual(prevDownloads, dloads.Downloads) { // "8b42055e-8d9d-4bbb-800b-6a44c45c7b48"
+				time.Sleep(duration)
 
-		} else {
-			prevIPSWs = ipsws
-		}
-
-		for version := range ipsws {
-			for _, watchPattern := range dp.config.WatchList {
-				re, err := regexp.Compile(watchPattern)
-				if err != nil {
-					return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+				if err := dp.refreshSession(); err != nil {
+					return err
 				}
-				if re.MatchString(version) {
-					for _, ipsw := range ipsws[version] {
-						if err := dp.Download(ipsw.URL); err != nil {
-							log.Errorf("failed to download %s: %v", ipsw.URL, err)
+
+				continue
+
+			} else {
+				prevDownloads = dloads.Downloads
+			}
+
+			for _, dl := range dloads.Downloads {
+				for _, watchPattern := range dp.config.WatchList {
+					re, err := regexp.Compile(watchPattern)
+					if err != nil {
+						return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+					}
+					if re.MatchString(dl.Name) {
+						for _, f := range dl.Files {
+							dp.Download(f.URL(), folder)
+						}
+					}
+				}
+			}
+		default:
+			ipsws, err := dp.getDevDownloads()
+			if err != nil {
+				return fmt.Errorf("failed to get developer downloads: %v", err)
+			}
+
+			// check for NEW downloads
+			if reflect.DeepEqual(prevIPSWs, ipsws) {
+				time.Sleep(5 * time.Minute)
+
+				if err := dp.refreshSession(); err != nil {
+					return err
+				}
+
+				continue
+
+			} else {
+				prevIPSWs = ipsws
+			}
+
+			for version := range ipsws {
+				for _, watchPattern := range dp.config.WatchList {
+					re, err := regexp.Compile(watchPattern)
+					if err != nil {
+						return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+					}
+					if re.MatchString(version) {
+						for _, ipsw := range ipsws[version] {
+							if err := dp.Download(ipsw.URL, folder); err != nil {
+								log.Errorf("failed to download %s: %v", ipsw.URL, err)
+							}
 						}
 					}
 				}
@@ -966,7 +1084,7 @@ func (dp *DevPortal) Watch() error {
 }
 
 // DownloadPrompt prompts the user for which files to download from https://developer.apple.com/download
-func (dp *DevPortal) DownloadPrompt(downloadType string) error {
+func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 	switch downloadType {
 	case "more":
 		dloads, err := dp.getDownloads()
@@ -992,7 +1110,7 @@ func (dp *DevPortal) DownloadPrompt(downloadType string) error {
 
 		for _, idx := range dfiles {
 			for _, f := range dloads.Downloads[idx].Files {
-				dp.Download(f.URL())
+				dp.Download(f.URL(), folder)
 			}
 		}
 	default:
@@ -1042,10 +1160,10 @@ func (dp *DevPortal) DownloadPrompt(downloadType string) error {
 			}
 
 			for _, df := range dfiles {
-				dp.Download(ipsws[version][df].URL)
+				dp.Download(ipsws[version][df].URL, folder)
 			}
 		} else {
-			dp.Download(ipsws[version][0].URL)
+			dp.Download(ipsws[version][0].URL, folder)
 		}
 	}
 
@@ -1053,7 +1171,7 @@ func (dp *DevPortal) DownloadPrompt(downloadType string) error {
 }
 
 // Download downloads a file that requires a valid dev portal session
-func (dp *DevPortal) Download(url string) error {
+func (dp *DevPortal) Download(url, folder string) error {
 
 	// proxy, insecure are null because we override the client below
 	downloader := NewDownload(
@@ -1069,6 +1187,8 @@ func (dp *DevPortal) Download(url string) error {
 	downloader.client = dp.Client
 
 	destName := getDestName(url, dp.config.RemoveCommas)
+	destName = filepath.Join(filepath.Clean(folder), filepath.Base(destName))
+
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
 
 		log.WithFields(log.Fields{
@@ -1151,7 +1271,7 @@ func (dp *DevPortal) DownloadADC(path string) error {
 	return nil
 }
 
-func (dp *DevPortal) DownloadKDK(version, build string) error {
+func (dp *DevPortal) DownloadKDK(version, build, folder string) error {
 	if err := dp.refreshSession(); err != nil {
 		return err
 	}
@@ -1162,7 +1282,7 @@ func (dp *DevPortal) DownloadKDK(version, build string) error {
 		build,
 	)
 	log.WithField("url", url).Info("Downloading KDK")
-	err := dp.Download(url)
+	err := dp.Download(url, folder)
 	if err != nil {
 		url := fmt.Sprintf("%s?path=/Developer_Tools/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
 			version,
@@ -1171,7 +1291,7 @@ func (dp *DevPortal) DownloadKDK(version, build string) error {
 			build,
 		)
 		log.WithField("url", url).Info("Downloading KDK (retry)")
-		return dp.Download(url)
+		return dp.Download(url, folder)
 	}
 	return nil
 }

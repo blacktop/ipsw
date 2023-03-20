@@ -56,6 +56,7 @@ const sidebars = {
         "guides/shsh",
         "guides/debugserver",
         "guides/pongo",
+        "guides/ida_pro",
         // {
         //   type: "category",
         //   label: "Docs",
