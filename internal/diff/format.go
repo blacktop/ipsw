@@ -18,6 +18,11 @@ import (
 const diffMarkdownTemplate = `
 # {{ .Title }}
 
+## IPSWs
+
+- {{ .Old.IPSWPath | base }}
+- {{ .New.IPSWPath | base }}
+
 ## Kernel
 
 ### Version
@@ -50,11 +55,18 @@ const diffMarkdownTemplate = `
 func (d *Diff) String() string {
 	var tmptout bytes.Buffer
 
-	tmpl := template.Must(template.New("diff").Funcs(template.FuncMap{
-		"noescape": func(value interface{}) template.HTML {
-			return template.HTML(fmt.Sprint(value))
-		},
-	}).Parse(diffMarkdownTemplate))
+	tmpl := template.Must(template.New("diff").
+		Funcs(template.FuncMap{
+			"noescape": func(value interface{}) template.HTML {
+				return template.HTML(fmt.Sprint(value))
+			},
+		}).
+		Funcs(template.FuncMap{
+			"base": func(value string) template.HTML {
+				return template.HTML(fmt.Sprintf("`%s`", filepath.Base(value)))
+			},
+		}).
+		Parse(diffMarkdownTemplate))
 	if err := tmpl.Execute(&tmptout, d); err != nil {
 		return fmt.Errorf("failed to execute diff template: %s", err).Error()
 	}
@@ -100,8 +112,10 @@ func (d *Diff) ToHTML(folder string) error {
 	if err := os.MkdirAll(folder, 0755); err != nil {
 		return err
 	}
-	log.Info("Creating HTML diff file: diff.html")
-	return os.WriteFile(filepath.Join(folder, fmt.Sprintf("%s.html", d.Title)), htmlBuf.Bytes(), 0644)
+
+	fname := filepath.Join(folder, fmt.Sprintf("%s.html", d.Title))
+	log.Infof("Creating HTML diff file: %s", fname)
+	return os.WriteFile(fname, htmlBuf.Bytes(), 0644)
 }
 
 func renderHook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
