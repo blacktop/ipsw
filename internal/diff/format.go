@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gomarkdown/markdown"
@@ -60,7 +61,7 @@ func (d *Diff) String() string {
 	return tmptout.String()
 }
 
-func (d *Diff) ToHTML() error {
+func (d *Diff) ToHTML(folder string) error {
 	htmlHeader := `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,7 +96,11 @@ func (d *Diff) ToHTML() error {
 		return err
 	}
 
-	return os.WriteFile("index.html", htmlBuf.Bytes(), 0644)
+	if err := os.MkdirAll(folder, 0755); err != nil {
+		return err
+	}
+
+	return os.WriteFile(filepath.Join(folder, "diff.html"), htmlBuf.Bytes(), 0644)
 }
 
 func renderHook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {

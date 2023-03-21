@@ -34,8 +34,10 @@ import (
 func init() {
 	rootCmd.AddCommand(diffCmd)
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
+	diffCmd.Flags().BoolP("html", "h", false, "Save diff as HTML file")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
 	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
+	viper.BindPFlag("diff.html", diffCmd.Flags().Lookup("html"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
 }
 
@@ -62,11 +64,10 @@ var diffCmd = &cobra.Command{
 			return err
 		}
 
-		if err := d.ToHTML(); err != nil {
-			return err
-		}
-
 		if viper.GetString("diff.output") != "" {
+			if viper.GetBool("diff.html") {
+				return d.ToHTML(viper.GetString("diff.output"))
+			}
 			return d.Save(viper.GetString("diff.output"))
 		}
 
