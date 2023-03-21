@@ -101,7 +101,7 @@ func (d *Diff) ToHTML(folder string) error {
 		return err
 	}
 	log.Info("Creating HTML diff file: diff.html")
-	return os.WriteFile(filepath.Join(folder, "diff.html"), htmlBuf.Bytes(), 0644)
+	return os.WriteFile(filepath.Join(folder, fmt.Sprintf("%s.html", d.Title)), htmlBuf.Bytes(), 0644)
 }
 
 func renderHook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
