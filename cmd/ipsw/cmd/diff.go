@@ -34,7 +34,7 @@ import (
 func init() {
 	rootCmd.AddCommand(diffCmd)
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
-	diffCmd.Flags().BoolP("html", "h", false, "Save diff as HTML file")
+	diffCmd.Flags().Bool("html", false, "Save diff as HTML file")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
 	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
 	viper.BindPFlag("diff.html", diffCmd.Flags().Lookup("html"))

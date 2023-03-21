@@ -356,26 +356,33 @@ func (d *Diff) parseDSC() error {
 
 	sort.Strings(new)
 
-	buf := bytes.NewBufferString("### 🆕 dylibs\n\n")
-	for _, d := range new {
-		buf.WriteString(fmt.Sprintf("- %s\n", d))
-	}
-	buf.WriteString("\n### ❌ removed dylibs\n\n")
-	for _, d := range gone {
-		buf.WriteString(fmt.Sprintf("- %s\n", d))
-	}
-	buf.WriteString("\n### ⬆️ (delta) updated dylibs\n\n")
-	utils.SortMachoVersions(deltas)
-	w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-	var prev string
-	for _, d := range deltas {
-		if len(prev) > 0 && prev != d.Version {
-			fmt.Fprintf(w, "\n---\n\n")
+	buf := bytes.NewBufferString("")
+	if len(new) > 0 {
+		buf.WriteString("### 🆕 dylibs\n\n")
+		for _, d := range new {
+			buf.WriteString(fmt.Sprintf("- %s\n", d))
 		}
-		fmt.Fprintf(w, "- (%s)\t`%s`  \n", d.Version, d.Name)
-		prev = d.Version
 	}
-	w.Flush()
+	if len(gone) > 0 {
+		buf.WriteString("\n### ❌ removed dylibs\n\n")
+		for _, d := range gone {
+			buf.WriteString(fmt.Sprintf("- %s\n", d))
+		}
+	}
+	if len(deltas) > 0 {
+		buf.WriteString("\n### ⬆️ (delta) updated dylibs\n\n")
+		utils.SortMachoVersions(deltas)
+		w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
+		var prev string
+		for _, d := range deltas {
+			if len(prev) > 0 && prev != d.Version {
+				fmt.Fprintf(w, "\n---\n\n")
+			}
+			fmt.Fprintf(w, "- (%s)\t`%s`  \n", d.Version, d.Name)
+			prev = d.Version
+		}
+		w.Flush()
+	}
 
 	d.Dylibs = buf.String()
 
