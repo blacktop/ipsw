@@ -54,6 +54,10 @@ var diffCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		if viper.GetBool("diff.html") && viper.GetString("diff.output") == "" {
+			return fmt.Errorf("you must specify an --output folder when saving as HTML")
+		}
+
 		d := diff.New(
 			viper.GetString("diff.title"),
 			filepath.Clean(args[0]),
@@ -66,7 +70,9 @@ var diffCmd = &cobra.Command{
 
 		if viper.GetString("diff.output") != "" {
 			if viper.GetBool("diff.html") {
-				return d.ToHTML(viper.GetString("diff.output"))
+				if err := d.ToHTML(viper.GetString("diff.output")); err != nil {
+					log.Errorf("failed to save HTML diff: %s", err)
+				}
 			}
 			return d.Save(viper.GetString("diff.output"))
 		}

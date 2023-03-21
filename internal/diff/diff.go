@@ -121,10 +121,14 @@ func (d *Diff) Diff() (err error) {
 		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
 	}
 
+	log.Info("Diffing KERNELCACHES")
 	if err := d.parseKernelcache(); err != nil {
 		return err
 	}
 
+	// log.Info("Diffing KDKS") TODO: add KDK diffing
+
+	log.Info("Diffing DYLD_SHARED_CACHES")
 	if err := d.mountSystemOsDMGs(); err != nil {
 		return fmt.Errorf("failed to mount DMGs: %v", err)
 	}
@@ -134,6 +138,7 @@ func (d *Diff) Diff() (err error) {
 		return err
 	}
 
+	log.Info("Diffing ENTITLEMENTS")
 	d.Ents, err = d.parseEntitlements()
 	if err != nil {
 		return err

@@ -41,10 +41,10 @@ func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 
 	// create or load entitlement database
 	if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
-		log.Info("Generating entitlement database file...")
+		utils.Indent(log.Info, 2)("Generating entitlement database file...")
 
 		if appOS, err := i.GetAppOsDmg(); err == nil {
-			log.Info("Scanning AppOS")
+			utils.Indent(log.Info, 3)("Scanning AppOS")
 			if ents, err := scanEnts(ipswPath, appOS, "AppOS"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
 			} else {
@@ -54,7 +54,7 @@ func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 			}
 		}
 		if systemOS, err := i.GetSystemOsDmg(); err == nil {
-			log.Info("Scanning SystemOS")
+			utils.Indent(log.Info, 3)("Scanning SystemOS")
 			if ents, err := scanEnts(ipswPath, systemOS, "SystemOS"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
 			} else {
@@ -64,7 +64,7 @@ func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 			}
 		}
 		if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-			log.Info("Scanning filesystem")
+			utils.Indent(log.Info, 3)("Scanning filesystem")
 			if ents, err := scanEnts(ipswPath, fsOS, "filesystem"); err != nil {
 				return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
 			} else {
@@ -154,7 +154,7 @@ func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 			}
 			found = true
 			if conf.Markdown {
-				buf.WriteString(fmt.Sprintf("### `%s`\n\n", f2))
+				buf.WriteString(fmt.Sprintf("### %s\n\n> `%s`\n\n", filepath.Base(f2), f2))
 				buf.WriteString("```diff\n" + out + "\n```\n")
 			} else {
 				buf.WriteString(color.New(color.Bold).Sprintf("\n%s\n\n", f2))
@@ -163,9 +163,9 @@ func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 		} else {
 			found = true
 			if conf.Markdown {
-				buf.WriteString(fmt.Sprintf("\n### 🆕 `%s`\n\n", f2))
+				buf.WriteString(fmt.Sprintf("\n### 🆕 %s\n\n> `%s`\n\n", filepath.Base(f2), f2))
 			} else {
-				buf.WriteString(color.New(color.Bold).Sprintf("\n🆕 %s 🆕\n\n", f2))
+				buf.WriteString(color.New(color.Bold).Sprintf("\n🆕 %s\n\n", f2))
 			}
 			if len(e2) == 0 {
 				buf.WriteString("- No entitlements *(yet)*\n")

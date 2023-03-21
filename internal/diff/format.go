@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/apex/log"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/ast"
 	"github.com/gomarkdown/markdown/html"
@@ -99,7 +100,7 @@ func (d *Diff) ToHTML(folder string) error {
 	if err := os.MkdirAll(folder, 0755); err != nil {
 		return err
 	}
-
+	log.Info("Creating HTML diff file: diff.html")
 	return os.WriteFile(filepath.Join(folder, "diff.html"), htmlBuf.Bytes(), 0644)
 }
 
