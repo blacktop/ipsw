@@ -4,6 +4,13 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
+	"io"
+	"os"
+	"strconv"
+
+	"github.com/gomarkdown/markdown"
+	"github.com/gomarkdown/markdown/ast"
+	"github.com/gomarkdown/markdown/html"
 )
 
 const diffMarkdownTemplate = `
@@ -20,11 +27,11 @@ const diffMarkdownTemplate = `
 
 ### Kexts
 
-{{ .Kexts }}
+{{ .Kexts | noescape }}
 
 ## Entitlements
 
-{{ .Ents }}
+{{ .Ents | noescape }}
 
 ## DSC
 
@@ -41,10 +48,100 @@ const diffMarkdownTemplate = `
 func (d *Diff) String() string {
 	var tmptout bytes.Buffer
 
-	tmpl := template.Must(template.New("diff").Parse(diffMarkdownTemplate))
+	tmpl := template.Must(template.New("diff").Funcs(template.FuncMap{
+		"noescape": func(value interface{}) template.HTML {
+			return template.HTML(fmt.Sprint(value))
+		},
+	}).Parse(diffMarkdownTemplate))
 	if err := tmpl.Execute(&tmptout, d); err != nil {
 		return fmt.Errorf("failed to execute diff template: %s", err).Error()
 	}
 
 	return tmptout.String()
 }
+
+func (d *Diff) ToHTML() error {
+	htmlHeader := `<!DOCTYPE html>
+<html lang="en">
+<head>
+   <meta charset="UTF-8">
+   <meta http-equiv="X-UA-Compatible" content="IE=edge">
+   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
+</head>
+<body>
+<br>
+<div class="container is-max-desktop">
+<div class="content">`
+
+	htmlFooter := `
+</div>
+</div>
+<br>
+</body>
+</html>
+`
+	var htmlBuf bytes.Buffer
+
+	renderer := html.NewRenderer(html.RendererOptions{
+		Title:          d.Title,
+		Flags:          html.TOC,
+		RenderNodeHook: renderHook,
+	})
+	output := string(markdown.ToHTML([]byte(d.String()), nil, renderer))
+
+	tmpl := template.Must(template.New("Render").Parse(htmlHeader + "{{.}}" + htmlFooter))
+	if err := tmpl.Execute(&htmlBuf, template.HTML(output)); err != nil {
+		return err
+	}
+
+	return os.WriteFile("index.html", htmlBuf.Bytes(), 0644)
+}
+
+func renderHook(w io.Writer, node ast.Node, entering bool) (ast.WalkStatus, bool) {
+	if _, ok := node.(*ast.Heading); ok {
+		level := strconv.Itoa(node.(*ast.Heading).Level)
+
+		if entering && level == "1" {
+			w.Write([]byte(`<h1 class="title is-1 has-text-centered">`))
+		} else if entering {
+			w.Write([]byte("<h" + level + ">"))
+		} else {
+			w.Write([]byte("</h" + level + ">"))
+		}
+
+		return ast.GoToNext, true
+
+	} else if _, ok := node.(*ast.Image); ok {
+		src := string(node.(*ast.Image).Destination)
+
+		c := node.(*ast.Image).GetChildren()[0]
+		alt := string(c.AsLeaf().Literal)
+
+		if entering && alt != "" {
+			w.Write([]byte(`<figure class="image is-5by3"><img src="` + src + `" alt="` + alt + `">`))
+		} else if entering {
+			w.Write([]byte(`<figure class="image is-5by3"><img src="` + src + `">`))
+		} else {
+			w.Write([]byte(`</figure>`))
+		}
+
+		return ast.SkipChildren, true
+	} else {
+		return ast.GoToNext, false
+	}
+}
+
+// func (c *Context) MarshalJSON() ([]byte, error) {
+// 	return json.Marshal(&struct {
+// 		ID       int         `json:"id,omitempty"`
+// 		Name     string      `json:"name,omitempty"`
+// 		Info     info        `json:"info,omitempty"`
+// 		Encoding intEncoding `json:"encoding,omitempty"`
+// 	}{
+// 		ID:       i.id,
+// 		Name:     i.name,
+// 		Info:     i.info,
+// 		Encoding: i.encoding,
+// 	})
+// }

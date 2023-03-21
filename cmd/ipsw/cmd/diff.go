@@ -62,6 +62,10 @@ var diffCmd = &cobra.Command{
 			return err
 		}
 
+		if err := d.ToHTML(); err != nil {
+			return err
+		}
+
 		if viper.GetString("diff.output") != "" {
 			return d.Save(viper.GetString("diff.output"))
 		}
