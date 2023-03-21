@@ -48,11 +48,15 @@ var machoDiffCmd = &cobra.Command{
 	Args:          cobra.ExactArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+
+		// FIXME: implement
+		panic("ipsw macho diff - not implemented yet")
 
 		return nil
 	},
