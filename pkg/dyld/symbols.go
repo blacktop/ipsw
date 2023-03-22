@@ -32,6 +32,7 @@ var ErrNoExportTrieInCache = errors.New("dyld shared cache does NOT contain expo
 var ErrNoExportTrieInMachO = errors.New("dylib does NOT contain export trie info")
 var ErrSymbolNotInExportTrie = errors.New("dylib does NOT contain symbolin export trie info")
 var ErrSymbolNotInImage = errors.New("dylib does NOT contain symbol")
+var ErrNoPrebuiltLoadersInCache = errors.New("dyld shared cache does NOT contain prebuilt loader info")
 
 type symKind uint8
 
@@ -318,7 +319,7 @@ func (f *File) GetExportedSymbols(ctx context.Context, symbolName string) (<-cha
 		return syms, errs.Wait()
 	}
 
-	return nil, fmt.Errorf("shared cache does not support prebuilt loader")
+	return nil, ErrNoPrebuiltLoadersInCache
 }
 
 func (f *File) DumpStubIslands() error {
