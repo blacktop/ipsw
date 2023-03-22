@@ -29,7 +29,8 @@ func GetDscPathsInMount(mountPoint string) ([]string, error) {
 
 	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("failed to walk %s: %v", path, err)
+			utils.Indent(log.Warn, 3)(fmt.Sprintf("failed to walk %s: %v", path, err))
+			return nil
 		}
 		if info.IsDir() {
 			return nil
@@ -39,7 +40,7 @@ func GetDscPathsInMount(mountPoint string) ([]string, error) {
 		}
 		return nil
 	}); err != nil {
-		return nil, err
+		return nil, err // FIXME: this will never error
 	}
 
 	return matches, nil
