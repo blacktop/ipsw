@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -21,31 +22,34 @@ import (
 	"github.com/vbauerster/mpb/v7/decor"
 )
 
-type extractConfig struct {
-	CacheFolder string
-	CacheRegex  string
-	MountPoint  string
-	Prefix      string
-	Glob        string
-	IsMacOS     bool
+func GetDscPathsInMount(mountPoint string) ([]string, error) {
+	var matches []string
+
+	re := regexp.MustCompile(fmt.Sprintf("%s%c%s", mountPoint, filepath.Separator, CacheRegex))
+
+	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to walk %s: %v", path, err)
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if re.MatchString(path) {
+			matches = append(matches, path)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return matches, nil
 }
 
 func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) error {
-	var err error
-
-	var config extractConfig
-	if utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") {
-		config.CacheFolder = MacOSCacheFolder
-		config.CacheRegex = MacOSCacheRegex
-		config.IsMacOS = true
-	} else {
-		config.CacheFolder = IPhoneCacheFolder
-		config.CacheRegex = IPhoneCacheRegex
-	}
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	var alreadyMounted bool
-	config.MountPoint, alreadyMounted, err = utils.MountFS(dmgPath)
+	mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
 	if err != nil {
 		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
@@ -54,7 +58,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 	} else {
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
-			if err := utils.Unmount(config.MountPoint, false); err != nil {
+			if err := utils.Unmount(mountPoint, false); err != nil {
 				log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
 			}
 		}()
@@ -64,8 +68,6 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 		if err := os.MkdirAll(destPath, 0750); err != nil {
 			return fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
 		}
-		config.Prefix = filepath.Join(config.MountPoint, config.CacheFolder) + "/"
-		config.Glob = config.CacheFolder + "dyld_shared_cache_*"
 	} else {
 		if _, ok := os.LookupEnv("IPSW_IN_DOCKER"); ok {
 			if err := os.MkdirAll(filepath.Join("/data", destPath), 0750); err != nil {
@@ -76,22 +78,20 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 			if err := os.MkdirAll(destPath, 0750); err != nil {
 				return fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
 			}
-			if err := os.MkdirAll(config.MountPoint, 0750); err != nil {
-				return fmt.Errorf("failed to create temporary mount point %s: %v", config.MountPoint, err)
+			if err := os.MkdirAll(mountPoint, 0750); err != nil {
+				return fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
 			} else {
-				defer os.RemoveAll(config.MountPoint)
+				defer os.RemoveAll(mountPoint)
 			}
 		}
-		config.Prefix = filepath.Join(config.MountPoint, config.CacheFolder) + "/"
-		config.Glob = "root/" + config.CacheFolder + "dyld_shared_cache_*"
 	}
 
-	matches, err := filepath.Glob(filepath.Join(config.MountPoint, config.Glob))
+	matches, err := GetDscPathsInMount(mountPoint)
 	if err != nil {
-		return fmt.Errorf("failed to glob %s: %v", config.Glob, err)
+		return err
 	}
 
-	if config.IsMacOS {
+	if utils.StrSliceContains(i.Plists.BuildManifest.SupportedProductTypes, "mac") { // Is macOS IPSW
 		if len(arches) == 0 {
 			selMatches := []string{}
 			prompt := &survey.MultiSelect{
@@ -109,7 +109,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 			matches = selMatches
 		} else {
 			var filtered []string
-			r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", config.CacheRegex, strings.Join(arches, "|"), CacheRegexEnding))
+			r := regexp.MustCompile(fmt.Sprintf("%s(%s)%s", CacheRegex, strings.Join(arches, "|"), CacheRegexEnding))
 			for _, match := range matches {
 				if r.MatchString(match) {
 					filtered = append(filtered, match)

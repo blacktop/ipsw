@@ -16,10 +16,10 @@ const (
 	IPhoneCacheFolder    = "System/Library/Caches/com.apple.dyld/"
 	DriverKitCacheFolder = "System/DriverKit/System/Library/dyld/"
 
-	MacOSCacheRegex                      = `System/Library/dyld/dyld_shared_cache_`
-	IPhoneCacheRegex                     = `System/Library/Caches/com\.apple\.dyld/dyld_shared_cache_`
+	CacheRegex                           = `System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_`
 	DriverKitCacheRegex                  = `System/DriverKit/System/Library/dyld/dyld_shared_cache_`
 	CacheRegexEnding                     = `(\..*)?$`
+	CacheUberRegex                       = `(System/DriverKit/)?System/Library/(dyld|Caches/com\.apple\.dyld)/dyld_shared_cache_(arm64e|x86_64)(\..*)?$`
 	DYLD_SHARED_CACHE_DYNAMIC_DATA_MAGIC = "dyld_data    v0"
 )
 

@@ -383,7 +383,6 @@ var dyldInfoCmd = &cobra.Command{
 					} else {
 						fmt.Println(buf.String())
 					}
-
 				}
 
 				if diff {

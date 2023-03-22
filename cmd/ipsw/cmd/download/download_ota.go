@@ -377,10 +377,8 @@ var otaDLCmd = &cobra.Command{
 							var dscRegex string
 							if dyldDriverKit {
 								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.DriverKitCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
-							} else if utils.StrSliceHas([]string{"macos", "recovery"}, strings.ToLower(platform)) {
-								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.MacOSCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
 							} else {
-								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.IPhoneCacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
+								dscRegex = fmt.Sprintf("%s(%s)%s", dyld.CacheRegex, strings.Join(dyldArches, "|"), dyld.CacheRegexEnding)
 							}
 							// hack: to get a priori list of files to extract (so we know when to stop)
 							rfiles, err := ota.RemoteList(zr)
