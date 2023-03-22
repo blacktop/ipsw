@@ -279,58 +279,13 @@ func (d *Diff) parseKernelcache() error {
 }
 
 func (d *Diff) parseKDKs() (err error) {
-	// foundOld := false
-	// foundNew := false
-	// if err := filepath.Walk("/Library/Developer/KDKs", func(path string, info fs.FileInfo, err error) error {
-	// 	if err != nil {
-	// 		return fmt.Errorf("failed to walk KDKs: %v", err)
-	// 	}
-	// 	if info.IsDir() {
-	// 		return nil // skip
-	// 	}
-	// 	if !strings.Contains(path, "kernel") {
-	// 		return nil // skip
-	// 	}
-	// 	m, err := macho.Open(path)
-	// 	if err != nil {
-	// 		return nil // skip
-	// 	}
-	// 	defer m.Close()
-	// 	ver, err := kernelcache.GetVersion(m)
-	// 	if err != nil {
-	// 		return nil // skip
-	// 	}
-
-	// 	if ver.Kernel.XNU == d.Old.Kernel.Version.Kernel.XNU { // TODO: these don't match perfectly so we need to find the closest match
-	// 		d.Old.KDK = path
-	// 		foundOld = true
-	// 	}
-	// 	if ver.Kernel.XNU == d.New.Kernel.Version.Kernel.XNU {
-	// 		d.New.KDK = path
-	// 		foundNew = true
-	// 	}
-	// 	if foundOld && foundNew {
-	// 		return filepath.SkipAll
-	// 	}
-
-	// 	return nil
-	// }); err != nil {
-	// 	if !errors.Is(err, filepath.SkipAll) {
-	// 		return err
-	// 	}
-	// }
-
-	// diff sructs
 	d.KDKs, err = dwarf.DiffStructures(d.Old.KDK, d.New.KDK, &dwarf.Config{
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",
 	})
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return
 }
 
 func (d *Diff) parseDSC() error {
