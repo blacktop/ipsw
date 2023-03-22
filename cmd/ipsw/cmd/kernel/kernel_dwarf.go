@@ -259,12 +259,15 @@ var dwarfCmd = &cobra.Command{
 				}
 			} else { // diff ALL structs
 				log.Info("Diffing all structs")
-				dwarf.DiffStructures(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
+				out, err := dwarf.DiffStructures(filepath.Clean(args[0]), filepath.Clean(args[1]), &dwarf.Config{
 					Markdown: viper.GetBool("kernel.dwarf.md"),
 					Color:    viper.GetBool("color"),
 					DiffTool: viper.GetString("diff-tool"),
 				})
-
+				if err != nil {
+					return fmt.Errorf("failed diffing structs: %s", err)
+				}
+				fmt.Println(out)
 			}
 
 			return nil
