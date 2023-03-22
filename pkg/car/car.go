@@ -10,6 +10,7 @@ import (
 	"image/png"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/apex/log"
@@ -19,6 +20,7 @@ import (
 )
 
 type Config struct {
+	Output  string
 	Export  bool
 	Verbose bool
 }
@@ -464,7 +466,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 									if !strings.HasSuffix(name, ".png") {
 										name += ".png"
 									}
-									imgFile, err := os.Create(name)
+									imgFile, err := os.Create(filepath.Join(a.conf.Output, name))
 									if err != nil {
 										return nil, err
 									}
@@ -492,7 +494,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 								if !strings.HasSuffix(name, ".pdf") {
 									name += ".pdf"
 								}
-								f, err := os.Create(name)
+								f, err := os.Create(filepath.Join(a.conf.Output, name))
 								if err != nil {
 									return nil, err
 								}
@@ -507,7 +509,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 								if !strings.HasSuffix(name, ".jpg") {
 									name += ".jpg"
 								}
-								f, err := os.Create(name)
+								f, err := os.Create(filepath.Join(a.conf.Output, name))
 								if err != nil {
 									return nil, err
 								}
@@ -522,7 +524,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 								if !strings.HasSuffix(name, ".heic") {
 									name += ".heic"
 								}
-								f, err := os.Create(name)
+								f, err := os.Create(filepath.Join(a.conf.Output, name))
 								if err != nil {
 									return nil, err
 								}
@@ -534,7 +536,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 							rend.Type = "Data"
 							if a.conf.Export {
 								name := string(bytes.Trim(cheader.Metadata.Name[:], "\x00"))
-								f, err := os.Create(name)
+								f, err := os.Create(filepath.Join(a.conf.Output, name))
 								if err != nil {
 									return nil, err
 								}
