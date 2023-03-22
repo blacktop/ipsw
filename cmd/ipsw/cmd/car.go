@@ -23,6 +23,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/car"
@@ -33,7 +34,9 @@ import (
 func init() {
 	rootCmd.AddCommand(carCmd)
 	carCmd.Flags().BoolP("export", "x", false, "Export all renditions")
+	viper.BindPFlag("car.output", carCmd.Flags().Lookup("output"))
 	viper.BindPFlag("car.export", carCmd.Flags().Lookup("export"))
+	viper.BindPFlag("car.output", carCmd.Flags().Lookup("output"))
 }
 
 // carCmd represents the car command
@@ -68,8 +71,15 @@ var carCmd = &cobra.Command{
 		// 	return err
 		// }
 
+		if len(viper.GetString("car.output")) > 0 {
+			if err := os.MkdirAll(viper.GetString("car.output"), 0755); err != nil {
+				return err
+			}
+		}
+
 		asset, err := car.Parse(args[0], &car.Config{
 			Export:  viper.GetBool("car.export"),
+			Output:  viper.GetString("car.output"),
 			Verbose: Verbose,
 		})
 		if err != nil {

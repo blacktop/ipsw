@@ -99,7 +99,7 @@ func (d *Diff) ToHTML(folder string) error {
 
 	renderer := html.NewRenderer(html.RendererOptions{
 		Title:          d.Title,
-		Flags:          html.TOC,
+		Flags:          html.TOC | html.CommonFlags,
 		RenderNodeHook: renderHook,
 	})
 	output := string(markdown.ToHTML([]byte(d.String()), nil, renderer))

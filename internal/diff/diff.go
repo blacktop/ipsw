@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -39,6 +41,7 @@ type Context struct {
 	Kernel          kernel
 	DSC             string
 	Webkit          string
+	KDK             string
 }
 
 type Diff struct {
@@ -48,6 +51,7 @@ type Diff struct {
 	Kexts  string
 	Dylibs string
 	Ents   string
+	KDKs   string
 
 	tmpDir string
 }
@@ -126,7 +130,10 @@ func (d *Diff) Diff() (err error) {
 		return err
 	}
 
-	// log.Info("Diffing KDKS") TODO: add KDK diffing
+	// log.Info("Diffing KDKS")
+	// if err := d.parseKDKs(); err != nil {
+	// 	return err
+	// }
 
 	log.Info("Diffing DYLD_SHARED_CACHES")
 	if err := d.mountSystemOsDMGs(); err != nil {
@@ -260,6 +267,65 @@ func (d *Diff) parseKernelcache() error {
 		d.Kexts = "- No differences found"
 	} else {
 		d.Kexts = "```diff\n" + out + "\n```"
+	}
+
+	return nil
+}
+
+func (d *Diff) parseKDKs() (err error) {
+	foundOld := false
+	foundNew := false
+	if err := filepath.Walk("/Library/Developer/KDKs", func(path string, info fs.FileInfo, err error) error {
+		if err != nil {
+			return fmt.Errorf("failed to walk KDKs: %v", err)
+		}
+		if info.IsDir() {
+			return nil // skip
+		}
+		if !strings.Contains(path, "kernel") {
+			return nil // skip
+		}
+		m, err := macho.Open(path)
+		if err != nil {
+			return nil // skip
+		}
+		defer m.Close()
+		ver, err := kernelcache.GetVersion(m)
+		if err != nil {
+			return nil // skip
+		}
+
+		if ver.Kernel.XNU == d.Old.Kernel.Version.Kernel.XNU { // TODO: these don't match perfectly so we need to find the closest match
+			d.Old.KDK = path
+			foundOld = true
+		}
+		if ver.Kernel.XNU == d.New.Kernel.Version.Kernel.XNU {
+			d.New.KDK = path
+			foundNew = true
+		}
+		if foundOld && foundNew {
+			return filepath.SkipAll
+		}
+
+		return nil
+	}); err != nil {
+		if !errors.Is(err, filepath.SkipAll) {
+			return err
+		}
+	}
+
+	if d.Old.KDK == "" || d.New.KDK == "" {
+		return fmt.Errorf("failed to find KDKs for %s and %s", d.Old.Kernel.Version.Kernel.XNU, d.New.Kernel.Version.Kernel.XNU)
+	}
+
+	// diff sructs
+	d.KDKs, err = dwarf.DiffStructures(d.Old.KDK, d.New.KDK, &dwarf.Config{
+		Markdown: true,
+		Color:    false,
+		DiffTool: "git",
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
