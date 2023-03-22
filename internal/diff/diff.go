@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -56,14 +55,16 @@ type Diff struct {
 	tmpDir string
 }
 
-func New(title, ipswOld, ipswNew string) *Diff {
+func New(title, ipswOld, ipswNew string, kdks []string) *Diff {
 	return &Diff{
 		Title: title,
 		Old: Context{
 			IPSWPath: ipswOld,
+			KDK:      kdks[0],
 		},
 		New: Context{
 			IPSWPath: ipswNew,
+			KDK:      kdks[1],
 		},
 	}
 }
@@ -130,10 +131,12 @@ func (d *Diff) Diff() (err error) {
 		return err
 	}
 
-	// log.Info("Diffing KDKS")
-	// if err := d.parseKDKs(); err != nil {
-	// 	return err
-	// }
+	if d.Old.KDK != "" && d.New.KDK != "" {
+		log.Info("Diffing KDKS")
+		if err := d.parseKDKs(); err != nil {
+			return err
+		}
+	}
 
 	log.Info("Diffing DYLD_SHARED_CACHES")
 	if err := d.mountSystemOsDMGs(); err != nil {
@@ -273,46 +276,46 @@ func (d *Diff) parseKernelcache() error {
 }
 
 func (d *Diff) parseKDKs() (err error) {
-	foundOld := false
-	foundNew := false
-	if err := filepath.Walk("/Library/Developer/KDKs", func(path string, info fs.FileInfo, err error) error {
-		if err != nil {
-			return fmt.Errorf("failed to walk KDKs: %v", err)
-		}
-		if info.IsDir() {
-			return nil // skip
-		}
-		if !strings.Contains(path, "kernel") {
-			return nil // skip
-		}
-		m, err := macho.Open(path)
-		if err != nil {
-			return nil // skip
-		}
-		defer m.Close()
-		ver, err := kernelcache.GetVersion(m)
-		if err != nil {
-			return nil // skip
-		}
+	// foundOld := false
+	// foundNew := false
+	// if err := filepath.Walk("/Library/Developer/KDKs", func(path string, info fs.FileInfo, err error) error {
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to walk KDKs: %v", err)
+	// 	}
+	// 	if info.IsDir() {
+	// 		return nil // skip
+	// 	}
+	// 	if !strings.Contains(path, "kernel") {
+	// 		return nil // skip
+	// 	}
+	// 	m, err := macho.Open(path)
+	// 	if err != nil {
+	// 		return nil // skip
+	// 	}
+	// 	defer m.Close()
+	// 	ver, err := kernelcache.GetVersion(m)
+	// 	if err != nil {
+	// 		return nil // skip
+	// 	}
 
-		if ver.Kernel.XNU == d.Old.Kernel.Version.Kernel.XNU { // TODO: these don't match perfectly so we need to find the closest match
-			d.Old.KDK = path
-			foundOld = true
-		}
-		if ver.Kernel.XNU == d.New.Kernel.Version.Kernel.XNU {
-			d.New.KDK = path
-			foundNew = true
-		}
-		if foundOld && foundNew {
-			return filepath.SkipAll
-		}
+	// 	if ver.Kernel.XNU == d.Old.Kernel.Version.Kernel.XNU { // TODO: these don't match perfectly so we need to find the closest match
+	// 		d.Old.KDK = path
+	// 		foundOld = true
+	// 	}
+	// 	if ver.Kernel.XNU == d.New.Kernel.Version.Kernel.XNU {
+	// 		d.New.KDK = path
+	// 		foundNew = true
+	// 	}
+	// 	if foundOld && foundNew {
+	// 		return filepath.SkipAll
+	// 	}
 
-		return nil
-	}); err != nil {
-		if !errors.Is(err, filepath.SkipAll) {
-			return err
-		}
-	}
+	// 	return nil
+	// }); err != nil {
+	// 	if !errors.Is(err, filepath.SkipAll) {
+	// 		return err
+	// 	}
+	// }
 
 	if d.Old.KDK == "" || d.New.KDK == "" {
 		return fmt.Errorf("failed to find KDKs for %s and %s", d.Old.Kernel.Version.Kernel.XNU, d.New.Kernel.Version.Kernel.XNU)

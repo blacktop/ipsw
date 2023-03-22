@@ -35,9 +35,11 @@ func init() {
 	rootCmd.AddCommand(diffCmd)
 	diffCmd.Flags().StringP("title", "t", "", "Title of the diff")
 	diffCmd.Flags().Bool("html", false, "Save diff as HTML file")
+	diffCmd.Flags().StringArrayP("kdk", "k", []string{}, "Path to KDKs to diff")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
 	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
 	viper.BindPFlag("diff.html", diffCmd.Flags().Lookup("html"))
+	viper.BindPFlag("diff.kdk", diffCmd.Flags().Lookup("kdk"))
 	viper.BindPFlag("diff.output", diffCmd.Flags().Lookup("output"))
 }
 
@@ -62,6 +64,7 @@ var diffCmd = &cobra.Command{
 			viper.GetString("diff.title"),
 			filepath.Clean(args[0]),
 			filepath.Clean(args[1]),
+			viper.GetStringSlice("diff.kdk"),
 		)
 
 		if err := d.Diff(); err != nil {
