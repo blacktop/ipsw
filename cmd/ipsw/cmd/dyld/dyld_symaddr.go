@@ -276,17 +276,22 @@ var SymAddrCmd = &cobra.Command{
 			 **********************************/
 			symChan, err := f.GetExportedSymbols(context.Background(), args[1])
 			if err != nil {
-				return err
-			}
-			for {
-				sym, ok := <-symChan
-				if !ok {
-					break
+				if !errors.Is(err, dyld.ErrNoPrebuiltLoadersInCache) {
+					return fmt.Errorf("failed to get exported symbols: %v", err)
 				}
-				fmt.Println(sym.String(viper.GetBool("color")))
+			} else {
+				for {
+					sym, ok := <-symChan
+					if !ok {
+						break
+					}
+					fmt.Println(sym.String(viper.GetBool("color")))
+					if !allMatches {
+						return nil
+					}
+				}
 			}
-
-			for _, image := range f.Images {
+			for _, image := range f.Images { // use brute force search
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				if sym, err := image.GetSymbol(args[1]); err == nil {
 					if (sym.Address > 0 || allMatches) && (sym.Kind != dyld.BIND || showBinds) {
