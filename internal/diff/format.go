@@ -36,6 +36,14 @@ const diffMarkdownTemplate = `
 
 {{ .Kexts | noescape }}
 
+{{ if .KDKs }}
+## KDKs
+- {{ .Old.KDK | code}}
+- {{ .New.KDK | code}}
+
+{{ .KDKs | noescape }}
+{{end -}}
+
 ## Entitlements
 
 {{ .Ents | noescape }}
@@ -64,6 +72,11 @@ func (d *Diff) String() string {
 		Funcs(template.FuncMap{
 			"base": func(value string) template.HTML {
 				return template.HTML(fmt.Sprintf("`%s`", filepath.Base(value)))
+			},
+		}).
+		Funcs(template.FuncMap{
+			"code": func(value string) template.HTML {
+				return template.HTML(fmt.Sprintf("`%s`", value))
 			},
 		}).
 		Parse(diffMarkdownTemplate))

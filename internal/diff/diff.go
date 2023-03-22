@@ -44,13 +44,15 @@ type Context struct {
 }
 
 type Diff struct {
-	Title  string
-	Old    Context
-	New    Context
+	Title string
+
+	Old Context
+	New Context
+
 	Kexts  string
-	Dylibs string
-	Ents   string
 	KDKs   string
+	Ents   string
+	Dylibs string
 
 	tmpDir string
 }
@@ -317,10 +319,6 @@ func (d *Diff) parseKDKs() (err error) {
 	// 		return err
 	// 	}
 	// }
-
-	if d.Old.KDK == "" || d.New.KDK == "" {
-		return fmt.Errorf("failed to find KDKs for %s and %s", d.Old.Kernel.Version.Kernel.XNU, d.New.Kernel.Version.Kernel.XNU)
-	}
 
 	// diff sructs
 	d.KDKs, err = dwarf.DiffStructures(d.Old.KDK, d.New.KDK, &dwarf.Config{
