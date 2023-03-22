@@ -55,6 +55,7 @@ type Diff struct {
 	tmpDir string
 }
 
+// New news the diff
 func New(title, ipswOld, ipswNew string, kdks []string) *Diff {
 	return &Diff{
 		Title: title,
