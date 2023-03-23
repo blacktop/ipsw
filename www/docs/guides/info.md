@@ -2,7 +2,7 @@
 description: Get a TON of info about an IPSW/OTA withouth having to even download it.
 ---
 
-# Parse fireware zip metadata
+# Parse firmware zip metadata
 
 ### Display info about IPSWs and OTAs
 
