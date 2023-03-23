@@ -10,7 +10,7 @@ require (
 	github.com/apex/log v1.9.0
 	github.com/blacktop/arm64-cgo v1.0.55
 	github.com/blacktop/go-dwarf v1.0.9
-	github.com/blacktop/go-macho v1.1.150
+	github.com/blacktop/go-macho v1.1.151
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -24,7 +24,7 @@ require (
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20230307103607-6e717729cb4f
 	github.com/gocolly/colly/v2 v2.1.0
-	github.com/gomarkdown/markdown v0.0.0-20230321061146-9af27b67c68e
+	github.com/gomarkdown/markdown v0.0.0-20230322041520-c84983bdbf2a
 	github.com/google/gousb v1.1.2
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/go-version v1.6.0
@@ -96,7 +96,7 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-isatty v0.0.18 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
