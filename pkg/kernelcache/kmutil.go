@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -91,6 +92,9 @@ func InspectKM(m *macho.File, filter string, explicitOnly, asJSON bool) (string,
 			// whitelist all bundles that are not blacklisted
 			for _, bundle := range prelink.PrelinkInfoDictionary {
 				if utils.StrSliceContains(blacklist, bundle.ID) {
+					utils.Indent(log.WithFields(log.Fields{
+						"bundle": bundle.ID,
+					}).Info, 2)("Filtered")
 					continue
 				}
 				if explicitOnly {
