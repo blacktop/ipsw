@@ -30,28 +30,20 @@ func init() {
 	rand.Seed(time.Now().Unix())
 }
 
-type stop struct {
-	error
-}
-
-func Retry(attempts int, sleep time.Duration, f func() error) error {
-	if err := f(); err != nil {
-		if s, ok := err.(stop); ok {
-			// Return the original error for later checking
-			return s.error
-		}
-
-		if attempts--; attempts > 0 {
-			jitter := time.Duration(rand.Int63n(int64(sleep)))
-			sleep = sleep + jitter/2
-
+// Retry will retry a function f a number of attempts with a sleep duration in between
+func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
+	for i := 0; i < attempts; i++ {
+		if i > 0 {
+			Indent(log.Debug, 2)(fmt.Sprintf("retrying after error: %s", err))
 			time.Sleep(sleep)
-			return Retry(attempts, 2*sleep, f)
+			sleep *= 2
 		}
-		return fmt.Errorf("after %d attempts, %v", attempts, err)
+		err = f()
+		if err == nil {
+			return nil
+		}
 	}
-
-	return nil
+	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }
 
 // ConvertStrToInt converts an input string to uint64

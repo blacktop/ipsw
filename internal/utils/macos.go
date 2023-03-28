@@ -461,7 +461,11 @@ func Unmount(mountPoint string, force bool) error {
 
 		err := cmd.Run()
 		if err != nil {
-			return fmt.Errorf("failed to unmount %s: %v", mountPoint, err)
+			var edetail string
+			if strings.Contains(err.Error(), "exit status 16") {
+				edetail = " (Resource busy)"
+			}
+			return fmt.Errorf("failed to unmount %s%s: %v", mountPoint, edetail, err)
 		}
 
 	} else if runtime.GOOS == "linux" {
