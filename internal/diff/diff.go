@@ -52,7 +52,11 @@ type Diff struct {
 	Kexts  string
 	KDKs   string
 	Ents   string
-	Dylibs string
+	Dylibs struct {
+		New     string
+		Removed string
+		Updated string
+	}
 
 	tmpDir string
 }
@@ -369,7 +373,7 @@ func (d *Diff) parseDSC() error {
 		dylib2verNEW[img.Name] = m.SourceVersion().Version.String()
 	}
 
-	var new []string
+	var newd []string
 	var gone []string
 
 	for d1, v1 := range dylib2verOLD {
@@ -395,27 +399,32 @@ func (d *Diff) parseDSC() error {
 				// fmt.Printf("%s\t(%s -> %s) %s\n", d2, v2, v1, verdiff)
 			}
 		} else {
-			new = append(new, fmt.Sprintf("`%s`\t(%s)", d2, v2))
+			newd = append(newd, fmt.Sprintf("`%s`\t(%s)", d2, v2))
 		}
 	}
 
-	sort.Strings(new)
+	sort.Strings(newd)
 
-	buf := bytes.NewBufferString("")
-	if len(new) > 0 {
-		buf.WriteString("### 🆕 dylibs\n\n")
-		for _, d := range new {
+	if len(newd) > 0 {
+		buf := bytes.NewBufferString("")
+		buf.WriteString("### 🆕 new dylibs\n\n")
+		for _, d := range newd {
 			buf.WriteString(fmt.Sprintf("- %s\n", d))
 		}
+		d.Dylibs.New = buf.String()
 	}
 	if len(gone) > 0 {
+		buf := bytes.NewBufferString("")
 		buf.WriteString("\n### ❌ removed dylibs\n\n")
 		for _, d := range gone {
 			buf.WriteString(fmt.Sprintf("- %s\n", d))
 		}
+		d.Dylibs.Removed = buf.String()
 	}
 	if len(deltas) > 0 {
-		buf.WriteString("\n### ⬆️ (delta) updated dylibs\n\n")
+		buf := bytes.NewBufferString("")
+		buf.WriteString("\n### ⬆️ updated dylibs\n\n")
+		buf.WriteString("> NOTE: These are the semantic version deltas\n\n")
 		utils.SortMachoVersions(deltas)
 		w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
 		var prev string
@@ -427,9 +436,8 @@ func (d *Diff) parseDSC() error {
 			prev = d.Version
 		}
 		w.Flush()
+		d.Dylibs.Updated = buf.String()
 	}
-
-	d.Dylibs = buf.String()
 
 	return nil
 }

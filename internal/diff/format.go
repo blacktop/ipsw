@@ -10,12 +10,38 @@ import (
 	"strconv"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/gomarkdown/markdown"
 	"github.com/gomarkdown/markdown/ast"
 	"github.com/gomarkdown/markdown/html"
 )
 
+// {{ range $index, $element := .Ents }}
+// 		- [{{ $element }}](#{{ $element | urlize }})
+// {{ end -}}
+
 const diffMarkdownTemplate = `
+- [{{ .Title }}](#{{ .Title | slug }})
+	- [IPSWs](#ipsws)
+	- [Kernel](#kernel)
+		- [Version](#version)
+		- [Kexts](#kexts)
+{{- if .Ents }}
+	- [Entitlements](#entitlements)
+{{- end }}		
+	- [DSC](#dsc)
+		- [WebKit](#webkit)
+{{- if .Dylibs.New }}
+		- [🆕 dylibs](#🆕-new-dylibs)
+{{- end }}
+{{- if .Dylibs.Removed }}
+		- [❌ dylibs](#❌-removed-dylibs)
+{{- end }}
+{{- if .Dylibs.Updated }}
+		- [⬆️ dylibs](#⬆️-updated-dylibs)
+{{- end }}
+
+
 # {{ .Title }}
 
 ## IPSWs
@@ -57,7 +83,15 @@ const diffMarkdownTemplate = `
 | {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Webkit }} |
 | {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Webkit }} |
 
-{{ .Dylibs }}
+{{ if .Dylibs.New }}
+{{ .Dylibs.New }}
+{{ end -}}
+{{- if .Dylibs.Removed }}
+{{ .Dylibs.Removed }}
+{{ end -}}
+{{- if .Dylibs.Updated }}
+{{ .Dylibs.Updated | noescape }}
+{{ end -}}
 `
 
 func (d *Diff) String() string {
@@ -77,6 +111,11 @@ func (d *Diff) String() string {
 		Funcs(template.FuncMap{
 			"code": func(value string) template.HTML {
 				return template.HTML(fmt.Sprintf("`%s`", value))
+			},
+		}).
+		Funcs(template.FuncMap{
+			"slug": func(value string) string {
+				return utils.Slugify(value)
 			},
 		}).
 		Parse(diffMarkdownTemplate))
