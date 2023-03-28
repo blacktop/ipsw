@@ -60,6 +60,10 @@ var diffCmd = &cobra.Command{
 			return fmt.Errorf("you must specify an --output folder when saving as HTML")
 		}
 
+		if len(viper.GetStringSlice("diff.kdk")) > 0 && len(viper.GetStringSlice("diff.kdk")) != 2 {
+			return fmt.Errorf("you must specify two KDKs to diff; example: --kdk <KDK1> --kdk <KDK2>")
+		}
+
 		d := diff.New(
 			viper.GetString("diff.title"),
 			filepath.Clean(args[0]),

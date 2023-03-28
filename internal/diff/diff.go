@@ -59,6 +59,17 @@ type Diff struct {
 
 // New news the diff
 func New(title, ipswOld, ipswNew string, kdks []string) *Diff {
+	if len(kdks) == 0 {
+		return &Diff{
+			Title: title,
+			Old: Context{
+				IPSWPath: ipswOld,
+			},
+			New: Context{
+				IPSWPath: ipswNew,
+			},
+		}
+	}
 	return &Diff{
 		Title: title,
 		Old: Context{
