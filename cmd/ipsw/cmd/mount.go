@@ -32,6 +32,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -127,8 +128,10 @@ var mountCmd = &cobra.Command{
 		} else {
 			defer func() {
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
-				if err := utils.Unmount(mountPoint, false); err != nil {
-					log.Errorf("failed to unmount DMG at %s: %v", dmgPath, err)
+				if err := utils.Retry(3, 2*time.Second, func() error {
+					return utils.Unmount(mountPoint, false)
+				}); err != nil {
+					log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
 				}
 			}()
 		}

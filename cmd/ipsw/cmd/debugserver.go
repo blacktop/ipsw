@@ -31,6 +31,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -168,13 +169,16 @@ var debugserverCmd = &cobra.Command{
 			}
 
 			utils.Indent(log.Info, 2)("Mounting DeveloperDiskImage")
-			if err := utils.Mount(imagePath, "/tmp/dev_img"); err != nil {
+			mountPoint := "/tmp/dev_img"
+			if err := utils.Mount(imagePath, mountPoint); err != nil {
 				utils.Indent(log.Fatal, 2)(fmt.Sprintf("failed to mount %s: %v", imagePath, err))
 			}
 			defer func() {
 				utils.Indent(log.Info, 2)("Unmounting DeveloperDiskImage")
-				if err := utils.Unmount("/tmp/dev_img", false); err != nil {
-					utils.Indent(log.Fatal, 2)(fmt.Sprintf("failed to unmount /tmp/dev_img: %v", err))
+				if err := utils.Retry(3, 2*time.Second, func() error {
+					return utils.Unmount(mountPoint, false)
+				}); err != nil {
+					log.Errorf("failed to unmount %s at %s: %v", imagePath, mountPoint, err)
 				}
 			}()
 
