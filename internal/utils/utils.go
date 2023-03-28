@@ -3,7 +3,6 @@ package utils
 import (
 	"archive/tar"
 	"archive/zip"
-	"bytes"
 	"compress/gzip"
 	"crypto/sha1"
 	"fmt"
@@ -12,11 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
-	"strconv"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/apex/log"
 	"github.com/apex/log/handlers/cli"
@@ -46,21 +42,6 @@ func Retry(attempts int, sleep time.Duration, f func() error) (err error) {
 	return fmt.Errorf("after %d attempts, last error: %s", attempts, err)
 }
 
-// ConvertStrToInt converts an input string to uint64
-func ConvertStrToInt(intStr string) (uint64, error) {
-	intStr = strings.ToLower(intStr)
-
-	if strings.ContainsAny(strings.ToLower(intStr), "xabcdef") {
-		intStr = strings.Replace(intStr, "0x", "", -1)
-		intStr = strings.Replace(intStr, "x", "", -1)
-		if out, err := strconv.ParseUint(intStr, 16, 64); err == nil {
-			return out, err
-		}
-		log.Warn("assuming given integer is in decimal")
-	}
-	return strconv.ParseUint(intStr, 10, 64)
-}
-
 func RandomAgent() string {
 	var userAgents = []string{
 		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36",
@@ -82,92 +63,6 @@ func Indent(f func(s string), level int) func(string) {
 	}
 }
 
-func getFmtStr() string {
-	if runtime.GOOS == "windows" {
-		return "%s"
-	}
-	return "\033[1m%s\033[0m"
-}
-
-// Pad creates left padding for printf members
-func Pad(length int) string {
-	if length > 0 {
-		return strings.Repeat(" ", length)
-	}
-	return " "
-}
-
-// StrSliceContains returns true if string slice contains given string
-func StrSliceContains(slice []string, item string) bool {
-	for _, s := range slice {
-		if strings.Contains(strings.ToLower(s), strings.ToLower(item)) {
-			return true
-		}
-	}
-	return false
-}
-
-// StrContainsStrSliceItem returns true if given string contains any item in the string slice
-func StrContainsStrSliceItem(item string, slice []string) bool {
-	for _, s := range slice {
-		if strings.Contains(strings.ToLower(item), strings.ToLower(s)) {
-			return true
-		}
-	}
-	return false
-}
-
-// StrSliceHas returns true if string slice has an exact given string
-func StrSliceHas(slice []string, item string) bool {
-	for _, s := range slice {
-		if strings.EqualFold(strings.ToLower(item), strings.ToLower(s)) {
-			return true
-		}
-	}
-	return false
-}
-
-// FilterStrSlice removes all the strings that do NOT contain the filter from a string slice
-func FilterStrSlice(slice []string, filter string) []string {
-	var filtered []string
-	for _, s := range slice {
-		if strings.Contains(strings.ToLower(s), strings.ToLower(filter)) {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
-}
-
-// FilterStrFromSlice removes all the strings that contain the filter from a string slice
-func FilterStrFromSlice(slice []string, filter string) []string {
-	var filtered []string
-	for _, s := range slice {
-		if !strings.Contains(strings.ToLower(s), strings.ToLower(filter)) {
-			filtered = append(filtered, s)
-		}
-	}
-	return filtered
-}
-
-// TrimPrefixStrSlice trims the prefix from all strings in string slice
-func TrimPrefixStrSlice(slice []string, prefix string) []string {
-	var trimmed []string
-	for _, s := range slice {
-		trimmed = append(trimmed, strings.TrimPrefix(s, prefix))
-	}
-	return trimmed
-}
-
-// RemoveStrFromSlice removes a single string from a string slice
-func RemoveStrFromSlice(s []string, r string) []string {
-	for i, v := range s {
-		if v == r {
-			return append(s[:i], s[i+1:]...)
-		}
-	}
-	return s
-}
-
 // Uint64SliceContains returns true if uint64 slice contains given uint64
 func Uint64SliceContains(slice []uint64, item uint64) bool {
 	for _, s := range slice {
@@ -176,14 +71,6 @@ func Uint64SliceContains(slice []uint64, item uint64) bool {
 		}
 	}
 	return false
-}
-
-func StrSliceAddSuffix(slice []string, suffix string) []string {
-	var out []string
-	for _, s := range slice {
-		out = append(out, s+suffix)
-	}
-	return out
 }
 
 // Unique returns a slice with only unique elements
@@ -493,40 +380,4 @@ func UnTarGz(tarfile, destPath string) error {
 		}
 	}
 	return nil
-}
-
-// GrepStrings returns all matching strings in []byte
-func GrepStrings(data []byte, searchStr string) []string {
-
-	var matchStrings []string
-
-	r := bytes.NewBuffer(data[:])
-
-	for {
-		s, err := r.ReadString('\x00')
-
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-
-		if len(s) > 0 && strings.Contains(s, searchStr) {
-			matchStrings = append(matchStrings, strings.Trim(s, "\x00"))
-		}
-	}
-
-	return matchStrings
-}
-
-// IsASCII checks if given string is ascii
-func IsASCII(s string) bool {
-	for _, r := range s {
-		if r > unicode.MaxASCII || !unicode.IsPrint(r) {
-			return false
-		}
-	}
-	return true
 }
