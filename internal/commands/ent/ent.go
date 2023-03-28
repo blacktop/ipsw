@@ -226,9 +226,9 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 		defer func() {
 			utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
 			if err := utils.Retry(3, 2*time.Second, func() error {
-				return utils.Unmount(mountPoint, false)
+				return utils.Unmount(mountPoint, true)
 			}); err != nil {
-				log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
+				utils.Indent(log.Error, 3)(fmt.Sprintf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err))
 			}
 		}()
 	}
