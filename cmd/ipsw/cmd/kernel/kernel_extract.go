@@ -62,6 +62,10 @@ var kerExtractCmd = &cobra.Command{
 		dumpAll := viper.GetBool("kernel.extract.all")
 		extractPath := viper.GetString("kernel.extract.output")
 
+		if len(args) == 1 && !dumpAll {
+			return fmt.Errorf("you must specify a KEXT to extract OR use the --all flag")
+		}
+
 		kernPath := filepath.Clean(args[0])
 
 		if ok, err := magic.IsMachO(kernPath); !ok {
