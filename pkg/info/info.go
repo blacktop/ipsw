@@ -249,11 +249,7 @@ func (i *Info) String() string {
 			if len(bls[strings.ToLower(dt.BoardConfig)]) > 0 {
 				iStr += "   - BootLoaders\n"
 				for _, bl := range bls[strings.ToLower(dt.BoardConfig)] {
-					if _, key, err := getApFirmwareKey(dt.ProductType, i.Plists.BuildManifest.ProductBuildVersion, filepath.Base(bl)); err != nil {
-						iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
-					} else {
-						iStr += fmt.Sprintf("       * %s 🔑 -> %s\n", filepath.Base(bl), key)
-					}
+					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
 				}
 			}
 		}
