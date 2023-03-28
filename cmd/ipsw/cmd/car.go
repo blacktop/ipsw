@@ -34,7 +34,7 @@ import (
 func init() {
 	rootCmd.AddCommand(carCmd)
 	carCmd.Flags().BoolP("export", "x", false, "Export all renditions")
-	carCmd.Flags().BoolP("output", "o", false, "Output folder to save renditions")
+	carCmd.Flags().StringP("output", "o", "", "Output folder to save renditions")
 	viper.BindPFlag("car.export", carCmd.Flags().Lookup("export"))
 	viper.BindPFlag("car.output", carCmd.Flags().Lookup("output"))
 }
@@ -75,6 +75,12 @@ var carCmd = &cobra.Command{
 			if err := os.MkdirAll(viper.GetString("car.output"), 0755); err != nil {
 				return err
 			}
+		} else {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current working directory: %w", err)
+			}
+			viper.Set("car.output", cwd)
 		}
 
 		asset, err := car.Parse(args[0], &car.Config{
