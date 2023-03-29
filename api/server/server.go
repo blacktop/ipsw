@@ -51,7 +51,8 @@ func (s *Server) Start() error {
 
 	// Restore default behavior on the interrupt signal and notify user of shutdown.
 	stop()
-	log.Info("shutting down gracefully, press Ctrl+C again to force")
+
+	log.Warn("Shutting down gracefully: Press Ctrl+C again to force")
 
 	return s.Stop()
 }
@@ -67,7 +68,7 @@ func (s *Server) Stop() error {
 		return fmt.Errorf("server forced to shutdown: %v", err)
 	}
 
-	log.Info("Server exiting")
+	log.Info("Server Exiting")
 
 	return nil
 }

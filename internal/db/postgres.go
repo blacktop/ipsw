@@ -40,10 +40,7 @@ func (p Postgres) Connect() (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to connect postgres database: %w", err)
 	}
-
-	p.db.AutoMigrate(&models.IPSW{})
-
-	return nil
+	return p.db.AutoMigrate(&models.IPSW{})
 }
 
 // Create creates a new entry in the database.

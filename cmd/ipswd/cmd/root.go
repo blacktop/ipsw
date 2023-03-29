@@ -24,6 +24,8 @@ package cmd
 import (
 	"os"
 
+	"github.com/apex/log"
+	clihander "github.com/apex/log/handlers/cli"
 	"github.com/spf13/cobra"
 )
 
@@ -46,6 +48,7 @@ func Execute() {
 }
 
 func init() {
+	log.SetHandler(clihander.Default)
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cmd.yaml)")
 	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
