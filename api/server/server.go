@@ -11,6 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api/server/route/download"
+	"github.com/blacktop/ipsw/api/server/route/macho"
 	"github.com/gin-gonic/gin"
 )
 
@@ -34,6 +35,7 @@ func (s *Server) Start() error {
 
 	rg := s.router.Group("/api/v1")
 	download.AddRoutes(rg)
+	macho.AddRoutes(rg)
 
 	s.server = &http.Server{
 		Addr:    ":8080",

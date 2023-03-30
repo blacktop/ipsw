@@ -14,6 +14,9 @@ func downloadIPSW(c *gin.Context) {
 
 	c.IndentedJSON(http.StatusOK, gin.H{"version": version, "build": build, "device": device})
 }
+func downloadLatestIPSWs(c *gin.Context) {
+	c.IndentedJSON(http.StatusOK, gin.H{"count": 0})
+}
 
 func latestVersion(c *gin.Context) {
 	version, err := ipsw.GetLatestIosVersion("", false)

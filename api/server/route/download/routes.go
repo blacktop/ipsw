@@ -15,8 +15,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	})
 	// GET download IPSW
 	dl.GET("/ipsw", downloadIPSW)
+	// GET download latest iOS IPSWs
+	dl.GET("/ipsw/ios/latest", downloadLatestIPSWs)
 	// GET latest iOS version
-	dl.GET("/ipsw/latest/version", latestVersion)
+	dl.GET("/ipsw/ios/latest/version", latestVersion)
 	// GET latest iOS build
-	dl.GET("/ipsw/latest/build", latestBuild)
+	dl.GET("/ipsw/ios/latest/build", latestBuild)
 }
