@@ -3,11 +3,32 @@ package download
 import (
 	"net/http"
 
+	"github.com/blacktop/ipsw/internal/commands/download/ipsw"
 	"github.com/gin-gonic/gin"
 )
 
 func downloadIPSW(c *gin.Context) {
-	id := c.Param("id")
+	version := c.Query("version")
+	build := c.Query("build")
+	device := c.Query("device")
 
-	c.IndentedJSON(http.StatusOK, gin.H{"message": "ipsw not found", "id": id})
+	c.IndentedJSON(http.StatusOK, gin.H{"version": version, "build": build, "device": device})
+}
+
+func latestVersion(c *gin.Context) {
+	version, err := ipsw.GetLatestIosVersion("", false)
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"version": version})
+}
+
+func latestBuild(c *gin.Context) {
+	build, err := ipsw.GetLatestIosBuild()
+	if err != nil {
+		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, gin.H{"build": build})
 }
