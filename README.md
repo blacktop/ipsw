@@ -95,7 +95,7 @@ Use "ipsw [command] --help" for more information about a command.
 
 ## Documentation
 
-- [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw/docs/)
+- [https://blacktop.github.io/ipsw](https://blacktop.github.io/ipsw)
 
 ```mermaid
 graph TD
