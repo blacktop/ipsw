@@ -703,7 +703,7 @@ func (f *File) GetSelectorAddresses(selector string) ([]uint64, error) {
 func (f *File) GetAllObjCClasses(print bool) (map[uint64]objHashMap, error) {
 	shash, uuid, err := f.getClassStringHash()
 	if err != nil {
-		return nil, fmt.Errorf("failed read class objc_stringhash_t")
+		return nil, fmt.Errorf("failed read class objc_stringhash_t: %v", err)
 	}
 
 	if shash.dylibMap == nil {
