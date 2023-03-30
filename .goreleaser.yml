@@ -598,7 +598,7 @@ release:
     ### Summary
     **Full Changelog**: https://github.com/blacktop/ipsw/compare/{{ .PreviousTag }}...{{ .Tag }}
     ## What to do next?
-    - Read the [documentation](https://blacktop.github.io/ipsw/docs/)
+    - Read the [documentation](https://blacktop.github.io/ipsw)
     - Join our [Discord server](https://discord.gg/xx2y9yrcgs)
     - Follow us on [Twitter](https://twitter.com/blacktop__)
     - Follow us on [Mastodon](https://mastodon.social/@blacktop)
