@@ -174,7 +174,7 @@ var PatchesCmd = &cobra.Command{
 						fmt.Fprintf(w, "%#x\t(%d patches)\t%s\n", patch.GetImplOffset(), len(patch.GetPatchLocations().([]dyld.CachePatchableLocationV1)), patch.GetName())
 					}
 					w.Flush()
-				case 2, 3:
+				case 2, 3, 4: //FIXME: add proper support v4
 					exp2uses := make(map[string][]dyld.Patch)
 					for _, patch := range image.PatchableExports {
 						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
