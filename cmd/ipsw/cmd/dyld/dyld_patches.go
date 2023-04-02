@@ -119,7 +119,7 @@ var PatchesCmd = &cobra.Command{
 							}
 						}
 					}
-				case 2, 3:
+				case 2, 3, 4: //FIXME: add proper support v4
 					exp2uses := make(map[string][]dyld.Patch)
 					for _, patch := range image.PatchableExports {
 						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
