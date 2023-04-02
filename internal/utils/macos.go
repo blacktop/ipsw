@@ -568,3 +568,17 @@ func ExtractFromDMG(dmgPath, destPath string, pattern *regexp.Regexp) error {
 
 	return nil
 }
+
+func PkgUtilExpand(src, dst string) (string, error) {
+	if runtime.GOOS == "darwin" {
+		// cmd := exec.Command("pkgutil", "--expand-full", name, filepath.Join(os.TempDir(), "macosupd"))
+		outDir := filepath.Join(dst, "macosupd")
+		cmd := exec.Command("pkgutil", "--expand", src, outDir)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return outDir, nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
