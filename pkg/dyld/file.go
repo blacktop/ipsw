@@ -1164,7 +1164,7 @@ func (f *File) ParsePatchInfo() error {
 			if err := f.parsePatchInfoV1(); err != nil {
 				return fmt.Errorf("failed to parse patch info v1: %v", err)
 			}
-		case 2, 3:
+		case 2, 3, 4: //FIXME: add proper support v4
 			if err := f.parsePatchInfoV2(); err != nil {
 				return fmt.Errorf("failed to parse patch info v%d: %v", f.PatchInfoVersion, err)
 			}
