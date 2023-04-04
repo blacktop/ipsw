@@ -45,6 +45,6 @@ var stopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the ipswd daemon",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return daemon.NewDaemon().Stop()
+		return daemon.NewDaemon(&daemon.Config{}).Stop()
 	},
 }

@@ -19,16 +19,25 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Config is the server config
+type Config struct {
+	Host  string
+	Port  int
+	Debug bool
+}
+
 // Server is the main server struct
 type Server struct {
 	router *gin.Engine
 	server *http.Server
+	conf   *Config
 }
 
 // NewServer creates a new server
-func NewServer() *Server {
+func NewServer(conf *Config) *Server {
 	return &Server{
 		router: gin.Default(),
+		conf:   conf,
 	}
 }
 

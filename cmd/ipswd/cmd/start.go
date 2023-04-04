@@ -24,6 +24,7 @@ package cmd
 import (
 	"github.com/blacktop/ipsw/internal/daemon"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -37,7 +38,8 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// startCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	startCmd.Flags().BoolP("debug", "d", false, "Debug mode")
+	viper.BindPFlag("start.debug", startCmd.Flags().Lookup("debug"))
 }
 
 // startCmd represents the start command
@@ -45,6 +47,8 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the ipswd daemon",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return daemon.NewDaemon().Start()
+		return daemon.NewDaemon(&daemon.Config{
+			Debug: viper.GetBool("start.debug"),
+		}).Start()
 	},
 }
