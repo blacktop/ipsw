@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -32,12 +33,12 @@ type Config struct {
 }
 
 func (c *Config) verify() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("config: failed to get user home directory: %v", err)
+	}
 	if c.Daemon.Host == "" && c.Daemon.Port == 0 && c.Daemon.Socket == "" {
 		// c.Daemon.Socket = "/var/run/ipsw.sock"
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("config: failed to get user home directory: %v", err)
-		}
 		c.Daemon.Socket = filepath.Join(home, ".config", "ipsw", "ipsw.sock")
 	} else if c.Daemon.Host != "" && c.Daemon.Socket != "" {
 		return fmt.Errorf("config: host and socket cannot be set at the same time")
@@ -45,6 +46,8 @@ func (c *Config) verify() error {
 		return fmt.Errorf("config: port must be set if host is set")
 	} else if c.Daemon.Host == "" && c.Daemon.Port != 0 {
 		c.Daemon.Host = "localhost"
+	} else if strings.HasPrefix(c.Daemon.Socket, "~/") {
+		c.Daemon.Socket = filepath.Join(home, c.Daemon.Socket[2:]) // TODO: is this bad practice?
 	}
 
 	return nil

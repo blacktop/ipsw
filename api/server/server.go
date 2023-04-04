@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -63,18 +64,19 @@ func (s *Server) Start() error {
 
 	go func() {
 		if len(s.conf.Socket) > 0 {
-			l, err := net.Listen("unix", s.conf.Socket)
+			l, err := net.Listen("unix", filepath.Clean(s.conf.Socket))
 			if err != nil {
-				log.Fatalf("ipsw server failed to listen: %v\n", err)
+				log.Fatalf("server: failed to listen: %v\n", err)
 			}
 			if err := s.server.Serve(l); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("ipsw server failed to listen: %v\n", err)
+				log.Fatalf("server: failed to serve: %v\n", err)
 			}
 		} else {
 			if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Fatalf("ipsw server failed to listen: %v\n", err)
+				log.Fatalf("server: failed to listen and serve: %v\n", err)
 			}
 		}
+		s.Stop()
 	}()
 
 	// Listen for the interrupt signal.
