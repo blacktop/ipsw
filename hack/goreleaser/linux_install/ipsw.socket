@@ -1,0 +1,13 @@
+[Unit]
+Description=ipswd Socket for the API
+
+[Socket]
+# If /var/run is not implemented as a symlink to /run, you may need to
+# specify ListenStream=/var/run/ipsw.sock instead.
+ListenStream=/run/ipsw.sock
+SocketMode=0660
+SocketUser=root
+SocketGroup=ipsw
+
+[Install]
+WantedBy=sockets.target

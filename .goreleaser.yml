@@ -136,7 +136,7 @@ builds:
     env:
       - CGO_ENABLED=1
       - CC=zig cc -target x86_64-linux-musl
-      - CC=zig c++ -target x86_64-linux-musl
+      - CXX=zig c++ -target x86_64-linux-musl
     goos:
       - linux
     goarch:
@@ -151,7 +151,7 @@ builds:
     env:
       - CGO_ENABLED=1
       - CC=zig cc -target aarch64-linux-musl
-      - CC=zig c++ -target aarch64-linux-musl
+      - CXX=zig c++ -target aarch64-linux-musl
     goos:
       - linux
     goarch:
@@ -172,7 +172,7 @@ builds:
   #   env:
   #     - CGO_ENABLED=1
   #     - CC=zig cc -target x86_64-linux-musl
-  #     - CC=zig c++ -target x86_64-linux-musl
+  #     - CXX=zig c++ -target x86_64-linux-musl
   #     - CGO_LDFLAGS=-L/tmp/install_x86_64/usr/local/lib
   #     - PKG_CONFIG_PATH=/tmp/install_x86_64/usr/local/lib/pkgconfig
   #     - CGO_CFLAGS=-I/tmp/install_x86_64/usr/local/include/libusb-1.0 -I/tmp/install_x86_64/usr/local/include
@@ -199,7 +199,7 @@ builds:
   #   env:
   #     - CGO_ENABLED=1
   #     - CC=zig cc -target aarch64-linux-musl
-  #     - CC=zig c++ -target aarch64-linux-musl
+  #     - CXX=zig c++ -target aarch64-linux-musl
   #     - CGO_LDFLAGS=-L/tmp/install_aarch64/usr/local/lib
   #     - PKG_CONFIG_PATH=/tmp/install_aarch64/usr/local/lib/pkgconfig
   #     - CGO_CFLAGS=-I/tmp/install_aarch64/usr/local/include/libusb-1.0 -I/tmp/install_aarch64/usr/local/include
@@ -220,7 +220,7 @@ builds:
     env:
       - CGO_ENABLED=1
       - CC=zig cc -target x86_64-windows-gnu
-      - CC=zig c++ -target x86_64-windows-gnu
+      - CXX=zig c++ -target x86_64-windows-gnu
     goos:
       - windows
     goarch:
@@ -235,7 +235,7 @@ builds:
     env:
       - CGO_ENABLED=1
       - CC=zig cc -target aarch64-windows-gnu
-      - CC=zig c++ -target aarch64-windows-gnu
+      - CXX=zig c++ -target aarch64-windows-gnu
     goos:
       - windows
     goarch:
@@ -244,9 +244,86 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
+  # DAEMONS ###########################################################
+  - id: darwin_daemon_build
+    main: ./cmd/ipswd
+    binary: ipswd
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
+  - id: linux_amd64_daemon_build
+    main: ./cmd/ipswd
+    binary: ipswd
+    # env:
+    #   - CGO_ENABLED=1
+    #   - CC=zig cc -target x86_64-linux-musl
+    #   - CXX=zig c++ -target x86_64-linux-musl
+    goos:
+      - linux
+    goarch:
+      - amd64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
+  - id: linux_arm64_daemon_build
+    main: ./cmd/ipswd
+    binary: ipswd
+    # env:
+    #   - CGO_ENABLED=1
+    #   - CC=zig cc -target aarch64-linux-musl
+    #   - CXX=zig c++ -target aarch64-linux-musl
+    goos:
+      - linux
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
+  - id: windows_amd64_daemon_build
+    main: ./cmd/ipswd
+    binary: ipswd
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-windows-gnu
+      - CXX=zig c++ -target x86_64-windows-gnu
+    goos:
+      - windows
+    goarch:
+      - amd64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
+  - id: windows_arm64_daemon_build
+    main: ./cmd/ipswd
+    binary: ipswd
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-windows-gnu
+      - CXX=zig c++ -target aarch64-windows-gnu
+    goos:
+      - windows
+    goarch:
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
 
 universal_binaries:
   - id: darwin_build
+    replace: false
+  - id: darwin_daemon_build
     replace: false
 
 archives:
@@ -272,7 +349,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - completions/*
+      - completions/ipsw/*
       - manpages/*
     wrap_in_directory: true
   - id: extras_archive
@@ -294,7 +371,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - completions/*
+      - completions/ipsw/*
       - manpages/*
     wrap_in_directory: true
   - id: frida_archive
@@ -314,8 +391,30 @@ archives:
     files:
       - README.md
       - LICENSE
-      - completions/*
+      - completions/ipsw/*
       - manpages/*
+    wrap_in_directory: true
+  - id: daemon_archive
+    builds:
+      - darwin_daemon_build
+      - linux_amd64_daemon_build
+      - linux_arm64_daemon_build
+      - windows_amd64_daemon_build
+      - windows_arm64_daemon_build
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "ios" }}iOS
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "all" }}universal
+      {{- else }}{{ .Arch }}{{ end }}_daemon
+    rlcp: true
+    files:
+      - README.md
+      - LICENSE
+      - completions/ipswd/*
     wrap_in_directory: true
 
 brews:
@@ -341,9 +440,9 @@ brews:
       - ipsw-frida
     install: |
       bin.install "ipsw"
-      bash_completion.install "completions/_bash" => "ipsw"
-      zsh_completion.install "completions/_zsh" => "_ipsw"
-      fish_completion.install "completions/_fish" => "ipsw.fish"
+      bash_completion.install "completions/ipsw/_bash" => "ipsw"
+      zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
+      fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
     test: |
       system "#{bin}/ipsw --version"
@@ -366,12 +465,37 @@ brews:
       - ipsw
     install: |
       bin.install "ipsw"
-      bash_completion.install "completions/_bash" => "ipsw"
-      zsh_completion.install "completions/_zsh" => "_ipsw"
-      fish_completion.install "completions/_fish" => "ipsw.fish"
+      bash_completion.install "completions/ipsw/_bash" => "ipsw"
+      zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
+      fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
     test: |
       system "#{bin}/ipsw --version"
+  - name: ipswd
+    tap:
+      owner: blacktop
+      name: homebrew-tap
+    ids:
+      - daemon_archive
+    folder: Formula
+    homepage: "https://github.com/blacktop/ipsw"
+    description: "ipsw - Daemon."
+    license: MIT
+    dependencies:
+      - name: ipsw
+      - name: libusb
+        type: optional
+    install: |
+      bin.install "ipswd"
+      bash_completion.install "completions/ipswd/_bash" => "ipswd"
+      zsh_completion.install "completions/ipswd/_zsh" => "_ipswd"
+      fish_completion.install "completions/ipswd/_fish" => "ipswd.fish"
+    service: |
+      run: ipswd
+      keep_alive: true
+      sockets: /var/run/ipsw.sock
+    test: |
+      system "#{bin}/ipswd --version"
 
 checksum:
   name_template: "checksums.txt"
@@ -401,9 +525,9 @@ aurs:
       mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
       mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
       mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
-      install -Dm644 "./completions/ipsw" "${pkgdir}/usr/share/bash-completion/completions/ipsw"
-      install -Dm644 "./completions/_ipsw" "${pkgdir}/usr/share/zsh/site-functions/_ipsw"
-      install -Dm644 "./completions/ipsw.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/ipsw.fish"
+      install -Dm644 "./completions/ipsw/_bash" "${pkgdir}/usr/share/bash-completion/completions/ipsw"
+      install -Dm644 "./completions/ipsw/_zsh" "${pkgdir}/usr/share/zsh/site-functions/_ipsw"
+      install -Dm644 "./completions/ipsw/_fish" "${pkgdir}/usr/share/fish/vendor_completions.d/ipsw.fish"
 
       # man pages
       install -Dm644 "./manpages/ipsw.1.gz" "${pkgdir}/usr/share/man/man1/ipsw.1.gz"
@@ -422,16 +546,16 @@ nfpms:
     bindir: /usr/bin
     section: utils
     contents:
-      - src: ./completions/_bash
+      - src: ./completions/ipsw/_bash
         dst: /usr/share/bash-completion/completions/ipsw
         file_info:
           mode: 0644
-      - src: ./completions/_fish
-        dst: /usr/share/fish/vendor_completions.d/ipsw.fish
+      - src: ./completions/ipsw/_zsh
+        dst: /usr/share/zsh/vendor-completions/_ipsw
         file_info:
           mode: 0644
-      - src: ./completions/_zsh
-        dst: /usr/share/zsh/vendor-completions/_ipsw
+      - src: ./completions/ipsw/_fish
+        dst: /usr/share/fish/vendor_completions.d/ipsw.fish
         file_info:
           mode: 0644
       - src: ./manpages/ipsw.1.gz
@@ -457,6 +581,61 @@ nfpms:
       lintian_overrides:
         - statically-linked-binary
         - changelog-file-missing-in-native-package
+  - id: daemon
+    builds:
+      - linux_amd64_daemon_build
+      - linux_arm64_daemon_build
+    homepage: https://github.com/blacktop/ipsw
+    description: |-
+      ipsw daemon.
+    maintainer: Blacktop <https://github.com/blacktop>
+    license: MIT
+    vendor: Blacktop
+    bindir: /usr/bin
+    section: utils
+    contents:
+      - src: ./hack/goreleaser/linux_install/ipsw.service
+        dst: /lib/systemd/system/ipsws.service
+        file_info:
+          mode: 0644
+      - src: ./hack/goreleaser/linux_install/ipsw.socket
+        dst: /lib/systemd/system/ipsws.socket
+        file_info:
+          mode: 0644
+      - src: ./completions/ipswd/_bash
+        dst: /usr/share/bash-completion/completions/ipswd
+        file_info:
+          mode: 0644
+      - src: ./completions/ipswd/_zsh
+        dst: /usr/share/zsh/vendor-completions/_ipswd
+        file_info:
+          mode: 0644
+      - src: ./completions/ipswd/_fish
+        dst: /usr/share/fish/vendor_completions.d/ipswd.fish
+        file_info:
+          mode: 0644
+      - src: ./LICENSE
+        dst: /usr/share/doc/ipsw/copyright
+        file_info:
+          mode: 0644
+    scripts:
+      postinstall: "./hack/goreleaser/linux_install/postinstall.sh"
+      postremove: "./hack/goreleaser/linux_install/postremove.sh"
+    file_name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}_daemon
+    formats:
+      - deb
+      - rpm
+      - apk
+      - archlinux
+    deb:
+      lintian_overrides:
+        - statically-linked-binary
+        - changelog-file-missing-in-native-package
 # - id: packages_extras
 #   file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
 #   builds:
@@ -471,18 +650,18 @@ nfpms:
 #   bindir: /usr/bin
 #   section: utils
 #   contents:
-#     - src: ./completions/_bash
-#       dst: /usr/share/bash-completion/completions/ipsw
-#       file_info:
-#         mode: 0644
-#     - src: ./completions/_fish
-#       dst: /usr/share/fish/completions/ipsw.fish
-#       file_info:
-#         mode: 0644
-#     - src: ./completions/_zsh
-#       dst:  /usr/share/zsh/vendor-completions/_ipsw
-#       file_info:
-#         mode: 0644
+# - src: ./completions/ipsw/_bash
+#   dst: /usr/share/bash-completion/completions/ipsw
+#   file_info:
+#     mode: 0644
+# - src: ./completions/ipsw/_zsh
+#   dst: /usr/share/zsh/vendor-completions/_ipsw
+#   file_info:
+#     mode: 0644
+# - src: ./completions/ipsw/_fish
+#   dst: /usr/share/fish/vendor_completions.d/ipsw.fish
+#   file_info:
+#     mode: 0644
 #     - src: ./manpages/ipsw.1.gz
 #       dst: /usr/share/man/man1/ipsw.1.gz
 #       file_info:
@@ -517,14 +696,14 @@ snapcrafts:
     publish: true
     license: MIT
     extra_files:
-      - source: ./completions/_bash
+      - source: ./completions/ipsw/_bash
         destination: /usr/share/bash-completion/completions/ipsw
         mode: 0644
-      - source: ./completions/_fish
-        destination: /usr/share/fish/vendor_completions.d/ipsw.fish
-        mode: 0644
-      - source: ./completions/_zsh
+      - source: ./completions/ipsw/_zsh
         destination: /usr/share/zsh/vendor-completions/_ipsw
+        mode: 0644
+      - source: ./completions/ipsw/_fish
+        destination: /usr/share/fish/vendor_completions.d/ipsw.fish
         mode: 0644
       - source: ./manpages/ipsw.1.gz
         destination: /usr/share/man/man1/ipsw.1.gz
@@ -536,6 +715,40 @@ snapcrafts:
       ipsw:
         command: ipsw
         plugs: ["home", "network"]
+  - id: snaps-daemon
+    builds:
+      - linux_amd64_daemon_build
+      - linux_arm64_daemon_build
+    summary: ipsw - Daemon.
+    description: |
+      ipsw - Daemon.
+    grade: stable
+    confinement: strict
+    publish: true
+    license: MIT
+    extra_files:
+      - source: ./completions/ipsw/_bash
+        destination: /usr/share/bash-completion/completions/ipsw
+        mode: 0644
+      - source: ./completions/ipsw/_zsh
+        destination: /usr/share/zsh/vendor-completions/_ipsw
+        mode: 0644
+      - source: ./completions/ipsw/_fish
+        destination: /usr/share/fish/vendor_completions.d/ipsw.fish
+        mode: 0644
+      - source: ./LICENSE
+        destination: /usr/share/doc/ipsw/copyright
+        mode: 0644
+    apps:
+      ipsw:
+        command: ipswd
+        daemon: simple
+        sockets:
+          sock:
+            listen-stream: $SNAP_COMMON/ipsw.sock
+            socket-group: socket-group
+            socket-mode: 416
+        plugs: ["home", "network", "network-bind"]
 
 scoop:
   bucket:
