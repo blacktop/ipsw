@@ -12,6 +12,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api/server/route/download"
 	"github.com/blacktop/ipsw/api/server/route/info"
+	"github.com/blacktop/ipsw/api/server/route/ipsw"
 	"github.com/blacktop/ipsw/api/server/route/kernel"
 	"github.com/blacktop/ipsw/api/server/route/macho"
 	"github.com/blacktop/ipsw/api/server/route/system"
@@ -41,6 +42,7 @@ func (s *Server) Start() error {
 	macho.AddRoutes(rg)
 	kernel.AddRoutes(rg)
 	info.AddRoutes(rg)
+	ipsw.AddRoutes(rg)
 	system.AddRoutes(rg)
 
 	s.server = &http.Server{
