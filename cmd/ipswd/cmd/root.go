@@ -55,7 +55,7 @@ func init() {
 
 	cobra.OnInitialize(initConfig)
 	// Flags
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $CONFIG/ipsw/config.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.config/ipsw/config.yaml)")
 	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
