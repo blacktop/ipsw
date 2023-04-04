@@ -3,6 +3,7 @@ package daemon
 
 import (
 	"github.com/blacktop/ipsw/api/server"
+	"github.com/blacktop/ipsw/internal/config"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,29 +15,31 @@ type Daemon interface {
 	Stop() error
 }
 
-// Config is the daemon config.
-type Config struct {
-	Debug bool
-}
-
 type daemon struct {
 	server *server.Server
-	conf   *Config
+	conf   *config.Config
 }
 
 // NewDaemon creates a new daemon.
-func NewDaemon(conf *Config) Daemon {
-	return &daemon{conf: conf}
+func NewDaemon() Daemon {
+	return &daemon{}
 }
 
-func (d *daemon) Start() error {
-	if d.conf.Debug {
+func (d *daemon) Start() (err error) {
+	d.conf, err = config.LoadConfig()
+	if err != nil {
+		return err
+	}
+	if d.conf.Daemon.Debug {
 		gin.SetMode(gin.DebugMode)
 	} else {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	d.server = server.NewServer(&server.Config{
-		Debug: d.conf.Debug,
+		Host:   d.conf.Daemon.Host,
+		Port:   d.conf.Daemon.Port,
+		Socket: d.conf.Daemon.Socket,
+		Debug:  d.conf.Daemon.Debug,
 	})
 	return d.server.Start()
 }

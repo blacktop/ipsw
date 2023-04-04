@@ -1,0 +1,3 @@
+daemon:
+  socket: /tmp/ipsw.sock
+  debug: false

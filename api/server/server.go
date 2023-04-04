@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -21,9 +22,10 @@ import (
 
 // Config is the server config
 type Config struct {
-	Host  string
-	Port  int
-	Debug bool
+	Host   string
+	Port   int
+	Socket string
+	Debug  bool
 }
 
 // Server is the main server struct
@@ -55,23 +57,23 @@ func (s *Server) Start() error {
 	system.AddRoutes(rg)
 
 	s.server = &http.Server{
-		Addr:    ":8080",
+		Addr:    fmt.Sprintf(":%d", s.conf.Port),
 		Handler: s.router,
 	}
 
 	go func() {
-		// l, err := net.Listen("unix", "/var/run/ipsw.sock")
-		// log.Infof("Listening on %s", filepath.Join(os.TempDir(), "ipsw.sock"))
-		// l, err := net.Listen("unix", filepath.Join(os.TempDir(), "ipsw.sock"))
-		// l, err := net.Listen("unix", "/tmp/ipsw.sock")
-		// if err != nil {
-		// 	log.Fatalf("ipsw server failed to listen: %v\n", err)
-		// }
-		// if err := s.server.Serve(l); err != nil && err != http.ErrServerClosed {
-		// 	log.Fatalf("ipsw server failed to listen: %v\n", err)
-		// }
-		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("ipsw server failed to listen: %v\n", err)
+		if len(s.conf.Socket) > 0 {
+			l, err := net.Listen("unix", s.conf.Socket)
+			if err != nil {
+				log.Fatalf("ipsw server failed to listen: %v\n", err)
+			}
+			if err := s.server.Serve(l); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("ipsw server failed to listen: %v\n", err)
+			}
+		} else {
+			if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("ipsw server failed to listen: %v\n", err)
+			}
 		}
 	}()
 

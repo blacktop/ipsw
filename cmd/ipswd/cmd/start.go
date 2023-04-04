@@ -30,14 +30,6 @@ import (
 func init() {
 	rootCmd.AddCommand(startCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// startCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
 	startCmd.Flags().BoolP("debug", "d", false, "Debug mode")
 	viper.BindPFlag("start.debug", startCmd.Flags().Lookup("debug"))
 }
@@ -47,8 +39,6 @@ var startCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the ipswd daemon",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return daemon.NewDaemon(&daemon.Config{
-			Debug: viper.GetBool("start.debug"),
-		}).Start()
+		return daemon.NewDaemon().Start()
 	},
 }
