@@ -2,9 +2,9 @@
 set -e
 rm -rf completions
 mkdir -p completions/{ipsw,ipswd}
-for sh in bash zsh fish; do
+for sh in bash zsh fish powershell; do
 	go run ./cmd/ipsw/main.go completion "$sh" >"completions/ipsw/_$sh"
 done
-for sh in bash zsh fish; do
+for sh in bash zsh fish powershell; do
 	go run ./cmd/ipswd/main.go completion "$sh" >"completions/ipswd/_$sh"
 done
