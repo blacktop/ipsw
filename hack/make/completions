@@ -2,6 +2,6 @@
 set -e
 rm -rf completions
 mkdir completions
-for sh in bash zsh fish; do
-	go run ./cmd/ipsw/main.go completion "$sh" > "completions/_$sh"
+for sh in bash zsh fish powershell; do
+	go run ./cmd/ipsw/main.go completion "$sh" >"completions/_$sh"
 done
