@@ -4,7 +4,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"net"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -13,6 +12,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api/server/route/download"
 	"github.com/blacktop/ipsw/api/server/route/info"
+	"github.com/blacktop/ipsw/api/server/route/kernel"
 	"github.com/blacktop/ipsw/api/server/route/macho"
 	"github.com/blacktop/ipsw/api/server/route/system"
 	"github.com/gin-gonic/gin"
@@ -39,6 +39,7 @@ func (s *Server) Start() error {
 	rg := s.router.Group("/api/v1")
 	download.AddRoutes(rg)
 	macho.AddRoutes(rg)
+	kernel.AddRoutes(rg)
 	info.AddRoutes(rg)
 	system.AddRoutes(rg)
 
@@ -51,11 +52,14 @@ func (s *Server) Start() error {
 		// l, err := net.Listen("unix", "/var/run/ipsw.sock")
 		// log.Infof("Listening on %s", filepath.Join(os.TempDir(), "ipsw.sock"))
 		// l, err := net.Listen("unix", filepath.Join(os.TempDir(), "ipsw.sock"))
-		l, err := net.Listen("unix", "/tmp/ipsw.sock")
-		if err != nil {
-			log.Fatalf("ipsw server failed to listen: %v\n", err)
-		}
-		if err := s.server.Serve(l); err != nil && err != http.ErrServerClosed {
+		// l, err := net.Listen("unix", "/tmp/ipsw.sock")
+		// if err != nil {
+		// 	log.Fatalf("ipsw server failed to listen: %v\n", err)
+		// }
+		// if err := s.server.Serve(l); err != nil && err != http.ErrServerClosed {
+		// 	log.Fatalf("ipsw server failed to listen: %v\n", err)
+		// }
+		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("ipsw server failed to listen: %v\n", err)
 		}
 	}()

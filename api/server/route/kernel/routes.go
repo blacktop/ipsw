@@ -14,5 +14,5 @@ func AddRoutes(rg *gin.RouterGroup) {
 		c.JSON(http.StatusOK, "kernel")
 	})
 
-	// dl.GET("/dwarf", extractDSC)
+	dl.GET("/kexts", listKexts)
 }
