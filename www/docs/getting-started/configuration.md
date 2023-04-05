@@ -1,17 +1,17 @@
 ---
-description: How to configure ipsw with ~/.ipsw.yaml
+description: How to configure ipsw with ~/.config/ipsw/config.yml
 ---
 
 # Configuration
 
-> How to configure ipsw with ~/.ipsw.yaml
+> How to configure ipsw with ~/.config/ipsw/config.yml
 
 ## `ipsw` config
 
 You can also use a config file with `ipsw` so you don't have to use the flags
 
 ```bash
-❯ cat ~/.ipsw.yml
+❯ cat ~/.config/ipsw/config.yml
 ```
 
 ```yaml
