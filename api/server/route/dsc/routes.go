@@ -14,10 +14,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 		c.JSON(http.StatusOK, "dsc")
 	})
 
-	dl.GET("/a2s", extractKBAG)
-	dl.GET("/ida", extractKernel)
-	dl.GET("/imps", extractKernel)
-	dl.GET("/info", extractKBAG)
-	dl.GET("/sym", extractDSC)
-	dl.GET("/str", extractDSC)
+	// dl.GET("/a2s", extractKBAG)
+	// dl.GET("/ida", extractKernel)
+	// dl.GET("/imps", extractKernel)
+	dl.GET("/info", dscInfo)
+	// dl.GET("/sym", extractDSC)
+	dl.GET("/str", dscStrings)
 }

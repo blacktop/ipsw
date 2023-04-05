@@ -13,6 +13,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/api/server/route/download"
+	"github.com/blacktop/ipsw/api/server/route/dsc"
 	"github.com/blacktop/ipsw/api/server/route/idev"
 	"github.com/blacktop/ipsw/api/server/route/info"
 	"github.com/blacktop/ipsw/api/server/route/ipsw"
@@ -52,6 +53,7 @@ func (s *Server) Start() error {
 
 	rg := s.router.Group("/api/v1")
 
+	dsc.AddRoutes(rg)
 	download.AddRoutes(rg)
 	macho.AddRoutes(rg)
 	kernel.AddRoutes(rg)

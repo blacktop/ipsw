@@ -1,27 +1,47 @@
+// Package dsc provides the /dsc route and handlers
 package dsc
 
 import (
 	"net/http"
 
+	cmd "github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/gin-gonic/gin"
 )
 
-func extractDSC(c *gin.Context) {
-	ipswPath := c.Query("ipsw_path")
-	c.IndentedJSON(http.StatusOK, gin.H{"ipsw_path": ipswPath})
+func dscInfo(c *gin.Context) {
+	dscPath := c.Query("path")
+	f, err := dyld.Open(dscPath)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	defer f.Close()
+
+	info, err := cmd.GetInfo(f)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "info": info})
 }
 
-func extractKBAG(c *gin.Context) {
-	ipswPath := c.Query("ipsw_path")
-	c.IndentedJSON(http.StatusOK, gin.H{"ipsw_path": ipswPath})
-}
+func dscStrings(c *gin.Context) {
+	dscPath := c.Query("path")
+	f, err := dyld.Open(dscPath)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	defer f.Close()
 
-func extractKernel(c *gin.Context) {
-	ipswPath := c.Query("ipsw_path")
-	c.IndentedJSON(http.StatusOK, gin.H{"ipsw_path": ipswPath})
-}
+	pattern := c.Query("pattern")
+	strs, err := cmd.GetStrings(f, pattern)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
 
-func extractPattern(c *gin.Context) {
-	ipswPath := c.Query("ipsw_path")
-	c.IndentedJSON(http.StatusOK, gin.H{"ipsw_path": ipswPath})
+	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "strings": strs})
 }
