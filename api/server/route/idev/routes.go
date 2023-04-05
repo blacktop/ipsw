@@ -11,7 +11,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	dl := rg.Group("/idev")
 	// base path
 	dl.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "extract")
+		c.JSON(http.StatusOK, "idev")
 	})
 
 	dl.GET("/info", idevInfo)
