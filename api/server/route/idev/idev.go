@@ -20,10 +20,12 @@ func idevInfo(c *gin.Context) {
 	devices, err := conn.ListDevices()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, err)
+		return
 	}
 
 	if len(devices) == 0 {
 		c.JSON(http.StatusOK, gin.H{"status": "no devices found", "devices": nil})
+		return
 	}
 
 	var dds []*lockdownd.DeviceValues
@@ -32,11 +34,13 @@ func idevInfo(c *gin.Context) {
 		cli, err := lockdownd.NewClient(device.SerialNumber)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, err)
+			return
 		}
 
 		values, err := cli.GetValues()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, err)
+			return
 		}
 
 		dds = append(dds, values)
