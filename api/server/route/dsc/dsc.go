@@ -27,6 +27,30 @@ func dscInfo(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "info": info})
 }
 
+func dscSymbols(c *gin.Context) {
+	dscPath := c.Query("path")
+	f, err := dyld.Open(dscPath)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	defer f.Close()
+
+	var lookups []cmd.Symbol
+	if err := c.ShouldBindJSON(&lookups); err != nil {
+		c.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
+
+	syms, err := cmd.GetSymbols(f, lookups)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "symbols": syms})
+}
+
 func dscStrings(c *gin.Context) {
 	dscPath := c.Query("path")
 	f, err := dyld.Open(dscPath)

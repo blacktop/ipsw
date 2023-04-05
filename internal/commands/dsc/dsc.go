@@ -37,6 +37,15 @@ type Info struct {
 	Dylibs             []Dylib                                     `json:"dylibs,omitempty"`
 }
 
+// Symbol is a struct that contains information about a dyld_shared_cache symbol
+type Symbol struct {
+	Address uint64 `json:"address,omitempty"`
+	Name    string `json:"name,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Image   string `json:"image,omitempty"`
+	Pattern string `json:"pattern,omitempty"`
+}
+
 // String is a struct that contains information about a dyld_shared_cache string
 type String struct {
 	Address uint64 `json:"address,omitempty"`
@@ -84,6 +93,122 @@ func GetInfo(f *dyld.File) (*Info, error) {
 	}
 
 	return info, nil
+}
+
+// GetSymbols returns a list of symbols from a dyld_shared_cache file for a given list of lookup symbol structs
+func GetSymbols(f *dyld.File, lookups []Symbol) ([]Symbol, error) {
+	var syms []Symbol
+
+	// group syms by image
+	sym2imgs := make(map[string][]Symbol)
+	for _, lookup := range lookups {
+		if len(lookup.Pattern) == 0 {
+			return nil, fmt.Errorf("pattern cannot be empty: %v", lookup)
+		}
+		if len(lookup.Image) > 0 {
+			image, err := f.Image(lookup.Image)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get image %s: %v", lookup.Image, err)
+			}
+			sym2imgs[image.Name] = append(sym2imgs[image.Name], lookup)
+		} else {
+			sym2imgs["unknown"] = append(sym2imgs["unknown"], lookup)
+		}
+	}
+
+	for imageName, lookups := range sym2imgs {
+		if imageName == "unknown" {
+			for _, lookup := range lookups {
+				re, err := regexp.Compile(lookup.Pattern)
+				if err != nil {
+					return nil, fmt.Errorf("invalid regex for %v: %w", lookup, err)
+				}
+				for _, image := range f.Images {
+					m, err := image.GetPartialMacho()
+					if err != nil {
+						return nil, err
+					}
+					if err := image.ParseLocalSymbols(false); err != nil {
+						return nil, err
+					}
+					for _, lsym := range image.LocalSymbols {
+						if re.MatchString(lsym.Name) {
+							var sec string
+							if lsym.Sect > 0 && int(lsym.Sect) <= len(m.Sections) {
+								sec = fmt.Sprintf("%s.%s", m.Sections[lsym.Sect-1].Seg, m.Sections[lsym.Sect-1].Name)
+							}
+							syms = append(syms, Symbol{
+								Name:    lsym.Name,
+								Address: lsym.Value,
+								Type:    lsym.Type.String(sec),
+								Image:   filepath.Base(image.Name),
+							})
+						}
+					}
+					if err := image.ParsePublicSymbols(false); err != nil {
+						return nil, err
+					}
+					for _, sym := range image.PublicSymbols {
+						if re.MatchString(sym.Name) {
+							syms = append(syms, Symbol{
+								Name:    sym.Name,
+								Address: sym.Address,
+								Type:    sym.Type,
+								Image:   filepath.Base(image.Name),
+							})
+						}
+					}
+				}
+			}
+		} else { // image is known
+			image, err := f.Image(imageName)
+			if err != nil {
+				return nil, err
+			}
+			for _, lookup := range lookups {
+				re, err := regexp.Compile(lookup.Pattern)
+				if err != nil {
+					return nil, fmt.Errorf("invalid regex for %v: %w", lookup, err)
+				}
+				m, err := image.GetPartialMacho()
+				if err != nil {
+					return nil, err
+				}
+				if err := image.ParseLocalSymbols(false); err != nil {
+					return nil, err
+				}
+				for _, lsym := range image.LocalSymbols {
+					if re.MatchString(lsym.Name) {
+						var sec string
+						if lsym.Sect > 0 && int(lsym.Sect) <= len(m.Sections) {
+							sec = fmt.Sprintf("%s.%s", m.Sections[lsym.Sect-1].Seg, m.Sections[lsym.Sect-1].Name)
+						}
+						syms = append(syms, Symbol{
+							Name:    lsym.Name,
+							Address: lsym.Value,
+							Type:    lsym.Type.String(sec),
+							Image:   filepath.Base(image.Name),
+						})
+					}
+				}
+				if err := image.ParsePublicSymbols(false); err != nil {
+					return nil, err
+				}
+				for _, sym := range image.PublicSymbols {
+					if re.MatchString(sym.Name) {
+						syms = append(syms, Symbol{
+							Name:    sym.Name,
+							Address: sym.Address,
+							Type:    sym.Type,
+							Image:   filepath.Base(image.Name),
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return syms, nil
 }
 
 // GetStrings returns a list of strings from a dyld_shared_cache file for a given regex pattern
