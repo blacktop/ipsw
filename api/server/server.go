@@ -51,6 +51,7 @@ func (s *Server) Start() error {
 	defer stop()
 
 	rg := s.router.Group("/api/v1")
+
 	download.AddRoutes(rg)
 	macho.AddRoutes(rg)
 	kernel.AddRoutes(rg)
@@ -78,7 +79,6 @@ func (s *Server) Start() error {
 				log.Fatalf("server: failed to listen and serve: %v\n", err)
 			}
 		}
-		s.Stop()
 	}()
 
 	// Listen for the interrupt signal.
