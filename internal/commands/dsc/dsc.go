@@ -14,6 +14,12 @@ import (
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
 
+// ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib
+type ImportedBy struct {
+	DSC  []string `json:"dsc,omitempty"`
+	Apps []string `json:"apps,omitempty"`
+}
+
 // Dylib is a struct that contains information about a dyld_shared_cache dylib
 type Dylib struct {
 	Index       int    `json:"index,omitempty"`
@@ -21,11 +27,6 @@ type Dylib struct {
 	Version     string `json:"version,omitempty"`
 	UUID        string `json:"uuid,omitempty"`
 	LoadAddress uint64 `json:"load_address,omitempty"`
-}
-
-type ImportedBy struct {
-	DSC  []string `json:"dsc,omitempty"`
-	Apps []string `json:"apps,omitempty"`
 }
 
 // Info is a struct that contains information about a dyld_shared_cache file
