@@ -16,7 +16,7 @@ require (
 	github.com/blacktop/lzss v0.1.1
 	github.com/blacktop/ranger v1.0.3
 	github.com/caarlos0/ctrlc v1.2.0
-	github.com/docker/docker v23.0.2+incompatible
+	github.com/docker/docker v23.0.3+incompatible
 	github.com/dominikbraun/graph v0.16.2
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
@@ -49,7 +49,7 @@ require (
 	golang.org/x/oauth2 v0.6.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.7.0
-	golang.org/x/term v0.6.0
+	golang.org/x/term v0.7.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.0
 	gorm.io/gorm v1.24.7-0.20230306060331-85eaf9eeda11
