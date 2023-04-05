@@ -18,6 +18,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// dl.GET("/ida", extractKernel)
 	dl.GET("/imps", dscImports)
 	dl.GET("/info", dscInfo)
+	dl.GET("/macho", dscMacho)
 	dl.POST("/sym", dscSymbols)
 	dl.GET("/str", dscStrings)
 }

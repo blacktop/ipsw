@@ -45,6 +45,30 @@ func dscInfo(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "info": info})
 }
 
+func dscMacho(c *gin.Context) {
+	dscPath := c.Query("path")
+	f, err := dyld.Open(dscPath)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	defer f.Close()
+
+	image, err := f.Image(c.Query("dylib"))
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	m, err := image.GetMacho()
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "macho": m})
+}
+
 func dscSymbols(c *gin.Context) {
 	dscPath := c.Query("path")
 	f, err := dyld.Open(dscPath)
