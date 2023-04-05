@@ -9,6 +9,24 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func dscImports(c *gin.Context) {
+	dscPath := c.Query("path")
+	f, err := dyld.Open(dscPath)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	defer f.Close()
+
+	imps, err := cmd.GetDylibsThatImport(f, c.Query("dylib"))
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "imported_by": imps})
+}
+
 func dscInfo(c *gin.Context) {
 	dscPath := c.Query("path")
 	f, err := dyld.Open(dscPath)

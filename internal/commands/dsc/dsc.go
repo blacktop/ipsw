@@ -23,6 +23,11 @@ type Dylib struct {
 	LoadAddress uint64 `json:"load_address,omitempty"`
 }
 
+type ImportedBy struct {
+	DSC  []string `json:"dsc,omitempty"`
+	Apps []string `json:"apps,omitempty"`
+}
+
 // Info is a struct that contains information about a dyld_shared_cache file
 type Info struct {
 	Magic              string                                      `json:"magic,omitempty"`
@@ -51,6 +56,63 @@ type String struct {
 	Address uint64 `json:"address,omitempty"`
 	Image   string `json:"image,omitempty"`
 	String  string `json:"string,omitempty"`
+}
+
+// GetDylibsThatImport returns a list of dylibs that import the given dylib
+func GetDylibsThatImport(f *dyld.File, name string) (*ImportedBy, error) {
+	var importedBy ImportedBy
+
+	image, err := f.Image(name)
+	if err != nil {
+		return nil, fmt.Errorf("dylib not in DSC: %v", err)
+	}
+
+	if f.SupportsDylibPrebuiltLoader() {
+		for _, img := range f.Images {
+			pbl, err := f.GetDylibPrebuiltLoader(img.Name)
+			if err != nil {
+				return nil, err
+			}
+			for _, dep := range pbl.Dependents {
+				if strings.EqualFold(dep.Name, image.Name) {
+					importedBy.DSC = append(importedBy.DSC, img.Name)
+				}
+			}
+		}
+	} else {
+		for _, img := range f.Images {
+			m, err := img.GetPartialMacho()
+			if err != nil {
+				return nil, err
+			}
+			for _, imp := range m.ImportedLibraries() {
+				if strings.EqualFold(imp, image.Name) {
+					importedBy.DSC = append(importedBy.DSC, img.Name)
+				}
+			}
+			m.Close()
+		}
+	}
+
+	if f.SupportsPrebuiltLoaderSet() {
+		if err := f.ForEachLaunchLoaderSet(func(execPath string, pset *dyld.PrebuiltLoaderSet) {
+			for _, loader := range pset.Loaders {
+				for _, dep := range loader.Dependents {
+					if strings.EqualFold(dep.Name, image.Name) {
+						if execPath != loader.Path {
+							importedBy.Apps = append(importedBy.Apps, fmt.Sprintf("%s (%s)", execPath, loader.Path))
+						} else {
+							importedBy.Apps = append(importedBy.Apps, execPath)
+						}
+					}
+				}
+			}
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	return &importedBy, nil
 }
 
 // GetInfo returns a Info struct for a given dyld_shared_cache file

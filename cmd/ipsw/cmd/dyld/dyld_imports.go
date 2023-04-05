@@ -29,6 +29,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -127,52 +128,24 @@ var dyldImportsCmd = &cobra.Command{
 			fmt.Print(title)
 			fmt.Println(strings.Repeat("=", len(title)-2))
 
-			if f.SupportsDylibPrebuiltLoader() {
+			importedBy, err := dscCmd.GetDylibsThatImport(f, image.Name)
+			if err != nil {
+				return fmt.Errorf("failed to get dylibs that import %s: %v", image.Name, err)
+			}
+
+			if len(importedBy.DSC) > 0 {
 				fmt.Println("\nIn DSC (Dylibs)")
 				fmt.Println("---------------")
-				for _, img := range f.Images {
-					pbl, err := f.GetDylibPrebuiltLoader(img.Name)
-					if err != nil {
-						return err
-					}
-					for _, dep := range pbl.Dependents {
-						if strings.EqualFold(dep.Name, image.Name) {
-							fmt.Println(img.Name)
-						}
-					}
-				}
-			} else {
-				for _, img := range f.Images {
-					m, err := img.GetPartialMacho()
-					if err != nil {
-						return err
-					}
-					for _, imp := range m.ImportedLibraries() {
-						if strings.EqualFold(imp, image.Name) {
-							fmt.Println(img.Name)
-						}
-					}
-					m.Close()
+				for _, img := range importedBy.DSC {
+					fmt.Println(img)
 				}
 			}
 
-			if f.SupportsPrebuiltLoaderSet() {
+			if len(importedBy.Apps) > 0 {
 				fmt.Println("\nIn FileSystem DMG (Apps)")
 				fmt.Println("------------------------")
-				if err := f.ForEachLaunchLoaderSet(func(execPath string, pset *dyld.PrebuiltLoaderSet) {
-					for _, loader := range pset.Loaders {
-						for _, dep := range loader.Dependents {
-							if strings.EqualFold(dep.Name, image.Name) {
-								if execPath != loader.Path {
-									fmt.Printf("%s (%s)\n", execPath, loader.Path)
-								} else {
-									fmt.Println(execPath)
-								}
-							}
-						}
-					}
-				}); err != nil {
-					return err
+				for _, img := range importedBy.Apps {
+					fmt.Println(img)
 				}
 			}
 		}
