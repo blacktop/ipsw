@@ -8,11 +8,19 @@ import (
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
-	dl := rg.Group("/kernel")
+	kg := rg.Group("/kernel")
 	// base path
-	dl.GET("/", func(c *gin.Context) {
+	kg.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, "kernel")
 	})
-
-	dl.GET("/kexts", listKexts)
+	// commands
+	// kg.GET("/ctfdump", handler) // TODO: implement this
+	// kg.GET("/dec", handler)     // TODO: implement this
+	// kg.GET("/dwarf", handler)   // TODO: implement this
+	// kg.GET("/extract", handler) // TODO: implement this
+	kg.GET("/kexts", listKexts)
+	// kg.GET("/sbopts", handler)     // TODO: implement this
+	// kg.GET("/symbolsets", handler) // TODO: implement this
+	// kg.GET("/syscall", handler)    // TODO: implement this
+	// kg.GET("/version", handler)    // TODO: implement this
 }
