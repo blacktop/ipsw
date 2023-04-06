@@ -179,13 +179,14 @@ func Verify(sha1sum, name string) (bool, error) {
 	return match, nil
 }
 
-// RemoteUnzip unzips a remote file from zip (like partialzip)
-func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, progress bool) error {
+// SearchZip searches for files in a zip.Reader
+func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, progress bool) ([]string, error) {
 	var fname string
+	var artifacts []string
 
 	cwd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %v", err)
+		return nil, fmt.Errorf("failed to get current working directory: %v", err)
 	}
 
 	found := false
@@ -202,21 +203,21 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat,
 			}
 
 			if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
-				return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
+				return nil, fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
 			}
 
 			var r io.ReadCloser
 			if _, err := os.Stat(fname); os.IsNotExist(err) {
 				rc, err := f.Open()
 				if err != nil {
-					return fmt.Errorf("error opening remote zipped file %s: %v", f.Name, err)
+					return nil, fmt.Errorf("error opening remote zipped file %s: %v", f.Name, err)
 				}
 				defer rc.Close()
 
 				var p *mpb.Progress
 				if progress {
 					// setup progress bar
-					var total int64 = int64(f.UncompressedSize64)
+					var total = int64(f.UncompressedSize64)
 					p = mpb.New(
 						mpb.WithWidth(60),
 						mpb.WithRefreshRate(180*time.Millisecond),
@@ -242,7 +243,7 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat,
 				Indent(log.Info, 2)(fmt.Sprintf("Extracting %s", strings.TrimPrefix(fname, cwd)))
 				out, err := os.Create(fname)
 				if err != nil {
-					return fmt.Errorf("error creating remote unzipped file destination %s: %v", fname, err)
+					return nil, fmt.Errorf("error creating remote unzipped file destination %s: %v", fname, err)
 				}
 				defer out.Close()
 
@@ -253,6 +254,7 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat,
 					p.Wait()
 				}
 
+				artifacts = append(artifacts, fname)
 			} else {
 				Indent(log.Warn, 2)(fmt.Sprintf("%s already exists", fname))
 			}
@@ -260,10 +262,10 @@ func RemoteUnzip(files []*zip.File, pattern *regexp.Regexp, folder string, flat,
 	}
 
 	if !found {
-		return fmt.Errorf("no files found matching %s", pattern.String())
+		return nil, fmt.Errorf("no files found matching %s", pattern.String())
 	}
 
-	return nil
+	return artifacts, nil
 }
 
 // Unzip - https://stackoverflow.com/a/24792688

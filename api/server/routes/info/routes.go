@@ -6,6 +6,5 @@ import (
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
-	dl := rg.Group("/info")
-	dl.GET("/", getInfo)
+	rg.GET("/info", getInfo)
 }

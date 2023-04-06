@@ -1,3 +1,4 @@
+// Package extract provides the /extract API route
 package extract
 
 import (
@@ -15,6 +16,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	})
 
 	dl.GET("/dsc", extractDSC)
+	dl.GET("/dmg", extractDMG)
 	dl.GET("/kbag", extractKBAG)
 	dl.GET("/kernel", extractKernel)
 	dl.GET("/pattern", extractPattern)

@@ -22,52 +22,16 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"archive/zip"
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/devicetree"
-	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/blacktop/ipsw/pkg/img4"
-	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
-
-func isURL(str string) bool {
-	u, err := url.Parse(str)
-	return err == nil && u.Scheme != "" && u.Host != ""
-}
-
-func extractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) error {
-	// check if filesystem DMG already exists (due to previous mount command)
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		defer os.Remove(dmgs[0])
-	}
-	if err := utils.ExtractFromDMG(dmgPath, destPath, pattern); err != nil {
-		return fmt.Errorf("failed to extract files matching pattern: %v", err)
-	}
-
-	return nil
-}
 
 func init() {
 	rootCmd.AddCommand(extractCmd)
@@ -78,7 +42,7 @@ func init() {
 	extractCmd.Flags().BoolP("kernel", "k", false, "Extract kernelcache")
 	extractCmd.Flags().BoolP("dyld", "d", false, "Extract dyld_shared_cache")
 	extractCmd.Flags().BoolP("dtree", "t", false, "Extract DeviceTree")
-	extractCmd.Flags().BoolP("dmg", "m", false, "Extract File System DMG file")
+	extractCmd.Flags().StringP("dmg", "m", "", "Extract DMG file (app, sys, fs)")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
 	extractCmd.Flags().BoolP("kbag", "b", false, "Extract Im4p Keybags")
@@ -87,6 +51,13 @@ func init() {
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	extractCmd.Flags().Bool("flat", false, "Do NOT perserve directory structure when extracting")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
+	extractCmd.RegisterFlagCompletionFunc("dmg", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{
+			"app\tAppOS",
+			"sys\tSystemOS",
+			"fs\tFileSystem",
+		}, cobra.ShellCompDirectiveDefault
+	})
 
 	viper.BindPFlag("extract.proxy", extractCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("extract.insecure", extractCmd.Flags().Lookup("insecure"))
@@ -133,243 +104,131 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
 				}
 			}
+		} else if viper.GetBool("extract.dmg") {
+			if !utils.StrSliceHas([]string{"app", "sys", "fs"}, viper.GetString("extract.dmg")) {
+				return fmt.Errorf("invalid DMG type '%s' (must be: app, sys or fs)", viper.GetString("extract.dmg"))
+			}
+		}
+
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current working directory: %v", err)
+		}
+
+		config := &extract.Config{
+			IPSW:     "",
+			URL:      "",
+			Pattern:  viper.GetString("extract.pattern"),
+			Arches:   viper.GetStringSlice("extract.dyld-arch"),
+			Proxy:    viper.GetString("extract.proxy"),
+			Insecure: viper.GetBool("extract.insecure"),
+			DMGs:     false,
+			DmgType:  viper.GetString("extract.dmg"),
+			Flatten:  viper.GetBool("extract.flat"),
+			Progress: true,
+			Output:   viper.GetString("extract.output"),
 		}
 
 		if viper.GetBool("extract.remote") {
-			remoteURL := args[0]
+			config.URL = args[0]
+		} else {
+			config.IPSW = args[0]
+		}
 
-			if !isURL(remoteURL) {
-				log.Fatal("must supply valid URL when using the remote flag")
-			}
-
-			// Get handle to remote IPSW zip
-			zr, err := download.NewRemoteZipReader(remoteURL, &download.RemoteConfig{
-				Proxy:    viper.GetString("extract.proxy"),
-				Insecure: viper.GetBool("extract.insecure"),
-			})
+		if viper.GetBool("extract.kernel") {
+			log.Info("Extracting kernelcache")
+			artifacts, err := extract.Kernelcache(config)
 			if err != nil {
-				return fmt.Errorf("unable to download remote zip: %v", err)
+				return err
 			}
+			for _, artifact := range artifacts {
+				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
+			}
+		}
 
-			i, err := info.ParseZipFiles(zr.File)
+		if viper.GetBool("extract.dyld") {
+			log.Info("Extracting dyld_shared_cache")
+			artifacts, err := extract.DSC(config)
 			if err != nil {
-				return fmt.Errorf("failed to parse plists in remote zip: %v", err)
+				return err
 			}
-			folder, err := i.GetFolder()
-			if err != nil {
-				log.Errorf("failed to get folder from remote zip metadata: %v", err)
+			for _, artifact := range artifacts {
+				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
-			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), folder)
+		}
 
-			if viper.GetBool("extract.kernel") {
-				log.Info("Extracting remote kernelcache")
-				if err = kernelcache.RemoteParse(zr, destPath); err != nil {
-					return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
-				}
-			}
-
-			if viper.GetBool("extract.dyld") {
-				log.Info("Extracting remote dyld_shared_cache(s)")
-				sysDMG, err := i.GetSystemOsDmg()
-				if err != nil {
-					return fmt.Errorf("only iOS16.x/macOS13.x supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
-				}
-				if len(sysDMG) == 0 {
-					return fmt.Errorf("only iOS16.x/macOS13.x supported: no SystemOS DMG found in remote zip metadata")
-				}
-				tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
-				if err != nil {
-					return fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
-				}
-				defer os.RemoveAll(tmpDIR)
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, viper.GetBool("extract.flat"), true); err != nil {
-					return fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
-				}
-				if err := dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), destPath, viper.GetStringSlice("extract.dyld-arch")); err != nil {
-					return fmt.Errorf("failed to extract dyld_shared_cache(s) from remote IPSW: %v", err)
-				}
-			}
-
-			if viper.GetBool("extract.dmg") {
+		if viper.GetBool("extract.dmg") {
+			config.DMGs = true
+			if viper.GetBool("extract.remote") {
 				log.Error("unable to extract File System DMG remotely (let the author know if this is something you want)")
-			}
-
-			if viper.GetBool("extract.dtree") {
-				log.Info("Extracting remote DeviceTree(s)")
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*DeviceTree.*im(3|4)p$`), destPath, viper.GetBool("extract.flat"), true); err != nil {
-					return fmt.Errorf("failed to extract DeviceTree from remote IPSW: %v", err)
-				}
-			}
-
-			if viper.GetBool("extract.iboot") {
-				log.Info("Extracting remote iBoot(s)")
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*iBoot.*im4p$`), destPath, viper.GetBool("extract.flat"), true); err != nil {
-					return fmt.Errorf("failed to extract iBoot from remote IPSW: %v", err)
-				}
-			}
-
-			if viper.GetBool("extract.sep") {
-				log.Info("Extracting sep-firmware(s)")
-				if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(`.*sep-firmware.*im4p$`), destPath, viper.GetBool("extract.flat"), true); err != nil {
-					return fmt.Errorf("failed to extract SEPOS from remote IPSW: %v", err)
-				}
-			}
-
-			if viper.GetBool("extract.kbag") {
-				log.Info("Extracting im4p kbags")
-				kbags, err := img4.ParseZipKeyBags(zr.File, i, viper.GetString("extract.pattern"))
+			} else {
+				log.Info("Extracting DMG")
+				artifacts, err := extract.DMG(config)
 				if err != nil {
-					return fmt.Errorf("failed to parse im4p kbags: %v", err)
+					return err
 				}
-				out, err := json.Marshal(kbags)
-				if err != nil {
-					return fmt.Errorf("failed to marshal im4p kbags: %v", err)
-				}
-				fmt.Println(string(out))
-				os.Mkdir(destPath, 0770)
-				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), out, 0660); err != nil {
-					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
+				for _, artifact := range artifacts {
+					utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 				}
 			}
+		}
 
-			if len(viper.GetString("extract.pattern")) > 0 {
-				log.Infof("Extracting files matching pattern %#v", viper.GetString("extract.pattern"))
-				validRegex, err := regexp.Compile(viper.GetString("extract.pattern"))
-				if err != nil {
-					return fmt.Errorf("failed to compile regexp: %v", err)
-				}
-				if err := utils.RemoteUnzip(zr.File, validRegex, destPath, viper.GetBool("extract.flat"), true); err != nil {
-					return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
-				}
-			}
-		} else { // local IPSW/OTA
-			ipswPath := filepath.Clean(args[0])
-
-			if _, err := os.Stat(ipswPath); os.IsNotExist(err) {
-				return fmt.Errorf("file %s does not exist", ipswPath)
-			}
-
-			i, err := info.Parse(ipswPath)
+		if viper.GetBool("extract.dtree") {
+			log.Info("Extracting DeviceTree")
+			config.Pattern = `.*DeviceTree.*im(3|4)p$`
+			artifacts, err := extract.Search(config)
 			if err != nil {
-				return fmt.Errorf("failed to parse plists in IPSW: %v", err)
+				return err
 			}
+			for _, artifact := range artifacts {
+				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
+			}
+		}
 
-			folder, err := i.GetFolder()
+		if viper.GetBool("extract.iboot") {
+			log.Info("Extracting iBoot")
+			config.Pattern = `.*iBoot.*im4p$`
+			artifacts, err := extract.Search(config)
 			if err != nil {
-				log.Errorf("failed to get folder from zip metadata: %v", err)
+				return err
 			}
-			destPath := filepath.Join(filepath.Clean(viper.GetString("extract.output")), folder)
-
-			if viper.GetBool("extract.kernel") {
-				log.Info("Extracting kernelcaches")
-				if err := kernelcache.Extract(ipswPath, destPath); err != nil {
-					return fmt.Errorf("failed to extract kernelcaches from IPSW: %v", err)
-				}
+			for _, artifact := range artifacts {
+				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
+		}
 
-			if viper.GetBool("extract.dyld") {
-				log.Info("Extracting dyld_shared_cache")
-				if err := dyld.Extract(ipswPath, destPath, viper.GetStringSlice("extract.dyld-arch")); err != nil {
-					return fmt.Errorf("failed to extract dyld_shared_cache(s) from IPSW: %v", err)
-				}
+		if viper.GetBool("extract.sep") {
+			log.Info("Extracting sep-firmware")
+			config.Pattern = `.*sep-firmware.*im4p$`
+			artifacts, err := extract.Search(config)
+			if err != nil {
+				return err
 			}
-
-			if viper.GetBool("extract.dtree") {
-				log.Info("Extracting DeviceTrees")
-				if err := devicetree.Extract(ipswPath, destPath); err != nil {
-					return fmt.Errorf("failed to extract DeviceTrees from IPSW: %v", err)
-				}
+			for _, artifact := range artifacts {
+				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
+		}
 
-			if viper.GetBool("extract.dmg") {
-				fsDMG, err := i.GetFileSystemOsDmg()
-				if err != nil {
-					return fmt.Errorf("failed to find filesystem DMG in IPSW: %v", err)
-				}
-				log.Info("Extracting File System DMG")
-				if _, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
-					return strings.EqualFold(filepath.Base(f.Name), fsDMG)
-				}); err != nil {
-					return fmt.Errorf("failed extract %s from IPSW: %v", fsDMG, err)
-				}
-				log.Infof("Created %s", filepath.Join(destPath, fsDMG))
+		if viper.GetBool("extract.kbag") {
+			log.Info("Extracting im4p key bags")
+			artifact, err := extract.Keybags(config)
+			if err != nil {
+				return err
 			}
+			utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
+		}
 
-			if viper.GetBool("extract.iboot") {
-				log.Info("Extracting iBoot")
-				if _, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
-					var validIBoot = regexp.MustCompile(`.*iBoot.*im4p$`)
-					return validIBoot.MatchString(f.Name)
-				}); err != nil {
-					return fmt.Errorf("failed extract iBoot from IPSW: %v", err)
-				}
+		if len(viper.GetString("extract.pattern")) > 0 {
+			log.Infof("Extracting files matching pattern %#v", viper.GetString("extract.pattern"))
+			if viper.GetBool("extract.files") {
+				config.DMGs = true
 			}
-
-			if viper.GetBool("extract.sep") {
-				log.Info("Extracting sep-firmwares")
-				if _, err := utils.Unzip(ipswPath, destPath, func(f *zip.File) bool {
-					var validSEP = regexp.MustCompile(`.*sep-firmware.*im4p$`)
-					return validSEP.MatchString(f.Name)
-				}); err != nil {
-					return fmt.Errorf("failed to extract sep-firmwares from IPSW: %v", err)
-				}
+			artifacts, err := extract.Search(config)
+			if err != nil {
+				return err
 			}
-
-			if viper.GetBool("extract.kbag") {
-				log.Info("Extracting im4p kbags")
-				zr, err := zip.OpenReader(ipswPath)
-				if err != nil {
-					return fmt.Errorf("failed to open zip: %v", err)
-				}
-				defer zr.Close()
-				kbags, err := img4.ParseZipKeyBags(zr.File, i, viper.GetString("extract.pattern"))
-				if err != nil {
-					return fmt.Errorf("failed to parse im4p kbags: %v", err)
-				}
-				out, err := json.Marshal(kbags)
-				if err != nil {
-					return fmt.Errorf("failed to marshal im4p kbags: %v", err)
-				}
-				fmt.Println(string(out))
-				os.Mkdir(destPath, 0770)
-				if err := os.WriteFile(filepath.Join(destPath, "kbags.json"), out, 0660); err != nil {
-					return fmt.Errorf("failed to write %s: %v", filepath.Join(destPath, "kbags.json"), err)
-				}
-			}
-
-			if len(viper.GetString("extract.pattern")) > 0 {
-				log.Infof("Extracting files matching pattern %#v", viper.GetString("extract.pattern"))
-				patternRE, err := regexp.Compile(viper.GetString("extract.pattern"))
-				if err != nil {
-					return fmt.Errorf("failed to compile regexp: %v", err)
-				}
-
-				if viper.GetBool("extract.files") { // SEARCH THE DMGs
-					if appOS, err := i.GetAppOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, appOS, destPath, patternRE); err != nil {
-							return fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
-						}
-					}
-					if systemOS, err := i.GetSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, systemOS, destPath, patternRE); err != nil {
-							return fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
-						}
-					}
-					if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, fsOS, destPath, patternRE); err != nil {
-							return fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
-						}
-					}
-				} else { // SEARCH THE ZIP
-					zr, err := zip.OpenReader(ipswPath)
-					if err != nil {
-						return fmt.Errorf("failed to open IPSW: %v", err)
-					}
-					defer zr.Close()
-					if err := utils.RemoteUnzip(zr.File, patternRE, destPath, viper.GetBool("extract.flat"), false); err != nil {
-						return fmt.Errorf("failed to extract files matching pattern: %v", err)
-					}
-				}
+			for _, artifact := range artifacts {
+				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
 		}
 

@@ -12,14 +12,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/api/server/route/download"
-	"github.com/blacktop/ipsw/api/server/route/dsc"
-	"github.com/blacktop/ipsw/api/server/route/idev"
-	"github.com/blacktop/ipsw/api/server/route/info"
-	"github.com/blacktop/ipsw/api/server/route/ipsw"
-	"github.com/blacktop/ipsw/api/server/route/kernel"
-	"github.com/blacktop/ipsw/api/server/route/macho"
-	"github.com/blacktop/ipsw/api/server/route/system"
+	"github.com/blacktop/ipsw/api/server/routes"
 	"github.com/gin-gonic/gin"
 )
 
@@ -53,14 +46,7 @@ func (s *Server) Start() error {
 
 	rg := s.router.Group("/api/v1")
 
-	dsc.AddRoutes(rg)
-	download.AddRoutes(rg)
-	macho.AddRoutes(rg)
-	kernel.AddRoutes(rg)
-	idev.AddRoutes(rg)
-	info.AddRoutes(rg)
-	ipsw.AddRoutes(rg)
-	system.AddRoutes(rg)
+	routes.Add(rg)
 
 	s.server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", s.conf.Port),

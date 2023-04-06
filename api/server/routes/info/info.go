@@ -1,3 +1,4 @@
+// Package info provides a route for getting info about an IPSW or OTA file
 package info
 
 import (
@@ -8,11 +9,11 @@ import (
 )
 
 func getInfo(c *gin.Context) {
-	ipswPath := c.Query("ipsw_path")
-	i, err := info.Parse(ipswPath)
+	path := c.Query("path")
+	i, err := info.Parse(path)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"ipsw_path": ipswPath, "info": i})
+	c.IndentedJSON(http.StatusOK, gin.H{"path": path, "info": i})
 }
