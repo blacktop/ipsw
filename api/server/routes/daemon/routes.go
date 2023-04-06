@@ -1,4 +1,5 @@
-package system
+// Package daemon provides the daemon routes
+package daemon
 
 import (
 	"net/http"
@@ -9,9 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Ping contains response of Engine API:
-// GET "/_ping"
-type Ping struct {
+// Version is the version struct
+type Version struct {
 	APIVersion     string
 	OSType         string
 	BuilderVersion string
@@ -19,10 +19,15 @@ type Ping struct {
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
-	m := rg.Group("/system")
-
-	m.HEAD("/_ping", pingHandler)
-	m.GET("/_ping", pingHandler)
+	rg.HEAD("/_ping", pingHandler)
+	rg.GET("/_ping", pingHandler)
+	rg.GET("/version", func(c *gin.Context) {
+		c.JSON(http.StatusOK, Version{
+			APIVersion:     api.DefaultVersion,
+			OSType:         runtime.GOOS,
+			BuilderVersion: types.BuildVersion,
+		})
+	})
 }
 
 func pingHandler(c *gin.Context) {
@@ -34,10 +39,5 @@ func pingHandler(c *gin.Context) {
 		c.Header("Content-Length", "0")
 		return
 	}
-
-	c.JSON(http.StatusOK, Ping{
-		APIVersion:     api.DefaultVersion,
-		OSType:         runtime.GOOS,
-		BuilderVersion: types.BuildVersion,
-	})
+	c.String(http.StatusOK, "OK")
 }

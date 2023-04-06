@@ -2,6 +2,7 @@
 package routes
 
 import (
+	"github.com/blacktop/ipsw/api/server/routes/daemon"
 	"github.com/blacktop/ipsw/api/server/routes/devicelist"
 	"github.com/blacktop/ipsw/api/server/routes/download"
 	"github.com/blacktop/ipsw/api/server/routes/dsc"
@@ -11,12 +12,12 @@ import (
 	"github.com/blacktop/ipsw/api/server/routes/ipsw"
 	"github.com/blacktop/ipsw/api/server/routes/kernel"
 	"github.com/blacktop/ipsw/api/server/routes/macho"
-	"github.com/blacktop/ipsw/api/server/routes/system"
 	"github.com/gin-gonic/gin"
 )
 
 // Add adds the command routes to the router
 func Add(rg *gin.RouterGroup) {
+	daemon.AddRoutes(rg)
 	devicelist.AddRoutes(rg)
 	download.AddRoutes(rg)
 	// dtree.AddRoutes(rg) // TODO: add dtree routes
@@ -34,5 +35,4 @@ func Add(rg *gin.RouterGroup) {
 	// pongo.AddRoutes(rg) // TODO: add pongo routes
 	// sepfw.AddRoutes(rg) // TODO: add sepfw routes
 	// symbolicate.AddRoutes(rg) // TODO: add symbolicate routes
-	system.AddRoutes(rg)
 }
