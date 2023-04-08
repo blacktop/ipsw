@@ -10,20 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Version is the version struct
-type Version struct {
-	APIVersion     string
-	OSType         string
-	BuilderVersion string
-}
-
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
 	rg.HEAD("/_ping", pingHandler)
 	rg.GET("/_ping", pingHandler)
 	rg.GET("/version", func(c *gin.Context) {
-		c.JSON(http.StatusOK, Version{
-			APIVersion:     api.DefaultVersion,
+		c.JSON(http.StatusOK, types.Version{
+			ApiVersion:     api.DefaultVersion,
 			OSType:         runtime.GOOS,
 			BuilderVersion: types.BuildVersion,
 		})

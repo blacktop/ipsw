@@ -8,11 +8,14 @@ import (
 	"net/http"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/api"
 	"github.com/blacktop/ipsw/api/server/routes"
+	"github.com/blacktop/ipsw/api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,7 +47,15 @@ func (s *Server) Start() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	rg := s.router.Group("/api/v1")
+	s.router.GET("/version", func(c *gin.Context) {
+		c.JSON(http.StatusOK, types.Version{
+			ApiVersion:     api.DefaultVersion,
+			OSType:         runtime.GOOS,
+			BuilderVersion: types.BuildVersion,
+		})
+	})
+
+	rg := s.router.Group(fmt.Sprintf("/v%s", api.DefaultVersion))
 
 	routes.Add(rg)
 
