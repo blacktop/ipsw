@@ -44,6 +44,7 @@ func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
 	machoSearchCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for search criteria")
 	machoSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
+	machoSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
 	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol regex")
 	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
 	machoSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class regex")
@@ -55,6 +56,7 @@ func init() {
 	})
 	viper.BindPFlag("macho.search.ipsw", machoSearchCmd.Flags().Lookup("ipsw"))
 	viper.BindPFlag("macho.search.load-command", machoSearchCmd.Flags().Lookup("load-command"))
+	viper.BindPFlag("macho.search.section", machoSearchCmd.Flags().Lookup("section"))
 	viper.BindPFlag("macho.search.sym", machoSearchCmd.Flags().Lookup("sym"))
 	viper.BindPFlag("macho.search.protocol", machoSearchCmd.Flags().Lookup("protocol"))
 	viper.BindPFlag("macho.search.class", machoSearchCmd.Flags().Lookup("class"))
@@ -86,6 +88,18 @@ var machoSearchCmd = &cobra.Command{
 					for _, lc := range m.Loads {
 						if re.MatchString(lc.Command().String()) {
 							fmt.Printf("%s\t%s=%s\n", path, colorField("load"), lc.Command())
+							break
+						}
+					}
+				}
+				if viper.GetString("macho.search.section") != "" {
+					re, err := regexp.Compile(viper.GetString("macho.search.section"))
+					if err != nil {
+						return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.section"), err)
+					}
+					for _, sec := range m.Sections {
+						if re.MatchString(fmt.Sprintf("%s.%s", sec.Seg, sec.Name)) {
+							fmt.Printf("%s\t%s=%s\n", path, colorField("load"), fmt.Sprintf("%s.%s", sec.Seg, sec.Name))
 							break
 						}
 					}
