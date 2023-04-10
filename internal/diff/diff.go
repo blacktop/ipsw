@@ -494,7 +494,7 @@ func (d *Diff) parseLaunchdPlists() error {
 	getConfig := func(ctx Context) (string, error) {
 		fsDMG, err := ctx.Info.GetFileSystemOsDmg()
 		if err != nil {
-			return "", fmt.Errorf("failed to get 'Old' File System DMG: %v", err)
+			return "", fmt.Errorf("failed to get File System DMG: %v", err)
 		}
 
 		extracted, err := utils.ExtractFromDMG(ctx.IPSWPath, fsDMG, d.tmpDir, regexp.MustCompile(`.*/sbin/launchd$`))
