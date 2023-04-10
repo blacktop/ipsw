@@ -22,5 +22,5 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// kg.GET("/sbopts", handler)     // TODO: implement this
 	// kg.GET("/symbolsets", handler) // TODO: implement this
 	// kg.GET("/syscall", handler)    // TODO: implement this
-	// kg.GET("/version", handler)    // TODO: implement this
+	kg.GET("/version", getVersion)
 }

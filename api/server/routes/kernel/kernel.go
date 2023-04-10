@@ -26,3 +26,19 @@ func listKexts(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"kernel_path": kernelPath, "kexts": bundles})
 }
+
+func getVersion(c *gin.Context) {
+	kernelPath := c.Query("path")
+	m, err := macho.Open(kernelPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err)
+		return
+	}
+	defer m.Close()
+	v, err := kernelcache.GetVersion(m)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"path": kernelPath, "version": v})
+}
