@@ -523,17 +523,17 @@ func MountInfo() (*HdiUtilInfo, error) {
 	return nil, fmt.Errorf("only supported on macOS")
 }
 
-func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) error {
+func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) ([]string, error) {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := Unzip(ipswPath, "", func(f *zip.File) bool {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
 		}
 		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
 		}
 		defer os.Remove(dmgs[0])
 	}
@@ -541,7 +541,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	mountPoint, alreadyMounted, err := MountFS(dmgPath)
 	if err != nil {
-		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
+		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
 	if alreadyMounted {
 		Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))

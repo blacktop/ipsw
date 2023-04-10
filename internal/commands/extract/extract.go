@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -33,23 +32,6 @@ type Config struct {
 	Flatten  bool     `json:"flatten,omitempty"`
 	Progress bool     `json:"progress,omitempty"`
 	Output   string   `json:"output,omitempty"`
-}
-
-func extractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) ([]string, error) {
-	// check if filesystem DMG already exists (due to previous mount command)
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		defer os.Remove(dmgs[0])
-	}
-	return utils.ExtractFromDMG(dmgPath, destPath, pattern)
 }
 
 func isURL(str string) bool {
@@ -288,21 +270,21 @@ func Search(c *Config) ([]string, error) {
 		artifacts = append(artifacts, out...)
 		if c.DMGs { // SEARCH THE DMGs
 			if appOS, err := i.GetAppOsDmg(); err == nil {
-				out, err := extractFromDMG(c.IPSW, appOS, destPath, re)
+				out, err := utils.ExtractFromDMG(c.IPSW, appOS, destPath, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if systemOS, err := i.GetSystemOsDmg(); err == nil {
-				out, err := extractFromDMG(c.IPSW, systemOS, destPath, re)
+				out, err := utils.ExtractFromDMG(c.IPSW, systemOS, destPath, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
 				}
 				artifacts = append(artifacts, out...)
 			}
 			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-				out, err := extractFromDMG(c.IPSW, fsOS, destPath, re)
+				out, err := utils.ExtractFromDMG(c.IPSW, fsOS, destPath, re)
 				if err != nil {
 					return nil, fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
 				}

@@ -495,7 +495,7 @@ func (d *Diff) parseLaunchdPlists() error {
 	if err != nil {
 		return fmt.Errorf("failed to get 'Old' File System DMG: %v", err)
 	}
-	if err := utils.ExtractFromDMG(d.Old.IPSWPath, oldFsDMG, filepath.Join(d.tmpDir, "old"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
+	if _, err := utils.ExtractFromDMG(d.Old.IPSWPath, oldFsDMG, filepath.Join(d.tmpDir, "old"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
 		return err
 	}
 	m, err := macho.Open(filepath.Join(d.tmpDir, "old/sbin/launchd"))
@@ -513,7 +513,7 @@ func (d *Diff) parseLaunchdPlists() error {
 	if err != nil {
 		return fmt.Errorf("failed to get 'New' File System DMG: %v", err)
 	}
-	if err := utils.ExtractFromDMG(d.New.IPSWPath, newFsDMG, filepath.Join(d.tmpDir, "new"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
+	if _, err := utils.ExtractFromDMG(d.New.IPSWPath, newFsDMG, filepath.Join(d.tmpDir, "new"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
 		return err
 	}
 	m2, err := macho.Open(filepath.Join(d.tmpDir, "new/sbin/launchd"))
