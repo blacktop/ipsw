@@ -46,29 +46,38 @@ func (p Postgres) Connect() (err error) {
 // Create creates a new entry in the database.
 // It returns ErrAlreadyExists if the key already exists.
 func (p Postgres) Create(i *models.IPSW) error {
-	panic("not implemented") // TODO: Implement
+	p.db.Create(i)
+	return nil
 }
 
 // Get returns the value for the given key.
 // It returns ErrNotFound if the key does not exist.
 func (p Postgres) Get(key uint) (*models.IPSW, error) {
-	panic("not implemented") // TODO: Implement
+	i := &models.IPSW{}
+	p.db.First(&i, key)
+	return i, nil
 }
 
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
 func (p Postgres) Set(key uint, value *models.IPSW) error {
-	panic("not implemented") // TODO: Implement
+	p.db.Save(value)
+	return nil
 }
 
 // Delete removes the given key.
 // It returns ErrNotFound if the key does not exist.
 func (p Postgres) Delete(key uint) error {
-	panic("not implemented") // TODO: Implement
+	p.db.Delete(&models.IPSW{}, key)
+	return nil
 }
 
 // Close closes the database.
 // It returns ErrClosed if the database is already closed.
 func (p Postgres) Close() error {
-	panic("not implemented") // TODO: Implement
+	db, err := p.db.DB()
+	if err != nil {
+		return err
+	}
+	return db.Close()
 }
