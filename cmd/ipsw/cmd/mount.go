@@ -1,5 +1,3 @@
-//go:build darwin
-
 /*
 Copyright © 2018-2023 blacktop
 
