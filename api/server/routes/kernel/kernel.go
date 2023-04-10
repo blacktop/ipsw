@@ -9,7 +9,7 @@ import (
 )
 
 func listKexts(c *gin.Context) {
-	kernelPath := c.Query("kernel_path")
+	kernelPath := c.Query("path")
 
 	m, err := macho.Open(kernelPath)
 	if err != nil {
@@ -24,7 +24,7 @@ func listKexts(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"kernel_path": kernelPath, "kexts": bundles})
+	c.JSON(http.StatusOK, gin.H{"path": kernelPath, "kexts": bundles})
 }
 
 func getVersion(c *gin.Context) {
