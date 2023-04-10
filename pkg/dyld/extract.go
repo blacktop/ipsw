@@ -77,14 +77,8 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) err
 				return fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
 			}
 		} else {
-			// Create temporary mount point
 			if err := os.MkdirAll(destPath, 0750); err != nil {
 				return fmt.Errorf("failed to create destination directory %s: %v", destPath, err)
-			}
-			if err := os.MkdirAll(mountPoint, 0750); err != nil {
-				return fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
-			} else {
-				defer os.RemoveAll(mountPoint)
 			}
 		}
 	}

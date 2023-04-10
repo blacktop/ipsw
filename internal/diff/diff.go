@@ -1,3 +1,4 @@
+// Package diff provides a way to diff two ipsws
 package diff
 
 import (
@@ -7,8 +8,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"text/tabwriter"
 	"time"
 
@@ -22,18 +25,32 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 )
 
+const (
+	systemOsDmg   = "sys"
+	appOsDmg      = "app"
+	fileSystemDmg = "fs"
+)
+
 type kernel struct {
 	Path    string
 	Version *kernelcache.Version
 	Kexts   []string
 }
 
+type mount struct {
+	DmgPath   string
+	MountPath string
+	IsMounted bool
+}
+
+// Context is the context for the diff
 type Context struct {
 	IPSWPath        string
 	Info            *info.Info
 	Version         string
 	Build           string
 	Folder          string
+	Mount           map[string]mount
 	SystemOsDmgPath string
 	MountPath       string
 	IsMounted       bool
@@ -41,8 +58,11 @@ type Context struct {
 	DSC             string
 	Webkit          string
 	KDK             string
+
+	mu *sync.Mutex
 }
 
+// Diff is the diff
 type Diff struct {
 	Title string
 
@@ -57,6 +77,7 @@ type Diff struct {
 		Removed string
 		Updated string
 	}
+	Launchd string
 
 	tmpDir string
 }
@@ -68,9 +89,11 @@ func New(title, ipswOld, ipswNew string, kdks []string) *Diff {
 			Title: title,
 			Old: Context{
 				IPSWPath: ipswOld,
+				Mount:    make(map[string]mount),
 			},
 			New: Context{
 				IPSWPath: ipswNew,
+				Mount:    make(map[string]mount),
 			},
 		}
 	}
@@ -78,10 +101,12 @@ func New(title, ipswOld, ipswNew string, kdks []string) *Diff {
 		Title: title,
 		Old: Context{
 			IPSWPath: ipswOld,
+			Mount:    make(map[string]mount),
 			KDK:      kdks[0],
 		},
 		New: Context{
 			IPSWPath: ipswNew,
+			Mount:    make(map[string]mount),
 			KDK:      kdks[1],
 		},
 	}
@@ -164,6 +189,11 @@ func (d *Diff) Diff() (err error) {
 
 	if err := d.parseDSC(); err != nil {
 		return err
+	}
+
+	log.Info("Diffing launchd PLIST")
+	if err := d.parseLaunchdPlists(); err != nil {
+		return fmt.Errorf("failed to parse launchd config plists: %v", err)
 	}
 
 	log.Info("Diffing ENTITLEMENTS")
@@ -458,4 +488,55 @@ func (d *Diff) parseEntitlements() (string, error) {
 		Color:    false,
 		DiffTool: "git",
 	})
+}
+
+func (d *Diff) parseLaunchdPlists() error {
+	oldFsDMG, err := d.Old.Info.GetFileSystemOsDmg()
+	if err != nil {
+		return fmt.Errorf("failed to get 'Old' File System DMG: %v", err)
+	}
+	if err := utils.ExtractFromDMG(d.Old.IPSWPath, oldFsDMG, filepath.Join(d.tmpDir, "old"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
+		return err
+	}
+	m, err := macho.Open(filepath.Join(d.tmpDir, "old/sbin/launchd"))
+	if err != nil {
+		return err
+	}
+	defer m.Close()
+
+	oldData, err := m.Section("__TEXT", "__config").Data()
+	if err != nil {
+		return err
+	}
+
+	newFsDMG, err := d.New.Info.GetFileSystemOsDmg()
+	if err != nil {
+		return fmt.Errorf("failed to get 'New' File System DMG: %v", err)
+	}
+	if err := utils.ExtractFromDMG(d.New.IPSWPath, newFsDMG, filepath.Join(d.tmpDir, "new"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
+		return err
+	}
+	m2, err := macho.Open(filepath.Join(d.tmpDir, "new/sbin/launchd"))
+	if err != nil {
+		return err
+	}
+	defer m2.Close()
+
+	newData, err := m.Section("__TEXT", "__config").Data()
+	if err != nil {
+		return err
+	}
+
+	out, err := utils.GitDiff(
+		string(oldData)+"\n",
+		string(newData)+"\n",
+		&utils.GitDiffConfig{Color: false, Tool: "git"})
+	if err != nil {
+		return err
+	}
+	if len(out) > 0 {
+		d.Launchd = "```diff\n" + out + "\n```"
+	}
+
+	return nil
 }
