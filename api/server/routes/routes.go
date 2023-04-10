@@ -12,6 +12,7 @@ import (
 	"github.com/blacktop/ipsw/api/server/routes/ipsw"
 	"github.com/blacktop/ipsw/api/server/routes/kernel"
 	"github.com/blacktop/ipsw/api/server/routes/macho"
+	"github.com/blacktop/ipsw/api/server/routes/mount"
 	"github.com/gin-gonic/gin"
 )
 
@@ -30,7 +31,7 @@ func Add(rg *gin.RouterGroup) {
 	kernel.AddRoutes(rg)
 	macho.AddRoutes(rg)
 	// mdevs.AddRoutes(rg) // TODO: add mdevs routes
-	// mount.AddRoutes(rg) // TODO: add mount routes
+	mount.AddRoutes(rg)
 	// ota.AddRoutes(rg) // TODO: add ota routes
 	// pongo.AddRoutes(rg) // TODO: add pongo routes
 	// sepfw.AddRoutes(rg) // TODO: add sepfw routes
