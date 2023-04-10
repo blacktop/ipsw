@@ -74,6 +74,11 @@ const diffMarkdownTemplate = `
 
 {{ .Ents | noescape }}
 
+{{ if .Launchd }}
+## launchd Config
+{{ .Launchd | noescape }}
+{{end -}}
+
 ## DSC
 
 ### WebKit

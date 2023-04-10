@@ -48,27 +48,6 @@ func isURL(str string) bool {
 	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
-func extractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) error {
-	// check if filesystem DMG already exists (due to previous mount command)
-	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-		}
-		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-		}
-		defer os.Remove(dmgs[0])
-	}
-	if err := utils.ExtractFromDMG(dmgPath, destPath, pattern); err != nil {
-		return fmt.Errorf("failed to extract files matching pattern: %v", err)
-	}
-
-	return nil
-}
-
 func init() {
 	rootCmd.AddCommand(extractCmd)
 
@@ -346,17 +325,17 @@ var extractCmd = &cobra.Command{
 
 				if viper.GetBool("extract.files") { // SEARCH THE DMGs
 					if appOS, err := i.GetAppOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, appOS, destPath, patternRE); err != nil {
+						if err := utils.ExtractFromDMG(ipswPath, appOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from AppOS %s: %v", appOS, err)
 						}
 					}
 					if systemOS, err := i.GetSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, systemOS, destPath, patternRE); err != nil {
+						if err := utils.ExtractFromDMG(ipswPath, systemOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from SystemOS %s: %v", systemOS, err)
 						}
 					}
 					if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-						if err := extractFromDMG(ipswPath, fsOS, destPath, patternRE); err != nil {
+						if err := utils.ExtractFromDMG(ipswPath, fsOS, destPath, patternRE); err != nil {
 							return fmt.Errorf("failed to extract files from filesystem %s: %v", fsOS, err)
 						}
 					}
