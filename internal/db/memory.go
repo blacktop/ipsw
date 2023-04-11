@@ -52,7 +52,8 @@ func (m Memory) Get(id uint) (*models.IPSW, error) {
 // Set sets the value for the given key.
 // It overwrites any previous value for that key.
 func (m Memory) Set(key uint, value *models.IPSW) error {
-	panic("not implemented") // TODO: Implement
+	m.IPSWs[key] = value
+	return nil
 }
 
 func (m Memory) List(version string) ([]*models.IPSW, error) {
