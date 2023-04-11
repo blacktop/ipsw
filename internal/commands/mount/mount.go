@@ -77,9 +77,9 @@ func DmgInIPSW(path, typ string) (*Context, error) {
 		}
 	}
 
-	mp, am, err := utils.MountFS(dmgPath)
+	mp, am, err := utils.MountFS(extractedDMG)
 	if err != nil {
-		return nil, fmt.Errorf("failed to mount %s: %v", dmgPath, err)
+		return nil, fmt.Errorf("failed to mount %s: %v", extractedDMG, err)
 	}
 
 	return &Context{
