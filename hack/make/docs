@@ -16,7 +16,15 @@ This script generates markdown docs from cli.
     exit
 fi
 
+move_swagger() {
+    if [[ -f api/swagger.json ]]; then
+        mv api/swagger.json www/static/api/swagger.json
+    fi
+}
+
 main() {
+    move_swagger
+
     SED="sed"
     if which gsed >/dev/null 2>&1; then
         SED="gsed"

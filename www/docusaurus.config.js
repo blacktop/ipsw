@@ -58,6 +58,28 @@ const config = {
         },
       }),
     ],
+    [
+      "redocusaurus",
+      /** @type {import('redocusaurus').PresetEntry} */
+      ({
+        // Plugin Options for loading OpenAPI files
+        specs: [
+          {
+            spec: "api/swagger.json",
+            route: "/api",
+            layout: {
+              title: "ipsw API",
+              noFooter: true,
+            },
+          },
+        ],
+        // Theme Options for modifying how redoc renders them
+        theme: {
+          // Change with your site colors
+          primaryColor: "#503B9F",
+        },
+      }),
+    ],
   ],
   // plugins: [require.resolve("@cmfcmf/docusaurus-search-local")],
   themeConfig:
@@ -112,6 +134,12 @@ const config = {
             position: "left",
             sidebarId: "cli",
             label: "CLI",
+          },
+          {
+            label: "API",
+            to: "/api",
+            position: "left",
+            sidebarId: "api",
           },
           // Right
           {
