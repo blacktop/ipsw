@@ -507,7 +507,7 @@ func (d *Diff) parseLaunchdPlists() error {
 		} else if len(extracted) > 1 {
 			return "", fmt.Errorf("failed to extract launchd from %s: too many files extracted", fsDMG)
 		}
-		defer os.Remove(extracted[0])
+		defer os.Remove(filepath.Clean(extracted[0]))
 
 		m, err := macho.Open(extracted[0])
 		if err != nil {

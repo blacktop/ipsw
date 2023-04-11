@@ -507,6 +507,17 @@ type HdiUtilInfo struct {
 	Images    []image `plist:"images,omitempty" xml:"images,omitempty"`
 }
 
+func (i HdiUtilInfo) Mount(mount string) *image {
+	for _, img := range i.Images {
+		for _, entry := range img.SystemEntities {
+			if strings.Contains(entry.MountPoint, mount) {
+				return &img
+			}
+		}
+	}
+	return nil
+}
+
 func MountInfo() (*HdiUtilInfo, error) {
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("hdiutil", "info", "-plist")
@@ -535,7 +546,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 		if len(dmgs) == 0 {
 			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
 		}
-		defer os.Remove(dmgs[0])
+		defer os.Remove(filepath.Clean(dmgs[0]))
 	}
 
 	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))

@@ -111,6 +111,7 @@ func Extract(ipsw, destPath string) ([]string, error) {
 	for _, kcache := range kcaches {
 		fname := i.GetKernelCacheFileName(kcache)
 		fname = filepath.Join(destPath, fname)
+		fname = filepath.Clean(fname)
 
 		content, err := os.ReadFile(kcache)
 		if err != nil {

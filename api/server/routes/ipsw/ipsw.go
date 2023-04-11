@@ -52,7 +52,7 @@ func getFsFiles(c *gin.Context) {
 		if len(dmgs) == 0 {
 			c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to find %s in IPSW", dmgPath))
 		}
-		defer os.Remove(dmgs[0])
+		defer os.Remove(filepath.Clean(dmgs[0]))
 	} else {
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 	}

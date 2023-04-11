@@ -17,19 +17,25 @@ var dmgTypes = []string{"fs", "sys", "app"}
 
 // Context is the mount context
 type Context struct {
-	DmgPath        string `json:"dmg_path" binding:"required"`
 	MountPoint     string `json:"mount_point" binding:"required"`
+	DmgPath        string `json:"dmg_path,omitempty"` // FIXME: required on linux
 	AlreadyMounted bool   `json:"already_mounted,omitempty"`
 }
 
 // Unmount will unmount a DMG and remove the DMG source file
 func (c Context) Unmount() error {
+	if info, err := utils.MountInfo(); err == nil { // darwin only
+		if image := info.Mount(c.MountPoint); image != nil {
+			c.DmgPath = filepath.Clean(image.ImagePath)
+		}
+	}
 	if err := utils.Retry(3, 2*time.Second, func() error {
 		return utils.Unmount(c.MountPoint, false)
 	}); err != nil {
 		return fmt.Errorf("failed to unmount %s at %s: %v", c.DmgPath, c.MountPoint, err)
 	}
-	return os.Remove(c.DmgPath)
+	// TODO: check if DmgPath is safe before removing (should be in /tmp and should be src of mount)
+	return os.Remove(filepath.Clean(c.DmgPath))
 }
 
 // DmgInIPSW will mount a DMG from an IPSW
