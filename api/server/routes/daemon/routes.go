@@ -12,8 +12,23 @@ import (
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
+	// swagger:route HEAD /_ping daemon daemonPingHead
+	//
+	// Daemon health check.
+	//
+	// This will return OK if the daemon is running.
 	rg.HEAD("/_ping", pingHandler)
+	// swagger:route GET /_ping daemon daemonPingGet
+	//
+	// Daemon health check.
+	//
+	// This will return OK if the daemon is running.
 	rg.GET("/_ping", pingHandler)
+	// swagger:route GET /version daemon daemonvVersion
+	//
+	// Daemon version.
+	//
+	// This will return the daemon version info.
 	rg.GET("/version", func(c *gin.Context) {
 		c.JSON(http.StatusOK, types.Version{
 			ApiVersion:     api.DefaultVersion,

@@ -1,4 +1,17 @@
-// Package server contains the main server struct and methods
+// Package server The ipsw API.
+//
+//	Schemes: http
+//	Host: localhost:8080
+//	BasePath: /v1
+//	Version: v1.0
+//
+//	Consumes:
+//	- application/json
+//
+//	Produces:
+//	- application/json
+//
+// swagger:meta
 package server
 
 import (

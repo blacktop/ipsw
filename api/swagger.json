@@ -1,0 +1,48 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "title": "The ipsw API.",
+    "version": "v1.0"
+  },
+  "host": "localhost:8080",
+  "basePath": "/v1",
+  "paths": {
+    "/_ping": {
+      "get": {
+        "description": "This will return OK if the daemon is running.",
+        "tags": [
+          "daemon"
+        ],
+        "summary": "Daemon health check.",
+        "operationId": "daemonPingGet"
+      },
+      "head": {
+        "description": "This will return OK if the daemon is running.",
+        "tags": [
+          "daemon"
+        ],
+        "summary": "Daemon health check.",
+        "operationId": "daemonPingHead"
+      }
+    },
+    "/version": {
+      "get": {
+        "description": "This will return the daemon version info.",
+        "tags": [
+          "daemon"
+        ],
+        "summary": "Daemon version.",
+        "operationId": "daemonvVersion"
+      }
+    }
+  }
+}
