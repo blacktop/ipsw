@@ -81,8 +81,8 @@ github.com/aphistic/golf v0.0.0-20180712155816-02c07f170c5a/go.mod h1:3NqKYiepwy
 github.com/aphistic/sweet v0.2.0/go.mod h1:fWDlIh/isSE9n6EPsRmC0det+whmX6dJid3stzu0Xys=
 github.com/aws/aws-sdk-go v1.20.6/go.mod h1:KmX6BPdI08NWTb3/sm4ZGu5ShLoqVDhKgpiN924inxo=
 github.com/aybabtme/rgbterm v0.0.0-20170906152045-cc83f3b3ce59/go.mod h1:q/89r3U2H7sSsE2t6Kca0lfwTK8JdoNGS/yzM/4iH5I=
-github.com/blacktop/arm64-cgo v1.0.55 h1:Ze2bj2iDxr//eUFPoZeA1ph3WFEOeF3ihfv8YfXE9lc=
-github.com/blacktop/arm64-cgo v1.0.55/go.mod h1:+8K+RkaTCC3o3WZme98SiIJuHteOxGoIvuc3WVlHHBI=
+github.com/blacktop/arm64-cgo v1.0.56 h1:JvoEPGuFaD+SYJ8mjEIKXmrkmilQFBl+yXfkTGAO8p8=
+github.com/blacktop/arm64-cgo v1.0.56/go.mod h1:vtUJ9dYFP6ButAUcLeaLgcfV5GvndxjLKJmWmxIgJ/g=
 github.com/blacktop/cast v1.5.1 h1:gwXxBZ2XlcNnU57Ws+pTDFYHKKtLdxwBqvUI2wS31wg=
 github.com/blacktop/cast v1.5.1/go.mod h1:SpXXQ5YoyJw6s3/6cMTQuxvgRl3PCJiyaX9p6b155UU=
 github.com/blacktop/go-dwarf v1.0.9 h1:eT/L7gt0gllvvgnRXY0MFKjNB6+jtOY5DTm2ynVX2dY=
