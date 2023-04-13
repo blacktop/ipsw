@@ -440,6 +440,7 @@ brews:
       - ipsw-frida
     install: |
       bin.install "ipsw"
+      etc.install "config.example.yml" => "config.yml"
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
@@ -465,6 +466,7 @@ brews:
       - ipsw
     install: |
       bin.install "ipsw"
+      etc.install "config.example.yml" => "config.yml"      
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
