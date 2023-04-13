@@ -126,6 +126,11 @@ docker: ## Build docker image
 	@echo " > Building Docker Image"
 	docker build --build-arg VERSION=$(NEXT_VERSION) -t $(REPO)/$(NAME):$(NEXT_VERSION) .
 
+.PHONY: docker-daemon
+docker-daemon: ## Build daemon docker image
+	@echo " > Building Docker Image"
+	docker build --build-arg VERSION=$(NEXT_VERSION) -t $(REPO)/$(NAME)-daemon:$(NEXT_VERSION) -f Dockerfile.daemon .
+
 .PHONY: docker-tag
 docker-tag: docker ## Tag docker image
 	docker tag $(REPO)/$(NAME):$(NEXT_VERSION) docker.pkg.github.com/blacktop/ipsw/$(NAME):$(NEXT_VERSION)
