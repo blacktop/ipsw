@@ -17,8 +17,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/signal"
 	"path/filepath"
 	"runtime"
@@ -34,10 +36,11 @@ import (
 
 // Config is the server config
 type Config struct {
-	Host   string
-	Port   int
-	Socket string
-	Debug  bool
+	Host    string
+	Port    int
+	Socket  string
+	Debug   bool
+	LogFile string
 }
 
 // Server is the main server struct
@@ -59,6 +62,14 @@ func NewServer(conf *Config) *Server {
 func (s *Server) Start() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	if len(s.conf.LogFile) > 0 {
+		f, err := os.Create(s.conf.LogFile)
+		if err != nil {
+			return fmt.Errorf("server: failed to create log file: %v\n", err)
+		}
+		gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
+	}
 
 	s.router.GET("/version", func(c *gin.Context) {
 		c.JSON(http.StatusOK, types.Version{
