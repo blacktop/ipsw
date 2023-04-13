@@ -277,6 +277,16 @@ func (d *Diff) parseKernelcache() error {
 	}
 
 	for kmodel := range d.Old.Info.Plists.GetKernelCaches() {
+		if _, ok := d.Old.Info.Plists.GetKernelCaches()[kmodel]; !ok {
+			return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
+		} else if len(d.Old.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
+			return fmt.Errorf("failed to find kernelcache for %s in 'Old' IPSW", kmodel)
+		}
+		if _, ok := d.New.Info.Plists.GetKernelCaches()[kmodel]; !ok {
+			return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW: `ipsw diff` expects you to compare 2 versions of the same IPSW device type", kmodel)
+		} else if len(d.New.Info.Plists.GetKernelCaches()[kmodel]) == 0 {
+			return fmt.Errorf("failed to find kernelcache for %s in 'New' IPSW", kmodel)
+		}
 		kcache1 := d.Old.Info.Plists.GetKernelCaches()[kmodel][0]
 		kcache2 := d.New.Info.Plists.GetKernelCaches()[kmodel][0]
 		d.Old.Kernel.Path = filepath.Join(d.Old.Folder, d.Old.Info.GetKernelCacheFileName(kcache1))
@@ -344,9 +354,15 @@ func (d *Diff) parseDSC() error {
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.Old.MountPath, err)
 	}
+	if len(oldDSCes) == 0 {
+		return fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", d.Old.MountPath)
+	}
 	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.New.MountPath, err)
+	}
+	if len(newDSCes) == 0 {
+		return fmt.Errorf("no DSCs found in 'New' IPSW mount %s", d.New.MountPath)
 	}
 
 	dscOLD, err := dyld.Open(oldDSCes[0])
