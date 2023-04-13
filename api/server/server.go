@@ -1,7 +1,7 @@
 // Package server The ipsw API.
 //
 //	Schemes: http
-//	Host: localhost:8080
+//	Host: localhost:3993
 //	BasePath: /v1
 //	Version: v1.0
 //
