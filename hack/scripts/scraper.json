@@ -27,6 +27,11 @@
       "selectors_key": "cli"
     },
     {
+      "url": "https://blacktop.github.io/ipsw/docs/api/",
+      "extra_attributes": { "lang": ["en"] },
+      "selectors_key": "api"
+    },
+    {
       "url": "https://blacktop.github.io/ipsw/",
       "extra_attributes": { "lang": ["en"] }
     }
@@ -61,6 +66,11 @@
       "lvl0": {
         "selector": "",
         "default_value": "CLI"
+      },
+    "api": {
+      "lvl0": {
+        "selector": "",
+        "default_value": "API"
       },
       "lvl1": "article h1",
       "lvl2": "article h2",
