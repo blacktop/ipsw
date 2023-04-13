@@ -1,7 +1,9 @@
 # This is an example config.yml file with some sensible defaults.
 # Make sure to check the documentation at https://blacktop.github.io/ipsw
 daemon:
-  socket: /tmp/ipsw.sock
+  host:
+  port: 3993
+  # socket: /tmp/ipsw.sock
   debug: false
 # The lines beneath this are called `modelines`. See `:help modeline`
 # Feel free to remove those if you don't want/use them.
