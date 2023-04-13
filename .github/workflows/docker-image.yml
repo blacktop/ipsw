@@ -20,35 +20,50 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      -
-        name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v4
         with:
           images: |
             blacktop/ipsw
             ghcr.io/${{ github.repository }}
-      -
-        name: Docker Login
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Docker Login
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      -
-        name: Log in to the Container registry
+      - name: Log in to the Container registry
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      -
-        name: Build and push Docker image
+      - name: Build and push Docker image
         id: docker_build
         uses: docker/build-push-action@v4
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
+          platforms: linux/amd64,linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+      - name: Build and push DAEMON Docker image
+        id: docker_daemon_build
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: Dockerfile.daemon
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            blacktop/ipswd:latest
+            ghcr.io/blacktop/ipswd:latest
+          platforms: linux/amd64,linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
