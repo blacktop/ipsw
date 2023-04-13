@@ -269,10 +269,10 @@ func (d *Diff) unmountSystemOsDMGs() error {
 }
 
 func (d *Diff) parseKernelcache() error {
-	if err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder); err != nil {
+	if _, err := kernelcache.Extract(d.Old.IPSWPath, d.Old.Folder); err != nil {
 		return fmt.Errorf("failed to extract kernelcaches from 'Old' IPSW: %v", err)
 	}
-	if err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder); err != nil {
+	if _, err := kernelcache.Extract(d.New.IPSWPath, d.New.Folder); err != nil {
 		return fmt.Errorf("failed to extract kernelcaches from 'New' IPSW: %v", err)
 	}
 
@@ -507,45 +507,49 @@ func (d *Diff) parseEntitlements() (string, error) {
 }
 
 func (d *Diff) parseLaunchdPlists() error {
-	oldFsDMG, err := d.Old.Info.GetFileSystemOsDmg()
-	if err != nil {
-		return fmt.Errorf("failed to get 'Old' File System DMG: %v", err)
-	}
-	if err := utils.ExtractFromDMG(d.Old.IPSWPath, oldFsDMG, filepath.Join(d.tmpDir, "old"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
-		return err
-	}
-	m, err := macho.Open(filepath.Join(d.tmpDir, "old/sbin/launchd"))
-	if err != nil {
-		return err
-	}
-	defer m.Close()
+	getConfig := func(ctx Context) (string, error) {
+		fsDMG, err := ctx.Info.GetFileSystemOsDmg()
+		if err != nil {
+			return "", fmt.Errorf("failed to get File System DMG: %v", err)
+		}
 
-	oldData, err := m.Section("__TEXT", "__config").Data()
-	if err != nil {
-		return err
-	}
+		extracted, err := utils.ExtractFromDMG(ctx.IPSWPath, fsDMG, d.tmpDir, regexp.MustCompile(`.*/sbin/launchd$`))
+		if err != nil {
+			return "", fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
+		}
 
-	newFsDMG, err := d.New.Info.GetFileSystemOsDmg()
-	if err != nil {
-		return fmt.Errorf("failed to get 'New' File System DMG: %v", err)
-	}
-	if err := utils.ExtractFromDMG(d.New.IPSWPath, newFsDMG, filepath.Join(d.tmpDir, "new"), regexp.MustCompile(`.*/sbin/launchd$`)); err != nil {
-		return err
-	}
-	m2, err := macho.Open(filepath.Join(d.tmpDir, "new/sbin/launchd"))
-	if err != nil {
-		return err
-	}
-	defer m2.Close()
+		if len(extracted) == 0 {
+			return "", fmt.Errorf("failed to extract launchd from %s: no files extracted", fsDMG)
+		} else if len(extracted) > 1 {
+			return "", fmt.Errorf("failed to extract launchd from %s: too many files extracted", fsDMG)
+		}
+		defer os.Remove(filepath.Clean(extracted[0]))
 
-	newData, err := m.Section("__TEXT", "__config").Data()
-	if err != nil {
-		return err
+		m, err := macho.Open(extracted[0])
+		if err != nil {
+			return "", fmt.Errorf("failed to open launchd: %v", err)
+		}
+		defer m.Close()
+
+		data, err := m.Section("__TEXT", "__config").Data()
+		if err != nil {
+			return "", fmt.Errorf("failed to get launchd config: %v", err)
+		}
+
+		return string(data), nil
 	}
 
+	oldConfig, err := getConfig(d.Old)
+	if err != nil {
+		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' config: %v", err)
+	}
+	newConfig, err := getConfig(d.New)
+	if err != nil {
+		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' config: %v", err)
+	}
 	out, err := utils.GitDiff(
-		string(oldData)+"\n",
-		string(newData)+"\n",
+		string(oldConfig)+"\n",
+		string(newConfig)+"\n",
 		&utils.GitDiffConfig{Color: false, Tool: "git"})
 	if err != nil {
 		return err

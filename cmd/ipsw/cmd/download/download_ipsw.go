@@ -25,16 +25,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -159,11 +157,6 @@ var ipswCmd = &cobra.Command{
 			}
 			dFlg.Device = dev.ProductType
 			dFlg.Build = dev.BuildVersion
-		}
-
-		var destPath string
-		if len(output) > 0 {
-			destPath = filepath.Clean(output)
 		}
 
 		if len(device) > 0 {
@@ -332,70 +325,68 @@ var ipswCmd = &cobra.Command{
 						"signed":  ipsw.Signed,
 					}).Info("Parsing remote IPSW")
 
-					zr, err := download.NewRemoteZipReader(ipsw.URL, &download.RemoteConfig{
+					config := &extract.Config{
+						IPSW:     "",
+						URL:      ipsw.URL,
+						Pattern:  remotePattern,
+						Arches:   dyldArches,
 						Proxy:    proxy,
 						Insecure: insecure,
-					})
-					if err != nil {
-						return fmt.Errorf("failed to create remote zip reader of IPSW: %v", err)
+						DMGs:     false,
+						DmgType:  "",
+						Flatten:  flat,
+						Progress: true,
+						Output:   output,
 					}
 
-					inf, err := info.ParseZipFiles(zr.File)
+					cwd, err := os.Getwd()
 					if err != nil {
-						return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
+						return fmt.Errorf("failed to get current working directory: %v", err)
 					}
-
-					folder, err := inf.GetFolder()
-					if err != nil {
-						log.Errorf("failed to get folder from remote zip metadata: %v", err)
-					}
-					destPath = filepath.Join(destPath, folder)
 
 					// REMOTE KERNEL MODE
 					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
-						if err := kernelcache.RemoteParse(zr, destPath); err != nil {
-							return fmt.Errorf("failed to download kernelcache from remote IPSW: %v", err)
+						artifacts, err := extract.Kernelcache(config)
+						if err != nil {
+							return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
+						}
+						for _, artifact := range artifacts {
+							utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 						}
 					}
 					// REMOTE DSC MODE
 					if remoteDSC {
 						log.Info("Extracting remote dyld_shared_cache(s)")
-						sysDMG, err := inf.GetSystemOsDmg()
+						artifacts, err := extract.DSC(config)
 						if err != nil {
-							return fmt.Errorf("only iOS16.x/macOS13.x supported: failed to get SystemOS DMG from remote zip metadata: %v", err)
+							return err
 						}
-						if len(sysDMG) == 0 {
-							return fmt.Errorf("only iOS16.x/macOS13.x supported: no SystemOS DMG found in remote zip metadata")
-						}
-						tmpDIR, err := os.MkdirTemp("", "ipsw_extract_remote_dyld")
-						if err != nil {
-							return fmt.Errorf("failed to create temporary directory to store SystemOS DMG: %v", err)
-						}
-						defer os.RemoveAll(tmpDIR)
-						if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, true, true); err != nil {
-							return fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
-						}
-
-						if err := dyld.ExtractFromDMG(inf, filepath.Join(tmpDIR, sysDMG), destPath, viper.GetStringSlice("extract.dyld-arch")); err != nil {
-							return fmt.Errorf("failed to extract dyld_shared_cache(s) from remote IPSW: %v", err)
+						for _, artifact := range artifacts {
+							utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 						}
 					}
 					// PATTERN MATCHING MODE
 					if len(remotePattern) > 0 {
-						dlRE, err := regexp.Compile(remotePattern)
-						if err != nil {
-							return fmt.Errorf("failed to compile regex for pattern '%s': %v", remotePattern, err)
-						}
 						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat, true); err != nil {
-							return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
+						artifacts, err := extract.Search(config)
+						if err != nil {
+							return err
+						}
+						for _, artifact := range artifacts {
+							utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 						}
 					}
 				}
 			} else { // NORMAL MODE
 				for _, i := range ipsws {
 					destName := getDestName(i.URL, removeCommas)
+					if len(output) > 0 {
+						destName = filepath.Join(filepath.Clean(output), destName)
+					}
+					if err := os.MkdirAll(filepath.Dir(destName), 0755); err != nil {
+						return fmt.Errorf("failed to create directory: %v", err)
+					}
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						log.WithFields(log.Fields{
 							"device":  i.Identifier,

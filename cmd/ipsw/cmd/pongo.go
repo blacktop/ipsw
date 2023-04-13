@@ -79,14 +79,8 @@ var pongoCmd = &cobra.Command{
 		var kbags *img4.KeyBags
 
 		if viper.GetBool("pongo.remote") {
-			remoteURL := args[0]
-
-			if !isURL(remoteURL) {
-				log.Fatal("must supply valid URL when using the remote flag")
-			}
-
 			// Get handle to remote IPSW zip
-			zr, err := download.NewRemoteZipReader(remoteURL, &download.RemoteConfig{
+			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
 				Proxy:    viper.GetString("pongo.proxy"),
 				Insecure: viper.GetBool("pongo.insecure"),
 			})
@@ -112,7 +106,7 @@ var pongoCmd = &cobra.Command{
 
 			if viper.GetBool("pongo.decrypt") {
 				for _, kbag := range kbags.Files {
-					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(kbag.Name), destPath, true, true); err != nil {
+					if _, err := utils.SearchZip(zr.File, regexp.MustCompile(kbag.Name), destPath, true, true); err != nil {
 						return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
 					}
 				}
@@ -148,7 +142,7 @@ var pongoCmd = &cobra.Command{
 
 			if viper.GetBool("pongo.decrypt") {
 				for _, kbag := range kbags.Files {
-					if err := utils.RemoteUnzip(zr.File, regexp.MustCompile(fmt.Sprintf(".*%s$", kbag.Name)), destPath, true, false); err != nil {
+					if _, err := utils.SearchZip(zr.File, regexp.MustCompile(fmt.Sprintf(".*%s$", kbag.Name)), destPath, true, false); err != nil {
 						return fmt.Errorf("failed to extract files matching pattern in remote IPSW: %v", err)
 					}
 				}

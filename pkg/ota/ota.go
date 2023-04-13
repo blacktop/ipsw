@@ -405,7 +405,7 @@ func Extract(otaZIP, extractPattern, folder string) error {
 
 	// check for matches in the OTA zip
 	utils.Indent(log.Info, 2)("Searching in OTA zip files...")
-	if err := utils.RemoteUnzip(zr.File, re, folder, false, false); err != nil {
+	if _, err := utils.SearchZip(zr.File, re, folder, false, false); err != nil {
 		log.Errorf("failed to find in OTA zip: %v", err)
 	}
 

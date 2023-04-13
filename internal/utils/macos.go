@@ -507,6 +507,17 @@ type HdiUtilInfo struct {
 	Images    []image `plist:"images,omitempty" xml:"images,omitempty"`
 }
 
+func (i HdiUtilInfo) Mount(mount string) *image {
+	for _, img := range i.Images {
+		for _, entry := range img.SystemEntities {
+			if strings.Contains(entry.MountPoint, mount) {
+				return &img
+			}
+		}
+	}
+	return nil
+}
+
 func MountInfo() (*HdiUtilInfo, error) {
 	if runtime.GOOS == "darwin" {
 		cmd := exec.Command("hdiutil", "info", "-plist")
@@ -523,25 +534,25 @@ func MountInfo() (*HdiUtilInfo, error) {
 	return nil, fmt.Errorf("only supported on macOS")
 }
 
-func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) error {
+func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) ([]string, error) {
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := Unzip(ipswPath, "", func(f *zip.File) bool {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
+			return nil, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
 		}
 		if len(dmgs) == 0 {
-			return fmt.Errorf("failed to find %s in IPSW", dmgPath)
+			return nil, fmt.Errorf("failed to find %s in IPSW", dmgPath)
 		}
-		defer os.Remove(dmgs[0])
+		defer os.Remove(filepath.Clean(dmgs[0]))
 	}
 
 	Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	mountPoint, alreadyMounted, err := MountFS(dmgPath)
 	if err != nil {
-		return fmt.Errorf("failed to IPSW FS dmg: %v", err)
+		return nil, fmt.Errorf("failed to IPSW FS dmg: %v", err)
 	}
 	if alreadyMounted {
 		Indent(log.Debug, 3)(fmt.Sprintf("%s already mounted", dmgPath))
@@ -556,6 +567,7 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 		}()
 	}
 
+	var artifacts []string
 	// extract files that match regex pattern
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -574,13 +586,14 @@ func ExtractFromDMG(ipswPath, dmgPath, destPath string, pattern *regexp.Regexp) 
 			if err := Copy(path, fname); err != nil {
 				return fmt.Errorf("failed to extract %s: %v", fname, err)
 			}
+			artifacts = append(artifacts, fname)
 		}
 		return nil
 	}); err != nil {
-		return fmt.Errorf("failed to extract File System files from IPSW: %v", err)
+		return nil, fmt.Errorf("failed to extract File System files from IPSW: %v", err)
 	}
 
-	return nil
+	return artifacts, nil
 }
 
 func PkgUtilExpand(src, dst string) (string, error) {

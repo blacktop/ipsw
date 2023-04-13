@@ -35,7 +35,7 @@ import (
 	"github.com/alecthomas/chroma/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/pkg/codesign"
+	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/fullsailor/pkcs7"
@@ -62,27 +62,6 @@ func init() {
 	viper.BindPFlag("dyld.info.delta", dyldInfoCmd.Flags().Lookup("delta"))
 
 	dyldInfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
-}
-
-type dylib struct {
-	Index       int    `json:"index,omitempty"`
-	Name        string `json:"name,omitempty"`
-	Version     string `json:"version,omitempty"`
-	UUID        string `json:"uuid,omitempty"`
-	LoadAddress uint64 `json:"load_address,omitempty"`
-}
-
-type dyldInfo struct {
-	Magic              string                                      `json:"magic,omitempty"`
-	UUID               string                                      `json:"uuid,omitempty"`
-	Platform           string                                      `json:"platform,omitempty"`
-	MaxSlide           int                                         `json:"max_slide,omitempty"`
-	SubCacheArrayCount int                                         `json:"num_sub_caches,omitempty"`
-	SubCacheGroupID    int                                         `json:"sub_cache_group_id,omitempty"`
-	SymSubCacheUUID    string                                      `json:"sym_sub_cache_uuid,omitempty"`
-	Mappings           map[string][]dyld.CacheMappingWithSlideInfo `json:"mappings,omitempty"`
-	CodeSignature      map[string]codesign.CodeSignature           `json:"code_signature,omitempty"`
-	Dylibs             []dylib                                     `json:"dylibs,omitempty"`
 }
 
 // dyldInfoCmd represents the info command
@@ -145,54 +124,15 @@ var dyldInfoCmd = &cobra.Command{
 		defer f.Close()
 
 		if outAsJSON {
-			dinfo := dyldInfo{
-				Magic:    f.Headers[f.UUID].Magic.String(),
-				UUID:     f.UUID.String(),
-				Platform: f.Headers[f.UUID].Platform.String(),
-				MaxSlide: int(f.Headers[f.UUID].MaxSlide),
+			dinfo, err := dscCmd.GetInfo(f)
+			if err != nil {
+				return fmt.Errorf("failed to get DSC info: %s", err)
 			}
-
-			dinfo.Mappings = make(map[string][]dyld.CacheMappingWithSlideInfo)
-
-			for u, mp := range f.MappingsWithSlideInfo {
-				for _, m := range mp {
-					dinfo.Mappings[u.String()] = append(dinfo.Mappings[u.String()], *m)
-				}
-			}
-
-			dinfo.CodeSignature = make(map[string]codesign.CodeSignature)
-
-			if showSignature {
-				for u, cs := range f.CodeSignatures {
-					dinfo.CodeSignature[u.String()] = *cs
-				}
-			}
-
-			if showDylibs {
-				for idx, img := range f.Images {
-					m, err := img.GetPartialMacho()
-					if err != nil {
-						continue
-						// return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-					}
-					dinfo.Dylibs = append(dinfo.Dylibs, dylib{
-						Index:       idx + 1,
-						Name:        img.Name,
-						Version:     m.SourceVersion().Version.String(),
-						UUID:        m.UUID().String(),
-						LoadAddress: img.Info.Address,
-					})
-					m.Close()
-				}
-			}
-
 			j, err := json.Marshal(dinfo)
 			if err != nil {
 				return err
 			}
-
 			fmt.Println(string(j))
-
 			return nil
 		}
 

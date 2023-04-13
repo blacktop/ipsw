@@ -6,10 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jinzhu/gorm"
-	// importing the sqlite dialects
-	_ "github.com/jinzhu/gorm/dialects/sqlite"
+	"github.com/glebarez/sqlite"
 	"github.com/pkg/errors"
+	"gorm.io/gorm"
 )
 
 func uniqueDevices(d []Device) []Device {
@@ -35,11 +34,10 @@ func ReadDeviceTraitsDB() ([]Device, error) {
 		for _, releaseType := range []string{"", "-beta"} {
 			dbFile := fmt.Sprintf("/Applications/Xcode%s.app/Contents/Developer/Platforms/%s.platform/usr/standalone/device_traits.db", releaseType, osType)
 			if _, err := os.Stat(dbFile); err == nil {
-				db, err := gorm.Open("sqlite3", dbFile)
+				db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 				if err != nil {
 					return nil, errors.Wrapf(err, "unable to open database: %s", dbFile)
 				}
-				defer db.Close()
 
 				var devices []Device
 				db.Preload("DeviceTrait").Find(&devices)

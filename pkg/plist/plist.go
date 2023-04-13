@@ -151,7 +151,7 @@ func Parse(path string) (*Plists, error) {
 
 	zr, err := zip.OpenReader(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open ipsw zip: %s", err)
+		return nil, fmt.Errorf("failed to open IPSW zip: %s", err)
 	}
 	defer zr.Close()
 

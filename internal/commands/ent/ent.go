@@ -74,27 +74,29 @@ func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 			}
 		}
 
-		buff := new(bytes.Buffer)
+		if len(entDBPath) > 0 {
+			buff := new(bytes.Buffer)
 
-		e := gob.NewEncoder(buff)
+			e := gob.NewEncoder(buff)
 
-		// Encoding the map
-		err := e.Encode(entDB)
-		if err != nil {
-			return nil, fmt.Errorf("failed to encode entitlement db to binary: %v", err)
-		}
+			// Encoding the map
+			err := e.Encode(entDB)
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode entitlement db to binary: %v", err)
+			}
 
-		of, err := os.Create(entDBPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create file %s: %v", ipswPath+".entDB", err)
-		}
-		defer of.Close()
+			of, err := os.Create(entDBPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to create file %s: %v", ipswPath+".entDB", err)
+			}
+			defer of.Close()
 
-		gzw := gzip.NewWriter(of)
-		defer gzw.Close()
+			gzw := gzip.NewWriter(of)
+			defer gzw.Close()
 
-		if _, err := buff.WriteTo(gzw); err != nil {
-			return nil, fmt.Errorf("failed to write entitlement db to gzip file: %v", err)
+			if _, err := buff.WriteTo(gzw); err != nil {
+				return nil, fmt.Errorf("failed to write entitlement db to gzip file: %v", err)
+			}
 		}
 	} else {
 		log.Info("Found ipsw entitlement database file...")

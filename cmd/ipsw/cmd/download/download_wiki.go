@@ -26,15 +26,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/plist"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -307,41 +306,41 @@ var wikiCmd = &cobra.Command{
 							d, v, b := download.ParseIpswURLString(url)
 							log.WithFields(log.Fields{"devices": d, "build": b, "version": v}).Info("Parsing remote IPSW")
 
-							zr, err := download.NewRemoteZipReader(url, &download.RemoteConfig{
+							config := &extract.Config{
+								URL:      url,
+								Pattern:  pattern,
 								Proxy:    proxy,
 								Insecure: insecure,
-							})
-							if err != nil {
-								return fmt.Errorf("failed to create remote zip reader of IPSW: %v", err)
+								Flatten:  flat,
+								Progress: true,
+								Output:   output,
 							}
 
-							inf, err := info.ParseZipFiles(zr.File)
+							cwd, err := os.Getwd()
 							if err != nil {
-								return fmt.Errorf("failed to parse remote IPSW metadata: %v", err)
+								return fmt.Errorf("failed to get current working directory: %v", err)
 							}
-
-							folder, err := inf.GetFolder()
-							if err != nil {
-								log.Errorf("failed to get folder from remote zip metadata: %v", err)
-							}
-							destPath = filepath.Join(destPath, folder)
 
 							// REMOTE KERNEL MODE
 							if kernel {
 								log.Info("Extracting remote kernelcache")
-								if err := kernelcache.RemoteParse(zr, destPath); err != nil {
-									return fmt.Errorf("failed to download kernelcache from remote IPSW: %v", err)
+								artifacts, err := extract.Kernelcache(config)
+								if err != nil {
+									return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
+								}
+								for _, artifact := range artifacts {
+									utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 								}
 							}
 							// PATTERN MATCHING MODE
 							if len(pattern) > 0 {
-								dlRE, err := regexp.Compile(pattern)
+								log.Infof("Downloading files matching pattern %#v", pattern)
+								artifacts, err := extract.Search(config)
 								if err != nil {
-									return fmt.Errorf("failed to compile regex for pattern '%s': %v", pattern, err)
+									return err
 								}
-								log.Infof("Downloading files that contain: %s", pattern)
-								if err := utils.RemoteUnzip(zr.File, dlRE, destPath, flat, true); err != nil {
-									return fmt.Errorf("failed to download pattern matching files from remote IPSW: %v", err)
+								for _, artifact := range artifacts {
+									utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 								}
 							}
 						}
