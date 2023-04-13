@@ -48,5 +48,7 @@ COPY --from=builder /bin/ipswd /bin/ipswd
 
 WORKDIR /data
 
+EXPOSE 3993
+
 ENTRYPOINT [ "/bin/ipswd" ]
 CMD [ "--help" ]
