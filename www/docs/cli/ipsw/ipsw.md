@@ -14,7 +14,7 @@ Download and Parse IPSWs (and SO much more)
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw/config.yaml)
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
   -h, --help            help for ipsw
   -V, --verbose         verbose output
 ```
@@ -23,6 +23,7 @@ Download and Parse IPSWs (and SO much more)
 
 * [ipsw debugserver](/docs/cli/ipsw/debugserver)	 - Prep device for remote debugging
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
+* [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
 * [ipsw dtree](/docs/cli/ipsw/dtree)	 - Parse DeviceTree
 * [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache
