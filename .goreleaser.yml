@@ -351,6 +351,7 @@ archives:
       - LICENSE
       - completions/ipsw/*
       - manpages/*
+      - config.example.yml
     wrap_in_directory: true
   - id: extras_archive
     builds:
@@ -373,6 +374,7 @@ archives:
       - LICENSE
       - completions/ipsw/*
       - manpages/*
+      - config.example.yml
     wrap_in_directory: true
   - id: frida_archive
     builds:
@@ -393,6 +395,7 @@ archives:
       - LICENSE
       - completions/ipsw/*
       - manpages/*
+      - config.example.yml
     wrap_in_directory: true
   - id: daemon_archive
     builds:
@@ -415,6 +418,7 @@ archives:
       - README.md
       - LICENSE
       - completions/ipswd/*
+      - config.example.yml
     wrap_in_directory: true
 
 brews:
@@ -440,11 +444,11 @@ brews:
       - ipsw-frida
     install: |
       bin.install "ipsw"
-      etc.install "config.example.yml" => "config.yml"
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
+      etc.install "config.example.yml" => "config.yml"
     test: |
       system "#{bin}/ipsw --version"
   - name: ipsw-frida
@@ -465,12 +469,12 @@ brews:
     conflicts:
       - ipsw
     install: |
-      bin.install "ipsw"
-      etc.install "config.example.yml" => "config.yml"      
+      bin.install "ipsw"    
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
+      etc.install "config.example.yml" => "config.yml"
     test: |
       system "#{bin}/ipsw --version"
   - name: ipswd
@@ -492,6 +496,7 @@ brews:
       bash_completion.install "completions/ipswd/_bash" => "ipswd"
       zsh_completion.install "completions/ipswd/_zsh" => "_ipswd"
       fish_completion.install "completions/ipswd/_fish" => "ipswd.fish"
+      etc.install "config.example.yml" => "config.yml"
     service: |
       run [opt_bin/"ipswd", "start"]
       keep_alive true
@@ -516,6 +521,8 @@ aurs:
     license: MIT
     private_key: /Users/blacktop/.ssh/aur
     git_url: "ssh://aur@aur.archlinux.org/ipsw-bin.git"
+    backup:
+      - /etc/ipsw.conf
     package: |-
       # bin
       install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
@@ -533,6 +540,10 @@ aurs:
 
       # man pages
       install -Dm644 "./manpages/ipsw.1.gz" "${pkgdir}/usr/share/man/man1/ipsw.1.gz"
+
+      # config
+      mkdir -p "${pkgdir}/etc"
+      install -Dm644 "./config.example.yml" "${pkgdir}/etc/ipsw.conf"
 
 nfpms:
   - id: packages
@@ -566,6 +577,10 @@ nfpms:
           mode: 0644
       - src: ./LICENSE
         dst: /usr/share/doc/ipsw/copyright
+        file_info:
+          mode: 0644
+      - src: ./config.example.yml
+        dst: /etc/ipsw.conf
         file_info:
           mode: 0644
     file_name_template: >-
@@ -618,6 +633,10 @@ nfpms:
           mode: 0644
       - src: ./LICENSE
         dst: /usr/share/doc/ipsw/copyright
+        file_info:
+          mode: 0644
+      - src: ./config.example.yml
+        dst: /etc/ipsw.conf
         file_info:
           mode: 0644
     scripts:
@@ -713,6 +732,9 @@ snapcrafts:
       - source: ./LICENSE
         destination: /usr/share/doc/ipsw/copyright
         mode: 0644
+      - source: ./config.example.yml
+        destination: /etc/ipsw.conf
+        mode: 0644
     apps:
       ipsw:
         command: ipsw
@@ -742,6 +764,9 @@ snapcrafts:
         mode: 0644
       - source: ./LICENSE
         destination: /usr/share/doc/ipsw/copyright
+        mode: 0644
+      - source: ./config.example.yml
+        destination: /etc/ipsw.conf
         mode: 0644
     apps:
       ipsw:
