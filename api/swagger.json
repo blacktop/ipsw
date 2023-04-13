@@ -18,30 +18,235 @@
   "paths": {
     "/_ping": {
       "get": {
-        "description": "This will return OK if the daemon is running.",
+        "description": "This will return \"OK\" if the daemon is running.",
         "tags": [
-          "daemon"
+          "Daemon"
         ],
-        "summary": "Daemon health check.",
-        "operationId": "daemonPingGet"
+        "summary": "Ping",
+        "operationId": "getDaemonPing"
       },
       "head": {
-        "description": "This will return OK if the daemon is running.",
+        "description": "This will return if 200 the daemon is running.",
         "tags": [
-          "daemon"
+          "Daemon"
         ],
-        "summary": "Daemon health check.",
-        "operationId": "daemonPingHead"
+        "summary": "Ping",
+        "operationId": "headDaemonPing"
+      }
+    },
+    "/device_list": {
+      "get": {
+        "description": "This will return JSON of all XCode devices.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DeviceList"
+        ],
+        "summary": "List XCode Devices.",
+        "operationId": "getDeviceList"
+      }
+    },
+    "/dmg": {
+      "get": {
+        "description": "Extract DMGs from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "DMG",
+        "operationId": "getExtractDmg"
+      }
+    },
+    "/dsc": {
+      "get": {
+        "description": "Extract dyld_shared_caches from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "DSC",
+        "operationId": "getExtractDsc",
+        "parameters": [
+          {
+            "description": "Parameters for the extract operation",
+            "name": "Body",
+            "in": "body",
+            "schema": {}
+          }
+        ]
+      }
+    },
+    "/imports": {
+      "get": {
+        "description": "Get list of dylibs that import a given dylib.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Imports",
+        "operationId": "getDscImports",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "dylib to search for",
+            "name": "dylib",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/info": {
+      "get": {
+        "description": "Get info about a given DSC",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Info",
+        "operationId": "getDscInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/kbag": {
+      "get": {
+        "description": "Extract KBAGs from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "KBAG",
+        "operationId": "getExtractKbags"
+      }
+    },
+    "/kernel": {
+      "get": {
+        "description": "Extract kernelcaches from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "Kernel",
+        "operationId": "getExtractKernel"
+      }
+    },
+    "/macho": {
+      "get": {
+        "description": "Get MachO info for a given dylib in the DSC.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "MachO",
+        "operationId": "getDscMacho",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "dylib to search for",
+            "name": "dylib",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/pattern": {
+      "get": {
+        "description": "Extract files from an IPSW that match a given pattern.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "Pattern",
+        "operationId": "getExtractPattern"
+      }
+    },
+    "/str": {
+      "get": {
+        "description": "Get strings in the DSC that match a given pattern.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Strings",
+        "operationId": "getDscStrings",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "regex to search for",
+            "name": "pattern",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/symaddr": {
+      "get": {
+        "description": "Get symbols addresses in the DSC that match a given lookup JSON payload.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Symbols",
+        "operationId": "getDscSymbols",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
       }
     },
     "/version": {
       "get": {
         "description": "This will return the daemon version info.",
         "tags": [
-          "daemon"
+          "Daemon"
         ],
-        "summary": "Daemon version.",
-        "operationId": "daemonvVersion"
+        "summary": "Version",
+        "operationId": "getDaemonVersion"
       }
     }
   }

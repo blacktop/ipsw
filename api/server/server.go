@@ -68,7 +68,7 @@ func (s *Server) Start() error {
 		})
 	})
 
-	rg := s.router.Group(fmt.Sprintf("/v%s", api.DefaultVersion))
+	rg := s.router.Group("/v" + api.DefaultVersion)
 
 	routes.Add(rg)
 

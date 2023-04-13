@@ -9,16 +9,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Ping contains response of Engine API:
-// GET "/_ping"
-type Ping struct {
-	APIVersion     string
-	OSType         string
-	BuilderVersion string
-}
-
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
+	// swagger:route GET /device_list DeviceList getDeviceList
+	//
+	// List XCode Devices.
+	//
+	// This will return JSON of all XCode devices.
+	//
+	//     Produces:
+	//     - application/json
 	rg.GET("/device_list", func(c *gin.Context) {
 		c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
 		c.Header("Pragma", "no-cache")

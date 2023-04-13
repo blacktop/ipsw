@@ -34,6 +34,19 @@
         "operationId": "daemonPingHead"
       }
     },
+    "/device_list": {
+      "get": {
+        "description": "This will return JSON of all XCode devices.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DeviceList"
+        ],
+        "summary": "List XCode Devices.",
+        "operationId": "getDeviceList"
+      }
+    },
     "/version": {
       "get": {
         "description": "This will return the daemon version info.",

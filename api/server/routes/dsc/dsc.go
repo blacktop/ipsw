@@ -11,6 +11,10 @@ import (
 
 func dscImports(c *gin.Context) {
 	dscPath := c.Query("path")
+	if dscPath == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing required 'path' query parameter"})
+		return
+	}
 	f, err := dyld.Open(dscPath)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -29,6 +33,10 @@ func dscImports(c *gin.Context) {
 
 func dscInfo(c *gin.Context) {
 	dscPath := c.Query("path")
+	if dscPath == "" {
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "missing required 'path' query parameter"})
+		return
+	}
 	f, err := dyld.Open(dscPath)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
@@ -69,6 +77,25 @@ func dscMacho(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "macho": m})
 }
 
+func dscStrings(c *gin.Context) {
+	dscPath := c.Query("path")
+	f, err := dyld.Open(dscPath)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	defer f.Close()
+
+	pattern := c.Query("pattern")
+	strs, err := cmd.GetStrings(f, pattern)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "strings": strs})
+}
+
 func dscSymbols(c *gin.Context) {
 	dscPath := c.Query("path")
 	f, err := dyld.Open(dscPath)
@@ -91,23 +118,4 @@ func dscSymbols(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "symbols": syms})
-}
-
-func dscStrings(c *gin.Context) {
-	dscPath := c.Query("path")
-	f, err := dyld.Open(dscPath)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-	defer f.Close()
-
-	pattern := c.Query("pattern")
-	strs, err := cmd.GetStrings(f, pattern)
-	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
-		return
-	}
-
-	c.IndentedJSON(http.StatusOK, gin.H{"path": dscPath, "strings": strs})
 }

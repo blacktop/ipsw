@@ -20,18 +20,54 @@ import (
 )
 
 // Config is the extract command configuration.
+//
+// swagger:model ExtractConfig
 type Config struct {
-	IPSW     string   `json:"ipsw,omitempty"`
-	URL      string   `json:"url,omitempty"`
-	Pattern  string   `json:"pattern,omitempty"`
-	Arches   []string `json:"arches,omitempty"`
-	Proxy    string   `json:"proxy,omitempty"`
-	Insecure bool     `json:"insecure,omitempty"`
-	DMGs     bool     `json:"dmgs,omitempty"`
-	DmgType  string   `json:"dmg_type,omitempty"`
-	Flatten  bool     `json:"flatten,omitempty"`
-	Progress bool     `json:"progress,omitempty"`
-	Output   string   `json:"output,omitempty"`
+	// path to the IPSW
+	//
+	// required: true
+	IPSW string `json:"ipsw,omitempty"`
+	// url to the remote IPSW
+	//
+	// required: true
+	URL string `json:"url,omitempty"`
+	// regex pattern to search for in the IPSW
+	//
+	// required: true
+	Pattern string `json:"pattern,omitempty"`
+	// arches of the DSCs to extract
+	//
+	// required: true
+	Arches []string `json:"arches,omitempty"`
+	// http proxy to use
+	//
+	// required: true
+	Proxy string `json:"proxy,omitempty"`
+	// don't verify the certificate chain
+	//
+	// required: true
+	Insecure bool `json:"insecure,omitempty"`
+	// search the DMGs for files
+	//
+	// required: true
+	DMGs bool `json:"dmgs,omitempty"`
+	// type of DMG to extract
+	//
+	// required: true
+	// pattern: (app|sys|fs)
+	DmgType string `json:"dmg_type,omitempty"`
+	// flatten the extracted files paths (remove the folders)
+	//
+	// required: true
+	Flatten bool `json:"flatten,omitempty"`
+	// show the progress bar (when using the CLI)
+	//
+	// required: false
+	Progress bool `json:"progress,omitempty"`
+	// output directory to write extracted files to
+	//
+	// required: true
+	Output string `json:"output,omitempty"`
 }
 
 func isURL(str string) bool {
