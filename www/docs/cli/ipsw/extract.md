@@ -17,7 +17,7 @@ ipsw extract <IPSW/OTA | URL> [flags]
 ### Options
 
 ```
-  -m, --dmg                     Extract File System DMG file
+  -m, --dmg string              Extract DMG file (app, sys, fs)
   -t, --dtree                   Extract DeviceTree
   -d, --dyld                    Extract dyld_shared_cache
   -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
@@ -39,7 +39,7 @@ ipsw extract <IPSW/OTA | URL> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw/config.yaml)
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 

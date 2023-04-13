@@ -24,6 +24,7 @@ ipsw macho search [flags]
       --ivar string           Search for specific ObjC instance variable regex
   -l, --load-command string   Search for specific load command regex
   -p, --protocol string       Search for specific ObjC protocol regex
+  -x, --section string        Search for specific section regex
   -s, --sel string            Search for specific ObjC selector regex
   -m, --sym string            Search for specific symbol regex
 ```
@@ -32,7 +33,7 @@ ipsw macho search [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw/config.yaml)
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 

@@ -34,7 +34,7 @@ ipsw macho disass <MACHO> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw/config.yaml)
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 

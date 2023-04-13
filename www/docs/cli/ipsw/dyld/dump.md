@@ -31,7 +31,7 @@ ipsw dyld dump <dyld_shared_cache> <address> [flags]
 
 ```
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw/config.yaml)
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
   -V, --verbose         verbose output
 ```
 
