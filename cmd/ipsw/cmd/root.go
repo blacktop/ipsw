@@ -77,7 +77,7 @@ func init() {
 	// will be global for your application.
 
 	// Flags
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.ipsw/config.yaml)")
+	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.config/ipsw/config.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "V", false, "verbose output")
 	rootCmd.PersistentFlags().BoolVar(&Color, "color", false, "colorize output")
 	rootCmd.PersistentFlags().String("diff-tool", "", "git diff tool (for --diff commands)")
@@ -109,7 +109,7 @@ func initConfig() {
 		cobra.CheckErr(err)
 
 		// Search config in home directory with name ".ipsw" (without extension).
-		viper.AddConfigPath(filepath.Join(home, ".ipsw"))
+		viper.AddConfigPath(filepath.Join(home, ".config", "ipsw"))
 		viper.SetConfigType("yaml")
 		viper.SetConfigName("config")
 	}

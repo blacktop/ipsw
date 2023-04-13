@@ -1,5 +1,3 @@
-//go:build darwin
-
 /*
 Copyright © 2018-2023 blacktop
 
@@ -24,19 +22,15 @@ THE SOFTWARE.
 package cmd
 
 import (
-	"archive/zip"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"syscall"
-	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/spf13/cobra"
 )
 
@@ -66,82 +60,24 @@ var mountCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
-		ipswPath := filepath.Clean(args[1])
-
-		i, err := info.Parse(ipswPath)
+		mctx, err := mount.DmgInIPSW(args[1], args[0])
 		if err != nil {
-			return fmt.Errorf("failed to parse IPSW: %v", err)
+			return fmt.Errorf("failed to mount %s DMG: %v", args[0], err)
 		}
 
-		var dmgPath string
-
-		switch args[0] {
-		case "fs":
-			dmgPath, err = i.GetFileSystemOsDmg()
-			if err != nil {
-				return fmt.Errorf("failed to get filesystem DMG: %v", err)
-			}
-			log.Info("Found Filesystem DMG")
-		case "sys":
-			dmgPath, err = i.GetSystemOsDmg()
-			if err != nil {
-				return fmt.Errorf("failed to get SystemOS DMG: %v", err)
-			}
-			log.Info("Found SystemOS DMG")
-		case "app":
-			dmgPath, err = i.GetAppOsDmg()
-			if err != nil {
-				return fmt.Errorf("failed to get AppOS DMG: %v", err)
-			}
-			log.Info("Found AppOS DMG")
-		default:
-			return fmt.Errorf("invalid subcommand: %s; must be one of: '%s'", args[0], strings.Join(mountCmdSubCmds, "', '"))
-		}
-
-		// check if filesystem DMG already exists (due to previous mount command)
-		if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
-			// extract filesystem DMG
-			dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
-				return strings.EqualFold(filepath.Base(f.Name), dmgPath)
-			})
-			if err != nil {
-				return fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err)
-			}
-			if len(dmgs) == 0 {
-				return fmt.Errorf("failed to find %s in IPSW", dmgPath)
-			}
-			defer os.Remove(dmgs[0])
+		if mctx.AlreadyMounted {
+			log.Infof("%s DMG already mounted at %s", args[0], mctx.MountPoint)
 		} else {
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
-		}
-
-		// mount filesystem DMG
-		utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
-		mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
-		if err != nil {
-			if !errors.Is(err, utils.ErrMountResourceBusy) {
-				return fmt.Errorf("failed to mount DMG: %v", err)
-			}
-		}
-		if alreadyMounted {
-			utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", dmgPath))
-		} else {
-			defer func() {
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", dmgPath))
-				if err := utils.Retry(3, 2*time.Second, func() error {
-					return utils.Unmount(mountPoint, false)
-				}); err != nil {
-					log.Errorf("failed to unmount %s at %s: %v", dmgPath, mountPoint, err)
-				}
-			}()
+			log.Infof("Mounted %s DMG %s", args[0], filepath.Base(mctx.DmgPath))
 		}
 
 		// block until user hits ctrl-c
 		done := make(chan os.Signal, 1)
 		signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
-		utils.Indent(log.Info, 3)(fmt.Sprintf("Press Ctrl+C to unmount '%s' ...", mountPoint))
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Press Ctrl+C to unmount '%s' ...", mctx.MountPoint))
 		<-done
 
-		return nil
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Unmounting %s", mctx.MountPoint))
+		return mctx.Unmount()
 	},
 }

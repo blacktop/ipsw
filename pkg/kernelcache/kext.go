@@ -147,22 +147,8 @@ func GetKextInfos(m *macho.File) ([]KmodInfoT, error) {
 	return nil, fmt.Errorf("section __PRELINK_INFO.__kmod_start not found")
 }
 
-// KextList lists all the kernel extensions in the kernelcache
-func KextList(kernel string, diffable bool) ([]string, error) {
-	var out []string
-
-	m, err := macho.Open(kernel)
-	if err != nil {
-		return nil, err
-	}
-	defer m.Close()
-
-	kextStartAdddrs, err := GetKextStartVMAddrs(m)
-	if err != nil {
-		log.Debugf("failed to get kext start addresses: %v", err)
-	}
-
-	if infoSec := m.Section("__PRELINK_INFO", "__info"); infoSec != nil {
+func GetKexts(kernel *macho.File) ([]CFBundle, error) {
+	if infoSec := kernel.Section("__PRELINK_INFO", "__info"); infoSec != nil {
 
 		data, err := infoSec.Data()
 		if err != nil {
@@ -175,18 +161,41 @@ func KextList(kernel string, diffable bool) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode __PRELINK_INFO.__info section: %v", err)
 		}
+		return prelink.PrelinkInfoDictionary, nil
+	}
+	return nil, fmt.Errorf("section __PRELINK_INFO.__info not found")
+}
 
-		if diffable {
-			for _, bundle := range prelink.PrelinkInfoDictionary {
-				out = append(out, fmt.Sprintf("%s (%s)", bundle.ID, bundle.Version))
-			}
-		} else {
-			for _, bundle := range prelink.PrelinkInfoDictionary {
-				if !bundle.OSKernelResource && len(kextStartAdddrs) > 0 {
-					out = append(out, fmt.Sprintf("%#x: %s (%s)", kextStartAdddrs[bundle.ModuleIndex]|tagPtrMask, bundle.ID, bundle.Version))
-				} else {
-					out = append(out, fmt.Sprintf("%#x: %s (%s)", bundle.ExecutableLoadAddr, bundle.ID, bundle.Version))
-				}
+// KextList lists all the kernel extensions in the kernelcache
+func KextList(kernelPath string, diffable bool) ([]string, error) {
+	var out []string
+
+	m, err := macho.Open(kernelPath)
+	if err != nil {
+		return nil, err
+	}
+	defer m.Close()
+
+	bundles, err := GetKexts(m)
+	if err != nil {
+		return nil, err
+	}
+
+	kextStartAdddrs, err := GetKextStartVMAddrs(m)
+	if err != nil {
+		log.Debugf("failed to get kext start addresses: %v", err)
+	}
+
+	if diffable {
+		for _, bundle := range bundles {
+			out = append(out, fmt.Sprintf("%s (%s)", bundle.ID, bundle.Version))
+		}
+	} else {
+		for _, bundle := range bundles {
+			if !bundle.OSKernelResource && len(kextStartAdddrs) > 0 {
+				out = append(out, fmt.Sprintf("%#x: %s (%s)", kextStartAdddrs[bundle.ModuleIndex]|tagPtrMask, bundle.ID, bundle.Version))
+			} else {
+				out = append(out, fmt.Sprintf("%#x: %s (%s)", bundle.ExecutableLoadAddr, bundle.ID, bundle.Version))
 			}
 		}
 	}

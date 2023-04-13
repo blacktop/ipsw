@@ -81,18 +81,18 @@ type sysMaster struct {
 }
 
 type sysent struct {
-	Call       uint64     // implementing function
-	Munge      uint64     // system call arguments munger for 32-bit process
-	ReturnType returnType // system call return types
-	NArg       int16      // number of args
-	ArgBytes   uint16     // Total size of arguments in bytes for 32-bit system calls
+	Call       uint64     `json:"call,omitempty"`        // implementing function
+	Munge      uint64     `json:"munge,omitempty"`       // system call arguments munger for 32-bit process
+	ReturnType returnType `json:"return_type,omitempty"` // system call return types
+	NArg       int16      `json:"n_arg,omitempty"`       // number of args
+	ArgBytes   uint16     `json:"arg_bytes,omitempty"`   // Total size of arguments in bytes for 32-bit system calls
 }
 
 type Sysent struct {
-	Name   string
-	Number int
-	Proto  string
-	New    bool
+	Name   string `json:"name,omitempty"`
+	Number int    `json:"number,omitempty"`
+	Proto  string `json:"proto,omitempty"`
+	New    bool   `json:"new,omitempty"`
 	sysent
 }
 

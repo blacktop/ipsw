@@ -359,7 +359,7 @@ var otaDLCmd = &cobra.Command{
 
 					if remoteKernel { // REMOTE KERNEL MODE
 						log.Info("Extracting remote kernelcache")
-						err = kernelcache.RemoteParse(zr, destPath)
+						_, err = kernelcache.RemoteParse(zr, destPath)
 						if err != nil {
 							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
 						}
@@ -413,7 +413,7 @@ var otaDLCmd = &cobra.Command{
 							return fmt.Errorf("failed to compile regex for pattern '%s': %v", remotePattern, err)
 						}
 						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						if err := utils.RemoteUnzip(zr.File, re, destPath, flat, true); err != nil {
+						if _, err := utils.SearchZip(zr.File, re, destPath, flat, true); err != nil {
 							utils.Indent(log.Warn, 2)("0 files matched pattern in remote OTA zip. Now checking payloadv2 payloads...")
 							rfiles, err := ota.RemoteList(zr)
 							if err != nil {

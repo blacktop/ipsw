@@ -94,51 +94,52 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 }
 
 // Extract extracts and decompresses a kernelcache from ipsw
-func Extract(ipsw, destPath string) error {
-	log.Debug("Extracting Kernelcache from IPSW")
+func Extract(ipsw, destPath string) ([]string, error) {
 	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
 		return strings.Contains(f.Name, "kernelcache")
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed extract kernelcache from ipsw")
+		return nil, fmt.Errorf("failed to unzip kernelcache: %v", err)
 	}
 
 	i, err := info.Parse(ipsw)
 	if err != nil {
-		return fmt.Errorf("failed to parse ipsw info: %v", err)
+		return nil, fmt.Errorf("failed to parse ipsw info: %v", err)
 	}
 
+	var artifacts []string
 	for _, kcache := range kcaches {
 		fname := i.GetKernelCacheFileName(kcache)
-		// fname := fmt.Sprintf("%s.%s", strings.TrimSuffix(kcache, filepath.Ext(kcache)), strings.Join(i.GetDevicesForKernelCache(kcache), "_"))
 		fname = filepath.Join(destPath, fname)
+		fname = filepath.Clean(fname)
 
 		content, err := os.ReadFile(kcache)
 		if err != nil {
-			return errors.Wrap(err, "failed to read Kernelcache")
+			return nil, errors.Wrap(err, "failed to read Kernelcache")
 		}
 
 		kc, err := ParseImg4Data(content)
 		if err != nil {
-			return errors.Wrap(err, "failed parse compressed kernelcache Img4")
+			return nil, fmt.Errorf("failed to parse im4p kernelcache data: %v", err)
 		}
 
 		dec, err := DecompressData(kc)
 		if err != nil {
-			return errors.Wrap(err, "failed to decompress kernelcache")
+			return nil, fmt.Errorf("failed to decompress kernelcache data: %v", err)
 		}
 
-		os.Mkdir(destPath, 0750)
-
-		err = os.WriteFile(fname, dec, 0660)
-		if err != nil {
-			return errors.Wrap(err, "failed to write kernelcache")
+		if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
+			return nil, fmt.Errorf("failed to create output directory: %v", err)
 		}
-		utils.Indent(log.Info, 2)("Created " + fname)
+		if err := os.WriteFile(fname, dec, 0660); err != nil {
+			return nil, fmt.Errorf("failed to write decompressed kernelcache: %v", err)
+		}
 		os.Remove(kcache)
+
+		artifacts = append(artifacts, fname)
 	}
 
-	return nil
+	return artifacts, nil
 }
 
 // Decompress decompresses a compressed kernelcache
@@ -295,11 +296,12 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 }
 
 // RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(zr *zip.Reader, destPath string) error {
+func RemoteParse(zr *zip.Reader, destPath string) ([]string, error) {
+	var artifacts []string
 
 	i, err := info.ParseZipFiles(zr.File)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, f := range zr.File {
@@ -309,35 +311,36 @@ func RemoteParse(zr *zip.Reader, destPath string) error {
 				kdata := make([]byte, f.UncompressedSize64)
 				rc, err := f.Open()
 				if err != nil {
-					return fmt.Errorf("failed to open kernelcache %s in zip: %v", f.Name, err)
+					return nil, fmt.Errorf("failed to open kernelcache %s in zip: %v", f.Name, err)
 				}
 				io.ReadFull(rc, kdata)
 				rc.Close()
 
 				kcomp, err := ParseImg4Data(kdata)
 				if err != nil {
-					return fmt.Errorf("failed to parse kernelcache im4p %s: %v", f.Name, err)
+					return nil, fmt.Errorf("failed to parse kernelcache im4p %s: %v", f.Name, err)
 				}
 
 				dec, err := DecompressData(kcomp)
 				if err != nil {
-					return fmt.Errorf("failed to decompress kernelcache %s: %v", f.Name, err)
+					return nil, fmt.Errorf("failed to decompress kernelcache %s: %v", f.Name, err)
 				}
 
 				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
-					return fmt.Errorf("failed to create destination directory: %v", err)
+					return nil, fmt.Errorf("failed to create destination directory: %v", err)
 				}
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
 				if err := os.WriteFile(fname, dec, 0660); err != nil {
-					return fmt.Errorf("failed to write kernelcache %s: %v", fname, err)
+					return nil, fmt.Errorf("failed to write kernelcache %s: %v", fname, err)
 				}
+				artifacts = append(artifacts, fname)
 			} else {
 				log.Warnf("kernelcache already exists: %s", fname)
 			}
 		}
 	}
 
-	return nil
+	return artifacts, nil
 }
 
 // Parse parses the compressed kernelcache Img4 data
