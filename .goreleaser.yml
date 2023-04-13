@@ -491,9 +491,9 @@ brews:
       zsh_completion.install "completions/ipswd/_zsh" => "_ipswd"
       fish_completion.install "completions/ipswd/_fish" => "ipswd.fish"
     service: |
-      run: ipswd
-      keep_alive: true
-      sockets: /var/run/ipsw.sock
+      run [opt_bin/"ipswd", "start"]
+      keep_alive true
+      sockets "tcp://127.0.0.1:3993"
     test: |
       system "#{bin}/ipswd --version"
 
