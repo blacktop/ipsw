@@ -7,23 +7,26 @@ import (
 	"path/filepath"
 	"strings"
 
+	env "github.com/caarlos0/env/v8"
 	"github.com/spf13/viper"
 )
 
 type daemon struct {
-	Host   string `json:"host"`
-	Port   int    `json:"port"`
-	Socket string `json:"socket"`
-	Debug  bool   `json:"debug"`
+	Host    string `json:"host" env:"DAEMON_HOST" envDefault:"localhost"`
+	Port    int    `json:"port" env:"DAEMON_PORT" envDefault:"3993"`
+	Socket  string `json:"socket" env:"DAEMON_SOCKET"`
+	Debug   bool   `json:"debug" env:"DAEMON_DEBUG"`
+	LogFile string `json:"logfile" env:"DAEMON_LOGFILE"`
 }
 
 type database struct {
-	Name     string `json:"database"`
-	Host     string `json:"host"`
-	Port     string `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
-	SSLMode  string `json:"sslmode"`
+	Driver   string `json:"driver" env:"DB_DRIVER"`
+	Name     string `json:"database" env:"DB_NAME"`
+	Host     string `json:"host" env:"DB_HOST"`
+	Port     string `json:"port" env:"DB_PORT"`
+	User     string `json:"user" env:"DB_USER"`
+	Password string `json:"password" env:"DB_PASSWORD"`
+	SSLMode  string `json:"sslmode" env:"DB_SSLMODE"`
 }
 
 // Config is the configuration struct
@@ -55,7 +58,14 @@ func (c *Config) verify() error {
 
 // LoadConfig loads the configuration file
 func LoadConfig() (*Config, error) {
-	var c *Config
+	c := Config{}
+
+	if len(viper.ConfigFileUsed()) == 0 {
+		// NOTE: this is here because if someone doesn't have a config.yml it will ignore the ENV vars
+		if err := env.ParseWithOptions(&c, env.Options{Prefix: "IPSW_"}); err != nil {
+			return nil, fmt.Errorf("config: failed to parse env vars: %v", err)
+		}
+	}
 
 	if err := viper.Unmarshal(&c); err != nil {
 		return nil, fmt.Errorf("config: failed to unmarshal: %v", err)
@@ -65,5 +75,5 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("config: failed to verify: %v", err)
 	}
 
-	return c, nil
+	return &c, nil
 }
