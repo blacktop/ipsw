@@ -479,7 +479,7 @@ brews:
       - daemon_archive
     folder: Formula
     homepage: "https://github.com/blacktop/ipsw"
-    description: "ipsw - Daemon."
+    description: "ipsw - Daemon"
     license: MIT
     dependencies:
       - name: ipsw
