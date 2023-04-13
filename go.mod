@@ -17,14 +17,14 @@ require (
 	github.com/blacktop/ranger v1.0.3
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/docker/docker v23.0.3+incompatible
-	github.com/dominikbraun/graph v0.16.2
+	github.com/dominikbraun/graph v0.17.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.2
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20230307103607-6e717729cb4f
 	github.com/gin-gonic/gin v1.9.0
-	github.com/glebarez/sqlite v1.7.0
+	github.com/glebarez/sqlite v1.8.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/gomarkdown/markdown v0.0.0-20230322041520-c84983bdbf2a
 	github.com/google/gousb v1.1.2
@@ -52,7 +52,7 @@ require (
 	golang.org/x/term v0.7.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.0
-	gorm.io/gorm v1.24.7-0.20230306060331-85eaf9eeda11
+	gorm.io/gorm v1.25.0
 )
 
 // TODO: remove this once https://github.com/spf13/cast/pull/155 is merged
