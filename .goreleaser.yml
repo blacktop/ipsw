@@ -262,10 +262,10 @@ builds:
   - id: linux_amd64_daemon_build
     main: ./cmd/ipswd
     binary: ipswd
-    # env:
-    #   - CGO_ENABLED=1
-    #   - CC=zig cc -target x86_64-linux-musl
-    #   - CXX=zig c++ -target x86_64-linux-musl
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target x86_64-linux-musl
+      - CXX=zig c++ -target x86_64-linux-musl
     goos:
       - linux
     goarch:
@@ -277,10 +277,10 @@ builds:
   - id: linux_arm64_daemon_build
     main: ./cmd/ipswd
     binary: ipswd
-    # env:
-    #   - CGO_ENABLED=1
-    #   - CC=zig cc -target aarch64-linux-musl
-    #   - CXX=zig c++ -target aarch64-linux-musl
+    env:
+      - CGO_ENABLED=1
+      - CC=zig cc -target aarch64-linux-musl
+      - CXX=zig c++ -target aarch64-linux-musl
     goos:
       - linux
     goarch:
