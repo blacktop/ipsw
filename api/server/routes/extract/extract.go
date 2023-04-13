@@ -4,32 +4,19 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	cmd "github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
-// ExtractParams contains all the bound params for the extract operations
-// typically these are obtained from a http.Request
-//
-// swagger:parameters getExtractDsc
-type ExtractParams struct {
-
-	// HTTP Request Object
-	HTTPRequest *http.Request `json:"-"`
-
-	// Parameters for the extract operation
-	// in: body
-	Body *cmd.Config
-}
-
 func extractDSC(c *gin.Context) {
-	var query ExtractParams
+	var query extract.Config
 	if err := c.BindQuery(&query); err != nil {
 		c.IndentedJSON(http.StatusBadRequest, err)
 		return
 	}
-	artifacts, err := cmd.DSC(query.Body)
+	artifacts, err := cmd.DSC(&query)
 	if err != nil {
 		c.AbortWithError(http.StatusInternalServerError, err)
 		return

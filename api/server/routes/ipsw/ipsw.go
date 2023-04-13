@@ -28,7 +28,7 @@ type File struct {
 }
 
 func getFsFiles(c *gin.Context) {
-	ipswPath := c.Query("ipsw_path")
+	ipswPath := c.Query("path")
 	ipswPath = filepath.Clean(ipswPath)
 
 	i, err := info.Parse(ipswPath)
@@ -103,11 +103,11 @@ func getFsFiles(c *gin.Context) {
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{"ipsw_path": ipswPath, "files": files})
+	c.IndentedJSON(http.StatusOK, gin.H{"path": ipswPath, "files": files})
 }
 
 func getFsEntitlements(c *gin.Context) {
-	ipswPath := c.Query("ipsw_path")
+	ipswPath := c.Query("path")
 	ipswPath = filepath.Clean(ipswPath)
 
 	ents, err := ent.GetDatabase(ipswPath, "")
@@ -126,5 +126,5 @@ func getFsEntitlements(c *gin.Context) {
 		entDB[f] = ents
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{"ipsw_path": ipswPath, "entitlements": entDB})
+	c.IndentedJSON(http.StatusOK, gin.H{"path": ipswPath, "entitlements": entDB})
 }

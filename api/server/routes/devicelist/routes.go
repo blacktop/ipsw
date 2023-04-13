@@ -1,4 +1,4 @@
-// Package devicelist contains the routes for the device_list API
+// Package devicelist contains the /device_list routes for the API
 package devicelist
 
 import (

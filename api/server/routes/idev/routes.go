@@ -1,19 +1,13 @@
 package idev
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 )
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
 	ig := rg.Group("/idev")
-	// base path
-	ig.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "idev")
-	})
-	// commands
+
 	// ig.GET("/afc", handler)       // TODO: implement this
 	// ig.GET("/afc/cat", handler)   // TODO:
 	// ig.GET("/afc/ls", handler)    // TODO:
@@ -52,6 +46,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// ig.GET("/img/mount", handler)   // TODO: implement this
 	// ig.GET("/img/unmount", handler) // TODO: implement this
 
+	// swagger:route GET /idev/info USB getIdevInfo
+	//
+	// Info
+	//
+	// Get info about USB connected devices.
 	ig.GET("/info", idevInfo) // `ipsw idev list`
 
 	// ig.GET("/loc", handler)       // TODO: implement this

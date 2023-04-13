@@ -2,43 +2,38 @@
 package extract
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 )
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
 	dl := rg.Group("/extract")
-	// base path
-	dl.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "extract")
-	})
-	// swagger:route GET /dsc Extract getExtractDsc
+
+	// swagger:route GET /extract/dsc Extract getExtractDsc
 	//
 	// DSC
 	//
 	// Extract dyld_shared_caches from an IPSW.
 	dl.GET("/dsc", extractDSC)
-	// swagger:route GET /dmg Extract getExtractDmg
+	// swagger:route GET /extract/dmg Extract getExtractDmg
 	//
 	// DMG
 	//
 	// Extract DMGs from an IPSW.
 	dl.GET("/dmg", extractDMG)
-	// swagger:route GET /kbag Extract getExtractKbags
+	// swagger:route GET /extract/kbag Extract getExtractKbags
 	//
 	// KBAG
 	//
 	// Extract KBAGs from an IPSW.
 	dl.GET("/kbag", extractKBAG)
-	// swagger:route GET /kernel Extract getExtractKernel
+	// swagger:route GET /extract/kernel Extract getExtractKernel
 	//
 	// Kernel
 	//
 	// Extract kernelcaches from an IPSW.
 	dl.GET("/kernel", extractKernel)
-	// swagger:route GET /pattern Extract getExtractPattern
+	// swagger:route GET /extract/pattern Extract getExtractPattern
 	//
 	// Pattern
 	//

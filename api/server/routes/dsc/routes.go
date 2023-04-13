@@ -1,19 +1,13 @@
 package dsc
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
 )
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
 	dr := rg.Group("/dsc")
-	// base path
-	dr.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "dsc")
-	})
-	// commands
+
 	// dr.GET("/a2f", handler)     // TODO: implement this
 	// dr.GET("/a2o", handler)     // TODO: implement this
 	// dr.GET("/a2s", handler)     // TODO: implement this
@@ -23,7 +17,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// dr.GET("/ida", handler)     // TODO: implement this
 	// dr.GET("/image", handler)   // TODO: implement this
 
-	// swagger:route GET /imports DSC getDscImports
+	// swagger:route GET /dsc/imports DSC getDscImports
 	//
 	// Imports
 	//
@@ -44,7 +38,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         required: true
 	//         type: string
 	dr.GET("/imports", dscImports)
-	// swagger:route GET /info DSC getDscInfo
+	// swagger:route GET /dsc/info DSC getDscInfo
 	//
 	// Info
 	//
@@ -60,7 +54,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         required: true
 	//         type: string
 	dr.GET("/info", dscInfo)
-	// swagger:route GET /macho DSC getDscMacho
+	// swagger:route GET /dsc/macho DSC getDscMacho
 	//
 	// MachO
 	//
@@ -88,7 +82,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// dr.GET("/slide", handler)   // TODO: implement this
 	// dr.GET("/split", handler)   // TODO: implement this
 
-	// swagger:route GET /str DSC getDscStrings
+	// swagger:route GET /dsc/str DSC getDscStrings
 	//
 	// Strings
 	//
@@ -112,7 +106,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// dr.GET("/stubs", handler) // TODO: implement this
 	// dr.GET("/swift", handler) // TODO: implement this
 
-	// swagger:route GET /symaddr DSC getDscSymbols
+	// swagger:route GET /dsc/symaddr DSC getDscSymbols
 	//
 	// Symbols
 	//

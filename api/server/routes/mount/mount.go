@@ -11,10 +11,27 @@ import (
 
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
-	rg.GET("/mount", func(c *gin.Context) {
-		c.JSON(http.StatusOK, "mount")
-	})
-	// commands
+	// swagger:route POST /mount/{type} Mount postMount
+	//
+	// Mount
+	//
+	// Mount a DMG inside a given IPSW.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: type
+	//         in: path
+	//         description: type of DMG to mount
+	// 	       pattern: (app|sys|fs)
+	//         required: true
+	//         type: string
+	//       + name: path
+	//         in: query
+	//         description: path to IPSW
+	//         required: true
+	//         type: string
 	rg.POST("/mount/:type", func(c *gin.Context) {
 		ipswPath := filepath.Clean(c.Query("path"))
 		ctx, err := mount.DmgInIPSW(ipswPath, c.Param("type"))
@@ -23,6 +40,25 @@ func AddRoutes(rg *gin.RouterGroup) {
 		}
 		c.JSON(http.StatusOK, gin.H{"dmg_path": ctx.DmgPath, "mount_point": ctx.MountPoint, "already_mounted": ctx.AlreadyMounted})
 	})
+	// swagger:route POST /unmount Mount postUnmount
+	//
+	// Unmount
+	//
+	// Unmount a previously mounted DMG.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: mount_point
+	//         in: path
+	//         description: mount point of DMG
+	//         required: true
+	//         type: string
+	//       + name: dmg_path
+	//         in: query
+	//         description: path to DMG
+	//         type: string
 	rg.POST("/unmount", func(c *gin.Context) {
 		ctx := mount.Context{}
 		if err := c.ShouldBindJSON(&ctx); err != nil {
