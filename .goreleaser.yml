@@ -719,6 +719,8 @@ snapcrafts:
     builds:
       - linux_amd64_daemon_build
       - linux_arm64_daemon_build
+    name: ipswd
+    name_template: "ipswd_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     summary: ipsw - Daemon.
     description: |
       ipsw - Daemon.
