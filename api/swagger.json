@@ -13,7 +13,7 @@
     "title": "The ipsw API.",
     "version": "v1.0"
   },
-  "host": "localhost:8080",
+  "host": "localhost:3993",
   "basePath": "/v1",
   "paths": {
     "/_ping": {
