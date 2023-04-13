@@ -149,12 +149,12 @@ jobs:
       #
       # Package Installers
       #
-      - name: Package Installers (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git 
-          scoop install blacktop/ipsw 
-          ipsw --help
+      # - name: Package Installers (Windows) FIXME: https://github.com/goreleaser/goreleaser/issues/3941
+      #   if: matrix.platform == 'windows-latest'
+      #   run: |
+      #     scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git
+      #     scoop install blacktop/ipsw
+      #     ipsw --help
       - name: Package Installers (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
