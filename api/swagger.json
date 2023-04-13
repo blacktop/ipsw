@@ -1,0 +1,582 @@
+{
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "title": "The ipsw API.",
+    "version": "v1.0"
+  },
+  "host": "localhost:8080",
+  "basePath": "/v1",
+  "paths": {
+    "/_ping": {
+      "get": {
+        "description": "This will return \"OK\" if the daemon is running.",
+        "tags": [
+          "Daemon"
+        ],
+        "summary": "Ping",
+        "operationId": "getDaemonPing"
+      },
+      "head": {
+        "description": "This will return if 200 the daemon is running.",
+        "tags": [
+          "Daemon"
+        ],
+        "summary": "Ping",
+        "operationId": "headDaemonPing"
+      }
+    },
+    "/device_list": {
+      "get": {
+        "description": "This will return JSON of all XCode devices.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DeviceList"
+        ],
+        "summary": "List XCode Devices.",
+        "operationId": "getDeviceList"
+      }
+    },
+    "/download/ipsw/ios/latest/build": {
+      "get": {
+        "description": "Get latest iOS build.",
+        "tags": [
+          "Download"
+        ],
+        "summary": "Latest iOS Build",
+        "operationId": "getDownloadLatestIPSWsBuild"
+      }
+    },
+    "/download/ipsw/ios/latest/version": {
+      "get": {
+        "description": "Get latest iOS version.",
+        "tags": [
+          "Download"
+        ],
+        "summary": "Latest iOS Version",
+        "operationId": "getDownloadLatestIPSWsVersion"
+      }
+    },
+    "/dsc/imports": {
+      "get": {
+        "description": "Get list of dylibs that import a given dylib.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Imports",
+        "operationId": "getDscImports",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "dylib to search for",
+            "name": "dylib",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/dsc/info": {
+      "get": {
+        "description": "Get info about a given DSC",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Info",
+        "operationId": "getDscInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/dsc/macho": {
+      "get": {
+        "description": "Get MachO info for a given dylib in the DSC.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "MachO",
+        "operationId": "getDscMacho",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "dylib to search for",
+            "name": "dylib",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/dsc/str": {
+      "get": {
+        "description": "Get strings in the DSC that match a given pattern.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Strings",
+        "operationId": "getDscStrings",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "regex to search for",
+            "name": "pattern",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/dsc/symaddr": {
+      "get": {
+        "description": "Get symbols addresses in the DSC that match a given lookup JSON payload.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Symbols",
+        "operationId": "getDscSymbols",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/extract/dmg": {
+      "get": {
+        "description": "Extract DMGs from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "DMG",
+        "operationId": "getExtractDmg"
+      }
+    },
+    "/extract/dsc": {
+      "get": {
+        "description": "Extract dyld_shared_caches from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "DSC",
+        "operationId": "getExtractDsc"
+      }
+    },
+    "/extract/kbag": {
+      "get": {
+        "description": "Extract KBAGs from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "KBAG",
+        "operationId": "getExtractKbags"
+      }
+    },
+    "/extract/kernel": {
+      "get": {
+        "description": "Extract kernelcaches from an IPSW.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "Kernel",
+        "operationId": "getExtractKernel"
+      }
+    },
+    "/extract/pattern": {
+      "get": {
+        "description": "Extract files from an IPSW that match a given pattern.",
+        "tags": [
+          "Extract"
+        ],
+        "summary": "Pattern",
+        "operationId": "getExtractPattern"
+      }
+    },
+    "/idev/info": {
+      "get": {
+        "description": "Get info about USB connected devices.",
+        "tags": [
+          "USB"
+        ],
+        "summary": "Info",
+        "operationId": "getIdevInfo"
+      }
+    },
+    "/info/ipsw": {
+      "get": {
+        "description": "Get IPSW info.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
+        "summary": "IPSW",
+        "operationId": "getIpswInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/info/ipsw/remote": {
+      "get": {
+        "description": "Get remote IPSW info.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
+        "summary": "Remote IPSW",
+        "operationId": "getRemoteIpswInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "url to IPSW",
+            "name": "url",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "http proxy to use",
+            "name": "proxy",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "ignore TLS errors",
+            "name": "insecure",
+            "in": "query"
+          }
+        ]
+      }
+    },
+    "/info/ota": {
+      "get": {
+        "description": "Get OTA info.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
+        "summary": "OTA",
+        "operationId": "getOtaInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to OTA",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/info/ota/remote": {
+      "get": {
+        "description": "Get remote OTA info.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
+        "summary": "Remote OTA",
+        "operationId": "getRemoteOtaInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "url to OTA",
+            "name": "url",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "http proxy to use",
+            "name": "proxy",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "ignore TLS errors",
+            "name": "insecure",
+            "in": "query"
+          }
+        ]
+      }
+    },
+    "/ipsw/fs/ents": {
+      "get": {
+        "description": "Get IPSW Filesystem DMG MachO entitlements.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "IPSW"
+        ],
+        "summary": "Entitlements",
+        "operationId": "getIpswFsEntitlements",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/ipsw/fs/files": {
+      "get": {
+        "description": "Get IPSW Filesystem DMG file listing.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "IPSW"
+        ],
+        "summary": "Files",
+        "operationId": "getIpswFsFiles",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/kernel/kexts": {
+      "get": {
+        "description": "Get kernelcache KEXTs info.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
+        "summary": "Kexts",
+        "operationId": "getKernelKexts",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to kernelcache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/kernel/syscall": {
+      "get": {
+        "description": "Get kernelcache syscalls info.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
+        "summary": "Syscalls",
+        "operationId": "getKernelSyscalls",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to kernelcache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/kernel/version": {
+      "get": {
+        "description": "Get kernelcache version.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
+        "summary": "Version",
+        "operationId": "getKernelVersion",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to kernelcache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/macho/info": {
+      "get": {
+        "description": "Get MachO info.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "MachO"
+        ],
+        "summary": "Info",
+        "operationId": "getMachoInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to MachO",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "architecture to get info for in universal MachO",
+            "name": "arch",
+            "in": "query"
+          }
+        ]
+      }
+    },
+    "/mount/{type}": {
+      "post": {
+        "description": "Mount a DMG inside a given IPSW.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Mount"
+        ],
+        "summary": "Mount",
+        "operationId": "postMount",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "type of DMG to mount",
+            "name": "type",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
+    "/unmount": {
+      "post": {
+        "description": "Unmount a previously mounted DMG.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Mount"
+        ],
+        "summary": "Unmount",
+        "operationId": "postUnmount",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "mount point of DMG",
+            "name": "mount_point",
+            "in": "path",
+            "required": true
+          },
+          {
+            "type": "string",
+            "description": "path to DMG",
+            "name": "dmg_path",
+            "in": "query"
+          }
+        ]
+      }
+    },
+    "/version": {
+      "get": {
+        "description": "This will return the daemon version info.",
+        "tags": [
+          "Daemon"
+        ],
+        "summary": "Version",
+        "operationId": "getDaemonVersion"
+      }
+    }
+  }
+}
