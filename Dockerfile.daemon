@@ -9,7 +9,7 @@ COPY . /go/src/github.com/blacktop/ipsw
 WORKDIR /go/src/github.com/blacktop/ipsw
 
 RUN CGO_ENABLED=1 go build \
-    -o /bin/ipsw \
+    -o /bin/ipswd \
     -ldflags "-X github.com/blacktop/ipsw/api/types.BuildVersion==${VERSION}" \
     -ldflags "-X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" \
     ./cmd/ipswd
@@ -45,6 +45,7 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 ENV IPSW_IN_DOCKER=1
 
 COPY --from=builder /bin/ipswd /bin/ipswd
+COPY config.example.yml /root/.config/ipsw/config.yml
 
 WORKDIR /data
 
