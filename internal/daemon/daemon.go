@@ -36,10 +36,11 @@ func (d *daemon) Start() (err error) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	d.server = server.NewServer(&server.Config{
-		Host:   d.conf.Daemon.Host,
-		Port:   d.conf.Daemon.Port,
-		Socket: d.conf.Daemon.Socket,
-		Debug:  d.conf.Daemon.Debug,
+		Host:    d.conf.Daemon.Host,
+		Port:    d.conf.Daemon.Port,
+		Socket:  d.conf.Daemon.Socket,
+		Debug:   d.conf.Daemon.Debug,
+		LogFile: d.conf.Daemon.LogFile,
 	})
 	return d.server.Start()
 }
