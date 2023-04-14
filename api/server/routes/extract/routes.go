@@ -8,7 +8,7 @@ import (
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
 	er := rg.Group("/extract")
-	// swagger:operation GET /extract/dsc Extract getExtractDsc
+	// swagger:operation POST /extract/dsc Extract getExtractDsc
 	//
 	// DSC
 	//
@@ -45,8 +45,8 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
-	er.GET("/dsc", extractDSC)
-	// swagger:operation GET /extract/dmg Extract getExtractDmg
+	er.POST("/dsc", extractDSC)
+	// swagger:operation POST /extract/dmg Extract getExtractDmg
 	//
 	// DMG
 	//
@@ -81,8 +81,8 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
-	er.GET("/dmg", extractDMG)
-	// swagger:operation GET /extract/kbag Extract getExtractKbags
+	er.POST("/dmg", extractDMG)
+	// swagger:operation POST /extract/kbag Extract getExtractKbags
 	//
 	// KBAG
 	//
@@ -116,8 +116,8 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
-	er.GET("/kbag", extractKBAG)
-	// swagger:operation GET /extract/kernel Extract getExtractKernel
+	er.POST("/kbag", extractKBAG)
+	// swagger:operation POST /extract/kernel Extract getExtractKernel
 	//
 	// Kernel
 	//
@@ -150,7 +150,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         output:
 	//           type: string
 	er.POST("/kernel", extractKernel)
-	// swagger:operation GET /extract/pattern Extract getExtractPattern
+	// swagger:operation POST /extract/pattern Extract getExtractPattern
 	//
 	// Pattern
 	//
@@ -186,5 +186,5 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
-	er.GET("/pattern", extractPattern)
+	er.POST("/pattern", extractPattern)
 }
