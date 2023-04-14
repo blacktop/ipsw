@@ -326,7 +326,7 @@ jobs:
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
         run: |
-          echo '[{"regex":".*zero.*", "image":"libsystem_c.dylib"}]' > dyld_symaddr.json
+          echo '[{"pattern":".*zero.*", "image":"libsystem_c.dylib"}]' > dyld_symaddr.json
           ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --in dyld_symaddr.json
       # - name: Run dyld symaddr (ALL)
       #   if: matrix.platform == 'macos-12'

@@ -13,7 +13,7 @@ description: How to use lookup JSON files
 ```json
 [
   {
-    "regex": ".*zero.*",
+    "pattern": ".*zero.*",
     "image": "libsystem_c.dylib"
   }
 ]
