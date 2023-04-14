@@ -204,51 +204,321 @@
     "/extract/dmg": {
       "get": {
         "description": "Extract DMGs from an IPSW.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
         "tags": [
           "Extract"
         ],
         "summary": "DMG",
-        "operationId": "getExtractDmg"
+        "operationId": "getExtractDmg",
+        "parameters": [
+          {
+            "description": "Extraction options",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "arches": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "dmg_type": {
+                  "type": "string",
+                  "pattern": "^(app|sys|fs)$"
+                },
+                "dmgs": {
+                  "type": "boolean"
+                },
+                "flatten": {
+                  "type": "boolean"
+                },
+                "insecure": {
+                  "type": "boolean"
+                },
+                "ipsw": {
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "proxy": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "/extract/dsc": {
       "get": {
         "description": "Extract dyld_shared_caches from an IPSW.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
         "tags": [
           "Extract"
         ],
         "summary": "DSC",
-        "operationId": "getExtractDsc"
+        "operationId": "getExtractDsc",
+        "parameters": [
+          {
+            "description": "Extraction options",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "arches": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "dmg_type": {
+                  "type": "string",
+                  "pattern": "^(app|sys|fs)$"
+                },
+                "dmgs": {
+                  "type": "boolean"
+                },
+                "flatten": {
+                  "type": "boolean"
+                },
+                "insecure": {
+                  "type": "boolean"
+                },
+                "ipsw": {
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "proxy": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "/extract/kbag": {
       "get": {
         "description": "Extract KBAGs from an IPSW.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
         "tags": [
           "Extract"
         ],
         "summary": "KBAG",
-        "operationId": "getExtractKbags"
+        "operationId": "getExtractKbags",
+        "parameters": [
+          {
+            "description": "Extraction options",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "arches": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "dmg_type": {
+                  "type": "string",
+                  "pattern": "^(app|sys|fs)$"
+                },
+                "dmgs": {
+                  "type": "boolean"
+                },
+                "flatten": {
+                  "type": "boolean"
+                },
+                "insecure": {
+                  "type": "boolean"
+                },
+                "ipsw": {
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "proxy": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "/extract/kernel": {
       "get": {
         "description": "Extract kernelcaches from an IPSW.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
         "tags": [
           "Extract"
         ],
         "summary": "Kernel",
-        "operationId": "getExtractKernel"
+        "operationId": "getExtractKernel",
+        "parameters": [
+          {
+            "description": "Extraction options",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "arches": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "dmg_type": {
+                  "type": "string",
+                  "pattern": "^(app|sys|fs)$"
+                },
+                "dmgs": {
+                  "type": "boolean"
+                },
+                "flatten": {
+                  "type": "boolean"
+                },
+                "insecure": {
+                  "type": "boolean"
+                },
+                "ipsw": {
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "proxy": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "/extract/pattern": {
       "get": {
         "description": "Extract files from an IPSW that match a given pattern.",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
         "tags": [
           "Extract"
         ],
         "summary": "Pattern",
-        "operationId": "getExtractPattern"
+        "operationId": "getExtractPattern",
+        "parameters": [
+          {
+            "description": "Extraction options",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "arches": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "dmg_type": {
+                  "type": "string",
+                  "pattern": "^(app|sys|fs)$"
+                },
+                "dmgs": {
+                  "type": "boolean"
+                },
+                "flatten": {
+                  "type": "boolean"
+                },
+                "insecure": {
+                  "type": "boolean"
+                },
+                "ipsw": {
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "pattern": {
+                  "type": "string"
+                },
+                "proxy": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "/idev/info": {
