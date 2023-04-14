@@ -10,7 +10,7 @@
   ],
   "swagger": "2.0",
   "info": {
-    "title": "The ipsw API.",
+    "description": "Package server The \u003ccode\u003eipswd\u003c/code\u003e API",
     "version": "v1.0"
   },
   "host": "localhost:3993",
