@@ -82,6 +82,7 @@ build-linux: ## Build ipsw (linux)
 .PHONY: docs
 docs: ## Build the cli docs
 	@echo " > Updating CLI Docs"
+	go generate ./...
 	hack/make/docs
 
 .PHONY: docs-search

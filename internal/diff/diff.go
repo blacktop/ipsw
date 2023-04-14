@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -19,6 +18,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/commands/ent"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
@@ -507,45 +507,13 @@ func (d *Diff) parseEntitlements() (string, error) {
 }
 
 func (d *Diff) parseLaunchdPlists() error {
-	getConfig := func(ctx Context) (string, error) {
-		fsDMG, err := ctx.Info.GetFileSystemOsDmg()
-		if err != nil {
-			return "", fmt.Errorf("failed to get File System DMG: %v", err)
-		}
-
-		extracted, err := utils.ExtractFromDMG(ctx.IPSWPath, fsDMG, d.tmpDir, regexp.MustCompile(`.*/sbin/launchd$`))
-		if err != nil {
-			return "", fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
-		}
-
-		if len(extracted) == 0 {
-			return "", fmt.Errorf("failed to extract launchd from %s: no files extracted", fsDMG)
-		} else if len(extracted) > 1 {
-			return "", fmt.Errorf("failed to extract launchd from %s: too many files extracted", fsDMG)
-		}
-		defer os.Remove(filepath.Clean(extracted[0]))
-
-		m, err := macho.Open(extracted[0])
-		if err != nil {
-			return "", fmt.Errorf("failed to open launchd: %v", err)
-		}
-		defer m.Close()
-
-		data, err := m.Section("__TEXT", "__config").Data()
-		if err != nil {
-			return "", fmt.Errorf("failed to get launchd config: %v", err)
-		}
-
-		return string(data), nil
-	}
-
-	oldConfig, err := getConfig(d.Old)
+	oldConfig, err := extract.LaunchdConfig(d.Old.IPSWPath)
 	if err != nil {
-		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' config: %v", err)
+		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'Old' launchd config: %v", err)
 	}
-	newConfig, err := getConfig(d.New)
+	newConfig, err := extract.LaunchdConfig(d.New.IPSWPath)
 	if err != nil {
-		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' config: %v", err)
+		return fmt.Errorf("diff: parseLaunchdPlists: failed to get 'New' launchd config: %v", err)
 	}
 	out, err := utils.GitDiff(
 		string(oldConfig)+"\n",

@@ -15,6 +15,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/commands/ent"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/gin-gonic/gin"
@@ -127,4 +128,16 @@ func getFsEntitlements(c *gin.Context) {
 	}
 
 	c.IndentedJSON(http.StatusOK, gin.H{"path": ipswPath, "entitlements": entDB})
+}
+
+func getFsLaunchdConfig(c *gin.Context) {
+	ipswPath := c.Query("path")
+
+	ldconf, err := extract.LaunchdConfig(ipswPath)
+	if err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, gin.H{"path": ipswPath, "launchd_config": ldconf})
 }
