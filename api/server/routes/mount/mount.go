@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/blacktop/ipsw/internal/commands/mount"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,8 +24,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: type
 	//         in: path
-	//         description: type of DMG to mount
-	// 	       pattern: (app|sys|fs)
+	//         description: type of DMG to mount (app|sys|fs)
 	//         required: true
 	//         type: string
 	//       + name: path
@@ -34,7 +34,12 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         type: string
 	rg.POST("/mount/:type", func(c *gin.Context) {
 		ipswPath := filepath.Clean(c.Query("path"))
-		ctx, err := mount.DmgInIPSW(ipswPath, c.Param("type"))
+		dmgType := c.Param("type")
+		if !utils.StrSliceContains([]string{"app", "sys", "fs"}, dmgType) {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "invalid dmg type: must be app, sys, or fs"})
+			return
+		}
+		ctx, err := mount.DmgInIPSW(ipswPath, dmgType)
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 		}
