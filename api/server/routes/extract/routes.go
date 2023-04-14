@@ -32,8 +32,6 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: string
 	//         url:
 	//           type: string
-	//         pattern:
-	//           type: string
 	//         arches:
 	//           type: array
 	//           items:
@@ -43,11 +41,6 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: string
 	//         insecure:
 	//           type: boolean
-	//         dmgs:
-	//           type: boolean
-	//         dmg_type:
-	//           type: string
-	//           pattern: ^(app|sys|fs)$
 	//         flatten:
 	//           type: boolean
 	//         output:
@@ -77,18 +70,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: string
 	//         url:
 	//           type: string
-	//         pattern:
-	//           type: string
-	//         arches:
-	//           type: array
-	//           items:
-	//           	type: string
-	//           	minLength: 1
 	//         proxy:
 	//           type: string
 	//         insecure:
-	//           type: boolean
-	//         dmgs:
 	//           type: boolean
 	//         dmg_type:
 	//           type: string
@@ -124,20 +108,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: string
 	//         pattern:
 	//           type: string
-	//         arches:
-	//           type: array
-	//           items:
-	//           	type: string
-	//           	minLength: 1
 	//         proxy:
 	//           type: string
 	//         insecure:
 	//           type: boolean
-	//         dmgs:
-	//           type: boolean
-	//         dmg_type:
-	//           type: string
-	//           pattern: ^(app|sys|fs)$
 	//         flatten:
 	//           type: boolean
 	//         output:
@@ -167,22 +141,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: string
 	//         url:
 	//           type: string
-	//         pattern:
-	//           type: string
-	//         arches:
-	//           type: array
-	//           items:
-	//           	type: string
-	//           	minLength: 1
 	//         proxy:
 	//           type: string
 	//         insecure:
 	//           type: boolean
-	//         dmgs:
-	//           type: boolean
-	//         dmg_type:
-	//           type: string
-	//           pattern: ^(app|sys|fs)$
 	//         flatten:
 	//           type: boolean
 	//         output:
@@ -214,20 +176,12 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: string
 	//         pattern:
 	//           type: string
-	//         arches:
-	//           type: array
-	//           items:
-	//           	type: string
-	//           	minLength: 1
 	//         proxy:
 	//           type: string
 	//         insecure:
 	//           type: boolean
 	//         dmgs:
 	//           type: boolean
-	//         dmg_type:
-	//           type: string
-	//           pattern: ^(app|sys|fs)$
 	//         flatten:
 	//           type: boolean
 	//         output:
