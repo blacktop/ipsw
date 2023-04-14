@@ -56,7 +56,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//
 	//     Parameters:
 	//       + name: mount_point
-	//         in: path
+	//         in: query
 	//         description: mount point of DMG
 	//         required: true
 	//         type: string
