@@ -1,4 +1,8 @@
-// Package server The <code>ipswd</code> API
+// Package server ipswd API
+//
+// This allows you to interact with <code>ipsw</code> in a VERY powerful and flexible way via a RESTful API.
+//
+// The <code>ipswd</code> design was heavily influenced by the design of dockerd. So many of the same concepts apply.
 //
 //	Schemes: http
 //	Host: localhost:3993
