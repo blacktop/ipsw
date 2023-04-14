@@ -10,7 +10,8 @@
   ],
   "swagger": "2.0",
   "info": {
-    "description": "Package server The \u003ccode\u003eipswd\u003c/code\u003e API",
+    "description": "This allows you to interact with \u003ccode\u003eipsw\u003c/code\u003e in a VERY powerful and flexible way via a RESTful API.\n\nThe \u003ccode\u003eipswd\u003c/code\u003e design was heavily influenced by the design of dockerd. So many of the same concepts apply.",
+    "title": "ipswd API",
     "version": "v1.0"
   },
   "host": "localhost:3993",
