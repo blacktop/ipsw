@@ -525,7 +525,7 @@
         "parameters": [
           {
             "type": "string",
-            "description": "type of DMG to mount",
+            "description": "type of DMG to mount (app|sys|fs)",
             "name": "type",
             "in": "path",
             "required": true
