@@ -70,7 +70,7 @@ func (s *Server) Start() error {
 	if len(s.conf.LogFile) > 0 {
 		f, err := os.Create(s.conf.LogFile)
 		if err != nil {
-			return fmt.Errorf("server: failed to create log file: %v\n", err)
+			return fmt.Errorf("server: failed to create log file: %v", err)
 		}
 		gin.DefaultWriter = io.MultiWriter(f, os.Stdout)
 	}
