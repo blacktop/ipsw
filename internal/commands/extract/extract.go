@@ -300,8 +300,8 @@ func Search(c *Config) ([]string, error) {
 		}
 		defer zr.Close()
 		out, err := utils.SearchZip(zr.File, re, destPath, c.Flatten, false)
-		if err != nil {
-			return nil, fmt.Errorf("failed to extract files matching pattern: %v", err)
+		if err != nil && !c.DMGs {
+			return nil, fmt.Errorf("failed to extract files matching pattern from ZIP: %v", err)
 		}
 		artifacts = append(artifacts, out...)
 		if c.DMGs { // SEARCH THE DMGs
