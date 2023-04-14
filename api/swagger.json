@@ -224,19 +224,9 @@
             "schema": {
               "type": "object",
               "properties": {
-                "arches": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
                 "dmg_type": {
                   "type": "string",
                   "pattern": "^(app|sys|fs)$"
-                },
-                "dmgs": {
-                  "type": "boolean"
                 },
                 "flatten": {
                   "type": "boolean"
@@ -248,9 +238,6 @@
                   "type": "string"
                 },
                 "output": {
-                  "type": "string"
-                },
-                "pattern": {
                   "type": "string"
                 },
                 "proxy": {
@@ -295,13 +282,6 @@
                     "minLength": 1
                   }
                 },
-                "dmg_type": {
-                  "type": "string",
-                  "pattern": "^(app|sys|fs)$"
-                },
-                "dmgs": {
-                  "type": "boolean"
-                },
                 "flatten": {
                   "type": "boolean"
                 },
@@ -312,9 +292,6 @@
                   "type": "string"
                 },
                 "output": {
-                  "type": "string"
-                },
-                "pattern": {
                   "type": "string"
                 },
                 "proxy": {
@@ -352,20 +329,6 @@
             "schema": {
               "type": "object",
               "properties": {
-                "arches": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "dmg_type": {
-                  "type": "string",
-                  "pattern": "^(app|sys|fs)$"
-                },
-                "dmgs": {
-                  "type": "boolean"
-                },
                 "flatten": {
                   "type": "boolean"
                 },
@@ -416,20 +379,6 @@
             "schema": {
               "type": "object",
               "properties": {
-                "arches": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "dmg_type": {
-                  "type": "string",
-                  "pattern": "^(app|sys|fs)$"
-                },
-                "dmgs": {
-                  "type": "boolean"
-                },
                 "flatten": {
                   "type": "boolean"
                 },
@@ -440,9 +389,6 @@
                   "type": "string"
                 },
                 "output": {
-                  "type": "string"
-                },
-                "pattern": {
                   "type": "string"
                 },
                 "proxy": {
@@ -480,17 +426,6 @@
             "schema": {
               "type": "object",
               "properties": {
-                "arches": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "dmg_type": {
-                  "type": "string",
-                  "pattern": "^(app|sys|fs)$"
-                },
                 "dmgs": {
                   "type": "boolean"
                 },
