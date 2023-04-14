@@ -1,4 +1,4 @@
-// Package server The ipsw API.
+// Package server The <code>ipswd</code> API
 //
 //	Schemes: http
 //	Host: localhost:3993
