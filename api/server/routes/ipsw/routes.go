@@ -39,4 +39,20 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         required: true
 	//         type: string
 	dl.GET("/fs/ents", getFsEntitlements)
+	// swagger:route GET /ipsw/fs/launchd IPSW getIpswFsLaunchd
+	//
+	// launchd Config
+	//
+	// Get <code>launchd</code> config from IPSW Filesystem DMG.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Parameters:
+	//       + name: path
+	//         in: query
+	//         description: path to IPSW
+	//         required: true
+	//         type: string
+	dl.GET("/fs/launchd", getFsLaunchdConfig)
 }

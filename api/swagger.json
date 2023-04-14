@@ -622,6 +622,28 @@
         ]
       }
     },
+    "/ipsw/fs/launchd": {
+      "get": {
+        "description": "Get \u003ccode\u003elaunchd\u003c/code\u003e config from IPSW Filesystem DMG.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "IPSW"
+        ],
+        "summary": "launchd Config",
+        "operationId": "getIpswFsLaunchd",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to IPSW",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ]
+      }
+    },
     "/kernel/kexts": {
       "get": {
         "description": "Get kernelcache KEXTs info.",

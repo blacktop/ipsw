@@ -11,6 +11,7 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -346,4 +347,42 @@ func Search(c *Config) ([]string, error) {
 		return artifacts, nil
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
+}
+
+// LaunchdConfig extracts launchd config from an IPSW
+func LaunchdConfig(path string) (string, error) {
+	ipswPath := filepath.Clean(path)
+
+	i, err := info.Parse(ipswPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+	fsDMG, err := i.GetFileSystemOsDmg()
+	if err != nil {
+		return "", fmt.Errorf("failed to get filesystem DMG path: %v", err)
+	}
+	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), regexp.MustCompile(`.*/sbin/launchd$`))
+	if err != nil {
+		return "", fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
+	}
+
+	if len(extracted) == 0 {
+		return "", fmt.Errorf("failed to extract launchd from %s: no files extracted", fsDMG)
+	} else if len(extracted) > 1 {
+		return "", fmt.Errorf("failed to extract launchd from %s: too many files extracted", fsDMG)
+	}
+	defer os.Remove(filepath.Clean(extracted[0]))
+
+	m, err := macho.Open(extracted[0])
+	if err != nil {
+		return "", fmt.Errorf("failed to open launchd: %v", err)
+	}
+	defer m.Close()
+
+	data, err := m.Section("__TEXT", "__config").Data()
+	if err != nil {
+		return "", fmt.Errorf("failed to get launchd config: %v", err)
+	}
+
+	return string(data), nil
 }
