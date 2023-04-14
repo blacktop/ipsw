@@ -166,7 +166,7 @@ func GetSymbols(f *dyld.File, lookups []Symbol) ([]Symbol, error) {
 	sym2imgs := make(map[string][]Symbol)
 	for _, lookup := range lookups {
 		if len(lookup.Pattern) == 0 {
-			return nil, fmt.Errorf("pattern cannot be empty: %v", lookup)
+			return nil, fmt.Errorf("'pattern' cannot be empty ('pattern' field can just be the name of the symbol): %#v", lookup)
 		}
 		if len(lookup.Image) > 0 {
 			image, err := f.Image(lookup.Image)

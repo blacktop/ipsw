@@ -432,11 +432,11 @@ Read in a JSON symbol lookup file
 ❯ jq . sym_lookup.json
 [
   {
-    "name": "__platform_memmove",
+    "pattern": "__platform_memmove",
     "image": "libsystem_platform.dylib"
   },
   {
-    "name": "_memcpy",
+    "pattern": "_memcpy",
     "image": "libsystem_c.dylib"
   }
 ]
