@@ -202,7 +202,7 @@
       }
     },
     "/extract/dmg": {
-      "get": {
+      "post": {
         "description": "Extract DMGs from an IPSW.",
         "consumes": [
           "application/json"
@@ -253,7 +253,7 @@
       }
     },
     "/extract/dsc": {
-      "get": {
+      "post": {
         "description": "Extract dyld_shared_caches from an IPSW.",
         "consumes": [
           "application/json"
@@ -307,7 +307,7 @@
       }
     },
     "/extract/kbag": {
-      "get": {
+      "post": {
         "description": "Extract KBAGs from an IPSW.",
         "consumes": [
           "application/json"
@@ -357,7 +357,7 @@
       }
     },
     "/extract/kernel": {
-      "get": {
+      "post": {
         "description": "Extract kernelcaches from an IPSW.",
         "consumes": [
           "application/json"
@@ -404,7 +404,7 @@
       }
     },
     "/extract/pattern": {
-      "get": {
+      "post": {
         "description": "Extract files from an IPSW that match a given pattern.",
         "consumes": [
           "application/json"
