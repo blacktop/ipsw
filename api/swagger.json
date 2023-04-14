@@ -556,7 +556,7 @@
             "type": "string",
             "description": "mount point of DMG",
             "name": "mount_point",
-            "in": "path",
+            "in": "query",
             "required": true
           },
           {
