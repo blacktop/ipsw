@@ -444,11 +444,12 @@ brews:
       - ipsw-frida
     install: |
       bin.install "ipsw"
+      prefix.install "LICENSE", "README.md"
+      prefix.install "config.example.yml" => "config.yml"
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
-      etc.install "config.example.yml" => "config.yml"
     test: |
       system "#{bin}/ipsw --version"
   - name: ipsw-frida
@@ -469,12 +470,13 @@ brews:
     conflicts:
       - ipsw
     install: |
-      bin.install "ipsw"    
+      bin.install "ipsw"
+      prefix.install "LICENSE", "README.md"
+      prefix.install "config.example.yml" => "config.yml"
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
-      etc.install "config.example.yml" => "config.yml"
     test: |
       system "#{bin}/ipsw --version"
   - name: ipswd
@@ -493,11 +495,13 @@ brews:
         type: optional
     install: |
       bin.install "ipswd"
+      prefix.install "LICENSE", "README.md"
+      prefix.install "config.example.yml" => "config.yml"
       bash_completion.install "completions/ipswd/_bash" => "ipswd"
       zsh_completion.install "completions/ipswd/_zsh" => "_ipswd"
       fish_completion.install "completions/ipswd/_fish" => "ipswd.fish"
-      etc.install "config.example.yml" => "config.yml"
     service: |
+      # run [opt_bin/"ipswd", "start", "--config", opt_prefix/"config.yaml"]
       run [opt_bin/"ipswd", "start"]
       keep_alive true
       sockets "tcp://127.0.0.1:3993"
