@@ -20,7 +20,7 @@ func downloadLatestIPSWs(c *gin.Context) {
 }
 
 func latestVersion(c *gin.Context) {
-	version, err := ipsw.GetLatestIosVersion("", false)
+	version, err := ipsw.GetLatestIosVersion("", true)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"message": err.Error()})
 		return
