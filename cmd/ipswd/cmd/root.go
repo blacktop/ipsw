@@ -24,6 +24,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/apex/log"
@@ -32,7 +33,10 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var (
+	userConfigDir string
+	cfgFile       string
+)
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -51,10 +55,22 @@ func Execute() {
 
 func init() {
 	log.SetHandler(clihander.Default)
-
 	cobra.OnInitialize(initConfig)
 	// Flags
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.config/ipsw/config.yaml)")
+	var defaultConfg string
+	switch runtime.GOOS {
+	case "darwin":
+		if os.Getenv("IPSW_IN_HOMEBREW") != "" {
+			defaultConfg = "/opt/homebrew/etc/ipsw/config.yaml"
+		} else {
+			defaultConfg = filepath.Join("$HOME", ".config", "ipsw", "config.yaml")
+		}
+	case "windows":
+		defaultConfg = filepath.Join("$AppData", "ipsw", "config.yaml")
+	case "linux":
+		defaultConfg = "/etc/ipsw/config.yaml"
+	}
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", defaultConfg, "config file")
 	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
@@ -68,11 +84,26 @@ func initConfig() {
 		// Find home directory.
 		home, err := os.UserHomeDir()
 		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".ipsw" (without extension).
-		viper.AddConfigPath(filepath.Join(home, ".config", "ipsw"))
-		viper.SetConfigType("yaml")
+		switch runtime.GOOS {
+		case "darwin":
+			// Search config in home directory with name ".ipsw" (without extension).
+			viper.AddConfigPath(filepath.Join(home, ".config", "ipsw"))
+			if os.Getenv("IPSW_IN_HOMEBREW") != "" {
+				viper.AddConfigPath("/opt/homebrew/etc/ipsw/config.yaml")
+			}
+		case "windows":
+			dir := os.Getenv("AppData")
+			if dir == "" {
+				log.Error("init config: %AppData% is not defined")
+			}
+			// Search config in home directory with name ".ipsw" (without extension).
+			viper.AddConfigPath(filepath.Join(dir, "ipsw"))
+		case "linux":
+			// Search config in home directory with name ".ipsw" (without extension).
+			viper.AddConfigPath(filepath.Join("/etc", "ipsw"))
+		}
 		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
 	}
 
 	viper.SetEnvPrefix("ipsw")
