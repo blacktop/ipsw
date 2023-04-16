@@ -10,6 +10,7 @@ snapshot:
   name_template: "{{ incpatch .Version }}-next"
 
 builds:
+  # CLIs ###########################################################
   - id: darwin_build
     main: ./cmd/ipsw
     binary: ipsw
@@ -490,20 +491,41 @@ brews:
     description: "ipsw - Daemon"
     license: MIT
     dependencies:
-      - name: ipsw
       - name: libusb
         type: optional
+    caveats: |
+      By default, ipswd runs on localhost (127.0.0.1), port 3993.
+      If you would like to change these settings, you will have to 
+      edit the configuration file:
+        #{etc}/ipsw/config.yml
+
+      To restart ipswd after an upgrade or config change:
+        brew services restart ipswd
+      Or, if you don't want/need a background service you can just run:
+        /opt/homebrew/opt/ipswd/bin/ipswd start
+
+      To see ipswd logs:
+        tail -f /opt/homebrew/var/log/ipswd.log
+
+      To remove ipswd:
+        brew services stop ipswd        
+        brew uninstall ipswd
     install: |
       bin.install "ipswd"
       prefix.install "LICENSE", "README.md"
-      prefix.install "config.example.yml" => "config.yml"
+      pkgshare.install "config.example.yml" => "ipsw/config.yml"
+      etc.install pkgshare/"ipsw/config.yml" => "ipsw/config.yml"
+      prefix.install_symlink etc/"ipsw/config.yml" => "config.yaml"
       bash_completion.install "completions/ipswd/_bash" => "ipswd"
       zsh_completion.install "completions/ipswd/_zsh" => "_ipswd"
       fish_completion.install "completions/ipswd/_fish" => "ipswd.fish"
     service: |
-      # run [opt_bin/"ipswd", "start", "--config", opt_prefix/"config.yaml"]
+      # run [opt_bin/"ipswd", "start", "--config", etc/"ipsw/config.yml"]
       run [opt_bin/"ipswd", "start"]
+      environment_variables IPSW_IN_HOMEBREW: 1
       keep_alive true
+      log_path var/"log/ipswd.log"
+      error_log_path var/"log/ipswd.err.log"
       sockets "tcp://127.0.0.1:3993"
     test: |
       system "#{bin}/ipswd --version"
@@ -661,50 +683,6 @@ nfpms:
       lintian_overrides:
         - statically-linked-binary
         - changelog-file-missing-in-native-package
-# - id: packages_extras
-#   file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_extras"
-#   builds:
-#     - linux_amd64_extras_build
-#     - linux_arm64_extras_build
-#   homepage:  https://github.com/blacktop/ipsw
-#   description: |-
-#     iOS/macOS Research Swiss Army Knife.
-#   maintainer: Blacktop <https://github.com/blacktop>
-#   license: MIT
-#   vendor: Blacktop
-#   bindir: /usr/bin
-#   section: utils
-#   contents:
-# - src: ./completions/ipsw/_bash
-#   dst: /usr/share/bash-completion/completions/ipsw
-#   file_info:
-#     mode: 0644
-# - src: ./completions/ipsw/_zsh
-#   dst: /usr/share/zsh/vendor-completions/_ipsw
-#   file_info:
-#     mode: 0644
-# - src: ./completions/ipsw/_fish
-#   dst: /usr/share/fish/vendor_completions.d/ipsw.fish
-#   file_info:
-#     mode: 0644
-#     - src: ./manpages/ipsw.1.gz
-#       dst: /usr/share/man/man1/ipsw.1.gz
-#       file_info:
-#         mode: 0644
-#     - src: ./LICENSE
-#       dst: /usr/share/doc/ipsw/copyright
-#       file_info:
-#         mode: 0644
-#   replacements:
-#     amd64: x86_64
-#   formats:
-#   - apk
-#   - deb
-#   - rpm
-#   deb:
-#     lintian_overrides:
-#       - statically-linked-binary
-#       - changelog-file-missing-in-native-package
 
 snapcrafts:
   - id: snaps
@@ -721,14 +699,8 @@ snapcrafts:
     publish: true
     license: MIT
     extra_files:
-      - source: ./completions/ipsw/_bash
-        destination: /usr/share/bash-completion/completions/ipsw
-        mode: 0644
-      - source: ./completions/ipsw/_zsh
-        destination: /usr/share/zsh/vendor-completions/_ipsw
-        mode: 0644
-      - source: ./completions/ipsw/_fish
-        destination: /usr/share/fish/vendor_completions.d/ipsw.fish
+      - source: ./completions/ipsw/*
+        destination: /usr/share/completions
         mode: 0644
       - source: ./manpages/ipsw.1.gz
         destination: /usr/share/man/man1/ipsw.1.gz
@@ -737,8 +709,18 @@ snapcrafts:
         destination: /usr/share/doc/ipsw/copyright
         mode: 0644
       - source: ./config.example.yml
-        destination: /etc/ipsw.conf
+        destination: /etc/ipsw/config.yml
         mode: 0644
+    layout:
+      # The path you want to access in sandbox.
+      /etc/ipsw/config.yml:
+        bind_file: $SNAP_DATA/etc/ipsw/config.yml
+      /usr/share/bash-completion/completions/ipsw:
+        bind_file: $SNAP_DATA/usr/share/completions/_bash
+      /usr/share/zsh/vendor-completions/_ipsw:
+        bind_file: $SNAP_DATA/usr/share/completions/_zsh
+      /usr/share/fish/vendor_completions.d/ipsw.fish:
+        bind_file: $SNAP_DATA/usr/share/completions/_fish
     apps:
       ipsw:
         command: ipsw
@@ -748,7 +730,6 @@ snapcrafts:
       - linux_amd64_daemon_build
       - linux_arm64_daemon_build
     name: ipswd
-    name_template: "ipswd_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     summary: ipsw - Daemon.
     description: |
       ipsw - Daemon.
@@ -757,25 +738,35 @@ snapcrafts:
     publish: true
     license: MIT
     extra_files:
-      - source: ./completions/ipsw/_bash
-        destination: /usr/share/bash-completion/completions/ipsw
-        mode: 0644
-      - source: ./completions/ipsw/_zsh
-        destination: /usr/share/zsh/vendor-completions/_ipsw
-        mode: 0644
-      - source: ./completions/ipsw/_fish
-        destination: /usr/share/fish/vendor_completions.d/ipsw.fish
+      - source: ./completions/ipsw/*
+        destination: /usr/share/completions
         mode: 0644
       - source: ./LICENSE
         destination: /usr/share/doc/ipsw/copyright
         mode: 0644
       - source: ./config.example.yml
-        destination: /etc/ipsw.conf
+        destination: /etc/ipsw/config.yml
         mode: 0644
+    layout:
+      # The path you want to access in sandbox.
+      /etc/ipsw/config.yml:
+        bind_file: $SNAP_DATA/etc/ipsw/config.yml
+      /usr/share/bash-completion/completions/ipsw:
+        bind_file: $SNAP_DATA/usr/share/completions/_bash
+      /usr/share/zsh/vendor-completions/_ipsw:
+        bind_file: $SNAP_DATA/usr/share/completions/_zsh
+      /usr/share/fish/vendor_completions.d/ipsw.fish:
+        bind_file: $SNAP_DATA/usr/share/completions/_fish
     apps:
-      ipsw:
+      ipswd:
         command: ipswd
+        args: start
         daemon: simple
+        refresh_mode: restart
+        restart_condition: "always"
+        environment:
+          IPSW_IN_SNAP: 1
+          IPSW_DAEMON_SOCKET: $SNAP_COMMON/ipsw.sock
         sockets:
           sock:
             listen-stream: $SNAP_COMMON/ipsw.sock
