@@ -29,7 +29,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: path
 	//         in: query
-	//         description: path to IPSW
+	//         description: path to dyld_shared_cache
 	//         required: true
 	//         type: string
 	//	    + name: dylib
@@ -50,7 +50,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: path
 	//         in: query
-	//         description: path to IPSW
+	//         description: path to dyld_shared_cache
 	//         required: true
 	//         type: string
 	dr.GET("/info", dscInfo)
@@ -66,7 +66,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: path
 	//         in: query
-	//         description: path to IPSW
+	//         description: path to dyld_shared_cache
 	//         required: true
 	//         type: string
 	//	    + name: dylib
@@ -94,7 +94,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: path
 	//         in: query
-	//         description: path to IPSW
+	//         description: path to dyld_shared_cache
 	//         required: true
 	//         type: string
 	//	    + name: pattern
@@ -121,7 +121,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     Parameters:
 	//       + name: path
 	//         in: query
-	//         description: path to IPSW
+	//         description: path to dyld_shared_cache
 	//         required: true
 	//         type: string
 	dr.POST("/symaddr", dscSymbols)
