@@ -625,6 +625,7 @@ nfpms:
         - statically-linked-binary
         - changelog-file-missing-in-native-package
   - id: daemon
+    package_name: ipswd
     builds:
       - linux_amd64_daemon_build
       - linux_arm64_daemon_build
@@ -636,6 +637,8 @@ nfpms:
     vendor: Blacktop
     bindir: /usr/bin
     section: utils
+    provides:
+      - ipswd
     contents:
       - src: ./hack/goreleaser/linux_install/ipsw.service
         dst: /lib/systemd/system/ipsws.service
@@ -766,13 +769,13 @@ snapcrafts:
     layout:
       # The path you want to access in sandbox.
       /etc/ipsw/config.yml:
-        bind_file: $SNAP_DATA/etc/ipsw/config.yml
+        bind_file: $SNAP_USER_COMMON/etc/ipsw/config.yml
       /usr/share/bash-completion/completions/ipswd:
-        bind_file: $SNAP_DATA/usr/share/completions/_bash
+        bind_file: $SNAP/usr/share/completions/_bash
       /usr/share/zsh/vendor-completions/_ipswd:
-        bind_file: $SNAP_DATA/usr/share/completions/_zsh
+        bind_file: $SNAP/usr/share/completions/_zsh
       /usr/share/fish/vendor_completions.d/ipswd.fish:
-        bind_file: $SNAP_DATA/usr/share/completions/_fish
+        bind_file: $SNAP/usr/share/completions/_fish
     apps:
       ipswd:
         command: bin/ipswd.wrapper
@@ -785,8 +788,7 @@ snapcrafts:
         sockets:
           sock:
             listen-stream: $SNAP_COMMON/ipsw.sock
-            socket-group: socket-group
-            socket-mode: 416
+            socket-mode: 0770
         plugs: ["home", "network", "network-bind"]
 
 scoop:
