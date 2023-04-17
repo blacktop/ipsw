@@ -6,6 +6,8 @@ on:
     paths-ignore:
       - "www/**"
       - ".github/workflows/docs.yml"
+      - ".goreleaser.yml"
+      - "config.example.yml"
   pull_request:
     branches:
       - master
