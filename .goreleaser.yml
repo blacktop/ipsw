@@ -747,7 +747,7 @@ snapcrafts:
     extra_files:
       - source: ./hack/goreleaser/linux_install/ipswd.wrapper
         destination: /bin/ipswd.wrapper
-        mode: 0644
+        mode: 0755
       - source: ./completions/ipswd/_bash
         destination: /usr/share/completions/_bash
         mode: 0644
