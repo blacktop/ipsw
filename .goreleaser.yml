@@ -406,14 +406,14 @@ archives:
       - windows_amd64_daemon_build
       - windows_arm64_daemon_build
     name_template: >-
-      {{ .ProjectName }}_{{ .Version }}_
+      ipswd_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
       {{- else if eq .Os "ios" }}iOS
       {{- else }}{{ .Os }}{{ end }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "all" }}universal
-      {{- else }}{{ .Arch }}{{ end }}_daemon
+      {{- else }}{{ .Arch }}{{ end }}
     rlcp: true
     files:
       - README.md
@@ -669,11 +669,11 @@ nfpms:
       postinstall: "./hack/goreleaser/linux_install/postinstall.sh"
       postremove: "./hack/goreleaser/linux_install/postremove.sh"
     file_name_template: >-
-      {{ .ProjectName }}_{{ .Version }}_
+      ipswd_{{ .Version }}_
       {{- .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}_daemon
+      {{- else }}{{ .Arch }}{{ end }}
     formats:
       - deb
       - rpm
@@ -699,7 +699,13 @@ snapcrafts:
     publish: true
     license: MIT
     extra_files:
-      - source: ./completions/ipsw/*
+      - source: ./completions/ipsw/_bash
+        destination: /usr/share/completions
+        mode: 0644
+      - source: ./completions/ipsw/_zsh
+        destination: /usr/share/completions
+        mode: 0644
+      - source: ./completions/ipsw/_fish
         destination: /usr/share/completions
         mode: 0644
       - source: ./manpages/ipsw.1.gz
@@ -730,6 +736,7 @@ snapcrafts:
       - linux_amd64_daemon_build
       - linux_arm64_daemon_build
     name: ipswd
+    name_template: "ipswd-{{.Version}}-{{.Os}}-{{.Arch}}"
     summary: ipsw - Daemon.
     description: |
       ipsw - Daemon.
@@ -738,7 +745,13 @@ snapcrafts:
     publish: true
     license: MIT
     extra_files:
-      - source: ./completions/ipsw/*
+      - source: ./completions/ipswd/_bash
+        destination: /usr/share/completions
+        mode: 0644
+      - source: ./completions/ipswd/_zsh
+        destination: /usr/share/completions
+        mode: 0644
+      - source: ./completions/ipswd/_fish
         destination: /usr/share/completions
         mode: 0644
       - source: ./LICENSE
@@ -751,11 +764,11 @@ snapcrafts:
       # The path you want to access in sandbox.
       /etc/ipsw/config.yml:
         bind_file: $SNAP_DATA/etc/ipsw/config.yml
-      /usr/share/bash-completion/completions/ipsw:
+      /usr/share/bash-completion/completions/ipswd:
         bind_file: $SNAP_DATA/usr/share/completions/_bash
-      /usr/share/zsh/vendor-completions/_ipsw:
+      /usr/share/zsh/vendor-completions/_ipswd:
         bind_file: $SNAP_DATA/usr/share/completions/_zsh
-      /usr/share/fish/vendor_completions.d/ipsw.fish:
+      /usr/share/fish/vendor_completions.d/ipswd.fish:
         bind_file: $SNAP_DATA/usr/share/completions/_fish
     apps:
       ipswd:
