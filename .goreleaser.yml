@@ -445,8 +445,9 @@ brews:
       - ipsw-frida
     install: |
       bin.install "ipsw"
-      prefix.install "LICENSE", "README.md"
-      prefix.install "config.example.yml" => "config.yml"
+      prefix.install "LICENSE", "README.md", "config.example.yml"
+      (etc/"ipsw").mkpath
+      etc.install prefix/"config.example.yml" => "ipsw/config.yml"
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
@@ -472,8 +473,9 @@ brews:
       - ipsw
     install: |
       bin.install "ipsw"
-      prefix.install "LICENSE", "README.md"
-      prefix.install "config.example.yml" => "config.yml"
+      prefix.install "LICENSE", "README.md", "config.example.yml"
+      (etc/"ipsw").mkpath
+      etc.install prefix/"config.example.yml" => "ipsw/config.yml"
       bash_completion.install "completions/ipsw/_bash" => "ipsw"
       zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
       fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
@@ -495,7 +497,7 @@ brews:
         type: optional
     caveats: |
       By default, ipswd runs on localhost (127.0.0.1), port 3993.
-      If you would like to change these settings, you will have to 
+      If you would like to change these settings, you will have to
       edit the configuration file:
         #{etc}/ipsw/config.yml
 
@@ -508,20 +510,18 @@ brews:
         tail -f /opt/homebrew/var/log/ipswd.log
 
       To remove ipswd:
-        brew services stop ipswd        
+        brew services stop ipswd
         brew uninstall ipswd
     install: |
       bin.install "ipswd"
-      prefix.install "LICENSE", "README.md"
-      pkgshare.install "config.example.yml" => "ipsw/config.yml"
-      etc.install pkgshare/"ipsw/config.yml" => "ipsw/config.yml"
-      prefix.install_symlink etc/"ipsw/config.yml" => "config.yaml"
+      prefix.install "LICENSE", "README.md", "config.example.yml"
+      (etc/"ipsw").mkpath
+      etc.install prefix/"config.example.yml" => "ipsw/config.yml"
       bash_completion.install "completions/ipswd/_bash" => "ipswd"
       zsh_completion.install "completions/ipswd/_zsh" => "_ipswd"
       fish_completion.install "completions/ipswd/_fish" => "ipswd.fish"
     service: |
-      # run [opt_bin/"ipswd", "start", "--config", etc/"ipsw/config.yml"]
-      run [opt_bin/"ipswd", "start"]
+      run [opt_bin/"ipswd", "start", "--config", etc/"ipsw/config.yml"]
       environment_variables IPSW_IN_HOMEBREW: 1
       keep_alive true
       log_path var/"log/ipswd.log"
