@@ -768,8 +768,6 @@ snapcrafts:
         mode: 0644
     layout:
       # The path you want to access in sandbox.
-      /etc/ipsw/config.yml:
-        bind_file: $SNAP_USER_COMMON/etc/ipsw/config.yml
       /usr/share/bash-completion/completions/ipswd:
         bind_file: $SNAP/usr/share/completions/_bash
       /usr/share/zsh/vendor-completions/_ipswd:
