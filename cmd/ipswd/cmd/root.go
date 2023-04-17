@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -70,7 +71,7 @@ func init() {
 	case "linux":
 		defaultConfg = "/etc/ipsw/config.yaml"
 	}
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", defaultConfg, "config file")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", fmt.Sprintf("config file (default is %s)", defaultConfg))
 	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 }
