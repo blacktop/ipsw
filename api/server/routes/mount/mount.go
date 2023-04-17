@@ -10,6 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// swagger:response
+type mountReponse struct {
+	mount.Context
+}
+
+// swagger:response
+type successResponse struct {
+	Success bool `json:"success,omitempty"`
+}
+
 // AddRoutes adds the download routes to the router
 func AddRoutes(rg *gin.RouterGroup) {
 	// swagger:route POST /mount/{type} Mount postMount
@@ -32,6 +42,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//     Responses:
+	//       default: genericError
+	//       200: mountReponse
 	rg.POST("/mount/:type", func(c *gin.Context) {
 		ipswPath := filepath.Clean(c.Query("path"))
 		dmgType := c.Param("type")
@@ -43,7 +56,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 		if err != nil {
 			c.AbortWithError(http.StatusInternalServerError, err)
 		}
-		c.JSON(http.StatusOK, gin.H{"dmg_path": ctx.DmgPath, "mount_point": ctx.MountPoint, "already_mounted": ctx.AlreadyMounted})
+		c.JSON(http.StatusOK, mountReponse{
+			*ctx,
+		})
 	})
 	// swagger:route POST /unmount Mount postUnmount
 	//
@@ -64,6 +79,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         in: query
 	//         description: path to DMG
 	//         type: string
+	//     Responses:
+	//       default: genericError
+	//       200: successResponse
 	rg.POST("/unmount", func(c *gin.Context) {
 		ctx := mount.Context{}
 		if err := c.ShouldBindJSON(&ctx); err != nil {
@@ -74,6 +92,6 @@ func AddRoutes(rg *gin.RouterGroup) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"success": true})
+		c.JSON(http.StatusOK, successResponse{Success: true})
 	})
 }

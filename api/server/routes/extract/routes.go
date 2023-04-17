@@ -45,6 +45,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
+	// responses:
+	//   '200':
+	//     description: extraction response
+	//     schema:
+	//       $ref: '#/responses/extractReponse'
 	er.POST("/dsc", extractDSC)
 	// swagger:operation POST /extract/dmg Extract getExtractDmg
 	//
@@ -81,6 +86,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
+	// responses:
+	//   '200':
+	//     description: extraction response
+	//     schema:
+	//       $ref: '#/responses/extractReponse'
 	er.POST("/dmg", extractDMG)
 	// swagger:operation POST /extract/kbag Extract getExtractKbags
 	//
@@ -116,6 +126,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
+	// responses:
+	//   '200':
+	//     description: extraction response
+	//     schema:
+	//       $ref: '#/responses/extractReponse'
 	er.POST("/kbag", extractKBAG)
 	// swagger:operation POST /extract/kernel Extract getExtractKernel
 	//
@@ -149,6 +164,11 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
+	// responses:
+	//   '200':
+	//     description: extraction response
+	//     schema:
+	//       $ref: '#/responses/extractReponse'
 	er.POST("/kernel", extractKernel)
 	// swagger:operation POST /extract/pattern Extract getExtractPattern
 	//
@@ -186,5 +206,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//           type: boolean
 	//         output:
 	//           type: string
+	// responses:
+	//   '200':
+	//     description: extraction response
+	//     schema:
+	//       $ref: '#/responses/extractReponse'
 	er.POST("/pattern", extractPattern)
 }

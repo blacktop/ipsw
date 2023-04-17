@@ -10,6 +10,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// The extract response message
+// swagger:response extractReponse
+type extractReponse struct {
+	// The list of extracted files
+	//
+	// in: body
+	// min items: 0
+	Artifacts []string `json:"artifacts"`
+}
+
 func extractDSC(c *gin.Context) {
 	var query extract.Config
 	if err := c.ShouldBindJSON(&query); err != nil {
@@ -21,7 +31,7 @@ func extractDSC(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"query": query, "artifacts": artifacts})
+	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
 
 func extractDMG(c *gin.Context) {
@@ -39,7 +49,7 @@ func extractDMG(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"query": query, "artifacts": artifacts})
+	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
 
 func extractKBAG(c *gin.Context) {
@@ -53,7 +63,7 @@ func extractKBAG(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"query": query, "artifacts": artifacts})
+	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: []string{artifacts}})
 }
 
 func extractKernel(c *gin.Context) {
@@ -67,7 +77,7 @@ func extractKernel(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"query": query, "artifacts": artifacts})
+	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
 
 func extractPattern(c *gin.Context) {
@@ -81,5 +91,5 @@ func extractPattern(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"query": query, "artifacts": artifacts})
+	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
