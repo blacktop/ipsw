@@ -18,7 +18,7 @@ require (
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/docker/docker v23.0.3+incompatible
-	github.com/dominikbraun/graph v0.17.0
+	github.com/dominikbraun/graph v0.18.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.2
