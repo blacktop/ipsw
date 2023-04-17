@@ -1,3 +1,4 @@
+// Package ent contains functions to extract entitlements from an IPSW
 package ent
 
 import (
@@ -21,16 +22,17 @@ import (
 	"github.com/fatih/color"
 )
 
-var haveChecked []string // TODO: refactor this
-
+// Entitlements is a map of entitlements
 type Entitlements map[string]any
 
+// Config is the configuration for the entitlements command
 type Config struct {
 	Markdown bool
 	Color    bool
 	DiffTool string
 }
 
+// GetDatabase returns the entitlement database for the given IPSW
 func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 	entDB := make(map[string]string)
 
@@ -122,6 +124,7 @@ func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 	return entDB, nil
 }
 
+// DiffDatabases compares two entitlement databases and returns a diff
 func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 	var err error
 	var dat bytes.Buffer
@@ -197,10 +200,6 @@ func DiffDatabases(db1, db2 map[string]string, conf *Config) (string, error) {
 }
 
 func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
-	if utils.StrSliceHas(haveChecked, dmgPath) {
-		return nil, nil // already checked
-	}
-
 	// check if filesystem DMG already exists (due to previous mount command)
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
 		dmgs, err := utils.Unzip(ipswPath, "", func(f *zip.File) bool {
@@ -260,8 +259,6 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 			}
 		}
 	}
-
-	haveChecked = append(haveChecked, dmgPath)
 
 	return entDB, nil
 }
