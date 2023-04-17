@@ -63,7 +63,7 @@ init() {
             ERROR "- or simply log back in as the desired unprivileged user (ssh works for remote machines, machinectl shell works for local machines)"
             exit 1
         fi
-        export XDG_RUNTIME_DIR="$HOME/.docker/run"
+        export XDG_RUNTIME_DIR="$HOME/.ipsw/run"
         mkdir -p -m 700 "$XDG_RUNTIME_DIR"
         XDG_RUNTIME_DIR_CREATED=1
     fi
@@ -102,7 +102,7 @@ install_systemd() {
             show_systemd_error
             exit 1
         fi
-        IPSW_HOST="unix://$XDG_RUNTIME_DIR/ipsw.sock" $BIN/ipswd version
+        IPSW_DAEMON_SOCKET="unix://$XDG_RUNTIME_DIR/ipsw.sock" $BIN/ipswd version
         systemctl --user enable "${SYSTEMD_UNIT}"
     )
     INFO "Installed ${SYSTEMD_UNIT} successfully."
