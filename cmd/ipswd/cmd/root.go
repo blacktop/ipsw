@@ -62,14 +62,18 @@ func init() {
 	switch runtime.GOOS {
 	case "darwin":
 		if os.Getenv("IPSW_IN_HOMEBREW") != "" {
-			defaultConfg = "/opt/homebrew/etc/ipsw/config.yaml"
+			defaultConfg = "/opt/homebrew/etc/ipsw/config.yml"
 		} else {
-			defaultConfg = filepath.Join("$HOME", ".config", "ipsw", "config.yaml")
+			defaultConfg = filepath.Join("$HOME", ".config", "ipsw", "config.yml")
 		}
 	case "windows":
-		defaultConfg = filepath.Join("$AppData", "ipsw", "config.yaml")
+		defaultConfg = filepath.Join("$AppData", "ipsw", "config.yml")
 	case "linux":
-		defaultConfg = "/etc/ipsw/config.yaml"
+		if os.Getenv("IPSW_IN_SNAP") == "1" {
+			defaultConfg = "/root/snap/ipswd/common/ipsw/config.yml"
+		} else {
+			defaultConfg = "/etc/ipsw/config.yml"
+		}
 	}
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", fmt.Sprintf("config file (default is %s)", defaultConfg))
 	// Settings
