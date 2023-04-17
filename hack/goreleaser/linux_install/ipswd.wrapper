@@ -1,13 +1,15 @@
 #!/bin/sh
+set -e
 
-mkdir -p "$SNAP_DATA/logs"
-chmod 750 "$SNAP_DATA/logs"
+mkdir -p "$SNAP_USER_DATA/logs"
+chmod 750 "$SNAP_USER_DATA/logs"
 
 # Migrate config if necessary
-if [ ! -d $SNAP_COMMON/ipsw ]; then
-    cp $SNAP/etc/ipsw/config.yml $SNAP_COMMON/ipsw
+if [ ! -d $SNAP_USER_COMMON/ipsw ]; then
+    mkdir -p $SNAP_USER_COMMON/ipsw
+    cp $SNAP/etc/ipsw/config.yml $SNAP_USER_COMMON/ipsw/config.yml
 else
-    cp $SNAP/etc/ipsw/config.yml $SNAP_COMMON/ipsw/config.yml.default
+    cp $SNAP/etc/ipsw/config.yml $SNAP_USER_COMMON/ipsw/config.yml.default
 fi
 
-ipswd start --config $SNAP_COMMON/ipsw/config.yml
+ipswd start --config $SNAP_USER_COMMON/ipsw/config.yml
