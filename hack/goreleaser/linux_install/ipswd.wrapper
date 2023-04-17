@@ -1,0 +1,13 @@
+#!/bin/sh
+
+mkdir -p "$SNAP_DATA/logs"
+chmod 750 "$SNAP_DATA/logs"
+
+# Migrate config if necessary
+if [ ! -d $SNAP_COMMON/ipsw ]; then
+    cp $SNAP/etc/ipsw/config.yml $SNAP_COMMON/ipsw
+else
+    cp $SNAP/etc/ipsw/config.yml $SNAP_COMMON/ipsw/config.yml.default
+fi
+
+ipswd start --config $SNAP_COMMON/ipsw/config.yml

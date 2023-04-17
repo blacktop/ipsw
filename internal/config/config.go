@@ -41,8 +41,12 @@ func (c *Config) verify() error {
 		return fmt.Errorf("config: failed to get user home directory: %v", err)
 	}
 	if c.Daemon.Host == "" && c.Daemon.Port == 0 && c.Daemon.Socket == "" {
-		// c.Daemon.Socket = "/var/run/ipsw.sock"
-		c.Daemon.Socket = filepath.Join(home, ".config", "ipsw", "ipsw.sock")
+		if os.Getenv("IPSW_IN_SNAP") == "1" {
+			c.Daemon.Socket = "/var/snap/ipswd/common/ipsw.sock"
+		} else {
+			c.Daemon.Host = "localhost"
+			c.Daemon.Port = 3993
+		}
 	} else if c.Daemon.Host != "" && c.Daemon.Socket != "" {
 		return fmt.Errorf("config: host and socket cannot be set at the same time")
 	} else if c.Daemon.Host != "" && c.Daemon.Port == 0 {
