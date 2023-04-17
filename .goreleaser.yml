@@ -746,13 +746,13 @@ snapcrafts:
     license: MIT
     extra_files:
       - source: ./completions/ipswd/_bash
-        destination: /usr/share/completions
+        destination: /usr/share/completions/_bash
         mode: 0644
       - source: ./completions/ipswd/_zsh
-        destination: /usr/share/completions
+        destination: /usr/share/completions/_zsh
         mode: 0644
       - source: ./completions/ipswd/_fish
-        destination: /usr/share/completions
+        destination: /usr/share/completions/_fish
         mode: 0644
       - source: ./LICENSE
         destination: /usr/share/doc/ipsw/copyright
@@ -772,8 +772,7 @@ snapcrafts:
         bind_file: $SNAP_DATA/usr/share/completions/_fish
     apps:
       ipswd:
-        command: ipswd
-        args: start
+        command: ipswd start $SNAP_DATA/etc/ipsw/config.yml
         daemon: simple
         refresh_mode: restart
         restart_condition: "always"
