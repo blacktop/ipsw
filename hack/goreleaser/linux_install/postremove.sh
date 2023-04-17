@@ -63,7 +63,7 @@ init() {
             ERROR "- or simply log back in as the desired unprivileged user (ssh works for remote machines, machinectl shell works for local machines)"
             exit 1
         fi
-        export XDG_RUNTIME_DIR="$HOME/.docker/run"
+        export XDG_RUNTIME_DIR="$HOME/.ipsw/run"
         mkdir -p -m 700 "$XDG_RUNTIME_DIR"
         XDG_RUNTIME_DIR_CREATED=1
     fi
@@ -73,7 +73,7 @@ init() {
 cmd_uninstall() {
     # requirements are already checked in init()
     if [ -z "$SYSTEMD" ]; then
-        INFO "systemd not detected, ${DOCKERD_ROOTLESS_SH} needs to be stopped manually:"
+        INFO "systemd not detected, ${SYSTEMD_UNIT} needs to be stopped manually:"
     else
         unit_file="${CFG_DIR}/systemd/user/${SYSTEMD_UNIT}"
         (
@@ -88,18 +88,15 @@ cmd_uninstall() {
         INFO "Uninstalled ${SYSTEMD_UNIT}"
     fi
 
-    if cli_ctx_exists "${CLI_CONTEXT}"; then
-        cli_ctx_rm "${CLI_CONTEXT}"
-        INFO "Deleted CLI context \"${CLI_CONTEXT}\""
-    fi
-    unset DOCKER_HOST
-    unset DOCKER_CONTEXT
-    cli_ctx_use "default"
+    unset IPSW_DAEMON_HOST
+    unset IPSW_DAEMON_PORT
+    unset IPSW_DAEMON_SOCKET
+
     INFO 'Configured CLI use the "default" context.'
     INFO
-    INFO 'Make sure to unset or update the environment PATH, DOCKER_HOST, and DOCKER_CONTEXT environment variables if you have added them to `~/.bashrc`.'
-    INFO "This uninstallation tool does NOT remove Docker binaries and data."
-    INFO "To remove data, run: \`$BIN/rootlesskit rm -rf $HOME/.local/share/docker\`"
+    INFO 'Make sure to unset or update the environment PATH, IPSW_DAEMON_HOST, IPSW_DAEMON_PORT or IPSW_DAEMON_SOCKET environment variables if you have added them to `~/.bashrc`.'
+    INFO "This uninstallation tool does NOT remove ipswd binaries and data."
+    INFO "To remove data, run: \`rm -rf $HOME/.local/share/ipswd\`"
 }
 
 main() {
