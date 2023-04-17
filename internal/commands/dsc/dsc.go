@@ -44,11 +44,20 @@ type Info struct {
 }
 
 // Symbol is a struct that contains information about a dyld_shared_cache symbol
+//
+// swagger:model
 type Symbol struct {
+	// The address of the symbol
 	Address uint64 `json:"address,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Type    string `json:"type,omitempty"`
-	Image   string `json:"image,omitempty"`
+	// The name of the symbol
+	Name string `json:"name,omitempty"`
+	// The type of the symbol
+	Type string `json:"type,omitempty"`
+	// The image that contains the symbol
+	Image string `json:"image,omitempty"`
+	// The lookup pattern used to find the symbol
+	//
+	// required: true
 	Pattern string `json:"pattern,omitempty"`
 }
 

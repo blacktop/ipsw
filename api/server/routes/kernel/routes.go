@@ -63,5 +63,8 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to kernelcache
 	//         required: true
 	//         type: string
+	//     Responses:
+	//       default: genericError
+	//       200: kernelcacheVersion
 	kg.GET("/version", getVersion)
 }

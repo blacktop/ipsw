@@ -41,22 +41,43 @@ type CompressedCache struct {
 	Data   []byte
 }
 
+// KernelVersion represents the kernel version.
+// swagger:model
+type KernelVersion struct {
+	// The darwin version
+	Darwin string `json:"darwin,omitempty"`
+	// The build date
+	Date time.Time `json:"date,omitempty"`
+	// The xnu version
+	XNU string `json:"xnu,omitempty"`
+	// The kernel type
+	Type string `json:"type,omitempty"`
+	// The kernel architecture
+	Arch string `json:"arch,omitempty"`
+	// The kernel CPU
+	CPU string `json:"cpu,omitempty"`
+}
+
+// LLVMVersion represents the LLVM version used to compile the kernel.
+// swagger:model
+type LLVMVersion struct {
+	// The LLVM version
+	Version string `json:"version,omitempty"`
+	// The LLVM compiler
+	Clang string `json:"clang,omitempty"`
+	// The LLVM compiler flags
+	Flags []string `json:"flags,omitempty"`
+}
+
+// Version represents the kernel version and LLVM version.
+// swagger:response kernelcacheVersion
 type Version struct {
-	Kernel struct {
-		Darwin string    `json:"darwin,omitempty"`
-		Date   time.Time `json:"date,omitempty"`
-		XNU    string    `json:"xnu,omitempty"`
-		Type   string    `json:"type,omitempty"`
-		Arch   string    `json:"arch,omitempty"`
-		CPU    string    `json:"cpu,omitempty"`
-	} `json:"kernel,omitempty"`
-	LLVM struct {
-		Version string   `json:"version,omitempty"`
-		Clang   string   `json:"clang,omitempty"`
-		Flags   []string `json:"flags,omitempty"`
-	} `json:"llvm,omitempty"`
-	rawKernel string
-	rawLLVM   string
+	// swagger:model
+	KernelVersion `json:"kernel,omitempty"`
+	// swagger:allOf
+	LLVMVersion `json:"llvm,omitempty"`
+	rawKernel   string
+	rawLLVM     string
 }
 
 func (v *Version) String() string {
@@ -409,16 +430,16 @@ func GetVersion(m *macho.File) (*Version, error) {
 						foundKV = true
 						kv.rawKernel = s
 						matches := reKV.FindStringSubmatch(s)
-						kv.Kernel.Darwin = matches[reKV.SubexpIndex("darwin")]
+						kv.KernelVersion.Darwin = matches[reKV.SubexpIndex("darwin")]
 						// TODO: confirm that day is not in form 02 for day
-						kv.Kernel.Date, err = time.Parse("Mon Jan 2 15:04:05 MST 2006", matches[reKV.SubexpIndex("date")])
+						kv.KernelVersion.Date, err = time.Parse("Mon Jan 2 15:04:05 MST 2006", matches[reKV.SubexpIndex("date")])
 						if err != nil {
 							return nil, fmt.Errorf("failed to parse date %s: %v", matches[reKV.SubexpIndex("date")], err)
 						}
-						kv.Kernel.XNU = matches[reKV.SubexpIndex("xnu")]
-						kv.Kernel.Type = matches[reKV.SubexpIndex("type")]
-						kv.Kernel.Arch = matches[reKV.SubexpIndex("arch")]
-						kv.Kernel.CPU = matches[reKV.SubexpIndex("cpu")]
+						kv.KernelVersion.XNU = matches[reKV.SubexpIndex("xnu")]
+						kv.KernelVersion.Type = matches[reKV.SubexpIndex("type")]
+						kv.KernelVersion.Arch = matches[reKV.SubexpIndex("arch")]
+						kv.KernelVersion.CPU = matches[reKV.SubexpIndex("cpu")]
 					}
 
 					reLLVM := regexp.MustCompile(`^Apple LLVM (?P<version>.+) \(clang-(?P<clang>.+)\) \[(?P<flags>.+)\]$`)
@@ -426,9 +447,9 @@ func GetVersion(m *macho.File) (*Version, error) {
 						foundLLVM = true
 						kv.rawLLVM = s
 						matches := reLLVM.FindStringSubmatch(s)
-						kv.LLVM.Version = matches[reLLVM.SubexpIndex("version")]
-						kv.LLVM.Clang = matches[reLLVM.SubexpIndex("clang")]
-						kv.LLVM.Flags = strings.Split(matches[reLLVM.SubexpIndex("flags")], ", ")
+						kv.LLVMVersion.Version = matches[reLLVM.SubexpIndex("version")]
+						kv.LLVMVersion.Clang = matches[reLLVM.SubexpIndex("clang")]
+						kv.LLVMVersion.Flags = strings.Split(matches[reLLVM.SubexpIndex("flags")], ", ")
 					}
 
 					if foundKV && foundLLVM {
