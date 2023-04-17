@@ -12,5 +12,4 @@ else
     cp $SNAP/etc/ipsw/config.yml $SNAP_USER_COMMON/ipsw/config.yml.default
 fi
 
-# /snap/ipswd/current/ipswd start --config $SNAP_USER_COMMON/ipsw/config.yml
-/usr/bin/ipswd start --config $SNAP_USER_COMMON/ipsw/config.yml
+$SNAP/ipswd start --config $SNAP_USER_COMMON/ipsw/config.yml
