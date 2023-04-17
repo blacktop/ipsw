@@ -745,6 +745,9 @@ snapcrafts:
     publish: true
     license: MIT
     extra_files:
+      - source: ./hack/goreleaser/linux_install/ipswd.wrapper
+        destination: /bin/ipswd.wrapper
+        mode: 0644
       - source: ./completions/ipswd/_bash
         destination: /usr/share/completions/_bash
         mode: 0644
@@ -772,7 +775,7 @@ snapcrafts:
         bind_file: $SNAP_DATA/usr/share/completions/_fish
     apps:
       ipswd:
-        command: ipswd start $SNAP_DATA/etc/ipsw/config.yml
+        command: bin/ipswd.wrapper
         daemon: simple
         refresh_mode: restart
         restart_condition: "always"
