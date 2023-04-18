@@ -586,7 +586,7 @@ nfpms:
     section: utils
     contents:
       - src: ./config.example.yml
-        dst: /etc/ipsw.conf
+        dst: /etc/ipsw/config.yml
         type: config|noreplace
         file_info:
           mode: 0644
@@ -646,7 +646,7 @@ nfpms:
         file_info:
           mode: 0644
       - src: ./config.example.yml
-        dst: /etc/ipsw.conf
+        dst: /etc/ipsw/config.yml
         type: config|noreplace
         file_info:
           mode: 0644
