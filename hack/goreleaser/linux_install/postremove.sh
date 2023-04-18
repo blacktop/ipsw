@@ -23,7 +23,7 @@ ERROR() {
 # constants
 SYSTEMD_UNIT="ipsw.service"
 # global vars
-BIN=""
+BIN="/usr/bin"
 SYSTEMD=""
 CFG_DIR=""
 XDG_RUNTIME_DIR_CREATED=""
@@ -75,7 +75,6 @@ cmd_uninstall() {
     if [ -z "$SYSTEMD" ]; then
         INFO "systemd not detected, ${SYSTEMD_UNIT} needs to be stopped manually:"
     else
-        unit_file="${CFG_DIR}/systemd/user/${SYSTEMD_UNIT}"
         (
             set -x
             systemctl --user stop "${SYSTEMD_UNIT}"
@@ -84,7 +83,6 @@ cmd_uninstall() {
             set -x
             systemctl --user disable "${SYSTEMD_UNIT}"
         ) || :
-        rm -f "${unit_file}"
         INFO "Uninstalled ${SYSTEMD_UNIT}"
     fi
 
@@ -92,8 +90,6 @@ cmd_uninstall() {
     unset IPSW_DAEMON_PORT
     unset IPSW_DAEMON_SOCKET
 
-    INFO 'Configured CLI use the "default" context.'
-    INFO
     INFO 'Make sure to unset or update the environment PATH, IPSW_DAEMON_HOST, IPSW_DAEMON_PORT or IPSW_DAEMON_SOCKET environment variables if you have added them to `~/.bashrc`.'
     INFO "This uninstallation tool does NOT remove ipswd binaries and data."
     INFO "To remove data, run: \`rm -rf $HOME/.local/share/ipswd\`"

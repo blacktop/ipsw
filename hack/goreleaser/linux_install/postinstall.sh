@@ -23,7 +23,7 @@ ERROR() {
 # constants
 SYSTEMD_UNIT="ipsw.service"
 # global vars
-BIN=""
+BIN="/usr/bin"
 SYSTEMD=""
 CFG_DIR=""
 XDG_RUNTIME_DIR_CREATED=""
@@ -76,13 +76,7 @@ show_systemd_error() {
 
 # install (systemd)
 install_systemd() {
-    mkdir -p "${CFG_DIR}/systemd/user"
-    unit_file="${CFG_DIR}/systemd/user/${SYSTEMD_UNIT}"
-    if [ -f "${unit_file}" ]; then
-        WARNING "File already exists, skipping: ${unit_file}"
-    else
-        systemctl --user daemon-reload
-    fi
+    systemctl --user daemon-reload
     if ! systemctl --user --no-pager status "${SYSTEMD_UNIT}" >/dev/null 2>&1; then
         INFO "starting systemd service ${SYSTEMD_UNIT}"
         (
