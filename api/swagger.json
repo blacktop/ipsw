@@ -1,7 +1,13 @@
 {
-  "consumes": ["application/json"],
-  "produces": ["application/json"],
-  "schemes": ["http"],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "schemes": [
+    "http"
+  ],
   "swagger": "2.0",
   "info": {
     "description": "This allows you to interact with \u003ccode\u003eipsw\u003c/code\u003e in a VERY powerful and flexible way via a RESTful API.\n\nThe \u003ccode\u003eipswd\u003c/code\u003e design was heavily influenced by the design of dockerd. So many of the same concepts apply.",
@@ -14,13 +20,17 @@
     "/_ping": {
       "get": {
         "description": "This will return \"OK\" if the daemon is running.",
-        "tags": ["Daemon"],
+        "tags": [
+          "Daemon"
+        ],
         "summary": "Ping",
         "operationId": "getDaemonPing"
       },
       "head": {
         "description": "This will return if 200 the daemon is running.",
-        "tags": ["Daemon"],
+        "tags": [
+          "Daemon"
+        ],
         "summary": "Ping",
         "operationId": "headDaemonPing"
       }
@@ -28,8 +38,12 @@
     "/device_list": {
       "get": {
         "description": "This will return JSON of all XCode devices.",
-        "produces": ["application/json"],
-        "tags": ["DeviceList"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DeviceList"
+        ],
         "summary": "List XCode Devices.",
         "operationId": "getDeviceList"
       }
@@ -37,7 +51,9 @@
     "/download/ipsw/ios/latest/build": {
       "get": {
         "description": "Get latest iOS build.",
-        "tags": ["Download"],
+        "tags": [
+          "Download"
+        ],
         "summary": "Latest iOS Build",
         "operationId": "getDownloadLatestIPSWsBuild"
       }
@@ -45,7 +61,9 @@
     "/download/ipsw/ios/latest/version": {
       "get": {
         "description": "Get latest iOS version.",
-        "tags": ["Download"],
+        "tags": [
+          "Download"
+        ],
         "summary": "Latest iOS Version",
         "operationId": "getDownloadLatestIPSWsVersion"
       }
@@ -53,8 +71,12 @@
     "/dsc/imports": {
       "get": {
         "description": "Get list of dylibs that import a given dylib.",
-        "produces": ["application/json"],
-        "tags": ["DSC"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
         "summary": "Imports",
         "operationId": "getDscImports",
         "parameters": [
@@ -72,14 +94,26 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscImportsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/info": {
       "get": {
         "description": "Get info about a given DSC",
-        "produces": ["application/json"],
-        "tags": ["DSC"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
         "summary": "Info",
         "operationId": "getDscInfo",
         "parameters": [
@@ -90,14 +124,26 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscInfoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/macho": {
       "get": {
         "description": "Get MachO info for a given dylib in the DSC.",
-        "produces": ["application/json"],
-        "tags": ["DSC"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
         "summary": "MachO",
         "operationId": "getDscMacho",
         "parameters": [
@@ -115,14 +161,26 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscMachoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/str": {
       "get": {
         "description": "Get strings in the DSC that match a given pattern.",
-        "produces": ["application/json"],
-        "tags": ["DSC"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
         "summary": "Strings",
         "operationId": "getDscStrings",
         "parameters": [
@@ -140,17 +198,85 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscStringsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/symaddr": {
       "get": {
         "description": "Get symbols addresses in the DSC that match a given lookup JSON payload.",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "tags": ["DSC"],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
         "summary": "Symbols",
         "operationId": "getDscSymbols",
+        "parameters": [
+          {
+            "description": "Symbol lookups",
+            "name": "lookups",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Symbol"
+              }
+            }
+          },
+          {
+            "type": "string",
+            "description": "path to dyld_shared_cache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "symbol lookup response",
+            "schema": {
+              "$ref": "#/responses/dscSymbolsResponse"
+            }
+          },
+          "400": {
+            "description": "bad request",
+            "schema": {
+              "$ref": "#/responses/genericError"
+            }
+          },
+          "500": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/responses/genericError"
+            }
+          }
+        }
+      }
+    },
+    "/dsc/webkit": {
+      "get": {
+        "description": "Get \u003ccode\u003ewebkit\u003c/code\u003e version from dylib in the DSC.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Webkit",
+        "operationId": "getDscWebkit",
         "parameters": [
           {
             "type": "string",
@@ -159,15 +285,29 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscWebkitResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/extract/dmg": {
       "post": {
         "description": "Extract DMGs from an IPSW.",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "tags": ["Extract"],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Extract"
+        ],
         "summary": "DMG",
         "operationId": "getExtractDmg",
         "parameters": [
@@ -204,15 +344,29 @@
               }
             }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "extraction response",
+            "schema": {
+              "$ref": "#/responses/extractReponse"
+            }
+          }
+        }
       }
     },
     "/extract/dsc": {
       "post": {
         "description": "Extract dyld_shared_caches from an IPSW.",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "tags": ["Extract"],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Extract"
+        ],
         "summary": "DSC",
         "operationId": "getExtractDsc",
         "parameters": [
@@ -252,15 +406,29 @@
               }
             }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "extraction response",
+            "schema": {
+              "$ref": "#/responses/extractReponse"
+            }
+          }
+        }
       }
     },
     "/extract/kbag": {
       "post": {
         "description": "Extract KBAGs from an IPSW.",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "tags": ["Extract"],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Extract"
+        ],
         "summary": "KBAG",
         "operationId": "getExtractKbags",
         "parameters": [
@@ -296,15 +464,29 @@
               }
             }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "extraction response",
+            "schema": {
+              "$ref": "#/responses/extractReponse"
+            }
+          }
+        }
       }
     },
     "/extract/kernel": {
       "post": {
         "description": "Extract kernelcaches from an IPSW.",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "tags": ["Extract"],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Extract"
+        ],
         "summary": "Kernel",
         "operationId": "getExtractKernel",
         "parameters": [
@@ -337,15 +519,29 @@
               }
             }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "extraction response",
+            "schema": {
+              "$ref": "#/responses/extractReponse"
+            }
+          }
+        }
       }
     },
     "/extract/pattern": {
       "post": {
         "description": "Extract files from an IPSW that match a given pattern.",
-        "consumes": ["application/json"],
-        "produces": ["application/json"],
-        "tags": ["Extract"],
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Extract"
+        ],
         "summary": "Pattern",
         "operationId": "getExtractPattern",
         "parameters": [
@@ -384,13 +580,23 @@
               }
             }
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "extraction response",
+            "schema": {
+              "$ref": "#/responses/extractReponse"
+            }
+          }
+        }
       }
     },
     "/idev/info": {
       "get": {
         "description": "Get info about USB connected devices.",
-        "tags": ["USB"],
+        "tags": [
+          "USB"
+        ],
         "summary": "Info",
         "operationId": "getIdevInfo"
       }
@@ -398,8 +604,12 @@
     "/info/ipsw": {
       "get": {
         "description": "Get IPSW info.",
-        "produces": ["application/json"],
-        "tags": ["Info"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
         "summary": "IPSW",
         "operationId": "getIpswInfo",
         "parameters": [
@@ -416,8 +626,12 @@
     "/info/ipsw/remote": {
       "get": {
         "description": "Get remote IPSW info.",
-        "produces": ["application/json"],
-        "tags": ["Info"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
         "summary": "Remote IPSW",
         "operationId": "getRemoteIpswInfo",
         "parameters": [
@@ -446,8 +660,12 @@
     "/info/ota": {
       "get": {
         "description": "Get OTA info.",
-        "produces": ["application/json"],
-        "tags": ["Info"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
         "summary": "OTA",
         "operationId": "getOtaInfo",
         "parameters": [
@@ -464,8 +682,12 @@
     "/info/ota/remote": {
       "get": {
         "description": "Get remote OTA info.",
-        "produces": ["application/json"],
-        "tags": ["Info"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Info"
+        ],
         "summary": "Remote OTA",
         "operationId": "getRemoteOtaInfo",
         "parameters": [
@@ -494,8 +716,12 @@
     "/ipsw/fs/ents": {
       "get": {
         "description": "Get IPSW Filesystem DMG MachO entitlements.",
-        "produces": ["application/json"],
-        "tags": ["IPSW"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "IPSW"
+        ],
         "summary": "Entitlements",
         "operationId": "getIpswFsEntitlements",
         "parameters": [
@@ -512,8 +738,12 @@
     "/ipsw/fs/files": {
       "get": {
         "description": "Get IPSW Filesystem DMG file listing.",
-        "produces": ["application/json"],
-        "tags": ["IPSW"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "IPSW"
+        ],
         "summary": "Files",
         "operationId": "getIpswFsFiles",
         "parameters": [
@@ -530,8 +760,12 @@
     "/ipsw/fs/launchd": {
       "get": {
         "description": "Get \u003ccode\u003elaunchd\u003c/code\u003e config from IPSW Filesystem DMG.",
-        "produces": ["application/json"],
-        "tags": ["IPSW"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "IPSW"
+        ],
         "summary": "launchd Config",
         "operationId": "getIpswFsLaunchd",
         "parameters": [
@@ -548,8 +782,12 @@
     "/kernel/kexts": {
       "get": {
         "description": "Get kernelcache KEXTs info.",
-        "produces": ["application/json"],
-        "tags": ["Kernel"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
         "summary": "Kexts",
         "operationId": "getKernelKexts",
         "parameters": [
@@ -566,8 +804,12 @@
     "/kernel/syscall": {
       "get": {
         "description": "Get kernelcache syscalls info.",
-        "produces": ["application/json"],
-        "tags": ["Kernel"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
         "summary": "Syscalls",
         "operationId": "getKernelSyscalls",
         "parameters": [
@@ -584,8 +826,12 @@
     "/kernel/version": {
       "get": {
         "description": "Get kernelcache version.",
-        "produces": ["application/json"],
-        "tags": ["Kernel"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Kernel"
+        ],
         "summary": "Version",
         "operationId": "getKernelVersion",
         "parameters": [
@@ -596,14 +842,26 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/kernelcacheVersion"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/macho/info": {
       "get": {
         "description": "Get MachO info.",
-        "produces": ["application/json"],
-        "tags": ["MachO"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "MachO"
+        ],
         "summary": "Info",
         "operationId": "getMachoInfo",
         "parameters": [
@@ -626,8 +884,12 @@
     "/mount/{type}": {
       "post": {
         "description": "Mount a DMG inside a given IPSW.",
-        "produces": ["application/json"],
-        "tags": ["Mount"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Mount"
+        ],
         "summary": "Mount",
         "operationId": "postMount",
         "parameters": [
@@ -645,14 +907,26 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/mountReponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/unmount": {
       "post": {
         "description": "Unmount a previously mounted DMG.",
-        "produces": ["application/json"],
-        "tags": ["Mount"],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "Mount"
+        ],
         "summary": "Unmount",
         "operationId": "postUnmount",
         "parameters": [
@@ -669,15 +943,209 @@
             "name": "dmg_path",
             "in": "query"
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/successResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/version": {
       "get": {
         "description": "This will return the daemon version info.",
-        "tags": ["Daemon"],
+        "tags": [
+          "Daemon"
+        ],
         "summary": "Version",
         "operationId": "getDaemonVersion"
+      }
+    }
+  },
+  "definitions": {
+    "Dylib": {
+      "description": "Dylib is a struct that contains information about a dyld_shared_cache dylib",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "ImportedBy": {
+      "description": "ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "Info": {
+      "description": "Info is a struct that contains information about a dyld_shared_cache file",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "KernelVersion": {
+      "title": "KernelVersion represents the kernel version.",
+      "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
+    },
+    "LLVMVersion": {
+      "title": "LLVMVersion represents the LLVM version used to compile the kernel.",
+      "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
+    },
+    "String": {
+      "description": "String is a struct that contains information about a dyld_shared_cache string",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "Symbol": {
+      "description": "Symbol is a struct that contains information about a dyld_shared_cache symbol",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    }
+  },
+  "responses": {
+    "dscImportsResponse": {
+      "description": "",
+      "headers": {
+        "imported_by": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "dscInfoResponse": {
+      "description": "",
+      "headers": {
+        "info": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "dscMachoResponse": {
+      "description": "",
+      "headers": {
+        "macho": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "dscStringsResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "strings": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
+    "dscSymbolsResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "symbols": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
+    "dscWebkitResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "webkit": {
+          "type": "string"
+        }
+      }
+    },
+    "extractReponse": {
+      "description": "The extract response message",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "genericError": {
+      "description": "",
+      "headers": {
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "kernelcacheVersion": {
+      "description": "Version represents the kernel version and LLVM version.",
+      "headers": {
+        "arch": {
+          "type": "string",
+          "description": "The kernel architecture"
+        },
+        "clang": {
+          "type": "string",
+          "description": "The LLVM compiler"
+        },
+        "cpu": {
+          "type": "string",
+          "description": "The kernel CPU"
+        },
+        "darwin": {
+          "type": "string",
+          "description": "The darwin version"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The build date"
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The LLVM compiler flags"
+        },
+        "rawKernel": {
+          "type": "string"
+        },
+        "rawLLVM": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "The kernel type"
+        },
+        "version": {
+          "type": "string",
+          "description": "The LLVM version"
+        },
+        "xnu": {
+          "type": "string",
+          "description": "The xnu version"
+        }
+      }
+    },
+    "mountReponse": {
+      "description": "",
+      "headers": {
+        "already_mounted": {
+          "type": "boolean"
+        },
+        "dmg_path": {
+          "type": "string"
+        },
+        "mount_point": {
+          "type": "string"
+        }
+      }
+    },
+    "successResponse": {
+      "description": "",
+      "headers": {
+        "success": {
+          "type": "boolean"
+        }
       }
     }
   }
