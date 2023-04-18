@@ -8,7 +8,7 @@ My strech goal is to make the worlds first _dyld_shared_cache_ disassembler that
 
 ### TODO
 
-- [ ] MachO read/write
+- [x] MachO read/write
 - [ ] pure Go dyld splitter
 - [ ] APFS/HFS parsing to pull dyld without mounting
 - [x] (jtool) -K Kextract™ a kernel extension by its bundle ID *(only MH_FILESETS for now)*
@@ -24,5 +24,5 @@ My strech goal is to make the worlds first _dyld_shared_cache_ disassembler that
 - [ ] speed up downloads w/ https://github.com/ynsgnr/aria2go
 - [ ] make a color syntax highlighter like https://github.com/trishume/syntect but for Golang
 - [x] use https://github.com/google/gousb to detect what device(s) are connected (maybe filter downloads?)
-- [ ] replace cgo sqlite w/ https://pkg.go.dev/modernc.org/sqlite
+- [x] replace cgo sqlite w/ https://pkg.go.dev/modernc.org/sqlite *(used github.com/glebarez/go-sqlite)*
 - [ ] emulator ideas: [qemu](https://github.com/containers/podman/tree/main/pkg/machine/qemu), [qemu](https://github.com/digitalocean/go-qemu), [lxd](https://github.com/lxc/lxd), [qemu-t8030](https://github.com/TrungNguyen1909/qemu-t8030)
