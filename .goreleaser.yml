@@ -585,6 +585,11 @@ nfpms:
     bindir: /usr/bin
     section: utils
     contents:
+      - src: ./config.example.yml
+        dst: /etc/ipsw.conf
+        type: config|noreplace
+        file_info:
+          mode: 0644
       - src: ./completions/ipsw/_bash
         dst: /usr/share/bash-completion/completions/ipsw
         file_info:
@@ -603,10 +608,6 @@ nfpms:
           mode: 0644
       - src: ./LICENSE
         dst: /usr/share/doc/ipsw/copyright
-        file_info:
-          mode: 0644
-      - src: ./config.example.yml
-        dst: /etc/ipsw.conf
         file_info:
           mode: 0644
     file_name_template: >-
@@ -641,11 +642,12 @@ nfpms:
       - ipswd
     contents:
       - src: ./hack/goreleaser/linux_install/ipsw.service
-        dst: /lib/systemd/system/ipsws.service
+        dst: /lib/systemd/user/ipsws.service
         file_info:
           mode: 0644
-      - src: ./hack/goreleaser/linux_install/ipsw.socket
-        dst: /lib/systemd/system/ipsws.socket
+      - src: ./config.example.yml
+        dst: /etc/ipsw.conf
+        type: config|noreplace
         file_info:
           mode: 0644
       - src: ./completions/ipswd/_bash
@@ -662,10 +664,6 @@ nfpms:
           mode: 0644
       - src: ./LICENSE
         dst: /usr/share/doc/ipsw/copyright
-        file_info:
-          mode: 0644
-      - src: ./config.example.yml
-        dst: /etc/ipsw.conf
         file_info:
           mode: 0644
     scripts:
