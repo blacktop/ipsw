@@ -31,7 +31,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// This will return the daemon version info.
 	rg.GET("/version", func(c *gin.Context) {
 		c.JSON(http.StatusOK, types.Version{
-			ApiVersion:     api.DefaultVersion,
+			APIVersion:     api.DefaultVersion,
 			OSType:         runtime.GOOS,
 			BuilderVersion: types.BuildVersion,
 		})

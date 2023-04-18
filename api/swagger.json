@@ -94,7 +94,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscImportsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/info": {
@@ -116,7 +124,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscInfoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/macho": {
@@ -145,7 +161,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscMachoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/str": {
@@ -174,7 +198,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscStringsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/symaddr": {
@@ -211,7 +243,57 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "description": "symbol lookup response",
+            "schema": {
+              "$ref": "#/responses/dscSymbolsResponse"
+            }
+          },
+          "400": {
+            "description": "bad request",
+            "schema": {
+              "$ref": "#/responses/genericError"
+            }
+          },
+          "500": {
+            "description": "error",
+            "schema": {
+              "$ref": "#/responses/genericError"
+            }
+          }
+        }
+      }
+    },
+    "/dsc/webkit": {
+      "get": {
+        "description": "Get \u003ccode\u003ewebkit\u003c/code\u003e version from dylib in the DSC.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Webkit",
+        "operationId": "getDscWebkit",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "path to dyld_shared_cache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscWebkitResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/extract/dmg": {
@@ -765,7 +847,7 @@
           "200": {
             "$ref": "#/responses/kernelcacheVersion"
           },
-          "default": {
+          "500": {
             "$ref": "#/responses/genericError"
           }
         }
@@ -830,7 +912,7 @@
           "200": {
             "$ref": "#/responses/mountReponse"
           },
-          "default": {
+          "500": {
             "$ref": "#/responses/genericError"
           }
         }
@@ -866,7 +948,7 @@
           "200": {
             "$ref": "#/responses/successResponse"
           },
-          "default": {
+          "500": {
             "$ref": "#/responses/genericError"
           }
         }
@@ -884,6 +966,18 @@
     }
   },
   "definitions": {
+    "Dylib": {
+      "description": "Dylib is a struct that contains information about a dyld_shared_cache dylib",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "ImportedBy": {
+      "description": "ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "Info": {
+      "description": "Info is a struct that contains information about a dyld_shared_cache file",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
     "KernelVersion": {
       "title": "KernelVersion represents the kernel version.",
       "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
@@ -892,17 +986,91 @@
       "title": "LLVMVersion represents the LLVM version used to compile the kernel.",
       "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
     },
+    "String": {
+      "description": "String is a struct that contains information about a dyld_shared_cache string",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
     "Symbol": {
       "description": "Symbol is a struct that contains information about a dyld_shared_cache symbol",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     }
   },
   "responses": {
+    "dscImportsResponse": {
+      "description": "",
+      "headers": {
+        "imported_by": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "dscInfoResponse": {
+      "description": "",
+      "headers": {
+        "info": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "dscMachoResponse": {
+      "description": "",
+      "headers": {
+        "macho": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "dscStringsResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "strings": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
+    "dscSymbolsResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "symbols": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
+    "dscWebkitResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "webkit": {
+          "type": "string"
+        }
+      }
+    },
     "extractReponse": {
       "description": "The extract response message",
       "schema": {
         "type": "array",
         "items": {
+          "type": "string"
+        }
+      }
+    },
+    "genericError": {
+      "description": "",
+      "headers": {
+        "error": {
           "type": "string"
         }
       }
