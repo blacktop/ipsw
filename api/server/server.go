@@ -77,7 +77,7 @@ func (s *Server) Start() error {
 
 	s.router.GET("/version", func(c *gin.Context) {
 		c.JSON(http.StatusOK, types.Version{
-			ApiVersion:     api.DefaultVersion,
+			APIVersion:     api.DefaultVersion,
 			OSType:         runtime.GOOS,
 			BuilderVersion: types.BuildVersion,
 		})

@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	dcsCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -105,14 +106,9 @@ var WebkitCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		image, err := f.Image("WebKit")
+		webkit1, err := dcsCmd.GetWebkitVersion(f)
 		if err != nil {
-			return fmt.Errorf("image not in %s: %v", dscPath, err)
-		}
-
-		m, err := image.GetPartialMacho()
-		if err != nil {
-			return err
+			return fmt.Errorf("failed to get WebKit version: %v", err)
 		}
 
 		if diff {
@@ -140,19 +136,14 @@ var WebkitCmd = &cobra.Command{
 			}
 			defer f.Close()
 
-			image, err := f.Image("WebKit")
+			webkit2, err := dcsCmd.GetWebkitVersion(f)
 			if err != nil {
-				return fmt.Errorf("image not in %s: %v", dscPath2, err)
-			}
-
-			m2, err := image.GetPartialMacho()
-			if err != nil {
-				return err
+				return fmt.Errorf("failed to get WebKit version: %v", err)
 			}
 
 			out, err := utils.GitDiff(
-				m.SourceVersion().Version.String()+"\n",
-				m2.SourceVersion().Version.String()+"\n",
+				webkit1+"\n",
+				webkit2+"\n",
 				&utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
 			if err != nil {
 				return err
@@ -170,9 +161,9 @@ var WebkitCmd = &cobra.Command{
 		var svnRev string
 		if getRev {
 			log.Info("Querying https://trac.webkit.org...")
-			ver, rev, err := dyld.ScrapeWebKitTRAC(m.SourceVersion().Version.String())
+			ver, rev, err := dyld.ScrapeWebKitTRAC(webkit1)
 			if err != nil {
-				log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+				log.Infof("WebKit Version: %s", webkit1)
 				return err
 			}
 			svnRev = fmt.Sprintf("%s (svn rev %s)", ver, rev)
@@ -182,24 +173,24 @@ var WebkitCmd = &cobra.Command{
 			if len(apiToken) == 0 {
 				tags, err = download.GetPreprocessedWebKitTags(proxy, insecure)
 				if err != nil {
-					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+					log.Infof("WebKit Version: %s", webkit1)
 					return err
 				}
 			} else {
 				tags, err = download.WebKitGraphQLTags(proxy, insecure, apiToken)
 				if err != nil {
-					log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+					log.Infof("WebKit Version: %s", webkit1)
 					return err
 				}
 			}
 			for _, tag := range tags {
-				if strings.Contains(tag.Name, m.SourceVersion().Version.String()) {
+				if strings.Contains(tag.Name, webkit1) {
 					if asJSON {
 						b, err := json.Marshal(&struct {
 							Version string             `json:"version"`
 							Tag     download.GithubTag `json:"tag,omitempty"`
 						}{
-							Version: m.SourceVersion().Version.String(),
+							Version: webkit1,
 							Tag:     tag,
 						})
 						if err != nil {
@@ -207,7 +198,7 @@ var WebkitCmd = &cobra.Command{
 						}
 						fmt.Println(string(b))
 					} else {
-						log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+						log.Infof("WebKit Version: %s", webkit1)
 						utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
 						utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))
 						utils.Indent(log.Info, 2)(fmt.Sprintf("Date: %s", tag.Commit.Date.Format("02Jan2006 15:04:05")))
@@ -222,7 +213,7 @@ var WebkitCmd = &cobra.Command{
 				Version string `json:"version"`
 				Rev     string `json:"rev,omitempty"`
 			}{
-				Version: m.SourceVersion().Version.String(),
+				Version: webkit1,
 				Rev:     svnRev,
 			})
 			if err != nil {
@@ -230,7 +221,7 @@ var WebkitCmd = &cobra.Command{
 			}
 			fmt.Println(string(b))
 		} else {
-			log.Infof("WebKit Version: %s", m.SourceVersion().Version)
+			log.Infof("WebKit Version: %s", webkit1)
 			if len(svnRev) > 0 {
 				utils.Indent(log.Info, 2)(svnRev)
 			}

@@ -15,12 +15,14 @@ import (
 )
 
 // ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib
+// swagger:model
 type ImportedBy struct {
 	DSC  []string `json:"dsc,omitempty"`
 	Apps []string `json:"apps,omitempty"`
 }
 
 // Dylib is a struct that contains information about a dyld_shared_cache dylib
+// swagger:model
 type Dylib struct {
 	Index       int    `json:"index,omitempty"`
 	Name        string `json:"name,omitempty"`
@@ -30,6 +32,7 @@ type Dylib struct {
 }
 
 // Info is a struct that contains information about a dyld_shared_cache file
+// swagger:model
 type Info struct {
 	Magic              string                                      `json:"magic,omitempty"`
 	UUID               string                                      `json:"uuid,omitempty"`
@@ -44,7 +47,6 @@ type Info struct {
 }
 
 // Symbol is a struct that contains information about a dyld_shared_cache symbol
-//
 // swagger:model
 type Symbol struct {
 	// The address of the symbol
@@ -62,6 +64,7 @@ type Symbol struct {
 }
 
 // String is a struct that contains information about a dyld_shared_cache string
+// swagger:model
 type String struct {
 	Address uint64 `json:"address,omitempty"`
 	Image   string `json:"image,omitempty"`
@@ -364,4 +367,19 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 	}
 
 	return strs, nil
+}
+
+// GetWebkitVersion returns the WebKit version from a dyld_shared_cache file
+func GetWebkitVersion(f *dyld.File) (string, error) {
+	image, err := f.Image("WebKit")
+	if err != nil {
+		return "", fmt.Errorf("image not in DSC: %v", err)
+	}
+
+	m, err := image.GetPartialMacho()
+	if err != nil {
+		return "", fmt.Errorf("failed to create MachO for image %s: %v", image.Name, err)
+	}
+
+	return m.SourceVersion().Version.String(), nil
 }

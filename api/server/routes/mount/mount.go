@@ -43,7 +43,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         required: true
 	//         type: string
 	//     Responses:
-	//       default: genericError
+	//       500: genericError
 	//       200: mountReponse
 	rg.POST("/mount/:type", func(c *gin.Context) {
 		ipswPath := filepath.Clean(c.Query("path"))
@@ -80,7 +80,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to DMG
 	//         type: string
 	//     Responses:
-	//       default: genericError
+	//       500: genericError
 	//       200: successResponse
 	rg.POST("/unmount", func(c *gin.Context) {
 		ctx := mount.Context{}
