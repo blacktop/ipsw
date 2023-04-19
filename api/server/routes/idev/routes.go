@@ -51,6 +51,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// Info
 	//
 	// Get info about USB connected devices.
+	//
+	//     Responses:
+	//       200: idevInfoResponse
+	//       500: genericError
 	ig.GET("/info", idevInfo) // `ipsw idev list`
 
 	// ig.GET("/loc", handler)       // TODO: implement this

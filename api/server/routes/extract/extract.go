@@ -14,8 +14,6 @@ import (
 // swagger:response extractReponse
 type extractReponse struct {
 	// The list of extracted files
-	//
-	// in: body
 	// min items: 0
 	Artifacts []string `json:"artifacts"`
 }

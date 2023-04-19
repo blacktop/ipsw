@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/pkg/usb"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/gin-gonic/gin"
 )
+
+// swagger:response idevInfoResponse
+type idevInfoResponse struct {
+	Devices []*lockdownd.DeviceValues `json:"devices,omitempty"`
+}
 
 func idevInfo(c *gin.Context) {
 	conn, err := usb.NewConn()
@@ -20,7 +26,7 @@ func idevInfo(c *gin.Context) {
 
 	devices, err := conn.ListDevices()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 
@@ -34,13 +40,13 @@ func idevInfo(c *gin.Context) {
 	for _, device := range devices {
 		cli, err := lockdownd.NewClient(device.SerialNumber)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
 
 		values, err := cli.GetValues()
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, err)
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
 
@@ -49,5 +55,5 @@ func idevInfo(c *gin.Context) {
 		cli.Close()
 	}
 
-	c.JSON(http.StatusOK, gin.H{"devices": dds})
+	c.JSON(http.StatusOK, idevInfoResponse{Devices: dds})
 }

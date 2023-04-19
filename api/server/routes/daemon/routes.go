@@ -17,25 +17,48 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// Ping
 	//
 	// This will return if 200 the daemon is running.
+	//
+	//     Responses:
+	//       200:
+	//       	description: "no error"
+	//   		schema:
+	//     			type: "string"
+	//     			example: "(empty)"
 	rg.HEAD("/_ping", pingHandler)
 	// swagger:route GET /_ping Daemon getDaemonPing
 	//
 	// Ping
 	//
 	// This will return "OK" if the daemon is running.
+	//
+	//     Responses:
+	//       200:
+	//       	description: "no error"
+	//   		schema:
+	//     			type: "string"
+	//     			example: "OK"
 	rg.GET("/_ping", pingHandler)
 	// swagger:route GET /version Daemon getDaemonVersion
 	//
 	// Version
 	//
 	// This will return the daemon version info.
+	//
+	//     Responses:
+	//       200: versionResponse
 	rg.GET("/version", func(c *gin.Context) {
-		c.JSON(http.StatusOK, types.Version{
+		c.JSON(http.StatusOK, versionResponse{types.Version{
 			APIVersion:     api.DefaultVersion,
 			OSType:         runtime.GOOS,
 			BuilderVersion: types.BuildVersion,
-		})
+		}})
 	})
+}
+
+// swagger:response versionResponse
+type versionResponse struct {
+	// swagger:allOf
+	types.Version
 }
 
 func pingHandler(c *gin.Context) {

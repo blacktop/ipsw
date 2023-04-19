@@ -28,6 +28,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to kernelcache
 	//         required: true
 	//         type: string
+	//     Responses:
+	//       200: kernelKextsResponse
+	//       500: genericError
 	kg.GET("/kexts", listKexts)
 	// kg.GET("/sbopts", handler)     // TODO: implement this
 	// kg.GET("/symbolsets", handler) // TODO: implement this
@@ -47,6 +50,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to kernelcache
 	//         required: true
 	//         type: string
+	//     Responses:
+	//       200: kernelSyscallsResponse
+	//       500: genericError
 	kg.GET("/syscall", getSyscalls)
 	// swagger:route GET /kernel/version Kernel getKernelVersion
 	//
@@ -64,7 +70,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         required: true
 	//         type: string
 	//     Responses:
+	//       200: kernelVersionResponse
 	//       500: genericError
-	//       200: kernelcacheVersion
 	kg.GET("/version", getVersion)
 }

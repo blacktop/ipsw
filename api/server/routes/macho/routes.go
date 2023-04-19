@@ -33,7 +33,12 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: architecture to get info for in universal MachO
 	//         required: false
 	//         type: string
+	//     Responses:
+	//       200: machoInfoResponse
+	//       400: genericError
+	//       500: genericError
 	m.GET("/info", machoInfo)
+
 	// m.GET("/lipo", handler)   // TODO: implement this
 	// m.GET("/o2a", handler)    // TODO: implement this
 	// m.GET("/patch", handler)  // TODO: implement this

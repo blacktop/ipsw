@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/api/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,12 +15,19 @@ type Info struct {
 	Arch string `form:"arch" json:"arch"`
 }
 
+// swagger:response
+type machoInfoResponse struct {
+	Path string      `json:"path"`
+	Arch string      `json:"arch"`
+	Info *macho.File `json:"info"`
+}
+
 func machoInfo(c *gin.Context) {
 	var m *macho.File
 	var params Info
 
 	if err := c.BindQuery(&params); err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
 		return
 	}
 
@@ -28,16 +36,16 @@ func machoInfo(c *gin.Context) {
 		if err == macho.ErrNotFat { // not a fat binary
 			m, err = macho.Open(params.Path)
 			if err != nil {
-				c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 				return
 			}
 		} else {
-			c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
 	} else { // fat binary
 		if params.Arch == "" {
-			c.IndentedJSON(http.StatusBadRequest, gin.H{"error": "'arch' query parameter is required for universal binaries"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: "'arch' query parameter is required for universal binaries"})
 			return
 		}
 		for _, farch := range fat.Arches {
@@ -46,5 +54,5 @@ func machoInfo(c *gin.Context) {
 			}
 		}
 	}
-	c.IndentedJSON(http.StatusOK, gin.H{"info": m})
+	c.IndentedJSON(http.StatusOK, machoInfoResponse{Path: params.Path, Arch: params.Arch, Info: m})
 }
