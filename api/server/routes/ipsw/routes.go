@@ -22,6 +22,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//
+	//     Responses:
+	//       200: getFsFilesResponse
+	//       500: genericError
 	dl.GET("/fs/files", getFsFiles)
 	// swagger:route GET /ipsw/fs/ents IPSW getIpswFsEntitlements
 	//
@@ -38,6 +42,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//
+	//     Responses:
+	//       200: getFsEntitlementsResponse
+	//       500: genericError
 	dl.GET("/fs/ents", getFsEntitlements)
 	// swagger:route GET /ipsw/fs/launchd IPSW getIpswFsLaunchd
 	//
@@ -54,5 +62,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//
+	//     Responses:
+	//       200: getFsLaunchdConfigResponse
+	//       500: genericError
 	dl.GET("/fs/launchd", getFsLaunchdConfig)
 }

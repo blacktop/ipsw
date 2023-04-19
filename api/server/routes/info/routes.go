@@ -22,6 +22,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to IPSW
 	//         required: true
 	//         type: string
+	//
+	//     Responses:
+	//       200: infoResponse
+	//       500: genericError
 	ig.GET("/ipsw", getInfo)
 	// swagger:route GET /info/ota Info getOtaInfo
 	//
@@ -38,6 +42,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         description: path to OTA
 	//         required: true
 	//         type: string
+	//
+	//     Responses:
+	//       200: infoResponse
+	//       500: genericError
 	ig.GET("/ota", getInfo)
 	// swagger:route GET /info/ipsw/remote Info getRemoteIpswInfo
 	//
@@ -62,6 +70,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         in: query
 	//         description: ignore TLS errors
 	//         type: boolean
+	//
+	//     Responses:
+	//       200: infoRemoteResponse
+	//       500: genericError
 	ig.GET("/ipsw/remote", getRemoteInfo)
 	// swagger:route GET /info/ota/remote Info getRemoteOtaInfo
 	//
@@ -86,5 +98,9 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//         in: query
 	//         description: ignore TLS errors
 	//         type: boolean
+	//
+	//     Responses:
+	//       200: infoRemoteResponse
+	//       500: genericError
 	ig.GET("/ota/remote", getRemoteInfo)
 }

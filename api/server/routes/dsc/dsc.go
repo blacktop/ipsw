@@ -13,8 +13,9 @@ import (
 
 // swagger:response
 type dscImportsResponse struct {
+	// The path to the DSC file
 	Path string `json:"path,omitempty"`
-	// swagger:allOf
+	// The list of dylibs/apps that import the specified dylib
 	ImportedBy *cmd.ImportedBy `json:"imported_by,omitempty"`
 }
 
@@ -42,8 +43,7 @@ func dscImports(c *gin.Context) {
 
 // swagger:response
 type dscInfoResponse struct {
-	Path string `json:"path,omitempty"`
-	// swagger:allOf
+	Path string    `json:"path,omitempty"`
 	Info *cmd.Info `json:"info,omitempty"`
 }
 
@@ -71,8 +71,7 @@ func dscInfo(c *gin.Context) {
 
 // swagger:response
 type dscMachoResponse struct {
-	Path string `json:"path,omitempty"`
-	// swagger:allOf
+	Path  string      `json:"path,omitempty"`
 	Macho *macho.File `json:"macho,omitempty"`
 }
 
@@ -102,8 +101,7 @@ func dscMacho(c *gin.Context) {
 
 // swagger:response
 type dscStringsResponse struct {
-	Path string `json:"path,omitempty"`
-	// swagger:allOf
+	Path    string       `json:"path,omitempty"`
 	Strings []cmd.String `json:"strings,omitempty"`
 }
 
@@ -126,35 +124,40 @@ func dscStrings(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, dscStringsResponse{Path: dscPath, Strings: strs})
 }
 
-// swagger:response
-type dscSymbolsResponse struct {
+// swagger:parameters getDscSymbols
+type dscSymbolsRequest struct {
 	Path string `json:"path,omitempty"`
 	// swagger:allOf
+	Lookups []cmd.Symbol `json:"lookups,omitempty"`
+}
+
+// swagger:response
+type dscSymbolsResponse struct {
+	Path    string       `json:"path,omitempty"`
 	Symbols []cmd.Symbol `json:"symbols,omitempty"`
 }
 
 func dscSymbols(c *gin.Context) {
-	dscPath := c.Query("path")
-	f, err := dyld.Open(dscPath)
+	var params dscSymbolsRequest
+	if err := c.ShouldBindJSON(&params); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
+		return
+	}
+
+	f, err := dyld.Open(params.Path)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 	defer f.Close()
 
-	var lookups []cmd.Symbol
-	if err := c.ShouldBindJSON(&lookups); err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
-		return
-	}
-
-	syms, err := cmd.GetSymbols(f, lookups)
+	syms, err := cmd.GetSymbols(f, params.Lookups)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, dscSymbolsResponse{Path: dscPath, Symbols: syms})
+	c.IndentedJSON(http.StatusOK, dscSymbolsResponse{Path: params.Path, Symbols: syms})
 }
 
 // swagger:response

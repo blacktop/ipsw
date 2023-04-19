@@ -14,6 +14,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/api/types"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -21,11 +22,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// swagger:model
 type File struct {
 	Name    string
 	Size    int64
 	Mode    string
 	ModTime time.Time
+}
+
+// FS files response
+// swagger:response
+type getFsFilesResponse struct {
+	// The path to the IPSW
+	Path string `json:"path"`
+	// The files in the IPSW filesystem
+	Files []File `json:"files"`
 }
 
 func getFsFiles(c *gin.Context) {
@@ -34,12 +45,12 @@ func getFsFiles(c *gin.Context) {
 
 	i, err := info.Parse(ipswPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 	dmgPath, err := i.GetFileSystemOsDmg()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 	if _, err := os.Stat(dmgPath); os.IsNotExist(err) {
@@ -48,10 +59,10 @@ func getFsFiles(c *gin.Context) {
 			return strings.EqualFold(filepath.Base(f.Name), dmgPath)
 		})
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to extract %s from IPSW: %v", dmgPath, err))
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to extract %s from IPSW: %v", dmgPath, err)})
 		}
 		if len(dmgs) == 0 {
-			c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to find %s in IPSW", dmgPath))
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to find %s in IPSW", dmgPath)})
 		}
 		defer os.Remove(filepath.Clean(dmgs[0]))
 	} else {
@@ -63,7 +74,7 @@ func getFsFiles(c *gin.Context) {
 	mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
 	if err != nil {
 		if !errors.Is(err, utils.ErrMountResourceBusy) {
-			c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to mount DMG: %v", err))
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to mount DMG: %v", err)})
 		}
 	}
 	if alreadyMounted {
@@ -100,11 +111,17 @@ func getFsFiles(c *gin.Context) {
 		})
 		return nil
 	}); err != nil {
-		c.JSON(http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{"path": ipswPath, "files": files})
+	c.IndentedJSON(http.StatusOK, getFsFilesResponse{Path: ipswPath, Files: files})
+}
+
+// swagger:response
+type getFsEntitlementsResponse struct {
+	Path         string                    `json:"path"`
+	Entitlements map[string]map[string]any `json:"entitlements"`
 }
 
 func getFsEntitlements(c *gin.Context) {
@@ -113,7 +130,7 @@ func getFsEntitlements(c *gin.Context) {
 
 	ents, err := ent.GetDatabase(ipswPath, "")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 
@@ -122,12 +139,18 @@ func getFsEntitlements(c *gin.Context) {
 	for f, ent := range ents {
 		ents := make(map[string]any)
 		if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
-			c.JSON(http.StatusInternalServerError, fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err))
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to decode entitlements plist for %s: %v", f, err)})
 		}
 		entDB[f] = ents
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{"path": ipswPath, "entitlements": entDB})
+	c.IndentedJSON(http.StatusOK, getFsEntitlementsResponse{Path: ipswPath, Entitlements: entDB})
+}
+
+// swagger:response
+type getFsLaunchdConfigResponse struct {
+	Path          string `json:"path"`
+	LaunchdConfig string `json:"launchd_config"`
 }
 
 func getFsLaunchdConfig(c *gin.Context) {
@@ -135,9 +158,9 @@ func getFsLaunchdConfig(c *gin.Context) {
 
 	ldconf, err := extract.LaunchdConfig(ipswPath)
 	if err != nil {
-		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
 	}
 
-	c.IndentedJSON(http.StatusOK, gin.H{"path": ipswPath, "launchd_config": ldconf})
+	c.IndentedJSON(http.StatusOK, getFsLaunchdConfigResponse{Path: ipswPath, LaunchdConfig: ldconf})
 }

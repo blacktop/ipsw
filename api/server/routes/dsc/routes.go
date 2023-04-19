@@ -118,44 +118,18 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// dr.GET("/stubs", handler) // TODO: implement this
 	// dr.GET("/swift", handler) // TODO: implement this
 
-	// swagger:operation GET /dsc/symaddr DSC getDscSymbols
+	// swagger:route GET /dsc/symaddr DSC getDscSymbols
 	//
 	// Symbols
 	//
 	// Get symbols addresses in the DSC that match a given lookup JSON payload.
 	//
-	// ---
-	// consumes:
-	//   - "application/json"
-	// produces:
-	//   - "application/json"
-	// parameters:
-	//   - name: lookups
-	//     in: body
-	//     description: Symbol lookups
-	//     required: true
-	//     schema:
-	//       type: array
-	//       items:
-	//        $ref: "#/definitions/Symbol"
-	//   - name: path
-	//     in: query
-	//     description: path to dyld_shared_cache
-	//     required: true
-	//     type: string
-	// responses:
-	//   '200':
-	//     description: symbol lookup response
-	//     schema:
-	//       $ref: '#/responses/dscSymbolsResponse'
-	//   '400':
-	//     description: bad request
-	//     schema:
-	//       $ref: '#/responses/genericError'
-	//   '500':
-	//     description: error
-	//     schema:
-	//       $ref: '#/responses/genericError'
+	//     Produces:
+	//     - application/json
+	//
+	//     Responses:
+	//       200: dscSymbolsResponse
+	//       500: genericError
 	dr.POST("/symaddr", dscSymbols)
 	// dr.GET("/tbd", handler)    // TODO: implement this
 

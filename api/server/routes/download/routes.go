@@ -20,12 +20,20 @@ func AddRoutes(rg *gin.RouterGroup) {
 	// Latest iOS Version
 	//
 	// Get latest iOS version.
+	//
+	//     Responses:
+	//       200: latestIpswIosVersionResponse
+	//       500: genericError
 	dl.GET("/ipsw/ios/latest/version", latestVersion)
 	// swagger:route GET /download/ipsw/ios/latest/build Download getDownloadLatestIPSWsBuild
 	//
 	// Latest iOS Build
 	//
 	// Get latest iOS build.
+	//
+	//     Responses:
+	//       200: latestIpswIosBuildResponse
+	//       500: genericError
 	dl.GET("/ipsw/ios/latest/build", latestBuild)
 
 	// dl.GET("/macos", handler) // TODO:
