@@ -24,7 +24,12 @@
           "Daemon"
         ],
         "summary": "Ping",
-        "operationId": "getDaemonPing"
+        "operationId": "getDaemonPing",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
       },
       "head": {
         "description": "This will return if 200 the daemon is running.",
@@ -32,7 +37,12 @@
           "Daemon"
         ],
         "summary": "Ping",
-        "operationId": "headDaemonPing"
+        "operationId": "headDaemonPing",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
       }
     },
     "/device_list": {
@@ -45,7 +55,15 @@
           "DeviceList"
         ],
         "summary": "List XCode Devices.",
-        "operationId": "getDeviceList"
+        "operationId": "getDeviceList",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/deviceListResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/download/ipsw/ios/latest/build": {
@@ -55,7 +73,15 @@
           "Download"
         ],
         "summary": "Latest iOS Build",
-        "operationId": "getDownloadLatestIPSWsBuild"
+        "operationId": "getDownloadLatestIPSWsBuild",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/latestIpswIosBuildResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/download/ipsw/ios/latest/version": {
@@ -65,7 +91,15 @@
           "Download"
         ],
         "summary": "Latest iOS Version",
-        "operationId": "getDownloadLatestIPSWsVersion"
+        "operationId": "getDownloadLatestIPSWsVersion",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/latestIpswIosVersionResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/dsc/imports": {
@@ -212,9 +246,6 @@
     "/dsc/symaddr": {
       "get": {
         "description": "Get symbols addresses in the DSC that match a given lookup JSON payload.",
-        "consumes": [
-          "application/json"
-        ],
         "produces": [
           "application/json"
         ],
@@ -225,43 +256,25 @@
         "operationId": "getDscSymbols",
         "parameters": [
           {
-            "description": "Symbol lookups",
-            "name": "lookups",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "array",
-              "items": {
-                "$ref": "#/definitions/Symbol"
-              }
-            }
+            "type": "string",
+            "x-go-name": "Path",
+            "name": "path",
+            "in": "query"
           },
           {
-            "type": "string",
-            "description": "path to dyld_shared_cache",
-            "name": "path",
-            "in": "query",
-            "required": true
+            "type": "array",
+            "items": {},
+            "x-go-name": "Lookups",
+            "name": "lookups",
+            "in": "query"
           }
         ],
         "responses": {
           "200": {
-            "description": "symbol lookup response",
-            "schema": {
-              "$ref": "#/responses/dscSymbolsResponse"
-            }
-          },
-          "400": {
-            "description": "bad request",
-            "schema": {
-              "$ref": "#/responses/genericError"
-            }
+            "$ref": "#/responses/dscSymbolsResponse"
           },
           "500": {
-            "description": "error",
-            "schema": {
-              "$ref": "#/responses/genericError"
-            }
+            "$ref": "#/responses/genericError"
           }
         }
       }
@@ -598,7 +611,15 @@
           "USB"
         ],
         "summary": "Info",
-        "operationId": "getIdevInfo"
+        "operationId": "getIdevInfo",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/idevInfoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/info/ipsw": {
@@ -620,7 +641,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/infoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/info/ipsw/remote": {
@@ -654,7 +683,15 @@
             "name": "insecure",
             "in": "query"
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/infoRemoteResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/info/ota": {
@@ -676,7 +713,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/infoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/info/ota/remote": {
@@ -710,7 +755,15 @@
             "name": "insecure",
             "in": "query"
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/infoRemoteResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/ipsw/fs/ents": {
@@ -732,7 +785,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/getFsEntitlementsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/ipsw/fs/files": {
@@ -754,7 +815,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/getFsFilesResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/ipsw/fs/launchd": {
@@ -776,7 +845,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/getFsLaunchdConfigResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/kernel/kexts": {
@@ -798,7 +875,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/kernelKextsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/kernel/syscall": {
@@ -820,7 +905,15 @@
             "in": "query",
             "required": true
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/kernelSyscallsResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/kernel/version": {
@@ -845,7 +938,7 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/responses/kernelcacheVersion"
+            "$ref": "#/responses/kernelVersionResponse"
           },
           "500": {
             "$ref": "#/responses/genericError"
@@ -878,7 +971,18 @@
             "name": "arch",
             "in": "query"
           }
-        ]
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/machoInfoResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
       }
     },
     "/mount/{type}": {
@@ -961,7 +1065,12 @@
           "Daemon"
         ],
         "summary": "Version",
-        "operationId": "getDaemonVersion"
+        "operationId": "getDaemonVersion",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/versionResponse"
+          }
+        }
       }
     }
   },
@@ -969,6 +1078,9 @@
     "Dylib": {
       "description": "Dylib is a struct that contains information about a dyld_shared_cache dylib",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "File": {
+      "x-go-package": "github.com/blacktop/ipsw/api/server/routes/ipsw"
     },
     "ImportedBy": {
       "description": "ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib",
@@ -996,12 +1108,24 @@
     }
   },
   "responses": {
+    "deviceListResponse": {
+      "description": "",
+      "headers": {
+        "devices": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
     "dscImportsResponse": {
       "description": "",
       "headers": {
-        "imported_by": {},
+        "imported_by": {
+          "description": "The list of dylibs/apps that import the specified dylib"
+        },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "The path to the DSC file"
         }
       }
     },
@@ -1060,10 +1184,14 @@
     },
     "extractReponse": {
       "description": "The extract response message",
-      "schema": {
-        "type": "array",
-        "items": {
-          "type": "string"
+      "headers": {
+        "artifacts": {
+          "minItems": 0,
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The list of extracted files"
         }
       }
     },
@@ -1073,6 +1201,104 @@
         "error": {
           "type": "string"
         }
+      }
+    },
+    "getFsEntitlementsResponse": {
+      "description": "",
+      "schema": {
+        "type": "object",
+        "additionalProperties": {}
+      },
+      "headers": {
+        "entitlements": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "getFsFilesResponse": {
+      "description": "FS files response",
+      "headers": {
+        "files": {
+          "type": "array",
+          "items": {},
+          "description": "The files in the IPSW filesystem"
+        },
+        "path": {
+          "type": "string",
+          "description": "The path to the IPSW"
+        }
+      }
+    },
+    "getFsLaunchdConfigResponse": {
+      "description": "",
+      "headers": {
+        "launchd_config": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "idevInfoResponse": {
+      "description": "",
+      "headers": {
+        "devices": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
+    "infoRemoteResponse": {
+      "description": "",
+      "headers": {
+        "info": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "infoResponse": {
+      "description": "",
+      "headers": {
+        "info": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "kernelKextsResponse": {
+      "description": "",
+      "headers": {
+        "kexts": {
+          "type": "array",
+          "items": {}
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "kernelSyscallsResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "syscalls": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
+    "kernelVersionResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "version": {}
       }
     },
     "kernelcacheVersion": {
@@ -1126,6 +1352,34 @@
         }
       }
     },
+    "latestIpswIosBuildResponse": {
+      "description": "",
+      "headers": {
+        "build": {
+          "type": "string"
+        }
+      }
+    },
+    "latestIpswIosVersionResponse": {
+      "description": "",
+      "headers": {
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "machoInfoResponse": {
+      "description": "",
+      "headers": {
+        "arch": {
+          "type": "string"
+        },
+        "info": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
     "mountReponse": {
       "description": "",
       "headers": {
@@ -1145,6 +1399,20 @@
       "headers": {
         "success": {
           "type": "boolean"
+        }
+      }
+    },
+    "versionResponse": {
+      "description": "",
+      "headers": {
+        "api_version": {
+          "type": "string"
+        },
+        "builder_version": {
+          "type": "string"
+        },
+        "os_type": {
+          "type": "string"
         }
       }
     }
