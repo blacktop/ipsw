@@ -74,6 +74,20 @@
         ],
         "summary": "Blobs",
         "operationId": "postDiffBlobs",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Previous",
+            "name": "prev",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "x-go-name": "Current",
+            "name": "curr",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "$ref": "#/responses/diffResponse"
@@ -92,6 +106,20 @@
         ],
         "summary": "Files",
         "operationId": "postDiffFiles",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Previous",
+            "name": "prev",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "x-go-name": "Current",
+            "name": "curr",
+            "in": "query"
+          }
+        ],
         "responses": {
           "200": {
             "$ref": "#/responses/diffResponse"
