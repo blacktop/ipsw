@@ -4,6 +4,7 @@ package routes
 import (
 	"github.com/blacktop/ipsw/api/server/routes/daemon"
 	"github.com/blacktop/ipsw/api/server/routes/devicelist"
+	"github.com/blacktop/ipsw/api/server/routes/diff"
 	"github.com/blacktop/ipsw/api/server/routes/download"
 	"github.com/blacktop/ipsw/api/server/routes/dsc"
 	"github.com/blacktop/ipsw/api/server/routes/extract"
@@ -20,6 +21,7 @@ import (
 func Add(rg *gin.RouterGroup) {
 	daemon.AddRoutes(rg)
 	devicelist.AddRoutes(rg)
+	diff.AddRoutes(rg)
 	download.AddRoutes(rg)
 	// dtree.AddRoutes(rg) // TODO: add dtree routes
 	dsc.AddRoutes(rg)
