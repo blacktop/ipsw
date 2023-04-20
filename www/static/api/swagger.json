@@ -66,6 +66,45 @@
         }
       }
     },
+    "/diff/blobs": {
+      "post": {
+        "description": "This will return the diff of two text blobs.",
+        "tags": [
+          "Diff"
+        ],
+        "summary": "Blobs",
+        "operationId": "postDiffBlobs",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/diffResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/diff/files": {
+      "post": {
+        "description": "This will return the diff of two text files.",
+        "tags": [
+          "Diff"
+        ],
+        "summary": "Files",
+        "operationId": "postDiffFiles",
+        "responses": {
+          "200": {
+            "$ref": "#/responses/diffResponse"
+          },
+          "400": {
+            "$ref": "#/responses/genericError"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/download/ipsw/ios/latest/build": {
       "get": {
         "description": "Get latest iOS build.",
@@ -1114,6 +1153,14 @@
         "devices": {
           "type": "array",
           "items": {}
+        }
+      }
+    },
+    "diffResponse": {
+      "description": "",
+      "headers": {
+        "diff": {
+          "type": "string"
         }
       }
     },
