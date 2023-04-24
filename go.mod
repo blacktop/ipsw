@@ -8,6 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/apex/log v1.9.0
+	github.com/aymanbagabas/go-udiff v0.1.0
 	github.com/blacktop/arm64-cgo v1.0.56
 	github.com/blacktop/go-dwarf v1.0.9
 	github.com/blacktop/go-macho v1.1.152
@@ -18,7 +19,7 @@ require (
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/docker/docker v23.0.4+incompatible
-	github.com/dominikbraun/graph v0.18.0
+	github.com/dominikbraun/graph v0.19.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.2
@@ -75,7 +76,6 @@ require (
 	github.com/antchfx/htmlquery v1.3.0 // indirect
 	github.com/antchfx/xmlquery v1.3.15 // indirect
 	github.com/antchfx/xpath v1.2.4 // indirect
-	github.com/aymanbagabas/go-udiff v0.1.0 // indirect
 	github.com/bytedance/sonic v1.8.7 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
