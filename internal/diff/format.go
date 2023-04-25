@@ -55,8 +55,8 @@ const diffMarkdownTemplate = `
 
 | iOS                                     | Version                                 | Build                                | Date                                  |
 | :-------------------------------------- | :-------------------------------------- | :----------------------------------- | :------------------------------------ |
-| {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Kernel.Version.Kernel.Darwin }} | {{ .Old.Kernel.Version.Kernel.XNU }} | {{ .Old.Kernel.Version.Kernel.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
-| {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Kernel.Version.Kernel.Darwin }} | {{ .New.Kernel.Version.Kernel.XNU }} | {{ .New.Kernel.Version.Kernel.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
+| {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Kernel.Version.KernelVersion.Darwin }} | {{ .Old.Kernel.Version.KernelVersion.XNU }} | {{ .Old.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
+| {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Kernel.Version.KernelVersion.Darwin }} | {{ .New.Kernel.Version.KernelVersion.XNU }} | {{ .New.Kernel.Version.KernelVersion.Date.Format "Mon, 02Jan2006 15:04:05 MST" }} |
 
 ### Kexts
 
