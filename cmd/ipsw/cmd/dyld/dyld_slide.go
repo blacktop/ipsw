@@ -38,8 +38,14 @@ func init() {
 	DyldCmd.AddCommand(SlideCmd)
 	SlideCmd.Flags().BoolP("auth", "a", false, "Print only slide info for mappings with auth flags")
 	SlideCmd.Flags().Bool("json", false, "Output as JSON")
+	SlideCmd.Flags().StringP("output", "o", "", "folder to save JSON output")
 	SlideCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	SlideCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+
+	viper.BindPFlag("dyld.slide.auth", SlideCmd.Flags().Lookup("auth"))
+	viper.BindPFlag("dyld.slide.json", SlideCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dyld.slide.output", SlideCmd.Flags().Lookup("output"))
+	viper.BindPFlag("dyld.slide.cache", SlideCmd.Flags().Lookup("cache"))
 }
 
 // SlideCmd represents the slide command
@@ -49,15 +55,31 @@ var SlideCmd = &cobra.Command{
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
+		var enc *json.Encoder
+
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		// flags
+		cacheFile := viper.GetString("dyld.slide.cache")
+		// validate flags
+		if len(viper.GetString("dyld.slide.output")) > 0 && !viper.GetBool("dyld.slide.json") {
+			return errors.New("must use --json flag when using --output flag")
+		}
 
-		printAuthSlideInfo, _ := cmd.Flags().GetBool("auth")
-		dumpJSON, _ := cmd.Flags().GetBool("json")
-		cacheFile, _ := cmd.Flags().GetString("cache")
-
-		enc := json.NewEncoder(os.Stdout)
+		if len(viper.GetString("dyld.slide.output")) > 0 {
+			if err := os.MkdirAll(viper.GetString("dyld.slide.output"), 0750); err != nil {
+				return errors.Wrapf(err, "failed to create output directory %s", viper.GetString("dyld.slide.output"))
+			}
+			f, err := os.Create(filepath.Join(viper.GetString("dyld.slide.output"), "slide_info.json"))
+			if err != nil {
+				return errors.Wrapf(err, "failed to create output file %s", viper.GetString("dyld.slide.output"))
+			}
+			defer f.Close()
+			enc = json.NewEncoder(f)
+		} else {
+			enc = json.NewEncoder(os.Stdout)
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -102,7 +124,7 @@ var SlideCmd = &cobra.Command{
 					SlideInfoOffset: f.Headers[uuid].SlideInfoOffsetUnused,
 					SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
 				}, Name: "__DATA"}
-				if dumpJSON {
+				if viper.GetBool("dyld.slide.json") {
 					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
 					if err != nil {
 						return err
@@ -113,11 +135,11 @@ var SlideCmd = &cobra.Command{
 				}
 			} else {
 				for _, extMapping := range f.MappingsWithSlideInfo[uuid] {
-					if printAuthSlideInfo && !extMapping.Flags.IsAuthData() {
+					if viper.GetBool("dyld.slide.auth") && !extMapping.Flags.IsAuthData() {
 						continue
 					}
 					if extMapping.SlideInfoSize > 0 {
-						if dumpJSON {
+						if viper.GetBool("dyld.slide.json") {
 							rebases, err := f.GetRebaseInfoForPages(uuid, extMapping, 0, 0)
 							if err != nil {
 								return err
