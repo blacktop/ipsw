@@ -273,6 +273,90 @@
         }
       }
     },
+    "/dsc/slide": {
+      "get": {
+        "description": "Get slide info for the DSC.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Slide Info",
+        "operationId": "getDscSlideInfo",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Path",
+            "description": "path to dyld_shared_cache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "pattern": "=\"auth\"",
+            "type": "string",
+            "x-go-name": "Type",
+            "description": "filter by mapping type",
+            "name": "type",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscSlideInfoResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/dsc/split": {
+      "post": {
+        "description": "Split the DSC into its constituent dylibs using XCode's \u003ccode\u003edsc_extractor.bundle\u003c/code\u003e.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "Split",
+        "operationId": "getDscSplit",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Path",
+            "description": "path to dyld_shared_cache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Output",
+            "description": "the folder to output the split dylibs",
+            "name": "output",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "x-go-name": "XCodePath",
+            "description": "the path to the Xcode.app to use for splitting",
+            "name": "xcode_path",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscSplitResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/dsc/str": {
       "get": {
         "description": "Get strings in the DSC that match a given pattern.",
@@ -311,7 +395,7 @@
       }
     },
     "/dsc/symaddr": {
-      "get": {
+      "post": {
         "description": "Get symbols addresses in the DSC that match a given lookup JSON payload.",
         "produces": [
           "application/json"
@@ -325,15 +409,19 @@
           {
             "type": "string",
             "x-go-name": "Path",
+            "description": "path to dyld_shared_cache",
             "name": "path",
-            "in": "query"
+            "in": "query",
+            "required": true
           },
           {
             "type": "array",
             "items": {},
             "x-go-name": "Lookups",
+            "description": "symbols to lookup",
             "name": "lookups",
-            "in": "query"
+            "in": "query",
+            "required": true
           }
         ],
         "responses": {
@@ -1217,6 +1305,32 @@
       "description": "",
       "headers": {
         "macho": {},
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "dscSlideInfoResponse": {
+      "description": "",
+      "headers": {
+        "path": {
+          "type": "string"
+        },
+        "slide_info": {
+          "type": "array",
+          "items": {}
+        }
+      }
+    },
+    "dscSplitResponse": {
+      "description": "",
+      "headers": {
+        "dylibs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "path": {
           "type": "string"
         }

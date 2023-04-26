@@ -104,7 +104,7 @@ var SplitCmd = &cobra.Command{
 			outputPath = filepath.Join(home, fmt.Sprintf("/Library/Developer/Xcode/iOS DeviceSupport/%s (%s)%s", version, viper.GetString("dyld.split.build"), arm64e))
 		}
 
-		if err := os.MkdirAll(outputPath, 0755); err != nil {
+		if err := os.MkdirAll(outputPath, 0750); err != nil {
 			return fmt.Errorf("failed to create output directory %s: %v", outputPath, err)
 		}
 
