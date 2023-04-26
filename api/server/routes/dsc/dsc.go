@@ -149,7 +149,6 @@ func dscSlideInfo(c *gin.Context) {
 	header.Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	var mappings []*dyld.CacheMappingWithSlideInfo
 	for uuid := range f.Mappings {
 		if f.Headers[uuid].SlideInfoOffsetUnused > 0 {
 			mapping := &dyld.CacheMappingWithSlideInfo{CacheMappingAndSlideInfo: dyld.CacheMappingAndSlideInfo{
@@ -160,21 +159,6 @@ func dscSlideInfo(c *gin.Context) {
 				SlideInfoSize:   f.Headers[uuid].SlideInfoSizeUnused,
 			}, Name: "__DATA"}
 			if mapping.SlideInfoSize > 0 {
-				mappings = append(mappings, mapping)
-			}
-		} else {
-			for _, mapping := range f.MappingsWithSlideInfo[uuid] {
-				if auth && !mapping.Flags.IsAuthData() {
-					continue
-				}
-				if mapping.SlideInfoSize > 0 {
-					mappings = append(mappings, mapping)
-				}
-			}
-		}
-
-		if len(mappings) > 0 {
-			for _, mapping := range mappings {
 				rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
 				if err != nil {
 					c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
@@ -182,6 +166,21 @@ func dscSlideInfo(c *gin.Context) {
 				}
 				enc.Encode(dscSlideInfoResponse{Path: params.Path, SlideInfo: rebases})
 				w.(http.Flusher).Flush()
+			}
+		} else {
+			for _, mapping := range f.MappingsWithSlideInfo[uuid] {
+				if auth && !mapping.Flags.IsAuthData() {
+					continue
+				}
+				if mapping.SlideInfoSize > 0 {
+					rebases, err := f.GetRebaseInfoForPages(uuid, mapping, 0, 0)
+					if err != nil {
+						c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+						return
+					}
+					enc.Encode(dscSlideInfoResponse{Path: params.Path, SlideInfo: rebases})
+					w.(http.Flusher).Flush()
+				}
 			}
 		}
 	}
