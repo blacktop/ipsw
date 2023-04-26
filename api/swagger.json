@@ -274,7 +274,7 @@
       }
     },
     "/dsc/slide": {
-      "get": {
+      "post": {
         "description": "Get slide info for the DSC.",
         "produces": [
           "application/json"
