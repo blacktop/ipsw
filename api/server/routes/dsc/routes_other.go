@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build !darwin
 
 package dsc
 
@@ -144,21 +144,6 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//       200: dscSlideInfoResponse
 	//       500: genericError
 	dr.POST("/slide", dscSlideInfo)
-	// swagger:route POST /dsc/split DSC getDscSplit
-	//
-	// Split
-	//
-	// Split the DSC into its constituent dylibs using XCode's <code>dsc_extractor.bundle</code>
-	//
-	// <b>NOTE:</b> darwin ONLY
-	//
-	//     Produces:
-	//     - application/json
-	//
-	//     Responses:
-	//       200: dscSplitResponse
-	//       500: genericError
-	dr.POST("/split", dscSplit)
 
 	// swagger:route GET /dsc/str DSC getDscStrings
 	//
