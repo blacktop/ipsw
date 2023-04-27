@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/spf13/cobra"
@@ -66,8 +67,6 @@ var AddrToSymCmd = &cobra.Command{
 		showImage := viper.GetBool("dyld.a2s.image")
 		showMapping := viper.GetBool("dyld.a2s.mapping")
 		cacheFile := viper.GetString("dyld.a2s.cache")
-
-		secondAttempt := false
 
 		addr, err := utils.ConvertStrToInt(args[1])
 		if err != nil {
@@ -112,121 +111,34 @@ var AddrToSymCmd = &cobra.Command{
 			return err
 		}
 
-	retry:
-		if showMapping {
-			uuid, mapping, err := f.GetMappingForVMAddress(unslidAddr)
-			if err != nil {
-				return err
-			}
-
-			var ext string
-			ext, _ = f.GetSubCacheExtensionFromUUID(uuid)
-			var stubs string
-			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-				stubs = "STUB Island "
-			}
-			fmt.Printf("\nMAPPING\n")
-			fmt.Printf("=======\n")
-			fmt.Printf("  > %s(dsc%s) UUID: %s\n\n", stubs, ext, uuid.String())
-			fmt.Println(mapping.String())
-		}
-
-		if image, err := f.GetImageContainingVMAddr(unslidAddr); err == nil {
-			m, err := image.GetMacho()
-			if err != nil {
-				return err
-			}
-			defer m.Close()
-
-			if showImage {
-				fmt.Println("IMAGE")
-				fmt.Println("-----")
-				fmt.Printf(" > %s\n\n", image.Name)
-			}
-
-			if s := m.FindSegmentForVMAddr(unslidAddr); s != nil {
-				if s.Nsect > 0 {
-					if c := m.FindSectionForVMAddr(unslidAddr); c != nil {
-						if showImage {
-							fmt.Println(s)
-							fmt.Println(c)
-						} else {
-							log.WithFields(log.Fields{
-								"dylib":   image.Name,
-								"section": fmt.Sprintf("%s.%s", s.Name, c.Name),
-							}).Info("Address location")
-						}
-					}
-				} else {
-					log.WithFields(log.Fields{
-						"dylib":   image.Name,
-						"segment": s.Name,
-					}).Info("Address location")
-				}
-			}
-
-			// Load all symbols
-			if err := image.Analyze(); err != nil {
-				return err
-			}
-
-			if fn, err := m.GetFunctionForVMAddr(unslidAddr); err == nil {
-				delta := ""
-				if unslidAddr-fn.StartAddr != 0 {
-					delta = fmt.Sprintf(" + %d", unslidAddr-fn.StartAddr)
-				}
-				if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
-					if secondAttempt {
-						symName = "_ptr." + symName
-					}
-					fmt.Printf("\n%#x: %s%s\n", addr, symName, delta)
-				} else {
-					if secondAttempt {
-						fmt.Printf("\n%#x: _ptr.func_%x%s\n", addr, fn.StartAddr, delta)
-						return nil
-					}
-					fmt.Printf("\n%#x: func_%x%s\n", addr, fn.StartAddr, delta)
-				}
-				return nil
-			}
-
-			if cstr, ok := m.IsCString(unslidAddr); ok {
-				if secondAttempt {
-					fmt.Printf("\n%#x: _ptr.%#v\n", addr, cstr)
-				} else {
-					fmt.Printf("\n%#x: %#v\n", addr, cstr)
-				}
-				return nil
-			}
-
-		} else {
-			log.Error(err.Error())
-		}
-
-		if symName, ok := f.AddressToSymbol[unslidAddr]; ok {
-			if secondAttempt {
-				symName = "_ptr." + symName
-			}
-			fmt.Printf("\n%#x: %s\n", addr, symName)
-			return nil
-		}
-
-		if secondAttempt {
-			log.Error("no symbol found")
-			return nil
-		}
-
-		ptr, err := f.ReadPointerAtAddress(unslidAddr)
+		sym, err := dsc.LookupSymbol(f, unslidAddr)
 		if err != nil {
 			return err
 		}
 
-		utils.Indent(log.Error, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", unslidAddr, f.SlideInfo.SlidePointer(ptr)))
+		if showMapping {
+			var stubs string
+			if sym.StubIsland {
+				stubs = "STUB Island "
+			}
+			fmt.Printf("\nMAPPING\n")
+			fmt.Printf("=======\n")
+			fmt.Printf("  > %s(dsc%s) UUID: %s, %s\n\n", stubs, sym.Extension, sym.UUID, sym.Mapping)
+		}
 
-		unslidAddr = f.SlideInfo.SlidePointer(ptr)
+		if showImage {
+			fmt.Println("IMAGE")
+			fmt.Println("-----")
+			fmt.Printf(" > %s (%s.%s)\n\n", sym.Image, sym.Segment, sym.Section)
+		} else {
+			log.WithFields(log.Fields{
+				"dylib":   sym.Image,
+				"section": fmt.Sprintf("%s.%s", sym.Segment, sym.Section),
+			}).Info("Address location")
+		}
 
-		secondAttempt = true
+		fmt.Printf("%#x: %s\n", unslidAddr, sym.Symbol)
 
-		goto retry
+		return nil
 	},
 }

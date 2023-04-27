@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -91,41 +92,61 @@ var AddrToOffsetCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		uuid, off, err := f.GetOffset(addr)
+		if f.Headers[f.UUID].CacheType == dyld.CacheTypeUniversal {
+			utils.Indent(log.Warn, 2)("dyld4 cache with stub islands detected (will search within dyld_subcache_entry's cacheVMOffsets)")
+		} else if f.IsDyld4 {
+			utils.Indent(log.Warn, 2)("dyld4 cache detected (will search for offset in each subcache)")
+		}
+
+		off, err := dsc.ConvertAddressToOffset(f, addr)
 		if err != nil {
-			log.Error(err.Error())
+			return err
+		}
+
+		if inDec {
+			fmt.Printf("%d\n", off.File.Offset)
+		} else if inHex {
+			fmt.Printf("%#x\n", off.File.Offset)
 		} else {
-			if inDec {
-				fmt.Printf("%d\n", off)
-			} else if inHex {
-				fmt.Printf("%#x\n", off)
+			if f.IsDyld4 {
+				var stubs string
+				if off.File.SubCache.InStubs {
+					stubs = "STUB Island "
+				}
+				log.WithFields(log.Fields{
+					"hex": fmt.Sprintf("%#x", off.File.Offset),
+					"dec": fmt.Sprintf("%d", off.File.Offset),
+					"sub_cache": fmt.Sprintf("%sdsc%s, mapping: %s, UUID: %s",
+						stubs,
+						off.File.SubCache.Extension,
+						off.File.SubCache.Mapping,
+						off.File.SubCache.UUID,
+					),
+				}).Info("Offset")
 			} else {
-				m, err := f.GetMappingForOffsetForUUID(uuid, off)
-				if err != nil {
-					return err
-				}
-				if f.IsDyld4 {
-					ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
-					var stubs bool
-					if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-						stubs = true
-					}
-					log.WithFields(log.Fields{
-						"uuid":    uuid.String(),
-						"hex":     fmt.Sprintf("%#x", off),
-						"dec":     fmt.Sprintf("%d", off),
-						"ext":     ext,
-						"stubs":   stubs,
-						"mapping": m.Name,
-					}).Info("Offset")
-				} else {
-					log.WithFields(log.Fields{
-						"hex":     fmt.Sprintf("%#x", off),
-						"dec":     fmt.Sprintf("%d", off),
-						"mapping": m.Name,
-					}).Info("Offset")
-				}
+				log.WithFields(log.Fields{
+					"hex":     fmt.Sprintf("%#x", off.File.Offset),
+					"dec":     fmt.Sprintf("%d", off.File.Offset),
+					"mapping": off.File.SubCache.Mapping,
+				}).Info("Offset")
 			}
+		}
+
+		if off.Cache != nil {
+			var stubs string
+			if off.Cache.SubCache.InStubs {
+				stubs = "STUB Island "
+			}
+			log.WithFields(log.Fields{
+				"hex": fmt.Sprintf("%#x", off.Cache.Offset),
+				"dec": fmt.Sprintf("%d", off.Cache.Offset),
+				"sub_cache": fmt.Sprintf("%sdsc%s, mapping: %s, UUID: %s",
+					stubs,
+					off.Cache.SubCache.Extension,
+					off.Cache.SubCache.Mapping,
+					off.Cache.SubCache.UUID,
+				),
+			}).Info("CACHE offset")
 		}
 
 		return nil

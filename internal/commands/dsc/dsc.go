@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -63,12 +64,295 @@ type Symbol struct {
 	Pattern string `json:"pattern,omitempty"`
 }
 
+// SymbolLookup is a struct that contains information about a dyld_shared_cache symbol lookup
+// swagger:model
+type SymbolLookup struct {
+	// The symbol name
+	Symbol string `json:"symbol,omitempty"`
+	// The demangled symbol name
+	Demanged string `json:"demanged,omitempty"`
+	// The DSC mapping name
+	Mapping string `json:"mapping,omitempty"`
+	// The DSC sub-cache UUID
+	UUID string `json:"uuid,omitempty"`
+	// Is the symbol in a DSC stub island
+	StubIsland bool `json:"stub_island,omitempty"`
+	// The DSC sub-cache file extension
+	Extension string `json:"ext,omitempty"`
+	// The containing image name
+	Image string `json:"image,omitempty"`
+	// The containing image section
+	Section string `json:"section,omitempty"`
+	// The containing image segment
+	Segment string `json:"segment,omitempty"`
+}
+
 // String is a struct that contains information about a dyld_shared_cache string
 // swagger:model
 type String struct {
 	Address uint64 `json:"address,omitempty"`
 	Image   string `json:"image,omitempty"`
 	String  string `json:"string,omitempty"`
+}
+
+type subCache struct {
+	// the DSC sub-cache UUID
+	UUID string `json:"uuid"`
+	// the DSC sub-cache file extension
+	Extension string `json:"ext"`
+	// is the offset in a DSC stub island
+	InStubs bool `json:"stubs"`
+	// the DSC sub-cache mapping name
+	Mapping string `json:"mapping"`
+}
+
+type offset struct {
+	// the file offset in the DSC sub-cache
+	Offset uint64 `json:"offset"`
+	// the DSC sub-cache
+	SubCache subCache `json:"sub_cache"`
+}
+
+// Offset is a struct that contains information about a dyld_shared_cache offset
+// swagger:model
+type Offset struct {
+	File  *offset `json:"file,omitempty"`
+	Cache *offset `json:"cache,omitempty"`
+}
+
+type address struct {
+	// the offset in the DSC sub-cache
+	Address uint64 `json:"address"`
+	// the DSC sub-cache
+	SubCache subCache `json:"sub_cache"`
+}
+
+// Address is a struct that contains information about a dyld_shared_cache address
+// swagger:model
+type Address struct {
+	Files []*address `json:"files,omitempty"`
+	Cache *address   `json:"cache,omitempty"`
+}
+
+// ConvertAddressToOffset converts a dyld_shared_cache address to an offset
+func ConvertAddressToOffset(f *dyld.File, addr uint64) (*Offset, error) {
+
+	uuid, off, err := f.GetOffset(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	o := &Offset{
+		File: &offset{
+			Offset: off,
+			SubCache: subCache{
+				UUID: uuid.String(),
+			},
+		},
+	}
+
+	m, err := f.GetMappingForOffsetForUUID(uuid, off)
+	if err != nil {
+		return nil, err
+	}
+
+	o.File.SubCache.Mapping = m.Name
+
+	if f.IsDyld4 {
+		o.File.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
+		if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+			o.File.SubCache.InStubs = true
+		}
+	}
+
+	if f.Headers[f.UUID].CacheType == dyld.CacheTypeUniversal {
+		uuid, off, err := f.GetCacheOffsetFromAddress(addr)
+		if err != nil {
+			return nil, err
+		}
+		o.Cache = &offset{
+			Offset: off,
+			SubCache: subCache{
+				UUID: uuid.String(),
+			},
+		}
+
+		if m, err := f.GetMappingForOffsetForUUID(uuid, o.File.Offset); err == nil {
+			o.Cache.SubCache.Mapping = m.Name
+		} else {
+			o.Cache.SubCache.Mapping = "?"
+		}
+
+		if f.IsDyld4 {
+			o.Cache.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
+			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+				o.Cache.SubCache.InStubs = true
+			}
+		}
+	}
+
+	return o, nil
+}
+
+// ConvertOffsetToAddress converts a dyld_shared_cache offset to an address
+func ConvertOffsetToAddress(f *dyld.File, offset uint64) (*Address, error) {
+	a := &Address{}
+
+	for uuid := range f.MappingsWithSlideInfo {
+		addr, err := f.GetVMAddressForUUID(uuid, offset)
+		if err != nil {
+			continue
+		}
+		aa := &address{
+			Address: addr,
+			SubCache: subCache{
+				UUID: uuid.String(),
+			},
+		}
+		// break
+		uuid, m, err := f.GetMappingForVMAddress(aa.Address)
+		if err != nil {
+			return nil, err
+		}
+
+		aa.SubCache.Mapping = m.Name
+
+		if f.IsDyld4 {
+			aa.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
+			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+				aa.SubCache.InStubs = true
+			}
+		}
+		a.Files = append(a.Files, aa)
+	}
+
+	if f.Headers[f.UUID].CacheType == dyld.CacheTypeUniversal {
+		uuid, addr, err := f.GetCacheVMAddress(offset)
+		if err != nil {
+			return nil, err
+		}
+		a.Cache = &address{
+			Address: addr,
+			SubCache: subCache{
+				UUID: uuid.String(),
+			},
+		}
+		uuid, m, err := f.GetMappingForVMAddress(addr)
+		if err != nil {
+			a.Cache = nil
+			return a, nil
+		}
+
+		a.Cache.SubCache.Mapping = m.Name
+
+		if f.IsDyld4 {
+			a.Cache.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
+			if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+				a.Cache.SubCache.InStubs = true
+			}
+		}
+	}
+
+	return a, nil
+}
+
+// LookupSymbol returns a dyld_shared_cache symbol for an address
+func LookupSymbol(f *dyld.File, addr uint64) (*SymbolLookup, error) {
+	var secondAttempt bool
+
+	sym := &SymbolLookup{}
+
+	uuid, mapping, err := f.GetMappingForVMAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	sym.UUID = uuid.String()
+	sym.Mapping = mapping.Name
+
+	sym.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
+	if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
+		sym.StubIsland = true
+	}
+
+retry:
+	if image, err := f.GetImageContainingVMAddr(addr); err == nil {
+		m, err := image.GetMacho()
+		if err != nil {
+			return nil, err
+		}
+		defer m.Close()
+
+		sym.Image = image.Name
+
+		if s := m.FindSegmentForVMAddr(addr); s != nil {
+			sym.Segment = s.Name
+			if s.Nsect > 0 {
+				if c := m.FindSectionForVMAddr(addr); c != nil {
+					sym.Section = c.Name
+				}
+			}
+		}
+
+		// Load all symbols
+		if err := image.Analyze(); err != nil {
+			return nil, err
+		}
+
+		if fn, err := m.GetFunctionForVMAddr(addr); err == nil {
+			delta := ""
+			if addr-fn.StartAddr != 0 {
+				delta = fmt.Sprintf(" + %d", addr-fn.StartAddr)
+			}
+			if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
+				if secondAttempt {
+					symName = "_ptr." + symName
+				}
+				sym.Symbol = fmt.Sprintf("%s%s", symName, delta)
+				return sym, nil
+			}
+			if secondAttempt {
+				sym.Symbol = fmt.Sprintf("_ptr.func_%x%s", fn.StartAddr, delta)
+				return sym, nil
+			}
+			sym.Symbol = fmt.Sprintf("func_%x%s", fn.StartAddr, delta)
+			return sym, nil
+		}
+
+		if cstr, ok := m.IsCString(addr); ok {
+			if secondAttempt {
+				sym.Symbol = fmt.Sprintf("_ptr.%#v", cstr)
+				return sym, nil
+			}
+			sym.Symbol = fmt.Sprintf("%#v", cstr)
+			return sym, nil
+		}
+	}
+
+	if symName, ok := f.AddressToSymbol[addr]; ok {
+		if secondAttempt {
+			symName = "_ptr." + symName
+		}
+		sym.Symbol = symName
+		return sym, nil
+	}
+
+	if secondAttempt {
+		return sym, fmt.Errorf("no symbol found")
+	}
+
+	ptr, err := f.ReadPointerAtAddress(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Indent(log.Debug, 2)(fmt.Sprintf("no symbol found (trying again with %#x as a pointer to %#x)", addr, f.SlideInfo.SlidePointer(ptr)))
+
+	addr = f.SlideInfo.SlidePointer(ptr)
+
+	secondAttempt = true
+
+	goto retry
 }
 
 // GetDylibsThatImport returns a list of dylibs that import the given dylib
