@@ -102,6 +102,23 @@ func (f *File) GetCacheOffset(vmoffset uint64) (types.UUID, uint64, error) {
 	return types.UUID{}, 0, fmt.Errorf("offset %#x not within any sub cache VM offset range", vmoffset)
 }
 
+func (f *File) GetCacheOffsetFromAddress(addr uint64) (types.UUID, uint64, error) {
+	vmstart := f.Headers[f.UUID].SharedRegionStart
+	for idx, scinfo := range f.SubCacheInfo { // check the sub subcaches
+		if idx < len(f.SubCacheInfo)-1 {
+			if vmstart+scinfo.CacheVMOffset <= addr && addr < vmstart+f.SubCacheInfo[idx+1].CacheVMOffset {
+				return scinfo.UUID, addr - (vmstart + scinfo.CacheVMOffset) + scinfo.CacheVMOffset, nil
+			}
+		} else {
+			if vmstart+scinfo.CacheVMOffset <= addr {
+				return scinfo.UUID, addr - (vmstart + scinfo.CacheVMOffset) + scinfo.CacheVMOffset, nil
+			}
+		}
+	}
+	// NOTE: via the dyld src comments; the .symbols subcache is unmmapped
+	return types.UUID{}, 0, fmt.Errorf("address %#x not within any sub cache VM offset range", addr)
+}
+
 func (f *File) GetCacheVMAddress(offset uint64) (types.UUID, uint64, error) {
 	if offset < f.SubCacheInfo[0].CacheVMOffset {
 		return f.UUID, f.MappingsWithSlideInfo[f.UUID][0].Address + offset, nil // vm addr in primary subcache

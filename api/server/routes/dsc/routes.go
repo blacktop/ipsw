@@ -9,8 +9,34 @@ func AddRoutes(rg *gin.RouterGroup) {
 	dr := rg.Group("/dsc")
 
 	// dr.GET("/a2f", handler)     // TODO: implement this
-	// dr.GET("/a2o", handler)     // TODO: implement this
-	// dr.GET("/a2s", handler)     // TODO: implement this
+
+	// swagger:route POST /dsc/a2o DSC postDscAddrToOff
+	//
+	// a2o
+	//
+	// Convert virtual address to file offset.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Responses:
+	//       200: dscAddrToOffResponse
+	//       500: genericError
+	dr.POST("/a2o", dscAddrToOff)
+	// swagger:route POST /dsc/a2s DSC postDscAddrToSym
+	//
+	// a2s
+	//
+	// Convert virtual address to symbol.
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Responses:
+	//       200: dscAddrToSymResponse
+	//       500: genericError
+	dr.POST("/a2s", dscAddrToSym)
+
 	// dr.GET("/disass", handler)  // TODO: implement this
 	// dr.GET("/dump", handler)    // TODO: implement this
 	// dr.GET("/extract", handler) // TODO: implement this
@@ -84,7 +110,21 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//       200: dscMachoResponse
 	//       500: genericError
 	dr.GET("/macho", dscMacho)
-	// dr.GET("/o2a", handler)     // TODO: implement this
+
+	// swagger:route POST /dsc/o2a DSC postDscOffToAddr
+	//
+	// o2a
+	//
+	// Convert file offset to virtual address
+	//
+	//     Produces:
+	//     - application/json
+	//
+	//     Responses:
+	//       200: dscOffToAddrResponse
+	//       500: genericError
+	dr.POST("/o2a", dscOffToAddr)
+
 	// dr.GET("/objc", handler)    // TODO: implement this
 	// dr.GET("/patches", handler) // TODO: implement this
 	// dr.GET("/search", handler)  // TODO: implement this
@@ -106,7 +146,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//
 	// Split
 	//
-	// Split the DSC into its constituent dylibs using XCode's <code>dsc_extractor.bundle</code>.
+	// Split the DSC into its constituent dylibs using XCode's <code>dsc_extractor.bundle</code>
 	//
 	//     Produces:
 	//     - application/json
