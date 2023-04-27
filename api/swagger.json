@@ -431,7 +431,7 @@
     },
     "/dsc/split": {
       "post": {
-        "description": "Split the DSC into its constituent dylibs using XCode's \u003ccode\u003edsc_extractor.bundle\u003c/code\u003e",
+        "description": "Split the DSC into its constituent dylibs using XCode's \u003ccode\u003edsc_extractor.bundle\u003c/code\u003e\n\nNOTE: darwin ONLY",
         "produces": [
           "application/json"
         ],
