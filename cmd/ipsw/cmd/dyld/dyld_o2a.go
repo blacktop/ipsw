@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
@@ -94,77 +95,62 @@ var OffsetToAddrCmd = &cobra.Command{
 		defer f.Close()
 
 		if f.Headers[f.UUID].CacheType == dyld.CacheTypeUniversal {
-			log.Warn("dyld4 cache with stub islands detected (will search within dyld_subcache_entry's cacheVMOffsets)")
-			uuid, address, err := f.GetCacheVMAddress(offset)
-			if err != nil {
-				return err
-			}
-			if f.IsDyld4 {
-				ext, err := f.GetSubCacheExtensionFromUUID(uuid)
-				if err != nil {
-					return err
-				}
-				_, m, err := f.GetMappingForVMAddress(address)
-				if err != nil {
-					return err
-				}
-				var stubs bool
-				if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-					stubs = true
-				}
-				log.WithFields(log.Fields{
-					"uuid":    uuid.String(),
-					"hex":     fmt.Sprintf("%#x", address),
-					"dec":     fmt.Sprintf("%d", address),
-					"ext":     fmt.Sprintf("\"%s\"", ext),
-					"stubs":   stubs,
-					"mapping": m.Name,
-				}).Info("Address")
-				return nil
-			}
+			utils.Indent(log.Warn, 2)("dyld4 cache with stub islands detected (will search within dyld_subcache_entry's cacheVMOffsets)")
+		} else if f.IsDyld4 {
+			utils.Indent(log.Warn, 2)("dyld4 cache detected (will search for offset in each subcache)")
 		}
 
-		if f.IsDyld4 {
-			log.Warn("dyld4 cache detected (will search for offset in each subcache)")
+		addr, err := dsc.ConvertOffsetToAddress(f, offset)
+		if err != nil {
+			return err
 		}
 
-		for uuid := range f.MappingsWithSlideInfo {
-			address, err := f.GetVMAddressForUUID(uuid, offset)
-			if err != nil {
-				continue
+		for _, addr := range addr.Files {
+			if inDec {
+				fmt.Printf("%d\n", addr.Address)
+			} else if inHex {
+				fmt.Printf("%#x\n", addr.Address)
 			} else {
-				if inDec {
-					fmt.Printf("%d\n", address)
-				} else if inHex {
-					fmt.Printf("%#x\n", address)
+				if f.IsDyld4 {
+					var stubs string
+					if addr.SubCache.InStubs {
+						stubs = "STUB Island "
+					}
+					log.WithFields(log.Fields{
+						"hex": fmt.Sprintf("%#x", addr.Address),
+						"dec": fmt.Sprintf("%d", addr.Address),
+						"sub_cache": fmt.Sprintf("%sdsc%-16s mapping: %s, UUID: %s",
+							stubs,
+							addr.SubCache.Extension,
+							addr.SubCache.Mapping,
+							addr.SubCache.UUID,
+						),
+					}).Info("Address")
 				} else {
-					uuid, m, err := f.GetMappingForVMAddress(address)
-					if err != nil {
-						return err
-					}
-					if f.IsDyld4 {
-						ext, _ := f.GetSubCacheExtensionFromUUID(uuid)
-						var stubs bool
-						if f.Headers[uuid].ImagesCount == 0 && f.Headers[uuid].ImagesCountOld == 0 {
-							stubs = true
-						}
-						log.WithFields(log.Fields{
-							"uuid":    uuid.String(),
-							"hex":     fmt.Sprintf("%#x", address),
-							"dec":     fmt.Sprintf("%d", address),
-							"ext":     fmt.Sprintf("\"%s\"", ext),
-							"stubs":   stubs,
-							"mapping": m.Name,
-						}).Info("Address")
-					} else {
-						log.WithFields(log.Fields{
-							"hex":     fmt.Sprintf("%#x", address),
-							"dec":     fmt.Sprintf("%d", address),
-							"mapping": m.Name,
-						}).Info("Address")
-					}
+					log.WithFields(log.Fields{
+						"hex":     fmt.Sprintf("%#x", addr.Address),
+						"dec":     fmt.Sprintf("%d", addr.Address),
+						"mapping": addr.SubCache.Mapping,
+					}).Info("Address")
 				}
 			}
+		}
+
+		if addr.Cache != nil {
+			var stubs string
+			if addr.Cache.SubCache.InStubs {
+				stubs = "STUB Island "
+			}
+			log.WithFields(log.Fields{
+				"hex": fmt.Sprintf("%#x", addr.Cache.Address),
+				"dec": fmt.Sprintf("%d", addr.Cache.Address),
+				"sub_cache": fmt.Sprintf("%sdsc%-16s mapping: %s, UUID: %s",
+					stubs,
+					addr.Cache.SubCache.Extension,
+					addr.Cache.SubCache.Mapping,
+					addr.Cache.SubCache.UUID,
+				),
+			}).Info("CACHE address")
 		}
 
 		return nil
