@@ -8,14 +8,102 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/api/types"
 	cmd "github.com/blacktop/ipsw/internal/commands/dsc"
+	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/gin-gonic/gin"
 )
+
+// swagger:parameters postDscAddrToOff postDscAddrToSym
+type dscAddrToOffParams struct {
+	// path to dyld_shared_cache
+	// in:query
+	// required: true
+	Path string `json:"path" binding:"required"`
+	// address to convert
+	// in:query
+	// required: true
+	Addr string `json:"addr" binding:"required"`
+}
+
+// swagger:response
+type dscAddrToOffResponse struct {
+	// The DSC offset
+	// in:body
+	cmd.Offset
+}
+
+func dscAddrToOff(c *gin.Context) {
+	var params dscAddrToOffParams
+	if err := c.ShouldBindJSON(&params); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
+		return
+	}
+
+	f, err := dyld.Open(filepath.Clean(params.Path))
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+		return
+	}
+	defer f.Close()
+
+	addr, err := strconv.ParseUint(params.Addr, 10, 64)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("invalid param 'addr' %s: %v", params.Addr, err)})
+	}
+
+	off, err := cmd.ConvertAddressToOffset(f, addr)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, dscAddrToOffResponse{*off})
+}
+
+// swagger:response
+type dscAddrToSymResponse struct {
+	// The DSC symbol
+	// in:body
+	cmd.SymbolLookup
+}
+
+func dscAddrToSym(c *gin.Context) {
+	var params dscAddrToOffParams
+	if err := c.ShouldBindJSON(&params); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
+		return
+	}
+
+	f, err := dyld.Open(filepath.Clean(params.Path))
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+		return
+	}
+	defer f.Close()
+
+	addr, err := strconv.ParseUint(params.Addr, 10, 64)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("invalid param 'addr' %s: %v", params.Addr, err)})
+	}
+
+	sym, err := cmd.LookupSymbol(f, addr)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+		return
+	}
+
+	sym.Demanged = demangle.Do(sym.Symbol, false, false)
+	sym.Demanged = swift.DemangleBlob(sym.Demanged)
+
+	c.IndentedJSON(http.StatusOK, dscAddrToSymResponse{*sym})
+}
 
 // swagger:response
 type dscImportsResponse struct {
@@ -105,6 +193,53 @@ func dscMacho(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, dscMachoResponse{Path: dscPath, Macho: m})
 }
 
+// swagger:parameters postDscOffToAddr
+type dscOffToAddrParams struct {
+	// path to dyld_shared_cache
+	// in:query
+	// required: true
+	Path string `json:"path" binding:"required"`
+	// offset to convert
+	// in:query
+	// required: true
+	Offset string `json:"off" binding:"required"`
+}
+
+// swagger:response
+type dscOffToAddrResponse struct {
+	// The DSC address
+	// in:body
+	cmd.Address
+}
+
+func dscOffToAddr(c *gin.Context) {
+	var params dscOffToAddrParams
+	if err := c.ShouldBindJSON(&params); err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
+		return
+	}
+
+	f, err := dyld.Open(filepath.Clean(params.Path))
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+		return
+	}
+	defer f.Close()
+
+	off, err := strconv.ParseUint(params.Offset, 10, 64)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("invalid param 'off' %s: %v", params.Offset, err)})
+	}
+
+	addr, err := cmd.ConvertOffsetToAddress(f, off)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+		return
+	}
+
+	c.IndentedJSON(http.StatusOK, dscOffToAddrResponse{*addr})
+}
+
 // swagger:parameters getDscSlideInfo
 type dscSlideInfoParams struct {
 	// path to dyld_shared_cache
@@ -119,8 +254,8 @@ type dscSlideInfoParams struct {
 
 // swagger:response
 type dscSlideInfoResponse struct {
-	Path      string        `json:"path"`
-	SlideInfo []dyld.Rebase `json:"slide_info"`
+	Mapping *dyld.CacheMappingWithSlideInfo `json:"mapping,omitempty"`
+	Rebases []dyld.Rebase                   `json:"rebases,omitempty"`
 }
 
 func dscSlideInfo(c *gin.Context) {
@@ -164,7 +299,7 @@ func dscSlideInfo(c *gin.Context) {
 					c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 					return
 				}
-				enc.Encode(dscSlideInfoResponse{Path: params.Path, SlideInfo: rebases})
+				enc.Encode(dscSlideInfoResponse{Mapping: mapping, Rebases: rebases})
 				w.(http.Flusher).Flush()
 			}
 		} else {
@@ -178,7 +313,7 @@ func dscSlideInfo(c *gin.Context) {
 						c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 						return
 					}
-					enc.Encode(dscSlideInfoResponse{Path: params.Path, SlideInfo: rebases})
+					enc.Encode(dscSlideInfoResponse{Mapping: mapping, Rebases: rebases})
 					w.(http.Flusher).Flush()
 				}
 			}
