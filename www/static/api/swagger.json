@@ -1389,6 +1389,15 @@
     "SymbolLookup": {
       "description": "SymbolLookup is a struct that contains information about a dyld_shared_cache symbol lookup",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "address": {
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "offset": {
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "subCache": {
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     }
   },
   "responses": {
@@ -1412,26 +1421,11 @@
     "dscAddrToOffResponse": {
       "description": "",
       "headers": {
-        "ext": {
-          "type": "string",
-          "description": "the DSC sub-cache file extension"
+        "cache": {
+          "description": "the vmcache offset"
         },
-        "mapping": {
-          "type": "string",
-          "description": "the DSC sub-cache mapping name"
-        },
-        "offset": {
-          "type": "integer",
-          "format": "uint64",
-          "description": "the offset in the DSC sub-cache"
-        },
-        "stubs": {
-          "type": "boolean",
-          "description": "is the offset in a DSC stub island"
-        },
-        "uuid": {
-          "type": "string",
-          "description": "the DSC sub-cache UUID"
+        "file": {
+          "description": "the file offset"
         }
       }
     },
@@ -1509,26 +1503,13 @@
     "dscOffToAddrResponse": {
       "description": "",
       "headers": {
-        "address": {
-          "type": "integer",
-          "format": "uint64",
-          "description": "the offset in the DSC sub-cache"
+        "cache": {
+          "description": "the vmcache address"
         },
-        "ext": {
-          "type": "string",
-          "description": "the DSC sub-cache file extension"
-        },
-        "mapping": {
-          "type": "string",
-          "description": "the DSC sub-cache mapping name"
-        },
-        "stubs": {
-          "type": "boolean",
-          "description": "is the offset in a DSC stub island"
-        },
-        "uuid": {
-          "type": "string",
-          "description": "the DSC sub-cache UUID"
+        "files": {
+          "type": "array",
+          "items": {},
+          "description": "the virtual addresses"
         }
       }
     },

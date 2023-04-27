@@ -95,6 +95,7 @@ type String struct {
 	String  string `json:"string,omitempty"`
 }
 
+// swagger:model
 type subCache struct {
 	// the DSC sub-cache UUID
 	UUID string `json:"uuid"`
@@ -106,32 +107,42 @@ type subCache struct {
 	Mapping string `json:"mapping"`
 }
 
+// swagger:model
 type offset struct {
 	// the file offset in the DSC sub-cache
 	Offset uint64 `json:"offset"`
 	// the DSC sub-cache
+	// swagger:allOf
 	SubCache subCache `json:"sub_cache"`
 }
 
 // Offset is a struct that contains information about a dyld_shared_cache offset
 // swagger:model
 type Offset struct {
-	File  *offset `json:"file,omitempty"`
+	// the file offset
+	File *offset `json:"file,omitempty"`
+	// the vmcache offset
 	Cache *offset `json:"cache,omitempty"`
 }
 
+// swagger:model
 type address struct {
 	// the offset in the DSC sub-cache
 	Address uint64 `json:"address"`
 	// the DSC sub-cache
+	// swagger:allOf
 	SubCache subCache `json:"sub_cache"`
 }
 
 // Address is a struct that contains information about a dyld_shared_cache address
 // swagger:model
 type Address struct {
+	// the virtual addresses
+	// swagger:allOf
 	Files []*address `json:"files,omitempty"`
-	Cache *address   `json:"cache,omitempty"`
+	// the vmcache address
+	// swagger:allOf
+	Cache *address `json:"cache,omitempty"`
 }
 
 // ConvertAddressToOffset converts a dyld_shared_cache address to an offset

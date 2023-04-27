@@ -209,6 +209,7 @@ type dscOffToAddrParams struct {
 type dscOffToAddrResponse struct {
 	// The DSC address
 	// in:body
+	// swagger:allOf
 	cmd.Address
 }
 
