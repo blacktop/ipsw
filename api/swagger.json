@@ -1351,63 +1351,12 @@
       "description": "Address is a struct that contains information about a dyld_shared_cache address",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
-    "AuthenticateOKBody": {
-      "description": "AuthenticateOKBody authenticate o k body",
-      "x-go-package": "github.com/docker/docker/api/types/registry"
-    },
-    "ContainerChangeResponseItem": {
-      "description": "ContainerChangeResponseItem change item in response to ContainerChanges operation",
-      "x-go-package": "github.com/docker/docker/api/types/container"
-    },
-    "ContainerTopOKBody": {
-      "description": "ContainerTopOKBody OK response to ContainerTop operation",
-      "x-go-package": "github.com/docker/docker/api/types/container"
-    },
-    "ContainerUpdateOKBody": {
-      "description": "ContainerUpdateOKBody OK response to ContainerUpdate operation",
-      "x-go-package": "github.com/docker/docker/api/types/container"
-    },
-    "CreateOptions": {
-      "description": "Volume configuration",
-      "title": "CreateOptions VolumeConfig",
-      "x-go-package": "github.com/docker/docker/api/types/volume"
-    },
-    "CreateResponse": {
-      "description": "OK response to ContainerCreate operation",
-      "title": "CreateResponse ContainerCreateResponse",
-      "x-go-package": "github.com/docker/docker/api/types/container"
-    },
     "Dylib": {
       "description": "Dylib is a struct that contains information about a dyld_shared_cache dylib",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
-    "ErrorResponse": {
-      "title": "ErrorResponse Represents an error.",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
     "File": {
       "x-go-package": "github.com/blacktop/ipsw/api/server/routes/ipsw"
-    },
-    "GraphDriverData": {
-      "description": "GraphDriverData Information about the storage driver used to store the container's and\nimage's filesystem.",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "HistoryResponseItem": {
-      "description": "HistoryResponseItem individual image layer information in response to ImageHistory operation",
-      "x-go-package": "github.com/docker/docker/api/types/image"
-    },
-    "IdResponse": {
-      "description": "IDResponse Response to an API call that returns just an Id",
-      "x-go-name": "IDResponse",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "ImageDeleteResponseItem": {
-      "description": "ImageDeleteResponseItem image delete response item",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "ImageSummary": {
-      "description": "ImageSummary image summary",
-      "x-go-package": "github.com/docker/docker/api/types"
     },
     "ImportedBy": {
       "description": "ImportedBy is a struct that contains information about which dyld_shared_cache dylibs import a given dylib",
@@ -1425,74 +1374,9 @@
       "title": "LLVMVersion represents the LLVM version used to compile the kernel.",
       "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
     },
-    "ListResponse": {
-      "description": "Volume list response",
-      "title": "ListResponse VolumeListResponse",
-      "x-go-package": "github.com/docker/docker/api/types/volume"
-    },
     "Offset": {
       "description": "Offset is a struct that contains information about a dyld_shared_cache offset",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
-    },
-    "Plugin": {
-      "description": "Plugin A plugin for the Engine API",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginConfig": {
-      "title": "PluginConfig The config of a plugin.",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginConfigArgs": {
-      "description": "PluginConfigArgs plugin config args",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginConfigInterface": {
-      "description": "PluginConfigInterface The interface between Docker and the plugin",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginConfigLinux": {
-      "description": "PluginConfigLinux plugin config linux",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginConfigNetwork": {
-      "description": "PluginConfigNetwork plugin config network",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginConfigRootfs": {
-      "description": "PluginConfigRootfs plugin config rootfs",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginConfigUser": {
-      "description": "PluginConfigUser plugin config user",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginDevice": {
-      "description": "PluginDevice plugin device",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginEnv": {
-      "description": "PluginEnv plugin env",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginInterfaceType": {
-      "description": "PluginInterfaceType plugin interface type",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginMount": {
-      "description": "PluginMount plugin mount",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "PluginSettings": {
-      "title": "PluginSettings Settings that can be modified by users.",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "Port": {
-      "description": "Port An open port on a container",
-      "x-go-package": "github.com/docker/docker/api/types"
-    },
-    "ServiceUpdateResponse": {
-      "description": "ServiceUpdateResponse service update response",
-      "x-go-package": "github.com/docker/docker/api/types"
     },
     "String": {
       "description": "String is a struct that contains information about a dyld_shared_cache string",
@@ -1505,23 +1389,6 @@
     "SymbolLookup": {
       "description": "SymbolLookup is a struct that contains information about a dyld_shared_cache symbol lookup",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
-    },
-    "UsageData": {
-      "description": "UsageData Usage details about the volume. This information is used by the\n`GET /system/df` endpoint, and omitted in other endpoints.",
-      "x-go-package": "github.com/docker/docker/api/types/volume"
-    },
-    "Volume": {
-      "description": "Volume volume",
-      "x-go-package": "github.com/docker/docker/api/types/volume"
-    },
-    "WaitExitError": {
-      "description": "WaitExitError container waiting error, if any",
-      "x-go-package": "github.com/docker/docker/api/types/container"
-    },
-    "WaitResponse": {
-      "description": "OK response to ContainerWait operation",
-      "title": "WaitResponse ContainerWaitResponse",
-      "x-go-package": "github.com/docker/docker/api/types/container"
     },
     "address": {
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
