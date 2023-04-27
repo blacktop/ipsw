@@ -190,7 +190,8 @@
             "required": true
           },
           {
-            "type": "string",
+            "type": "integer",
+            "format": "uint64",
             "x-go-name": "Addr",
             "description": "address to convert",
             "name": "addr",
@@ -229,10 +230,14 @@
             "required": true
           },
           {
-            "type": "string",
-            "x-go-name": "Addr",
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint64"
+            },
+            "x-go-name": "Addrs",
             "description": "address to convert",
-            "name": "addr",
+            "name": "addrs",
             "in": "query",
             "required": true
           }
@@ -372,7 +377,8 @@
             "required": true
           },
           {
-            "type": "string",
+            "type": "integer",
+            "format": "uint64",
             "x-go-name": "Offset",
             "description": "offset to convert",
             "name": "off",
@@ -1386,10 +1392,6 @@
       "description": "Symbol is a struct that contains information about a dyld_shared_cache symbol",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
-    "SymbolLookup": {
-      "description": "SymbolLookup is a struct that contains information about a dyld_shared_cache symbol lookup",
-      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
-    },
     "address": {
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
@@ -1431,43 +1433,9 @@
     },
     "dscAddrToSymResponse": {
       "description": "",
-      "headers": {
-        "demanged": {
-          "type": "string",
-          "description": "The demangled symbol name"
-        },
-        "ext": {
-          "type": "string",
-          "description": "The DSC sub-cache file extension"
-        },
-        "image": {
-          "type": "string",
-          "description": "The containing image name"
-        },
-        "mapping": {
-          "type": "string",
-          "description": "The DSC mapping name"
-        },
-        "section": {
-          "type": "string",
-          "description": "The containing image section"
-        },
-        "segment": {
-          "type": "string",
-          "description": "The containing image segment"
-        },
-        "stub_island": {
-          "type": "boolean",
-          "description": "Is the symbol in a DSC stub island"
-        },
-        "symbol": {
-          "type": "string",
-          "description": "The symbol name"
-        },
-        "uuid": {
-          "type": "string",
-          "description": "The DSC sub-cache UUID"
-        }
+      "schema": {
+        "type": "array",
+        "items": {}
       }
     },
     "dscImportsResponse": {
