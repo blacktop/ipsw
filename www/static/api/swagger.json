@@ -169,6 +169,84 @@
         }
       }
     },
+    "/dsc/a2o": {
+      "post": {
+        "description": "Convert virtual address to file offset.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "a2o",
+        "operationId": "postDscAddrToOff",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Path",
+            "description": "path to dyld_shared_cache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Addr",
+            "description": "address to convert",
+            "name": "addr",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscAddrToOffResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
+    "/dsc/a2s": {
+      "post": {
+        "description": "Convert virtual address to symbol.",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "a2s",
+        "operationId": "postDscAddrToSym",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Path",
+            "description": "path to dyld_shared_cache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Addr",
+            "description": "address to convert",
+            "name": "addr",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscAddrToSymResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/dsc/imports": {
       "get": {
         "description": "Get list of dylibs that import a given dylib.",
@@ -273,6 +351,45 @@
         }
       }
     },
+    "/dsc/o2a": {
+      "post": {
+        "description": "Convert file offset to virtual address",
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "DSC"
+        ],
+        "summary": "o2a",
+        "operationId": "postDscOffToAddr",
+        "parameters": [
+          {
+            "type": "string",
+            "x-go-name": "Path",
+            "description": "path to dyld_shared_cache",
+            "name": "path",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "string",
+            "x-go-name": "Offset",
+            "description": "offset to convert",
+            "name": "off",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/dscOffToAddrResponse"
+          },
+          "500": {
+            "$ref": "#/responses/genericError"
+          }
+        }
+      }
+    },
     "/dsc/slide": {
       "post": {
         "description": "Get slide info for the DSC.",
@@ -314,7 +431,7 @@
     },
     "/dsc/split": {
       "post": {
-        "description": "Split the DSC into its constituent dylibs using XCode's \u003ccode\u003edsc_extractor.bundle\u003c/code\u003e.",
+        "description": "Split the DSC into its constituent dylibs using XCode's \u003ccode\u003edsc_extractor.bundle\u003c/code\u003e",
         "produces": [
           "application/json"
         ],
@@ -1230,6 +1347,10 @@
     }
   },
   "definitions": {
+    "Address": {
+      "description": "Address is a struct that contains information about a dyld_shared_cache address",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
     "Dylib": {
       "description": "Dylib is a struct that contains information about a dyld_shared_cache dylib",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
@@ -1253,12 +1374,20 @@
       "title": "LLVMVersion represents the LLVM version used to compile the kernel.",
       "x-go-package": "github.com/blacktop/ipsw/pkg/kernelcache"
     },
+    "Offset": {
+      "description": "Offset is a struct that contains information about a dyld_shared_cache offset",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
     "String": {
       "description": "String is a struct that contains information about a dyld_shared_cache string",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     },
     "Symbol": {
       "description": "Symbol is a struct that contains information about a dyld_shared_cache symbol",
+      "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
+    },
+    "SymbolLookup": {
+      "description": "SymbolLookup is a struct that contains information about a dyld_shared_cache symbol lookup",
       "x-go-package": "github.com/blacktop/ipsw/internal/commands/dsc"
     }
   },
@@ -1277,6 +1406,73 @@
       "headers": {
         "diff": {
           "type": "string"
+        }
+      }
+    },
+    "dscAddrToOffResponse": {
+      "description": "",
+      "headers": {
+        "ext": {
+          "type": "string",
+          "description": "the DSC sub-cache file extension"
+        },
+        "mapping": {
+          "type": "string",
+          "description": "the DSC sub-cache mapping name"
+        },
+        "offset": {
+          "type": "integer",
+          "format": "uint64",
+          "description": "the offset in the DSC sub-cache"
+        },
+        "stubs": {
+          "type": "boolean",
+          "description": "is the offset in a DSC stub island"
+        },
+        "uuid": {
+          "type": "string",
+          "description": "the DSC sub-cache UUID"
+        }
+      }
+    },
+    "dscAddrToSymResponse": {
+      "description": "",
+      "headers": {
+        "demanged": {
+          "type": "string",
+          "description": "The demangled symbol name"
+        },
+        "ext": {
+          "type": "string",
+          "description": "The DSC sub-cache file extension"
+        },
+        "image": {
+          "type": "string",
+          "description": "The containing image name"
+        },
+        "mapping": {
+          "type": "string",
+          "description": "The DSC mapping name"
+        },
+        "section": {
+          "type": "string",
+          "description": "The containing image section"
+        },
+        "segment": {
+          "type": "string",
+          "description": "The containing image segment"
+        },
+        "stub_island": {
+          "type": "boolean",
+          "description": "Is the symbol in a DSC stub island"
+        },
+        "symbol": {
+          "type": "string",
+          "description": "The symbol name"
+        },
+        "uuid": {
+          "type": "string",
+          "description": "The DSC sub-cache UUID"
         }
       }
     },
@@ -1310,13 +1506,37 @@
         }
       }
     },
+    "dscOffToAddrResponse": {
+      "description": "",
+      "headers": {
+        "address": {
+          "type": "integer",
+          "format": "uint64",
+          "description": "the offset in the DSC sub-cache"
+        },
+        "ext": {
+          "type": "string",
+          "description": "the DSC sub-cache file extension"
+        },
+        "mapping": {
+          "type": "string",
+          "description": "the DSC sub-cache mapping name"
+        },
+        "stubs": {
+          "type": "boolean",
+          "description": "is the offset in a DSC stub island"
+        },
+        "uuid": {
+          "type": "string",
+          "description": "the DSC sub-cache UUID"
+        }
+      }
+    },
     "dscSlideInfoResponse": {
       "description": "",
       "headers": {
-        "path": {
-          "type": "string"
-        },
-        "slide_info": {
+        "mapping": {},
+        "rebases": {
           "type": "array",
           "items": {}
         }

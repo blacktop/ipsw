@@ -17,10 +17,11 @@ ipsw dyld slide <dyld_shared_cache> [flags]
 ### Options
 
 ```
-  -a, --auth           Print only slide info for mappings with auth flags
-  -c, --cache string   path to addr to sym cache file
-  -h, --help           help for slide
-      --json           Output as JSON
+  -a, --auth            Print only slide info for mappings with auth flags
+  -c, --cache string    path to addr to sym cache file
+  -h, --help            help for slide
+      --json            Output as JSON
+  -o, --output string   folder to save JSON output
 ```
 
 ### Options inherited from parent commands
