@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/blacktop/go-macho"
@@ -20,7 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// swagger:parameters postDscAddrToOff postDscAddrToSym
+// swagger:parameters postDscAddrToOff
 type dscAddrToOffParams struct {
 	// path to dyld_shared_cache
 	// in:query
@@ -29,7 +28,7 @@ type dscAddrToOffParams struct {
 	// address to convert
 	// in:query
 	// required: true
-	Addr string `json:"addr" binding:"required"`
+	Addr uint64 `json:"addr" binding:"required"`
 }
 
 // swagger:response
@@ -53,12 +52,7 @@ func dscAddrToOff(c *gin.Context) {
 	}
 	defer f.Close()
 
-	addr, err := strconv.ParseUint(params.Addr, 10, 64)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("invalid param 'addr' %s: %v", params.Addr, err)})
-	}
-
-	off, err := cmd.ConvertAddressToOffset(f, addr)
+	off, err := cmd.ConvertAddressToOffset(f, params.Addr)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
@@ -67,15 +61,26 @@ func dscAddrToOff(c *gin.Context) {
 	c.IndentedJSON(http.StatusOK, dscAddrToOffResponse{*off})
 }
 
-// swagger:response
+// swagger:parameters postDscAddrToSym
+type dscAddrsToSymsParams struct {
+	// path to dyld_shared_cache
+	// in:query
+	// required: true
+	Path string `json:"path" binding:"required"`
+	// address to convert
+	// in:query
+	// required: true
+	Addrs []uint64 `json:"addrs" binding:"required"`
+}
+
+// swagger:response dscAddrToSymResponse
 type dscAddrToSymResponse struct {
-	// The DSC symbol
 	// in:body
-	cmd.SymbolLookup
+	Body []cmd.SymbolLookup `json:"body"`
 }
 
 func dscAddrToSym(c *gin.Context) {
-	var params dscAddrToOffParams
+	var params dscAddrsToSymsParams
 	if err := c.ShouldBindJSON(&params); err != nil {
 		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: err.Error()})
 		return
@@ -88,21 +93,27 @@ func dscAddrToSym(c *gin.Context) {
 	}
 	defer f.Close()
 
-	addr, err := strconv.ParseUint(params.Addr, 10, 64)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("invalid param 'addr' %s: %v", params.Addr, err)})
+	w := c.Writer
+	enc := json.NewEncoder(w)
+	header := w.Header()
+	header.Set("Transfer-Encoding", "chunked")
+	header.Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	var syms []cmd.SymbolLookup
+	for _, addr := range params.Addrs {
+		sym, err := cmd.LookupSymbol(f, addr)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
+			return
+		}
+		sym.Demanged = demangle.Do(sym.Symbol, false, false)
+		sym.Demanged = swift.DemangleBlob(sym.Demanged)
+		enc.Encode(sym)
+		w.(http.Flusher).Flush()
 	}
 
-	sym, err := cmd.LookupSymbol(f, addr)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
-		return
-	}
-
-	sym.Demanged = demangle.Do(sym.Symbol, false, false)
-	sym.Demanged = swift.DemangleBlob(sym.Demanged)
-
-	c.IndentedJSON(http.StatusOK, dscAddrToSymResponse{*sym})
+	c.IndentedJSON(http.StatusOK, syms)
 }
 
 // swagger:response
@@ -202,7 +213,7 @@ type dscOffToAddrParams struct {
 	// offset to convert
 	// in:query
 	// required: true
-	Offset string `json:"off" binding:"required"`
+	Offset uint64 `json:"off" binding:"required"`
 }
 
 // swagger:response
@@ -227,12 +238,7 @@ func dscOffToAddr(c *gin.Context) {
 	}
 	defer f.Close()
 
-	off, err := strconv.ParseUint(params.Offset, 10, 64)
-	if err != nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, types.GenericError{Error: fmt.Sprintf("invalid param 'off' %s: %v", params.Offset, err)})
-	}
-
-	addr, err := cmd.ConvertOffsetToAddress(f, off)
+	addr, err := cmd.ConvertOffsetToAddress(f, params.Offset)
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return

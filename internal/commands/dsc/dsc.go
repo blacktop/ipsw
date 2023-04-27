@@ -65,8 +65,9 @@ type Symbol struct {
 }
 
 // SymbolLookup is a struct that contains information about a dyld_shared_cache symbol lookup
-// swagger:model
 type SymbolLookup struct {
+	// The address of the symbol
+	Address uint64 `json:"address,omitempty"`
 	// The symbol name
 	Symbol string `json:"symbol,omitempty"`
 	// The demangled symbol name
@@ -248,13 +249,12 @@ func ConvertOffsetToAddress(f *dyld.File, offset uint64) (*Address, error) {
 				UUID: uuid.String(),
 			},
 		}
-		uuid, m, err := f.GetMappingForVMAddress(addr)
-		if err != nil {
-			a.Cache = nil
-			return a, nil
-		}
 
-		a.Cache.SubCache.Mapping = m.Name
+		if _, m, err := f.GetMappingForVMAddress(addr); err == nil {
+			a.Cache.SubCache.Mapping = m.Name
+		} else {
+			a.Cache.SubCache.Mapping = "?"
+		}
 
 		if f.IsDyld4 {
 			a.Cache.SubCache.Extension, _ = f.GetSubCacheExtensionFromUUID(uuid)
@@ -271,7 +271,9 @@ func ConvertOffsetToAddress(f *dyld.File, offset uint64) (*Address, error) {
 func LookupSymbol(f *dyld.File, addr uint64) (*SymbolLookup, error) {
 	var secondAttempt bool
 
-	sym := &SymbolLookup{}
+	sym := &SymbolLookup{
+		Address: addr,
+	}
 
 	uuid, mapping, err := f.GetMappingForVMAddress(addr)
 	if err != nil {
@@ -349,7 +351,8 @@ retry:
 	}
 
 	if secondAttempt {
-		return sym, fmt.Errorf("no symbol found")
+		sym.Symbol = "?"
+		return sym, nil
 	}
 
 	ptr, err := f.ReadPointerAtAddress(addr)
