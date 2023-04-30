@@ -964,7 +964,7 @@ target triple = "arm64-apple-ios15.5.0"
 Disassemble ARMv9 binaries
 
 ```bash
-❯ ipsw disass --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
+❯ ipsw macho disass --vaddr 0xfffffff007b7c05c kernelcache.release.iphone12.decompressed
 ```
 
 ```
@@ -994,13 +994,13 @@ Disassemble ARMv9 binaries
 You can also dissassemble a function by name
 
 ```bash
-❯ ipsw disass --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore
+❯ ipsw macho disass --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore
 ```
 
 Make it pretty 💄🐷 using `--color` flag
 
 ```bash
-❯ ipsw disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed --color
+❯ ipsw macho disass --vaddr 0xFFFFFFF007B44000 kernelcache.release.iphone13.decompressed --color
 ```
 
 ```armasm
@@ -1032,7 +1032,7 @@ func_fffffff007b44034:
 Demangle C++ names
 
 ```bash
-❯ ipsw disass --demangle --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore --color
+❯ ipsw macho disass --demangle --symbol <SYMBOL_NAME> --instrs 200 JavaScriptCore --color
 ```
 
 ### **macho patch**
