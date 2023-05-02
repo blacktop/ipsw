@@ -1011,7 +1011,6 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 		// scrape dev portal
 		switch downloadType {
 		case "more":
-
 			dloads, err := dp.getDownloads()
 			if err != nil {
 				return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)

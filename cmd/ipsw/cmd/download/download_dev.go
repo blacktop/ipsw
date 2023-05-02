@@ -25,6 +25,7 @@ package download
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -185,8 +186,12 @@ var devCmd = &cobra.Command{
 				}
 				return nil
 			}); err != nil {
-				log.Warn("Exiting...")
-				os.Exit(0)
+				if errors.As(err, &ctrlc.ErrorCtrlC{}) {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				} else {
+					return fmt.Errorf("failed while watching: %v", err)
+				}
 			}
 		}
 
