@@ -24,6 +24,7 @@ package idev
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"math/bits"
 	"os"
@@ -128,7 +129,11 @@ var PcapCmd = &cobra.Command{
 			}
 			return nil
 		}); err != nil {
-			return err
+			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
+				log.Warn("Exiting...")
+			} else {
+				return err
+			}
 		}
 
 		return nil

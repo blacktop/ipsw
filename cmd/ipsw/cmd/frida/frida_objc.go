@@ -27,6 +27,7 @@ import (
 	"bufio"
 	"context"
 	_ "embed"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -274,7 +275,11 @@ var fridaObjcCmd = &cobra.Command{
 
 			return nil
 		}); err != nil {
-			log.Warn("Detaching Session...")
+			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
+				log.Warn("Detaching Session...")
+			} else {
+				return err
+			}
 		}
 
 		return nil

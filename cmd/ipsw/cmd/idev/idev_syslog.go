@@ -24,6 +24,7 @@ package idev
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -148,7 +149,11 @@ var SyslogCmd = &cobra.Command{
 			}
 			return nil
 		}); err != nil {
-			return err
+			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
+				log.Warn("Exiting...")
+			} else {
+				return err
+			}
 		}
 
 		return nil

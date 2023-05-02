@@ -23,6 +23,7 @@ package idev
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/apex/log"
@@ -89,7 +90,11 @@ var NotificationCmd = &cobra.Command{
 			}
 			return nil
 		}); err != nil {
-			log.Warn("Exiting...")
+			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
+				log.Warn("Exiting...")
+			} else {
+				return err
+			}
 		}
 
 		return nil
