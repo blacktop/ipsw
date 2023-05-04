@@ -316,31 +316,18 @@ var wikiCmd = &cobra.Command{
 								Output:   output,
 							}
 
-							cwd, err := os.Getwd()
-							if err != nil {
-								return fmt.Errorf("failed to get current working directory: %v", err)
-							}
-
 							// REMOTE KERNEL MODE
 							if kernel {
 								log.Info("Extracting remote kernelcache")
-								artifacts, err := extract.Kernelcache(config)
-								if err != nil {
+								if _, err := extract.Kernelcache(config); err != nil {
 									return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
-								}
-								for _, artifact := range artifacts {
-									utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 								}
 							}
 							// PATTERN MATCHING MODE
 							if len(pattern) > 0 {
 								log.Infof("Downloading files matching pattern %#v", pattern)
-								artifacts, err := extract.Search(config)
-								if err != nil {
+								if _, err := extract.Search(config); err != nil {
 									return err
-								}
-								for _, artifact := range artifacts {
-									utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 								}
 							}
 						}
