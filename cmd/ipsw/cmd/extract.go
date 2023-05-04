@@ -102,7 +102,7 @@ var extractCmd = &cobra.Command{
 					return fmt.Errorf("invalid dyld_shared_cache architecture '%s' (must be: arm64, arm64e, x86_64 or x86_64h)", arch)
 				}
 			}
-		} else if viper.GetBool("extract.dmg") {
+		} else if viper.GetString("extract.dmg") != "" {
 			if !utils.StrSliceHas([]string{"app", "sys", "fs"}, viper.GetString("extract.dmg")) {
 				return fmt.Errorf("invalid DMG type '%s' (must be: app, sys or fs)", viper.GetString("extract.dmg"))
 			}
@@ -142,7 +142,7 @@ var extractCmd = &cobra.Command{
 			}
 		}
 
-		if viper.GetBool("extract.dmg") {
+		if viper.GetString("extract.dmg") != "" {
 			config.DMGs = true
 			if viper.GetBool("extract.remote") {
 				log.Error("unable to extract File System DMG remotely (let the author know if this is something you want)")
