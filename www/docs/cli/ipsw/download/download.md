@@ -44,6 +44,7 @@ ipsw download [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
+* [ipsw download appledb](/docs/cli/ipsw/download/appledb)	 - Download IPSWs from appledb
 * [ipsw download dev](/docs/cli/ipsw/download/dev)	 - Download IPSWs (and more) from https://developer.apple.com/download
 * [ipsw download git](/docs/cli/ipsw/download/git)	 - Download github.com/orgs/apple-oss-distributions tarballs
 * [ipsw download ipa](/docs/cli/ipsw/download/ipa)	 - Download App Packages from the iOS App Store
