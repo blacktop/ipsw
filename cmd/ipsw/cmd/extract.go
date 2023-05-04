@@ -23,8 +23,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/extract"
@@ -110,11 +108,6 @@ var extractCmd = &cobra.Command{
 			}
 		}
 
-		cwd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get current working directory: %v", err)
-		}
-
 		config := &extract.Config{
 			IPSW:     "",
 			URL:      "",
@@ -137,23 +130,15 @@ var extractCmd = &cobra.Command{
 
 		if viper.GetBool("extract.kernel") {
 			log.Info("Extracting kernelcache")
-			artifacts, err := extract.Kernelcache(config)
-			if err != nil {
+			if _, err := extract.Kernelcache(config); err != nil {
 				return err
-			}
-			for _, artifact := range artifacts {
-				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
 		}
 
 		if viper.GetBool("extract.dyld") {
 			log.Info("Extracting dyld_shared_cache")
-			artifacts, err := extract.DSC(config)
-			if err != nil {
+			if _, err := extract.DSC(config); err != nil {
 				return err
-			}
-			for _, artifact := range artifacts {
-				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
 		}
 
@@ -163,12 +148,8 @@ var extractCmd = &cobra.Command{
 				log.Error("unable to extract File System DMG remotely (let the author know if this is something you want)")
 			} else {
 				log.Info("Extracting DMG")
-				artifacts, err := extract.DMG(config)
-				if err != nil {
+				if _, err := extract.DMG(config); err != nil {
 					return err
-				}
-				for _, artifact := range artifacts {
-					utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 				}
 			}
 		}
@@ -176,46 +157,32 @@ var extractCmd = &cobra.Command{
 		if viper.GetBool("extract.dtree") {
 			log.Info("Extracting DeviceTree")
 			config.Pattern = `.*DeviceTree.*im(3|4)p$`
-			artifacts, err := extract.Search(config)
-			if err != nil {
+			if _, err := extract.Search(config); err != nil {
 				return err
-			}
-			for _, artifact := range artifacts {
-				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
 		}
 
 		if viper.GetBool("extract.iboot") {
 			log.Info("Extracting iBoot")
 			config.Pattern = `.*iBoot.*im4p$`
-			artifacts, err := extract.Search(config)
-			if err != nil {
+			if _, err := extract.Search(config); err != nil {
 				return err
-			}
-			for _, artifact := range artifacts {
-				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
 		}
 
 		if viper.GetBool("extract.sep") {
 			log.Info("Extracting sep-firmware")
 			config.Pattern = `.*sep-firmware.*im4p$`
-			artifacts, err := extract.Search(config)
-			if err != nil {
+			if _, err := extract.Search(config); err != nil {
 				return err
-			}
-			for _, artifact := range artifacts {
-				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
 		}
 
 		if viper.GetBool("extract.kbag") {
 			log.Info("Extracting im4p key bags")
-			artifact, err := extract.Keybags(config)
-			if err != nil {
+			if _, err := extract.Keybags(config); err != nil {
 				return err
 			}
-			utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 		}
 
 		if len(viper.GetString("extract.pattern")) > 0 {
@@ -223,12 +190,8 @@ var extractCmd = &cobra.Command{
 			if viper.GetBool("extract.files") {
 				config.DMGs = true
 			}
-			artifacts, err := extract.Search(config)
-			if err != nil {
+			if _, err := extract.Search(config); err != nil {
 				return err
-			}
-			for _, artifact := range artifacts {
-				utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 			}
 		}
 

@@ -25,7 +25,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -126,6 +125,7 @@ var downloadAppledbCmd = &cobra.Command{
 			destPath = filepath.Clean(output)
 		}
 
+		log.Info("Querying AppleDB...")
 		results, err := download.AppleDBQuery(&download.ADBQuery{
 			OS:       osType,
 			Version:  version,
@@ -181,31 +181,18 @@ var downloadAppledbCmd = &cobra.Command{
 						Output:   output,
 					}
 
-					cwd, err := os.Getwd()
-					if err != nil {
-						return fmt.Errorf("failed to get current working directory: %v", err)
-					}
-
 					// REMOTE KERNEL MODE
 					if kernel {
 						log.Info("Extracting remote kernelcache")
-						artifacts, err := extract.Kernelcache(config)
-						if err != nil {
+						if _, err := extract.Kernelcache(config); err != nil {
 							return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
-						}
-						for _, artifact := range artifacts {
-							utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 						}
 					}
 					// PATTERN MATCHING MODE
 					if len(pattern) > 0 {
 						log.Infof("Downloading files matching pattern %#v", pattern)
-						artifacts, err := extract.Search(config)
-						if err != nil {
+						if _, err := extract.Search(config); err != nil {
 							return err
-						}
-						for _, artifact := range artifacts {
-							utils.Indent(log.Info, 2)("Extracted " + strings.TrimPrefix(cwd, artifact))
 						}
 					}
 				}
@@ -225,6 +212,7 @@ var downloadAppledbCmd = &cobra.Command{
 						// download file
 						downloader.URL = url
 						downloader.DestName = fname
+						downloader.Sha1 = result.Hashes.Sha1
 
 						err = downloader.Do()
 						if err != nil {
