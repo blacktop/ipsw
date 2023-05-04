@@ -361,10 +361,19 @@ func GetBuildInfo() (*BuildInfo, error) {
 
 func GetKernelCollectionPath() (string, error) {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("sysctl", "-n", "kern.bootobjectspath")
+		defaultKcPath := "/System/Library/KernelCollections/BootKernelExtensions.kc"
+
+		cmd := exec.Command("uname", "-m")
 		out, err := cmd.CombinedOutput()
+
+		if err == nil && strings.Contains(string(out), "x86_64") {
+			return defaultKcPath, nil
+		}
+
+		cmd = exec.Command("sysctl", "-n", "kern.bootobjectspath")
+		out, err = cmd.CombinedOutput()
 		if err != nil {
-			return "/System/Library/KernelCollections/BootKernelExtensions.kc", nil
+			return defaultKcPath, nil
 		}
 		return filepath.Join("/System/Volumes/Preboot", strings.TrimSpace(string(out)), "System/Library/Caches/com.apple.kernelcaches/kernelcache"), nil
 	}
