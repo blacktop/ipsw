@@ -45,8 +45,10 @@ import (
 func init() {
 	MachoCmd.AddCommand(machoDisassCmd)
 	// machoDisassCmd.Flags().Uint64("slide", 0, "MachO slide to remove from --vaddr")
+	machoDisassCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
 	machoDisassCmd.Flags().StringP("symbol", "s", "", "Function to disassemble")
 	machoDisassCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
+	machoDisassCmd.Flags().Uint64P("off", "o", 0, "File offset to start disassembling")
 	machoDisassCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	machoDisassCmd.Flags().BoolP("demangle", "d", false, "Demangle symbol names")
 	machoDisassCmd.Flags().BoolP("json", "j", false, "Output as JSON")
@@ -57,8 +59,10 @@ func init() {
 	machoDisassCmd.Flags().StringP("section", "x", "", "Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)")
 	machoDisassCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 
+	viper.BindPFlag("macho.disass.arch", machoDisassCmd.Flags().Lookup("arch"))
 	viper.BindPFlag("macho.disass.symbol", machoDisassCmd.Flags().Lookup("symbol"))
 	viper.BindPFlag("macho.disass.vaddr", machoDisassCmd.Flags().Lookup("vaddr"))
+	viper.BindPFlag("macho.disass.off", machoDisassCmd.Flags().Lookup("off"))
 	viper.BindPFlag("macho.disass.count", machoDisassCmd.Flags().Lookup("count"))
 	viper.BindPFlag("macho.disass.demangle", machoDisassCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("macho.disass.json", machoDisassCmd.Flags().Lookup("json"))
@@ -93,8 +97,10 @@ var machoDisassCmd = &cobra.Command{
 		color.NoColor = !viper.GetBool("color")
 
 		// flags
+		selectedArch := viper.GetString("macho.info.arch")
 		symbolName := viper.GetString("macho.disass.symbol")
 		startAddr := viper.GetUint64("macho.disass.vaddr")
+		startOff := viper.GetUint64("macho.disass.off")
 		instructions := viper.GetUint64("macho.disass.count")
 		segmentSection := viper.GetString("macho.disass.section")
 
@@ -108,11 +114,14 @@ var machoDisassCmd = &cobra.Command{
 
 		allFuncs := false
 
-		if len(symbolName) > 0 && startAddr != 0 {
-			return fmt.Errorf("you can only use --symbol OR --vaddr (not both)")
-		} else if len(symbolName) == 0 && startAddr == 0 {
+		// validate args
+		if len(symbolName) > 0 && (startAddr != 0 || startOff != 0) {
+			return fmt.Errorf("you can only use --symbol OR --vaddr/--off (not both)")
+		} else if len(symbolName) == 0 && startAddr == 0 && startOff == 0 {
 			allFuncs = true
 			// return fmt.Errorf("you must supply a --symbol OR --vaddr to disassemble")
+		} else if startAddr != 0 && startOff != 0 {
+			return fmt.Errorf("you can only use --vaddr OR --off (not both)")
 		}
 		if len(filesetEntry) > 0 && viper.GetBool("macho.disass.all-fileset-entries") {
 			return fmt.Errorf("you can only use --fileset-entry OR --all-fileset-entries (not both)")
@@ -136,10 +145,37 @@ var machoDisassCmd = &cobra.Command{
 				log.Fatal(err.Error())
 			}
 		} else {
+			var options []string
+			var shortOptions []string
 			for _, arch := range fat.Arches {
 				if strings.Contains(strings.ToLower(arch.SubCPU.String(arch.CPU)), "arm64") {
-					m = arch.File
-					break
+					options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
+					shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
+					m = arch.File //
+				}
+			}
+
+			if len(shortOptions) > 1 {
+				if len(selectedArch) > 0 {
+					found := false
+					for i, opt := range shortOptions {
+						if strings.Contains(strings.ToLower(opt), strings.ToLower(selectedArch)) {
+							m = fat.Arches[i].File
+							found = true
+							break
+						}
+					}
+					if !found {
+						return fmt.Errorf("--arch '%s' not found in: %s", selectedArch, strings.Join(shortOptions, ", "))
+					}
+				} else {
+					choice := 0
+					prompt := &survey.Select{
+						Message: "Detected a universal MachO file, please select an architecture to analyze:",
+						Options: options,
+					}
+					survey.AskOne(prompt, &choice)
+					m = fat.Arches[choice].File
 				}
 			}
 		}
@@ -175,6 +211,12 @@ var machoDisassCmd = &cobra.Command{
 
 		if err := ctrlc.Default.Run(context.Background(), func() error {
 			for _, m := range ms {
+				if startAddr == 0 && startOff != 0 {
+					if startAddr, err = m.GetVMAddress(startOff); err != nil {
+						return fmt.Errorf("failed to get vmaddr for file offset %#x: %v", startOff, err)
+					}
+				}
+
 				if !quiet {
 					if len(cacheFile) == 0 {
 						cacheFile = machoPath + ".a2s"
@@ -352,8 +394,10 @@ var machoDisassCmd = &cobra.Command{
 			return nil
 		}); err != nil {
 			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
-				if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
-					log.Errorf("failed to save symbol map: %v", err)
+				if !quiet {
+					if err := engine.SaveAddrToSymMap(cacheFile); err != nil {
+						log.Errorf("failed to save symbol map: %v", err)
+					}
 				}
 				log.Warn("exiting...")
 			} else {
