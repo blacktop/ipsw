@@ -787,13 +787,13 @@ snapcrafts:
             socket-mode: 0770
         plugs: ["home", "network", "network-bind"]
 
-scoop:
-  bucket:
-    owner: blacktop
-    name: scoop-bucket
-  homepage: https://blacktop.github.io/ipsw
-  description: iOS/macOS Research Swiss Army Knife
-  license: MIT
+scoops:
+  - bucket:
+      owner: blacktop
+      name: scoop-bucket
+    homepage: https://blacktop.github.io/ipsw
+    description: iOS/macOS Research Swiss Army Knife
+    license: MIT
 
 # chocolateys:
 #   - project_url: https://github.com/blacktop/ipsw
