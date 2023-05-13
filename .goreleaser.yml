@@ -788,11 +788,21 @@ snapcrafts:
         plugs: ["home", "network", "network-bind"]
 
 scoops:
-  - bucket:
+  - ids: [default_archive]
+    name: ipsw
+    bucket:
       owner: blacktop
       name: scoop-bucket
     homepage: https://blacktop.github.io/ipsw
     description: iOS/macOS Research Swiss Army Knife
+    license: MIT
+  - ids: [daemon_archive]
+    name: ipswd
+    bucket:
+      owner: blacktop
+      name: scoop-bucket
+    homepage: https://blacktop.github.io/ipsw
+    description: ipsw - Daemon
     license: MIT
 
 # chocolateys:
