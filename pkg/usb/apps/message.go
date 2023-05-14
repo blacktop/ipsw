@@ -112,7 +112,7 @@ type AppBundle struct {
 	UIStatusBarStyle                         string            `plist:"UIStatusBarStyle"`
 	UISupportedDevices                       []string          `plist:"UISupportedDevices"`
 	UISupportedInterfaceOrientations         []string          `plist:"UISupportedInterfaceOrientations"`
-	UIViewControllerBasedStatusBarAppearance bool              `plist:"UIViewControllerBasedStatusBarAppearance"`
+	UIViewControllerBasedStatusBarAppearance any               `plist:"UIViewControllerBasedStatusBarAppearance,omitempty"`
 }
 
 func (i AppBundle) String() string {

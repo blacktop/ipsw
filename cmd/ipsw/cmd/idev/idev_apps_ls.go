@@ -38,6 +38,7 @@ func init() {
 	AppsCmd.AddCommand(idevAppsListCmd)
 	idevAppsListCmd.Flags().BoolP("system", "s", false, "List system apps")
 	idevAppsListCmd.Flags().BoolP("user", "r", false, "List user apps")
+	idevAppsListCmd.Flags().BoolP("hidden", "n", false, "List hidden apps")
 	idevAppsListCmd.Flags().BoolP("json", "j", false, "Display apps as JSON")
 }
 
@@ -56,11 +57,8 @@ var idevAppsListCmd = &cobra.Command{
 		udid, _ := cmd.Flags().GetString("udid")
 		system, _ := cmd.Flags().GetBool("system")
 		user, _ := cmd.Flags().GetBool("user")
+		hidden, _ := cmd.Flags().GetBool("hidden")
 		asJSON, _ := cmd.Flags().GetBool("json")
-
-		if system && user {
-			return fmt.Errorf("cannot list system and user apps at the same time")
-		}
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()
@@ -88,7 +86,9 @@ var idevAppsListCmd = &cobra.Command{
 				filtered = append(filtered, a)
 			} else if user && a.ApplicationType == "User" {
 				filtered = append(filtered, a)
-			} else if !system && !user {
+			} else if hidden && a.ApplicationType == "Hidden" {
+				filtered = append(filtered, a)
+			} else if !system && !user && !hidden {
 				filtered = append(filtered, a)
 			}
 		}
