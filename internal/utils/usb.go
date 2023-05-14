@@ -48,29 +48,33 @@ func PickDevice() (*lockdownd.DeviceValues, error) {
 
 	if len(deets) == 1 {
 		return deets[0], nil
-	} else {
-		selected := make(map[string]*lockdownd.DeviceValues, len(deets))
-		for _, d := range deets {
-			selected[fmt.Sprintf("%s_%s_%s", d.ProductType, d.HardwareModel, d.BuildVersion)] = d
-		}
-
-		var choices []string
-		for s := range selected {
-			choices = append(choices, s)
-		}
-
-		var picked string
-		prompt := &survey.Select{
-			Message: "Select what iDevice to connect to:",
-			Options: choices,
-		}
-		if err := survey.AskOne(prompt, &picked); err == terminal.InterruptErr {
-			log.Warn("Exiting...")
-			os.Exit(0)
-		}
-
-		return selected[picked], nil
 	}
+
+	selected := make(map[string]*lockdownd.DeviceValues, len(deets))
+	for _, d := range deets {
+		selected[fmt.Sprintf("%s_%s_%s", d.ProductType, d.HardwareModel, d.BuildVersion)] = d
+	}
+
+	if len(selected) == 1 {
+		return deets[0], nil // can happen if device setup to connect via network
+	}
+
+	var choices []string
+	for s := range selected {
+		choices = append(choices, s)
+	}
+
+	var picked string
+	prompt := &survey.Select{
+		Message: "Select what iDevice to connect to:",
+		Options: choices,
+	}
+	if err := survey.AskOne(prompt, &picked); err == terminal.InterruptErr {
+		log.Warn("Exiting...")
+		os.Exit(0)
+	}
+
+	return selected[picked], nil
 }
 
 func PickDevices() ([]*lockdownd.DeviceValues, error) {
