@@ -642,7 +642,7 @@ nfpms:
       - ipswd
     contents:
       - src: ./hack/goreleaser/linux_install/ipsw.service
-        dst: /lib/systemd/user/ipsws.service
+        dst: /usr/lib/systemd/user/ipsws.service
         file_info:
           mode: 0644
       - src: ./config.example.yml
