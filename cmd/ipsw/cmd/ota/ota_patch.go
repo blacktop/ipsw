@@ -32,8 +32,10 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/ota/ridiff"
+	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -66,6 +68,23 @@ var patchCmd = &cobra.Command{
 
 		inFolder := viper.GetString("ota.patch.input")
 		outFolder := viper.GetString("ota.patch.output")
+
+		// check if we are running on compatible macOS version
+		host, err := utils.GetBuildInfo()
+		if err != nil {
+			return fmt.Errorf("failed to get host build info: %v", err)
+		}
+		reqVer, err := semver.NewVersion("13.0.0")
+		if err != nil {
+			log.Fatal("failed to convert required macOS version into semver object")
+		}
+		curVer, err := semver.NewVersion(host.ProductVersion)
+		if err != nil {
+			log.Fatal("failed to convert version into semver object")
+		}
+		if curVer.LessThan(reqVer) {
+			return fmt.Errorf("patching OTA only supported on macOS 13+/iOS 16+ (if you are trying to run on iOS let author know as macOS is currently the only supported darwin platform)")
+		}
 
 		otaPath := filepath.Clean(args[0])
 

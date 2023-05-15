@@ -336,7 +336,7 @@ func GetBuildInfo() (*BuildInfo, error) {
 			return nil, fmt.Errorf("%v: %s", err, out)
 		}
 
-		binfo.ProductNames = string(out)
+		binfo.ProductNames = strings.TrimSuffix(string(out), "\n")
 
 		cmd = exec.Command("/usr/bin/sw_vers", "-productVersion")
 		out, err = cmd.CombinedOutput()
@@ -344,7 +344,7 @@ func GetBuildInfo() (*BuildInfo, error) {
 			return nil, fmt.Errorf("%v: %s", err, out)
 		}
 
-		binfo.ProductVersion = string(out)
+		binfo.ProductVersion = strings.TrimSuffix(string(out), "\n")
 
 		cmd = exec.Command("/usr/bin/sw_vers", "-buildVersion")
 		out, err = cmd.CombinedOutput()
@@ -352,7 +352,7 @@ func GetBuildInfo() (*BuildInfo, error) {
 			return nil, fmt.Errorf("%v: %s", err, out)
 		}
 
-		binfo.BuildVersion = string(out)
+		binfo.BuildVersion = strings.TrimSuffix(string(out), "\n")
 
 		return &binfo, nil
 	}
