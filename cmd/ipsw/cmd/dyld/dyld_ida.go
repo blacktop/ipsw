@@ -182,7 +182,7 @@ var idaCmd = &cobra.Command{
 		}
 
 		if scriptFile == "" {
-			script, err := dscu.GenerateScript(defaultframeworks, !viper.GetBool("dyld.ida.enable-gui"))
+			dscuScript, err := dscu.GenerateScript(defaultframeworks, !viper.GetBool("dyld.ida.enable-gui"))
 			if err != nil {
 				return err
 			}
@@ -190,7 +190,14 @@ var idaCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			if _, err := tmp.WriteString(script); err != nil {
+			objcScripts, err := dscu.ExpandScript()
+			if err != nil {
+				return err
+			}
+			if _, err := tmp.WriteString(objcScripts); err != nil {
+				return err
+			}
+			if _, err := tmp.WriteString(dscuScript); err != nil {
 				return err
 			}
 			if err := tmp.Close(); err != nil {
@@ -271,8 +278,9 @@ var idaCmd = &cobra.Command{
 				return fmt.Errorf("failed to run IDA Pro: %v", err)
 			}
 		}
-
-		log.WithField("db", dbFile).Info("🎉 Done!")
+		if !viper.GetBool("dyld.ida.delete-db") && !viper.GetBool("dyld.ida.temp-database") {
+			log.WithField("db", dbFile).Info("🎉 Done!")
+		}
 
 		return nil
 	},

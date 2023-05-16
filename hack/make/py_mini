@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+files=($(find -f ./internal/commands/ida/dscu/data -- -type f -name '*.py'))
+
+for item in ${files[*]}; do
+  printf "Minimizing Py: %s\n" $item
+  gzip -cn $item >"$(dirname $item)/$(basename -- $item .py).gz"
+done

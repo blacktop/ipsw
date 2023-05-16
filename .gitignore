@@ -50,6 +50,7 @@ www/docs/static/releases*.json
 *.unstripped
 *.bndb
 *.lock
+internal/commands/ida/dscu/data/dscu.py
 
 # Unicorn EMU
 unicorn2/

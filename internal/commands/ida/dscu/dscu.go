@@ -2,11 +2,17 @@ package dscu
 
 import (
 	"bytes"
+	"compress/gzip"
+	_ "embed"
 	"fmt"
 	"text/template"
 )
 
-const idaDscuPyScriptTemplate = ` # https://hex-rays.com/products/ida/news/7_2/the_mac_rundown/
+//go:embed data/dscu.gz
+var dscuScriptData []byte
+
+const idaDscuPyScriptTemplate = `
+# https://hex-rays.com/products/ida/news/7_2/the_mac_rundown/
 
 def dscu_load_module(module):
 	node = idaapi.netnode()
@@ -47,6 +53,12 @@ load_and_run_plugin("objc", 5)
 # close IDA and save the database
 qexit(0)
 {{- end }}
+
+print("[ipsw] running objc_stubs.py ...")
+fix_objc_stubs()
+
+print("[ipsw] applying objc hotkeys...")
+set_hotkeys()
 `
 
 // GenerateScript generates a IDAPython script from a template
@@ -66,4 +78,20 @@ func GenerateScript(frameworks []string, closeIDA bool) (string, error) {
 	}
 
 	return tplOut.String(), nil
+}
+
+// ExpandScript expands the embedded gzipped IDAPython script
+func ExpandScript() (string, error) {
+	zr, err := gzip.NewReader(bytes.NewReader(dscuScriptData))
+	if err != nil {
+		return "", fmt.Errorf("failed to create gzip reader: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(zr); err != nil {
+		return "", fmt.Errorf("failed to read from gzip reader: %v", err)
+	}
+	defer zr.Close()
+
+	return buf.String(), nil
 }

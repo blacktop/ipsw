@@ -5,6 +5,7 @@ before:
     - ./hack/make/completions
     - ./hack/make/manpages
     - ./hack/make/json_mini
+    - ./hack/make/py_mini
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
