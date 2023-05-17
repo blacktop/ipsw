@@ -482,10 +482,10 @@ var otaDLCmd = &cobra.Command{
 						if err := downloader.Do(); err != nil {
 							return fmt.Errorf("failed to download file: %v", err)
 						}
-					} else if os.IsExist(err) {
-						log.Warnf("ota already exists: %s", destName)
-					} else {
+					} else if err != nil {
 						return fmt.Errorf("failed to stat file %s: %v", destName, err)
+					} else {
+						log.Warnf("ota already exists: %s", destName)
 					}
 				}
 			}
