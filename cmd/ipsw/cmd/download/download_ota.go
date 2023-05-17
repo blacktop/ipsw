@@ -450,13 +450,25 @@ var otaDLCmd = &cobra.Command{
 					var devices string
 					if len(o.SupportedDevices) > 0 {
 						sort.Strings(o.SupportedDevices)
-						devices = strings.Join(o.SupportedDevices, "_")
+						if len(o.SupportedDevices) > 5 {
+							devices = fmt.Sprintf("%s_and_%d_others", o.SupportedDevices[0], len(o.SupportedDevices)-1)
+						} else {
+							devices = strings.Join(o.SupportedDevices, "_")
+						}
 					} else {
 						sort.Strings(o.SupportedDeviceModels)
-						devices = strings.Join(o.SupportedDeviceModels, "_")
+						if len(o.SupportedDeviceModels) > 5 {
+							devices = fmt.Sprintf("%s_and_%d_others", o.SupportedDeviceModels[0], len(o.SupportedDeviceModels)-1)
+						} else {
+							devices = strings.Join(o.SupportedDeviceModels, "_")
+						}
 					}
 					url := o.BaseURL + o.RelativePath
-					destName := filepath.Join(folder, fmt.Sprintf("%s_%s", devices, getDestName(url, removeCommas)))
+					var isRSR string
+					if o.SplatOnly {
+						isRSR = fmt.Sprintf("%s_%s_%s_RSR_", o.OSVersion, o.ProductVersionExtra, o.Build)
+					}
+					destName := filepath.Join(folder, fmt.Sprintf("%s%s_%s", isRSR, devices, getDestName(url, removeCommas)))
 					if _, err := os.Stat(destName); os.IsNotExist(err) {
 						log.WithFields(log.Fields{
 							"device": strings.Join(o.SupportedDevices, " "),
@@ -470,8 +482,10 @@ var otaDLCmd = &cobra.Command{
 						if err := downloader.Do(); err != nil {
 							return fmt.Errorf("failed to download file: %v", err)
 						}
-					} else {
+					} else if os.IsExist(err) {
 						log.Warnf("ota already exists: %s", destName)
+					} else {
+						return fmt.Errorf("failed to stat file %s: %v", destName, err)
 					}
 				}
 			}
