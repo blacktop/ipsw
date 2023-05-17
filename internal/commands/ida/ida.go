@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
@@ -233,4 +234,8 @@ func (c *Client) Run() error {
 		return cli.Run(c.ctx)
 	}
 	return c.cmd.Run()
+}
+
+func (c *Client) Stop() error {
+	return c.cmd.Process.Signal(syscall.SIGTERM)
 }
