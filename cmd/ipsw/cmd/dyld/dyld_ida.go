@@ -270,15 +270,14 @@ var idaCmd = &cobra.Command{
 			}
 			return nil
 		}); err != nil {
-			var cerr *ctrlc.ErrorCtrlC
-			if errors.As(err, &cerr) {
+			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
 				log.Warn("Exiting...")
-				os.Exit(0)
-			} else {
-				return fmt.Errorf("failed to run IDA Pro: %v", err)
+				return cli.Stop()
 			}
+			return fmt.Errorf("failed to run IDA Pro: %v", err)
 		}
-		if !viper.GetBool("dyld.ida.delete-db") && !viper.GetBool("dyld.ida.temp-database") {
+
+		if !viper.GetBool("dyld.ida.temp-database") {
 			log.WithField("db", dbFile).Info("🎉 Done!")
 		}
 
