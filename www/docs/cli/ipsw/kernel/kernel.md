@@ -35,6 +35,7 @@ ipsw kernel [flags]
 * [ipsw kernel dec](/docs/cli/ipsw/kernel/dec)	 - Decompress a kernelcache
 * [ipsw kernel dwarf](/docs/cli/ipsw/kernel/dwarf)	 - 🚧 Dump DWARF debug information
 * [ipsw kernel extract](/docs/cli/ipsw/kernel/extract)	 - Extract KEXT(s) from kernelcache
+* [ipsw kernel ida](/docs/cli/ipsw/kernel/ida)	 - 🚧 Analyze kernelcache in IDA Pro
 * [ipsw kernel kexts](/docs/cli/ipsw/kernel/kexts)	 - List kernel extentions
 * [ipsw kernel symbolsets](/docs/cli/ipsw/kernel/symbolsets)	 - Dump kernel symbolsets
 * [ipsw kernel syscall](/docs/cli/ipsw/kernel/syscall)	 - Dump kernelcache syscalls

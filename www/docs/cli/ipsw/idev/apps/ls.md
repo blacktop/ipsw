@@ -18,6 +18,7 @@ ipsw idev apps ls [flags]
 
 ```
   -h, --help     help for ls
+  -n, --hidden   List hidden apps
   -j, --json     Display apps as JSON
   -s, --system   List system apps
   -r, --user     List user apps

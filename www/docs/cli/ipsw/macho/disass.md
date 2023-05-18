@@ -18,12 +18,14 @@ ipsw macho disass <MACHO> [flags]
 
 ```
   -z, --all-fileset-entries    Parse all fileset entries
+      --arch string            Which architecture to use for fat/universal MachO
       --cache string           Path to .a2s addr to sym cache file (speeds up analysis)
   -c, --count uint             Number of instructions to disassemble
   -d, --demangle               Demangle symbol names
   -t, --fileset-entry string   Which fileset entry to analyze
   -h, --help                   help for disass
   -j, --json                   Output as JSON
+  -o, --off uint               File offset to start disassembling
   -q, --quiet                  Do NOT markup analysis (Faster)
   -x, --section string         Disassemble an entire segment/section (i.e. __TEXT_EXEC.__text)
   -s, --symbol string          Function to disassemble
