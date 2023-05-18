@@ -82,7 +82,7 @@ var idaCmd = &cobra.Command{
 	Short:         "Analyze DSC in IDA Pro",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(2),
+	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var fileType string
@@ -177,6 +177,10 @@ var idaCmd = &cobra.Command{
 			fileType = fmt.Sprintf("Apple DYLD cache for %s (complete image)", strings.TrimSpace(magic))
 			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s.i64", f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 		} else { // analyze single or more dylibs
+			if len(args) < 2 {
+				return fmt.Errorf("must specify at least one dylib to analyze")
+			}
+
 			fileType = fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.TrimSpace(magic))
 
 			var defaultframeworks = []string{

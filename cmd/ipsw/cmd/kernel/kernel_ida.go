@@ -49,38 +49,38 @@ func removeExtension(filename string) string {
 }
 
 func init() {
-	KernelcacheCmd.AddCommand(idaCmd)
+	KernelcacheCmd.AddCommand(kernelIdaCmd)
 
-	idaCmd.Flags().StringP("ida-path", "p", "", "IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)")
-	idaCmd.Flags().StringP("script", "s", "", "IDA Pro script to run")
-	idaCmd.Flags().StringSliceP("script-args", "r", []string{}, "IDA Pro script arguments")
-	idaCmd.Flags().BoolP("all", "a", false, "Analyze kernel+kexts (this will take a while)")
-	idaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
-	idaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
-	idaCmd.Flags().BoolP("temp-db", "t", false, "Do not create a database file (requires --enable-gui)")
-	idaCmd.Flags().StringP("log-file", "l", "", "IDA log file")
-	idaCmd.Flags().StringSliceP("extra-args", "e", []string{}, "IDA Pro CLI extra arguments")
-	idaCmd.Flags().StringP("output", "o", "", "Output folder")
-	// idaCmd.Flags().String("slide", "", "kernelcache ASLR slide value (hexadecimal)")
-	idaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
-	idaCmd.Flags().String("docker-image", "blacktop/idapro:8.2-pro", "IDA Pro docker image")
-	viper.BindPFlag("dyld.ida.ida-path", idaCmd.Flags().Lookup("ida-path"))
-	viper.BindPFlag("dyld.ida.script", idaCmd.Flags().Lookup("script"))
-	viper.BindPFlag("dyld.ida.script-args", idaCmd.Flags().Lookup("script-args"))
-	viper.BindPFlag("dyld.ida.all", idaCmd.Flags().Lookup("all"))
-	viper.BindPFlag("dyld.ida.enable-gui", idaCmd.Flags().Lookup("enable-gui"))
-	viper.BindPFlag("dyld.ida.delete-db", idaCmd.Flags().Lookup("delete-db"))
-	viper.BindPFlag("dyld.ida.temp-db", idaCmd.Flags().Lookup("temp-db"))
-	viper.BindPFlag("dyld.ida.log-file", idaCmd.Flags().Lookup("log-file"))
-	viper.BindPFlag("dyld.ida.extra-args", idaCmd.Flags().Lookup("extra-args"))
-	viper.BindPFlag("dyld.ida.output", idaCmd.Flags().Lookup("output"))
-	// viper.BindPFlag("dyld.ida.slide", idaCmd.Flags().Lookup("slide"))
-	viper.BindPFlag("dyld.ida.docker", idaCmd.Flags().Lookup("docker"))
-	viper.BindPFlag("dyld.ida.docker-image", idaCmd.Flags().Lookup("docker-image"))
+	kernelIdaCmd.Flags().StringP("ida-path", "p", "", "IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)")
+	kernelIdaCmd.Flags().StringP("script", "s", "", "IDA Pro script to run")
+	kernelIdaCmd.Flags().StringSliceP("script-args", "r", []string{}, "IDA Pro script arguments")
+	kernelIdaCmd.Flags().BoolP("all", "a", false, "Analyze kernel+kexts (this will take a while)")
+	kernelIdaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
+	kernelIdaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
+	kernelIdaCmd.Flags().BoolP("temp-db", "t", false, "Do not create a database file (requires --enable-gui)")
+	kernelIdaCmd.Flags().StringP("log-file", "l", "", "IDA log file")
+	kernelIdaCmd.Flags().StringSliceP("extra-args", "e", []string{}, "IDA Pro CLI extra arguments")
+	kernelIdaCmd.Flags().StringP("output", "o", "", "Output folder")
+	// kernelIdaCmd.Flags().String("slide", "", "kernelcache ASLR slide value (hexadecimal)")
+	kernelIdaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
+	kernelIdaCmd.Flags().String("docker-image", "blacktop/idapro:8.2-pro", "IDA Pro docker image")
+	viper.BindPFlag("kernel.ida.ida-path", kernelIdaCmd.Flags().Lookup("ida-path"))
+	viper.BindPFlag("kernel.ida.script", kernelIdaCmd.Flags().Lookup("script"))
+	viper.BindPFlag("kernel.ida.script-args", kernelIdaCmd.Flags().Lookup("script-args"))
+	viper.BindPFlag("kernel.ida.all", kernelIdaCmd.Flags().Lookup("all"))
+	viper.BindPFlag("kernel.ida.enable-gui", kernelIdaCmd.Flags().Lookup("enable-gui"))
+	viper.BindPFlag("kernel.ida.delete-db", kernelIdaCmd.Flags().Lookup("delete-db"))
+	viper.BindPFlag("kernel.ida.temp-db", kernelIdaCmd.Flags().Lookup("temp-db"))
+	viper.BindPFlag("kernel.ida.log-file", kernelIdaCmd.Flags().Lookup("log-file"))
+	viper.BindPFlag("kernel.ida.extra-args", kernelIdaCmd.Flags().Lookup("extra-args"))
+	viper.BindPFlag("kernel.ida.output", kernelIdaCmd.Flags().Lookup("output"))
+	// viper.BindPFlag("kernel.ida.slide", kernelIdaCmd.Flags().Lookup("slide"))
+	viper.BindPFlag("kernel.ida.docker", kernelIdaCmd.Flags().Lookup("docker"))
+	viper.BindPFlag("kernel.ida.docker-image", kernelIdaCmd.Flags().Lookup("docker-image"))
 }
 
-// idaCmd represents the ida command
-var idaCmd = &cobra.Command{
+// kernelIdaCmd represents the ida command
+var kernelIdaCmd = &cobra.Command{
 	Use:           "ida <KC> <KEXT> [KEXTS...]",
 	Short:         "🚧 Analyze kernelcache in IDA Pro",
 	SilenceUsage:  true,
@@ -99,20 +99,20 @@ var idaCmd = &cobra.Command{
 		}
 
 		// flags
-		scriptFile := viper.GetString("dyld.ida.script")
-		logFile := viper.GetString("dyld.ida.log-file")
-		output := viper.GetString("dyld.ida.output")
+		scriptFile := viper.GetString("kernel.ida.script")
+		logFile := viper.GetString("kernel.ida.log-file")
+		output := viper.GetString("kernel.ida.output")
 		// validate args
-		if !viper.GetBool("dyld.ida.enable-gui") && viper.GetBool("dyld.ida.temp-db") {
+		if !viper.GetBool("kernel.ida.enable-gui") && viper.GetBool("kernel.ida.temp-db") {
 			return fmt.Errorf("cannot use '--temp-db' without '--enable-gui'")
-		} else if viper.GetBool("dyld.ida.temp-db") && viper.GetBool("dyld.ida.delete-db") {
+		} else if viper.GetBool("kernel.ida.temp-db") && viper.GetBool("kernel.ida.delete-db") {
 			return fmt.Errorf("cannot use '--temp-db' and '--delete-db'")
-		} else if len(args) > 2 && viper.GetBool("dyld.ida.dependancies") {
+		} else if len(args) > 2 && viper.GetBool("kernel.ida.dependancies") {
 			log.Warnf("will only load dependancies for first dylib (%s)", args[1])
 		}
 
-		// if viper.GetString("dyld.ida.slide") != "" { TODO: how to set kc slide?
-		// 	env = append(env, fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")))
+		// if viper.GetString("kernel.ida.slide") != "" { TODO: how to set kc slide?
+		// 	env = append(env, fmt.Sprintf("IDA_kernel_SHARED_CACHE_SLIDE=%s", viper.GetString("kernel.ida.slide")))
 		// }
 
 		kcPath, err := filepath.Abs(filepath.Clean(args[0]))
@@ -128,7 +128,7 @@ var idaCmd = &cobra.Command{
 			}
 			folder = absout
 		} else {
-			if viper.GetBool("dyld.ida.temp-db") {
+			if viper.GetBool("kernel.ida.temp-db") {
 				folder = os.TempDir()
 			}
 		}
@@ -152,7 +152,7 @@ var idaCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		if viper.GetBool("dyld.ida.all") { // analyze all dylibs
+		if viper.GetBool("kernel.ida.all") { // analyze all dylibs
 			autoAnalyze = true
 			device := filepath.Ext(kcPath)[1:]
 			fileType = fmt.Sprintf("Apple XNU kernelcache for %s (kernel + all kexts)", m.SubCPU.String(m.CPU))
@@ -162,7 +162,7 @@ var idaCmd = &cobra.Command{
 		}
 
 		if len(logFile) > 0 {
-			logFile = filepath.Join(folder, viper.GetString("dyld.ida.log-file"))
+			logFile = filepath.Join(folder, viper.GetString("kernel.ida.log-file"))
 			if _, err := os.Stat(logFile); err == nil {
 				if err := os.Remove(logFile); err != nil {
 					return fmt.Errorf("failed to remove log file %s: %w", logFile, err)
@@ -170,7 +170,7 @@ var idaCmd = &cobra.Command{
 			}
 		}
 
-		if viper.GetBool("dyld.ida.temp-db") { // clean up temp IDA database files
+		if viper.GetBool("kernel.ida.temp-db") { // clean up temp IDA database files
 			defer func() {
 				matches, err := filepath.Glob(removeExtension(dbFile) + ".*")
 				if err != nil {
@@ -188,29 +188,29 @@ var idaCmd = &cobra.Command{
 		defer cancel()
 
 		cli, err := ida.NewClient(ctx, &ida.Config{
-			IdaPath:      viper.GetString("dyld.ida.ida-path"),
+			IdaPath:      viper.GetString("kernel.ida.ida-path"),
 			InputFile:    kcPath,
 			Frameworks:   defaultframeworks,
 			LogFile:      logFile,
 			Output:       dbFile,
-			EnableGUI:    viper.GetBool("dyld.ida.enable-gui"),
-			TempDatabase: viper.GetBool("dyld.ida.temp-db"), // TODO: I think this is actually useless
-			DeleteDB:     viper.GetBool("dyld.ida.delete-db"),
+			EnableGUI:    viper.GetBool("kernel.ida.enable-gui"),
+			TempDatabase: viper.GetBool("kernel.ida.temp-db"), // TODO: I think this is actually useless
+			DeleteDB:     viper.GetBool("kernel.ida.delete-db"),
 			CompressDB:   true,
 			FileType:     fileType,
 			AutoAnalyze:  autoAnalyze,
 			Env:          env,
 			// Options:      []string{"objc:+l"},
 			ScriptFile: scriptFile,
-			ScriptArgs: viper.GetStringSlice("dyld.ida.script-args"),
-			ExtraArgs:  viper.GetStringSlice("dyld.ida.extra-args"),
+			ScriptArgs: viper.GetStringSlice("kernel.ida.script-args"),
+			ExtraArgs:  viper.GetStringSlice("kernel.ida.extra-args"),
 			// RemoteDebugger: ida.RemoteDebugger{
 			// 	Host: viper.GetString("remote-debugger-host"),
 			// 	Port: viper.GetInt("remote-debugger-port"),
 			// },
 			Verbose:     viper.GetBool("verbose"),
-			RunInDocker: viper.GetBool("dyld.ida.docker"),
-			DockerImage: viper.GetString("dyld.ida.docker-image"),
+			RunInDocker: viper.GetBool("kernel.ida.docker"),
+			DockerImage: viper.GetString("kernel.ida.docker-image"),
 		})
 		if err != nil {
 			return err
@@ -219,7 +219,7 @@ var idaCmd = &cobra.Command{
 		m.Close() // close the kernelcache file so IDA can open it
 
 		if err := ctrlc.Default.Run(ctx, func() error {
-			if viper.GetBool("dyld.ida.docker") {
+			if viper.GetBool("kernel.ida.docker") {
 				log.Info("Starting IDA Pro in Docker...")
 			} else {
 				log.Info("Starting IDA Pro...")
@@ -236,7 +236,7 @@ var idaCmd = &cobra.Command{
 			return fmt.Errorf("failed to run IDA Pro: %v", err)
 		}
 
-		if !viper.GetBool("dyld.ida.temp-db") {
+		if !viper.GetBool("kernel.ida.temp-db") {
 			log.WithField("db", dbFile).Info("🎉 Done!")
 		}
 
