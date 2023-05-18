@@ -18,10 +18,11 @@ ipsw download appledb [flags]
 
 ```bash
   # Download the iOS 16.5 beta 4 kernelcache from remote IPSW
-  ❯ ipsw download appledb --os iOS --version '16.4 beta 4' --device iPhone15,2 --kernel
-   • Parsing remote IPSW       build=20E5239b devices=iPhone15,2 version=16.4
+  ❯ ipsw download appledb --os iOS --version '16.5 beta 4' --device iPhone15,2 --kernel
+   • Querying AppleDB...
+   • Parsing remote IPSW       build=20F5059a devices=iPhone15,2 version=16.5
    • Extracting remote kernelcache
-      • Writing 20E5239b__iPhone15,2/kernelcache.release.iPhone15,2
+      • Writing 20F5059a__iPhone15,2/kernelcache.release.iPhone15,2
 ```
 
 ### Options
