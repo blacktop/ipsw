@@ -39,11 +39,13 @@ func machoInfo(c *gin.Context) {
 				c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 				return
 			}
+			defer m.Close()
 		} else {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 			return
 		}
 	} else { // fat binary
+		defer fat.Close()
 		if params.Arch == "" {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: "'arch' query parameter is required for universal binaries"})
 			return
