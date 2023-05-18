@@ -31,12 +31,17 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/commands/ida"
 	"github.com/blacktop/ipsw/internal/commands/ida/dscu"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/caarlos0/ctrlc"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+func removeExtension(filename string) string {
+	return filename[:len(filename)-len(filepath.Ext(filename))]
+}
 
 func init() {
 	DyldCmd.AddCommand(idaCmd)
@@ -124,6 +129,10 @@ var idaCmd = &cobra.Command{
 				return fmt.Errorf("failed to get absolute path of %s: %w", output, err)
 			}
 			folder = absout
+		} else {
+			if viper.GetBool("dyld.ida.temp-db") {
+				folder = os.TempDir()
+			}
 		}
 		if _, err := os.Stat(folder); os.IsPermission(err) {
 			log.Errorf("permission denied to write to %s", folder)
@@ -218,6 +227,20 @@ var idaCmd = &cobra.Command{
 
 		dbFile := filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s.i64", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 
+		if viper.GetBool("dyld.ida.temp-db") { // clean up temp IDA database files
+			defer func() {
+				matches, err := filepath.Glob(removeExtension(dbFile) + ".*")
+				if err != nil {
+					log.Errorf("failed to get temp IDA database files: %v", err)
+					return
+				}
+				for _, match := range matches {
+					utils.Indent(log.Info, 2)(fmt.Sprintf("deleting temp IDA database %s", match))
+					os.Remove(match)
+				}
+			}()
+		}
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -233,7 +256,7 @@ var idaCmd = &cobra.Command{
 			LogFile:      logFile,
 			Output:       dbFile,
 			EnableGUI:    viper.GetBool("dyld.ida.enable-gui"),
-			TempDatabase: viper.GetBool("dyld.ida.temp-database"),
+			TempDatabase: viper.GetBool("dyld.ida.temp-db"), // I think this is actually useless
 			DeleteDB:     viper.GetBool("dyld.ida.delete-db"),
 			CompressDB:   true,
 			FileType:     fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.TrimSpace(magic)),
@@ -277,7 +300,7 @@ var idaCmd = &cobra.Command{
 			return fmt.Errorf("failed to run IDA Pro: %v", err)
 		}
 
-		if !viper.GetBool("dyld.ida.temp-database") {
+		if !viper.GetBool("dyld.ida.temp-db") {
 			log.WithField("db", dbFile).Info("🎉 Done!")
 		}
 
