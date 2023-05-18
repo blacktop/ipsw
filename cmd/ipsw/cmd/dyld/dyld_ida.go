@@ -48,7 +48,8 @@ func init() {
 
 	idaCmd.Flags().StringP("ida-path", "p", "", "IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)")
 	idaCmd.Flags().StringP("script", "s", "", "IDA Pro script to run")
-	idaCmd.Flags().StringSliceP("script-args", "a", []string{}, "IDA Pro script arguments")
+	idaCmd.Flags().StringSliceP("script-args", "r", []string{}, "IDA Pro script arguments")
+	idaCmd.Flags().BoolP("all", "a", false, "Analyze whole cache (this will take a while)")
 	idaCmd.Flags().BoolP("dependancies", "d", false, "Analyze module dependencies")
 	idaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
 	idaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
@@ -63,6 +64,7 @@ func init() {
 	viper.BindPFlag("dyld.ida.script", idaCmd.Flags().Lookup("script"))
 	viper.BindPFlag("dyld.ida.script-args", idaCmd.Flags().Lookup("script-args"))
 	viper.BindPFlag("dyld.ida.dependancies", idaCmd.Flags().Lookup("dependancies"))
+	viper.BindPFlag("dyld.ida.all", idaCmd.Flags().Lookup("all"))
 	viper.BindPFlag("dyld.ida.enable-gui", idaCmd.Flags().Lookup("enable-gui"))
 	viper.BindPFlag("dyld.ida.delete-db", idaCmd.Flags().Lookup("delete-db"))
 	viper.BindPFlag("dyld.ida.temp-db", idaCmd.Flags().Lookup("temp-db"))
@@ -82,6 +84,12 @@ var idaCmd = &cobra.Command{
 	SilenceErrors: true,
 	Args:          cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		var fileType string
+		var dbFile string
+		var env []string
+		var defaultframeworks []string
+
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
@@ -97,6 +105,10 @@ var idaCmd = &cobra.Command{
 			return fmt.Errorf("cannot use '--temp-db' and '--delete-db'")
 		} else if len(args) > 2 && viper.GetBool("dyld.ida.dependancies") {
 			log.Warnf("will only load dependancies for first dylib (%s)", args[1])
+		}
+
+		if viper.GetString("dyld.ida.slide") != "" {
+			env = append(env, fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")))
 		}
 
 		dscPath, err := filepath.Abs(filepath.Clean(args[0]))
@@ -152,68 +164,85 @@ var idaCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open dyld shared cache %s: %w", dscPath, err)
 		}
+		defer f.Close()
 
-		var defaultframeworks = []string{
-			"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
-			"/System/Library/Frameworks/Foundation.framework/Foundation",
-			"/usr/lib/libobjc.A.dylib",
-			"/usr/lib/system/libdyld.dylib",
-			"/usr/lib/system/libsystem_blocks.dylib",
-			"/usr/lib/system/libsystem_c.dylib",
-			"/usr/lib/system/libsystem_darwin.dylib",
-			"/usr/lib/system/libsystem_kernel.dylib",
-			"/usr/lib/system/libsystem_platform.dylib",
-			"/usr/lib/system/libsystem_trace.dylib",
-			"/usr/lib/system/libunwind.dylib",
+		_, magic, ok := strings.Cut(f.Headers[f.UUID].Magic.String(), " ")
+		if !ok {
+			return fmt.Errorf("failed to get arch from DSC magic %s", f.Headers[f.UUID].Magic.String())
 		}
 
-		if len(args) > 2 { // add any extra args to default frameworks
-			for _, additional := range args[2:] {
-				img, err := f.Image(additional)
-				if err != nil {
-					return fmt.Errorf("failed to get image %s: %w", additional, err)
+		if viper.GetBool("dyld.ida.all") { // analyze all dylibs
+			fileType = fmt.Sprintf("Apple DYLD cache for %s (complete image)", strings.TrimSpace(magic))
+			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s.i64", f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
+		} else { // analyze single or more dylibs
+			fileType = fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.TrimSpace(magic))
+
+			var defaultframeworks = []string{
+				"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
+				"/System/Library/Frameworks/Foundation.framework/Foundation",
+				"/usr/lib/libobjc.A.dylib",
+				"/usr/lib/system/libdyld.dylib",
+				"/usr/lib/system/libsystem_blocks.dylib",
+				"/usr/lib/system/libsystem_c.dylib",
+				"/usr/lib/system/libsystem_darwin.dylib",
+				"/usr/lib/system/libsystem_kernel.dylib",
+				"/usr/lib/system/libsystem_platform.dylib",
+				"/usr/lib/system/libsystem_trace.dylib",
+				"/usr/lib/system/libunwind.dylib",
+			}
+
+			if len(args) > 2 { // add any extra args to default frameworks
+				for _, additional := range args[2:] {
+					img, err := f.Image(additional)
+					if err != nil {
+						return fmt.Errorf("failed to get image %s: %w", additional, err)
+					}
+					defaultframeworks = append(defaultframeworks, img.Name)
 				}
-				defaultframeworks = append(defaultframeworks, img.Name)
 			}
-		}
 
-		img, err := f.Image(args[1])
-		if err != nil {
-			return fmt.Errorf("failed to get image %s: %w", args[1], err)
-		}
+			img, err := f.Image(args[1])
+			if err != nil {
+				return fmt.Errorf("failed to get image %s: %w", args[1], err)
+			}
 
-		if viper.GetBool("dyld.ida.dependancies") {
-			m, err := img.GetMacho()
-			if err != nil {
-				return fmt.Errorf("failed to get macho for %s: %w", img.Name, err)
+			if viper.GetBool("dyld.ida.dependancies") {
+				m, err := img.GetMacho()
+				if err != nil {
+					return fmt.Errorf("failed to get macho for %s: %w", img.Name, err)
+				}
+				defaultframeworks = append(defaultframeworks, m.ImportedLibraries()...)
 			}
-			defaultframeworks = append(defaultframeworks, m.ImportedLibraries()...)
-		}
 
-		if scriptFile == "" {
-			dscuScript, err := dscu.GenerateScript(defaultframeworks, !viper.GetBool("dyld.ida.enable-gui"))
-			if err != nil {
-				return err
+			if scriptFile == "" {
+				dscuScript, err := dscu.GenerateScript(defaultframeworks, !viper.GetBool("dyld.ida.enable-gui"))
+				if err != nil {
+					return err
+				}
+				tmp, err := os.Create(filepath.Join(folder, "dscu.py"))
+				if err != nil {
+					return err
+				}
+				objcScripts, err := dscu.ExpandScript()
+				if err != nil {
+					return err
+				}
+				if _, err := tmp.WriteString(objcScripts); err != nil {
+					return err
+				}
+				if _, err := tmp.WriteString(dscuScript); err != nil {
+					return err
+				}
+				if err := tmp.Close(); err != nil {
+					return err
+				}
+				scriptFile = tmp.Name()
+				defer os.Remove(scriptFile)
 			}
-			tmp, err := os.Create(filepath.Join(folder, "dscu.py"))
-			if err != nil {
-				return err
-			}
-			objcScripts, err := dscu.ExpandScript()
-			if err != nil {
-				return err
-			}
-			if _, err := tmp.WriteString(objcScripts); err != nil {
-				return err
-			}
-			if _, err := tmp.WriteString(dscuScript); err != nil {
-				return err
-			}
-			if err := tmp.Close(); err != nil {
-				return err
-			}
-			scriptFile = tmp.Name()
-			defer os.Remove(scriptFile)
+
+			env = append(env, fmt.Sprintf("IDA_DYLD_CACHE_MODULE=%s", img.Name))
+
+			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s.i64", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 		}
 
 		if len(logFile) > 0 {
@@ -224,8 +253,6 @@ var idaCmd = &cobra.Command{
 				}
 			}
 		}
-
-		dbFile := filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s.i64", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 
 		if viper.GetBool("dyld.ida.temp-db") { // clean up temp IDA database files
 			defer func() {
@@ -244,11 +271,6 @@ var idaCmd = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		_, magic, ok := strings.Cut(f.Headers[f.UUID].Magic.String(), " ")
-		if !ok {
-			return fmt.Errorf("failed to get arch from DSC magic %s", f.Headers[f.UUID].Magic.String())
-		}
-
 		cli, err := ida.NewClient(ctx, &ida.Config{
 			IdaPath:      viper.GetString("dyld.ida.ida-path"),
 			InputFile:    dscPath,
@@ -256,18 +278,15 @@ var idaCmd = &cobra.Command{
 			LogFile:      logFile,
 			Output:       dbFile,
 			EnableGUI:    viper.GetBool("dyld.ida.enable-gui"),
-			TempDatabase: viper.GetBool("dyld.ida.temp-db"), // I think this is actually useless
+			TempDatabase: viper.GetBool("dyld.ida.temp-db"), // TODO: I think this is actually useless
 			DeleteDB:     viper.GetBool("dyld.ida.delete-db"),
 			CompressDB:   true,
-			FileType:     fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.TrimSpace(magic)),
-			Env: []string{
-				fmt.Sprintf("IDA_DYLD_CACHE_MODULE=%s", img.Name),
-				fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")),
-			},
-			Options:    []string{"objc:+l"},
-			ScriptFile: scriptFile,
-			ScriptArgs: viper.GetStringSlice("dyld.ida.script-args"),
-			ExtraArgs:  viper.GetStringSlice("dyld.ida.extra-args"),
+			FileType:     fileType,
+			Env:          env,
+			Options:      []string{"objc:+l"},
+			ScriptFile:   scriptFile,
+			ScriptArgs:   viper.GetStringSlice("dyld.ida.script-args"),
+			ExtraArgs:    viper.GetStringSlice("dyld.ida.extra-args"),
 			// RemoteDebugger: ida.RemoteDebugger{
 			// 	Host: viper.GetString("remote-debugger-host"),
 			// 	Port: viper.GetInt("remote-debugger-port"),
