@@ -591,7 +591,7 @@ func (o *Ota) filterOTADevices(otas []types.Asset) []types.Asset { // FIXME: thi
 	var filteredOtas []types.Asset
 
 	if o.Config.Platform == "macos" {
-		if len(o.Config.Build) > 0 && !o.Config.RSR {
+		if o.Config.Build != "0" && !o.Config.RSR {
 			for _, ota := range otas {
 				if strings.EqualFold(ota.Build, o.Config.Build) {
 					filteredOtas = append(filteredOtas, ota)
