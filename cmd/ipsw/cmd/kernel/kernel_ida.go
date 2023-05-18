@@ -199,6 +199,7 @@ var kernelIdaCmd = &cobra.Command{
 			CompressDB:   true,
 			FileType:     fileType,
 			AutoAnalyze:  autoAnalyze,
+			BatchMode:    true,
 			Env:          env,
 			// Options:      []string{"objc:+l"},
 			ScriptFile: scriptFile,
