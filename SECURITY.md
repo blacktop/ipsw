@@ -6,4 +6,6 @@ Only the last stable version at any given point.
 
 ## Reporting a Vulnerability
 
-Vulnerabilies can be disclosed via twitter to [@blacktop\_\_](https://twitter.com/blacktop__).
+Vulnerabilies can be disclosed in private using GitHub advisories: https://github.com/blacktop/ipsw/security
+
+Thanks!
