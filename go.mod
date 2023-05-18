@@ -22,7 +22,7 @@ require (
 	github.com/dominikbraun/graph v0.20.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
-	github.com/frida/frida-go v0.6.2
+	github.com/frida/frida-go v0.6.3
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20230307103607-6e717729cb4f
 	github.com/gin-gonic/gin v1.9.0
