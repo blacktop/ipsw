@@ -19,24 +19,29 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
-package dyld
+package kernel
 
 import (
 	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/commands/ida"
-	"github.com/blacktop/ipsw/internal/commands/ida/dscu"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/caarlos0/ctrlc"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+const (
+// "Apple XNU kernelcache for ARM64e (kernel + all kexts)"
+// "Apple XNU kernelcache for ARM64e (kernel only)"
+// "Apple XNU kernelcache for ARM64e (single kext)"
+// "Apple XNU kernelcache for ARM64e (normal mach-o file)"
 )
 
 func removeExtension(filename string) string {
@@ -44,26 +49,24 @@ func removeExtension(filename string) string {
 }
 
 func init() {
-	DyldCmd.AddCommand(idaCmd)
+	KernelcacheCmd.AddCommand(idaCmd)
 
 	idaCmd.Flags().StringP("ida-path", "p", "", "IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)")
 	idaCmd.Flags().StringP("script", "s", "", "IDA Pro script to run")
 	idaCmd.Flags().StringSliceP("script-args", "r", []string{}, "IDA Pro script arguments")
-	idaCmd.Flags().BoolP("all", "a", false, "Analyze whole cache (this will take a while)")
-	idaCmd.Flags().BoolP("dependancies", "d", false, "Analyze module dependencies")
+	idaCmd.Flags().BoolP("all", "a", false, "Analyze kernel+kexts (this will take a while)")
 	idaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
 	idaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
 	idaCmd.Flags().BoolP("temp-db", "t", false, "Do not create a database file (requires --enable-gui)")
 	idaCmd.Flags().StringP("log-file", "l", "", "IDA log file")
 	idaCmd.Flags().StringSliceP("extra-args", "e", []string{}, "IDA Pro CLI extra arguments")
 	idaCmd.Flags().StringP("output", "o", "", "Output folder")
-	idaCmd.Flags().String("slide", "", "dyld_shared_cache image ASLR slide value (hexadecimal)")
+	// idaCmd.Flags().String("slide", "", "kernelcache ASLR slide value (hexadecimal)")
 	idaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
 	idaCmd.Flags().String("docker-image", "blacktop/idapro:8.2-pro", "IDA Pro docker image")
 	viper.BindPFlag("dyld.ida.ida-path", idaCmd.Flags().Lookup("ida-path"))
 	viper.BindPFlag("dyld.ida.script", idaCmd.Flags().Lookup("script"))
 	viper.BindPFlag("dyld.ida.script-args", idaCmd.Flags().Lookup("script-args"))
-	viper.BindPFlag("dyld.ida.dependancies", idaCmd.Flags().Lookup("dependancies"))
 	viper.BindPFlag("dyld.ida.all", idaCmd.Flags().Lookup("all"))
 	viper.BindPFlag("dyld.ida.enable-gui", idaCmd.Flags().Lookup("enable-gui"))
 	viper.BindPFlag("dyld.ida.delete-db", idaCmd.Flags().Lookup("delete-db"))
@@ -71,18 +74,18 @@ func init() {
 	viper.BindPFlag("dyld.ida.log-file", idaCmd.Flags().Lookup("log-file"))
 	viper.BindPFlag("dyld.ida.extra-args", idaCmd.Flags().Lookup("extra-args"))
 	viper.BindPFlag("dyld.ida.output", idaCmd.Flags().Lookup("output"))
-	viper.BindPFlag("dyld.ida.slide", idaCmd.Flags().Lookup("slide"))
+	// viper.BindPFlag("dyld.ida.slide", idaCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.ida.docker", idaCmd.Flags().Lookup("docker"))
 	viper.BindPFlag("dyld.ida.docker-image", idaCmd.Flags().Lookup("docker-image"))
 }
 
 // idaCmd represents the ida command
 var idaCmd = &cobra.Command{
-	Use:           "ida <DSC> <DYLIB> [DYLIBS...]",
-	Short:         "Analyze DSC in IDA Pro",
+	Use:           "ida <KC> <KEXT> [KEXTS...]",
+	Short:         "🚧 Analyze kernelcache in IDA Pro",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(2),
+	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var fileType string
@@ -108,34 +111,16 @@ var idaCmd = &cobra.Command{
 			log.Warnf("will only load dependancies for first dylib (%s)", args[1])
 		}
 
-		if viper.GetString("dyld.ida.slide") != "" {
-			env = append(env, fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")))
-		}
+		// if viper.GetString("dyld.ida.slide") != "" { TODO: how to set kc slide?
+		// 	env = append(env, fmt.Sprintf("IDA_DYLD_SHARED_CACHE_SLIDE=%s", viper.GetString("dyld.ida.slide")))
+		// }
 
-		dscPath, err := filepath.Abs(filepath.Clean(args[0]))
+		kcPath, err := filepath.Abs(filepath.Clean(args[0]))
 		if err != nil {
-			return errors.Wrapf(err, "failed to get absolute path for %s", dscPath)
+			return errors.Wrapf(err, "failed to get absolute path for %s", kcPath)
 		}
 
-		fileInfo, err := os.Lstat(dscPath)
-		if err != nil {
-			return fmt.Errorf("file %s does not exist", dscPath)
-		}
-
-		// Check if file is a symlink
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			symlinkPath, err := os.Readlink(dscPath)
-			if err != nil {
-				return errors.Wrapf(err, "failed to read symlink %s", dscPath)
-			}
-			// TODO: this seems like it would break
-			linkParent := filepath.Dir(dscPath)
-			linkRoot := filepath.Dir(linkParent)
-
-			dscPath = filepath.Join(linkRoot, symlinkPath)
-		}
-
-		folder := filepath.Dir(dscPath) // default to folder of shared cache
+		folder := filepath.Dir(kcPath) // default to folder of kernelcache
 		if len(output) > 0 {
 			absout, err := filepath.Abs(output)
 			if err != nil {
@@ -161,90 +146,19 @@ var idaCmd = &cobra.Command{
 			}
 		}
 
-		f, err := dyld.Open(dscPath)
+		m, err := macho.Open(kcPath)
 		if err != nil {
-			return fmt.Errorf("failed to open dyld shared cache %s: %w", dscPath, err)
+			return fmt.Errorf("failed to open kernelcache %s: %w", kcPath, err)
 		}
-		defer f.Close()
-
-		_, magic, ok := strings.Cut(f.Headers[f.UUID].Magic.String(), " ")
-		if !ok {
-			return fmt.Errorf("failed to get arch from DSC magic %s", f.Headers[f.UUID].Magic.String())
-		}
+		defer m.Close()
 
 		if viper.GetBool("dyld.ida.all") { // analyze all dylibs
 			autoAnalyze = true
-			fileType = fmt.Sprintf("Apple DYLD cache for %s (complete image)", strings.TrimSpace(magic))
-			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s.i64", f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
+			device := filepath.Ext(kcPath)[1:]
+			fileType = fmt.Sprintf("Apple XNU kernelcache for %s (kernel + all kexts)", m.SubCPU.String(m.CPU))
+			dbFile = filepath.Join(folder, fmt.Sprintf("KC_%s_%s.i64", device, m.SubCPU.String(m.CPU)))
 		} else { // analyze single or more dylibs
-			fileType = fmt.Sprintf("Apple DYLD cache for %s (single module)", strings.TrimSpace(magic))
-
-			var defaultframeworks = []string{
-				"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
-				"/System/Library/Frameworks/Foundation.framework/Foundation",
-				"/usr/lib/libobjc.A.dylib",
-				"/usr/lib/system/libdyld.dylib",
-				"/usr/lib/system/libsystem_blocks.dylib",
-				"/usr/lib/system/libsystem_c.dylib",
-				"/usr/lib/system/libsystem_darwin.dylib",
-				"/usr/lib/system/libsystem_kernel.dylib",
-				"/usr/lib/system/libsystem_platform.dylib",
-				"/usr/lib/system/libsystem_trace.dylib",
-				"/usr/lib/system/libunwind.dylib",
-			}
-
-			if len(args) > 2 { // add any extra args to default frameworks
-				for _, additional := range args[2:] {
-					img, err := f.Image(additional)
-					if err != nil {
-						return fmt.Errorf("failed to get image %s: %w", additional, err)
-					}
-					defaultframeworks = append(defaultframeworks, img.Name)
-				}
-			}
-
-			img, err := f.Image(args[1])
-			if err != nil {
-				return fmt.Errorf("failed to get image %s: %w", args[1], err)
-			}
-
-			if viper.GetBool("dyld.ida.dependancies") {
-				m, err := img.GetMacho()
-				if err != nil {
-					return fmt.Errorf("failed to get macho for %s: %w", img.Name, err)
-				}
-				defaultframeworks = append(defaultframeworks, m.ImportedLibraries()...)
-			}
-
-			if scriptFile == "" {
-				dscuScript, err := dscu.GenerateScript(defaultframeworks, !viper.GetBool("dyld.ida.enable-gui"))
-				if err != nil {
-					return err
-				}
-				tmp, err := os.Create(filepath.Join(folder, "dscu.py"))
-				if err != nil {
-					return err
-				}
-				objcScripts, err := dscu.ExpandScript()
-				if err != nil {
-					return err
-				}
-				if _, err := tmp.WriteString(objcScripts); err != nil {
-					return err
-				}
-				if _, err := tmp.WriteString(dscuScript); err != nil {
-					return err
-				}
-				if err := tmp.Close(); err != nil {
-					return err
-				}
-				scriptFile = tmp.Name()
-				defer os.Remove(scriptFile)
-			}
-
-			env = append(env, fmt.Sprintf("IDA_DYLD_CACHE_MODULE=%s", img.Name))
-
-			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s_%s.i64", args[1], f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
+			return fmt.Errorf("single kext support not implemented yet (please use --all)")
 		}
 
 		if len(logFile) > 0 {
@@ -275,7 +189,7 @@ var idaCmd = &cobra.Command{
 
 		cli, err := ida.NewClient(ctx, &ida.Config{
 			IdaPath:      viper.GetString("dyld.ida.ida-path"),
-			InputFile:    dscPath,
+			InputFile:    kcPath,
 			Frameworks:   defaultframeworks,
 			LogFile:      logFile,
 			Output:       dbFile,
@@ -286,10 +200,10 @@ var idaCmd = &cobra.Command{
 			FileType:     fileType,
 			AutoAnalyze:  autoAnalyze,
 			Env:          env,
-			Options:      []string{"objc:+l"},
-			ScriptFile:   scriptFile,
-			ScriptArgs:   viper.GetStringSlice("dyld.ida.script-args"),
-			ExtraArgs:    viper.GetStringSlice("dyld.ida.extra-args"),
+			// Options:      []string{"objc:+l"},
+			ScriptFile: scriptFile,
+			ScriptArgs: viper.GetStringSlice("dyld.ida.script-args"),
+			ExtraArgs:  viper.GetStringSlice("dyld.ida.extra-args"),
 			// RemoteDebugger: ida.RemoteDebugger{
 			// 	Host: viper.GetString("remote-debugger-host"),
 			// 	Port: viper.GetInt("remote-debugger-port"),
@@ -302,7 +216,7 @@ var idaCmd = &cobra.Command{
 			return err
 		}
 
-		f.Close() // close the dyld_shared_cache file so IDA can open it
+		m.Close() // close the kernelcache file so IDA can open it
 
 		if err := ctrlc.Default.Run(ctx, func() error {
 			if viper.GetBool("dyld.ida.docker") {
