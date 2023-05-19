@@ -94,6 +94,8 @@ func (m MachTrap) String() string {
 			}
 		}
 		funcStr = fmt.Sprintf("%s(%s);", colorName(m.Name), strings.Join(args, ", "))
+	} else {
+		return fmt.Sprintf("%s: %s", colorAddr("%#x", m.Function), colorBold(m.Name))
 	}
 	return fmt.Sprintf("%s: %s\t%s=%#x\t%s=%d\t%s=%d\t%s",
 		colorAddr("%#x", m.Function),
