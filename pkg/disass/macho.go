@@ -213,6 +213,16 @@ func (d MachoDisass) FindSymbol(addr uint64) (string, bool) {
 	return "", false
 }
 
+// Contains returns true if Triage immediates contains a given address and will return the instruction address
+func (d MachoDisass) Contains(address uint64) (bool, uint64) {
+	for loc, addr := range d.tr.Addresses {
+		if addr == address {
+			return true, loc
+		}
+	}
+	return false, 0
+}
+
 func (d MachoDisass) GetCString(addr uint64) (string, error) {
 	return d.f.GetCString(addr)
 }
