@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
 	"github.com/apex/log"
@@ -52,7 +53,12 @@ var kernelMachCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+
 		machoPath := filepath.Clean(args[0])
+
+		if strings.Contains(machoPath, "development") {
+			log.Warn("development kernelcache detected: 'MACH_ASSERT=1' so 'mach_trap_t' has an extra 'const char *mach_trap_name' field which will throw off the parsing of the mach_traps table")
+		}
 
 		m, err := macho.Open(machoPath)
 		if err != nil {
