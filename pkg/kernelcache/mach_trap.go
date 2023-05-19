@@ -10,6 +10,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/pkg/disass"
@@ -17,23 +18,25 @@ import (
 )
 
 const (
-	numMachTraps        = 128
-	kernInvalidFunc     = "kern_invalid"
-	kernelInvalidString = "kern_invalid mach trap"
+	MACH_TRAP_TABLE_COUNT = 128
+	unknownTrap           = "<unknown>"
+	kernInvalidFunc       = "kern_invalid"
+	kernelInvalidString   = "kern_invalid mach trap"
 )
 
 //go:embed data/syscalls.gz
 var syscallsData []byte
 
 type machTrapT struct {
-	Function    uint64
-	ArgMunge32  uint64
 	ArgCount    uint8
 	U32Words    uint8
 	ReturnsPort uint8
 	Padding     [5]uint8
+	Function    uint64
+	ArgMunge32  uint64
 }
 
+// MachTrap is the mach_trap object
 type MachTrap struct {
 	Number int
 	Name   string
@@ -41,22 +44,28 @@ type MachTrap struct {
 	machTrapT
 }
 
+// MachSyscall is the mach tral object
 type MachSyscall struct {
 	Arguments []string `json:"arguments"`
 	Name      string   `json:"name"`
 	Number    int      `json:"number"`
 }
+
+// BsdSyscall is the bsd syscall object
 type BsdSyscall struct {
 	Arguments []string `json:"arguments"`
 	Name      string   `json:"name"`
 	Number    int      `json:"number"`
 	Old       bool     `json:"old,omitempty"`
 }
+
+// SyscallsData is the struct that holds the syscall data
 type SyscallsData struct {
 	MachSyscalls []MachSyscall `json:"mach_syscalls"`
 	BsdSyscalls  []BsdSyscall  `json:"bsd_syscalls"`
 }
 
+// GetMachSyscallByNumber returns the mach trap for the given number
 func (s SyscallsData) GetMachSyscallByNumber(num int) (MachSyscall, error) {
 	for _, sc := range s.MachSyscalls {
 		if sc.Number == num {
@@ -67,13 +76,14 @@ func (s SyscallsData) GetMachSyscallByNumber(num int) (MachSyscall, error) {
 }
 
 var colorAddr = color.New(color.Faint).SprintfFunc()
+var colorBold = color.New(color.Bold).SprintFunc()
 var colorField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
 var colorName = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 var colorType = color.New(color.Bold, color.FgHiYellow).SprintFunc()
 
 func (m MachTrap) String() string {
 	var funcStr string
-	if m.Name != kernInvalidFunc {
+	if m.Name != kernInvalidFunc && m.Name != unknownTrap {
 		var args []string
 		for _, arg := range m.Args {
 			parts := strings.Split(arg, " ")
@@ -87,10 +97,10 @@ func (m MachTrap) String() string {
 	}
 	return fmt.Sprintf("%s: %s\t%s=%#x\t%s=%d\t%s=%d\t%s",
 		colorAddr("%#x", m.Function),
-		m.Name,
+		colorBold(m.Name),
 		colorField("munge"), m.ArgMunge32,
-		colorField("args"), m.ArgCount,
-		colorField("return_port"), m.ReturnsPort,
+		colorField("nargs"), m.ArgCount,
+		colorField("ret_port"), m.ReturnsPort,
 		funcStr)
 }
 
@@ -154,85 +164,58 @@ func getKernelInvalidAddress(m *macho.File) (uint64, error) {
 	return 0, fmt.Errorf("failed to find kern_invalid mach trap address")
 }
 
-func patternMatch(m *macho.File) ([]MachTrap, error) {
-	syscalls, err := getSyscallsData()
-	if err != nil {
-		return nil, err
-	}
-
-	var mtraps []MachTrap
-
+func patternMatch(m *macho.File) (uint64, error) {
 	if sec := m.Section("__DATA_CONST", "__const"); sec != nil {
 		dat, err := sec.Data()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
 
 		r := bytes.NewReader(dat)
 
 		var zero uint64
-		var nonzero uint64
+		var kernelInvalid uint64
 		var match uint64
 		for {
-			if err := binary.Read(r, binary.LittleEndian, &nonzero); err != nil {
-				return nil, err
+			if err := binary.Read(r, binary.LittleEndian, &zero); err != nil {
+				return 0, err
 			}
-			if nonzero == 0 {
+			if zero != 0 {
+				continue
+			}
+			if err := binary.Read(r, binary.LittleEndian, &kernelInvalid); err != nil {
+				return 0, err
+			}
+			if kernelInvalid == 0 {
 				continue
 			}
 			if err := binary.Read(r, binary.LittleEndian, &zero); err != nil {
-				return nil, err
+				return 0, err
 			}
 			if zero != 0 {
 				continue
 			}
 			if err := binary.Read(r, binary.LittleEndian, &zero); err != nil {
-				return nil, err
+				return 0, err
 			}
 			if zero != 0 {
 				continue
 			}
 			if err := binary.Read(r, binary.LittleEndian, &match); err != nil {
-				return nil, err
+				return 0, err
 			}
-			if nonzero == match {
-				r.Seek(-8, io.SeekCurrent) // rewind
+			if match == kernelInvalid {
 				break
 			}
 		}
 
-		mtrapts := make([]machTrapT, numMachTraps)
-		if err := binary.Read(r, binary.LittleEndian, mtrapts); err != nil {
-			return nil, err
-		}
-
-		for i := 0; i < len(mtrapts); i++ {
-			mtrapts[i].Function = m.SlidePointer(mtrapts[i].Function)
-			if mtrapts[i].Function == 0 {
-				break
-			}
-			mtrapts[i].ArgMunge32 = m.SlidePointer(mtrapts[i].ArgMunge32)
-			mtrap, err := syscalls.GetMachSyscallByNumber(i + 1)
-			if err != nil {
-				mtrap = MachSyscall{
-					Number: i + 1,
-					Name:   kernInvalidFunc,
-				}
-			}
-			mtraps = append(mtraps, MachTrap{
-				Number:    mtrap.Number,
-				Name:      mtrap.Name,
-				Args:      mtrap.Arguments,
-				machTrapT: mtrapts[i],
-			})
-		}
-
-		return mtraps, nil
+		return m.SlidePointer(kernelInvalid), nil
 	}
 
-	return nil, fmt.Errorf("failed to find __DATA_CONST __const section in kernel")
+	return 0, fmt.Errorf("failed to find __DATA_CONST __const section in kernel")
 }
 
+// GetMachTrapTable returns the mach trap table for the given kernel.
 func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 	syscalls, err := getSyscallsData()
 	if err != nil {
@@ -249,26 +232,13 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 		}
 	}
 
-	mtraps, err = patternMatch(m) // fast way
-	if err == nil {
-		return mtraps, nil
-	}
-
-	ptr, err := m.GetPointerAtAddress(0xFFFFFFF0078E6138)
+	kernelInvalidAddr, err := patternMatch(m) // fast way
 	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("ptr: %#x\n", ptr)
-
-	ptr, err = m.GetPointerAtAddress(0xFFFFFFF0078E6140)
-	if err != nil {
-		return nil, err
-	}
-	fmt.Printf("ptr: %#x\n", ptr)
-
-	kernelInvalidAddr, err := getKernelInvalidAddress(m)
-	if err != nil {
-		return nil, err
+		log.Warn("failed to find mach trap table using pattern match, falling back to slower emulation method")
+		kernelInvalidAddr, err = getKernelInvalidAddress(m)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	kernelInvalidBytePattern := make([]byte, 8)
@@ -281,7 +251,7 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 		}
 
 		r := bytes.NewReader(dat)
-		off := int64(0)
+
 		var match uint64
 		for {
 			if err := binary.Read(r, binary.LittleEndian, &match); err != nil {
@@ -290,12 +260,15 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 			if m.SlidePointer(match) == kernelInvalidAddr {
 				break
 			}
-			off += 8
 		}
 
-		r.Seek(off, io.SeekStart)
+		r.Seek(-8*2, io.SeekCurrent) // rewind
 
-		mtrapts := make([]machTrapT, numMachTraps)
+		curr, _ := r.Seek(0, io.SeekCurrent)
+
+		log.WithField("mach_trap_table", fmt.Sprintf("%#x", uint64(curr)+sec.Addr)).Infof("Found")
+
+		mtrapts := make([]machTrapT, MACH_TRAP_TABLE_COUNT)
 		if err := binary.Read(r, binary.LittleEndian, mtrapts); err != nil {
 			return nil, err
 		}
@@ -303,11 +276,18 @@ func GetMachTrapTable(m *macho.File) ([]MachTrap, error) {
 		for i := 0; i < len(mtrapts); i++ {
 			mtrapts[i].Function = m.SlidePointer(mtrapts[i].Function)
 			mtrapts[i].ArgMunge32 = m.SlidePointer(mtrapts[i].ArgMunge32)
-			mtrap, err := syscalls.GetMachSyscallByNumber(i + 1)
+			mtrap, err := syscalls.GetMachSyscallByNumber(i)
 			if err != nil {
-				mtrap = MachSyscall{
-					Number: i + 1,
-					Name:   kernInvalidFunc,
+				if mtrapts[i].Function == kernelInvalidAddr {
+					mtrap = MachSyscall{
+						Number: i,
+						Name:   kernInvalidFunc,
+					}
+				} else {
+					mtrap = MachSyscall{
+						Number: i,
+						Name:   unknownTrap,
+					}
 				}
 			}
 			mtraps = append(mtraps, MachTrap{

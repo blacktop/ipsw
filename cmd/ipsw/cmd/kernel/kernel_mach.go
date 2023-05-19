@@ -36,16 +36,7 @@ import (
 
 func init() {
 	KernelcacheCmd.AddCommand(kernelMachCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// kernelMachCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// kernelMachCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	kernelMachCmd.MarkZshCompPositionalArgumentFile(1, "kernelcache*")
 }
 
 // kernelMachCmd represents the mach command
@@ -76,7 +67,7 @@ var kernelMachCmd = &cobra.Command{
 
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
 		for idx, mtrap := range machTraps {
-			fmt.Fprintf(w, "%d\t%s\n", idx+1, mtrap)
+			fmt.Fprintf(w, "%d\t%s\n", idx, mtrap)
 		}
 		w.Flush()
 
