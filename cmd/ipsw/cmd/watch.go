@@ -27,6 +27,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -63,11 +64,13 @@ func init() {
 	watchCmd.Flags().IntP("days", "d", 1, "Days back to search for commits")
 	watchCmd.Flags().StringP("api", "a", "", "Github API Token")
 	watchCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
+	watchCmd.Flags().DurationP("timeout", "t", 0, "Timeout for watch attempts (default: 0s = no timeout/run once)")
 	viper.BindPFlag("watch.file", watchCmd.Flags().Lookup("file"))
 	viper.BindPFlag("watch.pattern", watchCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("watch.days", watchCmd.Flags().Lookup("days"))
 	viper.BindPFlag("watch.api", watchCmd.Flags().Lookup("api"))
 	viper.BindPFlag("watch.json", watchCmd.Flags().Lookup("json"))
+	viper.BindPFlag("watch.timeout", watchCmd.Flags().Lookup("timeout"))
 }
 
 // watchCmd represents the watch command
@@ -101,41 +104,71 @@ var watchCmd = &cobra.Command{
 			return fmt.Errorf("invalid repo: %s (should be in the form 'org/repo')", args[0])
 		}
 
-		commits, err := download.GetGithubCommits(
-			parts[0], // org
-			parts[1], // repo
-			viper.GetString("watch.file"),
-			viper.GetString("watch.pattern"),
-			viper.GetInt("watch.days"),
-			"",
-			false,
-			apiToken)
-		if err != nil {
-			return err
+		seenCommitOIDs := make(map[string]bool) // TODO: this can grow unbounded, need to limit it or switch to a LRU cache
+
+		shouldStop := false
+
+		if time.Duration(viper.GetDuration("watch.timeout")) == 0 {
+			shouldStop = true
 		}
 
-		if asJSON {
-			json.NewEncoder(os.Stdout).Encode(commits)
-		} else {
-			for idx, commit := range commits {
-				re := regexp.MustCompile(viper.GetString("watch.pattern"))
-				fmt.Println(highlightHeader(re, string(commit.MsgHeadline)))
-				fmt.Printf("\n%s\n\n", colorSeparator(
-					fmt.Sprintf("commit: %s (author: %s, date: %s)",
-						commit.OID,
-						commit.Author.Name,
-						commit.Author.Date.Format("02Jan2006 15:04:05")),
-				))
-				body := re.ReplaceAllStringFunc(string(commit.MsgBody), func(s string) string {
-					return colorHighlight(s)
-				})
-				fmt.Println(body)
-				if idx < len(commits)-1 {
-					println()
-					fmt.Println(colorSeparator("---"))
-					println()
+		for {
+			commits, err := download.GetGithubCommits(
+				parts[0], // org
+				parts[1], // repo
+				viper.GetString("watch.file"),
+				viper.GetString("watch.pattern"),
+				viper.GetInt("watch.days"),
+				"",
+				false,
+				apiToken)
+			if err != nil {
+				return err
+			}
+
+			if asJSON {
+				for _, commit := range commits {
+					if _, ok := seenCommitOIDs[string(commit.OID)]; !ok {
+						seenCommitOIDs[string(commit.OID)] = true
+					} else {
+						continue
+					}
+					json.NewEncoder(os.Stdout).Encode(commit)
+				}
+			} else {
+				for idx, commit := range commits {
+					// check if we've seen this commit before and skip if we have
+					if _, ok := seenCommitOIDs[string(commit.OID)]; !ok {
+						seenCommitOIDs[string(commit.OID)] = true
+					} else {
+						continue
+					}
+					re := regexp.MustCompile(viper.GetString("watch.pattern"))
+					fmt.Println(highlightHeader(re, string(commit.MsgHeadline)))
+					fmt.Printf("\n%s\n\n", colorSeparator(
+						fmt.Sprintf("commit: %s (author: %s, date: %s)",
+							commit.OID,
+							commit.Author.Name,
+							commit.Author.Date.Format("02Jan2006 15:04:05")),
+					))
+					body := re.ReplaceAllStringFunc(string(commit.MsgBody), func(s string) string {
+						return colorHighlight(s)
+					})
+					fmt.Println(body)
+					if idx < len(commits)-1 {
+						println()
+						fmt.Println(colorSeparator("---"))
+						println()
+					}
 				}
 			}
+
+			if shouldStop { // if timeout is 0 then just run once
+				break
+			}
+
+			// sleep for timeout
+			time.Sleep(time.Duration(viper.GetDuration("watch.timeout")))
 		}
 
 		return nil
