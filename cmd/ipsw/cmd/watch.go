@@ -59,12 +59,14 @@ func highlightHeader(re *regexp.Regexp, input string) string {
 func init() {
 	rootCmd.AddCommand(watchCmd)
 
+	watchCmd.Flags().StringP("branch", "b", "main", "Repo branch to watch")
 	watchCmd.Flags().StringP("file", "f", "", "Commit file path to watch")
 	watchCmd.Flags().StringP("pattern", "p", "", "Commit message pattern to match")
 	watchCmd.Flags().IntP("days", "d", 1, "Days back to search for commits")
 	watchCmd.Flags().StringP("api", "a", "", "Github API Token")
 	watchCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	watchCmd.Flags().DurationP("timeout", "t", 0, "Timeout for watch attempts (default: 0s = no timeout/run once)")
+	viper.BindPFlag("watch.branch", watchCmd.Flags().Lookup("branch"))
 	viper.BindPFlag("watch.file", watchCmd.Flags().Lookup("file"))
 	viper.BindPFlag("watch.pattern", watchCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("watch.days", watchCmd.Flags().Lookup("days"))
@@ -116,6 +118,7 @@ var watchCmd = &cobra.Command{
 			commits, err := download.GetGithubCommits(
 				parts[0], // org
 				parts[1], // repo
+				viper.GetString("watch.branch"),
 				viper.GetString("watch.file"),
 				viper.GetString("watch.pattern"),
 				viper.GetInt("watch.days"),

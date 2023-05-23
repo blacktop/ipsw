@@ -557,7 +557,7 @@ type Repo struct {
 }
 
 // GetGithubCommits returns a list of commits for a given pattern
-func GetGithubCommits(org, repo, file, pattern string, days int, proxy string, insecure bool, apikey string) ([]Commit, error) {
+func GetGithubCommits(org, repo, branch, file, pattern string, days int, proxy string, insecure bool, apikey string) ([]Commit, error) {
 	var commits []Commit
 
 	re, err := regexp.Compile(pattern)
@@ -578,7 +578,7 @@ func GetGithubCommits(org, repo, file, pattern string, days int, proxy string, i
 
 	var q struct {
 		Repository struct {
-			DefaultBranchRef struct {
+			Ref struct {
 				Target struct {
 					Commit struct {
 						History struct {
@@ -592,7 +592,7 @@ func GetGithubCommits(org, repo, file, pattern string, days int, proxy string, i
 						} `graphql:"history(path: $filePath, since: $sinceDate, after: $endCursor)"`
 					} `graphql:"... on Commit"`
 				}
-			}
+			} `graphql:"ref(qualifiedName: $repoRef)"`
 		} `graphql:"repository(owner: $repoOrg, name: $repoName)"`
 	}
 
@@ -605,6 +605,7 @@ func GetGithubCommits(org, repo, file, pattern string, days int, proxy string, i
 	variables := map[string]interface{}{
 		"repoOrg":   githubv4.String(org),
 		"repoName":  githubv4.String(repo),
+		"repoRef":   githubv4.String(branch), // "main" etc
 		"filePath":  filePath,
 		"sinceDate": githubv4.GitTimestamp{Time: time.Now().AddDate(0, 0, -days)},
 		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
@@ -615,17 +616,17 @@ func GetGithubCommits(org, repo, file, pattern string, days int, proxy string, i
 			return nil, err
 		}
 
-		for _, commit := range q.Repository.DefaultBranchRef.Target.Commit.History.Nodes {
+		for _, commit := range q.Repository.Ref.Target.Commit.History.Nodes {
 			if re.MatchString(string(commit.Message)) {
 				commits = append(commits, commit.Commit)
 			}
 		}
 
-		if !q.Repository.DefaultBranchRef.Target.Commit.History.PageInfo.HasNextPage {
+		if !q.Repository.Ref.Target.Commit.History.PageInfo.HasNextPage {
 			break
 		}
 
-		variables["endCursor"] = githubv4.NewString(q.Repository.DefaultBranchRef.Target.Commit.History.PageInfo.EndCursor)
+		variables["endCursor"] = githubv4.NewString(q.Repository.Ref.Target.Commit.History.PageInfo.EndCursor)
 	}
 
 	return commits, nil
