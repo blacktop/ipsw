@@ -25,12 +25,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var colorHeader = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorHighlight = color.New(color.Bold, color.FgHiYellow).SprintfFunc()
+var colorSeparator = color.New(color.Faint).SprintFunc()
 
 func init() {
 	rootCmd.AddCommand(watchCmd)
@@ -89,10 +95,17 @@ var watchCmd = &cobra.Command{
 			json.NewEncoder(os.Stdout).Encode(commits)
 		} else {
 			for _, commit := range commits {
-				fmt.Println(commit.Headline)
-				fmt.Println("---")
-				fmt.Println(commit.Body)
+				fmt.Println(colorHeader(commit.Headline))
 				println()
+				println(colorSeparator("commit: " + commit.OID))
+				println()
+				re := regexp.MustCompile(viper.GetString("watch.pattern"))
+				body := re.ReplaceAllStringFunc(string(commit.Body), func(s string) string {
+					return colorHighlight(s)
+				})
+				fmt.Println(body)
+				println()
+				fmt.Println(colorSeparator("---"))
 				println()
 			}
 		}
