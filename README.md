@@ -62,6 +62,7 @@ Usage:
 Available Commands:
   debugserver     Prep device for remote debugging
   device-list     List all iOS devices
+  diff            Diff IPSWs
   download        Download Apple Firmware files (and more)
   dtree           Parse DeviceTree
   dyld            Parse dyld_shared_cache
@@ -77,16 +78,16 @@ Available Commands:
   mdevs           List all MobileDevices in IPSW
   mount           Mount DMG from IPSW
   ota             Parse OTAs
-  pongo           PongoOS Terminal
   sepfw           Dump MachOs
   shsh            Get shsh blobs from device
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
   update          Download an ipsw update if one exists
   version         Print the version number of ipsw
+  watch           Watch Github Commits
 
 Flags:
       --color           colorize output
-      --config string   config file (default is $HOME/.ipsw/config.yaml)
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
   -h, --help            help for ipsw
   -V, --verbose         verbose output
 
