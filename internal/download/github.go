@@ -560,6 +560,11 @@ type Repo struct {
 func WebKitCommits(file, pattern string, days int, proxy string, insecure bool, apikey string) ([]Commit, error) {
 	var commits []Commit
 
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile regexp '%s': %v", pattern, err)
+	}
+
 	httpClient := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: apikey},
 	))
@@ -603,11 +608,8 @@ func WebKitCommits(file, pattern string, days int, proxy string, insecure bool, 
 		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
 	}
 
-	re := regexp.MustCompile(pattern)
-
 	for {
-		err := client.Query(context.Background(), &q, variables)
-		if err != nil {
+		if err := client.Query(context.Background(), &q, variables); err != nil {
 			return nil, err
 		}
 
