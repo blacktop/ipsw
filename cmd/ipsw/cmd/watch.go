@@ -35,7 +35,7 @@ import (
 )
 
 var colorHeader = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorHighlight = color.New(color.Bold, color.FgHiYellow).SprintfFunc()
+var colorHighlight = color.New(color.Bold, color.BgHiYellow).SprintfFunc()
 var colorSeparator = color.New(color.Faint).SprintFunc()
 
 func init() {
