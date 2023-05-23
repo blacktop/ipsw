@@ -556,8 +556,8 @@ type Repo struct {
 	} `graphql:"refs(refPrefix: \"refs/tags/\", last: 1)"`
 }
 
-// WebKitCommits returns a list of commits for a given pattern
-func WebKitCommits(file, pattern string, days int, proxy string, insecure bool, apikey string) ([]Commit, error) {
+// GetGithubCommits returns a list of commits for a given pattern
+func GetGithubCommits(org, repo, file, pattern string, days int, proxy string, insecure bool, apikey string) ([]Commit, error) {
 	var commits []Commit
 
 	re, err := regexp.Compile(pattern)
@@ -593,7 +593,7 @@ func WebKitCommits(file, pattern string, days int, proxy string, insecure bool, 
 					} `graphql:"... on Commit"`
 				}
 			}
-		} `graphql:"repository(owner: \"WebKit\", name: \"WebKit\")"`
+		} `graphql:"repository(owner: $repoOrg, name: $repoName)"`
 	}
 
 	var filePath any
@@ -603,6 +603,8 @@ func WebKitCommits(file, pattern string, days int, proxy string, insecure bool, 
 	}
 
 	variables := map[string]interface{}{
+		"repoOrg":   githubv4.String(org),
+		"repoName":  githubv4.String(repo),
 		"filePath":  filePath,
 		"sinceDate": githubv4.GitTimestamp{Time: time.Now().AddDate(0, 0, -days)},
 		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
