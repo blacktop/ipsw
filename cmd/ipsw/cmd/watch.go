@@ -119,14 +119,14 @@ var watchCmd = &cobra.Command{
 		} else {
 			for idx, commit := range commits {
 				re := regexp.MustCompile(viper.GetString("watch.pattern"))
-				fmt.Println(highlightHeader(re, string(commit.Headline)))
+				fmt.Println(highlightHeader(re, string(commit.MsgHeadline)))
 				fmt.Printf("\n%s\n\n", colorSeparator(
 					fmt.Sprintf("commit: %s (author: %s, date: %s)",
 						commit.OID,
 						commit.Author.Name,
 						commit.Author.Date.Format("02Jan2006 15:04:05")),
 				))
-				body := re.ReplaceAllStringFunc(string(commit.Body), func(s string) string {
+				body := re.ReplaceAllStringFunc(string(commit.MsgBody), func(s string) string {
 					return colorHighlight(s)
 				})
 				fmt.Println(body)

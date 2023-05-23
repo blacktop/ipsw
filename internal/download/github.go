@@ -527,9 +527,8 @@ type Commit struct {
 	ChangedFiles githubv4.Int         `graphql:"changedFilesIfAvailable" json:"changed_files"`
 	Additions    githubv4.Int         `json:"additions"`
 	Deletions    githubv4.Int         `json:"deletions"`
-	Headline     githubv4.String      `graphql:"messageHeadline" json:"message_headline"`
-	Message      githubv4.String      `json:"message"`
-	Body         githubv4.String      `graphql:"messageBody" json:"message_body"`
+	MsgHeadline  githubv4.String      `graphql:"messageHeadline" json:"message_headline"`
+	MsgBody      githubv4.String      `graphql:"messageBody" json:"message_body"`
 	Author       struct {
 		Name  githubv4.String       `json:"name,omitempty"`
 		Email githubv4.String       `json:"email,omitempty"`
