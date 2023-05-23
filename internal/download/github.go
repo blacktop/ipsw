@@ -528,6 +528,7 @@ type Commit struct {
 	Additions    githubv4.Int         `json:"additions"`
 	Deletions    githubv4.Int         `json:"deletions"`
 	MsgHeadline  githubv4.String      `graphql:"messageHeadline" json:"message_headline"`
+	Message      githubv4.String      `graphql:"message" json:"-"`
 	MsgBody      githubv4.String      `graphql:"messageBody" json:"message_body"`
 	Author       struct {
 		Name  githubv4.String       `json:"name,omitempty"`
