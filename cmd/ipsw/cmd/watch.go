@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
@@ -71,12 +72,11 @@ func init() {
 
 // watchCmd represents the watch command
 var watchCmd = &cobra.Command{
-	Use:           "watch",
-	Short:         "Watch WebKit Commits",
-	Args:          cobra.NoArgs,
+	Use:           "watch <ORG/REPO>",
+	Short:         "Watch Github Commits",
+	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if Verbose {
@@ -96,7 +96,14 @@ var watchCmd = &cobra.Command{
 			}
 		}
 
-		commits, err := download.WebKitCommits(
+		parts := strings.Split(args[0], "/")
+		if len(parts) != 2 {
+			return fmt.Errorf("invalid repo: %s (should be in the form 'org/repo')", args[0])
+		}
+
+		commits, err := download.GetGithubCommits(
+			parts[0], // org
+			parts[1], // repo
 			viper.GetString("watch.file"),
 			viper.GetString("watch.pattern"),
 			viper.GetInt("watch.days"),
@@ -110,19 +117,24 @@ var watchCmd = &cobra.Command{
 		if asJSON {
 			json.NewEncoder(os.Stdout).Encode(commits)
 		} else {
-			for _, commit := range commits {
+			for idx, commit := range commits {
 				re := regexp.MustCompile(viper.GetString("watch.pattern"))
 				fmt.Println(highlightHeader(re, string(commit.Headline)))
-				println()
-				println(colorSeparator("commit: " + commit.OID))
-				println()
+				fmt.Printf("\n%s\n\n", colorSeparator(
+					fmt.Sprintf("commit: %s (author: %s, date: %s)",
+						commit.OID,
+						commit.Author.Name,
+						commit.Author.Date.Format("02Jan2006 15:04:05")),
+				))
 				body := re.ReplaceAllStringFunc(string(commit.Body), func(s string) string {
 					return colorHighlight(s)
 				})
 				fmt.Println(body)
-				println()
-				fmt.Println(colorSeparator("---"))
-				println()
+				if idx < len(commits)-1 {
+					println()
+					fmt.Println(colorSeparator("---"))
+					println()
+				}
 			}
 		}
 
