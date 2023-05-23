@@ -101,8 +101,8 @@ github.com/blacktop/lzss v0.1.1/go.mod h1:eWPx0Tq21QndictvoAb20bFvvhDDbZ3mkcZ/mD
 github.com/blacktop/ranger v1.0.3 h1:uIWlR8chK6AtNNPZz67+cwibOe8T5XnYyQfkk04ueZA=
 github.com/blacktop/ranger v1.0.3/go.mod h1:2KXlAasHzrHMkXg1+/87hT5ISdQjxlcjbmZFZD69zas=
 github.com/bytedance/sonic v1.5.0/go.mod h1:ED5hyg4y6t3/9Ku1R6dU/4KyJ48DZ4jPhfY1O2AihPM=
-github.com/bytedance/sonic v1.8.9 h1:mXB6OoHaI9OrWugkvNxWiuHTy5RCrVfxg2Nn40sf0oc=
-github.com/bytedance/sonic v1.8.9/go.mod h1:i736AoUSYt75HyZLoJW9ERYxcy6eaN6h4BZXU064P/U=
+github.com/bytedance/sonic v1.8.10 h1:XFSQg4/rwpQnNWSybNDr8oz6QtQY9uRGfRKDVWVsvP8=
+github.com/bytedance/sonic v1.8.10/go.mod h1:i736AoUSYt75HyZLoJW9ERYxcy6eaN6h4BZXU064P/U=
 github.com/caarlos0/ctrlc v1.2.0 h1:AtbThhmbeYx1WW3WXdWrd94EHKi+0NPRGS4/4pzrjwk=
 github.com/caarlos0/ctrlc v1.2.0/go.mod h1:n3gDlSjsXZ7rbD9/RprIR040b7oaLfNStikPd4gFago=
 github.com/caarlos0/env/v8 v8.0.0 h1:POhxHhSpuxrLMIdvTGARuZqR4Jjm8AYmoi/JKlcScs0=
