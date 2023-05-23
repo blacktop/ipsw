@@ -38,6 +38,22 @@ var colorHeader = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 var colorHighlight = color.New(color.Bold, color.BgHiYellow).SprintfFunc()
 var colorSeparator = color.New(color.Faint).SprintFunc()
 
+func highlightHeader(re *regexp.Regexp, input string) string {
+	parts := re.FindAllStringIndex(input, -1)
+	if len(parts) == 0 {
+		return colorHeader(input)
+	}
+	highlighted := ""
+	lastIndex := 0
+	for _, part := range parts {
+		highlighted += colorHeader(input[lastIndex:part[0]])
+		highlighted += colorHighlight(input[part[0]:part[1]])
+		lastIndex = part[1]
+	}
+	highlighted += colorHeader(input[lastIndex:])
+	return highlighted
+}
+
 func init() {
 	rootCmd.AddCommand(watchCmd)
 
@@ -95,11 +111,11 @@ var watchCmd = &cobra.Command{
 			json.NewEncoder(os.Stdout).Encode(commits)
 		} else {
 			for _, commit := range commits {
-				fmt.Println(colorHeader(commit.Headline))
+				re := regexp.MustCompile(viper.GetString("watch.pattern"))
+				fmt.Println(highlightHeader(re, string(commit.Headline)))
 				println()
 				println(colorSeparator("commit: " + commit.OID))
 				println()
-				re := regexp.MustCompile(viper.GetString("watch.pattern"))
 				body := re.ReplaceAllStringFunc(string(commit.Body), func(s string) string {
 					return colorHighlight(s)
 				})
