@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -519,14 +520,23 @@ func GetPreprocessedWebKitTags(proxy string, insecure bool) ([]GithubTag, error)
 	return tags, nil
 }
 
+// Commit represents a GitHub GraphQL Commit
 type Commit struct {
-	OID        string `json:"oid"`
-	ZipballUrl string `json:"zipballUrl"`
-	TarballUrl string `json:"tarballUrl"`
-	Author     struct {
-		Name string    `json:"name,omitempty"`
-		Date time.Time `json:"date,omitempty"`
+	OID          githubv4.GitObjectID `json:"oid"`
+	URL          githubv4.URI         `graphql:"commitUrl" json:"url"`
+	ChangedFiles githubv4.Int         `graphql:"changedFilesIfAvailable" json:"changed_files"`
+	Additions    githubv4.Int         `json:"additions"`
+	Deletions    githubv4.Int         `json:"deletions"`
+	Headline     githubv4.String      `graphql:"messageHeadline" json:"message_headline"`
+	Message      githubv4.String      `json:"message"`
+	Body         githubv4.String      `graphql:"messageBody" json:"message_body"`
+	Author       struct {
+		Name  githubv4.String       `json:"name,omitempty"`
+		Email githubv4.String       `json:"email,omitempty"`
+		Date  githubv4.GitTimestamp `json:"date,omitempty"`
 	} `json:"author"`
+	ZipballURL string `json:"zipballUrl"`
+	TarballURL string `json:"tarballUrl"`
 }
 
 type Repo struct {
@@ -544,6 +554,77 @@ type Repo struct {
 			}
 		}
 	} `graphql:"refs(refPrefix: \"refs/tags/\", last: 1)"`
+}
+
+// WebKitCommits returns a list of commits for a given pattern
+func WebKitCommits(file, pattern string, days int, proxy string, insecure bool, apikey string) ([]Commit, error) {
+	var commits []Commit
+
+	httpClient := oauth2.NewClient(context.Background(), oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: apikey},
+	))
+
+	// httpClient.Transport = &http.Transport{
+	// 	Proxy:           GetProxy(proxy),
+	// 	TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+	// }
+
+	client := githubv4.NewClient(httpClient)
+
+	var q struct {
+		Repository struct {
+			DefaultBranchRef struct {
+				Target struct {
+					Commit struct {
+						History struct {
+							Nodes []struct {
+								Commit
+							}
+							PageInfo struct {
+								EndCursor   githubv4.String
+								HasNextPage bool
+							}
+						} `graphql:"history(path: $filePath, since: $sinceDate, after: $endCursor)"`
+					} `graphql:"... on Commit"`
+				}
+			}
+		} `graphql:"repository(owner: \"WebKit\", name: \"WebKit\")"`
+	}
+
+	var filePath any
+	filePath = (*githubv4.String)(nil)
+	if file != "" {
+		filePath = githubv4.String(file)
+	}
+
+	variables := map[string]interface{}{
+		"filePath":  filePath,
+		"sinceDate": githubv4.GitTimestamp{Time: time.Now().AddDate(0, 0, -days)},
+		"endCursor": (*githubv4.String)(nil), // Null after argument to get first page.
+	}
+
+	re := regexp.MustCompile(pattern)
+
+	for {
+		err := client.Query(context.Background(), &q, variables)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, commit := range q.Repository.DefaultBranchRef.Target.Commit.History.Nodes {
+			if re.MatchString(string(commit.Message)) {
+				commits = append(commits, commit.Commit)
+			}
+		}
+
+		if !q.Repository.DefaultBranchRef.Target.Commit.History.PageInfo.HasNextPage {
+			break
+		}
+
+		variables["endCursor"] = githubv4.NewString(q.Repository.DefaultBranchRef.Target.Commit.History.PageInfo.EndCursor)
+	}
+
+	return commits, nil
 }
 
 // AppleOssGraphQLTags returns a list of apple-oss-distributions tags from the Github GraphQL API
@@ -584,9 +665,9 @@ func AppleOssGraphQLTags(proxy string, insecure bool, apikey string) (map[string
 					TarURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.tar.gz", repo.Name, ref.Name),
 					ZipURL: fmt.Sprintf("https://github.com/apple-oss-distributions/%s/archive/refs/tags/%s.zip", repo.Name, ref.Name),
 					Commit: GithubCommit{
-						SHA:  ref.Target.Tag.Target.Commit.OID,
+						SHA:  string(ref.Target.Tag.Target.Commit.OID),
 						URL:  ref.Target.Tag.CommitURL,
-						Date: ref.Target.Tag.Target.Commit.Author.Date,
+						Date: ref.Target.Tag.Target.Commit.Author.Date.Time,
 					},
 				}
 			}
@@ -646,9 +727,9 @@ func WebKitGraphQLTags(proxy string, insecure bool, apikey string) ([]GithubTag,
 				TarURL: fmt.Sprintf("https://github.com/WebKit/WebKit/archive/refs/tags/%s.tar.gz", ref.Name),
 				ZipURL: fmt.Sprintf("https://github.com/WebKit/WebKit/archive/refs/tags/%s.zip", ref.Name),
 				Commit: GithubCommit{
-					SHA:  ref.Target.Tag.Target.Commit.OID,
+					SHA:  string(ref.Target.Tag.Target.Commit.OID),
 					URL:  ref.Target.Tag.CommitURL,
-					Date: ref.Target.Tag.Target.Commit.Author.Date,
+					Date: ref.Target.Tag.Target.Commit.Author.Date.Time,
 				},
 			})
 		}
