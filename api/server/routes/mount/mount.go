@@ -60,29 +60,39 @@ func AddRoutes(rg *gin.RouterGroup) {
 			*ctx,
 		})
 	})
-	// swagger:route POST /unmount Mount postUnmount
+	// swagger:operation POST /unmount Mount postUnmount
 	//
 	// Unmount
 	//
 	// Unmount a previously mounted DMG.
 	//
-	//     Produces:
-	//     - application/json
-	//
-	//     Parameters:
-	//       + name: mount_point
-	//         in: query
-	//         description: mount point of DMG
-	//         required: true
-	//         type: string
-	//       + name: dmg_path
-	//         in: query
-	//         description: path to DMG
-	//         required: true
-	//         type: string
-	//     Responses:
-	//       500: genericError
-	//       200: successResponse
+	// ---
+	// consumes:
+	//   - "application/json"
+	// produces:
+	//   - "application/json"
+	// parameters:
+	//   -
+	//     in: "body"
+	//     name: "body"
+	//     description: "Unmount Context (returned from /mount)"
+	//     required: true
+	//     schema:
+	//       type: object
+	//       properties:
+	//         mount_point:
+	//           type: string
+	//         dmg_path:
+	//           type: string
+	// responses:
+	//   '200':
+	//     description: successful response
+	//     schema:
+	//       $ref: '#/responses/successResponse'
+	//   '500':
+	//     description: error response
+	//     schema:
+	//       $ref: '#/responses/genericError'
 	rg.POST("/unmount", func(c *gin.Context) {
 		ctx := mount.Context{}
 		if err := c.ShouldBindJSON(&ctx); err != nil {

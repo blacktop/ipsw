@@ -1303,6 +1303,9 @@
     "/unmount": {
       "post": {
         "description": "Unmount a previously mounted DMG.",
+        "consumes": [
+          "application/json"
+        ],
         "produces": [
           "application/json"
         ],
@@ -1313,26 +1316,35 @@
         "operationId": "postUnmount",
         "parameters": [
           {
-            "type": "string",
-            "description": "mount point of DMG",
-            "name": "mount_point",
-            "in": "query",
-            "required": true
-          },
-          {
-            "type": "string",
-            "description": "path to DMG",
-            "name": "dmg_path",
-            "in": "query",
-            "required": true
+            "description": "Unmount Context (returned from /mount)",
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "dmg_path": {
+                  "type": "string"
+                },
+                "mount_point": {
+                  "type": "string"
+                }
+              }
+            }
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/responses/successResponse"
+            "description": "successful response",
+            "schema": {
+              "$ref": "#/responses/successResponse"
+            }
           },
           "500": {
-            "$ref": "#/responses/genericError"
+            "description": "error response",
+            "schema": {
+              "$ref": "#/responses/genericError"
+            }
           }
         }
       }
