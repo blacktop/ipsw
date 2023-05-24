@@ -1323,7 +1323,8 @@
             "type": "string",
             "description": "path to DMG",
             "name": "dmg_path",
-            "in": "query"
+            "in": "query",
+            "required": true
           }
         ],
         "responses": {
