@@ -17,12 +17,14 @@ ipsw watch <ORG/REPO> [flags]
 ### Options
 
 ```
-  -a, --api string       Github API Token
-  -d, --days int         Days back to search for commits (default 1)
-  -f, --file string      Commit file path to watch
-  -h, --help             help for watch
-      --json             Output downloadable tar.gz URLs as JSON
-  -p, --pattern string   Commit message pattern to match
+  -a, --api string         Github API Token
+  -b, --branch string      Repo branch to watch (default "main")
+  -d, --days int           Days back to search for commits (default 1)
+  -f, --file string        Commit file path to watch
+  -h, --help               help for watch
+      --json               Output downloadable tar.gz URLs as JSON
+  -p, --pattern string     Commit message pattern to match
+  -t, --timeout duration   Timeout for watch attempts (default: 0s = no timeout/run once)
 ```
 
 ### Options inherited from parent commands

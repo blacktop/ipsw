@@ -78,6 +78,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//       + name: dmg_path
 	//         in: query
 	//         description: path to DMG
+	//         required: true
 	//         type: string
 	//     Responses:
 	//       500: genericError
