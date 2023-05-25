@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/search"
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -40,6 +41,18 @@ import (
 var colorAddr = color.New(color.Faint).SprintfFunc()
 var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
 var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+
+func recurseProtocols(re *regexp.Regexp, proto objc.Protocol, depth int) (bool, string, int) {
+	if re.MatchString(proto.Name) {
+		return true, proto.Name, depth
+	}
+	for _, sub := range proto.Prots {
+		if found, name, newDepth := recurseProtocols(re, sub, depth+1); found {
+			return true, name, newDepth
+		}
+	}
+	return false, "", 0
+}
 
 func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
@@ -167,8 +180,8 @@ var machoSearchCmd = &cobra.Command{
 								ps = append(ps, proto.Name)
 							} else { // check for subprotocols
 								for _, sub := range proto.Prots {
-									if protRE.MatchString(sub.Name) {
-										ps = append(ps, sub.Name)
+									if found, name, _ := recurseProtocols(protRE, sub, 1); found {
+										ps = append(ps, name)
 									}
 								}
 							}
@@ -185,9 +198,13 @@ var machoSearchCmd = &cobra.Command{
 						seen := make(map[uint64]bool)
 						for _, proto := range protos {
 							for _, sub := range proto.Prots {
-								if protRE.MatchString(sub.Name) {
+								if found, name, depth := recurseProtocols(protRE, sub, 1); found {
 									if _, yes := seen[proto.Ptr]; !yes {
-										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", proto.Ptr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name)
+										if depth > 1 {
+											fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\n", colorAddr("%#09x", proto.Ptr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth)
+										} else {
+											fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", proto.Ptr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name)
+										}
 										seen[proto.Ptr] = true
 									}
 								}
@@ -219,8 +236,12 @@ var machoSearchCmd = &cobra.Command{
 										break
 									} else { // check for subprotocols
 										for _, sub := range proto.Prots {
-											if protRE.MatchString(sub.Name) {
-												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name, colorField("class"), swift.DemangleBlob(class.Name))
+											if found, name, depth := recurseProtocols(protRE, sub, 1); found {
+												if depth > 1 {
+													fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("class"), swift.DemangleBlob(class.Name))
+												} else {
+													fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("class"), swift.DemangleBlob(class.Name))
+												}
 												break
 											}
 										}
@@ -294,8 +315,12 @@ var machoSearchCmd = &cobra.Command{
 									break
 								} else { // check for subprotocols
 									for _, sub := range proto.Prots {
-										if protRE.MatchString(sub.Name) {
-											fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+										if found, name, depth := recurseProtocols(protRE, sub, 1); found {
+											if depth > 1 {
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+											} else {
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+											}
 											break
 										}
 									}
@@ -307,8 +332,12 @@ var machoSearchCmd = &cobra.Command{
 									break
 								} else { // check for subprotocols
 									for _, sub := range proto.Prots {
-										if protRE.MatchString(sub.Name) {
-											fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+										if found, name, depth := recurseProtocols(protRE, sub, 1); found {
+											if depth > 1 {
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+											} else {
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(path), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+											}
 											break
 										}
 									}
