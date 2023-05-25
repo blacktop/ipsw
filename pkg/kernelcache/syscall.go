@@ -49,7 +49,7 @@ const (
 func (r returnType) String() string {
 	switch r {
 	case RET_NONE:
-		return "none"
+		return "void"
 	case RET_INT_T:
 		return "int"
 	case RET_UINT_T:
@@ -89,19 +89,54 @@ type sysent struct {
 }
 
 type Sysent struct {
-	Name   string `json:"name,omitempty"`
-	Number int    `json:"number,omitempty"`
-	Proto  string `json:"proto,omitempty"`
-	New    bool   `json:"new,omitempty"`
+	Number int      `json:"number,omitempty"`
+	Name   string   `json:"name,omitempty"`
+	Args   []string `json:"args,omitempty"`
+	Proto  string   `json:"proto,omitempty"`
+	New    bool     `json:"new,omitempty"`
+	Old    bool     `json:"old,omitempty"`
 	sysent
 }
 
 func (s Sysent) String() string {
-	var isNew string
-	if s.New {
-		isNew = "(found 🆕 syscall)"
+	var funcStr string
+	if s.Old {
+		funcStr = colorAddr("// old " + s.Name)
+		s.Name = "nosys"
+	} else {
+		var args []string
+		if len(s.Args) == 0 {
+			args = append(args, "void")
+		} else {
+			for _, arg := range s.Args {
+				parts := strings.Split(arg, " ")
+				if len(parts) == 2 {
+					args = append(args, fmt.Sprintf("%s %s", colorType(parts[0]), (parts[1])))
+				} else {
+					args = append(args, colorType(arg))
+				}
+			}
+		}
+		funcStr = fmt.Sprintf("%s %s(%s);", colorType(s.ReturnType.String()), colorName(s.Name), strings.Join(args, ", "))
 	}
-	return fmt.Sprintf("%d:\t%s\tcall=%#x\tmunge=%#x\tret=%s\tnarg=%d (bytes=%d)\t%s%s", s.Number, s.Name, s.Call, s.Munge, s.ReturnType, s.NArg, s.ArgBytes, s.Proto, isNew)
+	if s.Name == "syscall" {
+		funcStr += colorAddr("// indirect syscall")
+	}
+	var isNew string
+	if s.New && s.Name != "nosys" && s.Name != "enosys" && s.Name != "syscall" {
+		isNew = colorBold(" (found NEW syscall) 👀")
+	}
+	return fmt.Sprintf(
+		"%d\t%s\t%s=%#x\t%s=%#x\t%s=%s\t%s=%d\t%s=%d\t%s%s",
+		s.Number,
+		s.Name,
+		colorField("call"), s.Call,
+		colorField("munge"), s.Munge,
+		colorField("ret"), s.ReturnType,
+		colorField("narg"), s.NArg,
+		colorField("bytes"), s.ArgBytes,
+		funcStr,
+		isNew)
 }
 
 func getSyscallData() (*SyscallData, error) {
@@ -122,17 +157,15 @@ func getSyscallData() (*SyscallData, error) {
 // GetSyscallTable returns a map of system call table as array of sysent structs
 func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 	var syscalls []Sysent
+	var sysnoAddr uint64
 	var SYS_MAXSYSCALL int
 
-	sdata, err := getSyscallData()
+	sdata, err := getSyscallsData()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get embedded syscall data: %v", err)
 	}
-	for k, v := range sdata.Names {
-		if v == "MAXSYSCALL" {
-			SYS_MAXSYSCALL = k
-		}
-	}
+
+	SYS_MAXSYSCALL = len(sdata.BsdSyscalls)
 
 	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 		var err error
@@ -167,24 +200,32 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 				if sc.ReturnType > RET_UINT64_T || sc.ReturnType < RET_NONE {
 					break
 				}
-				if idx > SYS_MAXSYSCALL {
-					isNew = true
-				}
 				sysents[idx].Call = m.SlidePointer(sc.Call)
 				sysents[idx].Munge = m.SlidePointer(sc.Munge)
-				name := "enosys"
-				if n, ok := sdata.Names[idx]; ok {
-					name = n
+
+				var name string
+				if idx == 0 {
+					name = "syscall"
+					sysnoAddr = sc.Call
+				} else if sc.Call == sysnoAddr {
+					name = "nosys"
+				} else {
+					name = "enosys"
 				}
-				var proto string
-				if sm, ok := sdata.Table[idx]; ok {
-					proto = sm.NameAndArgs
+
+				sc, err := sdata.GetBsdSyscallByNumber(idx)
+				if err == nil {
+					name = sc.Name
+				} else {
+					isNew = true
 				}
+
 				syscalls = append(syscalls, Sysent{
 					Name:   name,
 					Number: idx,
-					Proto:  proto,
+					Args:   sc.Arguments,
 					New:    isNew,
+					Old:    sc.Old,
 					sysent: sysents[idx],
 				})
 			}
