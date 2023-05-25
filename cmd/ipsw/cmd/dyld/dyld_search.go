@@ -226,6 +226,10 @@ var dyldSearchCmd = &cobra.Command{
 							return fmt.Errorf("invalid regex '%s': %w", viper.GetString("dyld.search.class"), err)
 						}
 						for _, class := range classes {
+							classType := "class"
+							if class.IsSwift() {
+								classType = colorField("swift_class")
+							}
 							if viper.GetString("dyld.search.class") != "" && classRE.MatchString(class.Name) {
 								fmt.Printf("%s: %s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name))
 								break
@@ -237,15 +241,15 @@ var dyldSearchCmd = &cobra.Command{
 								}
 								for _, proto := range class.Protocols {
 									if protRE.MatchString(proto.Name) {
-										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("class"), swift.DemangleBlob(class.Name))
+										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField(classType), swift.DemangleBlob(class.Name))
 										break
 									} else { // check for subprotocols
 										for _, sub := range proto.Prots {
 											if found, name, depth := recurseProtocols(protRE, sub, 1); found {
 												if depth > 1 {
-													fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("class"), swift.DemangleBlob(class.Name))
+													fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField(classType), swift.DemangleBlob(class.Name))
 												} else {
-													fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("class"), swift.DemangleBlob(class.Name))
+													fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField(classType), swift.DemangleBlob(class.Name))
 												}
 												break
 											}
@@ -260,13 +264,13 @@ var dyldSearchCmd = &cobra.Command{
 								}
 								for _, sel := range class.ClassMethods {
 									if re.MatchString(sel.Name) {
-										fmt.Printf("%s: %s\t%s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField("class"), class.Name, colorField("sel"), sel.Name)
+										fmt.Printf("%s: %s\t%s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField(classType), class.Name, colorField("sel"), sel.Name)
 										break
 									}
 								}
 								for _, sel := range class.InstanceMethods {
 									if re.MatchString(sel.Name) {
-										fmt.Printf("%s: %s\t%s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField("class"), class.Name, colorField("sel"), sel.Name)
+										fmt.Printf("%s: %s\t%s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField(classType), class.Name, colorField("sel"), sel.Name)
 										break
 									}
 								}
@@ -278,7 +282,7 @@ var dyldSearchCmd = &cobra.Command{
 								}
 								for _, ivar := range class.Ivars {
 									if ivarRE.MatchString(ivar.Name) {
-										fmt.Printf("%s\t%s=%s %s=%s\n", colorImage(filepath.Base(img.Name)), colorField("class"), class.Name, colorField("ivar"), ivar.Name)
+										fmt.Printf("%s\t%s=%s %s=%s\n", colorImage(filepath.Base(img.Name)), colorField(classType), class.Name, colorField("ivar"), ivar.Name)
 										break
 									}
 								}
@@ -309,6 +313,10 @@ var dyldSearchCmd = &cobra.Command{
 								fmt.Printf("%s: %s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name))
 							}
 						}
+						classType := "class"
+						if cat.Class.IsSwift() {
+							classType = colorField("swift_class")
+						}
 						if viper.GetString("dyld.search.protocol") != "" {
 							protRE, err := regexp.Compile(viper.GetString("dyld.search.protocol"))
 							if err != nil {
@@ -316,15 +324,15 @@ var dyldSearchCmd = &cobra.Command{
 							}
 							for _, proto := range cat.Protocols {
 								if protRE.MatchString(proto.Name) {
-									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField(classType), swift.DemangleBlob(cat.Class.Name))
 									break
 								} else { // check for subprotocols
 									for _, sub := range proto.Prots {
 										if found, name, depth := recurseProtocols(protRE, sub, 1); found {
 											if depth > 1 {
-												fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("category"), swift.DemangleBlob(cat.Name), colorField(classType), swift.DemangleBlob(cat.Class.Name))
 											} else {
-												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("category"), swift.DemangleBlob(cat.Name), colorField(classType), swift.DemangleBlob(cat.Class.Name))
 											}
 											break
 										}
@@ -333,15 +341,15 @@ var dyldSearchCmd = &cobra.Command{
 							}
 							for _, proto := range cat.Class.Protocols {
 								if protRE.MatchString(proto.Name) {
-									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField(classType), swift.DemangleBlob(cat.Class.Name))
 									break
 								} else { // check for subprotocols
 									for _, sub := range proto.Prots {
 										if found, name, depth := recurseProtocols(protRE, sub, 1); found {
 											if depth > 1 {
-												fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s %s=%d\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("depth"), depth, colorField("category"), swift.DemangleBlob(cat.Name), colorField(classType), swift.DemangleBlob(cat.Class.Name))
 											} else {
-												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), name, colorField("category"), swift.DemangleBlob(cat.Name), colorField(classType), swift.DemangleBlob(cat.Class.Name))
 											}
 											break
 										}
@@ -356,13 +364,13 @@ var dyldSearchCmd = &cobra.Command{
 							}
 							for _, sel := range cat.Class.ClassMethods {
 								if re.MatchString(sel.Name) {
-									fmt.Printf("%s: %s\t%s=%s %s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField("cat"), cat.Name, colorField("class"), cat.Class.Name, colorField("sel"), sel.Name)
+									fmt.Printf("%s: %s\t%s=%s %s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField("cat"), cat.Name, colorField(classType), cat.Class.Name, colorField("sel"), sel.Name)
 									break
 								}
 							}
 							for _, sel := range cat.Class.InstanceMethods {
 								if re.MatchString(sel.Name) {
-									fmt.Printf("%s: %s\t%s=%s %s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField("cat"), cat.Name, colorField("class"), cat.Class.Name, colorField("sel"), sel.Name)
+									fmt.Printf("%s: %s\t%s=%s %s=%s %s=%s\n", colorAddr("%#09x", sel.ImpVMAddr), filepath.Base(img.Name), colorField("cat"), cat.Name, colorField(classType), cat.Class.Name, colorField("sel"), sel.Name)
 									break
 								}
 							}
@@ -374,7 +382,7 @@ var dyldSearchCmd = &cobra.Command{
 							}
 							for _, ivar := range cat.Class.Ivars {
 								if ivarRE.MatchString(ivar.Name) {
-									fmt.Printf("%s\t%s=%s %s=%s %s=%s\n", colorImage(img.Name), colorField("cat"), cat.Name, colorField("class"), cat.Class.Name, colorField("ivar"), ivar.Name)
+									fmt.Printf("%s\t%s=%s %s=%s %s=%s\n", colorImage(img.Name), colorField("cat"), cat.Name, colorField(classType), cat.Class.Name, colorField("ivar"), ivar.Name)
 									break
 								}
 							}
