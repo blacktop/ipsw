@@ -621,20 +621,24 @@ var machoInfoCmd = &cobra.Command{
 					fmt.Println(m.GetObjCToc())
 				}
 				if protos, err := m.GetObjCProtocols(); err == nil {
+					seen := make(map[uint64]bool)
 					for _, proto := range protos {
-						if viper.GetBool("verbose") {
-							if viper.GetBool("color") {
-								quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", "nord")
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+						if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
+							if viper.GetBool("verbose") {
+								if viper.GetBool("color") {
+									quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", "nord")
+									quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
+								} else {
+									fmt.Println(swift.DemangleBlob(proto.Verbose()))
+								}
 							} else {
-								fmt.Println(swift.DemangleBlob(proto.Verbose()))
+								if viper.GetBool("color") {
+									quick.Highlight(os.Stdout, proto.String()+"\n", "objc", "terminal256", "nord")
+								} else {
+									fmt.Println(proto.String())
+								}
 							}
-						} else {
-							if viper.GetBool("color") {
-								quick.Highlight(os.Stdout, proto.String()+"\n", "objc", "terminal256", "nord")
-							} else {
-								fmt.Println(proto.String())
-							}
+							seen[proto.Ptr] = true
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
