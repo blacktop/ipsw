@@ -1316,7 +1316,7 @@
         "operationId": "postUnmount",
         "parameters": [
           {
-            "description": "Unmount Context (returned from /mount)",
+            "description": "The unmount context (returned from /mount)",
             "name": "body",
             "in": "body",
             "required": true,

@@ -38,6 +38,7 @@ import (
 )
 
 var colorAddr = color.New(color.Faint).SprintfFunc()
+var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
 var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 var colorClassField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
 
