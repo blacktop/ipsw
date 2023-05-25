@@ -30,6 +30,7 @@ import (
 	"time"
 
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/commands/watch"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -66,6 +67,8 @@ func init() {
 	watchCmd.Flags().StringP("api", "a", "", "Github API Token")
 	watchCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	watchCmd.Flags().DurationP("timeout", "t", 0, "Timeout for watch attempts (default: 0s = no timeout/run once)")
+	watchCmd.Flags().String("discord-id", "", "Discord Webhook ID")
+	watchCmd.Flags().String("discord-token", "", "Discord Webhook Token")
 	viper.BindPFlag("watch.branch", watchCmd.Flags().Lookup("branch"))
 	viper.BindPFlag("watch.file", watchCmd.Flags().Lookup("file"))
 	viper.BindPFlag("watch.pattern", watchCmd.Flags().Lookup("pattern"))
@@ -73,7 +76,11 @@ func init() {
 	viper.BindPFlag("watch.api", watchCmd.Flags().Lookup("api"))
 	viper.BindPFlag("watch.json", watchCmd.Flags().Lookup("json"))
 	viper.BindPFlag("watch.timeout", watchCmd.Flags().Lookup("timeout"))
+	viper.BindPFlag("watch.discord-id", watchCmd.Flags().Lookup("discord-id"))
+	viper.BindPFlag("watch.discord-token", watchCmd.Flags().Lookup("discord-token"))
 }
+
+// TODO: add support for watching local repos so that we can leverage `git log -L :func:file` to watch a single function
 
 // watchCmd represents the watch command
 var watchCmd = &cobra.Command{
@@ -90,6 +97,11 @@ var watchCmd = &cobra.Command{
 
 		apiToken := viper.GetString("watch.api")
 		asJSON := viper.GetBool("watch.json")
+		annouce := false
+
+		if viper.GetString("watch.discord-id") != "" && viper.GetString("watch.discord-token") != "" {
+			annouce = true
+		}
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
@@ -129,7 +141,19 @@ var watchCmd = &cobra.Command{
 				return err
 			}
 
-			if asJSON {
+			if annouce {
+				for _, commit := range commits {
+					if err := watch.DiscordAnnounce(string(commit.Message), &watch.Config{
+						DiscordWebhookID:    viper.GetString("watch.discord-id"),
+						DiscordWebhookToken: viper.GetString("watch.discord-token"),
+						DiscordColor:        "4535172",
+						DiscordAuthor:       string(commit.Author.Name),
+						DiscordIconURL:      "https://raw.githubusercontent.com/blacktop/ipsw/master/www/static/img/webkit.png",
+					}); err != nil {
+						return fmt.Errorf("discord announce failed: %v", err)
+					}
+				}
+			} else if asJSON {
 				for _, commit := range commits {
 					if _, ok := seenCommitOIDs[string(commit.OID)]; !ok {
 						seenCommitOIDs[string(commit.OID)] = true
