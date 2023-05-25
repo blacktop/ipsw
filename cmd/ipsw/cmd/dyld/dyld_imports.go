@@ -82,15 +82,20 @@ var dyldImportsCmd = &cobra.Command{
 		}
 
 		if ipswPath != "" {
+			found := false
 			if err := search.ForEachMachoInIPSW(filepath.Clean(ipswPath), func(path string, m *macho.File) error {
 				for _, imp := range m.ImportedLibraries() {
-					if strings.Contains(strings.ToLower(imp), strings.ToLower(args[0])) {
+					if strings.EqualFold(imp, args[0]) {
 						fmt.Printf("%s\n", path)
+						found = true
 					}
 				}
 				return nil
 			}); err != nil {
 				return fmt.Errorf("failed to scan files in IPSW: %v", err)
+			}
+			if !found {
+				log.Warn("No MachOs found containing import; NOTE: '--ipsw' imports searching requires the exact FULL path to the dylib (example:  /usr/lib/libobjc.A.dylib)")
 			}
 		} else {
 			dscPath := filepath.Clean(args[0])
