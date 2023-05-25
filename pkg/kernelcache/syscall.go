@@ -101,7 +101,7 @@ type Sysent struct {
 func (s Sysent) String() string {
 	var funcStr string
 	if s.Old {
-		funcStr = colorAddr("// old " + s.Name)
+		funcStr = colorAddr(fmt.Sprintf("// OLD %s", s.Name))
 		s.Name = "nosys"
 	} else {
 		var args []string
@@ -120,17 +120,22 @@ func (s Sysent) String() string {
 		funcStr = fmt.Sprintf("%s %s(%s);", colorType(s.ReturnType.String()), colorName(s.Name), strings.Join(args, ", "))
 	}
 	if s.Name == "syscall" {
-		funcStr += colorAddr("// indirect syscall")
+		funcStr += colorAddr(" // indirect syscall")
 	}
 	var isNew string
 	if s.New && s.Name != "nosys" && s.Name != "enosys" && s.Name != "syscall" {
 		isNew = colorBold(" (found NEW syscall) 👀")
 	}
+	if s.Name == "nosys" || s.Name == "enosys" || s.Name == "syscall" {
+		s.Name = colorAddr(s.Name)
+	} else {
+		s.Name = colorBold(s.Name)
+	}
 	return fmt.Sprintf(
-		"%d\t%s\t%s=%#x\t%s=%#x\t%s=%s\t%s=%d\t%s=%d\t%s%s",
+		"%d\t%s: %s\t%s=%#x\t%s=%s\t%s=%d\t%s=%d\t%s%s",
 		s.Number,
+		colorAddr("%#x", s.Call),
 		s.Name,
-		colorField("call"), s.Call,
 		colorField("munge"), s.Munge,
 		colorField("ret"), s.ReturnType,
 		colorField("narg"), s.NArg,
@@ -190,10 +195,12 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 
 		if found := bytes.Index(dat, pattern); found > 0 {
 			found -= (binary.Size(uint64(0)) * 5) // rewind to beginning of syscall table
-			log.Debugf("found at addr: %#x\n", sec.Addr+uint64(found))
+			log.WithField("bsd_syscall_table", fmt.Sprintf("%#x", sec.Addr+uint64(found))).Infof("Found")
+
 			if err := binary.Read(bytes.NewReader(dat[found:]), binary.LittleEndian, &sysents); err != nil {
 				return nil, fmt.Errorf("failed to read syscalls sysent data: %v", err)
 			}
+
 			// fixup syscall table call/munge addresses
 			for idx, sc := range sysents {
 				isNew := false
