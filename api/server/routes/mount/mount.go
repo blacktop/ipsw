@@ -75,7 +75,7 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//   -
 	//     in: "body"
 	//     name: "body"
-	//     description: "Unmount Context (returned from /mount)"
+	//     description: "The unmount context (returned from /mount)"
 	//     required: true
 	//     schema:
 	//       type: object

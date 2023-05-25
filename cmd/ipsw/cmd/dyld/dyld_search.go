@@ -52,6 +52,7 @@ func init() {
 	viper.BindPFlag("dyld.search.category", dyldSearchCmd.Flags().Lookup("category"))
 	viper.BindPFlag("dyld.search.sel", dyldSearchCmd.Flags().Lookup("sel"))
 	viper.BindPFlag("dyld.search.ivar", dyldSearchCmd.Flags().Lookup("ivar"))
+	dyldSearchCmd.MarkFlagsMutuallyExclusive("protocol", "class", "category", "sel", "ivar")
 }
 
 // dyldSearchCmd represents the search command
@@ -65,6 +66,15 @@ var dyldSearchCmd = &cobra.Command{
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
+		}
+
+		if viper.GetString("dyld.search.load-command") == "" &&
+			viper.GetString("dyld.search.protocol") == "" &&
+			viper.GetString("dyld.search.class") == "" &&
+			viper.GetString("dyld.search.category") == "" &&
+			viper.GetString("dyld.search.sel") == "" &&
+			viper.GetString("dyld.search.ivar") == "" {
+			return fmt.Errorf("must specify a search criteria via one of the flags")
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -104,7 +114,7 @@ var dyldSearchCmd = &cobra.Command{
 				}
 				for _, lc := range m.Loads {
 					if re.MatchString(lc.Command().String()) {
-						fmt.Printf("%s\t%s=%s\n", filepath.Base(img.Name), colorField("load"), lc.Command())
+						fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("load"), lc.Command())
 						break
 					}
 				}
@@ -160,21 +170,31 @@ var dyldSearchCmd = &cobra.Command{
 						for _, proto := range protos {
 							if protRE.MatchString(proto.Name) {
 								ps = append(ps, proto.Name)
+							} else { // check for subprotocols
+								for _, sub := range proto.Prots {
+									if protRE.MatchString(sub.Name) {
+										ps = append(ps, sub.Name)
+									}
+								}
 							}
 						}
 						ps = utils.Unique(ps)
 						if len(ps) > 0 {
 							if len(ps) == 1 {
-								fmt.Printf("%s\t%s=%s\n", filepath.Base(img.Name), colorField("protocol"), ps[0])
+								fmt.Printf("%s\t%s=%s\n", colorImage(img.Name), colorField("protocol"), ps[0])
 							} else {
-								fmt.Printf("%s\t%s=%v\n", filepath.Base(img.Name), colorField("protocols"), ps)
+								fmt.Printf("%s\t%s=%v\n", colorImage(img.Name), colorField("protocols"), ps)
 							}
 						}
 						// check for subprotocols
+						seen := make(map[uint64]bool)
 						for _, proto := range protos {
 							for _, sub := range proto.Prots {
 								if protRE.MatchString(sub.Name) {
-									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", proto.Ptr), filepath.Base(img.Name), colorField("protocol"), sub.Name, colorField("sub-protocol"), proto.Name)
+									if _, yes := seen[proto.Ptr]; !yes {
+										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", proto.Ptr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name)
+										seen[proto.Ptr] = true
+									}
 								}
 							}
 						}
@@ -202,6 +222,13 @@ var dyldSearchCmd = &cobra.Command{
 									if protRE.MatchString(proto.Name) {
 										fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("class"), swift.DemangleBlob(class.Name))
 										break
+									} else { // check for subprotocols
+										for _, sub := range proto.Prots {
+											if protRE.MatchString(sub.Name) {
+												fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name, colorField("class"), swift.DemangleBlob(class.Name))
+												break
+											}
+										}
 									}
 								}
 							}
@@ -230,7 +257,7 @@ var dyldSearchCmd = &cobra.Command{
 								}
 								for _, ivar := range class.Ivars {
 									if ivarRE.MatchString(ivar.Name) {
-										fmt.Printf("%s\t%s=%s %s=%s\n", filepath.Base(img.Name), colorField("class"), class.Name, colorField("ivar"), ivar.Name)
+										fmt.Printf("%s\t%s=%s %s=%s\n", colorImage(filepath.Base(img.Name)), colorField("class"), class.Name, colorField("ivar"), ivar.Name)
 										break
 									}
 								}
@@ -241,7 +268,7 @@ var dyldSearchCmd = &cobra.Command{
 					}
 				}
 			}
-			if viper.GetString("dyld.search.category") != "" || viper.GetString("dyld.search.protocol") != "" || viper.GetString("dyld.search.sel") != "" || viper.GetString("dyld.search.ivar") != "" {
+			if viper.GetString("dyld.search.category") != "" || viper.GetString("dyld.search.class") != "" || viper.GetString("dyld.search.protocol") != "" || viper.GetString("dyld.search.sel") != "" || viper.GetString("dyld.search.ivar") != "" {
 				if cats, err := m.GetObjCCategories(); err == nil {
 					catRE, err := regexp.Compile(viper.GetString("dyld.search.category"))
 					if err != nil {
@@ -249,8 +276,17 @@ var dyldSearchCmd = &cobra.Command{
 					}
 					for _, cat := range cats {
 						if viper.GetString("dyld.search.category") != "" && catRE.MatchString(cat.Name) {
-							fmt.Printf("%#x: %s\n", cat.VMAddr, filepath.Base(img.Name))
+							fmt.Printf("%s: %s\n", colorAddr("%#09x", cat.VMAddr), filepath.Base(img.Name))
 							break
+						}
+						if viper.GetString("dyld.search.class") != "" {
+							classRE, err := regexp.Compile(viper.GetString("dyld.search.class"))
+							if err != nil {
+								return fmt.Errorf("invalid regex '%s': %w", viper.GetString("dyld.search.class"), err)
+							}
+							if classRE.MatchString(cat.Class.Name) {
+								fmt.Printf("%s: %s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name))
+							}
 						}
 						if viper.GetString("dyld.search.protocol") != "" {
 							protRE, err := regexp.Compile(viper.GetString("dyld.search.protocol"))
@@ -259,14 +295,28 @@ var dyldSearchCmd = &cobra.Command{
 							}
 							for _, proto := range cat.Protocols {
 								if protRE.MatchString(proto.Name) {
-									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.VMAddr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name))
+									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
 									break
+								} else { // check for subprotocols
+									for _, sub := range proto.Prots {
+										if protRE.MatchString(sub.Name) {
+											fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+											break
+										}
+									}
 								}
 							}
 							for _, proto := range cat.Class.Protocols {
 								if protRE.MatchString(proto.Name) {
 									fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
 									break
+								} else { // check for subprotocols
+									for _, sub := range proto.Prots {
+										if protRE.MatchString(sub.Name) {
+											fmt.Printf("    %s: %s\t%s=%s\t%s=%s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("protocol"), proto.Name, colorField("sub-protocol"), sub.Name, colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
+											break
+										}
+									}
 								}
 							}
 						}
@@ -295,10 +345,25 @@ var dyldSearchCmd = &cobra.Command{
 							}
 							for _, ivar := range cat.Class.Ivars {
 								if ivarRE.MatchString(ivar.Name) {
-									fmt.Printf("%s\t%s=%s %s=%s %s=%s\n", filepath.Base(img.Name), colorField("cat"), cat.Name, colorField("class"), cat.Class.Name, colorField("ivar"), ivar.Name)
+									fmt.Printf("%s\t%s=%s %s=%s %s=%s\n", colorImage(img.Name), colorField("cat"), cat.Name, colorField("class"), cat.Class.Name, colorField("ivar"), ivar.Name)
 									break
 								}
 							}
+						}
+					}
+				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+					log.Error(err.Error())
+				}
+			}
+			if viper.GetString("dyld.search.sel") != "" {
+				selRE, err := regexp.Compile(viper.GetString("dyld.search.sel"))
+				if err != nil {
+					return fmt.Errorf("invalid regex '%s': %w", viper.GetString("dyld.search.sel"), err)
+				}
+				if sels, err := m.GetObjCSelectorReferences(); err == nil {
+					for ref, sel := range sels {
+						if selRE.MatchString(sel.Name) {
+							fmt.Printf("%s: %s\t%s=%s %s=%s\n", colorImage(filepath.Base(img.Name)), colorAddr("%#09x", ref), colorField("addr"), colorAddr("%#09x", sel.VMAddr), colorField("sel"), sel.Name)
 						}
 					}
 				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {

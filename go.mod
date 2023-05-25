@@ -11,7 +11,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.1.2
 	github.com/blacktop/arm64-cgo v1.0.56
 	github.com/blacktop/go-dwarf v1.0.9
-	github.com/blacktop/go-macho v1.1.153
+	github.com/blacktop/go-macho v1.1.154
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -19,7 +19,7 @@ require (
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/docker/docker v24.0.1+incompatible
-	github.com/dominikbraun/graph v0.21.0
+	github.com/dominikbraun/graph v0.22.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.3
@@ -129,7 +129,7 @@ require (
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.7 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
