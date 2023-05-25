@@ -75,6 +75,15 @@ func (s SyscallsData) GetMachSyscallByNumber(num int) (MachSyscall, error) {
 	return MachSyscall{}, fmt.Errorf("mach trap %d not found", num)
 }
 
+func (s SyscallsData) GetBsdSyscallByNumber(num int) (BsdSyscall, error) {
+	for _, sc := range s.BsdSyscalls {
+		if sc.Number == num {
+			return sc, nil
+		}
+	}
+	return BsdSyscall{}, fmt.Errorf("mach trap %d not found", num)
+}
+
 var colorAddr = color.New(color.Faint).SprintfFunc()
 var colorBold = color.New(color.Bold).SprintFunc()
 var colorField = color.New(color.Bold, color.FgHiCyan).SprintFunc()
