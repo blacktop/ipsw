@@ -345,7 +345,7 @@ jobs:
       - name: Run dyld webkit
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
-        run: ipsw dyld webkit "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --git --api ${{ secrets.GITHUB_TOKEN }}
+        run: ipsw dyld webkit "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       - name: Run dyld slide
         if: matrix.platform == 'macos-12'
         working-directory: /tmp/ipsw
