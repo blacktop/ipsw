@@ -1,0 +1,17 @@
+name: "Discord"
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Package Installer
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo snap install ipsw
+      - name: Run ipsw watch WebKit/WebKit
+        run: |
+          ipsw watch --pattern 'Lockdown Mode' --days 1 --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} WebKit/WebKit
