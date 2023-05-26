@@ -91,6 +91,7 @@ type sysent struct {
 type Sysent struct {
 	Number int      `json:"number,omitempty"`
 	Name   string   `json:"name,omitempty"`
+	DBName string   `json:"old_name,omitempty"`
 	Args   []string `json:"args,omitempty"`
 	Proto  string   `json:"proto,omitempty"`
 	New    bool     `json:"new,omitempty"`
@@ -99,38 +100,45 @@ type Sysent struct {
 }
 
 func (s Sysent) String() string {
+	var args []string
 	var funcStr string
+	var extra string
+
+	if s.Name == "syscall" {
+		extra = colorAddr(" // indirect syscall")
+	}
 	if s.Old {
-		funcStr = colorAddr(fmt.Sprintf("// OLD %s", s.Name))
 		s.Name = "nosys"
+		extra = colorAddr(fmt.Sprintf(" // old '%s'", s.DBName))
+	}
+
+	// get args
+	if len(s.Args) == 0 || (len(s.Args) == 1 && s.Args[0] == RET_NONE.String()) {
+		args = append(args, "void")
 	} else {
-		var args []string
-		if len(s.Args) == 0 {
-			args = append(args, "void")
-		} else {
-			for _, arg := range s.Args {
-				parts := strings.Split(arg, " ")
-				if len(parts) == 2 {
-					args = append(args, fmt.Sprintf("%s %s", colorType(parts[0]), (parts[1])))
-				} else {
-					args = append(args, colorType(arg))
-				}
+		for _, arg := range s.Args {
+			parts := strings.Split(arg, " ")
+			if len(parts) == 2 {
+				args = append(args, fmt.Sprintf("%s %s", colorType(parts[0]), (parts[1])))
+			} else {
+				args = append(args, colorType(arg))
 			}
 		}
-		funcStr = fmt.Sprintf("%s %s(%s);", colorType(s.ReturnType.String()), colorName(s.Name), strings.Join(args, ", "))
 	}
-	if s.Name == "syscall" {
-		funcStr += colorAddr(" // indirect syscall")
-	}
+
+	funcStr = fmt.Sprintf("%s %s(%s);%s", colorType(s.ReturnType.String()), colorName(s.Name), strings.Join(args, ", "), extra)
+
 	var isNew string
 	if s.New && s.Name != "nosys" && s.Name != "enosys" && s.Name != "syscall" {
-		isNew = colorBold(" (found NEW syscall) 👀")
+		isNew = colorBold(" << 👀 [found NEW syscall] 👀 >>")
 	}
+
 	if s.Name == "nosys" || s.Name == "enosys" || s.Name == "syscall" {
 		s.Name = colorAddr(s.Name)
 	} else {
 		s.Name = colorBold(s.Name)
 	}
+
 	return fmt.Sprintf(
 		"%d\t%s: %s\t%s=%#x\t%s=%s\t%s=%d\t%s=%d\t%s%s",
 		s.Number,
@@ -152,8 +160,7 @@ func getSyscallData() (*SyscallData, error) {
 	}
 	defer gzr.Close()
 	// Decoding the serialized data
-	err = gob.NewDecoder(gzr).Decode(&sdata)
-	if err != nil {
+	if err = gob.NewDecoder(gzr).Decode(&sdata); err != nil {
 		return nil, fmt.Errorf("failed to decode syscall data; %v", err)
 	}
 	return &sdata, nil
@@ -163,14 +170,19 @@ func getSyscallData() (*SyscallData, error) {
 func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 	var syscalls []Sysent
 	var sysnoAddr uint64
-	var SYS_MAXSYSCALL int
+	var maxSyscall int
 
-	sdata, err := getSyscallsData()
+	srcdata, err := getSyscallData()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get embedded syscall data: %v", err)
 	}
 
-	SYS_MAXSYSCALL = len(sdata.BsdSyscalls)
+	sdata, err := getSyscallsData()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get embedded syscall JSON data: %v", err)
+	}
+
+	maxSyscall = len(sdata.BsdSyscalls)
 
 	if m.FileTOC.FileHeader.Type == types.MH_FILESET {
 		var err error
@@ -186,7 +198,7 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 			return nil, err
 		}
 
-		sysents := make([]sysent, SYS_MAXSYSCALL+20)
+		sysents := make([]sysent, maxSyscall+20)
 
 		pattern, err := hex.DecodeString(syscall2Pattern)
 		if err != nil {
@@ -217,19 +229,33 @@ func GetSyscallTable(m *macho.File) ([]Sysent, error) {
 				} else if sc.Call == sysnoAddr {
 					name = "nosys"
 				} else {
-					name = "enosys"
+					if sysents[idx].Munge == 0 &&
+						sysents[idx].ReturnType == RET_INT_T &&
+						sysents[idx].NArg == 0 &&
+						sysents[idx].ArgBytes == 0 {
+						name = "enosys"
+					} else {
+						name = unknownTrap
+					}
 				}
 
+				// check if we have a name for this syscall in JSON data
 				sc, err := sdata.GetBsdSyscallByNumber(idx)
-				if err == nil {
+				if err != nil { // not found
+					// check if we have a name for this syscall in xnu src
+					if n, ok := srcdata.Names[idx]; ok {
+						name = n
+					} else {
+						isNew = true
+					}
+				} else { // found
 					name = sc.Name
-				} else {
-					isNew = true
 				}
 
 				syscalls = append(syscalls, Sysent{
-					Name:   name,
 					Number: idx,
+					Name:   name,
+					DBName: sc.Name,
 					Args:   sc.Arguments,
 					New:    isNew,
 					Old:    sc.Old,
@@ -285,7 +311,6 @@ func ParseSyscallFiles(output string) error {
 }
 
 func ParseSyscallHeader() (map[int]string, error) {
-
 	f, err := os.Open(syscallBetaHeader)
 	if err != nil {
 		ff, err := os.Open(syscallHeader)
@@ -294,9 +319,9 @@ func ParseSyscallHeader() (map[int]string, error) {
 		}
 		defer ff.Close()
 		f = ff
-		return nil, fmt.Errorf("failed to open syscall beta header: %v", err)
+	} else {
+		defer f.Close()
 	}
-	defer f.Close()
 
 	r := bufio.NewReader(f)
 
