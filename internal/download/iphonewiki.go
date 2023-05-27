@@ -2,6 +2,7 @@ package download
 
 import (
 	"bufio"
+	"container/list"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -10,24 +11,67 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/blacktop/ipsw/internal/sm"
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const (
-	iPhoneWikiAPI = "https://www.theiphonewiki.com/w/api.php"
+	iPhoneWikiAPI = "https://theapplewiki.com/api.php"
 )
 
+type Queue struct {
+	l   *list.List
+	len int
+}
+
+func NewQueue(len int) *Queue { // constraint : length > 0
+	return &Queue{
+		l:   list.New(),
+		len: len,
+	}
+}
+
+func (q *Queue) Len() int {
+	return q.l.Len()
+}
+
+func (q *Queue) IsEmpty() bool {
+	return q.l.Len() == 0
+}
+
+func (q *Queue) Push(item string) {
+	for q.l.Len() >= q.len {
+		q.l.Remove(q.l.Front())
+	}
+	q.l.PushBack(item)
+}
+
+func (q *Queue) Peek() string {
+	if q.IsEmpty() {
+		return ""
+	}
+	return q.l.Back().Value.(string)
+}
+
+func (q *Queue) Pop() string {
+	if q.IsEmpty() {
+		return ""
+	}
+	return q.l.Remove(q.l.Back()).(string)
+}
+
 type WikiIPSW struct {
-	Version       string   `json:"version,omitempty"`
-	Build         string   `json:"build,omitempty"`
-	Devices       []string `json:"keys,omitempty"`
-	Baseband      string   `json:"baseband,omitempty"`
-	ReleaseDate   string   `json:"release_date,omitempty"`
-	DownloadUrl   string   `json:"download_url,omitempty"`
-	Sha1Hash      string   `json:"sha1,omitempty"`
-	FileSize      int      `json:"file_size,omitempty"`
-	Documentation string   `json:"doc,omitempty"`
+	Version       string    `json:"version,omitempty"`
+	Build         string    `json:"build,omitempty"`
+	Devices       []string  `json:"keys,omitempty"`
+	Baseband      string    `json:"baseband,omitempty"`
+	ReleaseDate   time.Time `json:"release_date,omitempty"`
+	DownloadURL   string    `json:"download_url,omitempty"`
+	Sha1Hash      string    `json:"sha1,omitempty"`
+	FileSize      int       `json:"file_size,omitempty"`
+	Documentation []string  `json:"doc,omitempty"`
 }
 
 type WikiOTA WikiIPSW
@@ -255,139 +299,328 @@ func parseWikiTable(text string) ([]*WikiIPSW, error) {
 	headerCount := 0
 	ipsw := &WikiIPSW{}
 	index2Header := make(map[int]string)
+	header2Values := make(map[string]*Queue)
+
+	machine := sm.Machine{
+		ID:      "mediawiki",
+		Initial: "title",
+		States: sm.StateMap{
+			"title": sm.MachineState{
+				On: sm.TransitionMap{
+					"start": sm.MachineTransition{
+						To: "start_table",
+					},
+				},
+			},
+			"start_table": sm.MachineState{
+				On: sm.TransitionMap{
+					"read_header": sm.MachineTransition{
+						To: "header",
+					},
+				},
+			},
+			"header": sm.MachineState{
+				On: sm.TransitionMap{
+					"read_subheader": sm.MachineTransition{
+						To: "subheader",
+					},
+				},
+			},
+			"subheader": sm.MachineState{
+				On: sm.TransitionMap{
+					"process_item": sm.MachineTransition{
+						To: "process_item",
+					},
+				},
+			},
+			"process_item": sm.MachineState{
+				On: sm.TransitionMap{
+					// "item_done": sm.MachineTransition{
+					// 	To: "item_done",
+					// },
+					"stop": sm.MachineTransition{
+						To: "end_table",
+					},
+				},
+			},
+			// "item_done": sm.MachineState{
+			// 	On: sm.TransitionMap{
+			// 		"another": sm.MachineTransition{
+			// 			To: "start_item",
+			// 		},
+			// 		"stop": sm.MachineTransition{
+			// 			To: "end_table",
+			// 		},
+			// 	},
+			// },
+			"end_table": sm.MachineState{
+				On: sm.TransitionMap{
+					"done": sm.MachineTransition{
+						To: "title",
+					},
+				},
+			},
+		},
+	}
+
+	parseItem := func(i int) error {
+		switch v := index2Header[i]; v {
+		case "Product Version", "Version":
+			ipsw.Version = header2Values[v].Pop()
+		case "Build":
+			ipsw.Build = header2Values[v].Pop()
+		case "Keys":
+			keys := header2Values[v].Pop()
+			if keys == "" {
+				return nil
+			}
+			var parts []string
+			if strings.Contains(keys, "<br/>") {
+				parts = strings.Split(keys, "<br/>")
+			} else {
+				parts = strings.Split(keys, "<br />")
+			}
+			for _, part := range parts {
+				part = strings.TrimSpace(part)
+				part = strings.Trim(part, "[]")
+				if _, dev, ok := strings.Cut(part, "|"); ok {
+					ipsw.Devices = append(ipsw.Devices, dev)
+				}
+			}
+		case "Baseband":
+			ipsw.Baseband = header2Values[v].Pop()
+		case "Release Date":
+			// example: "{{date|2017|07|19}}"
+			dstr := header2Values[v].Pop()
+			if dstr != "Preinstalled" {
+				dstr = strings.TrimPrefix(dstr, "{{date|")
+				dstr = strings.TrimSuffix(dstr, "}}")
+				date, error := time.Parse("2006|01|02", dstr)
+				if error == nil {
+					ipsw.ReleaseDate = date
+				}
+			}
+		case "Download URL", "IPSW Download URL", "OTA Download URL":
+			url := header2Values[v].Pop()
+			ipsw.DownloadURL = strings.Trim(url, "[]")
+		case "SHA1 Hash":
+			sha := header2Values[v].Pop()
+			sha = strings.TrimPrefix(sha, "<code>")
+			sha = strings.TrimSuffix(sha, "</code>")
+			ipsw.Sha1Hash = sha
+		case "File Size":
+			fstr := header2Values[v].Pop()
+			fs, err := strconv.Atoi(strings.Replace(fstr, ",", "", -1))
+			if err == nil {
+				ipsw.FileSize = fs
+			}
+		case "Release Notes":
+			fallthrough
+		case "Documentation":
+			doc := header2Values[v].Pop()
+			if strings.Contains(doc, "<br") {
+				doc = strings.ReplaceAll(doc, "]<br/>[", "\n")
+				doc = strings.ReplaceAll(doc, "]<br />[", "\n")
+				doc = strings.Trim(doc, "[]")
+				parts := strings.Split(doc, "\n")
+				ipsw.Documentation = append(ipsw.Documentation, parts...)
+			} else {
+				ipsw.Documentation = append(ipsw.Documentation, doc)
+			}
+		default:
+			header2Values[v].Pop() // pop into the ether
+		}
+		return nil
+	}
 
 	scanner := bufio.NewScanner(strings.NewReader(text))
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "==") {
-			continue // skip header
-		} else if strings.HasPrefix(line, "{|") {
+		if strings.HasPrefix(line, "\"{{") { /* title */
+			if machine.Current() != "title" {
+				return nil, fmt.Errorf("title: invalid state '%s'", machine.Current())
+			}
+			// log.Debugf("title: %s", line)
+			continue
+		} else if strings.HasPrefix(line, "==") { /* subtitle */
+			if machine.Current() != "title" {
+				return nil, fmt.Errorf("title: invalid state '%s'", machine.Current())
+			}
+			title := strings.Trim(strings.TrimSpace(line), "=[] ")
+			_ = title
+			continue
+		} else if strings.HasPrefix(line, "{|") { /* table start */
+			if machine.Current() != "title" {
+				return nil, fmt.Errorf("table start: invalid state '%s'", machine.Current())
+			}
+			machine.Transition("start")
+			fieldCount = 0
 			headerCount = 0
 			index2Header = make(map[int]string)
-			continue // skip table
-		} else if strings.HasPrefix(line, "|-") {
-			fieldCount = 0
-			continue // skip table row delimiter
-		} else if strings.HasPrefix(line, "! ") {
-			line = strings.TrimPrefix(line, "! ")
-			line = strings.TrimSpace(line)
-			if strings.Contains(line, "rowspan") {
-				line = strings.Split(line, "|")[1]
-				line = strings.TrimSpace(line)
-				index2Header[headerCount] = line
-				headerCount++
-			} else if strings.Contains(line, "colspan") {
-				parts := strings.Split(line, "|")
-				parts[0] = strings.TrimSpace(parts[0])
-				colWidth := strings.TrimPrefix(parts[0], "colspan=\"")
-				colWidth = strings.TrimSuffix(colWidth, "\"")
-				inc, err := strconv.Atoi(colWidth)
-				if err != nil {
-					return nil, fmt.Errorf("failed to parse colspan: %s", err)
+			header2Values = make(map[string]*Queue)
+			continue
+		} else if strings.HasPrefix(line, "|}") { /* table end */
+			if machine.Current() != "process_item" {
+				return nil, fmt.Errorf("table end: invalid state '%s'", machine.Current())
+			}
+			machine.Transition("stop")
+			for i := 0; i < headerCount; i++ {
+				parseItem(i)
+			}
+			results = append(results, ipsw)
+			machine.Transition("done")
+		} else if strings.HasPrefix(line, "|-") { /* table row delimiter */
+			switch machine.Current() {
+			case "start_table":
+				machine.Transition("read_header")
+			case "header":
+				machine.Transition("read_subheader")
+			case "subheader":
+				machine.Transition("process_item")
+			case "process_item":
+				for i := 0; i < headerCount; i++ {
+					parseItem(i)
 				}
-				index2Header[headerCount] = strings.TrimSpace(parts[1])
-				headerCount += inc
-			} else {
-				index2Header[headerCount] = line
-				headerCount++
+				results = append(results, ipsw)
+				machine.Transition("item_done")
+				ipsw = &WikiIPSW{}
+				fieldCount = 0
 			}
-		} else if strings.HasPrefix(line, "|}") {
-			fieldCount = 0
-			headerCount = 0
-			index2Header = make(map[int]string)
-			continue // skip table row
-			// } else if strings.HasPrefix(line, "| ") && strings.Contains(line, "{{n/a}}") {
-			// 	line = strings.TrimPrefix(line, "|")
-			// 	line = strings.TrimSpace(line)
-			// 	a, b, c, e := getRowOrColInc(line)
-			// 	if e != nil {
-			// 		return nil, e
-			// 	}
-			// 	fmt.Println(a, b, c)
-			// 	fieldCount++
-			// 	continue // skip n/a
-		} else if strings.HasPrefix(line, "| ") {
-			if fieldCount >= headerCount {
-				continue // skip empty or extra field
+			continue
+		} else if strings.HasPrefix(line, "!") { /* header values */
+			if machine.Current() != "header" && machine.Current() != "subheader" {
+				return nil, fmt.Errorf("parsing header: invalid state '%s'", machine.Current())
+			}
+			if machine.Current() == "header" {
+				line = strings.TrimPrefix(line, "! ")
+				if strings.Contains(line, "rowspan") {
+					_, line, _ = strings.Cut(line, "|")
+					line = strings.TrimSpace(line)
+					index2Header[headerCount] = line
+					header2Values[line] = NewQueue(20)
+					headerCount++
+				} else if strings.Contains(line, "colspan") {
+					col, rest, _ := strings.Cut(line, "|")
+					col = strings.TrimSpace(col)
+					rest = strings.TrimSpace(rest)
+					colWidth := strings.TrimPrefix(strings.TrimSpace(col), "colspan=\"")
+					colWidth = strings.TrimSuffix(colWidth, "\"")
+					inc, err := strconv.Atoi(colWidth)
+					if err != nil {
+						return nil, fmt.Errorf("failed to parse colspan: %s", err)
+					}
+					header2Values[rest] = NewQueue(20)
+					for i := 0; i < inc; i++ {
+						index2Header[headerCount] = rest
+						headerCount++
+					}
+				} else {
+					index2Header[headerCount] = line
+					header2Values[line] = NewQueue(20)
+					headerCount++
+				}
+			} else if machine.Current() == "subheader" {
+				line = strings.TrimPrefix(line, "! ")
+				if strings.HasPrefix(line, "class=") {
+					_, line, _ = strings.Cut(line, " | ")
+					line = strings.TrimSpace(line)
+				}
+				var last string
+				for i := 0; i < headerCount; i++ {
+					if last == index2Header[i] {
+						index2Header[i] = line
+						header2Values[line] = NewQueue(20)
+					}
+					last = index2Header[i]
+				}
+			}
+		} else if strings.HasPrefix(line, "|") { /* field values */
+			if machine.Current() == "subheader" {
+				machine.Transition("process_item") // skip missing subheader
+			}
+			if machine.Current() != "process_item" {
+				return nil, fmt.Errorf("parsing items: invalid state '%s'", machine.Current())
 			}
 
-			line = strings.TrimPrefix(line, "|")
-			line = strings.TrimSpace(line)
-
-			if strings.Contains(line, "{{n/a}}") {
+			for header2Values[index2Header[fieldCount]].Len() > 0 {
 				fieldCount++
+			}
+
+			line = strings.TrimPrefix(line, "| ")
+			line = strings.TrimSpace(line)
+			if strings.Contains(line, "Nowrap") {
+				line = strings.Replace(line, "Nowrap", "", -1)
+			}
+
+			if line == "{{n/a}}" { // empty field
+				header2Values[index2Header[fieldCount]].Push("")
 				continue
 			}
 
-			if strings.Contains(line, "rowspan") {
-				line = strings.Split(line, "|")[1]
-				line = strings.TrimSpace(line)
+			if strings.Contains(line, "colspan") && strings.Contains(line, "rowspan") {
+				colrow, field, ok := strings.Cut(line, " | ")
+				if !ok {
+					lastIdx := strings.LastIndex(line, " ")
+					colrow = line[:lastIdx]
+					field = line[lastIdx+1:]
+				}
+				field = strings.TrimSpace(field)
+				var col, row string
+				if strings.HasPrefix(colrow, "colspan") { // colspan first
+					col, row, _ = strings.Cut(colrow, " ")
+				} else { // rowspan fist
+					row, col, _ = strings.Cut(colrow, " ")
+				}
+				colWidth := strings.TrimPrefix(col, "colspan=\"")
+				colWidth, _, _ = strings.Cut(colWidth, "\"")
+				colInc, err := strconv.Atoi(colWidth)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse colspan: %s", err)
+				}
+				rowHeight := strings.TrimPrefix(row, "rowspan=\"")
+				rowHeight = strings.TrimSuffix(rowHeight, "\"")
+				rowInc, err := strconv.Atoi(rowHeight)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse rowspan: %s", err)
+				}
+				for i := 0; i < colInc; i++ {
+					for j := 0; j < rowInc; j++ {
+						header2Values[index2Header[fieldCount+i]].Push(field)
+					}
+				}
 			} else if strings.Contains(line, "colspan") {
-				parts := strings.Split(line, "|")
-				parts[0] = strings.TrimSpace(parts[0])
-				colWidth := strings.TrimPrefix(parts[0], "colspan=\"")
-				colWidth = strings.TrimSuffix(colWidth, "\"")
+				col, _, _ := strings.Cut(line, "|")
+				col = strings.TrimSpace(col)
+				colWidth := strings.TrimPrefix(col, "colspan=\"")
+				colWidth, val, _ := strings.Cut(colWidth, "\"")
+				colWidth = strings.TrimSpace(colWidth)
+				val = strings.TrimSpace(val)
 				inc, err := strconv.Atoi(colWidth)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse colspan: %s", err)
 				}
-				fieldCount += inc
-			}
-
-			switch index2Header[fieldCount] {
-			case "Product Version":
-				fallthrough
-			case "Version":
-				ipsw.Version = line
-			case "Build":
-				ipsw.Build = line
-			case "Keys":
-				parts := strings.Split(line, "<br/>")
-				for _, part := range parts {
-					part = strings.TrimSpace(part)
-					part = strings.TrimPrefix(part, "[[")
-					part = strings.TrimSuffix(part, "]]")
-					part = strings.Split(part, "|")[1]
-					ipsw.Devices = append(ipsw.Devices, part)
+				for i := 0; i < inc-1; i++ {
+					header2Values[index2Header[fieldCount+i]].Push(val)
 				}
-			case "Baseband":
-				ipsw.Baseband = line
-			case "Release Date":
-				ipsw.ReleaseDate = line
-			case "OTA Download URL":
-				fallthrough
-			case "Download URL":
-				line = strings.TrimPrefix(line, "[")
-				line = strings.TrimSuffix(line, "]")
-				ipsw.DownloadUrl = line
-			case "SHA1 Hash":
-				line = strings.TrimPrefix(line, "<code>")
-				line = strings.TrimSuffix(line, "</code>")
-				ipsw.Sha1Hash = line
-			case "File Size":
-				fs, err := strconv.Atoi(strings.Replace(line, ",", "", -1))
+			} else if strings.Contains(line, "rowspan") {
+				row, field, ok := strings.Cut(line, "|")
+				if !ok {
+					row, field, _ = strings.Cut(line, " ")
+				}
+				row = strings.TrimSpace(row)
+				field = strings.TrimSpace(field)
+				rowHeight := strings.TrimPrefix(row, "rowspan=\"")
+				rowHeight = strings.TrimSpace(strings.TrimSuffix(rowHeight, "\""))
+				inc, err := strconv.Atoi(rowHeight)
 				if err != nil {
-					// return nil, err
-					fieldCount++
-					continue
+					return nil, fmt.Errorf("failed to parse rowspan: %s", err)
 				}
-				ipsw.FileSize = fs
-			case "Release Notes":
-				fallthrough
-			case "Documentation":
-				line = strings.TrimPrefix(line, "[")
-				line = strings.TrimSuffix(line, "]")
-				ipsw.Documentation = line
-			}
-
-			fieldCount++
-
-			if fieldCount >= headerCount {
-				if len(ipsw.DownloadUrl) > 0 {
-					results = append(results, ipsw)
+				for i := 0; i < inc; i++ {
+					header2Values[index2Header[fieldCount]].Push(field)
 				}
-				ipsw = &WikiIPSW{}
+			} else {
+				header2Values[index2Header[fieldCount]].Push(line)
 			}
 		}
 	}
@@ -442,7 +675,9 @@ func GetWikiIPSWs(proxy string, insecure bool) ([]*WikiIPSW, error) {
 
 	for _, link := range parseResp.Parse.Links {
 		if strings.HasPrefix(link.Link, "Firmware/") {
-			// if strings.HasPrefix(link.Link, "Firmware/Apple Watch/") {
+			if !strings.HasPrefix(link.Link, "Firmware/iPad") {
+				continue
+			}
 
 			wpage, err := getWikiPage(link.Link, proxy, insecure)
 			if err != nil {
@@ -459,6 +694,7 @@ func GetWikiIPSWs(proxy string, insecure bool) ([]*WikiIPSW, error) {
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse wikitable: %w", err)
 				}
+
 				ipsws = append(ipsws, tableIPSWs...)
 			}
 		}
