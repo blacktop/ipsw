@@ -1,13 +1,9 @@
 name: "Discord"
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [master]
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "00 01,13 * * *"
+    # - cron: "0 0 * * *"
 
 jobs:
   build:
@@ -18,4 +14,4 @@ jobs:
           sudo snap install ipsw
       - name: Run ipsw watch WebKit/WebKit
         run: |
-          /snap/bin/ipsw watch --pattern 'Lockdown Mode' --days 30 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} WebKit/WebKit
+          /snap/bin/ipsw watch --pattern 'Lockdown Mode' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} WebKit/WebKit
