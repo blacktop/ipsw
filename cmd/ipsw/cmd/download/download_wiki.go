@@ -218,16 +218,63 @@ var wikiCmd = &cobra.Command{
 				}
 			}
 		} else { // IPSWs
-			ipsws, err := download.ScrapeIPSWs(viper.GetBool("download.wiki.beta"))
+			ipsws, err := download.GetWikiIPSWs(download.CreateWikiFilter(&download.WikiConfig{
+				Device:  device,
+				Version: version,
+				Build:   build,
+				IPSW:    !viper.GetBool("download.wiki.ota"),
+				OTA:     viper.GetBool("download.wiki.ota"),
+				Beta:    viper.GetBool("download.wiki.beta"),
+			}), proxy, insecure)
 			if err != nil {
 				return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 			}
 
-			filteredURLS := download.FilterIpswURLs(ipsws, device, version, build)
-			if len(filteredURLS) == 0 {
-				log.Errorf("no IPSWs match %s", strings.Join([]string{device, version, build}, ", "))
-				return nil
+			// ipsws, err := download.ScrapeIPSWs(viper.GetBool("download.wiki.beta"))
+			// if err != nil {
+			// 	return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
+			// }
+
+			var filteredIPSW []download.WikiIPSW
+			for _, ipsw := range ipsws {
+				if len(version) > 0 || len(build) > 0 {
+					if strings.HasPrefix(ipsw.Version, version) || strings.EqualFold(ipsw.Build, build) {
+						if len(device) > 0 {
+							for _, dev := range ipsw.Devices {
+								if strings.EqualFold(dev, device) {
+									if len(ipsw.DownloadURL) > 0 {
+										filteredIPSW = append(filteredIPSW, ipsw)
+									}
+								}
+							}
+						} else {
+							if len(ipsw.DownloadURL) > 0 {
+								filteredIPSW = append(filteredIPSW, ipsw)
+							}
+						}
+					}
+				} else {
+					if len(device) > 0 {
+						for _, dev := range ipsw.Devices {
+							if strings.EqualFold(dev, device) {
+								if len(ipsw.DownloadURL) > 0 {
+									filteredIPSW = append(filteredIPSW, ipsw)
+								}
+							}
+						}
+					} else {
+						if len(ipsw.DownloadURL) > 0 {
+							filteredIPSW = append(filteredIPSW, ipsw)
+						}
+					}
+				}
 			}
+
+			var filteredURLS []string
+			for _, ipsw := range filteredIPSW {
+				filteredURLS = append(filteredURLS, ipsw.DownloadURL)
+			}
+			filteredURLS = utils.Unique(filteredURLS)
 
 			if viper.GetBool("download.wiki.json") {
 				db := make(map[string]*info.Info)
