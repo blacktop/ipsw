@@ -85,6 +85,15 @@ func (ds Devices) GetDevicesForType(typ string) (*Devices, error) {
 	return &devs, nil
 }
 
+func (ds Devices) GetDeviceForName(name string) (string, Device, error) {
+	for prod, dev := range ds {
+		if strings.EqualFold(dev.Name, name) || strings.EqualFold(dev.Description, name) {
+			return prod, dev, nil
+		}
+	}
+	return "", Device{}, fmt.Errorf("device not found with name %s", name)
+}
+
 func (ds Devices) GetDevicesForSDK(sdk string) (*Devices, error) {
 	devs := make(Devices)
 	for prod, dev := range ds {
