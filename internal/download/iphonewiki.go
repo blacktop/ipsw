@@ -40,7 +40,7 @@ const (
 	ipadPro          = "iPad Pro"
 	ipadMini         = "iPad mini"
 	iphone           = "iPhone"
-	ipodTouch        = "iPod Touch"
+	ipodTouch        = "iPod touch"
 )
 
 type Queue struct {
@@ -88,10 +88,12 @@ type WikiIPSW struct {
 	Version       string    `json:"version,omitempty"`
 	VersionExtra  string    `json:"version_extra,omitempty"`
 	Build         string    `json:"build,omitempty"`
+	Product       string    `json:"product,omitempty"`
+	BoardID       string    `json:"board_id,omitempty"`
 	Devices       []string  `json:"keys,omitempty"`
 	Baseband      string    `json:"baseband,omitempty"`
 	ReleaseDate   time.Time `json:"release_date,omitempty"`
-	DownloadURL   string    `json:"download_url,omitempty"`
+	URL           string    `json:"url,omitempty"`
 	Sha1Hash      string    `json:"sha1,omitempty"`
 	FileSize      int       `json:"file_size,omitempty"`
 	Documentation []string  `json:"doc,omitempty"`
@@ -354,6 +356,7 @@ func getVersionParts(input string) (version, extra string, err error) {
 
 // parse wikitable
 func parseWikiTable(text string) ([]WikiIPSW, error) {
+	var deviceID, boardID, productName string
 	var results []WikiIPSW
 
 	fieldCount := 0
@@ -361,6 +364,11 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 	ipsw := WikiIPSW{}
 	index2Header := make(map[int]string)
 	header2Values := make(map[string]*Queue)
+
+	db, err := info.GetIpswDB()
+	if err != nil {
+		log.Fatalf("failed to get ipsw db: %v", err)
+	}
 
 	machine := sm.Machine{
 		ID:      "mediawiki",
@@ -434,23 +442,26 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 				ipsw.VersionExtra = extra
 			}
 		case "Build":
-			ipsw.Build = header2Values[v].Pop()
+			build := header2Values[v].Pop()
+			build, _, _ = strings.Cut(build, "<")
+			ipsw.Build = build
 		case "Keys":
 			keys := header2Values[v].Pop()
 			if keys == "" {
-				return nil
-			}
-			var parts []string
-			if strings.Contains(keys, "<br/>") {
-				parts = strings.Split(keys, "<br/>")
+				ipsw.Devices = append(ipsw.Devices, deviceID)
 			} else {
-				parts = strings.Split(keys, "<br />")
-			}
-			for _, part := range parts {
-				part = strings.TrimSpace(part)
-				part = strings.Trim(part, "[]")
-				if _, dev, ok := strings.Cut(part, "|"); ok {
-					ipsw.Devices = append(ipsw.Devices, dev)
+				var parts []string
+				if strings.Contains(keys, "<br/>") {
+					parts = strings.Split(keys, "<br/>")
+				} else {
+					parts = strings.Split(keys, "<br />")
+				}
+				for _, part := range parts {
+					part = strings.TrimSpace(part)
+					part = strings.Trim(part, "[]")
+					if _, dev, ok := strings.Cut(part, "|"); ok {
+						ipsw.Devices = append(ipsw.Devices, dev)
+					}
 				}
 			}
 		case "Baseband":
@@ -473,7 +484,7 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 			if len(parts) > 1 {
 				url = parts[0]
 			}
-			ipsw.DownloadURL = url
+			ipsw.URL = url
 		case "SHA1 Hash":
 			sha := header2Values[v].Pop()
 			sha = strings.TrimPrefix(sha, "<code>")
@@ -501,6 +512,23 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 		default:
 			header2Values[v].Pop() // pop into the ether
 		}
+		if len(productName) > 0 {
+			ipsw.Product = productName
+		}
+		if len(boardID) > 0 {
+			ipsw.BoardID = boardID
+		}
+		if len(ipsw.Devices) == 0 {
+			if len(deviceID) > 0 {
+				ipsw.Devices = append(ipsw.Devices, deviceID)
+			} else {
+				if len(productName) > 0 {
+					if prod, _, err := db.GetDeviceForName(productName); err == nil {
+						ipsw.Devices = append(ipsw.Devices, prod)
+					}
+				}
+			}
+		}
 		return nil
 	}
 
@@ -508,24 +536,29 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "\"{{") { /* title */
-			if machine.Current() != "title" {
-				return nil, fmt.Errorf("title: invalid state '%s'", machine.Current())
+		if strings.HasPrefix(line, "===") { /* subtitle */
+			if machine.Current() != "title" && machine.Current() != "subtitle" {
+				return nil, fmt.Errorf("subtitle: invalid state '%s'", machine.Current())
 			}
-			// log.Debugf("title: %s", line)
-			continue
-		} else if strings.HasPrefix(line, "==") { /* subtitle */
-			if machine.Current() != "title" {
-				return nil, fmt.Errorf("title: invalid state '%s'", machine.Current())
-			}
-			title := strings.Trim(strings.TrimSpace(line), "=[] ")
-			board, name, ok := strings.Cut(title, "|")
+			deviceID = strings.Trim(strings.TrimSpace(line), "=[] ")
+			bID, dID, ok := strings.Cut(deviceID, "|")
 			if ok {
-				title = name
+				deviceID = dID
+				boardID = bID
 			}
-			// log.Info(title)
-			_ = title // TODO: use title
-			_ = board // TODO: use board
+			// log.Info(deviceID)
+			continue
+		} else if strings.HasPrefix(line, "==") { /* title */
+			if machine.Current() != "title" {
+				return nil, fmt.Errorf("title: invalid state '%s'", machine.Current())
+			}
+			productName = strings.Trim(strings.TrimSpace(line), "=[] ")
+			bID, dID, ok := strings.Cut(productName, "|")
+			if ok {
+				productName = dID
+				boardID = bID
+			}
+			// log.Info(productName)
 			continue
 		} else if strings.HasPrefix(line, "{|") { /* table start */
 			if machine.Current() != "title" {
@@ -545,8 +578,13 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 			for i := 0; i < headerCount; i++ {
 				parseItem(i)
 			}
-			results = append(results, ipsw)
+			if ipsw.URL != "" {
+				results = append(results, ipsw)
+			}
 			machine.Transition("done")
+			deviceID = ""
+			boardID = ""
+			productName = ""
 		} else if strings.HasPrefix(line, "|-") { /* table row delimiter */
 			switch machine.Current() {
 			case "start_table":
@@ -559,7 +597,9 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 				for i := 0; i < headerCount; i++ {
 					parseItem(i)
 				}
-				results = append(results, ipsw)
+				if ipsw.URL != "" {
+					results = append(results, ipsw)
+				}
 				machine.Transition("item_done")
 				ipsw = WikiIPSW{}
 				fieldCount = 0
@@ -577,21 +617,21 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 						return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
 					}
 					index2Header[headerCount] = field
-					header2Values[field] = NewQueue(20)
+					header2Values[field] = NewQueue(100)
 					headerCount++
 				} else if strings.Contains(line, "colspan") {
 					_, colInc, field, err := getRowOrColInc(line)
 					if err != nil {
 						return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
 					}
-					header2Values[field] = NewQueue(20)
+					header2Values[field] = NewQueue(100)
 					for i := 0; i < colInc; i++ {
 						index2Header[headerCount] = field
 						headerCount++
 					}
 				} else {
 					index2Header[headerCount] = line
-					header2Values[line] = NewQueue(20)
+					header2Values[line] = NewQueue(100)
 					headerCount++
 				}
 			} else if machine.Current() == "subheader" {
@@ -605,7 +645,7 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 				for i := 0; i < headerCount; i++ {
 					if last == index2Header[i] {
 						index2Header[i] = line
-						header2Values[line] = NewQueue(20)
+						header2Values[line] = NewQueue(100)
 						break
 					}
 					last = index2Header[i]
@@ -712,15 +752,19 @@ func CreateWikiFilter(cfg *WikiConfig) string {
 	}
 
 	if len(cfg.Version) > 0 {
-		ver, err := semver.NewVersion(cfg.Version)
-		if err != nil {
-			log.Fatalf("failed to convert version '%s' into semver object", cfg.Version)
+		if cfg.IPSW {
+			ver, err := semver.NewVersion(cfg.Version)
+			if err != nil {
+				log.Fatalf("failed to convert version '%s' into semver object", cfg.Version)
+			}
+			major = fmt.Sprintf("%s.x", strconv.Itoa(ver.Segments()[0]))
+		} else {
+			major = cfg.Version
 		}
-		major = strconv.Itoa(ver.Segments()[0])
 	}
 
 	if len(major) > 0 {
-		return fmt.Sprintf("%s/%s/%s.x", page, device, major)
+		return fmt.Sprintf("%s/%s/%s", page, device, major)
 	}
 
 	return fmt.Sprintf("%s/%s", page, device)
@@ -804,8 +848,8 @@ func GetWikiIPSWs(filter, proxy string, insecure bool) ([]WikiIPSW, error) {
 	return ipsws, nil
 }
 
-func GetWikiOTAs(proxy string, insecure bool) ([]*WikiOTA, error) {
-	var otas []*WikiOTA
+func GetWikiOTAs(filter, proxy string, insecure bool) ([]WikiIPSW, error) {
+	var otas []WikiIPSW
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -822,7 +866,7 @@ func GetWikiOTAs(proxy string, insecure bool) ([]*WikiOTA, error) {
 	q := req.URL.Query()
 	q.Add("format", "json")
 	q.Add("action", "parse")
-	q.Add("page", "OTA Updates")
+	q.Add("page", otaPage)
 	q.Add("prop", "links")
 	q.Add("redirects", "true")
 	req.URL.RawQuery = q.Encode()
@@ -849,8 +893,13 @@ func GetWikiOTAs(proxy string, insecure bool) ([]*WikiOTA, error) {
 	}
 
 	for _, link := range parseResp.Parse.Links {
-		// if strings.HasPrefix(link.Link, "OTA Updates/") {
-		if strings.HasPrefix(link.Link, "OTA Updates/iPhone/15") {
+		if strings.HasPrefix(link.Link, filter) {
+
+			log.Debugf("Parsing wiki page: '%s'", link.Link)
+
+			if strings.HasSuffix(link.Link, "iPod") { // skip weird info page
+				continue
+			}
 
 			wpage, err := getWikiPage(link.Link, proxy, insecure)
 			if err != nil {
@@ -863,12 +912,12 @@ func GetWikiOTAs(proxy string, insecure bool) ([]*WikiOTA, error) {
 					return nil, fmt.Errorf("failed to parse wikitable for %s: %w", link.Link, err)
 				}
 				// parse the wikitable
-				tableIPSWs, err := parseWikiTable(wtable.Parse.WikiText.Text)
+				tableOTAs, err := parseWikiTable(wtable.Parse.WikiText.Text)
 				if err != nil {
 					return nil, fmt.Errorf("failed to parse wikitable: %w", err)
 				}
-				fmt.Println(tableIPSWs)
-				// otas = append(otas, tableIPSWs...)
+
+				otas = append(otas, tableOTAs...)
 			}
 		}
 	}
