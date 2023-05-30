@@ -25,7 +25,7 @@ import (
 func GetDscPathsInMount(mountPoint string) ([]string, error) {
 	var matches []string
 
-	re := regexp.MustCompile(fmt.Sprintf("%s%c%s", mountPoint, filepath.Separator, CacheRegex))
+	re := regexp.MustCompile(CacheRegex)
 
 	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
