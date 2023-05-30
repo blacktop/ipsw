@@ -24,6 +24,7 @@ package download
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -134,14 +135,14 @@ var wikiCmd = &cobra.Command{
 		}
 
 		if dlIPSWs { /* DOWNLOAD IPSWs */
-			ipsws, err := download.GetWikiIPSWs(download.CreateWikiFilter(&download.WikiConfig{
+			ipsws, err := download.GetWikiIPSWs(&download.WikiConfig{
 				Device:  device,
 				Version: version,
 				Build:   build,
 				IPSW:    dlIPSWs,
 				OTA:     dlOTAs,
 				Beta:    viper.GetBool("download.wiki.beta"),
-			}), proxy, insecure)
+			}, proxy, insecure)
 			if err != nil {
 				return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 			}
@@ -158,13 +159,14 @@ var wikiCmd = &cobra.Command{
 						if len(device) > 0 {
 							for _, dev := range ipsw.Devices {
 								if strings.EqualFold(dev, device) {
-									if len(ipsw.URL) > 0 {
+									if _, err := url.ParseRequestURI(ipsw.URL); err == nil {
 										filteredIPSW = append(filteredIPSW, ipsw)
+										break
 									}
 								}
 							}
 						} else {
-							if len(ipsw.URL) > 0 {
+							if _, err := url.ParseRequestURI(ipsw.URL); err == nil {
 								filteredIPSW = append(filteredIPSW, ipsw)
 							}
 						}
@@ -173,13 +175,14 @@ var wikiCmd = &cobra.Command{
 					if len(device) > 0 {
 						for _, dev := range ipsw.Devices {
 							if strings.EqualFold(dev, device) {
-								if len(ipsw.URL) > 0 {
+								if _, err := url.ParseRequestURI(ipsw.URL); err == nil {
 									filteredIPSW = append(filteredIPSW, ipsw)
+									break
 								}
 							}
 						}
 					} else {
-						if len(ipsw.URL) > 0 {
+						if _, err := url.ParseRequestURI(ipsw.URL); err == nil {
 							filteredIPSW = append(filteredIPSW, ipsw)
 						}
 					}
@@ -327,14 +330,14 @@ var wikiCmd = &cobra.Command{
 				}
 			}
 		} else { /* DOWNLOAD OTAs */
-			otas, err := download.GetWikiOTAs(download.CreateWikiFilter(&download.WikiConfig{
+			otas, err := download.GetWikiOTAs(&download.WikiConfig{
 				Device:  device,
 				Version: version,
 				Build:   build,
 				IPSW:    dlIPSWs,
 				OTA:     dlOTAs,
 				Beta:    viper.GetBool("download.wiki.beta"),
-			}), proxy, insecure)
+			}, proxy, insecure)
 			if err != nil {
 				return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 			}
@@ -351,13 +354,13 @@ var wikiCmd = &cobra.Command{
 						if len(device) > 0 {
 							for _, dev := range ota.Devices {
 								if strings.EqualFold(dev, device) {
-									if len(ota.URL) > 0 {
+									if _, err := url.ParseRequestURI(ota.URL); err == nil {
 										filteredOTAs = append(filteredOTAs, ota)
 									}
 								}
 							}
 						} else {
-							if len(ota.URL) > 0 {
+							if _, err := url.ParseRequestURI(ota.URL); err == nil {
 								filteredOTAs = append(filteredOTAs, ota)
 							}
 						}
@@ -366,13 +369,13 @@ var wikiCmd = &cobra.Command{
 					if len(device) > 0 {
 						for _, dev := range ota.Devices {
 							if strings.EqualFold(dev, device) {
-								if len(ota.URL) > 0 {
+								if _, err := url.ParseRequestURI(ota.URL); err == nil {
 									filteredOTAs = append(filteredOTAs, ota)
 								}
 							}
 						}
 					} else {
-						if len(ota.URL) > 0 {
+						if _, err := url.ParseRequestURI(ota.URL); err == nil {
 							filteredOTAs = append(filteredOTAs, ota)
 						}
 					}

@@ -460,7 +460,7 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 					part = strings.TrimSpace(part)
 					part = strings.Trim(part, "[]")
 					if _, dev, ok := strings.Cut(part, "|"); ok {
-						ipsw.Devices = append(ipsw.Devices, dev)
+						ipsw.Devices = utils.UniqueAppend(ipsw.Devices, dev)
 					}
 				}
 			}
@@ -512,10 +512,10 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 		default:
 			header2Values[v].Pop() // pop into the ether
 		}
-		if len(productName) > 0 {
+		if len(ipsw.Product) == 0 && len(productName) > 0 {
 			ipsw.Product = productName
 		}
-		if len(boardID) > 0 {
+		if len(ipsw.BoardID) == 0 && len(boardID) > 0 {
 			ipsw.BoardID = boardID
 		}
 		if len(ipsw.Devices) == 0 {
@@ -524,7 +524,7 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 			} else {
 				if len(productName) > 0 {
 					if prod, _, err := db.GetDeviceForName(productName); err == nil {
-						ipsw.Devices = append(ipsw.Devices, prod)
+						ipsw.Devices = utils.UniqueAppend(ipsw.Devices, prod)
 					}
 				}
 			}
@@ -771,8 +771,10 @@ func CreateWikiFilter(cfg *WikiConfig) string {
 }
 
 // GetWikiIPSWs queries theiphonewiki.com for IPSWs
-func GetWikiIPSWs(filter, proxy string, insecure bool) ([]WikiIPSW, error) {
+func GetWikiIPSWs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiIPSW, error) {
 	var ipsws []WikiIPSW
+
+	filter := CreateWikiFilter(cfg)
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -818,11 +820,11 @@ func GetWikiIPSWs(filter, proxy string, insecure bool) ([]WikiIPSW, error) {
 	for _, link := range parseResp.Parse.Links {
 		if strings.HasPrefix(link.Link, filter) {
 
-			log.Info(link.Link)
-
 			if strings.HasSuffix(link.Link, "iPod") { // skip weird info page
 				continue
 			}
+
+			log.Debugf("Parsing wiki page: '%s'", link.Link)
 
 			wpage, err := getWikiPage(link.Link, proxy, insecure)
 			if err != nil {
@@ -848,8 +850,11 @@ func GetWikiIPSWs(filter, proxy string, insecure bool) ([]WikiIPSW, error) {
 	return ipsws, nil
 }
 
-func GetWikiOTAs(filter, proxy string, insecure bool) ([]WikiIPSW, error) {
+// GetWikiOTAs queries theiphonewiki.com for OTAs
+func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiIPSW, error) {
 	var otas []WikiIPSW
+
+	filter := CreateWikiFilter(cfg)
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -866,7 +871,11 @@ func GetWikiOTAs(filter, proxy string, insecure bool) ([]WikiIPSW, error) {
 	q := req.URL.Query()
 	q.Add("format", "json")
 	q.Add("action", "parse")
-	q.Add("page", otaPage)
+	if cfg.Beta {
+		q.Add("page", otaBetaPage)
+	} else {
+		q.Add("page", otaPage)
+	}
 	q.Add("prop", "links")
 	q.Add("redirects", "true")
 	req.URL.RawQuery = q.Encode()
