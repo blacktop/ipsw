@@ -28,6 +28,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -536,35 +537,36 @@ var wikiCmd = &cobra.Command{
 						}
 					} else { // NORMAL MODE
 						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
-						for idx, ota := range filteredOTAs {
-							fname := filepath.Join(destPath, getDestName(ota.URL, removeCommas))
-							if _, err := os.Stat(fname); os.IsNotExist(err) {
-								zr, err := download.NewRemoteZipReader(ota.URL, &download.RemoteConfig{
-									Proxy:    proxy,
-									Insecure: insecure,
-								})
-								if err != nil {
-									return fmt.Errorf("failed to create remote zip reader of ipsw: %v", err)
+						for _, o := range filteredOTAs {
+							folder := filepath.Join(destPath, fmt.Sprintf("%s%s_OTAs", o.Version, o.VersionExtra))
+							os.MkdirAll(folder, 0750)
+							var devices string
+							if len(o.Devices) > 0 {
+								sort.Strings(o.Devices)
+								if len(o.Devices) > 5 {
+									devices = fmt.Sprintf("%s_and_%d_others", o.Devices[0], len(o.Devices)-1)
+								} else {
+									devices = strings.Join(o.Devices, "_")
 								}
-								i, err := info.ParseZipFiles(zr.File)
-								if err != nil {
-									return fmt.Errorf("failed parsing remote OTA URL: %v", err)
-								}
+							}
+							url := o.URL
+							destName := filepath.Join(folder, fmt.Sprintf("%s_%s", devices, getDestName(url, removeCommas)))
+							if _, err := os.Stat(destName); os.IsNotExist(err) {
 								log.WithFields(log.Fields{
-									"devices": i.Plists.MobileAssetProperties.SupportedDevices,
-									"build":   i.Plists.BuildManifest.ProductBuildVersion,
-									"version": i.Plists.BuildManifest.ProductVersion,
-								}).Infof("Getting (%d/%d) OTA", idx+1, len(otas))
+									"device": strings.Join(o.Devices, " "),
+									"model":  o.BoardID,
+									"build":  o.Build,
+								}).Info(fmt.Sprintf("Getting %s%s OTA", o.Version, o.VersionExtra))
 								// download file
-								downloader.URL = ota.URL
-								downloader.DestName = fname
-
-								err = downloader.Do()
-								if err != nil {
-									return fmt.Errorf("failed to download OTA: %v", err)
+								downloader.URL = url
+								downloader.DestName = destName
+								if err := downloader.Do(); err != nil {
+									return fmt.Errorf("failed to download file: %v", err)
 								}
+							} else if err != nil {
+								return fmt.Errorf("failed to stat file %s: %v", destName, err)
 							} else {
-								log.Warnf("OTA already exists: %s", fname)
+								log.Warnf("OTA already exists: %s", destName)
 							}
 						}
 					}
