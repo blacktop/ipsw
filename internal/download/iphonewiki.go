@@ -641,7 +641,7 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 					headerCount++
 				}
 			} else if machine.Current() == "subheader" {
-				// FIXME: this replaces the 2nd colspan header (which works) but it's really supports to be a sub-header value (and could be ignored?)
+				// FIXME: this replaces the 2nd colspan header (which works) but it's really supposed to be a sub-header value (and could be ignored?)
 				line = strings.TrimPrefix(line, "! ")
 				if strings.HasPrefix(line, "class=") {
 					_, line, _ = strings.Cut(line, " | ")
