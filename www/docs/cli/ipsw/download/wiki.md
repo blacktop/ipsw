@@ -21,11 +21,14 @@ ipsw download wiki [flags]
       --db string        Path to local JSON database (will use CWD by default) (default "wiki_db.json")
   -f, --flat             Do NOT perserve directory structure when downloading with --pattern
   -h, --help             help for wiki
+      --ipsw             Download IPSWs
       --json             Parse URLs and store metadata in local JSON database
       --kernel           Extract kernelcache from remote IPSW
-      --ota              Download OTAs 🚧
+      --ota              Download OTAs
   -o, --output string    Folder to download files to
       --pattern string   Download remote files that match regex
+      --pb string        OTA prerequisite build
+      --pv string        OTA prerequisite version
 ```
 
 ### Options inherited from parent commands
