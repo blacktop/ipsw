@@ -44,7 +44,7 @@ require (
 	github.com/shurcooL/githubv4 v0.0.0-20230424031643-6cea62ecd5a9
 	github.com/spf13/cast v1.5.1
 	github.com/spf13/cobra v1.7.0
-	github.com/spf13/viper v1.15.0
+	github.com/spf13/viper v1.16.0
 	github.com/ulikunitz/xz v0.5.11
 	github.com/unicorn-engine/unicorn v0.0.0-20230207094436-7b8c63dfe650
 	github.com/vbauerster/mpb/v7 v7.5.3
