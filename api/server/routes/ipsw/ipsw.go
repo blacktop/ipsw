@@ -71,7 +71,7 @@ func getFsFiles(c *gin.Context) {
 
 	// mount filesystem DMG
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
 	if err != nil {
 		if !errors.Is(err, utils.ErrMountResourceBusy) {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: fmt.Sprintf("failed to mount DMG: %v", err)})
