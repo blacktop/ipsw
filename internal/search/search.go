@@ -31,7 +31,7 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 		utils.Indent(log.Debug, 2)(fmt.Sprintf("Found extracted %s", dmgPath))
 	}
 	utils.Indent(log.Debug, 2)(fmt.Sprintf("Mounting %s %s", dmgType, dmgPath))
-	mountPoint, alreadyMounted, err := utils.MountFS(dmgPath)
+	mountPoint, alreadyMounted, err := utils.MountDMG(dmgPath)
 	if err != nil {
 		return fmt.Errorf("failed to mount DMG: %v", err)
 	}
