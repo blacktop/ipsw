@@ -452,7 +452,9 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 		case "Keys":
 			keys := header2Values[v].Pop()
 			if keys == "" {
-				ipsw.Devices = append(ipsw.Devices, deviceID)
+				if deviceID != "" {
+					ipsw.Devices = append(ipsw.Devices, deviceID)
+				}
 			} else {
 				var parts []string
 				if strings.Contains(keys, "<br/>") {
@@ -679,14 +681,16 @@ func parseWikiTable(text string) ([]WikiFirmware, error) {
 					return nil, fmt.Errorf("failed to parse colspan|rowspan: %s", err)
 				}
 				if colInc > 0 && rowInc > 0 {
-					for i := 0; i < colInc-1; i++ {
+					for i := 0; i < colInc; i++ {
 						for j := 0; j < rowInc; j++ {
 							header2Values[index2Header[fieldCount+i]].Push(field)
 						}
 					}
 				} else if colInc > 0 {
 					for i := 0; i < colInc; i++ {
-						header2Values[index2Header[fieldCount+i]].Push(field)
+						if fieldCount+i < len(header2Values) {
+							header2Values[index2Header[fieldCount+i]].Push(field)
+						}
 					}
 				} else if rowInc > 0 {
 					for i := 0; i < rowInc; i++ {
