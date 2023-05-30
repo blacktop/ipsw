@@ -485,7 +485,7 @@ var otaDLCmd = &cobra.Command{
 					} else if err != nil {
 						return fmt.Errorf("failed to stat file %s: %v", destName, err)
 					} else {
-						log.Warnf("ota already exists: %s", destName)
+						log.Warnf("OTA already exists: %s", destName)
 					}
 				}
 			}
