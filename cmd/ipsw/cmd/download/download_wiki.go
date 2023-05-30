@@ -51,6 +51,8 @@ func init() {
 	wikiCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	wikiCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	wikiCmd.Flags().Bool("beta", false, "Download beta IPSWs/OTAs")
+	wikiCmd.Flags().String("pv", "", "OTA prerequisite version")
+	wikiCmd.Flags().String("pb", "", "OTA prerequisite build")
 	wikiCmd.Flags().Bool("json", false, "Parse URLs and store metadata in local JSON database")
 	wikiCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	wikiCmd.Flags().String("db", "wiki_db.json", "Path to local JSON database (will use CWD by default)")
@@ -66,6 +68,8 @@ func init() {
 	viper.BindPFlag("download.wiki.kernel", wikiCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.wiki.pattern", wikiCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.wiki.beta", wikiCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.wiki.pv", wikiCmd.Flags().Lookup("pv"))
+	viper.BindPFlag("download.wiki.pb", wikiCmd.Flags().Lookup("pb"))
 	viper.BindPFlag("download.wiki.json", wikiCmd.Flags().Lookup("json"))
 	viper.BindPFlag("download.wiki.output", wikiCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.wiki.db", wikiCmd.Flags().Lookup("db"))
@@ -153,7 +157,7 @@ var wikiCmd = &cobra.Command{
 			// 	return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 			// }
 
-			var filteredIPSW []download.WikiIPSW
+			var filteredIPSW []download.WikiFirmware
 			for _, ipsw := range ipsws {
 				if len(version) > 0 || len(build) > 0 {
 					if strings.HasPrefix(ipsw.Version, version) || strings.EqualFold(ipsw.Build, build) {
@@ -348,21 +352,35 @@ var wikiCmd = &cobra.Command{
 			// 	return fmt.Errorf("failed querying theiphonewiki.com: %v", err)
 			// }
 
-			var filteredOTAs []download.WikiIPSW
+			uniqueAppend := func(slice []download.WikiFirmware, i download.WikiFirmware) []download.WikiFirmware {
+				for _, ele := range slice {
+					if ele.URL == i.URL {
+						return slice
+					}
+				}
+				return append(slice, i)
+			}
+
+			var filteredOTAs []download.WikiFirmware
 			for _, ota := range otas {
 				if len(version) > 0 || len(build) > 0 {
 					if strings.HasPrefix(ota.Version, version) || strings.EqualFold(ota.Build, build) {
+						log.Debugf("prerequisite version: %s, prerequisite build: %s", viper.GetString("download.wiki.pv"), viper.GetString("download.wiki.pb"))
+						if !strings.EqualFold(ota.PrerequisiteVersion, viper.GetString("download.wiki.pv")) &&
+							!strings.EqualFold(ota.Build, viper.GetString("download.wiki.pb")) {
+							continue
+						}
 						if len(device) > 0 {
 							for _, dev := range ota.Devices {
 								if strings.EqualFold(dev, device) {
 									if _, err := url.ParseRequestURI(ota.URL); err == nil {
-										filteredOTAs = append(filteredOTAs, ota)
+										filteredOTAs = uniqueAppend(filteredOTAs, ota)
 									}
 								}
 							}
 						} else {
 							if _, err := url.ParseRequestURI(ota.URL); err == nil {
-								filteredOTAs = append(filteredOTAs, ota)
+								filteredOTAs = uniqueAppend(filteredOTAs, ota)
 							}
 						}
 					}
@@ -371,13 +389,13 @@ var wikiCmd = &cobra.Command{
 						for _, dev := range ota.Devices {
 							if strings.EqualFold(dev, device) {
 								if _, err := url.ParseRequestURI(ota.URL); err == nil {
-									filteredOTAs = append(filteredOTAs, ota)
+									filteredOTAs = uniqueAppend(filteredOTAs, ota)
 								}
 							}
 						}
 					} else {
 						if _, err := url.ParseRequestURI(ota.URL); err == nil {
-							filteredOTAs = append(filteredOTAs, ota)
+							filteredOTAs = uniqueAppend(filteredOTAs, ota)
 						}
 					}
 				}

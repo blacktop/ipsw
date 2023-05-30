@@ -84,22 +84,22 @@ func (q *Queue) Pop() string {
 	return q.l.Remove(q.l.Back()).(string)
 }
 
-type WikiIPSW struct {
-	Version       string    `json:"version,omitempty"`
-	VersionExtra  string    `json:"version_extra,omitempty"`
-	Build         string    `json:"build,omitempty"`
-	Product       string    `json:"product,omitempty"`
-	BoardID       string    `json:"board_id,omitempty"`
-	Devices       []string  `json:"keys,omitempty"`
-	Baseband      string    `json:"baseband,omitempty"`
-	ReleaseDate   time.Time `json:"release_date,omitempty"`
-	URL           string    `json:"url,omitempty"`
-	Sha1Hash      string    `json:"sha1,omitempty"`
-	FileSize      int       `json:"file_size,omitempty"`
-	Documentation []string  `json:"doc,omitempty"`
+type WikiFirmware struct {
+	Version             string    `json:"version,omitempty"`
+	VersionExtra        string    `json:"version_extra,omitempty"`
+	PrerequisiteVersion string    `json:"prerequisite_version,omitempty"`
+	Build               string    `json:"build,omitempty"`
+	PrerequisiteBuild   string    `json:"prerequisite_build,omitempty"`
+	Product             string    `json:"product,omitempty"`
+	BoardID             string    `json:"board_id,omitempty"`
+	Devices             []string  `json:"keys,omitempty"`
+	Baseband            string    `json:"baseband,omitempty"`
+	ReleaseDate         time.Time `json:"release_date,omitempty"`
+	URL                 string    `json:"url,omitempty"`
+	Sha1Hash            string    `json:"sha1,omitempty"`
+	FileSize            int       `json:"file_size,omitempty"`
+	Documentation       []string  `json:"doc,omitempty"`
 }
-
-type WikiOTA WikiIPSW
 
 type wikiSection struct {
 	TocLevel   int    `json:"toclevel,omitempty"`
@@ -355,13 +355,13 @@ func getVersionParts(input string) (version, extra string, err error) {
 }
 
 // parse wikitable
-func parseWikiTable(text string) ([]WikiIPSW, error) {
+func parseWikiTable(text string) ([]WikiFirmware, error) {
 	var deviceID, boardID, productName string
-	var results []WikiIPSW
+	var results []WikiFirmware
 
 	fieldCount := 0
 	headerCount := 0
-	ipsw := WikiIPSW{}
+	ipsw := WikiFirmware{}
 	index2Header := make(map[int]string)
 	header2Values := make(map[string]*Queue)
 
@@ -441,6 +441,10 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 				ipsw.Version = num
 				ipsw.VersionExtra = extra
 			}
+		case "Prerequisite Version":
+			ipsw.PrerequisiteVersion = strings.Replace(header2Values[v].Pop(), "{{n/a}}", "", -1)
+		case "Prerequisite Build":
+			ipsw.PrerequisiteBuild = strings.Replace(header2Values[v].Pop(), "{{n/a}}", "", -1)
 		case "Build":
 			build := header2Values[v].Pop()
 			build, _, _ = strings.Cut(build, "<")
@@ -601,7 +605,7 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 					results = append(results, ipsw)
 				}
 				machine.Transition("item_done")
-				ipsw = WikiIPSW{}
+				ipsw = WikiFirmware{}
 				fieldCount = 0
 			}
 			continue
@@ -669,11 +673,6 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 				line = strings.Replace(line, "Nowrap", "", -1)
 			}
 
-			if line == "{{n/a}}" { // empty field
-				header2Values[index2Header[fieldCount]].Push("")
-				continue
-			}
-
 			if strings.Contains(line, "colspan") || strings.Contains(line, "rowspan") {
 				rowInc, colInc, field, err := getRowOrColInc(line)
 				if err != nil {
@@ -686,7 +685,7 @@ func parseWikiTable(text string) ([]WikiIPSW, error) {
 						}
 					}
 				} else if colInc > 0 {
-					for i := 0; i < colInc-1; i++ {
+					for i := 0; i < colInc; i++ {
 						header2Values[index2Header[fieldCount+i]].Push(field)
 					}
 				} else if rowInc > 0 {
@@ -771,8 +770,8 @@ func CreateWikiFilter(cfg *WikiConfig) string {
 }
 
 // GetWikiIPSWs queries theiphonewiki.com for IPSWs
-func GetWikiIPSWs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiIPSW, error) {
-	var ipsws []WikiIPSW
+func GetWikiIPSWs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware, error) {
+	var ipsws []WikiFirmware
 
 	filter := CreateWikiFilter(cfg)
 
@@ -851,8 +850,8 @@ func GetWikiIPSWs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiIPSW, err
 }
 
 // GetWikiOTAs queries theiphonewiki.com for OTAs
-func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiIPSW, error) {
-	var otas []WikiIPSW
+func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiFirmware, error) {
+	var otas []WikiFirmware
 
 	filter := CreateWikiFilter(cfg)
 
@@ -934,8 +933,8 @@ func GetWikiOTAs(cfg *WikiConfig, proxy string, insecure bool) ([]WikiIPSW, erro
 	return otas, nil
 }
 
-func GetWikiFirmwareKeys(proxy string, insecure bool) ([]*WikiOTA, error) {
-	var otas []*WikiOTA
+func GetWikiFirmwareKeys(proxy string, insecure bool) ([]WikiFirmware, error) {
+	var otas []WikiFirmware
 
 	client := &http.Client{
 		Transport: &http.Transport{
