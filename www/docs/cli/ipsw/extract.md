@@ -18,6 +18,7 @@ ipsw extract <IPSW/OTA | URL> [flags]
 
 ```
   -m, --dmg string              Extract DMG file (app, sys, fs)
+      --driverkit               Extract DriverKit dyld_shared_cache
   -t, --dtree                   Extract DeviceTree
   -d, --dyld                    Extract dyld_shared_cache
   -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
