@@ -30,6 +30,8 @@ type Config struct {
 	Pattern string `json:"pattern,omitempty"`
 	// arches of the DSCs to extract
 	Arches []string `json:"arches,omitempty"`
+	// extract the DriverKit DSCs
+	DriverKit bool `json:"driver_kit,omitempty"`
 	// http proxy to use
 	Proxy string `json:"proxy,omitempty"`
 	// don't verify the certificate chain
@@ -112,7 +114,7 @@ func DSC(c *Config) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		return dyld.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), c.Arches)
+		return dyld.Extract(c.IPSW, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
 	} else if len(c.URL) > 0 {
 		if !isURL(c.URL) {
 			return nil, fmt.Errorf("invalid URL provided: %s", c.URL)
@@ -136,7 +138,7 @@ func DSC(c *Config) ([]string, error) {
 		if _, err := utils.SearchZip(zr.File, regexp.MustCompile(fmt.Sprintf("^%s$", sysDMG)), tmpDIR, c.Flatten, true); err != nil {
 			return nil, fmt.Errorf("failed to extract SystemOS DMG from remote IPSW: %v", err)
 		}
-		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.Arches)
+		return dyld.ExtractFromDMG(i, filepath.Join(tmpDIR, sysDMG), filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
 }

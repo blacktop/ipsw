@@ -49,6 +49,7 @@ func init() {
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	extractCmd.Flags().Bool("flat", false, "Do NOT perserve directory structure when extracting")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
+	extractCmd.Flags().Bool("driverkit", false, "Extract DriverKit dyld_shared_cache")
 	extractCmd.RegisterFlagCompletionFunc("dmg", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{
 			"app\tAppOS",
@@ -72,6 +73,7 @@ func init() {
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("extract.flat", extractCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("extract.dyld-arch", extractCmd.Flags().Lookup("dyld-arch"))
+	viper.BindPFlag("extract.driverkit", extractCmd.Flags().Lookup("driverkit"))
 }
 
 // extractCmd represents the extract command
@@ -94,8 +96,6 @@ var extractCmd = &cobra.Command{
 		// validate args
 		if len(viper.GetStringSlice("extract.dyld-arch")) > 0 && !viper.GetBool("extract.dyld") {
 			return fmt.Errorf("--dyld-arch or -a can only be used with --dyld or -d")
-		} else if viper.GetBool("extract.files") && len(viper.GetString("extract.pattern")) == 0 {
-			return fmt.Errorf("--pattern or -p must be used with --files or -f")
 		} else if len(viper.GetStringSlice("extract.dyld-arch")) > 0 {
 			for _, arch := range viper.GetStringSlice("extract.dyld-arch") {
 				if !utils.StrSliceHas([]string{"arm64", "arm64e", "x86_64", "x86_64h"}, arch) {
@@ -106,20 +106,25 @@ var extractCmd = &cobra.Command{
 			if !utils.StrSliceHas([]string{"app", "sys", "fs"}, viper.GetString("extract.dmg")) {
 				return fmt.Errorf("invalid DMG type '%s' (must be: app, sys or fs)", viper.GetString("extract.dmg"))
 			}
+		} else if viper.GetBool("extract.files") && len(viper.GetString("extract.pattern")) == 0 {
+			return fmt.Errorf("--pattern or -p must be used with --files or -f")
+		} else if viper.GetBool("extract.driverkit") && !viper.GetBool("extract.dyld") {
+			return fmt.Errorf("--driverkit can only be used with --dyld or -d")
 		}
 
 		config := &extract.Config{
-			IPSW:     "",
-			URL:      "",
-			Pattern:  viper.GetString("extract.pattern"),
-			Arches:   viper.GetStringSlice("extract.dyld-arch"),
-			Proxy:    viper.GetString("extract.proxy"),
-			Insecure: viper.GetBool("extract.insecure"),
-			DMGs:     false,
-			DmgType:  viper.GetString("extract.dmg"),
-			Flatten:  viper.GetBool("extract.flat"),
-			Progress: true,
-			Output:   viper.GetString("extract.output"),
+			IPSW:      "",
+			URL:       "",
+			Pattern:   viper.GetString("extract.pattern"),
+			Arches:    viper.GetStringSlice("extract.dyld-arch"),
+			DriverKit: viper.GetBool("extract.driverkit"),
+			Proxy:     viper.GetString("extract.proxy"),
+			Insecure:  viper.GetBool("extract.insecure"),
+			DMGs:      false,
+			DmgType:   viper.GetString("extract.dmg"),
+			Flatten:   viper.GetBool("extract.flat"),
+			Progress:  true,
+			Output:    viper.GetString("extract.output"),
 		}
 
 		if viper.GetBool("extract.remote") {

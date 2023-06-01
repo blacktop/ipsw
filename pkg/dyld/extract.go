@@ -22,10 +22,19 @@ import (
 	"github.com/vbauerster/mpb/v7/decor"
 )
 
-func GetDscPathsInMount(mountPoint string) ([]string, error) {
+func GetDscPathsInMount(mountPoint string, driverKit bool) ([]string, error) {
 	var matches []string
+	var re *regexp.Regexp
 
-	re := regexp.MustCompile(CacheRegex)
+	if runtime.GOOS == "linux" { // apfs-fuse mounts volume at mountPoint + "/root"
+		mountPoint = filepath.Join(mountPoint, "root")
+	}
+
+	if driverKit {
+		re = regexp.MustCompile(filepath.Join(mountPoint, DriverKitCacheRegex))
+	} else {
+		re = regexp.MustCompile(filepath.Join(mountPoint, CacheRegex))
+	}
 
 	if err := filepath.Walk(mountPoint, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
@@ -46,7 +55,7 @@ func GetDscPathsInMount(mountPoint string) ([]string, error) {
 	return matches, nil
 }
 
-func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) ([]string, error) {
+func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, driverkit bool) ([]string, error) {
 
 	utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting DMG %s", dmgPath))
 	var alreadyMounted bool
@@ -83,7 +92,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) ([]
 		}
 	}
 
-	matches, err := GetDscPathsInMount(mountPoint)
+	matches, err := GetDscPathsInMount(mountPoint, driverkit)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +147,7 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string) ([]
 }
 
 // Extract extracts dyld_shared_cache from IPSW
-func Extract(ipsw, destPath string, arches []string) ([]string, error) {
+func Extract(ipsw, destPath string, arches []string, driverkit bool) ([]string, error) {
 
 	if runtime.GOOS == "windows" {
 		return nil, fmt.Errorf("dyld extraction is not supported on Windows (see github.com/blacktop/go-apfs)")
@@ -171,10 +180,10 @@ func Extract(ipsw, destPath string, arches []string) ([]string, error) {
 		defer os.Remove(dmgs[0])
 	}
 
-	return ExtractFromDMG(i, dmgPath, destPath, arches)
+	return ExtractFromDMG(i, dmgPath, destPath, arches, driverkit)
 }
 
-func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) error {
+func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, driverkit bool) error {
 	found := false
 
 	for _, zf := range zr.File {
@@ -236,7 +245,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string) 
 				return fmt.Errorf("failed to parse info from cryptex-system-arm64e: %v", err)
 			}
 
-			if _, err := ExtractFromDMG(i, out.Name(), destPath, arches); err != nil {
+			if _, err := ExtractFromDMG(i, out.Name(), destPath, arches, driverkit); err != nil {
 				return fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
 			}
 

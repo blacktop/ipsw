@@ -350,14 +350,14 @@ func (d *Diff) parseKDKs() (err error) {
 }
 
 func (d *Diff) parseDSC() error {
-	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath)
+	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath, false)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.Old.MountPath, err)
 	}
 	if len(oldDSCes) == 0 {
 		return fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", d.Old.MountPath)
 	}
-	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath)
+	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.New.MountPath, err)
 	}

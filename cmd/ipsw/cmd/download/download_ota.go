@@ -368,7 +368,7 @@ var otaDLCmd = &cobra.Command{
 						found := false
 						if runtime.GOOS == "darwin" { // FIXME: figure out how to do this on all platforms
 							log.Info("Extracting remote dyld_shared_cache")
-							if err := dyld.ExtractFromRemoteCryptex(zr, destPath, dyldArches); err != nil {
+							if err := dyld.ExtractFromRemoteCryptex(zr, destPath, dyldArches, false); err != nil { // TODO: assuming user doesn't want DriverKit cache
 								log.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
 							}
 							found = true
