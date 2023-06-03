@@ -17,6 +17,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/utils/lsof"
 )
 
 // Cp copies a file from src to dest
@@ -471,7 +472,15 @@ func Unmount(mountPoint string, force bool) error {
 			if strings.Contains(err.Error(), "exit status 16") {
 				edetail = " (Resource busy)"
 			}
-			return fmt.Errorf("failed to unmount %s%s: %v", mountPoint, edetail, err)
+			procs, lerr := lsof.MountPoint(mountPoint)
+			if lerr == nil {
+				edetail += "\n  Processes using mount point:"
+				for _, proc := range procs {
+					edetail += fmt.Sprintf("\n    %s", proc)
+				}
+				edetail += "\n"
+			}
+			return fmt.Errorf("failed to unmount %s: %v%s", mountPoint, err, edetail)
 		}
 	} else if runtime.GOOS == "linux" {
 		cmd := exec.Command("umount", mountPoint)
