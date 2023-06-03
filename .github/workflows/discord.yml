@@ -2,8 +2,8 @@ name: "Discord"
 
 on:
   schedule:
-    - cron: "00 01,13 * * *"
-    # - cron: "0 0 * * *"
+    - cron: "0 0 * * *"
+    # - cron: "00 01,13 * * *"
 
 jobs:
   build:
