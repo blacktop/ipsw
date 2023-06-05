@@ -1071,6 +1071,9 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 					}
 					if re.MatchString(version) {
 						for _, ipsw := range ipsws[version] {
+							if strings.HasPrefix(ipsw.URL, "/services-account/download") {
+								ipsw.URL = "https://developer.apple.com" + ipsw.URL
+							}
 							if err := dp.Download(ipsw.URL, folder); err != nil {
 								log.Errorf("failed to download %s: %v", ipsw.URL, err)
 							}
