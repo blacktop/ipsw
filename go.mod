@@ -21,7 +21,7 @@ require (
 	github.com/disgoorg/disgo v0.16.5
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/docker/docker v24.0.2+incompatible
-	github.com/dominikbraun/graph v0.22.0
+	github.com/dominikbraun/graph v0.22.1
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.3
