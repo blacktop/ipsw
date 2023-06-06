@@ -42,6 +42,7 @@ import (
 */
 
 const (
+	developerURL    = "https://developer.apple.com"
 	downloadURL     = "https://developer.apple.com/download/"
 	downloadAppsURL = "https://developer.apple.com/download/applications/"
 
@@ -1071,9 +1072,6 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 					}
 					if re.MatchString(version) {
 						for _, ipsw := range ipsws[version] {
-							if strings.HasPrefix(ipsw.URL, "/services-account/download") {
-								ipsw.URL = "https://developer.apple.com" + ipsw.URL
-							}
 							if err := dp.Download(ipsw.URL, folder); err != nil {
 								log.Errorf("failed to download %s: %v", ipsw.URL, err)
 							}
@@ -1398,6 +1396,9 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 				ul.Find("ul > li").Each(func(_ int, li *goquery.Selection) {
 					a := li.Find("a[href]")
 					href, _ := a.Attr("href")
+					if strings.HasPrefix(href, "/services-account/download") {
+						href = developerURL + href
+					}
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
@@ -1414,6 +1415,9 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 				ul.Find("li").Each(func(_ int, li *goquery.Selection) {
 					a := li.Find("a[href]")
 					href, _ := a.Attr("href")
+					if strings.HasPrefix(href, "/services-account/download") {
+						href = developerURL + href
+					}
 					p := li.Find("p")
 					version := ul.Parent().Parent().Parent().Find("h3")
 					ipsws[version.Text()] = append(ipsws[version.Text()], DevDownload{
