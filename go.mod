@@ -11,7 +11,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.1.2
 	github.com/blacktop/arm64-cgo v1.0.57
 	github.com/blacktop/go-dwarf v1.0.9
-	github.com/blacktop/go-macho v1.1.156
+	github.com/blacktop/go-macho v1.1.157
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -21,7 +21,7 @@ require (
 	github.com/disgoorg/disgo v0.16.5
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/docker/docker v24.0.2+incompatible
-	github.com/dominikbraun/graph v0.22.0
+	github.com/dominikbraun/graph v0.22.2
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.3
@@ -158,8 +158,8 @@ require (
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gotest.tools/v3 v3.4.0 // indirect
-	modernc.org/libc v1.22.6 // indirect
+	modernc.org/libc v1.23.0 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
-	modernc.org/memory v1.5.0 // indirect
+	modernc.org/memory v1.6.0 // indirect
 	modernc.org/sqlite v1.23.0 // indirect
 )
