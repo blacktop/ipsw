@@ -284,7 +284,7 @@ var machoSearchCmd = &cobra.Command{
 							}
 						}
 					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
+						log.Error(fmt.Sprintf("%s: %s", path, err.Error()))
 					}
 				}
 			}
