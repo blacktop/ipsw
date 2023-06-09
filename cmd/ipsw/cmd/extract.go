@@ -43,6 +43,7 @@ func init() {
 	extractCmd.Flags().StringP("dmg", "m", "", "Extract DMG file (app, sys, fs)")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
+	extractCmd.Flags().BoolP("sptm", "p", false, "Extract SPTM Firmware")
 	extractCmd.Flags().BoolP("kbag", "b", false, "Extract Im4p Keybags")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().String("pattern", "", "Extract files that match regex")
@@ -67,6 +68,7 @@ func init() {
 	viper.BindPFlag("extract.dmg", extractCmd.Flags().Lookup("dmg"))
 	viper.BindPFlag("extract.iboot", extractCmd.Flags().Lookup("iboot"))
 	viper.BindPFlag("extract.sep", extractCmd.Flags().Lookup("sep"))
+	viper.BindPFlag("extract.sptm", extractCmd.Flags().Lookup("sptm"))
 	viper.BindPFlag("extract.kbag", extractCmd.Flags().Lookup("kbag"))
 	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
@@ -135,8 +137,12 @@ var extractCmd = &cobra.Command{
 
 		if viper.GetBool("extract.kernel") {
 			log.Info("Extracting kernelcache")
-			if _, err := extract.Kernelcache(config); err != nil {
+			out, err := extract.Kernelcache(config)
+			if err != nil {
 				return err
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 
@@ -153,8 +159,12 @@ var extractCmd = &cobra.Command{
 				log.Error("unable to extract File System DMG remotely (let the author know if this is something you want)")
 			} else {
 				log.Info("Extracting DMG")
-				if _, err := extract.DMG(config); err != nil {
+				out, err := extract.DMG(config)
+				if err != nil {
 					return err
+				}
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
 				}
 			}
 		}
@@ -162,32 +172,58 @@ var extractCmd = &cobra.Command{
 		if viper.GetBool("extract.dtree") {
 			log.Info("Extracting DeviceTree")
 			config.Pattern = `.*DeviceTree.*im(3|4)p$`
-			if _, err := extract.Search(config); err != nil {
+			out, err := extract.Search(config)
+			if err != nil {
 				return err
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 
 		if viper.GetBool("extract.iboot") {
 			log.Info("Extracting iBoot")
 			config.Pattern = `.*iBoot.*im4p$`
-			if _, err := extract.Search(config); err != nil {
+			out, err := extract.Search(config)
+			if err != nil {
 				return err
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 
 		if viper.GetBool("extract.sep") {
 			log.Info("Extracting sep-firmware")
 			config.Pattern = `.*sep-firmware.*im4p$`
-			if _, err := extract.Search(config); err != nil {
+			out, err := extract.Search(config)
+			if err != nil {
 				return err
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
+			}
+		}
+
+		if viper.GetBool("extract.sptm") {
+			log.Info("Extracting SPTM firmware")
+			config.Pattern = `.*sptm.*im4p$`
+			out, err := extract.SPTM(config)
+			if err != nil {
+				return err
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 
 		if viper.GetBool("extract.kbag") {
 			log.Info("Extracting im4p key bags")
-			if _, err := extract.Keybags(config); err != nil {
+			out, err := extract.Keybags(config)
+			if err != nil {
 				return err
 			}
+			utils.Indent(log.Info, 2)("Created " + out)
 		}
 
 		if len(viper.GetString("extract.pattern")) > 0 {
@@ -195,8 +231,12 @@ var extractCmd = &cobra.Command{
 			if viper.GetBool("extract.files") {
 				config.DMGs = true
 			}
-			if _, err := extract.Search(config); err != nil {
+			out, err := extract.Search(config)
+			if err != nil {
 				return err
+			}
+			for _, f := range out {
+				utils.Indent(log.Info, 2)("Created " + f)
 			}
 		}
 
