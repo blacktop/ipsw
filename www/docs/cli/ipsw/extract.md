@@ -34,6 +34,7 @@ ipsw extract <IPSW/OTA | URL> [flags]
       --proxy string            HTTP/HTTPS proxy
   -r, --remote                  Extract from URL
   -s, --sep                     Extract sep-firmware
+  -p, --sptm                    Extract SPTM Firmware
 ```
 
 ### Options inherited from parent commands
