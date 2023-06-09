@@ -240,7 +240,7 @@ func SearchZip(files []*zip.File, pattern *regexp.Regexp, folder string, flat, p
 					r = rc
 				}
 
-				Indent(log.Info, 2)(fmt.Sprintf("Extracting %s", strings.TrimPrefix(fname, cwd)))
+				Indent(log.Debug, 2)(fmt.Sprintf("Extracting %s", strings.TrimPrefix(fname, cwd)))
 				out, err := os.Create(fname)
 				if err != nil {
 					return nil, fmt.Errorf("error creating remote unzipped file destination %s: %v", fname, err)
@@ -324,7 +324,7 @@ func Unzip(src, dest string, filter func(f *zip.File) bool) ([]string, error) {
 
 	for _, f := range r.File {
 		if filter(f) {
-			fNames = append(fNames, filepath.Base(filepath.Clean(f.Name)))
+			fNames = append(fNames, filepath.Join(dest, filepath.Base(filepath.Clean(f.Name))))
 			err := extractAndWriteFile(f)
 			if err != nil {
 				return nil, err

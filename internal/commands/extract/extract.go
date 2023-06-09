@@ -3,12 +3,14 @@ package extract
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
@@ -18,6 +20,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/blacktop/ipsw/pkg/lzfse"
 )
 
 // Config is the extract command configuration.
@@ -105,6 +108,66 @@ func Kernelcache(c *Config) ([]string, error) {
 		return kernelcache.RemoteParse(zr, filepath.Join(filepath.Clean(c.Output), folder))
 	}
 	return nil, fmt.Errorf("no IPSW or URL provided")
+}
+
+// SPTM extracts the SPTM firmware from an IPSW
+func SPTM(c *Config) ([]string, error) {
+	var outfiles []string
+
+	origOutput := c.Output
+
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_sptm")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store SPTM im4p: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+	c.Output = tmpDIR
+
+	out, err := Search(c)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no SPTM firmware found")
+	}
+
+	c.Output = origOutput
+
+	for _, f := range out {
+		dat, err := os.ReadFile(f)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open SPTM im4p: %v", err)
+		}
+
+		im4p, err := img4.ParseIm4p(bytes.NewReader(dat))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse SPTM im4p: %v", err)
+		}
+
+		folder := filepath.Join(filepath.Clean(c.Output), strings.TrimPrefix(filepath.Dir(f), tmpDIR))
+		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
+		if err := os.MkdirAll(folder, 0750); err != nil {
+			return nil, fmt.Errorf("failed to create output directory for SPTM firmware '%s': %v", folder, err)
+		}
+
+		if bytes.Contains(im4p.Data[:4], []byte("bvx2")) {
+			dat, err = lzfse.NewDecoder(im4p.Data).DecodeBuffer()
+			if err != nil {
+				return nil, fmt.Errorf("failed to decompress SPTM im4p: %v", err)
+			}
+			if err = os.WriteFile(fname, dat, 0660); err != nil {
+				return nil, fmt.Errorf("failed to write SPTM firmware %s: %v", fname, err)
+			}
+			outfiles = append(outfiles, fname)
+		} else {
+			if err = os.WriteFile(fname, im4p.Data, 0660); err != nil {
+				return nil, fmt.Errorf("failed to write SPTM firmware %s: %v", fname, err)
+			}
+			outfiles = append(outfiles, fname)
+		}
+	}
+
+	return outfiles, nil
 }
 
 // DSC extracts the DSC file from an IPSW
@@ -205,15 +268,14 @@ func DMG(c *Config) ([]string, error) {
 }
 
 // Keybags extracts the keybags from an IPSW
-func Keybags(c *Config) (string, error) {
+func Keybags(c *Config) (fname string, err error) {
 	if len(c.IPSW) == 0 && len(c.URL) == 0 {
 		return "", fmt.Errorf("no IPSW or URL provided")
 	}
 
-	var err error
 	var i *info.Info
 	var folder string
-	var zr *zip.Reader
+	var kbags *img4.KeyBags
 
 	if len(c.IPSW) > 0 {
 		i, folder, err = getFolder(c)
@@ -225,7 +287,12 @@ func Keybags(c *Config) (string, error) {
 			return "", fmt.Errorf("failed to open IPSW: %v", err)
 		}
 		defer zr.Close()
+		kbags, err = img4.ParseZipKeyBags(zr.File, i, c.Pattern)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse im4p kbags: %v", err)
+		}
 	} else if len(c.URL) > 0 {
+		var zr *zip.Reader
 		if !isURL(c.URL) {
 			return "", fmt.Errorf("invalid URL provided: %s", c.URL)
 		}
@@ -233,11 +300,10 @@ func Keybags(c *Config) (string, error) {
 		if err != nil {
 			return "", err
 		}
-	}
-
-	kbags, err := img4.ParseZipKeyBags(zr.File, i, c.Pattern)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse im4p kbags: %v", err)
+		kbags, err = img4.ParseZipKeyBags(zr.File, i, c.Pattern)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse im4p kbags: %v", err)
+		}
 	}
 
 	out, err := json.Marshal(kbags)
@@ -245,7 +311,7 @@ func Keybags(c *Config) (string, error) {
 		return "", fmt.Errorf("failed to marshal im4p kbags: %v", err)
 	}
 
-	fname := filepath.Join(filepath.Join(filepath.Clean(c.Output), folder), "kbags.json")
+	fname = filepath.Join(filepath.Join(filepath.Clean(c.Output), folder), "kbags.json")
 	if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
 		return "", fmt.Errorf("failed to create directory %s: %v", filepath.Dir(fname), err)
 	}
@@ -253,7 +319,7 @@ func Keybags(c *Config) (string, error) {
 		return "", fmt.Errorf("failed to write %s: %v", filepath.Join(filepath.Join(filepath.Clean(c.Output), folder), "kbags.json"), err)
 	}
 
-	return fname, nil
+	return
 }
 
 // Search searches for files matching a pattern in an IPSW

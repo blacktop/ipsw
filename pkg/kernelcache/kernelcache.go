@@ -116,7 +116,13 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 
 // Extract extracts and decompresses a kernelcache from ipsw
 func Extract(ipsw, destPath string) ([]string, error) {
-	kcaches, err := utils.Unzip(ipsw, "", func(f *zip.File) bool {
+	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temporary directory to store SPTM im4p: %v", err)
+	}
+	defer os.RemoveAll(tmpDIR)
+
+	kcaches, err := utils.Unzip(ipsw, tmpDIR, func(f *zip.File) bool {
 		return strings.Contains(f.Name, "kernelcache")
 	})
 	if err != nil {
@@ -350,7 +356,6 @@ func RemoteParse(zr *zip.Reader, destPath string) ([]string, error) {
 				if err := os.MkdirAll(filepath.Dir(fname), 0750); err != nil {
 					return nil, fmt.Errorf("failed to create destination directory: %v", err)
 				}
-				utils.Indent(log.Info, 2)(fmt.Sprintf("Writing %s", fname))
 				if err := os.WriteFile(fname, dec, 0660); err != nil {
 					return nil, fmt.Errorf("failed to write kernelcache %s: %v", fname, err)
 				}
