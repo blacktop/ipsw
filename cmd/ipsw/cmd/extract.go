@@ -43,7 +43,7 @@ func init() {
 	extractCmd.Flags().StringP("dmg", "m", "", "Extract DMG file (app, sys, fs)")
 	extractCmd.Flags().BoolP("iboot", "i", false, "Extract iBoot")
 	extractCmd.Flags().BoolP("sep", "s", false, "Extract sep-firmware")
-	extractCmd.Flags().BoolP("sptm", "p", false, "Extract SPTM Firmware")
+	extractCmd.Flags().BoolP("sptm", "p", false, "Extract SPTM and TXM Firmwares")
 	extractCmd.Flags().BoolP("kbag", "b", false, "Extract Im4p Keybags")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().String("pattern", "", "Extract files that match regex")
@@ -207,7 +207,6 @@ var extractCmd = &cobra.Command{
 
 		if viper.GetBool("extract.sptm") {
 			log.Info("Extracting SPTM firmware")
-			config.Pattern = `.*sptm.*im4p$`
 			out, err := extract.SPTM(config)
 			if err != nil {
 				return err
