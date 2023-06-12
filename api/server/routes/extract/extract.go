@@ -91,3 +91,17 @@ func extractPattern(c *gin.Context) {
 	}
 	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
 }
+
+func extractSPTM(c *gin.Context) {
+	var query cmd.Config
+	if err := c.ShouldBindJSON(&query); err != nil {
+		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	artifacts, err := cmd.SPTM(&query)
+	if err != nil {
+		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
+}

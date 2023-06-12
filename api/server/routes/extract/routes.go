@@ -212,4 +212,46 @@ func AddRoutes(rg *gin.RouterGroup) {
 	//     schema:
 	//       $ref: '#/responses/extractReponse'
 	er.POST("/pattern", extractPattern)
+	// swagger:operation POST /extract/sptm Extract getExtractSPTM
+	//
+	// SPTM
+	//
+	// Extract SPTM and TXM Firmwares.
+	//
+	// ---
+	// consumes:
+	//   - "application/json"
+	// produces:
+	//   - "application/json"
+	// parameters:
+	//   -
+	//     in: "body"
+	//     name: "body"
+	//     description: "Extraction options"
+	//     required: true
+	//     schema:
+	//       type: object
+	//       properties:
+	//         ipsw:
+	//           type: string
+	//         url:
+	//           type: string
+	//         pattern:
+	//           type: string
+	//         proxy:
+	//           type: string
+	//         insecure:
+	//           type: boolean
+	//         dmgs:
+	//           type: boolean
+	//         flatten:
+	//           type: boolean
+	//         output:
+	//           type: string
+	// responses:
+	//   '200':
+	//     description: extraction response
+	//     schema:
+	//       $ref: '#/responses/extractReponse'
+	er.POST("/sptm", extractSPTM)
 }
