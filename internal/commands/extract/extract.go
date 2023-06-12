@@ -112,6 +112,7 @@ func Kernelcache(c *Config) ([]string, error) {
 
 // SPTM extracts the SPTM firmware from an IPSW
 func SPTM(c *Config) ([]string, error) {
+	var tmpOut []string
 	var outfiles []string
 
 	origOutput := c.Output
@@ -123,6 +124,7 @@ func SPTM(c *Config) ([]string, error) {
 	defer os.RemoveAll(tmpDIR)
 	c.Output = tmpDIR
 
+	c.Pattern = `.*sptm.*im4p$`
 	out, err := Search(c)
 	if err != nil {
 		return nil, err
@@ -131,37 +133,50 @@ func SPTM(c *Config) ([]string, error) {
 		return nil, fmt.Errorf("no SPTM firmware found")
 	}
 
+	tmpOut = append(tmpOut, out...)
+
+	c.Pattern = `.*txm.*im4p$`
+	out, err = Search(c)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no TXM firmware found")
+	}
+
+	tmpOut = append(tmpOut, out...)
+
 	c.Output = origOutput
 
-	for _, f := range out {
+	for _, f := range tmpOut {
 		dat, err := os.ReadFile(f)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open SPTM im4p: %v", err)
+			return nil, fmt.Errorf("failed to open '%s': %v", f, err)
 		}
 
 		im4p, err := img4.ParseIm4p(bytes.NewReader(dat))
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse SPTM im4p: %v", err)
+			return nil, fmt.Errorf("failed to parse '%s': %v", f, err)
 		}
 
 		folder := filepath.Join(filepath.Clean(c.Output), strings.TrimPrefix(filepath.Dir(f), tmpDIR))
 		fname := filepath.Join(folder, strings.TrimSuffix(filepath.Base(f), ".im4p"))
 		if err := os.MkdirAll(folder, 0750); err != nil {
-			return nil, fmt.Errorf("failed to create output directory for SPTM firmware '%s': %v", folder, err)
+			return nil, fmt.Errorf("failed to create output directory '%s': %v", folder, err)
 		}
 
 		if bytes.Contains(im4p.Data[:4], []byte("bvx2")) {
 			dat, err = lzfse.NewDecoder(im4p.Data).DecodeBuffer()
 			if err != nil {
-				return nil, fmt.Errorf("failed to decompress SPTM im4p: %v", err)
+				return nil, fmt.Errorf("failed to decompress '%s': %v", f, err)
 			}
 			if err = os.WriteFile(fname, dat, 0660); err != nil {
-				return nil, fmt.Errorf("failed to write SPTM firmware %s: %v", fname, err)
+				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
 			}
 			outfiles = append(outfiles, fname)
 		} else {
 			if err = os.WriteFile(fname, im4p.Data, 0660); err != nil {
-				return nil, fmt.Errorf("failed to write SPTM firmware %s: %v", fname, err)
+				return nil, fmt.Errorf("failed to write '%s': %v", fname, err)
 			}
 			outfiles = append(outfiles, fname)
 		}
