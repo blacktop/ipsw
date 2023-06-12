@@ -18,7 +18,7 @@ require (
 	github.com/blacktop/ranger v1.0.3
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/disgoorg/disgo v0.16.5
+	github.com/disgoorg/disgo v0.16.6
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/docker/docker v24.0.2+incompatible
 	github.com/dominikbraun/graph v0.22.2
