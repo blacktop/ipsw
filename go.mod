@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/99designs/keyring v1.2.2
-	github.com/AlecAivazis/survey/v2 v2.3.6
+	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/apex/log v1.9.0
@@ -18,7 +18,7 @@ require (
 	github.com/blacktop/ranger v1.0.3
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/disgoorg/disgo v0.16.5
+	github.com/disgoorg/disgo v0.16.6
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/docker/docker v24.0.2+incompatible
 	github.com/dominikbraun/graph v0.22.2
@@ -49,12 +49,12 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20230207094436-7b8c63dfe650
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.9.0
-	golang.org/x/net v0.10.0
-	golang.org/x/oauth2 v0.8.0
+	golang.org/x/crypto v0.10.0
+	golang.org/x/net v0.11.0
+	golang.org/x/oauth2 v0.9.0
 	golang.org/x/sync v0.2.0
-	golang.org/x/sys v0.8.0
-	golang.org/x/term v0.8.0
+	golang.org/x/sys v0.9.0
+	golang.org/x/term v0.9.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.2
 	gorm.io/gorm v1.25.1
@@ -76,7 +76,7 @@ require (
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d // indirect
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/antchfx/htmlquery v1.3.0 // indirect
-	github.com/antchfx/xmlquery v1.3.15 // indirect
+	github.com/antchfx/xmlquery v1.3.16 // indirect
 	github.com/antchfx/xpath v1.2.4 // indirect
 	github.com/bytedance/sonic v1.9.1 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20221115062448-fe3a3abad311 // indirect
@@ -152,14 +152,14 @@ require (
 	golang.org/x/arch v0.3.0 // indirect
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/tools v0.9.3 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gotest.tools/v3 v3.4.0 // indirect
-	modernc.org/libc v1.23.0 // indirect
+	modernc.org/libc v1.24.1 // indirect
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.6.0 // indirect
-	modernc.org/sqlite v1.23.0 // indirect
+	modernc.org/sqlite v1.23.1 // indirect
 )
