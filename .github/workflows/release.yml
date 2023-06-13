@@ -11,7 +11,7 @@ jobs:
   goreleaser:
     strategy:
       matrix:
-        # platform: [ubuntu-latest, windows-latest, macos-12]
+        # platform: [ubuntu-latest, windows-latest, macos-13]
         platform: [ubuntu-latest]
 
     runs-on: ${{ matrix.platform }}
@@ -106,7 +106,7 @@ jobs:
       #     path: dist/*
 
       # -  # MACOS ################################################################
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   name: macos-deps
       #   run: |
       #     brew tap anchore/syft
@@ -114,7 +114,7 @@ jobs:
       #     # arch -arch arm64 brew install libusb unicorn
       #     # arch -arch x86_64 brew install libusb unicorn
       # -
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   name: Run GoReleaser
       #   uses: goreleaser/goreleaser-action@v4
       #   with:
@@ -125,7 +125,7 @@ jobs:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       #     SCOOP_TAP_GITHUB_TOKEN: ${{ secrets.GH_SCOOP }}
       # -
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   name: Upload assets
       #   uses: actions/upload-artifact@v3
       #   with:
