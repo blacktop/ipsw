@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   # download:
-  #   runs-on: macos-12
+  #   runs-on: macos-13
   #   steps:
   #     - name: Cache beta IPSW
   #       id: cache-beta-ipsw
@@ -42,7 +42,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ubuntu-latest, macos-12, windows-latest]
+        platform: [ubuntu-latest, macos-13, windows-latest]
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -60,27 +60,27 @@ jobs:
       #
       # - name: Cache beta IPSW
       #   id: cache-beta-ipsw
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   uses: actions/cache@v3
       #   with:
       #     path: |
       #       ~/beta
       #     key: beta-ipsw
       # - name: Download beta IPSW from Artifacts
-      #   if: matrix.platform == 'macos-12' && steps.cache-beta-ipsw.outputs.cache-hit != 'true'
+      #   if: matrix.platform == 'macos-13' && steps.cache-beta-ipsw.outputs.cache-hit != 'true'
       #   uses: actions/download-artifact@v3
       #   with:
       #     name: beta-ipsw
       #     path: ~/beta/beta.ipsw
       # - name: Cache Downloaded IPSWs
       #   id: cache-ipsws
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   uses: actions/cache@v2
       #   with:
       #     path: /tmp/ipsw
       #     key: ${{ runner.os }}-${{ hashFiles('**/*.ipsw') }}
       - name: Cache go.mod (macOS)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         uses: actions/cache@v3
         with:
           path: |
@@ -121,7 +121,7 @@ jobs:
         run: |
           sudo apt-get -yq install libusb-dev
       - name: Build Dependencies (macOS)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         run: |
           brew install tree
       - name: Build Dependencies (Windows)
@@ -140,7 +140,7 @@ jobs:
         run: |
           CGO_ENABLED=1 go build -o ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (macOS)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         run: sudo CGO_ENABLED=1 go build -o ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
@@ -167,7 +167,7 @@ jobs:
           sudo snap install ipsw
           ipsw --help
       - name: Package Installers (macOS)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         run: |
           brew install blacktop/tap/ipsw
           ipsw --help
@@ -177,7 +177,7 @@ jobs:
       #
       - name: Get Latest Version
         id: get-latest
-        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-12'
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13'
         run: |
           echo "latest_ios_version=$(ipsw download ipsw --show-latest-version --insecure)" >> $GITHUB_ENV
           echo "latest_ios_build=$(ipsw download ipsw --show-latest-build --device iPhone15,2 --insecure)" >> $GITHUB_ENV
@@ -190,7 +190,7 @@ jobs:
           echo "macos_runner_version=$(sw_vers -productVersion)" >> $GITHUB_ENV
           echo "macos_runner_build=$(sw_vers -buildVersion)" >> $GITHUB_ENV
       - name: Make cache folders
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         run: |
           mkdir -p /tmp/ipsw
           mkdir -p /tmp/ipsw-beta
@@ -200,7 +200,7 @@ jobs:
       # DEVICE LIST
       #
       - name: Run Device List
-        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-12'
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13'
         run: ipsw device-list
       - name: Run Device List (Windows)
         if: matrix.platform == 'windows-latest'
@@ -210,11 +210,11 @@ jobs:
       # DOWNLOAD CMD (macOS)
       #
       - name: Run download latest (IPSW)
-        if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
         run: ipsw -V download ipsw --confirm --device iPhone12,1 --latest
       - name: Run download latest (kernelcache)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         run: |
           ipsw download ipsw --confirm --device iPhone12,1 --latest --kernel
           ipsw -V macho info "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache*
@@ -224,24 +224,24 @@ jobs:
           D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download ipsw --confirm --device iPhone12,1 --latest --kernel
           dir
       - name: Run download latest (PATTERN/iBoot)
-        if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
         run: ipsw download ipsw --confirm --device iPhone12,1 --latest --pattern iBoot
       - name: Run download tss
-        if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
         run: ipsw download tss --signed "${{ env.latest_ios_version }}"
       - name: Run download rss
-        if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
         run: ipsw download rss
         # BETA ########################################## TODO: fix this when Github Actions adds a macOS 13 runner
       # - name: Run download iOS beta OTA (kernelcache and DSC)
-      #   if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
+      #   if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
       #   working-directory: /tmp/ipsw-beta
       #   run: ipsw download ota --platform ios --device iPhone15,2 --beta --kernel --dyld
       # - name: Run download macOS beta OTA (kernelcache and DSC)
-      #   if: matrix.platform == 'macos-12' && steps.cache-ipsws.outputs.cache-hit != 'true'
+      #   if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
       #   working-directory: /tmp/ipsw-beta
       #   run: ipsw download ota --platform macos --device Mac14,7 --beta --kernel --dyld --dyld-arch arm64e --version 13.1
 
@@ -249,7 +249,7 @@ jobs:
       # INFO CMD (macOS)
       #
       - name: Run info
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw info *.ipsw
 
@@ -257,7 +257,7 @@ jobs:
       # EXTRACT CMD (macOS)
       #
       - name: Run extract - (kernel, dsc and dtree)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw extract --kernel --dyld --dtree --iboot --sep *.ipsw
@@ -267,7 +267,7 @@ jobs:
       # MDEVs CMD (macOS)
       #
       - name: Run mdevs
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw mdevs *.ipsw
 
@@ -275,7 +275,7 @@ jobs:
       # Mount CMD (macOS)
       #
       - name: Run mount
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw mount fs -V *.ipsw & # mount in background
 
@@ -283,27 +283,27 @@ jobs:
       # KERNEL CMD (macOS)
       #
       - name: Run kernel version
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw kernel version "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --json | jq .
       - name: Run kernel symbolsets
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw kernel symbolsets "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       - name: Run kernel syscall
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw kernel syscall "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       - name: Run kernel kexts
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw kernel kexts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       # - name: Run kernel sbopts
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   working-directory: /tmp/ipsw
       #   run: ipsw kernel sbopts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
       - name: Run kernel extract (KEXTs)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw kernel extract "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --all --output /tmp/KEXTS
@@ -313,93 +313,93 @@ jobs:
       # DYLD CMD (macOS)
       #
       - name: Run dyld info
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld info "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --dylibs --sig -V
       - name: Run dyld symaddr (img)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --image libsystem_c.dylib
       - name: Run dyld symaddr (sym)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e _memcpy
       - name: Run dyld symaddr (img+sym)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
       - name: Run dyld symaddr (JSON)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           echo '[{"pattern":".*zero.*", "image":"libsystem_c.dylib"}]' > dyld_symaddr.json
           ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --in dyld_symaddr.json
       # - name: Run dyld symaddr (ALL)
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   run: |
       #     ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e | grep _memcpy
       - name: Run dyld macho
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld macho "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e JavaScriptCore --loads --objc --objc-refs --strings --symbols --starts --stubs -V
       - name: Run dyld macho (extract)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld macho "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e JavaScriptCore --extract
       - name: Run dyld webkit
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld webkit "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       - name: Run dyld slide
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld slide "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --auth
       - name: Run dyld patches
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld patches "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       - name: Run dyld imports
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld imports "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e JavaScriptCore
       - name: Run dyld disass
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld disass "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --demangle --symbol _NSLog
       - name: Run dyld objc sel --image
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld objc sel "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --image JavaScriptCore
       - name: Run dyld objc --class
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld objc --class "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       - name: Run dyld objc --proto
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld objc --proto "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       # - name: Run dyld objc --imp-cache
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   run: |
       #     ipsw dyld objc --imp-cache "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
       - name: Run dyld split (Xcode)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw dyld split --xcode /Applications/Xcode_14.1.app "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e /tmp/ipsw
           tree /tmp/ipsw
       - name: Run dyld swfit
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw dyld swift "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --types --demangle
       - name: Run dyld str
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw dyld str "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
       # ipsw dyld str "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
       - name: Run dyld image
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw dyld image "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
@@ -408,49 +408,49 @@ jobs:
       # MACHO CMD (macOS)
       #
       - name: Run macho info
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw macho info ./System/Library/Frameworks/JavaScriptCore.framework/JavaScriptCore --ent --header --loads --starts --strings --symbols
       - name: Run macho info (ObjC)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ls /tmp/*.mount
           ipsw macho info "${{ env.latest_ios_build }}__iPhone12,1"/System/Library/PrivateFrameworks/ApplePushService.framework/apsd --objc --objc-refs --fixups
       - name: Run macho info (Dump Cert)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw macho info /bin/ls --arch x86_64 --dump-cert --output /tmp
           openssl crl2pkcs7 -nocrl -certfile /tmp/ls.pem | openssl pkcs7 -print_certs -text
       - name: Run macho disass
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw macho disass ./System/Library/Frameworks/Foundation.framework/Foundation --symbol _NSLog
       - name: Run macho disass (MTE)
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: ipsw macho disass "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --all-fileset-entries  --quiet --section __TEXT_EXEC.__text | grep 'addg\|cmpp\|gmi\|irg\|ldg\|ldgv\|st2g\|stg\|stgp\|stgv\|stz2g\|stzg\|subg\|subp\|subps'
       - name: Run macho lipo
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw macho lipo /bin/ls --output /tmp --arch x86_64
           ipsw macho lipo /bin/ls --output /tmp --arch arm64e
       - name: Run macho bbl
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw macho bbl --output /tmp/ls.bbl /tmp/ls.x86_64 /tmp/ls.arm64e
           diff /bin/ls /tmp/ls.bbl
       - name: Run macho patch
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw macho patch mod /tmp/ls.arm64e LC_BUILD_VERSION iOS 16.3 16.3 ld 820.1
           ipsw macho patch add /tmp/ls.arm64e LC_RPATH @executable_path/Frameworks --overwrite
       - name: Run macho sign
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw macho sign -V --ad-hoc --overwrite /tmp/ls.arm64e
@@ -459,7 +459,7 @@ jobs:
       # ENT CMD (macOS)
       #
       # - name: Run ents
-      #   if: matrix.platform == 'macos-12'
+      #   if: matrix.platform == 'macos-13'
       #   working-directory: /tmp/ipsw
       #   run: ipsw ent *.ipsw --ent platform-application
 
@@ -467,7 +467,7 @@ jobs:
       # UPDATE CMD (macOS)
       #
       - name: Run ipsw update
-        if: matrix.platform == 'macos-12'
+        if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw update --platform windows_x86_64 -V --api ${{ secrets.GITHUB_TOKEN }}
