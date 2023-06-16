@@ -54,6 +54,7 @@ var otaDlCmdPlatforms = []string{
 	"accessory\tAccessory: Studio Display, etc.",
 	"macos\tmacOS",
 	"recovery\trecoveryOS",
+	"visionos\tvisionOS",
 }
 
 func init() {
@@ -175,10 +176,10 @@ var otaDLCmd = &cobra.Command{
 			}
 		}
 		if len(platform) == 0 {
-			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos || accessory, macos, recovery")
+			return fmt.Errorf("you must supply a valid --platform flag. Choices are: ios, watchos, tvos, audioos, visionos || accessory, macos, recovery")
 		} else {
-			if !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory"}, platform) {
-				return fmt.Errorf("valid --platform flag choices are: ios, watchos, tvos, audioos || accessory, macos, recovery")
+			if !utils.StrSliceHas([]string{"ios", "macos", "recovery", "watchos", "tvos", "audioos", "accessory", "visionos"}, platform) {
+				return fmt.Errorf("valid --platform flag choices are: ios, watchos, tvos, audioos, visionos || accessory, macos, recovery")
 			}
 		}
 		if (showLatestVersion || showLatestBuild) && len(device) == 0 {
@@ -218,6 +219,8 @@ var otaDLCmd = &cobra.Command{
 					otaInfoType = "iOS"
 				} else if utils.StrSliceHas([]string{"macos", "recovery"}, platform) {
 					otaInfoType = "macOS"
+				} else if utils.StrSliceHas([]string{"visionos"}, platform) {
+					otaInfoType = "xrOS"
 				} else {
 					log.Errorf("--info flag does not support platform '%s'", platform)
 				}
