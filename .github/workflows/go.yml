@@ -264,10 +264,9 @@ jobs:
       #
       - name: Run extract - (kernel, dsc and dtree)
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13'
-        working-directory: /tmp/ipsw
         run: |
-          ipsw extract --kernel --dyld --dtree --iboot --sep *.ipsw
-          ipsw extract --pattern '.*ApplePushService.framework/apsd$' --files *.ipsw
+          ipsw extract --kernel --dyld --dtree --iboot --sep /tmp/ipsw/*.ipsw --output /tmp/ipsw
+          ipsw extract --pattern '.*ApplePushService.framework/apsd$' --files /tmp/ipsw/*.ipsw --output /tmp/ipsw
 
       #
       # MDEVs CMD (macOS)
