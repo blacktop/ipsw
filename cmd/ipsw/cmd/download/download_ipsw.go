@@ -383,10 +383,11 @@ var ipswCmd = &cobra.Command{
 						downloader.Sha1 = i.SHA1
 						downloader.DestName = destName
 
-						err = downloader.Do()
-						if err != nil {
+						if err := downloader.Do(); err != nil {
 							return fmt.Errorf("failed to download file: %v", err)
 						}
+
+						log.Info("Created :" + destName)
 
 						// append sha1 and filename to checksums file
 						f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
