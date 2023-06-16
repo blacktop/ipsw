@@ -381,28 +381,21 @@ var ErrMountResourceBusy = errors.New("hdiutil: mount failed - Resource busy")
 // Mount mounts a DMG with hdiutil
 func Mount(image, mountPoint string) error {
 	if runtime.GOOS == "darwin" {
-		cmd := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image)
-
-		out, err := cmd.CombinedOutput()
+		out, err := exec.Command("/usr/bin/hdiutil", "attach", "-noverify", "-mountpoint", mountPoint, image).CombinedOutput()
 		if err != nil {
+			if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
+				return ErrMountResourceBusy
+			}
 			return fmt.Errorf("%v: %s", err, out)
 		}
-
-		return nil
-	}
-
-	if _, err := exec.LookPath("apfs-fuse"); err != nil {
-		return fmt.Errorf("utils.Mount: apfs-fuse not found (required on non-darwin systems): %v", err)
-	}
-
-	cmd := exec.Command("apfs-fuse", image, mountPoint)
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if strings.Contains(string(out), "hdiutil: mount failed - Resource busy") {
-			return ErrMountResourceBusy
+	} else {
+		out, err := exec.Command("apfs-fuse", image, mountPoint).CombinedOutput()
+		if err != nil {
+			if _, lperr := exec.LookPath("apfs-fuse"); err != nil {
+				return fmt.Errorf("utils.Mount: 'apfs-fuse' not found (required on non-darwin systems): %v: %v: %s", lperr, err, out)
+			}
+			return fmt.Errorf("%v: %s", err, out)
 		}
-		return fmt.Errorf("%v: %s", err, out)
 	}
 
 	return nil
@@ -444,7 +437,7 @@ func MountDMG(image string) (string, bool, error) {
 			return mountPoint, true, nil
 		}
 	} else {
-		if err := os.Mkdir(mountPoint, 0750); err != nil {
+		if err := os.MkdirAll(mountPoint, 0750); err != nil {
 			return "", false, fmt.Errorf("failed to create temporary mount point %s: %v", mountPoint, err)
 		}
 	}

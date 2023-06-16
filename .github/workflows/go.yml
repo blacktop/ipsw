@@ -119,7 +119,15 @@ jobs:
       - name: Build Dependencies (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          sudo apt-get -yq install libusb-dev
+          sudo apt-get -yq install fuse libfuse3-dev bzip2 libbz2-dev cmake gcc-c++ git libattr1-dev zlib1g-dev
+          git clone https://github.com/sgan81/apfs-fuse.git
+          cd apfs-fuse
+          git submodule init
+          git submodule update
+          mkdir build
+          cd build
+          cmake ..
+          sudo make install
       - name: Build Dependencies (macOS)
         if: matrix.platform == 'macos-13'
         run: |
@@ -257,7 +265,7 @@ jobs:
       # EXTRACT CMD (macOS)
       #
       - name: Run extract - (kernel, dsc and dtree)
-        if: matrix.platform == 'macos-13'
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw extract --kernel --dyld --dtree --iboot --sep *.ipsw
