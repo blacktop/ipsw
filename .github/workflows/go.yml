@@ -146,10 +146,10 @@ jobs:
       - name: Build (Linux)
         if: matrix.platform == 'ubuntu-latest'
         run: |
-          CGO_ENABLED=1 go build -o ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+          CGO_ENABLED=1 go build -o /usr/local/bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (macOS)
         if: matrix.platform == 'macos-13'
-        run: sudo CGO_ENABLED=1 go build -o ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
+        run: sudo CGO_ENABLED=1 go build -o /usr/local/bin/ipsw -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion="v1.0.0" -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
       - name: Build (Windows)
         if: matrix.platform == 'windows-latest'
         env:
@@ -159,26 +159,6 @@ jobs:
           go build -o build/dist/ipsw.exe -ldflags "-linkmode external -extldflags -static" ./cmd/ipsw
           dir build/dist
           dir
-
-      #
-      # Package Installers
-      #
-      # - name: Package Installers (Windows) FIXME: https://github.com/goreleaser/goreleaser/issues/3941
-      #   if: matrix.platform == 'windows-latest'
-      #   run: |
-      #     scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git
-      #     scoop install blacktop/ipsw
-      #     ipsw --help
-      - name: Package Installers (Linux)
-        if: matrix.platform == 'ubuntu-latest'
-        run: |
-          sudo snap install ipsw
-          ipsw --help
-      - name: Package Installers (macOS)
-        if: matrix.platform == 'macos-13'
-        run: |
-          brew install blacktop/tap/ipsw
-          ipsw --help
 
       #
       # (SETUP)
@@ -478,6 +458,26 @@ jobs:
         run: |
           ipsw update --platform windows_x86_64 -V --api ${{ secrets.GITHUB_TOKEN }}
           ipsw update --detect --api ${{ secrets.GITHUB_TOKEN }}
+
+      #
+      # Package Installers
+      #
+      # - name: Package Installers (Windows) FIXME: https://github.com/goreleaser/goreleaser/issues/3941
+      #   if: matrix.platform == 'windows-latest'
+      #   run: |
+      #     scoop bucket add blacktop https://github.com/blacktop/scoop-bucket.git
+      #     scoop install blacktop/ipsw
+      #     ipsw --help
+      - name: Package Installers (Linux)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo snap install ipsw
+          ipsw --help
+      - name: Package Installers (macOS)
+        if: matrix.platform == 'macos-13'
+        run: |
+          brew install blacktop/tap/ipsw
+          ipsw --help
 
       # - uses: actions/upload-artifact@v3
       #   with:
