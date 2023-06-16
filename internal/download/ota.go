@@ -53,9 +53,10 @@ var audienceData []byte // CREDIT: Siguza
 type assetType string
 
 const (
-	softwareUpdate      assetType = "com.apple.MobileAsset.SoftwareUpdate"
-	rsrUpdate           assetType = "com.apple.MobileAsset.SplatSoftwareUpdate"
-	watchSoftwareUpdate assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
+	softwareUpdate       assetType = "com.apple.MobileAsset.SoftwareUpdate"
+	rsrUpdate            assetType = "com.apple.MobileAsset.SplatSoftwareUpdate"
+	watchSoftwareUpdate  assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
+	visionSoftwareUpdate assetType = "com.apple.MobileAsset.RecoveryOSUpdate"
 	// For macOS devices
 	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
 	macRsrUpdate             assetType = "com.apple.MobileAsset.MacSplatSoftwareUpdate"
@@ -251,6 +252,8 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 		return []assetType{macSoftwareUpdate}, nil
 	case "recovery":
 		return []assetType{recoveryOsSoftwareUpdate}, nil
+	case "visionos":
+		return []assetType{visionSoftwareUpdate}, nil
 	}
 	return nil, fmt.Errorf("unsupported platform %s", o.Config.Platform)
 }
