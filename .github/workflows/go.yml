@@ -220,8 +220,7 @@ jobs:
       - name: Run download latest (IPSW)
         if: (matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13') && steps.cache-ipsws.outputs.cache-hit != 'true'
         run: |
-          ipsw -V download ipsw --confirm --device iPhone12,1 --latest --output /tmp/ipsw
-          ls -lah /tmp/ipsw
+          ipsw -V download ipsw --confirm --device iPhone12,1 --latest --output /tmp/ipsw && ls -lah /tmp && ls -lah /tmp/ipsw
       - name: Run download latest (kernelcache)
         if: matrix.platform == 'macos-13'
         run: |
