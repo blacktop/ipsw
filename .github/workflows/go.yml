@@ -218,7 +218,7 @@ jobs:
       # DOWNLOAD CMD (macOS)
       #
       - name: Run download latest (IPSW)
-        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        if: (matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13') && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
         run: ipsw -V download ipsw --confirm --device iPhone12,1 --latest
       - name: Run download latest (kernelcache)
