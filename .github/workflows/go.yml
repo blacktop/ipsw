@@ -219,8 +219,7 @@ jobs:
       #
       - name: Run download latest (IPSW)
         if: (matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13') && steps.cache-ipsws.outputs.cache-hit != 'true'
-        working-directory: /tmp/ipsw
-        run: ipsw -V download ipsw --confirm --device iPhone12,1 --latest
+        run: ipsw -V download ipsw --confirm --device iPhone12,1 --latest --output /tmp/ipsw
       - name: Run download latest (kernelcache)
         if: matrix.platform == 'macos-13'
         run: |
@@ -243,15 +242,14 @@ jobs:
         if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
         run: ipsw download rss
-        # BETA ########################################## TODO: fix this when Github Actions adds a macOS 13 runner
-      # - name: Run download iOS beta OTA (kernelcache and DSC)
-      #   if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
-      #   working-directory: /tmp/ipsw-beta
-      #   run: ipsw download ota --platform ios --device iPhone15,2 --beta --kernel --dyld
-      # - name: Run download macOS beta OTA (kernelcache and DSC)
-      #   if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
-      #   working-directory: /tmp/ipsw-beta
-      #   run: ipsw download ota --platform macos --device Mac14,7 --beta --kernel --dyld --dyld-arch arm64e --version 13.1
+      - name: Run download iOS beta OTA (kernelcache and DSC)
+        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        working-directory: /tmp/ipsw-beta
+        run: ipsw download ota --platform ios --device iPhone15,2 --beta --kernel --dyld
+      - name: Run download macOS beta OTA (kernelcache and DSC)
+        if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
+        working-directory: /tmp/ipsw-beta
+        run: ipsw download ota --platform macos --device Mac14,7 --beta --kernel --dyld --dyld-arch arm64e --version 13.1
 
       #
       # INFO CMD (macOS)
