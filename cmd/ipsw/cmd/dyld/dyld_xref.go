@@ -230,7 +230,7 @@ var XrefCmd = &cobra.Command{
 				}
 				if len(xrefs) > 0 {
 					for addr, sym := range xrefs {
-						fmt.Printf("%#x: %s\n", addr, sym)
+						fmt.Printf("%s: %s\n", colorAddr("%#x", addr), sym)
 					}
 				}
 			}
