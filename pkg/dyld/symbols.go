@@ -387,12 +387,7 @@ func (f *File) OpenOrCreateA2SCache(cacheFile string) error {
 		if err := f.ParseAllObjc(); err != nil {
 			utils.Indent(log.Error, 2)(fmt.Sprintf("failed to parse objc info: %v: Continuing on without it...", err))
 		}
-
-		if err := f.SaveAddrToSymMap(cacheFile); err != nil {
-			return err
-		}
-
-		return nil
+		return f.SaveAddrToSymMap(cacheFile)
 	}
 
 	a2sFile, err := os.Open(cacheFile)

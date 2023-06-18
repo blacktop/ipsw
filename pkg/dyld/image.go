@@ -479,10 +479,6 @@ func (i *CacheImage) Analyze() error {
 		log.Errorf("failed to parse exported symbols for %s: %w", i.Name, err)
 	}
 
-	if !i.Analysis.State.IsStartsDone() {
-		i.ParseStarts()
-	}
-
 	if err := i.ParseLocalSymbols(false); err != nil {
 		if !errors.Is(err, ErrNoLocals) {
 			return fmt.Errorf("failed to parse local symbols for %s: %w", i.Name, err)
@@ -592,6 +588,10 @@ func (i *CacheImage) Analyze() error {
 		}
 	}
 
+	if !i.Analysis.State.IsStartsDone() {
+		i.ParseStarts()
+	}
+
 	return nil
 }
 
@@ -680,8 +680,14 @@ func (i *CacheImage) ParseObjC() error {
 		if err := i.cache.ClassesForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc classes for image %s: %v", filepath.Base(i.Name), err)
 		}
+		if err := i.cache.CategoriesForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc categories for image %s: %v", filepath.Base(i.Name), err)
+		}
 		if err := i.cache.ProtocolsForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc protocols for image %s: %v", filepath.Base(i.Name), err)
+		}
+		if err := i.cache.GetObjCStubsForImage(i.Name); err != nil {
+			return fmt.Errorf("failed to parse objc stubs for image %s: %v", filepath.Base(i.Name), err)
 		}
 		i.Analysis.State.SetObjC(true)
 	}

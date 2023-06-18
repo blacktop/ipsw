@@ -38,6 +38,7 @@ type objcInfo struct {
 	SuperRefs map[uint64]*objc.Class
 	SelRefs   map[uint64]*objc.Selector
 	ProtoRefs map[uint64]*objc.Protocol
+	CatRefs   map[uint64]*objc.Category
 	CFStrings []objc.CFString
 	Stubs     map[uint64]*objc.Stub
 }
@@ -837,6 +838,50 @@ func (f *File) ClassesForImage(imageNames ...string) error {
 	return nil
 }
 
+// CategoriesForImage returns all of the Objective-C categories for a given image
+func (f *File) CategoriesForImage(imageNames ...string) error {
+	var images []*CacheImage
+
+	if len(imageNames) > 0 && len(imageNames[0]) > 0 {
+		for _, imageName := range imageNames {
+			image, err := f.Image(imageName)
+			if err != nil {
+				return err
+			}
+			images = append(images, image)
+		}
+	} else {
+		images = f.Images
+	}
+
+	for _, image := range images {
+		m, err := image.GetMacho()
+		if err != nil {
+			return fmt.Errorf("failed get image %s as MachO: %v", image.Name, err)
+		}
+
+		cats, err := m.GetObjCCategories()
+		if err != nil {
+			return err
+		}
+
+		for _, cat := range cats {
+			if len(cat.Name) > 0 {
+				f.AddressToSymbol[cat.VMAddr] = fmt.Sprintf("cat_%s", cat.Name)
+				if sym, ok := f.AddressToSymbol[cat.VMAddr]; ok {
+					if len(sym) < len(cat.Name) {
+						f.AddressToSymbol[cat.VMAddr] = cat.Name
+					}
+				} else {
+					f.AddressToSymbol[cat.VMAddr] = cat.Name
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 // ProtocolsForImage returns all of the Objective-C protocols for a given image
 func (f *File) ProtocolsForImage(imageNames ...string) error {
 	var images []*CacheImage
@@ -1311,6 +1356,10 @@ func (f *File) GetObjCClassProtocolsAddrs(vmaddr uint64) ([]uint64, error) {
 	return addrs, nil
 }
 
+func (f *File) GetAllObjCStubs() error {
+	return f.GetObjCStubsForImage()
+}
+
 func (f *File) GetObjCStubsForImage(imageNames ...string) error {
 	var images []*CacheImage
 
@@ -1373,14 +1422,17 @@ func (f *File) ParseAllObjc() error {
 	if _, err := f.GetAllObjCClasses(false); err != nil {
 		return fmt.Errorf("failed to parse objc classes: %v", err)
 	}
-	// if err := f.GetAllObjcMethods(); err != nil { TODO: should I put this back in? The same info is in the symbols
-	// 	return fmt.Errorf("failed to parse objc methods: %v", err)
-	// }
+	if err := f.GetAllObjcMethods(); err != nil { // TODO: should I put this back in? The same info is in the symbols
+		return fmt.Errorf("failed to parse objc methods: %v", err)
+	}
 	if _, err := f.GetAllObjCSelectors(false); err != nil {
 		return fmt.Errorf("failed to parse objc selectors: %v", err)
 	}
 	if _, err := f.GetAllObjCProtocols(false); err != nil {
 		return fmt.Errorf("failed to parse objc protocols: %v", err)
+	}
+	if err := f.GetAllObjCStubs(); err != nil {
+		return fmt.Errorf("failed to parse objc stubs: %v", err)
 	}
 	return nil
 }
