@@ -347,7 +347,6 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "all" }}universal
       {{- else }}{{ .Arch }}{{ end }}
-    rlcp: true
     files:
       - README.md
       - LICENSE
@@ -370,7 +369,6 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "all" }}universal
       {{- else }}{{ .Arch }}{{ end }}_extras
-    rlcp: true
     files:
       - README.md
       - LICENSE
@@ -391,7 +389,6 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "all" }}universal
       {{- else }}{{ .Arch }}{{ end }}_frida
-    rlcp: true
     files:
       - README.md
       - LICENSE
@@ -415,7 +412,6 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "all" }}universal
       {{- else }}{{ .Arch }}{{ end }}
-    rlcp: true
     files:
       - README.md
       - LICENSE
@@ -424,7 +420,7 @@ archives:
     wrap_in_directory: true
 
 brews:
-  - tap:
+  - repository:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -456,7 +452,7 @@ brews:
     test: |
       system "#{bin}/ipsw --version"
   - name: ipsw-frida
-    tap:
+    repository:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -484,7 +480,7 @@ brews:
     test: |
       system "#{bin}/ipsw --version"
   - name: ipswd
-    tap:
+    repository:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -806,6 +802,23 @@ scoops:
     description: ipsw - Daemon
     license: MIT
 
+winget:
+  - name: ipsw
+    publisher: blacktop
+    license: MIT
+    homepage: https://github.com/blacktop/ipsw
+    short_description: iOS/macOS Research Swiss Army Knife
+    repository:
+      owner: blacktop
+      name: winget-pkgs
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
 # chocolateys:
 #   - project_url: https://github.com/blacktop/ipsw
 #     icon_url: https://github.com/blacktop/ipsw/raw/master/docs/static/images/ipsw.png
@@ -824,16 +837,19 @@ changelog:
   use: github
   groups:
     - title: Dependency updates
-      regexp: '^.*?(feat|fix)\(deps\)!?:.+$'
+      regexp: '^.*?(feat|fix|chore)\(deps\)!?:.+$'
       order: 300
     - title: "New Features"
       regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
       order: 100
+    - title: "Security updates"
+      regexp: '^.*?sec(\([[:word:]]+\))??!?:.+$'
+      order: 150
     - title: "Bug fixes"
       regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
       order: 200
     - title: "Documentation updates"
-      regexp: ^.*?doc(\([[:word:]]+\))??!?:.+$
+      regexp: ^.*?(doc|docs)(\([[:word:]]+\))??!?:.+$
       order: 400
     - title: "Build process updates"
       regexp: ^.*?build(\([[:word:]]+\))??!?:.+$
