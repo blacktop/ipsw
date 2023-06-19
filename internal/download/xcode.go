@@ -12,33 +12,35 @@ import (
 
 const (
 	dvtURL     = "https://devimages-cdn.apple.com/downloads/xcode/simulators/index2.dvtdownloadableindex"
-	xcodeDlURL = "https://storage.googleapis.com/xcodes-cache"
+	XcodeDlURL = "https://storage.googleapis.com/xcodes-cache"
 )
+
+type Downloadable struct {
+	Authentication    string `plist:"authentication,omitempty"`
+	Category          string `plist:"category,omitempty"`
+	ContentType       string `plist:"contentType,omitempty"`
+	DictionaryVersion int    `plist:"dictionaryVersion,omitempty"`
+	FileSize          int64  `plist:"fileSize,omitempty"`
+	HostRequirements  struct {
+		ExcludedHostArchitectures []string `plist:"excludedHostArchitectures,omitempty"`
+		MaxHostVersion            string   `plist:"maxHostVersion,omitempty"`
+		MinHostVersion            string   `plist:"minHostVersion,omitempty"`
+		MinXcodeVersion           string   `plist:"minXcodeVersion,omitempty"`
+	} `plist:"hostRequirements,omitempty"`
+	Identifier       string `plist:"identifier,omitempty"`
+	Name             string `plist:"name,omitempty"`
+	Platform         string `plist:"platform,omitempty"`
+	SimulatorVersion struct {
+		BuildUpdate string `plist:"buildUpdate,omitempty"`
+		Version     string `plist:"version,omitempty"`
+	} `plist:"simulatorVersion,omitempty"`
+	Source  string `plist:"source,omitempty"`
+	Version string `plist:"version,omitempty"`
+}
 
 // DVTDownloadable is the struct for the dvtdownloadableindex plist
 type DVTDownloadable struct {
-	Downloadables []struct {
-		Authentication    string `plist:"authentication,omitempty"`
-		Category          string `plist:"category,omitempty"`
-		ContentType       string `plist:"contentType,omitempty"`
-		DictionaryVersion int    `plist:"dictionaryVersion,omitempty"`
-		FileSize          int64  `plist:"fileSize,omitempty"`
-		HostRequirements  struct {
-			ExcludedHostArchitectures []string `plist:"excludedHostArchitectures,omitempty"`
-			MaxHostVersion            string   `plist:"maxHostVersion,omitempty"`
-			MinHostVersion            string   `plist:"minHostVersion,omitempty"`
-			MinXcodeVersion           string   `plist:"minXcodeVersion,omitempty"`
-		} `plist:"hostRequirements,omitempty"`
-		Identifier       string `plist:"identifier,omitempty"`
-		Name             string `plist:"name,omitempty"`
-		Platform         string `plist:"platform,omitempty"`
-		SimulatorVersion struct {
-			BuildUpdate string `plist:"buildUpdate,omitempty"`
-			Version     string `plist:"version,omitempty"`
-		} `plist:"simulatorVersion,omitempty"`
-		Source  string `plist:"source,omitempty"`
-		Version string `plist:"version,omitempty"`
-	} `plist:"downloadables,omitempty"`
+	Downloadables          []Downloadable `plist:"downloadables,omitempty"`
 	SdkToSimulatorMappings []struct {
 		SdkBuildUpdate       string `plist:"sdkBuildUpdate,omitempty"`
 		SimulatorBuildUpdate string `plist:"simulatorBuildUpdate,omitempty"`
@@ -97,7 +99,7 @@ type ListBucketResult struct {
 }
 
 func ListXCodes() (*ListBucketResult, error) {
-	resp, err := http.Get(xcodeDlURL)
+	resp, err := http.Get(XcodeDlURL)
 	if err != nil {
 		return nil, err
 	}
