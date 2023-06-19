@@ -30,6 +30,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -113,19 +114,37 @@ var xcodeCmd = &cobra.Command{
 				downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
 				downloader.URL = dl.Source
 				downloader.DestName = path.Base(dl.Source)
-				return downloader.Do()
+				if err := downloader.Do(); err != nil {
+					return err
+				}
+			} else {
+				app := download.NewDevPortal(&download.DevConfig{
+					Proxy:      proxy,
+					Insecure:   insecure,
+					SkipAll:    skipAll,
+					ResumeAll:  resumeAll,
+					RestartAll: restartAll,
+					Verbose:    viper.GetBool("verbose"),
+				})
+				if err := app.DownloadADC(dl.Source); err != nil {
+					return err
+				}
 			}
 
-			app := download.NewDevPortal(&download.DevConfig{
-				Proxy:      proxy,
-				Insecure:   insecure,
-				SkipAll:    skipAll,
-				ResumeAll:  resumeAll,
-				RestartAll: restartAll,
-				Verbose:    viper.GetBool("verbose"),
-			})
+			install := false
+			iprompt := &survey.Confirm{
+				Message: "Install Simulator Runtime?",
+			}
+			if err := survey.AskOne(iprompt, &install); err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				return nil
+			}
 
-			return app.DownloadADC(dl.Source)
+			if install {
+				return utils.InstallXCodeSimRuntime(path.Base(dl.Source))
+			}
+
+			return nil
 		}
 
 		xcodes, err := download.ListXCodes()

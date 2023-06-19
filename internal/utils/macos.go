@@ -615,3 +615,15 @@ func PkgUtilExpand(src, dst string) (string, error) {
 	}
 	return "", fmt.Errorf("only supported on macOS")
 }
+
+func InstallXCodeSimRuntime(path string) error {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("xcrun", "simctl", "runtime", "add", path)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%v: %s", err, out)
+		}
+		return nil
+	}
+	return fmt.Errorf("only supported on macOS")
+}
