@@ -26,6 +26,9 @@ import (
 	"bytes"
 	"fmt"
 	"image/png"
+	"os"
+	"path/filepath"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -40,6 +43,7 @@ func init() {
 	ImgCmd.AddCommand(nonceCmd)
 
 	nonceCmd.Flags().BoolP("qr-code", "q", false, "Generate QR code of nonce")
+	nonceCmd.Flags().StringP("output", "o", "", "Folder to write QR code PNG to")
 }
 
 // nonceCmd represents the nonce command
@@ -56,6 +60,7 @@ var nonceCmd = &cobra.Command{
 
 		udid, _ := cmd.Flags().GetString("udid")
 		asQrCode, _ := cmd.Flags().GetBool("qr-code")
+		output, _ := cmd.Flags().GetString("output")
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()
@@ -100,6 +105,17 @@ var nonceCmd = &cobra.Command{
 			}
 			buf.Flush()
 
+			if len(output) > 0 {
+				if err := os.MkdirAll(output, 0750); err != nil {
+					return fmt.Errorf("failed to create output folder: %w", err)
+				}
+				fname := filepath.Join(output, fmt.Sprintf("nonce_qr_code_%s.png", time.Now().Format("02Jan2006_150405")))
+				log.Infof("Writing QR code to %s", fname)
+				return os.WriteFile(fname, dat.Bytes(), 0644)
+			}
+
+			log.Warn("Displaying QR code in terminal (supported in iTerm2)")
+			println()
 			return utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), 500, 500)
 		}
 
