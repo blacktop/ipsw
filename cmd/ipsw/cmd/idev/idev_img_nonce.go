@@ -84,7 +84,7 @@ var nonceCmd = &cobra.Command{
 		if asQrCode {
 			personalID, err := cli.PersonalizationIdentifiers("")
 			if err != nil {
-				return fmt.Errorf("failed to get personalization identifiers: %w", err)
+				return fmt.Errorf("failed to get personalization identifiers: %w ('personalization' might not be supported on this device)", err)
 			}
 			// Create the barcode
 			qrCode, err := qr.Encode(fmt.Sprintf("ApBoardID=%d,ApChipID=%d,ApECID=%d,ApNonce=%s", personalID["BoardId"], personalID["ChipID"], personalID["UniqueChipID"], nonce), qr.M, qr.Auto)
