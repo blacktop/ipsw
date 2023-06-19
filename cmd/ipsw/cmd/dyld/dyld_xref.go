@@ -234,6 +234,8 @@ var XrefCmd = &cobra.Command{
 					}
 				}
 			}
+
+			img.Free() // free up memory
 		}
 
 		return nil
