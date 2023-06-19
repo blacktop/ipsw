@@ -76,17 +76,16 @@ var nonceCmd = &cobra.Command{
 		}
 		defer cli.Close()
 
-		personalID, err := cli.PersonalizationIdentifiers("")
-		if err != nil {
-			return fmt.Errorf("failed to get personalization identifiers: %w", err)
-		}
-
 		nonce, err := cli.Nonce("DeveloperDiskImage")
 		if err != nil {
 			return fmt.Errorf("failed to get nonce: %w", err)
 		}
 
 		if asQrCode {
+			personalID, err := cli.PersonalizationIdentifiers("")
+			if err != nil {
+				return fmt.Errorf("failed to get personalization identifiers: %w", err)
+			}
 			// Create the barcode
 			qrCode, err := qr.Encode(fmt.Sprintf("ApBoardID=%d,ApChipID=%d,ApECID=%d,ApNonce=%s", personalID["BoardId"], personalID["ChipID"], personalID["UniqueChipID"], nonce), qr.M, qr.Auto)
 			if err != nil {
