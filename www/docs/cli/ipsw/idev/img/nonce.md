@@ -17,8 +17,9 @@ ipsw idev img nonce [flags]
 ### Options
 
 ```
-  -h, --help      help for nonce
-  -q, --qr-code   Generate QR code of nonce
+  -h, --help            help for nonce
+  -o, --output string   Folder to write QR code PNG to
+  -q, --qr-code         Generate QR code of nonce
 ```
 
 ### Options inherited from parent commands
