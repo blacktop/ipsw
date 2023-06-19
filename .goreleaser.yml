@@ -420,7 +420,7 @@ archives:
     wrap_in_directory: true
 
 brews:
-  - repository:
+  - tap:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -452,7 +452,7 @@ brews:
     test: |
       system "#{bin}/ipsw --version"
   - name: ipsw-frida
-    repository:
+    tap:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -480,7 +480,7 @@ brews:
     test: |
       system "#{bin}/ipsw --version"
   - name: ipswd
-    repository:
+    tap:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -802,22 +802,22 @@ scoops:
     description: ipsw - Daemon
     license: MIT
 
-winget:
-  - name: ipsw
-    publisher: blacktop
-    license: MIT
-    homepage: https://github.com/blacktop/ipsw
-    short_description: iOS/macOS Research Swiss Army Knife
-    repository:
-      owner: blacktop
-      name: winget-pkgs
-      pull_request:
-        enabled: true
-        draft: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
+# winget:
+#   - name: ipsw
+#     publisher: blacktop
+#     license: MIT
+#     homepage: https://github.com/blacktop/ipsw
+#     short_description: iOS/macOS Research Swiss Army Knife
+#     repository:
+#       owner: blacktop
+#       name: winget-pkgs
+#       pull_request:
+#         enabled: true
+#         draft: true
+#         base:
+#           owner: microsoft
+#           name: winget-pkgs
+#           branch: master
 
 # chocolateys:
 #   - project_url: https://github.com/blacktop/ipsw
