@@ -113,13 +113,14 @@ func (c *Client) LookupImage(imageType string) (*LookupImageResponse, error) {
 }
 
 type MountRequest struct {
-	Command         string `plist:"Command,omitempty"`
-	ImageType       string `plist:"ImageType,omitempty"`
-	ImageSize       int    `plist:"ImageSize,omitempty"`
-	MountPath       string `plist:"MountPath,omitempty"`
-	ImageSignature  []byte `plist:"ImageSignature,omitempty"`
-	ImageTrustCache []byte `plist:"ImageTrustCache,omitempty"`
-	ImageInfoPlist  []byte `plist:"ImageInfoPlist,omitempty"`
+	Command               string `plist:"Command,omitempty"`
+	ImageType             string `plist:"ImageType,omitempty"`
+	ImageSize             int    `plist:"ImageSize,omitempty"`
+	MountPath             string `plist:"MountPath,omitempty"`
+	ImageSignature        []byte `plist:"ImageSignature,omitempty"`
+	ImageTrustCache       []byte `plist:"ImageTrustCache,omitempty"`
+	ImageInfoPlist        []byte `plist:"ImageInfoPlist,omitempty"`
+	PersonalizedImageType string `plist:"PersonalizedImageType,omitempty"`
 }
 
 type MountResponse struct {
@@ -231,8 +232,11 @@ func (c *Client) DeveloperModeStatus() (bool, error) {
 	return status.(bool), nil
 }
 
-func (c *Client) Nonce() (string, error) {
+func (c *Client) Nonce(imageType string) (string, error) {
 	req := &MountRequest{Command: "QueryNonce"}
+	if len(imageType) > 0 {
+		req.PersonalizedImageType = imageType
+	}
 	var resp map[string]any
 	if err := c.c.Request(req, &resp); err != nil {
 		return "", err
@@ -247,16 +251,22 @@ func (c *Client) Nonce() (string, error) {
 }
 
 func (c *Client) PersonalizationIdentifiers(imageType string) (map[string]any, error) {
+	req := &MountRequest{Command: "QueryPersonalizationIdentifiers"}
+	if len(imageType) > 0 {
+		req.PersonalizedImageType = imageType
+	}
 	var resp map[string]any
-	if err := c.c.Request(&map[string]any{
-		"Command":               "QueryPersonalizationIdentifiers",
-		"PersonalizedImageType": imageType,
-	}, &resp); err != nil {
+	if err := c.c.Request(req, &resp); err != nil {
 		return nil, err
 	}
+
 	if err, ok := resp["Error"]; ok {
-		return nil, fmt.Errorf("%s: %s", err, resp["DetailedError"])
+		if detail, ok := resp["DetailedError"]; ok {
+			return nil, fmt.Errorf("%s: %s", err, detail)
+		}
+		return nil, fmt.Errorf("%s", err)
 	}
+
 	ids, ok := resp["PersonalizationIdentifiers"]
 	if !ok {
 		return nil, fmt.Errorf("device does not support QueryPersonalizationIdentifiers")

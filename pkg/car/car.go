@@ -483,7 +483,7 @@ func Parse(name string, conf *Config) (*Asset, error) {
 									if err := png.Encode(buf, img); err != nil {
 										return nil, err
 									}
-									displayImageInTerminal(bytes.NewReader(dat.Bytes()), int(cheader.Width), int(cheader.Height))
+									utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), int(cheader.Width), int(cheader.Height))
 								}
 								rend.Asset = img
 							}
