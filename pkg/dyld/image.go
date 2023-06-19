@@ -266,6 +266,20 @@ type CacheReader struct {
 	ruuid types.UUID
 }
 
+// Free frees the underlying data so the GC can reclaim it.
+func (i *CacheImage) Free() {
+	i.m = nil
+	i.pm = nil
+	i.sinfo = nil
+	i.RangeEntries = nil
+	i.PatchableExports = nil
+	i.PatchableGOTs = nil
+	i.LocalSymbols = nil
+	i.PublicSymbols = nil
+	i.ObjC = objcInfo{}
+	i.Analysis = analysis{}
+}
+
 func (i *CacheImage) Read(p []byte) (n int, err error) {
 	if i.off >= i.limit {
 		return 0, io.EOF
@@ -686,7 +700,7 @@ func (i *CacheImage) ParseObjC() error {
 		if err := i.cache.ProtocolsForImage(i.Name); err != nil {
 			return fmt.Errorf("failed to parse objc protocols for image %s: %v", filepath.Base(i.Name), err)
 		}
-		if err := i.cache.GetObjCStubsForImage(i.Name); err != nil {
+		if err := i.cache.GetObjCStubsForImage(i.Name); err != nil && !errors.Is(err, macho.ErrObjcSectionNotFound) {
 			return fmt.Errorf("failed to parse objc stubs for image %s: %v", filepath.Base(i.Name), err)
 		}
 		i.Analysis.State.SetObjC(true)
