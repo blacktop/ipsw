@@ -1211,10 +1211,16 @@ func (dp *DevPortal) Download(url, folder string) error {
 	return nil
 }
 
-func (dp *DevPortal) DownloadADC(path string) error {
+// DownloadADC downloads an ADC file that requires a valid ADCDownloadAuth cookie, but not full dev portal session auth
+func (dp *DevPortal) DownloadADC(adcURL string) error {
 	var adcDownloadAuth string
 
-	req, err := http.NewRequest("GET", adcDownloadURL+path, nil)
+	u, err := url.Parse(adcURL)
+	if err != nil {
+		return fmt.Errorf("failed to parse url '%s': %v", adcURL, err)
+	}
+
+	req, err := http.NewRequest("GET", adcDownloadURL+u.Path, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create http GET request: %v", err)
 	}
@@ -1225,11 +1231,8 @@ func (dp *DevPortal) DownloadADC(path string) error {
 		return err
 	}
 
-	for _, cookie := range response.Cookies() {
-		if cookie.Name == "Set-Cookie" {
-			_, adcDownloadAuth, _ = strings.Cut(cookie.Value, "ADCDownloadAuth=")
-			break
-		}
+	if response.Header.Get("Set-Cookie") != "" {
+		_, adcDownloadAuth, _ = strings.Cut(response.Header.Get("Set-Cookie"), "ADCDownloadAuth=")
 	}
 
 	// proxy, insecure are null because we override the client below
@@ -1248,7 +1251,8 @@ func (dp *DevPortal) DownloadADC(path string) error {
 	// set auth cookie (for authless downloads)
 	downloader.Headers["Cookie"] = "ADCDownloadAuth=" + adcDownloadAuth
 
-	destName := getDestName(adcDownloadURL+path, dp.config.RemoveCommas)
+	// destName := getDestName(adcDownloadURL+path, dp.config.RemoveCommas)
+	destName := getDestName(adcURL, dp.config.RemoveCommas)
 	if _, err := os.Stat(destName); os.IsNotExist(err) {
 
 		log.WithFields(log.Fields{
@@ -1256,18 +1260,13 @@ func (dp *DevPortal) DownloadADC(path string) error {
 		}).Info("Downloading")
 
 		// download file
-		downloader.URL = adcDownloadURL + path
+		downloader.URL = adcURL
 		downloader.DestName = destName
 
-		err = downloader.Do()
-		if err != nil {
-			return fmt.Errorf("failed to download file: %v", err)
-		}
-
-	} else {
-		log.Warnf("file already exists: %s", destName)
+		return downloader.Do()
 	}
 
+	log.Warnf("file already exists: %s", destName)
 	return nil
 }
 
