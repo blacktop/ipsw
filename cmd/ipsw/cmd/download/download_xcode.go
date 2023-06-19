@@ -1,3 +1,5 @@
+//go:build !ios
+
 /*
 Copyright © 2023 blacktop
 
