@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/usb/mount"
 	"github.com/boombuler/barcode"
 	"github.com/boombuler/barcode/qr"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -42,6 +43,7 @@ import (
 func init() {
 	ImgCmd.AddCommand(nonceCmd)
 
+	nonceCmd.Flags().BoolP("readable", "r", false, "Print nonce as a more readable string")
 	nonceCmd.Flags().BoolP("qr-code", "q", false, "Generate QR code of nonce")
 	nonceCmd.Flags().StringP("output", "o", "", "Folder to write QR code PNG to")
 }
@@ -57,8 +59,10 @@ var nonceCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = !viper.GetBool("color")
 
 		udid, _ := cmd.Flags().GetString("udid")
+		readable, _ := cmd.Flags().GetBool("readable")
 		asQrCode, _ := cmd.Flags().GetBool("qr-code")
 		output, _ := cmd.Flags().GetString("output")
 
@@ -118,7 +122,20 @@ var nonceCmd = &cobra.Command{
 			return utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), 500, 500)
 		}
 
-		fmt.Println(nonce)
+		if readable {
+			var out string
+			for i, c := range nonce {
+				if i > 0 && i%4 == 0 && i%24 != 0 {
+					out += color.New(color.Faint).Sprint("-")
+				} else if i > 0 && i%24 == 0 {
+					out += "\n"
+				}
+				out += color.New(color.Bold).Sprintf("%c", c)
+			}
+			fmt.Println(out)
+		} else {
+			fmt.Println(nonce)
+		}
 
 		return nil
 	},
