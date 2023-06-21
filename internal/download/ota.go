@@ -496,6 +496,10 @@ func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 
 		// repair/parse base64 response data
 		parts := strings.Split(string(body), ".")
+		if len(parts) < 2 {
+			log.Errorf("failed to base64 decode pallas response: cannot split response body \"%s\" ", string(body))
+			continue
+		}
 		b64Str := parts[1]
 		b64Str = strings.ReplaceAll(b64Str, "-", "+")
 		b64Str = strings.ReplaceAll(b64Str, "_", "/")
