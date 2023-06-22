@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/alecthomas/chroma v0.10.0
 	github.com/apex/log v1.9.0
-	github.com/aymanbagabas/go-udiff v0.1.2
+	github.com/aymanbagabas/go-udiff v0.1.3
 	github.com/blacktop/arm64-cgo v1.0.57
 	github.com/blacktop/go-dwarf v1.0.9
 	github.com/blacktop/go-macho v1.1.161
