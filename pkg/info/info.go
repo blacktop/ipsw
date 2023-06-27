@@ -32,6 +32,8 @@ var (
 	t8103APKeysJSONData []byte // credit - https://gist.github.com/NyanSatan/a12ff77d9cf38fa70e6238794896093d - M1
 )
 
+var ErrorCryptexNotFound = errors.New("cryptex not found")
+
 type apKey struct {
 	Device   string `json:"device,omitempty"`
 	Build    string `json:"build,omitempty"`
@@ -315,13 +317,15 @@ func (i *Info) GetAppOsDmg() (string, error) {
 			}
 		}
 		dmgs = utils.Unique(dmgs)
-		if len(dmgs) == 1 {
+		if len(dmgs) == 0 {
+			return "", fmt.Errorf("no AppOS DMG found: %w", ErrorCryptexNotFound)
+		} else if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
 			return "", fmt.Errorf("multiple AppOS DMGs found")
 		}
 	}
-	return "", fmt.Errorf("no AppOS DMG found")
+	return "", fmt.Errorf("no BuildManifest.plist found")
 }
 
 // GetSystemOsDmg returns the name of the SystemOS dmg (the one with the dyld_shared_cache(s))
@@ -334,13 +338,15 @@ func (i *Info) GetSystemOsDmg() (string, error) {
 			}
 		}
 		dmgs = utils.Unique(dmgs)
-		if len(dmgs) == 1 {
+		if len(dmgs) == 0 {
+			return "", fmt.Errorf("no SystemOS DMG found: %w", ErrorCryptexNotFound)
+		} else if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
 			return "", fmt.Errorf("multiple SystemOS DMGs found")
 		}
 	}
-	return "", fmt.Errorf("no SystemOS DMG found")
+	return "", fmt.Errorf("no BuildManifest.plist found")
 }
 
 // GetFileSystemOsDmg returns the name of the file system dmg
@@ -353,13 +359,15 @@ func (i *Info) GetFileSystemOsDmg() (string, error) {
 			}
 		}
 		dmgs = utils.Unique(dmgs)
-		if len(dmgs) == 1 {
+		if len(dmgs) == 0 {
+			return "", fmt.Errorf("no filesystem DMG found: %w", ErrorCryptexNotFound)
+		} else if len(dmgs) == 1 {
 			return dmgs[0], nil
 		} else {
 			return "", fmt.Errorf("multiple filesystem DMGs found")
 		}
 	}
-	return "", fmt.Errorf("filesystem DMG not found")
+	return "", fmt.Errorf("no BuildManifest.plist found")
 }
 
 // GetRestoreRamDiskDmgs returns the name of the RestoreRamDisk dmg
