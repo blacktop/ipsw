@@ -2,11 +2,13 @@
 package mount
 
 import (
+	"errors"
 	"net/http"
 	"path/filepath"
 
 	"github.com/blacktop/ipsw/internal/commands/mount"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/gin-gonic/gin"
 )
 
@@ -54,6 +56,10 @@ func AddRoutes(rg *gin.RouterGroup) {
 		}
 		ctx, err := mount.DmgInIPSW(ipswPath, dmgType)
 		if err != nil {
+			if errors.Unwrap(err) == info.ErrorCryptexNotFound {
+				c.AbortWithError(http.StatusNotFound, err)
+				return
+			}
 			c.AbortWithError(http.StatusInternalServerError, err)
 		}
 		c.JSON(http.StatusOK, mountReponse{
