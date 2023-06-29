@@ -58,7 +58,7 @@ require (
 	golang.org/x/term v0.9.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.2
-	gorm.io/gorm v1.25.1
+	gorm.io/gorm v1.25.2
 )
 
 // TODO: remove this once https://github.com/spf13/cast/pull/155 is merged
