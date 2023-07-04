@@ -32,6 +32,7 @@ type Disass interface {
 	Data() []byte
 	StartAddr() uint64
 	Middle() uint64
+	ReadAddr(uint64) (uint64, error)
 }
 
 type opName uint32
@@ -165,11 +166,11 @@ func Disassemble(d Disass) {
 		}
 
 		if !d.AsJSON() {
+			var comment string
 			instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
 			if err != nil {
 				var op string
 				var oprs string
-				var comment string
 				if instrValue == 0xfeedfacf {
 					op = ".long"
 					oprs = fmt.Sprintf("%#x", instrValue)
@@ -317,11 +318,11 @@ func Disassemble(d Disass) {
 					}
 				} else if strings.Contains(instruction.Encoding.String(), "loadlit") {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
-						instrStr += fmt.Sprintf(" ; %s", name)
+						comment = fmt.Sprintf(" ; %s", name)
 					}
 				} else if instruction.Encoding == disassemble.ENC_CBZ_64_COMPBRANCH {
 					if name, ok := d.FindSymbol(uint64(instruction.Operands[1].Immediate)); ok {
-						instrStr += fmt.Sprintf(" ; %s", name)
+						comment = fmt.Sprintf(" ; %s", name)
 					}
 				} else if instruction.Operation == disassemble.ARM64_ADR {
 					opStr := strings.TrimPrefix(instrStr, fmt.Sprintf("%s\t", instruction.Operation))
@@ -332,9 +333,9 @@ func Disassemble(d Disass) {
 							} else if cstr, err := d.GetCString(uint64(operand.Immediate)); err == nil {
 								if utils.IsASCII(cstr) {
 									if len(cstr) > 200 {
-										instrStr += fmt.Sprintf(" ; %#v...", cstr[:200])
+										comment = fmt.Sprintf(" ; %#v...", cstr[:200])
 									} else if len(cstr) > 1 {
-										instrStr += fmt.Sprintf(" ; %#v", cstr)
+										comment = fmt.Sprintf(" ; %#v", cstr)
 									}
 								}
 							}
@@ -358,21 +359,27 @@ func Disassemble(d Disass) {
 						adrpImm += instruction.Operands[1].Immediate
 					}
 					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
-						instrStr += fmt.Sprintf(" ; %s", name)
+						comment = fmt.Sprintf(" ; %s", name)
 					} else if ok, detail := d.IsPointer(adrpImm); ok {
 						if name, ok := d.FindSymbol(uint64(detail.Pointer)); ok {
-							instrStr += fmt.Sprintf(" ; _ptr.%s", name)
+							comment = fmt.Sprintf(" ; _ptr.%s", name)
 						} else {
-							instrStr += fmt.Sprintf(" ; _ptr.%x (%s)", detail.Pointer, detail)
+							comment = fmt.Sprintf(" ; _ptr.%x (%s)", detail.Pointer, detail)
 						}
 					} else if ok, detail := d.IsData(adrpImm); ok {
 						instrStr += fmt.Sprintf(" ; dat_%x (%s)", adrpImm, detail)
-					} else if cstr, err := d.GetCString(adrpImm); err == nil {
+					} else if cstr, err := d.GetCString(adrpImm); err == nil && len(cstr) > 0 {
 						if utils.IsASCII(cstr) {
 							if len(cstr) > 200 {
-								instrStr += fmt.Sprintf(" ; %#v...", cstr[:200])
+								comment = fmt.Sprintf(" ; %#v...", cstr[:200])
 							} else if len(cstr) > 1 {
-								instrStr += fmt.Sprintf(" ; %#v", cstr)
+								comment = fmt.Sprintf(" ; %#v", cstr)
+							}
+						}
+					} else { // try again with immediate as pointer
+						if ptr, err := d.ReadAddr(adrpImm); err == nil {
+							if name, ok := d.FindSymbol(ptr); ok {
+								comment = fmt.Sprintf(" ; _ptr.%s", name)
 							}
 						}
 					}
@@ -386,18 +393,19 @@ func Disassemble(d Disass) {
 			if d.Middle() != 0 && d.Middle() == startAddr {
 				if d.Color() {
 					opStr := strings.TrimSpace(strings.TrimPrefix(instrStr, instruction.Operation.String()))
-					printCurLine("=>%08x:  %s   %-7s %s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction.Operation, opStr)
+					printCurLine("=>%08x:  %s   %-7s %s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instruction.Operation, opStr, comment)
 				} else {
-					fmt.Printf("=>%08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+					fmt.Printf("=>%08x:  %s\t%s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr, comment)
 				}
 			} else {
 				if d.Color() {
 					opStr := strings.TrimSpace(strings.TrimPrefix(instrStr, instruction.Operation.String()))
-					fmt.Printf("%s:  %s   %s %s\n",
+					fmt.Printf("%s:  %s   %s %s%s\n",
 						colorAddr("%#08x", uint64(startAddr)),
 						colorOpCodes(disassemble.GetOpCodeByteString(instrValue)),
 						colorOp("%-7s", instruction.Operation),
 						colorOperands(" "+opStr),
+						colorComment(comment),
 					)
 				} else {
 					fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)

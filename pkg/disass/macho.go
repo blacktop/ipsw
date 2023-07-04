@@ -16,6 +16,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
@@ -52,6 +53,13 @@ func (d MachoDisass) StartAddr() uint64 {
 }
 func (d MachoDisass) Middle() uint64 {
 	return d.cfg.Middle
+}
+func (d MachoDisass) ReadAddr(addr uint64) (uint64, error) {
+	ptr, err := d.f.GetPointerAtAddress(addr)
+	if err != nil {
+		return 0, err
+	}
+	return d.f.SlidePointer(ptr), nil
 }
 
 // Triage walks a function and analyzes all immediates
@@ -152,6 +160,10 @@ func (d MachoDisass) IsFunctionStart(addr uint64) (bool, string) {
 		if addr == fn.StartAddr {
 			if symName, ok := d.a2s[addr]; ok {
 				if d.Demangle() {
+					if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
+						symName, _ = swift.Demangle(symName)
+						return ok, symName
+					}
 					return ok, demangle.Do(symName, false, false)
 				}
 				return ok, symName
