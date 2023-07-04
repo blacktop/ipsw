@@ -14,14 +14,10 @@ var colorAddr = color.New(color.Bold, color.FgMagenta).SprintfFunc()
 var colorOpCodes = color.New(color.Faint, color.FgHiWhite).SprintFunc()
 var colorComment = color.New(color.Faint, color.FgWhite).SprintFunc()
 var colorLocation = color.New(color.FgHiYellow).SprintfFunc()
-var printCurLine = color.New(color.Bold, color.FgHiBlack, color.BgHiWhite).PrintfFunc()
+var printCurLine = color.New(color.Bold, color.FgBlack, color.BgHiWhite).PrintfFunc()
 
 func colorOperands(operands string) string {
 	if len(operands) > 0 {
-		commentMatch := regexp.MustCompile(`;.*$`)
-		operands = commentMatch.ReplaceAllStringFunc(operands, func(s string) string {
-			return colorComment(s)
-		})
 		immMatch := regexp.MustCompile(`#?-?0x[0-9a-z]+`)
 		operands = immMatch.ReplaceAllStringFunc(operands, func(s string) string {
 			return colorImm(s)
@@ -34,6 +30,11 @@ func colorOperands(operands string) string {
 		operands = regMatch.ReplaceAllStringFunc(operands, func(s string) string {
 			return string(s[0]) + colorRegs(s[1:])
 		})
+		// TODO: delete this (moved comment coloring into disass module)
+		// commentMatch := regexp.MustCompile(`;\s.*$`)
+		// operands = commentMatch.ReplaceAllStringFunc(operands, func(s string) string {
+		// 	return colorComment(s)
+		// })
 	}
 	return operands
 }

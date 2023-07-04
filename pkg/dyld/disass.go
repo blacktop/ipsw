@@ -10,6 +10,7 @@ import (
 
 	"github.com/blacktop/arm64-cgo/disassemble"
 	"github.com/blacktop/ipsw/internal/demangle"
+	"github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/pkg/disass"
 )
 
@@ -44,6 +45,13 @@ func (d DyldDisass) StartAddr() uint64 {
 }
 func (d DyldDisass) Middle() uint64 {
 	return d.cfg.Middle
+}
+func (d DyldDisass) ReadAddr(addr uint64) (uint64, error) {
+	ptr, err := d.f.ReadPointerAtAddress(addr)
+	if err != nil {
+		return 0, err
+	}
+	return d.f.SlideInfo.SlidePointer(ptr), nil
 }
 
 func (d DyldDisass) Dylibs() []*CacheImage {
@@ -101,7 +109,7 @@ func (d DyldDisass) IsBranchLocation(addr uint64) (bool, uint64) {
 // IsData returns if given address is a data variable address referenced in the disassembled function
 func (d DyldDisass) IsData(addr uint64) (bool, *disass.AddrDetails) {
 	if detail, ok := d.tr.Details[addr]; ok {
-		if strings.Contains(strings.ToLower(detail.Segment), "data") {
+		if strings.Contains(strings.ToLower(detail.Segment), "data") && !strings.EqualFold(detail.Section, "__got") {
 			return true, &detail
 		}
 	}
@@ -327,6 +335,10 @@ func (d DyldDisass) IsFunctionStart(addr uint64) (bool, string) {
 		if addr == fn.StartAddr {
 			if symName, ok := d.f.AddressToSymbol[addr]; ok {
 				if d.Demangle() {
+					if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
+						symName, _ = swift.Demangle(symName)
+						return ok, symName
+					}
 					return ok, demangle.Do(symName, false, false)
 				}
 				return ok, symName
@@ -341,6 +353,10 @@ func (d DyldDisass) IsFunctionStart(addr uint64) (bool, string) {
 func (d DyldDisass) FindSymbol(addr uint64) (string, bool) {
 	if symName, ok := d.f.AddressToSymbol[addr]; ok {
 		if d.cfg.Demangle {
+			if strings.HasPrefix(symName, "_$s") { // TODO: better detect swift symbols
+				symName, _ = swift.DemangleSimple(symName)
+				return symName, true
+			}
 			return demangle.Do(symName, false, false), true
 		}
 		return symName, true
