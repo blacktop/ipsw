@@ -656,33 +656,32 @@ type CachePatchableExportV1 struct {
 	ExportNameOffset         uint32
 }
 
-type CachePatchableLocationV1 uint64
-
-func (p CachePatchableLocationV1) CacheOffset() uint64 {
-	return types.ExtractBits(uint64(p), 0, 32)
+type CachePatchableLocationV1 struct {
+	CacheOffset uint32
+	// _           uint32 // padding TODO: FIXME do I need this padding or not
+	Location uint64
 }
+
 func (p CachePatchableLocationV1) Address(cacheBase uint64) uint64 {
-	return p.CacheOffset() + cacheBase
+	return uint64(p.CacheOffset) + cacheBase
 }
 func (p CachePatchableLocationV1) High7() uint64 {
-	return types.ExtractBits(uint64(p), 32, 7)
+	return types.ExtractBits(uint64(p.Location), 0, 7)
 }
 func (p CachePatchableLocationV1) Addend() uint64 {
-	signedAddend := int64(types.ExtractBits(uint64(p), 39, 5)) // 0..31
-	signedAddend = (signedAddend << 52) >> 52
-	return uint64(signedAddend)
+	return types.ExtractBits(uint64(p.Location), 7, 5) // 0..31
 }
 func (p CachePatchableLocationV1) Authenticated() bool {
-	return types.ExtractBits(uint64(p), 44, 1) != 0
+	return types.ExtractBits(uint64(p.Location), 12, 1) != 0
 }
 func (p CachePatchableLocationV1) UsesAddressDiversity() bool {
-	return types.ExtractBits(uint64(p), 45, 1) != 0
+	return types.ExtractBits(uint64(p.Location), 13, 1) != 0
 }
 func (p CachePatchableLocationV1) Key() uint64 {
-	return types.ExtractBits(uint64(p), 46, 2)
+	return types.ExtractBits(uint64(p.Location), 14, 2)
 }
 func (p CachePatchableLocationV1) Discriminator() uint64 {
-	return types.ExtractBits(uint64(p), 48, 16)
+	return types.ExtractBits(uint64(p.Location), 16, 16)
 }
 
 func (p CachePatchableLocationV1) String(cacheBase uint64) string {
@@ -805,9 +804,7 @@ func (p patchableLocationV2) High7() uint32 {
 	return uint32(types.ExtractBits(uint64(p), 0, 7))
 }
 func (p patchableLocationV2) Addend() uint64 {
-	signedAddend := int64(types.ExtractBits(uint64(p), 7, 5)) // 0..31
-	signedAddend = (signedAddend << 52) >> 52
-	return uint64(signedAddend)
+	return types.ExtractBits(uint64(p), 7, 5) // 0..31
 }
 func (p patchableLocationV2) Authenticated() bool {
 	return uint32(types.ExtractBits(uint64(p), 12, 1)) != 0
@@ -864,6 +861,71 @@ func (p CachePatchableLocationV3) String(o2a func(uint64) uint64) string {
 		return fmt.Sprintf("%#x: (%s)", o2a(p.CacheOffsetOfUse), strings.Join(detail, ", "))
 	}
 	return fmt.Sprintf("%#x:", o2a(p.CacheOffsetOfUse))
+}
+
+type CachePatchInfoV4 CachePatchInfoV3
+
+type CachePatchableLocationV4 struct {
+	DylibOffsetOfUse uint32 // Offset from the dylib we used to get a dyld_cache_image_clients_v2
+	Location         patchableLocationV4
+	_                uint32 // padding
+}
+
+func (p CachePatchableLocationV4) String(preferredLoadAddress uint64) string {
+	var detail []string
+	if p.Location.Addend() > 0 {
+		detail = append(detail, fmt.Sprintf("addend: %#x", p.Location.Addend()))
+	}
+	if p.Location.IsWeakImport() {
+		detail = append(detail, fmt.Sprintf("weak_import: %t", p.Location.IsWeakImport()))
+	}
+	if p.Location.Authenticated() {
+		if p.Location.UsesAddressDiversity() {
+			detail = append(detail, fmt.Sprintf("diversity: %#04x", p.Location.Discriminator()))
+		}
+		key := "IA"
+		if p.Location.IsDataKey() {
+			key = "DA"
+		}
+		detail = append(detail, fmt.Sprintf("key: %s, auth: %t", key, p.Location.Authenticated()))
+	}
+	if len(detail) > 0 {
+		return fmt.Sprintf("%#x: (%s)", preferredLoadAddress+uint64(p.DylibOffsetOfUse), strings.Join(detail, ", "))
+	}
+	return fmt.Sprintf("%#x:", preferredLoadAddress+uint64(p.DylibOffsetOfUse))
+}
+
+type patchableLocationV4 uint32
+
+func (p patchableLocationV4) Authenticated() bool {
+	return uint32(types.ExtractBits(uint64(p), 0, 1)) != 0
+}
+func (p patchableLocationV4) High7() uint32 {
+	return uint32(types.ExtractBits(uint64(p), 1, 7))
+}
+func (p patchableLocationV4) IsWeakImport() bool {
+	return uint32(types.ExtractBits(uint64(p), 8, 1)) != 0
+}
+func (p patchableLocationV4) Addend() uint64 {
+	if p.Authenticated() {
+		return types.ExtractBits(uint64(p), 9, 5) // 0..31
+	}
+	return types.ExtractBits(uint64(p), 9, 23)
+}
+func (p patchableLocationV4) UsesAddressDiversity() bool {
+	return uint32(types.ExtractBits(uint64(p), 14, 1)) != 0
+}
+func (p patchableLocationV4) IsDataKey() bool {
+	return uint32(types.ExtractBits(uint64(p), 15, 1)) != 0 // B keys are not permitted.  So this is just whether the A key is I or D (0 => I, 1 => D)
+}
+func (p patchableLocationV4) Discriminator() uint32 {
+	return uint32(types.ExtractBits(uint64(p), 16, 16))
+}
+
+type CachePatchableLocationV4Got struct {
+	CacheOffsetOfUse uint64 // Offset from the cache header
+	Location         patchableLocationV4
+	_                uint32 // padding
 }
 
 type SubcacheEntry struct {
