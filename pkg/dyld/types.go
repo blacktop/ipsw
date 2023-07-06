@@ -868,17 +868,10 @@ type CachePatchInfoV4 CachePatchInfoV3
 type CachePatchableLocationV4 struct {
 	DylibOffsetOfUse uint32 // Offset from the dylib we used to get a dyld_cache_image_clients_v2
 	Location         patchableLocationV4
-	_                uint32 // padding
 }
 
 func (p CachePatchableLocationV4) String(preferredLoadAddress uint64) string {
 	var detail []string
-	if p.Location.Addend() > 0 {
-		detail = append(detail, fmt.Sprintf("addend: %#x", p.Location.Addend()))
-	}
-	if p.Location.IsWeakImport() {
-		detail = append(detail, fmt.Sprintf("weak_import: %t", p.Location.IsWeakImport()))
-	}
 	if p.Location.Authenticated() {
 		if p.Location.UsesAddressDiversity() {
 			detail = append(detail, fmt.Sprintf("diversity: %#04x", p.Location.Discriminator()))
@@ -889,10 +882,16 @@ func (p CachePatchableLocationV4) String(preferredLoadAddress uint64) string {
 		}
 		detail = append(detail, fmt.Sprintf("key: %s, auth: %t", key, p.Location.Authenticated()))
 	}
-	if len(detail) > 0 {
-		return fmt.Sprintf("%#x: (%s)", preferredLoadAddress+uint64(p.DylibOffsetOfUse), strings.Join(detail, ", "))
+	if p.Location.Addend() > 0 {
+		detail = append(detail, fmt.Sprintf("addend: %#x", p.Location.Addend()))
 	}
-	return fmt.Sprintf("%#x:", preferredLoadAddress+uint64(p.DylibOffsetOfUse))
+	if p.Location.IsWeakImport() {
+		detail = append(detail, "weak_import")
+	}
+	if len(detail) > 0 {
+		return fmt.Sprintf("%s: PATCH\t%s", symDarkAddrColor("%#09x", preferredLoadAddress+uint64(p.DylibOffsetOfUse)), symTypeColor("(%s)", strings.Join(detail, ", ")))
+	}
+	return fmt.Sprintf("%s: PATCH\t", symDarkAddrColor("%#09x", preferredLoadAddress+uint64(p.DylibOffsetOfUse)))
 }
 
 type patchableLocationV4 uint32
@@ -926,6 +925,30 @@ type CachePatchableLocationV4Got struct {
 	CacheOffsetOfUse uint64 // Offset from the cache header
 	Location         patchableLocationV4
 	_                uint32 // padding
+}
+
+func (p CachePatchableLocationV4Got) String(o2a func(uint64) uint64) string {
+	var detail []string
+	if p.Location.Authenticated() {
+		if p.Location.UsesAddressDiversity() {
+			detail = append(detail, fmt.Sprintf("diversity: %#04x", p.Location.Discriminator()))
+		}
+		key := "IA"
+		if p.Location.IsDataKey() {
+			key = "DA"
+		}
+		detail = append(detail, fmt.Sprintf("key: %s, auth: %t", key, p.Location.Authenticated()))
+	}
+	if p.Location.Addend() > 0 {
+		detail = append(detail, fmt.Sprintf("addend: %#x", p.Location.Addend()))
+	}
+	if p.Location.IsWeakImport() {
+		detail = append(detail, "weak_import")
+	}
+	if len(detail) > 0 {
+		return fmt.Sprintf("%s: GOT\t%s", symDarkAddrColor("%#09x", o2a(p.CacheOffsetOfUse)), symTypeColor("(%s)", strings.Join(detail, ", ")))
+	}
+	return fmt.Sprintf("%s: GOT\t", symDarkAddrColor("%#09x", o2a(p.CacheOffsetOfUse)))
 }
 
 type SubcacheEntry struct {

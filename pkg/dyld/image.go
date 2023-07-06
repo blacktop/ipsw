@@ -34,7 +34,7 @@ type Patch interface {
 	GetImplOffset() uint64
 	GetClientIndex() uint32
 	GetPatchLocations() any
-	GetGotLocations() []CachePatchableLocationV3
+	GetGotLocations() any
 }
 
 type PatchableExport struct {
@@ -44,6 +44,7 @@ type PatchableExport struct {
 	ClientIndex      uint32
 	PatchLocations   []CachePatchableLocationV1
 	PatchLocationsV2 []CachePatchableLocationV2
+	PatchLocationsV4 []CachePatchableLocationV4
 }
 
 func (pe PatchableExport) GetName() string {
@@ -61,10 +62,15 @@ func (pe PatchableExport) GetClientIndex() uint32 {
 func (pe PatchableExport) GetPatchLocations() any {
 	if len(pe.PatchLocations) > 0 {
 		return pe.PatchLocations
+	} else if len(pe.PatchLocationsV2) > 0 {
+		return pe.PatchLocationsV2
+	} else if len(pe.PatchLocationsV4) > 0 {
+		return pe.PatchLocationsV4
+	} else {
+		return nil
 	}
-	return pe.PatchLocationsV2
 }
-func (pe PatchableExport) GetGotLocations() []CachePatchableLocationV3 {
+func (pe PatchableExport) GetGotLocations() any {
 	return nil
 }
 
@@ -72,7 +78,9 @@ type PatchableGotExport struct {
 	Name           string
 	Kind           string
 	OffsetOfImpl   uint32
+	ImageIndex     uint32
 	GotLocationsV3 []CachePatchableLocationV3
+	GotLocationsV4 []CachePatchableLocationV4Got
 }
 
 func (pg PatchableGotExport) GetName() string {
@@ -91,8 +99,14 @@ func (pg PatchableGotExport) GetClientIndex() uint32 {
 func (pg PatchableGotExport) GetPatchLocations() any {
 	return nil
 }
-func (pg PatchableGotExport) GetGotLocations() []CachePatchableLocationV3 {
-	return pg.GotLocationsV3
+func (pg PatchableGotExport) GetGotLocations() any {
+	if len(pg.GotLocationsV3) > 0 {
+		return pg.GotLocationsV3
+	} else if len(pg.GotLocationsV4) > 0 {
+		return pg.GotLocationsV4
+	} else {
+		return nil
+	}
 }
 
 type astate struct {
@@ -805,7 +819,7 @@ func (i *CacheImage) ParseLocalSymbols(dump bool) error {
 		for idx := uint32(0); idx < i.cache.LocalSymInfo.EntriesCount; idx++ {
 			// skip over other images
 			if idx != i.Index {
-				sr.Seek(int64(int(i.cache.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), os.SEEK_CUR)
+				sr.Seek(int64(int(i.cache.Images[idx].NlistCount)*binary.Size(types.Nlist64{})), io.SeekCurrent)
 				continue
 			}
 
