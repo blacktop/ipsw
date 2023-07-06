@@ -24,6 +24,7 @@ package dyld
 import (
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -119,7 +120,7 @@ var PatchesCmd = &cobra.Command{
 							}
 						}
 					}
-				case 2, 3, 4: //FIXME: add proper support v4
+				case 2, 3:
 					exp2uses := make(map[string][]dyld.Patch)
 					for _, patch := range image.PatchableExports {
 						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
@@ -142,7 +143,7 @@ var PatchesCmd = &cobra.Command{
 						}
 						if patches, ok := got2uses[symbolName]; ok {
 							for _, patch := range patches {
-								for _, got := range patch.GetGotLocations() {
+								for _, got := range patch.GetGotLocations().([]dyld.CachePatchableLocationV3) {
 									fmt.Fprintf(w, "    %s\tGOT\n",
 										got.String(func(u uint64) uint64 {
 											if _, addr, err := f.GetCacheVMAddress(u); err == nil {
@@ -155,9 +156,41 @@ var PatchesCmd = &cobra.Command{
 						}
 					}
 					w.Flush()
-					// } else {
-					// 	return fmt.Errorf("symbol not found: %s", symbolName)
-					// }
+				case 4:
+					// Patch locations
+					exp2uses := make(map[string][]dyld.Patch)
+					for _, patch := range image.PatchableExports {
+						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
+					}
+					if patches, ok := exp2uses[symbolName]; ok {
+						fmt.Printf("%#x: %s%s\n", image.LoadAddress+uint64(patches[0].GetImplOffset()), patches[0].GetKind(), symbolName)
+						for _, patch := range patches {
+							for _, loc := range patch.GetPatchLocations().([]dyld.CachePatchableLocationV4) {
+								fmt.Fprintf(w, "    %s\t%s\n",
+									loc.String(f.Images[patch.GetClientIndex()].LoadAddress),
+									colorImage(path.Base(f.Images[patch.GetClientIndex()].Name)))
+							}
+						}
+					}
+					// GOT patch locations
+					got2uses := make(map[string][]dyld.Patch)
+					for _, got := range image.PatchableGOTs {
+						got2uses[got.GetName()] = append(got2uses[got.GetName()], got)
+					}
+					if patches, ok := got2uses[symbolName]; ok {
+						for _, patch := range patches {
+							for _, got := range patch.GetGotLocations().([]dyld.CachePatchableLocationV4Got) {
+								fmt.Fprintf(w, "    %s\n",
+									got.String(func(u uint64) uint64 {
+										if _, addr, err := f.GetCacheVMAddress(u); err == nil {
+											return addr
+										}
+										return 0
+									}))
+							}
+						}
+					}
+					w.Flush()
 				default:
 					return fmt.Errorf("unsupported patch info version %d", f.PatchInfoVersion)
 				}
@@ -174,7 +207,7 @@ var PatchesCmd = &cobra.Command{
 						fmt.Fprintf(w, "%#x\t(%d patches)\t%s\n", patch.GetImplOffset(), len(patch.GetPatchLocations().([]dyld.CachePatchableLocationV1)), patch.GetName())
 					}
 					w.Flush()
-				case 2, 3, 4: //FIXME: add proper support v4
+				case 2, 3:
 					exp2uses := make(map[string][]dyld.Patch)
 					for _, patch := range image.PatchableExports {
 						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
@@ -198,6 +231,39 @@ var PatchesCmd = &cobra.Command{
 							case dyld.PatchableGotExport:
 								for _, got := range patch.GotLocationsV3 {
 									fmt.Fprintf(w, "    %s\tGOT\n",
+										got.String(func(u uint64) uint64 {
+											if _, addr, err := f.GetCacheVMAddress(u); err == nil {
+												return addr
+											}
+											return 0
+										}))
+								}
+							}
+						}
+						w.Flush()
+					}
+				case 4:
+					exp2uses := make(map[string][]dyld.Patch)
+					for _, patch := range image.PatchableExports {
+						exp2uses[patch.GetName()] = append(exp2uses[patch.GetName()], patch)
+					}
+					for _, got := range image.PatchableGOTs {
+						exp2uses[got.GetName()] = append(exp2uses[got.GetName()], got)
+					}
+					fmt.Printf("\t(%d symbols)\n", len(exp2uses))
+					for name, patches := range exp2uses {
+						fmt.Printf("%#x: %s\n", image.LoadAddress+uint64(patches[0].GetImplOffset()), name)
+						for _, patch := range patches {
+							switch patch := patch.(type) {
+							case dyld.PatchableExport:
+								for _, loc := range patch.PatchLocationsV4 {
+									fmt.Fprintf(w, "    %s\t%s\n",
+										loc.String(f.Images[patch.ClientIndex].LoadAddress),
+										colorImage(path.Base(f.Images[patch.ClientIndex].Name)))
+								}
+							case dyld.PatchableGotExport:
+								for _, got := range patch.GotLocationsV4 {
+									fmt.Fprintf(w, "    %s\n",
 										got.String(func(u uint64) uint64 {
 											if _, addr, err := f.GetCacheVMAddress(u); err == nil {
 												return addr
