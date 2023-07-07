@@ -21,7 +21,7 @@ require (
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/disgoorg/disgo v0.16.7
 	github.com/disgoorg/snowflake/v2 v2.0.1
-	github.com/docker/docker v24.0.2+incompatible
+	github.com/docker/docker v24.0.3+incompatible
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
