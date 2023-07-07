@@ -73,14 +73,14 @@ import (
 
 const (
 	MAGIC       = 0xcff1     /* magic number identifying header */
-	MAX_TYPE    = 0xffff     /* max type identifier value */
+	MAX_TYPE    = 0xfffffffe /* max type identifier value */
 	MAX_NAME    = 0x7fffffff /* max offset into a string table */
 	MAX_VLEN    = 0x3ff      /* max struct, union, enum members or args */
 	MAX_INTOFF  = 0xff       /* max offset of intrinsic value in bits */
 	MAX_INTBITS = 0xffff     /* max size of an intrinsic in bits */
 	/* See ctf_type_t */
-	MAX_SIZE   = 0xfffe /* max size of a type in bytes */
-	LSIZE_SENT = 0xffff /* sentinel for ctt_size */
+	MAX_SIZE   = 0xfffffffe /* max size of a type in bytes */
+	LSIZE_SENT = 0xffffffff /* sentinel for ctt_size */
 	MAX_LSIZE  = math.MaxUint64
 	/* data format version number */
 	VERSION_1     = 1
@@ -124,13 +124,23 @@ type lblent struct {
 	TypeIndex uint32 /* last type associated with this label */
 }
 
-// ctf_stype_t
+// ctf_stype
 type stype struct {
 	Name       uint32 /* reference to name in string table */
 	Info       info   /* encoded kind, variant length (see below) */
+	SizeOrType uint32 /* UNION {
+	uint32_t _size - size of entire type in bytes
+	uint32_t _type - reference to another type
+	} */
+}
+
+// ctf_stype_v1
+type stypeV1 struct {
+	Name       uint32 /* reference to name in string table */
+	Info       infoV1 /* encoded kind, variant length (see below) */
 	SizeOrType uint16 /* UNION {
-	size of entire type in bytes
-	reference to another type
+	uint16_t _size - size of entire type in bytes
+	uint16_t _type - reference to another type
 	} */
 }
 
@@ -153,7 +163,43 @@ func (t ctftype) LSize() uint64 {
 	return uint64(t.LSizeHI)<<32 | uint64(t.LSizeLO)
 }
 
-type info uint16
+type ctftypeV1 struct {
+	stypeV1
+	LSizeHI uint32 /* high 32 bits of type size in bytes */
+	LSizeLO uint32 /* low 32 bits of type size in bytes */
+}
+
+func (t ctftypeV1) LSize() uint64 {
+	return uint64(t.LSizeHI)<<32 | uint64(t.LSizeLO)
+}
+
+type Info interface {
+	Kind() kind
+	IsRoot() bool
+	VarLen() uint16
+	String() string
+	MarshalJSON() ([]byte, error)
+}
+
+/*
+ * The following macros compose and decompose values for ctt_info and
+ * ctt_name, as well as other structures that contain name references.
+ *
+ *             -----------------------------------
+ * ctt_info:   | reserved | kind | isroot | vlen |
+ *             -----------------------------------
+ *             31         15   11    10    9     0
+ *
+ * kind = CTF_INFO_KIND(c.ctt_info);     <-- CTF_K_* value (see below)
+ * vlen = CTF_INFO_VLEN(c.ctt_info);     <-- length of variable data list
+ *
+ * stid = CTF_NAME_STID(c.ctt_name);     <-- string table id number (0 or 1)
+ * offset = CTF_NAME_OFFSET(c.ctt_name); <-- string table byte offset
+ *
+ * c.ctt_info = CTF_TYPE_INFO(kind, vlen);
+ * c.ctt_name = CTF_TYPE_NAME(stid, offset);
+ */
+type info uint32
 
 func (i info) Kind() kind {
 	return kind((i & 0xf800) >> 11)
@@ -164,7 +210,36 @@ func (i info) IsRoot() bool {
 func (i info) VarLen() uint16 {
 	return uint16(i) & MAX_VLEN
 }
+func (i info) String() string {
+	return fmt.Sprintf("kind: %s, is_root: %t, len: %d", i.Kind(), i.IsRoot(), i.VarLen())
+}
 func (i info) MarshalJSON() ([]byte, error) {
+	return json.Marshal(&struct {
+		Kind   string `json:"kind,omitempty"`
+		IsRoot bool   `json:"is_root,omitempty"`
+		VarLen uint16 `json:"var_len,omitempty"`
+	}{
+		Kind:   i.Kind().String(),
+		IsRoot: i.IsRoot(),
+		VarLen: i.VarLen(),
+	})
+}
+
+type infoV1 uint16
+
+func (i infoV1) Kind() kind {
+	return kind((i & 0xf800) >> 11)
+}
+func (i infoV1) IsRoot() bool {
+	return ((i & 0x0400) >> 10) != 0
+}
+func (i infoV1) VarLen() uint16 {
+	return uint16(i) & MAX_VLEN
+}
+func (i infoV1) String() string {
+	return fmt.Sprintf("kind: %s, is_root: %t, len: %d", i.Kind(), i.IsRoot(), i.VarLen())
+}
+func (i infoV1) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		Kind   string `json:"kind,omitempty"`
 		IsRoot bool   `json:"is_root,omitempty"`
@@ -199,7 +274,7 @@ const (
 	POINTER  kind = 3 /* ctt_type is referenced type */
 	ARRAY    kind = 4 /* variant data is single ctf_array_t */
 	FUNCTION kind = 5 /* ctt_type is return type, variant data is */
-	/* list of argument types (uint16_t's) */
+	/* list of argument types (uint32_t's) */
 	STRUCT   kind = 6  /* variant data is list of ctf_member_t's */
 	UNION    kind = 7  /* variant data is list of ctf_member_t's */
 	ENUM     kind = 8  /* variant data is list of ctf_enum_t's */
@@ -344,6 +419,13 @@ func (p ptrAuthData) MarshalJSON() ([]byte, error) {
 
 // ctf_array_t
 type array struct {
+	Contents    uint32 `json:"contents,omitempty"`     /* reference to type of array contents */
+	Index       uint32 `json:"index,omitempty"`        /* reference to type of array index */
+	NumElements uint32 `json:"num_elements,omitempty"` /* number of elements */
+}
+
+// ctf_array_v1_t
+type arrayV1 struct {
 	Contents    uint16 `json:"contents,omitempty"`     /* reference to type of array contents */
 	Index       uint16 `json:"index,omitempty"`        /* reference to type of array index */
 	NumElements uint32 `json:"num_elements,omitempty"` /* number of elements */
@@ -361,6 +443,14 @@ const LSTRUCT_THRESH = 8192
 // ctf_member_t
 type member struct {
 	Name   uint32 /* reference to name in string table */
+	Type   uint32 /* reference to type of member */
+	Offset uint16 /* offset of this member in bits */
+	_      uint16 // padding ?
+}
+
+// ctf_member_v1
+type memberV1 struct {
+	Name   uint32 /* reference to name in string table */
 	Type   uint16 /* reference to type of member */
 	Offset uint16 /* offset of this member in bits */
 }
@@ -368,13 +458,25 @@ type member struct {
 // ctf_lmember_t
 type lmember struct {
 	Name     uint32 /* reference to name in string table */
+	Type     uint32 /* reference to type of member */
+	OffsetHI uint32 /* high 32 bits of member offset in bits */
+	OffsetLO uint32 /* low 32 bits of member offset in bits */
+}
+
+func (l lmember) Offset() uint64 {
+	return uint64(l.OffsetHI)<<32 | uint64(l.OffsetLO)
+}
+
+// ctf_lmember_v1
+type lmemberV1 struct {
+	Name     uint32 /* reference to name in string table */
 	Type     uint16 /* reference to type of member */
 	Pad      uint16 /* padding */
 	OffsetHI uint32 /* high 32 bits of member offset in bits */
 	OffsetLO uint32 /* low 32 bits of member offset in bits */
 }
 
-func (l lmember) Offset() uint64 {
+func (l lmemberV1) Offset() uint64 {
 	return uint64(l.OffsetHI)<<32 | uint64(l.OffsetLO)
 }
 
