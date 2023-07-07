@@ -12,7 +12,7 @@ import (
 type Type interface {
 	ID() int
 	Name() string
-	Info() info
+	Info() Info
 	ParentID() int
 	Type() string
 	String() string
@@ -22,7 +22,7 @@ type Type interface {
 type Integer struct {
 	id       int
 	name     string
-	info     info
+	info     Info
 	encoding intEncoding
 }
 
@@ -32,7 +32,7 @@ func (i *Integer) ID() int {
 func (i *Integer) Name() string {
 	return i.name
 }
-func (i *Integer) Info() info {
+func (i *Integer) Info() Info {
 	return i.info
 }
 func (i *Integer) Encoding() string {
@@ -67,7 +67,7 @@ func (i *Integer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID       int         `json:"id,omitempty"`
 		Name     string      `json:"name,omitempty"`
-		Info     info        `json:"info,omitempty"`
+		Info     Info        `json:"info,omitempty"`
 		Encoding intEncoding `json:"encoding,omitempty"`
 	}{
 		ID:       i.id,
@@ -80,7 +80,7 @@ func (i *Integer) MarshalJSON() ([]byte, error) {
 type Float struct {
 	id       int
 	name     string
-	info     info
+	info     Info
 	encoding floatEncoding
 }
 
@@ -90,7 +90,7 @@ func (f *Float) ID() int {
 func (f *Float) Name() string {
 	return f.name
 }
-func (f *Float) Info() info {
+func (f *Float) Info() Info {
 	return f.info
 }
 func (f *Float) Encoding() string {
@@ -125,7 +125,7 @@ func (f *Float) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID       int           `json:"id,omitempty"`
 		Name     string        `json:"name,omitempty"`
-		Info     info          `json:"info,omitempty"`
+		Info     Info          `json:"info,omitempty"`
 		Encoding floatEncoding `json:"encoding,omitempty"`
 	}{
 		ID:       f.id,
@@ -138,7 +138,7 @@ func (f *Float) MarshalJSON() ([]byte, error) {
 type Array struct {
 	id   int
 	name string
-	info info
+	info Info
 	array
 	lookupFn func(int) Type
 }
@@ -152,7 +152,7 @@ func (a *Array) Name() string {
 	}
 	return " " + a.name
 }
-func (a *Array) Info() info {
+func (a *Array) Info() Info {
 	return a.info
 }
 func (a *Array) Index() string {
@@ -195,19 +195,19 @@ func (a *Array) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID          int    `json:"id,omitempty"`
 		Name        string `json:"name,omitempty"`
-		Info        info   `json:"info,omitempty"`
-		ContentsID  uint16 `json:"contents_id,omitempty"`  /* reference to type of array contents */
+		Info        Info   `json:"info,omitempty"`
+		ContentsID  uint   `json:"contents_id,omitempty"`  /* reference to type of array contents */
 		Contents    string `json:"contents,omitempty"`     /* reference to type of array contents */
-		IndexID     uint16 `json:"index_id,omitempty"`     /* reference to type of array index */
+		IndexID     uint   `json:"index_id,omitempty"`     /* reference to type of array index */
 		IndexType   string `json:"index_type,omitempty"`   /* reference to type of array index */
 		NumElements uint32 `json:"num_elements,omitempty"` /* number of elements */
 	}{
 		ID:          a.id,
 		Name:        a.name,
 		Info:        a.info,
-		ContentsID:  a.array.Contents,
+		ContentsID:  uint(a.array.Contents),
 		Contents:    a.Contents(),
-		IndexID:     a.array.Index,
+		IndexID:     uint(a.array.Index),
 		IndexType:   a.Index(),
 		NumElements: a.array.NumElements,
 	})
@@ -216,9 +216,9 @@ func (a *Array) MarshalJSON() ([]byte, error) {
 type Function struct {
 	id       int
 	name     string
-	info     info
-	ret      uint16
-	args     []uint16
+	info     Info
+	ret      uint
+	args     []uint32
 	lookupFn func(int) Type
 }
 
@@ -233,7 +233,7 @@ func (f *Function) ID() int {
 func (f *Function) Name() string {
 	return f.name
 }
-func (f *Function) Info() info {
+func (f *Function) Info() Info {
 	return f.info
 }
 func (f *Function) Return() string {
@@ -300,15 +300,15 @@ func (f *Function) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID        int       `json:"id,omitempty"`
 		Name      string    `json:"name,omitempty"`
-		Info      info      `json:"info,omitempty"`
-		ReturnID  uint16    `json:"return_id,omitempty"`
+		Info      Info      `json:"info,omitempty"`
+		ReturnID  uint      `json:"return_id,omitempty"`
 		Return    string    `json:"return,omitempty"`
 		Arguments []funcArg `json:"arguments,omitempty"`
 	}{
 		ID:        f.id,
 		Name:      f.name,
 		Info:      f.info,
-		ReturnID:  f.ret,
+		ReturnID:  uint(f.ret),
 		Return:    f.Return(),
 		Arguments: args,
 	})
@@ -318,7 +318,7 @@ type Member struct {
 	parent    int
 	name      string
 	offset    uint64
-	reference uint16
+	reference uint
 	lookupFn  func(int) Type
 }
 
@@ -354,7 +354,7 @@ func (m Member) MarshalJSON() ([]byte, error) {
 type Struct struct {
 	id       int
 	name     string
-	info     info
+	info     Info
 	size     uint64
 	Fields   []Member
 	lookupFn func(int) Type
@@ -369,7 +369,7 @@ func (s *Struct) Name() string {
 	}
 	return s.name
 }
-func (s *Struct) Info() info {
+func (s *Struct) Info() Info {
 	return s.info
 }
 func (s *Struct) ParentID() int {
@@ -436,7 +436,7 @@ func (s *Struct) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID     int      `json:"id,omitempty"`
 		Name   string   `json:"name,omitempty"`
-		Info   info     `json:"info,omitempty"`
+		Info   Info     `json:"info,omitempty"`
 		Size   uint64   `json:"size,omitempty"`
 		Fields []Member `json:"fields,omitempty"`
 	}{
@@ -451,7 +451,7 @@ func (s *Struct) MarshalJSON() ([]byte, error) {
 type Union struct {
 	id       int
 	name     string
-	info     info
+	info     Info
 	size     uint64
 	Fields   []Member
 	lookupFn func(int) Type
@@ -466,7 +466,7 @@ func (s *Union) Name() string {
 	}
 	return s.name
 }
-func (s *Union) Info() info {
+func (s *Union) Info() Info {
 	return s.info
 }
 func (s *Union) ParentID() int {
@@ -526,7 +526,7 @@ func (s *Union) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID     int      `json:"id,omitempty"`
 		Name   string   `json:"name,omitempty"`
-		Info   info     `json:"info,omitempty"`
+		Info   Info     `json:"info,omitempty"`
 		Size   uint64   `json:"size,omitempty"`
 		Fields []Member `json:"fields,omitempty"`
 	}{
@@ -546,7 +546,7 @@ type enumField struct {
 type Enum struct {
 	id     int
 	name   string
-	info   info
+	info   Info
 	Fields []enumField
 }
 
@@ -556,7 +556,7 @@ func (e *Enum) ID() int {
 func (e *Enum) Name() string {
 	return e.name
 }
-func (e *Enum) Info() info {
+func (e *Enum) Info() Info {
 	return e.info
 }
 func (e *Enum) ParentID() int {
@@ -593,7 +593,7 @@ func (e *Enum) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID     int         `json:"id,omitempty"`
 		Name   string      `json:"name,omitempty"`
-		Info   info        `json:"info,omitempty"`
+		Info   Info        `json:"info,omitempty"`
 		Fields []enumField `json:"fields,omitempty"`
 	}{
 		ID:     e.id,
@@ -606,7 +606,7 @@ func (e *Enum) MarshalJSON() ([]byte, error) {
 type Forward struct {
 	id   int
 	name string
-	info info
+	info Info
 }
 
 func (f *Forward) ID() int {
@@ -615,7 +615,7 @@ func (f *Forward) ID() int {
 func (f *Forward) Name() string {
 	return f.name
 }
-func (f *Forward) Info() info {
+func (f *Forward) Info() Info {
 	return f.info
 }
 func (f *Forward) ParentID() int {
@@ -638,7 +638,7 @@ func (f *Forward) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID   int    `json:"id,omitempty"`
 		Name string `json:"name,omitempty"`
-		Info info   `json:"info,omitempty"`
+		Info Info   `json:"info,omitempty"`
 	}{
 		ID:   f.id,
 		Name: f.name,
@@ -649,8 +649,8 @@ func (f *Forward) MarshalJSON() ([]byte, error) {
 type Pointer struct {
 	id        int
 	name      string
-	info      info
-	reference uint16
+	info      Info
+	reference uint
 	lookupFn  func(int) Type
 }
 
@@ -660,7 +660,7 @@ func (p *Pointer) ID() int {
 func (p *Pointer) Name() string {
 	return p.name
 }
-func (p *Pointer) Info() info {
+func (p *Pointer) Info() Info {
 	return p.info
 }
 func (p *Pointer) Reference() string {
@@ -690,14 +690,14 @@ func (p *Pointer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID          int    `json:"id,omitempty"`
 		Name        string `json:"name,omitempty"`
-		Info        info   `json:"info,omitempty"`
-		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Info        Info   `json:"info,omitempty"`
+		ReferenceID uint   `json:"reference_id,omitempty"`
 		Reference   string `json:"reference,omitempty"`
 	}{
 		ID:          p.id,
 		Name:        p.name,
 		Info:        p.info,
-		ReferenceID: p.reference,
+		ReferenceID: uint(p.reference),
 		Reference:   p.Reference(),
 	})
 }
@@ -705,8 +705,8 @@ func (p *Pointer) MarshalJSON() ([]byte, error) {
 type Typedef struct {
 	id        int
 	name      string
-	info      info
-	reference uint16
+	info      Info
+	reference uint
 	lookupFn  func(int) Type
 }
 
@@ -716,7 +716,7 @@ func (p *Typedef) ID() int {
 func (p *Typedef) Name() string {
 	return p.name
 }
-func (p *Typedef) Info() info {
+func (p *Typedef) Info() Info {
 	return p.info
 }
 func (p *Typedef) Reference() string {
@@ -746,14 +746,14 @@ func (p *Typedef) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID          int    `json:"id,omitempty"`
 		Name        string `json:"name,omitempty"`
-		Info        info   `json:"info,omitempty"`
-		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Info        Info   `json:"info,omitempty"`
+		ReferenceID uint   `json:"reference_id,omitempty"`
 		Reference   string `json:"reference,omitempty"`
 	}{
 		ID:          p.id,
 		Name:        p.name,
 		Info:        p.info,
-		ReferenceID: p.reference,
+		ReferenceID: uint(p.reference),
 		Reference:   p.Reference(),
 	})
 }
@@ -761,8 +761,8 @@ func (p *Typedef) MarshalJSON() ([]byte, error) {
 type Volatile struct {
 	id        int
 	name      string
-	info      info
-	reference uint16
+	info      Info
+	reference uint
 	lookupFn  func(int) Type
 }
 
@@ -772,7 +772,7 @@ func (p *Volatile) ID() int {
 func (p *Volatile) Name() string {
 	return p.name
 }
-func (p *Volatile) Info() info {
+func (p *Volatile) Info() Info {
 	return p.info
 }
 func (p *Volatile) Reference() string {
@@ -802,14 +802,14 @@ func (p *Volatile) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID          int    `json:"id,omitempty"`
 		Name        string `json:"name,omitempty"`
-		Info        info   `json:"info,omitempty"`
-		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Info        Info   `json:"info,omitempty"`
+		ReferenceID uint   `json:"reference_id,omitempty"`
 		Reference   string `json:"reference,omitempty"`
 	}{
 		ID:          p.id,
 		Name:        p.name,
 		Info:        p.info,
-		ReferenceID: p.reference,
+		ReferenceID: uint(p.reference),
 		Reference:   p.Reference(),
 	})
 }
@@ -817,8 +817,8 @@ func (p *Volatile) MarshalJSON() ([]byte, error) {
 type Const struct {
 	id        int
 	name      string
-	info      info
-	reference uint16
+	info      Info
+	reference uint
 	lookupFn  func(int) Type
 }
 
@@ -828,7 +828,7 @@ func (p *Const) ID() int {
 func (p *Const) Name() string {
 	return p.name
 }
-func (p *Const) Info() info {
+func (p *Const) Info() Info {
 	return p.info
 }
 func (p *Const) Reference() string {
@@ -858,14 +858,14 @@ func (p *Const) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID          int    `json:"id,omitempty"`
 		Name        string `json:"name,omitempty"`
-		Info        info   `json:"info,omitempty"`
-		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Info        Info   `json:"info,omitempty"`
+		ReferenceID uint   `json:"reference_id,omitempty"`
 		Reference   string `json:"reference,omitempty"`
 	}{
 		ID:          p.id,
 		Name:        p.name,
 		Info:        p.info,
-		ReferenceID: p.reference,
+		ReferenceID: uint(p.reference),
 		Reference:   p.Reference(),
 	})
 }
@@ -873,8 +873,8 @@ func (p *Const) MarshalJSON() ([]byte, error) {
 type Restrict struct {
 	id        int
 	name      string
-	info      info
-	reference uint16
+	info      Info
+	reference uint
 	lookupFn  func(int) Type
 }
 
@@ -884,7 +884,7 @@ func (p *Restrict) ID() int {
 func (p *Restrict) Name() string {
 	return p.name
 }
-func (p *Restrict) Info() info {
+func (p *Restrict) Info() Info {
 	return p.info
 }
 func (p *Restrict) Reference() string {
@@ -914,14 +914,14 @@ func (p *Restrict) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID          int    `json:"id,omitempty"`
 		Name        string `json:"name,omitempty"`
-		Info        info   `json:"info,omitempty"`
-		ReferenceID uint16 `json:"reference_id,omitempty"`
+		Info        Info   `json:"info,omitempty"`
+		ReferenceID uint   `json:"reference_id,omitempty"`
 		Reference   string `json:"reference,omitempty"`
 	}{
 		ID:          p.id,
 		Name:        p.name,
 		Info:        p.info,
-		ReferenceID: p.reference,
+		ReferenceID: uint(p.reference),
 		Reference:   p.Reference(),
 	})
 }
@@ -929,9 +929,9 @@ func (p *Restrict) MarshalJSON() ([]byte, error) {
 type PtrAuth struct {
 	id        int
 	name      string
-	info      info
+	info      Info
 	data      ptrAuthData
-	reference uint16
+	reference uint
 	lookupFn  func(int) Type
 }
 
@@ -941,7 +941,7 @@ func (p *PtrAuth) ID() int {
 func (p *PtrAuth) Name() string {
 	return p.name
 }
-func (p *PtrAuth) Info() info {
+func (p *PtrAuth) Info() Info {
 	return p.info
 }
 func (p *PtrAuth) Reference() string {
@@ -978,16 +978,16 @@ func (p *PtrAuth) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&struct {
 		ID          int         `json:"id,omitempty"`
 		Name        string      `json:"name,omitempty"`
-		Info        info        `json:"info,omitempty"`
+		Info        Info        `json:"info,omitempty"`
 		Data        ptrAuthData `json:"data,omitempty"`
-		ReferenceID uint16      `json:"reference_id,omitempty"`
+		ReferenceID uint        `json:"reference_id,omitempty"`
 		Reference   string      `json:"reference,omitempty"`
 	}{
 		ID:          p.id,
 		Name:        p.name,
 		Info:        p.info,
 		Data:        p.data,
-		ReferenceID: p.reference,
+		ReferenceID: uint(p.reference),
 		Reference:   p.Reference(),
 	})
 }
@@ -1001,12 +1001,12 @@ type global struct {
 
 func (g global) String() string {
 	if g.Type != nil {
-		return fmt.Sprintf("%#x: %s %s\n", g.Address, g.Type.Type(), g.Name)
+		return fmt.Sprintf("%#x: %s %s", g.Address, g.Type.Type(), g.Name)
 	}
 	if g.Reference == 0 {
-		return fmt.Sprintf("%#x: <unknown> %s\n", g.Address, g.Name)
+		return fmt.Sprintf("%#x: <unknown> %s", g.Address, g.Name)
 	}
-	return fmt.Sprintf("%#x: %d %s\n", g.Address, g.Reference, g.Name)
+	return fmt.Sprintf("%#x: %d %s", g.Address, g.Reference, g.Name)
 }
 
 type function struct {

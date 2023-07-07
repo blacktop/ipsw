@@ -46,8 +46,8 @@ func Parse(m *macho.File) (*CTF, error) {
 		return nil, fmt.Errorf("failed to read ctf_header_t: %v", err)
 	}
 
-	if c.Header.Preamble.Version == 4 {
-		return nil, fmt.Errorf("CTF version 4 is not supported (yet)")
+	if c.Header.Preamble.Version < 2 || c.Header.Preamble.Version > 4 {
+		return nil, fmt.Errorf("CTF version %d is not supported", c.Header.Preamble.Version)
 	}
 
 	if (c.Header.Preamble.Flags & F_COMPRESS) != 0 {
@@ -166,6 +166,11 @@ func (c *CTF) GetDataTypes() error {
 			return fmt.Errorf("failed to read data type: %v", err)
 		}
 
+		// log.WithFields(log.Fields{
+		// 	"index": id,
+		// 	"kind":  t.Info.Kind().String(),
+		// }).Debug("Parsing Type")
+
 		size := uint64(t.SizeOrType)
 		if t.SizeOrType == LSIZE_SENT {
 			if err := binary.Read(r, binary.LittleEndian, &t.LSizeHI); err != nil {
@@ -213,20 +218,34 @@ func (c *CTF) GetDataTypes() error {
 				lookupFn: c.lookup,
 			}
 		case FUNCTION:
-			args := make([]uint16, t.Info.VarLen())
-			if err := binary.Read(r, binary.LittleEndian, &args); err != nil {
-				return fmt.Errorf("failed to read args: %v", err)
+			args := make([]uint32, t.Info.VarLen())
+			if c.Header.Preamble.Version < 4 {
+				argsV1 := make([]uint16, t.Info.VarLen())
+				if err := binary.Read(r, binary.LittleEndian, &argsV1); err != nil {
+					return fmt.Errorf("failed to read args: %v", err)
+				}
+				for idx, arg := range argsV1 {
+					args[idx] = uint32(arg)
+				}
+			} else {
+				if err := binary.Read(r, binary.LittleEndian, &args); err != nil {
+					return fmt.Errorf("failed to read args: %v", err)
+				}
 			}
 			c.Types[id] = &Function{
 				id:       id,
 				name:     c.getString(uint32(t.Name)),
 				info:     t.Info,
-				ret:      t.SizeOrType,
+				ret:      uint(t.SizeOrType),
 				args:     args,
 				lookupFn: c.lookup,
 			}
 			if (t.Info.VarLen() & 1) != 0 {
-				r.Seek(int64(binary.Size(uint16(0))), io.SeekCurrent) // alignment
+				if c.Header.Preamble.Version < 4 {
+					r.Seek(int64(binary.Size(uint16(0))), io.SeekCurrent) // alignment
+				} else {
+					r.Seek(int64(binary.Size(uint32(0))), io.SeekCurrent) // alignment
+				}
 			}
 		case STRUCT:
 			s := &Struct{
@@ -246,7 +265,7 @@ func (c *CTF) GetDataTypes() error {
 						parent:    id,
 						name:      c.getString(uint32(lmp.Name)),
 						offset:    lmp.Offset(),
-						reference: lmp.Type,
+						reference: uint(lmp.Type),
 						lookupFn:  c.lookup,
 					})
 				}
@@ -260,7 +279,7 @@ func (c *CTF) GetDataTypes() error {
 						parent:    id,
 						name:      c.getString(uint32(mp.Name)),
 						offset:    uint64(mp.Offset),
-						reference: mp.Type,
+						reference: uint(mp.Type),
 						lookupFn:  c.lookup,
 					})
 				}
@@ -284,7 +303,7 @@ func (c *CTF) GetDataTypes() error {
 						parent:    id,
 						name:      c.getString(uint32(lmp.Name)),
 						offset:    lmp.Offset(),
-						reference: lmp.Type,
+						reference: uint(lmp.Type),
 						lookupFn:  c.lookup,
 					})
 				}
@@ -298,7 +317,7 @@ func (c *CTF) GetDataTypes() error {
 						parent:    id,
 						name:      c.getString(uint32(mp.Name)),
 						offset:    uint64(mp.Offset),
-						reference: mp.Type,
+						reference: uint(mp.Type),
 						lookupFn:  c.lookup,
 					})
 				}
@@ -332,7 +351,7 @@ func (c *CTF) GetDataTypes() error {
 				id:        id,
 				name:      c.getString(uint32(t.Name)),
 				info:      t.Info,
-				reference: t.SizeOrType,
+				reference: uint(t.SizeOrType),
 				lookupFn:  c.lookup,
 			}
 		case TYPEDEF:
@@ -340,7 +359,7 @@ func (c *CTF) GetDataTypes() error {
 				id:        id,
 				name:      c.getString(uint32(t.Name)),
 				info:      t.Info,
-				reference: t.SizeOrType,
+				reference: uint(t.SizeOrType),
 				lookupFn:  c.lookup,
 			}
 		case VOLATILE:
@@ -348,7 +367,7 @@ func (c *CTF) GetDataTypes() error {
 				id:        id,
 				name:      c.getString(uint32(t.Name)),
 				info:      t.Info,
-				reference: t.SizeOrType,
+				reference: uint(t.SizeOrType),
 				lookupFn:  c.lookup,
 			}
 		case CONST:
@@ -356,7 +375,7 @@ func (c *CTF) GetDataTypes() error {
 				id:        id,
 				name:      c.getString(uint32(t.Name)),
 				info:      t.Info,
-				reference: t.SizeOrType,
+				reference: uint(t.SizeOrType),
 				lookupFn:  c.lookup,
 			}
 		case RESTRICT:
@@ -364,7 +383,7 @@ func (c *CTF) GetDataTypes() error {
 				id:        id,
 				name:      c.getString(uint32(t.Name)),
 				info:      t.Info,
-				reference: t.SizeOrType,
+				reference: uint(t.SizeOrType),
 				lookupFn:  c.lookup,
 			}
 		case PTRAUTH:
@@ -377,13 +396,12 @@ func (c *CTF) GetDataTypes() error {
 				name:      c.getString(uint32(t.Name)),
 				info:      t.Info,
 				data:      ptrauth,
-				reference: t.SizeOrType,
+				reference: uint(t.SizeOrType),
 				lookupFn:  c.lookup,
 			}
-		case UNKNOWN:
-			break /* hole in type id space */
+		case UNKNOWN: /* hole in type id space */
 		default:
-			return fmt.Errorf("unexpected kind %d", t.Info.Kind())
+			return fmt.Errorf("unexpected kind %d; possible name: '%s'", t.Info.Kind(), c.getString(uint32(t.Name)))
 		}
 
 		id++
@@ -394,14 +412,25 @@ func (c *CTF) GetDataTypes() error {
 
 // GetDataObjects returns all the CTF data objects
 func (c *CTF) GetDataObjects() error {
-
 	c.sr.Seek(int64(c.Header.ObjOffset), io.SeekStart)
 
 	dataSyms := c.getGlobalSymbols()
 
-	dataObjects := make([]uint16, (c.Header.FuncOffset-c.Header.ObjOffset)/uint32(binary.Size(uint16(0))))
-	if err := binary.Read(c.sr, binary.LittleEndian, &dataObjects); err != nil {
-		return fmt.Errorf("failed to read data objects: %v", err)
+	var dataObjects []uint32
+	if c.Header.Preamble.Version < 4 {
+		dataObjectsV1 := make([]uint16, (c.Header.FuncOffset-c.Header.ObjOffset)/uint32(binary.Size(uint16(0))))
+		if err := binary.Read(c.sr, binary.LittleEndian, &dataObjectsV1); err != nil {
+			return fmt.Errorf("failed to read data objects: %v", err)
+		}
+		dataObjects = make([]uint32, len(dataObjectsV1))
+		for idx, dobj := range dataObjectsV1 {
+			dataObjects[idx] = uint32(dobj)
+		}
+	} else {
+		dataObjects = make([]uint32, (c.Header.FuncOffset-c.Header.ObjOffset)/uint32(binary.Size(uint32(0))))
+		if err := binary.Read(c.sr, binary.LittleEndian, &dataObjects); err != nil {
+			return fmt.Errorf("failed to read data objects: %v", err)
+		}
 	}
 
 	if len(dataSyms) != len(dataObjects) {
@@ -423,16 +452,24 @@ func (c *CTF) GetDataObjects() error {
 // GetFunctions returns all the CTF function definitions
 func (c *CTF) GetFunctions() error {
 
-	var inf info
-	var ret uint16
-	var args []uint16
+	var inf Info
+	var ret uint32
 
 	c.sr.Seek(int64(c.Header.FuncOffset), io.SeekStart)
 
 	for idx, fsym := range c.getFunctionSymbols() {
-
-		if err := binary.Read(c.sr, binary.LittleEndian, &inf); err != nil {
-			return fmt.Errorf("failed to read function info: %v", err)
+		if c.Header.Preamble.Version < 4 {
+			var i infoV1
+			if err := binary.Read(c.sr, binary.LittleEndian, &i); err != nil {
+				return fmt.Errorf("failed to read function info: %v", err)
+			}
+			inf = i
+		} else {
+			var i info
+			if err := binary.Read(c.sr, binary.LittleEndian, &i); err != nil {
+				return fmt.Errorf("failed to read function info: %v", err)
+			}
+			inf = i
 		}
 
 		if inf.Kind() == UNKNOWN && inf.VarLen() == 0 {
@@ -443,19 +480,37 @@ func (c *CTF) GetFunctions() error {
 			return fmt.Errorf("[%d] unexpected kind -- %d", idx, inf.Kind())
 		}
 
-		if err := binary.Read(c.sr, binary.LittleEndian, &ret); err != nil {
-			return fmt.Errorf("failed to read return type: %v", err)
+		args := make([]uint32, inf.VarLen())
+		if c.Header.Preamble.Version < 4 {
+			// get return type
+			var retV1 uint16
+			if err := binary.Read(c.sr, binary.LittleEndian, &retV1); err != nil {
+				return fmt.Errorf("failed to read return type: %v", err)
+			}
+			ret = uint32(retV1)
+			// get arg types
+			argsV1 := make([]uint16, inf.VarLen())
+			if err := binary.Read(c.sr, binary.LittleEndian, &argsV1); err != nil {
+				return fmt.Errorf("failed to read args: %v", err)
+			}
+			for idx, arg := range argsV1 {
+				args[idx] = uint32(arg)
+			}
+		} else {
+			// get return type
+			if err := binary.Read(c.sr, binary.LittleEndian, &ret); err != nil {
+				return fmt.Errorf("failed to read return type: %v", err)
+			}
+			// get arg types
+			if err := binary.Read(c.sr, binary.LittleEndian, &args); err != nil {
+				return fmt.Errorf("failed to read args: %v", err)
+			}
 		}
 
 		f := function{
 			Address: fsym.Value,
 			Name:    strings.TrimPrefix(fsym.Name, "_"), // Lop off omnipresent underscore to match DWARF convention
 			Return:  c.lookup(int(ret)),
-		}
-
-		args = make([]uint16, inf.VarLen())
-		if err := binary.Read(c.sr, binary.LittleEndian, &args); err != nil {
-			return fmt.Errorf("failed to read arg types: %v", err)
 		}
 
 		for _, arg := range args {
