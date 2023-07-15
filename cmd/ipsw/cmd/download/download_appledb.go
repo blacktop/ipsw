@@ -44,6 +44,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
+	downloadAppledbCmd.Flags().StringP("api", "a", "", "Github API Token")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 
@@ -51,6 +52,7 @@ func init() {
 	viper.BindPFlag("download.appledb.kernel", downloadAppledbCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
 	viper.BindPFlag("download.appledb.output", downloadAppledbCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.appledb.flat", downloadAppledbCmd.Flags().Lookup("flat"))
 
@@ -115,10 +117,21 @@ var downloadAppledbCmd = &cobra.Command{
 		pattern := viper.GetString("download.appledb.pattern")
 		isBeta := viper.GetBool("download.appledb.beta")
 		output := viper.GetString("download.appledb.output")
+		apiToken := viper.GetString("download.appledb.api")
 		flat := viper.GetBool("download.appledb.flat")
 		// verify args
 		if !utils.StrSliceHas(supportedOSes, osType) {
 			return fmt.Errorf("valid --os flag choices are: %v", supportedOSes)
+		}
+
+		if len(apiToken) == 0 {
+			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
+				apiToken = val
+			} else {
+				if val, ok := os.LookupEnv("GITHUB_API_TOKEN"); ok {
+					apiToken = val
+				}
+			}
 		}
 
 		var destPath string
@@ -135,6 +148,7 @@ var downloadAppledbCmd = &cobra.Command{
 			IsBeta:   isBeta,
 			Proxy:    proxy,
 			Insecure: insecure,
+			APIToken: apiToken,
 		})
 		if err != nil {
 			fmt.Println(err)
