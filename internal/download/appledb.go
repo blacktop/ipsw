@@ -74,6 +74,7 @@ type ADBQuery struct {
 	IsBeta   bool
 	Proxy    string
 	Insecure bool
+	APIToken string
 }
 
 func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
@@ -112,7 +113,7 @@ func AppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 		return nil, err
 	}
 
-	folders, err := queryGithubAPI(qurl, q.Proxy, q.Insecure)
+	folders, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
 	if err != nil {
 		return nil, err
 	}
@@ -133,13 +134,13 @@ func AppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 		if err != nil {
 			return nil, err
 		}
-		files, err := queryGithubAPI(qurl, q.Proxy, q.Insecure)
+		files, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
 		if err != nil {
 			return nil, err
 		}
 
 		for _, file := range files {
-			of, err := getOsFiles(file.DownloadURL, q.Proxy, q.Insecure)
+			of, err := getOsFiles(file.DownloadURL, q.Proxy, q.APIToken, q.Insecure)
 			if err != nil {
 				return nil, err
 			}
@@ -150,7 +151,7 @@ func AppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 	return osfiles.Query(q), nil
 }
 
-func queryGithubAPI(path, proxy string, insecure bool) ([]GithubContentsResponse, error) {
+func queryGithubAPI(path, proxy, api string, insecure bool) ([]GithubContentsResponse, error) {
 	var contents []GithubContentsResponse
 
 	req, err := http.NewRequest("GET", ApiContentsURL+path, nil)
@@ -160,6 +161,9 @@ func queryGithubAPI(path, proxy string, insecure bool) ([]GithubContentsResponse
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 	req.Header.Add("User-Agent", utils.RandomAgent())
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -191,7 +195,7 @@ func queryGithubAPI(path, proxy string, insecure bool) ([]GithubContentsResponse
 	return contents, nil
 }
 
-func getOsFiles(path, proxy string, insecure bool) (*AppleDbOsFile, error) {
+func getOsFiles(path, proxy, api string, insecure bool) (*AppleDbOsFile, error) {
 	var osfile AppleDbOsFile
 
 	req, err := http.NewRequest("GET", path, nil)
@@ -200,6 +204,9 @@ func getOsFiles(path, proxy string, insecure bool) (*AppleDbOsFile, error) {
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Add("User-Agent", utils.RandomAgent())
+	if len(api) > 0 {
+		req.Header.Add("Authorization", "token "+api)
+	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
