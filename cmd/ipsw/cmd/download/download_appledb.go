@@ -44,6 +44,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
+	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadAppledbCmd.Flags().StringP("api", "a", "", "Github API Token")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
@@ -52,6 +53,7 @@ func init() {
 	viper.BindPFlag("download.appledb.kernel", downloadAppledbCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
 	viper.BindPFlag("download.appledb.output", downloadAppledbCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.appledb.flat", downloadAppledbCmd.Flags().Lookup("flat"))
@@ -151,16 +153,23 @@ var downloadAppledbCmd = &cobra.Command{
 			APIToken: apiToken,
 		})
 		if err != nil {
-			fmt.Println(err)
+			return err
 		}
 
 		log.Debug("URLs to download:")
 		for _, result := range results {
 			for _, link := range result.Links {
 				if link.Active && link.Preferred {
-					utils.Indent(log.Debug, 2)(link.URL)
+					if viper.GetBool("download.appledb.urls") {
+						fmt.Println(link.URL)
+					} else {
+						utils.Indent(log.Debug, 2)(link.URL)
+					}
 				}
 			}
+		}
+		if viper.GetBool("download.ota.urls") {
+			return nil
 		}
 
 		cont := true
