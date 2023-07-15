@@ -168,7 +168,7 @@ var downloadAppledbCmd = &cobra.Command{
 				}
 			}
 		}
-		if viper.GetBool("download.ota.urls") {
+		if viper.GetBool("download.appledb.urls") {
 			return nil
 		}
 
