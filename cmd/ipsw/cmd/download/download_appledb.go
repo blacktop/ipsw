@@ -46,6 +46,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadAppledbCmd.Flags().StringP("api", "a", "", "Github API Token")
+	downloadAppledbCmd.Flags().BoolP("local", "l", false, "Use local git repo")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 
@@ -55,6 +56,7 @@ func init() {
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
+	viper.BindPFlag("download.appledb.local", downloadAppledbCmd.Flags().Lookup("local"))
 	viper.BindPFlag("download.appledb.output", downloadAppledbCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.appledb.flat", downloadAppledbCmd.Flags().Lookup("flat"))
 
@@ -85,7 +87,7 @@ var downloadAppledbCmd = &cobra.Command{
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
@@ -120,6 +122,7 @@ var downloadAppledbCmd = &cobra.Command{
 		isBeta := viper.GetBool("download.appledb.beta")
 		output := viper.GetString("download.appledb.output")
 		apiToken := viper.GetString("download.appledb.api")
+		localRepo := viper.GetBool("download.appledb.local")
 		flat := viper.GetBool("download.appledb.flat")
 		// verify args
 		if !utils.StrSliceHas(supportedOSes, osType) {
@@ -142,18 +145,49 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 
 		log.Info("Querying AppleDB...")
-		results, err := download.AppleDBQuery(&download.ADBQuery{
-			OS:       osType,
-			Version:  version,
-			Build:    build,
-			Device:   device,
-			IsBeta:   isBeta,
-			Proxy:    proxy,
-			Insecure: insecure,
-			APIToken: apiToken,
-		})
-		if err != nil {
-			return err
+		var results []download.OsFileSource
+		if localRepo {
+			var configDir string
+			if len(viper.ConfigFileUsed()) == 0 {
+				home, err := os.UserHomeDir()
+				if err != nil {
+					return err
+				}
+				configDir = filepath.Join(home, ".config", "ipsw")
+				if err := os.MkdirAll(configDir, 0770); err != nil {
+					return fmt.Errorf("failed to create config folder: %v", err)
+				}
+			} else {
+				configDir = filepath.Dir(viper.ConfigFileUsed())
+			}
+			results, err = download.LocalAppleDBQuery(&download.ADBQuery{
+				OS:        osType,
+				Version:   version,
+				Build:     build,
+				Device:    device,
+				IsBeta:    isBeta,
+				Proxy:     proxy,
+				Insecure:  insecure,
+				APIToken:  apiToken,
+				ConfigDir: configDir,
+			})
+			if err != nil {
+				return err
+			}
+		} else {
+			results, err = download.AppleDBQuery(&download.ADBQuery{
+				OS:       osType,
+				Version:  version,
+				Build:    build,
+				Device:   device,
+				IsBeta:   isBeta,
+				Proxy:    proxy,
+				Insecure: insecure,
+				APIToken: apiToken,
+			})
+			if err != nil {
+				return err
+			}
 		}
 
 		log.Debug("URLs to download:")

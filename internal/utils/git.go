@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -12,6 +13,24 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"golang.org/x/term"
 )
+
+func GitClone(repo, dst string) (string, error) {
+	cmd := exec.Command("git", "clone", "--depth", "1", repo, dst)
+	dat, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to clone repo '%s' to %s", repo, dst)
+	}
+	return string(dat), nil
+}
+
+func GitRefresh(repoPath string) (string, error) {
+	cmd := exec.Command("git", "pull", "--rebase")
+	dat, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to refresh repo '%s'", repoPath)
+	}
+	return string(dat), nil
+}
 
 type GitDiffConfig struct {
 	Tool  string
