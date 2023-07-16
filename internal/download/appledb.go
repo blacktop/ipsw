@@ -7,14 +7,18 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const (
 	// AppleDBRepoURL is the URL to the AppleDB github repo
 	AppleDBRepoURL = "https://github.com/littlebyteorg/appledb"
+	AppleDBGitURL  = "https://github.com/littlebyteorg/appledb.git"
 	ApiContentsURL = "https://api.github.com/repos/littlebyteorg/appledb/contents/"
 )
 
@@ -67,14 +71,15 @@ type AppleDbOsFile struct {
 type OsFiles []AppleDbOsFile
 
 type ADBQuery struct {
-	OS       string
-	Version  string
-	Build    string
-	Device   string
-	IsBeta   bool
-	Proxy    string
-	Insecure bool
-	APIToken string
+	OS        string
+	Version   string
+	Build     string
+	Device    string
+	IsBeta    bool
+	Proxy     string
+	Insecure  bool
+	APIToken  string
+	ConfigDir string
 }
 
 func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
@@ -103,6 +108,62 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 		}
 	}
 	return sources
+}
+
+func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
+	var osfiles OsFiles
+
+	if _, err := os.Stat(filepath.Join(q.ConfigDir, "appledb")); os.IsNotExist(err) {
+		utils.Indent(log.Info, 2)(fmt.Sprintf("Git cloning local 'appledb' to %s", filepath.Join(q.ConfigDir, "appledb")))
+		if _, err := utils.GitClone(AppleDBGitURL, filepath.Join(q.ConfigDir, "appledb")); err != nil {
+			return nil, fmt.Errorf("failed to create local copy of 'appledb' repo: %v", err)
+		}
+	} else {
+		if _, err := utils.GitRefresh(filepath.Join(q.ConfigDir, "appledb")); err != nil {
+			return nil, fmt.Errorf("failed to update local copy of 'appledb' repo: %v", err)
+		}
+	}
+
+	var folders []string
+	if err := filepath.Walk(filepath.Join(q.ConfigDir, "appledb"), func(path string, f os.FileInfo, err error) error {
+		if f.IsDir() && strings.Contains(path, filepath.Join("osFiles", q.OS)) {
+			folders = append(folders, path)
+		}
+		return err
+	}); err != nil {
+		return nil, err
+	}
+
+	for _, folder := range folders {
+		build, version, found := strings.Cut(folder, " - ")
+		if !found {
+			continue
+		}
+		if len(q.Version) > 0 && !strings.HasPrefix(q.Version, strings.TrimSuffix(version, "x")) {
+			continue
+		}
+		if len(q.Build) > 0 && !strings.HasPrefix(q.Build, strings.TrimSuffix(build, "x")) {
+			continue
+		}
+		if err := filepath.Walk(folder, func(path string, f os.FileInfo, err error) error {
+			var osfile AppleDbOsFile
+			if !f.IsDir() {
+				dat, err := os.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				if err := json.Unmarshal(dat, &osfile); err != nil {
+					return err
+				}
+				osfiles = append(osfiles, osfile)
+			}
+			return err
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	return osfiles.Query(q), nil
 }
 
 func AppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
