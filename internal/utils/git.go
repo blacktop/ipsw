@@ -14,20 +14,23 @@ import (
 	"golang.org/x/term"
 )
 
+// GitClone clones a git repo
 func GitClone(repo, dst string) (string, error) {
 	cmd := exec.Command("git", "clone", "--depth", "1", repo, dst)
 	dat, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to clone repo '%s' to %s", repo, dst)
+		return "", fmt.Errorf("failed to clone repo '%s' to %s: %v", repo, dst, err)
 	}
 	return string(dat), nil
 }
 
+// GitRefresh refreshes a git repo
 func GitRefresh(repoPath string) (string, error) {
 	cmd := exec.Command("git", "pull", "--rebase")
+	cmd.Dir = repoPath
 	dat, err := cmd.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("failed to refresh repo '%s'", repoPath)
+		return "", fmt.Errorf("failed to refresh repo '%s': %v", repoPath, err)
 	}
 	return string(dat), nil
 }

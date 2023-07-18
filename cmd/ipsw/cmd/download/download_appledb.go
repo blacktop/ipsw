@@ -128,6 +128,9 @@ var downloadAppledbCmd = &cobra.Command{
 		if !utils.StrSliceHas(supportedOSes, osType) {
 			return fmt.Errorf("valid --os flag choices are: %v", supportedOSes)
 		}
+		if viper.GetBool("download.appledb.urls") && (kernel || len(pattern) > 0) {
+			return fmt.Errorf("cannot use --urls with --kernel or --pattern")
+		}
 
 		if len(apiToken) == 0 {
 			if val, ok := os.LookupEnv("GITHUB_TOKEN"); ok {
