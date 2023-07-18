@@ -40,7 +40,7 @@ var supportedOSes = []string{"audioOS", "bridgeOS", "iOS", "iPadOS", "iPodOS", "
 func init() {
 	DownloadCmd.AddCommand(downloadAppledbCmd)
 
-	downloadAppledbCmd.Flags().String("os", "", "Operating system to download (i.e. iOS, tvOS, watchOS, bridgeOS)")
+	downloadAppledbCmd.Flags().StringArray("os", []string{}, "Operating system to download (i.e. iOS, tvOS, watchOS, bridgeOS)")
 	downloadAppledbCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
@@ -116,7 +116,7 @@ var downloadAppledbCmd = &cobra.Command{
 		version := viper.GetString("download.version")
 		build := viper.GetString("download.build")
 		// flags
-		osType := viper.GetString("download.appledb.os")
+		osTypes := viper.GetStringSlice("download.appledb.os")
 		kernel := viper.GetBool("download.appledb.kernel")
 		pattern := viper.GetString("download.appledb.pattern")
 		isBeta := viper.GetBool("download.appledb.beta")
@@ -125,11 +125,16 @@ var downloadAppledbCmd = &cobra.Command{
 		localRepo := viper.GetBool("download.appledb.local")
 		flat := viper.GetBool("download.appledb.flat")
 		// verify args
-		if !utils.StrSliceHas(supportedOSes, osType) {
-			return fmt.Errorf("valid --os flag choices are: %v", supportedOSes)
+		for _, osType := range osTypes {
+			if !utils.StrSliceHas(supportedOSes, osType) {
+				return fmt.Errorf("valid --os flag choices are: %v", supportedOSes)
+			}
 		}
 		if viper.GetBool("download.appledb.urls") && (kernel || len(pattern) > 0) {
 			return fmt.Errorf("cannot use --urls with --kernel or --pattern")
+		}
+		if isBeta && len(build) > 0 {
+			return fmt.Errorf("cannot use --beta with --build")
 		}
 
 		if len(apiToken) == 0 {
@@ -164,7 +169,7 @@ var downloadAppledbCmd = &cobra.Command{
 				configDir = filepath.Dir(viper.ConfigFileUsed())
 			}
 			results, err = download.LocalAppleDBQuery(&download.ADBQuery{
-				OS:        osType,
+				OSes:      osTypes,
 				Version:   version,
 				Build:     build,
 				Device:    device,
@@ -179,7 +184,7 @@ var downloadAppledbCmd = &cobra.Command{
 			}
 		} else {
 			results, err = download.AppleDBQuery(&download.ADBQuery{
-				OS:       osType,
+				OSes:     osTypes,
 				Version:  version,
 				Build:    build,
 				Device:   device,

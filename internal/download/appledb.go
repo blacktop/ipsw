@@ -71,7 +71,7 @@ type AppleDbOsFile struct {
 type OsFiles []AppleDbOsFile
 
 type ADBQuery struct {
-	OS        string
+	OSes      []string
 	Version   string
 	Build     string
 	Device    string
@@ -85,16 +85,20 @@ type ADBQuery struct {
 func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 	var sources []OsFileSource
 	for _, f := range fs {
-		if len(query.OS) > 0 && f.OS != query.OS {
+		if len(query.OSes) > 0 {
+			for _, os := range query.OSes {
+				if f.OS == os {
+					continue
+				}
+			}
+		}
+		if query.IsBeta && !f.Beta {
 			continue
 		}
 		if len(query.Version) > 0 && f.Version != query.Version {
 			continue
 		}
 		if len(query.Build) > 0 && f.Build != query.Build {
-			continue
-		}
-		if query.IsBeta && !f.Beta {
 			continue
 		}
 		if len(query.Device) > 0 {
@@ -126,8 +130,12 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 
 	var folders []string
 	if err := filepath.Walk(filepath.Join(q.ConfigDir, "appledb"), func(path string, f os.FileInfo, err error) error {
-		if f.IsDir() && strings.Contains(path, filepath.Join("osFiles", q.OS)) {
-			folders = append(folders, path)
+		if f.IsDir() {
+			for _, os := range q.OSes {
+				if strings.Contains(path, filepath.Join("osFiles", os)) {
+					folders = append(folders, path)
+				}
+			}
 		}
 		return err
 	}); err != nil {
@@ -169,43 +177,45 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 func AppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 	var osfiles OsFiles
 
-	qurl, err := url.JoinPath("osFiles", q.OS)
-	if err != nil {
-		return nil, err
-	}
-
-	folders, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, folder := range folders {
-		build, version, found := strings.Cut(folder.Name, " - ")
-		if !found {
-			continue
-		}
-		if len(q.Version) > 0 && !strings.HasPrefix(q.Version, strings.TrimSuffix(version, "x")) {
-			continue
-		}
-		if len(q.Build) > 0 && !strings.HasPrefix(q.Build, strings.TrimSuffix(build, "x")) {
-			continue
-		}
-
-		qurl, err = url.JoinPath("osFiles", q.OS, folder.Name)
-		if err != nil {
-			return nil, err
-		}
-		files, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
+	for _, os := range q.OSes {
+		qurl, err := url.JoinPath("osFiles", os)
 		if err != nil {
 			return nil, err
 		}
 
-		for _, file := range files {
-			of, err := getOsFiles(file.DownloadURL, q.Proxy, q.APIToken, q.Insecure)
+		folders, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, folder := range folders {
+			build, version, found := strings.Cut(folder.Name, " - ")
+			if !found {
+				continue
+			}
+			if len(q.Version) > 0 && !strings.HasPrefix(q.Version, strings.TrimSuffix(version, "x")) {
+				continue
+			}
+			if len(q.Build) > 0 && !strings.HasPrefix(q.Build, strings.TrimSuffix(build, "x")) {
+				continue
+			}
+
+			qurl, err = url.JoinPath("osFiles", os, folder.Name)
 			if err != nil {
 				return nil, err
 			}
-			osfiles = append(osfiles, *of)
+			files, err := queryGithubAPI(qurl, q.Proxy, q.APIToken, q.Insecure)
+			if err != nil {
+				return nil, err
+			}
+
+			for _, file := range files {
+				of, err := getOsFiles(file.DownloadURL, q.Proxy, q.APIToken, q.Insecure)
+				if err != nil {
+					return nil, err
+				}
+				osfiles = append(osfiles, *of)
+			}
 		}
 	}
 
