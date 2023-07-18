@@ -10,6 +10,8 @@ before:
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 
+report_sizes: true
+
 builds:
   # CLIs ###########################################################
   - id: darwin_build
@@ -802,22 +804,26 @@ scoops:
     description: ipsw - Daemon
     license: MIT
 
-winget:
-  - name: ipsw
-    publisher: blacktop
-    license: MIT
-    homepage: https://github.com/blacktop/ipsw
-    short_description: iOS/macOS Research Swiss Army Knife
-    repository:
-      owner: blacktop
-      name: winget-pkgs
-      pull_request:
-        enabled: true
-        draft: true
-        base:
-          owner: microsoft
-          name: winget-pkgs
-          branch: master
+# winget:
+#   - name: ipsw
+#     publisher: blacktop
+#     license: MIT
+#     homepage: https://github.com/blacktop/ipsw
+#     short_description: iOS/macOS Research Swiss Army Knife
+#     ids:
+#       - windows_amd64_build
+#       - windows_arm64_build
+#     repository:
+#       owner: blacktop
+#       name: winget-pkgs
+#       branch: "ipsw-{{.Version}}"
+#       pull_request:
+#         enabled: true
+#         draft: true
+#         base:
+#           owner: microsoft
+#           name: winget-pkgs
+#           branch: master
 
 # chocolateys:
 #   - project_url: https://github.com/blacktop/ipsw
