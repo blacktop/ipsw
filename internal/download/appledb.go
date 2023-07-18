@@ -9,7 +9,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -57,12 +59,34 @@ type OsFileSource struct {
 	Size int64 `json:"size"`
 }
 
+type ReleasedDate time.Time
+
+func (r *ReleasedDate) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), "\"")
+	if s == "null" {
+		return nil
+	}
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return err
+	}
+	*r = ReleasedDate(t)
+	return nil
+}
+func (r ReleasedDate) MarshalJSON() ([]byte, error) {
+	return json.Marshal(time.Time(r))
+}
+func (r ReleasedDate) Format(s string) string {
+	t := time.Time(r)
+	return t.Format(s)
+}
+
 // AppleDbOsFiles is an AppleDB osFiles object
 type AppleDbOsFile struct {
 	OS        string         `json:"osStr"`
 	Version   string         `json:"version"`
 	Build     string         `json:"build"`
-	Released  string         `json:"released"`
+	Released  ReleasedDate   `json:"released"`
 	Beta      bool           `json:"beta"`
 	DeviceMap []string       `json:"deviceMap"`
 	Sources   []OsFileSource `json:"sources"`
@@ -70,20 +94,23 @@ type AppleDbOsFile struct {
 
 type OsFiles []AppleDbOsFile
 
-type ADBQuery struct {
-	OSes      []string
-	Version   string
-	Build     string
-	Device    string
-	IsBeta    bool
-	Proxy     string
-	Insecure  bool
-	APIToken  string
-	ConfigDir string
+func (fs OsFiles) Len() int {
+	return len(fs)
 }
 
+func (fs OsFiles) Less(i, j int) bool {
+	return time.Time(fs[i].Released).After(time.Time((fs[j].Released)))
+}
+
+func (fs OsFiles) Swap(i, j int) {
+	fs[i], fs[j] = fs[j], fs[i]
+}
+
+// Query returns a list of OsFileSource objects that match the query
 func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
+	var tmpFS OsFiles
 	var sources []OsFileSource
+
 	for _, f := range fs {
 		if len(query.OSes) > 0 {
 			for _, os := range query.OSes {
@@ -101,6 +128,26 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 		if len(query.Build) > 0 && f.Build != query.Build {
 			continue
 		}
+		tmpFS = append(tmpFS, f)
+	}
+
+	if query.Latest {
+		var latestFS OsFiles
+		sort.Sort(tmpFS)
+		if len(tmpFS) > 0 {
+			date := tmpFS[0].Released
+			for _, f := range tmpFS {
+				if f.Released == date {
+					latestFS = append(latestFS, f)
+				} else {
+					break
+				}
+			}
+		}
+		tmpFS = latestFS
+	}
+
+	for _, f := range tmpFS {
 		if len(query.Device) > 0 {
 			for _, source := range f.Sources {
 				if utils.StrSliceContains(source.DeviceMap, query.Device) {
@@ -111,7 +158,21 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 			sources = append(sources, f.Sources...)
 		}
 	}
+
 	return sources
+}
+
+type ADBQuery struct {
+	OSes      []string
+	Version   string
+	Build     string
+	Device    string
+	IsBeta    bool
+	Latest    bool
+	Proxy     string
+	Insecure  bool
+	APIToken  string
+	ConfigDir string
 }
 
 func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {

@@ -44,6 +44,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
+	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadAppledbCmd.Flags().StringP("api", "a", "", "Github API Token")
 	downloadAppledbCmd.Flags().BoolP("local", "l", false, "Use local git repo")
@@ -54,6 +55,7 @@ func init() {
 	viper.BindPFlag("download.appledb.kernel", downloadAppledbCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
+	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
 	viper.BindPFlag("download.appledb.local", downloadAppledbCmd.Flags().Lookup("local"))
@@ -120,6 +122,7 @@ var downloadAppledbCmd = &cobra.Command{
 		kernel := viper.GetBool("download.appledb.kernel")
 		pattern := viper.GetString("download.appledb.pattern")
 		isBeta := viper.GetBool("download.appledb.beta")
+		latest := viper.GetBool("download.appledb.latest")
 		output := viper.GetString("download.appledb.output")
 		apiToken := viper.GetString("download.appledb.api")
 		localRepo := viper.GetBool("download.appledb.local")
@@ -174,6 +177,7 @@ var downloadAppledbCmd = &cobra.Command{
 				Build:     build,
 				Device:    device,
 				IsBeta:    isBeta,
+				Latest:    latest,
 				Proxy:     proxy,
 				Insecure:  insecure,
 				APIToken:  apiToken,
@@ -189,6 +193,7 @@ var downloadAppledbCmd = &cobra.Command{
 				Build:    build,
 				Device:   device,
 				IsBeta:   isBeta,
+				Latest:   latest,
 				Proxy:    proxy,
 				Insecure: insecure,
 				APIToken: apiToken,
