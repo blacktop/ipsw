@@ -420,7 +420,7 @@ archives:
     wrap_in_directory: true
 
 brews:
-  - tap:
+  - repository:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -452,7 +452,7 @@ brews:
     test: |
       system "#{bin}/ipsw --version"
   - name: ipsw-frida
-    tap:
+    repository:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -480,7 +480,7 @@ brews:
     test: |
       system "#{bin}/ipsw --version"
   - name: ipswd
-    tap:
+    repository:
       owner: blacktop
       name: homebrew-tap
     ids:
@@ -787,7 +787,7 @@ snapcrafts:
 scoops:
   - ids: [default_archive]
     name: ipsw
-    bucket:
+    repository:
       owner: blacktop
       name: scoop-bucket
     homepage: https://blacktop.github.io/ipsw
@@ -795,29 +795,29 @@ scoops:
     license: MIT
   - ids: [daemon_archive]
     name: ipswd
-    bucket:
+    repository:
       owner: blacktop
       name: scoop-bucket
     homepage: https://blacktop.github.io/ipsw
     description: ipsw - Daemon
     license: MIT
 
-# winget:
-#   - name: ipsw
-#     publisher: blacktop
-#     license: MIT
-#     homepage: https://github.com/blacktop/ipsw
-#     short_description: iOS/macOS Research Swiss Army Knife
-#     repository:
-#       owner: blacktop
-#       name: winget-pkgs
-#       pull_request:
-#         enabled: true
-#         draft: true
-#         base:
-#           owner: microsoft
-#           name: winget-pkgs
-#           branch: master
+winget:
+  - name: ipsw
+    publisher: blacktop
+    license: MIT
+    homepage: https://github.com/blacktop/ipsw
+    short_description: iOS/macOS Research Swiss Army Knife
+    repository:
+      owner: blacktop
+      name: winget-pkgs
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
 
 # chocolateys:
 #   - project_url: https://github.com/blacktop/ipsw
