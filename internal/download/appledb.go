@@ -135,7 +135,7 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 	}
 
 	for _, folder := range folders {
-		build, version, found := strings.Cut(folder, " - ")
+		build, version, found := strings.Cut(filepath.Base(folder), " - ")
 		if !found {
 			continue
 		}
