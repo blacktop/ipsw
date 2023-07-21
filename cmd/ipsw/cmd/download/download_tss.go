@@ -1,3 +1,5 @@
+//go:build !386
+
 /*
 Copyright © 2018-2023 blacktop
 
