@@ -45,46 +45,29 @@ builds:
     hooks:
       post:
         - ./hack/make/codesign {{ .Path }}
-  - id: darwin_amd64_extras_build
+  - id: darwin_extras_build
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CGO_LDFLAGS=-L/usr/local/homebrew/lib -framework IOKit
-      - CGO_CFLAGS=-I/usr/local/homebrew/include
       - CC=sandbox-exec -f $PWD/hack/goreleaser/profile.sb cc
+      - >-
+        {{- if eq .Arch "amd64" }}CGO_LDFLAGS=-L/usr/local/homebrew/lib -framework IOKit
+        {{- else if eq .Arch "arm64" }}CGO_LDFLAGS=-L/opt/homebrew/lib -framework IOKit
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CGO_CFLAGS=-I/usr/local/homebrew/include
+        {{- else if eq .Arch "arm64" }}CGO_CFLAGS=-I/opt/homebrew/include
+        {{- end }}
     goos:
       - darwin
     goarch:
       - amd64
-    tags:
-      - libusb
-      - unicorn
-      - objc
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-    hooks:
-      post:
-        - ./hack/make/delete-all-rpaths {{ .Path }}
-  - id: darwin_arm64_extras_build
-    main: ./cmd/ipsw
-    binary: ipsw
-    env:
-      - CGO_ENABLED=1
-      - CGO_LDFLAGS=-L/opt/homebrew/lib -framework IOKit
-      - CGO_CFLAGS=-I/opt/homebrew/include
-      - CC=sandbox-exec -f $PWD/hack/goreleaser/profile.sb cc
-    goos:
-      - darwin
-    goarch:
       - arm64
     tags:
       - libusb
       - unicorn
       - objc
-      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
@@ -92,37 +75,25 @@ builds:
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
-  - id: darwin_amd64_frida_build
+  - id: darwin_frida_build
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
       - CGO_LDFLAGS=-L/usr/local/homebrew/lib
       - CGO_CFLAGS=-I/usr/local/homebrew/include
+      - >-
+        {{- if eq .Arch "amd64" }}CGO_LDFLAGS=-L/usr/local/homebrew/lib
+        {{- else if eq .Arch "arm64" }}CGO_LDFLAGS=-L/opt/homebrew/lib
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CGO_CFLAGS=-I/usr/local/homebrew/include
+        {{- else if eq .Arch "arm64" }}CGO_CFLAGS=-I/opt/homebrew/include
+        {{- end }}
     goos:
       - darwin
     goarch:
       - amd64
-    tags:
-      - frida
-      - libusb
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-    hooks:
-      post:
-        - ./hack/make/delete-all-rpaths {{ .Path }}
-  - id: darwin_arm64_frida_build
-    main: ./cmd/ipsw
-    binary: ipsw
-    env:
-      - CGO_ENABLED=1
-      - CGO_LDFLAGS=-L/opt/homebrew/lib
-      - CGO_CFLAGS=-I/opt/homebrew/include
-    goos:
-      - darwin
-    goarch:
       - arm64
     tags:
       - frida
@@ -134,31 +105,23 @@ builds:
     hooks:
       post:
         - ./hack/make/delete-all-rpaths {{ .Path }}
-  - id: linux_amd64_build
+  - id: linux_build
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-linux-musl
-      - CXX=zig c++ -target x86_64-linux-musl
+      - >-
+        {{- if eq .Arch "amd64" }}CC=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-linux-musl
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CXX=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-linux-musl
+        {{- end }}
     goos:
       - linux
     goarch:
       - amd64
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - id: linux_arm64_build
-    main: ./cmd/ipsw
-    binary: ipsw
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-linux-musl
-      - CXX=zig c++ -target aarch64-linux-musl
-    goos:
-      - linux
-    goarch:
       - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
@@ -218,31 +181,26 @@ builds:
   #   flags:
   #     - -trimpath
   #   ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - id: windows_amd64_build
+  - id: windows_build
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-windows-gnu
-      - CXX=zig c++ -target x86_64-windows-gnu
+      - >-
+        {{- if eq .Arch "386" }}CC=zig cc -target i386-windows-gnu
+        {{- else if eq .Arch "amd64" }}CC=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-windows-gnu
+        {{- end }}
+      - >-
+        {{- if eq .Arch "386" }}CXX=zig cc -target i386-windows-gnu
+        {{- else if eq .Arch "amd64" }}CXX=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-windows-gnu
+        {{- end }}
     goos:
       - windows
     goarch:
+      - "386"
       - amd64
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - id: windows_arm64_build
-    main: ./cmd/ipsw
-    binary: ipsw
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-windows-gnu
-      - CXX=zig c++ -target aarch64-windows-gnu
-    goos:
-      - windows
-    goarch:
       - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
@@ -263,61 +221,48 @@ builds:
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
-  - id: linux_amd64_daemon_build
+  - id: linux_daemon_build
     main: ./cmd/ipswd
     binary: ipswd
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-linux-musl
-      - CXX=zig c++ -target x86_64-linux-musl
+      - >-
+        {{- if eq .Arch "amd64" }}CC=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-linux-musl
+        {{- end }}
+      - >-
+        {{- if eq .Arch "amd64" }}CXX=zig cc -target x86_64-linux-musl
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-linux-musl
+        {{- end }}
     goos:
       - linux
     goarch:
       - amd64
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
-  - id: linux_arm64_daemon_build
-    main: ./cmd/ipswd
-    binary: ipswd
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-linux-musl
-      - CXX=zig c++ -target aarch64-linux-musl
-    goos:
-      - linux
-    goarch:
       - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
     ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
-  - id: windows_amd64_daemon_build
+  - id: windows_daemon_build
     main: ./cmd/ipswd
     binary: ipswd
     env:
       - CGO_ENABLED=1
-      - CC=zig cc -target x86_64-windows-gnu
-      - CXX=zig c++ -target x86_64-windows-gnu
+      - >-
+        {{- if eq .Arch "386" }}CC=zig cc -target i386-windows-gnu
+        {{- else if eq .Arch "amd64" }}CC=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-windows-gnu
+        {{- end }}
+      - >-
+        {{- if eq .Arch "386" }}CXX=zig cc -target i386-windows-gnu
+        {{- else if eq .Arch "amd64" }}CXX=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-windows-gnu
+        {{- end }}
     goos:
       - windows
     goarch:
+      - "386"
       - amd64
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/api/types.BuildVersion={{.Version}} -X github.com/blacktop/ipsw/api/types.BuildTime={{.Date}}
-  - id: windows_arm64_daemon_build
-    main: ./cmd/ipswd
-    binary: ipswd
-    env:
-      - CGO_ENABLED=1
-      - CC=zig cc -target aarch64-windows-gnu
-      - CXX=zig c++ -target aarch64-windows-gnu
-    goos:
-      - windows
-    goarch:
       - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
@@ -336,10 +281,8 @@ archives:
       - darwin_build
       - darwin_ios_build
       - darwin_universal
-      - linux_amd64_build
-      - linux_arm64_build
-      - windows_amd64_build
-      - windows_arm64_build
+      - linux_build
+      - windows_build
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
@@ -349,6 +292,12 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "all" }}universal
       {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    builds_info:
+      group: root
+      owner: root
     files:
       - README.md
       - LICENSE
@@ -358,8 +307,7 @@ archives:
     wrap_in_directory: true
   - id: extras_archive
     builds:
-      - darwin_amd64_extras_build
-      - darwin_arm64_extras_build
+      - darwin_extras_build
       # - linux_amd64_extras_build
       # - linux_arm64_extras_build
     name_template: >-
@@ -380,8 +328,7 @@ archives:
     wrap_in_directory: true
   - id: frida_archive
     builds:
-      - darwin_amd64_frida_build
-      - darwin_arm64_frida_build
+      - darwin_frida_build
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
@@ -401,10 +348,8 @@ archives:
   - id: daemon_archive
     builds:
       - darwin_daemon_build
-      - linux_amd64_daemon_build
-      - linux_arm64_daemon_build
-      - windows_amd64_daemon_build
-      - windows_arm64_daemon_build
+      - linux_daemon_build
+      - windows_daemon_build
     name_template: >-
       ipswd_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
@@ -414,6 +359,12 @@ archives:
       {{- else if eq .Arch "386" }}i386
       {{- else if eq .Arch "all" }}universal
       {{- else }}{{ .Arch }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    builds_info:
+      group: root
+      owner: root
     files:
       - README.md
       - LICENSE
@@ -539,7 +490,9 @@ sboms:
   - artifacts: archive
 
 aurs:
-  - homepage: https://github.com/blacktop/ipsw
+  - ids:
+      - default_archive
+    homepage: https://github.com/blacktop/ipsw
     description: iOS/macOS Research Swiss Army Knife
     maintainers:
       - "Blacktop <https://github.com/blacktop>"
@@ -547,13 +500,13 @@ aurs:
     private_key: /Users/blacktop/.ssh/aur
     git_url: "ssh://aur@aur.archlinux.org/ipsw-bin.git"
     backup:
-      - /etc/ipsw.conf
+      - etc/ipsw.conf
     package: |-
       # bin
       install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
 
       # license
-      install -Dm644 "./LICENSE.md" "${pkgdir}/usr/share/licenses/ipsw/LICENSE"
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/ipsw/LICENSE"
 
       # completions
       mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
@@ -573,8 +526,7 @@ aurs:
 nfpms:
   - id: packages
     builds:
-      - linux_amd64_build
-      - linux_arm64_build
+      - linux_build
     homepage: https://github.com/blacktop/ipsw
     description: |-
       iOS/macOS Research Swiss Army Knife.
@@ -627,8 +579,7 @@ nfpms:
   - id: daemon
     package_name: ipswd
     builds:
-      - linux_amd64_daemon_build
-      - linux_arm64_daemon_build
+      - linux_daemon_build
     homepage: https://github.com/blacktop/ipsw
     description: |-
       ipsw daemon.
@@ -687,8 +638,7 @@ nfpms:
 snapcrafts:
   - id: snaps
     builds:
-      - linux_amd64_build
-      - linux_arm64_build
+      - linux_build
       # - linux_amd64_extras_build
       # - linux_arm64_extras_build
     summary: iOS/macOS Research Swiss Army Knife.
@@ -733,8 +683,7 @@ snapcrafts:
         plugs: ["home", "network"]
   - id: snaps-daemon
     builds:
-      - linux_amd64_daemon_build
-      - linux_arm64_daemon_build
+      - linux_daemon_build
     name: ipswd
     name_template: "ipswd-{{.Version}}-{{.Os}}-{{.Arch}}"
     summary: ipsw - Daemon.
@@ -804,26 +753,43 @@ scoops:
     description: ipsw - Daemon
     license: MIT
 
-# winget:
-#   - name: ipsw
-#     publisher: blacktop
-#     license: MIT
-#     homepage: https://github.com/blacktop/ipsw
-#     short_description: iOS/macOS Research Swiss Army Knife
-#     ids:
-#       - windows_amd64_build
-#       - windows_arm64_build
-#     repository:
-#       owner: blacktop
-#       name: winget-pkgs
-#       branch: "ipsw-{{.Version}}"
-#       pull_request:
-#         enabled: true
-#         draft: true
-#         base:
-#           owner: microsoft
-#           name: winget-pkgs
-#           branch: master
+winget:
+  - name: ipsw
+    publisher: blacktop
+    license: MIT
+    homepage: https://github.com/blacktop/ipsw
+    short_description: iOS/macOS Research Swiss Army Knife
+    ids:
+      - default_archive
+    repository:
+      owner: blacktop
+      name: winget-pkgs
+      branch: "ipsw-{{.Version}}"
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+  - name: ipswd
+    publisher: blacktop
+    license: MIT
+    homepage: https://github.com/blacktop/ipsw
+    short_description: ipsw - Daemon
+    ids:
+      - daemon_archive
+    repository:
+      owner: blacktop
+      name: winget-pkgs
+      branch: "ipswd-{{.Version}}"
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
 
 # chocolateys:
 #   - project_url: https://github.com/blacktop/ipsw
@@ -863,18 +829,12 @@ changelog:
     - title: Other work
       order: 9999
   filters:
-    exclude:
-      - "^test:"
-      - "^bumping"
-      - "^Update"
-      - "^Delete"
-      - "^Working"
-      - "reorg"
-      - "updates"
-      - "merge conflict"
-      - Merge pull request
-      - Merge remote-tracking branch
-      - Merge branch
+    include:
+      - "^feat.*"
+      - "^fix.*"
+      - "^chore.*"
+      - "^sec.*"
+      - "^(doc|docs).*"
 
 release:
   footer: |
