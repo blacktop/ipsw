@@ -46,8 +46,8 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
 	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
-	downloadAppledbCmd.Flags().StringP("api", "a", "", "Github API Token")
-	downloadAppledbCmd.Flags().BoolP("local", "l", false, "Use local git repo")
+	downloadAppledbCmd.Flags().BoolP("api", "a", false, "Use Github API")
+	downloadAppledbCmd.Flags().String("api-token", "", "Github API Token")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 
@@ -58,7 +58,7 @@ func init() {
 	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
-	viper.BindPFlag("download.appledb.local", downloadAppledbCmd.Flags().Lookup("local"))
+	viper.BindPFlag("download.appledb.api-token", downloadAppledbCmd.Flags().Lookup("api-token"))
 	viper.BindPFlag("download.appledb.output", downloadAppledbCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.appledb.flat", downloadAppledbCmd.Flags().Lookup("flat"))
 
@@ -124,8 +124,8 @@ var downloadAppledbCmd = &cobra.Command{
 		isBeta := viper.GetBool("download.appledb.beta")
 		latest := viper.GetBool("download.appledb.latest")
 		output := viper.GetString("download.appledb.output")
-		apiToken := viper.GetString("download.appledb.api")
-		localRepo := viper.GetBool("download.appledb.local")
+		useAPI := viper.GetBool("download.appledb.api")
+		apiToken := viper.GetString("download.appledb.api-token")
 		flat := viper.GetBool("download.appledb.flat")
 		// verify args
 		for _, osType := range osTypes {
@@ -157,7 +157,22 @@ var downloadAppledbCmd = &cobra.Command{
 
 		log.Info("Querying AppleDB...")
 		var results []download.OsFileSource
-		if localRepo {
+		if useAPI {
+			results, err = download.AppleDBQuery(&download.ADBQuery{
+				OSes:     osTypes,
+				Version:  version,
+				Build:    build,
+				Device:   device,
+				IsBeta:   isBeta,
+				Latest:   latest,
+				Proxy:    proxy,
+				Insecure: insecure,
+				APIToken: apiToken,
+			})
+			if err != nil {
+				return err
+			}
+		} else {
 			var configDir string
 			if len(viper.ConfigFileUsed()) == 0 {
 				home, err := os.UserHomeDir()
@@ -182,21 +197,6 @@ var downloadAppledbCmd = &cobra.Command{
 				Insecure:  insecure,
 				APIToken:  apiToken,
 				ConfigDir: configDir,
-			})
-			if err != nil {
-				return err
-			}
-		} else {
-			results, err = download.AppleDBQuery(&download.ADBQuery{
-				OSes:     osTypes,
-				Version:  version,
-				Build:    build,
-				Device:   device,
-				IsBeta:   isBeta,
-				Latest:   latest,
-				Proxy:    proxy,
-				Insecure: insecure,
-				APIToken: apiToken,
 			})
 			if err != nil {
 				return err
