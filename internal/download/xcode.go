@@ -7,9 +7,11 @@ import (
 	"encoding/xml"
 	"io"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/utils"
 )
 
 const (
@@ -76,6 +78,8 @@ func GetDVTDownloadableIndex() (*DVTDownloadable, error) {
 		return nil, err
 	}
 
+	utils.Reverse(dvt.Downloadables)
+
 	return &dvt, nil
 }
 
@@ -88,10 +92,24 @@ type Contents struct {
 	LastModified   time.Time
 }
 
+type contents []*Contents
+
+func (cs contents) Len() int {
+	return len(cs)
+}
+
+func (cs contents) Less(i, j int) bool {
+	return cs[i].LastModified.After(cs[j].LastModified)
+}
+
+func (cs contents) Swap(i, j int) {
+	cs[i], cs[j] = cs[j], cs[i]
+}
+
 // ListObjectsOutput presents output for ListObjects.
 type ListBucketResult struct {
 	Name           string
-	Contents       []*Contents
+	Contents       contents
 	IsTruncated    bool
 	Prefix         string
 	Marker         string
@@ -116,6 +134,8 @@ func ListXCodes() (*ListBucketResult, error) {
 	if err := xml.Unmarshal(body, &out); err != nil {
 		return nil, err
 	}
+
+	sort.Sort(out.Contents)
 
 	return &out, nil
 }
