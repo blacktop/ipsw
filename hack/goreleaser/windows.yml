@@ -6,31 +6,26 @@ before:
     - go mod tidy
 
 builds:
-  - id: windows_amd64
+  - id: windows
     main: ./cmd/ipsw
     binary: ipsw
     env:
       - CGO_ENABLED=1
+      - >-
+        {{- if eq .Arch "386" }}CC=zig cc -target i386-windows-gnu
+        {{- else if eq .Arch "amd64" }}CC=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CC=zig cc -target aarch64-windows-gnu
+        {{- end }}
+      - >-
+        {{- if eq .Arch "386" }}CXX=zig cc -target i386-windows-gnu
+        {{- else if eq .Arch "amd64" }}CXX=zig cc -target x86_64-windows-gnu
+        {{- else if eq .Arch "arm64" }}CXX=zig cc -target aarch64-windows-gnu
+        {{- end }}
     goos:
       - windows
     goarch:
+      - "386"
       - amd64
-    mod_timestamp: "{{ .CommitTimestamp }}"
-    flags:
-      - -trimpath
-    ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
-  - id: windows_arm64
-    main: ./cmd/ipsw
-    binary: ipsw
-    env:
-      - CGO_ENABLED=1
-      - CC=zig.exe cc -target aarch64-windows-gnu
-      - CC=zig.exe c++ -target aarch64-windows-gnu
-    tags:
-      - extended
-    goos:
-      - windows
-    goarch:
       - arm64
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
@@ -38,29 +33,51 @@ builds:
     ldflags: -s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion={{.Version}} -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime={{.Date}}
 
 archives:
-  - replacements:
-      darwin: macOS
-      ios: iOS
-      amd64: x86_64
-      all: universal
+  - id: default_archive
+    builds:
+      - darwin_build
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}macOS
+      {{- else if eq .Os "ios" }}iOS
+      {{- else }}{{ .Os }}{{ end }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "all" }}universal
+      {{- else }}{{ .Arch }}{{ end }}
     format_overrides:
       - goos: windows
         format: zip
+    builds_info:
+      group: root
+      owner: root
     files:
       - README.md
       - LICENSE
-      - completions/*
+      - completions/ipsw/*
       - manpages/*
+      - config.example.yml
     wrap_in_directory: true
 
 checksum:
-  name_template: 'checksums.win.txt'
+  name_template: "checksums.win.txt"
 
-scoop:
-  bucket:
-    owner: blacktop
-    name: scoop-bucket
-    token: "{{ .Env.SCOOP_TAP_GITHUB_TOKEN }}"
-  homepage:  https://blacktop.github.io/ipsw
-  description: iOS/macOS Research Swiss Army Knife
-  license: MIT
+winget:
+  - name: ipsw
+    publisher: blacktop
+    license: MIT
+    homepage: https://github.com/blacktop/ipsw
+    short_description: iOS/macOS Research Swiss Army Knife
+    ids:
+      - default_archive
+    repository:
+      owner: blacktop
+      name: winget-pkgs
+      branch: "ipsw-{{.Version}}"
+      pull_request:
+        enabled: true
+        draft: true
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
