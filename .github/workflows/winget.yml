@@ -33,6 +33,7 @@ jobs:
           version: latest
           args: release --clean --snapshot --config hack\goreleaser\windows.yml
       - name: Run dir
+        shell: pwsh
         run: |
           dir
           dir dist
@@ -41,7 +42,7 @@ jobs:
           dir dist\winget\manifests\b
           dir dist\winget\manifests\b\blacktop
           dir dist\winget\manifests\b\blacktop\ipsw
-          dir dist\winget\manifests\b\blacktop\ipsw\3.1.371-SNAPSHOT-7e7d6926a
+          dir dist\winget\manifests\b\blacktop\ipsw\3.1.371*
       - name: Run winget validate
         run: winget validate --manifest ddist\winget\manifests\b\blacktop\ipsw\3.1.371-SNAPSHOT-7e7d6926a\blacktop.ipsw.installer.yaml
       - name: Run winget install
