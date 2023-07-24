@@ -24,7 +24,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --id windows_build --clean --timeout 60m --snapshot --single-target
+          args: build --id windows_build --clean --timeout 60m --snapshot --single-target --skip-before
       - name: Run dir
         run: dir
       - name: Run winget validate
