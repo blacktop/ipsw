@@ -25,6 +25,9 @@ on:
       - "config.example.yml"
   schedule:
     - cron: "22 7 * * 4"
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   analyze:
