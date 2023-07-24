@@ -41,8 +41,8 @@ jobs:
           dir dist\winget\manifests\b
           dir dist\winget\manifests\b\blacktop
           dir dist\winget\manifests\b\blacktop\ipsw
-          dir dist\winget\manifests\b\blacktop\ipsw\3.1.371*
+          dir dist\winget\manifests\b\blacktop\ipsw\3.1.371-SNAPSHOT-7e7d6926a
       - name: Run winget validate
-        run: winget validate --manifest ddist\winget\manifests\b\blacktop\ipsw\3.1.371*\blacktop.ipsw.installer.yaml
+        run: winget validate --manifest ddist\winget\manifests\b\blacktop\ipsw\3.1.371-SNAPSHOT-7e7d6926a\blacktop.ipsw.installer.yaml
       - name: Run winget install
-        run: winget install --manifest dist\winget\manifests\b\blacktop\ipsw\3.1.371*\blacktop.ipsw.installer.yaml
+        run: winget install --manifest dist\winget\manifests\b\blacktop\ipsw\3.1.371-SNAPSHOT-7e7d6926a\blacktop.ipsw.installer.yaml
