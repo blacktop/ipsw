@@ -35,7 +35,7 @@ builds:
 archives:
   - id: default_archive
     builds:
-      - darwin_build
+      - windows
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
@@ -70,6 +70,7 @@ winget:
     short_description: iOS/macOS Research Swiss Army Knife
     ids:
       - default_archive
+    path: manifests/b/ipsw
     repository:
       owner: blacktop
       name: winget-pkgs
