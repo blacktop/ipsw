@@ -35,12 +35,12 @@ jobs:
       - name: Run dir
         run: |
           dir
-          dist\winget
-          dist\winget\manifests
-          dist\winget\manifests\b
-          dist\winget\manifests\b\blacktop
-          dist\winget\manifests\b\blacktop\ipsw
-          dist\winget\manifests\b\blacktop\ipsw\3.1.371
+          dir dist\winget
+          dir dist\winget\manifests
+          dir dist\winget\manifests\b
+          dir dist\winget\manifests\b\blacktop
+          dir dist\winget\manifests\b\blacktop\ipsw
+          dir dist\winget\manifests\b\blacktop\ipsw\3.1.371
       - name: Run winget validate
         run: winget validate --manifest ddist\winget\manifests\b\blacktop\ipsw\3.1.371\blacktop.ipsw.installer.yaml
       - name: Run winget install
