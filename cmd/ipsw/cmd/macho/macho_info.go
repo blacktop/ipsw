@@ -25,6 +25,7 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -38,6 +39,7 @@ import (
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
@@ -581,6 +583,66 @@ var machoInfoCmd = &cobra.Command{
 
 					}
 					w.Flush()
+				}
+				if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
+					fmt.Println("Launch Constraints (Self):")
+					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
+					if err != nil {
+						return err
+					}
+					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if viper.GetBool("color") {
+						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(string(lcdata) + "\n")
+					}
+				}
+				if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
+					fmt.Println("Launch Constraints (Parent):")
+					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
+					if err != nil {
+						return err
+					}
+					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if viper.GetBool("color") {
+						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(string(lcdata) + "\n")
+					}
+				}
+				if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
+					fmt.Println("Launch Constraints (Responsible):")
+					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
+					if err != nil {
+						return err
+					}
+					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if viper.GetBool("color") {
+						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(string(lcdata) + "\n")
+					}
+				}
+				if len(m.CodeSignature().LibraryConstraints) > 0 {
+					fmt.Println("Library Constraints:")
+					lc, err := cstypes.ParseLaunchContraints(m.CodeSignature().LibraryConstraints)
+					if err != nil {
+						return err
+					}
+					lcdata, err := json.MarshalIndent(lc, "", "  ")
+					if viper.GetBool("color") {
+						if err := quick.Highlight(os.Stdout, string(lcdata)+"\n", "json", "terminal256", "nord"); err != nil {
+							return err
+						}
+					} else {
+						fmt.Println(string(lcdata) + "\n")
+					}
 				}
 			} else {
 				fmt.Println("  - no code signature data")
