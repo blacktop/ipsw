@@ -19,12 +19,12 @@ jobs:
           fetch-depth: 0
       - name: Set up Go
         uses: actions/setup-go@v4
-      - name: windows-deps
+      - name: Install Deps
         run: |
           choco install zig
           dir C:\ProgramData\chocolatey\bin
           dir C:\ProgramData\chocolatey\lib\zig\tools
-      - name: windows-deps
+      - name: Install winget
         shell: pwsh
         run: |
           $progressPreference = 'silentlyContinue'
