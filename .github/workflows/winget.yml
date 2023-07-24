@@ -31,10 +31,11 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: build --id windows_build --clean --timeout 60m --snapshot --single-target --skip-before
+          args: release --id windows_build --clean --timeout 60m --snapshot --skip-before
       - name: Run dir
         run: |
           dir
+          dir dist
           dir dist\winget
           dir dist\winget\manifests
           dir dist\winget\manifests\b
