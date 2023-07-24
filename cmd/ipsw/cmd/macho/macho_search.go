@@ -24,10 +24,12 @@ package macho
 import (
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"regexp"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/search"
 	swift "github.com/blacktop/ipsw/internal/swift"
@@ -57,6 +59,7 @@ func recurseProtocols(re *regexp.Regexp, proto objc.Protocol, depth int) (bool, 
 func init() {
 	MachoCmd.AddCommand(machoSearchCmd)
 	machoSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
+	machoSearchCmd.Flags().StringP("launch-const", "t", "", "Search for launch constraint regex")
 	machoSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
 	machoSearchCmd.Flags().StringP("sym", "m", "", "Search for specific symbol regex")
 	machoSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
@@ -69,6 +72,7 @@ func init() {
 	})
 	machoSearchCmd.MarkFlagsMutuallyExclusive("protocol", "class", "category", "sel", "ivar")
 	viper.BindPFlag("macho.search.load-command", machoSearchCmd.Flags().Lookup("load-command"))
+	viper.BindPFlag("macho.search.launch-const", machoSearchCmd.Flags().Lookup("launch-const"))
 	viper.BindPFlag("macho.search.section", machoSearchCmd.Flags().Lookup("section"))
 	viper.BindPFlag("macho.search.sym", machoSearchCmd.Flags().Lookup("sym"))
 	viper.BindPFlag("macho.search.protocol", machoSearchCmd.Flags().Lookup("protocol"))
@@ -92,6 +96,7 @@ var machoSearchCmd = &cobra.Command{
 		}
 
 		if viper.GetString("macho.search.load-command") == "" &&
+			viper.GetString("macho.search.launch-const") == "" &&
 			viper.GetString("macho.search.section") == "" &&
 			viper.GetString("macho.search.sym") == "" &&
 			viper.GetString("macho.search.protocol") == "" &&
@@ -112,6 +117,62 @@ var machoSearchCmd = &cobra.Command{
 					if re.MatchString(lc.Command().String()) {
 						fmt.Printf("%s\t%s=%s\n", colorImage(path), colorField("load"), lc.Command())
 						break
+					}
+				}
+			}
+			if viper.GetString("macho.search.launch-const") != "" {
+				if m.CodeSignature() != nil {
+					re, err := regexp.Compile(viper.GetString("macho.search.launch-const"))
+					if err != nil {
+						return fmt.Errorf("invalid regex '%s': %w", viper.GetString("macho.search.launch-const"), err)
+					}
+					if len(m.CodeSignature().LaunchConstraintsSelf) > 0 {
+						lc, err := types.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsSelf)
+						if err != nil {
+							return err
+						}
+						for k, v := range lc.Requirements {
+							if re.MatchString(k) || v == reflect.String && re.MatchString(v.(string)) {
+								fmt.Printf("%s\t%s={%s:%v}\n", colorImage(path), colorField("launch-const(self)"), k, v)
+								break
+							}
+						}
+					}
+					if len(m.CodeSignature().LaunchConstraintsParent) > 0 {
+						lc, err := types.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsParent)
+						if err != nil {
+							return err
+						}
+						for k, v := range lc.Requirements {
+							if re.MatchString(k) || v == reflect.String && re.MatchString(v.(string)) {
+								fmt.Printf("%s\t%s=(%s:%s)\n", colorImage(path), colorField("launch-const(parent)"), k, v)
+								break
+							}
+						}
+					}
+					if len(m.CodeSignature().LaunchConstraintsResponsible) > 0 {
+						lc, err := types.ParseLaunchContraints(m.CodeSignature().LaunchConstraintsResponsible)
+						if err != nil {
+							return err
+						}
+						for k, v := range lc.Requirements {
+							if re.MatchString(k) || v == reflect.String && re.MatchString(v.(string)) {
+								fmt.Printf("%s\t%s=(%s:%s)\n", colorImage(path), colorField("launch-const(parent)"), k, v)
+								break
+							}
+						}
+					}
+					if len(m.CodeSignature().LibraryConstraints) > 0 {
+						lc, err := types.ParseLaunchContraints(m.CodeSignature().LibraryConstraints)
+						if err != nil {
+							return err
+						}
+						for k, v := range lc.Requirements {
+							if re.MatchString(k) || v == reflect.String && re.MatchString(v.(string)) {
+								fmt.Printf("%s\t%s=(%s:%s)\n", colorImage(path), colorField("library-const"), k, v)
+								break
+							}
+						}
 					}
 				}
 			}
