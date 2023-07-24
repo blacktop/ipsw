@@ -1807,6 +1807,16 @@
     "CdLinkage": {
       "type": "object",
       "properties": {
+        "linkage_application_sub_type": {
+          "type": "integer",
+          "format": "uint16",
+          "x-go-name": "LinkageApplicationSubType"
+        },
+        "linkage_application_type": {
+          "type": "integer",
+          "format": "uint8",
+          "x-go-name": "LinkageApplicationType"
+        },
         "linkage_hash_type": {
           "description": "Version 0x20600 */",
           "type": "integer",
@@ -1822,11 +1832,6 @@
           "type": "integer",
           "format": "uint32",
           "x-go-name": "LinkageSize"
-        },
-        "linkage_truncated": {
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "LinkageTruncated"
         }
       },
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
@@ -1993,6 +1998,16 @@
           "format": "uint32",
           "x-go-name": "IdentOffset"
         },
+        "linkage_application_sub_type": {
+          "type": "integer",
+          "format": "uint16",
+          "x-go-name": "LinkageApplicationSubType"
+        },
+        "linkage_application_type": {
+          "type": "integer",
+          "format": "uint8",
+          "x-go-name": "LinkageApplicationType"
+        },
         "linkage_hash_type": {
           "description": "Version 0x20600 */",
           "type": "integer",
@@ -2008,11 +2023,6 @@
           "type": "integer",
           "format": "uint32",
           "x-go-name": "LinkageSize"
-        },
-        "linkage_truncated": {
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "LinkageTruncated"
         },
         "n_code_slots": {
           "type": "integer",
@@ -2095,6 +2105,38 @@
             "type": "string"
           },
           "x-go-name": "Errors"
+        },
+        "launch_constraints_parent": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LaunchConstraintsParent"
+        },
+        "launch_constraints_responsible": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LaunchConstraintsResponsible"
+        },
+        "launch_constraints_self": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LaunchConstraintsSelf"
+        },
+        "library_constraints": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LibraryConstraints"
         },
         "requirements": {
           "type": "array",
