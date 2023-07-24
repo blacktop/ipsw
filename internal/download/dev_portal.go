@@ -43,6 +43,7 @@ import (
 
 const (
 	developerURL    = "https://developer.apple.com"
+	downloadURLNew  = "https://download.developer.apple.com"
 	downloadURL     = "https://developer.apple.com/download/"
 	downloadAppsURL = "https://developer.apple.com/download/applications/"
 
@@ -309,7 +310,11 @@ type dfile struct {
 }
 
 func (d dfile) URL() string {
-	return fmt.Sprintf("%s?path=%s", downloadActionURL, d.RemotePath)
+	// https://download.developer.apple.com/macOS/Kernel_Debug_Kit_13.5_build_22G74/Kernel_Debug_Kit_13.5_build_22G74.dmg
+	if u, err := url.JoinPath(downloadURLNew, d.RemotePath); err == nil {
+		return u
+	}
+	return fmt.Sprintf("%s/%s", downloadURLNew, d.RemotePath)
 }
 
 type MoreDownload struct {
@@ -1110,7 +1115,10 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 
 		for _, idx := range dfiles {
 			for _, f := range dloads.Downloads[idx].Files {
-				dp.Download(f.URL(), folder)
+				log.Debugf("Downloading: %s", f.URL())
+				if err := dp.Download(f.URL(), folder); err != nil {
+					log.Errorf("failed to download %s: %v", f.URL(), err)
+				}
 			}
 		}
 	default:
