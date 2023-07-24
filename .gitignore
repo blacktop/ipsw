@@ -16,7 +16,7 @@
 .idea
 .vscode
 debug
-__debug_bin
+__debug_*
 
 # ipsw files
 *.ipsw
