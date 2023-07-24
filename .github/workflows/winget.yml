@@ -13,35 +13,13 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v4
-      - name: Install Deps
-        run: |
-          choco install zig
-          dir C:\ProgramData\chocolatey\bin
-          dir C:\ProgramData\chocolatey\lib\zig\tools
       - name: Install winget
         run: choco install winget-cli
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v4
-        with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean --snapshot --config hack\goreleaser\windows.yml
       - name: Run dir
         shell: pwsh
         run: |
-          dir
-          dir dist
-          dir dist\winget
-          dir dist\winget\manifests
-          dir dist\winget\manifests\b
-          dir dist\winget\manifests\b\ipsw
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/winget-pkgs/ceeebc4352b443e4dc035d3216cb798ca7b3dece/manifests/b/blacktop/ipsw/3.1.371/blacktop.ipsw.installer.yaml" -OutFile "blacktop.ipsw.installer.yaml"
       - name: Run winget validate
-        run: winget validate --manifest dist/winget/manifests/b/ipsw/blacktop.ipsw.installer.yaml
+        run: winget validate --verbose-logs --manifest blacktop.ipsw.installer.yaml
       - name: Run winget install
-        run: winget install --manifest dist/winget/manifests/b/ipsw/blacktop.ipsw.installer.yaml
+        run: winget install --manifest blacktop.ipsw.installer.yaml
