@@ -31,7 +31,7 @@ jobs:
         with:
           distribution: goreleaser
           version: latest
-          args: release --id windows_build --clean --timeout 60m --snapshot --skip-before
+          args: release --clean --snapshot --config hack\goreleaser\windows.yml
       - name: Run dir
         run: |
           dir
