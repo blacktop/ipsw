@@ -35,7 +35,7 @@ builds:
 archives:
   - id: default_archive
     builds:
-      - darwin_build
+      - windows
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin" }}macOS
