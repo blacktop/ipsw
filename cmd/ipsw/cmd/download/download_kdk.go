@@ -110,7 +110,7 @@ var downloadKdkCmd = &cobra.Command{
 			}
 		}
 
-		var destName string
+		destName := path.Base(aKDK.URL)
 		if len(output) > 0 {
 			destName = filepath.Join(filepath.Clean(output), path.Base(aKDK.URL))
 		}
