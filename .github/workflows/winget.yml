@@ -19,7 +19,9 @@ jobs:
         shell: pwsh
         run: |
           Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/winget-pkgs/ceeebc4352b443e4dc035d3216cb798ca7b3dece/manifests/b/blacktop/ipsw/3.1.371/blacktop.ipsw.installer.yaml" -OutFile "blacktop.ipsw.installer.yaml"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/winget-pkgs/ceeebc4352b443e4dc035d3216cb798ca7b3dece/manifests/b/blacktop/ipsw/3.1.371/blacktop.ipsw.locale.en-US.yaml" -OutFile "blacktop.ipsw.locale.en-US.yaml"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/microsoft/winget-pkgs/ceeebc4352b443e4dc035d3216cb798ca7b3dece/manifests/b/blacktop/ipsw/3.1.371/blacktop.ipsw.yaml" -OutFile "blacktop.ipsw.yaml"
       - name: Run winget validate
-        run: winget validate --verbose-logs --manifest blacktop.ipsw.installer.yaml
+        run: winget validate --verbose-logs --manifest blacktop.ipsw.yaml
       - name: Run winget install
         run: winget install --manifest blacktop.ipsw.installer.yaml
