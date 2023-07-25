@@ -358,11 +358,11 @@ var otaDLCmd = &cobra.Command{
 					if err != nil {
 						log.Errorf("failed to get folder from remote zip metadata: %v", err)
 					}
-					destPath = filepath.Join(destPath, folder)
+					folder = filepath.Join(destPath, folder)
 
 					if remoteKernel { // REMOTE KERNEL MODE
 						log.Info("Extracting remote kernelcache")
-						_, err = kernelcache.RemoteParse(zr, destPath)
+						_, err = kernelcache.RemoteParse(zr, folder)
 						if err != nil {
 							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
 						}
@@ -371,7 +371,7 @@ var otaDLCmd = &cobra.Command{
 						found := false
 						if runtime.GOOS == "darwin" { // FIXME: figure out how to do this on all platforms
 							log.Info("Extracting remote dyld_shared_cache")
-							if err := dyld.ExtractFromRemoteCryptex(zr, destPath, dyldArches, false); err != nil { // TODO: assuming user doesn't want DriverKit cache
+							if err := dyld.ExtractFromRemoteCryptex(zr, folder, dyldArches, false); err != nil { // TODO: assuming user doesn't want DriverKit cache
 								log.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
 							}
 							found = true
@@ -397,7 +397,7 @@ var otaDLCmd = &cobra.Command{
 							}
 
 							log.Info("Extracting remote dyld_shared_cache(s) (can be a bit CPU intensive)")
-							err = ota.RemoteExtract(zr, dscRegex, destPath, func(path string) bool {
+							err = ota.RemoteExtract(zr, dscRegex, folder, func(path string) bool {
 								for i, v := range matches {
 									if strings.HasSuffix(v, filepath.Base(path)) {
 										matches = append(matches[:i], matches[i+1:]...)
@@ -416,7 +416,7 @@ var otaDLCmd = &cobra.Command{
 							return fmt.Errorf("failed to compile regex for pattern '%s': %v", remotePattern, err)
 						}
 						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						if _, err := utils.SearchZip(zr.File, re, destPath, flat, true); err != nil {
+						if _, err := utils.SearchZip(zr.File, re, folder, flat, true); err != nil {
 							utils.Indent(log.Warn, 2)("0 files matched pattern in remote OTA zip. Now checking payloadv2 payloads...")
 							rfiles, err := ota.RemoteList(zr)
 							if err != nil {
@@ -431,7 +431,7 @@ var otaDLCmd = &cobra.Command{
 							if len(matches) == 0 {
 								return fmt.Errorf("no files matched pattern %#v in remote OTA zip", remotePattern)
 							}
-							err = ota.RemoteExtract(zr, remotePattern, destPath, func(path string) bool {
+							err = ota.RemoteExtract(zr, remotePattern, folder, func(path string) bool {
 								for i, v := range matches {
 									if strings.HasSuffix(v, filepath.Base(path)) {
 										matches = append(matches[:i], matches[i+1:]...)
