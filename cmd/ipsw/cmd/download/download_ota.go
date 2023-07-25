@@ -233,6 +233,9 @@ var otaDLCmd = &cobra.Command{
 						"posting_date":    asset.PostingDate,
 						"expiration_date": asset.ExpirationDate,
 					}).Info, 2)(asset.ProductVersion)
+					for _, device := range asset.SupportedDevices {
+						utils.Indent(log.Info, 3)(device)
+					}
 				}
 			}
 			return nil

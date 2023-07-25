@@ -116,6 +116,10 @@ func (a *AssetSets) LatestVersion(typ, platform string) string {
 			if utils.StrSliceContains(asset.SupportedDevices, "AppleTV") {
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
+		case "visionos":
+			if utils.StrSliceContains(asset.SupportedDevices, "xrOS") {
+				versionsRaw = append(versionsRaw, asset.ProductVersion)
+			}
 		case "recovery":
 			fallthrough
 		case "macos":

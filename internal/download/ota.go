@@ -53,10 +53,10 @@ var audienceData []byte // CREDIT: Siguza
 type assetType string
 
 const (
-	softwareUpdate       assetType = "com.apple.MobileAsset.SoftwareUpdate"
-	rsrUpdate            assetType = "com.apple.MobileAsset.SplatSoftwareUpdate"
-	watchSoftwareUpdate  assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
-	visionSoftwareUpdate assetType = "com.apple.MobileAsset.RecoveryOSUpdate"
+	softwareUpdate      assetType = "com.apple.MobileAsset.SoftwareUpdate"
+	rsrUpdate           assetType = "com.apple.MobileAsset.SplatSoftwareUpdate"
+	watchSoftwareUpdate assetType = "com.apple.MobileAsset.WatchSoftwareUpdateDocumentation"
+	recoveryOSUpdate    assetType = "com.apple.MobileAsset.RecoveryOSUpdate"
 	// For macOS devices
 	macSoftwareUpdate        assetType = "com.apple.MobileAsset.MacSoftwareUpdate"
 	macRsrUpdate             assetType = "com.apple.MobileAsset.MacSplatSoftwareUpdate"
@@ -152,6 +152,9 @@ func (a AssetAudienceIDs) LatestVersion(platform string) string {
 		versions = append(versions, i)
 	}
 	sort.Ints(versions)
+	if len(versions) == 0 {
+		return ""
+	}
 	return strconv.Itoa(versions[len(versions)-1])
 }
 
@@ -232,17 +235,14 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 
 func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	switch o.Config.Platform {
-	case "ios":
-		fallthrough
-	case "watchos":
-		fallthrough
-	case "audioos":
-		fallthrough
-	case "tvos":
+	case "ios", "watchos", "audioos", "tvos", "visionos":
 		if o.Config.RSR {
 			return []assetType{rsrUpdate}, nil
 		}
-		return []assetType{softwareUpdate}, nil
+		if o.Config.Platform == "ios" {
+			return []assetType{softwareUpdate}, nil
+		}
+		return []assetType{recoveryOSUpdate, softwareUpdate}, nil
 	case "accessory":
 		return []assetType{accessorySoftwareUpdate}, nil
 	case "macos":
@@ -252,8 +252,6 @@ func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 		return []assetType{macSoftwareUpdate}, nil
 	case "recovery":
 		return []assetType{recoveryOsSoftwareUpdate}, nil
-	case "visionos":
-		return []assetType{visionSoftwareUpdate}, nil
 	}
 	return nil, fmt.Errorf("unsupported platform %s", o.Config.Platform)
 }
@@ -305,6 +303,11 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 				}
 				if segs[0] == 0 { // empty version
 					latest := assetAudienceDB.LatestVersion(o.Config.Platform)
+					if latest == "" {
+						return []string{
+							assetAudienceDB[o.Config.Platform].Release,
+							assetAudienceDB[o.Config.Platform].Generic}, nil
+					}
 					return []string{
 						assetAudienceDB[o.Config.Platform].Versions[latest].DeveloperBeta,
 						assetAudienceDB[o.Config.Platform].Versions[latest].AppleSeedBeta,
@@ -353,7 +356,7 @@ func (o *Ota) getRequests(atype assetType, audienceID string) (reqs []pallasRequ
 
 	if o.Config.Beta {
 		switch o.Config.Platform {
-		case "ios", "audioos", "tvos":
+		case "ios", "audioos", "tvos", "visionos":
 			req.ReleaseType = "Beta"
 		}
 	}
