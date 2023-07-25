@@ -28,6 +28,7 @@ jobs:
       - name: Run winget install
         run: |
           $CurrentDirectory = Get-Location
+          winget settings --enable LocalManifestFiles
           winget install --manifest $CurrentDirectory
       - name: Run ipsw
         run: |
