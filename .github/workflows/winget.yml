@@ -26,4 +26,9 @@ jobs:
           $CurrentDirectory = Get-Location
           winget validate --verbose-logs --manifest $CurrentDirectory
       - name: Run winget install
-        run: winget install --manifest .
+        run: |
+          $CurrentDirectory = Get-Location
+          winget install --manifest $CurrentDirectory
+      - name: Run ipsw
+        run: |
+          ipsw
