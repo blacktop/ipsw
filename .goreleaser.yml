@@ -68,6 +68,7 @@ builds:
       - libusb
       - unicorn
       - objc
+      - sandbox
     mod_timestamp: "{{ .CommitTimestamp }}"
     flags:
       - -trimpath
