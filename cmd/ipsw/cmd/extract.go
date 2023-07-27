@@ -22,6 +22,7 @@ THE SOFTWARE.
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/apex/log"
@@ -45,6 +46,7 @@ func init() {
 	extractCmd.Flags().Bool("sep", false, "Extract sep-firmware")
 	extractCmd.Flags().Bool("sptm", false, "Extract SPTM and TXM Firmwares")
 	extractCmd.Flags().Bool("kbag", false, "Extract Im4p Keybags")
+	extractCmd.Flags().Bool("sys-ver", false, "Extract SystemVersion")
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
@@ -70,6 +72,7 @@ func init() {
 	viper.BindPFlag("extract.sep", extractCmd.Flags().Lookup("sep"))
 	viper.BindPFlag("extract.sptm", extractCmd.Flags().Lookup("sptm"))
 	viper.BindPFlag("extract.kbag", extractCmd.Flags().Lookup("kbag"))
+	viper.BindPFlag("extract.sys-ver", extractCmd.Flags().Lookup("sys-ver"))
 	viper.BindPFlag("extract.files", extractCmd.Flags().Lookup("files"))
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
@@ -223,6 +226,19 @@ var extractCmd = &cobra.Command{
 				return err
 			}
 			utils.Indent(log.Info, 2)("Created " + out)
+		}
+
+		if viper.GetBool("extract.sys-ver") {
+			log.Info("Extracting SystemVersion")
+			out, err := extract.SystemVersion(config.IPSW)
+			if err != nil {
+				return err
+			}
+			dat, err := json.MarshalIndent(out, "", "  ")
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(dat))
 		}
 
 		if len(viper.GetString("extract.pattern")) > 0 {
