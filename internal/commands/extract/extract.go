@@ -14,6 +14,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -444,4 +445,53 @@ func LaunchdConfig(path string) (string, error) {
 	}
 
 	return string(data), nil
+}
+
+// SystemVersionPlist is the SystemVersion.plist struct
+type SystemVersionPlist struct {
+	BuildID             string `json:"build_id,omitempty"`
+	ProductBuildVersion string `json:"product_build_version,omitempty"`
+	ProductCopyright    string `json:"product_copyright,omitempty"`
+	ProductName         string `json:"product_name,omitempty"`
+	ProductVersion      string `json:"product_version,omitempty"`
+	ReleaseType         string `json:"release_type,omitempty"`
+	SystemImageID       string `json:"system_image_id,omitempty"`
+}
+
+// SystemVersion extracts the system version info from an IPSW
+func SystemVersion(path string) (*SystemVersionPlist, error) {
+	ipswPath := filepath.Clean(path)
+
+	i, err := info.Parse(ipswPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+	}
+	fsDMG, err := i.GetFileSystemOsDmg()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get filesystem DMG path: %v", err)
+	}
+
+	extracted, err := utils.ExtractFromDMG(ipswPath, fsDMG, os.TempDir(), regexp.MustCompile(`System/Library/CoreServices/SystemVersion.plist$`))
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract launchd from %s: %v", fsDMG, err)
+	}
+
+	if len(extracted) == 0 {
+		return nil, fmt.Errorf("failed to extract SystemVersion.plist from %s: no files extracted", fsDMG)
+	} else if len(extracted) > 1 {
+		return nil, fmt.Errorf("failed to extract SystemVersion.plist from %s: too many files extracted", fsDMG)
+	}
+	defer os.Remove(filepath.Clean(extracted[0]))
+
+	dat, err := os.ReadFile(extracted[0])
+	if err != nil {
+		return nil, fmt.Errorf("failed to read SystemVersion.plist: %v", err)
+	}
+
+	var sysVer SystemVersionPlist
+	if err := plist.NewDecoder(bytes.NewReader(dat)).Decode(&sysVer); err != nil {
+		return nil, fmt.Errorf("failed to decode SystemVersion.plist: %v", err)
+	}
+
+	return &sysVer, nil
 }
