@@ -35,9 +35,9 @@ import (
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/frida/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/caarlos0/ctrlc"
-	"github.com/fatih/color"
 	"github.com/frida/frida-go/frida"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/cobra"
@@ -46,53 +46,23 @@ import (
 
 var (
 	//go:embed scripts/frida-objc.js
-	scriptData []byte // CREDIT: https://gist.github.com/aemmitt-ns/457f44bccac1eefc32e77e812fe27aff
+	objcScriptData []byte // CREDIT: https://gist.github.com/aemmitt-ns/457f44bccac1eefc32e77e812fe27aff
 )
-
-var colorHeader = color.New(color.FgHiBlue).SprintFunc()
-var colorFaint = color.New(color.Faint, color.FgHiBlue).SprintFunc()
-var colorBold = color.New(color.Bold).SprintFunc()
-
-type argument struct {
-	TypeString        string `json:"typeString,omitempty"`
-	TypeDescription   string `json:"typeDescription,omitempty"`
-	Object            string `json:"object,omitempty"`
-	ObjectDescription string `json:"objectDescription,omitempty"`
-}
-
-func (a argument) String() string {
-	return fmt.Sprintf("\t\t%s (%s)", colorBold(a.TypeDescription), colorFaint(a.ObjectDescription))
-}
-
-type payload struct {
-	TargetType         string     `json:"targetType,omitempty"`
-	TargetClass        string     `json:"targetClass,omitempty"`
-	TargetMethod       string     `json:"targetMethod,omitempty"`
-	Args               []argument `json:"args,omitempty"`
-	ReturnType         string     `json:"returnType,omitempty"`
-	RetTypeDescription string     `json:"retTypeDescription,omitempty"`
-	ReturnDescription  string     `json:"returnDescription,omitempty"`
-}
-
-func (p payload) String() string {
-	var args []string
-	for _, arg := range p.Args {
-		args = append(args, arg.String())
-	}
-	return fmt.Sprintf("\t%s %s(\n%s\n\t) -> %s (%s)", colorBold(p.TargetType), colorHeader(p.TargetClass), strings.Join(args, ",\n"), colorBold(p.RetTypeDescription), colorFaint(p.ReturnDescription))
-}
 
 func init() {
 	FridaCmd.AddCommand(fridaObjcCmd)
 
-	fridaObjcCmd.Flags().BoolP("spawn", "s", false, "Spawn process")
 	fridaObjcCmd.Flags().StringP("name", "n", "", "Name of process")
-	fridaObjcCmd.Flags().StringArray("methods", []string{}, "Method selector like \"*[NSMutable* initWith*]\"")
+	fridaObjcCmd.Flags().IntP("pid", "p", -1, "PID of process")
+	fridaObjcCmd.Flags().StringP("spawn", "s", "", "File to spawn")
+	fridaObjcCmd.Flags().StringArrayP("args", "a", []string{}, "File spawn arguments")
+	fridaObjcCmd.Flags().StringArrayP("methods", "m", []string{}, "Method selector like \"*[NSMutable* initWith*]\"")
 	fridaObjcCmd.Flags().StringP("watch", "w", "", "Watch a script for changes and reload it automatically")
-	fridaObjcCmd.MarkFlagRequired("name")
 	fridaObjcCmd.MarkFlagRequired("methods")
-	viper.BindPFlag("frida.objc.spawn", fridaObjcCmd.Flags().Lookup("spawn"))
 	viper.BindPFlag("frida.objc.name", fridaObjcCmd.Flags().Lookup("name"))
+	viper.BindPFlag("frida.objc.pid", fridaObjcCmd.Flags().Lookup("pid"))
+	viper.BindPFlag("frida.objc.spawn", fridaObjcCmd.Flags().Lookup("spawn"))
+	viper.BindPFlag("frida.objc.args", fridaObjcCmd.Flags().Lookup("args"))
 	viper.BindPFlag("frida.objc.methods", fridaObjcCmd.Flags().Lookup("methods"))
 	viper.BindPFlag("frida.objc.watch", fridaObjcCmd.Flags().Lookup("watch"))
 }
@@ -102,6 +72,7 @@ var fridaObjcCmd = &cobra.Command{
 	Use:           "objc",
 	Aliases:       []string{"o"},
 	Short:         "Trace ObjC methods",
+	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -111,10 +82,20 @@ var fridaObjcCmd = &cobra.Command{
 		}
 
 		udid := viper.GetString("frida.udid")
-		shouldSpawn := viper.GetBool("frida.objc.spawn")
 		procName := viper.GetString("frida.objc.name")
+		procPID := viper.GetInt("frida.objc.pid")
+		spawnPath := viper.GetString("frida.objc.spawn")
+		spawnArgs := viper.GetStringSlice("frida.objc.args")
 		methods := viper.GetStringSlice("frida.objc.methods")
 		watch := viper.GetString("frida.objc.watch")
+		// verify flag args
+		if procPID == -1 && len(procName) == 0 && len(spawnPath) == 0 {
+			return fmt.Errorf("must specify --name, --pid or --spawn")
+		} else if len(spawnPath) > 0 && (procPID != -1 || len(procName) > 0) {
+			return errors.New("cannot specify --spawn process AND --name OR --pid")
+		} else if procPID != -1 && len(procName) > 0 {
+			return errors.New("cannot specify both --name AND --pid")
+		}
 
 		log.WithField("version", fridaVersion).Info("Frida")
 
@@ -134,46 +115,90 @@ var fridaObjcCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to enumerate devices: %v", err)
 			}
-
-			var selected int
-			var choices []string
-			for _, d := range devices {
-				choices = append(choices, fmt.Sprintf("[%-6s] %s (%s)", strings.ToUpper(d.DeviceType().String()), d.Name(), d.ID()))
+			if len(devices) == 0 {
+				return fmt.Errorf("no devices found")
+			} else if len(devices) == 1 {
+				dev = devices[0]
+			} else {
+				var selected int
+				var choices []string
+				for _, d := range devices {
+					choices = append(choices, fmt.Sprintf("[%-6s] %s (%s)", strings.ToUpper(d.DeviceType().String()), d.Name(), d.ID()))
+				}
+				prompt := &survey.Select{
+					Message: "Select what device to connect to:",
+					Options: choices,
+				}
+				if err := survey.AskOne(prompt, &selected); err == terminal.InterruptErr {
+					log.Warn("Exiting...")
+					os.Exit(0)
+				}
+				dev = devices[selected]
 			}
-			prompt := &survey.Select{
-				Message: "Select what device to connect to:",
-				Options: choices,
-			}
-			if err := survey.AskOne(prompt, &selected); err == terminal.InterruptErr {
-				log.Warn("Exiting...")
-				os.Exit(0)
-			}
-			dev = devices[selected]
 		}
 
 		log.Infof("Chosen device: %s", dev.Name())
 
 		var session *frida.Session
-		if shouldSpawn {
-			log.Infof("Spawning process %s", procName)
-			pid, err := dev.Spawn(procName, nil)
-			if err != nil {
-				return fmt.Errorf("failed to spawn process: %v", err)
+		if len(spawnPath) > 0 {
+			log.Infof("Spawning process '%s'", spawnPath)
+			opts := frida.NewSpawnOptions()
+			argv := make([]string, len(spawnArgs)+1)
+			argv[0] = spawnPath
+			for i, arg := range spawnArgs {
+				argv[i+1] = arg
 			}
-			log.Infof("Attaching to PID %d", pid)
-			session, err = dev.Attach(pid, nil)
+			opts.SetArgv(argv)
+			procPID, err = dev.Spawn(spawnPath, opts)
 			if err != nil {
-				return fmt.Errorf("failed to attach to PID: %v", err)
+				return fmt.Errorf("error spawning '%s': %v", spawnPath, err)
+			}
+			session, err = dev.Attach(procPID, nil)
+			if err != nil {
+				return fmt.Errorf("failed to attach to spawned process with PID %d: %v", err, spawnPath, procPID)
 			}
 			defer session.Detach()
 		} else {
-			log.WithField("proc", procName).Info("Attaching")
-			session, err = dev.Attach(procName, nil)
-			if err != nil {
-				return fmt.Errorf("failed to attach to process: %v", err)
+			if procPID == -1 && len(procName) > 0 {
+				processes, err := dev.EnumerateProcesses(frida.ScopeMinimal)
+				if err != nil {
+					return fmt.Errorf("error enumerating processes: %v", err)
+				}
+				found := false
+				for _, proc := range processes {
+					log.WithFields(log.Fields{
+						"name": proc.Name(),
+						"pid":  proc.PID(),
+					}).Debug("Process")
+					if proc.Name() == procName {
+						procPID = proc.PID()
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("process '%s' not found", procName)
+				}
+				log.WithFields(log.Fields{
+					"name": procName,
+					"pid":  procPID,
+				}).Info("Attaching to process")
+			} else {
+				log.Infof("Attaching to PID %d", procPID)
 			}
-			defer session.Detach()
+			session, err = dev.Attach(procPID, nil)
+			if err != nil {
+				return fmt.Errorf("failed to attach to PID: %v", err)
+			}
+			defer session.Clean()
 		}
+
+		session.On("detached", func(reason frida.SessionDetachReason, crash *frida.Crash) {
+			log.Warnf("session detached: reason='{%s}'", frida.SessionDetachReason(reason))
+			if crash != nil {
+				log.Errorf("session crash: %s %s", crash.Report(), crash.Summary())
+			}
+		})
 
 		onMessage := func(data string) {
 			msg, err := frida.ScriptMessageToMessage(data)
@@ -188,11 +213,12 @@ var fridaObjcCmd = &cobra.Command{
 				}).Errorf("Received '%s' - %v", msg.Type, msg.Description)
 			case frida.MessageTypeSend:
 				if msg.IsPayloadMap {
-					var p payload
+					var p types.Payload
 					if err := mapstructure.Decode(msg.Payload, &p); err != nil {
 						log.Errorf("error decoding payload: %v", err)
 					}
 					log.Infof("Received '%s':\n%s", msg.Type, p)
+					utils.Indent(log.Debug, 2)(fmt.Sprintf("Backtrace:\n\t%s", types.ColorFaint(p.Backtrace)))
 				} else {
 					log.Infof("Received '%s' - %s", msg.Type, msg.Payload)
 				}
@@ -205,6 +231,8 @@ var fridaObjcCmd = &cobra.Command{
 				case frida.LevelTypeError:
 					log.Errorf("Received '%s' - %v", msg.Type, msg.Payload)
 				}
+			default:
+				log.Errorf("Received: (unknown) %v", msg)
 			}
 		}
 
@@ -240,7 +268,7 @@ var fridaObjcCmd = &cobra.Command{
 			}
 			log.Infof("Watching %s for changes", watch)
 		} else {
-			script, err := session.CreateScript(string(scriptData))
+			script, err = session.CreateScript(string(objcScriptData))
 			if err != nil {
 				return fmt.Errorf("error ocurred creating script: %v", err)
 			}
@@ -250,11 +278,16 @@ var fridaObjcCmd = &cobra.Command{
 			if err := script.Load(); err != nil {
 				return fmt.Errorf("error loading script: %v", err)
 			}
+			defer script.Unload()
 		}
+		log.Info("Loaded script")
 
-		session.On("detached", func(reason frida.SessionDetachReason) {
-			log.Infof("session detached: reason='{%s}'", frida.SessionDetachReason(reason))
-		})
+		if len(spawnPath) > 0 {
+			if err := dev.Resume(procPID); err != nil {
+				return fmt.Errorf("error resuming: %v", err)
+			}
+			log.Info("Resumed process")
+		}
 
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()

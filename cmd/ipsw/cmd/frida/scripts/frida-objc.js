@@ -135,6 +135,13 @@ const hookMethods = (selector) => {
                   args: [],
                 };
 
+                this.invocation.backtrace = Thread.backtrace(
+                  this.context,
+                  Backtracer.ACCURATE
+                )
+                  .map(DebugSymbol.fromAddress)
+                  .join("\n\t");
+
                 const nargs = sig["- numberOfArguments"]();
                 this.invocation.returnType = sig["- methodReturnType"]();
                 for (let i = 0; i < nargs; i++) {
