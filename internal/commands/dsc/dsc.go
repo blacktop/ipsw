@@ -11,6 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
+	"github.com/blacktop/ipsw/internal/commands/extract"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
@@ -680,4 +681,29 @@ func GetWebkitVersion(f *dyld.File) (string, error) {
 	}
 
 	return m.SourceVersion().Version.String(), nil
+}
+
+func GetUserAgent(f *dyld.File, sysVer *extract.SystemVersionPlist) (string, error) {
+	// NOTES:
+	// This calls WebCore::standardUserAgentWithApplicationName (which has iOS and Maco variants)
+	//    - which reads the SystemVersion.plist to get the OS version and replaces `.` with `_`
+	// Which is called by MobileSafari.app via
+	//    -[WKWebViewConfiguration setApplicationNameForUserAgent:_SFApplicationNameForUserAgent()];
+	//	      - `_SFApplicationNameForUserAgent` is in the MobileSafari framework
+	//        - which reads the Safari version from it's SFClass bundle aka it's Info.plist `CFBundleShortVersion` string key
+	//        - and uses that in the fmt string `"Version/%@ Mobile/15E148 Safari/604.1"` which gets used as the `applicationName` in the `standardUserAgentWithApplicationName` func
+	// The last piece of the puzzle is it get's the device name from _isClassic or MGCopyAnswer("DeviceName")
+	// It then uses all that info to build the string:
+	// makeString("Mozilla/5.0 (", deviceNameForUserAgent(), "; CPU ", osNameForUserAgent(), " ", osVersion, " like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)", separator, applicationName);
+	//
+	// image, err := f.Image("WebKit")
+	// if err != nil {
+	// 	return "", fmt.Errorf("image not in DSC: %v", err)
+	// }
+
+	// m, err := image.GetPartialMacho()
+	// if err != nil {
+	// 	return "", fmt.Errorf("failed to create MachO for image %s: %v", image.Name, err)
+	// }
+	return "", nil
 }
