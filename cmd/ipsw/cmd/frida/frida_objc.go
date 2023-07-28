@@ -165,11 +165,12 @@ var fridaObjcCmd = &cobra.Command{
 					return fmt.Errorf("error enumerating processes: %v", err)
 				}
 				found := false
+				log.Debugf("Searching process '%s'", procName)
 				for _, proc := range processes {
-					log.WithFields(log.Fields{
-						"name": proc.Name(),
+					utils.Indent(log.WithFields(log.Fields{
 						"pid":  proc.PID(),
-					}).Debug("Process")
+						"name": proc.Name(),
+					}).Debug, 2)("Process")
 					if proc.Name() == procName {
 						procPID = proc.PID()
 						found = true
