@@ -1,3 +1,5 @@
+//go:build darwin && frida
+
 /*
 Copyright © 2018-2023 blacktop
 
@@ -46,6 +48,7 @@ var fridaFMonCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.ExactArgs(1),
+	Hidden:        true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

@@ -31,6 +31,7 @@ import (
 	clihander "github.com/apex/log/handlers/cli"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/download"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/dyld"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/frida"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/idev"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/img4"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/kernel"
@@ -89,6 +90,7 @@ func init() {
 	// Add subcommand groups
 	rootCmd.AddCommand(download.DownloadCmd)
 	rootCmd.AddCommand(dyld.DyldCmd)
+	rootCmd.AddCommand(frida.FridaCmd)
 	rootCmd.AddCommand(idev.IDevCmd)
 	rootCmd.AddCommand(img4.Img4Cmd)
 	rootCmd.AddCommand(kernel.KernelcacheCmd)
