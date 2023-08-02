@@ -51,6 +51,7 @@ func init() {
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
 	extractCmd.Flags().Bool("flat", false, "Do NOT perserve directory structure when extracting")
+	extractCmd.Flags().BoolP("json", "j", false, "Output extracted paths as JSON")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")
 	extractCmd.Flags().Bool("driverkit", false, "Extract DriverKit dyld_shared_cache")
 	extractCmd.RegisterFlagCompletionFunc("dmg", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -77,6 +78,7 @@ func init() {
 	viper.BindPFlag("extract.pattern", extractCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("extract.output", extractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("extract.flat", extractCmd.Flags().Lookup("flat"))
+	viper.BindPFlag("extract.json", extractCmd.Flags().Lookup("json"))
 	viper.BindPFlag("extract.dyld-arch", extractCmd.Flags().Lookup("dyld-arch"))
 	viper.BindPFlag("extract.driverkit", extractCmd.Flags().Lookup("driverkit"))
 }
@@ -144,15 +146,35 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 
 		if viper.GetBool("extract.dyld") {
 			log.Info("Extracting dyld_shared_cache")
-			if _, err := extract.DSC(config); err != nil {
+			out, err := extract.DSC(config)
+			if err != nil {
 				return err
+			}
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 
@@ -166,8 +188,16 @@ var extractCmd = &cobra.Command{
 				if err != nil {
 					return err
 				}
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
+				if viper.GetBool("extract.json") {
+					dat, err := json.Marshal(out)
+					if err != nil {
+						return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+					}
+					fmt.Println(string(dat))
+				} else {
+					for _, f := range out {
+						utils.Indent(log.Info, 2)("Created " + f)
+					}
 				}
 			}
 		}
@@ -179,8 +209,16 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 
@@ -191,8 +229,16 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 
@@ -203,8 +249,16 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 
@@ -214,8 +268,16 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 
@@ -250,8 +312,16 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			for _, f := range out {
-				utils.Indent(log.Info, 2)("Created " + f)
+			if viper.GetBool("extract.json") {
+				dat, err := json.Marshal(out)
+				if err != nil {
+					return fmt.Errorf("failed to marshal output paths as JSON: %s", err)
+				}
+				fmt.Println(string(dat))
+			} else {
+				for _, f := range out {
+					utils.Indent(log.Info, 2)("Created " + f)
+				}
 			}
 		}
 

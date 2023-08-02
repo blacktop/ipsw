@@ -136,7 +136,8 @@ func ExtractFromDMG(i *info.Info, dmgPath, destPath string, arches []string, dri
 	var artifacts []string
 	for _, match := range matches {
 		dyldDest := filepath.Join(destPath, filepath.Base(match))
-		utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting %s to %s", filepath.Base(match), dyldDest))
+		// TODO: remove this (was commented out because I added --json to `ipsw extract` so the higher level func is now where this is printed)
+		// utils.Indent(log.Info, 3)(fmt.Sprintf("Extracting %s to %s", filepath.Base(match), dyldDest))
 		if err := utils.Copy(match, dyldDest); err != nil {
 			return nil, fmt.Errorf("failed to copy %s to %s: %v", match, dyldDest, err)
 		}
