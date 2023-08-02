@@ -359,7 +359,19 @@ func Disassemble(d Disass) {
 						adrpImm += instruction.Operands[1].Immediate
 					}
 					if name, ok := d.FindSymbol(uint64(adrpImm)); ok {
-						comment = fmt.Sprintf(" ; %s", name)
+						if ok, detail := d.IsData(adrpImm); ok {
+							_ = detail
+							if ok, detail := d.IsPointer(adrpImm); ok {
+								fmt.Printf("ptr_%x: .quad %s ; %s\n", adrpImm, detail, name)
+							}
+							if ptr, err := d.ReadAddr(adrpImm); err == nil {
+								if ptrname, ok := d.FindSymbol(ptr); ok {
+									comment = fmt.Sprintf(" ; %s _ptr.%s", name, ptrname)
+								}
+							}
+						} else {
+							comment = fmt.Sprintf(" ; %s", name)
+						}
 					} else if ok, detail := d.IsPointer(adrpImm); ok {
 						if name, ok := d.FindSymbol(uint64(detail.Pointer)); ok {
 							comment = fmt.Sprintf(" ; _ptr.%s", name)
@@ -375,11 +387,11 @@ func Disassemble(d Disass) {
 							} else if len(cstr) > 1 {
 								comment = fmt.Sprintf(" ; %#v", cstr)
 							}
-						}
-					} else { // try again with immediate as pointer
-						if ptr, err := d.ReadAddr(adrpImm); err == nil {
-							if name, ok := d.FindSymbol(ptr); ok {
-								comment = fmt.Sprintf(" ; _ptr.%s", name)
+						} else { // try again with immediate as pointer
+							if ptr, err := d.ReadAddr(adrpImm); err == nil {
+								if name, ok := d.FindSymbol(ptr); ok {
+									comment = fmt.Sprintf(" ; _ptr.%s", name)
+								}
 							}
 						}
 					}
