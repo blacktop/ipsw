@@ -6,6 +6,7 @@ package emu
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -94,6 +95,7 @@ type Emulation struct {
 	startAddr uint64
 	count     uint64
 	code      []byte
+	instr     []byte
 	// state
 	regs            Registers
 	stack_chk_guard uint64
@@ -229,19 +231,15 @@ func (e *Emulation) SetupHooks() error {
 			case uc.MEM_READ_UNMAPPED:
 				fmt.Print(colorHook("[MEM_READ_UNMAPPED]"))
 				addr = e.cache.SlideInfo.SlidePointer(addr)
-				image, err := e.cache.GetImageContainingVMAddr(addr)
-				if err != nil {
-					log.Errorf(err.Error())
-					return false
-				}
-				sinfo, err := image.GetSlideInfo()
-				if err != nil {
-					log.Errorf(err.Error())
-					return false
-				}
 				uuid, off, err := e.cache.GetOffset(e.cache.SlideInfo.SlidePointer(addr))
 				if err != nil {
-					log.Errorf(err.Error())
+					if ptr, err := e.cache.ReadPointerAtAddress(addr); err == nil { // try as a pointer
+						uuid, off, err = e.cache.GetOffset(e.cache.SlideInfo.SlidePointer(ptr))
+						if err != nil {
+							log.Errorf("failed to map memory for address %#x (or pointer %#x): %v", addr, ptr, err)
+						}
+						addr = ptr
+					}
 					return false
 				}
 				dat, err := e.cache.ReadBytesForUUID(uuid, int64(off), UC_MEM_ALIGN)
@@ -256,6 +254,22 @@ func (e *Emulation) SetupHooks() error {
 				}
 				if err := e.mu.MemWrite(addr, dat); err != nil {
 					log.Errorf("failed to mem write at %#x: %v", addr, err)
+					return false
+				}
+				image, err := e.cache.GetImageContainingVMAddr(addr)
+				if err != nil {
+					if ptr, err := e.cache.ReadPointerAtAddress(addr); err == nil { // try as a pointer
+						addr = e.cache.SlideInfo.SlidePointer(ptr)
+						image, err = e.cache.GetImageContainingVMAddr(addr)
+						if err != nil {
+							log.Errorf("failed to get image for address %#x (or pointer %#x): %v", addr, ptr, err)
+							return false
+						}
+					}
+				}
+				sinfo, err := image.GetSlideInfo()
+				if err != nil {
+					log.Errorf(err.Error())
 					return false
 				}
 				for where, target := range sinfo {
@@ -334,6 +348,7 @@ func (e *Emulation) SetupHooks() error {
 		}
 		// disassemble code
 		diss(addr, code)
+		e.instr = code
 	}, 1, 0); err != nil {
 		return fmt.Errorf("failed to register code hook: %v", err)
 	}
@@ -344,6 +359,12 @@ func (e *Emulation) SetupHooks() error {
 		fmt.Printf(colorHook("[INTERRUPT]") + colorInterrupt(" %s\n", interrupt(intno)))
 		switch interrupt(intno) {
 		case EXCP_UNDEFINED_INSTRUCTION:
+			if reflect.DeepEqual(e.instr, []byte{0xc0, 0x03, 0x5f, 0xd6}) { // skip over ret
+				if lr, err := e.mu.RegRead(uc.ARM64_REG_LR); err == nil {
+					e.mu.RegWrite(uc.ARM64_REG_PC, lr)
+				}
+				return
+			}
 			if err := e.GetState(); err != nil {
 				log.Errorf("failed to register state: %v", err)
 			}
