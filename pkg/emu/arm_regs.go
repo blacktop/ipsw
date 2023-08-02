@@ -328,6 +328,8 @@ func InitRegisters() Registers {
 		uc.ARM64_REG_VBAR_EL2:    {Name: "vbar_el2"},
 		uc.ARM64_REG_VBAR_EL3:    {Name: "vbar_el3"},
 		uc.ARM64_REG_CP_REG:      {Name: "coprocessor"},
+		uc.ARM64_REG_FPCR:        {Name: "fpcr"},
+		uc.ARM64_REG_FPSR:        {Name: "fpsr"},
 		uc.ARM64_REG_ENDING:      {Name: "ending"},
 	}
 }
@@ -335,10 +337,19 @@ func InitRegisters() Registers {
 // GetState refreshes the internal register state
 func (e *Emulation) GetState() error {
 	regs := make([]int, uc.ARM64_REG_ENDING-1)
-	for i := range regs {
-		regs[i] = uc.ARM64_REG_INVALID + i
-
+	for i := 0; i < uc.ARM64_REG_ENDING-1; i++ {
+		regs[i] = i
+		if i >= uc.ARM64_REG_CP_REG {
+			regs[i] = i + 1
+		}
 	}
+	// for _, reg := range regs {
+	// 	val, err := e.mu.RegRead(reg)
+	// 	if err != nil {
+	// 		log.Errorf("failed to read reg %s: %v", e.regs[reg].Name, err)
+	// 	}
+	// 	fmt.Printf("%s: %#x\n", e.regs[reg].Name, val)
+	// }
 	vals, err := e.mu.RegReadBatch(regs)
 	if err != nil {
 		return err
