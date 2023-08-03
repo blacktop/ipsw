@@ -91,7 +91,7 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 }
 
 // Kernelcache extracts the kernelcache from an IPSW
-func Kernelcache(c *Config) ([]string, error) {
+func Kernelcache(c *Config) (map[string][]string, error) {
 	if len(c.IPSW) > 0 {
 		_, folder, err := getFolder(c)
 		if err != nil {

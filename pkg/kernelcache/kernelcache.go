@@ -115,7 +115,7 @@ func ParseImg4Data(data []byte) (*CompressedCache, error) {
 }
 
 // Extract extracts and decompresses a kernelcache from ipsw
-func Extract(ipsw, destPath string) ([]string, error) {
+func Extract(ipsw, destPath string) (map[string][]string, error) {
 	tmpDIR, err := os.MkdirTemp("", "ipsw_extract_kcache")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temporary directory to store SPTM im4p: %v", err)
@@ -134,7 +134,7 @@ func Extract(ipsw, destPath string) ([]string, error) {
 		return nil, fmt.Errorf("failed to parse ipsw info: %v", err)
 	}
 
-	var artifacts []string
+	artifacts := make(map[string][]string)
 	for _, kcache := range kcaches {
 		fname := i.GetKernelCacheFileName(kcache)
 		fname = filepath.Join(destPath, fname)
@@ -163,7 +163,7 @@ func Extract(ipsw, destPath string) ([]string, error) {
 		}
 		os.Remove(kcache)
 
-		artifacts = append(artifacts, fname)
+		artifacts[fname] = i.GetDevicesForKernelCache(kcache)
 	}
 
 	return artifacts, nil
@@ -323,13 +323,13 @@ func DecompressData(cc *CompressedCache) ([]byte, error) {
 }
 
 // RemoteParse parses plist files in a remote ipsw file
-func RemoteParse(zr *zip.Reader, destPath string) ([]string, error) {
-	var artifacts []string
-
+func RemoteParse(zr *zip.Reader, destPath string) (map[string][]string, error) {
 	i, err := info.ParseZipFiles(zr.File)
 	if err != nil {
 		return nil, err
 	}
+
+	artifacts := make(map[string][]string)
 
 	for _, f := range zr.File {
 		if strings.Contains(f.Name, "kernelcache.") {
@@ -359,7 +359,7 @@ func RemoteParse(zr *zip.Reader, destPath string) ([]string, error) {
 				if err := os.WriteFile(fname, dec, 0660); err != nil {
 					return nil, fmt.Errorf("failed to write kernelcache %s: %v", fname, err)
 				}
-				artifacts = append(artifacts, fname)
+				artifacts[fname] = i.GetDevicesForKernelCache(f.Name)
 			} else {
 				log.Warnf("kernelcache already exists: %s", fname)
 			}

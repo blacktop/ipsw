@@ -153,8 +153,8 @@ var extractCmd = &cobra.Command{
 				}
 				fmt.Println(string(dat))
 			} else {
-				for _, f := range out {
-					utils.Indent(log.Info, 2)("Created " + f)
+				for fn := range out {
+					utils.Indent(log.Info, 2)("Created " + fn)
 				}
 			}
 		}

@@ -3503,6 +3503,24 @@
         }
       }
     },
+    "extractKernelsReponse": {
+      "description": "The extract kernels response message",
+      "schema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "headers": {
+        "artifacts": {
+          "minItems": 0,
+          "description": "The list of extracted kernels and what devices they are for"
+        }
+      }
+    },
     "extractReponse": {
       "description": "The extract response message",
       "headers": {
