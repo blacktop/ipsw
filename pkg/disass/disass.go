@@ -420,7 +420,7 @@ func Disassemble(d Disass) {
 						colorComment(comment),
 					)
 				} else {
-					fmt.Printf("%#08x:  %s\t%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr)
+					fmt.Printf("%#08x:  %s   %s%s\n", uint64(startAddr), disassemble.GetOpCodeByteString(instrValue), instrStr, comment)
 				}
 			}
 
