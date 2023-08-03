@@ -18,6 +18,14 @@ type extractReponse struct {
 	Artifacts []string `json:"artifacts"`
 }
 
+// The extract kernels response message
+// swagger:response extractKernelsReponse
+type extractKernelsReponse struct {
+	// The list of extracted kernels and what devices they are for
+	// min items: 0
+	Artifacts map[string][]string `json:"artifacts"`
+}
+
 func extractDSC(c *gin.Context) {
 	var query extract.Config
 	if err := c.ShouldBindJSON(&query); err != nil {
@@ -75,7 +83,7 @@ func extractKernel(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.IndentedJSON(http.StatusOK, extractReponse{Artifacts: artifacts})
+	c.IndentedJSON(http.StatusOK, extractKernelsReponse{Artifacts: artifacts})
 }
 
 func extractPattern(c *gin.Context) {
