@@ -312,10 +312,7 @@ var idaCmd = &cobra.Command{
 			} else {
 				log.Info("Starting IDA Pro...")
 			}
-			if err := cli.Run(); err != nil {
-				return err
-			}
-			return nil
+			return cli.Run()
 		}); err != nil {
 			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
 				log.Warn("Exiting...")

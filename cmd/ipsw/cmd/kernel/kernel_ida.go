@@ -54,7 +54,6 @@ func init() {
 	kernelIdaCmd.Flags().StringP("ida-path", "p", "", "IDA Pro directory (darwin default: /Applications/IDA Pro */ida64.app/Contents/MacOS)")
 	kernelIdaCmd.Flags().StringP("script", "s", "", "IDA Pro script to run")
 	kernelIdaCmd.Flags().StringSliceP("script-args", "r", []string{}, "IDA Pro script arguments")
-	kernelIdaCmd.Flags().BoolP("all", "a", false, "Analyze kernel+kexts (this will take a while)")
 	kernelIdaCmd.Flags().BoolP("enable-gui", "g", false, "Enable IDA Pro GUI (defaults to headless)")
 	kernelIdaCmd.Flags().BoolP("delete-db", "c", false, "Disassemble a new file (delete the old database)")
 	kernelIdaCmd.Flags().BoolP("temp-db", "t", false, "Do not create a database file (requires --enable-gui)")
@@ -91,7 +90,6 @@ var kernelIdaCmd = &cobra.Command{
 		var fileType string
 		var dbFile string
 		var env []string
-		var autoAnalyze bool
 		var defaultframeworks []string
 
 		if viper.GetBool("verbose") {
@@ -152,14 +150,9 @@ var kernelIdaCmd = &cobra.Command{
 		}
 		defer m.Close()
 
-		if viper.GetBool("kernel.ida.all") { // analyze all dylibs
-			autoAnalyze = true
-			device := filepath.Ext(kcPath)[1:]
-			fileType = fmt.Sprintf("Apple XNU kernelcache for %s (kernel + all kexts)", m.SubCPU.String(m.CPU))
-			dbFile = filepath.Join(folder, fmt.Sprintf("KC_%s_%s.i64", device, m.SubCPU.String(m.CPU)))
-		} else { // analyze single or more dylibs
-			return fmt.Errorf("single kext support not implemented yet (please use --all)")
-		}
+		device := filepath.Ext(kcPath)[1:]
+		fileType = fmt.Sprintf("Apple XNU kernelcache for %s (kernel + all kexts)", m.SubCPU.String(m.CPU))
+		dbFile = filepath.Join(folder, fmt.Sprintf("KC_%s_%s.i64", device, m.SubCPU.String(m.CPU)))
 
 		if len(logFile) > 0 {
 			logFile = filepath.Join(folder, viper.GetString("kernel.ida.log-file"))
@@ -198,7 +191,7 @@ var kernelIdaCmd = &cobra.Command{
 			DeleteDB:     viper.GetBool("kernel.ida.delete-db"),
 			CompressDB:   true,
 			FileType:     fileType,
-			AutoAnalyze:  autoAnalyze,
+			AutoAnalyze:  true,
 			BatchMode:    true,
 			Env:          env,
 			// Options:      []string{"objc:+l"},
@@ -225,10 +218,7 @@ var kernelIdaCmd = &cobra.Command{
 			} else {
 				log.Info("Starting IDA Pro...")
 			}
-			if err := cli.Run(); err != nil {
-				return err
-			}
-			return nil
+			return cli.Run()
 		}); err != nil {
 			if errors.As(err, &ctrlc.ErrorCtrlC{}) {
 				log.Warn("Exiting...")
