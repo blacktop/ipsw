@@ -54,8 +54,12 @@ load_and_run_plugin("objc", 5)
 qexit(0)
 {{- end }}
 
-print("[ipsw] running objc_stubs.py ...")
-fix_objc_stubs()
+ida_version = ida_kernwin.get_kernel_version().split('.')
+if ida_version[0] == 8 and ida_version[1] <= 2:
+	print("[ipsw] running objc_stubs.py ...")
+	fix_objc_stubs()
+else:
+	print("[ipsw] skipping objc fixups ...")	
 
 print("[ipsw] applying objc hotkeys...")
 set_hotkeys()
