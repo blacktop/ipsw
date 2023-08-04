@@ -88,7 +88,6 @@ var idaCmd = &cobra.Command{
 		var fileType string
 		var dbFile string
 		var env []string
-		var autoAnalyze bool
 		var defaultframeworks []string
 
 		if viper.GetBool("verbose") {
@@ -173,7 +172,6 @@ var idaCmd = &cobra.Command{
 		}
 
 		if viper.GetBool("dyld.ida.all") { // analyze all dylibs
-			autoAnalyze = true
 			fileType = fmt.Sprintf("Apple DYLD cache for %s (complete image)", strings.TrimSpace(magic))
 			dbFile = filepath.Join(folder, fmt.Sprintf("DSC_%s_%s.i64", f.Headers[f.UUID].Platform, f.Headers[f.UUID].OsVersion))
 		} else { // analyze single or more dylibs
@@ -288,7 +286,7 @@ var idaCmd = &cobra.Command{
 			DeleteDB:     viper.GetBool("dyld.ida.delete-db"),
 			CompressDB:   true,
 			FileType:     fileType,
-			AutoAnalyze:  autoAnalyze,
+			AutoAnalyze:  true,
 			Env:          env,
 			Options:      []string{"objc:+l"},
 			ScriptFile:   scriptFile,
