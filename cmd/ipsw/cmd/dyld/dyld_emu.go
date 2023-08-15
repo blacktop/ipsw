@@ -40,9 +40,10 @@ import (
 func init() {
 	DyldCmd.AddCommand(dyldEmuCmd)
 
+	dyldEmuCmd.Flags().StringP("sym", "s", "", "Function to start disassembling")
 	dyldEmuCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
 	dyldEmuCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
-	dyldEmuCmd.Flags().StringP("state", "s", "", "Path to initial state file")
+	dyldEmuCmd.Flags().StringP("state", "t", "", "Path to initial state file")
 
 	dyldEmuCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
@@ -62,9 +63,15 @@ var dyldEmuCmd = &cobra.Command{
 		}
 		color.NoColor = !viper.GetBool("color")
 
+		// Flags
+		symbolName, _ := cmd.Flags().GetString("sym")
 		startAddr, _ := cmd.Flags().GetUint64("vaddr")
 		instructions, _ := cmd.Flags().GetUint64("count")
 		stateFile, _ := cmd.Flags().GetString("state")
+		// Validate flags
+		if symbolName != "" && startAddr != 0 {
+			return fmt.Errorf("cannot specify both --sym and --vaddr")
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -98,9 +105,18 @@ var dyldEmuCmd = &cobra.Command{
 		}
 		defer mu.Close()
 
-		image, err := f.GetImageContainingVMAddr(startAddr)
-		if err != nil {
-			return err
+		var image *dyld.CacheImage
+		if symbolName != "" {
+			startAddr, image, err = f.GetSymbolAddress(symbolName)
+			if err != nil {
+				return err
+			}
+			fmt.Print(color.New(color.Bold).Sprintf("\n%s:", symbolName))
+		} else {
+			image, err = f.GetImageContainingVMAddr(startAddr)
+			if err != nil {
+				return err
+			}
 		}
 
 		m, err := image.GetMacho()
