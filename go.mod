@@ -1,6 +1,6 @@
 module github.com/blacktop/ipsw
 
-go 1.20
+go 1.21
 
 require (
 	github.com/99designs/keyring v1.2.2
