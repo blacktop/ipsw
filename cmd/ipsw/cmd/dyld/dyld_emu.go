@@ -161,8 +161,11 @@ var dyldEmuCmd = &cobra.Command{
 			return fmt.Errorf("failed to setup hooks: %v", err)
 		}
 		if err := mu.InitStack(); err != nil {
-			return fmt.Errorf("failed to setup hooks: %v", err)
+			return fmt.Errorf("failed to setup stack: %v", err)
 		}
+		// if err := mu.InitHeap(); err != nil {
+		// 	return fmt.Errorf("failed to setup heap: %v", err)
+		// }
 
 		if len(stateFile) > 0 {
 			state, err := emu.ParseState(stateFile)

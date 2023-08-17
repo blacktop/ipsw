@@ -27,7 +27,7 @@ func colorOperands(operands string) string {
 	return operands
 }
 
-func diss(startAddr uint64, data []byte) {
+func diss(startAddr uint64, data []byte) (instruction *disassemble.Instruction) {
 	var instrValue uint32
 	var results [1024]byte
 
@@ -40,7 +40,7 @@ func diss(startAddr uint64, data []byte) {
 			break
 		}
 
-		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+		instruction, err = disassemble.Decompose(startAddr, instrValue, &results)
 		if err != nil {
 			fmt.Printf("%s:  %s\t%s\t%#-18x ; (%s)\n",
 				colorAddr("%#08x", uint64(startAddr)),
@@ -61,4 +61,6 @@ func diss(startAddr uint64, data []byte) {
 
 		startAddr += uint64(binary.Size(uint32(0)))
 	}
+
+	return
 }

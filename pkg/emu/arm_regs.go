@@ -424,6 +424,15 @@ func (r Registers) AllChanged() string {
 	return out
 }
 
+func (r Registers) GetUC(name string) int {
+	for uc, reg := range r {
+		if reg.Name == name {
+			return uc
+		}
+	}
+	return uc.ARM64_REG_INVALID
+}
+
 type pstate uint32
 
 // NZCV
