@@ -45,6 +45,8 @@ func init() {
 
 	nonceCmd.Flags().BoolP("readable", "r", false, "Print nonce as a more readable string")
 	nonceCmd.Flags().BoolP("qr-code", "q", false, "Generate QR code of nonce")
+	nonceCmd.Flags().StringP("mail", "m", "", "QR mailto address")
+	nonceCmd.Flags().StringP("subject", "s", "Device Nonce Info", "QR mailto subject")
 	nonceCmd.Flags().StringP("output", "o", "", "Folder to write QR code PNG to")
 }
 
@@ -64,6 +66,8 @@ var nonceCmd = &cobra.Command{
 		udid, _ := cmd.Flags().GetString("udid")
 		readable, _ := cmd.Flags().GetBool("readable")
 		asQrCode, _ := cmd.Flags().GetBool("qr-code")
+		email, _ := cmd.Flags().GetString("mail")
+		emailSubject, _ := cmd.Flags().GetString("subject")
 		output, _ := cmd.Flags().GetString("output")
 
 		if len(udid) == 0 {
@@ -90,8 +94,13 @@ var nonceCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to get personalization identifiers: %w ('personalization' might not be supported on this device)", err)
 			}
+
 			// Create the barcode
-			qrCode, err := qr.Encode(fmt.Sprintf("ApBoardID=%d,ApChipID=%d,ApECID=%d,ApNonce=%s", personalID["BoardId"], personalID["ChipID"], personalID["UniqueChipID"], nonce), qr.M, qr.Auto)
+			qrCodeStr := fmt.Sprintf("ApBoardID=%d,ApChipID=%d,ApECID=%d,ApNonce=%s", personalID["BoardId"], personalID["ChipID"], personalID["UniqueChipID"], nonce)
+			if len(email) > 0 {
+				qrCodeStr = fmt.Sprintf("mailto:%s?subject=%s&body=%s", email, emailSubject, qrCodeStr)
+			}
+			qrCode, err := qr.Encode(qrCodeStr, qr.M, qr.Auto)
 			if err != nil {
 				return fmt.Errorf("failed to encode nonce as QR code: %w", err)
 			}
