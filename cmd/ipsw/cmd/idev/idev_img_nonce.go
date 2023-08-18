@@ -24,8 +24,10 @@ package idev
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"image/png"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
@@ -43,8 +45,10 @@ import (
 func init() {
 	ImgCmd.AddCommand(nonceCmd)
 
+	nonceCmd.Flags().BoolP("json", "j", false, "Print as JSON")
 	nonceCmd.Flags().BoolP("readable", "r", false, "Print nonce as a more readable string")
 	nonceCmd.Flags().BoolP("qr-code", "q", false, "Generate QR code of nonce")
+	nonceCmd.Flags().String("url", "", "QR code URL")
 	nonceCmd.Flags().StringP("mail", "m", "", "QR mailto address")
 	nonceCmd.Flags().StringP("subject", "s", "Device Nonce Info", "QR mailto subject")
 	nonceCmd.Flags().StringP("output", "o", "", "Folder to write QR code PNG to")
@@ -63,12 +67,21 @@ var nonceCmd = &cobra.Command{
 		}
 		color.NoColor = !viper.GetBool("color")
 
+		// flags
 		udid, _ := cmd.Flags().GetString("udid")
+		asJSON, _ := cmd.Flags().GetBool("json")
 		readable, _ := cmd.Flags().GetBool("readable")
 		asQrCode, _ := cmd.Flags().GetBool("qr-code")
+		qrURL, _ := cmd.Flags().GetString("url")
 		email, _ := cmd.Flags().GetString("mail")
 		emailSubject, _ := cmd.Flags().GetString("subject")
 		output, _ := cmd.Flags().GetString("output")
+		// Validate flags
+		if asQrCode && readable {
+			return fmt.Errorf("cannot specify both --qr-code and --readable")
+		} else if len(qrURL) > 0 && len(email) > 0 {
+			return fmt.Errorf("cannot specify both --url and --mail")
+		}
 
 		if len(udid) == 0 {
 			dev, err := utils.PickDevice()
@@ -89,16 +102,22 @@ var nonceCmd = &cobra.Command{
 			return fmt.Errorf("failed to get nonce: %w", err)
 		}
 
-		if asQrCode {
-			personalID, err := cli.PersonalizationIdentifiers("")
-			if err != nil {
-				return fmt.Errorf("failed to get personalization identifiers: %w ('personalization' might not be supported on this device)", err)
-			}
+		personalID, err := cli.PersonalizationIdentifiers("")
+		if err != nil {
+			log.Errorf("failed to get personalization identifiers: %v ('personalization' might not be supported on this device)", err)
+		}
 
+		if asQrCode {
 			// Create the barcode
 			qrCodeStr := fmt.Sprintf("ApBoardID=%d,ApChipID=%d,ApECID=%d,ApNonce=%s", personalID["BoardId"], personalID["ChipID"], personalID["UniqueChipID"], nonce)
 			if len(email) > 0 {
 				qrCodeStr = fmt.Sprintf("mailto:%s?subject=%s&body=%s", email, emailSubject, qrCodeStr)
+			} else if len(qrURL) > 0 {
+				u, err := url.Parse(fmt.Sprintf("%s?ApBoardID=%d&ApChipID=%d&ApECID=%d&ApNonce=%s", qrURL, personalID["BoardId"], personalID["ChipID"], personalID["UniqueChipID"], nonce))
+				if err != nil {
+					return fmt.Errorf("failed to parse URL: %w", err)
+				}
+				qrCodeStr = u.String()
 			}
 			qrCode, err := qr.Encode(qrCodeStr, qr.M, qr.Auto)
 			if err != nil {
@@ -126,12 +145,17 @@ var nonceCmd = &cobra.Command{
 				return os.WriteFile(fname, dat.Bytes(), 0644)
 			}
 
-			log.Warn("Displaying QR code in terminal (supported in iTerm2)")
+			log.Warn("Displaying QR code in terminal (supported in iTerm2, otherwise supply --output flag)")
 			println()
 			return utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), 500, 500)
 		}
 
 		if readable {
+			if personalID != nil {
+				fmt.Printf("%s %d\n", color.New(color.Bold).Sprintf("ApBoardID: "), personalID["BoardId"])
+				fmt.Printf("%s %d\n", color.New(color.Bold).Sprintf("ApChipID:  "), personalID["ChipID"])
+				fmt.Printf("%s %d\n\n", color.New(color.Bold).Sprintf("ApECID:    "), personalID["UniqueChipID"])
+			}
 			var out string
 			for i, c := range nonce {
 				if i > 0 && i%4 == 0 && i%24 != 0 {
@@ -143,7 +167,37 @@ var nonceCmd = &cobra.Command{
 			}
 			fmt.Println(out)
 		} else {
-			fmt.Println(nonce)
+			if asJSON {
+				var out []byte
+				if personalID == nil {
+					out, err = json.MarshalIndent(&struct {
+						ApNonce string `json:"nonce,omitempty"`
+					}{
+						ApNonce: nonce,
+					}, "", "  ")
+					if err != nil {
+						return fmt.Errorf("failed to marshal JSON: %w", err)
+					}
+				} else {
+					out, err = json.MarshalIndent(&struct {
+						ApBoardID int    `json:"board_id,omitempty"`
+						ApChipID  int    `json:"chip_id,omitempty"`
+						ApECID    int    `json:"ecid,omitempty"`
+						ApNonce   string `json:"nonce,omitempty"`
+					}{
+						ApBoardID: personalID["BoardId"].(int),
+						ApChipID:  personalID["ChipID"].(int),
+						ApECID:    personalID["UniqueChipID"].(int),
+						ApNonce:   nonce,
+					}, "", "  ")
+					if err != nil {
+						return fmt.Errorf("failed to marshal JSON: %w", err)
+					}
+				}
+				fmt.Println(string(out))
+			} else {
+				fmt.Println(nonce)
+			}
 		}
 
 		return nil
