@@ -34,8 +34,8 @@ import (
 func init() {
 	ImgCmd.AddCommand(idevImgUnmountCmd)
 
-	idevImgUnmountCmd.Flags().StringP("image-type", "t", "Developer", "Image type to unmount")
-	idevImgUnmountCmd.Flags().StringP("mount-point", "m", "/Developer", "Path to mount point")
+	idevImgUnmountCmd.Flags().StringP("image-type", "t", "", "Image type to unmount (i.e. 'Developer')")
+	idevImgUnmountCmd.Flags().StringP("mount-point", "m", "", "Path to mount point (i.e. '/Developer')")
 }
 
 // idevImgUnmountCmd represents the unmount command
@@ -68,9 +68,36 @@ var idevImgUnmountCmd = &cobra.Command{
 		}
 		defer cli.Close()
 
-		log.Infof("Unmounting %s image from %s", imageType, mountPoint)
-		if err := cli.Unmount(imageType, mountPoint, []byte{}); err != nil {
-			return fmt.Errorf("failed to unmount image: %w", err)
+		if imageType != "" && mountPoint != "" {
+			log.Infof("Unmounting %s image from %s", imageType, mountPoint)
+			if err := cli.Unmount(imageType, mountPoint, []byte{}); err != nil {
+				return fmt.Errorf("failed to unmount image: %w", err)
+			}
+		} else {
+			images, err := cli.ListImages()
+			if err != nil {
+				return fmt.Errorf("failed to list images: %w", err)
+			}
+
+			if len(images) == 0 {
+				log.Warn("No mounted images found")
+				return nil
+			}
+
+			if len(images) == 1 && images[0].IsMounted {
+				log.Infof("Unmounting %s image from %s", images[0].DiskImageType, images[0].MountPath)
+				if err := cli.Unmount(images[0].DiskImageType, images[0].MountPath, []byte(images[0].ImageSignature)); err != nil {
+					return fmt.Errorf("failed to unmount image: %w", err)
+				}
+				return nil
+			}
+
+			for _, img := range images {
+				log.Infof("Unmounting %s image from %s", img.DiskImageType, img.MountPath)
+				if err := cli.Unmount(img.DiskImageType, img.MountPath, []byte(images[0].ImageSignature)); err != nil {
+					return fmt.Errorf("failed to unmount image: %w", err)
+				}
+			}
 		}
 
 		return nil

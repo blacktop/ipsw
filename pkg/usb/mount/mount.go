@@ -211,7 +211,10 @@ func (c *Client) Unmount(imageType, mountPath string, signature []byte) error {
 	}
 
 	if resp.Status != "Complete" {
-		return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		if len(resp.DetailedError) > 0 {
+			return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		}
+		return fmt.Errorf("%s", resp.Error)
 	}
 
 	return nil
