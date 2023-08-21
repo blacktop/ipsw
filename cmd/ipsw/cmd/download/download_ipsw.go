@@ -54,8 +54,8 @@ func init() {
 	ipswCmd.Flags().Bool("beta", false, "Download Beta IPSWs")
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
-	ipswCmd.Flags().BoolP("usb", "u", false, "Download IPSWs for USB attached iDevices")
-	ipswCmd.Flags().Bool("urls", false, "Dump URLs only")
+	ipswCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
+	ipswCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest-version", ipswCmd.Flags().Lookup("show-latest-version"))
@@ -70,8 +70,8 @@ func init() {
 	viper.BindPFlag("download.ipsw.beta", ipswCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
-	viper.BindPFlag("download.ipsw.usb", ipswCmd.Flags().Lookup("usb"))
 	viper.BindPFlag("download.ipsw.urls", ipswCmd.Flags().Lookup("urls"))
+	viper.BindPFlag("download.ipsw.usb", ipswCmd.Flags().Lookup("usb"))
 }
 
 // ipswCmd represents the ipsw command

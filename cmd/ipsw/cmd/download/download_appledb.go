@@ -50,6 +50,7 @@ func init() {
 	downloadAppledbCmd.Flags().String("api-token", "", "Github API Token")
 	downloadAppledbCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadAppledbCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
+	downloadAppledbCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 
 	viper.BindPFlag("download.appledb.os", downloadAppledbCmd.Flags().Lookup("os"))
 	viper.BindPFlag("download.appledb.kernel", downloadAppledbCmd.Flags().Lookup("kernel"))
@@ -61,6 +62,7 @@ func init() {
 	viper.BindPFlag("download.appledb.api-token", downloadAppledbCmd.Flags().Lookup("api-token"))
 	viper.BindPFlag("download.appledb.output", downloadAppledbCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.appledb.flat", downloadAppledbCmd.Flags().Lookup("flat"))
+	viper.BindPFlag("download.appledb.usb", downloadAppledbCmd.Flags().Lookup("usb"))
 
 	downloadAppledbCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
@@ -153,6 +155,15 @@ var downloadAppledbCmd = &cobra.Command{
 		var destPath string
 		if len(output) > 0 {
 			destPath = filepath.Clean(output)
+		}
+
+		if viper.GetBool("download.appledb.usb") {
+			dev, err := utils.PickDevice()
+			if err != nil {
+				return err
+			}
+			device = dev.ProductType
+			build = dev.BuildVersion
 		}
 
 		log.Info("Querying AppleDB...")
