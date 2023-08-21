@@ -152,11 +152,11 @@ var nonceCmd = &cobra.Command{
 
 		if readable {
 			if personalID != nil {
-				fmt.Printf("%s %d\n", color.New(color.Bold).Sprintf("ApBoardID: "), personalID["BoardId"])
-				fmt.Printf("%s %d\n", color.New(color.Bold).Sprintf("ApChipID:  "), personalID["ChipID"])
-				fmt.Printf("%s %d\n\n", color.New(color.Bold).Sprintf("ApECID:    "), personalID["UniqueChipID"])
+				fmt.Printf("%s %d\n", color.New(color.Faint, color.FgHiBlue).Sprintf("ApBoardID: "), personalID["BoardId"])
+				fmt.Printf("%s %d\n", color.New(color.Faint, color.FgHiBlue).Sprintf("ApChipID:  "), personalID["ChipID"])
+				fmt.Printf("%s %d\n", color.New(color.Faint, color.FgHiBlue).Sprintf("ApECID:    "), personalID["UniqueChipID"])
 			}
-			fmt.Println(color.New(color.Bold).Sprintf("Nonce:"))
+			fmt.Println(color.New(color.Faint, color.FgHiBlue).Sprintf("Nonce:"))
 			var out string
 			for i, c := range nonce {
 				if i > 0 && i%4 == 0 && i%24 != 0 {
