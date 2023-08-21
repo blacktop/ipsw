@@ -38,6 +38,7 @@ func init() {
 	SpringbCmd.AddCommand(idevSpringbWallpaperCmd)
 
 	idevSpringbWallpaperCmd.Flags().StringP("output", "o", "", "Folder to save wallpaper")
+	idevSpringbWallpaperCmd.MarkFlagDirname("output")
 }
 
 // idevSpringbWallpaperCmd represents the wallpaper command

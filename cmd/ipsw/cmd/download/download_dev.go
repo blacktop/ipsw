@@ -66,6 +66,7 @@ func init() {
 	viper.BindPFlag("download.dev.output", devCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.dev.vault-password", devCmd.Flags().Lookup("vault-password"))
 	devCmd.Flags().MarkHidden("kdk")
+	devCmd.MarkFlagDirname("output")
 	devCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")

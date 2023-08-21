@@ -36,6 +36,7 @@ func init() {
 	OtaCmd.AddCommand(extractCmd)
 
 	extractCmd.Flags().StringP("output", "o", "", "Output folder")
+	extractCmd.MarkFlagDirname("output")
 	viper.BindPFlag("ota.extract.output", extractCmd.Flags().Lookup("output"))
 }
 

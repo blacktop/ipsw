@@ -60,6 +60,7 @@ func init() {
 	kernelIdaCmd.Flags().StringP("log-file", "l", "", "IDA log file")
 	kernelIdaCmd.Flags().StringSliceP("extra-args", "e", []string{}, "IDA Pro CLI extra arguments")
 	kernelIdaCmd.Flags().StringP("output", "o", "", "Output folder")
+	kernelIdaCmd.MarkFlagDirname("output")
 	// kernelIdaCmd.Flags().String("slide", "", "kernelcache ASLR slide value (hexadecimal)")
 	kernelIdaCmd.Flags().BoolP("docker", "k", false, "Run IDA Pro in a docker container")
 	kernelIdaCmd.Flags().String("docker-image", "blacktop/idapro:8.2-pro", "IDA Pro docker image")

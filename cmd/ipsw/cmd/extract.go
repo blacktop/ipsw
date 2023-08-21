@@ -50,6 +50,7 @@ func init() {
 	extractCmd.Flags().BoolP("files", "f", false, "Extract File System files")
 	extractCmd.Flags().StringP("pattern", "p", "", "Extract files that match regex")
 	extractCmd.Flags().StringP("output", "o", "", "Folder to extract files to")
+	extractCmd.MarkFlagDirname("output")
 	extractCmd.Flags().Bool("flat", false, "Do NOT perserve directory structure when extracting")
 	extractCmd.Flags().BoolP("json", "j", false, "Output extracted paths as JSON")
 	extractCmd.Flags().StringArrayP("dyld-arch", "a", []string{}, "dyld_shared_cache architecture to extract")

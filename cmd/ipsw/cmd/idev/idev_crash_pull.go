@@ -42,6 +42,7 @@ func init() {
 	iDevCrashPullCmd.Flags().BoolP("all", "a", false, "Pull all crashlogs")
 	iDevCrashPullCmd.Flags().BoolP("rm", "r", false, "Remove crashlogs after pulling")
 	iDevCrashPullCmd.Flags().StringP("output", "o", "", "Folder to save crashlogs")
+	iDevCrashPullCmd.MarkFlagDirname("output")
 }
 
 // iDevCrashPullCmd represents the pull command

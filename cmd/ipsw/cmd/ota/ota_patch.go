@@ -45,6 +45,7 @@ func init() {
 
 	patchCmd.Flags().StringP("input", "i", "", "Input folder")
 	patchCmd.Flags().StringP("output", "o", "", "Output folder")
+	patchCmd.MarkFlagDirname("input")
 	viper.BindPFlag("ota.patch.input", patchCmd.Flags().Lookup("input"))
 	viper.BindPFlag("ota.patch.output", patchCmd.Flags().Lookup("output"))
 }

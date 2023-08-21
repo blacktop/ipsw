@@ -56,6 +56,7 @@ func init() {
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	ipswCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	ipswCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
+	ipswCmd.MarkFlagDirname("output")
 
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest-version", ipswCmd.Flags().Lookup("show-latest-version"))

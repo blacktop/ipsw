@@ -38,6 +38,7 @@ import (
 func init() {
 	DownloadCmd.AddCommand(downloadKdkCmd)
 	downloadKdkCmd.Flags().StringP("output", "o", "", "Folder to download files to")
+	downloadKdkCmd.MarkFlagDirname("output")
 	downloadKdkCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")

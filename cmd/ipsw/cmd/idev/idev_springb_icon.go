@@ -38,6 +38,7 @@ func init() {
 	SpringbCmd.AddCommand(idevSpringbIconCmd)
 
 	idevSpringbIconCmd.Flags().StringP("output", "o", "", "Folder to save icon")
+	idevSpringbIconCmd.MarkFlagDirname("output")
 }
 
 // idevSpringbIconCmd represents the icon command

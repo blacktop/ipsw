@@ -52,6 +52,7 @@ func init() {
 	pongoCmd.Flags().BoolP("remote", "r", false, "Use remote IPSW")
 	pongoCmd.Flags().BoolP("decrypt", "d", false, "Extract and decrypt im4p files")
 	pongoCmd.Flags().StringP("output", "o", "", "Folder to write JSON to")
+	pongoCmd.MarkFlagDirname("output")
 	viper.BindPFlag("pongo.proxy", pongoCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("pongo.insecure", pongoCmd.Flags().Lookup("insecure"))
 	viper.BindPFlag("pongo.remote", pongoCmd.Flags().Lookup("remote"))

@@ -52,6 +52,7 @@ func init() {
 	nonceCmd.Flags().StringP("mail", "m", "", "QR mailto address")
 	nonceCmd.Flags().StringP("subject", "s", "Device Nonce Info", "QR mailto subject")
 	nonceCmd.Flags().StringP("output", "o", "", "Folder to write QR code PNG to")
+	nonceCmd.MarkFlagDirname("output")
 }
 
 // nonceCmd represents the nonce command
