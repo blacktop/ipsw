@@ -46,6 +46,7 @@ func init() {
 
 	PcapCmd.Flags().StringP("proc", "p", "", "process to get pcap for")
 	PcapCmd.Flags().StringP("output", "o", "", "Folder to save pcap")
+	PcapCmd.MarkFlagDirname("output")
 }
 
 // PcapCmd represents the pcap command

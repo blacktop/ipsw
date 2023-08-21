@@ -39,6 +39,7 @@ func init() {
 	IDevCmd.AddCommand(FetchsymsCmd)
 
 	FetchsymsCmd.Flags().StringP("output", "o", "", "Folder to save files")
+	FetchsymsCmd.MarkFlagDirname("output")
 }
 
 // FetchsymsCmd represents the fetchsyms command

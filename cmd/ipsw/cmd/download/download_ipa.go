@@ -43,6 +43,7 @@ func init() {
 	ipaCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipaCmd.Flags().StringP("store-front", "s", "US", "The country code for the App Store to download from")
 	ipaCmd.Flags().StringP("vault-password", "k", "", "Password to unlock credential vault (only for file vaults)")
+	ipaCmd.MarkFlagDirname("output")
 	viper.BindPFlag("download.ipa.sms", ipaCmd.Flags().Lookup("sms"))
 	viper.BindPFlag("download.ipa.search", ipaCmd.Flags().Lookup("search"))
 	viper.BindPFlag("download.ipa.output", ipaCmd.Flags().Lookup("output"))

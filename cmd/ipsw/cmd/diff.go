@@ -37,6 +37,7 @@ func init() {
 	diffCmd.Flags().Bool("html", false, "Save diff as HTML file")
 	diffCmd.Flags().StringArrayP("kdk", "k", []string{}, "Path to KDKs to diff")
 	diffCmd.Flags().StringP("output", "o", "", "Folder to save diff output")
+	diffCmd.MarkFlagDirname("output")
 	viper.BindPFlag("diff.title", diffCmd.Flags().Lookup("title"))
 	viper.BindPFlag("diff.html", diffCmd.Flags().Lookup("html"))
 	viper.BindPFlag("diff.kdk", diffCmd.Flags().Lookup("kdk"))

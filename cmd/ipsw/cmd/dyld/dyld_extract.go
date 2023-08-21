@@ -100,6 +100,7 @@ func init() {
 	// dyldExtractCmd.Flags().Bool("imports", false, "Add imported dylibs sym into to extracted symtab (will make BIG symtabs)")
 	dyldExtractCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
 	dyldExtractCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	dyldExtractCmd.MarkFlagDirname("output")
 	viper.BindPFlag("dyld.extract.all", dyldExtractCmd.Flags().Lookup("all"))
 	viper.BindPFlag("dyld.extract.force", dyldExtractCmd.Flags().Lookup("force"))
 	viper.BindPFlag("dyld.extract.slide", dyldExtractCmd.Flags().Lookup("slide"))

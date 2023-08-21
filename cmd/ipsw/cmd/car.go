@@ -35,6 +35,7 @@ func init() {
 	rootCmd.AddCommand(carCmd)
 	carCmd.Flags().BoolP("export", "x", false, "Export all renditions")
 	carCmd.Flags().StringP("output", "o", "", "Output folder to save renditions")
+	carCmd.MarkFlagDirname("output")
 	viper.BindPFlag("car.export", carCmd.Flags().Lookup("export"))
 	viper.BindPFlag("car.output", carCmd.Flags().Lookup("output"))
 }

@@ -46,9 +46,10 @@ func init() {
 	idevImgPersonCmd.Flags().Uint64P("chip-id", "c", 0, "Device ApChipID")
 	idevImgPersonCmd.Flags().Uint64P("ecid", "e", 0, "Device ApECID")
 	idevImgPersonCmd.Flags().StringP("nonce", "n", "", "Device ApNonce")
-	idevImgPersonCmd.Flags().StringP("output", "o", "", "Folder to write signature to")
 	idevImgPersonCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	idevImgPersonCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	idevImgPersonCmd.Flags().StringP("output", "o", "", "Folder to write signature to")
+	idevImgPersonCmd.MarkFlagDirname("output")
 
 	viper.BindPFlag("idev.img.person.xcode", idevImgPersonCmd.Flags().Lookup("xcode"))
 	viper.BindPFlag("idev.img.person.manifest", idevImgPersonCmd.Flags().Lookup("manifest"))

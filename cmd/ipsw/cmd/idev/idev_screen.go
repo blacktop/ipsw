@@ -39,6 +39,7 @@ func init() {
 	IDevCmd.AddCommand(ScreenCmd)
 
 	ScreenCmd.Flags().StringP("output", "o", "", "Folder to save screenshot(s)")
+	ScreenCmd.MarkFlagDirname("output")
 }
 
 func saveScreenshot(dev *lockdownd.DeviceValues, destPath string) error {

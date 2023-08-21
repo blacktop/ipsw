@@ -76,6 +76,7 @@ func init() {
 	viper.BindPFlag("download.wiki.flat", wikiCmd.Flags().Lookup("flat"))
 
 	wikiCmd.MarkFlagsMutuallyExclusive("ipsw", "ota")
+	wikiCmd.MarkFlagDirname("output")
 }
 
 // wikiCmd represents the wiki command

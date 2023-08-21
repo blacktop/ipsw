@@ -36,6 +36,7 @@ import (
 func init() {
 	ProvCmd.AddCommand(provDumpCmd)
 	provDumpCmd.Flags().StringP("output", "o", "", "Folder to save profiles(s)")
+	provDumpCmd.MarkFlagDirname("output")
 }
 
 // provDumpCmd represents the dump command

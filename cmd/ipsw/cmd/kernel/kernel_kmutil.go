@@ -44,6 +44,7 @@ func init() {
 	kernelKmutilCmd.Flags().BoolP("explicit-only", "x", false, "Format output to be used as -x arg to kmutil create")
 	kernelKmutilCmd.Flags().BoolP("json", "j", false, "Output as JSON")
 	kernelKmutilCmd.Flags().StringP("output", "o", "", "Output folder")
+	kernelKmutilCmd.MarkFlagDirname("output")
 	viper.BindPFlag("kernel.kmutil.filter", kernelKmutilCmd.Flags().Lookup("filter"))
 	viper.BindPFlag("kernel.kmutil.explicit-only", kernelKmutilCmd.Flags().Lookup("explicit-only"))
 	viper.BindPFlag("kernel.kmutil.json", kernelKmutilCmd.Flags().Lookup("json"))

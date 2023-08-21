@@ -44,6 +44,7 @@ func init() {
 	gitCmd.Flags().StringP("api", "a", "", "Github API Token")
 	gitCmd.Flags().Bool("json", false, "Output downloadable tar.gz URLs as JSON")
 	gitCmd.Flags().Bool("webkit", false, "Get WebKit tags")
+	gitCmd.MarkFlagDirname("output")
 	gitCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")
