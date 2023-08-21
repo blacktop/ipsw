@@ -22,12 +22,17 @@ THE SOFTWARE.
 package idev
 
 import (
+	"crypto/sha512"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
 	semver "github.com/hashicorp/go-version"
@@ -38,22 +43,30 @@ import (
 func init() {
 	ImgCmd.AddCommand(idevImgMountCmd)
 
-	idevImgMountCmd.Flags().StringP("xcode", "x", "/Applications/Xcode.app", "Path to Xcode.app")
-	idevImgMountCmd.Flags().StringP("image-type", "t", "Developer", "Image type to mount")
-	idevImgMountCmd.Flags().StringP("trust-cache", "c", "", "Cryptex trust cache to use")
-	idevImgMountCmd.Flags().StringP("info-plist", "i", "", "Cryptex Info.plist to use")
+	idevImgMountCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app (i.e. /Applications/Xcode.app)")
+	idevImgMountCmd.Flags().StringP("ddi-img", "d", "", "DDI.dmg to mount")
+	idevImgMountCmd.Flags().StringP("trustcache", "c", "", "trustcache to use")
+	idevImgMountCmd.Flags().StringP("manifest", "m", "", "BuildManifest.plist to use")
+	idevImgMountCmd.Flags().StringP("signature", "s", "", "Image signature to use")
+	idevImgMountCmd.Flags().StringP("image-type", "t", "", "Image type to mount (i.e. Developer)")
+	idevImgMountCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	idevImgMountCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 
 	viper.BindPFlag("idev.img.mount.xcode", idevImgMountCmd.Flags().Lookup("xcode"))
+	viper.BindPFlag("idev.img.mount.ddi-img", idevImgMountCmd.Flags().Lookup("ddi-img"))
+	viper.BindPFlag("idev.img.mount.trustcache", idevImgMountCmd.Flags().Lookup("trustcache"))
+	viper.BindPFlag("idev.img.mount.manifest", idevImgMountCmd.Flags().Lookup("manifest"))
+	viper.BindPFlag("idev.img.mount.signature", idevImgMountCmd.Flags().Lookup("signature"))
 	viper.BindPFlag("idev.img.mount.image-type", idevImgMountCmd.Flags().Lookup("image-type"))
-	viper.BindPFlag("idev.img.mount.trust-cache", idevImgMountCmd.Flags().Lookup("trust-cache"))
-	viper.BindPFlag("idev.img.mount.info-plist", idevImgMountCmd.Flags().Lookup("info-plist"))
+	viper.BindPFlag("idev.img.mount.proxy", idevImgMountCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("idev.img.mount.insecure", idevImgMountCmd.Flags().Lookup("insecure"))
 }
 
 // idevImgMountCmd represents the mount command
 var idevImgMountCmd = &cobra.Command{
-	Use:           "mount <image> <signature>",
+	Use:           "mount",
 	Short:         "Mount an image",
-	Args:          cobra.MaximumNArgs(2),
+	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,18 +74,25 @@ var idevImgMountCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-
+		// flags
 		udid, _ := cmd.Flags().GetString("udid")
 		xcode := viper.GetString("idev.img.mount.xcode")
+		dmgPath := viper.GetString("idev.img.mount.ddi-img")
+		trustcachePath := viper.GetString("idev.img.mount.trustcache")
+		manifestPath := viper.GetString("idev.img.mount.manifest")
+		signaturePath := viper.GetString("idev.img.mount.signature")
 		imageType := viper.GetString("idev.img.mount.image-type")
-		trustCache := viper.GetString("idev.img.mount.trust-cache")
-		infoPlist := viper.GetString("idev.img.mount.info-plist")
-
-		if !utils.StrSliceContains([]string{"Developer", "Cryptex"}, imageType) {
-			return fmt.Errorf("invalid --image-type: %s (must be Developer or Cryptex)", imageType)
+		// verify flags
+		if xcode != "" && (dmgPath != "" || trustcachePath != "" || manifestPath != "") {
+			return fmt.Errorf("cannot specify both --xcode AND ('--ddi-img' OR '--trust-cache' OR '--manifest')")
+		} else if xcode == "" && (dmgPath == "" && trustcachePath == "" && manifestPath == "") {
+			return fmt.Errorf("must specify either --xcode OR ('--ddi-img' AND '--trustcache' AND '--manifest')")
 		}
-		if imageType == "Developer" && (len(trustCache) > 0 || len(infoPlist) > 0) {
-			return fmt.Errorf("invalid flags --trust-cache or --info-plist (not allowed when --image-type=Developer)")
+		if !utils.StrSliceContains([]string{"Developer", "Cryptex", "Personalized"}, imageType) {
+			return fmt.Errorf("invalid --image-type: %s (must be Developer, Cryptex or Personalized)", imageType)
+		}
+		if imageType == "Developer" && (len(trustcachePath) > 0 || len(manifestPath) > 0) {
+			return fmt.Errorf("invalid flags --trustcache or --manifest (not allowed when --image-type=Developer)")
 		}
 
 		var err error
@@ -94,61 +114,175 @@ var idevImgMountCmd = &cobra.Command{
 			ldc.Close()
 		}
 
-		cli, err := mount.NewClient(dev.UniqueDeviceID)
+		ver, err := semver.NewVersion(dev.ProductVersion) // check
 		if err != nil {
-			return fmt.Errorf("failed to connect to mobile_image_mounter: %w", err)
-		}
-		defer cli.Close()
-
-		if _, err := cli.LookupImage(imageType); err == nil {
-			log.Warnf("image type %s already mounted", imageType)
-			return nil
+			return fmt.Errorf("failed to convert version into semver object")
 		}
 
-		var imgData []byte
-		var sigData []byte
+		if ver.LessThan(semver.Must(semver.NewVersion("17.0"))) {
+			cli, err := mount.NewClient(dev.UniqueDeviceID)
+			if err != nil {
+				return fmt.Errorf("failed to connect to mobile_image_mounter: %w", err)
+			}
+			defer cli.Close()
 
-		if len(args) == 0 {
-			version, err := semver.NewVersion(dev.ProductVersion)
-			if err != nil {
-				log.Fatal("failed to convert version into semver object")
+			if _, err := cli.LookupImage(imageType); err == nil {
+				log.Warnf("image type %s already mounted", imageType)
+				return nil
 			}
-			imgData, err = os.ReadFile(
-				filepath.Join(xcode,
-					fmt.Sprintf("/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/%d.%d/DeveloperDiskImage.dmg",
-						version.Segments()[0],
-						version.Segments()[1],
-					)))
-			if err != nil {
-				return fmt.Errorf("failed to read DeveloperDiskImage.dmg: %w", err)
-			}
-			sigData, err = os.ReadFile(
-				filepath.Join(xcode,
-					fmt.Sprintf("/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/%d.%d/DeveloperDiskImage.dmg.signature",
-						version.Segments()[0],
-						version.Segments()[1],
-					)))
-			if err != nil {
-				return fmt.Errorf("failed to read DeveloperDiskImage.dmg.signature: %w", err)
-			}
-		} else {
-			imgData, err = os.ReadFile(args[0])
-			if err != nil {
-				return fmt.Errorf("failed to read image: %w", err)
-			}
-			sigData, err = os.ReadFile(args[1])
-			if err != nil {
-				return fmt.Errorf("failed to read image: %w", err)
-			}
-		}
 
-		log.Infof("Uploading %s image", imageType)
-		if err := cli.Upload(imageType, imgData, sigData); err != nil {
-			return fmt.Errorf("failed to upload image: %w", err)
-		}
-		log.Infof("Mounting %s image", imageType)
-		if err := cli.Mount(imageType, sigData, trustCache, infoPlist); err != nil {
-			return fmt.Errorf("failed to mount image: %w", err)
+			var imgData []byte
+			var sigData []byte
+
+			if len(args) == 0 {
+				version, err := semver.NewVersion(dev.ProductVersion)
+				if err != nil {
+					log.Fatal("failed to convert version into semver object")
+				}
+				imgData, err = os.ReadFile(
+					filepath.Join(xcode,
+						fmt.Sprintf("/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/%d.%d/DeveloperDiskImage.dmg",
+							version.Segments()[0],
+							version.Segments()[1],
+						)))
+				if err != nil {
+					return fmt.Errorf("failed to read DeveloperDiskImage.dmg: %w", err)
+				}
+				sigData, err = os.ReadFile(
+					filepath.Join(xcode,
+						fmt.Sprintf("/Contents/Developer/Platforms/iPhoneOS.platform/DeviceSupport/%d.%d/DeveloperDiskImage.dmg.signature",
+							version.Segments()[0],
+							version.Segments()[1],
+						)))
+				if err != nil {
+					return fmt.Errorf("failed to read DeveloperDiskImage.dmg.signature: %w", err)
+				}
+			} else {
+				imgData, err = os.ReadFile(dmgPath)
+				if err != nil {
+					return fmt.Errorf("failed to read image '%s': %w", dmgPath, err)
+				}
+				sigData, err = os.ReadFile(signaturePath)
+				if err != nil {
+					return fmt.Errorf("failed to read signature '%s': %w", signaturePath, err)
+				}
+			}
+
+			log.Infof("Uploading %s image", imageType)
+			if err := cli.Upload(imageType, imgData, sigData); err != nil {
+				return fmt.Errorf("failed to upload image: %w", err)
+			}
+			log.Infof("Mounting %s image", imageType)
+			if err := cli.Mount(imageType, sigData, trustcachePath, manifestPath); err != nil {
+				return fmt.Errorf("failed to mount image: %w", err)
+			}
+		} else { // NEW iOS17 DDIs need to be personalized
+			var buildManifest *plist.BuildManifest
+
+			imageType = "Personalized"
+
+			if len(dmgPath) == 0 {
+				ddiDMG := filepath.Join(xcode, "/Contents/Resources/CoreDeviceDDIs/iOS_DDI.dmg")
+				if _, err := os.Stat(ddiDMG); errors.Is(err, os.ErrNotExist) {
+					return fmt.Errorf("failed to find iOS_DDI.dmg in '%s' (install NEW XCode.app or Xcode-beta.app)", xcode)
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Mounting %s", ddiDMG))
+				mountPoint, alreadyMounted, err := utils.MountDMG(ddiDMG)
+				if err != nil {
+					return fmt.Errorf("failed to mount iOS_DDI.dmg: %w", err)
+				}
+				if alreadyMounted {
+					utils.Indent(log.Info, 3)(fmt.Sprintf("%s already mounted", ddiDMG))
+				} else {
+					defer func() {
+						utils.Indent(log.Debug, 2)(fmt.Sprintf("Unmounting %s", ddiDMG))
+						if err := utils.Retry(3, 2*time.Second, func() error {
+							return utils.Unmount(mountPoint, false)
+						}); err != nil {
+							log.Errorf("failed to unmount %s at %s: %v", ddiDMG, mountPoint, err)
+						}
+					}()
+				}
+				manifestPath := filepath.Join(mountPoint, "Restore/BuildManifest.plist")
+				manifestData, err := os.ReadFile(manifestPath)
+				if err != nil {
+					return fmt.Errorf("failed to read BuildManifest.plist: %w", err)
+				}
+				buildManifest, err = plist.ParseBuildManifest(manifestData)
+				if err != nil {
+					return fmt.Errorf("failed to parse BuildManifest.plist: %w", err)
+				}
+				trustcachePath = filepath.Join(mountPoint, "Restore", buildManifest.BuildIdentities[0].Manifest["LoadableTrustCache"].Info["Path"].(string))
+				dmgPath = filepath.Join(mountPoint, "Restore", buildManifest.BuildIdentities[0].Manifest["PersonalizedDMG"].Info["Path"].(string))
+			}
+
+			if len(manifestPath) > 0 {
+				manifestData, err := os.ReadFile(manifestPath)
+				if err != nil {
+					return fmt.Errorf("failed to read BuildManifest.plist: %w", err)
+				}
+				buildManifest, err = plist.ParseBuildManifest(manifestData)
+				if err != nil {
+					return fmt.Errorf("failed to parse BuildManifest.plist: %w", err)
+				}
+			}
+
+			cli, err := mount.NewClient(dev.UniqueDeviceID)
+			if err != nil {
+				return fmt.Errorf("failed to connect to mobile_image_mounter: %w", err)
+			}
+			defer cli.Close()
+
+			if _, err := cli.LookupImage(imageType); err == nil {
+				log.Warnf("image type %s already mounted", imageType)
+				return nil
+			}
+
+			imgData, err := os.ReadFile(dmgPath)
+			if err != nil {
+				return fmt.Errorf("failed to read PersonalizedDMG: %w", err)
+			}
+
+			var sigData []byte
+			if len(signaturePath) > 0 {
+				sigData, err = os.ReadFile(signaturePath)
+				if err != nil {
+					return fmt.Errorf("failed to read signature '%s': %w", signaturePath, err)
+				}
+			} else {
+				digest := sha512.Sum384(imgData)
+				sigData, err = cli.PersonalizationManifest("DeveloperDiskImage", digest[:])
+				if err != nil {
+					log.Debugf("failed to get personalization manifest: %w", err)
+
+					nonce, err := cli.Nonce("DeveloperDiskImage")
+					if err != nil {
+						return fmt.Errorf("failed to get nonce: %w", err)
+					}
+
+					personalID, err := cli.PersonalizationIdentifiers("")
+					if err != nil {
+						log.Errorf("failed to get personalization identifiers: %v ('personalization' might not be supported on this device)", err)
+					}
+
+					sigData, err = tss.Personalize(&tss.PersonalConfig{
+						Proxy:         viper.GetString("idev.img.mount.proxy"),
+						Insecure:      viper.GetBool("idev.img.mount.insecure"),
+						PersonlID:     personalID,
+						BuildManifest: buildManifest,
+						Nonce:         nonce,
+					})
+				}
+			}
+
+			log.Infof("Uploading %s image", imageType)
+			if err := cli.Upload(imageType, imgData, sigData); err != nil {
+				return fmt.Errorf("failed to upload image: %w", err)
+			}
+			log.Infof("Mounting %s image", imageType)
+			if err := cli.Mount(imageType, sigData, trustcachePath, manifestPath); err != nil {
+				return fmt.Errorf("failed to mount image: %w", err)
+			}
 		}
 
 		return nil

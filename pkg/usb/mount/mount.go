@@ -75,9 +75,9 @@ func (e ListImageEntryList) String() string {
 			"SupportsContentProtection: %t\n",
 		e.BackingImage,
 		hex.EncodeToString(e.ImageSignature),
-		e.DeviceNode,
-		e.DeviceType,
 		e.DiskImageType,
+		e.DeviceType,
+		e.DeviceNode,
 		e.FilesystemType,
 		e.MountPath,
 		e.IsMounted,
@@ -146,7 +146,10 @@ func (c *Client) Upload(imageType string, imageData []byte, signature []byte) er
 	}
 
 	if resp.Status != "ReceiveBytesAck" {
-		return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		if len(resp.DetailedError) > 0 {
+			return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		}
+		return fmt.Errorf("%s", resp.Error)
 	}
 
 	if err := binary.Write(c.c.Conn(), binary.BigEndian, imageData); err != nil {
@@ -158,7 +161,10 @@ func (c *Client) Upload(imageType string, imageData []byte, signature []byte) er
 	}
 
 	if resp.Status != "Complete" {
-		return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		if len(resp.DetailedError) > 0 {
+			return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		}
+		return fmt.Errorf("%s", resp.Error)
 	}
 
 	return nil
@@ -174,25 +180,32 @@ func (c *Client) Mount(imageType string, signature []byte, trustCachePath, infoP
 		ImageType:      imageType,
 		ImageSignature: signature,
 	}
-	if imageType == ImageTypeCryptex {
+
+	if trustCachePath != "" {
 		trustCache, err := os.ReadFile(trustCachePath)
 		if err != nil {
-			return fmt.Errorf("failed to read %s: %v", trustCachePath, err)
+			return fmt.Errorf("failed to read trustcache %s: %v", trustCachePath, err)
 		}
 		req.ImageTrustCache = trustCache
+	}
+	if infoPlistPath != "" {
 		infoPlist, err := os.ReadFile(infoPlistPath)
 		if err != nil {
-			return fmt.Errorf("failed to read %s: %v", infoPlistPath, err)
+			return fmt.Errorf("failed to read info plist %s: %v", infoPlistPath, err)
 		}
 		req.ImageInfoPlist = infoPlist
 	}
+
 	resp := &MountResponse{}
 	if err := c.c.Request(req, resp); err != nil {
 		return err
 	}
 
 	if resp.Status != "Complete" {
-		return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		if len(resp.DetailedError) > 0 {
+			return fmt.Errorf("%s: %s", resp.Error, resp.DetailedError)
+		}
+		return fmt.Errorf("%s", resp.Error)
 	}
 
 	return nil
@@ -278,7 +291,7 @@ func (c *Client) PersonalizationIdentifiers(imageType string) (map[string]any, e
 	return ids.(map[string]any), nil
 }
 
-func (c *Client) PersonalizationManifest(imageType string, signature []byte) (map[string]any, error) {
+func (c *Client) PersonalizationManifest(imageType string, signature []byte) ([]byte, error) {
 	var resp map[string]any
 	if err := c.c.Request(&map[string]any{
 		"Command":               "QueryPersonalizationManifest",
@@ -289,14 +302,18 @@ func (c *Client) PersonalizationManifest(imageType string, signature []byte) (ma
 		return nil, err
 	}
 	if err, ok := resp["Error"]; ok {
-		return nil, fmt.Errorf("%s: %s", err, resp["DetailedError"])
+		if detail, ok := resp["DetailedError"]; ok {
+			return nil, fmt.Errorf("%s: %s", err, detail)
+		}
+		return nil, fmt.Errorf("%s", err)
 	}
+
 	manifest, ok := resp["ImageSignature"]
 	if !ok {
 		return nil, fmt.Errorf("device does not support QueryPersonalizationManifest")
 	}
 
-	return manifest.(map[string]any), nil
+	return manifest.([]byte), nil
 }
 
 func (c *Client) RollPersonalizationNonce() error {

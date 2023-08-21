@@ -228,7 +228,7 @@ func (p *Plists) GetOSType() string {
 
 func (p *Plists) GetKernelType(name string) string {
 	for _, bID := range p.BuildManifest.BuildIdentities {
-		if strings.EqualFold(bID.Manifest["KernelCache"].Info.Path, name) {
+		if strings.EqualFold(bID.Manifest["KernelCache"].Info["Path"].(string), name) {
 			return bID.Info.VariantContents["InstalledKernelCache"]
 		}
 	}

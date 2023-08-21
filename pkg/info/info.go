@@ -313,7 +313,7 @@ func (i *Info) GetAppOsDmg() (string, error) {
 	if i.Plists != nil && i.Plists.BuildManifest != nil {
 		for _, bi := range i.Plists.BuildIdentities {
 			if appOS, ok := bi.Manifest["Cryptex1,AppOS"]; ok {
-				dmgs = append(dmgs, appOS.Info.Path)
+				dmgs = append(dmgs, appOS.Info["Path"].(string))
 			}
 		}
 		dmgs = utils.Unique(dmgs)
@@ -334,7 +334,7 @@ func (i *Info) GetSystemOsDmg() (string, error) {
 	if i.Plists != nil && i.Plists.BuildManifest != nil {
 		for _, bi := range i.Plists.BuildIdentities {
 			if sysOS, ok := bi.Manifest["Cryptex1,SystemOS"]; ok {
-				return sysOS.Info.Path, nil
+				return sysOS.Info["Path"].(string), nil
 			}
 		}
 		dmgs = utils.Unique(dmgs)
@@ -355,7 +355,7 @@ func (i *Info) GetFileSystemOsDmg() (string, error) {
 	if i.Plists != nil && i.Plists.BuildManifest != nil {
 		for _, bi := range i.Plists.BuildIdentities {
 			if fsOS, ok := bi.Manifest["OS"]; ok {
-				dmgs = append(dmgs, fsOS.Info.Path)
+				dmgs = append(dmgs, fsOS.Info["Path"].(string))
 			}
 		}
 		dmgs = utils.Unique(dmgs)
@@ -376,7 +376,7 @@ func (i *Info) GetRestoreRamDiskDmgs() ([]string, error) {
 	if i.Plists != nil && i.Plists.BuildManifest != nil {
 		for _, bi := range i.Plists.BuildIdentities {
 			if rrdisk, ok := bi.Manifest["RestoreRamDisk"]; ok {
-				dmgs = append(dmgs, rrdisk.Info.Path)
+				dmgs = append(dmgs, rrdisk.Info["Path"].(string))
 			}
 		}
 		dmgs = utils.Unique(dmgs)
@@ -469,8 +469,8 @@ func (i *Info) getManifestPaths() map[string][]string {
 
 	for _, bID := range i.Plists.BuildIdentities {
 		for _, manifest := range bID.Manifest {
-			if len(manifest.Info.Path) > 0 {
-				files[bID.Info.DeviceClass] = append(files[bID.Info.DeviceClass], manifest.Info.Path)
+			if len(manifest.Info["Path"].(string)) > 0 {
+				files[bID.Info.DeviceClass] = append(files[bID.Info.DeviceClass], manifest.Info["Path"].(string))
 			}
 		}
 	}

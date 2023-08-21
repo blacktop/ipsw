@@ -1,0 +1,385 @@
+package tss
+
+import (
+	"bytes"
+	"crypto/rand"
+	"crypto/tls"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/apex/log"
+	"github.com/blacktop/go-plist"
+	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
+	info "github.com/blacktop/ipsw/pkg/plist"
+	"github.com/google/uuid"
+)
+
+// NOTES:
+// - https://github.com/Neal/savethemblobs
+// - https://github.com/tihmstar/tsschecker
+// - https://www.theiphonewiki.com/wiki/SHSH
+// - https://www.theiphonewiki.com/wiki/SHSH_Protocol
+// - https://tsssaver.1conan.com/v2/
+// - https://api.ineal.me/tss/docs
+
+const (
+	tssControllerActionURL = "http://gs.apple.com/TSS/controller?action=2"
+	tssClientVersion       = "libauthinstall-973.0.1"
+)
+
+// Request is the request sent to the TSS server
+type Request struct {
+	ApImg4Ticket              bool   `plist:"@ApImg4Ticket,omitempty"`
+	BBTicket                  bool   `plist:"@BBTicket,omitempty"`
+	HostPlatformInfo          string `plist:"@HostPlatformInfo,omitempty"`
+	Locality                  string `plist:"@Locality,omitempty"`
+	VersionInfo               string `plist:"@VersionInfo,omitempty"` // = libauthinstall-850.0.1.0.1 ( /usr/lib/libauthinstall.dylib)
+	ApBoardID                 uint64 `plist:"ApBoardID,omitempty"`
+	ApChipID                  uint64 `plist:"ApChipID,omitempty"`
+	ApECID                    uint64 `plist:"ApECID,omitempty"`
+	ApNonce                   []byte `plist:"ApNonce,omitempty"`
+	ApProductionMode          bool   `plist:"ApProductionMode,omitempty"`
+	ApSecurityDomain          int    `plist:"ApSecurityDomain,omitempty"` // = 1
+	ApSecurityMode            bool   `plist:"ApSecurityMode,omitempty"`
+	PearlCertificationRootPub []byte `plist:"PearlCertificationRootPub,omitempty"`
+	UniqueBuildID             []byte `plist:"UniqueBuildID,omitempty"`
+	SepNonce                  []byte `plist:"SepNonce,omitempty"`
+	UID_MODE                  bool   `plist:"UID_MODE"`
+	UUID                      string `plist:"@UUID,omitempty"`
+	// Personalize
+	LoadableTrustCache info.IdentityManifest `plist:"LoadableTrustCache,omitempty"`
+	PersonalizedDMG    info.IdentityManifest `plist:"PersonalizedDMG,omitempty"`
+}
+
+// Response is the response from the TSS server
+type Response struct {
+	Status  int
+	Message string
+	Plist   string
+}
+
+// Blob is the TSS response blob with ApImg4Ticket
+type Blob struct {
+	ServerVersion string `plist:"@ServerVersion,omitempty"`
+	ApImg4Ticket  []byte `plist:"ApImg4Ticket,omitempty"`
+}
+
+func randomHex(n int) ([]byte, error) {
+	b := make([]byte, n)
+	if _, err := rand.Read(b); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func randomHexStr(n int) (string, error) {
+	bytes := make([]byte, n)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func GetTSSResponse(version, proxy string, insecure bool) (*Blob, error) {
+	sepNonce, err := randomHex(20)
+	if err != nil {
+		return nil, err
+	}
+
+	apNonce, err := randomHex(32)
+	if err != nil {
+		return nil, err
+	}
+
+	// build, err := download.GetBuildID(version, "iPhone10,3")
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// ipsw, err := download.GetIPSW("iPhone10,3", build)
+	// zr, err := download.NewRemoteZipReader(ipsw.URL, &download.RemoteConfig{
+	// 	Proxy:    proxy,
+	// 	Insecure: insecure,
+	// })
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to parse remote ipsw: %v", err)
+	// }
+
+	// info, err := info.ParseZipFiles(zr.File)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to parse remote ipsw info: %v", err)
+	// }
+
+	tssReq := Request{
+		ApImg4Ticket:     true,
+		BBTicket:         true,
+		HostPlatformInfo: "mac",
+		Locality:         "en_US",
+		VersionInfo:      "libauthinstall-850.0.1.0.1",
+		ApBoardID:        6,                // device.ApBoardID
+		ApChipID:         32789,            // device.ApChipID
+		ApECID:           6303405673529390, // device.ApECID
+		ApNonce:          apNonce,          // device.ApNonce
+		ApProductionMode: true,             // device.EPRO
+		ApSecurityDomain: 1,                // device.ApSecurityDomain
+		ApSecurityMode:   true,             // device.ESEC
+		SepNonce:         sepNonce,
+		// UniqueBuildID:             info.Plists.BuildManifest.BuildIdentities[1].UniqueBuildID,
+		// PearlCertificationRootPub: info.Plists.BuildManifest.BuildIdentities[1].PearlCertificationRootPub,
+	}
+	trdata, err := plist.Marshal(tssReq, plist.XMLFormat)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", tssControllerActionURL, bytes.NewBuffer(trdata))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create https request: %v", err)
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Content-type", "text/xml; charset=\"utf-8\"")
+	req.Header.Add("User-Agent", utils.RandomAgent())
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           download.GetProxy(proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to connect to URL: got status %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var tr Response
+	for _, field := range strings.Split(string(body), "&") {
+		key, value, ok := strings.Cut(field, "=")
+		if !ok {
+			log.Error("failed to parse response field")
+			continue
+		}
+		switch key {
+		case "STATUS":
+			sInt, err := strconv.Atoi(value)
+			if err != nil {
+				return nil, err
+			}
+			tr.Status = sInt
+		case "MESSAGE":
+			tr.Message = value
+		case "REQUEST_STRING":
+			tr.Plist = value
+		}
+	}
+
+	log.WithFields(log.Fields{
+		"status":      tr.Status,
+		"message":     tr.Message,
+		"request_len": len(tr.Plist),
+	}).Debug("TSS Response")
+
+	if tr.Status == 0 && tr.Message == "SUCCESS" {
+		var blob Blob
+		if err := plist.NewDecoder(strings.NewReader(tr.Plist)).Decode(&blob); err != nil {
+			return nil, fmt.Errorf("failed to decode TSS request string: %v", err)
+		}
+		// TODO: parse response body as plist and get `ApImg4Ticket`
+		return &blob, nil
+	}
+
+	return nil, fmt.Errorf("failed to get TSS blob: %s", tr.Message)
+}
+
+// PersonalConfig is the config for personalizing a TSS blob
+type PersonalConfig struct {
+	Proxy         string
+	Insecure      bool
+	PersonlID     map[string]any
+	BuildManifest *info.BuildManifest
+	Nonce         string
+}
+
+// Personalize returns a personalized TSS blob
+func Personalize(conf *PersonalConfig) ([]byte, error) {
+	nonce, err := hex.DecodeString(conf.Nonce)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode nonce hex-string: %v", err)
+	}
+
+	tssReq := Request{
+		UUID:             uuid.New().String(),
+		ApImg4Ticket:     true,
+		BBTicket:         true,
+		HostPlatformInfo: "mac",
+		VersionInfo:      tssClientVersion,
+		ApBoardID:        conf.PersonlID["BoardId"].(uint64),
+		ApChipID:         conf.PersonlID["ChipID"].(uint64),
+		ApECID:           conf.PersonlID["UniqueChipID"].(uint64),
+		ApNonce:          nonce,
+		ApProductionMode: true,
+		ApSecurityDomain: 1,
+		ApSecurityMode:   true,
+		UID_MODE:         false,
+		SepNonce:         []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	}
+
+	var manifest map[string]info.IdentityManifest
+	for _, bid := range conf.BuildManifest.BuildIdentities {
+		boardID, err := strconv.ParseUint(strings.TrimPrefix(bid.ApBoardID, "0x"), 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse board id: %v", err)
+		}
+		chipID, err := strconv.ParseUint(strings.TrimPrefix(bid.ApChipID, "0x"), 16, 64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse chip id: %v", err)
+		}
+		if boardID == conf.PersonlID["BoardId"] && chipID == conf.PersonlID["ChipID"] {
+			manifest = bid.Manifest
+			break
+		}
+	}
+
+	parameters := map[string]any{
+		"ApProductionMode": true,
+		"ApSecurityDomain": 1,
+		"ApSecurityMode":   true,
+		"ApSupportsImg4":   true,
+	}
+
+	tssReq.PersonalizedDMG = manifest["PersonalizedDMG"]
+	tssReq.PersonalizedDMG.Info = nil
+	tssReq.LoadableTrustCache = manifest["LoadableTrustCache"]
+	tssReq.LoadableTrustCache.Info = nil
+
+	if rules, ok := manifest["LoadableTrustCache"].Info["RestoreRequestRules"]; ok {
+		for _, rule := range rules.([]any) {
+			satisfied := true
+			if conds, ok := rule.(map[string]any)["Conditions"]; ok {
+				for k, v := range conds.(map[string]any) {
+					if !satisfied {
+						break
+					}
+					switch k {
+					case "ApRawProductionMode":
+						satisfied = parameters["ApProductionMode"] == v
+					case "ApCurrentProductionMode":
+						satisfied = parameters["ApProductionMode"] == v
+					case "ApRawSecurityMode":
+						satisfied = parameters["ApSecurityMode"] == v
+					case "ApRequiresImage4":
+						satisfied = parameters["ApSupportsImg4"] == v
+					case "ApDemotionPolicyOverride":
+						satisfied = parameters["DemotionPolicy"] == v
+					case "ApInRomDFU":
+						satisfied = parameters["ApInRomDFU"] == v
+					default:
+						log.Fatalf("unknown LoadableTrustCache->RestoreRequestRules->Condition: %s", k)
+					}
+				}
+			}
+			if satisfied {
+				if actions, ok := rule.(map[string]any)["Actions"]; ok {
+					for k, v := range actions.(map[string]any) {
+						switch k {
+						case "EPRO":
+							tssReq.PersonalizedDMG.EPRO = v.(bool)
+							tssReq.LoadableTrustCache.EPRO = v.(bool)
+						case "ESEC":
+							tssReq.PersonalizedDMG.ESEC = v.(bool)
+							tssReq.LoadableTrustCache.ESEC = v.(bool)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	trdata, err := plist.Marshal(tssReq, plist.XMLFormat)
+	if err != nil {
+		return nil, err
+	}
+	// os.WriteFile("/tmp/tss.plist", trdata, 0644)
+
+	req, err := http.NewRequest("POST", tssControllerActionURL, bytes.NewBuffer(trdata))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create https request: %v", err)
+	}
+	req.Header.Set("Cache-Control", "no-cache")
+	req.Header.Set("Content-type", "text/xml; charset=\"utf-8\"")
+	req.Header.Add("User-Agent", "InetURL/1.0")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           download.GetProxy(conf.Proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to connect to URL: got status %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %v", err)
+	}
+
+	var tr Response
+	for _, field := range strings.Split(string(body), "&") {
+		key, value, ok := strings.Cut(field, "=")
+		if !ok {
+			log.Error("failed to parse response field")
+			continue
+		}
+		switch key {
+		case "STATUS":
+			sInt, err := strconv.Atoi(value)
+			if err != nil {
+				return nil, err
+			}
+			tr.Status = sInt
+		case "MESSAGE":
+			tr.Message = value
+		case "REQUEST_STRING":
+			tr.Plist = value
+		}
+	}
+
+	log.WithFields(log.Fields{
+		"status":      tr.Status,
+		"message":     tr.Message,
+		"request_len": len(tr.Plist),
+	}).Debug("TSS Response")
+
+	if tr.Status == 0 && tr.Message == "SUCCESS" {
+		var blob Blob
+		if err := plist.NewDecoder(strings.NewReader(tr.Plist)).Decode(&blob); err != nil {
+			return nil, fmt.Errorf("failed to decode TSS response REQUEST_STRING: %v", err)
+		}
+		return blob.ApImg4Ticket, nil
+	}
+
+	return nil, fmt.Errorf("failed to personalize TSS blob: %s", tr.Message)
+}
