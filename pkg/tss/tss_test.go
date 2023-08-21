@@ -22,9 +22,9 @@ func TestPersonalize(t *testing.T) {
 			name: "test",
 			args: args{
 				conf: &PersonalConfig{
-					PersonlID:     map[string]any{"BoardId": 8, "ChipID": 33040, "UniqueChipID": 6303405673529390},
+					PersonlID:     map[string]any{"BoardId": 6, "ChipID": 32789, "UniqueChipID": 6303405673529390},
 					BuildManifest: &plist.BuildManifest{},
-					Nonce:         "0019ed3874978b0ee4a16063791f9e5325f6cd088ce2cc7acdbaa807b9dd0fd12ce3b45f05e509fa86bdc24bdb57a98c",
+					Nonce:         "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
 				},
 			},
 			want:    []byte{},
