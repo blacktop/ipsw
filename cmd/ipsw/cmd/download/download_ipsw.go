@@ -55,6 +55,7 @@ func init() {
 	ipswCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	ipswCmd.Flags().BoolP("flat", "f", false, "Do NOT perserve directory structure when downloading with --pattern")
 	ipswCmd.Flags().BoolP("usb", "u", false, "Download IPSWs for USB attached iDevices")
+	ipswCmd.Flags().Bool("urls", false, "Dump URLs only")
 
 	viper.BindPFlag("download.ipsw.latest", ipswCmd.Flags().Lookup("latest"))
 	viper.BindPFlag("download.ipsw.show-latest-version", ipswCmd.Flags().Lookup("show-latest-version"))
@@ -70,6 +71,7 @@ func init() {
 	viper.BindPFlag("download.ipsw.output", ipswCmd.Flags().Lookup("output"))
 	viper.BindPFlag("download.ipsw.flat", ipswCmd.Flags().Lookup("flat"))
 	viper.BindPFlag("download.ipsw.usb", ipswCmd.Flags().Lookup("usb"))
+	viper.BindPFlag("download.ipsw.urls", ipswCmd.Flags().Lookup("urls"))
 }
 
 // ipswCmd represents the ipsw command
@@ -298,6 +300,12 @@ var ipswCmd = &cobra.Command{
 			}
 		}
 
+		if viper.GetBool("download.ipsw.urls") {
+			for _, i := range ipsws {
+				fmt.Println(i.URL)
+			}
+			return nil
+		}
 		log.Debug("URLs to Download:")
 		for _, i := range ipsws {
 			utils.Indent(log.Debug, 2)(i.URL)
