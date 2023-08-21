@@ -209,6 +209,9 @@ type DeviceValues struct {
 	CTPostponementInfoPRLName                     int              `plist:"kCTPostponementInfoPRLName,omitempty" json:"ct_postponement_info_prl_name,omitempty"`
 	CTPostponementInfoServiceProvisioningState    bool             `plist:"kCTPostponementInfoServiceProvisioningState,omitempty" json:"ct_postponement_info_service_provisioning_state"`
 	CTPostponementStatus                          string           `plist:"kCTPostponementStatus,omitempty" json:"ct_postponement_status,omitempty"`
+	Image4Supported                               bool             `plist:"Image4Supported,omitempty" json:"img4_supported"`
+	ApNonce                                       []byte           `plist:"ApNonce,omitempty" json:"ap_nonce,omitempty"`
+	SEPNonce                                      []byte           `plist:"SEPNonce,omitempty" json:"sep_nonce,omitempty"`
 }
 
 func (dv DeviceValues) String() string {
@@ -292,13 +295,21 @@ type getValueRequest struct {
 	Key     string `plist:"Key,omitempty"`
 }
 
-type getValueResponse struct {
+type getValuesResponse struct {
 	Domain  string `plist:"Domain,omitempty"`
 	Error   string `plist:"Error,omitempty"`
 	Key     string `plist:"Key,omitempty"`
 	Request string `plist:"Request,omitempty"`
 	Result  string `plist:"Result,omitempty"`
 	Value   *DeviceValues
+}
+
+type getValueResponse struct {
+	Domain  string `plist:"Domain,omitempty"`
+	Error   string `plist:"Error,omitempty"`
+	Key     string `plist:"Key,omitempty"`
+	Request string `plist:"Request,omitempty"`
+	Value   any    `plist:"Value,omitempty"`
 }
 
 type getBoolResponse struct {
@@ -390,11 +401,39 @@ func (lc *Client) GetValues() (*DeviceValues, error) {
 		Domain:  "",
 		Key:     "",
 	}
+	var resp getValuesResponse
+	if err := lc.Request(req, &resp); err != nil {
+		return nil, err
+	}
+	if resp.Error != "" {
+		return nil, fmt.Errorf("failed to get value: %s", resp.Error)
+	}
+	if v, e := lc.GetValue("", "Image4Supported"); e == nil {
+		resp.Value.Image4Supported = v.(bool)
+	}
+	if v, e := lc.GetValue("", "ApNonce"); e == nil {
+		resp.Value.ApNonce = v.([]byte)
+	}
+	if v, e := lc.GetValue("", "SEPNonce"); e == nil {
+		resp.Value.SEPNonce = v.([]byte)
+	}
+	return resp.Value, nil
+}
+
+func (lc *Client) GetValue(domain, key string) (any, error) {
+	req := &getValueRequest{
+		Request: "GetValue",
+		Label:   usb.BundleID,
+		Domain:  domain,
+		Key:     key,
+	}
 	var resp getValueResponse
 	if err := lc.Request(req, &resp); err != nil {
 		return nil, err
 	}
-
+	if resp.Error != "" {
+		return nil, fmt.Errorf("failed to get value: %s", resp.Error)
+	}
 	return resp.Value, nil
 }
 
