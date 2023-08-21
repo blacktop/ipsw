@@ -33,18 +33,18 @@ func (b *BuildManifest) String() string {
 }
 
 type buildIdentity struct {
-	ApBoardID                     string                           `json:"ap_board_id,omitempty"`
-	ApChipID                      string                           `json:"ap_chip_id,omitempty"`
-	ApSecurityDomain              string                           `json:"ap_security_domain,omitempty"`
-	BbActivationManifestKeyHash   []byte                           `json:"bb_activation_manifest_key_hash,omitempty"`
-	BbChipID                      string                           `json:"bb_chip_id,omitempty"`
-	BbFDRSecurityKeyHash          []byte                           `json:"bb_fdr_security_key_hash,omitempty"`
-	BbProvisioningManifestKeyHash []byte                           `json:"bb_provisioning_manifest_key_hash,omitempty"`
-	Info                          buildIdentityInfo                `json:"info,omitempty"`
-	Manifest                      map[string]buildIdentityManifest `json:"manifest,omitempty"`
-	PearlCertificationRootPub     []byte                           `json:"pearl_certification_root_pub,omitempty"`
-	ProductMarketingVersion       string                           `json:"product_marketing_version,omitempty"`
-	UniqueBuildID                 []byte                           `json:"unique_build_id,omitempty"`
+	ApBoardID                     string                      `json:"ap_board_id,omitempty"`
+	ApChipID                      string                      `json:"ap_chip_id,omitempty"`
+	ApSecurityDomain              string                      `json:"ap_security_domain,omitempty"`
+	BbActivationManifestKeyHash   []byte                      `json:"bb_activation_manifest_key_hash,omitempty"`
+	BbChipID                      string                      `json:"bb_chip_id,omitempty"`
+	BbFDRSecurityKeyHash          []byte                      `json:"bb_fdr_security_key_hash,omitempty"`
+	BbProvisioningManifestKeyHash []byte                      `json:"bb_provisioning_manifest_key_hash,omitempty"`
+	Info                          IdentityInfo                `plist:"Info,omitempty" json:"info,omitempty"`
+	Manifest                      map[string]IdentityManifest `json:"manifest,omitempty"`
+	PearlCertificationRootPub     []byte                      `json:"pearl_certification_root_pub,omitempty"`
+	ProductMarketingVersion       string                      `json:"product_marketing_version,omitempty"`
+	UniqueBuildID                 []byte                      `json:"unique_build_id,omitempty"`
 }
 
 func (i buildIdentity) String() string {
@@ -57,14 +57,14 @@ func (i buildIdentity) String() string {
 	out += fmt.Sprintf("    Info:\n%s", i.Info.String())
 	out += "    Manifest:\n"
 	for k, v := range i.Manifest {
-		if len(v.Info.Path) > 0 {
+		if len(v.Info["Path"].(string)) > 0 {
 			out += fmt.Sprintf("      %s: %s\n", k, v.String())
 		}
 	}
 	return out
 }
 
-type buildIdentityInfo struct {
+type IdentityInfo struct {
 	BuildNumber            string            `json:"build_number,omitempty"`
 	CodeName               string            `plist:"BuildTrain,omitempty" json:"code_name,omitempty"`
 	DeviceClass            string            `json:"device_class,omitempty"`
@@ -78,7 +78,7 @@ type buildIdentityInfo struct {
 	VariantContents        map[string]string `json:"variant_contents,omitempty"`
 }
 
-func (i buildIdentityInfo) String() string {
+func (i IdentityInfo) String() string {
 	return fmt.Sprintf(
 		"      BuildNumber:            %s\n"+
 			"      CodeName:               %s\n"+
@@ -99,32 +99,35 @@ func (i buildIdentityInfo) String() string {
 	)
 }
 
-type buildIdentityManifest struct {
-	Digest      []byte                    `json:"digest,omitempty"`
-	BuildString string                    `plist:"BuildString,omitempty" json:"build_string,omitempty"`
-	Info        buildIdentityManifestInfo `json:"info,omitempty"`
-	Trusted     bool                      `json:"trusted,omitempty"`
+type IdentityManifest struct {
+	Digest      []byte         `json:"digest,omitempty"`
+	Name        string         `plist:"Name,omitempty" json:"name,omitempty"`
+	BuildString string         `plist:"BuildString,omitempty" json:"build_string,omitempty"`
+	Info        map[string]any `plist:"Info,omitempty" json:"info,omitempty"`
+	Trusted     bool           `json:"trusted,omitempty"`
+	EPRO        bool           `plist:"EPRO,omitempty" json:"epro,omitempty"`
+	ESEC        bool           `plist:"ESEC,omitempty" json:"esec,omitempty"`
 }
 
-func (m buildIdentityManifest) String() string {
+func (m IdentityManifest) String() string {
 	var bs string
 	if len(m.BuildString) > 0 {
 		bs = fmt.Sprintf(" (%s)", m.BuildString)
 	}
-	return fmt.Sprintf("%s%s", m.Info.Path, bs)
+	return fmt.Sprintf("%s%s", m.Info["Path"].(string), bs)
 }
 
-type buildIdentityManifestInfo struct {
-	IsFTAB                      bool          `json:"is_ftab,omitempty"`
-	IsFUDFirmware               bool          `plist:"IsFUDFirmware,omitempty" json:"is_fud_firmware,omitempty"`
-	IsFirmwarePayload           bool          `plist:"IsFirmwarePayload,omitempty" json:"is_firmware_payload,omitempty"`
-	IsLoadedByiBoot             bool          `json:"is_loaded_byi_boot,omitempty"`
-	IsLoadedByiBootStage1       bool          `json:"is_loaded_byi_boot_stage_1,omitempty"`
-	IsiBootEANFirmware          bool          `json:"isi_boot_ean_firmware,omitempty"`
-	IsiBootNonEssentialFirmware bool          `json:"isi_boot_non_essential_firmware,omitempty"`
-	Path                        string        `plist:"Path" json:"path,omitempty"`
-	Personalize                 bool          `json:"personalize,omitempty"`
-	RestoreRequestRules         []interface{} `json:"restore_request_rules,omitempty"`
+type IdentityManifestInfo struct {
+	IsFTAB                      bool   `json:"is_ftab,omitempty"`
+	IsFUDFirmware               bool   `plist:"IsFUDFirmware,omitempty" json:"is_fud_firmware,omitempty"`
+	IsFirmwarePayload           bool   `plist:"IsFirmwarePayload,omitempty" json:"is_firmware_payload,omitempty"`
+	IsLoadedByiBoot             bool   `json:"is_loaded_byi_boot,omitempty"`
+	IsLoadedByiBootStage1       bool   `json:"is_loaded_byi_boot_stage_1,omitempty"`
+	IsiBootEANFirmware          bool   `json:"isi_boot_ean_firmware,omitempty"`
+	IsiBootNonEssentialFirmware bool   `json:"isi_boot_non_essential_firmware,omitempty"`
+	Path                        string `plist:"Path" json:"path,omitempty"`
+	Personalize                 bool   `json:"personalize,omitempty"`
+	RestoreRequestRules         []any  `json:"restore_request_rules,omitempty"`
 }
 
 // ParseBuildManifest parses the BuildManifest.plist
@@ -139,8 +142,8 @@ func ParseBuildManifest(data []byte) (*BuildManifest, error) {
 func (b *BuildManifest) GetKernelCaches() map[string][]string {
 	kernelCaches := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceHas(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path) {
-			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info.Path)
+		if !utils.StrSliceHas(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info["Path"].(string)) {
+			kernelCaches[bID.Info.DeviceClass] = append(kernelCaches[bID.Info.DeviceClass], bID.Manifest["KernelCache"].Info["Path"].(string))
 		}
 	}
 	return kernelCaches
@@ -161,29 +164,29 @@ func (b *BuildManifest) GetKernelForModel(model string) []string {
 func (b *BuildManifest) GetBootLoaders() map[string][]string {
 	bootLoaders := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path) {
-			if len(bID.Manifest["iBEC"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info.Path)
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info["Path"].(string)) {
+			if len(bID.Manifest["iBEC"].Info["Path"].(string)) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info["Path"].(string))
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path) {
-			if len(bID.Manifest["iBoot"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info.Path)
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info["Path"].(string)) {
+			if len(bID.Manifest["iBoot"].Info["Path"].(string)) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info["Path"].(string))
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path) {
-			if len(bID.Manifest["iBSS"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info.Path)
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info["Path"].(string)) {
+			if len(bID.Manifest["iBSS"].Info["Path"].(string)) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info["Path"].(string))
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path) {
-			if len(bID.Manifest["LLB"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info.Path)
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info["Path"].(string)) {
+			if len(bID.Manifest["LLB"].Info["Path"].(string)) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info["Path"].(string))
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info.Path) {
-			if len(bID.Manifest["SEP"].Info.Path) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info.Path)
+		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info["Path"].(string)) {
+			if len(bID.Manifest["SEP"].Info["Path"].(string)) > 0 {
+				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info["Path"].(string))
 			}
 		}
 	}
