@@ -22,7 +22,7 @@ func TestPersonalize(t *testing.T) {
 			name: "test",
 			args: args{
 				conf: &PersonalConfig{
-					PersonlID:     map[string]any{"BoardId": 6, "ChipID": 32789, "UniqueChipID": 6303405673529390},
+					PersonlID:     map[string]any{"BoardId": uint64(8), "ChipID": uint64(33040), "UniqueChipID": uint64(6303405673529390)},
 					BuildManifest: &plist.BuildManifest{},
 					Nonce:         "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
 				},
@@ -33,7 +33,8 @@ func TestPersonalize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manifestData, err := os.ReadFile("/Volumes/Xcode_iOS_DDI_Personalized/Restore/BuildManifest.plist")
+			manifestData, err := os.ReadFile("/private/tmp/iOS_DDI.dmg.mount/Restore/BuildManifest.plist")
+			// manifestData, err := os.ReadFile("/Volumes/Xcode_iOS_DDI_Personalized/Restore/BuildManifest.plist")
 			if err != nil {
 				t.Errorf("failed to read BuildManifest.plist: %v", err)
 			}

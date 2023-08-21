@@ -212,6 +212,7 @@ type DeviceValues struct {
 	Image4Supported                               bool             `plist:"Image4Supported,omitempty" json:"img4_supported"`
 	ApNonce                                       []byte           `plist:"ApNonce,omitempty" json:"ap_nonce,omitempty"`
 	SEPNonce                                      []byte           `plist:"SEPNonce,omitempty" json:"sep_nonce,omitempty"`
+	FirmwarePreflightInfo                         map[string]any   `plist:"FirmwarePreflightInfo,omitempty" json:"preflight_info,omitempty"`
 }
 
 func (dv DeviceValues) String() string {
@@ -416,6 +417,9 @@ func (lc *Client) GetValues() (*DeviceValues, error) {
 	}
 	if v, e := lc.GetValue("", "SEPNonce"); e == nil {
 		resp.Value.SEPNonce = v.([]byte)
+	}
+	if v, e := lc.GetValue("", "FirmwarePreflightInfo"); e == nil {
+		resp.Value.FirmwarePreflightInfo = v.(map[string]any)
 	}
 	return resp.Value, nil
 }

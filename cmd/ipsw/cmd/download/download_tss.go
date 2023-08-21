@@ -27,7 +27,8 @@ import (
 	"fmt"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
+	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -35,23 +36,26 @@ import (
 func init() {
 	DownloadCmd.AddCommand(tssCmd)
 
-	tssCmd.Flags().StringP("signed", "s", "", "Check if iOS version is still being signed")
+	tssCmd.Flags().BoolP("signed", "s", false, "Check if iOS version is still being signed")
+	tssCmd.Flags().BoolP("usb", "u", false, "Download blobs for USB connected device")
+	tssCmd.Flags().StringP("output", "o", "", "Output directory to save blobs to")
+	viper.BindPFlag("download.tss.signed", tssCmd.Flags().Lookup("signed"))
+	viper.BindPFlag("download.tss.usb", tssCmd.Flags().Lookup("usb"))
+	viper.BindPFlag("download.tss.output", tssCmd.Flags().Lookup("output"))
+
 	tssCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		DownloadCmd.PersistentFlags().MarkHidden("white-list")
 		DownloadCmd.PersistentFlags().MarkHidden("black-list")
-		DownloadCmd.PersistentFlags().MarkHidden("device")
 		DownloadCmd.PersistentFlags().MarkHidden("model")
-		DownloadCmd.PersistentFlags().MarkHidden("version")
-		DownloadCmd.PersistentFlags().MarkHidden("build")
 		DownloadCmd.PersistentFlags().MarkHidden("confirm")
-		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
-		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
-		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
 		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
+		DownloadCmd.PersistentFlags().MarkHidden("restart-all")
+		DownloadCmd.PersistentFlags().MarkHidden("resume-all")
+		DownloadCmd.PersistentFlags().MarkHidden("skip-all")
 		c.Parent().HelpFunc()(c, s)
 	})
 
-	viper.BindPFlag("download.tss.signed", tssCmd.Flags().Lookup("signed"))
+	tssCmd.MarkFlagDirname("output")
 }
 
 // tssCmd represents the tss command
@@ -67,19 +71,52 @@ var tssCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
+		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))
+		viper.BindPFlag("download.version", cmd.Flags().Lookup("version"))
+		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
 		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
 		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))
 		// settings
+		device := viper.GetString("download.device")
+		build := viper.GetString("download.build")
+		version := viper.GetString("download.version")
 		proxy := viper.GetString("download.proxy")
 		insecure := viper.GetBool("download.insecure")
 		// flags
-		isSigned := viper.GetString("download.tss.signed")
+		isSigned := viper.GetBool("download.tss.signed")
 
-		if len(isSigned) > 0 {
-			if _, err := download.GetTSS(isSigned, proxy, insecure); err != nil {
-				log.Errorf("🔥 %s is NO LONGER being signed", isSigned)
+		if device == "" {
+			device = "iPhone10,3"
+		}
+
+		conf := &tss.Config{
+			Proxy:    proxy,
+			Insecure: insecure,
+			Device:   device,
+			Version:  version,
+			Build:    build,
+		}
+
+		if viper.GetBool("download.tss.usb") {
+			dev, err := utils.PickDevice()
+			if err != nil {
+				return err
+			}
+			conf.ECID = uint64(dev.UniqueChipID)
+			conf.Device = dev.ProductType
+			conf.Build = dev.BuildVersion
+			conf.Version = dev.ProductVersion
+			conf.ApNonce = dev.ApNonce
+			conf.SepNonce = dev.SEPNonce
+			conf.Image4Supported = dev.Image4Supported
+		}
+
+		if isSigned {
+			if _, err := tss.GetTSSResponse(conf); err != nil {
+				log.Errorf("🔥 %s is NO LONGER being signed: %v", conf.Version, err)
 			} else {
-				log.Infof("✅ %s is still being signed", isSigned)
+				log.Infof("✅ %s is still being signed", conf.Version)
 			}
 			return nil
 		}
