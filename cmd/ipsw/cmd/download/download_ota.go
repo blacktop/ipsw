@@ -342,7 +342,7 @@ var otaDLCmd = &cobra.Command{
 					log.WithFields(log.Fields{
 						"version": o.OSVersion,
 						"build":   o.Build,
-						"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices[:3], " "), len(o.SupportedDevices)),
+						"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.SupportedDevices, " "), len(o.SupportedDevices)),
 						"model":   strings.Join(o.SupportedDeviceModels, " "),
 					}).Info(fmt.Sprintf("Getting %s remote OTA", o.DocumentationID))
 
