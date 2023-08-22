@@ -33,7 +33,7 @@ require (
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/gomarkdown/markdown v0.0.0-20230716120725-531d2d74bc12
 	github.com/google/gousb v1.1.2
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-version v1.6.0
 	github.com/invopop/jsonschema v0.7.0
 	github.com/mitchellh/go-homedir v1.1.0
