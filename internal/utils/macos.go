@@ -627,3 +627,25 @@ func InstallXCodeSimRuntime(path string) error {
 	}
 	return fmt.Errorf("only supported on macOS")
 }
+
+func InstallKDK(path string) error {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("hdiutil", "attach", path)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%v: %s", err, out)
+		}
+		cmd = exec.Command("sudo", "installer", "-pkg", "/Volumes/Kernel Debug Kit/KernelDebugKit.pkg", "-target", "/")
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%v: %s", err, out)
+		}
+		cmd = exec.Command("hdiutil", "detach", "/Volumes/Kernel Debug Kit")
+		out, err = cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%v: %s", err, out)
+		}
+		return nil
+	}
+	return fmt.Errorf("only supported on macOS")
+}
