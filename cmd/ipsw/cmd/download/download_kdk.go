@@ -31,12 +31,14 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
 	DownloadCmd.AddCommand(downloadKdkCmd)
+	downloadKdkCmd.Flags().BoolP("install", "i", false, "Install KDK after download")
 	downloadKdkCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadKdkCmd.MarkFlagDirname("output")
 	downloadKdkCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
@@ -50,6 +52,7 @@ func init() {
 		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
 		c.Parent().HelpFunc()(c, s)
 	})
+	viper.BindPFlag("download.kdk.install", downloadKdkCmd.Flags().Lookup("install"))
 	viper.BindPFlag("download.kdk.output", downloadKdkCmd.Flags().Lookup("output"))
 }
 
@@ -79,6 +82,7 @@ var downloadKdkCmd = &cobra.Command{
 		resumeAll := viper.GetBool("download.resume-all")
 		restartAll := viper.GetBool("download.restart-all")
 		// flags
+		install := viper.GetBool("download.kdk.install")
 		output := viper.GetString("download.kdk.output")
 
 		kdks, err := download.ListKDKs()
@@ -124,10 +128,20 @@ var downloadKdkCmd = &cobra.Command{
 			downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
 			downloader.URL = aKDK.URL
 			downloader.DestName = destName
-			return downloader.Do()
+			if err := downloader.Do(); err != nil {
+				return err
+			}
+		} else {
+			log.Warnf("File already exists: %s", destName)
 		}
 
-		log.Warnf("File already exists: %s", destName)
+		if install {
+			log.Infof("Installing %s...", destName)
+			if err := utils.InstallKDK(destName); err != nil {
+				return err
+			}
+		}
+
 		return nil
 	},
 }
