@@ -17,7 +17,6 @@ ipsw kernel ida <KC> <KEXT> [KEXTS...] [flags]
 ### Options
 
 ```
-  -a, --all                   Analyze kernel+kexts (this will take a while)
   -c, --delete-db             Disassemble a new file (delete the old database)
   -k, --docker                Run IDA Pro in a docker container
       --docker-image string   IDA Pro docker image (default "blacktop/idapro:8.2-pro")

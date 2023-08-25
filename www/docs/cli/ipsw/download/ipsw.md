@@ -30,7 +30,8 @@ ipsw download ipsw [flags]
       --pattern string          Download remote files that match regex
       --show-latest-build       Show latest iOS build
       --show-latest-version     Show latest iOS version
-  -u, --usb                     Download IPSWs for USB attached iDevices
+  -u, --urls                    Dump URLs only
+      --usb                     Download IPSWs for USB attached iDevices
 ```
 
 ### Options inherited from parent commands

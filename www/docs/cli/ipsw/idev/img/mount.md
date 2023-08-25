@@ -11,17 +11,21 @@ description: Mount an image
 Mount an image
 
 ```
-ipsw idev img mount <image> <signature> [flags]
+ipsw idev img mount [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help                 help for mount
-  -t, --image-type string    Image type to mount (default "Developer")
-  -i, --info-plist string    Cryptex Info.plist to use
-  -c, --trust-cache string   Cryptex trust cache to use
-  -x, --xcode string         Path to Xcode.app (default "/Applications/Xcode.app")
+  -d, --ddi-img string      DDI.dmg to mount
+  -h, --help                help for mount
+  -t, --image-type string   Image type to mount (i.e. Developer)
+      --insecure            do not verify ssl certs
+  -m, --manifest string     BuildManifest.plist to use
+      --proxy string        HTTP/HTTPS proxy
+  -s, --signature string    Image signature to use
+  -c, --trustcache string   trustcache to use
+  -x, --xcode string        Path to Xcode.app (i.e. /Applications/Xcode.app)
 ```
 
 ### Options inherited from parent commands

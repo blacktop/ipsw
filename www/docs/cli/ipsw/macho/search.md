@@ -21,6 +21,7 @@ ipsw macho search <IPSW> [flags]
   -c, --class string          Search for specific ObjC class regex
   -h, --help                  help for search
   -r, --ivar string           Search for specific ObjC instance variable regex
+  -t, --launch-const string   Search for launch constraint regex
   -l, --load-command string   Search for specific load command regex
   -p, --protocol string       Search for specific ObjC protocol regex
   -x, --section string        Search for specific section regex
