@@ -22,124 +22,20 @@ THE SOFTWARE.
 package kernel
 
 import (
-	"bytes"
-	"fmt"
-	"os"
-	"path/filepath"
-
-	"github.com/apex/log"
-	"github.com/blacktop/go-macho"
-	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
-var kmutilCmdSubCmds = []string{"inspect"}
-
 func init() {
-	KernelcacheCmd.AddCommand(kernelKmutilCmd)
-	kernelKmutilCmd.Flags().StringP("filter", "f", "", "Fitler by bundle ID")
-	kernelKmutilCmd.Flags().BoolP("explicit-only", "x", false, "Format output to be used as -x arg to kmutil create")
-	kernelKmutilCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	kernelKmutilCmd.Flags().StringP("output", "o", "", "Output folder")
-	kernelKmutilCmd.MarkFlagDirname("output")
-	viper.BindPFlag("kernel.kmutil.filter", kernelKmutilCmd.Flags().Lookup("filter"))
-	viper.BindPFlag("kernel.kmutil.explicit-only", kernelKmutilCmd.Flags().Lookup("explicit-only"))
-	viper.BindPFlag("kernel.kmutil.json", kernelKmutilCmd.Flags().Lookup("json"))
-	viper.BindPFlag("kernel.kmutil.output", kernelKmutilCmd.Flags().Lookup("output"))
+	KernelcacheCmd.AddCommand(KernelKmutilCmd)
 }
 
-// kernelKmutilCmd represents the kmutil command
-var kernelKmutilCmd = &cobra.Command{
-	Use:     "kmutil",
-	Aliases: []string{"km"},
-	Short:   "KernelManagement Utility",
-	Args:    cobra.MinimumNArgs(1),
-	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			return kmutilCmdSubCmds, cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveDefault
-	},
-	SilenceUsage:  true,
-	SilenceErrors: true,
-	Hidden:        true,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var err error
-
-		if viper.GetBool("verbose") {
-			log.SetLevel(log.DebugLevel)
-		}
-
-		// flags
-		filter := viper.GetString("kernel.kmutil.filter")
-		explicitOnly := viper.GetBool("kernel.kmutil.explicit-only")
-		asJSON := viper.GetBool("kernel.kmutil.json")
-		outputDir := viper.GetString("kernel.kmutil.output")
-		// validate flags
-		if explicitOnly && asJSON {
-			return fmt.Errorf("cannot use --explicit-only and --json together")
-		}
-		if outputDir == "" {
-			cwd, err := os.Getwd()
-			if err != nil {
-				return fmt.Errorf("failed to get current working directory: %v", err)
-			}
-			outputDir = cwd
-		}
-
-		var kcpath string
-		if len(args) < 2 {
-			systemKernelCache, err := utils.GetKernelCollectionPath()
-			if err != nil {
-				return fmt.Errorf("could not find system kernelcache: %v (Please specify path to kernelcache)", err)
-			}
-			kcpath = systemKernelCache
-		} else {
-			kcpath = filepath.Clean(args[1])
-		}
-
-		if _, err := os.Stat(kcpath); os.IsNotExist(err) {
-			return fmt.Errorf("file %s does not exist", kcpath)
-		}
-
-		var m *macho.File
-
-		if isImg4(kcpath) {
-			log.Info("Decompressing KernelManagement kernelcache")
-			data, err := kernelcache.DecompressKernelManagementData(kcpath)
-			if err != nil {
-				return fmt.Errorf("failed to decompress kernelcache (kernel management data): %v", err)
-			}
-			m, err = macho.NewFile(bytes.NewReader(data))
-			if err != nil {
-				return fmt.Errorf("failed to parse kernelcache (kernel management data): %v", err)
-			}
-			defer m.Close()
-		} else {
-			log.Info("Parsing KernelManagement kernelcache")
-			m, err = macho.Open(kcpath)
-			if err != nil {
-				return fmt.Errorf("failed to parse kernelcache MachO: %v", err)
-			}
-			defer m.Close()
-		}
-
-		if m.FileTOC.FileHeader.Type != types.MH_FILESET {
-			return fmt.Errorf("kernelcache type is not MH_FILESET (kext collection)")
-		}
-
-		switch args[0] {
-		case "inspect":
-			out, err := kernelcache.InspectKM(m, filter, explicitOnly, asJSON)
-			if err != nil {
-				return fmt.Errorf("failed to inspect kernelcache: %v", err)
-			}
-			fmt.Println(out)
-		}
-
-		return nil
+// KernelKmutilCmd represents the kmutil command
+var KernelKmutilCmd = &cobra.Command{
+	Use:    "kmutil",
+	Short:  "KernelManagement Utility",
+	Args:   cobra.NoArgs,
+	Hidden: true,
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
 	},
 }

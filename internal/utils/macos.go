@@ -18,6 +18,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
 	"github.com/blacktop/ipsw/internal/utils/lsof"
+	semver "github.com/hashicorp/go-version"
 )
 
 // Cp copies a file from src to dest
@@ -360,6 +361,43 @@ func GetBuildInfo() (*BuildInfo, error) {
 	return nil, fmt.Errorf("only supported on macOS")
 }
 
+func GetXCodePath() (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("xcode-select", "-p")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		return strings.TrimSpace(string(out)), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
+func GetKernelPath() (string, error) {
+	if runtime.GOOS == "darwin" {
+		cmd := exec.Command("uname", "-a")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return "", fmt.Errorf("%v: %s", err, out)
+		}
+		uname := strings.TrimSpace(string(out))
+		_, triple, ok := strings.Cut(uname, "/")
+		if !ok {
+			return "", fmt.Errorf("failed to parse uname: %s", uname)
+		}
+		tripleParts := strings.Split(triple, " ")
+		if len(tripleParts) != 2 {
+			return "", fmt.Errorf("failed to parse uname: %s", uname)
+		}
+		tparts := strings.Split(tripleParts[0], "_")
+		if len(tparts) != 3 {
+			return "", fmt.Errorf("failed to parse uname: %s", uname)
+		}
+		return fmt.Sprintf("/System/Library/Kernels/kernel.release.%s", strings.ToLower(tparts[2])), nil
+	}
+	return "", fmt.Errorf("only supported on macOS")
+}
+
 func GetKernelCollectionPath() (string, error) {
 	if runtime.GOOS == "darwin" {
 		defaultKcPath := "/System/Library/KernelCollections/BootKernelExtensions.kc"
@@ -647,5 +685,69 @@ func InstallKDK(path string) error {
 		}
 		return nil
 	}
+	return fmt.Errorf("only supported on macOS")
+}
+
+type KMUConfig struct {
+	Suffix  string
+	Arch    string
+	KDK     string
+	Name    string
+	Kernel  string
+	Exclude []string
+}
+
+func KmutilCreate(conf *KMUConfig) (err error) {
+	if runtime.GOOS == "darwin" {
+		binfo, err := GetBuildInfo()
+		if err != nil {
+			return fmt.Errorf("failed to get build info: %v", err)
+		}
+		ver, err := semver.NewVersion(binfo.ProductVersion)
+		if err != nil {
+			return fmt.Errorf("failed to parse product version: %v", err)
+		}
+		args := []string{"create", "--verbose", "--new", "boot"}
+		if conf.Suffix != "" {
+			args = append(args, "--variant-suffix", conf.Suffix)
+		}
+		if conf.Arch != "" {
+			args = append(args, "--arch", conf.Arch)
+		}
+		if ver.GreaterThan(semver.Must(semver.NewVersion("13.0"))) {
+			if conf.KDK == "" {
+				conf.KDK = fmt.Sprintf("/Library/Developer/KDKs/KDK_%s_%s.kdk", binfo.ProductVersion, binfo.BuildVersion)
+			}
+			args = append(args, "--kdk", conf.KDK)
+		}
+		if conf.Kernel == "" {
+			conf.Kernel, err = GetKernelPath()
+			if err != nil {
+				return fmt.Errorf("failed to get kernel path: %v", err)
+			}
+		}
+		args = append(args, "--kernel", conf.Kernel)
+		if conf.Name != "" {
+			if err := os.MkdirAll(filepath.Dir(conf.Name), 0750); err != nil {
+				return fmt.Errorf("failed to create directory %s: %v", filepath.Dir(conf.Name), err)
+			}
+			args = append(args, "--boot-path", conf.Name)
+		}
+		if len(conf.Exclude) > 0 {
+			args = append(args, "--explicit-only")
+			args = append(args, conf.Exclude...)
+		}
+
+		cmd := exec.Command("kmutil", args...)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%v: %s", err, out)
+		}
+
+		fmt.Println(string(out))
+
+		return nil
+	}
+
 	return fmt.Errorf("only supported on macOS")
 }
