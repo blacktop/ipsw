@@ -74,7 +74,7 @@ func GetHandle(libs []string) (*LibHandle, error) {
 			return h, nil
 		}
 	}
-	return nil, errors.New("unable to open a handle to the library")
+	return nil, fmt.Errorf("unable to open a handle to the library")
 }
 
 // GetSymbolPointer takes a symbol name and returns a pointer to the symbol.
@@ -106,20 +106,23 @@ func (l *LibHandle) Close() error {
 
 // Split extracts all the dyld_shared_cache libraries
 func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bool) error {
+	var xcodeVersion string
 
-	var bundles []string
-
-	if len(xcodePath) > 0 {
-		xcodePaths = append([]string{xcodePath}, xcodePaths...)
+	if len(xcodePath) == 0 {
+		var err error
+		xcodePath, err = utils.GetXCodePath()
+		if err != nil {
+			return fmt.Errorf("failed to get XCode path: %v", err)
+		}
+	} else {
+		if !strings.HasSuffix(xcodePath, "Contents/Developer") {
+			xcodePath = filepath.Join(xcodePath, "Contents/Developer")
+		}
 	}
 
-	for _, xpath := range xcodePaths {
-		bundles = append(bundles, filepath.Join(xpath, "Contents/Developer/Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle"))
-	}
-
-	dscExtractor, err := GetHandle(bundles)
+	dscExtractor, err := GetHandle([]string{filepath.Join(xcodePath, "Platforms/iPhoneOS.platform/usr/lib/dsc_extractor.bundle")})
 	if err != nil {
-		return errors.Wrapf(err, "failed to split %s", dyldSharedCachePath)
+		return fmt.Errorf("failed to split %s: %v", dyldSharedCachePath, err)
 	}
 
 	if xcodeCache {
@@ -128,10 +131,9 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		if err != nil && err != macho.ErrNotFat {
 			return fmt.Errorf("failed to open %s: %v", dscExtractor.Libname, err)
 		}
-		m := fat.Arches[0]
 		extVer := "1040.2.2.0.0"
-		if m.SourceVersion() != nil {
-			extVer = m.SourceVersion().Version.String()
+		if fat.Arches[0].SourceVersion() != nil {
+			extVer = fat.Arches[0].SourceVersion().Version.String()
 		}
 		fat.Close()
 		// get XCodeVersion
@@ -143,7 +145,7 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		}
 		appInfo := XCodeAppInfoPlist{}
 		plist.NewDecoder(bytes.NewReader(data)).Decode(&appInfo)
-		xcodeVersion := "14.0"
+		xcodeVersion = "14.0"
 		if len(appInfo.CFBundleShortVersionString) > 0 {
 			xcodeVersion = appInfo.CFBundleShortVersionString
 		}
@@ -161,11 +163,31 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		os.WriteFile(infoPlistPath, data, 0644)
 
 		destinationPath = filepath.Join(destinationPath, "Symbols")
+
+		dscCopyPath := filepath.Join(destinationPath, "private/preboot/Cryptexes/OS/System/Library/Caches/com.apple.dyld/")
+
+		matches, err := filepath.Glob(filepath.Join(filepath.Dir(dyldSharedCachePath), "dyld_shared_cache_*"))
+		if err != nil {
+			return fmt.Errorf("failed to glob dyld_shared_cache_*: %v", err)
+		}
+		if err := os.MkdirAll(dscCopyPath, 0750); err != nil {
+			return fmt.Errorf("failed to create output directory %s: %v", dscCopyPath, err)
+		}
+		for _, match := range matches {
+			f, err := os.Create(filepath.Join(dscCopyPath, ".copied_"+filepath.Base(match)))
+			if err != nil {
+				return fmt.Errorf("failed to create .copied_%s: %v", match, err)
+			}
+			f.Close()
+			if err := utils.Copy(match, filepath.Join(dscCopyPath, filepath.Base(match))); err != nil {
+				return fmt.Errorf("failed to copy %s to %s: %v", match, dscCopyPath, err)
+			}
+		}
 	}
 
 	extractorProc, err := dscExtractor.GetSymbolPointer("dyld_shared_cache_extract_dylibs_progress")
 	if err != nil {
-		return errors.Wrapf(err, "failed to split %s", dyldSharedCachePath)
+		return fmt.Errorf("failed to get symbol 'dyld_shared_cache_extract_dylibs_progress' pointer: %v", err)
 	}
 
 	dscPath := C.CString(dyldSharedCachePath)
@@ -176,11 +198,11 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 
 	result := C.dsc_extract(extractorProc, dscPath, destPath)
 	if result != 0 {
-		return errors.New("failed to run dsc_extract")
+		return fmt.Errorf("failed to run dsc_extract: returned %d", result)
 	}
 
 	if err := dscExtractor.Close(); err != nil {
-		return errors.Wrapf(err, "failed to close dylib %s", dscExtractor.Libname)
+		return fmt.Errorf("failed to close dylib %s: %v", dscExtractor.Libname, err)
 	}
 
 	return nil
