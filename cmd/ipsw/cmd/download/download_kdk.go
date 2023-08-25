@@ -38,6 +38,7 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(downloadKdkCmd)
+	downloadKdkCmd.Flags().Bool("host", false, "Download KDK for current host OS")
 	downloadKdkCmd.Flags().BoolP("install", "i", false, "Install KDK after download")
 	downloadKdkCmd.Flags().StringP("output", "o", "", "Folder to download files to")
 	downloadKdkCmd.MarkFlagDirname("output")
@@ -52,6 +53,7 @@ func init() {
 		DownloadCmd.PersistentFlags().MarkHidden("remove-commas")
 		c.Parent().HelpFunc()(c, s)
 	})
+	viper.BindPFlag("download.kdk.host", downloadKdkCmd.Flags().Lookup("host"))
 	viper.BindPFlag("download.kdk.install", downloadKdkCmd.Flags().Lookup("install"))
 	viper.BindPFlag("download.kdk.output", downloadKdkCmd.Flags().Lookup("output"))
 }
@@ -82,6 +84,7 @@ var downloadKdkCmd = &cobra.Command{
 		resumeAll := viper.GetBool("download.resume-all")
 		restartAll := viper.GetBool("download.restart-all")
 		// flags
+		forHost := viper.GetBool("download.kdk.host")
 		install := viper.GetBool("download.kdk.install")
 		output := viper.GetString("download.kdk.output")
 
@@ -92,26 +95,44 @@ var downloadKdkCmd = &cobra.Command{
 
 		var aKDK download.KDK
 
-		var choices []string
-		for _, kdk := range kdks {
-			choices = append(choices, kdk.Name)
-		}
+		if forHost {
+			binfo, err := utils.GetBuildInfo()
+			if err != nil {
+				return fmt.Errorf("failed to get build info: %v", err)
+			}
+			found := false
+			for _, kdk := range kdks {
+				if kdk.Version == binfo.ProductVersion && kdk.Build == binfo.BuildVersion {
+					aKDK = kdk
+					found = true
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("failed to find KDK for %s (%s)", binfo.ProductVersion, binfo.BuildVersion)
+			}
+		} else {
+			var choices []string
+			for _, kdk := range kdks {
+				choices = append(choices, kdk.Name)
+			}
 
-		var choice string
-		prompt := &survey.Select{
-			Message:  "Select KDK to download:",
-			Options:  choices,
-			PageSize: 10,
-		}
-		if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-			log.Warn("Exiting...")
-			return nil
-		}
+			var choice string
+			prompt := &survey.Select{
+				Message:  "Select KDK to download:",
+				Options:  choices,
+				PageSize: 10,
+			}
+			if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				return nil
+			}
 
-		for _, kdk := range kdks {
-			if kdk.Name == choice {
-				aKDK = kdk
-				break
+			for _, kdk := range kdks {
+				if kdk.Name == choice {
+					aKDK = kdk
+					break
+				}
 			}
 		}
 
