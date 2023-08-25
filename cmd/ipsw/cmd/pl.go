@@ -45,7 +45,7 @@ func init() {
 var plistCmd = &cobra.Command{
 	Use:     "plist",
 	Aliases: []string{"pl"},
-	Short:   "Dump firmwares",
+	Short:   "Dump plist as JSON",
 	Args:    cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
