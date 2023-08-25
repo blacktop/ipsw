@@ -17,9 +17,14 @@ ipsw idev img nonce [flags]
 ### Options
 
 ```
-  -h, --help            help for nonce
-  -o, --output string   Folder to write QR code PNG to
-  -q, --qr-code         Generate QR code of nonce
+  -h, --help             help for nonce
+  -j, --json             Print as JSON
+  -m, --mail string      QR mailto address
+  -o, --output string    Folder to write QR code PNG to
+  -q, --qr-code          Generate QR code of nonce
+  -r, --readable         Print nonce as a more readable string
+  -s, --subject string   QR mailto subject (default "Device Nonce Info")
+      --url string       QR code URL
 ```
 
 ### Options inherited from parent commands

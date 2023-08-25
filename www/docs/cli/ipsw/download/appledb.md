@@ -28,13 +28,18 @@ ipsw download appledb [flags]
 ### Options
 
 ```
-      --beta             Download beta IPSWs
-  -f, --flat             Do NOT perserve directory structure when downloading with --pattern
-  -h, --help             help for appledb
-      --kernel           Extract kernelcache from remote IPSW
-      --os string        Operating system to download (i.e. iOS, tvOS, watchOS, bridgeOS)
-  -o, --output string    Folder to download files to
-      --pattern string   Download remote files that match regex
+  -a, --api                Use Github API
+      --api-token string   Github API Token
+      --beta               Download beta IPSWs
+  -f, --flat               Do NOT perserve directory structure when downloading with --pattern
+  -h, --help               help for appledb
+      --kernel             Extract kernelcache from remote IPSW
+      --latest             Download latest IPSWs
+      --os stringArray     Operating system to download (i.e. iOS, tvOS, watchOS, bridgeOS)
+  -o, --output string      Folder to download files to
+      --pattern string     Download remote files that match regex
+  -u, --urls               Dump URLs only
+      --usb                Download IPSWs for USB attached iDevices
 ```
 
 ### Options inherited from parent commands

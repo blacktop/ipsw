@@ -18,8 +18,8 @@ ipsw idev img unmount [flags]
 
 ```
   -h, --help                 help for unmount
-  -t, --image-type string    Image type to unmount (default "Developer")
-  -m, --mount-point string   Path to mount point (default "/Developer")
+  -t, --image-type string    Image type to unmount (i.e. 'Developer')
+  -m, --mount-point string   Path to mount point (i.e. '/Developer')
 ```
 
 ### Options inherited from parent commands

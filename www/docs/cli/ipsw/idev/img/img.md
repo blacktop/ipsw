@@ -36,5 +36,6 @@ ipsw idev img [flags]
 * [ipsw idev img ls](/docs/cli/ipsw/idev/img/ls)	 - List mounted images
 * [ipsw idev img mount](/docs/cli/ipsw/idev/img/mount)	 - Mount an image
 * [ipsw idev img nonce](/docs/cli/ipsw/idev/img/nonce)	 - Query Nonce
+* [ipsw idev img sign](/docs/cli/ipsw/idev/img/sign)	 - Personalize DDI
 * [ipsw idev img unmount](/docs/cli/ipsw/idev/img/unmount)	 - Unmount an image
 

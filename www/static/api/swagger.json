@@ -1807,6 +1807,16 @@
     "CdLinkage": {
       "type": "object",
       "properties": {
+        "linkage_application_sub_type": {
+          "type": "integer",
+          "format": "uint16",
+          "x-go-name": "LinkageApplicationSubType"
+        },
+        "linkage_application_type": {
+          "type": "integer",
+          "format": "uint8",
+          "x-go-name": "LinkageApplicationType"
+        },
         "linkage_hash_type": {
           "description": "Version 0x20600 */",
           "type": "integer",
@@ -1822,11 +1832,6 @@
           "type": "integer",
           "format": "uint32",
           "x-go-name": "LinkageSize"
-        },
-        "linkage_truncated": {
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "LinkageTruncated"
         }
       },
       "x-go-package": "github.com/blacktop/go-macho/pkg/codesign/types"
@@ -1993,6 +1998,16 @@
           "format": "uint32",
           "x-go-name": "IdentOffset"
         },
+        "linkage_application_sub_type": {
+          "type": "integer",
+          "format": "uint16",
+          "x-go-name": "LinkageApplicationSubType"
+        },
+        "linkage_application_type": {
+          "type": "integer",
+          "format": "uint8",
+          "x-go-name": "LinkageApplicationType"
+        },
         "linkage_hash_type": {
           "description": "Version 0x20600 */",
           "type": "integer",
@@ -2008,11 +2023,6 @@
           "type": "integer",
           "format": "uint32",
           "x-go-name": "LinkageSize"
-        },
-        "linkage_truncated": {
-          "type": "integer",
-          "format": "uint8",
-          "x-go-name": "LinkageTruncated"
         },
         "n_code_slots": {
           "type": "integer",
@@ -2095,6 +2105,38 @@
             "type": "string"
           },
           "x-go-name": "Errors"
+        },
+        "launch_constraints_parent": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LaunchConstraintsParent"
+        },
+        "launch_constraints_responsible": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LaunchConstraintsResponsible"
+        },
+        "launch_constraints_self": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LaunchConstraintsSelf"
+        },
+        "library_constraints": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "LibraryConstraints"
         },
         "requirements": {
           "type": "array",
@@ -2232,6 +2274,14 @@
         "activation_state_acknowledged": {
           "type": "boolean",
           "x-go-name": "ActivationStateAcknowledged"
+        },
+        "ap_nonce": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "ApNonce"
         },
         "baseband_activation_ticket_version": {
           "type": "string",
@@ -2425,6 +2475,10 @@
           "type": "boolean",
           "x-go-name": "HostAttached"
         },
+        "img4_supported": {
+          "type": "boolean",
+          "x-go-name": "Image4Supported"
+        },
         "integrated_circuit_card_identity": {
           "type": "string",
           "x-go-name": "IntegratedCircuitCardIdentity"
@@ -2495,6 +2549,11 @@
           },
           "x-go-name": "PkHash"
         },
+        "preflight_info": {
+          "type": "object",
+          "additionalProperties": {},
+          "x-go-name": "FirmwarePreflightInfo"
+        },
         "pri_version___major": {
           "type": "integer",
           "format": "int64",
@@ -2545,6 +2604,14 @@
         "release_type": {
           "type": "string",
           "x-go-name": "ReleaseType"
+        },
+        "sep_nonce": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint8"
+          },
+          "x-go-name": "SEPNonce"
         },
         "serial_number": {
           "type": "string",
@@ -3458,6 +3525,24 @@
         },
         "webkit": {
           "type": "string"
+        }
+      }
+    },
+    "extractKernelsReponse": {
+      "description": "The extract kernels response message",
+      "schema": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "headers": {
+        "artifacts": {
+          "minItems": 0,
+          "description": "The list of extracted kernels and what devices they are for"
         }
       }
     },

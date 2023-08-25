@@ -18,7 +18,9 @@ ipsw download tss [flags]
 
 ```
   -h, --help            help for tss
-  -s, --signed string   Check if iOS version is still being signed
+  -o, --output string   Output directory to save blobs to
+  -s, --signed          Check if iOS version is still being signed
+  -u, --usb             Download blobs for USB connected device
 ```
 
 ### Options inherited from parent commands

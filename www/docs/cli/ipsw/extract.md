@@ -17,24 +17,26 @@ ipsw extract <IPSW/OTA | URL> [flags]
 ### Options
 
 ```
-  -m, --dmg string              Extract DMG file (app, sys, fs)
+      --dmg string              Extract DMG file (app, sys, fs)
       --driverkit               Extract DriverKit dyld_shared_cache
-  -t, --dtree                   Extract DeviceTree
+      --dtree                   Extract DeviceTree
   -d, --dyld                    Extract dyld_shared_cache
   -a, --dyld-arch stringArray   dyld_shared_cache architecture to extract
   -f, --files                   Extract File System files
       --flat                    Do NOT perserve directory structure when extracting
   -h, --help                    help for extract
-  -i, --iboot                   Extract iBoot
+      --iboot                   Extract iBoot
       --insecure                do not verify ssl certs
-  -b, --kbag                    Extract Im4p Keybags
+  -j, --json                    Output extracted paths as JSON
+      --kbag                    Extract Im4p Keybags
   -k, --kernel                  Extract kernelcache
   -o, --output string           Folder to extract files to
-      --pattern string          Extract files that match regex
+  -p, --pattern string          Extract files that match regex
       --proxy string            HTTP/HTTPS proxy
   -r, --remote                  Extract from URL
-  -s, --sep                     Extract sep-firmware
-  -p, --sptm                    Extract SPTM and TXM Firmwares
+      --sep                     Extract sep-firmware
+      --sptm                    Extract SPTM and TXM Firmwares
+      --sys-ver                 Extract SystemVersion
 ```
 
 ### Options inherited from parent commands
