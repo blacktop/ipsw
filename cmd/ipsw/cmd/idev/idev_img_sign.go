@@ -38,33 +38,33 @@ import (
 )
 
 func init() {
-	ImgCmd.AddCommand(idevImgPersonCmd)
+	ImgCmd.AddCommand(idevImgSignCmd)
 
-	idevImgPersonCmd.Flags().StringP("xcode", "x", "/Applications/Xcode.app", "Path to Xcode.app")
-	idevImgPersonCmd.Flags().StringP("manifest", "m", "", "BuildManifest.plist to use")
-	idevImgPersonCmd.Flags().Uint64P("board-id", "b", 0, "Device ApBoardID")
-	idevImgPersonCmd.Flags().Uint64P("chip-id", "c", 0, "Device ApChipID")
-	idevImgPersonCmd.Flags().Uint64P("ecid", "e", 0, "Device ApECID")
-	idevImgPersonCmd.Flags().StringP("nonce", "n", "", "Device ApNonce")
-	idevImgPersonCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
-	idevImgPersonCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
-	idevImgPersonCmd.Flags().StringP("output", "o", "", "Folder to write signature to")
-	idevImgPersonCmd.MarkFlagDirname("output")
+	idevImgSignCmd.Flags().StringP("xcode", "x", "/Applications/Xcode.app", "Path to Xcode.app")
+	idevImgSignCmd.Flags().StringP("manifest", "m", "", "BuildManifest.plist to use")
+	idevImgSignCmd.Flags().Uint64P("board-id", "b", 0, "Device ApBoardID")
+	idevImgSignCmd.Flags().Uint64P("chip-id", "c", 0, "Device ApChipID")
+	idevImgSignCmd.Flags().Uint64P("ecid", "e", 0, "Device ApECID")
+	idevImgSignCmd.Flags().StringP("nonce", "n", "", "Device ApNonce")
+	idevImgSignCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
+	idevImgSignCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	idevImgSignCmd.Flags().StringP("output", "o", "", "Folder to write signature to")
+	idevImgSignCmd.MarkFlagDirname("output")
 
-	viper.BindPFlag("idev.img.person.xcode", idevImgPersonCmd.Flags().Lookup("xcode"))
-	viper.BindPFlag("idev.img.person.manifest", idevImgPersonCmd.Flags().Lookup("manifest"))
-	viper.BindPFlag("idev.img.person.board-id", idevImgPersonCmd.Flags().Lookup("board-id"))
-	viper.BindPFlag("idev.img.person.chip-id", idevImgPersonCmd.Flags().Lookup("chip-id"))
-	viper.BindPFlag("idev.img.person.ecid", idevImgPersonCmd.Flags().Lookup("ecid"))
-	viper.BindPFlag("idev.img.person.nonce", idevImgPersonCmd.Flags().Lookup("nonce"))
-	viper.BindPFlag("idev.img.person.output", idevImgPersonCmd.Flags().Lookup("output"))
-	viper.BindPFlag("idev.img.person.proxy", idevImgPersonCmd.Flags().Lookup("proxy"))
-	viper.BindPFlag("idev.img.person.insecure", idevImgPersonCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("idev.img.sign.xcode", idevImgSignCmd.Flags().Lookup("xcode"))
+	viper.BindPFlag("idev.img.sign.manifest", idevImgSignCmd.Flags().Lookup("manifest"))
+	viper.BindPFlag("idev.img.sign.board-id", idevImgSignCmd.Flags().Lookup("board-id"))
+	viper.BindPFlag("idev.img.sign.chip-id", idevImgSignCmd.Flags().Lookup("chip-id"))
+	viper.BindPFlag("idev.img.sign.ecid", idevImgSignCmd.Flags().Lookup("ecid"))
+	viper.BindPFlag("idev.img.sign.nonce", idevImgSignCmd.Flags().Lookup("nonce"))
+	viper.BindPFlag("idev.img.sign.output", idevImgSignCmd.Flags().Lookup("output"))
+	viper.BindPFlag("idev.img.sign.proxy", idevImgSignCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("idev.img.sign.insecure", idevImgSignCmd.Flags().Lookup("insecure"))
 }
 
-// idevImgPersonCmd represents the person command
-var idevImgPersonCmd = &cobra.Command{
-	Use:           "person",
+// idevImgSignCmd represents the sign command
+var idevImgSignCmd = &cobra.Command{
+	Use:           "sign",
 	Short:         "Personalize DDI",
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -78,11 +78,11 @@ var idevImgPersonCmd = &cobra.Command{
 		// flags
 		xcode := viper.GetString("idev.img.mount.xcode")
 		manifestPath := viper.GetString("idev.img.mount.manifest")
-		boardID := viper.GetUint64("idev.img.person.board-id")
-		chipID := viper.GetUint64("idev.img.person.chip-id")
-		ecid := viper.GetUint64("idev.img.person.ecid")
-		nonce := viper.GetString("idev.img.person.nonce")
-		output := viper.GetString("idev.img.person.output")
+		boardID := viper.GetUint64("idev.img.sign.board-id")
+		chipID := viper.GetUint64("idev.img.sign.chip-id")
+		ecid := viper.GetUint64("idev.img.sign.ecid")
+		nonce := viper.GetString("idev.img.sign.nonce")
+		output := viper.GetString("idev.img.sign.output")
 		// verify flags
 		if xcode != "" && manifestPath != "" {
 			return fmt.Errorf("cannot specify both --xcode and --manifest")
@@ -127,8 +127,8 @@ var idevImgPersonCmd = &cobra.Command{
 		}
 
 		sigData, err := tss.Personalize(&tss.PersonalConfig{
-			Proxy:    viper.GetString("idev.img.person.proxy"),
-			Insecure: viper.GetBool("idev.img.person.insecure"),
+			Proxy:    viper.GetString("idev.img.sign.proxy"),
+			Insecure: viper.GetBool("idev.img.sign.insecure"),
 			PersonlID: map[string]any{
 				"BoardId":      boardID,
 				"ChipID":       chipID,
