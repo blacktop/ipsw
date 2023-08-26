@@ -32,13 +32,13 @@ import (
 )
 
 func init() {
-	ASCertCmd.AddCommand(ASCertListCmd)
+	ASBundleCmd.AddCommand(ASBundleListCmd)
 }
 
-// ASCertListCmd represents the appstore cert ls command
-var ASCertListCmd = &cobra.Command{
+// ASBundleListCmd represents the appstore cert ls command
+var ASBundleListCmd = &cobra.Command{
 	Use:           "ls",
-	Short:         "List certificates.",
+	Short:         "List bundle IDs that are registered to your team.",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -55,14 +55,14 @@ var ASCertListCmd = &cobra.Command{
 
 		as := appstore.NewAppStore(viper.GetString("appstore.p8"), viper.GetString("appstore.iss"), viper.GetString("appstore.kid"))
 
-		certs, err := as.GetCertificates()
+		bIDs, err := as.GetBundleIDs()
 		if err != nil {
 			return err
 		}
 
-		log.Info("Certificates:")
-		for _, cert := range certs {
-			utils.Indent(log.Info, 2)(fmt.Sprintf("%s: %s (%s), Expires: %s", cert.ID, cert.Attributes.Name, cert.Attributes.CertificateType, cert.Attributes.ExpirationDate.Format("02Jan2006 15:04:05")))
+		log.Info("Bundle IDs:")
+		for _, bID := range bIDs {
+			utils.Indent(log.Info, 2)(fmt.Sprintf("%s: [%s]\t%s\t(%s)", bID.ID, bID.Attributes.Platform, bID.Attributes.ID, bID.Attributes.Name))
 		}
 
 		return nil
