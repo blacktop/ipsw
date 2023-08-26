@@ -13,7 +13,7 @@ type DevicesData struct {
 	Type       string `json:"type"`
 	ID         string `json:"id"`
 	Attributes struct {
-		AddedDate   string `json:"addedDate"`
+		AddedDate   Date   `json:"addedDate"`
 		Name        string `json:"name"`
 		DeviceClass string `json:"deviceClass"`
 		Model       string `json:"model"`
