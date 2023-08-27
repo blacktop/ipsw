@@ -112,7 +112,7 @@ type BundleIdCapabilityResponse struct {
 	Links DocumentLinks      `json:"links"`
 }
 
-type BundleIdCapabilityCreateRequest struct {
+type BundleIDCapabilityCreateRequest struct {
 	Data struct {
 		Type       string `json:"type"` // bundleIdCapabilities
 		Attributes struct {
@@ -131,15 +131,39 @@ type BundleIdCapabilityCreateRequest struct {
 }
 
 // EnableCapability enables a capability for a bundle ID.. // TODO: finish this
-func (as *AppStore) EnableCapability(id string) (*BundleIdCapability, error) {
+func (as *AppStore) EnableCapability(id, ctype string) (*BundleIdCapability, error) {
 	if err := as.createToken(); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
-	var bundleIdCapabilityCreateRequest BundleIdCapabilityCreateRequest
-	bundleIdCapabilityCreateRequest.Data.Type = "bundleIdCapabilities"
+	var bundleIDCapabilityCreateRequest BundleIDCapabilityCreateRequest
+	bundleIDCapabilityCreateRequest.Data.Type = "bundleIdCapabilities"
+	bundleIDCapabilityCreateRequest.Data.Relationships.BundleID.Data.ID = id
+	bundleIDCapabilityCreateRequest.Data.Relationships.BundleID.Data.Type = "bundleIds"
+	bundleIDCapabilityCreateRequest.Data.Attributes.CapabilityType = capabilityType(ctype)
+	bundleIDCapabilityCreateRequest.Data.Attributes.Settings = []CapabilitySetting{
+		{
+			AllowedInstances: SINGLE,
+			Description:      "Access to CloudKit containers",
+			Enabled:          true,
+			Key:              ICLOUD_VERSION,
+			Name:             "iCloud",
+			Options: []CapabilityOption{
+				{
+					Description:      "Access to CloudKit containers",
+					Enabled:          true,
+					Default:          true,
+					Key:              XCODE_5,
+					Name:             "CloudKit",
+					SupportsWildcard: false,
+				},
+			},
+			Visible:      true,
+			MinInstances: 1,
+		},
+	}
 
-	jsonStr, err := json.Marshal(&bundleIdCapabilityCreateRequest)
+	jsonStr, err := json.Marshal(&bundleIDCapabilityCreateRequest)
 	if err != nil {
 		return nil, err
 	}
