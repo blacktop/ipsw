@@ -33,7 +33,7 @@ func init() {
 var ASDeviceCmd = &cobra.Command{
 	Use:     "device",
 	Aliases: []string{"d"},
-	Short:   "Register devices for development and testing.",
+	Short:   "Register devices for development and testing",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

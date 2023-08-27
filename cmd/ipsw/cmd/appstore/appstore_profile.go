@@ -33,7 +33,7 @@ func init() {
 var ASProfileCmd = &cobra.Command{
 	Use:     "profile",
 	Aliases: []string{"p"},
-	Short:   "Create, delete, and download provisioning profiles that enable app installations for development and distribution.",
+	Short:   "Create, delete, and download provisioning profiles that enable app installations for development and distribution",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

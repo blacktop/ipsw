@@ -52,7 +52,7 @@ func init() {
 var ASProfileRenewCmd = &cobra.Command{
 	Use:           "renew <NAME>",
 	Aliases:       []string{"r"},
-	Short:         "Renew and expired or invalide provisioning profile.",
+	Short:         "Renew and expired or invalide provisioning profile",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,

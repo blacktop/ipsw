@@ -38,7 +38,7 @@ func init() {
 // ASCertListCmd represents the appstore cert ls command
 var ASCertListCmd = &cobra.Command{
 	Use:           "ls",
-	Short:         "List certificates.",
+	Short:         "List certificates",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,

@@ -33,7 +33,7 @@ func init() {
 var ASBundleCmd = &cobra.Command{
 	Use:     "bundle",
 	Aliases: []string{"b"},
-	Short:   "Manage the bundle IDs that uniquely identify your apps.",
+	Short:   "Manage the bundle IDs that uniquely identify your apps",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
