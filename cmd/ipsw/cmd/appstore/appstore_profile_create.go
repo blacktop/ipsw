@@ -77,6 +77,10 @@ var ASProfileCreateCmd = &cobra.Command{
 		bid := viper.GetString("appstore.profile.create.bundle-id")
 		certs := viper.GetStringSlice("appstore.profile.create.certs")
 		devices := viper.GetStringSlice("appstore.profile.create.devices")
+		// Validate flags
+		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
+			return fmt.Errorf("you must provide --p8, --iss and --kid")
+		}
 
 		as := appstore.NewAppStore(viper.GetString("appstore.p8"), viper.GetString("appstore.iss"), viper.GetString("appstore.kid"))
 

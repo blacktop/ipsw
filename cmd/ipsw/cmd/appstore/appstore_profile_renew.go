@@ -40,9 +40,11 @@ func init() {
 	ASProfileCmd.AddCommand(ASProfileRenewCmd)
 
 	ASProfileRenewCmd.Flags().String("id", "", "Profile ID to renew")
+	ASProfileRenewCmd.Flags().StringP("name", "n", "", "Profile name to renew")
 	ASProfileRenewCmd.Flags().StringP("output", "o", "", "Folder to download profile to")
 	ASProfileRenewCmd.MarkFlagDirname("output")
 	viper.BindPFlag("appstore.profile.renew.id", ASProfileRenewCmd.Flags().Lookup("id"))
+	viper.BindPFlag("appstore.profile.renew.name", ASProfileRenewCmd.Flags().Lookup("name"))
 	viper.BindPFlag("appstore.profile.renew.output", ASProfileRenewCmd.Flags().Lookup("output"))
 }
 
@@ -67,14 +69,38 @@ var ASProfileRenewCmd = &cobra.Command{
 		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
 		// flags
 		id := viper.GetString("appstore.profile.renew.id")
+		name := viper.GetString("appstore.profile.renew.name")
 		output := viper.GetString("appstore.profile.renew.output")
+		// Validate flags
+		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
+			return fmt.Errorf("you must provide --p8, --iss and --kid")
+		}
+		if id != "" && name != "" {
+			return fmt.Errorf("cannot use both --id and --name")
+		}
 
 		as := appstore.NewAppStore(viper.GetString("appstore.p8"), viper.GetString("appstore.iss"), viper.GetString("appstore.kid"))
 
-		if id != "" {
-			profile, err = as.GetProfile(id)
-			if err != nil {
-				return err
+		if id != "" || name != "" {
+			if id != "" {
+				profile, err = as.GetProfile(id)
+				if err != nil {
+					return err
+				}
+			} else {
+				profs, err := as.GetProfiles()
+				if err != nil {
+					return err
+				}
+				for _, prof := range profs {
+					if prof.Attributes.Name == name {
+						profile = &prof
+						break
+					}
+				}
+				if profile == nil {
+					return fmt.Errorf("failed to find profile with name '%s'", name)
+				}
 			}
 		} else {
 			profs, err := as.GetProfiles()
