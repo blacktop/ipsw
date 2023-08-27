@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/blacktop/ipsw/internal/download"
@@ -176,7 +177,15 @@ func (as *AppStore) GetProfiles() ([]Profile, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var profiles ProfilesResponse
@@ -214,7 +223,15 @@ func (as *AppStore) GetProfile(id string) (*Profile, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var profile ProfileResponse
@@ -225,8 +242,53 @@ func (as *AppStore) GetProfile(id string) (*Profile, error) {
 	return &profile.Data, nil
 }
 
+// GetProfileBundleID returns the bundle ID information for a specific provisioning profile.
+func (as *AppStore) GetProfileBundleID(id string) (*BundleID, error) {
+	if err := as.createToken(); err != nil {
+		return nil, fmt.Errorf("failed to create token: %v", err)
+	}
+
+	req, err := http.NewRequest("GET", profilesURL+fmt.Sprintf("/%s/bundleId", id), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http GET request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+as.token)
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           download.GetProxy(as.Proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: as.Insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send http request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+	}
+
+	var bundle BundleIdResponse
+	if err := json.NewDecoder(resp.Body).Decode(&bundle); err != nil {
+		return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+	}
+
+	return &bundle.Data, nil
+}
+
 // GetProfileDevices returns a list of all devices for a specific provisioning profile
-func (as *AppStore) GetProfileDevices(id string) ([]DevicesData, error) {
+func (as *AppStore) GetProfileDevices(id string) ([]Device, error) {
 	if err := as.createToken(); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
@@ -251,19 +313,27 @@ func (as *AppStore) GetProfileDevices(id string) ([]DevicesData, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
-	var devicesResponseList DevicesResponseList
-	if err := json.NewDecoder(resp.Body).Decode(&devicesResponseList); err != nil {
+	var devices DevicesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&devices); err != nil {
 		return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 	}
 
-	return devicesResponseList.Data, nil
+	return devices.Data, nil
 }
 
 // GetProfileCerts returns a list of all certificates and their data for a specific provisioning profile.
-func (as *AppStore) GetProfileCerts(id string) ([]CertificateData, error) {
+func (as *AppStore) GetProfileCerts(id string) ([]Certificate, error) {
 	if err := as.createToken(); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
@@ -288,10 +358,18 @@ func (as *AppStore) GetProfileCerts(id string) ([]CertificateData, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
-	var certs CertificateResponseList
+	var certs CertificatesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&certs); err != nil {
 		return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 	}
@@ -329,7 +407,7 @@ func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, ce
 	if err != nil {
 		return nil, err
 	}
-
+	// os.WriteFile("req.json", jsonStr, 0644)
 	req, err := http.NewRequest("POST", profilesURL, bytes.NewBuffer(jsonStr))
 	if err != nil {
 		return nil, err
@@ -352,7 +430,15 @@ func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, ce
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
-		return nil, fmt.Errorf("%d: %s", resp.StatusCode, resp.Status)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var profileResponse ProfileResponse
@@ -361,4 +447,45 @@ func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, ce
 	}
 
 	return &profileResponse, nil
+}
+
+// DeleteProfile deletes a provisioning profile that is used for app development or distribution.
+func (as *AppStore) DeleteProfile(id string) error {
+	if err := as.createToken(); err != nil {
+		return fmt.Errorf("failed to create token: %v", err)
+	}
+
+	req, err := http.NewRequest("DELETE", profilesURL+"/"+id, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+as.token)
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           download.GetProxy(as.Proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: as.Insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send http request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 204 {
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return fmt.Errorf("%s: %s", resp.Status, errOut)
+	}
+
+	return nil
 }

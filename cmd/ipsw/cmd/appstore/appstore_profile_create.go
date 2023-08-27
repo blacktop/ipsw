@@ -24,11 +24,13 @@ package appstore
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/appstore"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -44,19 +46,22 @@ func init() {
 	ASProfileCreateCmd.Flags().StringP("bundle-id", "b", "", "Board ID")
 	ASProfileCreateCmd.Flags().StringSliceP("certs", "c", []string{}, "Certificate IDs")
 	ASProfileCreateCmd.Flags().StringSliceP("devices", "d", []string{}, "Device IDs")
+	ASProfileCreateCmd.Flags().StringP("output", "o", "", "Folder to download profile to")
+	ASProfileCreateCmd.MarkFlagDirname("output")
 	viper.BindPFlag("appstore.profile.create.type", ASProfileCreateCmd.Flags().Lookup("type"))
 	viper.BindPFlag("appstore.profile.create.bundle-id", ASProfileCreateCmd.Flags().Lookup("bundle-id"))
 	viper.BindPFlag("appstore.profile.create.certs", ASProfileCreateCmd.Flags().Lookup("certs"))
 	viper.BindPFlag("appstore.profile.create.devices", ASProfileCreateCmd.Flags().Lookup("devices"))
+	viper.BindPFlag("appstore.profile.create.output", ASProfileCreateCmd.Flags().Lookup("output"))
 }
 
 // ASProfileCreateCmd represents the appstore profile command
 var ASProfileCreateCmd = &cobra.Command{
-	Use:     "create <NAME>",
-	Aliases: []string{"c"},
-	Short:   "Create a new provisioning profile.",
-	Args:    cobra.ExactArgs(1),
-	// SilenceUsage:  true,
+	Use:           "create <NAME>",
+	Aliases:       []string{"c"},
+	Short:         "Create a new provisioning profile.",
+	Args:          cobra.ExactArgs(1),
+	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -75,8 +80,7 @@ var ASProfileCreateCmd = &cobra.Command{
 
 		as := appstore.NewAppStore(viper.GetString("appstore.p8"), viper.GetString("appstore.iss"), viper.GetString("appstore.kid"))
 
-		if len(bid) == 0 {
-			// Pick Board ID
+		if len(bid) == 0 { // Pick Board ID
 			bids, err := as.GetBundleIDs()
 			if err != nil {
 				return err
@@ -106,8 +110,7 @@ var ASProfileCreateCmd = &cobra.Command{
 			}
 		}
 
-		if len(certs) == 0 {
-			// Pick Certs
+		if len(certs) == 0 { // Pick Certs
 			cs, err := as.GetCertificates()
 			if err != nil {
 				return err
@@ -118,26 +121,23 @@ var ASProfileCreateCmd = &cobra.Command{
 				choices = append(choices, c.Attributes.Name)
 			}
 
-			var choice string
-			prompt := &survey.Select{
+			var choose []int
+			prompt := &survey.MultiSelect{
 				Message:  "Select certificates to use:",
 				Options:  choices,
 				PageSize: 10,
 			}
-			if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+			if err := survey.AskOne(prompt, &choose); err == terminal.InterruptErr {
 				log.Warn("Exiting...")
 				return nil
 			}
 
-			for _, c := range cs {
-				if c.Attributes.Name == choice {
-					certs = append(certs, c.ID)
-				}
+			for _, idx := range choose {
+				certs = append(certs, cs[idx].ID)
 			}
 		}
 
-		if len(devices) == 0 {
-			// Pick Devvices
+		if len(devices) == 0 { // Pick Devvices
 			ds, err := as.GetDevices()
 			if err != nil {
 				return err
@@ -148,33 +148,68 @@ var ASProfileCreateCmd = &cobra.Command{
 				choices = append(choices, d.Attributes.Name)
 			}
 
-			var choice string
-			prompt := &survey.Select{
+			var choose []int
+			prompt := &survey.MultiSelect{
 				Message:  "Select devices to use:",
 				Options:  choices,
 				PageSize: 10,
 			}
-			if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+			if err := survey.AskOne(prompt, &choose); err == terminal.InterruptErr {
 				log.Warn("Exiting...")
 				return nil
 			}
 
-			for _, d := range ds {
-				if d.Attributes.Name == choice {
-					devices = append(devices, d.ID)
-				}
+			for _, idx := range choose {
+				fmt.Printf("adding idx=%d as %s\n", idx, ds[idx].ID)
+				devices = append(devices, ds[idx].ID)
 			}
 		}
+
+		log.WithFields(log.Fields{
+			"bundle-id": bid,
+			"certs":     certs,
+			"devices":   devices,
+		}).Debug("Creating profile")
 
 		resp, err := as.CreateProfile(args[0], viper.GetString("appstore.profile.create.type"), bid, certs, devices)
 		if err != nil {
 			return fmt.Errorf("failed to create profile: %v", err)
 		}
 
-		fname := args[0] + ".mobileprovision"
-		log.Infof("Downloading profile %s", fname)
+		log.Info("Created Profile:")
+		prof := resp.Data
+		utils.Indent(log.Info, 2)(fmt.Sprintf("%s: %s (%s), Expires: %s", prof.ID, prof.Attributes.Name, prof.Attributes.ProfileState, prof.Attributes.ExpirationDate.Format("02Jan2006 15:04:05")))
+		cs, err := as.GetProfileCerts(prof.ID)
+		if err != nil {
+			return err
+		}
+		if len(certs) > 0 {
+			utils.Indent(log.Info, 3)("Certificates:")
+		}
+		for _, cert := range cs {
+			utils.Indent(log.Info, 4)(fmt.Sprintf("%s: %s (%s), Expires: %s", cert.ID, cert.Attributes.Name, cert.Attributes.CertificateType, cert.Attributes.ExpirationDate.Format("02Jan2006 15:04:05")))
+		}
+		devs, err := as.GetProfileDevices(prof.ID)
+		if err != nil {
+			return err
+		}
+		if len(devs) > 0 {
+			utils.Indent(log.Info, 3)("Devices:")
+		}
+		for _, dev := range devs {
+			utils.Indent(log.Info, 4)(fmt.Sprintf("%s: %s (%s)", dev.ID, dev.Attributes.Name, dev.Attributes.DeviceClass))
+		}
+
+		fname := prof.Attributes.Name + ".mobileprovision"
+		if viper.GetString("appstore.profile.create.output") != "" {
+			if err := os.MkdirAll(viper.GetString("appstore.profile.create.output"), os.ModePerm); err != nil {
+				return fmt.Errorf("failed to create output directory: %v", err)
+			}
+			fname = filepath.Join(viper.GetString("appstore.profile.create.output"), fname)
+		}
+		log.Infof("Downloading profile to %s", fname)
 		if err := os.WriteFile(fname, resp.Data.Attributes.ProfileContent, 0644); err != nil {
-			return fmt.Errorf("failed to write profile to disk: %v", err)
+			return fmt.Errorf("failed to write profile to '%s': %v", fname, err)
 		}
 
 		return nil

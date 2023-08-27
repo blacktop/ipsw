@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/blacktop/ipsw/internal/download"
 )
 
-type CertificateData struct {
+type Certificate struct {
 	Type       string `json:"type"`
 	ID         string `json:"id"`
 	Attributes struct {
@@ -26,23 +27,23 @@ type CertificateData struct {
 	Links Links `json:"links"`
 }
 
-func (c CertificateData) IsExpired() bool {
+func (c Certificate) IsExpired() bool {
 	return time.Time(c.Attributes.ExpirationDate).Before(time.Now())
 }
 
 type CertificateResponse struct {
-	Data  CertificateData `json:"data"`
-	Links Links           `json:"links"`
+	Data  Certificate `json:"data"`
+	Links Links       `json:"links"`
 }
 
-type CertificateResponseList struct {
-	Data  []CertificateData  `json:"data"`
+type CertificatesResponse struct {
+	Data  []Certificate      `json:"data"`
 	Links PagedDocumentLinks `json:"links"`
 	Meta  Meta               `json:"meta"`
 }
 
 // GetCertificates returns a list certificates and download their data.
-func (as *AppStore) GetCertificates() ([]CertificateData, error) {
+func (as *AppStore) GetCertificates() ([]Certificate, error) {
 
 	if err := as.createToken(); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
@@ -68,15 +69,23 @@ func (as *AppStore) GetCertificates() ([]CertificateData, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
-	var certsResp CertificateResponseList
+	var certsResp CertificatesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&certsResp); err != nil {
 		return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 	}
 
-	certificateDataList := make([]CertificateData, 0)
+	certificateDataList := make([]Certificate, 0)
 	for _, v := range certsResp.Data {
 		if v.Type == "certificates" &&
 			(v.Attributes.CertificateType == "IOS_DEVELOPMENT" ||
