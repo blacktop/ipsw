@@ -4,11 +4,11 @@ title: ls
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: ls
-description: List bundle IDs that are registered to your team.
+description: List bundle IDs that are registered to your team
 ---
 ## ipsw appstore bundle ls
 
-List bundle IDs that are registered to your team.
+List bundle IDs that are registered to your team
 
 ```
 ipsw appstore bundle ls [flags]
@@ -33,5 +33,5 @@ ipsw appstore bundle ls [flags]
 
 ### SEE ALSO
 
-* [ipsw appstore bundle](/docs/cli/ipsw/appstore/bundle)	 - Manage the bundle IDs that uniquely identify your apps.
+* [ipsw appstore bundle](/docs/cli/ipsw/appstore/bundle)	 - Manage the bundle IDs that uniquely identify your apps
 

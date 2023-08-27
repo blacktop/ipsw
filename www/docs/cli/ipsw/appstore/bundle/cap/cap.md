@@ -1,23 +1,23 @@
 ---
-id: ls
-title: ls
+id: cap
+title: cap
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ls
-description: List devices registered to your team
+sidebar_label: cap
+description: Manage the app capabilities for a bundle ID
 ---
-## ipsw appstore device ls
+## ipsw appstore bundle cap
 
-List devices registered to your team
+Manage the app capabilities for a bundle ID
 
 ```
-ipsw appstore device ls [flags]
+ipsw appstore bundle cap [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ls
+  -h, --help   help for cap
 ```
 
 ### Options inherited from parent commands
@@ -33,5 +33,5 @@ ipsw appstore device ls [flags]
 
 ### SEE ALSO
 
-* [ipsw appstore device](/docs/cli/ipsw/appstore/device)	 - Register devices for development and testing
+* [ipsw appstore bundle](/docs/cli/ipsw/appstore/bundle)	 - Manage the bundle IDs that uniquely identify your apps
 

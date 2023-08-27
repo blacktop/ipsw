@@ -4,11 +4,11 @@ title: ls
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: ls
-description: List provisioning profiles and download their data.
+description: List provisioning profiles and download their data
 ---
 ## ipsw appstore profile ls
 
-List provisioning profiles and download their data.
+List provisioning profiles and download their data
 
 ```
 ipsw appstore profile ls [flags]
@@ -33,5 +33,5 @@ ipsw appstore profile ls [flags]
 
 ### SEE ALSO
 
-* [ipsw appstore profile](/docs/cli/ipsw/appstore/profile)	 - Create, delete, and download provisioning profiles that enable app installations for development and distribution.
+* [ipsw appstore profile](/docs/cli/ipsw/appstore/profile)	 - Create, delete, and download provisioning profiles that enable app installations for development and distribution
 

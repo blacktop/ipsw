@@ -4,11 +4,11 @@ title: bundle
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: bundle
-description: Manage the bundle IDs that uniquely identify your apps.
+description: Manage the bundle IDs that uniquely identify your apps
 ---
 ## ipsw appstore bundle
 
-Manage the bundle IDs that uniquely identify your apps.
+Manage the bundle IDs that uniquely identify your apps
 
 ```
 ipsw appstore bundle [flags]
@@ -34,5 +34,6 @@ ipsw appstore bundle [flags]
 ### SEE ALSO
 
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
-* [ipsw appstore bundle ls](/docs/cli/ipsw/appstore/bundle/ls)	 - List bundle IDs that are registered to your team.
+* [ipsw appstore bundle cap](/docs/cli/ipsw/appstore/bundle/cap)	 - Manage the app capabilities for a bundle ID
+* [ipsw appstore bundle ls](/docs/cli/ipsw/appstore/bundle/ls)	 - List bundle IDs that are registered to your team
 

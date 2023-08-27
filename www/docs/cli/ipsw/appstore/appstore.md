@@ -34,8 +34,8 @@ ipsw appstore [flags]
 ### SEE ALSO
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
-* [ipsw appstore bundle](/docs/cli/ipsw/appstore/bundle)	 - Manage the bundle IDs that uniquely identify your apps.
-* [ipsw appstore cert](/docs/cli/ipsw/appstore/cert)	 - Create, download, and revoke signing certificates for app development and distribution.
-* [ipsw appstore device](/docs/cli/ipsw/appstore/device)	 - Register devices for development and testing.
-* [ipsw appstore profile](/docs/cli/ipsw/appstore/profile)	 - Create, delete, and download provisioning profiles that enable app installations for development and distribution.
+* [ipsw appstore bundle](/docs/cli/ipsw/appstore/bundle)	 - Manage the bundle IDs that uniquely identify your apps
+* [ipsw appstore cert](/docs/cli/ipsw/appstore/cert)	 - Create, download, and revoke signing certificates for app development and distribution
+* [ipsw appstore device](/docs/cli/ipsw/appstore/device)	 - Register devices for development and testing
+* [ipsw appstore profile](/docs/cli/ipsw/appstore/profile)	 - Create, delete, and download provisioning profiles that enable app installations for development and distribution
 
