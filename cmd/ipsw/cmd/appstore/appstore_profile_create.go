@@ -160,7 +160,6 @@ var ASProfileCreateCmd = &cobra.Command{
 			}
 
 			for _, idx := range choose {
-				fmt.Printf("adding idx=%d as %s\n", idx, ds[idx].ID)
 				devices = append(devices, ds[idx].ID)
 			}
 		}
