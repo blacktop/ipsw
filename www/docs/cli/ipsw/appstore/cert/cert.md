@@ -1,0 +1,38 @@
+---
+id: cert
+title: cert
+hide_title: true
+hide_table_of_contents: true
+sidebar_label: cert
+description: Create, download, and revoke signing certificates for app development and distribution.
+---
+## ipsw appstore cert
+
+Create, download, and revoke signing certificates for app development and distribution.
+
+```
+ipsw appstore cert [flags]
+```
+
+### Options
+
+```
+  -h, --help   help for cert
+```
+
+### Options inherited from parent commands
+
+```
+      --color           colorize output
+      --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+  -i, --iss string      Issuer ID
+  -k, --kid string      Key ID
+  -p, --p8 string       Path to App Store Connect API Key (.p8)
+  -V, --verbose         verbose output
+```
+
+### SEE ALSO
+
+* [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
+* [ipsw appstore cert ls](/docs/cli/ipsw/appstore/cert/ls)	 - List certificates.
+

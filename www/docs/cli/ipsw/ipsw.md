@@ -21,6 +21,7 @@ Download and Parse IPSWs (and SO much more)
 
 ### SEE ALSO
 
+* [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
 * [ipsw debugserver](/docs/cli/ipsw/debugserver)	 - Prep device for remote debugging
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
 * [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs

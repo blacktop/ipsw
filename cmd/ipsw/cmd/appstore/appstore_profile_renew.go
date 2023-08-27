@@ -175,7 +175,7 @@ var ASProfileRenewCmd = &cobra.Command{
 			}
 			fname = filepath.Join(output, fname)
 		}
-		log.Infof("Downloading profile to %s", fname)
+		log.Infof("Downloading renewed profile to %s", fname)
 		if err := os.WriteFile(fname, resp.Data.Attributes.ProfileContent, 0644); err != nil {
 			return fmt.Errorf("failed to write profile to '%s': %v", fname, err)
 		}
