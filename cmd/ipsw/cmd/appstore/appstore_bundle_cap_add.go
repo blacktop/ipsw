@@ -36,8 +36,10 @@ import (
 func init() {
 	ASBundleCapabilityCmd.AddCommand(ASBundleCapabilityAddCmd)
 
-	ASBundleCapabilityAddCmd.Flags().String("id", "", "Profile ID to renew")
+	ASBundleCapabilityAddCmd.Flags().String("id", "", "Bundle ID to add capability to")
+	ASBundleCapabilityAddCmd.Flags().String("type", "", "Capability type")
 	viper.BindPFlag("appstore.bundle.cap.add.id", ASBundleCapabilityAddCmd.Flags().Lookup("id"))
+	viper.BindPFlag("appstore.bundle.cap.add.type", ASBundleCapabilityAddCmd.Flags().Lookup("type"))
 }
 
 // ASBundleCapabilityAddCmd represents the appstore cert ls command
@@ -60,6 +62,7 @@ var ASBundleCapabilityAddCmd = &cobra.Command{
 		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
 		// flags
 		bid := viper.GetString("appstore.bundle.cap.add.id")
+		ctype := viper.GetString("appstore.bundle.cap.add.type")
 		// Validate flags
 		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
 			return fmt.Errorf("you must provide --p8, --iss and --kid")
@@ -97,7 +100,7 @@ var ASBundleCapabilityAddCmd = &cobra.Command{
 			}
 		}
 
-		caps, err := as.EnableCapability(bid)
+		caps, err := as.EnableCapability(bid, ctype)
 		if err != nil {
 			return err
 		}
