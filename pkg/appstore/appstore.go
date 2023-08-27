@@ -14,6 +14,19 @@ const (
 	profilesURL      = "https://api.appstoreconnect.apple.com/v1/profiles"
 )
 
+type Errors struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+	Code   string `json:"code"`
+	Title  string `json:"title"`
+	Detail string `json:"detail"`
+	Source any    `json:"source"`
+}
+
+type ErrorResponse struct {
+	Errors []Errors `json:"errors"`
+}
+
 type Links struct {
 	Self    string `json:"self"`
 	Related string `json:"related,omitempty"`

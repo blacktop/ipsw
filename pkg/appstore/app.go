@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/blacktop/ipsw/internal/download"
 )
@@ -77,7 +78,15 @@ func (as *AppStore) GetApps() ([]App, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var apps AppsResponse

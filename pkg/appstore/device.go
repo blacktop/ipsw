@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/blacktop/ipsw/internal/download"
 )
 
-type DevicesData struct {
+type Device struct {
 	Type       string `json:"type"`
 	ID         string `json:"id"`
 	Attributes struct {
@@ -24,19 +25,19 @@ type DevicesData struct {
 	Links Links `json:"links"`
 }
 
-type DevicesResponse struct {
-	Data  DevicesData `json:"data"`
-	Links Links       `json:"links"`
+type DeviceResponse struct {
+	Data  Device `json:"data"`
+	Links Links  `json:"links"`
 }
 
-type DevicesResponseList struct {
-	Data  []DevicesData `json:"data"`
-	Links Links         `json:"links"`
-	Meta  Meta          `json:"meta"`
+type DevicesResponse struct {
+	Data  []Device `json:"data"`
+	Links Links    `json:"links"`
+	Meta  Meta     `json:"meta"`
 }
 
 // GetDevices returns a list devices registered to your team.
-func (as *AppStore) GetDevices() ([]DevicesData, error) {
+func (as *AppStore) GetDevices() ([]Device, error) {
 
 	if err := as.createToken(); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
@@ -62,10 +63,18 @@ func (as *AppStore) GetDevices() ([]DevicesData, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
-	var devicesResponseList DevicesResponseList
+	var devicesResponseList DevicesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&devicesResponseList); err != nil {
 		return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
 	}

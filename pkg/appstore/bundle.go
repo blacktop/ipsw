@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/blacktop/ipsw/internal/download"
 )
@@ -186,7 +187,15 @@ func (as *AppStore) GetBundleIDs() ([]BundleID, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var bundles BundleIdsResponse
@@ -223,7 +232,15 @@ func (as *AppStore) GetBundleID(id string) (*BundleID, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var bundle BundleIdResponse
@@ -261,7 +278,15 @@ func (as *AppStore) GetBundleIDApp(id string) (*AppResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var app AppResponse
@@ -298,7 +323,15 @@ func (as *AppStore) GetBundleIDProfiles(id string) (*ProfileResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var profile ProfileResponse
@@ -335,7 +368,15 @@ func (as *AppStore) GetBundleIDCapabilities(id string) (*BundleIdCapabilitiesRes
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("http request failed with status code: %d", resp.StatusCode)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var caps BundleIdCapabilitiesResponse
@@ -384,7 +425,15 @@ func (as *AppStore) RegisterBundleID(name, id string) (*BundleIdResponse, error)
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 201 {
-		return nil, fmt.Errorf("%s", resp.Body)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var bidResp BundleIdResponse
@@ -422,7 +471,15 @@ func (as *AppStore) DeleteBundleID(id string) (*BundleIdResponse, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 204 {
-		return nil, fmt.Errorf("%s", resp.Body)
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
 	}
 
 	var bidResp BundleIdResponse
