@@ -379,7 +379,6 @@ func (as *AppStore) GetProfileCerts(id string) ([]Certificate, error) {
 
 // CreateProfile creates a new profile
 func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, cerIDs, devicesIDs []string) (*ProfileResponse, error) {
-
 	if err := as.createToken(); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}

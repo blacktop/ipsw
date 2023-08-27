@@ -7,11 +7,12 @@ import (
 )
 
 const (
-	appsURL          = "https://api.appstoreconnect.apple.com/v1/apps"
-	bundleIDsURL     = "https://api.appstoreconnect.apple.com/v1/bundleIds"
-	certificatessURL = "https://api.appstoreconnect.apple.com/v1/certificates"
-	devicesURL       = "https://api.appstoreconnect.apple.com/v1/devices"
-	profilesURL      = "https://api.appstoreconnect.apple.com/v1/profiles"
+	appsURL                 = "https://api.appstoreconnect.apple.com/v1/apps"
+	bundleIDsURL            = "https://api.appstoreconnect.apple.com/v1/bundleIds"
+	bundleIDCapabilitiesURL = "https://api.appstoreconnect.apple.com/v1/bundleIdCapabilities"
+	certificatessURL        = "https://api.appstoreconnect.apple.com/v1/certificates"
+	devicesURL              = "https://api.appstoreconnect.apple.com/v1/devices"
+	profilesURL             = "https://api.appstoreconnect.apple.com/v1/profiles"
 )
 
 type Errors struct {
@@ -33,6 +34,10 @@ type Links struct {
 }
 
 type DocumentLinks struct {
+	Self string `json:"self"`
+}
+
+type ResourceLinks struct {
 	Self string `json:"self"`
 }
 
