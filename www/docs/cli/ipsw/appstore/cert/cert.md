@@ -4,11 +4,11 @@ title: cert
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: cert
-description: Create, download, and revoke signing certificates for app development and distribution.
+description: Create, download, and revoke signing certificates for app development and distribution
 ---
 ## ipsw appstore cert
 
-Create, download, and revoke signing certificates for app development and distribution.
+Create, download, and revoke signing certificates for app development and distribution
 
 ```
 ipsw appstore cert [flags]
@@ -34,5 +34,7 @@ ipsw appstore cert [flags]
 ### SEE ALSO
 
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
-* [ipsw appstore cert ls](/docs/cli/ipsw/appstore/cert/ls)	 - List certificates.
+* [ipsw appstore cert add](/docs/cli/ipsw/appstore/cert/add)	 - Create a new certificate using a certificate signing request
+* [ipsw appstore cert ls](/docs/cli/ipsw/appstore/cert/ls)	 - List certificates
+* [ipsw appstore cert rm](/docs/cli/ipsw/appstore/cert/rm)	 - Revoke a lost, stolen, compromised, or expiring signing certificate
 

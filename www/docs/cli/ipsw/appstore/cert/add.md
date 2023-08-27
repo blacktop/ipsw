@@ -1,23 +1,26 @@
 ---
-id: ls
-title: ls
+id: add
+title: add
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ls
-description: List certificates
+sidebar_label: add
+description: Create a new certificate using a certificate signing request
 ---
-## ipsw appstore cert ls
+## ipsw appstore cert add
 
-List certificates
+Create a new certificate using a certificate signing request
 
 ```
-ipsw appstore cert ls [flags]
+ipsw appstore cert add [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ls
+  -c, --csr string      CSR content
+  -h, --help            help for add
+  -o, --output string   Folder to download profile to
+  -t, --type string     Certificate type
 ```
 
 ### Options inherited from parent commands

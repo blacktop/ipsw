@@ -1,23 +1,26 @@
 ---
-id: ls
-title: ls
+id: mod
+title: mod
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ls
-description: List devices registered to your team
+sidebar_label: mod
+description: Register a new device for app development
 ---
-## ipsw appstore device ls
+## ipsw appstore device mod
 
-List devices registered to your team
+Register a new device for app development
 
 ```
-ipsw appstore device ls [flags]
+ipsw appstore device mod [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ls
+  -h, --help            help for mod
+      --id string       Device ID
+  -n, --name string     Device name
+  -s, --status string   Device status (ENABLED|DISABLED)) (default "ENABLED")
 ```
 
 ### Options inherited from parent commands

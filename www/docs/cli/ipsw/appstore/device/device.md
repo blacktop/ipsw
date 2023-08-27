@@ -4,11 +4,11 @@ title: device
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: device
-description: Register devices for development and testing.
+description: Register devices for development and testing
 ---
 ## ipsw appstore device
 
-Register devices for development and testing.
+Register devices for development and testing
 
 ```
 ipsw appstore device [flags]
@@ -34,5 +34,7 @@ ipsw appstore device [flags]
 ### SEE ALSO
 
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
-* [ipsw appstore device ls](/docs/cli/ipsw/appstore/device/ls)	 - List devices registered to your team..
+* [ipsw appstore device ls](/docs/cli/ipsw/appstore/device/ls)	 - List devices registered to your team
+* [ipsw appstore device mod](/docs/cli/ipsw/appstore/device/mod)	 - Register a new device for app development
+* [ipsw appstore device reg](/docs/cli/ipsw/appstore/device/reg)	 - Register a new device for app development
 

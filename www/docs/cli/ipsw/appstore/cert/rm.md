@@ -1,23 +1,24 @@
 ---
-id: ls
-title: ls
+id: rm
+title: rm
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ls
-description: List certificates
+sidebar_label: rm
+description: Revoke a lost, stolen, compromised, or expiring signing certificate
 ---
-## ipsw appstore cert ls
+## ipsw appstore cert rm
 
-List certificates
+Revoke a lost, stolen, compromised, or expiring signing certificate
 
 ```
-ipsw appstore cert ls [flags]
+ipsw appstore cert rm [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ls
+  -h, --help        help for rm
+      --id string   Profile ID to renew
 ```
 
 ### Options inherited from parent commands

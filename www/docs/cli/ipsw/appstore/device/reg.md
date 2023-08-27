@@ -1,23 +1,26 @@
 ---
-id: ls
-title: ls
+id: reg
+title: reg
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ls
-description: List devices registered to your team
+sidebar_label: reg
+description: Register a new device for app development
 ---
-## ipsw appstore device ls
+## ipsw appstore device reg
 
-List devices registered to your team
+Register a new device for app development
 
 ```
-ipsw appstore device ls [flags]
+ipsw appstore device reg [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ls
+  -h, --help              help for reg
+  -n, --name string       Device name
+  -t, --platform string   Device platform (default "IOS")
+  -u, --udid string       Device UDID
 ```
 
 ### Options inherited from parent commands

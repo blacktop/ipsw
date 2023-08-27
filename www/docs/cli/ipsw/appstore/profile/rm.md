@@ -1,28 +1,25 @@
 ---
-id: create
-title: create
+id: rm
+title: rm
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: create
-description: Create a new provisioning profile
+sidebar_label: rm
+description: Delete a provisioning profile that is used for app development or distribution
 ---
-## ipsw appstore profile create
+## ipsw appstore profile rm
 
-Create a new provisioning profile
+Delete a provisioning profile that is used for app development or distribution
 
 ```
-ipsw appstore profile create <NAME> [flags]
+ipsw appstore profile rm [flags]
 ```
 
 ### Options
 
 ```
-  -b, --bundle-id string   Board ID
-  -c, --certs strings      Certificate IDs
-  -d, --devices strings    Device IDs
-  -h, --help               help for create
-  -o, --output string      Folder to download profile to
-  -t, --type string        Profile type (default "IOS_APP_DEVELOPMENT")
+  -h, --help          help for rm
+      --id string     Profile ID to renew
+  -n, --name string   Profile name to renew
 ```
 
 ### Options inherited from parent commands
