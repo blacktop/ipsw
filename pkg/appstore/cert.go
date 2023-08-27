@@ -1,6 +1,7 @@
 package appstore
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -11,12 +12,42 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 )
 
+type certificateType string
+
+const (
+	CT_IOS_DEVELOPMENT            certificateType = "IOS_DEVELOPMENT"
+	CT_IOS_DISTRIBUTION           certificateType = "IOS_DISTRIBUTION"
+	CT_MAC_APP_DISTRIBUTION       certificateType = "MAC_APP_DISTRIBUTION"
+	CT_MAC_INSTALLER_DISTRIBUTION certificateType = "MAC_INSTALLER_DISTRIBUTION"
+	CT_MAC_APP_DEVELOPMENT        certificateType = "MAC_APP_DEVELOPMENT"
+	CT_DEVELOPER_ID_KEXT          certificateType = "DEVELOPER_ID_KEXT"
+	CT_DEVELOPER_ID_APPLICATION   certificateType = "DEVELOPER_ID_APPLICATION"
+	CT_DEVELOPMENT                certificateType = "DEVELOPMENT"
+	CT_DISTRIBUTION               certificateType = "DISTRIBUTION"
+	CT_PASS_TYPE_ID               certificateType = "PASS_TYPE_ID"
+	CT_PASS_TYPE_ID_WITH_NFC      certificateType = "PASS_TYPE_ID_WITH_NFC"
+)
+
+var CertTypes = []string{
+	"IOS_DEVELOPMENT",
+	"IOS_DISTRIBUTION",
+	"MAC_APP_DISTRIBUTION",
+	"MAC_INSTALLER_DISTRIBUTION",
+	"MAC_APP_DEVELOPMENT",
+	"DEVELOPER_ID_KEXT",
+	"DEVELOPER_ID_APPLICATION",
+	"DEVELOPMENT",
+	"DISTRIBUTION",
+	"PASS_TYPE_ID",
+	"PASS_TYPE_ID_WITH_NFC",
+}
+
 type Certificate struct {
 	Type       string `json:"type"`
 	ID         string `json:"id"`
 	Attributes struct {
 		SerialNumber       string `json:"serialNumber"`
-		CertificateContent string `json:"certificateContent"`
+		CertificateContent []byte `json:"certificateContent"`
 		DisplayName        string `json:"displayName"`
 		Name               string `json:"name"`
 		CsrContent         any    `json:"csrContent"`
@@ -40,6 +71,16 @@ type CertificatesResponse struct {
 	Data  []Certificate      `json:"data"`
 	Links PagedDocumentLinks `json:"links"`
 	Meta  Meta               `json:"meta"`
+}
+
+type CertificateCreateRequest struct {
+	Data struct {
+		Type       string `json:"type"` // certificates
+		Attributes struct {
+			CertificateType string `json:"certificateType"`
+			CSRContent      string `json:"csrContent"`
+		} `json:"attributes"`
+	} `json:"data"`
 }
 
 // GetCertificates returns a list certificates and download their data.
@@ -96,4 +137,102 @@ func (as *AppStore) GetCertificates() ([]Certificate, error) {
 	}
 
 	return certificateDataList, nil
+}
+
+// CreateCertificate creates a new certificate using a certificate signing request.
+func (as *AppStore) CreateCertificate(ctype string, csrData string) (*Certificate, error) {
+	if err := as.createToken(); err != nil {
+		return nil, fmt.Errorf("failed to create token: %v", err)
+	}
+
+	var profileCreateRequest CertificateCreateRequest
+	profileCreateRequest.Data.Type = "certificates"
+	profileCreateRequest.Data.Attributes.CertificateType = ctype
+	profileCreateRequest.Data.Attributes.CSRContent = csrData
+
+	jsonStr, err := json.Marshal(&profileCreateRequest)
+	if err != nil {
+		return nil, err
+	}
+	// os.WriteFile("req.json", jsonStr, 0644)
+	req, err := http.NewRequest("POST", certificatessURL, bytes.NewBuffer(jsonStr))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+as.token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           download.GetProxy(as.Proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: as.Insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send http request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 201 {
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return nil, fmt.Errorf("%s: %s", resp.Status, errOut)
+	}
+
+	var cert CertificateResponse
+	if err := json.NewDecoder(resp.Body).Decode(&cert); err != nil {
+		return nil, fmt.Errorf("failed to JSON decode http response: %v", err)
+	}
+
+	return &cert.Data, nil
+}
+
+// RevokeCertificate revokes a lost, stolen, compromised, or expiring signing certificate.
+func (as *AppStore) RevokeCertificate(id string) error {
+	if err := as.createToken(); err != nil {
+		return fmt.Errorf("failed to create token: %v", err)
+	}
+
+	req, err := http.NewRequest("DELETE", certificatessURL+"/"+id, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+as.token)
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			Proxy:           download.GetProxy(as.Proxy),
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: as.Insecure},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send http request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 204 {
+		var eresp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&eresp); err != nil {
+			return fmt.Errorf("failed to JSON decode http response: %v", err)
+		}
+		var errOut string
+		for idx, e := range eresp.Errors {
+			errOut += fmt.Sprintf("%s%s: %s (%s)\n", strings.Repeat("\t", idx), e.Code, e.Title, e.Detail)
+		}
+		return fmt.Errorf("%s: %s", resp.Status, errOut)
+	}
+
+	return nil
 }
