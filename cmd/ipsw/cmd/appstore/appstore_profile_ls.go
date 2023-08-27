@@ -38,7 +38,7 @@ func init() {
 // ASProfileListCmd represents the appstore profile command
 var ASProfileListCmd = &cobra.Command{
 	Use:           "ls",
-	Short:         "List provisioning profiles and download their data.",
+	Short:         "List provisioning profiles and download their data",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,

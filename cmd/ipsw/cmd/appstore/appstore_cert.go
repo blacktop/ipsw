@@ -33,7 +33,7 @@ func init() {
 var ASCertCmd = &cobra.Command{
 	Use:     "cert",
 	Aliases: []string{"c"},
-	Short:   "Create, download, and revoke signing certificates for app development and distribution.",
+	Short:   "Create, download, and revoke signing certificates for app development and distribution",
 	Args:    cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()

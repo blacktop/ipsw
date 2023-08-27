@@ -38,7 +38,7 @@ func init() {
 // ASBundleListCmd represents the appstore cert ls command
 var ASBundleListCmd = &cobra.Command{
 	Use:           "ls",
-	Short:         "List bundle IDs that are registered to your team.",
+	Short:         "List bundle IDs that are registered to your team",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,

@@ -59,7 +59,7 @@ func init() {
 var ASProfileCreateCmd = &cobra.Command{
 	Use:           "create <NAME>",
 	Aliases:       []string{"c"},
-	Short:         "Create a new provisioning profile.",
+	Short:         "Create a new provisioning profile",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,

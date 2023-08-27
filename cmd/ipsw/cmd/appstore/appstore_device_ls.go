@@ -38,7 +38,7 @@ func init() {
 // ASDeviceListCmd represents the appstore device ls command
 var ASDeviceListCmd = &cobra.Command{
 	Use:           "ls",
-	Short:         "List devices registered to your team..",
+	Short:         "List devices registered to your team",
 	Args:          cobra.NoArgs,
 	SilenceUsage:  true,
 	SilenceErrors: true,
