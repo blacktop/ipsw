@@ -22,7 +22,8 @@ download:
     - iPod9,1
     - iPhone14,2
   resume-all: true
-  output: /SHARE/IPSWs
+  ipsw:
+    output: /SHARE/IPSWs # this is the --output for the `ipsw download ipsw` command
 ```
 
 > This will download the `latest` IPSWs for _only_ the `iPod9,1` and the `iPhone14,2` without requesting user confirmation to download. It will also always try to `resume` previously interrupted downloads and will download everything to the `/SHARE/IPSWs` folder
