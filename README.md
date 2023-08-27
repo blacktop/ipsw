@@ -60,6 +60,7 @@ Usage:
   ipsw [command]
 
 Available Commands:
+  appstore        Interact with the App Store Connect API
   debugserver     Prep device for remote debugging
   device-list     List all iOS devices
   diff            Diff IPSWs
@@ -78,6 +79,7 @@ Available Commands:
   mdevs           List all MobileDevices in IPSW
   mount           Mount DMG from IPSW
   ota             Parse OTAs
+  plist           Dump plist as JSON
   sepfw           Dump MachOs
   shsh            Get shsh blobs from device
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
