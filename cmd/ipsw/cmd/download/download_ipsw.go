@@ -33,7 +33,6 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
-	"github.com/blacktop/ipsw/pkg/onthedl"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -380,44 +379,38 @@ var ipswCmd = &cobra.Command{
 					if err := os.MkdirAll(filepath.Dir(destName), 0755); err != nil {
 						return fmt.Errorf("failed to create directory: %v", err)
 					}
-					_ = skipAll
-					_ = resumeAll
-					_ = restartAll         
-					if err := onthedl.Download(destName, i.URL, 1024*1024*200); err != nil {
-						return fmt.Errorf("failed to download file: %v", err)
+					if _, err := os.Stat(destName); os.IsNotExist(err) {
+						log.WithFields(log.Fields{
+							"device":  i.Identifier,
+							"build":   i.BuildID,
+							"version": i.Version,
+							"signed":  i.Signed,
+						}).Info("Getting IPSW")
+
+						downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
+						downloader.URL = i.URL
+						downloader.Sha1 = i.SHA1
+						downloader.DestName = destName
+
+						if err := downloader.Do(); err != nil {
+							return fmt.Errorf("failed to download file: %v", err)
+						}
+
+						log.Info("Created: " + destName)
+
+						// append sha1 and filename to checksums file
+						f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+						if err != nil {
+							return fmt.Errorf("failed to open checksums.txt.sha1: %v", err)
+						}
+						defer f.Close()
+
+						if _, err = f.WriteString(i.SHA1 + "  " + destName + "\n"); err != nil {
+							return fmt.Errorf("failed to write to checksums.txt.sha1: %v", err)
+						}
+					} else {
+						log.Warnf("IPSW already exists: %s", destName)
 					}
-					// if _, err := os.Stat(destName); os.IsNotExist(err) {
-					// 	log.WithFields(log.Fields{
-					// 		"device":  i.Identifier,
-					// 		"build":   i.BuildID,
-					// 		"version": i.Version,
-					// 		"signed":  i.Signed,
-					// 	}).Info("Getting IPSW")
-
-					// 	downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
-					// 	downloader.URL = i.URL
-					// 	downloader.Sha1 = i.SHA1
-					// 	downloader.DestName = destName
-
-					// 	if err := downloader.Do(); err != nil {
-					// 		return fmt.Errorf("failed to download file: %v", err)
-					// 	}
-
-					// 	log.Info("Created: " + destName)
-
-					// 	// append sha1 and filename to checksums file
-					// 	f, err := os.OpenFile("checksums.txt.sha1", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
-					// 	if err != nil {
-					// 		return fmt.Errorf("failed to open checksums.txt.sha1: %v", err)
-					// 	}
-					// 	defer f.Close()
-
-					// 	if _, err = f.WriteString(i.SHA1 + "  " + destName + "\n"); err != nil {
-					// 		return fmt.Errorf("failed to write to checksums.txt.sha1: %v", err)
-					// 	}
-					// } else {
-					// 	log.Warnf("IPSW already exists: %s", destName)
-					// }
 				}
 			}
 		}
