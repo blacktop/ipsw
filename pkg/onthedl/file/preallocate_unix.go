@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
-	"github.com/rclone/rclone/fs"
+	"github.com/apex/log"
 	"golang.org/x/sys/unix"
 )
 
@@ -49,7 +49,7 @@ func PreAllocate(size int64, out *os.File) (err error) {
 			// Try the next flags combination
 			index++
 			fallocFlagsIndex.Store(index)
-			fs.Debugf(nil, "preAllocate: got error on fallocate, trying combination %d/%d: %v", index, len(fallocFlags), err)
+			log.Debugf(nil, "preAllocate: got error on fallocate, trying combination %d/%d: %v", index, len(fallocFlags), err)
 			goto again
 
 		}
