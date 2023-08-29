@@ -19,7 +19,7 @@ require (
 	github.com/boombuler/barcode v1.0.1
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/disgoorg/disgo v0.16.8
+	github.com/disgoorg/disgo v0.16.9
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/dominikbraun/graph v0.23.0
@@ -156,6 +156,7 @@ require (
 	golang.org/x/exp v0.0.0-20230811145659-89c5cff77bcb // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
+	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.12.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
