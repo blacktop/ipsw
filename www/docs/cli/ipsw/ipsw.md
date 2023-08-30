@@ -22,7 +22,6 @@ Download and Parse IPSWs (and SO much more)
 ### SEE ALSO
 
 * [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
-* [ipsw debugserver](/docs/cli/ipsw/debugserver)	 - Prep device for remote debugging
 * [ipsw device-list](/docs/cli/ipsw/device-list)	 - List all iOS devices
 * [ipsw diff](/docs/cli/ipsw/diff)	 - Diff IPSWs
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
@@ -42,7 +41,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw plist](/docs/cli/ipsw/plist)	 - Dump plist as JSON
 * [ipsw pongo](/docs/cli/ipsw/pongo)	 - PongoOS Terminal
 * [ipsw sepfw](/docs/cli/ipsw/sepfw)	 - Dump MachOs
-* [ipsw shsh](/docs/cli/ipsw/shsh)	 - Get shsh blobs from device
+* [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device
 * [ipsw symbolicate](/docs/cli/ipsw/symbolicate)	 - Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
 * [ipsw update](/docs/cli/ipsw/update)	 - Download an ipsw update if one exists
 * [ipsw version](/docs/cli/ipsw/version)	 - Print the version number of ipsw
