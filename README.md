@@ -61,7 +61,6 @@ Usage:
 
 Available Commands:
   appstore        Interact with the App Store Connect API
-  debugserver     Prep device for remote debugging
   device-list     List all iOS devices
   diff            Diff IPSWs
   download        Download Apple Firmware files (and more)
@@ -81,7 +80,7 @@ Available Commands:
   ota             Parse OTAs
   plist           Dump plist as JSON
   sepfw           Dump MachOs
-  shsh            Get shsh blobs from device
+  ssh             SSH into a jailbroken device
   symbolicate     Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
   update          Download an ipsw update if one exists
   version         Print the version number of ipsw
