@@ -4,10 +4,14 @@ package download
 
 import (
 	"bytes"
+	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"net/http"
+	"path"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/blacktop/go-plist"
@@ -15,8 +19,9 @@ import (
 )
 
 const (
-	dvtURL     = "https://devimages-cdn.apple.com/downloads/xcode/simulators/index2.dvtdownloadableindex"
-	XcodeDlURL = "https://storage.googleapis.com/xcodes-cache"
+	dvtURL           = "https://devimages-cdn.apple.com/downloads/xcode/simulators/index2.dvtdownloadableindex"
+	XcodeDlURL       = "https://storage.googleapis.com/xcodes-cache"
+	xcodeReleasesAPI = "https://xcodereleases.com/data.json"
 )
 
 type Downloadable struct {
@@ -138,4 +143,140 @@ func ListXCodes() (*ListBucketResult, error) {
 	sort.Sort(out.Contents)
 
 	return &out, nil
+}
+
+type XCodeRelease struct {
+	Checksums struct {
+		Sha1 string `json:"sha1"`
+	} `json:"checksums"`
+	Compilers struct {
+		Clang []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"clang"`
+		Gcc []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"gcc"`
+		Llvm []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"llvm"`
+		LlvmGcc []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"llvm_gcc"`
+		Swift []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"swift"`
+	} `json:"compilers"`
+	Date struct {
+		Day   int64 `json:"day"`
+		Month int64 `json:"month"`
+		Year  int64 `json:"year"`
+	} `json:"date"`
+	Links struct {
+		Download struct {
+			URL string `json:"url"`
+		} `json:"download"`
+		Notes struct {
+			URL string `json:"url"`
+		} `json:"notes"`
+	} `json:"links"`
+	Name     string `json:"name"`
+	Requires string `json:"requires"`
+	Sdks     struct {
+		IOS []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"iOS"`
+		MacOS []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"macOS"`
+		TvOS []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"tvOS"`
+		VisionOS []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"visionOS"`
+		WatchOS []struct {
+			Build   string `json:"build"`
+			Number  string `json:"number"`
+			Release struct {
+				Release bool `json:"release"`
+			} `json:"release"`
+		} `json:"watchOS"`
+	} `json:"sdks"`
+	Version struct {
+		Build   string `json:"build"`
+		Number  string `json:"number"`
+		Release struct {
+			Beta    int64 `json:"beta"`
+			Dp      int64 `json:"dp"`
+			Gm      bool  `json:"gm"`
+			GmSeed  int64 `json:"gmSeed"`
+			Rc      int64 `json:"rc"`
+			Release bool  `json:"release"`
+		} `json:"release"`
+	} `json:"version"`
+}
+
+// QueryXcodeReleasesAPI queries the xcodereleases.com API for the XCode Name
+func QueryXcodeReleasesAPI(name string) (string, error) {
+	name = strings.Replace(name, "-", "_", -1)
+
+	resp, err := http.Get(xcodeReleasesAPI)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var releases []XCodeRelease
+	if err := json.Unmarshal(body, &releases); err != nil {
+		return "", err
+	}
+
+	for _, r := range releases {
+		if path.Base(r.Links.Download.URL) == name {
+			return r.Checksums.Sha1, nil
+		}
+	}
+
+	return "", fmt.Errorf("could not find xcode release: %s", name)
 }
