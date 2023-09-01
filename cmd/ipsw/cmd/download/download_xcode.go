@@ -37,6 +37,7 @@ import (
 
 func init() {
 	DownloadCmd.AddCommand(xcodeCmd)
+	xcodeCmd.Flags().BoolP("latest", "l", false, "Download newest XCode")
 	xcodeCmd.Flags().BoolP("sim", "s", false, "Download Simulator Runtimes")
 
 	xcodeCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
@@ -78,6 +79,7 @@ var xcodeCmd = &cobra.Command{
 		resumeAll := viper.GetBool("download.resume-all")
 		restartAll := viper.GetBool("download.restart-all")
 		// flags
+		latest, _ := cmd.Flags().GetBool("latest")
 		dlSim, _ := cmd.Flags().GetBool("sim")
 
 		if dlSim {
@@ -152,25 +154,34 @@ var xcodeCmd = &cobra.Command{
 			return err
 		}
 
-		var choices []string
-		for _, xcode := range xcodes.Contents {
-			choices = append(choices, xcode.Key)
-		}
-
 		var choice string
-		prompt := &survey.Select{
-			Message:  "Select XCode to download:",
-			Options:  choices,
-			PageSize: 10,
-		}
-		if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
-			log.Warn("Exiting...")
-			return nil
+		if latest {
+			choice = xcodes.Contents[0].Key
+		} else {
+			var choices []string
+			for _, xcode := range xcodes.Contents {
+				choices = append(choices, xcode.Key)
+			}
+
+			prompt := &survey.Select{
+				Message:  "Select XCode to download:",
+				Options:  choices,
+				PageSize: 10,
+			}
+			if err := survey.AskOne(prompt, &choice); err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				return nil
+			}
 		}
 
 		log.Infof("Downloading %s...", choice)
+		sha1, err := download.QueryXcodeReleasesAPI(choice)
+		if err != nil {
+			return err
+		}
 		downloader := download.NewDownload(proxy, insecure, skipAll, resumeAll, restartAll, false, viper.GetBool("verbose"))
 		downloader.URL = download.XcodeDlURL + "/" + choice
+		downloader.Sha1 = sha1
 		downloader.DestName = choice
 		return downloader.Do()
 	},
