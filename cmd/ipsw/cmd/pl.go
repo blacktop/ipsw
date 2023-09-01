@@ -46,7 +46,8 @@ var cache map[string]string
 func readAllPlists(inpath string) error {
 	return filepath.Walk(inpath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return fmt.Errorf("failed to walk path: %v", err)
+			log.Errorf("failed to walk path: %v", err)
+			return nil
 		}
 		if filepath.Ext(path) != ".plist" {
 			return nil
