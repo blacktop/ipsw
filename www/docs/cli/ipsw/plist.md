@@ -11,13 +11,15 @@ description: Dump plist as JSON
 Dump plist as JSON
 
 ```
-ipsw plist [flags]
+ipsw plist <file|watch-path> [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for plist
+  -e, --exclude strings   Exclude files/directories from watching (default [ContextStoreAgent.plist,com.apple.knowledge-agent.plist,com.apple.universalaccess.plist])
+  -h, --help              help for plist
+  -w, --watch             Watch file/Directory (default: $HOME/Library/Preferences)
 ```
 
 ### Options inherited from parent commands
