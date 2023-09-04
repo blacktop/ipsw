@@ -43,6 +43,7 @@ import (
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/certs"
+	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -81,6 +82,7 @@ func init() {
 	machoInfoCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
 	machoInfoCmd.Flags().Bool("dump-cert", false, "Dump the certificate")
 	machoInfoCmd.Flags().BoolP("bit-code", "b", false, "Dump the LLVM bitcode")
+	machoInfoCmd.Flags().Bool("demangle", false, "Demangle symbol names")
 	machoInfoCmd.Flags().String("output", "", "Directory to extract files to")
 
 	viper.BindPFlag("macho.info.arch", machoInfoCmd.Flags().Lookup("arch"))
@@ -102,6 +104,7 @@ func init() {
 	viper.BindPFlag("macho.info.all-fileset-entries", machoInfoCmd.Flags().Lookup("all-fileset-entries"))
 	viper.BindPFlag("macho.info.dump-cert", machoInfoCmd.Flags().Lookup("dump-cert"))
 	viper.BindPFlag("macho.info.bit-code", machoInfoCmd.Flags().Lookup("bit-code"))
+	viper.BindPFlag("macho.info.demangle", machoInfoCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("macho.info.output", machoInfoCmd.Flags().Lookup("output"))
 
 	machoInfoCmd.MarkZshCompPositionalArgumentFile(1)
@@ -142,7 +145,12 @@ var machoInfoCmd = &cobra.Command{
 		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
 		dumpCert := viper.GetBool("macho.info.dump-cert")
 		dumpBitCode := viper.GetBool("macho.info.bit-code")
+		demangleSyms := viper.GetBool("macho.info.demangle")
 		extractPath := viper.GetString("macho.info.output")
+		// validate flags
+		if demangleSyms && !showSymbols {
+			return fmt.Errorf("you must also supply --symbols flag to demangle symbols")
+		}
 
 		if len(filesetEntry) == 0 && extractfilesetEntry {
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
@@ -882,6 +890,27 @@ var machoInfoCmd = &cobra.Command{
 					if sym.Type.IsUndefinedSym() && !undeflush {
 						w.Flush()
 						undeflush = true
+					}
+					if demangleSyms {
+						if strings.HasPrefix(sym.Name, "_associated conformance ") {
+							if _, rest, ok := strings.Cut(sym.Name, "_associated conformance "); ok {
+								sym.Name, _ = swift.Demangle("_$s" + rest)
+								sym.Name = "_associated conformance " + sym.Name
+							}
+						} else if strings.HasPrefix(sym.Name, "_symbolic ") {
+							if _, rest, ok := strings.Cut(sym.Name, "_symbolic "); ok {
+								rest = strings.TrimPrefix(rest, "_____ ")
+								if !strings.HasPrefix(rest, "$s") && !strings.HasPrefix(rest, "_$s") {
+									rest = "_$s" + rest
+								}
+								sym.Name, _ = swift.Demangle(rest)
+								sym.Name = "_symbolic " + sym.Name
+							}
+						} else if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") { // TODO: better detect swift symbols
+							sym.Name, _ = swift.Demangle(sym.Name)
+						} else {
+							sym.Name = demangle.Do(sym.Name, false, false)
+						}
 					}
 					if sym.Value == 0 {
 						fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))

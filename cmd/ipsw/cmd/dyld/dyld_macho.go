@@ -35,6 +35,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/ipsw/internal/demangle"
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -59,6 +60,7 @@ func init() {
 	MachoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
 	// MachoCmd.Flags().BoolP("swift", "w", false, "🚧 Print Swift info")
 	MachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
+	MachoCmd.Flags().Bool("demangle", false, "Demangle symbol names")
 	MachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
 	MachoCmd.Flags().BoolP("strings", "s", false, "Print cstrings")
 	MachoCmd.Flags().BoolP("stubs", "b", false, "Print stubs")
@@ -85,12 +87,14 @@ var MachoCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
 		showLoadCommandsAsJSON, _ := cmd.Flags().GetBool("json")
 		showObjC, _ := cmd.Flags().GetBool("objc")
 		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
 		showSwift, _ := cmd.Flags().GetBool("swift")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
+		demangleSyms, _ := cmd.Flags().GetBool("demangle")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
 		dumpStubs, _ := cmd.Flags().GetBool("stubs")
@@ -99,10 +103,13 @@ var MachoCmd = &cobra.Command{
 		extractDylib, _ := cmd.Flags().GetBool("extract")
 		extractPath, _ := cmd.Flags().GetString("output")
 		forceExtract, _ := cmd.Flags().GetBool("force")
-
+		// validate flags
 		onlyFuncStarts := !showLoadCommands && !showObjC && !showSwift && !dumpStubs && showFuncStarts
 		onlyStubs := !showLoadCommands && !showObjC && !showSwift && !showFuncStarts && dumpStubs
 		onlySearch := !showLoadCommands && !showObjC && !showSwift && !showFuncStarts && !dumpStubs && searchPattern != ""
+		if demangleSyms && !dumpSymbols {
+			return fmt.Errorf("you must also supply --symbols flag to demangle symbols")
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -430,6 +437,27 @@ var MachoCmd = &cobra.Command{
 							if sym.Type.IsUndefinedSym() && !undeflush {
 								w.Flush()
 								undeflush = true
+							}
+							if demangleSyms {
+								if strings.HasPrefix(sym.Name, "_associated conformance ") {
+									if _, rest, ok := strings.Cut(sym.Name, "_associated conformance "); ok {
+										sym.Name, _ = swift.Demangle("_$s" + rest)
+										sym.Name = "_associated conformance " + sym.Name
+									}
+								} else if strings.HasPrefix(sym.Name, "_symbolic ") {
+									if _, rest, ok := strings.Cut(sym.Name, "_symbolic "); ok {
+										rest = strings.TrimPrefix(rest, "_____ ")
+										if !strings.HasPrefix(rest, "$s") && !strings.HasPrefix(rest, "_$s") {
+											rest = "_$s" + rest
+										}
+										sym.Name, _ = swift.Demangle(rest)
+										sym.Name = "_symbolic " + sym.Name
+									}
+								} else if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") { // TODO: better detect swift symbols
+									sym.Name, _ = swift.Demangle(sym.Name)
+								} else {
+									sym.Name = demangle.Do(sym.Name, false, false)
+								}
 							}
 							if sym.Value == 0 {
 								fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
