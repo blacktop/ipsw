@@ -30,7 +30,7 @@ func init() {
 	AppstoreCmd.PersistentFlags().StringP("p8", "p", "", "Path to App Store Connect API Key (.p8)")
 	AppstoreCmd.PersistentFlags().StringP("iss", "i", "", "Issuer ID")
 	AppstoreCmd.PersistentFlags().StringP("kid", "k", "", "Key ID")
-	AppstoreCmd.PersistentFlags().StringP("jwt", "t", "", "JWT (use instead of other flags)")
+	AppstoreCmd.PersistentFlags().StringP("jwt", "j", "", "JWT api key")
 	viper.BindPFlag("appstore.p8", AppstoreCmd.Flags().Lookup("p8"))
 	viper.BindPFlag("appstore.iss", AppstoreCmd.Flags().Lookup("iss"))
 	viper.BindPFlag("appstore.kid", AppstoreCmd.Flags().Lookup("kid"))
