@@ -29,6 +29,7 @@ ipsw appstore cert add [flags]
       --color           colorize output
       --config string   config file (default is $HOME/.config/ipsw/config.yaml)
   -i, --iss string      Issuer ID
+  -j, --jwt string      JWT api key
   -k, --kid string      Key ID
   -p, --p8 string       Path to App Store Connect API Key (.p8)
   -V, --verbose         verbose output

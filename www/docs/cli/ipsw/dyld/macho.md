@@ -18,6 +18,7 @@ ipsw dyld macho <dyld_shared_cache> <dylib> [flags]
 
 ```
   -a, --all             Parse ALL dylibs
+      --demangle        Demangle symbol names
   -x, --extract         🚧 Extract the dylib
       --force           Overwrite existing extracted dylib(s)
   -h, --help            help for macho
