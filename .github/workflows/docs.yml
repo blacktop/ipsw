@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: www
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -58,7 +58,7 @@ jobs:
   #     MEILISEARCH_API_KEY: ${{ secrets.MEILISEARCH_API_KEY }}
   #     CONFIG_FILE_PATH: ${{ github.workspace }}/hack/scripts/scraper.json
   #   steps:
-  #     - uses: actions/checkout@v3
+  #     - uses: actions/checkout@v4
 
   #     - name: Wait for Meilisearch
   #       run: node ./hack/scripts/wait-for-search.js
