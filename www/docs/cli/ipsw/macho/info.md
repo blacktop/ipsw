@@ -20,6 +20,7 @@ ipsw macho info <macho> [flags]
   -z, --all-fileset-entries     Parse all fileset entries
   -a, --arch string             Which architecture to use for fat/universal MachO
   -b, --bit-code                Dump the LLVM bitcode
+      --demangle                Demangle symbol names
       --dump-cert               Dump the certificate
   -e, --ent                     Print entitlements
   -x, --extract-fileset-entry   Extract the fileset entry

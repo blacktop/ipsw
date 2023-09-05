@@ -1,23 +1,24 @@
 ---
-id: ls
-title: ls
+id: token
+title: token
 hide_title: true
 hide_table_of_contents: true
-sidebar_label: ls
-description: List bundle IDs that are registered to your team
+sidebar_label: token
+description: Generate JWT for AppStore Connect API
 ---
-## ipsw appstore bundle ls
+## ipsw appstore token
 
-List bundle IDs that are registered to your team
+Generate JWT for AppStore Connect API
 
 ```
-ipsw appstore bundle ls [flags]
+ipsw appstore token [flags]
 ```
 
 ### Options
 
 ```
-  -h, --help   help for ls
+  -h, --help                help for token
+  -l, --lifetime duration   Lifetime of JWT (default 5m0s)
 ```
 
 ### Options inherited from parent commands
@@ -34,5 +35,5 @@ ipsw appstore bundle ls [flags]
 
 ### SEE ALSO
 
-* [ipsw appstore bundle](/docs/cli/ipsw/appstore/bundle)	 - Manage the bundle IDs that uniquely identify your apps
+* [ipsw appstore](/docs/cli/ipsw/appstore)	 - Interact with the App Store Connect API
 
