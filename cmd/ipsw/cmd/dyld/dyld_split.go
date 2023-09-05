@@ -11,7 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	homedir "github.com/mitchellh/go-homedir"
+	semver "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -45,6 +45,8 @@ var SplitCmd = &cobra.Command{
 		}
 
 		xcodePath := viper.GetString("dyld.split.xcode")
+		version := viper.GetString("dyld.split.version")
+
 		dscPath := filepath.Clean(args[0])
 
 		fileInfo, err := os.Lstat(dscPath)
@@ -76,11 +78,11 @@ var SplitCmd = &cobra.Command{
 		} else if len(args) > 1 {
 			outputPath, _ = filepath.Abs(filepath.Clean(args[1]))
 		} else if viper.GetBool("dyld.split.cache") {
-			if len(viper.GetString("dyld.split.version")) == 0 || len(viper.GetString("dyld.split.build")) == 0 {
-				return fmt.Errorf("--version and --build are required when --cache is used")
+			if len(viper.GetString("dyld.split.build")) == 0 {
+				return fmt.Errorf("--build is required when --cache is used")
 			}
 
-			home, err := homedir.Dir()
+			home, err := os.UserHomeDir()
 			if err != nil {
 				return err
 			}
@@ -96,7 +98,15 @@ var SplitCmd = &cobra.Command{
 			}
 			f.Close()
 
-			version := viper.GetString("dyld.split.version")
+			if len(version) == 0 {
+				version = f.Headers[f.UUID].OsVersion.String()
+				if len(version) == 0 {
+					return fmt.Errorf("--version is required when --cache is used")
+				}
+			}
+			if _, err = semver.NewVersion(version); err != nil {
+				return fmt.Errorf("invalid version: %s", version)
+			}
 			if strings.HasSuffix(version, ".0.0") {
 				version = strings.TrimSuffix(version, ".0")
 			}
@@ -108,7 +118,7 @@ var SplitCmd = &cobra.Command{
 			return fmt.Errorf("failed to create output directory %s: %v", outputPath, err)
 		}
 
-		log.Infof("Splitting dyld_shared_cache to %s\n", outputPath)
+		log.Infof("Splitting dyld_shared_cache to %s", outputPath)
 		return dyld.Split(dscPath, outputPath, xcodePath, viper.GetBool("dyld.split.cache"))
 
 		// dscPath := filepath.Clean(args[0])

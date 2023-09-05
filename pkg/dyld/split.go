@@ -66,7 +66,7 @@ func GetHandle(libs []string) (*LibHandle, error) {
 		defer C.free(unsafe.Pointer(libname))
 		handle := C.dlopen(libname, C.RTLD_LAZY)
 		if handle != nil {
-			utils.Indent(log.Debug, 2)(fmt.Sprintf("using bundle: %s", name))
+			utils.Indent(log.Debug, 2)(fmt.Sprintf("Using bundle: %s", name))
 			h := &LibHandle{
 				Handle:  handle,
 				Libname: name,
@@ -159,7 +159,6 @@ func Split(dyldSharedCachePath, destinationPath, xcodePath string, xcodeCache bo
 		if err != nil {
 			return fmt.Errorf("failed to marshal stop session request: %v", err)
 		}
-		log.Infof("Creating XCode cache %s\n", infoPlistPath)
 		os.WriteFile(infoPlistPath, data, 0644)
 
 		destinationPath = filepath.Join(destinationPath, "Symbols")
