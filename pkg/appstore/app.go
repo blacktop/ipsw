@@ -54,7 +54,7 @@ type AppsResponse struct {
 
 // GetApps returns a list of Apps resources.
 func (as *AppStore) GetApps() ([]App, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 

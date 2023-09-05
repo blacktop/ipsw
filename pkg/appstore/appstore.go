@@ -87,10 +87,11 @@ type AppStore struct {
 }
 
 // NewAppStore creates a new App Store Connect API object
-func NewAppStore(p8, iss, kid string) *AppStore {
+func NewAppStore(p8, iss, kid, jwt string) *AppStore {
 	return &AppStore{
-		P8:  p8,
-		Iss: iss,
-		Kid: kid,
+		P8:    p8,
+		Iss:   iss,
+		Kid:   kid,
+		token: jwt,
 	}
 }

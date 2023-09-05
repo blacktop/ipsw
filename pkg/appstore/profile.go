@@ -153,7 +153,7 @@ type ProfilesResponse struct {
 // GetProfiles returns a list provisioning profiles and download their data.
 func (as *AppStore) GetProfiles() ([]Profile, error) {
 
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -199,7 +199,7 @@ func (as *AppStore) GetProfiles() ([]Profile, error) {
 // GetProfile returns a provisioning profile and download their data.
 func (as *AppStore) GetProfile(id string) (*Profile, error) {
 
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -244,7 +244,7 @@ func (as *AppStore) GetProfile(id string) (*Profile, error) {
 
 // GetProfileBundleID returns the bundle ID information for a specific provisioning profile.
 func (as *AppStore) GetProfileBundleID(id string) (*BundleID, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -289,7 +289,7 @@ func (as *AppStore) GetProfileBundleID(id string) (*BundleID, error) {
 
 // GetProfileDevices returns a list of all devices for a specific provisioning profile
 func (as *AppStore) GetProfileDevices(id string) ([]Device, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -334,7 +334,7 @@ func (as *AppStore) GetProfileDevices(id string) ([]Device, error) {
 
 // GetProfileCerts returns a list of all certificates and their data for a specific provisioning profile.
 func (as *AppStore) GetProfileCerts(id string) ([]Certificate, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -379,7 +379,7 @@ func (as *AppStore) GetProfileCerts(id string) ([]Certificate, error) {
 
 // CreateProfile creates a new profile
 func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, cerIDs, devicesIDs []string) (*ProfileResponse, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -450,7 +450,7 @@ func (as *AppStore) CreateProfile(name string, ptype string, bundleID string, ce
 
 // DeleteProfile deletes a provisioning profile that is used for app development or distribution.
 func (as *AppStore) DeleteProfile(id string) error {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return fmt.Errorf("failed to create token: %v", err)
 	}
 

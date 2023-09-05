@@ -53,7 +53,7 @@ type DeviceCreateRequest struct {
 // GetDevices returns a list devices registered to your team.
 func (as *AppStore) GetDevices() ([]Device, error) {
 
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -98,7 +98,7 @@ func (as *AppStore) GetDevices() ([]Device, error) {
 
 // RegisterDevice registers a new device for app development.
 func (as *AppStore) RegisterDevice(name, platform, udid string) (*Device, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -169,7 +169,7 @@ type DeviceUpdateRequest struct {
 
 // ModifyDevice updates the name or status of a specific device.
 func (as *AppStore) ModifyDevice(id, name, status string) (*Device, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
