@@ -75,7 +75,7 @@ type BundleIdCreateRequest struct {
 
 // GetBundleIDs returns a list bundle IDs that are registered to your team.
 func (as *AppStore) GetBundleIDs() ([]BundleID, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -120,7 +120,7 @@ func (as *AppStore) GetBundleIDs() ([]BundleID, error) {
 
 // GetBundleID returns information about a specific bundle ID.
 func (as *AppStore) GetBundleID(id string) (*BundleID, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -166,7 +166,7 @@ func (as *AppStore) GetBundleID(id string) (*BundleID, error) {
 // GetBundleIDApp returns the app information for a specific bundle ID.
 func (as *AppStore) GetBundleIDApp(id string) (*AppResponse, error) {
 
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -211,7 +211,7 @@ func (as *AppStore) GetBundleIDApp(id string) (*AppResponse, error) {
 
 // GetBundleIDProfiles returns a list of all provisioning profiles for a specific bundle ID.
 func (as *AppStore) GetBundleIDProfiles(id string) (*ProfileResponse, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -256,7 +256,7 @@ func (as *AppStore) GetBundleIDProfiles(id string) (*ProfileResponse, error) {
 
 // GetBundleIDCapabilities returns a list of all capabilities for a specific bundle ID.
 func (as *AppStore) GetBundleIDCapabilities(id string) (*BundleIdCapabilitiesResponse, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -301,7 +301,7 @@ func (as *AppStore) GetBundleIDCapabilities(id string) (*BundleIdCapabilitiesRes
 
 // RegisterBundleID registers a new bundle ID for app development.
 func (as *AppStore) RegisterBundleID(name, id string) (*BundleIdResponse, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -358,7 +358,7 @@ func (as *AppStore) RegisterBundleID(name, id string) (*BundleIdResponse, error)
 
 // DeleteBundleID deletes a bundle ID that is used for app development.
 func (as *AppStore) DeleteBundleID(id string) (*BundleIdResponse, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 

@@ -73,16 +73,22 @@ var ASProfileCreateCmd = &cobra.Command{
 		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
 		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
 		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
+		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		bid := viper.GetString("appstore.profile.create.bundle-id")
 		certs := viper.GetStringSlice("appstore.profile.create.certs")
 		devices := viper.GetStringSlice("appstore.profile.create.devices")
 		// Validate flags
-		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
-			return fmt.Errorf("you must provide --p8, --iss and --kid")
+		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
+			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
 		}
 
-		as := appstore.NewAppStore(viper.GetString("appstore.p8"), viper.GetString("appstore.iss"), viper.GetString("appstore.kid"))
+		as := appstore.NewAppStore(
+			viper.GetString("appstore.p8"),
+			viper.GetString("appstore.iss"),
+			viper.GetString("appstore.kid"),
+			viper.GetString("appstore.jwt"),
+		)
 
 		if len(bid) == 0 { // Pick Board ID
 			bids, err := as.GetBundleIDs()

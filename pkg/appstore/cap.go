@@ -132,7 +132,7 @@ type BundleIDCapabilityCreateRequest struct {
 
 // EnableCapability enables a capability for a bundle ID.. // TODO: finish this
 func (as *AppStore) EnableCapability(id, ctype string) (*BundleIdCapability, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 

@@ -86,7 +86,7 @@ type CertificateCreateRequest struct {
 // GetCertificates returns a list certificates and download their data.
 func (as *AppStore) GetCertificates() ([]Certificate, error) {
 
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -141,7 +141,7 @@ func (as *AppStore) GetCertificates() ([]Certificate, error) {
 
 // CreateCertificate creates a new certificate using a certificate signing request.
 func (as *AppStore) CreateCertificate(ctype string, csrData string) (*Certificate, error) {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return nil, fmt.Errorf("failed to create token: %v", err)
 	}
 
@@ -198,7 +198,7 @@ func (as *AppStore) CreateCertificate(ctype string, csrData string) (*Certificat
 
 // RevokeCertificate revokes a lost, stolen, compromised, or expiring signing certificate.
 func (as *AppStore) RevokeCertificate(id string) error {
-	if err := as.createToken(); err != nil {
+	if err := as.createToken(defaultJWTLife); err != nil {
 		return fmt.Errorf("failed to create token: %v", err)
 	}
 

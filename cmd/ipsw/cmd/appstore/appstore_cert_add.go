@@ -64,19 +64,25 @@ var ASCertAddCmd = &cobra.Command{
 		viper.BindPFlag("appstore.p8", cmd.Flags().Lookup("p8"))
 		viper.BindPFlag("appstore.iss", cmd.Flags().Lookup("iss"))
 		viper.BindPFlag("appstore.kid", cmd.Flags().Lookup("kid"))
+		viper.BindPFlag("appstore.jwt", cmd.Flags().Lookup("jwt"))
 		// flags
 		ctype := viper.GetString("appstore.cert.add.type")
 		csr := viper.GetString("appstore.cert.add.csr")
 		output := viper.GetString("appstore.cert.add.output")
 		// Validate flags
-		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
-			return fmt.Errorf("you must provide --p8, --iss and --kid")
+		if (viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "") && viper.GetString("appstore.jwt") == "" {
+			return fmt.Errorf("you must provide (--p8, --iss and --kid) OR --jwt")
 		}
 		if ctype == "" || csr == "" {
 			return fmt.Errorf("you must provide --type and --csr")
 		}
 
-		as := appstore.NewAppStore(viper.GetString("appstore.p8"), viper.GetString("appstore.iss"), viper.GetString("appstore.kid"))
+		as := appstore.NewAppStore(
+			viper.GetString("appstore.p8"),
+			viper.GetString("appstore.iss"),
+			viper.GetString("appstore.kid"),
+			viper.GetString("appstore.jwt"),
+		)
 
 		cert, err := as.CreateCertificate(ctype, csr)
 		if err != nil {

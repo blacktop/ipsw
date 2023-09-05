@@ -11,7 +11,9 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func (as *AppStore) createToken() error {
+const defaultJWTLife = time.Second * 60
+
+func (as *AppStore) createToken(life time.Duration) error {
 
 	if as.token != "" {
 		return nil
@@ -24,7 +26,7 @@ func (as *AppStore) createToken() error {
 		},
 		Claims: jwt.MapClaims{
 			"iss": as.Iss,
-			"exp": time.Now().Add(time.Second * 60 * 5).Unix(),
+			"exp": time.Now().Add(life).Unix(),
 			"aud": "appstoreconnect-v1",
 		},
 		Method: jwt.SigningMethodES256,
@@ -61,4 +63,12 @@ func (as *AppStore) createToken() error {
 // GetToken returns the current JWT token
 func (as *AppStore) GetToken() string {
 	return as.token
+}
+
+// GenerateToken generates a new JWT token
+func (as *AppStore) GenerateToken(life time.Duration) (string, error) {
+	if err := as.createToken(life); err != nil {
+		return "", err
+	}
+	return as.token, nil
 }
