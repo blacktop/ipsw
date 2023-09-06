@@ -11,7 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const defaultJWTLife = time.Second * 60
+const defaultJWTLife = time.Minute
 
 func (as *AppStore) createToken(life time.Duration) error {
 
@@ -23,9 +23,11 @@ func (as *AppStore) createToken(life time.Duration) error {
 		Header: map[string]interface{}{
 			"alg": "ES256",
 			"kid": as.Kid,
+			"typ": "JWT",
 		},
 		Claims: jwt.MapClaims{
 			"iss": as.Iss,
+			"iat": time.Now().Unix(),
 			"exp": time.Now().Add(life).Unix(),
 			"aud": "appstoreconnect-v1",
 		},
