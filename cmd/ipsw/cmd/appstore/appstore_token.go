@@ -53,6 +53,9 @@ var ASTokenCmd = &cobra.Command{
 		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
 			return fmt.Errorf("you must provide --p8, --iss and --kid")
 		}
+		if lifetime >= 20*time.Minute {
+			return fmt.Errorf("lifetime cannot be more than 20m")
+		}
 
 		as := appstore.NewAppStore(
 			viper.GetString("appstore.p8"),
@@ -74,7 +77,7 @@ var ASTokenCmd = &cobra.Command{
 
 func init() {
 	AppstoreCmd.AddCommand(ASTokenCmd)
-	ASTokenCmd.Flags().DurationP("lifetime", "l", 5*time.Minute, "Lifetime of JWT")
+	ASTokenCmd.Flags().DurationP("lifetime", "l", 5*time.Minute, "Lifetime of JWT (max: 20m)")
 	ASTokenCmd.SetHelpFunc(func(c *cobra.Command, s []string) {
 		AppstoreCmd.PersistentFlags().MarkHidden("jwt")
 		c.Parent().HelpFunc()(c, s)

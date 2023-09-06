@@ -37,7 +37,7 @@ type Request struct {
 	BBTicket                  bool   `plist:"@BBTicket,omitempty"`
 	HostPlatformInfo          string `plist:"@HostPlatformInfo,omitempty"`
 	Locality                  string `plist:"@Locality,omitempty"`
-	VersionInfo               string `plist:"@VersionInfo,omitempty"` // = libauthinstall-850.0.1.0.1 ( /usr/lib/libauthinstall.dylib)
+	VersionInfo               string `plist:"@VersionInfo,omitempty"` // = libauthinstall-850.0.1.0.1 (/usr/lib/libauthinstall.dylib)
 	ApBoardID                 uint64 `plist:"ApBoardID,omitempty"`
 	ApChipID                  uint64 `plist:"ApChipID,omitempty"`
 	ApECID                    uint64 `plist:"ApECID,omitempty"`
