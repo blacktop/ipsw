@@ -39,7 +39,7 @@ func init() {
 	ASCertAddCmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return appstore.CertTypes, cobra.ShellCompDirectiveDefault
 	})
-	ASCertAddCmd.Flags().StringP("csr", "c", "", "CSR content")
+	ASCertAddCmd.Flags().StringP("csr", "c", "", "CSR content (https://developer.apple.com/help/account/create-certificates/create-a-certificate-signing-request)")
 	ASCertAddCmd.Flags().StringP("output", "o", "", "Folder to download profile to")
 	ASCertAddCmd.MarkFlagDirname("output")
 	viper.BindPFlag("appstore.cert.add.type", ASCertAddCmd.Flags().Lookup("type"))
