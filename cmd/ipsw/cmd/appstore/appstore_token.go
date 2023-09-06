@@ -53,7 +53,7 @@ var ASTokenCmd = &cobra.Command{
 		if viper.GetString("appstore.p8") == "" || viper.GetString("appstore.iss") == "" || viper.GetString("appstore.kid") == "" {
 			return fmt.Errorf("you must provide --p8, --iss and --kid")
 		}
-		if lifetime >= 20*time.Minute {
+		if lifetime > 20*time.Minute {
 			return fmt.Errorf("lifetime cannot be more than 20m")
 		}
 
