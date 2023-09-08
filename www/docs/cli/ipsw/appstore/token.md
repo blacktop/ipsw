@@ -18,7 +18,7 @@ ipsw appstore token [flags]
 
 ```
   -h, --help                help for token
-  -l, --lifetime duration   Lifetime of JWT (default 5m0s)
+  -l, --lifetime duration   Lifetime of JWT (max: 20m) (default 5m0s)
 ```
 
 ### Options inherited from parent commands

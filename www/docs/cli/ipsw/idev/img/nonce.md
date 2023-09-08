@@ -22,6 +22,7 @@ ipsw idev img nonce [flags]
   -m, --mail string      QR mailto address
   -o, --output string    Folder to write QR code PNG to
   -q, --qr-code          Generate QR code of nonce
+  -z, --qr-size int      QR size in pixels (default 256)
   -r, --readable         Print nonce as a more readable string
   -s, --subject string   QR mailto subject (default "Device Nonce Info")
       --url string       QR code URL
