@@ -48,6 +48,7 @@ func init() {
 	nonceCmd.Flags().BoolP("json", "j", false, "Print as JSON")
 	nonceCmd.Flags().BoolP("readable", "r", false, "Print nonce as a more readable string")
 	nonceCmd.Flags().BoolP("qr-code", "q", false, "Generate QR code of nonce")
+	nonceCmd.Flags().IntP("qr-size", "z", 256, "QR size in pixels")
 	nonceCmd.Flags().String("url", "", "QR code URL")
 	nonceCmd.Flags().StringP("mail", "m", "", "QR mailto address")
 	nonceCmd.Flags().StringP("subject", "s", "Device Nonce Info", "QR mailto subject")
@@ -73,6 +74,7 @@ var nonceCmd = &cobra.Command{
 		asJSON, _ := cmd.Flags().GetBool("json")
 		readable, _ := cmd.Flags().GetBool("readable")
 		asQrCode, _ := cmd.Flags().GetBool("qr-code")
+		qrcSize, _ := cmd.Flags().GetInt("qr-size")
 		qrURL, _ := cmd.Flags().GetString("url")
 		email, _ := cmd.Flags().GetString("mail")
 		emailSubject, _ := cmd.Flags().GetString("subject")
@@ -124,8 +126,8 @@ var nonceCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to encode nonce as QR code: %w", err)
 			}
-			// Scale the barcode to 500x500 pixels
-			qrCode, err = barcode.Scale(qrCode, 500, 500)
+			// Scale the barcode to 512x512 pixels
+			qrCode, err = barcode.Scale(qrCode, 512, 512)
 			if err != nil {
 				return fmt.Errorf("failed to scale QR code: %w", err)
 			}
@@ -148,7 +150,7 @@ var nonceCmd = &cobra.Command{
 
 			log.Warn("Displaying QR code in terminal (supported in iTerm2, otherwise supply --output flag)")
 			println()
-			return utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), 500, 500)
+			return utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), dat.Len(), qrcSize, qrcSize)
 		}
 
 		if readable {
