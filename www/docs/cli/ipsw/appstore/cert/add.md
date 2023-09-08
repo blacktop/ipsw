@@ -17,7 +17,7 @@ ipsw appstore cert add [flags]
 ### Options
 
 ```
-  -c, --csr string      CSR content
+  -c, --csr string      CSR content (https://developer.apple.com/help/account/create-certificates/create-a-certificate-signing-request)
   -h, --help            help for add
   -o, --output string   Folder to download profile to
   -t, --type string     Certificate type
