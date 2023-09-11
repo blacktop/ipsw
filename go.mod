@@ -6,12 +6,12 @@ require (
 	github.com/99designs/keyring v1.2.2
 	github.com/AlecAivazis/survey/v2 v2.3.7
 	github.com/PuerkitoBio/goquery v1.8.1
-	github.com/alecthomas/chroma/v2 v2.8.0
+	github.com/alecthomas/chroma/v2 v2.9.1
 	github.com/apex/log v1.9.0
 	github.com/aymanbagabas/go-udiff v0.1.3
 	github.com/blacktop/arm64-cgo v1.0.57
 	github.com/blacktop/go-dwarf v1.0.9
-	github.com/blacktop/go-macho v1.1.162
+	github.com/blacktop/go-macho v1.1.163
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -21,14 +21,14 @@ require (
 	github.com/caarlos0/env/v8 v8.0.0
 	github.com/disgoorg/disgo v0.16.9
 	github.com/disgoorg/snowflake/v2 v2.0.1
-	github.com/docker/docker v24.0.5+incompatible
+	github.com/docker/docker v24.0.6+incompatible
 	github.com/dominikbraun/graph v0.23.0
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.10
 	github.com/fsnotify/fsnotify v1.6.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
-	github.com/gen2brain/beeep v0.0.0-20230812223410-3e1549ef0811
+	github.com/gen2brain/beeep v0.0.0-20230907135156-1a38885a97fc
 	github.com/gin-gonic/gin v1.9.1
 	github.com/glebarez/sqlite v1.9.0
 	github.com/gocolly/colly/v2 v2.1.0
@@ -37,7 +37,7 @@ require (
 	github.com/google/gousb v1.1.2
 	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-version v1.6.0
-	github.com/invopop/jsonschema v0.7.0
+	github.com/invopop/jsonschema v0.8.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/image-spec v1.1.0-rc4
