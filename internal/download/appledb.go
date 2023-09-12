@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -150,7 +151,7 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 	for _, f := range tmpFS {
 		if len(query.Device) > 0 {
 			for _, source := range f.Sources {
-				if utils.StrSliceContains(source.DeviceMap, query.Device) {
+				if slices.Contains(source.DeviceMap, query.Device) {
 					sources = append(sources, source)
 				}
 			}
@@ -222,7 +223,8 @@ func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
 					return err
 				}
 				if err := json.Unmarshal(dat, &osfile); err != nil {
-					return err
+					log.Errorf("failed to unmarshal osfile for version %s (%s): %v", osfile.Version, osfile.Build, err)
+					return nil
 				}
 				osfiles = append(osfiles, osfile)
 			}

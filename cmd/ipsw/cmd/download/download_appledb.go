@@ -217,7 +217,7 @@ var downloadAppledbCmd = &cobra.Command{
 		log.Debug("URLs to download:")
 		for _, result := range results {
 			for _, link := range result.Links {
-				if link.Active && link.Preferred {
+				if link.Active {
 					if viper.GetBool("download.appledb.urls") {
 						fmt.Println(link.URL)
 					} else {
@@ -246,7 +246,7 @@ var downloadAppledbCmd = &cobra.Command{
 				for _, result := range results {
 					var url string
 					for _, link := range result.Links {
-						if link.Active && link.Preferred {
+						if link.Active {
 							url = link.URL
 						}
 					}
@@ -283,7 +283,7 @@ var downloadAppledbCmd = &cobra.Command{
 				for idx, result := range results {
 					var url string
 					for _, link := range result.Links {
-						if link.Active && link.Preferred {
+						if link.Active {
 							url = link.URL
 						}
 					}
