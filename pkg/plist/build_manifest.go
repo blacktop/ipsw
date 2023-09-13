@@ -57,8 +57,10 @@ func (i buildIdentity) String() string {
 	out += fmt.Sprintf("    Info:\n%s", i.Info.String())
 	out += "    Manifest:\n"
 	for k, v := range i.Manifest {
-		if len(v.Info["Path"].(string)) > 0 {
-			out += fmt.Sprintf("      %s: %s\n", k, v.String())
+		if path, ok := v.Info["Path"]; ok {
+			if len(path.(string)) > 0 {
+				out += fmt.Sprintf("      %-34s%s\n", k+":", v.String())
+			}
 		}
 	}
 	return out
