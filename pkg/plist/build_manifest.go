@@ -164,29 +164,39 @@ func (b *BuildManifest) GetKernelForModel(model string) []string {
 func (b *BuildManifest) GetBootLoaders() map[string][]string {
 	bootLoaders := make(map[string][]string, len(b.BuildIdentities))
 	for _, bID := range b.BuildIdentities {
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info["Path"].(string)) {
-			if len(bID.Manifest["iBEC"].Info["Path"].(string)) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBEC"].Info["Path"].(string))
+		if ibec, ok := bID.Manifest["iBEC"]; ok {
+			if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], ibec.Info["Path"].(string)) {
+				if len(ibec.Info["Path"].(string)) > 0 {
+					bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], ibec.Info["Path"].(string))
+				}
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info["Path"].(string)) {
-			if len(bID.Manifest["iBoot"].Info["Path"].(string)) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBoot"].Info["Path"].(string))
+		if iboot, ok := bID.Manifest["iBoot"]; ok {
+			if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], iboot.Info["Path"].(string)) {
+				if len(iboot.Info["Path"].(string)) > 0 {
+					bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], iboot.Info["Path"].(string))
+				}
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info["Path"].(string)) {
-			if len(bID.Manifest["iBSS"].Info["Path"].(string)) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["iBSS"].Info["Path"].(string))
+		if ibss, ok := bID.Manifest["iBSS"]; ok {
+			if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], ibss.Info["Path"].(string)) {
+				if len(ibss.Info["Path"].(string)) > 0 {
+					bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], ibss.Info["Path"].(string))
+				}
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info["Path"].(string)) {
-			if len(bID.Manifest["LLB"].Info["Path"].(string)) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["LLB"].Info["Path"].(string))
+		if llb, ok := bID.Manifest["LLB"]; ok {
+			if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], llb.Info["Path"].(string)) {
+				if len(llb.Info["Path"].(string)) > 0 {
+					bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], llb.Info["Path"].(string))
+				}
 			}
 		}
-		if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info["Path"].(string)) {
-			if len(bID.Manifest["SEP"].Info["Path"].(string)) > 0 {
-				bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], bID.Manifest["SEP"].Info["Path"].(string))
+		if sep, ok := bID.Manifest["SEP"]; ok {
+			if !utils.StrSliceHas(bootLoaders[bID.Info.DeviceClass], sep.Info["Path"].(string)) {
+				if len(sep.Info["Path"].(string)) > 0 {
+					bootLoaders[bID.Info.DeviceClass] = append(bootLoaders[bID.Info.DeviceClass], sep.Info["Path"].(string))
+				}
 			}
 		}
 	}
