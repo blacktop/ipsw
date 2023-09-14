@@ -62,7 +62,8 @@ var SymAddrCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = !viper.GetBool("color")
+		useColor := viper.GetBool("color")
+		color.NoColor = !useColor
 
 		imageName, _ := cmd.Flags().GetString("image")
 		symbolFile, _ := cmd.Flags().GetString("in")
@@ -143,7 +144,7 @@ var SymAddrCmd = &cobra.Command{
 				}
 
 				if lsym, err := i.GetSymbol(args[1]); err == nil {
-					fmt.Println(lsym.String(viper.GetBool("color")))
+					fmt.Println(lsym.String(useColor))
 				}
 
 				// if lsym, err := i.GetLocalSymbol(args[1]); err == nil {
@@ -172,7 +173,7 @@ var SymAddrCmd = &cobra.Command{
 					if !ok {
 						break
 					}
-					fmt.Println(sym.String(viper.GetBool("color")))
+					fmt.Println(sym.String(useColor))
 					if !allMatches {
 						return nil
 					}
@@ -182,7 +183,7 @@ var SymAddrCmd = &cobra.Command{
 				utils.Indent(log.Debug, 2)("Searching " + image.Name)
 				if sym, err := image.GetSymbol(args[1]); err == nil {
 					if (sym.Address > 0 || allMatches) && (sym.Kind != dyld.BIND || showBinds) {
-						fmt.Println(sym.String(viper.GetBool("color")))
+						fmt.Println(sym.String(useColor))
 						if !allMatches {
 							return nil
 						}
