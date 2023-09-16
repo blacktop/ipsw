@@ -185,6 +185,7 @@ var idaCmd = &cobra.Command{
 			var defaultframeworks = []string{
 				"/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation",
 				"/System/Library/Frameworks/Foundation.framework/Foundation",
+				"/usr/lib/swift/libswiftCore.dylib",
 				"/usr/lib/libobjc.A.dylib",
 				"/usr/lib/system/libdyld.dylib",
 				"/usr/lib/system/libsystem_blocks.dylib",
