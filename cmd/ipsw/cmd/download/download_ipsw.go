@@ -201,7 +201,7 @@ var ipswCmd = &cobra.Command{
 				}
 				if macos {
 					if showLatestVersion {
-						fmt.Println(assets.LatestVersion("macOS", "macos"))
+						fmt.Println(assets.LatestVersion("macos"))
 					}
 					if showLatestBuild {
 						itunes, err = download.NewMacOsXML()
@@ -215,7 +215,7 @@ var ipswCmd = &cobra.Command{
 						fmt.Println(latestBuild)
 					}
 				} else { // iOS
-					latestVersion := assets.LatestVersion("iOS", "ios")
+					latestVersion := assets.LatestVersion("ios")
 					if showLatestVersion {
 						fmt.Println(latestVersion)
 					}

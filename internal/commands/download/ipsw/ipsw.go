@@ -12,7 +12,7 @@ func GetLatestIosVersion(proxy string, insecure bool) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get asset latest version: %v", err)
 	}
-	return assets.LatestVersion("iOS", "ios"), nil
+	return assets.LatestVersion("ios"), nil
 }
 
 // GetLatestIosBuild returns the latest iOS build

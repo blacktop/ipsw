@@ -93,8 +93,18 @@ func (a *AssetSets) GetDevicesForVersion(version string, typ string) []string {
 }
 
 // LatestVersion returns the newest released version
-func (a *AssetSets) LatestVersion(typ, platform string) string {
+func (a *AssetSets) LatestVersion(platform string) string {
+	var typ string
 	var versionsRaw []string
+
+	switch platform {
+	case "accessory", "ios", "watchos", "audioos", "tvos":
+		typ = "iOS"
+	case "visionos":
+		typ = "xrOS"
+	case "recovery", "macos":
+		typ = "macOS"
+	}
 
 	for _, asset := range a.PublicAssetSets[typ] {
 		switch platform {
