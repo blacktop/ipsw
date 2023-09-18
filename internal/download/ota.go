@@ -12,6 +12,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/ota/types"
 	ilist "github.com/blacktop/ipsw/pkg/plist"
 	"github.com/hashicorp/go-version"
+	semver "github.com/hashicorp/go-version"
 	"github.com/ulikunitz/xz"
 	"golang.org/x/sync/errgroup"
 )
@@ -233,6 +235,57 @@ func NewOTA(as *AssetSets, conf OtaConf) (*Ota, error) {
 	return &o, nil
 }
 
+func (o *Ota) GetLatest() *semver.Version {
+	latest := o.as.LatestVersion(o.Config.Platform)
+	ver, err := semver.NewVersion(strings.TrimPrefix(latest, "9.9."))
+	if err != nil {
+		return nil
+	}
+	return ver
+}
+
+// QueryPublicXML queries the public XML for OTA assets that match the config
+func (o *Ota) QueryPublicXML() []types.Asset {
+	var filtered []types.Asset
+	if o.Config.Version.Original() == "0" && o.Config.Build == "0" {
+		if latest := o.GetLatest(); latest != nil {
+			o.Config.Version = latest
+		}
+	}
+	for _, asset := range o.Assets {
+		if !strings.EqualFold(o.Config.Platform, asset.ProductSystemName) {
+			continue
+		}
+		if o.Config.Beta && asset.ReleaseType != "Beta" {
+			continue
+		}
+		if o.Config.Version.Original() != "0" {
+			if ver, err := semver.NewVersion(strings.TrimPrefix(asset.OSVersion, "9.9.")); err == nil {
+				if !o.Config.Version.Equal(ver) {
+					continue
+				}
+			}
+		}
+		if o.Config.Build != "0" {
+			if !strings.EqualFold(o.Config.Build, asset.Build) {
+				continue
+			}
+		}
+		if len(o.Config.Device) > 0 {
+			if !slices.Contains(asset.SupportedDevices, o.Config.Device) {
+				continue
+			}
+		}
+		if len(o.Config.Model) > 0 {
+			if !slices.Contains(asset.SupportedDeviceModels, o.Config.Model) {
+				continue
+			}
+		}
+		filtered = append(filtered, asset)
+	}
+	return uniqueOTAs(filtered)
+}
+
 func (o *Ota) getRequestAssetTypes() ([]assetType, error) {
 	switch o.Config.Platform {
 	case "ios", "watchos", "audioos", "tvos", "visionos":
@@ -284,12 +337,12 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 						v.DeveloperBeta,
 						v.AppleSeedBeta,
 						v.PublicBeta}, nil
-				} else {
-					return nil, fmt.Errorf(
-						"invalid version %s (must be one of %s)",
-						o.Config.Version,
-						strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions("macos"), ".x"), ", "))
 				}
+
+				return nil, fmt.Errorf(
+					"invalid version %s (must be one of %s)",
+					o.Config.Version,
+					strings.Join(utils.StrSliceAddSuffix(assetAudienceDB.GetVersions("macos"), ".x"), ", "))
 			}
 		} else {
 			return []string{assetAudienceDB["macos"].Release, assetAudienceDB["macos"].Generic}, nil
@@ -460,7 +513,8 @@ func sendPostAsync(body []byte, rc chan *http.Response, config *OtaConf) error {
 // GetPallasOTAs returns an OTA assets for a given config using the newstyle OTA - CREDIT: https://gist.github.com/Siguza/0331c183c8c59e4850cd0b62fd501424
 func (o *Ota) GetPallasOTAs() ([]types.Asset, error) {
 	var err error
-	var oassets []types.Asset
+
+	oassets := o.QueryPublicXML()
 
 	pallasReqs, err := o.buildPallasRequests()
 	if err != nil {
