@@ -23,6 +23,7 @@ package dyld
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -35,6 +36,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
+	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/demangle"
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -43,6 +45,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 )
 
 var symAddrColor = color.New(color.Faint).SprintfFunc()
@@ -88,6 +91,8 @@ var MachoCmd = &cobra.Command{
 		}
 
 		// flags
+		verbose := viper.GetBool("verbose")
+		color := viper.GetBool("color")
 		showLoadCommands, _ := cmd.Flags().GetBool("loads")
 		showLoadCommandsAsJSON, _ := cmd.Flags().GetBool("json")
 		showObjC, _ := cmd.Flags().GetBool("objc")
@@ -242,22 +247,25 @@ var MachoCmd = &cobra.Command{
 						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 							log.Error(err.Error())
 						}
-						if viper.GetBool("verbose") {
+						if verbose {
 							fmt.Println(m.GetObjCToc())
 						}
 						if protos, err := m.GetObjCProtocols(); err == nil {
+							slices.SortStableFunc(protos, func(a, b objc.Protocol) int {
+								return cmp.Compare(a.Name, b.Name)
+							})
 							seen := make(map[uint64]bool)
 							for _, proto := range protos {
 								if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
-									if viper.GetBool("verbose") {
-										if viper.GetBool("color") {
+									if verbose {
+										if color {
 											quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", "nord")
 											quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
 										} else {
 											fmt.Println(swift.DemangleBlob(proto.Verbose()))
 										}
 									} else {
-										if viper.GetBool("color") {
+										if color {
 											quick.Highlight(os.Stdout, proto.String()+"\n", "objc", "terminal256", "nord")
 										} else {
 											fmt.Println(proto.String())
@@ -270,16 +278,19 @@ var MachoCmd = &cobra.Command{
 							log.Error(err.Error())
 						}
 						if classes, err := m.GetObjCClasses(); err == nil {
+							slices.SortStableFunc(classes, func(a, b objc.Class) int {
+								return cmp.Compare(a.Name, b.Name)
+							})
 							for _, class := range classes {
-								if viper.GetBool("verbose") {
-									if viper.GetBool("color") {
+								if verbose {
+									if color {
 										quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", "nord")
 										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
 									} else {
 										fmt.Println(swift.DemangleBlob(class.Verbose()))
 									}
 								} else {
-									if viper.GetBool("color") {
+									if color {
 										quick.Highlight(os.Stdout, class.String()+"\n", "objc", "terminal256", "nord")
 									} else {
 										fmt.Println(class.String())
@@ -290,16 +301,19 @@ var MachoCmd = &cobra.Command{
 							log.Error(err.Error())
 						}
 						if cats, err := m.GetObjCCategories(); err == nil {
+							slices.SortStableFunc(cats, func(a, b objc.Category) int {
+								return cmp.Compare(a.Name, b.Name)
+							})
 							for _, cat := range cats {
-								if viper.GetBool("verbose") {
-									if viper.GetBool("color") {
+								if verbose {
+									if color {
 										quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", "nord")
 										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
 									} else {
 										fmt.Println(swift.DemangleBlob(cat.Verbose()))
 									}
 								} else {
-									if viper.GetBool("color") {
+									if color {
 										quick.Highlight(os.Stdout, cat.String()+"\n", "objc", "terminal256", "nord")
 									} else {
 										fmt.Println(cat.String())
@@ -322,7 +336,7 @@ var MachoCmd = &cobra.Command{
 								fmt.Printf("\n@class refs\n")
 								for off, cls := range clsRefs {
 									fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr, cls.Name)
-									// if viper.GetBool("verbose") {
+									// if verbose {
 									// 	fmt.Println(cls.Verbose())
 									// } else {
 									// 	fmt.Println(cls.String())
@@ -347,7 +361,7 @@ var MachoCmd = &cobra.Command{
 							} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
 								log.Error(err.Error())
 							}
-							if viper.GetBool("verbose") {
+							if verbose {
 								if classes, err := m.GetObjCClassNames(); err == nil {
 									fmt.Printf("\n@objc_classname\n")
 									for vmaddr, className := range classes {
@@ -385,15 +399,15 @@ var MachoCmd = &cobra.Command{
 					if info != nil && info.HasSwift() {
 						if fields, err := m.GetSwiftFields(); err == nil {
 							for _, field := range fields {
-								if viper.GetBool("verbose") {
-									if viper.GetBool("color") {
+								if verbose {
+									if color {
 										quick.Highlight(os.Stdout, swift.DemangleBlob(field.String()), "swift", "terminal256", "nord")
 										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
 									} else {
 										fmt.Println(swift.DemangleBlob(field.String()))
 									}
 								} else {
-									if viper.GetBool("color") {
+									if color {
 										quick.Highlight(os.Stdout, field.String(), "swift", "terminal256", "nord")
 										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
 									} else {
@@ -417,7 +431,7 @@ var MachoCmd = &cobra.Command{
 					}
 					if m.FunctionStarts() != nil {
 						for _, fn := range m.GetFunctions() {
-							if viper.GetBool("verbose") {
+							if verbose {
 								fmt.Printf("%#016x-%#016x\n", fn.StartAddr, fn.EndAddr)
 							} else {
 								fmt.Printf("0x%016X\n", fn.StartAddr)
@@ -481,7 +495,7 @@ var MachoCmd = &cobra.Command{
 						w.Flush()
 					}
 					// Dedup these symbols (has repeats but also additional symbols??)
-					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && viper.GetBool("verbose") {
+					if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 && verbose {
 						fmt.Printf("\nDyld Exports\n")
 						fmt.Println("------------")
 						exports, err := m.DyldExports()
