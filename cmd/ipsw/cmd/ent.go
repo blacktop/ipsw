@@ -39,18 +39,25 @@ import (
 	"github.com/sergi/go-diff/diffmatchpatch"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"golang.org/x/exp/slices"
 )
+
+var colorBin = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorKey = color.New(color.Bold, color.FgHiGreen).SprintFunc()
+var colorValue = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 
 func init() {
 	rootCmd.AddCommand(entCmd)
 
 	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
+	entCmd.Flags().StringP("val", "v", "", "Entitlement's value to search for (i.e. <array> strings)")
 	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO")
 	entCmd.Flags().StringP("output", "o", "", "Folder to r/w entitlement databases")
 	entCmd.MarkFlagDirname("output")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	entCmd.Flags().BoolP("md", "m", false, "Markdown style output")
 	viper.BindPFlag("ent.ent", entCmd.Flags().Lookup("ent"))
+	viper.BindPFlag("ent.val", entCmd.Flags().Lookup("val"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
 	viper.BindPFlag("ent.output", entCmd.Flags().Lookup("output"))
 	viper.BindPFlag("ent.diff", entCmd.Flags().Lookup("diff"))
@@ -71,15 +78,16 @@ var entCmd = &cobra.Command{
 		color.NoColor = !viper.GetBool("color")
 
 		entitlement := viper.GetString("ent.ent")
+		value := viper.GetString("ent.val")
 		searchFile := viper.GetString("ent.file")
 		markdown := viper.GetBool("ent.md")
 
 		if len(entitlement) > 0 && len(searchFile) > 0 {
-			log.Errorf("you can only use --ent OR --file (not both)")
-			return nil
+			return fmt.Errorf("you can only use --ent OR --file (not both)")
+		} else if len(entitlement) > 0 && len(value) > 0 {
+			return fmt.Errorf("you can only use --ent OR --val (not both)")
 		} else if len(entitlement) > 0 && viper.GetBool("ent.diff") {
-			log.Errorf("you can only use --ent OR --diff (not both)")
-			return nil
+			return fmt.Errorf("you can only use --ent OR --diff (not both)")
 		}
 
 		ipswPath := filepath.Clean(args[0])
@@ -238,19 +246,68 @@ var entCmd = &cobra.Command{
 							switch v := v.(type) {
 							case bool:
 								if v {
-									fmt.Fprintf(w, "%s\t%s\n", k, f)
+									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
 								}
+							case uint64:
+								fmt.Fprintf(w, "%s=%d\t%s\n", colorKey(k), colorValue(v), colorBin(f))
 							case string:
-								fmt.Fprintf(w, "%s\t%s\n", k, f)
-								fmt.Fprintf(w, " - %s\n", v)
+								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+								fmt.Fprintf(w, " - %s\n", colorValue(v))
 							case []any:
-								fmt.Fprintf(w, "%s\t%s\n", k, f)
+								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
 								for _, i := range v {
-									fmt.Fprintf(w, " - %v\n", i)
+									fmt.Fprintf(w, " - %v\n", colorValue(i))
+								}
+							case map[string]any:
+								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+								for kk, vv := range v {
+									fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
 								}
 							default:
 								log.Error(fmt.Sprintf("unhandled entitlement kind %T in %s", v, f))
 							}
+						}
+					}
+				}
+			}
+			w.Flush()
+		} else if len(value) > 0 {
+			log.Infof("Files containing entitlement value: %s", value)
+			fmt.Println()
+			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+			for f, ent := range entDB {
+				ents := make(map[string]any)
+				if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
+					return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
+				}
+				for k, v := range ents {
+					if strings.Contains(k, entitlement) {
+						switch v := v.(type) {
+						case bool:
+							continue // skip bools (prob too noisy)
+						case uint64:
+							continue // skip uint64 (prob too noisy)
+						case string:
+							if strings.Contains(v, value) {
+								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+								fmt.Fprintf(w, " - %s\n", colorValue(v))
+							}
+						case []any:
+							if slices.Contains(v, any(value)) {
+								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+								for _, i := range v {
+									fmt.Fprintf(w, " - %v\n", colorValue(i))
+								}
+							}
+						case map[string]any:
+							for kk, vv := range v {
+								if strings.Contains(kk, value) {
+									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+									fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
+								}
+							}
+						default:
+							log.Error(fmt.Sprintf("unhandled entitlement kind %T in %s", v, f))
 						}
 					}
 				}
