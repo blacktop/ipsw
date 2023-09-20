@@ -237,7 +237,7 @@ var dyldSearchCmd = &cobra.Command{
 								classType = colorField("swift_class")
 							}
 							if classReStr != "" && classRE.MatchString(class.Name) {
-								fmt.Printf("%s: %s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name))
+								fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField(classType), swift.DemangleBlob(class.Name))
 								break
 							}
 							if protocolReStr != "" {
@@ -316,7 +316,7 @@ var dyldSearchCmd = &cobra.Command{
 								return fmt.Errorf("invalid regex '%s': %w", classReStr, err)
 							}
 							if classRE.MatchString(cat.Class.Name) {
-								fmt.Printf("%s: %s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name))
+								fmt.Printf("%s: %s\t%s=%s\t%s=%s\n", colorAddr("%#09x", cat.Class.ClassPtr), filepath.Base(img.Name), colorField("category"), swift.DemangleBlob(cat.Name), colorField("class"), swift.DemangleBlob(cat.Class.Name))
 							}
 						}
 						classType := "class"
