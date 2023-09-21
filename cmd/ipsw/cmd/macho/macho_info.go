@@ -45,6 +45,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/certs"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	"github.com/blacktop/ipsw/internal/magic"
 	swift "github.com/blacktop/ipsw/internal/swift"
@@ -1110,6 +1111,19 @@ var machoInfoCmd = &cobra.Command{
 					fmt.Println("---------")
 					for _, cfstr := range cfstrs {
 						fmt.Printf("%s:  %s\n", symAddrColor("%#09x", cfstr.Address), symNameColor(fmt.Sprintf("%#v", cfstr.Name)))
+					}
+				}
+			}
+			if info, err := m.GetObjCImageInfo(); err == nil {
+				if info != nil && info.HasSwift() {
+					if ss, err := mcmd.FindSwiftStrings(m); err == nil {
+						if len(ss) > 0 {
+							fmt.Printf("\nSwift Strings\n")
+							fmt.Println("-------------")
+						}
+						for addr, s := range ss {
+							fmt.Printf("%s:  %s\n", symAddrColor("%#09x", addr), symNameColor(fmt.Sprintf("%#v", s)))
+						}
 					}
 				}
 			}

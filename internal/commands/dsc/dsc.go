@@ -12,6 +12,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho/pkg/codesign"
 	"github.com/blacktop/ipsw/internal/commands/extract"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 )
@@ -659,6 +660,23 @@ func GetStrings(f *dyld.File, pattern string) ([]String, error) {
 							Image:   filepath.Base(i.Name),
 							String:  cfstr.Name,
 						})
+					}
+				}
+			}
+		}
+
+		// swift small string literals
+		if info, err := m.GetObjCImageInfo(); err == nil {
+			if info != nil && info.HasSwift() {
+				if ss, err := mcmd.FindSwiftStrings(m); err == nil {
+					for addr, s := range ss {
+						if strRE.MatchString(s) {
+							strs = append(strs, String{
+								Address: addr,
+								Image:   filepath.Base(i.Name),
+								String:  s,
+							})
+						}
 					}
 				}
 			}

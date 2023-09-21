@@ -1,0 +1,34 @@
+package macho
+
+import (
+	"fmt"
+
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/pkg/disass"
+)
+
+func FindSwiftStrings(m *macho.File) (map[uint64]string, error) {
+	text := m.Section("__TEXT", "__text")
+	if text == nil {
+		return nil, fmt.Errorf("no __TEXT.__text section found")
+	}
+
+	data, err := text.Data()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get __TEXT.__text data: %v", err)
+	}
+
+	symbolMap := make(map[uint64]string)
+
+	engine := disass.NewMachoDisass(m, &symbolMap, &disass.Config{
+		Data:         data,
+		StartAddress: text.Addr,
+		Middle:       text.Addr + text.Size,
+		AsJSON:       false,
+		Demangle:     false,
+		Quite:        false,
+		Color:        false,
+	})
+
+	return engine.FindSwiftStrings()
+}

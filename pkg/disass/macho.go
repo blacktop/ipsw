@@ -154,6 +154,103 @@ func (d *MachoDisass) Triage() error {
 	return nil
 }
 
+// FindSwiftStrings walks a function extracts Swift StringObjects/String Structs/Compiler optimized strings
+func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
+	var instrValue uint32
+	var results [1024]byte
+	var prevInstr *disassemble.Instruction
+
+	d.tr = &Triage{
+		Addresses: make(map[uint64]uint64),
+		Locations: make(map[uint64][]uint64),
+	}
+	startAddr := d.StartAddr()
+	r := bytes.NewReader(d.Data())
+
+	out = make(map[uint64]string)
+
+	ss := make([]byte, 16)
+	buf := bytes.NewBuffer(ss)
+
+	strAddr := uint64(0)
+	reg := disassemble.REG_NONE
+	regVal := uint64(0)
+	next := disassemble.REG_NONE
+	nextVal := uint64(0)
+
+	// extract all Swift strings
+	for {
+		err := binary.Read(r, binary.LittleEndian, &instrValue)
+
+		if err == io.EOF {
+			break
+		}
+
+		instruction, err := disassemble.Decompose(startAddr, instrValue, &results)
+		if err != nil {
+			startAddr += uint64(binary.Size(uint32(0)))
+			continue
+		}
+
+		if instruction.Operation == disassemble.ARM64_MOV {
+			if reg == disassemble.REG_NONE {
+				strAddr = instruction.Address
+				reg = instruction.Operands[0].Registers[0]
+				regVal = instruction.Operands[1].Immediate
+			} else {
+				next = instruction.Operands[0].Registers[0]
+				nextVal = instruction.Operands[1].Immediate
+			}
+		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_MOV) && (instruction.Operation == disassemble.ARM64_MOVK) {
+			if reg == instruction.Operands[0].Registers[0] {
+				regVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
+			} else if next == instruction.Operands[0].Registers[0] {
+				nextVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
+			}
+		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_MOVK) && (instruction.Operation == disassemble.ARM64_MOVK) {
+			if reg == instruction.Operands[0].Registers[0] {
+				regVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
+			} else if next == instruction.Operands[0].Registers[0] {
+				nextVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
+			}
+		} else {
+			if regVal > 0 && nextVal > 0 {
+				discriminator := (nextVal & 0xFF00_0000_0000_0000) >> 56
+				if discriminator&0xF0 == 0xE0 { // small ascii string
+					count := discriminator & 0xF
+					nextVal = nextVal & 0x00FF_FFFF_FFFF_FFFF
+					buf.Reset()
+					binary.Write(buf, binary.LittleEndian, regVal)
+					binary.Write(buf, binary.LittleEndian, nextVal)
+					if utils.IsASCII(string(ss[:count])) {
+						out[strAddr] = string(ss[:count])
+						ss = ss[:0]
+					}
+				} else if discriminator&0xF0 == 0xA0 { // smal non-ascii string
+					count := discriminator & 0xF
+					nextVal = nextVal & 0x00FF_FFFF_FFFF_FFFF
+					buf.Reset()
+					binary.Write(buf, binary.LittleEndian, regVal)
+					binary.Write(buf, binary.LittleEndian, nextVal)
+					out[strAddr] = utils.UnicodeSanitize(string(ss[:count]))
+					ss = ss[:0]
+				} // TODO: add support for discriminator&0xF0 == 0x80 { // large string
+			}
+			// RESET
+			strAddr = uint64(0)
+			reg = disassemble.REG_NONE
+			regVal = uint64(0)
+			next = disassemble.REG_NONE
+			nextVal = uint64(0)
+		}
+
+		prevInstr = instruction
+		startAddr += uint64(binary.Size(uint32(0)))
+	}
+
+	return out, nil
+}
+
 // IsFunctionStart checks if address is at a function start and returns symbol name
 func (d MachoDisass) IsFunctionStart(addr uint64) (bool, string) {
 	for _, fn := range d.f.GetFunctions() {

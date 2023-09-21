@@ -37,6 +37,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types/objc"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
@@ -565,6 +566,20 @@ var MachoCmd = &cobra.Command{
 							fmt.Println("---------")
 							for _, cfstr := range cfstrs {
 								fmt.Printf("%#09x:  %#v\n", cfstr.Address, cfstr.Name)
+							}
+						}
+					}
+
+					if info, err := m.GetObjCImageInfo(); err == nil {
+						if info != nil && info.HasSwift() {
+							if ss, err := mcmd.FindSwiftStrings(m); err == nil {
+								if len(ss) > 0 {
+									fmt.Printf("\nSwift Strings\n")
+									fmt.Println("-------------")
+								}
+								for addr, s := range ss {
+									fmt.Printf("%s:  %s\n", symAddrColor("%#09x", addr), symNameColor(fmt.Sprintf("%#v", s)))
+								}
 							}
 						}
 					}
