@@ -24,10 +24,6 @@ func FindSwiftStrings(m *macho.File) (map[uint64]string, error) {
 		Data:         data,
 		StartAddress: text.Addr,
 		Middle:       text.Addr + text.Size,
-		AsJSON:       false,
-		Demangle:     false,
-		Quite:        false,
-		Color:        false,
 	})
 
 	return engine.FindSwiftStrings()
