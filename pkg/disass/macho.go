@@ -203,13 +203,9 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 				next = instruction.Operands[0].Registers[0]
 				nextVal = instruction.Operands[1].Immediate
 			}
-		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_MOV) && (instruction.Operation == disassemble.ARM64_MOVK) {
-			if reg == instruction.Operands[0].Registers[0] {
-				regVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
-			} else if next == instruction.Operands[0].Registers[0] {
-				nextVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
-			}
-		} else if (prevInstr != nil && prevInstr.Operation == disassemble.ARM64_MOVK) && (instruction.Operation == disassemble.ARM64_MOVK) {
+		} else if prevInstr != nil &&
+			((prevInstr.Operation == disassemble.ARM64_MOV && instruction.Operation == disassemble.ARM64_MOVK) ||
+				(prevInstr.Operation == disassemble.ARM64_MOVK && instruction.Operation == disassemble.ARM64_MOVK)) {
 			if reg == instruction.Operands[0].Registers[0] {
 				regVal += instruction.Operands[1].Immediate << uint64(instruction.Operands[1].ShiftValue)
 			} else if next == instruction.Operands[0].Registers[0] {
