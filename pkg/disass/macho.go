@@ -218,7 +218,7 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 		} else {
 			if regVal > 0 && nextVal > 0 {
 				discriminator := (nextVal & 0xFF00_0000_0000_0000) >> 56
-				if discriminator&0xF0 == 0xE0 { // small ascii string
+				if (discriminator & 0xF0) == 0xE0 { // small ascii string
 					count := discriminator & 0xF
 					nextVal = nextVal & 0x00FF_FFFF_FFFF_FFFF
 					buf.Reset()
@@ -228,7 +228,7 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 						out[strAddr] = string(ss[:count])
 						ss = ss[:0]
 					}
-				} else if discriminator&0xF0 == 0xA0 { // smal non-ascii string
+				} else if (discriminator & 0xF0) == 0xA0 { // small non-ascii string
 					count := discriminator & 0xF
 					nextVal = nextVal & 0x00FF_FFFF_FFFF_FFFF
 					buf.Reset()
@@ -236,7 +236,7 @@ func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 					binary.Write(buf, binary.LittleEndian, nextVal)
 					out[strAddr] = utils.UnicodeSanitize(string(ss[:count]))
 					ss = ss[:0]
-				} // TODO: add support for discriminator&0xF0 == 0x80 { // large string
+				} // TODO: add support for (discriminator & 0xF0) == 0x80 { // large string
 			}
 			// RESET
 			strAddr = uint64(0)
