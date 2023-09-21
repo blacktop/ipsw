@@ -155,6 +155,8 @@ func (d *MachoDisass) Triage() error {
 }
 
 // FindSwiftStrings walks a function extracts Swift StringObjects/String Structs/Compiler optimized strings
+// ref - test/SILOptimizer/character_literals.swift
+// ref - stdlib/public/core/StringObject.swift
 func (d *MachoDisass) FindSwiftStrings() (out map[uint64]string, err error) {
 	var instrValue uint32
 	var results [1024]byte
