@@ -37,6 +37,7 @@ test-caches/
 completions/
 manpages/
 *.txt
+*.swift
 *.prof
 *.download
 checksums.txt.sha1

@@ -1121,8 +1121,14 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Printf("\nSwift Strings\n")
 							fmt.Println("-------------")
 						}
-						for addr, s := range ss {
-							fmt.Printf("%s:  %s\n", symAddrColor("%#09x", addr), symNameColor(fmt.Sprintf("%#v", s)))
+						// sort by address
+						addrs := make([]uint64, 0, len(ss))
+						for addr := range ss {
+							addrs = append(addrs, addr)
+						}
+						slices.Sort(addrs)
+						for _, addr := range addrs {
+							fmt.Printf("%s:  %s\n", symAddrColor("%#09x", addr), symNameColor(fmt.Sprintf("%#v", ss[addr])))
 						}
 					}
 				}
