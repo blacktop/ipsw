@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 
 	"github.com/apex/log"
@@ -88,6 +89,27 @@ func getRemoteFolder(c *Config) (*info.Info, *zip.Reader, string, error) {
 		return nil, nil, "", fmt.Errorf("failed to get folder from remote zip metadata: %v", err)
 	}
 	return i, zr, folder, nil
+}
+
+// FirmwareType returns the type of the firmware: IPSW or OTA
+func FirmwareType(c *Config) (string, error) {
+	if len(c.IPSW) > 0 {
+		i, _, err := getFolder(c)
+		if err != nil {
+			return "", err
+		}
+		return i.Plists.Type, nil
+	} else if len(c.URL) > 0 {
+		if !isURL(c.URL) {
+			return "", fmt.Errorf("invalid URL provided: %s", c.URL)
+		}
+		i, _, _, err := getRemoteFolder(c)
+		if err != nil {
+			return "", err
+		}
+		return i.Plists.Type, nil
+	}
+	return "", fmt.Errorf("no IPSW or URL provided")
 }
 
 // Kernelcache extracts the kernelcache from an IPSW
@@ -201,6 +223,12 @@ func DSC(c *Config) ([]string, error) {
 		i, zr, folder, err := getRemoteFolder(c)
 		if err != nil {
 			return nil, err
+		}
+		if i.Plists.Type == "OTA" {
+			if runtime.GOOS == "darwin" {
+				return dyld.ExtractFromRemoteCryptex(zr, filepath.Join(filepath.Clean(c.Output), folder), c.Arches, c.DriverKit)
+			}
+			return nil, fmt.Errorf("extracting dyld_shared_cache from remote OTA is only supported on macOS")
 		}
 		sysDMG, err := i.GetSystemOsDmg()
 		if err != nil {

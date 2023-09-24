@@ -141,6 +141,12 @@ var extractCmd = &cobra.Command{
 			config.IPSW = args[0]
 		}
 
+		if typ, err := extract.FirmwareType(config); err == nil {
+			if typ == "OTA" {
+				log.Warn("Extracting from OTA may not work (you should try the `ipsw ota extract` command)")
+			}
+		}
+
 		if viper.GetBool("extract.kernel") {
 			log.Info("Extracting kernelcache")
 			out, err := extract.Kernelcache(config)

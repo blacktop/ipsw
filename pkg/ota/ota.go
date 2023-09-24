@@ -415,6 +415,8 @@ func Extract(otaZIP, extractPattern, folder string) error {
 		if err := ExtractFromCryptexes(zr, extractPattern, folder, func(string) bool { return false }); err != nil {
 			log.Errorf("failed to find in OTA cryptexes: %v", err)
 		}
+	} else {
+		utils.Indent(log.Warn, 2)("Skipping searching OTA cryptexes files... (macOS only)")
 	}
 
 	utils.Indent(log.Info, 2)("Searching in OTA payload files...")
