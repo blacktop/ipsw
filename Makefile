@@ -43,7 +43,7 @@ snapshot: ## Run goreleaser snapshot
 release: ## Create a new release from the NEXT_VERSION
 	@echo " > Creating Release ${NEXT_VERSION}"
 	@hack/make/release ${NEXT_VERSION}
-	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip-validate
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip=validate
 	@echo " > Update Portfile ${NEXT_VERSION}"
 	@hack/make/portfile ../ports
 
@@ -51,7 +51,7 @@ release: ## Create a new release from the NEXT_VERSION
 release-minor: ## Create a new minor semver release
 	@echo " > Creating Release $(shell svu minor)"
 	@hack/make/release $(shell svu minor)
-	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip-validate
+	@GOROOT=$(shell go env GOROOT) goreleaser --clean --timeout 60m --skip=validate
 
 .PHONY: destroy
 destroy: ## Remove release from the CUR_VERSION
