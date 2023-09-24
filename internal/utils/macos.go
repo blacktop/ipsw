@@ -40,6 +40,14 @@ func Cp(src, dst string) error {
 	return err
 }
 
+// MkdirAndCopy recursively copies src into dst with src's file modes while also creating the outer directory
+func MkdirAndCopy(src, dst string) error {
+	if err := os.MkdirAll(filepath.Dir(dst), 0750); err != nil {
+		return err
+	}
+	return CopyWithMode(src, dst, 0)
+}
+
 // Copy recursively copies src into dst with src's file modes.
 // CREDIT: https://github.com/goreleaser/goreleaser/blob/main/internal/gio/copy.go
 func Copy(src, dst string) error {
