@@ -185,10 +185,11 @@ func Extract(ipsw, destPath string, arches []string, driverkit bool) ([]string, 
 }
 
 func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, driverkit bool) error {
-	found := false
+	re := regexp.MustCompile(`cryptex-system-arm64?e$`)
 
+	found := false
 	for _, zf := range zr.File {
-		if regexp.MustCompile(`cryptex-system-arm64?e$`).MatchString(zf.Name) {
+		if re.MatchString(zf.Name) {
 			found = true
 			rc, err := zf.Open()
 			if err != nil {
