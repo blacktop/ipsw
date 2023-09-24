@@ -184,16 +184,18 @@ func Extract(ipsw, destPath string, arches []string, driverkit bool) ([]string, 
 	return ExtractFromDMG(i, dmgPath, destPath, arches, driverkit)
 }
 
-func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, driverkit bool) error {
+// ExtractFromRemoteCryptex extracts the dyld_shared_cache from the cryptex-system-arm64e file in the given zip.Reader.
+// It creates a temp file for the cryptex-system-arm64e file, patches it, and extracts the dyld_shared_cache from the decrypted file.
+// The extracted dyld_shared_cache is saved to the given destPath.
+// The function returns a slice of artifacts extracted from the dyld_shared_cache and an error if any.
+func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, driverkit bool) ([]string, error) {
 	re := regexp.MustCompile(`cryptex-system-arm64?e$`)
 
-	found := false
 	for _, zf := range zr.File {
 		if re.MatchString(zf.Name) {
-			found = true
 			rc, err := zf.Open()
 			if err != nil {
-				return fmt.Errorf("failed to open cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to open cryptex-system-arm64e: %v", err)
 			}
 			defer rc.Close()
 			// setup progress bar
@@ -219,7 +221,7 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, 
 
 			in, err := os.CreateTemp("", "cryptex-system-arm64e")
 			if err != nil {
-				return fmt.Errorf("failed to create temp file for cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to create temp file for cryptex-system-arm64e: %v", err)
 			}
 			defer os.Remove(in.Name())
 
@@ -231,33 +233,30 @@ func ExtractFromRemoteCryptex(zr *zip.Reader, destPath string, arches []string, 
 
 			out, err := os.CreateTemp("", "cryptex-system-arm64e.decrypted.*.dmg")
 			if err != nil {
-				return fmt.Errorf("failed to create temp file for cryptex-system-arm64e.decrypted: %v", err)
+				return nil, fmt.Errorf("failed to create temp file for cryptex-system-arm64e.decrypted: %v", err)
 			}
 			defer os.Remove(out.Name())
 			out.Close()
 
-			log.Info("Patching cryptex-system-arm64e")
+			log.Infof("Patching cryptex-system-arm64e to %s", out.Name())
 			if err := ridiff.RawImagePatch("", in.Name(), out.Name(), 0); err != nil {
-				return fmt.Errorf("failed to patch cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to patch cryptex-system-arm64e: %v", err)
 
 			}
 
 			i, err := info.ParseZipFiles(zr.File)
 			if err != nil {
-				return fmt.Errorf("failed to parse info from cryptex-system-arm64e: %v", err)
+				return nil, fmt.Errorf("failed to parse info from cryptex-system-arm64e: %v", err)
 			}
 
-			if _, err := ExtractFromDMG(i, out.Name(), destPath, arches, driverkit); err != nil {
-				return fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
+			artifacts, err := ExtractFromDMG(i, out.Name(), destPath, arches, driverkit)
+			if err != nil {
+				return nil, fmt.Errorf("failed to extract dyld_shared_cache from cryptex-system-arm64e: %v", err)
 			}
 
-			return nil
+			return artifacts, nil
 		}
 	}
 
-	if !found {
-		return fmt.Errorf("cryptex-system-arm64e NOT found in remote zip")
-	}
-
-	return nil
+	return nil, fmt.Errorf("cryptex-system-arm64e NOT found in remote zip")
 }

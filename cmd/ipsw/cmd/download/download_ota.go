@@ -365,19 +365,28 @@ var otaDLCmd = &cobra.Command{
 
 					if remoteKernel { // REMOTE KERNEL MODE
 						log.Info("Extracting remote kernelcache")
-						_, err = kernelcache.RemoteParse(zr, folder)
+						artifacts, err := kernelcache.RemoteParse(zr, folder)
 						if err != nil {
 							return fmt.Errorf("failed to download kernelcache from remote ota: %v", err)
+						}
+						for kc := range artifacts {
+							utils.Indent(log.Info, 2)("Extracted " + kc)
 						}
 					}
 					if remoteDyld { // REMOTE DSC MODE
 						found := false
 						if runtime.GOOS == "darwin" { // FIXME: figure out how to do this on all platforms
 							log.Info("Extracting remote dyld_shared_cache")
-							if err := dyld.ExtractFromRemoteCryptex(zr, folder, dyldArches, false); err != nil { // TODO: assuming user doesn't want DriverKit cache
+							artifacts, err := dyld.ExtractFromRemoteCryptex(zr, folder, dyldArches, dyldDriverKit)
+							if err != nil {
 								log.Errorf("failed to download dyld_shared_cache from remote OTA: %v", err)
 							}
-							found = true
+							if len(artifacts) > 0 {
+								found = true
+							}
+							for _, artifact := range artifacts {
+								utils.Indent(log.Info, 2)("Extracted " + filepath.Base(artifact))
+							}
 						}
 						if !found {
 							var dscRegex string
