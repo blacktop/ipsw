@@ -37,7 +37,7 @@ require (
 	github.com/google/gousb v1.1.2
 	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-version v1.6.0
-	github.com/invopop/jsonschema v0.9.0
+	github.com/invopop/jsonschema v0.10.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/image-spec v1.1.0-rc5
