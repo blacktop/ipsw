@@ -19,7 +19,7 @@ require (
 	github.com/boombuler/barcode v1.0.1
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/disgoorg/disgo v0.16.9
+	github.com/disgoorg/disgo v0.16.11
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/dominikbraun/graph v0.23.0
@@ -37,7 +37,7 @@ require (
 	github.com/google/gousb v1.1.2
 	github.com/google/uuid v1.3.1
 	github.com/hashicorp/go-version v1.6.0
-	github.com/invopop/jsonschema v0.9.0
+	github.com/invopop/jsonschema v0.10.0
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/opencontainers/image-spec v1.1.0-rc5

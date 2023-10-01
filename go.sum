@@ -143,8 +143,8 @@ github.com/danieljoos/wincred v1.2.0/go.mod h1:FzQLLMKBFdvu+osBrnFODiv32YGwCfx0S
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/disgoorg/disgo v0.16.9 h1:QkdfM930SSi/p5TaJF2/BxjUKPQVcA3zu6sGtocSUhg=
-github.com/disgoorg/disgo v0.16.9/go.mod h1:QnvUII334g/LJzjOmhYGCJzbl38Og83iXCEe28DklVM=
+github.com/disgoorg/disgo v0.16.11 h1:bkbjjEOuXPISSdNFVIGiTtkyGj+CmHoVeRGo1N+LgFo=
+github.com/disgoorg/disgo v0.16.11/go.mod h1:QnvUII334g/LJzjOmhYGCJzbl38Og83iXCEe28DklVM=
 github.com/disgoorg/json v1.1.0 h1:7xigHvomlVA9PQw9bMGO02PHGJJPqvX5AnwlYg/Tnys=
 github.com/disgoorg/json v1.1.0/go.mod h1:BHDwdde0rpQFDVsRLKhma6Y7fTbQKub/zdGO5O9NqqA=
 github.com/disgoorg/log v1.2.1 h1:kZYAWkUBcGy4LbZcgYtgYu49xNVLy+xG5Uq3yz5VVQs=
@@ -316,8 +316,8 @@ github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:
 github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
 github.com/inconshreveable/mousetrap v1.1.0 h1:wN+x4NVGpMsO7ErUn/mUI3vEoE6Jt13X2s0bqwp9tc8=
 github.com/inconshreveable/mousetrap v1.1.0/go.mod h1:vpF70FUmC8bwa3OWnCshd2FqLfsEA9PFc4w1p2J65bw=
-github.com/invopop/jsonschema v0.9.0 h1:m1Fe5PN4X9V7P1TCF+pA8Xly3Vj3pY905klC++8oOpM=
-github.com/invopop/jsonschema v0.9.0/go.mod h1:uMhbTEOXoPcOKzdYRfk914W6UTGA/cVcgEQxXh1MJ7g=
+github.com/invopop/jsonschema v0.10.0 h1:c1ktzNLBun3LyQQhyty5WE3lulbOdIIyOVlkmDLehcE=
+github.com/invopop/jsonschema v0.10.0/go.mod h1:ffZ5Km5SWWRAIN6wbDXItl95euhFz2uON45H2qjYt+0=
 github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
 github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
 github.com/jackc/pgservicefile v0.0.0-20221227161230-091c0ba34f0a h1:bbPeKD0xmW/Y25WS6cokEszi5g+S0QxI/d45PkRi7Nk=
