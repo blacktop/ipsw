@@ -143,8 +143,8 @@ github.com/danieljoos/wincred v1.2.0/go.mod h1:FzQLLMKBFdvu+osBrnFODiv32YGwCfx0S
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/disgoorg/disgo v0.16.9 h1:QkdfM930SSi/p5TaJF2/BxjUKPQVcA3zu6sGtocSUhg=
-github.com/disgoorg/disgo v0.16.9/go.mod h1:QnvUII334g/LJzjOmhYGCJzbl38Og83iXCEe28DklVM=
+github.com/disgoorg/disgo v0.16.11 h1:bkbjjEOuXPISSdNFVIGiTtkyGj+CmHoVeRGo1N+LgFo=
+github.com/disgoorg/disgo v0.16.11/go.mod h1:QnvUII334g/LJzjOmhYGCJzbl38Og83iXCEe28DklVM=
 github.com/disgoorg/json v1.1.0 h1:7xigHvomlVA9PQw9bMGO02PHGJJPqvX5AnwlYg/Tnys=
 github.com/disgoorg/json v1.1.0/go.mod h1:BHDwdde0rpQFDVsRLKhma6Y7fTbQKub/zdGO5O9NqqA=
 github.com/disgoorg/log v1.2.1 h1:kZYAWkUBcGy4LbZcgYtgYu49xNVLy+xG5Uq3yz5VVQs=
