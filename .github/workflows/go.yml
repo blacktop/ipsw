@@ -172,9 +172,9 @@ jobs:
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13'
         run: |
           echo "latest_ios_version=$(ipsw download ipsw --show-latest-version --insecure)" >> $GITHUB_ENV
-          echo "latest_ios_build=$(ipsw download ipsw --show-latest-build --device iPhone15,2 --insecure)" >> $GITHUB_ENV
-          echo "beta_ios_version=$(ipsw download ota --platform ios --beta --show-latest-version --device iPhone15,2 --insecure)" >> $GITHUB_ENV
-          echo "beta_ios_build=$(ipsw download ota --platform ios --beta --show-latest-build --device iPhone15,2 --insecure)" >> $GITHUB_ENV
+          echo "latest_ios_build=$(ipsw download ipsw --show-latest-build --device iPhone16,2 --insecure)" >> $GITHUB_ENV
+          echo "beta_ios_version=$(ipsw download ota --platform ios --beta --show-latest-version --device iPhone16,2 --insecure)" >> $GITHUB_ENV
+          echo "beta_ios_build=$(ipsw download ota --platform ios --beta --show-latest-build --device iPhone16,2 --insecure)" >> $GITHUB_ENV
           echo "latest_macos_version=$(ipsw download ipsw --show-latest-version --macos --insecure)" >> $GITHUB_ENV
           echo "latest_macos_build=$(ipsw download ipsw --show-latest-build --macos --device Mac14,7 --insecure)" >> $GITHUB_ENV
           echo "beta_macos_version=$(ipsw download ota --platform macos --beta --show-latest-version --device Mac14,7 --insecure)" >> $GITHUB_ENV
@@ -230,7 +230,7 @@ jobs:
       - name: Run download iOS beta OTA (kernelcache and DSC)
         if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw-beta
-        run: ipsw download ota --platform ios --device iPhone15,2 --beta --kernel --dyld
+        run: ipsw download ota --platform ios --device iPhone16,2 --beta --kernel --dyld
       - name: Run download macOS beta OTA (kernelcache and DSC)
         if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw-beta
@@ -387,13 +387,13 @@ jobs:
         working-directory: /tmp/ipsw
         run: |
           ipsw dyld str "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
-      # ipsw dyld str "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
+      # ipsw dyld str "${{ env.beta_ios_build }}__iPhone16,2"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
       - name: Run dyld image
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           ipsw dyld image "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
-      # ipsw dyld image "${{ env.beta_ios_build }}__iPhone15,2"/dyld_shared_cache_arm64e
+      # ipsw dyld image "${{ env.beta_ios_build }}__iPhone16,2"/dyld_shared_cache_arm64e
       #
       # MACHO CMD (macOS)
       #
