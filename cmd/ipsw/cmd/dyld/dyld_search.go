@@ -92,7 +92,7 @@ var dyldSearchCmd = &cobra.Command{
 		ivarReStr := viper.GetString("dyld.search.ivar")
 		symReStr := viper.GetString("dyld.search.sym")
 		// verify flags
-		if loadCmdReStr == "" && protocolReStr == "" && classReStr == "" && categoryReStr == "" && selectorReStr == "" && ivarReStr == "" {
+		if loadCmdReStr == "" && protocolReStr == "" && classReStr == "" && categoryReStr == "" && selectorReStr == "" && ivarReStr == "" && symReStr == "" {
 			return fmt.Errorf("must specify a search criteria via one of the flags")
 		}
 
