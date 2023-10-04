@@ -117,6 +117,7 @@ var dyldExtractCmd = &cobra.Command{
 	Aliases:       []string{"e"},
 	Short:         "Extract dylib from dyld_shared_cache",
 	Args:          cobra.MinimumNArgs(1),
+	Hidden:        true, // FIXME: remove when extraction is fixed (is creating machos w/ incorrect headers/segment/section boundaries)
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
