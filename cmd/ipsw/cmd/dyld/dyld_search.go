@@ -54,20 +54,20 @@ func init() {
 	DyldCmd.AddCommand(dyldSearchCmd)
 
 	dyldSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
+	dyldSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
 	dyldSearchCmd.Flags().StringP("protocol", "p", "", "Search for specific ObjC protocol regex")
 	dyldSearchCmd.Flags().StringP("class", "c", "", "Search for specific ObjC class regex")
 	dyldSearchCmd.Flags().StringP("category", "g", "", "Search for specific ObjC category regex")
 	dyldSearchCmd.Flags().StringP("sel", "s", "", "Search for specific ObjC selector regex")
 	dyldSearchCmd.Flags().String("ivar", "", "Search for specific ObjC instance variable regex")
-	dyldSearchCmd.Flags().String("sym", "", "Search for specific symbol regex")
 	viper.BindPFlag("dyld.search.load-command", dyldSearchCmd.Flags().Lookup("load-command"))
+	viper.BindPFlag("dyld.search.section", dyldSearchCmd.Flags().Lookup("section"))
 	viper.BindPFlag("dyld.search.protocol", dyldSearchCmd.Flags().Lookup("protocol"))
 	viper.BindPFlag("dyld.search.class", dyldSearchCmd.Flags().Lookup("class"))
 	viper.BindPFlag("dyld.search.category", dyldSearchCmd.Flags().Lookup("category"))
 	viper.BindPFlag("dyld.search.sel", dyldSearchCmd.Flags().Lookup("sel"))
 	viper.BindPFlag("dyld.search.ivar", dyldSearchCmd.Flags().Lookup("ivar"))
-	viper.BindPFlag("dyld.search.sym", dyldSearchCmd.Flags().Lookup("sym"))
-	dyldSearchCmd.MarkFlagsMutuallyExclusive("protocol", "class", "category", "sel", "ivar", "sym")
+	dyldSearchCmd.MarkFlagsMutuallyExclusive("protocol", "class", "category", "sel", "ivar")
 }
 
 // dyldSearchCmd represents the search command
@@ -85,14 +85,14 @@ var dyldSearchCmd = &cobra.Command{
 
 		// flags
 		loadCmdReStr := viper.GetString("dyld.search.load-command")
+		sectionReStr := viper.GetString("dyld.search.section")
 		protocolReStr := viper.GetString("dyld.search.protocol")
 		classReStr := viper.GetString("dyld.search.class")
 		categoryReStr := viper.GetString("dyld.search.category")
 		selectorReStr := viper.GetString("dyld.search.sel")
 		ivarReStr := viper.GetString("dyld.search.ivar")
-		symReStr := viper.GetString("dyld.search.sym")
 		// verify flags
-		if loadCmdReStr == "" && protocolReStr == "" && classReStr == "" && categoryReStr == "" && selectorReStr == "" && ivarReStr == "" && symReStr == "" {
+		if loadCmdReStr == "" && sectionReStr == "" && protocolReStr == "" && classReStr == "" && categoryReStr == "" && selectorReStr == "" && ivarReStr == "" {
 			return fmt.Errorf("must specify a search criteria via one of the flags")
 		}
 
@@ -134,47 +134,17 @@ var dyldSearchCmd = &cobra.Command{
 				for _, lc := range m.Loads {
 					if re.MatchString(lc.Command().String()) {
 						fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("load"), lc.Command())
-						break
 					}
 				}
 			}
-			if symReStr != "" {
-				symRE, err := regexp.Compile(symReStr)
+			if sectionReStr != "" {
+				re, err := regexp.Compile(sectionReStr)
 				if err != nil {
-					return fmt.Errorf("invalid regex '%s': %w", symReStr, err)
+					return fmt.Errorf("invalid regex '%s': %w", sectionReStr, err)
 				}
-				for _, sym := range m.Symtab.Syms {
-					if symRE.MatchString(sym.Name) {
-						fmt.Printf("%#x: %s\t(%s)\t%s\n", sym.Value, filepath.Base(img.Name), sym.Type.String(""), sym.Name)
-						break
-					}
-				}
-				if binds, err := m.GetBindInfo(); err == nil {
-					for _, bind := range binds {
-						if symRE.MatchString(bind.Name) {
-							fmt.Printf("%#x: %s\t(%s)\n", bind.Start+bind.Offset, filepath.Base(img.Name), bind.Name)
-							break
-						}
-					}
-				}
-				if exports, err := m.GetExports(); err == nil {
-					for _, export := range exports {
-						if symRE.MatchString(export.Name) {
-							fmt.Printf("%#x: %s\t(%s)\t%s\n", export.Address, filepath.Base(img.Name), export.Flags, export.Name)
-							break
-						}
-					}
-				}
-				if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
-					exports, err := m.DyldExports()
-					if err != nil {
-						return err
-					}
-					for _, export := range exports {
-						if symRE.MatchString(export.Name) {
-							fmt.Printf("%#x: %s\t(%s)\t%s\n", export.Address, filepath.Base(img.Name), export.Flags, export.Name)
-							break
-						}
+				for _, sec := range m.Sections {
+					if re.MatchString(fmt.Sprintf("%s.%s", sec.Seg, sec.Name)) {
+						fmt.Printf("%-55s%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("load"), fmt.Sprintf("%s.%s", sec.Seg, sec.Name))
 					}
 				}
 			}
