@@ -227,7 +227,10 @@ func (f *File) String(verbose bool) string {
 			"%s"+ // progClosuresTrie
 			"%s"+ // prebuiltLoaderSet
 			"%s"+ // prebuiltLoaderSet pool
+			"%s"+ // dynamic config
+			"%s"+ // objcOpts
 			"%s"+ // swiftOpts
+			"%s"+ // dyld/_dyld_start addrs
 			"%s", // mappings
 		f.Headers[f.UUID].Magic.String(),
 		f.Headers[f.UUID].Platform,
@@ -249,7 +252,10 @@ func (f *File) String(verbose bool) string {
 		f.getProgClosuresTrie(f.UUID),
 		f.getPrebuiltLoaderSet(f.UUID),
 		f.getPrebuiltLoaderSetPool(f.UUID),
+		f.getDynamicConfig(f.UUID),
+		f.getObjcOpts(f.UUID),
 		f.getSwiftOpts(f.UUID),
+		f.getDyldInfo(f.UUID),
 		f.getMappings(slideVersion, verbose),
 	)
 }
@@ -373,11 +379,22 @@ func (f *File) getBranchPools(uuid types.UUID) string {
 
 func (f *File) getAccelerateInfo(uuid types.UUID) string {
 	var output string
-	if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr > 0 {
-		output = fmt.Sprintf("Accelerate Tab:              %3dKB, address: 0x%09X -> 0x%09X\n",
-			f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr/1024,
-			f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr,
-			f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr+f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr)
+	if !f.IsDyld4 {
+		if f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr > 0 {
+			output = fmt.Sprintf("Accelerate Tab:              %3dKB, address: 0x%09X -> 0x%09X\n",
+				f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr/1024,
+				f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr,
+				f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr+f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr)
+		}
+	}
+	return output
+}
+
+func (f *File) getDyldInfo(uuid types.UUID) string {
+	var output string
+	if f.IsDyld4 {
+		output = fmt.Sprintf("\ndyld MachO:    address: 0x%09X\n", f.Headers[uuid].AccelerateInfoAddrUnusedOrDyldAddr)
+		output += fmt.Sprintf("_dyld_start:   address: 0x%09X\n", f.Headers[uuid].AccelerateInfoSizeUnusedOrDyldStartFuncAddr)
 	}
 	return output
 }
@@ -417,8 +434,8 @@ func (f *File) getProgClosuresTrie(uuid types.UUID) string {
 func (f *File) getPrebuiltLoaderSet(uuid types.UUID) string {
 	var output string
 	if f.IsDyld4 && f.Headers[uuid].DylibsPblSetAddr > 0 {
-		output = fmt.Sprintf("Prebuilt Loader Set:         %3dKB, address: 0x%09X -> 0x%09X\n",
-			(f.Headers[uuid].ProgramsPblSetPoolAddr-f.Headers[uuid].DylibsPblSetAddr)/1024,
+		output = fmt.Sprintf("Prebuilt Loader Set:         %3dMB, address: 0x%09X -> 0x%09X\n",
+			(f.Headers[uuid].ProgramsPblSetPoolAddr-f.Headers[uuid].DylibsPblSetAddr)/1024/1024,
 			f.Headers[uuid].DylibsPblSetAddr,
 			f.Headers[uuid].ProgramsPblSetPoolAddr-f.Headers[uuid].DylibsPblSetAddr)
 	}
@@ -436,13 +453,35 @@ func (f *File) getPrebuiltLoaderSetPool(uuid types.UUID) string {
 	return output
 }
 
+func (f *File) getObjcOpts(uuid types.UUID) string {
+	var output string
+	if f.IsDyld4 && f.Headers[uuid].ObjcOptsOffset > 0 {
+		output = fmt.Sprintf("ObjC Opts:                    %3dB, offset:  0x%09X -> 0x%09X\n",
+			f.Headers[uuid].ObjcOptsSize,
+			f.Headers[uuid].ObjcOptsOffset,
+			f.Headers[uuid].ObjcOptsOffset+f.Headers[uuid].ObjcOptsSize)
+	}
+	return output
+}
+
 func (f *File) getSwiftOpts(uuid types.UUID) string {
 	var output string
 	if f.IsDyld4 && f.Headers[uuid].SwiftOptsOffset > 0 {
-		output = fmt.Sprintf("Swift Opts:                  %3dMB, offset:  0x%09X -> 0x%09X\n",
-			f.Headers[uuid].SwiftOptsSize/(1024*1024),
+		output = fmt.Sprintf("Swift Opts:                  %3dkB, offset:  0x%09X -> 0x%09X\n",
+			f.Headers[uuid].SwiftOptsSize/(1024),
 			f.Headers[uuid].SwiftOptsOffset,
 			f.Headers[uuid].SwiftOptsOffset+f.Headers[uuid].SwiftOptsSize)
+	}
+	return output
+}
+
+func (f *File) getDynamicConfig(uuid types.UUID) string {
+	var output string
+	if f.IsDyld4 && f.Headers[uuid].SwiftOptsOffset > 0 {
+		output = fmt.Sprintf("Dynamic Config:              %3dkB, address: 0x%09X -> 0x%09X\n",
+			f.Headers[uuid].DynamicDataMaxSize/(1024),
+			f.Headers[uuid].SharedRegionStart+f.Headers[uuid].DynamicDataOffset,
+			f.Headers[uuid].SharedRegionStart+f.Headers[uuid].DynamicDataOffset+f.Headers[uuid].DynamicDataMaxSize)
 	}
 	return output
 }
