@@ -573,10 +573,6 @@ Dump all the imp-caches
 ❯ ipsw dyld objc --imp-cache dyld_shared_cache
 ```
 
-:::caution
-`--imp-cache` NOT supported on macOS12/iOS15+ *(yet)*
-:::
-
 ### **dyld objc class**
 
 Lookup a class's address *(same as `ipsw dyld objc --class`)*
