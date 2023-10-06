@@ -1035,15 +1035,6 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 	var selectorStringVMAddrStart uint64
 	var selectorStringVMAddrEnd uint64
 
-	// opt, err := f.GetOptimizations()
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if f.IsDyld4 || opt.GetVersion() >= 16 {
-	// 	return fmt.Errorf("imp-cache dumping is NOT supported on macOS12/iOS15+ (yet)")
-	// }
-
 	image, err := f.Image("/usr/lib/libobjc.A.dylib")
 	if err != nil {
 		return err
