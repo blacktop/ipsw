@@ -58,6 +58,7 @@ type Loader struct {
 	// leaveMapped        :  1,  // RTLD_NODELETE
 	// hasReadOnlyObjC    :  1,  // Has __DATA_CONST,__objc_selrefs section
 	// pre2022Binary      :  1,
+	// isPremapped        :  1,  // mapped by exclave core
 	// padding            :  6;
 	Ref LoaderRef
 }
@@ -88,6 +89,9 @@ func (l Loader) HasReadOnlyObjC() bool {
 }
 func (l Loader) Pre2022Binary() bool {
 	return types.ExtractBits(uint64(l.Info), 8, 1) != 0
+}
+func (l Loader) IsPremapped() bool {
+	return types.ExtractBits(uint64(l.Info), 9, 1) != 0
 }
 
 func (l Loader) String() string {
@@ -120,6 +124,9 @@ func (l Loader) String() string {
 	}
 	if l.Pre2022Binary() {
 		out = append(out, "pre-2022")
+	}
+	if l.IsPremapped() {
+		out = append(out, "premapped")
 	}
 	return fmt.Sprintf("%s, ref: %s", strings.Join(out, "|"), l.Ref)
 }
@@ -283,10 +290,10 @@ type BindTarget struct {
 // fileValidation stored in PrebuiltLoader when it references a file on disk
 type fileValidation struct {
 	SliceOffset     uint64
+	DeviceID        uint64
 	Inode           uint64
 	Mtime           uint64
 	CDHash          [20]byte // to validate file has not changed since PrebuiltLoader was built
-	UUID            types.UUID
 	CheckInodeMtime bool
 	CheckCDHash     bool
 }
@@ -519,12 +526,13 @@ func (pl PrebuiltLoader) String(f *File) string {
 		}
 		if pl.FileValidation.CheckInodeMtime {
 			out += fmt.Sprintf("slice-offset:  %#x\n", pl.FileValidation.SliceOffset)
+			out += fmt.Sprintf("device-id:  %#x\n", pl.FileValidation.DeviceID)
 			out += fmt.Sprintf("inode          %#x\n", pl.FileValidation.Inode)
 			out += fmt.Sprintf("mod-time       %#x\n", pl.FileValidation.Mtime)
 		}
-		if !pl.FileValidation.UUID.IsNull() {
-			out += fmt.Sprintf("UUID:          %s\n", pl.FileValidation.UUID)
-		}
+		// if !pl.FileValidation.UUID.IsNull() {
+		// 	out += fmt.Sprintf("UUID:          %s\n", pl.FileValidation.UUID)
+		// }
 	}
 	out += fmt.Sprintf("Loader:        %s\n", pl.Loader)
 	if len(pl.GetInfo()) > 0 {

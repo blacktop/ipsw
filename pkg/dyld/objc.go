@@ -432,8 +432,8 @@ func (f *File) dumpOffsets(shash *StringHash, uuid types.UUID) {
 					if err != nil {
 						log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
 					}
-					if len(shash.dylibMap) > 0 {
-						fmt.Printf("%s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.ObjectOffsets[idx].DylibObjCIndex()])))
+					if img, ok := shash.dylibMap[shash.ObjectOffsets[idx].DylibObjCIndex()]; ok {
+						fmt.Printf("%s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(img)))
 					} else {
 						fmt.Printf("%s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
 					}
@@ -443,8 +443,8 @@ func (f *File) dumpOffsets(shash *StringHash, uuid types.UUID) {
 						if err != nil {
 							log.Errorf("failed to get cache vmaddr for object at cache vmoffset %#x: %v", shash.ObjectOffsets[idx].ObjectCacheOffset(), err)
 						}
-						if len(shash.dylibMap) > 0 {
-							fmt.Printf("    %s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(shash.dylibMap[shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].DylibObjCIndex()])))
+						if img, ok := shash.dylibMap[shash.DuplicateOffsets[shash.ObjectOffsets[idx].DuplicateIndex()+uint64(i)].DylibObjCIndex()]; ok {
+							fmt.Printf("    %s: %s\t%s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"), symImageColor(filepath.Base(img)))
 						} else {
 							fmt.Printf("    %s: %s\n", symAddrColor("%#09x", addr), strings.Trim(s, "\x00"))
 						}
@@ -473,6 +473,11 @@ type header_info_ro struct {
 	// from this location.
 	InfoOffset int64
 
+	// Note, this is no longer a pointer, but instead an offset to a pointer
+	// from this location.
+	// This may not be present in old shared caches
+	DyldInfoOffset int64
+
 	// // Offset from this location to the non-lazy class list
 	// NlclslistOffset int64
 	// NlclslistCount  uint64
@@ -492,33 +497,42 @@ type header_info_ro struct {
 
 func (h *objc_headeropt_ro_t) GetMachoHdrOffset(index int) (uint64, error) {
 	if h == nil {
-		return 0, fmt.Errorf("headeropt_ro is nil")
+		return 0, fmt.Errorf("objc_headeropt_ro_t is nil")
 	}
 	if index > len(h.Headers) {
 		return 0, fmt.Errorf("index out of range")
 	}
-	return h.offset + 8 + uint64(index*binary.Size(header_info_ro{})) + uint64(h.Headers[index].MhdrOffset), nil
+	return uint64(int64(h.offset) + 8 + int64(index*binary.Size(header_info_ro{})) + h.Headers[index].MhdrOffset), nil
 }
 func (h *objc_headeropt_ro_t) FindElement(addr uint64) (uint16, error) {
 	if h == nil {
-		return 0, fmt.Errorf("headeropt_ro is nil")
+		return 0, fmt.Errorf("objc_headeropt_ro_t is nil")
 	}
 	for idx, hdr := range h.Headers {
-		calcAddr := h.offset + 8 + uint64(idx*binary.Size(header_info_ro{})) + uint64(hdr.MhdrOffset)
-		if 0x180000000+calcAddr == addr {
+		calcAddr := uint64(int64(h.offset) + 8 + int64(idx*binary.Size(header_info_ro{})) + hdr.MhdrOffset)
+		if (0x180000000 + calcAddr) == addr { // FIXME: this is for arm64 and shouldn't be hardcoded
 			return uint16(idx), nil
 		}
 	}
-	return 0, fmt.Errorf("could not find element")
+	return 0, fmt.Errorf("failed to find element for address %#x", addr)
 }
 func (h *objc_headeropt_ro_t) GetObjcInfoOffset(index int) (uint64, error) {
 	if h == nil {
-		return 0, fmt.Errorf("headeropt_ro is nil")
+		return 0, fmt.Errorf("objc_headeropt_ro_t is nil")
 	}
 	if index > len(h.Headers) {
 		return 0, fmt.Errorf("index out of range")
 	}
-	return h.offset + 8 + 4 + uint64(index*binary.Size(header_info_ro{})) + uint64(h.Headers[index].InfoOffset), nil
+	return uint64(int64(h.offset) + 8 + int64(unsafe.Offsetof(h.Headers[index].InfoOffset)) + int64(index*binary.Size(header_info_ro{})) + h.Headers[index].InfoOffset), nil
+}
+func (h *objc_headeropt_ro_t) GetDyldInfoOffset(index int) (uint64, error) {
+	if h == nil {
+		return 0, fmt.Errorf("objc_headeropt_ro_t is nil")
+	}
+	if index > len(h.Headers) {
+		return 0, fmt.Errorf("index out of range")
+	}
+	return uint64(int64(h.offset) + 8 + int64(unsafe.Offsetof(h.Headers[index].DyldInfoOffset)) + int64(index*binary.Size(header_info_ro{})) + h.Headers[index].DyldInfoOffset), nil
 }
 
 type objc_headeropt_rw_t struct {
@@ -1018,21 +1032,34 @@ func (f *File) MethodsForImage(imageNames ...string) error {
 
 // ImpCachesForImage dumps all of the Objective-C imp caches for a given image
 func (f *File) ImpCachesForImage(imageNames ...string) error {
-	var optOffsets objc.OptOffsets
-	// var optOffsets objc.OptOffsets2
 	var selectorStringVMAddrStart uint64
 	var selectorStringVMAddrEnd uint64
 
-	opt, err := f.GetOptimizations()
+	// opt, err := f.GetOptimizations()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// if f.IsDyld4 || opt.GetVersion() >= 16 {
+	// 	return fmt.Errorf("imp-cache dumping is NOT supported on macOS12/iOS15+ (yet)")
+	// }
+
+	image, err := f.Image("/usr/lib/libobjc.A.dylib")
 	if err != nil {
 		return err
 	}
 
-	if f.IsDyld4 || opt.GetVersion() >= 16 {
-		return fmt.Errorf("imp-cache dumping is NOT supported on macOS12/iOS15+ (yet)")
+	libObjC, err := image.GetMacho()
+	if err != nil {
+		return err
 	}
 
-	libObjC, err := f.getLibObjC()
+	symaddr, err := libObjC.FindSymbolAddress("_objc_opt_preopt_caches_version")
+	if err != nil {
+		return err
+	}
+
+	impCachesVersion, err := f.ReadPointerAtAddress(symaddr)
 	if err != nil {
 		return err
 	}
@@ -1048,12 +1075,18 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 			return fmt.Errorf("failed to read %s.%s data: %v", sec.Seg, sec.Name, err)
 		}
 
+		optOffsets := make([]uint64, sec.Size/uint64(binary.Size(uint64(0))))
 		if err := binary.Read(bytes.NewReader(dat), f.ByteOrder, &optOffsets); err != nil {
 			return err
 		}
 
-		selectorStringVMAddrStart = f.SlideInfo.SlidePointer(optOffsets.MethodNameStart)
-		selectorStringVMAddrEnd = f.SlideInfo.SlidePointer(optOffsets.MethodNameEnd)
+		selectorStringIndex := 0
+		if impCachesVersion > 1 {
+			selectorStringIndex = 1
+		}
+
+		selectorStringVMAddrStart = f.SlideInfo.SlidePointer(optOffsets[selectorStringIndex])
+		selectorStringVMAddrEnd = f.SlideInfo.SlidePointer(optOffsets[selectorStringIndex+1])
 		// inlinedSelectorsVMAddrStart = scoffs[2]
 		// inlinedSelectorsVMAddrEnd = scoffs[3]
 	} else {
@@ -1097,29 +1130,57 @@ func (f *File) ImpCachesForImage(imageNames ...string) error {
 
 				sr.Seek(int64(off), io.SeekStart)
 
-				var impCache objc.ImpCache
-				if err := binary.Read(sr, f.ByteOrder, &impCache.PreoptCacheT); err != nil {
-					return fmt.Errorf("failed to read preopt_cache_t: %v", err)
-				}
+				if impCachesVersion < 3 {
+					var impCache objc.ImpCacheV1
+					if err := binary.Read(sr, f.ByteOrder, &impCache.ImpCacheHeaderV1); err != nil {
+						return fmt.Errorf("failed to read preopt_cache_t: %v", err)
+					}
 
-				impCache.Entries = make([]objc.PreoptCacheEntryT, impCache.Capacity())
-				if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
-					return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
-				}
+					impCache.Entries = make([]objc.ImpCacheEntryV1, impCache.Capacity())
+					if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
+						return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
+					}
 
-				fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.PreoptCacheT, impCache.Capacity())
+					fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.ImpCacheHeaderV1, impCache.Capacity())
 
-				for _, bucket := range impCache.Entries {
-					if bucket.SelOffset == 0xFFFFFFFF {
-						fmt.Printf("  - %#09x:\n", 0)
-					} else {
-						if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
-							sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
-							if err != nil {
-								return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
-							}
-							fmt.Printf("  - %#09x: %s\n", c.ClassPtr-uint64(bucket.ImpOffset), sel)
-						} // TODO: handle the error case warn or crash?
+					for _, bucket := range impCache.Entries {
+						if bucket.SelOffset == 0xFFFFFFFF {
+							fmt.Printf("  - %#09x:\n", 0)
+						} else {
+							if selectorStringVMAddrStart+uint64(bucket.SelOffset) < selectorStringVMAddrEnd {
+								sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.SelOffset))
+								if err != nil {
+									return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
+								}
+								fmt.Printf("  - %#09x: %s\n", c.ClassPtr-uint64(bucket.ImpOffset), sel)
+							} // TODO: handle the error case warn or crash?
+						}
+					}
+				} else {
+					var impCache objc.ImpCacheV2
+					if err := binary.Read(sr, f.ByteOrder, &impCache.ImpCacheHeaderV2); err != nil {
+						return fmt.Errorf("failed to read preopt_cache_t: %v", err)
+					}
+
+					impCache.Entries = make([]objc.ImpCacheEntryV2, impCache.Capacity())
+					if err := binary.Read(sr, f.ByteOrder, &impCache.Entries); err != nil {
+						return fmt.Errorf("failed to read []preopt_cache_entry_t: %v", err)
+					}
+
+					fmt.Printf("%s: (%s, buckets: %d)\n", c.Name, impCache.ImpCacheHeaderV2, impCache.Capacity())
+
+					for _, bucket := range impCache.Entries {
+						if bucket.GetSelOffset() == 0x3FFFFFF {
+							fmt.Printf("  - %#09x:\n", 0)
+						} else {
+							if selectorStringVMAddrStart+uint64(bucket.GetSelOffset()) < selectorStringVMAddrEnd {
+								sel, err := f.GetCString(selectorStringVMAddrStart + uint64(bucket.GetSelOffset()))
+								if err != nil {
+									return fmt.Errorf("failed to get cstring for selector in imp-cache bucket")
+								}
+								fmt.Printf("  - %#09x: %s\n", c.ClassPtr-uint64(bucket.GetImpOffset()<<2), sel)
+							} // TODO: handle the error case warn or crash?
+						}
 					}
 				}
 			} else {
