@@ -49,7 +49,7 @@ var ObjcCmd = &cobra.Command{
 	Short:         "Dump Objective-C Optimization Info",
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(1),
+	Args:          cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
