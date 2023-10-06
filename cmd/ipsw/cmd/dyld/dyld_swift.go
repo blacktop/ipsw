@@ -63,6 +63,10 @@ var SwiftCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		if !viper.GetBool("dyld.swift.types") && !viper.GetBool("dyld.swift.metadata") && !viper.GetBool("dyld.swift.foreign") {
+			return fmt.Errorf("must specify at least one of the following flags: --types, --metadata, --foreign")
+		}
+
 		dscPath := filepath.Clean(args[0])
 
 		fileInfo, err := os.Lstat(dscPath)
