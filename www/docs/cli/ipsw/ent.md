@@ -23,6 +23,7 @@ ipsw ent <IPSW> [flags]
   -h, --help            help for ent
   -m, --md              Markdown style output
   -o, --output string   Folder to r/w entitlement databases
+  -v, --val string      Entitlement's value to search for (i.e. <array> strings)
 ```
 
 ### Options inherited from parent commands

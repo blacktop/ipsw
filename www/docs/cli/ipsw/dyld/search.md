@@ -23,6 +23,7 @@ ipsw dyld search [flags]
       --ivar string           Search for specific ObjC instance variable regex
   -l, --load-command string   Search for specific load command regex
   -p, --protocol string       Search for specific ObjC protocol regex
+  -x, --section string        Search for specific section regex
   -s, --sel string            Search for specific ObjC selector regex
 ```
 
