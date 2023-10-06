@@ -926,20 +926,13 @@ func (f *File) GetProgClosureAddress(executablePath string) (uint64, error) {
 func (f *File) GetProgClosureImageArray() error {
 	var addr uint64
 	var size uint64
-	// if f.Headers[f.UUID].DylibsPblSetAddr > 0 {
-	// 	return fmt.Errorf("ipsw cannot parse dylibs image array info for macOS12+/iOS15+ yet 😔")
-	// }
-	// return fmt.Errorf("cache does not contain dylibs image array info")
+
+	if f.IsDyld4 {
+		return fmt.Errorf("dyld4 no longer uses prog closures")
+	}
+
 	if f.Headers[f.UUID].ProgClosuresAddr == 0 {
-		// if f.Headers[f.UUID].ProgramsPblSetPoolAddr == 0 {
-		if f.Headers[f.UUID].ProgramsPblSetPoolAddr > 0 {
-			return fmt.Errorf("ipsw cannot parse prog launch closure info for macOS12+/iOS15+ yet 😔")
-		}
 		return fmt.Errorf("cache does not contain prog launch closure info")
-		// } else {
-		// 	addr = f.Headers[f.UUID].ProgramsPblSetPoolAddr
-		// 	size = f.Headers[f.UUID].ProgramsPblSetPoolSize
-		// }
 	} else {
 		addr = f.Headers[f.UUID].ProgClosuresAddr
 		size = f.Headers[f.UUID].ProgClosuresSize
