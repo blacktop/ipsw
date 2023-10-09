@@ -60,10 +60,12 @@ destroy: ## Remove release from the CUR_VERSION
 	git tag -d ${LOCAL_VERSION}
 	git push origin :refs/tags/${LOCAL_VERSION}
 
-build: ## Build ipsw
+build: ## Build ipsw and ipswd
 	@echo " > Building ipsw"
 	@$(GO_BIN) mod download
 	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" ./cmd/ipsw
+	@echo " > Building ipswd"
+	@CGO_ENABLED=1 $(GO_BIN) build -ldflags "-s -w --X github.com/blacktop/ipsw/api/types.BuildVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/api/types.BuildTime=$(date -u +%Y%m%d)" ./cmd/ipswd
 
 build-ios: ## Build ipsw for iOS
 	@echo " > Building ipsw"
@@ -71,7 +73,7 @@ build-ios: ## Build ipsw for iOS
 	@CGO_ENABLED=1 GOOS=ios GOARCH=arm64 CC=$(shell go env GOROOT)/misc/ios/clangwrap.sh $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime==$(date -u +%Y%m%d)" ./cmd/ipsw
 	@codesign --entitlements hack/make/data/ent.plist -s - -f ipsw
 
-build-linux: ## Build ipsw (linux)
+build-linux: ## Build ipsw and ipswd (linux)
 	@echo " > Building ipsw (linux)"
 	@$(GO_BIN) mod download
 	@CGO_ENABLED=1 GOOS=linux GOARCH=arm64 CC='zig cc -target aarch64-linux-musl' CXX='zig c++ -target aarch64-linux-musl' $(GO_BIN) build -ldflags "-s -w -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppVersion=$(CUR_VERSION) -X github.com/blacktop/ipsw/cmd/ipsw/cmd.AppBuildTime=$(date -u +%Y%m%d)" ./cmd/ipsw
