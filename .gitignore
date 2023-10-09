@@ -14,7 +14,8 @@
 
 # IDE
 .idea
-.vscode
+# glob to include things like .vscode-ctags
+.vscode*
 debug
 __debug_*
 
