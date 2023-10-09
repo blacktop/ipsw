@@ -100,6 +100,11 @@ test-docs: ## Start local server hosting docusaurus docs
 	@echo " > Testing Docs"
 	cd www; npm start
 
+.PHONY: completions
+completions: ## Generate the shell (bash, zsh, fish, powershell) completions
+	@echo " > Generating shell (bash, zsh, fish, powershell) completions"
+	hack/make/completions
+
 .PHONY: update_mod
 update_mod: ## Update go.mod file
 	@echo " > Updating go.mod"
