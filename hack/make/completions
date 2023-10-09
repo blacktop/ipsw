@@ -1,10 +1,27 @@
 #!/bin/sh
 set -e
 rm -rf completions
-mkdir -p completions/{ipsw,ipswd}
 for sh in bash zsh fish powershell; do
-	go run ./cmd/ipsw/main.go completion "$sh" >"completions/ipsw/_$sh"
-done
-for sh in bash zsh fish powershell; do
-	go run ./cmd/ipswd/main.go completion "$sh" >"completions/ipswd/_$sh"
+	for tool in ipsw ipswd; do
+		mkdir -p completions/$sh
+		case $sh in
+			bash)
+				dst=$tool
+				;;
+			zsh)
+				dst=_$tool
+				;;
+			fish)
+				dst=$tool.fish
+				;;
+			powershell)
+				dst=$tool.psm1
+				;;
+			*)
+				echo Unknown shell $sh
+				exit 1
+				;;
+		esac
+		go run ./cmd/$tool/main.go completion "$sh" >"completions/$sh/$dst"
+	done
 done

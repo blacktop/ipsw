@@ -302,7 +302,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - completions/ipsw/*
+      - completions/*
       - manpages/*
       - config.example.yml
     wrap_in_directory: true
@@ -323,7 +323,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - completions/ipsw/*
+      - completions/*
       - manpages/*
       - config.example.yml
     wrap_in_directory: true
@@ -342,7 +342,7 @@ archives:
     files:
       - README.md
       - LICENSE
-      - completions/ipsw/*
+      - completions/*
       - manpages/*
       - config.example.yml
     wrap_in_directory: true
@@ -399,9 +399,9 @@ brews:
       prefix.install "LICENSE", "README.md", "config.example.yml"
       (etc/"ipsw").mkpath
       etc.install prefix/"config.example.yml" => "ipsw/config.yml"
-      bash_completion.install "completions/ipsw/_bash" => "ipsw"
-      zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
-      fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
+      bash_completion.install "completions/bash/ipsw" => "ipsw"
+      zsh_completion.install "completions/zsh/_ipsw" => "_ipsw"
+      fish_completion.install "completions/fish/ipsw.fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
     test: |
       system "#{bin}/ipsw --version"
@@ -427,9 +427,9 @@ brews:
       prefix.install "LICENSE", "README.md", "config.example.yml"
       (etc/"ipsw").mkpath
       etc.install prefix/"config.example.yml" => "ipsw/config.yml"
-      bash_completion.install "completions/ipsw/_bash" => "ipsw"
-      zsh_completion.install "completions/ipsw/_zsh" => "_ipsw"
-      fish_completion.install "completions/ipsw/_fish" => "ipsw.fish"
+      bash_completion.install "completions/bash/ipsw" => "ipsw"
+      zsh_completion.install "completions/zsh/_ipsw" => "_ipsw"
+      fish_completion.install "completions/fish/ipsw.fish" => "ipsw.fish"
       man1.install Dir["manpages/*"]
     test: |
       system "#{bin}/ipsw --version"
@@ -468,9 +468,9 @@ brews:
       prefix.install "LICENSE", "README.md", "config.example.yml"
       (etc/"ipsw").mkpath
       etc.install prefix/"config.example.yml" => "ipsw/config.yml"
-      bash_completion.install "completions/ipswd/_bash" => "ipswd"
-      zsh_completion.install "completions/ipswd/_zsh" => "_ipswd"
-      fish_completion.install "completions/ipswd/_fish" => "ipswd.fish"
+      bash_completion.install "completions/bash/ipswd" => "ipswd"
+      zsh_completion.install "completions/zsh/_ipswd" => "_ipswd"
+      fish_completion.install "completions/fish/ipswd.fish" => "ipswd.fish"
     service: |
       run [opt_bin/"ipswd", "start", "--config", etc/"ipsw/config.yml"]
       environment_variables IPSW_IN_HOMEBREW: 1
@@ -513,9 +513,11 @@ aurs:
       mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
       mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
       mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
-      install -Dm644 "./completions/ipsw/_bash" "${pkgdir}/usr/share/bash-completion/completions/ipsw"
-      install -Dm644 "./completions/ipsw/_zsh" "${pkgdir}/usr/share/zsh/site-functions/_ipsw"
-      install -Dm644 "./completions/ipsw/_fish" "${pkgdir}/usr/share/fish/vendor_completions.d/ipsw.fish"
+      mkdir -p "${pkgdir}/usr/local/share/powershell/Modules/"
+      install -Dm644 "./completions/bash/ipsw" "${pkgdir}/usr/share/bash-completion/completions/ipsw"
+      install -Dm644 "./completions/zsh/_ipsw" "${pkgdir}/usr/share/zsh/site-functions/_ipsw"
+      install -Dm644 "./completions/fish/ipsw.fish" "${pkgdir}/usr/share/fish/vendor_completions.d/ipsw.fish"
+      install -Dm644 "./completions/powershell/ipsw.psm1" "${pkgdir}/usr/local/share/powershell/Modules/ipsw.psm1"
 
       # man pages
       install -Dm644 "./manpages/ipsw.1.gz" "${pkgdir}/usr/share/man/man1/ipsw.1.gz"
@@ -542,16 +544,20 @@ nfpms:
         type: config|noreplace
         file_info:
           mode: 0644
-      - src: ./completions/ipsw/_bash
+      - src: ./completions/bash/ipsw
         dst: /usr/share/bash-completion/completions/ipsw
         file_info:
           mode: 0644
-      - src: ./completions/ipsw/_zsh
+      - src: ./completions/zsh/_ipsw
         dst: /usr/share/zsh/vendor-completions/_ipsw
         file_info:
           mode: 0644
-      - src: ./completions/ipsw/_fish
+      - src: ./completions/fish/ipsw.fish
         dst: /usr/share/fish/vendor_completions.d/ipsw.fish
+        file_info:
+          mode: 0644
+      - src: ./completions/powershell/ipsw.psm1
+        dst: /usr/local/share/powershell/Modules/ipsw.psm1
         file_info:
           mode: 0644
       - src: ./manpages/ipsw.1.gz
@@ -601,16 +607,20 @@ nfpms:
         type: config|noreplace
         file_info:
           mode: 0644
-      - src: ./completions/ipswd/_bash
+      - src: ./completions/bash/ipswd
         dst: /usr/share/bash-completion/completions/ipswd
         file_info:
           mode: 0644
-      - src: ./completions/ipswd/_zsh
+      - src: ./completions/zsh/_ipswd
         dst: /usr/share/zsh/vendor-completions/_ipswd
         file_info:
           mode: 0644
-      - src: ./completions/ipswd/_fish
+      - src: ./completions/fish/_ipswd
         dst: /usr/share/fish/vendor_completions.d/ipswd.fish
+        file_info:
+          mode: 0644
+      - src: ./completions/powershell/ipswd.psm1
+        dst: /usr/local/share/powershell/Modules/ipswd.psm1
         file_info:
           mode: 0644
       - src: ./LICENSE
@@ -650,13 +660,16 @@ snapcrafts:
     publish: true
     license: MIT
     extra_files:
-      - source: ./completions/ipsw/_bash
+      - source: ./completions/bash/ipsw
         destination: /usr/share/completions
         mode: 0644
-      - source: ./completions/ipsw/_zsh
+      - source: ./completions/zsh/_ipsw
         destination: /usr/share/completions
         mode: 0644
-      - source: ./completions/ipsw/_fish
+      - source: ./completions/fish/ipsw.fish
+        destination: /usr/share/completions
+        mode: 0644
+      - source: ./completions/powershell/ipsw.psm1
         destination: /usr/share/completions
         mode: 0644
       - source: ./manpages/ipsw.1.gz
@@ -673,11 +686,13 @@ snapcrafts:
       /etc/ipsw/config.yml:
         bind_file: $SNAP_DATA/etc/ipsw/config.yml
       /usr/share/bash-completion/completions/ipsw:
-        bind_file: $SNAP_DATA/usr/share/completions/_bash
+        bind_file: $SNAP_DATA/usr/share/completions/ipsw
       /usr/share/zsh/vendor-completions/_ipsw:
-        bind_file: $SNAP_DATA/usr/share/completions/_zsh
+        bind_file: $SNAP_DATA/usr/share/completions/_ipsw
       /usr/share/fish/vendor_completions.d/ipsw.fish:
-        bind_file: $SNAP_DATA/usr/share/completions/_fish
+        bind_file: $SNAP_DATA/usr/share/completions/ipsw.fish
+      /usr/local/share/powershell/Modules/ipsw.psm1:
+        bind_file: $SNAP_DATA/usr/share/completions/ipsw.psm1
     apps:
       ipsw:
         command: ipsw
@@ -698,14 +713,17 @@ snapcrafts:
       - source: ./hack/goreleaser/linux_install/ipswd.wrapper
         destination: /bin/ipswd.wrapper
         mode: 0755
-      - source: ./completions/ipswd/_bash
-        destination: /usr/share/completions/_bash
+      - source: ./completions/bash/ipswd
+        destination: /usr/share/completions/ipswd
         mode: 0644
-      - source: ./completions/ipswd/_zsh
-        destination: /usr/share/completions/_zsh
+      - source: ./completions/zsh/_ipswd
+        destination: /usr/share/completions/_ipswd
         mode: 0644
-      - source: ./completions/ipswd/_fish
-        destination: /usr/share/completions/_fish
+      - source: ./completions/fish/ipswd.fish
+        destination: /usr/share/completions/ipswd.fish
+        mode: 0644
+      - source: ./completions/powershell/ipswd.psm1
+        destination: /usr/share/completions/ipswd.psm1
         mode: 0644
       - source: ./LICENSE
         destination: /usr/share/doc/ipsw/copyright
@@ -716,11 +734,13 @@ snapcrafts:
     layout:
       # The path you want to access in sandbox.
       /usr/share/bash-completion/completions/ipswd:
-        bind_file: $SNAP/usr/share/completions/_bash
+        bind_file: $SNAP/usr/share/completions/ipswwd
       /usr/share/zsh/vendor-completions/_ipswd:
-        bind_file: $SNAP/usr/share/completions/_zsh
+        bind_file: $SNAP/usr/share/completions/_ipswd
       /usr/share/fish/vendor_completions.d/ipswd.fish:
-        bind_file: $SNAP/usr/share/completions/_fish
+        bind_file: $SNAP/usr/share/completions/ipswd.fish
+      /usr/local/share/powershell/Modules/ipswd.psm1:
+        bind_file: $SNAP_DATA/usr/share/completions/ipswd.psm1
     apps:
       ipswd:
         command: bin/ipswd.wrapper
