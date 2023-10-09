@@ -5,6 +5,9 @@
 *.so
 *.dylib
 *.a
+# ipsw and ipswd themselves
+/ipsw
+/ipswd
 
 # Test binary, build with `go test -c`
 *.test
