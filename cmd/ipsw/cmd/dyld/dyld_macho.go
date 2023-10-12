@@ -62,7 +62,7 @@ func init() {
 	MachoCmd.Flags().BoolP("json", "j", false, "Print the TOC as JSON")
 	MachoCmd.Flags().BoolP("objc", "o", false, "Print ObjC info")
 	MachoCmd.Flags().BoolP("objc-refs", "r", false, "Print ObjC references")
-	// MachoCmd.Flags().BoolP("swift", "w", false, "🚧 Print Swift info")
+	MachoCmd.Flags().BoolP("swift", "w", false, "🚧 Print Swift info")
 	MachoCmd.Flags().BoolP("symbols", "n", false, "Print symbols")
 	MachoCmd.Flags().Bool("demangle", false, "Demangle symbol names")
 	MachoCmd.Flags().BoolP("starts", "f", false, "Print function starts")
@@ -100,7 +100,7 @@ var MachoCmd = &cobra.Command{
 		showObjcRefs, _ := cmd.Flags().GetBool("objc-refs")
 		showSwift, _ := cmd.Flags().GetBool("swift")
 		dumpSymbols, _ := cmd.Flags().GetBool("symbols")
-		demangleSyms, _ := cmd.Flags().GetBool("demangle")
+		doDemangle, _ := cmd.Flags().GetBool("demangle")
 		showFuncStarts, _ := cmd.Flags().GetBool("starts")
 		dumpStrings, _ := cmd.Flags().GetBool("strings")
 		dumpStubs, _ := cmd.Flags().GetBool("stubs")
@@ -113,8 +113,9 @@ var MachoCmd = &cobra.Command{
 		onlyFuncStarts := !showLoadCommands && !showObjC && !showSwift && !dumpStubs && showFuncStarts
 		onlyStubs := !showLoadCommands && !showObjC && !showSwift && !showFuncStarts && dumpStubs
 		onlySearch := !showLoadCommands && !showObjC && !showSwift && !showFuncStarts && !dumpStubs && searchPattern != ""
-		if demangleSyms && !dumpSymbols {
-			return fmt.Errorf("you must also supply --symbols flag to demangle symbols")
+		onlySwift := !showLoadCommands && !showObjC && !showFuncStarts && !dumpStubs && searchPattern == "" && showSwift
+		if doDemangle && (!dumpSymbols && !showSwift) {
+			return fmt.Errorf("you must also supply --symbols OR --swift flag to demangle")
 		}
 
 		dscPath := filepath.Clean(args[0])
@@ -227,7 +228,7 @@ var MachoCmd = &cobra.Command{
 					continue
 				}
 
-				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs && searchPattern == "" {
+				if showLoadCommands || !showObjC && !dumpSymbols && !dumpStrings && !showFuncStarts && !dumpStubs && searchPattern == "" && !showSwift {
 					if showLoadCommandsAsJSON {
 						dat, err := m.FileTOC.MarshalJSON()
 						if err != nil {
@@ -389,8 +390,10 @@ var MachoCmd = &cobra.Command{
 				}
 
 				if showSwift {
-					fmt.Println("Swift")
-					fmt.Println("=====")
+					if !onlySwift {
+						fmt.Println("Swift")
+						fmt.Println("=====")
+					}
 					info, err := m.GetObjCImageInfo()
 					if err != nil {
 						if !errors.Is(err, macho.ErrObjcSectionNotFound) {
@@ -398,22 +401,111 @@ var MachoCmd = &cobra.Command{
 						}
 					}
 					if info != nil && info.HasSwift() {
-						if fields, err := m.GetSwiftFields(); err == nil {
-							for _, field := range fields {
+						if typs, err := m.GetSwiftTypes(); err == nil {
+							for _, typ := range typs {
+								sout := typ.String()
 								if verbose {
-									if color {
-										quick.Highlight(os.Stdout, swift.DemangleBlob(field.String()), "swift", "terminal256", "nord")
-										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-									} else {
-										fmt.Println(swift.DemangleBlob(field.String()))
+									if doDemangle {
+										sout = swift.DemangleBlob(typ.String())
 									}
 								} else {
-									if color {
-										quick.Highlight(os.Stdout, field.String(), "swift", "terminal256", "nord")
-										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
-									} else {
-										fmt.Println(field.String())
+									if doDemangle {
+										sout = swift.DemangleSimpleBlob(typ.String())
 									}
+								}
+								if color {
+									quick.Highlight(os.Stdout, sout, "swift", "terminal256", "nord")
+									quick.Highlight(os.Stdout, "\n\n/****************************************/\n\n", "swift", "terminal256", "nord")
+								} else {
+									fmt.Println(sout)
+								}
+							}
+						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+							log.Error(err.Error())
+						}
+						if mpenums, err := m.GetMultiPayloadEnums(); err == nil {
+							for _, mpenum := range mpenums {
+								sout := mpenum.String()
+								if verbose {
+									if doDemangle {
+										sout = swift.DemangleBlob(mpenum.String())
+									}
+								} else {
+									if doDemangle {
+										sout = swift.DemangleSimpleBlob(mpenum.String())
+									}
+								}
+								if color {
+									quick.Highlight(os.Stdout, sout, "swift", "terminal256", "nord")
+									quick.Highlight(os.Stdout, "\n\n/****************************************/\n\n", "swift", "terminal256", "nord")
+								} else {
+									fmt.Println(sout)
+								}
+							}
+						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+							log.Error(err.Error())
+						}
+						if protos, err := m.GetSwiftProtocols(); err == nil {
+							for _, proto := range protos {
+								sout := proto.String()
+								if verbose {
+									if doDemangle {
+										sout = swift.DemangleBlob(proto.String())
+									}
+								} else {
+									if doDemangle {
+										sout = swift.DemangleSimpleBlob(proto.String())
+									}
+								}
+								if color {
+									quick.Highlight(os.Stdout, sout, "swift", "terminal256", "nord")
+									quick.Highlight(os.Stdout, "\n\n/****************************************/\n\n", "swift", "terminal256", "nord")
+								} else {
+									fmt.Println(sout)
+								}
+							}
+						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+							log.Error(err.Error())
+						}
+						if protos, err := m.GetSwiftProtocolConformances(); err == nil {
+							for _, proto := range protos {
+								sout := proto.String()
+								if verbose {
+									if doDemangle {
+										sout = swift.DemangleBlob(proto.String())
+									}
+								} else {
+									if doDemangle {
+										sout = swift.DemangleSimpleBlob(proto.String())
+									}
+								}
+								if color {
+									quick.Highlight(os.Stdout, sout, "swift", "terminal256", "nord")
+									quick.Highlight(os.Stdout, "\n\n/****************************************/\n\n", "swift", "terminal256", "nord")
+								} else {
+									fmt.Println(sout)
+								}
+							}
+						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+							log.Error(err.Error())
+						}
+						if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
+							for _, at := range asstyps {
+								sout := at.String()
+								if verbose {
+									if doDemangle {
+										sout = swift.DemangleBlob(at.String())
+									}
+								} else {
+									if doDemangle {
+										sout = swift.DemangleSimpleBlob(at.String())
+									}
+								}
+								if color {
+									quick.Highlight(os.Stdout, sout, "swift", "terminal256", "nord")
+									quick.Highlight(os.Stdout, "\n\n/****************************************/\n\n", "swift", "terminal256", "nord")
+								} else {
+									fmt.Println(sout)
 								}
 							}
 						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
@@ -453,7 +545,7 @@ var MachoCmd = &cobra.Command{
 								w.Flush()
 								undeflush = true
 							}
-							if demangleSyms {
+							if doDemangle {
 								if strings.HasPrefix(sym.Name, "_associated conformance ") {
 									if _, rest, ok := strings.Cut(sym.Name, "_associated conformance "); ok {
 										sym.Name, _ = swift.Demangle("_$s" + rest)
