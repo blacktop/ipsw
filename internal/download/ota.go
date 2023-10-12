@@ -331,12 +331,22 @@ func (o *Ota) getRequestAudienceIDs() ([]string, error) {
 						assetAudienceDB["macos"].Versions[latest].PublicBeta,
 						assetAudienceDB["macos"].Generic}, nil
 				}
-				// looup major version in DB
-				if v, ok := assetAudienceDB["macos"].Versions[strconv.Itoa(segs[0])]; ok {
-					return []string{
-						v.DeveloperBeta,
-						v.AppleSeedBeta,
-						v.PublicBeta}, nil
+				if o.Config.Platform == "accessory" {
+					// looup major version in DB
+					if v, ok := assetAudienceDB["ios"].Versions[strconv.Itoa(segs[0])]; ok {
+						return []string{
+							v.DeveloperBeta,
+							v.AppleSeedBeta,
+							v.PublicBeta}, nil
+					}
+				} else {
+					// looup major version in DB
+					if v, ok := assetAudienceDB["macos"].Versions[strconv.Itoa(segs[0])]; ok {
+						return []string{
+							v.DeveloperBeta,
+							v.AppleSeedBeta,
+							v.PublicBeta}, nil
+					}
 				}
 
 				return nil, fmt.Errorf(
