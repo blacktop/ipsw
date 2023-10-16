@@ -845,7 +845,17 @@ var machoInfoCmd = &cobra.Command{
 				}
 			}
 			if info != nil && info.HasSwift() {
+				m.GetSwiftFields()
+				m.GetColocateTypeDescriptors()
 				if typs, err := m.GetSwiftTypes(); err == nil {
+					if verbose {
+						if color {
+							quick.Highlight(os.Stdout, "/********\n* TYPES *\n********/\n\n", "swift", "terminal256", "nord")
+						} else {
+							fmt.Println("TYPES")
+							fmt.Print("-----\n\n")
+						}
+					}
 					for _, typ := range typs {
 						sout := typ.String()
 						if verbose {
@@ -868,6 +878,14 @@ var machoInfoCmd = &cobra.Command{
 					log.Error(err.Error())
 				}
 				if protos, err := m.GetSwiftProtocols(); err == nil {
+					if verbose {
+						if color {
+							quick.Highlight(os.Stdout, "/************\n* PROTOCOLS *\n************/\n\n", "swift", "terminal256", "nord")
+						} else {
+							fmt.Println("PROTOCOLS")
+							fmt.Print("---------\n\n")
+						}
+					}
 					for _, proto := range protos {
 						sout := proto.String()
 						if verbose {
@@ -890,6 +908,14 @@ var machoInfoCmd = &cobra.Command{
 					log.Error(err.Error())
 				}
 				if protos, err := m.GetSwiftProtocolConformances(); err == nil {
+					if verbose {
+						if color {
+							quick.Highlight(os.Stdout, "/************************\n* PROTOCOL CONFORMANCES *\n************************/\n\n", "swift", "terminal256", "nord")
+						} else {
+							fmt.Println("PROTOCOL CONFORMANCES")
+							fmt.Print("---------------------\n\n")
+						}
+					}
 					for _, proto := range protos {
 						sout := proto.String()
 						if verbose {
@@ -912,6 +938,14 @@ var machoInfoCmd = &cobra.Command{
 					log.Error(err.Error())
 				}
 				if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
+					if verbose {
+						if color {
+							quick.Highlight(os.Stdout, "/*******************\n* ASSOCIATED TYPES *\n*******************/\n\n", "swift", "terminal256", "nord")
+						} else {
+							fmt.Println("ASSOCIATED TYPES")
+							fmt.Print("---------------------\n\n")
+						}
+					}
 					for _, at := range asstyps {
 						sout := at.String()
 						if verbose {
