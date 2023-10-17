@@ -845,6 +845,7 @@ var machoInfoCmd = &cobra.Command{
 				}
 			}
 			if info != nil && info.HasSwift() {
+				// cache fields and types
 				m.GetSwiftFields()
 				m.GetColocateTypeDescriptors()
 				if typs, err := m.GetSwiftTypes(); err == nil {
