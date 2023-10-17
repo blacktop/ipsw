@@ -11,7 +11,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.1.3
 	github.com/blacktop/arm64-cgo v1.0.57
 	github.com/blacktop/go-dwarf v1.0.9
-	github.com/blacktop/go-macho v1.1.165
+	github.com/blacktop/go-macho v1.1.166
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -129,7 +129,7 @@ require (
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/moby/term v0.5.0 // indirect
@@ -158,8 +158,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/arch v0.5.0 // indirect
 	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
