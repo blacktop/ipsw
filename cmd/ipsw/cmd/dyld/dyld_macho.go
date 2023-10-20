@@ -180,7 +180,6 @@ var MachoCmd = &cobra.Command{
 				defer m.Close()
 
 				if extractDylib {
-
 					folder := filepath.Dir(dscPath) // default to folder of shared cache
 					if len(extractPath) > 0 {
 						folder = extractPath
@@ -401,9 +400,9 @@ var MachoCmd = &cobra.Command{
 						}
 					}
 					if info != nil && info.HasSwift() {
-						// cache fields and types
-						m.GetSwiftFields()
-						m.GetColocateTypeDescriptors()
+						if err := m.PreCache(); err != nil { // cache fields and types
+							log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(image.Name), err)
+						}
 						if typs, err := m.GetSwiftTypes(); err == nil {
 							if verbose {
 								if color {
@@ -416,8 +415,9 @@ var MachoCmd = &cobra.Command{
 							for _, typ := range typs {
 								sout := typ.String()
 								if verbose {
+									sout = typ.Verbose()
 									if doDemangle {
-										sout = swift.DemangleBlob(typ.Verbose())
+										sout = swift.DemangleBlob(sout)
 									}
 								} else {
 									if doDemangle {
@@ -432,7 +432,7 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-							log.Error(err.Error())
+							log.Errorf("failed to parse swift types for %s: %v", filepath.Base(image.Name), err)
 						}
 						if protos, err := m.GetSwiftProtocols(); err == nil {
 							if verbose {
@@ -446,8 +446,9 @@ var MachoCmd = &cobra.Command{
 							for _, proto := range protos {
 								sout := proto.String()
 								if verbose {
+									sout = proto.Verbose()
 									if doDemangle {
-										sout = swift.DemangleBlob(proto.Verbose())
+										sout = swift.DemangleBlob(sout)
 									}
 								} else {
 									if doDemangle {
@@ -462,7 +463,7 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-							log.Error(err.Error())
+							log.Errorf("failed to parse swift protocols for %s: %v", filepath.Base(image.Name), err)
 						}
 						if protos, err := m.GetSwiftProtocolConformances(); err == nil {
 							if verbose {
@@ -476,8 +477,9 @@ var MachoCmd = &cobra.Command{
 							for _, proto := range protos {
 								sout := proto.String()
 								if verbose {
+									sout = proto.Verbose()
 									if doDemangle {
-										sout = swift.DemangleBlob(proto.Verbose())
+										sout = swift.DemangleBlob(sout)
 									}
 								} else {
 									if doDemangle {
@@ -492,7 +494,7 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-							log.Error(err.Error())
+							log.Errorf("failed to parse swift protocol conformances for %s: %v", filepath.Base(image.Name), err)
 						}
 						if asstyps, err := m.GetSwiftAssociatedTypes(); err == nil {
 							if verbose {
@@ -506,8 +508,9 @@ var MachoCmd = &cobra.Command{
 							for _, at := range asstyps {
 								sout := at.String()
 								if verbose {
+									sout = at.Verbose()
 									if doDemangle {
-										sout = swift.DemangleBlob(at.Verbose())
+										sout = swift.DemangleBlob(sout)
 									}
 								} else {
 									if doDemangle {
@@ -522,7 +525,7 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 						} else if !errors.Is(err, macho.ErrSwiftSectionError) {
-							log.Error(err.Error())
+							log.Errorf("failed to parse swift associated types for %s: %v", filepath.Base(image.Name), err)
 						}
 					} else {
 						fmt.Println("  - no swift")
@@ -795,6 +798,9 @@ var MachoCmd = &cobra.Command{
 						}
 					}
 				}
+				// sacrifice to the GC gods
+				m = nil
+				image = nil
 			}
 
 			if len(searchPattern) > 0 && !foundPattern {
