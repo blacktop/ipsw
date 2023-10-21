@@ -848,6 +848,7 @@ var machoInfoCmd = &cobra.Command{
 				if err := m.PreCache(); err != nil { // cache fields and types
 					log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(machoPath), err)
 				}
+				var sout string
 				if typs, err := m.GetSwiftTypes(); err == nil {
 					if verbose {
 						if color {
@@ -858,13 +859,13 @@ var machoInfoCmd = &cobra.Command{
 						}
 					}
 					for _, typ := range typs {
-						sout := typ.String()
 						if verbose {
 							sout = typ.Verbose()
 							if doDemangle {
 								sout = swift.DemangleBlob(sout)
 							}
 						} else {
+							sout = typ.String()
 							if doDemangle {
 								sout = swift.DemangleSimpleBlob(typ.String())
 							}
@@ -889,13 +890,13 @@ var machoInfoCmd = &cobra.Command{
 						}
 					}
 					for _, proto := range protos {
-						sout := proto.String()
 						if verbose {
 							sout = proto.Verbose()
 							if doDemangle {
 								sout = swift.DemangleBlob(sout)
 							}
 						} else {
+							sout = proto.String()
 							if doDemangle {
 								sout = swift.DemangleSimpleBlob(proto.String())
 							}
@@ -919,13 +920,13 @@ var machoInfoCmd = &cobra.Command{
 						}
 					}
 					for _, proto := range protos {
-						sout := proto.String()
 						if verbose {
 							sout = proto.Verbose()
 							if doDemangle {
 								sout = swift.DemangleBlob(sout)
 							}
 						} else {
+							sout = proto.String()
 							if doDemangle {
 								sout = swift.DemangleSimpleBlob(proto.String())
 							}
@@ -950,13 +951,13 @@ var machoInfoCmd = &cobra.Command{
 						}
 					}
 					for _, at := range asstyps {
-						sout := at.String()
 						if verbose {
 							sout = at.Verbose()
 							if doDemangle {
 								sout = swift.DemangleBlob(sout)
 							}
 						} else {
+							sout = at.String()
 							if doDemangle {
 								sout = swift.DemangleSimpleBlob(at.String())
 							}

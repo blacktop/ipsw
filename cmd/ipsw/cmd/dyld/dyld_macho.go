@@ -403,6 +403,7 @@ var MachoCmd = &cobra.Command{
 						if err := m.PreCache(); err != nil { // cache fields and types
 							log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(image.Name), err)
 						}
+						var sout string
 						if typs, err := m.GetSwiftTypes(); err == nil {
 							if verbose {
 								if color {
@@ -413,13 +414,13 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 							for _, typ := range typs {
-								sout := typ.String()
 								if verbose {
 									sout = typ.Verbose()
 									if doDemangle {
 										sout = swift.DemangleBlob(sout)
 									}
 								} else {
+									sout = typ.String()
 									if doDemangle {
 										sout = swift.DemangleSimpleBlob(typ.String())
 									}
@@ -444,13 +445,13 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 							for _, proto := range protos {
-								sout := proto.String()
 								if verbose {
 									sout = proto.Verbose()
 									if doDemangle {
 										sout = swift.DemangleBlob(sout)
 									}
 								} else {
+									sout = proto.String()
 									if doDemangle {
 										sout = swift.DemangleSimpleBlob(proto.String())
 									}
@@ -475,13 +476,13 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 							for _, proto := range protos {
-								sout := proto.String()
 								if verbose {
 									sout = proto.Verbose()
 									if doDemangle {
 										sout = swift.DemangleBlob(sout)
 									}
 								} else {
+									sout = proto.String()
 									if doDemangle {
 										sout = swift.DemangleSimpleBlob(proto.String())
 									}
@@ -506,13 +507,13 @@ var MachoCmd = &cobra.Command{
 								}
 							}
 							for _, at := range asstyps {
-								sout := at.String()
 								if verbose {
 									sout = at.Verbose()
 									if doDemangle {
 										sout = swift.DemangleBlob(sout)
 									}
 								} else {
+									sout = at.String()
 									if doDemangle {
 										sout = swift.DemangleSimpleBlob(at.String())
 									}
@@ -798,7 +799,7 @@ var MachoCmd = &cobra.Command{
 						}
 					}
 				}
-				// sacrifice to the GC gods
+				// sacrifice to the GC gods (TODO: still not good enough)
 				m = nil
 				image = nil
 			}
