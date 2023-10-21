@@ -908,6 +908,7 @@ var machoInfoCmd = &cobra.Command{
 							fmt.Println(sout + "\n")
 						}
 					}
+				} else if !errors.Is(err, macho.ErrSwiftSectionError) {
 					log.Errorf("failed to parse swift protocols for %s: %v", filepath.Base(machoPath), err)
 				}
 				if protos, err := m.GetSwiftProtocolConformances(); err == nil {
