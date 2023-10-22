@@ -1085,10 +1085,8 @@ var machoInfoCmd = &cobra.Command{
 						} else {
 							export.Name = demangle.Do(export.Name, false, false)
 						}
-						fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
-					} else {
-						fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 					}
+					fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
 				w.Flush()
 			}
