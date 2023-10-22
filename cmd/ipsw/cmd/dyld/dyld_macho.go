@@ -600,6 +600,9 @@ var MachoCmd = &cobra.Command{
 						fmt.Printf("\nDyld Binds\n")
 						fmt.Println("----------")
 						for _, bind := range binds {
+							if doDemangle {
+								bind.Name, _ = swift.Demangle(bind.Name)
+							}
 							fmt.Fprintf(w, "%#09x:\t(%s.%s|from %s)\t%s\n", bind.Start+bind.Offset, bind.Segment, bind.Section, bind.Dylib, bind.Name)
 						}
 						w.Flush()
@@ -621,6 +624,13 @@ var MachoCmd = &cobra.Command{
 								}
 								if rexpSym, err := reimg.GetExport(export.ReExport); err == nil {
 									export.Address = rexpSym.Address
+								}
+							}
+							if doDemangle {
+								if strings.HasPrefix(export.Name, "_$s") || strings.HasPrefix(export.Name, "$s") { // TODO: better detect swift symbols
+									export.Name, _ = swift.Demangle(export.Name)
+								} else {
+									export.Name = demangle.Do(export.Name, false, false)
 								}
 							}
 							fmt.Println(export)
