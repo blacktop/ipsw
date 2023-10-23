@@ -158,9 +158,10 @@ func Open(name string) (*File, error) {
 			if len(ff.SubCacheInfo[i-1].Extention) > 0 {
 				subCacheName = fmt.Sprintf("%s%s", name, ff.SubCacheInfo[i-1].Extention)
 			}
-			log.WithFields(log.Fields{
-				"cache": subCacheName,
-			}).Debug("Parsing SubCache")
+			/* NOTE: removing because it feels too noisy */
+			// log.WithFields(log.Fields{
+			// 	"cache": subCacheName,
+			// }).Debug("Parsing SubCache")
 
 			fsub, err := os.Open(subCacheName)
 			if err != nil {
@@ -191,9 +192,9 @@ func Open(name string) (*File, error) {
 		}
 
 		if !ff.Headers[ff.UUID].SymbolFileUUID.IsNull() {
-			log.WithFields(log.Fields{
-				"cache": name + ".symbols",
-			}).Debug("Parsing SubCache")
+			// log.WithFields(log.Fields{
+			// 	"cache": name + ".symbols",
+			// }).Debug("Parsing SubCache")
 			fsym, err := os.Open(name + ".symbols")
 			if err != nil {
 				return nil, err
