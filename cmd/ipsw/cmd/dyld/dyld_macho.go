@@ -393,13 +393,8 @@ var MachoCmd = &cobra.Command{
 						fmt.Println("Swift")
 						fmt.Println("=====")
 					}
-					info, err := m.GetObjCImageInfo()
-					if err != nil {
-						if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-							return err
-						}
-					}
-					if info != nil && info.HasSwift() {
+					if m.HasSwift() {
+						toc := m.GetSwiftTOC()
 						if err := m.PreCache(); err != nil { // cache fields and types
 							log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(image.Name), err)
 						}
@@ -413,7 +408,7 @@ var MachoCmd = &cobra.Command{
 									fmt.Print("-----\n\n")
 								}
 							}
-							for _, typ := range typs {
+							for i, typ := range typs {
 								if verbose {
 									sout = typ.Verbose()
 									if doDemangle {
@@ -427,7 +422,11 @@ var MachoCmd = &cobra.Command{
 								}
 								if color {
 									quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-									quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									if i < (toc.Types-1) && (toc.Protocols > 0 || toc.ProtocolConformances > 0) { // skip last type if others follow
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									} else {
+										fmt.Println()
+									}
 								} else {
 									fmt.Println(sout + "\n")
 								}
@@ -444,7 +443,7 @@ var MachoCmd = &cobra.Command{
 									fmt.Print("---------\n\n")
 								}
 							}
-							for _, proto := range protos {
+							for i, proto := range protos {
 								if verbose {
 									sout = proto.Verbose()
 									if doDemangle {
@@ -458,7 +457,11 @@ var MachoCmd = &cobra.Command{
 								}
 								if color {
 									quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-									quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									if i < (toc.Protocols-1) && toc.ProtocolConformances > 0 { // skip last type if others follow
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									} else {
+										fmt.Println()
+									}
 								} else {
 									fmt.Println(sout + "\n")
 								}
@@ -475,7 +478,7 @@ var MachoCmd = &cobra.Command{
 									fmt.Print("---------------------\n\n")
 								}
 							}
-							for _, proto := range protos {
+							for i, proto := range protos {
 								if verbose {
 									sout = proto.Verbose()
 									if doDemangle {
@@ -489,7 +492,11 @@ var MachoCmd = &cobra.Command{
 								}
 								if color {
 									quick.Highlight(os.Stdout, sout+"\n", "swift", "terminal256", "nord")
-									quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									if i < (toc.ProtocolConformances - 1) { // skip last type if others follow
+										quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "swift", "terminal256", "nord")
+									} else {
+										fmt.Println()
+									}
 								} else {
 									fmt.Println(sout + "\n")
 								}
