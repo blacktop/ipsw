@@ -11,7 +11,7 @@ require (
 	github.com/aymanbagabas/go-udiff v0.1.3
 	github.com/blacktop/arm64-cgo v1.0.57
 	github.com/blacktop/go-dwarf v1.0.9
-	github.com/blacktop/go-macho v1.1.171
+	github.com/blacktop/go-macho v1.1.172
 	github.com/blacktop/go-plist v1.0.1
 	github.com/blacktop/lzfse-cgo v1.1.19
 	github.com/blacktop/lzss v0.1.1
@@ -26,7 +26,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1
 	github.com/fatih/color v1.15.0
 	github.com/frida/frida-go v0.6.10
-	github.com/fsnotify/fsnotify v1.6.0
+	github.com/fsnotify/fsnotify v1.7.0
 	github.com/fullsailor/pkcs7 v0.0.0-20190404230743-d7302db945fa
 	github.com/gen2brain/beeep v0.0.0-20230907135156-1a38885a97fc
 	github.com/gin-gonic/gin v1.9.1
