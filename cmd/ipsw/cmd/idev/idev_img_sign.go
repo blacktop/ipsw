@@ -76,8 +76,8 @@ var idevImgSignCmd = &cobra.Command{
 		color.NoColor = !viper.GetBool("color")
 
 		// flags
-		xcode := viper.GetString("idev.img.mount.xcode")
-		manifestPath := viper.GetString("idev.img.mount.manifest")
+		xcode := viper.GetString("idev.img.sign.xcode")
+		manifestPath := viper.GetString("idev.img.sign.manifest")
 		boardID := viper.GetUint64("idev.img.sign.board-id")
 		chipID := viper.GetUint64("idev.img.sign.chip-id")
 		ecid := viper.GetUint64("idev.img.sign.ecid")
