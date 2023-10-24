@@ -148,7 +148,7 @@ var nonceCmd = &cobra.Command{
 				return os.WriteFile(fname, dat.Bytes(), 0644)
 			}
 
-			log.Warn("Displaying QR code in terminal (supported in iTerm2, otherwise supply --output flag)")
+			log.Warn("Displaying QR code in terminal (supported in iTerm2 and VSCode, otherwise supply --output flag)")
 			println()
 			return utils.DisplayImageInTerminal(bytes.NewReader(dat.Bytes()), dat.Len(), qrcSize, qrcSize)
 		}
@@ -184,14 +184,14 @@ var nonceCmd = &cobra.Command{
 					}
 				} else {
 					out, err = json.MarshalIndent(&struct {
-						ApBoardID int    `json:"board_id,omitempty"`
-						ApChipID  int    `json:"chip_id,omitempty"`
-						ApECID    int    `json:"ecid,omitempty"`
+						ApBoardID uint64 `json:"board_id,omitempty"`
+						ApChipID  uint64 `json:"chip_id,omitempty"`
+						ApECID    uint64 `json:"ecid,omitempty"`
 						ApNonce   string `json:"nonce,omitempty"`
 					}{
-						ApBoardID: personalID["BoardId"].(int),
-						ApChipID:  personalID["ChipID"].(int),
-						ApECID:    personalID["UniqueChipID"].(int),
+						ApBoardID: personalID["BoardId"].(uint64),
+						ApChipID:  personalID["ChipID"].(uint64),
+						ApECID:    personalID["UniqueChipID"].(uint64),
 						ApNonce:   nonce,
 					}, "", "  ")
 					if err != nil {
