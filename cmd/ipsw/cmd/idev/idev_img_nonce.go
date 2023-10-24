@@ -110,6 +110,14 @@ var nonceCmd = &cobra.Command{
 			log.Errorf("failed to get personalization identifiers: %v ('personalization' might not be supported on this device)", err)
 		}
 
+		personalID["ApNonce"] = nonce
+
+		delete(personalID, "CertificateProductionStatus")
+		delete(personalID, "EffectiveProductionStatusAp")
+		delete(personalID, "SecurityDomain")
+		delete(personalID, "CertificateSecurityMode")
+		delete(personalID, "EffectiveSecurityModeAp")
+
 		if asQrCode {
 			// Create the barcode
 			qrCodeStr := fmt.Sprintf("ApBoardID=%d,ApChipID=%d,ApECID=%d,ApNonce=%s", personalID["BoardId"], personalID["ChipID"], personalID["UniqueChipID"], nonce)
@@ -183,17 +191,7 @@ var nonceCmd = &cobra.Command{
 						return fmt.Errorf("failed to marshal JSON: %w", err)
 					}
 				} else {
-					out, err = json.MarshalIndent(&struct {
-						ApBoardID uint64 `json:"board_id,omitempty"`
-						ApChipID  uint64 `json:"chip_id,omitempty"`
-						ApECID    uint64 `json:"ecid,omitempty"`
-						ApNonce   string `json:"nonce,omitempty"`
-					}{
-						ApBoardID: personalID["BoardId"].(uint64),
-						ApChipID:  personalID["ChipID"].(uint64),
-						ApECID:    personalID["UniqueChipID"].(uint64),
-						ApNonce:   nonce,
-					}, "", "  ")
+					out, err = json.MarshalIndent(personalID, "", "  ")
 					if err != nil {
 						return fmt.Errorf("failed to marshal JSON: %w", err)
 					}

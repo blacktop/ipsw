@@ -22,6 +22,7 @@ THE SOFTWARE.
 package idev
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -46,8 +47,10 @@ func init() {
 	idevImgSignCmd.Flags().Uint64P("chip-id", "c", 0, "Device ApChipID")
 	idevImgSignCmd.Flags().Uint64P("ecid", "e", 0, "Device ApECID")
 	idevImgSignCmd.Flags().StringP("nonce", "n", "", "Device ApNonce")
+	idevImgSignCmd.Flags().StringP("ap-item", "a", "", "Ap'Item to personalize (example: --ap-item 'Ap,SikaFuse')")
 	idevImgSignCmd.Flags().String("proxy", "", "HTTP/HTTPS proxy")
 	idevImgSignCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
+	idevImgSignCmd.Flags().StringP("input", "i", "", "JSON file from `ipsw idev img nonce --json` command")
 	idevImgSignCmd.Flags().StringP("output", "o", "", "Folder to write signature to")
 	idevImgSignCmd.MarkFlagDirname("output")
 
@@ -56,7 +59,9 @@ func init() {
 	viper.BindPFlag("idev.img.sign.board-id", idevImgSignCmd.Flags().Lookup("board-id"))
 	viper.BindPFlag("idev.img.sign.chip-id", idevImgSignCmd.Flags().Lookup("chip-id"))
 	viper.BindPFlag("idev.img.sign.ecid", idevImgSignCmd.Flags().Lookup("ecid"))
+	viper.BindPFlag("idev.img.sign.ap-item", idevImgSignCmd.Flags().Lookup("ap-item"))
 	viper.BindPFlag("idev.img.sign.nonce", idevImgSignCmd.Flags().Lookup("nonce"))
+	viper.BindPFlag("idev.img.sign.input", idevImgSignCmd.Flags().Lookup("input"))
 	viper.BindPFlag("idev.img.sign.output", idevImgSignCmd.Flags().Lookup("output"))
 	viper.BindPFlag("idev.img.sign.proxy", idevImgSignCmd.Flags().Lookup("proxy"))
 	viper.BindPFlag("idev.img.sign.insecure", idevImgSignCmd.Flags().Lookup("insecure"))
@@ -81,15 +86,51 @@ var idevImgSignCmd = &cobra.Command{
 		boardID := viper.GetUint64("idev.img.sign.board-id")
 		chipID := viper.GetUint64("idev.img.sign.chip-id")
 		ecid := viper.GetUint64("idev.img.sign.ecid")
+		apItems := viper.GetStringSlice("idev.img.sign.ap-item")
 		nonce := viper.GetString("idev.img.sign.nonce")
+		input := viper.GetString("idev.img.sign.input")
 		output := viper.GetString("idev.img.sign.output")
 		// verify flags
 		if xcode != "" && manifestPath != "" {
 			return fmt.Errorf("cannot specify both --xcode and --manifest")
 		} else if xcode == "" && manifestPath == "" {
 			return fmt.Errorf("must specify either --xcode or --manifest")
-		} else if boardID == 0 || chipID == 0 || ecid == 0 || nonce == "" {
+		} else if (boardID == 0 || chipID == 0 || ecid == 0 || nonce == "") && input == "" {
 			return fmt.Errorf("must specify --board-id, --chip-id, --ecid AND --nonce")
+		}
+
+		personlID := make(map[string]any)
+
+		if input != "" {
+			dat, err := os.ReadFile(filepath.Clean(input))
+			if err != nil {
+				return fmt.Errorf("failed to read input file '%s': %w", input, err)
+			}
+			if err := json.Unmarshal(dat, &personlID); err != nil {
+				return fmt.Errorf("failed to unmarshal input file '%s': %w", input, err)
+			}
+			// validate personlID
+			if _, ok := personlID["BoardId"]; !ok {
+				return errors.New("input JSON missing BoardId field")
+			}
+			if _, ok := personlID["ChipID"]; !ok {
+				return errors.New("input JSON missing ChipID field")
+			}
+			if _, ok := personlID["UniqueChipID"]; !ok {
+				return errors.New("input JSON missing UniqueChipID field")
+			}
+			if _, ok := personlID["ApNonce"]; !ok {
+				return errors.New("input JSON missing ApNonce field")
+			}
+		} else {
+			// NOTE: I have to store them as float64 because that's how Go decodes JSON numbers
+			personlID["BoardId"] = float64(boardID)
+			personlID["ChipID"] = float64(chipID)
+			personlID["UniqueChipID"] = float64(ecid)
+			personlID["ApNonce"] = nonce
+			for _, ap := range apItems {
+				personlID[ap] = uint64(0)
+			}
 		}
 
 		if xcode != "" {
@@ -127,21 +168,16 @@ var idevImgSignCmd = &cobra.Command{
 		}
 
 		sigData, err := tss.Personalize(&tss.PersonalConfig{
-			Proxy:    viper.GetString("idev.img.sign.proxy"),
-			Insecure: viper.GetBool("idev.img.sign.insecure"),
-			PersonlID: map[string]any{
-				"BoardId":      boardID,
-				"ChipID":       chipID,
-				"UniqueChipID": ecid,
-			},
+			Proxy:         viper.GetString("idev.img.sign.proxy"),
+			Insecure:      viper.GetBool("idev.img.sign.insecure"),
+			PersonlID:     personlID,
 			BuildManifest: buildManifest,
-			Nonce:         nonce,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to personalize DDI: %w", err)
 		}
 
-		fname := fmt.Sprintf("%d.%d.%d.%s", boardID, chipID, ecid, "personalized.signature")
+		fname := fmt.Sprintf("%d.%d.%d.%s", uint64(personlID["BoardId"].(float64)), uint64(personlID["ChipID"].(float64)), uint64(personlID["UniqueChipID"].(float64)), "personalized.signature")
 		if output != "" {
 			if err := os.MkdirAll(output, 0750); err != nil {
 				return fmt.Errorf("failed to create output folder '%s': %w", output, err)

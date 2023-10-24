@@ -29,6 +29,7 @@ usr
 *.s
 .DS_Store
 *.dmg
+*.signature
 
 # Repo
 *.bu

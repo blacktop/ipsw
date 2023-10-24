@@ -16,6 +16,7 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	info "github.com/blacktop/ipsw/pkg/plist"
 	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
 )
 
 // NOTES:
@@ -33,27 +34,27 @@ const (
 
 // Request is the request sent to the TSS server
 type Request struct {
-	ApImg4Ticket              bool   `plist:"@ApImg4Ticket,omitempty"`
-	BBTicket                  bool   `plist:"@BBTicket,omitempty"`
-	HostPlatformInfo          string `plist:"@HostPlatformInfo,omitempty"`
-	Locality                  string `plist:"@Locality,omitempty"`
-	VersionInfo               string `plist:"@VersionInfo,omitempty"` // = libauthinstall-850.0.1.0.1 (/usr/lib/libauthinstall.dylib)
-	ApBoardID                 uint64 `plist:"ApBoardID,omitempty"`
-	ApChipID                  uint64 `plist:"ApChipID,omitempty"`
-	ApECID                    uint64 `plist:"ApECID,omitempty"`
-	ApNonce                   []byte `plist:"ApNonce,omitempty"`
-	ApProductionMode          bool   `plist:"ApProductionMode,omitempty"`
-	ApSecurityDomain          int    `plist:"ApSecurityDomain,omitempty"` // = 1
-	ApSecurityMode            bool   `plist:"ApSecurityMode,omitempty"`
-	ApSupportsImg4            bool   `plist:"ApSupportsImg4,omitempty"`
-	PearlCertificationRootPub []byte `plist:"PearlCertificationRootPub,omitempty"`
-	UniqueBuildID             []byte `plist:"UniqueBuildID,omitempty"`
-	SepNonce                  []byte `plist:"SepNonce,omitempty"`
-	UID_MODE                  bool   `plist:"UID_MODE"`
-	UUID                      string `plist:"@UUID,omitempty"`
+	UUID                      string `plist:"@UUID,omitempty" mapstructure:"@UUID,omitempty"`
+	ApImg4Ticket              bool   `plist:"@ApImg4Ticket,omitempty" mapstructure:"@ApImg4Ticket,omitempty"`
+	BBTicket                  bool   `plist:"@BBTicket,omitempty" mapstructure:"@BBTicket,omitempty"`
+	HostPlatformInfo          string `plist:"@HostPlatformInfo,omitempty" mapstructure:"@HostPlatformInfo,omitempty"`
+	Locality                  string `plist:"@Locality,omitempty" mapstructure:"@Locality,omitempty"`
+	VersionInfo               string `plist:"@VersionInfo,omitempty" mapstructure:"@VersionInfo,omitempty"` // = libauthinstall-850.0.1.0.1 (/usr/lib/libauthinstall.dylib)
+	ApBoardID                 uint64 `plist:"ApBoardID,omitempty" mapstructure:"ApBoardID,omitempty"`
+	ApChipID                  uint64 `plist:"ApChipID,omitempty" mapstructure:"ApChipID,omitempty"`
+	ApECID                    uint64 `plist:"ApECID,omitempty" mapstructure:"ApECID,omitempty"`
+	ApNonce                   []byte `plist:"ApNonce,omitempty" mapstructure:"ApNonce,omitempty"`
+	ApProductionMode          bool   `plist:"ApProductionMode,omitempty" mapstructure:"ApProductionMode,omitempty"`
+	ApSecurityDomain          int    `plist:"ApSecurityDomain,omitempty" mapstructure:"ApSecurityDomain,omitempty"` // = 1
+	ApSecurityMode            bool   `plist:"ApSecurityMode,omitempty" mapstructure:"ApSecurityMode,omitempty"`
+	ApSupportsImg4            bool   `plist:"ApSupportsImg4,omitempty" mapstructure:"ApSupportsImg4,omitempty"`
+	PearlCertificationRootPub []byte `plist:"PearlCertificationRootPub,omitempty" mapstructure:"PearlCertificationRootPub,omitempty"`
+	UniqueBuildID             []byte `plist:"UniqueBuildID,omitempty" mapstructure:"UniqueBuildID,omitempty"`
+	SepNonce                  []byte `plist:"SepNonce,omitempty" mapstructure:"SepNonce,omitempty"`
+	UIDMode                   bool   `plist:"UID_MODE" mapstructure:"UID_MODE"`
 	// Personalize
-	LoadableTrustCache info.IdentityManifest `plist:"LoadableTrustCache,omitempty"`
-	PersonalizedDMG    info.IdentityManifest `plist:"PersonalizedDMG,omitempty"`
+	LoadableTrustCache info.IdentityManifest `plist:"LoadableTrustCache,omitempty" mapstructure:"LoadableTrustCache,omitempty"`
+	PersonalizedDMG    info.IdentityManifest `plist:"PersonalizedDMG,omitempty" mapstructure:"PersonalizedDMG,omitempty"`
 }
 
 // Response is the response from the TSS server
@@ -92,14 +93,8 @@ func randomHexStr(n int) (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-func getApImg4Ticket(tssReq *Request, proxy string, insecure bool) (*Blob, error) {
-	trdata, err := plist.Marshal(tssReq, plist.XMLFormat)
-	if err != nil {
-		return nil, err
-	}
-	// os.WriteFile("/tmp/tss.plist", trdata, 0644)
-
-	req, err := http.NewRequest("POST", tssControllerActionURL, bytes.NewBuffer(trdata))
+func getApImg4Ticket(payload io.Reader, proxy string, insecure bool) (*Blob, error) {
+	req, err := http.NewRequest("POST", tssControllerActionURL, payload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create https request: %v", err)
 	}
@@ -167,6 +162,7 @@ func getApImg4Ticket(tssReq *Request, proxy string, insecure bool) (*Blob, error
 	return nil, fmt.Errorf("failed to personalize TSS blob: %s", tr.Message)
 }
 
+// Config represents the configuration for a TSS request.
 type Config struct {
 	Device          string
 	Version         string
@@ -179,6 +175,7 @@ type Config struct {
 	Insecure        bool
 }
 
+// GetTSSResponse retrieves a TSS response for the given configuration.
 func GetTSSResponse(conf *Config) ([]byte, error) {
 	var err error
 
@@ -241,7 +238,13 @@ func GetTSSResponse(conf *Config) ([]byte, error) {
 		tssReq.ApSupportsImg4 = false
 	}
 
-	blob, err := getApImg4Ticket(&tssReq, conf.Proxy, conf.Insecure)
+	trdata, err := plist.Marshal(tssReq, plist.XMLFormat)
+	if err != nil {
+		return nil, err
+	}
+	// os.WriteFile("/tmp/tss.plist", trdata, 0644)
+
+	blob, err := getApImg4Ticket(bytes.NewReader(trdata), conf.Proxy, conf.Insecure)
 	if err != nil {
 		return nil, err
 	}
@@ -260,12 +263,11 @@ type PersonalConfig struct {
 	Insecure      bool
 	PersonlID     map[string]any
 	BuildManifest *info.BuildManifest
-	Nonce         string
 }
 
 // Personalize returns a personalized TSS blob
 func Personalize(conf *PersonalConfig) ([]byte, error) {
-	nonce, err := hex.DecodeString(conf.Nonce)
+	nonce, err := hex.DecodeString(conf.PersonlID["ApNonce"].(string))
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode nonce hex-string: %v", err)
 	}
@@ -276,14 +278,14 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 		BBTicket:         true,
 		HostPlatformInfo: "mac",
 		VersionInfo:      tssClientVersion,
-		ApBoardID:        conf.PersonlID["BoardId"].(uint64),
-		ApChipID:         conf.PersonlID["ChipID"].(uint64),
-		ApECID:           conf.PersonlID["UniqueChipID"].(uint64),
+		ApBoardID:        uint64(conf.PersonlID["BoardId"].(float64)),
+		ApChipID:         uint64(conf.PersonlID["ChipID"].(float64)),
+		ApECID:           uint64(conf.PersonlID["UniqueChipID"].(float64)),
 		ApNonce:          nonce,
 		ApProductionMode: true,
 		ApSecurityDomain: 1,
 		ApSecurityMode:   true,
-		UID_MODE:         false,
+		UIDMode:          false,
 		SepNonce:         []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	}
 
@@ -297,7 +299,7 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse chip id: %v", err)
 		}
-		if boardID == conf.PersonlID["BoardId"] && chipID == conf.PersonlID["ChipID"] {
+		if boardID == uint64(conf.PersonlID["BoardId"].(float64)) && chipID == uint64(conf.PersonlID["ChipID"].(float64)) {
 			manifest = bid.Manifest
 			break
 		}
@@ -358,7 +360,29 @@ func Personalize(conf *PersonalConfig) ([]byte, error) {
 		}
 	}
 
-	blob, err := getApImg4Ticket(&tssReq, conf.Proxy, conf.Insecure)
+	var tssMap map[string]any
+	if err := mapstructure.Decode(tssReq, &tssMap); err != nil {
+		return nil, err
+	}
+
+	for k, v := range conf.PersonlID {
+		if strings.HasPrefix(k, "Ap,") {
+			switch v.(type) {
+			case float64:
+				tssMap[k] = uint64(v.(float64))
+			default:
+				tssMap[k] = v
+			}
+		}
+	}
+
+	buf := new(bytes.Buffer)
+	if err := plist.NewEncoder(buf).Encode(tssMap); err != nil {
+		return nil, err
+	}
+	// os.WriteFile("/tmp/tss.plist", buf.Bytes(), 0644)
+
+	blob, err := getApImg4Ticket(buf, conf.Proxy, conf.Insecure)
 	if err != nil {
 		return nil, err
 	}
