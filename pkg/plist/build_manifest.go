@@ -102,13 +102,13 @@ func (i IdentityInfo) String() string {
 }
 
 type IdentityManifest struct {
-	Digest      []byte         `json:"digest,omitempty"`
-	Name        string         `plist:"Name,omitempty" json:"name,omitempty"`
-	BuildString string         `plist:"BuildString,omitempty" json:"build_string,omitempty"`
-	Info        map[string]any `plist:"Info,omitempty" json:"info,omitempty"`
-	Trusted     bool           `json:"trusted,omitempty"`
-	EPRO        bool           `plist:"EPRO,omitempty" json:"epro,omitempty"`
-	ESEC        bool           `plist:"ESEC,omitempty" json:"esec,omitempty"`
+	Digest      []byte         `json:"digest,omitempty" mapstructure:"Digest,omitempty"`
+	Name        string         `plist:"Name,omitempty" json:"name,omitempty" mapstructure:"Name,omitempty"`
+	BuildString string         `plist:"BuildString,omitempty" json:"build_string,omitempty" mapstructure:"BuildString,omitempty"`
+	Info        map[string]any `plist:"Info,omitempty" json:"info,omitempty" mapstructure:"Info,omitempty"`
+	Trusted     bool           `json:"trusted,omitempty" mapstructure:"Trusted,omitempty"`
+	EPRO        bool           `plist:"EPRO,omitempty" json:"epro,omitempty" mapstructure:"EPRO,omitempty"`
+	ESEC        bool           `plist:"ESEC,omitempty" json:"esec,omitempty" mapstructure:"ESEC,omitempty"`
 }
 
 func (m IdentityManifest) String() string {
@@ -120,16 +120,16 @@ func (m IdentityManifest) String() string {
 }
 
 type IdentityManifestInfo struct {
-	IsFTAB                      bool   `json:"is_ftab,omitempty"`
-	IsFUDFirmware               bool   `plist:"IsFUDFirmware,omitempty" json:"is_fud_firmware,omitempty"`
-	IsFirmwarePayload           bool   `plist:"IsFirmwarePayload,omitempty" json:"is_firmware_payload,omitempty"`
-	IsLoadedByiBoot             bool   `json:"is_loaded_byi_boot,omitempty"`
-	IsLoadedByiBootStage1       bool   `json:"is_loaded_byi_boot_stage_1,omitempty"`
-	IsiBootEANFirmware          bool   `json:"isi_boot_ean_firmware,omitempty"`
-	IsiBootNonEssentialFirmware bool   `json:"isi_boot_non_essential_firmware,omitempty"`
-	Path                        string `plist:"Path" json:"path,omitempty"`
-	Personalize                 bool   `json:"personalize,omitempty"`
-	RestoreRequestRules         []any  `json:"restore_request_rules,omitempty"`
+	IsFTAB                      bool   `json:"is_ftab,omitempty" mapstructure:"IsFTAB,omitempty"`
+	IsFUDFirmware               bool   `plist:"IsFUDFirmware,omitempty" json:"is_fud_firmware,omitempty" mapstructure:"IsFUDFirmware,omitempty"`
+	IsFirmwarePayload           bool   `plist:"IsFirmwarePayload,omitempty" json:"is_firmware_payload,omitempty" mapstructure:"IsFirmwarePayload,omitempty"`
+	IsLoadedByiBoot             bool   `json:"is_loaded_byi_boot,omitempty" mapstructure:"IsLoadedByiBoot,omitempty"`
+	IsLoadedByiBootStage1       bool   `json:"is_loaded_byi_boot_stage_1,omitempty" mapstructure:"IsLoadedByiBootStage1,omitempty"`
+	IsiBootEANFirmware          bool   `json:"isi_boot_ean_firmware,omitempty" mapstructure:"IsiBootEANFirmware,omitempty"`
+	IsiBootNonEssentialFirmware bool   `json:"isi_boot_non_essential_firmware,omitempty" mapstructure:"IsiBootNonEssentialFirmware,omitempty"`
+	Path                        string `plist:"Path" json:"path,omitempty" mapstructure:"Path,omitempty"`
+	Personalize                 bool   `json:"personalize,omitempty" mapstructure:"Personalize,omitempty"`
+	RestoreRequestRules         []any  `json:"restore_request_rules,omitempty" mapstructure:"RestoreRequestRules,omitempty"`
 }
 
 // ParseBuildManifest parses the BuildManifest.plist

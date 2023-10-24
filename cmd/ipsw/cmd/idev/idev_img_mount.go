@@ -265,12 +265,13 @@ var idevImgMountCmd = &cobra.Command{
 						log.Errorf("failed to get personalization identifiers: %v ('personalization' might not be supported on this device)", err)
 					}
 
+					personalID["ApNonce"] = nonce
+
 					sigData, err = tss.Personalize(&tss.PersonalConfig{
 						Proxy:         viper.GetString("idev.img.mount.proxy"),
 						Insecure:      viper.GetBool("idev.img.mount.insecure"),
 						PersonlID:     personalID,
 						BuildManifest: buildManifest,
-						Nonce:         nonce,
 					})
 				}
 			}
