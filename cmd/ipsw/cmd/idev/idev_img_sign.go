@@ -41,7 +41,7 @@ import (
 func init() {
 	ImgCmd.AddCommand(idevImgSignCmd)
 
-	idevImgSignCmd.Flags().StringP("xcode", "x", "/Applications/Xcode.app", "Path to Xcode.app")
+	idevImgSignCmd.Flags().StringP("xcode", "x", "", "Path to Xcode.app")
 	idevImgSignCmd.Flags().StringP("manifest", "m", "", "BuildManifest.plist to use")
 	idevImgSignCmd.Flags().Uint64P("board-id", "b", 0, "Device ApBoardID")
 	idevImgSignCmd.Flags().Uint64P("chip-id", "c", 0, "Device ApChipID")
