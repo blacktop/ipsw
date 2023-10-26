@@ -31,7 +31,8 @@ ipsw dyld macho <dyld_shared_cache> <dylib> [flags]
   -f, --starts          Print function starts
   -s, --strings         Print cstrings
   -b, --stubs           Print stubs
-  -w, --swift           🚧 Print Swift info
+  -w, --swift           Print Swift info
+      --swift-all       Print all other Swift sections info
   -n, --symbols         Print symbols
 ```
 
