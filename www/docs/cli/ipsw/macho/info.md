@@ -37,7 +37,8 @@ ipsw macho info <macho> [flags]
   -g, --split-seg               Print split seg info
   -f, --starts                  Print function starts
   -c, --strings                 Print cstrings
-  -w, --swift                   🚧 Print Swift info
+  -w, --swift                   Print Swift info
+      --swift-all               Print all other Swift sections info
   -n, --symbols                 Print symbols
 ```
 
