@@ -545,7 +545,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__swift5_entry",
-								}).Infof("Swift Entry")
+								}).Info("Swift Entry")
 								fmt.Println()
 								fmt.Printf("%#x: entry\n\n", entry)
 							} else if !errors.Is(err, macho.ErrSwiftSectionError) {
@@ -555,7 +555,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__swift5_builtin",
-								}).Infof("Swift Builtin Types")
+								}).Info("Swift Builtin Types")
 								fmt.Println()
 								for _, bin := range bins {
 									if verbose {
@@ -583,7 +583,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__textg_swiftm",
-								}).Infof("Swift Colocate Metadata")
+								}).Info("Swift Colocate Metadata")
 								fmt.Println()
 								for _, md := range metadatas {
 									fmt.Println(md.Verbose())
@@ -595,7 +595,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__swift5_mpenum",
-								}).Infof("Swift MultiPayload Enums")
+								}).Info("Swift MultiPayload Enums")
 								fmt.Println()
 								for _, mpenum := range mpenums {
 									sout = mpenum.String()
@@ -616,7 +616,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__swift5_capture",
-								}).Infof("Swift Closures")
+								}).Info("Swift Closures")
 								fmt.Println()
 								for _, closure := range closures {
 									sout = closure.String()
@@ -637,7 +637,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__swift5_replace",
-								}).Infof("Swift Dynamic Replacement Info")
+								}).Info("Swift Dynamic Replacement Info")
 								fmt.Println()
 								if rep != nil {
 									fmt.Println(rep)
@@ -649,7 +649,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__swift5_replac2",
-								}).Infof("Swift Dynamic Replacement Info For Opaque Types")
+								}).Info("Swift Dynamic Replacement Info For Opaque Types")
 								fmt.Println()
 								if rep != nil {
 									fmt.Println(rep)
@@ -661,7 +661,7 @@ var MachoCmd = &cobra.Command{
 								log.WithFields(log.Fields{
 									"segment": "__TEXT",
 									"section": "__swift5_acfuncs",
-								}).Infof("Swift Accessible Functions")
+								}).Info("Swift Accessible Functions")
 								fmt.Println()
 								for _, afunc := range afuncs {
 									fmt.Println(afunc)
