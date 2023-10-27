@@ -127,7 +127,7 @@ func (a *AssetSets) LatestVersion(platform string) string {
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "visionos":
-			if utils.StrSliceContains(asset.SupportedDevices, "xrOS") {
+			if utils.StrSliceContains(asset.SupportedDevices, "Reality") {
 				versionsRaw = append(versionsRaw, asset.ProductVersion)
 			}
 		case "recovery":
