@@ -390,12 +390,34 @@ var MachoCmd = &cobra.Command{
 					fmt.Println()
 				}
 
+				fixedLocals := false
+
 				if showSwift {
 					if !onlySwift {
 						fmt.Println("Swift")
 						fmt.Println("=====")
 					}
 					if m.HasSwift() {
+						image.ParseLocalSymbols(false) // parse local symbols for swift demangling
+						if m.Symtab != nil {
+							for idx, sym := range m.Symtab.Syms {
+								if sym.Value != 0 {
+									if sym.Name == "<redacted>" {
+										if name, ok := f.AddressToSymbol[sym.Value]; ok {
+											m.Symtab.Syms[idx].Name = name
+										}
+									}
+								}
+								if doDemangle {
+									if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") {
+										m.Symtab.Syms[idx].Name, _ = swift.Demangle(sym.Name)
+									} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
+										m.Symtab.Syms[idx].Name = demangle.Do(sym.Name, false, false)
+									}
+								}
+							}
+						}
+						fixedLocals = true
 						toc := m.GetSwiftTOC()
 						if err := m.PreCache(); err != nil { // cache fields and types
 							log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(image.Name), err)
@@ -721,14 +743,14 @@ var MachoCmd = &cobra.Command{
 									}
 								} else if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") { // TODO: better detect swift symbols
 									sym.Name, _ = swift.Demangle(sym.Name)
-								} else {
+								} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
 									sym.Name = demangle.Do(sym.Name, false, false)
 								}
 							}
 							if sym.Value == 0 {
 								fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 							} else {
-								if sym.Name == "<redacted>" {
+								if !fixedLocals && sym.Name == "<redacted>" {
 									if name, ok := f.AddressToSymbol[sym.Value]; ok {
 										sym.Name = name
 									}

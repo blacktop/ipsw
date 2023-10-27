@@ -1174,7 +1174,7 @@ var machoInfoCmd = &cobra.Command{
 							}
 						} else if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") { // TODO: better detect swift symbols
 							sym.Name, _ = swift.Demangle(sym.Name)
-						} else {
+						} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
 							sym.Name = demangle.Do(sym.Name, false, false)
 						}
 					}
@@ -1225,7 +1225,7 @@ var machoInfoCmd = &cobra.Command{
 					if doDemangle {
 						if strings.HasPrefix(export.Name, "_$s") || strings.HasPrefix(export.Name, "$s") { // TODO: better detect swift symbols
 							export.Name, _ = swift.Demangle(export.Name)
-						} else {
+						} else if strings.HasPrefix(export.Name, "__Z") || strings.HasPrefix(export.Name, "_Z") {
 							export.Name = demangle.Do(export.Name, false, false)
 						}
 					}
