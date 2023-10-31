@@ -299,7 +299,6 @@ var machoSearchCmd = &cobra.Command{
 							}
 							if classReStr != "" && classRE.MatchString(class.Name) {
 								fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(path), colorField(classType), swift.DemangleBlob(class.Name))
-								break
 							}
 							if protoReStr != "" {
 								protRE, err := regexp.Compile(protoReStr)
