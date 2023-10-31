@@ -208,7 +208,6 @@ var dyldSearchCmd = &cobra.Command{
 							}
 							if classReStr != "" && classRE.MatchString(class.Name) {
 								fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField(classType), swift.DemangleBlob(class.Name))
-								break
 							}
 							if protocolReStr != "" {
 								protRE, err := regexp.Compile(protocolReStr)
