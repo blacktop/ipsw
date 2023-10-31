@@ -726,6 +726,11 @@ var MachoCmd = &cobra.Command{
 								w.Flush()
 								undeflush = true
 							}
+							if !fixedLocals && sym.Name == "<redacted>" {
+								if name, ok := f.AddressToSymbol[sym.Value]; ok {
+									sym.Name = name
+								}
+							}
 							if doDemangle {
 								if strings.HasPrefix(sym.Name, "_associated conformance ") {
 									if _, rest, ok := strings.Cut(sym.Name, "_associated conformance "); ok {
@@ -743,18 +748,13 @@ var MachoCmd = &cobra.Command{
 									}
 								} else if strings.HasPrefix(sym.Name, "_$s") || strings.HasPrefix(sym.Name, "$s") { // TODO: better detect swift symbols
 									sym.Name, _ = swift.Demangle(sym.Name)
-								} else if strings.HasPrefix(sym.Name, "__Z") || strings.HasPrefix(sym.Name, "_Z") {
+								} else {
 									sym.Name = demangle.Do(sym.Name, false, false)
 								}
 							}
 							if sym.Value == 0 {
 								fmt.Fprintf(w, "              %s\n", strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 							} else {
-								if !fixedLocals && sym.Name == "<redacted>" {
-									if name, ok := f.AddressToSymbol[sym.Value]; ok {
-										sym.Name = name
-									}
-								}
 								fmt.Fprintf(w, "%s:  %s\n", symAddrColor("%#09x", sym.Value), strings.Join([]string{symTypeColor(sym.GetType(m)), symNameColor(sym.Name), symLibColor(sym.GetLib(m))}, "\t"))
 							}
 						}
