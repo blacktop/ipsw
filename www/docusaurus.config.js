@@ -20,6 +20,9 @@ const config = {
   organizationName: "blacktop", // Usually your GitHub org/user name.
   projectName: "ipsw", // Usually your repo name.
 
+  onBrokenLinks: "throw",
+  onBrokenMarkdownLinks: "warn",
+
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
   // to replace "en" with "zh-Hans".
@@ -151,11 +154,6 @@ const config = {
             className: "header-icon-link header-github-link",
           },
           {
-            href: "https://discord.gg/xx2y9yrcgs",
-            position: "right",
-            className: "header-icon-link header-discord-link",
-          },
-          {
             href: "https://twitter.com/blacktop__",
             position: "right",
             className: "header-icon-link header-twitter-link",
@@ -186,10 +184,6 @@ const config = {
           {
             title: "Community",
             items: [
-              {
-                label: "Discord",
-                href: "https://discord.gg/xx2y9yrcgs",
-              },
               {
                 label: "Twitter",
                 href: "https://twitter.com/blacktop__",
