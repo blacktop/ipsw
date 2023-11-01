@@ -43,7 +43,7 @@ func init() {
 // mountCmd represents the mount command
 var mountCmd = &cobra.Command{
 	Use:           "mount [fs|sys|app] IPSW",
-	Aliases:       []string{"m", "mnt"},
+	Aliases:       []string{"mo", "mnt"},
 	Short:         "Mount DMG from IPSW",
 	SilenceUsage:  true,
 	SilenceErrors: true,
