@@ -204,21 +204,21 @@ jobs:
       - name: Run download latest (IPSW)
         if: (matrix.platform == 'ubuntu-latest' || matrix.platform == 'macos-13') && steps.cache-ipsws.outputs.cache-hit != 'true'
         run: |
-          ipsw -V download ipsw --confirm --device iPhone12,1 --latest --output /tmp/ipsw && ls -lah && ls -lah /tmp && ls -lah /tmp/ipsw
+          ipsw -V download ipsw --confirm --device iPhone16,1 --latest --output /tmp/ipsw && ls -lah && ls -lah /tmp && ls -lah /tmp/ipsw
       - name: Run download latest (kernelcache)
         if: matrix.platform == 'macos-13'
         run: |
-          ipsw download ipsw --confirm --device iPhone12,1 --latest --kernel
-          ipsw -V macho info "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache*
+          ipsw download ipsw --confirm --device iPhone16,1 --latest --kernel
+          ipsw -V macho info "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache*
       - name: Run download latest (kernelcache) [Windows]
         if: matrix.platform == 'windows-latest'
         run: |
-          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download ipsw --confirm --device iPhone12,1 --latest --kernel
+          D:\a\ipsw\ipsw\build\dist\ipsw.exe -V download ipsw --confirm --device iPhone16,1 --latest --kernel
           dir
       - name: Run download latest (PATTERN/iBoot)
         if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
-        run: ipsw download ipsw --confirm --device iPhone12,1 --latest --pattern iBoot
+        run: ipsw download ipsw --confirm --device iPhone16,1 --latest --pattern iBoot
       - name: Run download tss
         if: matrix.platform == 'macos-13' && steps.cache-ipsws.outputs.cache-hit != 'true'
         working-directory: /tmp/ipsw
@@ -276,28 +276,28 @@ jobs:
       - name: Run kernel version
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw kernel version "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --json | jq .
+        run: ipsw kernel version "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache.release.* --json | jq .
       - name: Run kernel symbolsets
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw kernel symbolsets "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+        run: ipsw kernel symbolsets "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache.release.*
       - name: Run kernel syscall
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw kernel syscall "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+        run: ipsw kernel syscall "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache.release.*
       - name: Run kernel kexts
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw kernel kexts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+        run: ipsw kernel kexts "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache.release.*
       # - name: Run kernel sbopts
       #   if: matrix.platform == 'macos-13'
       #   working-directory: /tmp/ipsw
-      #   run: ipsw kernel sbopts "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.*
+      #   run: ipsw kernel sbopts "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache.release.*
       - name: Run kernel extract (KEXTs)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
-          ipsw kernel extract "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --all --output /tmp/KEXTS
+          ipsw kernel extract "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache.release.* --all --output /tmp/KEXTS
           cd /tmp/KEXTS && ls -1 | xargs codesign -s - -f
 
       #
@@ -306,94 +306,94 @@ jobs:
       - name: Run dyld info
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld info "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --dylibs --sig -V
+        run: ipsw dyld info "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --dylibs --sig -V
       - name: Run dyld symaddr (img)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --image libsystem_c.dylib
+        run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --image libsystem_c.dylib
       - name: Run dyld symaddr (sym)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e _memcpy
+        run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e _memcpy
       - name: Run dyld symaddr (img+sym)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
+        run: ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --image libsystem_c.dylib _memcpy
       - name: Run dyld symaddr (JSON)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
           echo '[{"pattern":".*zero.*", "image":"libsystem_c.dylib"}]' > dyld_symaddr.json
-          ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --in dyld_symaddr.json
+          ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --in dyld_symaddr.json
       # - name: Run dyld symaddr (ALL)
       #   if: matrix.platform == 'macos-13'
       #   run: |
-      #     ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e | grep _memcpy
+      #     ipsw dyld symaddr "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e | grep _memcpy
       - name: Run dyld macho
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld macho "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e JavaScriptCore --loads --objc --objc-refs --strings --symbols --starts --stubs -V
+        run: ipsw dyld macho "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e JavaScriptCore --loads --objc --objc-refs --strings --symbols --starts --stubs -V
       - name: Run dyld macho (extract)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld macho "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e JavaScriptCore --extract
+        run: ipsw dyld macho "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e JavaScriptCore --extract
       - name: Run dyld webkit
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld webkit "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+        run: ipsw dyld webkit "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e
       - name: Run dyld slide
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld slide "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --auth
+        run: ipsw dyld slide "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --auth
       - name: Run dyld patches
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld patches "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+        run: ipsw dyld patches "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e
       - name: Run dyld imports
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld imports "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e JavaScriptCore
+        run: ipsw dyld imports "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e JavaScriptCore
       - name: Run dyld disass
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld disass "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --demangle --symbol _NSLog
+        run: ipsw dyld disass "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --demangle --symbol _NSLog
       - name: Run dyld objc sel --image
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld objc sel "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --image JavaScriptCore
+        run: ipsw dyld objc sel "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --image JavaScriptCore
       - name: Run dyld objc --class
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld objc --class "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+        run: ipsw dyld objc --class "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e
       - name: Run dyld objc --proto
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld objc --proto "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+        run: ipsw dyld objc --proto "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e
       # - name: Run dyld objc --imp-cache
       #   if: matrix.platform == 'macos-13'
       #   run: |
-      #     ipsw dyld objc --imp-cache "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+      #     ipsw dyld objc --imp-cache "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e
       - name: Run dyld split (Xcode)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
-          ipsw dyld split --xcode /Applications/Xcode_14.1.app "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e /tmp/ipsw
+          ipsw dyld split --xcode /Applications/Xcode_14.1.app "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e /tmp/ipsw
           tree /tmp/ipsw
       - name: Run dyld swfit
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw dyld swift "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --types --demangle
+        run: ipsw dyld swift "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --types --demangle
       - name: Run dyld str
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
-          ipsw dyld str "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
+          ipsw dyld str "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
       # ipsw dyld str "${{ env.beta_ios_build }}__iPhone16,2"/dyld_shared_cache_arm64e --pattern "LDMGlobalEnabled"
       - name: Run dyld image
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
-          ipsw dyld image "${{ env.latest_ios_build }}__iPhone12,1"/dyld_shared_cache_arm64e
+          ipsw dyld image "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e
       # ipsw dyld image "${{ env.beta_ios_build }}__iPhone16,2"/dyld_shared_cache_arm64e
       #
       # MACHO CMD (macOS)
@@ -407,7 +407,7 @@ jobs:
         working-directory: /tmp/ipsw
         run: |
           ls /tmp/*.mount
-          ipsw macho info "${{ env.latest_ios_build }}__iPhone12,1"/System/Library/PrivateFrameworks/ApplePushService.framework/apsd --objc --objc-refs --fixups
+          ipsw macho info "${{ env.latest_ios_build }}__iPhone16,1"/System/Library/PrivateFrameworks/ApplePushService.framework/apsd --objc --objc-refs --fixups
       - name: Run macho info (Dump Cert)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
@@ -421,7 +421,7 @@ jobs:
       - name: Run macho disass (MTE)
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
-        run: ipsw macho disass "${{ env.latest_ios_build }}__iPhone12,1"/kernelcache.release.* --all-fileset-entries  --quiet --section __TEXT_EXEC.__text | grep 'addg\|cmpp\|gmi\|irg\|ldg\|ldgv\|st2g\|stg\|stgp\|stgv\|stz2g\|stzg\|subg\|subp\|subps'
+        run: ipsw macho disass "${{ env.latest_ios_build }}__iPhone16,1"/kernelcache.release.* --all-fileset-entries  --quiet --section __TEXT_EXEC.__text | grep 'addg\|cmpp\|gmi\|irg\|ldg\|ldgv\|st2g\|stg\|stgp\|stgv\|stz2g\|stzg\|subg\|subp\|subps'
       - name: Run macho lipo
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
