@@ -64,6 +64,23 @@ var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
 var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
 var symNameColor = color.New(color.Bold).SprintFunc()
 
+const (
+	onlyHeader       = 1 << 0
+	onlyLoadCommands = 1 << 1
+	onlySig          = 1 << 2
+	onlyEnt          = 1 << 3
+	onlyObjC         = 1 << 4
+	onlyObjCRefs     = 1 << 5
+	onlySwift        = 1 << 6
+	onlySwiftAll     = 1 << 7
+	onlySymbols      = 1 << 8
+	onlyFixups       = 1 << 9
+	onlyFuncStarts   = 1 << 10
+	onlyStrings      = 1 << 11
+	onlySplitSeg     = 1 << 12
+	onlyBitCode      = 1 << 13
+)
+
 func init() {
 	MachoCmd.AddCommand(machoInfoCmd)
 
@@ -138,43 +155,46 @@ var machoInfoCmd = &cobra.Command{
 		color := viper.GetBool("color")
 
 		selectedArch := viper.GetString("macho.info.arch")
+		filesetEntry := viper.GetString("macho.info.fileset-entry")
+		extractPath := viper.GetString("macho.info.output")
+		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
+
 		showHeader := viper.GetBool("macho.info.header")
 		showLoadCommands := viper.GetBool("macho.info.loads")
 		showSignature := viper.GetBool("macho.info.sig")
+		showCert := viper.GetBool("macho.info.dump-cert")
 		showEntitlements := viper.GetBool("macho.info.ent")
 		showObjC := viper.GetBool("macho.info.objc")
 		showObjcRefs := viper.GetBool("macho.info.objc-refs")
 		showSwift := viper.GetBool("macho.info.swift")
 		showSwiftAll := viper.GetBool("macho.info.swift-all")
 		showSymbols := viper.GetBool("macho.info.symbols")
-		showFuncStarts := viper.GetBool("macho.info.starts")
-		dumpStrings := viper.GetBool("macho.info.strings")
 		showFixups := viper.GetBool("macho.info.fixups")
+		showFuncStarts := viper.GetBool("macho.info.starts")
+		showStrings := viper.GetBool("macho.info.strings")
 		showSplitSeg := viper.GetBool("macho.info.split-seg")
-		filesetEntry := viper.GetString("macho.info.fileset-entry")
-		extractfilesetEntry := viper.GetBool("macho.info.extract-fileset-entry")
-		dumpCert := viper.GetBool("macho.info.dump-cert")
-		dumpBitCode := viper.GetBool("macho.info.bit-code")
+		showBitCode := viper.GetBool("macho.info.bit-code")
+
 		doDemangle := viper.GetBool("macho.info.demangle")
-		extractPath := viper.GetString("macho.info.output")
+
 		// validate flags
 		if doDemangle && (!showSymbols && !showSwift) {
 			return fmt.Errorf("you must also supply --symbols OR --swift flag to demangle")
-		}
-
-		if len(filesetEntry) == 0 && extractfilesetEntry {
+		} else if showSwiftAll && !showSwift {
+			return fmt.Errorf("you must also supply --swift flag with the --swift-all flag")
+		} else if len(filesetEntry) == 0 && extractfilesetEntry {
 			return fmt.Errorf("you must supply a --fileset-entry|-t AND --extract-fileset-entry|-x to extract a file-set entry")
 		}
 
-		onlySig := !showHeader && !showLoadCommands && showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
-		onlyEnt := !showHeader && !showLoadCommands && !showSignature && showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
-		onlyFixups := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
-		onlyFuncStarts := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
-		onlyStrings := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && dumpStrings && !showSplitSeg && !showSwift
-		onlySymbols := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
-		onlyObjC := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
-		onlySplitSegs := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift
-		onlySwift := !showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && showSwift
+		var options uint32
+		for i, opt := range []bool{
+			showHeader, showLoadCommands, showSignature, showEntitlements, showObjC, showObjcRefs, showSwift,
+			showSwiftAll, showSymbols, showFixups, showFuncStarts, showStrings, showSplitSeg, showBitCode,
+		} {
+			if opt {
+				options |= 1 << i
+			}
+		}
 
 		machoPath := filepath.Clean(args[0])
 
@@ -237,7 +257,7 @@ var machoInfoCmd = &cobra.Command{
 			folder = extractPath
 		}
 
-		if dumpCert {
+		if showCert {
 			if cs := m.CodeSignature(); cs != nil {
 				if len(m.CodeSignature().CMSSignature) > 0 {
 					// parse cert
@@ -268,7 +288,11 @@ var machoInfoCmd = &cobra.Command{
 			}
 		}
 
-		if dumpBitCode {
+		if showBitCode {
+			if options != onlyBitCode {
+				fmt.Println("LLVM Bitcode")
+				fmt.Println("============")
+			}
 			// NOTE: /opt/homebrew/opt/llvm/bin/llvm-dis 1.bc 2.bc 3.bc # to disassemble bitcode
 			xr, err := m.GetEmbeddedLLVMBitcode()
 			if err != nil {
@@ -391,7 +415,7 @@ var machoInfoCmd = &cobra.Command{
 		if showHeader && !showLoadCommands {
 			fmt.Println(m.FileHeader.String())
 		}
-		if showLoadCommands || (!showHeader && !showLoadCommands && !showSignature && !showEntitlements && !showObjC && !showSymbols && !showFixups && !showFuncStarts && !dumpStrings && !showSplitSeg && !showSwift) {
+		if showLoadCommands || options == 0 {
 			if viper.GetBool("macho.info.json") {
 				dat, err := m.FileTOC.MarshalJSON()
 				if err != nil {
@@ -410,7 +434,7 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showSignature {
-			if !onlySig {
+			if options != onlySig {
 				fmt.Println("Code Signature")
 				fmt.Println("==============")
 			}
@@ -669,7 +693,7 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showEntitlements {
-			if !onlyEnt {
+			if options != onlyEnt {
 				fmt.Println("Entitlements")
 				fmt.Println("============")
 			}
@@ -687,7 +711,7 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showObjC {
-			if !onlyObjC {
+			if options != onlyObjC {
 				fmt.Println("Objective-C")
 				fmt.Println("===========")
 			}
@@ -837,7 +861,7 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showSwift {
-			if !onlySwift {
+			if options != onlySwift {
 				fmt.Println("Swift")
 				fmt.Println("=====")
 			}
@@ -1123,7 +1147,7 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showFuncStarts {
-			if !onlyFuncStarts {
+			if options != onlyFuncStarts {
 				fmt.Println("FUNCTION STARTS")
 				fmt.Println("===============")
 			}
@@ -1141,7 +1165,7 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showSymbols {
-			if !onlySymbols {
+			if options != onlySymbols {
 				fmt.Println("SYMBOLS")
 				fmt.Println("=======")
 			}
@@ -1236,7 +1260,7 @@ var machoInfoCmd = &cobra.Command{
 		}
 
 		if showFixups {
-			if !onlyFixups {
+			if options != onlyFixups {
 				fmt.Println("FIXUPS")
 				fmt.Println("======")
 			}
@@ -1283,45 +1307,8 @@ var machoInfoCmd = &cobra.Command{
 			}
 		}
 
-		if showSplitSeg {
-			if !onlySplitSegs {
-				fmt.Println("SEGMENT_SPLIT_INFO")
-				fmt.Println("==================")
-			}
-			var sections []types.Section
-			for _, l := range m.Loads {
-				if s, ok := l.(*macho.Segment); ok {
-					for j := uint32(0); j < s.Nsect; j++ {
-						sections = append(sections, *m.Sections[j+s.Firstsect])
-					}
-				}
-			}
-			m.ForEachV2SplitSegReference(func(fromSectionIndex, fromSectionOffset, toSectionIndex, toSectionOffset uint64, kind types.SplitInfoKind) {
-				var toSeg string
-				var toName string
-				var toAddr uint64
-				if toSectionIndex > 0 {
-					toSeg = sections[toSectionIndex-1].Seg
-					toName = sections[toSectionIndex-1].Name
-					toAddr = sections[toSectionIndex-1].Addr + fromSectionOffset
-				} else {
-					toSeg = "mach"
-					toName = "header"
-					toAddr = fromSectionOffset
-				}
-				fmt.Printf("%16s.%-16s %#08x  =>  %16s.%-16s %#08x\tkind(%s)\n",
-					sections[fromSectionIndex-1].Seg,
-					sections[fromSectionIndex-1].Name,
-					sections[fromSectionIndex-1].Addr+fromSectionOffset,
-					toSeg,
-					toName,
-					toAddr,
-					kind)
-			})
-		}
-
-		if dumpStrings {
-			if !onlyStrings {
+		if showStrings {
+			if options != onlyStrings {
 				fmt.Println("STRINGS")
 				fmt.Println("=======")
 			}
@@ -1390,6 +1377,43 @@ var machoInfoCmd = &cobra.Command{
 					}
 				}
 			}
+		}
+
+		if showSplitSeg {
+			if options != onlySplitSeg {
+				fmt.Println("SEGMENT_SPLIT_INFO")
+				fmt.Println("==================")
+			}
+			var sections []types.Section
+			for _, l := range m.Loads {
+				if s, ok := l.(*macho.Segment); ok {
+					for j := uint32(0); j < s.Nsect; j++ {
+						sections = append(sections, *m.Sections[j+s.Firstsect])
+					}
+				}
+			}
+			m.ForEachV2SplitSegReference(func(fromSectionIndex, fromSectionOffset, toSectionIndex, toSectionOffset uint64, kind types.SplitInfoKind) {
+				var toSeg string
+				var toName string
+				var toAddr uint64
+				if toSectionIndex > 0 {
+					toSeg = sections[toSectionIndex-1].Seg
+					toName = sections[toSectionIndex-1].Name
+					toAddr = sections[toSectionIndex-1].Addr + fromSectionOffset
+				} else {
+					toSeg = "mach"
+					toName = "header"
+					toAddr = fromSectionOffset
+				}
+				fmt.Printf("%16s.%-16s %#08x  =>  %16s.%-16s %#08x\tkind(%s)\n",
+					sections[fromSectionIndex-1].Seg,
+					sections[fromSectionIndex-1].Name,
+					sections[fromSectionIndex-1].Addr+fromSectionOffset,
+					toSeg,
+					toName,
+					toAddr,
+					kind)
+			})
 		}
 
 		return nil
