@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
@@ -36,11 +37,14 @@ import (
 )
 
 var supportedOSes = []string{"audioOS", "bridgeOS", "iOS", "iPadOS", "iPodOS", "macOS", "tvOS", "watchOS"}
+var supportedRsrOSes = []string{"iOS", "iPadOS", "macOS"}
+var supportedFWs = []string{"ipsw", "ota", "rsr"}
 
 func init() {
 	DownloadCmd.AddCommand(downloadAppledbCmd)
 
-	downloadAppledbCmd.Flags().StringArray("os", []string{}, "Operating system to download (i.e. iOS, tvOS, watchOS, bridgeOS)")
+	downloadAppledbCmd.Flags().StringArray("os", []string{}, fmt.Sprintf("Operating system to download (%s)", strings.Join(supportedOSes, ", ")))
+	downloadAppledbCmd.Flags().String("type", "ipsw", fmt.Sprintf("FW type to download (%s)", strings.Join(supportedFWs, ", ")))
 	downloadAppledbCmd.Flags().Bool("kernel", false, "Extract kernelcache from remote IPSW")
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
@@ -53,6 +57,7 @@ func init() {
 	downloadAppledbCmd.Flags().Bool("usb", false, "Download IPSWs for USB attached iDevices")
 
 	viper.BindPFlag("download.appledb.os", downloadAppledbCmd.Flags().Lookup("os"))
+	viper.BindPFlag("download.appledb.type", downloadAppledbCmd.Flags().Lookup("type"))
 	viper.BindPFlag("download.appledb.kernel", downloadAppledbCmd.Flags().Lookup("kernel"))
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
@@ -74,6 +79,9 @@ func init() {
 	downloadAppledbCmd.MarkFlagRequired("os")
 	downloadAppledbCmd.RegisterFlagCompletionFunc("os", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return supportedOSes, cobra.ShellCompDirectiveDefault
+	})
+	downloadAppledbCmd.RegisterFlagCompletionFunc("type", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return supportedFWs, cobra.ShellCompDirectiveDefault
 	})
 }
 
@@ -121,6 +129,7 @@ var downloadAppledbCmd = &cobra.Command{
 		build := viper.GetString("download.build")
 		// flags
 		osTypes := viper.GetStringSlice("download.appledb.os")
+		fwType := viper.GetString("download.appledb.type")
 		kernel := viper.GetBool("download.appledb.kernel")
 		pattern := viper.GetString("download.appledb.pattern")
 		isBeta := viper.GetBool("download.appledb.beta")
@@ -135,6 +144,9 @@ var downloadAppledbCmd = &cobra.Command{
 				return fmt.Errorf("valid --os flag choices are: %v", supportedOSes)
 			}
 		}
+		if !utils.StrSliceHas(supportedFWs, fwType) {
+			return fmt.Errorf("valid --type flag choices are: %v", supportedFWs)
+		}
 		if viper.GetBool("download.appledb.urls") && (kernel || len(pattern) > 0) {
 			return fmt.Errorf("cannot use --urls with --kernel or --pattern")
 		}
@@ -148,6 +160,16 @@ var downloadAppledbCmd = &cobra.Command{
 			} else {
 				if val, ok := os.LookupEnv("GITHUB_API_TOKEN"); ok {
 					apiToken = val
+				}
+			}
+		}
+
+		if fwType == "rsr" {
+			for idx, osType := range osTypes {
+				if utils.StrSliceContains(supportedRsrOSes, osType) {
+					osTypes[idx] = filepath.Join("Rapid Security Responses", osType)
+				} else {
+					return fmt.Errorf("for --type 'rsr', the valid --os choices are: %v", supportedRsrOSes)
 				}
 			}
 		}
@@ -171,6 +193,7 @@ var downloadAppledbCmd = &cobra.Command{
 		if useAPI {
 			results, err = download.AppleDBQuery(&download.ADBQuery{
 				OSes:     osTypes,
+				Type:     fwType,
 				Version:  version,
 				Build:    build,
 				Device:   device,
@@ -199,6 +222,7 @@ var downloadAppledbCmd = &cobra.Command{
 			}
 			results, err = download.LocalAppleDBQuery(&download.ADBQuery{
 				OSes:      osTypes,
+				Type:      fwType,
 				Version:   version,
 				Build:     build,
 				Device:    device,
@@ -223,6 +247,7 @@ var downloadAppledbCmd = &cobra.Command{
 					} else {
 						utils.Indent(log.Debug, 2)(link.URL)
 					}
+					break
 				}
 			}
 		}
