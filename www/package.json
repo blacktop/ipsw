@@ -28,7 +28,7 @@
     "react-dom": "^18.0.0",
     "prism-themes": "^1.9.0",
     "meilisearch-docsearch": "^0.4.5",
-    "redocusaurus": "^1.6.4"
+    "redocusaurus": "^2.0.0"
   },
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.0.0",
