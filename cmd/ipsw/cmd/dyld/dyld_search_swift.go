@@ -28,25 +28,29 @@ import (
 	"regexp"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/types/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 func init() {
-	DyldCmd.AddCommand(dyldSearchCmd)
+	dyldSearchCmd.AddCommand(dyldSearchSwiftCmd)
 
-	dyldSearchCmd.Flags().StringP("load-command", "l", "", "Search for specific load command regex")
-	dyldSearchCmd.Flags().StringP("section", "x", "", "Search for specific section regex")
-	viper.BindPFlag("dyld.search.load-command", dyldSearchCmd.Flags().Lookup("load-command"))
-	viper.BindPFlag("dyld.search.section", dyldSearchCmd.Flags().Lookup("section"))
+	dyldSearchSwiftCmd.Flags().StringP("class", "c", "", "Search for specific Swift class regex")
+
+	viper.BindPFlag("dyld.search.swift.class", dyldSearchSwiftCmd.Flags().Lookup("class"))
+
+	// dyldSearchSwiftCmd.MarkFlagsMutuallyExclusive("class", "")
 }
 
-// dyldSearchCmd represents the search command
-var dyldSearchCmd = &cobra.Command{
-	Use:           "search",
-	Aliases:       []string{"sr"},
-	Short:         "Find Dylib files for given search criteria",
+// dyldSearchSwiftCmd represents the swift command
+var dyldSearchSwiftCmd = &cobra.Command{
+	Use:           "swift",
+	Aliases:       []string{"s"},
+	Short:         "Find Dylib files for given Swift search criteria",
 	Args:          cobra.ExactArgs(1),
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -56,10 +60,9 @@ var dyldSearchCmd = &cobra.Command{
 		}
 
 		// flags
-		loadCmdReStr := viper.GetString("dyld.search.load-command")
-		sectionReStr := viper.GetString("dyld.search.section")
+		classReStr := viper.GetString("dyld.search.swift.class")
 		// verify flags
-		if loadCmdReStr == "" && sectionReStr == "" {
+		if classReStr == "" {
 			return fmt.Errorf("must specify a search criteria via one of the flags")
 		}
 
@@ -88,30 +91,30 @@ var dyldSearchCmd = &cobra.Command{
 			return fmt.Errorf("failed to open dyld shared cache %s: %w", dscPath, err)
 		}
 
-		for _, img := range f.Images {
-			m, err := img.GetMacho()
+		for _, image := range f.Images {
+			m, err := image.GetMacho()
 			if err != nil {
 				return err
 			}
-			if loadCmdReStr != "" {
-				re, err := regexp.Compile(loadCmdReStr)
-				if err != nil {
-					return fmt.Errorf("invalid regex '%s': %w", loadCmdReStr, err)
-				}
-				for _, lc := range m.Loads {
-					if re.MatchString(lc.Command().String()) {
-						fmt.Printf("%s\t%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("load"), lc.Command())
+			if m.HasSwift() {
+				if classReStr != "" {
+					classRE, err := regexp.Compile(classReStr)
+					if err != nil {
+						return fmt.Errorf("invalid regex '%s': %w", classReStr, err)
 					}
-				}
-			}
-			if sectionReStr != "" {
-				re, err := regexp.Compile(sectionReStr)
-				if err != nil {
-					return fmt.Errorf("invalid regex '%s': %w", sectionReStr, err)
-				}
-				for _, sec := range m.Sections {
-					if re.MatchString(fmt.Sprintf("%s.%s", sec.Seg, sec.Name)) {
-						fmt.Printf("%-55s%s=%s\n", colorImage(filepath.Base(img.Name)), colorField("load"), fmt.Sprintf("%s.%s", sec.Seg, sec.Name))
+					if err := m.PreCache(); err != nil { // cache fields and types
+						log.Errorf("failed to precache swift fields/types for %s: %v", filepath.Base(image.Name), err)
+					}
+					if typs, err := m.GetSwiftTypes(); err == nil {
+						for _, typ := range typs {
+							if typ.Kind == swift.CDKindClass {
+								if classRE.MatchString(typ.Name) {
+									fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", typ.Address), colorImage(filepath.Base(image.Name)), colorField("class"), typ.Name)
+								}
+							}
+						}
+					} else if !errors.Is(err, macho.ErrSwiftSectionError) {
+						log.Errorf("failed to parse swift types for %s: %v", filepath.Base(image.Name), err)
 					}
 				}
 			}
