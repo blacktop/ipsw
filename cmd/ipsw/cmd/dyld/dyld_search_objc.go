@@ -218,14 +218,12 @@ var dyldSearchObjcCmd = &cobra.Command{
 				if classRE != nil || protRE != nil || selRE != nil || ivarRE != nil {
 					if classes, err := m.GetObjCClasses(); err == nil {
 						for _, class := range classes {
-							if classRE != nil {
-								classType := "class"
-								if class.IsSwift() {
-									classType = colorField("swift_class")
-								}
-								if classRE.MatchString(class.Name) {
-									fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField(classType), swift.DemangleBlob(class.Name))
-								}
+							classType := "class"
+							if class.IsSwift() {
+								classType = colorField("swift_class")
+							}
+							if classRE != nil && classRE.MatchString(class.Name) {
+								fmt.Printf("%s: %s\t%s=%s\n", colorAddr("%#09x", class.ClassPtr), filepath.Base(img.Name), colorField(classType), swift.DemangleBlob(class.Name))
 							}
 							if protRE != nil {
 								for _, proto := range class.Protocols {
