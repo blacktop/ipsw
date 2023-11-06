@@ -35,9 +35,10 @@ ipsw download appledb [flags]
   -h, --help               help for appledb
       --kernel             Extract kernelcache from remote IPSW
       --latest             Download latest IPSWs
-      --os stringArray     Operating system to download (i.e. iOS, tvOS, watchOS, bridgeOS)
+      --os stringArray     Operating system to download (audioOS, bridgeOS, iOS, iPadOS, iPodOS, macOS, tvOS, watchOS)
   -o, --output string      Folder to download files to
       --pattern string     Download remote files that match regex
+      --type string        FW type to download (ipsw, ota, rsr) (default "ipsw")
   -u, --urls               Dump URLs only
       --usb                Download IPSWs for USB attached iDevices
 ```
