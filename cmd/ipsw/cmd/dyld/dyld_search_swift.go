@@ -73,20 +73,16 @@ var dyldSearchSwiftCmd = &cobra.Command{
 		// compile regexes
 		var classRE *regexp.Regexp
 		if classReStr != "" {
-			if classReStr != "" {
-				classRE, err = regexp.Compile(classReStr)
-				if err != nil {
-					return fmt.Errorf("invalid regex '%s': %w", classReStr, err)
-				}
+			classRE, err = regexp.Compile(classReStr)
+			if err != nil {
+				return fmt.Errorf("invalid regex '%s': %w", classReStr, err)
 			}
 		}
 		var protocolRE *regexp.Regexp
 		if protocolReStr != "" {
-			if protocolReStr != "" {
-				protocolRE, err = regexp.Compile(protocolReStr)
-				if err != nil {
-					return fmt.Errorf("invalid regex '%s': %w", protocolReStr, err)
-				}
+			protocolRE, err = regexp.Compile(protocolReStr)
+			if err != nil {
+				return fmt.Errorf("invalid regex '%s': %w", protocolReStr, err)
 			}
 		}
 
