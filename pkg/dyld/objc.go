@@ -159,6 +159,9 @@ func (o *ObjCOptimizationHeader) GetFlags() optFlags {
 func (o *ObjCOptimizationHeader) GetHeaderInfoRoCacheOffset() uint64 {
 	return o.HeaderInfoRoCacheOffset
 }
+func (o *ObjCOptimizationHeader) GetHeaderInfoRwCacheOffset() uint64 {
+	return o.HeaderInfoRwCacheOffset
+}
 func (o *ObjCOptimizationHeader) SelectorHashTableOffset(base uint64) uint64 {
 	return o.SelectorHashTableCacheOffset
 }
@@ -416,6 +419,17 @@ func (f *File) getProtocolStringHash() (*StringHash, *types.UUID, error) {
 	return &shash, &u, nil
 }
 
+func (f *File) getObjcDylibMap(shash *StringHash) {
+	if shash.dylibMap == nil {
+		shash.dylibMap = make(map[uint16]string)
+		for _, image := range f.Images {
+			if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
+				shash.dylibMap[idx] = image.Name
+			}
+		}
+	}
+}
+
 func (f *File) dumpOffsets(shash *StringHash, uuid types.UUID) {
 	sr := io.NewSectionReader(f.r[uuid], 0, 1<<63-1)
 	for idx, ptr := range shash.Offsets {
@@ -540,8 +554,16 @@ type objc_headeropt_rw_t struct {
 	Entsize uint32
 	Headers []header_info_rw
 }
-type header_info_rw struct {
-	Ptr uint64
+type header_info_rw uint64
+
+func (rw header_info_rw) IsLoaded() bool {
+	return types.ExtractBits(uint64(rw), 0, 1) == 1
+}
+func (rw header_info_rw) AllClassesRealized() bool {
+	return types.ExtractBits(uint64(rw), 1, 1) == 1
+}
+func (rw header_info_rw) Next() uint64 {
+	return types.ExtractBits(uint64(rw), 62, 2)
 }
 
 // func (f *File) dumpHeaderROOffsets(offsets []int32, fileOffset int64) {
@@ -652,14 +674,7 @@ func (f *File) GetAllObjCSelectors(print bool) (map[uint64]objHashMap, error) {
 		return nil, fmt.Errorf("failed read selector objc_stringhash_t: %v", err)
 	}
 
-	if shash.dylibMap == nil {
-		shash.dylibMap = make(map[uint16]string)
-		for _, image := range f.Images {
-			if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
-				shash.dylibMap[idx] = image.Name
-			}
-		}
-	}
+	f.getObjcDylibMap(shash)
 
 	if print {
 		f.dumpOffsets(shash, *uuid)
@@ -721,14 +736,7 @@ func (f *File) GetAllObjCClasses(print bool) (map[uint64]objHashMap, error) {
 		return nil, fmt.Errorf("failed read class objc_stringhash_t: %v", err)
 	}
 
-	if shash.dylibMap == nil {
-		shash.dylibMap = make(map[uint16]string)
-		for _, image := range f.Images {
-			if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
-				shash.dylibMap[idx] = image.Name
-			}
-		}
-	}
+	f.getObjcDylibMap(shash)
 
 	if print {
 		f.dumpOffsets(shash, *uuid)
@@ -759,14 +767,7 @@ func (f *File) GetAllObjCProtocols(print bool) (map[uint64]objHashMap, error) {
 		return nil, fmt.Errorf("failed read protocol objc_stringhash_t: %v", err)
 	}
 
-	if shash.dylibMap == nil {
-		shash.dylibMap = make(map[uint16]string)
-		for _, image := range f.Images {
-			if idx, err := shash.hdrRO.FindElement(image.LoadAddress); err == nil {
-				shash.dylibMap[idx] = image.Name
-			}
-		}
-	}
+	f.getObjcDylibMap(shash)
 
 	if print {
 		f.dumpOffsets(shash, *uuid)
