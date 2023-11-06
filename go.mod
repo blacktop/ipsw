@@ -45,7 +45,7 @@ require (
 	github.com/sergi/go-diff v1.3.1
 	github.com/shurcooL/githubv4 v0.0.0-20230704064427-599ae7bbf278
 	github.com/spf13/cast v1.5.1
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.17.0
 	github.com/ulikunitz/xz v0.5.11
 	github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2
