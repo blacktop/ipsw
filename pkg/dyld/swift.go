@@ -182,6 +182,7 @@ type SwiftHashTable struct {
 	Tab        []byte  /* tab[mask+1] (always power-of-2). Rounded up to roundedTabSize */
 	CheckBytes []byte  /* check byte for each string */
 	Offsets    []int32 /* offsets from &capacity to cstrings */
+	dylibMap   map[uint16]string
 }
 
 func (s *SwiftHashTable) Read(r *io.SectionReader) error {
@@ -319,8 +320,17 @@ func (f *File) getSwiftForeignTypeHashTable() (*SwiftHashTable, error) {
 
 func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 	var imgName string
+
 	sr := io.NewSectionReader(f.r[h.UUID], 0, 1<<63-1)
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
+
+	shash, _, err := f.getSelectorStringHash()
+	if err != nil {
+		log.Errorf("failed read selector string SwiftHashTable: %v", err)
+	}
+
+	f.getObjcDylibMap(shash)
+
 	for _, ptr := range h.Offsets {
 		if ptr != int32(h.SentinelTarget) {
 			var protocolCacheOffset uint64
@@ -336,8 +346,11 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 					continue
 				}
 
-				fmt.Printf("%s: %s\n", symDarkAddrColor("%#x", int64(int32(h.CacheOffset)+ptr)), symImageColor(pconf.String()))
-
+				if h.Type == TypeConformance {
+					fmt.Printf("%s: %s\n", symDarkAddrColor("%#x", int64(int32(h.CacheOffset)+ptr)), symImageColor(fmt.Sprintf("type: %#x, protocol: %#x %s", pconf.Key.TypeDescriptorCacheOffset, pconf.Key.ProtocolCacheOffset, pconf.Location.String())))
+				} else {
+					fmt.Printf("%s: %s\n", symDarkAddrColor("%#x", int64(int32(h.CacheOffset)+ptr)), symImageColor(fmt.Sprintf("metadata: %#x, protocol: %#x %s", pconf.Key.TypeDescriptorCacheOffset, pconf.Key.ProtocolCacheOffset, pconf.Location.String())))
+				}
 				protocolCacheOffset = pconf.Key.ProtocolCacheOffset
 				protocolConformanceCacheOffset = pconf.Location.ProtocolConformanceCacheOffset()
 
@@ -412,7 +425,7 @@ func (f *File) dumpSwiftOffsets(h *SwiftHashTable) {
 				} else {
 					out = strings.Join(names, " ")
 				}
-				fmt.Fprintf(w, "    %s: %s %s\n", symAddrColor("%#x", addr), symTypeColor("T"), symNameColor(out))
+				fmt.Fprintf(w, "    %s: %s %s\t%s\n", symAddrColor("%#x", addr), symTypeColor("T"), symNameColor(out), symImageColor(filepath.Base(shash.dylibMap[uint16(pconf.Location.DylibObjCIndex())])))
 			}
 
 			_, addr, err := f.GetCacheVMAddress(protocolCacheOffset)
