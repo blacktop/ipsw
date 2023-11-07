@@ -38,6 +38,7 @@ import (
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/kernel"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/macho"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ota"
+	"github.com/blacktop/ipsw/cmd/ipsw/cmd/sb"
 	"github.com/blacktop/ipsw/cmd/ipsw/cmd/ssh"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -99,6 +100,7 @@ func init() {
 	rootCmd.AddCommand(kernel.KernelcacheCmd)
 	rootCmd.AddCommand(macho.MachoCmd)
 	rootCmd.AddCommand(ota.OtaCmd)
+	rootCmd.AddCommand(sb.SbCmd)
 	rootCmd.AddCommand(ssh.SSHCmd)
 	// Settings
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
