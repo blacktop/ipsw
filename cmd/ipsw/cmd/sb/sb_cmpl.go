@@ -1,3 +1,5 @@
+//go:build sandbox && cgo
+
 /*
 Copyright © 2023 blacktop
 
