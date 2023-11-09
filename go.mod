@@ -51,10 +51,10 @@ require (
 	github.com/unicorn-engine/unicorn v0.0.0-20230617215146-d4b92485b1a2
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
-	golang.org/x/crypto v0.14.0
+	golang.org/x/crypto v0.15.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
-	golang.org/x/net v0.17.0
-	golang.org/x/oauth2 v0.13.0
+	golang.org/x/net v0.18.0
+	golang.org/x/oauth2 v0.14.0
 	golang.org/x/sync v0.5.0
 	golang.org/x/sys v0.14.0
 	golang.org/x/term v0.14.0
