@@ -153,7 +153,7 @@ var diffCmd = &cobra.Command{
 
 		for f := range sbDBs[0] {
 			if _, ok := sbDBs[1][f]; !ok {
-				log.Warnf("sandbox profile removed: %s", f)
+				utils.Indent(log.WithFields(log.Fields{"profile": f}).Warn, 2)("Sandbox Profile Removed")
 			}
 		}
 
