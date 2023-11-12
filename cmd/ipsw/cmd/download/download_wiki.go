@@ -487,10 +487,16 @@ var wikiCmd = &cobra.Command{
 				if cont {
 					if kernel || len(pattern) > 0 {
 						for _, o := range filteredOTAs {
+							var upto4 []string
+							if len(o.Devices) > 4 {
+								upto4 = o.Devices[:4]
+							} else {
+								upto4 = o.Devices
+							}
 							log.WithFields(log.Fields{
 								"version": o.Version,
 								"build":   o.Build,
-								"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(o.Devices[:3], " "), len(o.Devices)),
+								"devices": fmt.Sprintf("%s... (count=%d)", strings.Join(upto4, " "), len(o.Devices)),
 								"model":   strings.Join(o.Devices, " "),
 							}).Info("Getting remote OTA")
 
