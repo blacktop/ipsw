@@ -47,9 +47,10 @@ type GithubContentsResponse struct {
 }
 
 type OsFileSource struct {
-	Type      string   `json:"type"`
-	DeviceMap []string `json:"deviceMap"`
-	Links     []struct {
+	Type              string             `json:"type"`
+	PrerequisiteBuild PrerequisiteBuilds `json:"prerequisiteBuild,omitempty"`
+	DeviceMap         []string           `json:"deviceMap"`
+	Links             []struct {
 		URL    string `json:"url"`
 		Active bool   `json:"active"`
 	} `json:"links"`
@@ -80,6 +81,24 @@ func (r ReleasedDate) MarshalJSON() ([]byte, error) {
 func (r ReleasedDate) Format(s string) string {
 	t := time.Time(r)
 	return t.Format(s)
+}
+
+type PrerequisiteBuilds struct {
+	Builds []string
+}
+
+func (p *PrerequisiteBuilds) UnmarshalJSON(b []byte) error {
+	var str string
+	if err := json.Unmarshal(b, &str); err == nil {
+		p.Builds = []string{str}
+		return nil
+	}
+	var slice []string
+	if err := json.Unmarshal(b, &slice); err == nil {
+		p.Builds = slice
+		return nil
+	}
+	return fmt.Errorf("could not unmarshal PrerequisiteBuilds as string or []string")
 }
 
 // AppleDbOsFiles is an AppleDB osFiles object
@@ -166,21 +185,32 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 		}
 	}
 
+	if len(query.PrerequisiteBuild) > 0 {
+		var tmpSources []OsFileSource
+		for _, source := range sources {
+			if slices.Contains(source.PrerequisiteBuild.Builds, query.PrerequisiteBuild) {
+				tmpSources = append(tmpSources, source)
+			}
+		}
+		sources = tmpSources
+	}
+
 	return sources
 }
 
 type ADBQuery struct {
-	OSes      []string
-	Type      string
-	Version   string
-	Build     string
-	Device    string
-	IsBeta    bool
-	Latest    bool
-	Proxy     string
-	Insecure  bool
-	APIToken  string
-	ConfigDir string
+	OSes              []string
+	Type              string
+	Version           string
+	Build             string
+	PrerequisiteBuild string
+	Device            string
+	IsBeta            bool
+	Latest            bool
+	Proxy             string
+	Insecure          bool
+	APIToken          string
+	ConfigDir         string
 }
 
 func LocalAppleDBQuery(q *ADBQuery) ([]OsFileSource, error) {
