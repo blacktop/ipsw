@@ -49,6 +49,7 @@ func init() {
 	downloadAppledbCmd.Flags().String("pattern", "", "Download remote files that match regex")
 	downloadAppledbCmd.Flags().Bool("beta", false, "Download beta IPSWs")
 	downloadAppledbCmd.Flags().Bool("latest", false, "Download latest IPSWs")
+	downloadAppledbCmd.Flags().StringP("prereq-build", "p", "", "OTA prerequisite build")
 	downloadAppledbCmd.Flags().BoolP("urls", "u", false, "Dump URLs only")
 	downloadAppledbCmd.Flags().BoolP("api", "a", false, "Use Github API")
 	downloadAppledbCmd.Flags().String("api-token", "", "Github API Token")
@@ -62,6 +63,7 @@ func init() {
 	viper.BindPFlag("download.appledb.pattern", downloadAppledbCmd.Flags().Lookup("pattern"))
 	viper.BindPFlag("download.appledb.beta", downloadAppledbCmd.Flags().Lookup("beta"))
 	viper.BindPFlag("download.appledb.latest", downloadAppledbCmd.Flags().Lookup("latest"))
+	viper.BindPFlag("download.appledb.prereq-build", downloadAppledbCmd.Flags().Lookup("prereq-build"))
 	viper.BindPFlag("download.appledb.urls", downloadAppledbCmd.Flags().Lookup("urls"))
 	viper.BindPFlag("download.appledb.api", downloadAppledbCmd.Flags().Lookup("api"))
 	viper.BindPFlag("download.appledb.api-token", downloadAppledbCmd.Flags().Lookup("api-token"))
@@ -134,6 +136,7 @@ var downloadAppledbCmd = &cobra.Command{
 		pattern := viper.GetString("download.appledb.pattern")
 		isBeta := viper.GetBool("download.appledb.beta")
 		latest := viper.GetBool("download.appledb.latest")
+		prereqBuild := viper.GetString("download.appledb.prereq-build")
 		output := viper.GetString("download.appledb.output")
 		useAPI := viper.GetBool("download.appledb.api")
 		apiToken := viper.GetString("download.appledb.api-token")
@@ -152,6 +155,9 @@ var downloadAppledbCmd = &cobra.Command{
 		}
 		if isBeta && len(build) > 0 {
 			return fmt.Errorf("cannot use --beta with --build")
+		}
+		if len(prereqBuild) > 0 && !(fwType == "ota" || fwType == "rsr") {
+			return fmt.Errorf("cannot use --prereq-build with --type %s", fwType)
 		}
 
 		if len(apiToken) == 0 {
@@ -192,16 +198,17 @@ var downloadAppledbCmd = &cobra.Command{
 		var results []download.OsFileSource
 		if useAPI {
 			results, err = download.AppleDBQuery(&download.ADBQuery{
-				OSes:     osTypes,
-				Type:     fwType,
-				Version:  version,
-				Build:    build,
-				Device:   device,
-				IsBeta:   isBeta,
-				Latest:   latest,
-				Proxy:    proxy,
-				Insecure: insecure,
-				APIToken: apiToken,
+				OSes:              osTypes,
+				Type:              fwType,
+				Version:           version,
+				Build:             build,
+				PrerequisiteBuild: prereqBuild,
+				Device:            device,
+				IsBeta:            isBeta,
+				Latest:            latest,
+				Proxy:             proxy,
+				Insecure:          insecure,
+				APIToken:          apiToken,
 			})
 			if err != nil {
 				return err
@@ -221,17 +228,18 @@ var downloadAppledbCmd = &cobra.Command{
 				configDir = filepath.Dir(viper.ConfigFileUsed())
 			}
 			results, err = download.LocalAppleDBQuery(&download.ADBQuery{
-				OSes:      osTypes,
-				Type:      fwType,
-				Version:   version,
-				Build:     build,
-				Device:    device,
-				IsBeta:    isBeta,
-				Latest:    latest,
-				Proxy:     proxy,
-				Insecure:  insecure,
-				APIToken:  apiToken,
-				ConfigDir: configDir,
+				OSes:              osTypes,
+				Type:              fwType,
+				Version:           version,
+				Build:             build,
+				PrerequisiteBuild: prereqBuild,
+				Device:            device,
+				IsBeta:            isBeta,
+				Latest:            latest,
+				Proxy:             proxy,
+				Insecure:          insecure,
+				APIToken:          apiToken,
+				ConfigDir:         configDir,
 			})
 			if err != nil {
 				return err
