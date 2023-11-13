@@ -33,6 +33,7 @@ import (
 	"github.com/blacktop/ipsw/internal/download"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	semver "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -183,29 +184,55 @@ var WebkitCmd = &cobra.Command{
 					return err
 				}
 			}
+			wkver, err := semver.NewVersion(webkit1)
+			if err != nil {
+				return fmt.Errorf("failed to parse WebKit version %s: %v", webkit1, err)
+			}
+			// search
+			exact := false
+			var match download.GithubTag
 			for _, tag := range tags {
-				if strings.Contains(tag.Name, webkit1) {
-					if asJSON {
-						b, err := json.Marshal(&struct {
-							Version string             `json:"version"`
-							Tag     download.GithubTag `json:"tag,omitempty"`
-						}{
-							Version: webkit1,
-							Tag:     tag,
-						})
-						if err != nil {
-							return err
-						}
-						fmt.Println(string(b))
-					} else {
-						log.Infof("WebKit Version: %s", webkit1)
-						utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", tag.Name))
-						utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", tag.TarURL))
-						utils.Indent(log.Info, 2)(fmt.Sprintf("Date: %s", tag.Commit.Date.Format("02Jan2006 15:04:05")))
-					}
-					return nil
+				if !strings.HasPrefix(tag.Name, "WebKit-7") {
+					continue
+				}
+				tver, err := semver.NewVersion(strings.TrimPrefix(tag.Name, "WebKit-7"))
+				if err != nil {
+					continue
+				}
+				if wkver.Equal(tver) {
+					exact = true
+					match = tag
+					break
+				} else if wkver.GreaterThan(tver) {
+					match = tag
+					break
 				}
 			}
+			// output
+			if asJSON {
+				b, err := json.Marshal(&struct {
+					Version string             `json:"version"`
+					Tag     download.GithubTag `json:"tag,omitempty"`
+					Exact   bool               `json:"exact"`
+				}{
+					Version: webkit1,
+					Tag:     match,
+					Exact:   exact,
+				})
+				if err != nil {
+					return err
+				}
+				fmt.Println(string(b))
+			} else {
+				log.Infof("WebKit Version: %s", webkit1)
+				if !exact {
+					log.Warn("No exact match found (using closest match)")
+				}
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Tag:  %s", match.Name))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("URL:  %s", match.TarURL))
+				utils.Indent(log.Info, 2)(fmt.Sprintf("Date: %s", match.Commit.Date.Format("02Jan2006 15:04:05")))
+			}
+			return nil
 		}
 
 		if asJSON {
