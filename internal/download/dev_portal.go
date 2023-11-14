@@ -1278,29 +1278,39 @@ func (dp *DevPortal) DownloadADC(adcURL string) error {
 	return nil
 }
 
-func (dp *DevPortal) DownloadKDK(version, build, folder string) error {
+func (dp *DevPortal) DownloadKDK(version, build, folder string) (err error) {
 	if err := dp.refreshSession(); err != nil {
 		return err
 	}
-	url := fmt.Sprintf("%s?path=/macOS/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
+
+	var urls []string
+	urls = append(urls, fmt.Sprintf("%s?path=/macOS/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
 		version,
 		build,
 		version,
 		build,
-	)
-	log.WithField("url", url).Info("Downloading KDK")
-	err := dp.Download(url, folder)
-	if err != nil {
-		url := fmt.Sprintf("%s?path=/Developer_Tools/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
-			version,
-			build,
-			version,
-			build,
-		)
-		log.WithField("url", url).Info("Downloading KDK (retry)")
-		return dp.Download(url, folder)
+	))
+	urls = append(urls, fmt.Sprintf("%s?path=/Developer_Tools/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
+		version,
+		build,
+		version,
+		build,
+	))
+	urls = append(urls, fmt.Sprintf("https://download.developer.apple.com/macOS/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg",
+		version,
+		build,
+		version,
+		build,
+	))
+
+	for _, url := range urls {
+		log.WithField("url", url).Info("Downloading KDK")
+		if err = dp.Download(url, folder); err == nil {
+			return nil
+		}
+		log.WithField("url", url).Warn("Retrying")
 	}
-	return nil
+	return
 }
 
 func (dp *DevPortal) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byte, error) {
