@@ -30,6 +30,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/apex/log"
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/pkg/errors"
 )
 
@@ -1308,7 +1309,7 @@ func (dp *DevPortal) DownloadKDK(version, build, folder string) (err error) {
 		if err = dp.Download(url, folder); err == nil {
 			return nil
 		}
-		log.WithField("url", url).Warn("Retrying")
+		utils.Indent(log.Warn, 2)("Retrying...")
 	}
 	return
 }
