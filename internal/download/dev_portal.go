@@ -1280,10 +1280,6 @@ func (dp *DevPortal) DownloadADC(adcURL string) error {
 }
 
 func (dp *DevPortal) DownloadKDK(version, build, folder string) (err error) {
-	if err := dp.refreshSession(); err != nil {
-		return err
-	}
-
 	var urls []string
 	urls = append(urls, fmt.Sprintf("%s?path=/macOS/Kernel_Debug_Kit_%s_build_%s/Kernel_Debug_Kit_%s_build_%s.dmg", downloadActionURL,
 		version,
@@ -1309,7 +1305,7 @@ func (dp *DevPortal) DownloadKDK(version, build, folder string) (err error) {
 		if err = dp.Download(url, folder); err == nil {
 			return nil
 		}
-		utils.Indent(log.Warn, 2)("Retrying...")
+		utils.Indent(log.Warn, 2)(fmt.Sprintf("%v: Retrying...", err))
 	}
 	return
 }
