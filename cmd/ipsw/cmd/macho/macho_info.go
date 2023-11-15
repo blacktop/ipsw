@@ -1233,7 +1233,7 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Printf("\n%s\n", label)
 				fmt.Println(strings.Repeat("-", len(label)))
 				for _, export := range exports {
-					fmt.Fprintf(w, "%#09x:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
+					fmt.Fprintf(w, "%s:  %s\t%s\n", symAddrColor("%#09x", export.Address), symTypeColor(export.Flags.String()), symNameColor(export.Name))
 				}
 				w.Flush()
 			}
