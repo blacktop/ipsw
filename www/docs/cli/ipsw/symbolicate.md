@@ -11,7 +11,7 @@ description: Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecr
 Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
 
 ```
-ipsw symbolicate <crashlog> <dyld_shared_cache> [flags]
+ipsw symbolicate <CRASHLOG> <DSC> [flags]
 ```
 
 ### Options

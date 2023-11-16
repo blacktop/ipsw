@@ -11,7 +11,7 @@ description: Lookup function containing unslid address
 Lookup function containing unslid address
 
 ```
-ipsw dyld a2f <dyld_shared_cache> <vaddr> [flags]
+ipsw dyld a2f <DSC> <ADDR> [flags]
 ```
 
 ### Options

@@ -11,7 +11,7 @@ description: Dump Swift Optimizations Info
 Dump Swift Optimizations Info
 
 ```
-ipsw dyld swift [flags]
+ipsw dyld swift <DSC> [flags]
 ```
 
 ### Options

@@ -11,7 +11,7 @@ description: Search dyld_shared_cache for string
 Search dyld_shared_cache for string
 
 ```
-ipsw dyld str <dyld_shared_cache> <string> [flags]
+ipsw dyld str <DSC> [flags]
 ```
 
 ### Options

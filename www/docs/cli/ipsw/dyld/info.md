@@ -11,7 +11,7 @@ description: Parse dyld_shared_cache
 Parse dyld_shared_cache
 
 ```
-ipsw dyld info <dyld_shared_cache> [flags]
+ipsw dyld info <DSC> [flags]
 ```
 
 ### Options

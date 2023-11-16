@@ -11,7 +11,7 @@ description: Find Dylib files for given ObjC search criteria
 Find Dylib files for given ObjC search criteria
 
 ```
-ipsw dyld search objc [flags]
+ipsw dyld search objc <DSC> [flags]
 ```
 
 ### Options
@@ -20,6 +20,7 @@ ipsw dyld search objc [flags]
   -g, --category string   Search for specific ObjC category regex
   -c, --class string      Search for specific ObjC class regex
   -h, --help              help for objc
+  -i, --image strings     Images to search (default: all)
       --ivar string       Search for specific ObjC instance variable regex
   -p, --protocol string   Search for specific ObjC protocol regex
   -s, --sel string        Search for specific ObjC selector regex

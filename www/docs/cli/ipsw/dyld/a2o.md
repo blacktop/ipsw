@@ -4,14 +4,14 @@ title: a2o
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: a2o
-description: Convert dyld_shared_cache address to offset
+description: Convert address to offset
 ---
 ## ipsw dyld a2o
 
-Convert dyld_shared_cache address to offset
+Convert address to offset
 
 ```
-ipsw dyld a2o <dyld_shared_cache> <vaddr> [flags]
+ipsw dyld a2o <DSC> <ADDR> [flags]
 ```
 
 ### Options

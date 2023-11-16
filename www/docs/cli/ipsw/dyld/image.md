@@ -11,18 +11,18 @@ description: Dump image array info
 Dump image array info
 
 ```
-ipsw dyld image <dyld_shared_cache> <IMAGE> [flags]
+ipsw dyld image <DSC> <DYLIB> [flags]
 ```
 
 ### Examples
 
 ```bash
   # List all the apps
-  ❯ ipsw dyld image <dyld_shared_cache>
+  ❯ ipsw dyld image DSC
   # Dump the closure info for a in-cache dylib
-  ❯ ipsw dyld image <dyld_shared_cache> Foundation
+  ❯ ipsw dyld image DSC Foundation
   # Dump the closure info for an app
-  ❯ ipsw dyld image <dyld_shared_cache> /usr/libexec/timed
+  ❯ ipsw dyld image DSC /usr/libexec/timed
 ```
 
 ### Options

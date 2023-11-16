@@ -4,14 +4,14 @@ title: o2a
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: o2a
-description: Convert dyld_shared_cache offset to address
+description: Convert offset to address
 ---
 ## ipsw dyld o2a
 
-Convert dyld_shared_cache offset to address
+Convert offset to address
 
 ```
-ipsw dyld o2a <dyld_shared_cache> <offset> [flags]
+ipsw dyld o2a <DSC> <OFFSET> [flags]
 ```
 
 ### Options

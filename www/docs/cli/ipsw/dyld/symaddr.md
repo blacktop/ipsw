@@ -11,7 +11,7 @@ description: Lookup or dump symbol(s)
 Lookup or dump symbol(s)
 
 ```
-ipsw dyld symaddr <dyld_shared_cache> [flags]
+ipsw dyld symaddr <DSC> [flags]
 ```
 
 ### Options

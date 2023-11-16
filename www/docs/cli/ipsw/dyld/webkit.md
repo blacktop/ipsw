@@ -11,7 +11,7 @@ description: Get WebKit version from a dyld_shared_cache
 Get WebKit version from a dyld_shared_cache
 
 ```
-ipsw dyld webkit <dyld_shared_cache> [flags]
+ipsw dyld webkit <DSC> [flags]
 ```
 
 ### Options

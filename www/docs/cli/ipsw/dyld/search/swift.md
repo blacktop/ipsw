@@ -11,7 +11,7 @@ description: Find Dylib files for given Swift search criteria
 Find Dylib files for given Swift search criteria
 
 ```
-ipsw dyld search swift [flags]
+ipsw dyld search swift <DSC> [flags]
 ```
 
 ### Options
