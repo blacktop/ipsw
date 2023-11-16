@@ -33,7 +33,7 @@ require (
 	github.com/glebarez/sqlite v1.10.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/golang-jwt/jwt/v5 v5.1.0
-	github.com/gomarkdown/markdown v0.0.0-20230922112808-5421fefb8386
+	github.com/gomarkdown/markdown v0.0.0-20231115200524-a660076da3fd
 	github.com/google/gousb v1.1.2
 	github.com/google/uuid v1.4.0
 	github.com/hashicorp/go-version v1.6.0
