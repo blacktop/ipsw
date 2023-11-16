@@ -23,7 +23,7 @@ func init() {
 	SplitCmd.Flags().BoolP("cache", "c", false, "Build XCode device support cache")
 	SplitCmd.Flags().StringP("version", "v", "", "Cache version")
 	SplitCmd.Flags().StringP("build", "b", "", "Cache build")
-	SplitCmd.Flags().StringP("output", "o", "", "Directory to extract the dylibs")
+	SplitCmd.Flags().StringP("output", "o", "", "Directory to extract the dylibs (default: CWD)")
 	SplitCmd.MarkFlagDirname("output")
 	viper.BindPFlag("dyld.split.xcode", SplitCmd.Flags().Lookup("xcode"))
 	viper.BindPFlag("dyld.split.cache", SplitCmd.Flags().Lookup("cache"))
@@ -47,10 +47,25 @@ var SplitCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
 		xcodePath := viper.GetString("dyld.split.xcode")
 		version := viper.GetString("dyld.split.version")
 		output := viper.GetString("dyld.split.output")
-		output, _ = filepath.Abs(filepath.Clean(output))
+		// validate flags
+		if runtime.GOOS != "darwin" {
+			log.Fatal("dyld_shared_cache splitting only works on macOS (as it requires 'dsc_extractor.bundle')")
+		} else if len(output) > 0 && viper.GetBool("dyld.split.cache") {
+			return fmt.Errorf("cannot specify --output dir and use --cache flag at the same time")
+		}
+		if len(output) == 0 {
+			cwd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get current working directory: %w", err)
+			}
+			output = cwd
+		} else {
+			output, _ = filepath.Abs(filepath.Clean(output))
+		}
 
 		dscPath := filepath.Clean(args[0])
 
@@ -72,13 +87,7 @@ var SplitCmd = &cobra.Command{
 			dscPath = filepath.Join(linkRoot, symlinkPath)
 		}
 
-		if runtime.GOOS != "darwin" {
-			log.Fatal("dyld_shared_cache splitting only works on macOS")
-		}
-
-		if len(output) > 0 && viper.GetBool("dyld.split.cache") {
-			return fmt.Errorf("cannot specify output path and use --cache flag at the same time")
-		} else if viper.GetBool("dyld.split.cache") {
+		if viper.GetBool("dyld.split.cache") {
 			if len(viper.GetString("dyld.split.build")) == 0 {
 				return fmt.Errorf("--build is required when --cache is used")
 			}
@@ -90,7 +99,7 @@ var SplitCmd = &cobra.Command{
 
 			f, err := dyld.Open(dscPath)
 			if err != nil {
-				return errors.Wrapf(err, "failed to open dyld_shared_cache %s", dscPath)
+				return errors.Wrapf(err, "failed to open %s", dscPath)
 			}
 
 			var arm64e string
@@ -119,7 +128,7 @@ var SplitCmd = &cobra.Command{
 			return fmt.Errorf("failed to create output directory %s: %v", output, err)
 		}
 
-		log.Infof("Splitting dyld_shared_cache to %s", output)
+		log.Infof("Splitting to %s", output)
 		return dyld.Split(dscPath, output, xcodePath, viper.GetBool("dyld.split.cache"))
 	},
 }
