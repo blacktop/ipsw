@@ -35,15 +35,21 @@ import (
 
 func init() {
 	DyldCmd.AddCommand(TbdCmd)
-	TbdCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // TbdCmd represents the tbd command
 var TbdCmd = &cobra.Command{
-	Use:     "tbd <dyld_shared_cache> <image>",
+	Use:     "tbd <DSC> <DYLIB>",
 	Aliases: []string{"t"},
 	Short:   "Generate a .tbd file for a dylib",
-	Args:    cobra.MinimumNArgs(2),
+	Args:    cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 1 {
+			return getImages(args[0]), cobra.ShellCompDirectiveDefault
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
@@ -80,6 +86,7 @@ var TbdCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("image not in %s: %v", dscPath, err)
 		}
+
 		t, err := tbd.NewTBD(f, image)
 		if err != nil {
 			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
@@ -93,8 +100,7 @@ var TbdCmd = &cobra.Command{
 		tbdFile := filepath.Base(t.Path)
 
 		log.Info("Created " + tbdFile + ".tbd")
-		err = os.WriteFile(tbdFile+".tbd", []byte(outTBD), 0660)
-		if err != nil {
+		if err = os.WriteFile(tbdFile+".tbd", []byte(outTBD), 0660); err != nil {
 			return fmt.Errorf("failed to write tbd file %s: %v", tbdFile+".tbd", err)
 		}
 

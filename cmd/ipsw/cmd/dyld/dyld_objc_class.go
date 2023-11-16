@@ -35,17 +35,19 @@ import (
 
 func init() {
 	ObjcCmd.AddCommand(objcClassCmd)
-
 	objcClassCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	objcClassCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // objcClassCmd represents the class command
 var objcClassCmd = &cobra.Command{
-	Use:     "class  <dyld_shared_cache>",
+	Use:     "class <DSC>",
 	Aliases: []string{"c"},
-	Short:   "Get ObjC class info",
-	Args:    cobra.MinimumNArgs(1),
+	Short:   "Get ObjC optimization class info",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

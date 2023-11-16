@@ -46,17 +46,21 @@ func init() {
 	SymAddrCmd.Flags().String("in", "", "Path to JSON file containing list of symbols to lookup")
 	SymAddrCmd.Flags().String("out", "", "Path to output JSON file")
 	// SymAddrCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
-	SymAddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // SymAddrCmd represents the symaddr command
 var SymAddrCmd = &cobra.Command{
-	Use:           "symaddr <dyld_shared_cache>",
-	Aliases:       []string{"sym"},
-	Short:         "Lookup or dump symbol(s)",
-	SilenceUsage:  false,
+	Use:     "symaddr <DSC>",
+	Aliases: []string{"sym"},
+	Short:   "Lookup or dump symbol(s)",
+	Args:    cobra.MaximumNArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

@@ -79,11 +79,16 @@ func init() {
 
 // idaCmd represents the ida command
 var idaCmd = &cobra.Command{
-	Use:           "ida <DSC> <DYLIB> [DYLIBS...]",
-	Short:         "Analyze DSC in IDA Pro",
-	SilenceUsage:  true,
+	Use:   "ida <DSC> <DYLIB> [DYLIBS...]",
+	Short: "Analyze DSC in IDA Pro",
+	Args:  cobra.MinimumNArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return getImages(args[0]), cobra.ShellCompDirectiveDefault
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var fileType string

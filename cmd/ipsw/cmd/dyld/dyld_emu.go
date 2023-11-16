@@ -41,21 +41,21 @@ func init() {
 	DyldCmd.AddCommand(dyldEmuCmd)
 
 	dyldEmuCmd.Flags().StringP("sym", "s", "", "Function to start disassembling")
-	dyldEmuCmd.Flags().Uint64P("vaddr", "a", 0, "Virtual address to start disassembling")
+	dyldEmuCmd.Flags().Uint64P("addr", "a", 0, "Virtual address to start disassembling")
 	dyldEmuCmd.Flags().Uint64P("count", "c", 0, "Number of instructions to disassemble")
 	dyldEmuCmd.Flags().StringP("state", "t", "", "Path to initial state file")
-
-	dyldEmuCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // dyldEmuCmd represents the dyld emu command
 var dyldEmuCmd = &cobra.Command{
-	Use:           "emu",
-	Short:         "🚧 Emulate ARM64 dyld_shared_cache",
-	SilenceUsage:  true,
+	Use:   "emu <DSC>",
+	Short: "🚧 Emulate ARM64 dyld_shared_cache",
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	Hidden:        true,
-	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

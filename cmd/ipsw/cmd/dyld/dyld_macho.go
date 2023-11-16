@@ -42,18 +42,11 @@ import (
 	swift "github.com/blacktop/ipsw/internal/swift"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"golang.org/x/exp/slices"
 )
-
-var symAddrColor = color.New(color.Faint).SprintfFunc()
-var symImageColor = color.New(color.Faint, color.FgBlue).SprintfFunc()
-var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
-var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
-var symNameColor = color.New(color.Bold).SprintFunc()
 
 func init() {
 	DyldCmd.AddCommand(MachoCmd)
@@ -74,17 +67,20 @@ func init() {
 	MachoCmd.Flags().BoolP("extract", "x", false, "🚧 Extract the dylib")
 	MachoCmd.Flags().String("output", "", "Directory to extract the dylib(s)")
 	MachoCmd.Flags().Bool("force", false, "Overwrite existing extracted dylib(s)")
-
-	MachoCmd.MarkZshCompPositionalArgumentFile(1)
 }
 
 // MachoCmd represents the macho command
 var MachoCmd = &cobra.Command{
-	Use:           "macho <dyld_shared_cache> <dylib>",
-	Aliases:       []string{"m"},
-	Short:         "Parse a dylib file",
-	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
+	Use:     "macho <DSC> <DYLIB>",
+	Aliases: []string{"m"},
+	Short:   "Parse an incache dylib file",
+	Args:    cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 1 {
+			return getImages(args[0]), cobra.ShellCompDirectiveDefault
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

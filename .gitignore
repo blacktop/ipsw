@@ -42,6 +42,7 @@ manpages/
 *.prof
 *.download
 checksums.txt.sha1
+mg.*
 
 # Docs
 public

@@ -58,15 +58,20 @@ func init() {
 	viper.BindPFlag("dyld.dump.section", DumpCmd.Flags().Lookup("section"))
 	viper.BindPFlag("dyld.dump.output", DumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("dyld.dump.color", DumpCmd.Flags().Lookup("color"))
-
-	DumpCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // DumpCmd represents the dump command
 var DumpCmd = &cobra.Command{
-	Use:   "dump <dyld_shared_cache> <address>",
-	Short: "Dump dyld_shared_cache data at given virtual address",
+	Use:   "dump <DSC> <ADDR>",
+	Short: "Dump data at given virtual address",
 	Args:  cobra.MaximumNArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

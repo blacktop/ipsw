@@ -43,9 +43,13 @@ func init() {
 
 // StrSearchCmd represents the str command
 var StrSearchCmd = &cobra.Command{
-	Use:   "str <dyld_shared_cache> <string>",
+	Use:   "str <DSC>",
 	Short: "Search dyld_shared_cache for string",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

@@ -46,17 +46,17 @@ func init() {
 	viper.BindPFlag("dyld.swift.foreign", SwiftCmd.Flags().Lookup("foreign"))
 	viper.BindPFlag("dyld.swift.demangle", SwiftCmd.Flags().Lookup("demangle"))
 	viper.BindPFlag("dyld.swift.cache", SwiftCmd.Flags().Lookup("cache"))
-
-	SwiftCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // SwiftCmd represents the swift command
 var SwiftCmd = &cobra.Command{
-	Use:           "swift",
-	Short:         "Dump Swift Optimizations Info",
-	SilenceUsage:  true,
+	Use:   "swift <DSC>",
+	Short: "Dump Swift Optimizations Info",
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

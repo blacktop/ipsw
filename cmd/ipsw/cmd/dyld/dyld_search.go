@@ -44,10 +44,13 @@ func init() {
 
 // dyldSearchCmd represents the search command
 var dyldSearchCmd = &cobra.Command{
-	Use:           "search",
-	Aliases:       []string{"sr"},
-	Short:         "Find Dylib files for given search criteria",
-	Args:          cobra.ExactArgs(1),
+	Use:     "search <DSC>",
+	Aliases: []string{"sr"},
+	Short:   "Find Dylib files for given search criteria",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

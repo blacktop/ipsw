@@ -60,19 +60,20 @@ func init() {
 	viper.BindPFlag("dyld.info.json", dyldInfoCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dyld.info.diff", dyldInfoCmd.Flags().Lookup("diff"))
 	viper.BindPFlag("dyld.info.delta", dyldInfoCmd.Flags().Lookup("delta"))
-
-	dyldInfoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // dyldInfoCmd represents the info command
 var dyldInfoCmd = &cobra.Command{
-	Use:           "info <dyld_shared_cache>",
-	Aliases:       []string{"i"},
-	Short:         "Parse dyld_shared_cache",
-	SilenceUsage:  true,
+	Use:     "info <DSC>",
+	Aliases: []string{"i"},
+	Short:   "Parse dyld_shared_cache",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}

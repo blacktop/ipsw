@@ -59,17 +59,17 @@ func init() {
 	viper.BindPFlag("dyld.disass.color", DisassCmd.Flags().Lookup("color"))
 	viper.BindPFlag("dyld.disass.input", DisassCmd.Flags().Lookup("input"))
 	viper.BindPFlag("dyld.disass.cache", DisassCmd.Flags().Lookup("cache"))
-
-	DisassCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
-// disassCmd represents the disass command
+// DisassCmd represents the disass command
 var DisassCmd = &cobra.Command{
-	Use:           "disass <dyld_shared_cache>",
-	Aliases:       []string{"dis"},
-	Short:         "Disassemble dyld_shared_cache at symbol/vaddr",
-	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
+	Use:     "disass <DSC>",
+	Aliases: []string{"dis"},
+	Short:   "Disassemble at symbol/vaddr",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -262,7 +262,7 @@ var DisassCmd = &cobra.Command{
 			funcFile = filepath.Clean(funcFile)
 			fdata, _ := os.ReadFile(funcFile)
 
-			var funcs []Func
+			var funcs []dscFunc
 			if err := json.Unmarshal(fdata, &funcs); err != nil {
 				return fmt.Errorf("failed to parse function JSON file %s: %v", funcFile, err)
 			}

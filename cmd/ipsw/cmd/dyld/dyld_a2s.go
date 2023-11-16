@@ -45,17 +45,20 @@ func init() {
 	viper.BindPFlag("dyld.a2s.image", AddrToSymCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.a2s.mapping", AddrToSymCmd.Flags().Lookup("mapping"))
 	viper.BindPFlag("dyld.a2s.cache", AddrToSymCmd.Flags().Lookup("cache"))
-
-	AddrToSymCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // AddrToSymCmd represents the a2s command
 var AddrToSymCmd = &cobra.Command{
-	Use:           "a2s <dyld_shared_cache> <vaddr>",
-	Short:         "Lookup symbol at unslid address",
-	SilenceUsage:  false,
+	Use:   "a2s <DSC> <ADDR>",
+	Short: "Lookup symbol at unslid address",
+	Args:  cobra.MinimumNArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

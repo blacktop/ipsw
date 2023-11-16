@@ -47,7 +47,7 @@ func init() {
 
 // symbolicateCmd represents the symbolicate command
 var symbolicateCmd = &cobra.Command{
-	Use:     "symbolicate <crashlog> <dyld_shared_cache>",
+	Use:     "symbolicate <CRASHLOG> <DSC>",
 	Aliases: []string{"sym"},
 	Short:   "Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)",
 	Args:    cobra.MinimumNArgs(1),

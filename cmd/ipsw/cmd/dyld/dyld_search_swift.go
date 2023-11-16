@@ -45,16 +45,18 @@ func init() {
 	viper.BindPFlag("dyld.search.swift.image", dyldSearchSwiftCmd.Flags().Lookup("image"))
 	viper.BindPFlag("dyld.search.swift.class", dyldSearchSwiftCmd.Flags().Lookup("class"))
 	viper.BindPFlag("dyld.search.swift.protocol", dyldSearchSwiftCmd.Flags().Lookup("protocol"))
-
 	// dyldSearchSwiftCmd.MarkFlagsMutuallyExclusive("class", "")
 }
 
 // dyldSearchSwiftCmd represents the swift command
 var dyldSearchSwiftCmd = &cobra.Command{
-	Use:           "swift",
-	Aliases:       []string{"s"},
-	Short:         "Find Dylib files for given Swift search criteria",
-	Args:          cobra.ExactArgs(1),
+	Use:     "swift <DSC>",
+	Aliases: []string{"s"},
+	Short:   "Find Dylib files for given Swift search criteria",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) (err error) {
 

@@ -37,18 +37,9 @@ import (
 	"github.com/spf13/viper"
 )
 
-func getDSCs(path string) []string {
-	matches, err := filepath.Glob(filepath.Join(path, "dyld_shared_cache*"))
-	if err != nil {
-		return nil
-	}
-	return matches
-}
-
 func init() {
 	DyldCmd.AddCommand(dyldImportsCmd)
 	dyldImportsCmd.Flags().StringP("ipsw", "i", "", "Path to IPSW to scan for MachO files that import dylib")
-	dyldImportsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 	dyldImportsCmd.RegisterFlagCompletionFunc("ipsw", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"ipsw", "zip"}, cobra.ShellCompDirectiveFilterFileExt
 	})
@@ -56,17 +47,17 @@ func init() {
 
 // dyldImportsCmd represents the imports command
 var dyldImportsCmd = &cobra.Command{
-	Use:           "imports",
-	Aliases:       []string{"imp"},
-	Short:         "List all dylibs that load a given dylib",
-	Args:          cobra.MaximumNArgs(2),
-	SilenceErrors: true,
+	Use:     "imports <DSC> <DYLIB>",
+	Aliases: []string{"imp"},
+	Short:   "List all dylibs that load a given dylib",
+	Args:    cobra.MaximumNArgs(2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
+		if len(args) == 1 {
+			return getImages(args[0]), cobra.ShellCompDirectiveDefault
 		}
 		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
 	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
