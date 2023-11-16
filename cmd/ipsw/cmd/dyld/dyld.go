@@ -22,9 +22,52 @@ THE SOFTWARE.
 package dyld
 
 import (
+	"path/filepath"
+
+	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var symAddrColor = color.New(color.Faint).SprintfFunc()
+var symImageColor = color.New(color.Faint, color.FgBlue).SprintfFunc()
+var symTypeColor = color.New(color.Faint, color.FgCyan).SprintfFunc()
+var symLibColor = color.New(color.Faint, color.FgMagenta).SprintfFunc()
+var symNameColor = color.New(color.Bold).SprintFunc()
+
+var colorAddr = color.New(color.Faint).SprintfFunc()
+var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
+var colorClassField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
+
+type dscFunc struct {
+	Addr  uint64 `json:"addr,omitempty"`
+	Start uint64 `json:"start,omitempty"`
+	End   uint64 `json:"end,omitempty"`
+	Size  uint64 `json:"size,omitempty"`
+	Name  string `json:"name,omitempty"`
+	Image string `json:"image,omitempty"`
+}
+
+func getDSCs(path string) []string {
+	matches, err := filepath.Glob(filepath.Join(path, "dyld_shared_cache*"))
+	if err != nil {
+		return nil
+	}
+	return matches
+}
+
+func getImages(dscPath string) []string {
+	var images []string
+	if f, err := dyld.Open(dscPath); err == nil {
+		defer f.Close()
+		for _, image := range f.Images {
+			images = append(images, filepath.Base(image.Name))
+		}
+	}
+	return images
+}
 
 // DyldCmd represents the dyld command
 var DyldCmd = &cobra.Command{

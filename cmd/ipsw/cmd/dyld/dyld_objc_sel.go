@@ -35,17 +35,19 @@ import (
 
 func init() {
 	ObjcCmd.AddCommand(objcSelCmd)
-
 	objcSelCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	objcSelCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // objcSelCmd represents the sel command
 var objcSelCmd = &cobra.Command{
-	Use:     "sel  <dyld_shared_cache>",
+	Use:     "sel <DSC>",
 	Aliases: []string{"s"},
-	Short:   "Get ObjC selector info",
-	Args:    cobra.MinimumNArgs(1),
+	Short:   "Get ObjC optimization selector info",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

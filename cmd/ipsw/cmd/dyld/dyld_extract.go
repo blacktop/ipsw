@@ -98,8 +98,8 @@ func init() {
 	dyldExtractCmd.Flags().Bool("objc", false, "Add ObjC metadata to extracted dylib(s) symtab")
 	dyldExtractCmd.Flags().Bool("stubs", false, "Add stub islands to extracted dylib(s) symtab")
 	// dyldExtractCmd.Flags().Bool("imports", false, "Add imported dylibs sym into to extracted symtab (will make BIG symtabs)")
-	dyldExtractCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
 	dyldExtractCmd.Flags().StringP("cache", "c", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
+	dyldExtractCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
 	dyldExtractCmd.MarkFlagDirname("output")
 	viper.BindPFlag("dyld.extract.all", dyldExtractCmd.Flags().Lookup("all"))
 	viper.BindPFlag("dyld.extract.force", dyldExtractCmd.Flags().Lookup("force"))
@@ -107,19 +107,24 @@ func init() {
 	viper.BindPFlag("dyld.extract.objc", dyldExtractCmd.Flags().Lookup("objc"))
 	viper.BindPFlag("dyld.extract.stubs", dyldExtractCmd.Flags().Lookup("stubs"))
 	// viper.BindPFlag("dyld.extract.imports", dyldExtractCmd.Flags().Lookup("imports"))
-	viper.BindPFlag("dyld.extract.output", dyldExtractCmd.Flags().Lookup("output"))
 	viper.BindPFlag("dyld.extract.cache", dyldExtractCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("dyld.extract.output", dyldExtractCmd.Flags().Lookup("output"))
 }
 
 // dyldExtractCmd represents the extractDyld command
 var dyldExtractCmd = &cobra.Command{
-	Use:           "extract <DSC> <DYLIB>",
-	Aliases:       []string{"e"},
-	Short:         "Extract dylib from dyld_shared_cache",
-	Args:          cobra.MinimumNArgs(1),
-	Hidden:        true, // FIXME: remove when extraction is fixed (is creating machos w/ incorrect headers/segment/section boundaries)
-	SilenceUsage:  true,
+	Use:     "extract <DSC> <DYLIB>",
+	Aliases: []string{"e"},
+	Short:   "Extract dylib from dyld_shared_cache",
+	Args:    cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 1 {
+			return getImages(args[0]), cobra.ShellCompDirectiveDefault
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
+	Hidden:        true, // FIXME: remove when extraction is fixed (is creating machos w/ incorrect headers/segment/section boundaries)
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var bar *mpb.Bar

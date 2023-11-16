@@ -48,15 +48,18 @@ func init() {
 	WebkitCmd.Flags().Bool("insecure", false, "do not verify ssl certs")
 	WebkitCmd.Flags().BoolP("diff", "d", false, "Diff two dyld_shared_cache files")
 	WebkitCmd.Flags().BoolP("json", "j", false, "Output as JSON")
-	WebkitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // WebkitCmd represents the webkit command
 var WebkitCmd = &cobra.Command{
-	Use:     "webkit <dyld_shared_cache>",
+	Use:     "webkit <DSC>",
 	Aliases: []string{"w"},
 	Short:   "Get WebKit version from a dyld_shared_cache",
-	Args:    cobra.MinimumNArgs(1),
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

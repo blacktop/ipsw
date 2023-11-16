@@ -47,17 +47,20 @@ func init() {
 	viper.BindPFlag("dyld.xref.all", XrefCmd.Flags().Lookup("all"))
 	viper.BindPFlag("dyld.xref.slide", XrefCmd.Flags().Lookup("slide"))
 	viper.BindPFlag("dyld.xref.cache", XrefCmd.Flags().Lookup("cache"))
-
-	XrefCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // XrefCmd represents the xref command
 var XrefCmd = &cobra.Command{
-	Use:           "xref <dyld_shared_cache> <vaddr>",
-	Aliases:       []string{"x"},
-	Short:         "🚧 [WIP] Find all cross references to an address",
-	Args:          cobra.MinimumNArgs(2),
-	SilenceUsage:  true,
+	Use:     "xref <DSC> <ADDR>",
+	Aliases: []string{"x"},
+	Short:   "🚧 [WIP] Find all cross references to an address",
+	Args:    cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

@@ -38,17 +38,17 @@ func init() {
 
 	stubsCmd.Flags().String("cache", "", "Path to .a2s addr to sym cache file (speeds up analysis)")
 	viper.BindPFlag("dyld.stubs.cache", stubsCmd.Flags().Lookup("cache"))
-
-	stubsCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // stubsCmd represents the stubs command
 var stubsCmd = &cobra.Command{
-	Use:           "stubs",
-	Short:         "Dump Stub Islands",
-	SilenceUsage:  true,
+	Use:   "stubs <DSC>",
+	Short: "Dump Stub Islands",
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
-	Args:          cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

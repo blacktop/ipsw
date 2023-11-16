@@ -35,23 +35,27 @@ import (
 
 func init() {
 	DyldCmd.AddCommand(ImageCmd)
-	ImageCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // imageCmd represents the image command
 var ImageCmd = &cobra.Command{
-	Use:           "image <dyld_shared_cache> <IMAGE>",
-	Aliases:       []string{"img"},
-	Short:         "Dump image array info",
-	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
+	Use:     "image <DSC> <DYLIB>",
+	Aliases: []string{"img"},
+	Short:   "Dump image array info",
+	Args:    cobra.MaximumNArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 1 {
+			return getImages(args[0]), cobra.ShellCompDirectiveDefault
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	Example: `  # List all the apps
-  ❯ ipsw dyld image <dyld_shared_cache>
+  ❯ ipsw dyld image DSC
   # Dump the closure info for a in-cache dylib
-  ❯ ipsw dyld image <dyld_shared_cache> Foundation
+  ❯ ipsw dyld image DSC Foundation
   # Dump the closure info for an app
-  ❯ ipsw dyld image <dyld_shared_cache> /usr/libexec/timed`,
+  ❯ ipsw dyld image DSC /usr/libexec/timed`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

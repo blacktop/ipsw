@@ -23,20 +23,23 @@ func init() {
 	SplitCmd.Flags().BoolP("cache", "c", false, "Build XCode device support cache")
 	SplitCmd.Flags().StringP("version", "v", "", "Cache version")
 	SplitCmd.Flags().StringP("build", "b", "", "Cache build")
+	SplitCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
+	SplitCmd.MarkFlagDirname("output")
 	viper.BindPFlag("dyld.split.xcode", SplitCmd.Flags().Lookup("xcode"))
 	viper.BindPFlag("dyld.split.cache", SplitCmd.Flags().Lookup("cache"))
 	viper.BindPFlag("dyld.split.version", SplitCmd.Flags().Lookup("version"))
 	viper.BindPFlag("dyld.split.build", SplitCmd.Flags().Lookup("build"))
-
-	SplitCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
+	viper.BindPFlag("dyld.split.output", SplitCmd.Flags().Lookup("output"))
 }
 
 // SplitCmd represents the split command
 var SplitCmd = &cobra.Command{
-	Use:           "split <dyld_shared_cache> <optional_output_path>",
-	Short:         "Extracts all the dyld_shared_cache libraries",
-	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  false,
+	Use:   "split <DSC>",
+	Short: "Extracts all the dylibs using XCode's dsc_extractor",
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -46,6 +49,8 @@ var SplitCmd = &cobra.Command{
 
 		xcodePath := viper.GetString("dyld.split.xcode")
 		version := viper.GetString("dyld.split.version")
+		output := viper.GetString("dyld.split.output")
+		output, _ = filepath.Abs(filepath.Clean(output))
 
 		dscPath := filepath.Clean(args[0])
 
@@ -71,12 +76,8 @@ var SplitCmd = &cobra.Command{
 			log.Fatal("dyld_shared_cache splitting only works on macOS")
 		}
 
-		outputPath := filepath.Dir(dscPath)
-
-		if len(args) > 1 && viper.GetBool("dyld.split.cache") {
+		if len(output) > 0 && viper.GetBool("dyld.split.cache") {
 			return fmt.Errorf("cannot specify output path and use --cache flag at the same time")
-		} else if len(args) > 1 {
-			outputPath, _ = filepath.Abs(filepath.Clean(args[1]))
 		} else if viper.GetBool("dyld.split.cache") {
 			if len(viper.GetString("dyld.split.build")) == 0 {
 				return fmt.Errorf("--build is required when --cache is used")
@@ -111,74 +112,14 @@ var SplitCmd = &cobra.Command{
 				version = strings.TrimSuffix(version, ".0")
 			}
 
-			outputPath = filepath.Join(home, fmt.Sprintf("/Library/Developer/Xcode/iOS DeviceSupport/%s (%s)%s", version, viper.GetString("dyld.split.build"), arm64e))
+			output = filepath.Join(home, fmt.Sprintf("/Library/Developer/Xcode/iOS DeviceSupport/%s (%s)%s", version, viper.GetString("dyld.split.build"), arm64e))
 		}
 
-		if err := os.MkdirAll(outputPath, 0750); err != nil {
-			return fmt.Errorf("failed to create output directory %s: %v", outputPath, err)
+		if err := os.MkdirAll(output, 0750); err != nil {
+			return fmt.Errorf("failed to create output directory %s: %v", output, err)
 		}
 
-		log.Infof("Splitting dyld_shared_cache to %s", outputPath)
-		return dyld.Split(dscPath, outputPath, xcodePath, viper.GetBool("dyld.split.cache"))
-
-		// dscPath := filepath.Clean(args[0])
-
-		// fileInfo, err := os.Lstat(dscPath)
-		// if err != nil {
-		// 	return fmt.Errorf("file %s does not exist", dscPath)
-		// }
-
-		// // Check if file is a symlink
-		// if fileInfo.Mode()&os.ModeSymlink != 0 {
-		// 	symlinkPath, err := os.Readlink(dscPath)
-		// 	if err != nil {
-		// 		return errors.Wrapf(err, "failed to read symlink %s", dscPath)
-		// 	}
-		// 	// TODO: this seems like it would break
-		// 	linkParent := filepath.Dir(dscPath)
-		// 	linkRoot := filepath.Dir(linkParent)
-
-		// 	dscPath = filepath.Join(linkRoot, symlinkPath)
-		// }
-
-		// f, err := dyld.Open(dscPath)
-		// if err != nil {
-		// 	return err
-		// }
-		// defer f.Close()
-
-		// var wg sync.WaitGroup
-
-		// for _, i := range f.Images {
-		// 	wg.Add(1)
-
-		// 	go func(i *dyld.CacheImage) {
-		// 		defer wg.Done()
-
-		// 		m, err := i.GetMacho()
-		// 		if err != nil {
-		// 			// return err
-		// 		}
-		// 		defer m.Close()
-
-		// 		// f.GetLocalSymbolsForImage(i)
-
-		// 		folder := filepath.Dir(dscPath)        // default to folder of shared cache
-		// 		fname := filepath.Join(folder, i.Name) // default to full dylib path
-
-		// 		if err := m.Export(fname, nil, m.GetBaseAddress(), i.GetLocalSymbols()); err != nil {
-		// 			// return fmt.Errorf("failed to export entry MachO %s; %v", i.Name, err)
-		// 		}
-
-		// 		if err := rebaseMachO(f, fname); err != nil {
-		// 			// return fmt.Errorf("failed to rebase macho via cache slide info: %v", err)
-		// 		}
-		// 	}(i)
-
-		// }
-
-		// wg.Wait()
-
-		// return nil
+		log.Infof("Splitting dyld_shared_cache to %s", output)
+		return dyld.Split(dscPath, output, xcodePath, viper.GetBool("dyld.split.cache"))
 	},
 }

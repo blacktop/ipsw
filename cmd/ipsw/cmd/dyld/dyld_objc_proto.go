@@ -31,30 +31,26 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
-var colorAddr = color.New(color.Faint).SprintfFunc()
-var colorImage = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-var colorField = color.New(color.Bold, color.FgHiBlue).SprintFunc()
-var colorClassField = color.New(color.Bold, color.FgHiMagenta).SprintFunc()
-
 func init() {
 	ObjcCmd.AddCommand(objcProtoCmd)
-
 	objcProtoCmd.Flags().StringP("image", "i", "", "dylib image to search")
-	objcProtoCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // objcProtoCmd represents the proto command
 var objcProtoCmd = &cobra.Command{
-	Use:     "proto  <dyld_shared_cache>",
+	Use:     "proto <DSC>",
 	Aliases: []string{"p"},
-	Short:   "Get ObjC proto info",
-	Args:    cobra.MinimumNArgs(1),
+	Short:   "Get ObjC optimization proto info",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {

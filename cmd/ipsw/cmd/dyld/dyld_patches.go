@@ -40,16 +40,17 @@ func init() {
 	DyldCmd.AddCommand(PatchesCmd)
 	PatchesCmd.Flags().StringP("image", "i", "", "dylib image to search")
 	PatchesCmd.Flags().StringP("sym", "s", "", "dylib image symbol to dump patches for")
-	PatchesCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // PatchesCmd represents the patches command
 var PatchesCmd = &cobra.Command{
-	Use:           "patches <dyld_shared_cache>",
-	Aliases:       []string{"p"},
-	Short:         "Dump dyld patch info",
-	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  true,
+	Use:     "patches <DSC>",
+	Aliases: []string{"p"},
+	Short:   "Dump dyld patch info",
+	Args:    cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

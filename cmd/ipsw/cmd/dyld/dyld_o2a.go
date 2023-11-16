@@ -39,16 +39,19 @@ func init() {
 	DyldCmd.AddCommand(OffsetToAddrCmd)
 	OffsetToAddrCmd.Flags().BoolP("dec", "d", false, "Return address in decimal")
 	OffsetToAddrCmd.Flags().BoolP("hex", "x", false, "Return address in hexadecimal")
-
-	OffsetToAddrCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // OffsetToAddrCmd represents the o2a command
 var OffsetToAddrCmd = &cobra.Command{
-	Use:           "o2a <dyld_shared_cache> <offset>",
-	Short:         "Convert dyld_shared_cache offset to address",
-	Args:          cobra.MinimumNArgs(2),
-	SilenceUsage:  true,
+	Use:   "o2a <DSC> <OFFSET>",
+	Short: "Convert offset to address",
+	Args:  cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 

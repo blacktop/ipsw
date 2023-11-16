@@ -41,19 +41,22 @@ func init() {
 	SlideCmd.Flags().StringP("cache", "c", "", "path to addr to sym cache file")
 	SlideCmd.Flags().StringP("output", "o", "", "folder to save JSON output")
 	SlideCmd.MarkFlagDirname("output")
-	SlideCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 
 	viper.BindPFlag("dyld.slide.auth", SlideCmd.Flags().Lookup("auth"))
 	viper.BindPFlag("dyld.slide.json", SlideCmd.Flags().Lookup("json"))
-	viper.BindPFlag("dyld.slide.output", SlideCmd.Flags().Lookup("output"))
 	viper.BindPFlag("dyld.slide.cache", SlideCmd.Flags().Lookup("cache"))
+	viper.BindPFlag("dyld.slide.output", SlideCmd.Flags().Lookup("output"))
 }
 
 // SlideCmd represents the slide command
 var SlideCmd = &cobra.Command{
-	Use:   "slide <dyld_shared_cache>",
+	Use:   "slide <DSC>",
 	Short: "Dump slide info",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		var enc *json.Encoder

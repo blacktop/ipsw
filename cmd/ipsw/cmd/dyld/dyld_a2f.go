@@ -49,25 +49,19 @@ func init() {
 	viper.BindPFlag("dyld.a2f.out", AddrToFuncCmd.Flags().Lookup("out"))
 	viper.BindPFlag("dyld.a2f.json", AddrToFuncCmd.Flags().Lookup("json"))
 	viper.BindPFlag("dyld.a2f.cache", AddrToFuncCmd.Flags().Lookup("cache"))
-
-	AddrToFuncCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
-}
-
-type Func struct {
-	Addr  uint64 `json:"addr,omitempty"`
-	Start uint64 `json:"start,omitempty"`
-	End   uint64 `json:"end,omitempty"`
-	Size  uint64 `json:"size,omitempty"`
-	Name  string `json:"name,omitempty"`
-	Image string `json:"image,omitempty"`
 }
 
 // AddrToFuncCmd represents the a2f command
 var AddrToFuncCmd = &cobra.Command{
-	Use:           "a2f <dyld_shared_cache> <vaddr>",
-	Short:         "Lookup function containing unslid address",
-	Args:          cobra.MinimumNArgs(1),
-	SilenceUsage:  false,
+	Use:   "a2f <DSC> <ADDR>",
+	Short: "Lookup function containing unslid address",
+	Args:  cobra.ExactArgs(2),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -108,7 +102,7 @@ var AddrToFuncCmd = &cobra.Command{
 		defer f.Close()
 
 		if len(ptrFile) > 0 {
-			var fs []Func
+			var fs []dscFunc
 			var enc *json.Encoder
 
 			imap := make(map[*dyld.CacheImage][]uint64)
@@ -175,7 +169,7 @@ var AddrToFuncCmd = &cobra.Command{
 						if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 							fn.Name = symName
 						}
-						fs = append(fs, Func{
+						fs = append(fs, dscFunc{
 							Addr:  ptr,
 							Start: fn.StartAddr,
 							End:   fn.EndAddr,
@@ -225,7 +219,7 @@ var AddrToFuncCmd = &cobra.Command{
 					if symName, ok := f.AddressToSymbol[fn.StartAddr]; ok {
 						fn.Name = symName
 					}
-					if err := json.NewEncoder(os.Stdout).Encode(Func{
+					if err := json.NewEncoder(os.Stdout).Encode(dscFunc{
 						Addr:  addr,
 						Start: fn.StartAddr,
 						End:   fn.EndAddr,

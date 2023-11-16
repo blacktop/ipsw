@@ -39,17 +39,17 @@ func init() {
 	ObjcCmd.Flags().BoolP("sel", "s", false, "Print the selectors")
 	ObjcCmd.Flags().BoolP("proto", "p", false, "Print the protocols")
 	ObjcCmd.Flags().BoolP("imp-cache", "i", false, "Print the imp-caches")
-
-	ObjcCmd.MarkZshCompPositionalArgumentFile(1, "dyld_shared_cache*")
 }
 
 // ObjcCmd represents the objc command
 var ObjcCmd = &cobra.Command{
-	Use:           "objc <dyld_shared_cache>",
-	Short:         "Dump Objective-C Optimization Info",
-	SilenceUsage:  true,
+	Use:   "objc <DSC>",
+	Short: "Dump Objective-C Optimization Info",
+	Args:  cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
-	Args:          cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		if viper.GetBool("verbose") {
