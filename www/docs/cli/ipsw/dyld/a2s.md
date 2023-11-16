@@ -11,7 +11,7 @@ description: Lookup symbol at unslid address
 Lookup symbol at unslid address
 
 ```
-ipsw dyld a2s <dyld_shared_cache> <vaddr> [flags]
+ipsw dyld a2s <DSC> <ADDR> [flags]
 ```
 
 ### Options

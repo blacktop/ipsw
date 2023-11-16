@@ -4,14 +4,14 @@ title: disass
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: disass
-description: Disassemble dyld_shared_cache at symbol/vaddr
+description: Disassemble at symbol/vaddr
 ---
 ## ipsw dyld disass
 
-Disassemble dyld_shared_cache at symbol/vaddr
+Disassemble at symbol/vaddr
 
 ```
-ipsw dyld disass <dyld_shared_cache> [flags]
+ipsw dyld disass <DSC> [flags]
 ```
 
 ### Options

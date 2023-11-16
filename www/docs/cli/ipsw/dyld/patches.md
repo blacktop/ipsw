@@ -11,7 +11,7 @@ description: Dump dyld patch info
 Dump dyld patch info
 
 ```
-ipsw dyld patches <dyld_shared_cache> [flags]
+ipsw dyld patches <DSC> [flags]
 ```
 
 ### Options

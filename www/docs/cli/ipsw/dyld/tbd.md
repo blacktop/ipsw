@@ -11,7 +11,7 @@ description: Generate a .tbd file for a dylib
 Generate a .tbd file for a dylib
 
 ```
-ipsw dyld tbd <dyld_shared_cache> <image> [flags]
+ipsw dyld tbd <DSC> <DYLIB> [flags]
 ```
 
 ### Options

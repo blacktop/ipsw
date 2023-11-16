@@ -11,7 +11,7 @@ description: 🚧 [WIP] Find all cross references to an address
 🚧 [WIP] Find all cross references to an address
 
 ```
-ipsw dyld xref <dyld_shared_cache> <vaddr> [flags]
+ipsw dyld xref <DSC> <ADDR> [flags]
 ```
 
 ### Options

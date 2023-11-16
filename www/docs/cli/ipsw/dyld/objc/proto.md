@@ -4,14 +4,14 @@ title: proto
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: proto
-description: Get ObjC proto info
+description: Get ObjC optimization proto info
 ---
 ## ipsw dyld objc proto
 
-Get ObjC proto info
+Get ObjC optimization proto info
 
 ```
-ipsw dyld objc proto  <dyld_shared_cache> [flags]
+ipsw dyld objc proto <DSC> [flags]
 ```
 
 ### Options

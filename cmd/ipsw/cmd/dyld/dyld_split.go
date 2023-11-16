@@ -23,7 +23,7 @@ func init() {
 	SplitCmd.Flags().BoolP("cache", "c", false, "Build XCode device support cache")
 	SplitCmd.Flags().StringP("version", "v", "", "Cache version")
 	SplitCmd.Flags().StringP("build", "b", "", "Cache build")
-	SplitCmd.Flags().StringP("output", "o", "", "Directory to extract the dylib(s)")
+	SplitCmd.Flags().StringP("output", "o", "", "Directory to extract the dylibs")
 	SplitCmd.MarkFlagDirname("output")
 	viper.BindPFlag("dyld.split.xcode", SplitCmd.Flags().Lookup("xcode"))
 	viper.BindPFlag("dyld.split.cache", SplitCmd.Flags().Lookup("cache"))

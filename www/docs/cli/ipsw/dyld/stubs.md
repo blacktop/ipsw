@@ -11,7 +11,7 @@ description: Dump Stub Islands
 Dump Stub Islands
 
 ```
-ipsw dyld stubs [flags]
+ipsw dyld stubs <DSC> [flags]
 ```
 
 ### Options

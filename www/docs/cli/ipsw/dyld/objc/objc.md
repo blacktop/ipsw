@@ -11,7 +11,7 @@ description: Dump Objective-C Optimization Info
 Dump Objective-C Optimization Info
 
 ```
-ipsw dyld objc <dyld_shared_cache> [flags]
+ipsw dyld objc <DSC> [flags]
 ```
 
 ### Options
@@ -35,7 +35,7 @@ ipsw dyld objc <dyld_shared_cache> [flags]
 ### SEE ALSO
 
 * [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache
-* [ipsw dyld objc class](/docs/cli/ipsw/dyld/objc/class)	 - Get ObjC class info
-* [ipsw dyld objc proto](/docs/cli/ipsw/dyld/objc/proto)	 - Get ObjC proto info
-* [ipsw dyld objc sel](/docs/cli/ipsw/dyld/objc/sel)	 - Get ObjC selector info
+* [ipsw dyld objc class](/docs/cli/ipsw/dyld/objc/class)	 - Get ObjC optimization class info
+* [ipsw dyld objc proto](/docs/cli/ipsw/dyld/objc/proto)	 - Get ObjC optimization proto info
+* [ipsw dyld objc sel](/docs/cli/ipsw/dyld/objc/sel)	 - Get ObjC optimization selector info
 

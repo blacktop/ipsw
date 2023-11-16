@@ -4,14 +4,14 @@ title: class
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: class
-description: Get ObjC class info
+description: Get ObjC optimization class info
 ---
 ## ipsw dyld objc class
 
-Get ObjC class info
+Get ObjC optimization class info
 
 ```
-ipsw dyld objc class  <dyld_shared_cache> [flags]
+ipsw dyld objc class <DSC> [flags]
 ```
 
 ### Options

@@ -11,7 +11,7 @@ description: List all dylibs that load a given dylib
 List all dylibs that load a given dylib
 
 ```
-ipsw dyld imports [flags]
+ipsw dyld imports <DSC> <DYLIB> [flags]
 ```
 
 ### Options

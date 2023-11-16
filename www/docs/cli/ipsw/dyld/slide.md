@@ -11,7 +11,7 @@ description: Dump slide info
 Dump slide info
 
 ```
-ipsw dyld slide <dyld_shared_cache> [flags]
+ipsw dyld slide <DSC> [flags]
 ```
 
 ### Options

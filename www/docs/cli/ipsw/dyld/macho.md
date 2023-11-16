@@ -4,14 +4,14 @@ title: macho
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: macho
-description: Parse a dylib file
+description: Parse an incache dylib file
 ---
 ## ipsw dyld macho
 
-Parse a dylib file
+Parse an incache dylib file
 
 ```
-ipsw dyld macho <dyld_shared_cache> <dylib> [flags]
+ipsw dyld macho <DSC> <DYLIB> [flags]
 ```
 
 ### Options

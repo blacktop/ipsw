@@ -4,14 +4,14 @@ title: dump
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: dump
-description: Dump dyld_shared_cache data at given virtual address
+description: Dump data at given virtual address
 ---
 ## ipsw dyld dump
 
-Dump dyld_shared_cache data at given virtual address
+Dump data at given virtual address
 
 ```
-ipsw dyld dump <dyld_shared_cache> <address> [flags]
+ipsw dyld dump <DSC> <ADDR> [flags]
 ```
 
 ### Options

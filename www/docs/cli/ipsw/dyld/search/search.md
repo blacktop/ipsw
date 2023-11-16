@@ -11,7 +11,7 @@ description: Find Dylib files for given search criteria
 Find Dylib files for given search criteria
 
 ```
-ipsw dyld search [flags]
+ipsw dyld search <DSC> [flags]
 ```
 
 ### Options

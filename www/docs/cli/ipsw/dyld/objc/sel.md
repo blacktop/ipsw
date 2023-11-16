@@ -4,14 +4,14 @@ title: sel
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: sel
-description: Get ObjC selector info
+description: Get ObjC optimization selector info
 ---
 ## ipsw dyld objc sel
 
-Get ObjC selector info
+Get ObjC optimization selector info
 
 ```
-ipsw dyld objc sel  <dyld_shared_cache> [flags]
+ipsw dyld objc sel <DSC> [flags]
 ```
 
 ### Options

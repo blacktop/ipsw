@@ -32,21 +32,21 @@ ipsw dyld [flags]
 
 * [ipsw](/docs/cli/ipsw)	 - Download and Parse IPSWs (and SO much more)
 * [ipsw dyld a2f](/docs/cli/ipsw/dyld/a2f)	 - Lookup function containing unslid address
-* [ipsw dyld a2o](/docs/cli/ipsw/dyld/a2o)	 - Convert dyld_shared_cache address to offset
+* [ipsw dyld a2o](/docs/cli/ipsw/dyld/a2o)	 - Convert address to offset
 * [ipsw dyld a2s](/docs/cli/ipsw/dyld/a2s)	 - Lookup symbol at unslid address
-* [ipsw dyld disass](/docs/cli/ipsw/dyld/disass)	 - Disassemble dyld_shared_cache at symbol/vaddr
-* [ipsw dyld dump](/docs/cli/ipsw/dyld/dump)	 - Dump dyld_shared_cache data at given virtual address
+* [ipsw dyld disass](/docs/cli/ipsw/dyld/disass)	 - Disassemble at symbol/vaddr
+* [ipsw dyld dump](/docs/cli/ipsw/dyld/dump)	 - Dump data at given virtual address
 * [ipsw dyld ida](/docs/cli/ipsw/dyld/ida)	 - Analyze DSC in IDA Pro
 * [ipsw dyld image](/docs/cli/ipsw/dyld/image)	 - Dump image array info
 * [ipsw dyld imports](/docs/cli/ipsw/dyld/imports)	 - List all dylibs that load a given dylib
 * [ipsw dyld info](/docs/cli/ipsw/dyld/info)	 - Parse dyld_shared_cache
-* [ipsw dyld macho](/docs/cli/ipsw/dyld/macho)	 - Parse a dylib file
-* [ipsw dyld o2a](/docs/cli/ipsw/dyld/o2a)	 - Convert dyld_shared_cache offset to address
+* [ipsw dyld macho](/docs/cli/ipsw/dyld/macho)	 - Parse an incache dylib file
+* [ipsw dyld o2a](/docs/cli/ipsw/dyld/o2a)	 - Convert offset to address
 * [ipsw dyld objc](/docs/cli/ipsw/dyld/objc)	 - Dump Objective-C Optimization Info
 * [ipsw dyld patches](/docs/cli/ipsw/dyld/patches)	 - Dump dyld patch info
 * [ipsw dyld search](/docs/cli/ipsw/dyld/search)	 - Find Dylib files for given search criteria
 * [ipsw dyld slide](/docs/cli/ipsw/dyld/slide)	 - Dump slide info
-* [ipsw dyld split](/docs/cli/ipsw/dyld/split)	 - Extracts all the dyld_shared_cache libraries
+* [ipsw dyld split](/docs/cli/ipsw/dyld/split)	 - Extracts all the dylibs using XCode's dsc_extractor
 * [ipsw dyld str](/docs/cli/ipsw/dyld/str)	 - Search dyld_shared_cache for string
 * [ipsw dyld stubs](/docs/cli/ipsw/dyld/stubs)	 - Dump Stub Islands
 * [ipsw dyld swift](/docs/cli/ipsw/dyld/swift)	 - Dump Swift Optimizations Info
