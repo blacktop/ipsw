@@ -377,7 +377,7 @@ jobs:
         if: matrix.platform == 'macos-13'
         working-directory: /tmp/ipsw
         run: |
-          ipsw dyld split --xcode /Applications/Xcode_14.1.app "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e /tmp/ipsw
+          ipsw dyld split --xcode /Applications/Xcode_14.1.app "${{ env.latest_ios_build }}__iPhone16,1"/dyld_shared_cache_arm64e --output /tmp/ipsw
           tree /tmp/ipsw
       - name: Run dyld swfit
         if: matrix.platform == 'macos-13'
