@@ -20,7 +20,7 @@ ipsw dyld split <DSC> [flags]
   -b, --build string     Cache build
   -c, --cache            Build XCode device support cache
   -h, --help             help for split
-  -o, --output string    Directory to extract the dylibs
+  -o, --output string    Directory to extract the dylibs (default: CWD)
   -v, --version string   Cache version
   -x, --xcode string     Path to Xcode.app
 ```
