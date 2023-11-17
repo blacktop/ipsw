@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -342,7 +343,33 @@ var downloadAppledbCmd = &cobra.Command{
 							url = link.URL
 						}
 					}
-					fname := filepath.Join(destPath, getDestName(url, removeCommas))
+					var fname string
+					switch fwType {
+					case "ipsw":
+						fname = filepath.Join(destPath, getDestName(url, removeCommas))
+					case "ota", "rsr":
+						var details string
+						if version != "" {
+							details += fmt.Sprintf("%s_", version)
+						}
+						if build != "" {
+							details += fmt.Sprintf("%s_", build)
+						}
+						if device != "" {
+							details += fmt.Sprintf("%s_", device)
+						} else {
+							var devices string
+							sort.Strings(result.DeviceMap)
+							if len(result.DeviceMap) > 5 {
+								devices = fmt.Sprintf("%s_and_%d_others", result.DeviceMap[0], len(result.DeviceMap)-1)
+							} else {
+								devices = strings.Join(result.DeviceMap, "_")
+							}
+							details += fmt.Sprintf("%s_", devices)
+						}
+						details += fmt.Sprintf("%s_", strings.ToUpper(result.Type))
+						fname = filepath.Join(destPath, fmt.Sprintf("%s%s", details, getDestName(url, removeCommas)))
+					}
 					if _, err := os.Stat(fname); os.IsNotExist(err) {
 						if fwType == "ipsw" {
 							log.Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
