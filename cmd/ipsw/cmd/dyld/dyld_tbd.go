@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -35,6 +36,11 @@ import (
 
 func init() {
 	DyldCmd.AddCommand(TbdCmd)
+	TbdCmd.Flags().BoolP("private", "p", false, "Add private symbols")
+	TbdCmd.Flags().StringP("output", "o", "", "Directory to extract the dylibs (default: CWD)")
+	TbdCmd.MarkFlagDirname("output")
+	viper.BindPFlag("dyld.tbd.private", TbdCmd.Flags().Lookup("private"))
+	viper.BindPFlag("dyld.tbd.output", TbdCmd.Flags().Lookup("output"))
 }
 
 // TbdCmd represents the tbd command
@@ -56,25 +62,11 @@ var TbdCmd = &cobra.Command{
 			log.SetLevel(log.DebugLevel)
 		}
 
+		// flags
+		private := viper.GetBool("dyld.tbd.private")
+		output := viper.GetString("dyld.tbd.output")
+
 		dscPath := filepath.Clean(args[0])
-
-		fileInfo, err := os.Lstat(dscPath)
-		if err != nil {
-			return fmt.Errorf("file %s does not exist", dscPath)
-		}
-
-		// Check if file is a symlink
-		if fileInfo.Mode()&os.ModeSymlink != 0 {
-			symlinkPath, err := os.Readlink(dscPath)
-			if err != nil {
-				return fmt.Errorf("failed to read symlink %s: %v", dscPath, err)
-			}
-			// TODO: this seems like it would break
-			linkParent := filepath.Dir(dscPath)
-			linkRoot := filepath.Dir(linkParent)
-
-			dscPath = filepath.Join(linkRoot, symlinkPath)
-		}
 
 		f, err := dyld.Open(dscPath)
 		if err != nil {
@@ -87,7 +79,7 @@ var TbdCmd = &cobra.Command{
 			return fmt.Errorf("image not in %s: %v", dscPath, err)
 		}
 
-		t, err := tbd.NewTBD(image)
+		t, err := tbd.NewTBD(image, private)
 		if err != nil {
 			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
 		}
@@ -97,11 +89,22 @@ var TbdCmd = &cobra.Command{
 			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
 		}
 
-		tbdFile := filepath.Base(t.Path)
+		tbdFile := filepath.Base(t.Path) + ".tbd"
+		if len(output) > 0 {
+			if err := os.MkdirAll(output, 0750); err != nil {
+				return fmt.Errorf("failed to create output directory %s: %v", output, err)
+			}
+			tbdFile = filepath.Join(output, tbdFile)
+		}
 
-		log.Info("Created " + tbdFile + ".tbd")
-		if err = os.WriteFile(tbdFile+".tbd", []byte(outTBD), 0660); err != nil {
-			return fmt.Errorf("failed to write tbd file %s: %v", tbdFile+".tbd", err)
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current working directory: %v", err)
+		}
+
+		log.Info("Created " + strings.TrimPrefix(tbdFile, cwd))
+		if err = os.WriteFile(tbdFile, []byte(outTBD), 0660); err != nil {
+			return fmt.Errorf("failed to write tbd file %s: %v", tbdFile, err)
 		}
 
 		return nil

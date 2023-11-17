@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/pkg/errors"
 )
@@ -21,7 +22,7 @@ type TBD struct {
 }
 
 // NewTBD creates a new tbd object
-func NewTBD(image *dyld.CacheImage) (*TBD, error) {
+func NewTBD(image *dyld.CacheImage, private bool) (*TBD, error) {
 	var syms []string
 	var objcClasses []string
 	var objcIvars []string
@@ -32,19 +33,32 @@ func NewTBD(image *dyld.CacheImage) (*TBD, error) {
 	}
 	defer m.Close()
 
-	// get symbols
-	if m.DyldExportsTrie() != nil && m.DyldExportsTrie().Size > 0 {
-		exports, err := m.DyldExports()
-		if err != nil {
+	// get public symbols
+	for _, sym := range m.Symtab.Syms {
+		if sym.Name == "<redacted>" || sym.Value == 0 {
+			continue
+		}
+		syms = utils.UniqueAppend(syms, sym.Name)
+	}
+	if exports, err := m.DyldExports(); err == nil {
+		for _, export := range exports {
+			syms = utils.UniqueAppend(syms, export.Name)
+		}
+	}
+	if exports, err := m.GetExports(); err == nil {
+		for _, export := range exports {
+			syms = utils.UniqueAppend(syms, export.Name)
+		}
+	}
+
+	// get private symbols
+	if private {
+		if err := image.ParseLocalSymbols(false); err != nil {
 			return nil, err
 		}
-		for _, sym := range exports {
-			if !strings.HasPrefix(sym.Name, "_OBJC_") {
-				syms = append(syms, sym.Name)
-			}
+		for _, sym := range image.LocalSymbols {
+			syms = append(syms, sym.Name)
 		}
-	} else {
-		return nil, fmt.Errorf("%s contains no exported symbols", image.Name)
 	}
 
 	// get objc classes and ivars
