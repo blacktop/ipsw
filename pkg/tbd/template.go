@@ -1,14 +1,18 @@
 package tbd
 
-const tbdTemplate = `--- !tapi-tbd-v3
-archs:           [ {{ StringsJoin .Archs ", " }} ]
-uuids:           [ {{ StringsJoin .UUIDs ", " }} ]
-platform:        {{.Platform}}
-install-name:    {{.Path}}
-current-version: {{.Version}}
-objc-constraint: none
+const tbdTemplate = `--- !tapi-tbd
+tbd-version:     4
+targets:         {{.Targets}}
+install-name:    '{{.Path}}'
 exports:
-  - archs:           [ {{ StringsJoin .Archs ", " }} ]
+  - targets:         {{.Targets}}
     symbols:         [ {{ StringsJoin .Symbols ",\n                       " }} ]
+{{- if .ObjcClasses }}    
+    objc-classes:    [ {{ StringsJoin .ObjcClasses ",\n                       " }} ]
+{{- end }}
+{{- if .ObjcIvars }}    
+    objc-ivars:      [ {{ StringsJoin .ObjcIvars ",\n                       " }} ]
+{{- end }}
 ...
+
 `
