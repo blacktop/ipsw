@@ -218,9 +218,9 @@ func (i *Info) String() string {
 			iStr += "IsRSR          = ✅\n"
 		}
 	}
-	kcs := i.Plists.BuildManifest.GetKernelCaches()
-	bls := i.Plists.BuildManifest.GetBootLoaders()
 	if len(i.DeviceTrees) > 0 {
+		kcs := i.Plists.BuildManifest.GetKernelCaches()
+		bls := i.Plists.BuildManifest.GetBootLoaders()
 		iStr += "\nDevices\n"
 		iStr += "-------\n"
 		for _, dtree := range i.DeviceTrees {
@@ -254,6 +254,12 @@ func (i *Info) String() string {
 					iStr += fmt.Sprintf("       * %s\n", filepath.Base(bl))
 				}
 			}
+		}
+	} else {
+		iStr += "\nDevices\n"
+		iStr += "-------\n"
+		for _, dev := range i.Plists.BuildManifest.SupportedProductTypes {
+			iStr += fmt.Sprintf(" > %s_%s\n", dev, i.Plists.BuildManifest.ProductBuildVersion)
 		}
 	}
 	return iStr
