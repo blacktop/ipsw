@@ -41,7 +41,7 @@ func init() {
 var TbdCmd = &cobra.Command{
 	Use:     "tbd <DSC> <DYLIB>",
 	Aliases: []string{"t"},
-	Short:   "Generate a .tbd file for a dylib",
+	Short:   "Generate a text-based stub library '.tbd' file for a dylib",
 	Args:    cobra.ExactArgs(2),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
@@ -87,7 +87,7 @@ var TbdCmd = &cobra.Command{
 			return fmt.Errorf("image not in %s: %v", dscPath, err)
 		}
 
-		t, err := tbd.NewTBD(f, image)
+		t, err := tbd.NewTBD(image)
 		if err != nil {
 			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
 		}

@@ -3,6 +3,7 @@ package tbd
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 	"text/template"
 
@@ -12,17 +13,18 @@ import (
 
 // TBD object
 type TBD struct {
-	UUIDs    []string
-	Archs    []string
-	Platform string
-	Path     string
-	Version  string
-	Symbols  []string
+	Targets     []string
+	Path        string
+	Symbols     []string
+	ObjcClasses []string
+	ObjcIvars   []string
 }
 
 // NewTBD creates a new tbd object
-func NewTBD(f *dyld.File, image *dyld.CacheImage) (*TBD, error) {
+func NewTBD(image *dyld.CacheImage) (*TBD, error) {
 	var syms []string
+	var objcClasses []string
+	var objcIvars []string
 
 	m, err := image.GetMacho()
 	if err != nil {
@@ -37,23 +39,43 @@ func NewTBD(f *dyld.File, image *dyld.CacheImage) (*TBD, error) {
 			return nil, err
 		}
 		for _, sym := range exports {
-			syms = append(syms, sym.Name)
+			if !strings.HasPrefix(sym.Name, "_OBJC_") {
+				syms = append(syms, sym.Name)
+			}
 		}
 	} else {
 		return nil, fmt.Errorf("%s contains no exported symbols", image.Name)
 	}
 
-	arch := strings.Fields(strings.ToLower(m.SubCPU.String(m.CPU)))[0]
-	uuid := fmt.Sprintf("'%s: %s'", arch, m.UUID().UUID.String())
-	// TODO: add objc-classes
+	// get objc classes and ivars
+	if m.HasObjC() {
+		classes, err := m.GetObjCClasses()
+		if err != nil {
+			return nil, err
+		}
+		for _, class := range classes {
+			objcClasses = append(objcClasses, class.Name)
+			for _, ivar := range class.Ivars {
+				objcIvars = append(objcIvars, fmt.Sprintf("%s.%s", class.Name, ivar.Name))
+			}
+		}
+	}
+
+	sort.Strings(syms)
+	sort.Strings(objcClasses)
+	sort.Strings(objcIvars)
 
 	return &TBD{
-		UUIDs:    []string{uuid},
-		Archs:    []string{arch},
-		Platform: strings.ToLower(f.Headers[f.UUID].Platform.String()),
-		Path:     image.Name,
-		Version:  m.SourceVersion().Version.String(),
-		Symbols:  syms,
+		Targets: []string{"x86_64-macos",
+			"x86_64-maccatalyst",
+			"arm64-macos",
+			"arm64-maccatalyst",
+			"arm64e-macos",
+			"arm64e-maccatalyst"},
+		Path:        image.Name,
+		Symbols:     syms,
+		ObjcClasses: objcClasses,
+		ObjcIvars:   objcIvars,
 	}, nil
 }
 
