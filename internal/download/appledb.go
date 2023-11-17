@@ -185,22 +185,24 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 		}
 	}
 
-	if len(query.PrerequisiteBuild) > 0 {
-		var tmpSources []OsFileSource
-		for _, source := range sources {
-			if slices.Contains(source.PrerequisiteBuild.Builds, query.PrerequisiteBuild) {
-				tmpSources = append(tmpSources, source)
+	if query.Type == "ota" {
+		if len(query.PrerequisiteBuild) > 0 {
+			var tmpSources []OsFileSource
+			for _, source := range sources {
+				if slices.Contains(source.PrerequisiteBuild.Builds, query.PrerequisiteBuild) {
+					tmpSources = append(tmpSources, source)
+				}
 			}
-		}
-		sources = tmpSources
-	} else {
-		var tmpSources []OsFileSource
-		for _, source := range sources {
-			if len(source.PrerequisiteBuild.Builds) == 0 {
-				tmpSources = append(tmpSources, source)
+			sources = tmpSources
+		} else {
+			var tmpSources []OsFileSource
+			for _, source := range sources {
+				if len(source.PrerequisiteBuild.Builds) == 0 {
+					tmpSources = append(tmpSources, source)
+				}
 			}
+			sources = tmpSources
 		}
-		sources = tmpSources
 	}
 
 	return sources
