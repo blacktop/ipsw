@@ -344,7 +344,11 @@ var downloadAppledbCmd = &cobra.Command{
 					}
 					fname := filepath.Join(destPath, getDestName(url, removeCommas))
 					if _, err := os.Stat(fname); os.IsNotExist(err) {
-						log.WithFields(log.Fields{"devices": result.DeviceMap}).Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
+						if fwType == "ipsw" {
+							log.Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
+						} else {
+							log.WithFields(log.Fields{"devices": result.DeviceMap}).Infof("Getting (%d/%d) %s: %s", idx+1, len(results), strings.ToUpper(result.Type), filepath.Base(fname))
+						}
 						// download file
 						downloader.URL = url
 						downloader.DestName = fname

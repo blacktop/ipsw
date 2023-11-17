@@ -193,6 +193,14 @@ func (fs OsFiles) Query(query *ADBQuery) []OsFileSource {
 			}
 		}
 		sources = tmpSources
+	} else {
+		var tmpSources []OsFileSource
+		for _, source := range sources {
+			if len(source.PrerequisiteBuild.Builds) == 0 {
+				tmpSources = append(tmpSources, source)
+			}
+		}
+		sources = tmpSources
 	}
 
 	return sources
