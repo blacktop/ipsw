@@ -146,12 +146,10 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
-github.com/disgoorg/disgo v0.16.12 h1:9YxlDaQE0XoNpsory4w6UsILeG5eTkW9v0NyhyKKzA8=
-github.com/disgoorg/disgo v0.16.12/go.mod h1:QnvUII334g/LJzjOmhYGCJzbl38Og83iXCEe28DklVM=
+github.com/disgoorg/disgo v0.17.0 h1:/LcgXgPDhzHt3GkQ4cpjmIJBim1/VYfS31VhGYif3Ms=
+github.com/disgoorg/disgo v0.17.0/go.mod h1:AE2J/8oLR2PtYfqcARsk1mgBxQ5z3Z1OD6Lc2SA0gak=
 github.com/disgoorg/json v1.1.0 h1:7xigHvomlVA9PQw9bMGO02PHGJJPqvX5AnwlYg/Tnys=
 github.com/disgoorg/json v1.1.0/go.mod h1:BHDwdde0rpQFDVsRLKhma6Y7fTbQKub/zdGO5O9NqqA=
-github.com/disgoorg/log v1.2.1 h1:kZYAWkUBcGy4LbZcgYtgYu49xNVLy+xG5Uq3yz5VVQs=
-github.com/disgoorg/log v1.2.1/go.mod h1:hhQWYTFTnIGzAuFPZyXJEi11IBm9wq+/TVZt/FEwX0o=
 github.com/disgoorg/snowflake/v2 v2.0.1 h1:CuUxGLwggUxEswZOmZ+mZ5i0xSumQdXW9tXW7uGqe+0=
 github.com/disgoorg/snowflake/v2 v2.0.1/go.mod h1:SPU9c2CNn5DSyb86QcKtdZgix9osEtKrHLW4rMhfLCs=
 github.com/distribution/reference v0.5.0 h1:/FUIFXtfc/x2gpa5/VGfiGLuOIdYa1t65IKK2OFGvA0=

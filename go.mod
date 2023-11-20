@@ -19,7 +19,7 @@ require (
 	github.com/boombuler/barcode v1.0.1
 	github.com/caarlos0/ctrlc v1.2.0
 	github.com/caarlos0/env/v8 v8.0.0
-	github.com/disgoorg/disgo v0.16.12
+	github.com/disgoorg/disgo v0.17.0
 	github.com/disgoorg/snowflake/v2 v2.0.1
 	github.com/docker/docker v24.0.7+incompatible
 	github.com/dominikbraun/graph v0.23.0
@@ -90,7 +90,6 @@ require (
 	github.com/creack/pty v1.1.21 // indirect
 	github.com/danieljoos/wincred v1.2.0 // indirect
 	github.com/disgoorg/json v1.1.0 // indirect
-	github.com/disgoorg/log v1.2.1 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/dlclark/regexp2 v1.10.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
