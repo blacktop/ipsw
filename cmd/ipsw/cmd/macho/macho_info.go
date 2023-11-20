@@ -1312,6 +1312,7 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("STRINGS")
 				fmt.Println("=======")
 			}
+			// TODO: add option to dump all strings - https://github.com/robpike/strings/blob/master/strings.go
 			for _, sec := range m.Sections {
 				if sec.Flags.IsCstringLiterals() || sec.Seg == "__TEXT" && sec.Name == "__const" {
 					off, err := m.GetOffset(sec.Addr)
