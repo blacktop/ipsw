@@ -430,7 +430,7 @@ func GetVersion(m *macho.File) (*Version, error) {
 
 			if len(s) > 0 {
 				if utils.IsASCII(s) {
-					reKV := regexp.MustCompile(`^Darwin Kernel Version (?P<darwin>.+): (?P<date>.+); root:xnu-(?P<xnu>.+)/(?P<type>.+)_(?P<arch>.+)_(?P<cpu>.+)$`)
+					reKV := regexp.MustCompile(`^Darwin Kernel Version (?P<darwin>.+): (?P<date>.+); root:xnu.*-(?P<xnu>.+)/(?P<type>.+)_(?P<arch>.+)_(?P<cpu>.+)$`)
 					if reKV.MatchString(s) {
 						foundKV = true
 						kv.rawKernel = s
