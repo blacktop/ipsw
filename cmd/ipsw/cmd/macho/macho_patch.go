@@ -333,36 +333,49 @@ func patchMacho(m *macho.File, machoPath, action, loadCommand string, args []str
 				return fmt.Errorf("failed to find %s in %s", loadCommand, machoPath)
 			}
 			for _, lc := range lcs {
-				if lc.(*macho.Dylib).Name == args[3] {
-					switch c := lc.(type) {
-					case *macho.LoadDylib:
-						prevLen := int32(c.Len)
-						c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-						c.Name = args[4]
-						m.ModifySizeCommands(prevLen, int32(c.Len))
-					case *macho.WeakDylib:
-						prevLen := int32(c.Len)
-						c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-						c.Name = args[4]
-						m.ModifySizeCommands(prevLen, int32(c.Len))
-					case *macho.ReExportDylib:
-						prevLen := int32(c.Len)
-						c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-						c.Name = args[4]
-						m.ModifySizeCommands(prevLen, int32(c.Len))
-					case *macho.LazyLoadDylib:
-						prevLen := int32(c.Len)
-						c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-						c.Name = args[4]
-						m.ModifySizeCommands(prevLen, int32(c.Len))
-					case *macho.UpwardDylib:
-						prevLen := int32(c.Len)
-						c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
-						c.Name = args[4]
-						m.ModifySizeCommands(prevLen, int32(c.Len))
-					default:
-						return fmt.Errorf("failed to modify load command %s in %s", loadCommand, machoPath)
+				switch c := lc.(type) {
+				case *macho.LoadDylib:
+					if c.Name != args[3] {
+						continue
 					}
+					prevLen := int32(c.Len)
+					c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+					c.Name = args[4]
+					m.ModifySizeCommands(prevLen, int32(c.Len))
+				case *macho.WeakDylib:
+					if c.Name != args[3] {
+						continue
+					}
+					prevLen := int32(c.Len)
+					c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+					c.Name = args[4]
+					m.ModifySizeCommands(prevLen, int32(c.Len))
+				case *macho.ReExportDylib:
+					if c.Name != args[3] {
+						continue
+					}
+					prevLen := int32(c.Len)
+					c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+					c.Name = args[4]
+					m.ModifySizeCommands(prevLen, int32(c.Len))
+				case *macho.LazyLoadDylib:
+					if c.Name != args[3] {
+						continue
+					}
+					prevLen := int32(c.Len)
+					c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+					c.Name = args[4]
+					m.ModifySizeCommands(prevLen, int32(c.Len))
+				case *macho.UpwardDylib:
+					if c.Name != args[3] {
+						continue
+					}
+					prevLen := int32(c.Len)
+					c.Len = pointerAlign(uint32(binary.Size(types.DylibCmd{}) + len(args[4]) + 1))
+					c.Name = args[4]
+					m.ModifySizeCommands(prevLen, int32(c.Len))
+				default:
+					return fmt.Errorf("failed to modify load command %s in %s", loadCommand, machoPath)
 				}
 			}
 		case "LC_BUILD_VERSION":
