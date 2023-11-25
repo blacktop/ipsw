@@ -29,7 +29,7 @@ import (
 	"path/filepath"
 
 	"github.com/apex/log"
-	"github.com/blacktop/ipsw/pkg/sandbox"
+	"github.com/blacktop/ipsw/pkg/sandbox/compile"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -64,7 +64,7 @@ var cmplCmd = &cobra.Command{
 		}
 		defer f.Close()
 
-		profile, err := sandbox.Compile(f)
+		profile, err := compile.Do(f)
 		if err != nil {
 			return fmt.Errorf("failed to compile profile %s: %w", sbProfile, err)
 		}
