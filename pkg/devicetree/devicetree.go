@@ -365,11 +365,9 @@ func Parse(ipswPath string) (map[string]*DeviceTree, error) {
 }
 
 // ParseZipFiles parses DeviceTree in remote ipsw zip
-func ParseZipFiles(files []*zip.File) (map[string]*DeviceTree, error) {
+func ParseZipFiles(files []*zip.File) (dt map[string]*DeviceTree, err error) {
 
-	var err error
-
-	dt := make(map[string]*DeviceTree)
+	dt = make(map[string]*DeviceTree)
 
 	for _, f := range files {
 		if regexp.MustCompile(`.*DeviceTree.*im4p$`).MatchString(f.Name) {
