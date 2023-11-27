@@ -351,22 +351,34 @@ var ipswCmd = &cobra.Command{
 					// REMOTE KERNEL MODE
 					if remoteKernel {
 						log.Info("Extracting remote kernelcache")
-						if _, err := extract.Kernelcache(config); err != nil {
+						if out, err := extract.Kernelcache(config); err != nil {
 							return fmt.Errorf("failed to extract kernelcache from remote IPSW: %v", err)
+						} else {
+							for fn := range out {
+								utils.Indent(log.Info, 2)("Created " + fn)
+							}
 						}
 					}
 					// REMOTE DSC MODE
 					if remoteDSC {
 						log.Info("Extracting remote dyld_shared_cache(s)")
-						if _, err := extract.DSC(config); err != nil {
+						if out, err := extract.DSC(config); err != nil {
 							return err
+						} else {
+							for _, f := range out {
+								utils.Indent(log.Info, 2)("Created " + f)
+							}
 						}
 					}
 					// PATTERN MATCHING MODE
 					if len(remotePattern) > 0 {
 						log.Infof("Downloading files matching pattern %#v", remotePattern)
-						if _, err := extract.Search(config); err != nil {
+						if out, err := extract.Search(config); err != nil {
 							return err
+						} else {
+							for _, f := range out {
+								utils.Indent(log.Info, 2)("Created " + f)
+							}
 						}
 					}
 				}
