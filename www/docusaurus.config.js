@@ -44,7 +44,9 @@ const config = {
           sidebarPath: require.resolve("./sidebars.js"),
           // Please change this to your repo.
           // Remove this to remove the "edit this page" links.
-          editUrl: "https://github.com/blacktop/ipsw/tree/master/www/",
+          editUrl: ({ docPath }) => {
+            return `https://holocron.so/github/pr/blacktop/ipsw/master/editor/www/docs/${docPath}`
+          },
         },
         gtag: {
           trackingID: "G-6PLDXGZBEK",
