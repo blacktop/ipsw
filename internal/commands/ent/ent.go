@@ -27,56 +27,82 @@ type Entitlements map[string]any
 
 // Config is the configuration for the entitlements command
 type Config struct {
+	IPSW     string
+	Folder   string
+	Database string
 	Markdown bool
 	Color    bool
 	DiffTool string
 }
 
 // GetDatabase returns the entitlement database for the given IPSW
-func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
+func GetDatabase(conf *Config) (map[string]string, error) {
 	entDB := make(map[string]string)
 
-	i, err := info.Parse(ipswPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse IPSW: %v", err)
-	}
-
 	// create or load entitlement database
-	if _, err := os.Stat(entDBPath); os.IsNotExist(err) {
+	if _, err := os.Stat(conf.Database); os.IsNotExist(err) {
 		utils.Indent(log.Info, 2)("Generating entitlement database file...")
+		if len(conf.IPSW) > 0 {
+			i, err := info.Parse(conf.IPSW)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse IPSW: %v", err)
+			}
 
-		if appOS, err := i.GetAppOsDmg(); err == nil {
-			utils.Indent(log.Info, 3)("Scanning AppOS")
-			if ents, err := scanEnts(ipswPath, appOS, "AppOS"); err != nil {
-				return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
-			} else {
-				for k, v := range ents {
-					entDB[k] = v
+			if appOS, err := i.GetAppOsDmg(); err == nil {
+				utils.Indent(log.Info, 3)("Scanning AppOS")
+				if ents, err := scanEnts(conf.IPSW, appOS, "AppOS"); err != nil {
+					return nil, fmt.Errorf("failed to scan files in AppOS %s: %v", appOS, err)
+				} else {
+					for k, v := range ents {
+						entDB[k] = v
+					}
 				}
 			}
-		}
-		if systemOS, err := i.GetSystemOsDmg(); err == nil {
-			utils.Indent(log.Info, 3)("Scanning SystemOS")
-			if ents, err := scanEnts(ipswPath, systemOS, "SystemOS"); err != nil {
-				return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
-			} else {
-				for k, v := range ents {
-					entDB[k] = v
+			if systemOS, err := i.GetSystemOsDmg(); err == nil {
+				utils.Indent(log.Info, 3)("Scanning SystemOS")
+				if ents, err := scanEnts(conf.IPSW, systemOS, "SystemOS"); err != nil {
+					return nil, fmt.Errorf("failed to scan files in SystemOS %s: %v", systemOS, err)
+				} else {
+					for k, v := range ents {
+						entDB[k] = v
+					}
 				}
 			}
-		}
-		if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
-			utils.Indent(log.Info, 3)("Scanning filesystem")
-			if ents, err := scanEnts(ipswPath, fsOS, "filesystem"); err != nil {
-				return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
-			} else {
-				for k, v := range ents {
-					entDB[k] = v
+			if fsOS, err := i.GetFileSystemOsDmg(); err == nil {
+				utils.Indent(log.Info, 3)("Scanning filesystem")
+				if ents, err := scanEnts(conf.IPSW, fsOS, "filesystem"); err != nil {
+					return nil, fmt.Errorf("failed to scan files in filesystem %s: %v", fsOS, err)
+				} else {
+					for k, v := range ents {
+						entDB[k] = v
+					}
 				}
 			}
 		}
 
-		if len(entDBPath) > 0 {
+		if len(conf.Folder) > 0 {
+			var files []string
+			if err := filepath.Walk(conf.Folder, func(path string, info os.FileInfo, err error) error {
+				if !info.IsDir() {
+					files = append(files, path)
+				}
+				return nil
+			}); err != nil {
+				return nil, fmt.Errorf("failed to walk files in dir %s: %v", conf.Folder, err)
+			}
+
+			for _, file := range files {
+				if m, err := macho.Open(file); err == nil {
+					if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
+						entDB[strings.TrimPrefix(file, conf.Folder)] = m.CodeSignature().Entitlements
+					} else {
+						entDB[strings.TrimPrefix(file, conf.Folder)] = ""
+					}
+				}
+			}
+		}
+
+		if len(conf.Database) > 0 {
 			buff := new(bytes.Buffer)
 
 			e := gob.NewEncoder(buff)
@@ -87,9 +113,9 @@ func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 				return nil, fmt.Errorf("failed to encode entitlement db to binary: %v", err)
 			}
 
-			of, err := os.Create(entDBPath)
+			of, err := os.Create(conf.Database)
 			if err != nil {
-				return nil, fmt.Errorf("failed to create file %s: %v", ipswPath+".entDB", err)
+				return nil, fmt.Errorf("failed to create file %s: %v", conf.Database, err)
 			}
 			defer of.Close()
 
@@ -101,11 +127,11 @@ func GetDatabase(ipswPath, entDBPath string) (map[string]string, error) {
 			}
 		}
 	} else {
-		log.Info("Found ipsw entitlement database file...")
+		log.WithField("database", filepath.Base(conf.Database)).Info("Loading entitlement DB")
 
-		edbFile, err := os.Open(entDBPath)
+		edbFile, err := os.Open(conf.Database)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open entitlement database file %s; %v", entDBPath, err)
+			return nil, fmt.Errorf("failed to open entitlement database file %s; %v", conf.Database, err)
 		}
 		defer edbFile.Close()
 

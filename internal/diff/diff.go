@@ -489,12 +489,12 @@ func (d *Diff) parseDSC() error {
 }
 
 func (d *Diff) parseEntitlements() (string, error) {
-	oldDB, err := ent.GetDatabase(d.Old.IPSWPath, filepath.Join(d.tmpDir, filepath.Base(d.Old.IPSWPath+".entDB")))
+	oldDB, err := ent.GetDatabase(&ent.Config{IPSW: d.Old.IPSWPath, Database: filepath.Join(d.tmpDir, filepath.Base(d.Old.IPSWPath+".entDB"))})
 	if err != nil {
 		return "", err
 	}
 
-	newDB, err := ent.GetDatabase(d.New.IPSWPath, filepath.Join(d.tmpDir, filepath.Base(d.New.IPSWPath+".entDB")))
+	newDB, err := ent.GetDatabase(&ent.Config{IPSW: d.New.IPSWPath, Database: filepath.Join(d.tmpDir, filepath.Base(d.New.IPSWPath+".entDB"))})
 	if err != nil {
 		return "", err
 	}

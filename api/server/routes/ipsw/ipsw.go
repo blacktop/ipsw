@@ -128,7 +128,7 @@ func getFsEntitlements(c *gin.Context) {
 	ipswPath := c.Query("path")
 	ipswPath = filepath.Clean(ipswPath)
 
-	ents, err := ent.GetDatabase(ipswPath, "")
+	ents, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath})
 	if err != nil {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, types.GenericError{Error: err.Error()})
 		return
