@@ -23,13 +23,16 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"text/tabwriter"
 
+	"github.com/AlecAivazis/survey/v2"
+	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
 	"github.com/blacktop/go-plist"
@@ -49,82 +52,127 @@ var colorValue = color.New(color.Bold, color.FgHiBlue).SprintFunc()
 func init() {
 	rootCmd.AddCommand(entCmd)
 
-	entCmd.Flags().StringP("ent", "e", "", "Entitlement to search for")
-	entCmd.Flags().StringP("val", "v", "", "Entitlement's value to search for (i.e. <array> strings)")
-	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO")
-	entCmd.Flags().StringP("output", "o", "", "Folder to r/w entitlement databases")
-	entCmd.MarkFlagDirname("output")
+	entCmd.Flags().StringArray("ipsw", []string{}, "IPSWs to analyze")
+	entCmd.Flags().StringArray("input", []string{}, "Folders of MachOs to analyze")
+	entCmd.MarkFlagDirname("input")
+	entCmd.Flags().StringP("key", "k", "", "Entitlement KEY to search for")
+	entCmd.Flags().StringP("val", "v", "", "Entitlement VALUE to search for (i.e. <array> strings)")
+	entCmd.Flags().StringP("file", "f", "", "Dump entitlements for MachO as plist")
+	entCmd.Flags().String("db", "", "Folder to r/w entitlement databases")
+	entCmd.MarkFlagDirname("db")
 	entCmd.Flags().BoolP("diff", "d", false, "Diff entitlements")
 	entCmd.Flags().BoolP("md", "m", false, "Markdown style output")
-	viper.BindPFlag("ent.ent", entCmd.Flags().Lookup("ent"))
+	entCmd.Flags().Bool("ui", false, "Show entitlements UI")
+	viper.BindPFlag("ent.ipsw", entCmd.Flags().Lookup("ipsw"))
+	viper.BindPFlag("ent.input", entCmd.Flags().Lookup("input"))
+	viper.BindPFlag("ent.key", entCmd.Flags().Lookup("key"))
 	viper.BindPFlag("ent.val", entCmd.Flags().Lookup("val"))
 	viper.BindPFlag("ent.file", entCmd.Flags().Lookup("file"))
-	viper.BindPFlag("ent.output", entCmd.Flags().Lookup("output"))
+	viper.BindPFlag("ent.db", entCmd.Flags().Lookup("db"))
 	viper.BindPFlag("ent.diff", entCmd.Flags().Lookup("diff"))
 	viper.BindPFlag("ent.md", entCmd.Flags().Lookup("md"))
+	viper.BindPFlag("ent.ui", entCmd.Flags().Lookup("ui"))
+	entCmd.MarkFlagsMutuallyExclusive("key", "val", "ui")
+	entCmd.Flags().MarkHidden("ui")
 }
 
 // entCmd represents the ent command
 var entCmd = &cobra.Command{
-	Use:          "ent <IPSW>",
-	Short:        "Search IPSW filesystem DMG for MachOs with a given entitlement",
-	Args:         cobra.MinimumNArgs(1),
-	SilenceUsage: true,
+	Use:           "ent",
+	Short:         "Search IPSW filesystem DMG or Folder for MachOs with a given entitlement",
+	Args:          cobra.NoArgs,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+
+		entDBs := make([]map[string]string, 0, 2)
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 		color.NoColor = !viper.GetBool("color")
 
-		entitlement := viper.GetString("ent.ent")
-		value := viper.GetString("ent.val")
+		// flags
+		ipsws := viper.GetStringSlice("ent.ipsw")
+		inputs := viper.GetStringSlice("ent.input")
+		dbFolder := viper.GetString("ent.db")
+		entitlementKey := viper.GetString("ent.key")
+		entitlementValue := viper.GetString("ent.val")
 		searchFile := viper.GetString("ent.file")
+		doDiff := viper.GetBool("ent.diff")
 		markdown := viper.GetBool("ent.md")
-
-		if len(entitlement) > 0 && len(searchFile) > 0 {
-			return fmt.Errorf("you can only use --ent OR --file (not both)")
-		} else if len(entitlement) > 0 && len(value) > 0 {
-			return fmt.Errorf("you can only use --ent OR --val (not both)")
-		} else if len(entitlement) > 0 && viper.GetBool("ent.diff") {
-			return fmt.Errorf("you can only use --ent OR --diff (not both)")
+		showUI := viper.GetBool("ent.ui")
+		// check flags
+		if len(dbFolder) == 0 && len(ipsws) == 0 && len(inputs) == 0 {
+			return fmt.Errorf("must supply either --db, --ipsw or --input")
 		}
 
-		ipswPath := filepath.Clean(args[0])
-
-		entDBPath := strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
-		if len(viper.GetString("ent.output")) > 0 {
-			entDBPath = filepath.Join(viper.GetString("ent.output"), filepath.Base(entDBPath))
-		}
-
-		entDB, err := ent.GetDatabase(ipswPath, entDBPath)
-		if err != nil {
-			return fmt.Errorf("failed to get entitlement database: %v", err)
-		}
-
-		if viper.GetBool("ent.diff") { // DIFF ENTITLEMENTS
-			if len(args) < 2 {
-				return fmt.Errorf("you must specify two IPSWs to diff")
-			}
-
-			ipswPath2 := filepath.Clean(args[1])
-
-			entDBPath2 := strings.TrimSuffix(ipswPath2, filepath.Ext(ipswPath2)) + ".entDB"
-			if len(viper.GetString("ent.output")) > 0 {
-				entDBPath2 = filepath.Join(viper.GetString("ent.output"), filepath.Base(entDBPath2))
-			}
-
-			entDB2, err := ent.GetDatabase(ipswPath2, entDBPath2)
+		if len(dbFolder) > 0 && len(ipsws) == 0 && len(inputs) == 0 {
+			// search preprocessed entitlement databases
+			dbs, err := filepath.Glob(filepath.Join(dbFolder, "*.entDB"))
 			if err != nil {
-				return fmt.Errorf("failed to get entitlement database: %v", err)
+				return fmt.Errorf("failed to glob entitlement databases: %v", err)
+			}
+			if len(dbs) == 0 {
+				return fmt.Errorf("no entitlement databases found in %s", dbFolder)
 			}
 
-			dmp := diffmatchpatch.New()
+			var choices []string
+			for _, db := range dbs {
+				choices = append(choices, strings.TrimSuffix(filepath.Base(db), ".entDB"))
+			}
 
+			dbIndices := []int{}
+			prompt := &survey.MultiSelect{
+				Message:  "Select DB(s):",
+				Options:  choices,
+				PageSize: 20,
+			}
+			if err := survey.AskOne(prompt, &dbIndices); err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				os.Exit(0)
+			}
+
+			for _, idx := range dbIndices {
+				entDB, err := ent.GetDatabase(&ent.Config{Database: dbs[idx]})
+				if err != nil {
+					return fmt.Errorf("failed to get entitlement database: %v", err)
+				}
+				entDBs = append(entDBs, entDB)
+			}
+		} else { // create NEW entitlement databases
+			for _, ipswPath := range ipsws {
+				entDBPath := strings.TrimSuffix(ipswPath, filepath.Ext(ipswPath)) + ".entDB"
+				if len(dbFolder) > 0 {
+					entDBPath = filepath.Join(dbFolder, filepath.Base(entDBPath))
+				}
+				entDB, err := ent.GetDatabase(&ent.Config{IPSW: ipswPath, Database: entDBPath})
+				if err != nil {
+					return fmt.Errorf("failed to get entitlement database: %v", err)
+				}
+				entDBs = append(entDBs, entDB)
+			}
+			for _, input := range inputs {
+				md5Hash := md5.Sum([]byte(input))
+				entDBPath := hex.EncodeToString(md5Hash[:]) + ".entDB"
+				if len(dbFolder) > 0 {
+					entDBPath = filepath.Join(dbFolder, filepath.Base(entDBPath))
+				}
+				entDB, err := ent.GetDatabase(&ent.Config{Folder: input, Database: entDBPath})
+				if err != nil {
+					return fmt.Errorf("failed to get entitlement database: %v", err)
+				}
+				entDBs = append(entDBs, entDB)
+			}
+		}
+
+		if showUI {
+			panic("not implemented")
+		} else if doDiff { // DIFF ENTITLEMENTS
 			if len(searchFile) > 0 { // DIFF MACHO'S ENTITLEMENTS
-				for f2, ent2 := range entDB2 {
+				dmp := diffmatchpatch.New()
+				for f2, ent2 := range entDBs[1] {
 					if strings.Contains(strings.ToLower(f2), strings.ToLower(searchFile)) {
-						if e, ok := entDB[f2]; ok {
+						if e, ok := entDBs[0][f2]; ok {
 							log.Infof(f2)
 							diffs := dmp.DiffMain(e, ent2, false)
 							if len(diffs) > 2 {
@@ -148,152 +196,80 @@ var entCmd = &cobra.Command{
 						}
 					}
 				}
-			} else { // TODO: refactor this to use ent.DiffDatabases
-				// sort latest entitlements DB's files
-				var files []string
-				for f := range entDB2 {
-					files = append(files, f)
+			} else { // DIFF ENTITLEMENT DATABASES
+				log.Info("Diffing entitlement databases...")
+				out, err := ent.DiffDatabases(entDBs[0], entDBs[1], &ent.Config{Markdown: markdown, Color: viper.GetBool("color")})
+				if err != nil {
+					return fmt.Errorf("failed to diff entitlement databases: %v", err)
 				}
-				sort.Strings(files)
-
-				found := false
-				for _, f2 := range files { // DIFF ALL ENTITLEMENTS
-					e2 := entDB2[f2]
-					if e1, ok := entDB[f2]; ok {
-						var out string
-						if markdown {
-							out, err = utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Color: false, Tool: "git"})
-							if err != nil {
-								return err
-							}
-						} else {
-							out, err = utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Color: viper.GetBool("color"), Tool: viper.GetString("diff-tool")})
-							if err != nil {
-								return err
-							}
-						}
-						if len(out) == 0 {
-							continue
-						}
-						found = true
-						if markdown {
-							color.New(color.Bold).Printf("\n### `%s`\n\n", f2)
-							fmt.Println("```diff")
-							fmt.Println(out)
-							fmt.Println("```")
-						} else {
-							color.New(color.Bold).Printf("\n%s\n\n", f2)
-							fmt.Println(out)
-						}
-					} else {
-						found = true
-						if markdown {
-							color.New(color.Bold).Printf("\n### 🆕 `%s`\n\n", f2)
-						} else {
-							color.New(color.Bold).Printf("\n🆕 %s 🆕\n\n", f2)
-						}
-						if len(e2) == 0 {
-							if markdown {
-								fmt.Println("- No entitlements *(yet)*")
-							} else {
-								log.Warn("No entitlements (yet)")
-							}
-						} else {
-							if viper.GetBool("color") {
-								if err := quick.Highlight(os.Stdout, e2, "xml", "terminal256", "nord"); err != nil {
-									return err
-								}
-							} else {
-								if markdown {
-									fmt.Println("```xml")
-									fmt.Println(e2)
-									fmt.Println("```")
-								} else {
-									fmt.Println(e2)
-								}
-							}
-						}
-					}
-				}
-				if !found {
-					log.Warn("No differences found")
-				}
+				fmt.Println(out)
 			}
 			return nil
-		} else if len(searchFile) > 0 { // DUMP MACHO'S ENTITLEMENTS
-			for f, ent := range entDB {
-				if strings.Contains(strings.ToLower(f), strings.ToLower(searchFile)) {
-					log.Infof(f)
-					if len(ent) > 0 {
-						fmt.Printf("\n%s\n", ent)
-					} else {
-						fmt.Printf("\n\t- no entitlements\n")
-					}
-				}
-			}
-		} else if len(entitlement) > 0 { // FIND ALL FILES WITH ENTITLEMENT
-			log.Infof("Files containing entitlement: %s", entitlement)
+		} else if len(entitlementKey) > 0 { // FIND ALL FILES WITH ENTITLEMENT KEY
+			log.Infof("Files containing entitlement: %s", entitlementKey)
 			fmt.Println()
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-			for f, ent := range entDB {
-				if strings.Contains(ent, entitlement) {
-					ents := make(map[string]any)
-					if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
-						return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
-					}
-					for k, v := range ents {
-						if strings.Contains(k, entitlement) {
-							switch v := v.(type) {
-							case bool:
-								if v {
+			for _, entDB := range entDBs {
+				for f, ent := range entDB {
+					if strings.Contains(ent, entitlementKey) {
+						ents := make(map[string]any)
+						if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
+							return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
+						}
+						for k, v := range ents {
+							if strings.Contains(k, entitlementKey) {
+								switch v := v.(type) {
+								case bool:
+									if v {
+										fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+									}
+								case uint64:
+									fmt.Fprintf(w, "%s=%d\t%s\n", colorKey(k), colorValue(v), colorBin(f))
+								case string:
 									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+									fmt.Fprintf(w, " - %s\n", colorValue(v))
+								case []any:
+									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+									for _, i := range v {
+										fmt.Fprintf(w, " - %v\n", colorValue(i))
+									}
+								case map[string]any:
+									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
+									for kk, vv := range v {
+										fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
+									}
+								default:
+									log.Error(fmt.Sprintf("unhandled entitlement kind %T in %s", v, f))
 								}
-							case uint64:
-								fmt.Fprintf(w, "%s=%d\t%s\n", colorKey(k), colorValue(v), colorBin(f))
-							case string:
-								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-								fmt.Fprintf(w, " - %s\n", colorValue(v))
-							case []any:
-								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-								for _, i := range v {
-									fmt.Fprintf(w, " - %v\n", colorValue(i))
-								}
-							case map[string]any:
-								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
-								for kk, vv := range v {
-									fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
-								}
-							default:
-								log.Error(fmt.Sprintf("unhandled entitlement kind %T in %s", v, f))
 							}
 						}
 					}
 				}
 			}
 			w.Flush()
-		} else if len(value) > 0 {
-			log.Infof("Files containing entitlement value: %s", value)
+		} else if len(entitlementValue) > 0 { // FIND ALL FILES WITH ENTITLEMENT VALUE
+			log.Infof("Files containing entitlement value: %s", entitlementValue)
 			fmt.Println()
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 1, ' ', 0)
-			for f, ent := range entDB {
-				ents := make(map[string]any)
-				if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
-					return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
-				}
-				for k, v := range ents {
-					if strings.Contains(k, entitlement) {
+			for _, entDB := range entDBs {
+				for f, ent := range entDB {
+					ents := make(map[string]any)
+					if err := plist.NewDecoder(bytes.NewReader([]byte(ent))).Decode(&ents); err != nil {
+						return fmt.Errorf("failed to decode entitlements plist for %s: %v", f, err)
+					}
+					for k, v := range ents {
 						switch v := v.(type) {
 						case bool:
 							continue // skip bools (prob too noisy)
 						case uint64:
 							continue // skip uint64 (prob too noisy)
 						case string:
-							if strings.Contains(v, value) {
+							if strings.Contains(v, entitlementValue) {
 								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
 								fmt.Fprintf(w, " - %s\n", colorValue(v))
 							}
 						case []any:
-							if slices.Contains(v, any(value)) {
+							if slices.Contains(v, any(entitlementValue)) {
 								fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
 								for _, i := range v {
 									fmt.Fprintf(w, " - %v\n", colorValue(i))
@@ -301,7 +277,7 @@ var entCmd = &cobra.Command{
 							}
 						case map[string]any:
 							for kk, vv := range v {
-								if strings.Contains(kk, value) {
+								if strings.Contains(kk, entitlementValue) {
 									fmt.Fprintf(w, "%s\t%s\n", colorKey(k), colorBin(f))
 									fmt.Fprintf(w, " - %s: %v\n", colorKey(kk), colorValue(vv))
 								}
@@ -313,9 +289,41 @@ var entCmd = &cobra.Command{
 				}
 			}
 			w.Flush()
+		} else if len(searchFile) > 0 { // DUMP MACHO'S ENTITLEMENTS
+			for _, entDB := range entDBs {
+				for f, ent := range entDB {
+					if strings.Contains(strings.ToLower(f), strings.ToLower(searchFile)) {
+						if viper.GetBool("color") {
+							fmt.Print(color.New(color.Bold).Sprintf("\n%s\n\n", f))
+							if len(ent) > 0 {
+								quick.Highlight(os.Stdout, ent, "xml", "terminal256", "nord")
+							} else {
+								fmt.Printf("\n\t- no entitlements\n")
+							}
+						} else {
+							log.Infof(f)
+							if len(ent) > 0 {
+								fmt.Printf("\n%s\n", ent)
+							} else {
+								fmt.Printf("\n\t- no entitlements\n")
+							}
+						}
+					}
+				}
+			}
 		} else { // DUMP ALL ENTITLEMENTS
-			for f, ent := range entDB {
-				fmt.Printf("%s\n\n%s\n", f, ent)
+			for _, entDB := range entDBs {
+				for f, ent := range entDB {
+					if len(ent) == 0 {
+						continue
+					}
+					if viper.GetBool("color") {
+						fmt.Print(color.New(color.Bold).Sprintf("\n%s\n\n", f))
+						quick.Highlight(os.Stdout, ent, "xml", "terminal256", "nord")
+					} else {
+						fmt.Printf("%s\n\n%s\n", f, ent)
+					}
+				}
 			}
 		}
 
