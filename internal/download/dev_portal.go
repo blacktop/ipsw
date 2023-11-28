@@ -43,10 +43,11 @@ import (
 */
 
 const (
-	developerURL    = "https://developer.apple.com"
-	downloadURLNew  = "https://download.developer.apple.com"
-	downloadURL     = "https://developer.apple.com/download/"
-	downloadAppsURL = "https://developer.apple.com/download/applications/"
+	developerURL        = "https://developer.apple.com"
+	downloadURLNew      = "https://download.developer.apple.com"
+	downloadURL         = "https://developer.apple.com/download/"
+	downloadAppsURL     = "https://developer.apple.com/download/applications/"
+	downloadProfilesURL = "https://developer.apple.com/bug-reporting/profiles-and-logs/"
 
 	downloadActionURL      = "https://developer.apple.com/devcenter/download.action"
 	listDownloadsActionURL = "https://developer.apple.com/services-account/QH65B2/downloadws/listDownloads.action"
@@ -1013,6 +1014,7 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 
 	var prevDownloads []MoreDownload
 	var prevIPSWs map[string][]DevDownload
+	var prevProfiles map[string]string
 
 	for {
 		// scrape dev portal
@@ -1050,7 +1052,7 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 					}
 				}
 			}
-		default:
+		case "os":
 			ipsws, err := dp.getDevDownloads()
 			if err != nil {
 				return fmt.Errorf("failed to get developer downloads: %v", err)
@@ -1082,6 +1084,41 @@ func (dp *DevPortal) Watch(ctx context.Context, downloadType, folder string, dur
 								log.Errorf("failed to download %s: %v", ipsw.URL, err)
 							}
 						}
+					}
+				}
+			}
+		case "profile":
+			profiles, err := dp.getDevLoggingProfiles()
+			if err != nil {
+				return fmt.Errorf("failed to get developer downloads: %v", err)
+			}
+
+			// check for NEW downloads
+			if reflect.DeepEqual(prevProfiles, profiles) {
+				time.Sleep(5 * time.Minute)
+
+				if err := dp.refreshSession(); err != nil {
+					return err
+				}
+
+				continue
+
+			} else {
+				prevProfiles = profiles
+			}
+
+			for name, url := range profiles {
+				for _, watchPattern := range dp.config.WatchList {
+					re, err := regexp.Compile(watchPattern)
+					if err != nil {
+						return fmt.Errorf("failed to compile regex watch pattern '%s': %v", watchPattern, err)
+					}
+					if re.MatchString(name) {
+						output := filepath.Join(folder, strings.ReplaceAll(name, " ", "_"))
+						if err := os.MkdirAll(output, 0750); err != nil {
+							return fmt.Errorf("failed to create folder '%s': %v", output, err)
+						}
+						dp.Download(url, output)
 					}
 				}
 			}
@@ -1122,7 +1159,7 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 				}
 			}
 		}
-	default:
+	case "os":
 		ipsws, err := dp.getDevDownloads()
 		if err != nil {
 			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
@@ -1173,6 +1210,40 @@ func (dp *DevPortal) DownloadPrompt(downloadType, folder string) error {
 			}
 		} else {
 			dp.Download(ipsws[version][0].URL, folder)
+		}
+	case "profile":
+		profiles, err := dp.getDevLoggingProfiles()
+		if err != nil {
+			return fmt.Errorf("failed to get the '%s' downloads: %v", downloadType, err)
+		}
+
+		var choices []string
+		for name := range profiles {
+			choices = append(choices, name)
+		}
+
+		sort.Strings(choices)
+
+		dfiles := []string{}
+		prompt := &survey.MultiSelect{
+			Message:  "Select what file(s) to download:",
+			Options:  choices,
+			PageSize: dp.config.PageSize,
+		}
+		if err := survey.AskOne(prompt, &dfiles); err != nil {
+			if err == terminal.InterruptErr {
+				log.Warn("Exiting...")
+				os.Exit(0)
+			}
+			return err
+		}
+
+		for _, df := range dfiles {
+			output := filepath.Join(folder, strings.ReplaceAll(df, " ", "_"))
+			if err := os.MkdirAll(output, 0750); err != nil {
+				return fmt.Errorf("failed to create folder '%s': %v", output, err)
+			}
+			dp.Download(profiles[df], output)
 		}
 	}
 
@@ -1321,7 +1392,7 @@ func (dp *DevPortal) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byt
 			return json.MarshalIndent(dloads, "", "    ")
 		}
 		return json.Marshal(dloads)
-	default:
+	case "os":
 		ipsws, err := dp.getDevDownloads()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get developer downloads: %v", err)
@@ -1330,6 +1401,17 @@ func (dp *DevPortal) GetDownloadsAsJSON(downloadType string, pretty bool) ([]byt
 			return json.MarshalIndent(ipsws, "", "    ")
 		}
 		return json.Marshal(ipsws)
+	case "profile":
+		profs, err := dp.getDevLoggingProfiles()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get developer downloads: %v", err)
+		}
+		if pretty {
+			return json.MarshalIndent(profs, "", "    ")
+		}
+		return json.Marshal(profs)
+	default:
+		return nil, fmt.Errorf("invalid download type '%s'", downloadType)
 	}
 }
 
@@ -1447,4 +1529,56 @@ func (dp *DevPortal) getDevDownloads() (map[string][]DevDownload, error) {
 	})
 
 	return ipsws, nil
+}
+
+// getDevLoggingProfiles scrapes the https://developer.apple.com/bug-reporting/profiles-and-logs/ page for links
+func (dp *DevPortal) getDevLoggingProfiles() (map[string]string, error) {
+	profiles := make(map[string]string)
+
+	req, err := http.NewRequest("GET", downloadProfilesURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http GET request: %v", err)
+	}
+
+	response, err := dp.Client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to do GET request: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("failed to GET %s: response received %s", downloadURL, response.Status)
+	}
+
+	doc, err := goquery.NewDocumentFromReader(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	doc.Find("#main > section").Each(func(i int, s *goquery.Selection) {
+		s.Find("li.profile > section").Each(func(index int, row *goquery.Selection) {
+			var title string
+			var platform string
+			// Get ALL the profile links
+			row.Find("section.column").Each(func(_ int, section *goquery.Selection) {
+				section.Find("span").Each(func(_ int, span *goquery.Selection) {
+					if _, ok := span.Attr("data-profile-detail"); ok {
+						title = span.Text()
+					}
+					if _, ok := span.Attr("class"); ok {
+						platform = span.Text()
+					}
+				})
+				section.Find("ul > li").Each(func(_ int, li *goquery.Selection) {
+					a := li.Find("a[href]")
+					href, _ := a.Attr("href")
+					if strings.HasSuffix(href, ".mobileconfig") {
+						profiles[fmt.Sprintf("%s (%s)", title, platform)] = href
+					}
+				})
+			})
+		})
+	})
+
+	return profiles, nil
 }
