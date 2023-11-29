@@ -4,26 +4,43 @@ title: ent
 hide_title: true
 hide_table_of_contents: true
 sidebar_label: ent
-description: Search IPSW filesystem DMG for MachOs with a given entitlement
+description: Search IPSW filesystem DMG or Folder for MachOs with a given entitlement
 ---
 ## ipsw ent
 
-Search IPSW filesystem DMG for MachOs with a given entitlement
+Search IPSW filesystem DMG or Folder for MachOs with a given entitlement
 
 ```
-ipsw ent <IPSW> [flags]
+ipsw ent [flags]
+```
+
+### Examples
+
+```bash
+  # Search IPSW for entitlement key
+  ❯ ipsw ent --ipsw <IPSW> --db /tmp --key platform-application
+  # Search local folder for entitlement key
+  ❯ ipsw ent --input /usr/bin --db /tmp --val platform-application
+  # Search IPSW for entitlement value (i.e. one of the <array> strings)
+  ❯ ipsw ent --ipsw <IPSW> --db /tmp --val LockdownMode
+  # Dump entitlements for MachO in IPSW
+  ❯ ipsw ent --ipsw <IPSW> --db /tmp --file WebContent
+  # Diff two IPSWs
+  ❯ ipsw ent --diff --ipsw <PREV_IPSW> --ipsw <NEW_IPSW> --db /tmp
 ```
 
 ### Options
 
 ```
-  -d, --diff            Diff entitlements
-  -e, --ent string      Entitlement to search for
-  -f, --file string     Dump entitlements for MachO
-  -h, --help            help for ent
-  -m, --md              Markdown style output
-  -o, --output string   Folder to r/w entitlement databases
-  -v, --val string      Entitlement's value to search for (i.e. <array> strings)
+      --db string           Folder to r/w entitlement databases
+  -d, --diff                Diff entitlements
+  -f, --file string         Dump entitlements for MachO as plist
+  -h, --help                help for ent
+      --input stringArray   Folders of MachOs to analyze
+      --ipsw stringArray    IPSWs to analyze
+  -k, --key string          Entitlement KEY to search for
+  -m, --md                  Markdown style output
+  -v, --val string          Entitlement VALUE to search for (i.e. <array> strings)
 ```
 
 ### Options inherited from parent commands
