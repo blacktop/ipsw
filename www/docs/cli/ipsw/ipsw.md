@@ -39,6 +39,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw mount](/docs/cli/ipsw/mount)	 - Mount DMG from IPSW
 * [ipsw ota](/docs/cli/ipsw/ota)	 - Parse OTAs
 * [ipsw plist](/docs/cli/ipsw/plist)	 - Dump plist as JSON
+* [ipsw pongo](/docs/cli/ipsw/pongo)	 - PongoOS Terminal
 * [ipsw sepfw](/docs/cli/ipsw/sepfw)	 - Dump MachOs
 * [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device
 * [ipsw symbolicate](/docs/cli/ipsw/symbolicate)	 - Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)
