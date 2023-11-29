@@ -51,7 +51,7 @@ ipsw dyld [flags]
 * [ipsw dyld stubs](/docs/cli/ipsw/dyld/stubs)	 - Dump Stub Islands
 * [ipsw dyld swift](/docs/cli/ipsw/dyld/swift)	 - Dump Swift Optimizations Info
 * [ipsw dyld symaddr](/docs/cli/ipsw/dyld/symaddr)	 - Lookup or dump symbol(s)
-* [ipsw dyld tbd](/docs/cli/ipsw/dyld/tbd)	 - Generate a .tbd file for a dylib
+* [ipsw dyld tbd](/docs/cli/ipsw/dyld/tbd)	 - Generate a text-based stub library '.tbd' file for a dylib
 * [ipsw dyld webkit](/docs/cli/ipsw/dyld/webkit)	 - Get WebKit version from a dyld_shared_cache
 * [ipsw dyld xref](/docs/cli/ipsw/dyld/xref)	 - 🚧 [WIP] Find all cross references to an address
 

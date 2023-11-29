@@ -27,7 +27,7 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw download](/docs/cli/ipsw/download)	 - Download Apple Firmware files (and more)
 * [ipsw dtree](/docs/cli/ipsw/dtree)	 - Parse DeviceTree
 * [ipsw dyld](/docs/cli/ipsw/dyld)	 - Parse dyld_shared_cache
-* [ipsw ent](/docs/cli/ipsw/ent)	 - Search IPSW filesystem DMG for MachOs with a given entitlement
+* [ipsw ent](/docs/cli/ipsw/ent)	 - Search IPSW filesystem DMG or Folder for MachOs with a given entitlement
 * [ipsw extract](/docs/cli/ipsw/extract)	 - Extract kernelcache, dyld_shared_cache or DeviceTree from IPSW/OTA
 * [ipsw iboot](/docs/cli/ipsw/iboot)	 - Dump firmwares
 * [ipsw idev](/docs/cli/ipsw/idev)	 - USB connected device commands
@@ -39,7 +39,6 @@ Download and Parse IPSWs (and SO much more)
 * [ipsw mount](/docs/cli/ipsw/mount)	 - Mount DMG from IPSW
 * [ipsw ota](/docs/cli/ipsw/ota)	 - Parse OTAs
 * [ipsw plist](/docs/cli/ipsw/plist)	 - Dump plist as JSON
-* [ipsw pongo](/docs/cli/ipsw/pongo)	 - PongoOS Terminal
 * [ipsw sepfw](/docs/cli/ipsw/sepfw)	 - Dump MachOs
 * [ipsw ssh](/docs/cli/ipsw/ssh)	 - SSH into a jailbroken device
 * [ipsw symbolicate](/docs/cli/ipsw/symbolicate)	 - Symbolicate ARM 64-bit crash logs (similar to Apple's symbolicatecrash)

@@ -24,6 +24,7 @@ ipsw download dev [flags]
   -o, --output string           Folder to download files to
   -p, --page int                Page size for file lists (default 20)
       --pretty                  Pretty print JSON
+      --profile                 Download Logging Profiles
       --sms                     Prefer SMS Two-factor authentication
   -t, --timeout duration        Timeout for watch attempts in minutes (default 5m0s)
   -k, --vault-password string   Password to unlock credential vault (only for file vaults)
