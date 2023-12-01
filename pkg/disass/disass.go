@@ -258,7 +258,7 @@ func Disassemble(d Disass) {
 
 				if d.IsLocation(instruction.Address) {
 					if d.Color() {
-						fmt.Printf("%s:  %s\n", colorAddr("%#08x", instruction.Address), colorLocation("loc_%x", instruction.Address))
+						fmt.Printf("%s\n", colorLocation("loc_%x", instruction.Address))
 					} else {
 						fmt.Printf("%#08x:  ; loc_%x\n", instruction.Address, instruction.Address)
 					}
