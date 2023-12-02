@@ -23,6 +23,7 @@ package idev
 
 import (
 	"github.com/apex/log"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -44,6 +45,7 @@ var restoreUpdateCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		panic("not implemented") // TODO: implement
 

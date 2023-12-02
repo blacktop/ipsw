@@ -40,6 +40,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/dustin/go-humanize"
+	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -120,6 +121,7 @@ var otaDLCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
 		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))

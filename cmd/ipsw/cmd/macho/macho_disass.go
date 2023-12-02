@@ -94,7 +94,7 @@ var machoDisassCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = !viper.GetBool("color")
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		selectedArch := viper.GetString("macho.info.arch")

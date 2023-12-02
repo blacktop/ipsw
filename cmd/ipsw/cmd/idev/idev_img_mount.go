@@ -35,6 +35,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/tss"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
 	"github.com/blacktop/ipsw/pkg/usb/mount"
+	"github.com/fatih/color"
 	semver "github.com/hashicorp/go-version"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -74,6 +75,7 @@ var idevImgMountCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 		// flags
 		udid, _ := cmd.Flags().GetString("udid")
 		xcode := viper.GetString("idev.img.mount.xcode")

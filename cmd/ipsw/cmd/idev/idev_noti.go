@@ -30,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/notification"
 	"github.com/caarlos0/ctrlc"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,6 +53,7 @@ var NotificationCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		udid, _ := cmd.Flags().GetString("udid")
 		notificationName, _ := cmd.Flags().GetString("notification")

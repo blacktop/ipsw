@@ -61,7 +61,7 @@ var dyldEmuCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = !viper.GetBool("color")
+		color.NoColor = viper.GetBool("no-color")
 
 		// Flags
 		symbolName, _ := cmd.Flags().GetString("sym")

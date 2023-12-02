@@ -74,6 +74,7 @@ var machoDumpCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		selectedArch := viper.GetString("macho.dump.arch")
@@ -84,7 +85,7 @@ var machoDumpCmd = &cobra.Command{
 		outFile := viper.GetString("macho.dump.output")
 		segmentSection := viper.GetString("macho.dump.section")
 
-		color.NoColor = !viper.GetBool("color")
+		color.NoColor = viper.GetBool("no-color")
 
 		if size > 0 && count > 0 {
 			return fmt.Errorf("you can only use --size OR --count")

@@ -66,6 +66,7 @@ var SymAddrCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 		useColor := viper.GetBool("color")
 		color.NoColor = !useColor
 

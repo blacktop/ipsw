@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	icmd "github.com/blacktop/ipsw/internal/commands/img4"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -52,6 +53,7 @@ var decImg4Cmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		outputFile, _ := cmd.Flags().GetString("output")
