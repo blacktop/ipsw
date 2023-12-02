@@ -31,6 +31,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types/swift"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -63,6 +64,7 @@ var dyldSearchSwiftCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		searchImages := viper.GetStringSlice("dyld.search.swift.image")

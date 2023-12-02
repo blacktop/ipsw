@@ -99,7 +99,7 @@ var entCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = !viper.GetBool("color")
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		ipsws := viper.GetStringSlice("ent.ipsw")

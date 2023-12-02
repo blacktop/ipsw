@@ -32,6 +32,7 @@ import (
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -63,6 +64,7 @@ var inspectCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		filter := viper.GetString("kernel.kmutil.inspect.filter")

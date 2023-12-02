@@ -32,6 +32,7 @@ import (
 	"github.com/AlecAivazis/survey/v2/terminal"
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/download"
+	"github.com/fatih/color"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -79,6 +80,7 @@ var ipaCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
 		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))

@@ -53,7 +53,7 @@ var idevAfcTreeCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = !viper.GetBool("color")
+		color.NoColor = viper.GetBool("no-color")
 
 		udid, _ := cmd.Flags().GetString("udid")
 		flat, _ := cmd.Flags().GetBool("flat")

@@ -72,6 +72,7 @@ var kernelInfoCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		filter := viper.GetString("kernel.info.filter")
 

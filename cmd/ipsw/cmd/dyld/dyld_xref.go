@@ -30,6 +30,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/disass"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -67,6 +68,7 @@ var XrefCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		imageName := viper.GetString("dyld.xref.image")
 		// TODO: add slide support (add to output addrs)

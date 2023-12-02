@@ -29,6 +29,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/tss"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -70,6 +71,7 @@ var tssCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		viper.BindPFlag("download.device", cmd.Flags().Lookup("device"))
 		viper.BindPFlag("download.build", cmd.Flags().Lookup("build"))

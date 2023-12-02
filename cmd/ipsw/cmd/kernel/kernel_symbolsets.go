@@ -31,6 +31,7 @@ import (
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/go-macho/types"
 	"github.com/blacktop/go-plist"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -68,6 +69,7 @@ var symbolsetsCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		if _, err := os.Stat(args[0]); os.IsNotExist(err) {
 			return fmt.Errorf("file %s does not exist", args[0])

@@ -40,6 +40,7 @@ import (
 	"github.com/blacktop/ipsw/pkg/kernelcache"
 	"github.com/blacktop/ipsw/pkg/ota"
 	"github.com/blacktop/ipsw/pkg/plist"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -92,6 +93,7 @@ var wikiCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		viper.BindPFlag("download.proxy", cmd.Flags().Lookup("proxy"))
 		viper.BindPFlag("download.insecure", cmd.Flags().Lookup("insecure"))

@@ -31,6 +31,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/caarlos0/ctrlc"
+	"github.com/fatih/color"
 	"github.com/frida/frida-go/frida"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -54,6 +55,7 @@ var fridaFMonCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// udid := viper.GetString("frida.udid")
 

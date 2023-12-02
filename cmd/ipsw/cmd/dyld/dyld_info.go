@@ -38,6 +38,7 @@ import (
 	dscCmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/fullsailor/pkcs7"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -77,6 +78,7 @@ var dyldInfoCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		// showHeader := viper.GetBool("header")

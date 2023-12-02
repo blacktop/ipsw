@@ -63,6 +63,7 @@ var diffCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		var sbDBs []map[string]string
 

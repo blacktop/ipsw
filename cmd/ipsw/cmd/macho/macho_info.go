@@ -149,6 +149,7 @@ var machoInfoCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// flags
 		verbose := viper.GetBool("verbose")

@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/usb/irecv"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -48,6 +49,7 @@ var restoreExitCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		cli, err := irecv.NewClient()
 		if err != nil {

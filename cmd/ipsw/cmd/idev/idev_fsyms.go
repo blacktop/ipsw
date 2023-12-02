@@ -31,6 +31,7 @@ import (
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/usb/fetchsymbols"
 	"github.com/blacktop/ipsw/pkg/usb/lockdownd"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -53,6 +54,7 @@ var FetchsymsCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		udid, _ := cmd.Flags().GetString("udid")
 		output, _ := cmd.Flags().GetString("output")

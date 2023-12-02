@@ -51,11 +51,12 @@ var ListDevicesCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		ipswSpec, _ := cmd.Flags().GetBool("ipsw")
 		asJSON, _ := cmd.Flags().GetBool("json")
 
-		color.NoColor = !viper.GetBool("color")
+		color.NoColor = viper.GetBool("no-color")
 
 		conn, err := usb.NewConn()
 		if err != nil {

@@ -28,6 +28,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/internal/ssh"
 	"github.com/blacktop/ipsw/pkg/shsh"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -49,6 +50,7 @@ var sshShshBlobCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		// parent flags
 		viper.BindPFlag("ssh.host", cmd.Flags().Lookup("host"))

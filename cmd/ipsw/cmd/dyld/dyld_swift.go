@@ -28,6 +28,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/dyld"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -62,6 +63,7 @@ var SwiftCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		if !viper.GetBool("dyld.swift.types") && !viper.GetBool("dyld.swift.metadata") && !viper.GetBool("dyld.swift.foreign") {
 			return fmt.Errorf("must specify at least one of the following flags: --types, --metadata, --foreign")

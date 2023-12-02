@@ -29,6 +29,7 @@ import (
 	"github.com/apex/log"
 	"github.com/blacktop/ipsw/pkg/img4"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -63,6 +64,7 @@ var kernelDecCmd = &cobra.Command{
 		if viper.GetBool("verbose") {
 			log.SetLevel(log.DebugLevel)
 		}
+		color.NoColor = viper.GetBool("no-color")
 
 		outputDir, _ := cmd.Flags().GetString("output")
 
