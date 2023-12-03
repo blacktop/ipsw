@@ -80,12 +80,18 @@ func NewTBD(image *dyld.CacheImage, private bool) (*TBD, error) {
 	sort.Strings(objcIvars)
 
 	return &TBD{
-		Targets: []string{"x86_64-macos",
+		Targets: []string{
+			"x86_64-macos",
 			"x86_64-maccatalyst",
 			"arm64-macos",
 			"arm64-maccatalyst",
 			"arm64e-macos",
-			"arm64e-maccatalyst"},
+			"arm64e-maccatalyst",
+			"armv7-ios",
+			"armv7s-ios",
+			"arm64-ios",
+			"arm64e-ios",
+		},
 		Path:        image.Name,
 		Symbols:     syms,
 		ObjcClasses: objcClasses,
