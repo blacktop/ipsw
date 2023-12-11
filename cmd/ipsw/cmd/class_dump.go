@@ -23,6 +23,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/apex/log"
 
@@ -39,26 +42,34 @@ import (
 func init() {
 	rootCmd.AddCommand(classDumpCmd)
 
-	classDumpCmd.Flags().StringP("theme", "t", "", "Color theme (nord, github, etc)")
+	classDumpCmd.Flags().Bool("headers", false, "Dump ObjC headers")
+	classDumpCmd.Flags().StringP("output", "o", "", "Folder to write headers to")
+	classDumpCmd.MarkFlagDirname("output")
+	classDumpCmd.Flags().StringP("theme", "t", "nord", "Color theme (nord, github, etc)")
 	classDumpCmd.RegisterFlagCompletionFunc("theme", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return styles.Names(), cobra.ShellCompDirectiveNoFileComp
 	})
-	classDumpCmd.Flags().StringP("class", "c", "", "Dump class")
-	classDumpCmd.Flags().StringP("proto", "p", "", "Dump protocol")
-	classDumpCmd.Flags().StringP("cat", "a", "", "Dump category")
-	classDumpCmd.MarkFlagsMutuallyExclusive("class", "proto", "cat")
-
+	classDumpCmd.Flags().StringP("class", "c", "", "Dump class (regex)")
+	classDumpCmd.Flags().StringP("proto", "p", "", "Dump protocol (regex)")
+	classDumpCmd.Flags().StringP("cat", "a", "", "Dump category (regex)")
+	classDumpCmd.Flags().Bool("refs", false, "Dump ObjC references too")
+	classDumpCmd.Flags().String("re", "", "RE verbosity (with addresses)")
+	classDumpCmd.Flags().MarkHidden("re") // TODO: remove this when I've wired it up
+	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
+	viper.BindPFlag("class-dump.output", classDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("class-dump.class", classDumpCmd.Flags().Lookup("class"))
 	viper.BindPFlag("class-dump.proto", classDumpCmd.Flags().Lookup("proto"))
 	viper.BindPFlag("class-dump.cat", classDumpCmd.Flags().Lookup("cat"))
 	viper.BindPFlag("class-dump.theme", classDumpCmd.Flags().Lookup("theme"))
+	viper.BindPFlag("class-dump.refs", classDumpCmd.Flags().Lookup("refs"))
+	viper.BindPFlag("class-dump.re", classDumpCmd.Flags().Lookup("re"))
 }
 
 // classDumpCmd represents the classDump command
 var classDumpCmd = &cobra.Command{
 	Use:     "class-dump [<DSC> <DYLIB>|<MACHO>]",
 	Aliases: []string{"cd"},
-	Short:   "ObjC class-dump a dylib from a DSC or MachO",
+	Short:   "ObjC class-dump a dylib from a DSC or a MachO binary",
 	Args:    cobra.MinimumNArgs(1),
 	// ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	// 	if len(args) == 1 {
@@ -68,6 +79,7 @@ var classDumpCmd = &cobra.Command{
 	// },
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		var name string
 		var m *macho.File
 
 		if Verbose {
@@ -75,12 +87,27 @@ var classDumpCmd = &cobra.Command{
 		}
 		color.NoColor = viper.GetBool("no-color")
 
+		if viper.GetBool("class-dump.headers") &&
+			(viper.GetString("class-dump.class") != "" ||
+				viper.GetString("class-dump.proto") != "" ||
+				viper.GetString("class-dump.cat") != "") {
+			return fmt.Errorf("cannot dump --headers and use --class, --protocol or --category flags")
+		}
+
+		if len(viper.GetString("class-dump.output")) > 0 {
+			if err := os.MkdirAll(viper.GetString("class-dump.output"), 0o750); err != nil {
+				return err
+			}
+		}
+
 		if ok, _ := magic.IsMachO(args[0]); ok {
 			m, err := macho.Open(args[0])
 			if err != nil {
 				return err
 			}
 			defer m.Close()
+
+			name = filepath.Base(args[0])
 		} else {
 			f, err := dyld.Open(args[0])
 			if err != nil {
@@ -101,41 +128,66 @@ var classDumpCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
+
+			name = filepath.Base(img.Name)
 		}
 
-		switch {
-		case viper.GetString("class-dump.class") != "":
-			out, err := mcmd.GetClass(m, viper.GetString("class-dump.class"), &mcmd.Config{
-				Color: viper.GetBool("color"),
-				Theme: viper.GetString("class-dump.theme"),
-			})
+		var buildVersions []string
+		if bvers := m.GetLoadsByName("LC_BUILD_VERSION"); len(bvers) > 0 {
+			for _, bv := range bvers {
+				buildVersions = append(buildVersions, bv.String())
+			}
+		}
+		var sourceVersion string
+		if svers := m.GetLoadsByName("LC_SOURCE_VERSION"); len(svers) > 0 {
+			sourceVersion = svers[0].String()
+		}
+
+		conf := mcmd.Config{
+			Name:          name,
+			Verbose:       Verbose,
+			Addrs:         viper.GetBool("class-dump.re"),
+			ObjcRefs:      viper.GetBool("class-dump.refs"),
+			IpswVersion:   fmt.Sprintf("Version: %s, BuildTime: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime)),
+			BuildVersions: buildVersions,
+			SourceVersion: sourceVersion,
+			Color:         viper.GetBool("color"),
+			Theme:         viper.GetString("class-dump.theme"),
+			Output:        viper.GetString("class-dump.output"),
+		}
+
+		if viper.GetBool("class-dump.headers") {
+			return mcmd.Headers(m, &conf)
+		}
+
+		if viper.GetString("class-dump.class") != "" {
+			out, err := mcmd.GetClass(m, viper.GetString("class-dump.class"), &conf)
 			if err != nil {
 				return err
 			}
 			fmt.Println(out)
-		case viper.GetString("class-dump.proto") != "":
-			out, err := mcmd.GetProtocol(m, viper.GetString("class-dump.proto"), &mcmd.Config{
-				Color: viper.GetBool("color"),
-				Theme: viper.GetString("class-dump.theme"),
-			})
+		}
+
+		if viper.GetString("class-dump.proto") != "" {
+			out, err := mcmd.GetProtocol(m, viper.GetString("class-dump.proto"), &conf)
 			if err != nil {
 				return err
 			}
 			fmt.Println(out)
-		case viper.GetString("class-dump.cat") != "":
-			out, err := mcmd.GetCategory(m, viper.GetString("class-dump.cat"), &mcmd.Config{
-				Color: viper.GetBool("color"),
-				Theme: viper.GetString("class-dump.theme"),
-			})
+		}
+
+		if viper.GetString("class-dump.cat") != "" {
+			out, err := mcmd.GetCategory(m, viper.GetString("class-dump.cat"), &conf)
 			if err != nil {
 				return err
 			}
 			fmt.Println(out)
-		default:
-			out, err := mcmd.Dump(m, &mcmd.Config{
-				Color: viper.GetBool("color"),
-				Theme: viper.GetString("class-dump.theme"),
-			})
+		}
+
+		if viper.GetString("class-dump.class") == "" &&
+			viper.GetString("class-dump.proto") == "" &&
+			viper.GetString("class-dump.cat") == "" {
+			out, err := mcmd.Dump(m, &conf)
 			if err != nil {
 				return err
 			}

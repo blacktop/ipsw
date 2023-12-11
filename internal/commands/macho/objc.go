@@ -2,12 +2,17 @@
 package macho
 
 import (
+	"bytes"
 	"cmp"
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
+	"sort"
+	"strings"
+	"text/template"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -21,17 +26,22 @@ var ErrNoObjc = errors.New("macho does not contain objc info")
 
 // Config for MachO ObjC parser
 type Config struct {
+	Name     string
 	Verbose  bool
 	Addrs    bool
-	Arch     string
-	Objc     bool
-	Swift    bool
-	Color    bool
-	Theme    string
-	Demangle bool
 	ObjcRefs bool
+	Demangle bool
+
+	IpswVersion   string
+	BuildVersions []string
+	SourceVersion string
+
+	Color  bool
+	Theme  string
+	Output string
 }
 
+// GetClass returns a ObjC classes matching a given pattern from a MachO
 func GetClass(m *macho.File, pattern string, conf *Config) (out string, err error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -64,6 +74,7 @@ func GetClass(m *macho.File, pattern string, conf *Config) (out string, err erro
 	return
 }
 
+// GetProtocol returns a ObjC protocols matching a given pattern from a MachO
 func GetProtocol(m *macho.File, pattern string, conf *Config) (out string, err error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -98,6 +109,7 @@ func GetProtocol(m *macho.File, pattern string, conf *Config) (out string, err e
 	return
 }
 
+// GetCategory returns a ObjC categories matching a given pattern from a MachO
 func GetCategory(m *macho.File, pattern string, conf *Config) (out string, err error) {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -135,18 +147,16 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 	if !m.HasObjC() {
 		return "no objc", ErrNoObjc
 	}
-	if conf.Theme == "" {
-		conf.Theme = "nord"
-	}
 
 	if info, err := m.GetObjCImageInfo(); err == nil {
 		fmt.Println(info.Flags)
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		log.Error(err.Error())
+		return "", err
 	}
 	if conf.Verbose {
 		fmt.Println(m.GetObjCToc())
 	}
+	/* ObjC Protocols */
 	if protos, err := m.GetObjCProtocols(); err == nil {
 		slices.SortStableFunc(protos, func(a, b objc.Protocol) int {
 			return cmp.Compare(a.Name, b.Name)
@@ -172,8 +182,9 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 			}
 		}
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		log.Error(err.Error())
+		return "", err
 	}
+	/* ObjC Classes */
 	if classes, err := m.GetObjCClasses(); err == nil {
 		slices.SortStableFunc(classes, func(a, b objc.Class) int {
 			return cmp.Compare(a.Name, b.Name)
@@ -195,8 +206,9 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 			}
 		}
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		log.Error(err.Error())
+		return "", err
 	}
+	/* ObjC Categories */
 	if cats, err := m.GetObjCCategories(); err == nil {
 		slices.SortStableFunc(cats, func(a, b objc.Category) int {
 			return cmp.Compare(a.Name, b.Name)
@@ -218,7 +230,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 			}
 		}
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		log.Error(err.Error())
+		return "", err
 	}
 	if conf.ObjcRefs {
 		if protRefs, err := m.GetObjCProtoReferences(); err == nil {
@@ -227,7 +239,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr, prot.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			log.Error(err.Error())
+			return "", err
 		}
 		if clsRefs, err := m.GetObjCClassReferences(); err == nil {
 			fmt.Printf("\n@class refs\n")
@@ -235,7 +247,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr, cls.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			log.Error(err.Error())
+			return "", err
 		}
 		if supRefs, err := m.GetObjCSuperReferences(); err == nil {
 			fmt.Printf("\n@super refs\n")
@@ -243,7 +255,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr, sup.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			log.Error(err.Error())
+			return "", err
 		}
 		if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
 			fmt.Printf("\n@selectors refs\n")
@@ -251,7 +263,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			log.Error(err.Error())
+			return "", err
 		}
 		if conf.Verbose {
 			if classes, err := m.GetObjCClassNames(); err == nil {
@@ -260,7 +272,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 					fmt.Printf("0x%011x: %s\n", vmaddr, className)
 				}
 			} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-				log.Error(err.Error())
+				return "", err
 			}
 			if methods, err := m.GetObjCMethodNames(); err == nil {
 				fmt.Printf("\n@objc_methname\n")
@@ -268,7 +280,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 					fmt.Printf("0x%011x: %s\n", vmaddr, method)
 				}
 			} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-				log.Error(err.Error())
+				return "", err
 			}
 		}
 	}
@@ -276,10 +288,214 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 	return
 }
 
+func transformSetter(in string) string {
+	if strings.HasPrefix(in, "set") {
+		in = strings.TrimSuffix(strings.TrimPrefix(in, "set"), ":")
+		if len(in) > 0 {
+			return strings.ToLower(in[:1]) + in[1:]
+		}
+		return ""
+	}
+	return in
+}
+
+const classDumpHeader = `
+//
+//   Generated by https://github.com/blacktop/ipsw ({{ .IpswVersion }})
+//
+{{- range .BuildVersions }}
+//    - LC_BUILD_VERSION:  {{.}}
+{{ end -}}
+//    - LC_SOURCE_VERSION: {{ .SourceVersion }}
+//
+#ifndef {{ .Name }}_h
+#define {{ .Name }}_h
+{{ if not .IsUmbrella }}{{ "@import Foundation;" | println }}{{- end }}
+{{ .Object }}
+#endif /* {{ .Name }}_h */
+`
+
 // Headers outputs ObjC class-dump headers from a MachO
 func Headers(m *macho.File, conf *Config) error {
 	if !m.HasObjC() {
 		return ErrNoObjc
+	}
+
+	var headers []string
+
+	/* generate ObjC class headers */
+	classes, err := m.GetObjCClasses()
+	if err != nil {
+		if !errors.Is(err, macho.ErrObjcSectionNotFound) {
+			return err
+		}
+	}
+	slices.SortStableFunc(classes, func(a, b objc.Class) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+
+	for _, class := range classes {
+		var props []string
+		for _, prop := range class.Props {
+			props = append(props, prop.Name)
+		}
+		sort.Strings(props)
+		// remove ivars that are properties
+		class.Ivars = slices.DeleteFunc(class.Ivars, func(i objc.Ivar) bool {
+			// return slices.Contains(props, i.Name) || slices.Contains(props, strings.TrimPrefix(i.Name, "_")) TODO: use this instead
+			return slices.Contains(props, strings.TrimPrefix(i.Name, "_"))
+		})
+		// remove methods that are property getter/setter
+		class.InstanceMethods = slices.DeleteFunc(class.InstanceMethods, func(m objc.Method) bool {
+			return slices.Contains(props, m.Name) || slices.Contains(props, transformSetter(m.Name))
+		})
+
+		// quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", conf.Theme)
+		// quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
+
+		var headerDat bytes.Buffer
+		tmpl := template.Must(template.New("header").Parse(classDumpHeader))
+
+		if err := tmpl.Execute(&headerDat, struct {
+			IpswVersion   string
+			BuildVersions []string
+			SourceVersion string
+			IsUmbrella    bool
+			Name          string
+			Object        string
+		}{
+			IpswVersion:   conf.IpswVersion,
+			BuildVersions: conf.BuildVersions,
+			SourceVersion: conf.SourceVersion,
+			Name:          class.Name,
+			Object:        swift.DemangleBlob(class.Verbose()),
+		}); err != nil {
+			return fmt.Errorf("failed to generate header for %s: %v", class.Name, err)
+		}
+
+		fname := filepath.Join(conf.Output, class.Name+".h")
+		log.Infof("Creating %s", fname)
+		if err := os.WriteFile(fname, headerDat.Bytes(), 0644); err != nil {
+			return fmt.Errorf("failed to write header for %s: %v", class.Name, err)
+		}
+		headers = append(headers, class.Name+".h")
+	}
+
+	/* generate ObjC protocol headers */
+	protos, err := m.GetObjCProtocols()
+	if err != nil {
+		return err
+	}
+	slices.SortStableFunc(protos, func(a, b objc.Protocol) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+	seen := make(map[uint64]bool)
+	for _, proto := range protos {
+		if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
+			var headerDat bytes.Buffer
+			tmpl := template.Must(template.New("header").Parse(classDumpHeader))
+
+			if err := tmpl.Execute(&headerDat, struct {
+				IpswVersion   string
+				BuildVersions []string
+				SourceVersion string
+				IsUmbrella    bool
+				Name          string
+				Object        string
+			}{
+				IpswVersion:   conf.IpswVersion,
+				BuildVersions: conf.BuildVersions,
+				SourceVersion: conf.SourceVersion,
+				Name:          proto.Name,
+				Object:        swift.DemangleBlob(proto.Verbose()),
+			}); err != nil {
+				return fmt.Errorf("failed to generate header for %s: %v", proto.Name, err)
+			}
+
+			fname := filepath.Join(conf.Output, proto.Name+"-Protocol.h")
+			log.Infof("Creating %s", fname)
+			if err := os.WriteFile(fname, headerDat.Bytes(), 0644); err != nil {
+				return fmt.Errorf("failed to write header for %s: %v", proto.Name, err)
+			}
+			headers = append(headers, proto.Name+"-Protocol.h")
+			seen[proto.Ptr] = true
+		}
+	}
+
+	/* generate ObjC category headers */
+	cats, err := m.GetObjCCategories()
+	if err != nil {
+		return err
+	}
+	slices.SortStableFunc(cats, func(a, b objc.Category) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+	for _, cat := range cats {
+		var headerDat bytes.Buffer
+		tmpl := template.Must(template.New("header").Parse(classDumpHeader))
+
+		if err := tmpl.Execute(&headerDat, struct {
+			IpswVersion   string
+			BuildVersions []string
+			SourceVersion string
+			IsUmbrella    bool
+			Name          string
+			Object        string
+		}{
+			IpswVersion:   conf.IpswVersion,
+			BuildVersions: conf.BuildVersions,
+			SourceVersion: conf.SourceVersion,
+			Name:          cat.Name,
+			Object:        swift.DemangleBlob(cat.Verbose()),
+		}); err != nil {
+			return fmt.Errorf("failed to generate header for %s: %v", cat.Name, err)
+		}
+
+		fname := filepath.Join(conf.Output, cat.Name+".h")
+		log.Infof("Creating %s", fname)
+		if err := os.WriteFile(fname, headerDat.Bytes(), 0644); err != nil {
+			return fmt.Errorf("failed to write header for %s: %v", cat.Name, err)
+		}
+		headers = append(headers, cat.Name+".h")
+	}
+
+	// generate umbrella header
+	var umbrella string
+	if slices.Contains(headers, conf.Name+".h") {
+		umbrella = conf.Name + "-Umbrella"
+	} else {
+		umbrella = conf.Name
+	}
+
+	for i, header := range headers {
+		headers[i] = "#import \"" + header + "\""
+	}
+
+	var headerDat bytes.Buffer
+	tmpl := template.Must(template.New("header").Parse(classDumpHeader))
+
+	if err := tmpl.Execute(&headerDat, struct {
+		IpswVersion   string
+		BuildVersions []string
+		SourceVersion string
+		IsUmbrella    bool
+		Name          string
+		Object        string
+	}{
+		IpswVersion:   conf.IpswVersion,
+		BuildVersions: conf.BuildVersions,
+		SourceVersion: conf.SourceVersion,
+		IsUmbrella:    true,
+		Name:          umbrella,
+		Object:        strings.Join(headers, "\n") + "\n",
+	}); err != nil {
+		return fmt.Errorf("failed to generate header for %s: %v", umbrella, err)
+	}
+
+	fname := filepath.Join(conf.Output, umbrella+".h")
+	log.Infof("Creating %s", fname)
+	if err := os.WriteFile(fname, headerDat.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write header for %s: %v", umbrella, err)
 	}
 
 	return nil
