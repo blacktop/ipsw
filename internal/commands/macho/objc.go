@@ -398,9 +398,6 @@ func Headers(m *macho.File, conf *Config) error {
 			return slices.Contains(props, m.Name) || slices.Contains(props, transformSetter(m.Name))
 		})
 
-		// quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", conf.Theme)
-		// quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
-
 		var headerDat bytes.Buffer
 		tmpl := template.Must(template.New("header").Parse(classDumpHeader))
 
@@ -478,6 +475,7 @@ func Headers(m *macho.File, conf *Config) error {
 	slices.SortStableFunc(cats, func(a, b objc.Category) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
+	// FIXME: when running on `apsd` there is 4 (apsd) categories ?? these overwrite each other
 	for _, cat := range cats {
 		var headerDat bytes.Buffer
 		tmpl := template.Must(template.New("header").Parse(classDumpHeader))
@@ -534,7 +532,7 @@ func Headers(m *macho.File, conf *Config) error {
 		BuildVersions: conf.BuildVersions,
 		SourceVersion: conf.SourceVersion,
 		IsUmbrella:    true,
-		Name:          umbrella,
+		Name:          strings.ReplaceAll(umbrella, "-", "_"),
 		Object:        strings.Join(headers, "\n") + "\n",
 	}); err != nil {
 		return fmt.Errorf("failed to generate header for %s: %v", umbrella, err)
