@@ -416,7 +416,7 @@ func Headers(m *macho.File, conf *Config) error {
 		if err := os.WriteFile(fname, headerDat.Bytes(), 0644); err != nil {
 			return fmt.Errorf("failed to write header for %s: %v", class.Name, err)
 		}
-		headers = append(headers, class.Name+".h")
+		headers = append(headers, filepath.Base(fname))
 	}
 
 	/* generate ObjC protocol headers */
@@ -455,7 +455,7 @@ func Headers(m *macho.File, conf *Config) error {
 			if err := os.WriteFile(fname, headerDat.Bytes(), 0644); err != nil {
 				return fmt.Errorf("failed to write header for %s: %v", proto.Name, err)
 			}
-			headers = append(headers, proto.Name+"-Protocol.h")
+			headers = append(headers, filepath.Base(fname))
 			seen[proto.Ptr] = true
 		}
 	}
@@ -468,7 +468,6 @@ func Headers(m *macho.File, conf *Config) error {
 	slices.SortStableFunc(cats, func(a, b objc.Category) int {
 		return cmp.Compare(a.Name, b.Name)
 	})
-	// FIXME: when running on `apsd` there is 4 (apsd) categories ?? these overwrite each other
 	for _, cat := range cats {
 		var headerDat bytes.Buffer
 		tmpl := template.Must(template.New("header").Parse(classDumpHeader))
@@ -491,11 +490,14 @@ func Headers(m *macho.File, conf *Config) error {
 		}
 
 		fname := filepath.Join(conf.Output, cat.Name+".h")
+		if cat.Class != nil && cat.Class.Name != "" {
+			fname = filepath.Join(conf.Output, cat.Class.Name+"+"+cat.Name+".h")
+		}
 		log.Infof("Creating %s", fname)
 		if err := os.WriteFile(fname, headerDat.Bytes(), 0644); err != nil {
 			return fmt.Errorf("failed to write header for %s: %v", cat.Name, err)
 		}
-		headers = append(headers, cat.Name+".h")
+		headers = append(headers, filepath.Base(fname))
 	}
 
 	/* generate umbrella header */
