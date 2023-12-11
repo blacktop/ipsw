@@ -28,6 +28,7 @@ import (
 	"strings"
 
 	"github.com/apex/log"
+	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/tbd"
 	"github.com/fatih/color"
@@ -81,7 +82,20 @@ var TbdCmd = &cobra.Command{
 			return fmt.Errorf("image not in %s: %v", dscPath, err)
 		}
 
-		t, err := tbd.NewTBD(image, private)
+		m, err := image.GetMacho()
+		if err != nil {
+			return err
+		}
+		defer m.Close()
+
+		var reexports []string
+		if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
+			for _, rexp := range rexps {
+				reexports = append(reexports, rexp.(*macho.ReExportDylib).Name)
+			}
+		}
+
+		t, err := tbd.NewTBD(image, reexports, private)
 		if err != nil {
 			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
 		}
@@ -90,6 +104,27 @@ var TbdCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
 		}
+
+		if rexps := m.GetLoadsByName("LC_REEXPORT_DYLIB"); len(rexps) > 0 {
+			for _, rexp := range rexps {
+				image, err := f.Image(rexp.(*macho.ReExportDylib).Name)
+				if err != nil {
+					return fmt.Errorf("image not in %s: %v", dscPath, err)
+				}
+				t, err := tbd.NewTBD(image, nil, private)
+				if err != nil {
+					return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
+				}
+
+				rexpOut, err := t.Generate()
+				if err != nil {
+					return fmt.Errorf("failed to create tbd file for %s: %v", args[1], err)
+				}
+				outTBD += "\n" + rexpOut
+			}
+		}
+
+		outTBD += "...\n"
 
 		tbdFile := filepath.Base(t.Path) + ".tbd"
 		if len(output) > 0 {

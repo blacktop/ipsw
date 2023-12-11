@@ -16,13 +16,14 @@ import (
 type TBD struct {
 	Targets     []string
 	Path        string
+	ReExports   []string
 	Symbols     []string
 	ObjcClasses []string
 	ObjcIvars   []string
 }
 
 // NewTBD creates a new tbd object
-func NewTBD(image *dyld.CacheImage, private bool) (*TBD, error) {
+func NewTBD(image *dyld.CacheImage, reexports []string, private bool) (*TBD, error) {
 	var syms []string
 	var objcClasses []string
 	var objcIvars []string
@@ -93,6 +94,7 @@ func NewTBD(image *dyld.CacheImage, private bool) (*TBD, error) {
 			"arm64e-ios",
 		},
 		Path:        image.Name,
+		ReExports:   reexports,
 		Symbols:     syms,
 		ObjcClasses: objcClasses,
 		ObjcIvars:   objcIvars,
