@@ -168,10 +168,6 @@ func DumpCategory(m *macho.File, pattern string, conf *Config) error {
 
 // Dump outputs ObjC info from a MachO
 func Dump(m *macho.File, conf *Config) error {
-	if !m.HasObjC() {
-		return ErrNoObjc
-	}
-
 	if info, err := m.GetObjCImageInfo(); err == nil {
 		fmt.Println(info.Flags)
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
