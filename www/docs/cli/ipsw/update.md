@@ -42,6 +42,7 @@ ipsw update [flags]
 ```
       --color           colorize output
       --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
   -V, --verbose         verbose output
 ```
 

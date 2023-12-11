@@ -29,6 +29,7 @@ ipsw appstore cert rm [flags]
   -i, --iss string      Issuer ID
   -j, --jwt string      JWT api key
   -k, --kid string      Key ID
+      --no-color        disable colorize output
   -p, --p8 string       Path to App Store Connect API Key (.p8)
   -V, --verbose         verbose output
 ```
