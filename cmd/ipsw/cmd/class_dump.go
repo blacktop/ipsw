@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/apex/log"
 
 	"github.com/alecthomas/chroma/v2/styles"
@@ -54,6 +55,7 @@ func init() {
 	classDumpCmd.Flags().StringP("cat", "a", "", "Dump category (regex)")
 	classDumpCmd.Flags().Bool("refs", false, "Dump ObjC references too")
 	classDumpCmd.Flags().Bool("re", false, "RE verbosity (with addresses)")
+	classDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
 
 	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
 	viper.BindPFlag("class-dump.output", classDumpCmd.Flags().Lookup("output"))
@@ -63,6 +65,7 @@ func init() {
 	viper.BindPFlag("class-dump.theme", classDumpCmd.Flags().Lookup("theme"))
 	viper.BindPFlag("class-dump.refs", classDumpCmd.Flags().Lookup("refs"))
 	viper.BindPFlag("class-dump.re", classDumpCmd.Flags().Lookup("re"))
+	viper.BindPFlag("class-dump.arch", classDumpCmd.Flags().Lookup("arch"))
 }
 
 // classDumpCmd represents the classDump command
@@ -101,11 +104,47 @@ var classDumpCmd = &cobra.Command{
 		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok {
-			m, err := macho.Open(args[0])
-			if err != nil {
+			machoPath := filepath.Clean(args[0])
+			// first check for fat file
+			fat, err := macho.OpenFat(machoPath)
+			if err != nil && err != macho.ErrNotFat {
 				return err
 			}
-			defer m.Close()
+			if err == macho.ErrNotFat {
+				m, err = macho.Open(machoPath)
+				if err != nil {
+					return err
+				}
+			} else {
+				var options []string
+				var shortOptions []string
+				for _, arch := range fat.Arches {
+					options = append(options, fmt.Sprintf("%s, %s", arch.CPU, arch.SubCPU.String(arch.CPU)))
+					shortOptions = append(shortOptions, strings.ToLower(arch.SubCPU.String(arch.CPU)))
+				}
+
+				if len(viper.GetString("class-dump.arch")) > 0 {
+					found := false
+					for i, opt := range shortOptions {
+						if strings.Contains(strings.ToLower(opt), strings.ToLower(viper.GetString("class-dump.arch"))) {
+							m = fat.Arches[i].File
+							found = true
+							break
+						}
+					}
+					if !found {
+						return fmt.Errorf("--arch '%s' not found in: %s", viper.GetString("class-dump.arch"), strings.Join(shortOptions, ", "))
+					}
+				} else {
+					choice := 0
+					prompt := &survey.Select{
+						Message: "Detected a universal MachO file, please select an architecture to analyze:",
+						Options: options,
+					}
+					survey.AskOne(prompt, &choice)
+					m = fat.Arches[choice].File
+				}
+			}
 
 			name = filepath.Base(args[0])
 		} else {
