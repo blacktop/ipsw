@@ -171,6 +171,10 @@ var classDumpCmd = &cobra.Command{
 			name = filepath.Base(img.Name)
 		}
 
+		if !m.HasObjC() {
+			return mcmd.ErrNoObjc
+		}
+
 		var buildVersions []string
 		if bvers := m.GetLoadsByName("LC_BUILD_VERSION"); len(bvers) > 0 {
 			for _, bv := range bvers {
