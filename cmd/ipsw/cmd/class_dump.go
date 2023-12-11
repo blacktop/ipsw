@@ -53,8 +53,8 @@ func init() {
 	classDumpCmd.Flags().StringP("proto", "p", "", "Dump protocol (regex)")
 	classDumpCmd.Flags().StringP("cat", "a", "", "Dump category (regex)")
 	classDumpCmd.Flags().Bool("refs", false, "Dump ObjC references too")
-	classDumpCmd.Flags().String("re", "", "RE verbosity (with addresses)")
-	classDumpCmd.Flags().MarkHidden("re") // TODO: remove this when I've wired it up
+	classDumpCmd.Flags().Bool("re", false, "RE verbosity (with addresses)")
+
 	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
 	viper.BindPFlag("class-dump.output", classDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("class-dump.class", classDumpCmd.Flags().Lookup("class"))
@@ -161,37 +161,29 @@ var classDumpCmd = &cobra.Command{
 		}
 
 		if viper.GetString("class-dump.class") != "" {
-			out, err := mcmd.GetClass(m, viper.GetString("class-dump.class"), &conf)
-			if err != nil {
+			if err := mcmd.DumpClass(m, viper.GetString("class-dump.class"), &conf); err != nil {
 				return err
 			}
-			fmt.Println(out)
 		}
 
 		if viper.GetString("class-dump.proto") != "" {
-			out, err := mcmd.GetProtocol(m, viper.GetString("class-dump.proto"), &conf)
-			if err != nil {
+			if err := mcmd.DumpProtocol(m, viper.GetString("class-dump.proto"), &conf); err != nil {
 				return err
 			}
-			fmt.Println(out)
 		}
 
 		if viper.GetString("class-dump.cat") != "" {
-			out, err := mcmd.GetCategory(m, viper.GetString("class-dump.cat"), &conf)
-			if err != nil {
+			if err := mcmd.DumpCategory(m, viper.GetString("class-dump.cat"), &conf); err != nil {
 				return err
 			}
-			fmt.Println(out)
 		}
 
 		if viper.GetString("class-dump.class") == "" &&
 			viper.GetString("class-dump.proto") == "" &&
 			viper.GetString("class-dump.cat") == "" {
-			out, err := mcmd.Dump(m, &conf)
-			if err != nil {
+			if err := mcmd.Dump(m, &conf); err != nil {
 				return err
 			}
-			fmt.Println(out)
 		}
 
 		return nil

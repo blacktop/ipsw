@@ -41,19 +41,19 @@ type Config struct {
 	Output string
 }
 
-// GetClass returns a ObjC classes matching a given pattern from a MachO
-func GetClass(m *macho.File, pattern string, conf *Config) (out string, err error) {
+// DumpClass returns a ObjC classes matching a given pattern from a MachO
+func DumpClass(m *macho.File, pattern string, conf *Config) error {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return "", fmt.Errorf("failed to compile regex: %v", err)
+		return fmt.Errorf("failed to compile regex: %v", err)
 	}
 
 	classes, err := m.GetObjCClasses()
 	if err != nil {
 		if errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return "", nil
+			return err
 		}
-		return "", err
+		return err
 	}
 
 	slices.SortStableFunc(classes, func(a, b objc.Class) int {
@@ -63,30 +63,38 @@ func GetClass(m *macho.File, pattern string, conf *Config) (out string, err erro
 	for _, class := range classes {
 		if re.MatchString(class.Name) {
 			if conf.Color {
-				quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", conf.Theme)
+				if conf.Addrs {
+					quick.Highlight(os.Stdout, swift.DemangleBlob(class.WithAddrs()), "objc", "terminal256", conf.Theme)
+				} else {
+					quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", conf.Theme)
+				}
 				quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
 			} else {
-				fmt.Println(swift.DemangleBlob(class.Verbose()))
+				if conf.Addrs {
+					fmt.Println(swift.DemangleBlob(class.WithAddrs()))
+				} else {
+					fmt.Println(swift.DemangleBlob(class.Verbose()))
+				}
 			}
 		}
 	}
 
-	return
+	return nil
 }
 
-// GetProtocol returns a ObjC protocols matching a given pattern from a MachO
-func GetProtocol(m *macho.File, pattern string, conf *Config) (out string, err error) {
+// DumpProtocol returns a ObjC protocols matching a given pattern from a MachO
+func DumpProtocol(m *macho.File, pattern string, conf *Config) error {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return "", fmt.Errorf("failed to compile regex: %v", err)
+		return fmt.Errorf("failed to compile regex: %v", err)
 	}
 
 	protos, err := m.GetObjCProtocols()
 	if err != nil {
 		if errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return "", nil
+			return err
 		}
-		return "", err
+		return err
 	}
 
 	slices.SortStableFunc(protos, func(a, b objc.Protocol) int {
@@ -97,31 +105,39 @@ func GetProtocol(m *macho.File, pattern string, conf *Config) (out string, err e
 	for _, proto := range protos {
 		if re.MatchString(proto.Name) {
 			if conf.Color {
-				quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", conf.Theme)
+				if conf.Addrs {
+					quick.Highlight(os.Stdout, swift.DemangleBlob(proto.WithAddrs()), "objc", "terminal256", conf.Theme)
+				} else {
+					quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", conf.Theme)
+				}
 				quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
 			} else {
-				fmt.Println(swift.DemangleBlob(proto.Verbose()))
+				if conf.Addrs {
+					fmt.Println(swift.DemangleBlob(proto.WithAddrs()))
+				} else {
+					fmt.Println(swift.DemangleBlob(proto.Verbose()))
+				}
 			}
 			seen[proto.Ptr] = true
 		}
 	}
 
-	return
+	return nil
 }
 
-// GetCategory returns a ObjC categories matching a given pattern from a MachO
-func GetCategory(m *macho.File, pattern string, conf *Config) (out string, err error) {
+// DumpCategory returns a ObjC categories matching a given pattern from a MachO
+func DumpCategory(m *macho.File, pattern string, conf *Config) error {
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return "", fmt.Errorf("failed to compile regex: %v", err)
+		return fmt.Errorf("failed to compile regex: %v", err)
 	}
 
 	cats, err := m.GetObjCCategories()
 	if err != nil {
 		if errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return "", nil
+			return err
 		}
-		return "", err
+		return err
 	}
 
 	slices.SortStableFunc(cats, func(a, b objc.Category) int {
@@ -131,27 +147,35 @@ func GetCategory(m *macho.File, pattern string, conf *Config) (out string, err e
 	for _, cat := range cats {
 		if re.MatchString(cat.Name) {
 			if conf.Color {
-				quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", conf.Theme)
+				if conf.Addrs {
+					quick.Highlight(os.Stdout, swift.DemangleBlob(cat.WithAddrs()), "objc", "terminal256", conf.Theme)
+				} else {
+					quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", conf.Theme)
+				}
 				quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
 			} else {
-				fmt.Println(swift.DemangleBlob(cat.Verbose()))
+				if conf.Addrs {
+					fmt.Println(swift.DemangleBlob(cat.WithAddrs()))
+				} else {
+					fmt.Println(swift.DemangleBlob(cat.Verbose()))
+				}
 			}
 		}
 	}
 
-	return
+	return nil
 }
 
 // Dump outputs ObjC info from a MachO
-func Dump(m *macho.File, conf *Config) (out string, err error) {
+func Dump(m *macho.File, conf *Config) error {
 	if !m.HasObjC() {
-		return "no objc", ErrNoObjc
+		return ErrNoObjc
 	}
 
 	if info, err := m.GetObjCImageInfo(); err == nil {
 		fmt.Println(info.Flags)
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		return "", err
+		return err
 	}
 	if conf.Verbose {
 		fmt.Println(m.GetObjCToc())
@@ -166,10 +190,18 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 			if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
 				if conf.Verbose {
 					if conf.Color {
-						quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", conf.Theme)
+						if conf.Addrs {
+							quick.Highlight(os.Stdout, swift.DemangleBlob(proto.WithAddrs()), "objc", "terminal256", conf.Theme)
+						} else {
+							quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", conf.Theme)
+						}
 						quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
 					} else {
-						fmt.Println(swift.DemangleBlob(proto.Verbose()))
+						if conf.Addrs {
+							fmt.Println(swift.DemangleBlob(proto.WithAddrs()))
+						} else {
+							fmt.Println(swift.DemangleBlob(proto.Verbose()))
+						}
 					}
 				} else {
 					if conf.Color {
@@ -182,7 +214,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 			}
 		}
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		return "", err
+		return err
 	}
 	/* ObjC Classes */
 	if classes, err := m.GetObjCClasses(); err == nil {
@@ -192,10 +224,18 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 		for _, class := range classes {
 			if conf.Verbose {
 				if conf.Color {
-					quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", conf.Theme)
+					if conf.Addrs {
+						quick.Highlight(os.Stdout, swift.DemangleBlob(class.WithAddrs()), "objc", "terminal256", conf.Theme)
+					} else {
+						quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", conf.Theme)
+					}
 					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
 				} else {
-					fmt.Println(swift.DemangleBlob(class.Verbose()))
+					if conf.Addrs {
+						fmt.Println(swift.DemangleBlob(class.WithAddrs()))
+					} else {
+						fmt.Println(swift.DemangleBlob(class.Verbose()))
+					}
 				}
 			} else {
 				if conf.Color {
@@ -206,7 +246,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 			}
 		}
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		return "", err
+		return err
 	}
 	/* ObjC Categories */
 	if cats, err := m.GetObjCCategories(); err == nil {
@@ -216,10 +256,18 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 		for _, cat := range cats {
 			if conf.Verbose {
 				if conf.Color {
-					quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", conf.Theme)
+					if conf.Addrs {
+						quick.Highlight(os.Stdout, swift.DemangleBlob(cat.WithAddrs()), "objc", "terminal256", conf.Theme)
+					} else {
+						quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", conf.Theme)
+					}
 					quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", conf.Theme)
 				} else {
-					fmt.Println(swift.DemangleBlob(cat.Verbose()))
+					if conf.Addrs {
+						fmt.Println(swift.DemangleBlob(cat.WithAddrs()))
+					} else {
+						fmt.Println(swift.DemangleBlob(cat.Verbose()))
+					}
 				}
 			} else {
 				if conf.Color {
@@ -230,7 +278,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 			}
 		}
 	} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-		return "", err
+		return err
 	}
 	if conf.ObjcRefs {
 		if protRefs, err := m.GetObjCProtoReferences(); err == nil {
@@ -239,7 +287,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr, prot.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return "", err
+			return err
 		}
 		if clsRefs, err := m.GetObjCClassReferences(); err == nil {
 			fmt.Printf("\n@class refs\n")
@@ -247,7 +295,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr, cls.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return "", err
+			return err
 		}
 		if supRefs, err := m.GetObjCSuperReferences(); err == nil {
 			fmt.Printf("\n@super refs\n")
@@ -255,7 +303,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr, sup.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return "", err
+			return err
 		}
 		if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
 			fmt.Printf("\n@selectors refs\n")
@@ -263,7 +311,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 				fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
 			}
 		} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-			return "", err
+			return err
 		}
 		if conf.Verbose {
 			if classes, err := m.GetObjCClassNames(); err == nil {
@@ -272,7 +320,7 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 					fmt.Printf("0x%011x: %s\n", vmaddr, className)
 				}
 			} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-				return "", err
+				return err
 			}
 			if methods, err := m.GetObjCMethodNames(); err == nil {
 				fmt.Printf("\n@objc_methname\n")
@@ -280,12 +328,12 @@ func Dump(m *macho.File, conf *Config) (out string, err error) {
 					fmt.Printf("0x%011x: %s\n", vmaddr, method)
 				}
 			} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-				return "", err
+				return err
 			}
 		}
 	}
 
-	return
+	return nil
 }
 
 func transformSetter(in string) string {
