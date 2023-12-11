@@ -148,15 +148,15 @@ var classDumpCmd = &cobra.Command{
 
 			name = filepath.Base(args[0])
 		} else {
+			if len(args) < 2 {
+				return fmt.Errorf("must provide an in-cache DYLIB to dump")
+			}
+
 			f, err := dyld.Open(args[0])
 			if err != nil {
 				return err
 			}
 			defer f.Close()
-
-			if len(args) < 2 {
-				return fmt.Errorf("must provide an in-cache DYLIB to dump")
-			}
 
 			img, err := f.Image(args[1])
 			if err != nil {
