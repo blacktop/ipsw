@@ -25,6 +25,7 @@ ipsw idev afc push <local file> <remote file> [flags]
 ```
       --color           colorize output
       --config string   config file (default is $HOME/.config/ipsw/config.yaml)
+      --no-color        disable colorize output
   -u, --udid string     Device UniqueDeviceID to connect to
   -V, --verbose         verbose output
 ```

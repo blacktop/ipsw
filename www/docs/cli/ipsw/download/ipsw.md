@@ -45,6 +45,7 @@ ipsw download ipsw [flags]
   -d, --device string            iOS Device (i.e. iPhone11,2)
       --insecure                 do not verify ssl certs
   -m, --model string             iOS Model (i.e. D321AP)
+      --no-color                 disable colorize output
       --proxy string             HTTP/HTTPS proxy
   -_, --remove-commas            replace commas in IPSW filename with underscores
       --restart-all              always restart resumable IPSWs

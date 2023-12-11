@@ -30,6 +30,7 @@ ipsw ssh debugserver [flags]
   -t, --host string       ssh host (default "localhost")
   -n, --insecure          ignore known_hosts
   -i, --key string        ssh key (default "$HOME/.ssh/id_rsa")
+      --no-color          disable colorize output
   -s, --password string   ssh password (default "alpine")
   -p, --port string       ssh port (default "2222")
   -u, --user string       ssh user (default "root")
