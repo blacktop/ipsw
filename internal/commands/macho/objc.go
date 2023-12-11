@@ -354,7 +354,8 @@ const classDumpHeader = `
 //
 #ifndef {{ .Name }}_h
 #define {{ .Name }}_h
-{{ if not .IsUmbrella }}{{ "@import Foundation;" | println }}{{- end }}
+{{ if not .IsUmbrella }}@import Foundation;
+{{ end }}
 {{ .Object }}
 #endif /* {{ .Name }}_h */
 `
