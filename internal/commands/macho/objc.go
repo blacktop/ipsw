@@ -362,10 +362,6 @@ const classDumpHeader = `
 
 // Headers outputs ObjC class-dump headers from a MachO
 func Headers(m *macho.File, conf *Config) error {
-	if !m.HasObjC() {
-		return ErrNoObjc
-	}
-
 	var headers []string
 
 	/* generate ObjC class headers */
@@ -502,7 +498,7 @@ func Headers(m *macho.File, conf *Config) error {
 		headers = append(headers, cat.Name+".h")
 	}
 
-	// generate umbrella header
+	/* generate umbrella header */
 	var umbrella string
 	if slices.Contains(headers, conf.Name+".h") {
 		umbrella = conf.Name + "-Umbrella"
