@@ -43,11 +43,12 @@ const (
 	// AppStoreSearchLimit is the maximum number of results returned by the App Store search API
 	AppStoreSearchLimit = 200
 
-	ErrLoginRequires2fa             = "MZFinance.BadLogin.Configurator_message"
-	FailureTypeInvalidCredentials   = "-5000"
-	FailureTypeUnknownError         = "5002"
-	FailureTypePasswordTokenExpired = "2034"
-	FailureTypeLicenseNotFound      = "9610"
+	ErrLoginRequires2fa               = "MZFinance.BadLogin.Configurator_message"
+	FailureTypeInvalidCredentials     = "-5000"
+	FailureTypeUnknownError           = "5002"
+	FailureTypePasswordTokenExpired   = "2034"
+	FailureTypeLicenseNotFound        = "9610"
+	FailureTypeTemporarilyUnavailable = "2059"
 )
 
 type AppStoreConfig struct {
