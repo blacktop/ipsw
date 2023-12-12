@@ -118,6 +118,12 @@ Here are ways to get in touch with the `ipsw` community:
 [![Follow Mastodon](https://img.shields.io/badge/follow_on_mastodon-6364FF?style=for-the-badge&logo=mastodon&logoColor=white)](https://mastodon.social/@blacktop)
 [![GitHub Discussions](https://img.shields.io/badge/GITHUB_DISCUSSION-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/blacktop/ipsw/discussions)
 
+## Known Issues
+
+- `macOS` IPSW etc support is sometimes broken
+  
+  Automated testing of `ipsw` is challenging as it requires a lot of resources to test all the different IPSW flavors and OS versions etc. No CI/CD can really handle that unless I want to wait forever for it to run on each commit. Please create an [issue](https://github.com/blacktop/ipsw/issues) and I'll fix it as soon as I can ❤️ *(**NOTE:** a comprehensive test suite is in the roadmap so I can at least test on the few local IPSWs I have)*
+  
 ## Credit
 
 Big shout out to Jonathan Levin's amazing books and his legendary `jtool`
