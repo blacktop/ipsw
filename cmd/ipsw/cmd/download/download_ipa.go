@@ -73,7 +73,6 @@ var ipaCmd = &cobra.Command{
 	Aliases:       []string{"app"},
 	Short:         "Download App Packages from the iOS App Store",
 	Args:          cobra.ExactArgs(1),
-	SilenceUsage:  false,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
@@ -105,7 +104,7 @@ var ipaCmd = &cobra.Command{
 			Insecure:      insecure,
 			PreferSMS:     sms,
 			ConfigDir:     filepath.Join(home, ".ipsw"),
-			VaultPassword: viper.GetString("download.dev.vault-password"),
+			VaultPassword: viper.GetString("download.ipa.vault-password"),
 			StoreFront:    viper.GetString("download.ipa.store-front"),
 			Verbose:       viper.GetBool("verbose"),
 		})
