@@ -44,6 +44,7 @@ func init() {
 	rootCmd.AddCommand(classDumpCmd)
 
 	classDumpCmd.Flags().Bool("headers", false, "Dump ObjC headers")
+	classDumpCmd.Flags().Bool("deps", false, "Dump imported private frameworks")
 	classDumpCmd.Flags().StringP("output", "o", "", "Folder to write headers to")
 	classDumpCmd.MarkFlagDirname("output")
 	classDumpCmd.Flags().StringP("theme", "t", "nord", "Color theme (nord, github, etc)")
@@ -58,6 +59,7 @@ func init() {
 	classDumpCmd.Flags().String("arch", "", "Which architecture to use for fat/universal MachO")
 
 	viper.BindPFlag("class-dump.headers", classDumpCmd.Flags().Lookup("headers"))
+	viper.BindPFlag("class-dump.deps", classDumpCmd.Flags().Lookup("deps"))
 	viper.BindPFlag("class-dump.output", classDumpCmd.Flags().Lookup("output"))
 	viper.BindPFlag("class-dump.class", classDumpCmd.Flags().Lookup("class"))
 	viper.BindPFlag("class-dump.proto", classDumpCmd.Flags().Lookup("proto"))
@@ -70,6 +72,7 @@ func init() {
 
 // classDumpCmd represents the classDump command
 var classDumpCmd = &cobra.Command{
+	// TODO: is this too much magic? (should we be explicit about what the input is?)
 	Use:     "class-dump [<DSC> <DYLIB>|<MACHO>]",
 	Aliases: []string{"cd"},
 	Short:   "ObjC class-dump a dylib from a DSC or a MachO binary",
@@ -82,8 +85,8 @@ var classDumpCmd = &cobra.Command{
 	// },
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var name string
 		var m *macho.File
+		var o *mcmd.ObjC
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
@@ -101,6 +104,18 @@ var classDumpCmd = &cobra.Command{
 			if err := os.MkdirAll(viper.GetString("class-dump.output"), 0o750); err != nil {
 				return err
 			}
+		}
+
+		conf := mcmd.ObjcConfig{
+			Verbose:     Verbose,
+			Addrs:       viper.GetBool("class-dump.re"),
+			Headers:     viper.GetBool("class-dump.headers"),
+			ObjcRefs:    viper.GetBool("class-dump.refs"),
+			Deps:        viper.GetBool("class-dump.deps"),
+			IpswVersion: fmt.Sprintf("Version: %s, BuildTime: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime)),
+			Color:       viper.GetBool("color"),
+			Theme:       viper.GetString("class-dump.theme"),
+			Output:      viper.GetString("class-dump.output"),
 		}
 
 		if ok, _ := magic.IsMachO(args[0]); ok {
@@ -145,8 +160,16 @@ var classDumpCmd = &cobra.Command{
 					m = fat.Arches[choice].File
 				}
 			}
+			if viper.GetBool("class-dump.deps") {
+				log.Error("cannot dump imported private frameworks from a MachO file (only from a DSC)")
+			}
 
-			name = filepath.Base(args[0])
+			conf.Name = filepath.Base(machoPath)
+
+			o, err = mcmd.NewObjC(m, nil, &conf)
+			if err != nil {
+				return err
+			}
 		} else {
 			if len(args) < 2 {
 				return fmt.Errorf("must provide an in-cache DYLIB to dump")
@@ -168,55 +191,32 @@ var classDumpCmd = &cobra.Command{
 				return err
 			}
 
-			name = filepath.Base(img.Name)
-		}
+			conf.Name = filepath.Base(img.Name)
 
-		if !m.HasObjC() {
-			return mcmd.ErrNoObjc
-		}
-
-		var buildVersions []string
-		if bvers := m.GetLoadsByName("LC_BUILD_VERSION"); len(bvers) > 0 {
-			for _, bv := range bvers {
-				buildVersions = append(buildVersions, bv.String())
+			o, err = mcmd.NewObjC(m, f, &conf)
+			if err != nil {
+				return err
 			}
-		}
-		var sourceVersion string
-		if svers := m.GetLoadsByName("LC_SOURCE_VERSION"); len(svers) > 0 {
-			sourceVersion = svers[0].String()
-		}
-
-		conf := mcmd.Config{
-			Name:          name,
-			Verbose:       Verbose,
-			Addrs:         viper.GetBool("class-dump.re"),
-			ObjcRefs:      viper.GetBool("class-dump.refs"),
-			IpswVersion:   fmt.Sprintf("Version: %s, BuildTime: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime)),
-			BuildVersions: buildVersions,
-			SourceVersion: sourceVersion,
-			Color:         viper.GetBool("color"),
-			Theme:         viper.GetString("class-dump.theme"),
-			Output:        viper.GetString("class-dump.output"),
 		}
 
 		if viper.GetBool("class-dump.headers") {
-			return mcmd.Headers(m, &conf)
+			return o.Headers()
 		}
 
 		if viper.GetString("class-dump.class") != "" {
-			if err := mcmd.DumpClass(m, viper.GetString("class-dump.class"), &conf); err != nil {
+			if err := o.DumpClass(viper.GetString("class-dump.class")); err != nil {
 				return err
 			}
 		}
 
 		if viper.GetString("class-dump.proto") != "" {
-			if err := mcmd.DumpProtocol(m, viper.GetString("class-dump.proto"), &conf); err != nil {
+			if err := o.DumpProtocol(viper.GetString("class-dump.proto")); err != nil {
 				return err
 			}
 		}
 
 		if viper.GetString("class-dump.cat") != "" {
-			if err := mcmd.DumpCategory(m, viper.GetString("class-dump.cat"), &conf); err != nil {
+			if err := o.DumpCategory(viper.GetString("class-dump.cat")); err != nil {
 				return err
 			}
 		}
@@ -224,9 +224,7 @@ var classDumpCmd = &cobra.Command{
 		if viper.GetString("class-dump.class") == "" &&
 			viper.GetString("class-dump.proto") == "" &&
 			viper.GetString("class-dump.cat") == "" {
-			if err := mcmd.Dump(m, &conf); err != nil {
-				return err
-			}
+			return o.Dump()
 		}
 
 		return nil
