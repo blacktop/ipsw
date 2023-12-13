@@ -83,6 +83,10 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 		if len(conf.Folder) > 0 {
 			var files []string
 			if err := filepath.Walk(conf.Folder, func(path string, info os.FileInfo, err error) error {
+				if err != nil {
+					log.Errorf("failed to walk mount %s: %v", conf.Folder, err)
+					return nil
+				}
 				if !info.IsDir() {
 					files = append(files, path)
 				}
@@ -92,12 +96,25 @@ func GetDatabase(conf *Config) (map[string]string, error) {
 			}
 
 			for _, file := range files {
-				if m, err := macho.Open(file); err == nil {
-					if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-						entDB[strings.TrimPrefix(file, conf.Folder)] = m.CodeSignature().Entitlements
+				var m *macho.File
+				fat, err := macho.OpenFat(file)
+				if err == nil {
+					m = fat.Arches[len(fat.Arches)-1].File // grab last arch (probably arm64e)
+				} else {
+					if err == macho.ErrNotFat {
+						m, err = macho.Open(file)
+						if err != nil {
+							log.WithError(err).Warnf("failed to get entitlements for %s", file)
+							continue // bad macho file (skip)
+						}
 					} else {
-						entDB[strings.TrimPrefix(file, conf.Folder)] = ""
+						continue // not a macho file (skip)
 					}
+				}
+				if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
+					entDB[strings.TrimPrefix(file, conf.Folder)] = m.CodeSignature().Entitlements
+				} else {
+					entDB[strings.TrimPrefix(file, conf.Folder)] = ""
 				}
 			}
 		}
@@ -277,12 +294,25 @@ func scanEnts(ipswPath, dmgPath, dmgType string) (map[string]string, error) {
 	entDB := make(map[string]string)
 
 	for _, file := range files {
-		if m, err := macho.Open(file); err == nil {
-			if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
-				entDB[strings.TrimPrefix(file, mountPoint)] = m.CodeSignature().Entitlements
+		var m *macho.File
+		fat, err := macho.OpenFat(file)
+		if err == nil {
+			m = fat.Arches[len(fat.Arches)-1].File // grab last arch (probably arm64e)
+		} else {
+			if err == macho.ErrNotFat {
+				m, err = macho.Open(file)
+				if err != nil {
+					log.WithError(err).Warnf("failed to get entitlements for %s", file)
+					continue // bad macho file (skip)
+				}
 			} else {
-				entDB[strings.TrimPrefix(file, mountPoint)] = ""
+				continue // not a macho file (skip)
 			}
+		}
+		if m.CodeSignature() != nil && len(m.CodeSignature().Entitlements) > 0 {
+			entDB[strings.TrimPrefix(file, mountPoint)] = m.CodeSignature().Entitlements
+		} else {
+			entDB[strings.TrimPrefix(file, mountPoint)] = ""
 		}
 	}
 

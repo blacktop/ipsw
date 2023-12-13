@@ -461,11 +461,20 @@ func LaunchdConfig(path string) (string, error) {
 	}
 	defer os.Remove(filepath.Clean(extracted[0]))
 
-	m, err := macho.Open(extracted[0])
-	if err != nil {
-		return "", fmt.Errorf("failed to open launchd: %v", err)
+	var m *macho.File
+	fat, err := macho.OpenFat(filepath.Clean(extracted[0]))
+	if err == nil {
+		m = fat.Arches[len(fat.Arches)-1].File // grab last arch (probably arm64e)
+	} else {
+		if err == macho.ErrNotFat {
+			m, err = macho.Open(filepath.Clean(extracted[0]))
+			if err != nil {
+				return "", fmt.Errorf("failed to open macho file: %v", err)
+			}
+		} else {
+			return "", fmt.Errorf("failed to open universal macho file: %v", err)
+		}
 	}
-	defer m.Close()
 
 	data, err := m.Section("__TEXT", "__config").Data()
 	if err != nil {
