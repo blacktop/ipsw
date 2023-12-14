@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"unicode"
 
 	"github.com/alecthomas/chroma/v2/quick"
 	"github.com/apex/log"
@@ -32,16 +33,18 @@ const classDumpHeader = `
 //
 #ifndef {{ .Name }}_h
 #define {{ .Name }}_h
-{{ if not .IsUmbrella }}@import Foundation;
+{{ if not .IsUmbrella -}}
+@import Foundation;
+{{ end -}}
+{{- if .Locals }}
+{{ range .Locals }}#include "{{.}}"
 {{ end }}
+{{ end -}}
 {{ if .Classes }}@class {{ Join .Classes ", " }};
-
 {{ end }}
 {{- if .Protos}}@protocol {{ Join .Protos ", " }};
-
 {{ end }}
-
-{{- .Object }}
+{{ .Object }}
 #endif /* {{ .Name }}_h */
 `
 
@@ -525,6 +528,7 @@ func (o *ObjC) Headers() error {
 				SourceVersion string
 				IsUmbrella    bool
 				Name          string
+				Locals        []string
 				Classes       []string
 				Protos        []string
 				Object        string
@@ -533,6 +537,7 @@ func (o *ObjC) Headers() error {
 				BuildVersions: buildVersions,
 				SourceVersion: sourceVersion,
 				Name:          class.Name,
+				Locals:        imps[class.Name].Locals,
 				Classes:       imps[class.Name].Classes,
 				Protos:        imps[class.Name].Protos,
 				Object:        swift.DemangleBlob(class.Verbose()),
@@ -576,6 +581,7 @@ func (o *ObjC) Headers() error {
 					SourceVersion string
 					IsUmbrella    bool
 					Name          string
+					Locals        []string
 					Classes       []string
 					Protos        []string
 					Object        string
@@ -622,6 +628,7 @@ func (o *ObjC) Headers() error {
 				SourceVersion string
 				IsUmbrella    bool
 				Name          string
+				Locals        []string
 				Classes       []string
 				Protos        []string
 				Object        string
@@ -671,6 +678,7 @@ func (o *ObjC) Headers() error {
 				SourceVersion string
 				IsUmbrella    bool
 				Name          string
+				Locals        []string
 				Classes       []string
 				Protos        []string
 				Object        string
@@ -805,7 +813,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 					imp.Protos = append(imp.Protos, typ)
 				}
 			} else {
-				if !strings.HasPrefix(typ, "id") && !strings.HasPrefix(typ, "struct") && strings.HasSuffix(typ, "*") {
+				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") {
 					typ = strings.Trim(typ, " *")
 					if slices.Contains(classNames, typ) {
 						imp.Locals = append(imp.Locals, typ+".h")
@@ -818,7 +826,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range class.InstanceMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				if !strings.HasPrefix(typ, "id") && !strings.HasPrefix(typ, "struct") && strings.HasSuffix(typ, "*") { // or < >
+				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") { // or < >
 					if slices.Contains(classNames, typ) {
 						imp.Locals = append(imp.Locals, typ+".h")
 					} else if slices.Contains(protoNames, strings.Trim(typ, "NSObject<>")) {
@@ -835,7 +843,7 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 		for _, method := range class.ClassMethods {
 			for i := 0; i < method.NumberOfArguments(); i++ {
 				typ := method.ArgumentType(i)
-				if !strings.HasPrefix(typ, "id") && !strings.HasPrefix(typ, "struct") && strings.HasSuffix(typ, "*") { // or < >
+				if (len(typ) > 0 && unicode.IsUpper(rune(typ[0])) && unicode.IsLetter(rune(typ[0]))) && strings.HasSuffix(typ, "*") { // or < >
 					if slices.Contains(classNames, typ) {
 						imp.Locals = append(imp.Locals, typ+".h")
 					} else {
