@@ -67,7 +67,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - if: matrix.platform == 'ubuntu-latest'
         name: Upload assets
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ipsw_linux
           path: dist/*
@@ -93,14 +93,14 @@ jobs:
       # -
       #   if: matrix.platform == 'ubuntu-latest'
       #   name: Upload assets
-      #   uses: actions/upload-artifact@v3
+      #   uses: actions/upload-artifact@v4
       #   with:
       #     name: disass_linux
       #     path: dist/*
       # -
       #   if: matrix.platform == 'windows-latest'
       #   name: Upload assets
-      #   uses: actions/upload-artifact@v3
+      #   uses: actions/upload-artifact@v4
       #   with:
       #     name: ipsw_windows
       #     path: dist/*
@@ -127,7 +127,7 @@ jobs:
       # -
       #   if: matrix.platform == 'macos-13'
       #   name: Upload assets
-      #   uses: actions/upload-artifact@v3
+      #   uses: actions/upload-artifact@v4
       #   with:
       #     name: ipsw_macos
       #     path: dist/*
