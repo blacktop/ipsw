@@ -118,7 +118,7 @@ var classDumpCmd = &cobra.Command{
 			Output:      viper.GetString("class-dump.output"),
 		}
 
-		if ok, _ := magic.IsMachO(args[0]); ok {
+		if ok, _ := magic.IsMachO(args[0]); ok { /* MachO binary */
 			machoPath := filepath.Clean(args[0])
 			// first check for fat file
 			fat, err := macho.OpenFat(machoPath)
@@ -170,7 +170,7 @@ var classDumpCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-		} else {
+		} else { /* DSC file */
 			if len(args) < 2 {
 				return fmt.Errorf("must provide an in-cache DYLIB to dump")
 			}
