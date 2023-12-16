@@ -495,10 +495,13 @@ func (o *ObjC) Headers() error {
 		})
 		for _, class := range classes {
 			var props []string
+			var setters []string
 			for _, prop := range class.Props {
 				props = append(props, prop.Name)
+				setters = append(setters, "set"+strings.ToUpper(prop.Name[:1])+prop.Name[1:]+":")
 			}
 			slices.Sort(props)
+			slices.Sort(setters)
 			// remove ivars that are properties
 			class.Ivars = slices.DeleteFunc(class.Ivars, func(i objc.Ivar) bool {
 				// return slices.Contains(props, i.Name) || slices.Contains(props, strings.TrimPrefix(i.Name, "_")) TODO: use this instead
@@ -506,7 +509,7 @@ func (o *ObjC) Headers() error {
 			})
 			// remove methods that are property getter/setter
 			class.InstanceMethods = slices.DeleteFunc(class.InstanceMethods, func(m objc.Method) bool {
-				return slices.Contains(props, m.Name) || slices.Contains(props, transformSetter(m.Name))
+				return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
 			})
 			fname := filepath.Join(o.conf.Output, o.conf.Name, class.Name+".h")
 			if err := writeHeader(&headerInfo{
@@ -539,14 +542,28 @@ func (o *ObjC) Headers() error {
 				continue // skip Foundation protocols
 			}
 			if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
-
+				var props []string
+				var setters []string
+				for _, prop := range proto.InstanceProperties {
+					props = append(props, prop.Name)
+					setters = append(setters, "set"+strings.ToUpper(prop.Name[:1])+prop.Name[1:]+":")
+				}
+				slices.Sort(props)
+				slices.Sort(setters)
+				// remove methods that are property getter/setter
+				proto.InstanceMethods = slices.DeleteFunc(proto.InstanceMethods, func(m objc.Method) bool {
+					return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
+				})
+				proto.OptionalInstanceMethods = slices.DeleteFunc(proto.OptionalInstanceMethods, func(m objc.Method) bool {
+					return slices.Contains(props, m.Name) || slices.Contains(setters, m.Name)
+				})
 				fname := filepath.Join(o.conf.Output, o.conf.Name, proto.Name+"-Protocol.h")
 				if err := writeHeader(&headerInfo{
 					FileName:      fname,
 					IpswVersion:   o.conf.IpswVersion,
 					BuildVersions: buildVersions,
 					SourceVersion: sourceVersion,
-					Name:          proto.Name,
+					Name:          proto.Name + "_Protocol",
 					Imports:       imps[proto.Name],
 					Object:        swift.DemangleBlob(proto.Verbose()),
 				}); err != nil {
@@ -577,7 +594,7 @@ func (o *ObjC) Headers() error {
 				IpswVersion:   o.conf.IpswVersion,
 				BuildVersions: buildVersions,
 				SourceVersion: sourceVersion,
-				Name:          cat.Name,
+				Name:          cat.Class.Name + "_" + cat.Name,
 				Imports:       imps[cat.Name],
 				Object:        swift.DemangleBlob(cat.Verbose()),
 			}); err != nil {
@@ -648,10 +665,17 @@ func writeHeader(hdr *headerInfo) error {
 		out += fmt.Sprintf("@import Foundation;\n")
 	}
 	out += fmt.Sprintf("\n")
+	if len(hdr.Imports.Imports) > 0 {
+		for _, imp := range hdr.Imports.Imports {
+			out += fmt.Sprintf("#include \"%s\"\n", imp)
+		}
+	}
 	if len(hdr.Imports.Locals) > 0 {
 		for _, local := range hdr.Imports.Locals {
 			out += fmt.Sprintf("#include \"%s\"\n", local)
 		}
+	}
+	if len(hdr.Imports.Imports) > 0 || len(hdr.Imports.Locals) > 0 {
 		out += fmt.Sprintf("\n")
 	}
 	if len(hdr.Imports.Classes) > 0 {
@@ -707,12 +731,13 @@ func (o *ObjC) processForwardDeclarations(m *macho.File) (map[string]Imports, er
 	})
 	for _, proto := range protos {
 		protoNames = append(protoNames, proto.Name)
+		//TODO: parse protocol properties and methods and add to imports etc
 	}
 
 	for _, class := range classes {
 		imp := Imports{}
-		if class.SuperClass == "NSObject" {
-			imp.Imports = append(imp.Imports, "Foundation")
+		if class.SuperClass != "NSObject" { // skip NSObject since we'll import Foundation by default
+			imp.Imports = append(imp.Imports, class.SuperClass+".h")
 		}
 		for _, prot := range class.Protocols {
 			if slices.Contains(protoNames, prot.Name) {
@@ -864,15 +889,4 @@ func (o *ObjC) scanFoundation() error {
 		}
 	}
 	return nil
-}
-
-func transformSetter(in string) string {
-	if strings.HasPrefix(in, "set") {
-		in = strings.TrimSuffix(strings.TrimPrefix(in, "set"), ":")
-		if len(in) > 0 {
-			return strings.ToLower(in[:1]) + in[1:]
-		}
-		return ""
-	}
-	return in
 }
