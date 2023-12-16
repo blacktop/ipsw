@@ -40,6 +40,20 @@ import (
 	"github.com/spf13/viper"
 )
 
+func getImages(dscPath string) []string {
+	if ok, _ := magic.IsMachO(dscPath); ok {
+		return nil
+	}
+	var images []string
+	if f, err := dyld.Open(dscPath); err == nil {
+		defer f.Close()
+		for _, image := range f.Images {
+			images = append(images, filepath.Base(image.Name))
+		}
+	}
+	return images
+}
+
 func init() {
 	rootCmd.AddCommand(classDumpCmd)
 
@@ -77,12 +91,12 @@ var classDumpCmd = &cobra.Command{
 	Aliases: []string{"cd"},
 	Short:   "ObjC class-dump a dylib from a DSC or a MachO binary",
 	Args:    cobra.MinimumNArgs(1),
-	// ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-	// 	if len(args) == 1 {
-	// 		return getImages(args[0]), cobra.ShellCompDirectiveDefault
-	// 	}
-	// 	return getDSCs(toComplete), cobra.ShellCompDirectiveDefault
-	// },
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 1 {
+			return getImages(args[0]), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveDefault
+	},
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var m *macho.File
