@@ -105,7 +105,7 @@ var classDumpCmd = &cobra.Command{
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
-		color.NoColor = viper.GetBool("no-color")
+		color.NoColor = NoColor
 
 		if viper.GetBool("class-dump.headers") &&
 			(viper.GetString("class-dump.class") != "" ||
@@ -127,7 +127,7 @@ var classDumpCmd = &cobra.Command{
 			ObjcRefs:    viper.GetBool("class-dump.refs"),
 			Deps:        viper.GetBool("class-dump.deps"),
 			IpswVersion: fmt.Sprintf("Version: %s, BuildTime: %s", strings.TrimSpace(AppVersion), strings.TrimSpace(AppBuildTime)),
-			Color:       viper.GetBool("color"),
+			Color:       Color && !NoColor,
 			Theme:       viper.GetString("class-dump.theme"),
 			Output:      viper.GetString("class-dump.output"),
 		}
