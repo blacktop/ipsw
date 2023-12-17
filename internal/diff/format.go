@@ -26,6 +26,9 @@ const diffMarkdownTemplate = `
 	- [Kernel](#kernel)
 		- [Version](#version)
 		- [Kexts](#kexts)
+{{- if .MachOs }}
+	- [MachOs](#machos)
+{{- end }}			
 {{- if .Ents }}
 	- [Entitlements](#entitlements)
 {{- end }}		
@@ -69,15 +72,28 @@ const diffMarkdownTemplate = `
 
 {{ .KDKs | noescape }}
 {{end -}}
+{{ if .MachOs }}
+## MachOs
+<details>
+  <summary><i>View MachOs</i></summary>
 
+  {{ .MachOs | noescape }}
+
+</details>
+{{ end -}}
+{{ if .Ents }}
 ## Entitlements
+<details>
+  <summary><i>View Entitlements</i></summary>
 
-{{ .Ents | noescape }}
+  {{ .Ents | noescape }}
 
+</details>
+{{ end -}}
 {{ if .Launchd }}
 ## launchd Config
 {{ .Launchd | noescape }}
-{{end -}}
+{{ end }}
 
 ## DSC
 
@@ -88,6 +104,8 @@ const diffMarkdownTemplate = `
 | {{ .Old.Version }} *({{ .Old.Build }})* | {{ .Old.Webkit }} |
 | {{ .New.Version }} *({{ .New.Build }})* | {{ .New.Webkit }} |
 
+### Dylibs
+
 {{ if .Dylibs.New }}
 {{ .Dylibs.New }}
 {{ end -}}
@@ -95,7 +113,10 @@ const diffMarkdownTemplate = `
 {{ .Dylibs.Removed }}
 {{ end -}}
 {{- if .Dylibs.Updated }}
-{{ .Dylibs.Updated | noescape }}
+<details>
+  <summary><i>View Updated Dylibs</i></summary>
+  {{ .Dylibs.Updated | noescape }}
+</details>
 {{ end -}}
 `
 

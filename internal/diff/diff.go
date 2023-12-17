@@ -3,7 +3,6 @@ package diff
 
 import (
 	"archive/zip"
-	"bufio"
 	"bytes"
 	"errors"
 	"fmt"
@@ -20,13 +19,11 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/commands/extract"
-	"github.com/blacktop/ipsw/internal/search"
+	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
 	"github.com/blacktop/ipsw/pkg/info"
 	"github.com/blacktop/ipsw/pkg/kernelcache"
-	"github.com/fatih/color"
-	"golang.org/x/exp/slices"
 )
 
 const (
@@ -174,43 +171,43 @@ func (d *Diff) Diff() (err error) {
 		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
 	}
 
-	// log.Info("Diffing KERNELCACHES")
-	// if err := d.parseKernelcache(); err != nil {
-	// 	return err
-	// }
+	log.Info("Diffing KERNELCACHES")
+	if err := d.parseKernelcache(); err != nil {
+		return err
+	}
 
-	// if d.Old.KDK != "" && d.New.KDK != "" {
-	// 	log.Info("Diffing KDKS")
-	// 	if err := d.parseKDKs(); err != nil {
-	// 		return err
-	// 	}
-	// }
+	if d.Old.KDK != "" && d.New.KDK != "" {
+		log.Info("Diffing KDKS")
+		if err := d.parseKDKs(); err != nil {
+			return err
+		}
+	}
 
-	// log.Info("Diffing DYLD_SHARED_CACHES")
-	// if err := d.mountSystemOsDMGs(); err != nil {
-	// 	return fmt.Errorf("failed to mount DMGs: %v", err)
-	// }
-	// defer d.unmountSystemOsDMGs()
+	log.Info("Diffing DYLD_SHARED_CACHES")
+	if err := d.mountSystemOsDMGs(); err != nil {
+		return fmt.Errorf("failed to mount DMGs: %v", err)
+	}
+	defer d.unmountSystemOsDMGs()
 
-	// if err := d.parseDSC(); err != nil {
-	// 	return err
-	// }
+	if err := d.parseDSC(); err != nil {
+		return err
+	}
 
 	log.Info("Diffing MachOs")
 	if err := d.parseMachos(); err != nil {
 		return fmt.Errorf("failed to parse MachOs: %v", err)
 	}
 
-	// log.Info("Diffing launchd PLIST")
-	// if err := d.parseLaunchdPlists(); err != nil {
-	// 	return fmt.Errorf("failed to parse launchd config plists: %v", err)
-	// }
+	log.Info("Diffing launchd PLIST")
+	if err := d.parseLaunchdPlists(); err != nil {
+		return fmt.Errorf("failed to parse launchd config plists: %v", err)
+	}
 
-	// log.Info("Diffing ENTITLEMENTS")
-	// d.Ents, err = d.parseEntitlements()
-	// if err != nil {
-	// 	return err
-	// }
+	log.Info("Diffing ENTITLEMENTS")
+	d.Ents, err = d.parseEntitlements()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -463,7 +460,7 @@ func (d *Diff) parseDSC() error {
 
 	if len(newd) > 0 {
 		buf := bytes.NewBufferString("")
-		buf.WriteString("### 🆕 new dylibs\n\n")
+		buf.WriteString("### 🆕 NEW\n\n")
 		for _, d := range newd {
 			buf.WriteString(fmt.Sprintf("- %s\n", d))
 		}
@@ -471,7 +468,7 @@ func (d *Diff) parseDSC() error {
 	}
 	if len(gone) > 0 {
 		buf := bytes.NewBufferString("")
-		buf.WriteString("\n### ❌ removed dylibs\n\n")
+		buf.WriteString("\n### ❌ Removed\n\n")
 		for _, d := range gone {
 			buf.WriteString(fmt.Sprintf("- %s\n", d))
 		}
@@ -479,7 +476,7 @@ func (d *Diff) parseDSC() error {
 	}
 	if len(deltas) > 0 {
 		buf := bytes.NewBufferString("")
-		buf.WriteString("\n### ⬆️ updated dylibs\n\n")
+		buf.WriteString("\n### ⬆️ Updated\n\n")
 		buf.WriteString("> NOTE: These are the semantic version deltas\n\n")
 		utils.SortMachoVersions(deltas)
 		w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
@@ -516,156 +513,13 @@ func (d *Diff) parseEntitlements() (string, error) {
 	})
 }
 
-// difference returns the elements in `a` that aren't in `b`.
-func difference(a, b []string) []string {
-	mb := make(map[string]struct{}, len(b))
-	for _, x := range b {
-		mb[x] = struct{}{}
-	}
-	var diff []string
-	for _, x := range a {
-		if _, found := mb[x]; !found {
-			diff = append(diff, x)
-		}
-	}
-	return diff
-}
-
-type seg struct {
-	Name string
-	Size uint64
-}
-
-type machoInfo struct {
-	Version   string
-	Segments  []seg
-	Symbols   int
-	Functions int
-}
-
-func (i *machoInfo) String() string {
-	out := i.Version + "\n"
-	for _, seg := range i.Segments {
-		out += fmt.Sprintf("  %s: %#x\n", seg.Name, seg.Size)
-	}
-	out += fmt.Sprintf("  Symbols:   %d\n", i.Symbols)
-	out += fmt.Sprintf("  Functions: %d\n", i.Functions)
-	return out
-}
-
 func (d *Diff) parseMachos() (err error) {
-	var dat bytes.Buffer
-	buf := bufio.NewWriter(&dat)
-
-	prev := make(map[string]machoInfo)
-	next := make(map[string]machoInfo)
-
-	if err := search.ForEachMachoInIPSW(d.Old.IPSWPath, func(path string, m *macho.File) error {
-		var segs []seg
-		for _, s := range m.Segments() {
-			segs = append(segs, seg{
-				Name: s.Name,
-				Size: s.Filesz,
-			})
-		}
-		funcCount := 0
-		if fns := m.GetFunctions(); fns != nil {
-			funcCount = len(fns)
-		}
-		prev[path] = machoInfo{
-			Version:   m.SourceVersion().Version.String(),
-			Segments:  segs,
-			Symbols:   len(m.Symtab.Syms),
-			Functions: funcCount,
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
-	}
-	if err := search.ForEachMachoInIPSW(d.New.IPSWPath, func(path string, m *macho.File) error {
-		var segs []seg
-		for _, s := range m.Segments() {
-			segs = append(segs, seg{
-				Name: s.Name,
-				Size: s.Filesz,
-			})
-		}
-		funcCount := 0
-		if fns := m.GetFunctions(); fns != nil {
-			funcCount = len(fns)
-		}
-		next[path] = machoInfo{
-			Version:   m.SourceVersion().Version.String(),
-			Segments:  segs,
-			Symbols:   len(m.Symtab.Syms),
-			Functions: funcCount,
-		}
-		return nil
-	}); err != nil {
-		return fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
-	}
-
-	var prevFiles []string
-	for f := range prev {
-		prevFiles = append(prevFiles, f)
-	}
-	slices.Sort(prevFiles)
-
-	var nextFiles []string
-	for f := range next {
-		nextFiles = append(nextFiles, f)
-	}
-	slices.Sort(nextFiles)
-
-	for _, df := range difference(nextFiles, prevFiles) {
-		buf.WriteString(color.New(color.Bold).Sprintf("🆕 %s\n", df))
-	}
-	for _, df := range difference(prevFiles, nextFiles) {
-		buf.WriteString(color.New(color.Bold).Sprintf("❌ %s\n", df))
-	}
-
-	var hasDiffs bool
-	for _, f2 := range nextFiles {
-		dat2 := next[f2]
-		if dat1, ok := prev[f2]; ok {
-			if dat2.Version == dat1.Version {
-				continue
-			}
-			var out string
-			// if conf.Markdown {
-			// 	out, err = utils.GitDiff(e1+"\n", e2+"\n", &utils.GitDiffConfig{Color: false, Tool: "git"})
-			// 	if err != nil {
-			// 		return "", err
-			// 	}
-			// } else {
-			out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: true})
-			if err != nil {
-				return err
-			}
-			// }
-			if len(out) == 0 {
-				continue
-			}
-			hasDiffs = true
-			// if conf.Markdown {
-			// 	buf.WriteString(fmt.Sprintf("### %s\n\n> `%s`\n\n", filepath.Base(f2), f2))
-			// 	buf.WriteString("```diff\n" + out + "\n```\n")
-			// } else {
-			buf.WriteString(color.New(color.Bold).Sprintf("\n%s\n", f2))
-			buf.WriteString(out + "\n")
-			// }
-		}
-	}
-
-	if !hasDiffs {
-		buf.WriteString("- No differences found\n")
-	}
-
-	buf.Flush()
-
-	d.MachOs = dat.String()
-
-	return nil
+	d.MachOs, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
+		Markdown: true,
+		Color:    false,
+		DiffTool: "git",
+	})
+	return
 }
 
 func (d *Diff) parseLaunchdPlists() error {

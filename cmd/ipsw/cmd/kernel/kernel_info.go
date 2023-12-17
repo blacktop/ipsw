@@ -86,7 +86,7 @@ var kernelInfoCmd = &cobra.Command{
 
 		kernelPath := filepath.Clean(args[0])
 
-		if ok, err := magic.IsMachO(kernelPath); !ok {
+		if ok, err := magic.IsMachoOrImg4(kernelPath); !ok {
 			return err
 		}
 
