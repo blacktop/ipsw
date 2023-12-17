@@ -2,6 +2,7 @@ package search
 
 import (
 	"archive/zip"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/ipsw/internal/magic"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/info"
 )
@@ -59,17 +61,41 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 	}
 
 	for _, file := range files {
-		if m, err := macho.Open(file); err == nil {
-			if err := handler(strings.TrimPrefix(file, mountPoint), m); err != nil {
-				return fmt.Errorf("failed to handle macho %s: %v", file, err)
+		if err := func() error {
+			if ok, _ := magic.IsMachO(file); ok {
+				var m *macho.File
+				// UNIVERSAL MACHO
+				if fat, err := macho.OpenFat(file); err == nil {
+					defer fat.Close()
+					m = fat.Arches[len(fat.Arches)-1].File
+				} else { // SINGLE MACHO
+					if errors.Is(err, macho.ErrNotFat) {
+						m, err = macho.Open(file)
+						if err != nil {
+							return nil
+						}
+						defer m.Close()
+					} else { // NOT a macho file
+						return nil
+					}
+				}
+				if m == nil {
+					fmt.Println("WTF")
+				}
+				if err := handler(strings.TrimPrefix(file, mountPoint), m); err != nil {
+					return fmt.Errorf("failed to handle macho %s: %v", file, err)
+				}
 			}
-			m.Close()
+			return nil
+		}(); err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
+// ForEachMachoInIPSW walks the IPSW and calls the handler for each macho file found
 func ForEachMachoInIPSW(ipswPath string, handler func(string, *macho.File) error) error {
 
 	i, err := info.Parse(ipswPath)
