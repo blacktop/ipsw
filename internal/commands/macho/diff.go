@@ -1,16 +1,12 @@
 package macho
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"path/filepath"
 	"slices"
 
 	"github.com/blacktop/go-macho"
 	"github.com/blacktop/ipsw/internal/search"
 	"github.com/blacktop/ipsw/internal/utils"
-	"github.com/fatih/color"
 )
 
 type DiffConfig struct {
@@ -19,19 +15,10 @@ type DiffConfig struct {
 	DiffTool string
 }
 
-// difference returns the elements in `a` that aren't in `b`.
-func difference(a, b []string) []string {
-	mb := make(map[string]struct{}, len(b))
-	for _, x := range b {
-		mb[x] = struct{}{}
-	}
-	var diff []string
-	for _, x := range a {
-		if _, found := mb[x]; !found {
-			diff = append(diff, x)
-		}
-	}
-	return diff
+type MachoDiff struct {
+	New     []string
+	Removed []string
+	Updated map[string]string
 }
 
 type section struct {
@@ -39,7 +26,7 @@ type section struct {
 	Size uint64
 }
 
-type Info struct {
+type DiffInfo struct {
 	Version   string
 	Imports   []string
 	Sections  []section
@@ -47,7 +34,7 @@ type Info struct {
 	Functions int
 }
 
-func generateInfo(m *macho.File) *Info {
+func GenerateDiffInfo(m *macho.File) *DiffInfo {
 	var secs []section
 	for _, s := range m.Sections {
 		secs = append(secs, section{
@@ -63,17 +50,21 @@ func generateInfo(m *macho.File) *Info {
 	if m.SourceVersion() != nil {
 		sourceVersion = m.SourceVersion().Version.String()
 	}
-	return &Info{
+	var symCount int
+	if m.Symtab != nil {
+		symCount = len(m.Symtab.Syms)
+	}
+	return &DiffInfo{
 		Version:   sourceVersion,
 		Imports:   m.ImportedLibraries(),
 		Sections:  secs,
-		Symbols:   len(m.Symtab.Syms),
+		Symbols:   symCount,
 		Functions: funcCount,
 	}
 }
 
 // Equal checks if two Info structs are equal
-func (i Info) Equal(x Info) bool {
+func (i DiffInfo) Equal(x DiffInfo) bool {
 	if i.Version == x.Version {
 		return true
 	}
@@ -102,7 +93,7 @@ func (i Info) Equal(x Info) bool {
 	return true
 }
 
-func (i *Info) String() string {
+func (i *DiffInfo) String() string {
 	out := i.Version + "\n"
 	for _, sec := range i.Sections {
 		out += fmt.Sprintf("  %s: %#x\n", sec.Name, sec.Size)
@@ -117,19 +108,20 @@ func (i *Info) String() string {
 }
 
 // DiffIPSW diffs two IPSW's MachOs
-func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (string, error) {
-	var dat bytes.Buffer
-	buf := bufio.NewWriter(&dat)
+func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (*MachoDiff, error) {
+	diff := &MachoDiff{
+		Updated: make(map[string]string),
+	}
 
 	/* PREVIOUS IPSW */
 
-	prev := make(map[string]*Info)
+	prev := make(map[string]*DiffInfo)
 
 	if err := search.ForEachMachoInIPSW(oldIPSW, func(path string, m *macho.File) error {
-		prev[path] = generateInfo(m)
+		prev[path] = GenerateDiffInfo(m)
 		return nil
 	}); err != nil {
-		return "", fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
 	var prevFiles []string
@@ -140,13 +132,13 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (string, error) {
 
 	/* NEXT IPSW */
 
-	next := make(map[string]*Info)
+	next := make(map[string]*DiffInfo)
 
 	if err := search.ForEachMachoInIPSW(newIPSW, func(path string, m *macho.File) error {
-		next[path] = generateInfo(m)
+		next[path] = GenerateDiffInfo(m)
 		return nil
 	}); err != nil {
-		return "", fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
+		return nil, fmt.Errorf("failed to parse machos in 'Old' IPSW: %v", err)
 	}
 
 	var nextFiles []string
@@ -156,19 +148,12 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (string, error) {
 	slices.Sort(nextFiles)
 
 	/* DIFF IPSW */
-	buf.WriteString("### 🆕 NEW\n\n")
-	for _, df := range difference(nextFiles, prevFiles) {
-		buf.WriteString(color.New(color.Bold).Sprintf(" - %s\n", df))
-	}
-	buf.WriteString("\n### ❌ Removed\n\n")
-	for _, df := range difference(prevFiles, nextFiles) {
-		buf.WriteString(color.New(color.Bold).Sprintf(" - %s\n", df))
-	}
+	diff.New = utils.Difference(nextFiles, prevFiles)
+	diff.Removed = utils.Difference(prevFiles, nextFiles)
 	// gc
 	prevFiles = []string{}
 
 	var err error
-	var hasDiffs bool
 	for _, f2 := range nextFiles {
 		dat2 := next[f2]
 		if dat1, ok := prev[f2]; ok {
@@ -179,33 +164,24 @@ func DiffIPSW(oldIPSW, newIPSW string, conf *DiffConfig) (string, error) {
 			if conf.Markdown {
 				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
 				if err != nil {
-					return "", err
+					return nil, err
 				}
 			} else {
 				out, err = utils.GitDiff(dat1.String()+"\n", dat2.String()+"\n", &utils.GitDiffConfig{Color: conf.Color, Tool: conf.DiffTool})
 				if err != nil {
-					return "", err
+					return nil, err
 				}
 			}
 			if len(out) == 0 { // no diff
 				continue
 			}
-			hasDiffs = true
 			if conf.Markdown {
-				buf.WriteString(fmt.Sprintf("### %s\n\n> `%s`\n\n", filepath.Base(f2), f2))
-				buf.WriteString("```diff\n" + out + "\n```\n")
+				diff.Updated[f2] = "```diff\n" + out + "\n```\n"
 			} else {
-				buf.WriteString(color.New(color.Bold).Sprintf("\n%s\n", f2))
-				buf.WriteString(out + "\n")
+				diff.Updated[f2] = out
 			}
 		}
 	}
 
-	if !hasDiffs {
-		buf.WriteString("- No differences found\n")
-	}
-
-	buf.Flush()
-
-	return dat.String(), nil
+	return diff, nil
 }

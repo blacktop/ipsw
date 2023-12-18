@@ -26,22 +26,30 @@ const diffMarkdownTemplate = `
 	- [Kernel](#kernel)
 		- [Version](#version)
 		- [Kexts](#kexts)
-{{- if .MachOs }}
-	- [MachOs](#machos)
-{{- end }}			
+	- [Machos](#machos)
+{{- if .Machos.New }}
+		- [🆕 NEW ({{ len .Machos.New }})](#-new)
+{{- end }}
+{{- if .Machos.Removed }}
+		- [❌ Removed ({{ len .Machos.Removed }})](#-removed)
+{{- end }}
+{{- if .Machos.Updated }}
+		- [⬆️ Updated ({{ len .Machos.Updated }})](#️-updated)
+{{- end }}
 {{- if .Ents }}
-	- [Entitlements](#entitlements)
-{{- end }}		
+		- [Entitlements](#entitlements)
+{{- end }}
 	- [DSC](#dsc)
 		- [WebKit](#webkit)
+		- [Dylibs](#dylibs)
 {{- if .Dylibs.New }}
-		- [🆕 dylibs](#🆕-new-dylibs)
+			- [🆕 NEW ({{ len .Dylibs.New }})](#-new-1)
 {{- end }}
 {{- if .Dylibs.Removed }}
-		- [❌ dylibs](#❌-removed-dylibs)
+			- [❌ Removed ({{ len .Dylibs.Removed }})](#️-removed-1)
 {{- end }}
 {{- if .Dylibs.Updated }}
-		- [⬆️ dylibs](#⬆️-updated-dylibs)
+			- [⬆️ Updated ({{ len .Dylibs.Updated }})](#️-updated-1)
 {{- end }}
 
 
@@ -72,17 +80,35 @@ const diffMarkdownTemplate = `
 
 {{ .KDKs | noescape }}
 {{end -}}
-{{ if .MachOs }}
-## MachOs
-<details>
-  <summary><i>View MachOs</i></summary>
 
-  {{ .MachOs | noescape }}
+## MachOs
+{{ if .Machos.New }}
+### 🆕 NEW
+{{ range .Machos.New }}
+- {{ . | code }}
+{{ end }}
+{{ end -}}
+{{- if .Machos.Removed }}
+### ❌ Removed
+{{ range .Machos.Removed }}
+- {{ . | code }}
+{{ end }}
+{{ end -}}
+{{- if .Machos.Updated }}
+### ⬆️ Updated
+<details>
+  <summary><i>View Updated</i></summary>
+
+{{ range $key, $value := .Machos.Updated }}
+#### {{ $key | base }}
+> {{ $key | code }}
+{{ $value | noescape }}
+{{ end }}
 
 </details>
 {{ end -}}
 {{ if .Ents }}
-## Entitlements
+### Entitlements
 <details>
   <summary><i>View Entitlements</i></summary>
 
@@ -107,15 +133,28 @@ const diffMarkdownTemplate = `
 ### Dylibs
 
 {{ if .Dylibs.New }}
-{{ .Dylibs.New }}
+#### 🆕 NEW
+{{ range .Dylibs.New }}
+- {{ . | code }}
+{{ end }}
 {{ end -}}
 {{- if .Dylibs.Removed }}
-{{ .Dylibs.Removed }}
+#### ❌ Removed
+{{ range .Dylibs.Removed }}
+- {{ . | code }}
+{{ end }}
 {{ end -}}
 {{- if .Dylibs.Updated }}
+#### ⬆️ Updated
 <details>
-  <summary><i>View Updated Dylibs</i></summary>
-  {{ .Dylibs.Updated | noescape }}
+  <summary><i>View Updated</i></summary>
+
+{{ range $key, $value := .Dylibs.Updated }}
+##### {{ $key | base }}
+> {{ $key | code }}
+{{ $value | noescape }}
+{{ end }}
+
 </details>
 {{ end -}}
 `

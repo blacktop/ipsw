@@ -3,19 +3,17 @@ package diff
 
 import (
 	"archive/zip"
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
-	"text/tabwriter"
 	"time"
 
 	"github.com/apex/log"
 	"github.com/blacktop/go-macho"
+	dcmd "github.com/blacktop/ipsw/internal/commands/dsc"
 	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/commands/extract"
@@ -70,15 +68,11 @@ type Diff struct {
 	Old Context
 	New Context
 
-	Kexts  string
-	KDKs   string
-	Ents   string
-	Dylibs struct {
-		New     string
-		Removed string
-		Updated string
-	}
-	MachOs  string
+	Kexts   string
+	KDKs    string
+	Ents    string
+	Dylibs  *mcmd.MachoDiff
+	Machos  *mcmd.MachoDiff
 	Launchd string
 
 	tmpDir string
@@ -133,15 +127,7 @@ func (d *Diff) Save(folder string) error {
 	return err
 }
 
-// Diff diffs the diff
-func (d *Diff) Diff() (err error) {
-
-	d.tmpDir, err = os.MkdirTemp(os.TempDir(), "ipsw-diff")
-	if err != nil {
-		return fmt.Errorf("failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(d.tmpDir)
-
+func (d *Diff) getInfo() (err error) {
 	d.Old.Info, err = info.Parse(d.Old.IPSWPath)
 	if err != nil {
 		return fmt.Errorf("failed to parse 'Old' IPSW: %v", err)
@@ -171,6 +157,22 @@ func (d *Diff) Diff() (err error) {
 		d.Title = fmt.Sprintf("%s (%s) .vs %s (%s)", d.Old.Version, d.Old.Build, d.New.Version, d.New.Build)
 	}
 
+	return nil
+}
+
+// Diff diffs the diff
+func (d *Diff) Diff(launchd bool) (err error) {
+
+	d.tmpDir, err = os.MkdirTemp(os.TempDir(), "ipsw-diff")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(d.tmpDir)
+
+	if err := d.getInfo(); err != nil {
+		return err
+	}
+
 	log.Info("Diffing KERNELCACHES")
 	if err := d.parseKernelcache(); err != nil {
 		return err
@@ -198,9 +200,11 @@ func (d *Diff) Diff() (err error) {
 		return fmt.Errorf("failed to parse MachOs: %v", err)
 	}
 
-	log.Info("Diffing launchd PLIST")
-	if err := d.parseLaunchdPlists(); err != nil {
-		return fmt.Errorf("failed to parse launchd config plists: %v", err)
+	if launchd {
+		log.Info("Diffing launchd PLIST")
+		if err := d.parseLaunchdPlists(); err != nil {
+			return fmt.Errorf("failed to parse launchd config plists: %v", err)
+		}
 	}
 
 	log.Info("Diffing ENTITLEMENTS")
@@ -357,19 +361,13 @@ func (d *Diff) parseKDKs() (err error) {
 }
 
 func (d *Diff) parseDSC() error {
+	/* OLD DSC */
 	oldDSCes, err := dyld.GetDscPathsInMount(d.Old.MountPath, false)
 	if err != nil {
 		return fmt.Errorf("failed to get DSC paths in %s: %v", d.Old.MountPath, err)
 	}
 	if len(oldDSCes) == 0 {
 		return fmt.Errorf("no DSCs found in 'Old' IPSW mount %s", d.Old.MountPath)
-	}
-	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false)
-	if err != nil {
-		return fmt.Errorf("failed to get DSC paths in %s: %v", d.New.MountPath, err)
-	}
-	if len(newDSCes) == 0 {
-		return fmt.Errorf("no DSCs found in 'New' IPSW mount %s", d.New.MountPath)
 	}
 
 	dscOLD, err := dyld.Open(oldDSCes[0])
@@ -378,25 +376,14 @@ func (d *Diff) parseDSC() error {
 	}
 	defer dscOLD.Close()
 
-	image, err := dscOLD.Image("WebKit")
+	/* NEW DSC */
+
+	newDSCes, err := dyld.GetDscPathsInMount(d.New.MountPath, false)
 	if err != nil {
-		return fmt.Errorf("image not in %s: %v", oldDSCes[0], err)
+		return fmt.Errorf("failed to get DSC paths in %s: %v", d.New.MountPath, err)
 	}
-
-	m, err := image.GetPartialMacho()
-	if err != nil {
-		return err
-	}
-
-	d.Old.Webkit = m.SourceVersion().Version.String()
-
-	dylib2verOLD := make(map[string]string)
-	for _, img := range dscOLD.Images {
-		m, err := img.GetPartialMacho()
-		if err != nil {
-			return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-		}
-		dylib2verOLD[img.Name] = m.SourceVersion().Version.String()
+	if len(newDSCes) == 0 {
+		return fmt.Errorf("no DSCs found in 'New' IPSW mount %s", d.New.MountPath)
 	}
 
 	dscNEW, err := dyld.Open(newDSCes[0])
@@ -405,91 +392,35 @@ func (d *Diff) parseDSC() error {
 	}
 	defer dscNEW.Close()
 
+	/* DIFF WEBKIT*/
+
+	image, err := dscOLD.Image("WebKit")
+	if err != nil {
+		return fmt.Errorf("image not in %s: %v", oldDSCes[0], err)
+	}
+	m, err := image.GetPartialMacho()
+	if err != nil {
+		return err
+	}
+	d.Old.Webkit = m.SourceVersion().Version.String()
+
 	image, err = dscNEW.Image("WebKit")
 	if err != nil {
 		return fmt.Errorf("image not in %s: %v", newDSCes[0], err)
 	}
-
 	m, err = image.GetPartialMacho()
 	if err != nil {
 		return err
 	}
-
 	d.New.Webkit = m.SourceVersion().Version.String()
 
-	dylib2verNEW := make(map[string]string)
-	for _, img := range dscNEW.Images {
-		m, err := img.GetPartialMacho()
-		if err != nil {
-			return fmt.Errorf("failed to create partial MachO for image %s: %v", img.Name, err)
-		}
-		dylib2verNEW[img.Name] = m.SourceVersion().Version.String()
-	}
-
-	var newd []string
-	var gone []string
-
-	for d1, v1 := range dylib2verOLD {
-		if _, ok := dylib2verNEW[d1]; !ok {
-			gone = append(gone, fmt.Sprintf("`%s`\t(%s)", d1, v1))
-		}
-	}
-
-	sort.Strings(gone)
-
-	var deltas []utils.MachoVersion
-	for d2, v2 := range dylib2verNEW {
-		if v1, ok := dylib2verOLD[d2]; ok {
-			if v1 != v2 {
-				verdiff, err := utils.DiffVersion(v2, v1)
-				if err != nil {
-					return err
-				}
-				deltas = append(deltas, utils.MachoVersion{
-					Name:    d2,
-					Version: verdiff,
-				})
-				// fmt.Printf("%s\t(%s -> %s) %s\n", d2, v2, v1, verdiff)
-			}
-		} else {
-			newd = append(newd, fmt.Sprintf("`%s`\t(%s)", d2, v2))
-		}
-	}
-
-	sort.Strings(newd)
-
-	if len(newd) > 0 {
-		buf := bytes.NewBufferString("")
-		buf.WriteString("### 🆕 NEW\n\n")
-		for _, d := range newd {
-			buf.WriteString(fmt.Sprintf("- %s\n", d))
-		}
-		d.Dylibs.New = buf.String()
-	}
-	if len(gone) > 0 {
-		buf := bytes.NewBufferString("")
-		buf.WriteString("\n### ❌ Removed\n\n")
-		for _, d := range gone {
-			buf.WriteString(fmt.Sprintf("- %s\n", d))
-		}
-		d.Dylibs.Removed = buf.String()
-	}
-	if len(deltas) > 0 {
-		buf := bytes.NewBufferString("")
-		buf.WriteString("\n### ⬆️ Updated\n\n")
-		buf.WriteString("> NOTE: These are the semantic version deltas\n\n")
-		utils.SortMachoVersions(deltas)
-		w := tabwriter.NewWriter(buf, 0, 0, 1, ' ', 0)
-		var prev string
-		for _, d := range deltas {
-			if len(prev) > 0 && prev != d.Version {
-				fmt.Fprintf(w, "\n---\n\n")
-			}
-			fmt.Fprintf(w, "- (%s)\t`%s`  \n", d.Version, d.Name)
-			prev = d.Version
-		}
-		w.Flush()
-		d.Dylibs.Updated = buf.String()
+	d.Dylibs, err = dcmd.Diff(dscOLD, dscNEW, &mcmd.DiffConfig{
+		Markdown: true,
+		Color:    false,
+		DiffTool: "git",
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -514,7 +445,7 @@ func (d *Diff) parseEntitlements() (string, error) {
 }
 
 func (d *Diff) parseMachos() (err error) {
-	d.MachOs, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
+	d.Machos, err = mcmd.DiffIPSW(d.Old.IPSWPath, d.New.IPSWPath, &mcmd.DiffConfig{
 		Markdown: true,
 		Color:    false,
 		DiffTool: "git",

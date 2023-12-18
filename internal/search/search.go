@@ -83,9 +83,6 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 						return nil
 					}
 				}
-				if m == nil {
-					fmt.Println("WTF")
-				}
 				if err := handler(strings.TrimPrefix(file, mountPoint), m); err != nil {
 					return fmt.Errorf("failed to handle macho %s: %v", file, err)
 				}
