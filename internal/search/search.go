@@ -52,6 +52,10 @@ func scanDmg(ipswPath, dmgPath, dmgType string, handler func(string, *macho.File
 
 	var files []string
 	if err := filepath.Walk(mountPoint, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Errorf("failed to walk mount %s: %v", path, err)
+			return nil
+		}
 		if !info.IsDir() {
 			files = append(files, path)
 		}
