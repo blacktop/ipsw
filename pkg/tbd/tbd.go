@@ -39,7 +39,9 @@ func NewTBD(image *dyld.CacheImage, reexports []string, private bool) (*TBD, err
 		if sym.Name == "<redacted>" || sym.Value == 0 {
 			continue
 		}
-		syms = utils.UniqueAppend(syms, sym.Name)
+		if sym.Type.IsExternalSym() {
+			syms = utils.UniqueAppend(syms, sym.Name)
+		}
 	}
 	if exports, err := m.DyldExports(); err == nil {
 		for _, export := range exports {
