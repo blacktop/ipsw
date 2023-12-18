@@ -5113,6 +5113,16 @@ module.exports = register;
     bb.w = 0;
     bb.h = 0;
   };
+  var shiftBoundingBox = function shiftBoundingBox(bb, dx, dy) {
+    return {
+      x1: bb.x1 + dx,
+      x2: bb.x2 + dx,
+      y1: bb.y1 + dy,
+      y2: bb.y2 + dy,
+      w: bb.w,
+      h: bb.h
+    };
+  };
   var updateBoundingBox = function updateBoundingBox(bb1, bb2) {
     // update bb1 with bb2 bounds
 
@@ -12473,6 +12483,47 @@ module.exports = register;
     }
     return bounds;
   };
+  var updateBoundsFromOutline = function updateBoundsFromOutline(bounds, ele) {
+    if (ele.cy().headless()) {
+      return;
+    }
+    var outlineOpacity = ele.pstyle('outline-opacity').value;
+    var outlineWidth = ele.pstyle('outline-width').value;
+    if (outlineOpacity > 0 && outlineWidth > 0) {
+      var outlineOffset = ele.pstyle('outline-offset').value;
+      var nodeShape = ele.pstyle('shape').value;
+      var outlineSize = outlineWidth + outlineOffset;
+      var scaleX = (bounds.w + outlineSize * 2) / bounds.w;
+      var scaleY = (bounds.h + outlineSize * 2) / bounds.h;
+      var xOffset = 0;
+      var yOffset = 0;
+      if (["diamond", "pentagon", "round-triangle"].includes(nodeShape)) {
+        scaleX = (bounds.w + outlineSize * 2.4) / bounds.w;
+        yOffset = -outlineSize / 3.6;
+      } else if (["concave-hexagon", "rhomboid", "right-rhomboid"].includes(nodeShape)) {
+        scaleX = (bounds.w + outlineSize * 2.4) / bounds.w;
+      } else if (nodeShape === "star") {
+        scaleX = (bounds.w + outlineSize * 2.8) / bounds.w;
+        scaleY = (bounds.h + outlineSize * 2.6) / bounds.h;
+        yOffset = -outlineSize / 3.8;
+      } else if (nodeShape === "triangle") {
+        scaleX = (bounds.w + outlineSize * 2.8) / bounds.w;
+        scaleY = (bounds.h + outlineSize * 2.4) / bounds.h;
+        yOffset = -outlineSize / 1.4;
+      } else if (nodeShape === "vee") {
+        scaleX = (bounds.w + outlineSize * 4.4) / bounds.w;
+        scaleY = (bounds.h + outlineSize * 3.8) / bounds.h;
+        yOffset = -outlineSize * .5;
+      }
+      var hDelta = bounds.h * scaleY - bounds.h;
+      var wDelta = bounds.w * scaleX - bounds.w;
+      expandBoundingBoxSides(bounds, [Math.ceil(hDelta / 2), Math.ceil(wDelta / 2)]);
+      if (xOffset != 0 || yOffset !== 0) {
+        var oBounds = shiftBoundingBox(bounds, xOffset, yOffset);
+        updateBoundingBox(bounds, oBounds);
+      }
+    }
+  };
 
   // get the bounding box of the elements (in raw model position)
   var boundingBoxImpl = function boundingBoxImpl(ele, options) {
@@ -12539,6 +12590,9 @@ module.exports = register;
         ey1 = y - halfH;
         ey2 = y + halfH;
         updateBounds(bounds, ex1, ey1, ex2, ey2);
+        if (styleEnabled && options.includeOutlines) {
+          updateBoundsFromOutline(bounds, ele);
+        }
       } else if (isEdge && options.includeEdges) {
         if (styleEnabled && !headless) {
           var curveStyle = ele.pstyle('curve-style').strValue;
@@ -12733,6 +12787,7 @@ module.exports = register;
     key += tf(opts.includeSourceLabels);
     key += tf(opts.includeTargetLabels);
     key += tf(opts.includeOverlays);
+    key += tf(opts.includeOutlines);
     return key;
   };
   var getBoundingBoxPosKey = function getBoundingBoxPosKey(ele) {
@@ -12811,6 +12866,7 @@ module.exports = register;
     includeTargetLabels: true,
     includeOverlays: true,
     includeUnderlays: true,
+    includeOutlines: true,
     useCache: true
   };
   var defBbOptsKey = getKey(defBbOpts);
@@ -17173,10 +17229,11 @@ module.exports = register;
       var _p$styleKeys = _p.styleKeys,
         nodeBody = _p$styleKeys.nodeBody,
         nodeBorder = _p$styleKeys.nodeBorder,
+        nodeOutline = _p$styleKeys.nodeOutline,
         backgroundImage = _p$styleKeys.backgroundImage,
         compound = _p$styleKeys.compound,
         pie = _p$styleKeys.pie;
-      var nodeKeys = [nodeBody, nodeBorder, backgroundImage, compound, pie].filter(function (k) {
+      var nodeKeys = [nodeBody, nodeBorder, nodeOutline, backgroundImage, compound, pie].filter(function (k) {
         return k != null;
       }).reduce(hashArrays, [DEFAULT_HASH_SEED, DEFAULT_HASH_SEED_ALT]);
       _p.nodeKey = combineHashesArray(nodeKeys);
@@ -17241,9 +17298,6 @@ module.exports = register;
       var toVal = getVal(prop);
       self.checkTriggers(ele, prop.name, fromVal, toVal);
     };
-    if (prop && prop.name.substr(0, 3) === 'pie') {
-      warn('The pie style properties are deprecated.  Create charts using background images instead.');
-    }
 
     // edge sanity checks to prevent the client from making serious mistakes
     if (parsedProp.name === 'curve-style' && ele.isEdge() && (
@@ -17588,11 +17642,16 @@ module.exports = register;
       // then dirty the pll edge bb cache as well
       if (
       // only for beziers -- so performance of other edges isn't affected
-      prop.triggersBoundsOfParallelBeziers && (name === 'curve-style' && (fromValue === 'bezier' || toValue === 'bezier') || name === 'display' && (fromValue === 'none' || toValue === 'none'))) {
+      prop.triggersBoundsOfParallelBeziers && name === 'curve-style' && (fromValue === 'bezier' || toValue === 'bezier')) {
         ele.parallelEdges().forEach(function (pllEdge) {
           if (pllEdge.isBundledBezier()) {
             pllEdge.dirtyBoundingBoxCache();
           }
+        });
+      }
+      if (prop.triggersBoundsOfConnectedEdges && name === 'display' && (fromValue === 'none' || toValue === 'none')) {
+        ele.connectedEdges().forEach(function (edge) {
+          edge.dirtyBoundingBoxCache();
         });
       }
     });
@@ -18314,6 +18373,12 @@ module.exports = register;
       arrowFill: {
         enums: ['filled', 'hollow']
       },
+      arrowWidth: {
+        number: true,
+        units: '%|px|em',
+        implicitUnits: 'px',
+        enums: ['match-line']
+      },
       display: {
         enums: ['element', 'none']
       },
@@ -18632,7 +18697,7 @@ module.exports = register;
       type: t.display,
       triggersZOrder: diff.any,
       triggersBounds: diff.any,
-      triggersBoundsOfParallelBeziers: true
+      triggersBoundsOfConnectedEdges: true
     }, {
       name: 'visibility',
       type: t.visibility,
@@ -18777,6 +18842,24 @@ module.exports = register;
     }, {
       name: 'border-style',
       type: t.borderStyle
+    }];
+    var nodeOutline = [{
+      name: 'outline-color',
+      type: t.color
+    }, {
+      name: 'outline-opacity',
+      type: t.zeroOneNumber
+    }, {
+      name: 'outline-width',
+      type: t.size,
+      triggersBounds: diff.any
+    }, {
+      name: 'outline-style',
+      type: t.borderStyle
+    }, {
+      name: 'outline-offset',
+      type: t.size,
+      triggersBounds: diff.any
     }];
     var backgroundImage = [{
       name: 'background-image',
@@ -19041,6 +19124,9 @@ module.exports = register;
     }, {
       name: 'arrow-fill',
       type: t.arrowFill
+    }, {
+      name: 'arrow-width',
+      type: t.arrowWidth
     }].forEach(function (prop) {
       arrowPrefixes.forEach(function (prefix) {
         var name = prefix + '-' + prop.name;
@@ -19053,7 +19139,7 @@ module.exports = register;
         });
       });
     }, {});
-    var props = styfn$2.properties = [].concat(behavior, transition, visibility, overlay, underlay, ghost, commonLabel, labelDimensions, mainLabel, sourceLabel, targetLabel, nodeBody, nodeBorder, backgroundImage, pie, compound, edgeLine, edgeArrow, core);
+    var props = styfn$2.properties = [].concat(behavior, transition, visibility, overlay, underlay, ghost, commonLabel, labelDimensions, mainLabel, sourceLabel, targetLabel, nodeBody, nodeBorder, nodeOutline, backgroundImage, pie, compound, edgeLine, edgeArrow, core);
     var propGroups = styfn$2.propertyGroups = {
       // common to all eles
       behavior: behavior,
@@ -19071,6 +19157,7 @@ module.exports = register;
       // node props
       nodeBody: nodeBody,
       nodeBorder: nodeBorder,
+      nodeOutline: nodeOutline,
       backgroundImage: backgroundImage,
       pie: pie,
       compound: compound,
@@ -19250,6 +19337,11 @@ module.exports = register;
       'border-opacity': 1,
       'border-width': 0,
       'border-style': 'solid',
+      'outline-color': '#999',
+      'outline-opacity': 1,
+      'outline-width': 0,
+      'outline-offset': 0,
+      'outline-style': 'solid',
       'height': 30,
       'width': 30,
       'shape': 'ellipse',
@@ -19331,6 +19423,9 @@ module.exports = register;
     }, {
       name: 'arrow-fill',
       value: 'filled'
+    }, {
+      name: 'arrow-width',
+      value: 1
     }].reduce(function (css, prop) {
       styfn$2.arrowPrefixes.forEach(function (prefix) {
         var name = prefix + '-' + prop.name;
@@ -30152,6 +30247,9 @@ var printLayoutInfo;
     var arrowClearFill = edge.pstyle(prefix + '-arrow-fill').value === 'hollow' ? 'both' : 'filled';
     var arrowFill = edge.pstyle(prefix + '-arrow-fill').value;
     var edgeWidth = edge.pstyle('width').pfValue;
+    var pArrowWidth = edge.pstyle(prefix + '-arrow-width');
+    var arrowWidth = pArrowWidth.value === 'match-line' ? edgeWidth : pArrowWidth.pfValue;
+    if (pArrowWidth.units === '%') arrowWidth *= edgeWidth;
     var edgeOpacity = edge.pstyle('opacity').value;
     if (opacity === undefined) {
       opacity = edgeOpacity;
@@ -30162,16 +30260,16 @@ var printLayoutInfo;
       context.globalCompositeOperation = 'destination-out';
       self.colorFillStyle(context, 255, 255, 255, 1);
       self.colorStrokeStyle(context, 255, 255, 255, 1);
-      self.drawArrowShape(edge, context, arrowClearFill, edgeWidth, arrowShape, x, y, angle);
+      self.drawArrowShape(edge, context, arrowClearFill, edgeWidth, arrowShape, arrowWidth, x, y, angle);
       context.globalCompositeOperation = gco;
     } // otherwise, the opaque arrow clears it for free :)
 
     var color = edge.pstyle(prefix + '-arrow-color').value;
     self.colorFillStyle(context, color[0], color[1], color[2], opacity);
     self.colorStrokeStyle(context, color[0], color[1], color[2], opacity);
-    self.drawArrowShape(edge, context, arrowFill, edgeWidth, arrowShape, x, y, angle);
+    self.drawArrowShape(edge, context, arrowFill, edgeWidth, arrowShape, arrowWidth, x, y, angle);
   };
-  CRp$8.drawArrowShape = function (edge, context, fill, edgeWidth, shape, x, y, angle) {
+  CRp$8.drawArrowShape = function (edge, context, fill, edgeWidth, shape, shapeWidth, x, y, angle) {
     var r = this;
     var usePaths = this.usePaths() && shape !== 'triangle-cross';
     var pathCacheHit = false;
@@ -30228,7 +30326,7 @@ var printLayoutInfo;
       }
     }
     if (fill === 'hollow' || fill === 'both') {
-      context.lineWidth = (shapeImpl.matchEdgeWidth ? edgeWidth : 1) / (usePaths ? size : 1);
+      context.lineWidth = shapeWidth / (usePaths ? size : 1);
       context.lineJoin = 'miter';
       if (usePaths) {
         context.stroke(path);
@@ -30777,6 +30875,11 @@ var printLayoutInfo;
     var borderColor = node.pstyle('border-color').value;
     var borderStyle = node.pstyle('border-style').value;
     var borderOpacity = node.pstyle('border-opacity').value * eleOpacity;
+    var outlineWidth = node.pstyle('outline-width').pfValue;
+    var outlineColor = node.pstyle('outline-color').value;
+    var outlineStyle = node.pstyle('outline-style').value;
+    var outlineOpacity = node.pstyle('outline-opacity').value * eleOpacity;
+    var outlineOffset = node.pstyle('outline-offset').value;
     context.lineJoin = 'miter'; // so borders are square with the node shape
 
     var setupShapeColor = function setupShapeColor() {
@@ -30787,25 +30890,40 @@ var printLayoutInfo;
       var bdrOpy = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : borderOpacity;
       r.colorStrokeStyle(context, borderColor[0], borderColor[1], borderColor[2], bdrOpy);
     };
+    var setupOutlineColor = function setupOutlineColor() {
+      var otlnOpy = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : outlineOpacity;
+      r.colorStrokeStyle(context, outlineColor[0], outlineColor[1], outlineColor[2], otlnOpy);
+    };
 
     //
     // setup shape
 
-    var styleShape = node.pstyle('shape').strValue;
-    var shapePts = node.pstyle('shape-polygon-points').pfValue;
-    if (usePaths) {
-      context.translate(pos.x, pos.y);
+    var getPath = function getPath(width, height, shape, points) {
       var pathCache = r.nodePathCache = r.nodePathCache || [];
-      var key = hashStrings(styleShape === 'polygon' ? styleShape + ',' + shapePts.join(',') : styleShape, '' + nodeHeight, '' + nodeWidth);
+      var key = hashStrings(shape === 'polygon' ? shape + ',' + points.join(',') : shape, '' + height, '' + width);
       var cachedPath = pathCache[key];
+      var path;
+      var cacheHit = false;
       if (cachedPath != null) {
         path = cachedPath;
-        pathCacheHit = true;
+        cacheHit = true;
         rs.pathCache = path;
       } else {
         path = new Path2D();
         pathCache[key] = rs.pathCache = path;
       }
+      return {
+        path: path,
+        cacheHit: cacheHit
+      };
+    };
+    var styleShape = node.pstyle('shape').strValue;
+    var shapePts = node.pstyle('shape-polygon-points').pfValue;
+    if (usePaths) {
+      context.translate(pos.x, pos.y);
+      var shapePath = getPath(nodeWidth, nodeHeight, styleShape, shapePts);
+      path = shapePath.path;
+      pathCacheHit = shapePath.cacheHit;
     }
     var drawShape = function drawShape() {
       if (!pathCacheHit) {
@@ -30916,6 +31034,115 @@ var printLayoutInfo;
         }
       }
     };
+    var drawOutline = function drawOutline() {
+      if (outlineWidth > 0) {
+        context.lineWidth = outlineWidth;
+        context.lineCap = 'butt';
+        if (context.setLineDash) {
+          // for very outofdate browsers
+          switch (outlineStyle) {
+            case 'dotted':
+              context.setLineDash([1, 1]);
+              break;
+            case 'dashed':
+              context.setLineDash([4, 2]);
+              break;
+            case 'solid':
+            case 'double':
+              context.setLineDash([]);
+              break;
+          }
+        }
+        var npos = pos;
+        if (usePaths) {
+          npos = {
+            x: 0,
+            y: 0
+          };
+        }
+        var shape = r.getNodeShape(node);
+        var scaleX = (nodeWidth + borderWidth + (outlineWidth + outlineOffset)) / nodeWidth;
+        var scaleY = (nodeHeight + borderWidth + (outlineWidth + outlineOffset)) / nodeHeight;
+        var sWidth = nodeWidth * scaleX;
+        var sHeight = nodeHeight * scaleY;
+        var points = r.nodeShapes[shape].points;
+        var _path;
+        if (usePaths) {
+          var outlinePath = getPath(sWidth, sHeight, shape, points);
+          _path = outlinePath.path;
+        }
+
+        // draw the outline path, either by using expanded points or by scaling 
+        // the dimensions, depending on shape
+        if (shape === "ellipse") {
+          r.drawEllipsePath(_path || context, npos.x, npos.y, sWidth, sHeight);
+        } else if (['round-diamond', 'round-heptagon', 'round-hexagon', 'round-octagon', 'round-pentagon', 'round-polygon', 'round-triangle', 'round-tag'].includes(shape)) {
+          var sMult = 0;
+          var offsetX = 0;
+          var offsetY = 0;
+          if (shape === 'round-diamond') {
+            sMult = (borderWidth + outlineOffset + outlineWidth) * 1.4;
+          } else if (shape === 'round-heptagon') {
+            sMult = (borderWidth + outlineOffset + outlineWidth) * 1.075;
+            offsetY = -(borderWidth / 2 + outlineOffset + outlineWidth) / 35;
+          } else if (shape === 'round-hexagon') {
+            sMult = (borderWidth + outlineOffset + outlineWidth) * 1.12;
+          } else if (shape === 'round-pentagon') {
+            sMult = (borderWidth + outlineOffset + outlineWidth) * 1.13;
+            offsetY = -(borderWidth / 2 + outlineOffset + outlineWidth) / 15;
+          } else if (shape === 'round-tag') {
+            sMult = (borderWidth + outlineOffset + outlineWidth) * 1.12;
+            offsetX = (borderWidth / 2 + outlineWidth + outlineOffset) * .07;
+          } else if (shape === 'round-triangle') {
+            sMult = (borderWidth + outlineOffset + outlineWidth) * (Math.PI / 2);
+            offsetY = -(borderWidth + outlineOffset / 2 + outlineWidth) / Math.PI;
+          }
+          if (sMult !== 0) {
+            scaleX = (nodeWidth + sMult) / nodeWidth;
+            scaleY = (nodeHeight + sMult) / nodeHeight;
+          }
+          r.drawRoundPolygonPath(_path || context, npos.x + offsetX, npos.y + offsetY, nodeWidth * scaleX, nodeHeight * scaleY, points);
+        } else if (['roundrectangle', 'round-rectangle'].includes(shape)) {
+          r.drawRoundRectanglePath(_path || context, npos.x, npos.y, sWidth, sHeight);
+        } else if (['cutrectangle', 'cut-rectangle'].includes(shape)) {
+          r.drawCutRectanglePath(_path || context, npos.x, npos.y, sWidth, sHeight);
+        } else if (['bottomroundrectangle', 'bottom-round-rectangle'].includes(shape)) {
+          r.drawBottomRoundRectanglePath(_path || context, npos.x, npos.y, sWidth, sHeight);
+        } else if (shape === "barrel") {
+          r.drawBarrelPath(_path || context, npos.x, npos.y, sWidth, sHeight);
+        } else if (shape.startsWith("polygon") || ['rhomboid', 'right-rhomboid', 'round-tag', 'tag', 'vee'].includes(shape)) {
+          var pad = (borderWidth + outlineWidth + outlineOffset) / nodeWidth;
+          points = joinLines(expandPolygon(points, pad));
+          r.drawPolygonPath(_path || context, npos.x, npos.y, nodeWidth, nodeHeight, points);
+        } else {
+          var _pad = (borderWidth + outlineWidth + outlineOffset) / nodeWidth;
+          points = joinLines(expandPolygon(points, -_pad));
+          r.drawPolygonPath(_path || context, npos.x, npos.y, nodeWidth, nodeHeight, points);
+        }
+        if (usePaths) {
+          context.stroke(_path);
+        } else {
+          context.stroke();
+        }
+        if (outlineStyle === 'double') {
+          context.lineWidth = borderWidth / 3;
+          var gco = context.globalCompositeOperation;
+          context.globalCompositeOperation = 'destination-out';
+          if (usePaths) {
+            context.stroke(_path);
+          } else {
+            context.stroke();
+          }
+          context.globalCompositeOperation = gco;
+        }
+
+        // reset in case we changed the border style
+        if (context.setLineDash) {
+          // for very outofdate browsers
+          context.setLineDash([]);
+        }
+      }
+    };
     var drawOverlay = function drawOverlay() {
       if (shouldDrawOverlay) {
         r.drawNodeOverlay(context, node, pos, nodeWidth, nodeHeight);
@@ -30936,6 +31163,8 @@ var printLayoutInfo;
       var ghostOpacity = node.pstyle('ghost-opacity').value;
       var effGhostOpacity = ghostOpacity * eleOpacity;
       context.translate(gx, gy);
+      setupOutlineColor();
+      drawOutline();
       setupShapeColor(ghostOpacity * bgOpacity);
       drawShape();
       drawImages(effGhostOpacity, true);
@@ -30953,6 +31182,8 @@ var printLayoutInfo;
     if (usePaths) {
       context.translate(pos.x, pos.y);
     }
+    setupOutlineColor();
+    drawOutline();
     setupShapeColor();
     drawShape();
     drawImages(eleOpacity, true);
@@ -32567,7 +32798,7 @@ var printLayoutInfo;
     return style;
   };
 
-  var version = "3.27.0";
+  var version = "3.28.0";
 
   var cytoscape = function cytoscape(options) {
     // if no options specified, use default
