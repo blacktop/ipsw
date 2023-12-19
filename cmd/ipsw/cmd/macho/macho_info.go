@@ -100,6 +100,29 @@ func init() {
 	machoInfoCmd.Flags().BoolP("fixups", "u", false, "Print fixup chains")
 	machoInfoCmd.Flags().BoolP("split-seg", "g", false, "Print split seg info")
 	machoInfoCmd.Flags().StringP("fileset-entry", "t", "", "Which fileset entry to analyze")
+	machoInfoCmd.RegisterFlagCompletionFunc("fileset-entry", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if ok, _ := magic.IsMachO(args[0]); ok {
+			var m *macho.File
+			fat, err := macho.OpenFat(args[0])
+			if err == nil {
+				m = fat.Arches[0].File
+			}
+			if err == macho.ErrNotFat {
+				m, err = macho.Open(args[0])
+				if err != nil {
+					return nil, cobra.ShellCompDirectiveNoFileComp
+				}
+			}
+			if m.FileTOC.FileHeader.Type == types.MH_FILESET {
+				var filesetEntries []string
+				for _, fe := range m.FileSets() {
+					filesetEntries = append(filesetEntries, fe.EntryID)
+				}
+				return filesetEntries, cobra.ShellCompDirectiveNoFileComp
+			}
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	})
 	machoInfoCmd.Flags().BoolP("extract-fileset-entry", "x", false, "Extract the fileset entry")
 	machoInfoCmd.Flags().BoolP("all-fileset-entries", "z", false, "Parse all fileset entries")
 	machoInfoCmd.Flags().Bool("dump-cert", false, "Dump the certificate")
