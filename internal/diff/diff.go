@@ -17,6 +17,7 @@ import (
 	"github.com/blacktop/ipsw/internal/commands/dwarf"
 	"github.com/blacktop/ipsw/internal/commands/ent"
 	"github.com/blacktop/ipsw/internal/commands/extract"
+	kcmd "github.com/blacktop/ipsw/internal/commands/kernel"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/utils"
 	"github.com/blacktop/ipsw/pkg/dyld"
@@ -68,7 +69,7 @@ type Diff struct {
 	Old Context
 	New Context
 
-	Kexts   string
+	Kexts   *mcmd.MachoDiff
 	KDKs    string
 	Ents    string
 	Dylibs  *mcmd.MachoDiff
@@ -305,47 +306,56 @@ func (d *Diff) parseKernelcache() error {
 		break // just use first kernelcache for now
 	}
 
-	m, err := macho.Open(d.Old.Kernel.Path)
+	m1, err := macho.Open(d.Old.Kernel.Path)
 	if err != nil {
 		return fmt.Errorf("failed to open kernelcache: %v", err)
 	}
-	d.Old.Kernel.Version, err = kernelcache.GetVersion(m)
+	d.Old.Kernel.Version, err = kernelcache.GetVersion(m1)
 	if err != nil {
 		return fmt.Errorf("failed to get kernelcache version: %v", err)
 	}
-	m.Close()
+	defer m1.Close()
 
-	m, err = macho.Open(d.New.Kernel.Path)
+	m2, err := macho.Open(d.New.Kernel.Path)
 	if err != nil {
 		return fmt.Errorf("failed to open kernelcache: %v", err)
 	}
-	d.New.Kernel.Version, err = kernelcache.GetVersion(m)
+	d.New.Kernel.Version, err = kernelcache.GetVersion(m2)
 	if err != nil {
 		return fmt.Errorf("failed to get kernelcache version: %v", err)
 	}
-	m.Close()
+	defer m2.Close()
 
-	// diff kexts
-	d.Old.Kernel.Kexts, err = kernelcache.KextList(d.Old.Kernel.Path, true)
+	d.Kexts, err = kcmd.Diff(m1, m2, &mcmd.DiffConfig{
+		Markdown: true,
+		Color:    false,
+		DiffTool: "git",
+	})
 	if err != nil {
 		return err
 	}
-	d.New.Kernel.Kexts, err = kernelcache.KextList(d.New.Kernel.Path, true)
-	if err != nil {
-		return err
-	}
-	out, err := utils.GitDiff(
-		strings.Join(d.Old.Kernel.Kexts, "\n")+"\n",
-		strings.Join(d.New.Kernel.Kexts, "\n")+"\n",
-		&utils.GitDiffConfig{Color: false, Tool: "git"})
-	if err != nil {
-		return err
-	}
-	if len(out) == 0 {
-		d.Kexts = "- No differences found"
-	} else {
-		d.Kexts = "```diff\n" + out + "\n```"
-	}
+
+	// // diff kexts
+	// d.Old.Kernel.Kexts, err = kernelcache.KextList(d.Old.Kernel.Path, true)
+	// if err != nil {
+	// 	return err
+	// }
+	// d.New.Kernel.Kexts, err = kernelcache.KextList(d.New.Kernel.Path, true)
+	// if err != nil {
+	// 	return err
+	// }
+	// out, err := utils.GitDiff(
+	// 	strings.Join(d.Old.Kernel.Kexts, "\n")+"\n",
+	// 	strings.Join(d.New.Kernel.Kexts, "\n")+"\n",
+	// 	&utils.GitDiffConfig{Color: false, Tool: "git"})
+	// if err != nil {
+	// 	return err
+	// }
+	// if len(out) == 0 {
+	// 	d.Kexts = "- No differences found"
+	// } else {
+	// 	d.Kexts = "```diff\n" + out + "\n```"
+	// }
 
 	return nil
 }
