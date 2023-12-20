@@ -117,7 +117,7 @@ var dyldExtractCmd = &cobra.Command{
 	Use:     "extract <DSC> <DYLIB>",
 	Aliases: []string{"e"},
 	Short:   "Extract dylib from dyld_shared_cache",
-	Args:    cobra.ExactArgs(2),
+	Args:    cobra.MinimumNArgs(1),
 	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 1 {
 			return getImages(args[0]), cobra.ShellCompDirectiveDefault
