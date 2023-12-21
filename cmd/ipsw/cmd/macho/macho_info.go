@@ -23,7 +23,6 @@ package macho
 
 import (
 	"bytes"
-	"cmp"
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/json"
@@ -43,7 +42,6 @@ import (
 	cstypes "github.com/blacktop/go-macho/pkg/codesign/types"
 	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
-	"github.com/blacktop/go-macho/types/objc"
 	"github.com/blacktop/ipsw/internal/certs"
 	mcmd "github.com/blacktop/ipsw/internal/commands/macho"
 	"github.com/blacktop/ipsw/internal/demangle"
@@ -740,143 +738,18 @@ var machoInfoCmd = &cobra.Command{
 				fmt.Println("===========")
 			}
 			if m.HasObjC() {
-				if info, err := m.GetObjCImageInfo(); err == nil {
-					fmt.Println(info.Flags)
-				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-					log.Error(err.Error())
+				o, err := mcmd.NewObjC(m, nil, &mcmd.ObjcConfig{
+					Verbose:  viper.GetBool("verbose"),
+					Addrs:    true,
+					ObjcRefs: showObjcRefs,
+					Color:    viper.GetBool("color") && !viper.GetBool("no-color"),
+					Theme:    "nord",
+				})
+				if err != nil {
+					return fmt.Errorf("failed to create ObjC object: %v", err)
 				}
-				if verbose {
-					fmt.Println(m.GetObjCToc())
-				}
-				if protos, err := m.GetObjCProtocols(); err == nil {
-					slices.SortStableFunc(protos, func(a, b objc.Protocol) int {
-						return cmp.Compare(a.Name, b.Name)
-					})
-					seen := make(map[uint64]bool)
-					for _, proto := range protos {
-						if _, ok := seen[proto.Ptr]; !ok { // prevent displaying duplicates
-							if verbose {
-								if color {
-									quick.Highlight(os.Stdout, swift.DemangleBlob(proto.Verbose()), "objc", "terminal256", "nord")
-									quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
-								} else {
-									fmt.Println(swift.DemangleBlob(proto.Verbose()))
-								}
-							} else {
-								if color {
-									quick.Highlight(os.Stdout, proto.String()+"\n", "objc", "terminal256", "nord")
-								} else {
-									fmt.Println(proto.String())
-								}
-							}
-							seen[proto.Ptr] = true
-						}
-					}
-				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-					log.Error(err.Error())
-				}
-				if classes, err := m.GetObjCClasses(); err == nil {
-					slices.SortStableFunc(classes, func(a, b objc.Class) int {
-						return cmp.Compare(a.Name, b.Name)
-					})
-					for _, class := range classes {
-						if verbose {
-							if color {
-								quick.Highlight(os.Stdout, swift.DemangleBlob(class.Verbose()), "objc", "terminal256", "nord")
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
-							} else {
-								fmt.Println(swift.DemangleBlob(class.Verbose()))
-							}
-						} else {
-							if color {
-								quick.Highlight(os.Stdout, class.String()+"\n", "objc", "terminal256", "nord")
-							} else {
-								fmt.Println(class.String())
-							}
-						}
-					}
-				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-					log.Error(err.Error())
-				}
-				if cats, err := m.GetObjCCategories(); err == nil {
-					slices.SortStableFunc(cats, func(a, b objc.Category) int {
-						return cmp.Compare(a.Name, b.Name)
-					})
-					for _, cat := range cats {
-						if verbose {
-							if color {
-								quick.Highlight(os.Stdout, swift.DemangleBlob(cat.Verbose()), "objc", "terminal256", "nord")
-								quick.Highlight(os.Stdout, "\n/****************************************/\n\n", "objc", "terminal256", "nord")
-							} else {
-								fmt.Println(swift.DemangleBlob(cat.Verbose()))
-							}
-						} else {
-							if color {
-								quick.Highlight(os.Stdout, cat.String()+"\n", "objc", "terminal256", "nord")
-							} else {
-								fmt.Println(cat.String())
-							}
-						}
-					}
-				} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-					log.Error(err.Error())
-				}
-				if showObjcRefs {
-					if protRefs, err := m.GetObjCProtoReferences(); err == nil {
-						fmt.Printf("\n@protocol refs\n")
-						for off, prot := range protRefs {
-							fmt.Printf("0x%011x => 0x%011x: %s\n", off, prot.Ptr, prot.Name)
-						}
-					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
-					}
-					if clsRefs, err := m.GetObjCClassReferences(); err == nil {
-						fmt.Printf("\n@class refs\n")
-						for off, cls := range clsRefs {
-							fmt.Printf("0x%011x => 0x%011x: %s\n", off, cls.ClassPtr, cls.Name)
-							// if verbose{
-							// 	fmt.Println(cls.Verbose())
-							// } else {
-							// 	fmt.Println(cls.String())
-							// }
-						}
-					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
-					}
-					if supRefs, err := m.GetObjCSuperReferences(); err == nil {
-						fmt.Printf("\n@super refs\n")
-						for off, sup := range supRefs {
-							fmt.Printf("0x%011x => 0x%011x: %s\n", off, sup.ClassPtr, sup.Name)
-						}
-					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
-					}
-					if selRefs, err := m.GetObjCSelectorReferences(); err == nil {
-						fmt.Printf("\n@selectors refs\n")
-						for off, sel := range selRefs {
-							fmt.Printf("0x%011x => 0x%011x: %s\n", off, sel.VMAddr, sel.Name)
-						}
-					} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-						log.Error(err.Error())
-					}
-					if verbose {
-						if classes, err := m.GetObjCClassNames(); err == nil {
-							fmt.Printf("\n@objc_classname\n")
-							for vmaddr, className := range classes {
-								fmt.Printf("0x%011x: %s\n", vmaddr, className)
-							}
-						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-							log.Error(err.Error())
-						}
-						if methods, err := m.GetObjCMethodNames(); err == nil {
-							fmt.Printf("\n@objc_methname\n")
-							for vmaddr, method := range methods {
-								fmt.Printf("0x%011x: %s\n", vmaddr, method)
-							}
-						} else if !errors.Is(err, macho.ErrObjcSectionNotFound) {
-							log.Error(err.Error())
-						}
-					}
+				if err := o.Dump(); err != nil {
+					return fmt.Errorf("failed to dump objc data: %v", err)
 				}
 			} else {
 				fmt.Println("  - no objc")
