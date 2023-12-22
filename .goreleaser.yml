@@ -798,7 +798,7 @@ winget:
 #     license_url: https://github.com/blacktop/ipsw/blob/master/LICENSE
 #     authors: blacktop
 #     release_notes: "https://github.com/blacktop/ipsw/releases/tag/v{{ .Version }}"
-#     copyright: 2018-2023 blacktop
+#     copyright: 2018-2024 blacktop
 #     project_source_url: https://github.com/blacktop/ipsw
 #     docs_url: https://blacktop.github.io/ipsw/
 #     summary: iOS/macOS Research Swiss Army Knife
