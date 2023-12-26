@@ -33,7 +33,7 @@ require (
 	github.com/glebarez/sqlite v1.10.0
 	github.com/gocolly/colly/v2 v2.1.0
 	github.com/golang-jwt/jwt/v5 v5.2.0
-	github.com/gomarkdown/markdown v0.0.0-20231115200524-a660076da3fd
+	github.com/gomarkdown/markdown v0.0.0-20231222211730-1d6d20845b47
 	github.com/google/gousb v1.1.2
 	github.com/google/uuid v1.5.0
 	github.com/hashicorp/go-version v1.6.0
@@ -52,7 +52,7 @@ require (
 	github.com/vbauerster/mpb/v7 v7.5.3
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8
 	golang.org/x/crypto v0.17.0
-	golang.org/x/exp v0.0.0-20231219180239-dc181d75b848
+	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b
 	golang.org/x/net v0.19.0
 	golang.org/x/oauth2 v0.15.0
 	golang.org/x/sync v0.5.0
