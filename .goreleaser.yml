@@ -503,6 +503,8 @@ aurs:
     backup:
       - etc/ipsw.conf
     package: |-
+      cd ipsw_${pkgver}_linux_${CHOST%%-*}
+
       # bin
       install -Dm755 "./ipsw" "${pkgdir}/usr/bin/ipsw"
 
@@ -519,6 +521,41 @@ aurs:
 
       # man pages
       install -Dm644 "./manpages/ipsw.1.gz" "${pkgdir}/usr/share/man/man1/ipsw.1.gz"
+
+      # config
+      mkdir -p "${pkgdir}/etc"
+      install -Dm644 "./config.example.yml" "${pkgdir}/etc/ipsw.conf"
+  - ids:
+      - daemon_archive
+    name: ipswd
+    homepage: https://github.com/blacktop/ipsw
+    description: ipsw - Daemon
+    maintainers:
+      - "Blacktop <https://github.com/blacktop>"
+    license: MIT
+    private_key: /Users/blacktop/.ssh/aur
+    git_url: "ssh://aur@aur.archlinux.org/ipswd-bin.git"
+    backup:
+      - etc/ipsw.conf
+    package: |-
+      cd ipswd_${pkgver}_linux_${CHOST%%-*}
+
+      # bin
+      install -Dm755 "./ipswd" "${pkgdir}/usr/bin/ipswd"
+
+      # license
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/ipswd/LICENSE"
+
+      # completions
+      mkdir -p "${pkgdir}/usr/share/bash-completion/completions/"
+      mkdir -p "${pkgdir}/usr/share/zsh/site-functions/"
+      mkdir -p "${pkgdir}/usr/share/fish/vendor_completions.d/"
+      install -Dm644 "./completions/ipswd/_bash" "${pkgdir}/usr/share/bash-completion/completions/ipswd"
+      install -Dm644 "./completions/ipswd/_zsh" "${pkgdir}/usr/share/zsh/site-functions/_ipswd"
+      install -Dm644 "./completions/ipswd/_fish" "${pkgdir}/usr/share/fish/vendor_completions.d/ipswd.fish"
+
+      # man pages
+      install -Dm644 "./manpages/ipswd.1.gz" "${pkgdir}/usr/share/man/man1/ipswd.1.gz"
 
       # config
       mkdir -p "${pkgdir}/etc"
