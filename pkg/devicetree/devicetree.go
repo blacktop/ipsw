@@ -239,7 +239,6 @@ type PmapIORange struct {
 }
 
 func (p *PmapIORange) MarshalJSON() ([]byte, error) {
-	slices.Reverse(p.Name[:])
 	return json.Marshal(&struct {
 		Start uint64 `json:"start,omitempty"`
 		Size  uint64 `json:"size,omitempty"`
@@ -265,6 +264,7 @@ func parsePmapIORanges(value []byte) any {
 			}
 			return parseValue(value)
 		}
+		slices.Reverse(pmap.Name[:])
 		ranges = append(ranges, pmap)
 	}
 	return ranges
