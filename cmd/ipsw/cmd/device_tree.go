@@ -26,8 +26,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	// "sort"
 
@@ -38,6 +36,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func init() {
@@ -50,6 +49,10 @@ func init() {
 	deviceTreeCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return []string{"im4p"}, cobra.ShellCompDirectiveFilterFileExt
 	}
+	viper.BindPFlag("dtree.proxy", deviceTreeCmd.Flags().Lookup("proxy"))
+	viper.BindPFlag("dtree.insecure", deviceTreeCmd.Flags().Lookup("insecure"))
+	viper.BindPFlag("dtree.json", deviceTreeCmd.Flags().Lookup("json"))
+	viper.BindPFlag("dtree.remote", deviceTreeCmd.Flags().Lookup("remote"))
 }
 
 // deviceTreeCmd represents the deviceTree command
@@ -60,55 +63,25 @@ var deviceTreeCmd = &cobra.Command{
 	Args:          cobra.MinimumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, args []string) (err error) {
 
 		if Verbose {
 			log.SetLevel(log.DebugLevel)
 		}
 
-		// settings
-		proxy, _ := cmd.Flags().GetString("proxy")
-		insecure, _ := cmd.Flags().GetBool("insecure")
-		// flags
-		remoteFlag, _ := cmd.Flags().GetBool("remote")
-		asJSON, _ := cmd.Flags().GetBool("json")
+		dtrees := make(map[string]*devicetree.DeviceTree)
 
-		if remoteFlag {
+		if viper.GetBool("dtree.remote") {
 			zr, err := download.NewRemoteZipReader(args[0], &download.RemoteConfig{
-				Proxy:    proxy,
-				Insecure: insecure,
+				Proxy:    viper.GetString("dtree.proxy"),
+				Insecure: viper.GetBool("dtree.insecure"),
 			})
 			if err != nil {
-				return errors.Wrap(err, "failed to create new remote zip reader")
+				return fmt.Errorf("failed to download DeviceTree: %v", err)
 			}
-			dtrees, err := devicetree.ParseZipFiles(zr.File)
+			dtrees, err = devicetree.ParseZipFiles(zr.File)
 			if err != nil {
 				return errors.Wrap(err, "failed to extract DeviceTree")
-			}
-			if asJSON {
-				for fileName, dtree := range dtrees {
-					j, err := json.Marshal(dtree)
-					if err != nil {
-						return err
-					}
-					fileName = strings.TrimSuffix(fileName, filepath.Ext(fileName))
-					err = os.WriteFile(fileName+".json", j, 0660)
-					if err != nil {
-						return errors.Wrap(err, "failed to decompress kernelcache")
-					}
-				}
-			} else {
-				// sort.Sort(dtrees)
-				for fileName, dtree := range dtrees {
-					utils.Indent(log.Info, 1)(fileName)
-					s, err := dtree.Summary()
-					if err != nil {
-						return errors.Wrap(err, "failed to parse device-tree")
-					}
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
-					utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
-				}
 			}
 		} else {
 			content, err := os.ReadFile(args[0])
@@ -129,21 +102,25 @@ var deviceTreeCmd = &cobra.Command{
 				}
 			}
 
-			if asJSON {
-				// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
-				// jq '.[ "device-tree" ].compatible'
-				// jq '.[ "device-tree" ].model'
-				j, err := json.Marshal(dtree)
-				if err != nil {
-					return err
-				}
+			dtrees[args[0]] = dtree
+		}
 
-				fmt.Println(string(j))
-			} else {
+		if viper.GetBool("dtree.json") {
+			// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
+			// jq '.[ "device-tree" ].compatible'
+			// jq '.[ "device-tree" ].model'
+			j, err := json.Marshal(dtrees)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(j))
+		} else {
+			for name, dtree := range dtrees {
 				s, err := dtree.Summary()
 				if err != nil {
 					return errors.Wrap(err, "failed to parse device-tree")
 				}
+				log.Infof("DeviceTree: %s", name)
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
