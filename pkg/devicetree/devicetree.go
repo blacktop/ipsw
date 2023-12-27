@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
+	"slices"
 	"time"
 
 	"fmt"
@@ -40,7 +42,7 @@ type NodeProperty struct {
 }
 
 // Properties object
-type Properties map[string]interface{}
+type Properties map[string]any
 
 // DeviceTree object
 type DeviceTree map[string]Properties
@@ -199,7 +201,7 @@ func (dtree *DeviceTree) GetModel() (string, error) {
 	return "", fmt.Errorf("failed to get model")
 }
 
-func parseValue(value []byte) interface{} {
+func parseValue(value []byte) any {
 	// remove trailing NULLs
 	value = bytes.TrimRight(value[:], "\x00")
 	// value is a string
@@ -229,6 +231,45 @@ func parseValue(value []byte) interface{} {
 	return base64.StdEncoding.EncodeToString(value)
 }
 
+type PmapIORange struct {
+	Start uint64
+	Size  uint64
+	Flags uint32
+	Name  [4]byte
+}
+
+func (p *PmapIORange) MarshalJSON() ([]byte, error) {
+	slices.Reverse(p.Name[:])
+	return json.Marshal(&struct {
+		Start uint64 `json:"start,omitempty"`
+		Size  uint64 `json:"size,omitempty"`
+		Flags uint32 `json:"flags,omitempty"`
+		Name  string `json:"name,omitempty"`
+	}{
+		Start: p.Start,
+		Size:  p.Size,
+		Flags: p.Flags,
+		Name:  string(p.Name[:]),
+	})
+}
+
+func parsePmapIORanges(value []byte) any {
+	var ranges []PmapIORange
+	r := bytes.NewReader(value)
+	for {
+		var pmap PmapIORange
+		err := binary.Read(r, binary.LittleEndian, &pmap)
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return parseValue(value)
+		}
+		ranges = append(ranges, pmap)
+	}
+	return ranges
+}
+
 func parseNode(buffer io.Reader) (Node, error) {
 	var node Node
 	// Read a Node from the buffer
@@ -238,7 +279,7 @@ func parseNode(buffer io.Reader) (Node, error) {
 	return node, nil
 }
 
-func parseNodeProperty(buffer io.Reader) (string, interface{}, error) {
+func parseNodeProperty(buffer io.Reader) (string, any, error) {
 	var nProp NodeProperty
 	// Read a NodeProperty from the buffer
 	if err := binary.Read(buffer, binary.LittleEndian, &nProp); err != nil {
@@ -256,7 +297,13 @@ func parseNodeProperty(buffer io.Reader) (string, interface{}, error) {
 	}
 
 	key := string(bytes.TrimRight(nProp.Name[:], "\x00"))
-	value := parseValue(dat)
+	var value any
+	switch key {
+	case "pmap-io-ranges":
+		value = parsePmapIORanges(dat)
+	default:
+		value = parseValue(dat)
+	}
 
 	return key, value, nil
 }
