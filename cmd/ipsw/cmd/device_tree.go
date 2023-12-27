@@ -105,22 +105,22 @@ var deviceTreeCmd = &cobra.Command{
 			dtrees[args[0]] = dtree
 		}
 
-		if viper.GetBool("dtree.json") {
-			// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
-			// jq '.[ "device-tree" ].compatible'
-			// jq '.[ "device-tree" ].model'
-			j, err := json.Marshal(dtrees)
-			if err != nil {
-				return err
-			}
-			fmt.Println(string(j))
-		} else {
-			for name, dtree := range dtrees {
+		for name, dtree := range dtrees {
+			log.Infof("DeviceTree: %s", name)
+			if viper.GetBool("dtree.json") {
+				// jq '.[ "device-tree" ].children [] | select(.product != null) | .product."product-name"'
+				// jq '.[ "device-tree" ].compatible'
+				// jq '.[ "device-tree" ].model'
+				j, err := json.Marshal(dtree)
+				if err != nil {
+					return err
+				}
+				fmt.Println(string(j))
+			} else {
 				s, err := dtree.Summary()
 				if err != nil {
 					return errors.Wrap(err, "failed to parse device-tree")
 				}
-				log.Infof("DeviceTree: %s", name)
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Model: %s", s.ProductType))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Board Config: %s", s.BoardConfig))
 				utils.Indent(log.Info, 2)(fmt.Sprintf("Product Name: %s", s.ProductName))
