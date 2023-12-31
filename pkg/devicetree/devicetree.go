@@ -201,34 +201,111 @@ func (dtree *DeviceTree) GetModel() (string, error) {
 	return "", fmt.Errorf("failed to get model")
 }
 
+func isZero(bytes []byte) bool {
+	b := byte(0)
+	for _, s := range bytes {
+		b |= s
+	}
+	return b == 0
+}
+
 func parseValue(value []byte) any {
-	// remove trailing NULLs
-	value = bytes.TrimRight(value[:], "\x00")
-	// value is a string
-	if utils.IsASCII(string(value)) {
-		return string(value)
+	if len(value) == 0 {
+		return nil
 	}
-	parts := bytes.Split(value, []byte("\x00"))
-	// value is a string array
-	if len(parts) > 1 {
-		var values []string
-		for _, part := range parts {
-			if len(string(part)) > 0 {
-				if utils.IsASCII(string(part)) {
-					values = append(values, string(part))
-				} // else {
-				// 	values = append(values, base64.StdEncoding.EncodeToString(value))
-				// }
+
+	if !bytes.HasPrefix(value, []byte("\x00")) {
+		// remove trailing NULLs
+		str := bytes.TrimRight(value[:], "\x00")
+		// value is a string
+		if utils.IsASCII(string(str)) {
+			if len(str) == 0 && len(value) <= binary.Size(uint64(0)) { // detect 0 (not empty string)
+				if i, err := binary.Uvarint(value); err > 0 {
+					return i
+				}
 			}
+			return string(str)
 		}
-		return values
+		parts := bytes.Split(str, []byte("\x00"))
+		if len(parts) > 1 { // value is a string array
+			var values []string
+			for _, part := range parts {
+				if len(string(part)) > 0 {
+					if utils.IsASCII(string(part)) {
+						values = append(values, string(part))
+					} // else {
+					// 	values = append(values, base64.StdEncoding.EncodeToString(value))
+					// }
+				}
+			}
+			return values
+		}
 	}
-	if len(value) < 3 {
-		i, _ := binary.Uvarint(value)
-		return i
+
+	if isZero(value) {
+		return 0
+	}
+
+	switch len(value) {
+	case binary.Size(uint8(0)):
+		fallthrough
+	case binary.Size(uint16(0)):
+		if bytes.HasSuffix(value, []byte("\xff")) {
+			return int16(binary.LittleEndian.Uint16(value))
+		}
+		fallthrough
+	case binary.Size(uint32(0)):
+		if bytes.HasSuffix(value, []byte("\xff")) {
+			return int32(binary.LittleEndian.Uint32(value))
+		}
+		fallthrough
+	case binary.Size(uint64(0)):
+		if bytes.HasSuffix(value, []byte("\xff")) {
+			return int64(binary.LittleEndian.Uint64(value))
+		}
+		if i, err := binary.Uvarint(value); err > 0 {
+			return i
+		}
 	}
 	// value is data
 	return base64.StdEncoding.EncodeToString(value)
+}
+
+func parseReg(value []byte) any {
+	switch len(value) {
+	case binary.Size(pmgr_reg{}):
+		var reg pmgr_reg
+		if err := binary.Read(bytes.NewReader(value), binary.LittleEndian, &reg); err != nil {
+			return parseValue(value)
+		}
+		return reg
+	case binary.Size(uint32(0)):
+		var reg uint32
+		if err := binary.Read(bytes.NewReader(value), binary.LittleEndian, &reg); err != nil {
+			return parseValue(value)
+		}
+		return reg
+	default:
+		if len(value)%binary.Size(pmgr_reg{}) == 0 {
+			regs := make([]pmgr_reg, len(value)/binary.Size(pmgr_reg{}))
+			if err := binary.Read(bytes.NewReader(value), binary.LittleEndian, &regs); err != nil {
+				return parseValue(value)
+			}
+			return regs
+		}
+		return parseValue(value)
+	}
+}
+
+func parseAddr(value []byte) any {
+	if len(value) == binary.Size(uint64(0)) {
+		var addr uint64
+		if err := binary.Read(bytes.NewReader(value), binary.LittleEndian, &addr); err != nil {
+			return parseValue(value)
+		}
+		return addr
+	}
+	return parseValue(value)
 }
 
 type PmapIORange struct {
@@ -299,10 +376,22 @@ func parseNodeProperty(buffer io.Reader) (string, any, error) {
 	key := string(bytes.TrimRight(nProp.Name[:], "\x00"))
 	var value any
 	switch key {
+	case "platform-name":
+		value = string(bytes.TrimRight(dat[:], "\x00"))
 	case "pmap-io-ranges":
 		value = parsePmapIORanges(dat)
+	case "ps-regs":
+		value = parsePmgrMap(dat)
+	case "devices":
+		value = parsePmgrDevices(dat)
+	case "reg-private":
+		value = parseAddr(dat)
 	default:
-		value = parseValue(dat)
+		if key == "reg" {
+			value = parseReg(dat)
+		} else {
+			value = parseValue(dat)
+		}
 	}
 
 	return key, value, nil
