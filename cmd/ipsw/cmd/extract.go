@@ -133,6 +133,7 @@ var extractCmd = &cobra.Command{
 			Flatten:   viper.GetBool("extract.flat"),
 			Progress:  true,
 			Output:    viper.GetString("extract.output"),
+			JSON:      viper.GetBool("extract.json"),
 		}
 
 		if viper.GetBool("extract.remote") {
@@ -294,7 +295,13 @@ var extractCmd = &cobra.Command{
 			if err != nil {
 				return err
 			}
-			utils.Indent(log.Info, 2)("Created " + out)
+			if viper.GetBool("extract.json") {
+				fmt.Println(out)
+			} else {
+				if len(out) > 0 {
+					utils.Indent(log.Info, 2)("Created " + out)
+				}
+			}
 		}
 
 		if viper.GetBool("extract.sys-ver") {

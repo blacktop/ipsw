@@ -52,6 +52,8 @@ type Config struct {
 	Progress bool `json:"progress,omitempty"`
 	// output directory to write extracted files to
 	Output string `json:"output,omitempty"`
+	// output as JSON
+	JSON bool `json:"json,omitempty"`
 }
 
 func isURL(str string) bool {
@@ -353,6 +355,10 @@ func Keybags(c *Config) (fname string, err error) {
 	out, err := json.Marshal(kbags)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal im4p kbags: %v", err)
+	}
+
+	if c.JSON {
+		return string(out), nil
 	}
 
 	fname = filepath.Join(filepath.Join(filepath.Clean(c.Output), folder), "kbags.json")
