@@ -14,4 +14,4 @@ jobs:
           sudo snap install ipsw
       - name: Run ipsw watch WebKit/WebKit
         run: |
-          /snap/bin/ipsw watch --pattern 'Lockdown Mode' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} WebKit/WebKit
+          /snap/bin/ipsw watch --pattern '(?i)Lockdown Mode' --days 1 --api ${{ secrets.GITHUB_TOKEN }} --discord-id ${{ secrets.DISCORD_ID }} --discord-token ${{ secrets.DISCORD_TOKEN }} WebKit/WebKit
