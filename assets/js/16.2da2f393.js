@@ -37,7 +37,7 @@ exports.modules = {
 /* harmony import */ var dayjs_plugin_advancedFormat_js__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(28734);
 /* harmony import */ var _mermaid_934d9bea_js__WEBPACK_IMPORTED_MODULE_7__ = __webpack_require__(36690);
 /* harmony import */ var d3__WEBPACK_IMPORTED_MODULE_5__ = __webpack_require__(64218);
-/* harmony import */ var dompurify__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(20683);
+/* harmony import */ var dompurify__WEBPACK_IMPORTED_MODULE_6__ = __webpack_require__(22424);
 
 
 
